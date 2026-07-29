@@ -8,6 +8,7 @@
 // Contas vêm de /api/gerenciamento/contas (select da conta vinculada).
 
 import { useState, useEffect, useMemo, useCallback } from 'react'
+import { useApi } from "@/src/lib/dados"
 
 type ContaRef = { id: number; nome: string; moeda?: string }
 type Carteira = {
@@ -51,11 +52,10 @@ async function jsonFetch(url: string, options: RequestInit = {}) {
   return data
 }
 
+// Identidade estável para a ausência de dados (evita recomputar memos).
+const SEM_ITENS: never[] = Object.freeze([]) as never[]
+
 export default function CarteirasTab() {
-  const [carteiras, setCarteiras] = useState<Carteira[]>([])
-  const [contas, setContas] = useState<ContaRef[]>([])
-  const [loading, setLoading] = useState(true)
-  const [erroLista, setErroLista] = useState<string | null>(null)
   const [busca, setBusca] = useState('')
 
   const [modalAberto, setModalAberto] = useState(false)
@@ -70,23 +70,21 @@ export default function CarteirasTab() {
   const [salvando, setSalvando] = useState(false)
   const [erroModal, setErroModal] = useState<string | null>(null)
 
+  // DUAS consultas independentes, cada uma com sua chave de cache — e é ganho:
+  // a lista de contas é compartilhada com outras telas, então vem do cache em vez
+  // de uma segunda requisição. Antes um Promise.all acoplava as duas e um erro em
+  // qualquer delas derrubava as duas.
+  const qCarteiras = useApi<{ carteiras?: Carteira[] }>('/api/gerenciamento/carteiras')
+  const qContas = useApi<{ contas?: ContaRef[] }>('/api/gerenciamento/contas')
+  const carteiras: Carteira[] = qCarteiras.dados?.carteiras ?? SEM_ITENS
+  const contas: ContaRef[] = qContas.dados?.contas ?? SEM_ITENS
+  const loading = qCarteiras.carregando
+  // O erro das CONTAS não bloqueia a tela — antes o `.catch(() => ({contas:[]}))`
+  // já expressava isso; aqui fica explícito.
+  const erroLista = qCarteiras.erro ? (qCarteiras.erro.message || 'Não foi possível carregar as carteiras.') : null
   const carregar = useCallback(async () => {
-    setLoading(true); setErroLista(null)
-    try {
-      const [dCart, dContas] = await Promise.all([
-        jsonFetch('/api/gerenciamento/carteiras', { cache: 'no-store' }),
-        jsonFetch('/api/gerenciamento/contas', { cache: 'no-store' }).catch(() => ({ contas: [] })),
-      ])
-      setCarteiras((dCart as any).carteiras || [])
-      setContas((dContas as any).contas || [])
-    } catch (e: any) {
-      setErroLista(e.message || 'Não foi possível carregar as carteiras.')
-    } finally {
-      setLoading(false)
-    }
-  }, [])
-
-  useEffect(() => { carregar() }, [carregar])
+    await Promise.all([qCarteiras.recarregar(), qContas.recarregar()])
+  }, [qCarteiras, qContas])
 
   const filtradas = useMemo(() => {
     const q = busca.trim().toLowerCase()
@@ -175,7 +173,7 @@ export default function CarteirasTab() {
       {!loading && erroLista && (
         <div className="rounded-lg border border-red-500/30 bg-red-500/10 p-4 text-sm text-red-200">
           {erroLista}
-          <button onClick={carregar} className="ml-3 underline hover:text-white">Tentar de novo</button>
+          <button onClick={() => void carregar()} className="ml-3 underline hover:text-white">Tentar de novo</button>
         </div>
       )}
 

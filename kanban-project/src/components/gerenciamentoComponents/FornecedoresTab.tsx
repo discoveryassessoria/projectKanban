@@ -8,6 +8,7 @@
 
 import { useState, useEffect, useMemo, useCallback } from 'react'
 import { CodigoPublicoField } from './CodigoPublicoField'
+import { useApi } from "@/src/lib/dados"
 
 type Fornecedor = {
   id: number
@@ -93,10 +94,10 @@ function Secao({ titulo, children, primeira }: { titulo: string; children: React
   )
 }
 
+// Identidade estável para a ausência de dados (evita recomputar memos).
+const SEM_ITENS: never[] = Object.freeze([]) as never[]
+
 export default function FornecedoresTab() {
-  const [fornecedores, setFornecedores] = useState<Fornecedor[]>([])
-  const [loading, setLoading] = useState(true)
-  const [erroLista, setErroLista] = useState<string | null>(null)
   const [busca, setBusca] = useState('')
 
   const [modalAberto, setModalAberto] = useState(false)
@@ -107,19 +108,12 @@ export default function FornecedoresTab() {
 
   const set = (k: keyof FormState, v: any) => setForm((f) => ({ ...f, [k]: v }))
 
-  const carregar = useCallback(async () => {
-    setLoading(true); setErroLista(null)
-    try {
-      const data = await jsonFetch('/api/gerenciamento/fornecedores', { cache: 'no-store' })
-      setFornecedores((data as any).fornecedores || [])
-    } catch (e: any) {
-      setErroLista(e.message || 'Não foi possível carregar os fornecedores.')
-    } finally {
-      setLoading(false)
-    }
-  }, [])
-
-  useEffect(() => { carregar() }, [carregar])
+  // Consulta em cache pela camada oficial (src/lib/dados): loading, erro,
+  // deduplicação e revalidação vêm dela. Some o par useState + useEffect de
+  // montagem, que era a origem do setState-em-efeito.
+  const { dados, carregando: loading, erro, recarregar: carregar } = useApi<{ fornecedores?: Fornecedor[] }>('/api/gerenciamento/fornecedores')
+  const fornecedores: Fornecedor[] = dados?.fornecedores ?? SEM_ITENS
+  const erroLista = erro ? (erro.message || 'Não foi possível carregar os fornecedores.') : null
 
   const filtrados = useMemo(() => {
     const q = busca.trim().toLowerCase()
@@ -212,7 +206,7 @@ export default function FornecedoresTab() {
       {!loading && erroLista && (
         <div className="rounded-lg border border-red-500/30 bg-red-500/10 p-4 text-sm text-red-200">
           {erroLista}
-          <button onClick={carregar} className="ml-3 underline hover:text-white">Tentar de novo</button>
+          <button onClick={() => void carregar()} className="ml-3 underline hover:text-white">Tentar de novo</button>
         </div>
       )}
 

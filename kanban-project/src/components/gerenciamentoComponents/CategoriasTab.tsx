@@ -9,6 +9,7 @@
 //   GET -> { categorias: [...], mestres: { tiposDocumento, servicos, honorarios, tiposProcesso } }
 
 import { useState, useEffect, useMemo, useCallback } from 'react'
+import { useApi } from "@/src/lib/dados"
 
 type MestreEmbed = { id: number; name: string; code?: string | null } | null
 type Categoria = {
@@ -79,11 +80,11 @@ async function jsonFetch(url: string, options: RequestInit = {}) {
   return data
 }
 
+// Identidade estável para a ausência de dados (evita recomputar memos).
+const SEM_ITENS: never[] = Object.freeze([]) as never[]
+
 export default function CategoriasTab() {
-  const [categorias, setCategorias] = useState<Categoria[]>([])
   const [mestres, setMestres] = useState<Mestres>(MESTRES_VAZIO)
-  const [loading, setLoading] = useState(true)
-  const [erroLista, setErroLista] = useState<string | null>(null)
   const [busca, setBusca] = useState('')
   const [filtroTipo, setFiltroTipo] = useState<'TODOS' | 'ENTRADA' | 'SAIDA'>('TODOS')
 
@@ -105,26 +106,12 @@ export default function CategoriasTab() {
   // categoria com mestre já vinculado → origem/mestre travados na edição
   const origemTravada = !!editando && editando.origem !== 'LEGADO'
 
-  const carregar = useCallback(async () => {
-    setLoading(true); setErroLista(null)
-    try {
-      const data = await jsonFetch('/api/gerenciamento/categorias', { cache: 'no-store' })
-      setCategorias((data as any).categorias || [])
-      const m = (data as any).mestres || {}
-      setMestres({
-        documento: (m.tiposDocumento || []).map((d: any) => ({ id: d.id, label: d.name, code: d.code ?? null })),
-        servico: (m.servicos || []).map((x: any) => ({ id: x.id, label: x.publicCode ? `${x.publicCode} — ${x.name}` : x.name, code: x.code ?? null })),
-        honorario: (m.honorarios || []).map((h: any) => ({ id: h.id, label: h.name, code: h.code ?? null })),
-        processo: (m.tiposProcesso || []).map((p: any) => ({ id: p.id, label: p.name, code: null })),
-      })
-    } catch (e: any) {
-      setErroLista(e.message || 'Não foi possível carregar as categorias.')
-    } finally {
-      setLoading(false)
-    }
-  }, [])
-
-  useEffect(() => { carregar() }, [carregar])
+  // Consulta em cache pela camada oficial (src/lib/dados): loading, erro,
+  // deduplicação e revalidação vêm dela. Some o par useState + useEffect de
+  // montagem, que era a origem do setState-em-efeito.
+  const { dados, carregando: loading, erro, recarregar: carregar } = useApi<{ categorias?: Categoria[] }>('/api/gerenciamento/categorias')
+  const categorias: Categoria[] = dados?.categorias ?? SEM_ITENS
+  const erroLista = erro ? (erro.message || 'Não foi possível carregar as categorias.') : null
 
   const filtradas = useMemo(() => {
     const q = busca.trim().toLowerCase()
@@ -256,7 +243,7 @@ export default function CategoriasTab() {
       {!loading && erroLista && (
         <div className="rounded-lg border border-red-500/30 bg-red-500/10 p-4 text-sm text-red-200">
           {erroLista}
-          <button onClick={carregar} className="ml-3 underline hover:text-white">Tentar de novo</button>
+          <button onClick={() => void carregar()} className="ml-3 underline hover:text-white">Tentar de novo</button>
         </div>
       )}
 
