@@ -1,6 +1,7 @@
 import { PrismaClient } from "@prisma/client"
 import { CODE_REGISTRY } from "./codigos/entity-registry"
-import { gerarCodigoPublico } from "./codigos/code-generator"
+import { gerarCodigoPublico, sincronizarSequenciaComTabela } from "./codigos/code-generator"
+import { escopoDe } from "./codigos/code-patterns"
 
 const globalForPrisma = globalThis as unknown as { prisma?: ReturnType<typeof buildPrisma>; prismaBase?: PrismaClient }
 
@@ -12,6 +13,15 @@ const base = globalForPrisma.prismaBase ?? new PrismaClient({ log: ["warn", "err
 // CODE_REGISTRY, sempre pelo CodeGeneratorService central. Uniforme p/ todas as entidades — nenhum
 // controller/serviço monta código. FAIL-SAFE: se a geração falhar, o create prossegue sem código
 // (backfill/reconciliação cobrem) — nunca derruba a criação da entidade.
+/** O erro é violação de UNIQUE no campo de código público? */
+function ehColisaoDeCodigo(e: unknown, campo: string): boolean {
+  const err = e as { code?: string; meta?: { target?: unknown } }
+  if (err?.code !== 'P2002') return false
+  const alvo = err?.meta?.target
+  const campos = Array.isArray(alvo) ? alvo.map(String) : typeof alvo === 'string' ? [alvo] : []
+  return campos.some((c) => c === campo || c.includes(campo))
+}
+
 function buildPrisma() {
   return base.$extends({
     query: {
@@ -19,14 +29,27 @@ function buildPrisma() {
         async create({ model, args, query }) {
           const cfg = CODE_REGISTRY[model as string]
           const data = args?.data as Record<string, unknown> | undefined
-          if (cfg && data && !Array.isArray(data)) {
-            // publicCode é SEMPRE gerado pelo backend: ignora qualquer valor enviado pelo cliente
-            // (nunca aceita código público informado) e é OBRIGATÓRIO — se a geração falhar, o
-            // create FALHA (sem fail-safe). Lacuna na sequência é aceitável; entidade sem código não.
+          if (!cfg || !data || Array.isArray(data)) return query(args)
+
+          // publicCode é SEMPRE gerado pelo backend: ignora qualquer valor enviado pelo cliente
+          // (nunca aceita código público informado) e é OBRIGATÓRIO — se a geração falhar, o
+          // create FALHA (sem fail-safe). Lacuna na sequência é aceitável; entidade sem código não.
+          delete data[cfg.campo]
+          data[cfg.campo] = await gerarCodigoPublico(base, cfg.entidade)
+          try {
+            return await query(args)
+          } catch (e) {
+            // AUTOCURA da sequência. Colidir no código público significa uma coisa só: o contador
+            // do escopo está ATRÁS dos códigos já gravados (limpeza que preservou registros e zerou
+            // CodeSequence, backfill que não avançou o contador...). Ressincroniza com o MAIOR
+            // código existente na tabela e tenta UMA vez. Não é esconder erro: é a sequência
+            // convergindo para a realidade — qualquer outra falha sobe intacta.
+            if (!ehColisaoDeCodigo(e, cfg.campo)) throw e
+            await sincronizarSequenciaComTabela(base, model as string, cfg.campo, escopoDe(cfg.entidade))
             delete data[cfg.campo]
             data[cfg.campo] = await gerarCodigoPublico(base, cfg.entidade)
+            return await query(args)
           }
-          return query(args)
         },
         // createMany: gera 1 código por linha (também obrigatório; ignora valor do cliente).
         async createMany({ model, args, query }) {

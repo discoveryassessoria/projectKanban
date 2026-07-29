@@ -52,3 +52,37 @@ export async function semearSequencia(db: DB, scope: string, ate: number): Promi
     DO UPDATE SET "ultimo" = GREATEST("CodeSequence"."ultimo", ${ate}), "atualizadoEm" = now()
   `
 }
+
+/**
+ * RESSINCRONIZA a sequência de um escopo com a REALIDADE da tabela.
+ *
+ * Existe porque a sequência e os dados podem divergir: uma limpeza/restauração
+ * que preserve registros mas zere `CodeSequence`, ou um backfill que grave
+ * códigos sem avançar o contador. Quando isso acontece, o gerador entrega um
+ * número já usado e o `create` estoura P2002 — foi exatamente o que derrubou a
+ * criação de usuários.
+ *
+ * Lê o MAIOR sufixo numérico já gravado na tabela para o prefixo do escopo e
+ * semeia a sequência nesse valor. Idempotente e monotônico (`semearSequencia`
+ * usa GREATEST): rodar de novo nunca retrocede nem reaproveita número.
+ *
+ * `tabela` e `campo` vêm SEMPRE do CODE_REGISTRY (constantes do próprio código),
+ * nunca de entrada externa; ainda assim são validados por allowlist antes de
+ * entrar no SQL.
+ */
+export async function sincronizarSequenciaComTabela(
+  db: DB, tabela: string, campo: string, scope: string,
+): Promise<number> {
+  if (!/^[A-Za-z][A-Za-z0-9_]*$/.test(tabela) || !/^[A-Za-z][A-Za-z0-9_]*$/.test(campo)) {
+    throw new Error(`Identificador inválido em sincronizarSequenciaComTabela: ${tabela}.${campo}`)
+  }
+  const rows = await db.$queryRawUnsafe<{ max: number | null }[]>(
+    `SELECT COALESCE(MAX(NULLIF(regexp_replace("${campo}", '^.*-', ''), '')::bigint), 0)::int AS max
+       FROM "${tabela}"
+      WHERE "${campo}" LIKE $1`,
+    `${scope}-%`,
+  )
+  const max = Number(rows?.[0]?.max ?? 0)
+  if (max > 0) await semearSequencia(db, scope, max)
+  return max
+}

@@ -50,13 +50,11 @@ export async function getUsers(search?: string): Promise<User[]> {
     ? `/api/usuarios?search=${encodeURIComponent(search)}&all=true`
     : '/api/usuarios?all=true'
   
-  try {
-    const data = await fetchWithAuth(url)
-    return data.usuarios || []
-  } catch (error) {
-    console.error("Erro ao buscar usuários:", error)
-    return []
-  }
+  // NÃO engolir a falha: devolver [] silenciosamente fazia a tela mostrar
+  // "nenhum usuário" quando o servidor tinha caído — o operador via uma lista
+  // vazia plausível em vez do problema real. O erro sobe e a tela o exibe.
+  const data = await fetchWithAuth(url)
+  return data.usuarios || []
 }
 
 // Criar novo usuário - PRECISA de autenticação de admin
@@ -67,27 +65,24 @@ export async function createUser(userData: User): Promise<User> {
     throw new Error("Você precisa estar autenticado para criar usuários")
   }
 
-  try {
-    const response = await fetch('/api/auth/register', {
-      method: 'POST',
-      headers: {
-        "Content-Type": "application/json",
-        "Authorization": `Bearer ${token}`,
-      },
-      body: JSON.stringify(userData),
-    })
+  const response = await fetch('/api/auth/register', {
+    method: 'POST',
+    headers: {
+      "Content-Type": "application/json",
+      "Authorization": `Bearer ${token}`,
+    },
+    body: JSON.stringify(userData),
+  })
 
-    const data = await response.json()
+  const data = await response.json().catch(() => ({}))
 
-    if (!response.ok) {
-      throw new Error(data.error || data.message || "Erro ao criar usuário")
-    }
-
-    return data.user || data.usuario
-  } catch (error: any) {
-    console.error("Erro ao criar usuário:", error)
-    throw error
+  if (!response.ok) {
+    if (response.status === 401) throw new Error("Sessão expirada. Faça login novamente.")
+    if (response.status === 403) throw new Error(data.error || "Você não tem permissão para criar usuários.")
+    throw new Error(data.error || data.message || `Não foi possível criar o usuário (HTTP ${response.status}).`)
   }
+
+  return data.user || data.usuario
 }
 
 // Atualizar usuário existente
