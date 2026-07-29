@@ -118,3 +118,39 @@ export function invalidar(prefixo: string): Promise<unknown> {
     { revalidate: true },
   )
 }
+
+/**
+ * ESCRITA (POST/PUT/PATCH/DELETE). Existe aqui porque a base tinha 24 cópias do
+ * mesmo `jsonFetch` local — cada tela reimplementando autenticação, parse e
+ * tratamento de erro. Mesma semântica das cópias que substitui: corpo em JSON,
+ * token do usuário, e erro com a mensagem que o servidor mandou.
+ *
+ * Não invalida nada sozinho: quem escreve sabe o que ficou obsoleto, então
+ * chama `invalidar(prefixo)` (ou o `recarregar()` da própria consulta) logo
+ * depois. Invalidação implícita esconde dependência.
+ */
+export async function enviar<T = unknown>(
+  chave: string,
+  opcoes: { metodo?: "POST" | "PUT" | "PATCH" | "DELETE"; corpo?: unknown } = {},
+): Promise<T> {
+  const { metodo = "POST", corpo } = opcoes
+  const res = await fetch(chave, {
+    method: metodo,
+    headers: { "Content-Type": "application/json", ...authHeaders() },
+    body: corpo === undefined ? undefined : JSON.stringify(corpo),
+  })
+  const dados = await res.json().catch(() => null)
+
+  if (res.status === 401) {
+    void encerrarSessao("token_invalido")
+    throw new ErroApi(401, "Sessão expirada.", dados)
+  }
+  if (!res.ok) {
+    const msg =
+      (dados && typeof dados === "object" && ("error" in dados || "erro" in dados)
+        ? String((dados as Record<string, unknown>).error ?? (dados as Record<string, unknown>).erro)
+        : null) ?? `Erro ${res.status}`
+    throw new ErroApi(res.status, msg, dados)
+  }
+  return dados as T
+}

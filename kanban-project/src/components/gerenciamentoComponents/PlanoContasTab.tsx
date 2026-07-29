@@ -7,6 +7,7 @@
 //   body { codigo, nome, tipo, natureza, ativo }
 
 import { useState, useEffect, useMemo, useCallback } from 'react'
+import { useApi } from "@/src/lib/dados"
 
 type PlanoConta = {
   id: number
@@ -45,10 +46,11 @@ async function jsonFetch(url: string, options: RequestInit = {}) {
   return data
 }
 
+// Identidade estável para a ausência de dados (evita recomputar memos).
+const SEM_ITENS: never[] = Object.freeze([]) as never[]
+
 export default function PlanoContasTab() {
   const [contas, setContas] = useState<PlanoConta[]>([])
-  const [loading, setLoading] = useState(true)
-  const [erroLista, setErroLista] = useState<string | null>(null)
   const [busca, setBusca] = useState('')
 
   const [modalAberto, setModalAberto] = useState(false)
@@ -60,19 +62,12 @@ export default function PlanoContasTab() {
   const [salvando, setSalvando] = useState(false)
   const [erroModal, setErroModal] = useState<string | null>(null)
 
-  const carregar = useCallback(async () => {
-    setLoading(true); setErroLista(null)
-    try {
-      const d = await jsonFetch('/api/gerenciamento/plano-contas', { cache: 'no-store' })
-      setContas((d as any).contas || [])
-    } catch (e: any) {
-      setErroLista(e.message || 'Não foi possível carregar o plano de contas.')
-    } finally {
-      setLoading(false)
-    }
-  }, [])
-
-  useEffect(() => { carregar() }, [carregar])
+  // Consulta em cache pela camada oficial (src/lib/dados): loading, erro,
+  // deduplicação e revalidação vêm dela. Some o par useState + useEffect de
+  // montagem, que era a origem do setState-em-efeito.
+  const { dados, carregando: loading, erro, recarregar: carregar } = useApi<{ contas?: PlanoConta[] }>('/api/gerenciamento/plano-contas')
+  const itens: PlanoConta[] = dados?.contas ?? SEM_ITENS
+  const erroLista = erro ? (erro.message || 'Não foi possível carregar o plano de contas.') : null
 
   const filtradas = useMemo(() => {
     const q = busca.trim().toLowerCase()
@@ -156,7 +151,7 @@ export default function PlanoContasTab() {
       {!loading && erroLista && (
         <div className="rounded-lg border border-red-500/30 bg-red-500/10 p-4 text-sm text-red-200">
           {erroLista}
-          <button onClick={carregar} className="ml-3 underline hover:text-white">Tentar de novo</button>
+          <button onClick={() => void carregar()} className="ml-3 underline hover:text-white">Tentar de novo</button>
         </div>
       )}
 
