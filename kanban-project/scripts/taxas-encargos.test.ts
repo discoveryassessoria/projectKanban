@@ -220,8 +220,14 @@ secao('Integração com o FinanceRuleEngine')
   for (const f of ['src/lib/motor/executor.ts', 'src/lib/motor/matriz-economica.ts']) {
     const src = readFileSync(join(RAIZ, f), 'utf8')
     ok(`${f} usa o ponto único`, src.includes('aplicarCondicaoPagamento'))
-    ok(`${f} persiste a condição aplicada`, src.includes('condicaoPagamentoId: ap.campos.condicaoPagamentoId'))
-    ok(`${f} persiste valor líquido`, src.includes('valorLiquido: ap.campos.valorLiquido'))
+    // V3-native: o motor não grava mais linhas legadas de Receita/Custo com
+    // condicaoPagamentoId/valorLiquido — nasce UMA ObrigacaoEconomica e o líquido
+    // (taxas/encargos) vive no Ledger. O que continua obrigatório é a condição
+    // aplicada ser RASTREÁVEL na obrigação e definir o vencimento.
+    ok(`${f} aplica a condição para CUSTO`, /aplicarCondicaoPagamento\(\{[^}]*natureza: 'CUSTO'/.test(src))
+    ok(`${f} usa a condição para definir o vencimento`, src.includes('vencimento: ap.data1'))
+    ok(`${f} deixa a condição aplicada auditável na obrigação`, src.includes('ap.resumo') && src.includes('observacoes'))
+    ok(`${f} não grava mais a linha legada de custo`, !src.includes('valorLiquido: ap.campos.valorLiquido'))
     ok(`${f} não monta parcelamento na mão`, !src.includes('gerarParcelas'))
   }
 

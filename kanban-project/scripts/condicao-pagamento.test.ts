@@ -6,7 +6,7 @@
 // Invariante testado em TODOS os cenários: a soma das parcelas fecha
 // exatamente o total contratado.
 // ============================================================================
-import { readFileSync } from 'node:fs'
+import { readFileSync, existsSync } from 'node:fs'
 import { join } from 'node:path'
 import {
   type CondicaoPagamentoView,
@@ -252,11 +252,16 @@ secao('FinanceRuleEngine consome a Condição de Pagamento')
   // internamente resolve a condição, gera o cronograma e calcula taxas/encargos.
   ok('executor usa o ponto único de aplicação', executor.includes('aplicarCondicaoPagamento'))
   ok('executor não chama mais gerarParcelas', !executor.includes('gerarParcelas'))
-  // ARQUITETURA base ÚNICA: o CUSTO ainda aplica a condição (cronograma/parcelas); a
-  // RECEITA virou CONTRATO puro — não nasce com parcelas/condição (isso vive na Cobrança).
-  ok('custo ainda aplica condição (nParcelas do cronograma)', executor.includes('nParcelas: ap.campos.nParcelas'))
+  // ARQUITETURA base ÚNICA: a RECEITA virou CONTRATO puro — não nasce com
+  // parcelas/condição (isso vive na Cobrança). E o CUSTO virou V3-native: UMA
+  // ObrigacaoEconomica A_PAGAR, com os pagamentos parciais no Ledger em vez de
+  // linhas de parcela. A condição continua sendo APLICADA — ela define o
+  // vencimento — e continua AUDITÁVEL, agora pelo resumo gravado na obrigação.
+  ok('custo aplica a condição pelo ponto único, para a natureza CUSTO', /aplicarCondicaoPagamento\(\{[^}]*natureza: 'CUSTO'/.test(executor))
+  ok('condição define o vencimento do custo (ap.data1)', executor.includes('vencimento: ap.data1'))
+  ok('condição aplicada fica auditável no custo (resumo na obrigação)', executor.includes('ap.resumo') && executor.includes('observacoes'))
+  ok('custo V3-native: UMA obrigação, sem linhas de parcela no lançamento', executor.includes('criarObrigacaoEconomicaComLedgerTx') && !executor.includes('nParcelas: ap.campos.nParcelas'))
   ok('Receita = contrato: motor NÃO gera parcelas/condição na receita', /a Receita é SÓ o CONTRATO/.test(executor))
-  ok('condição congelada no CUSTO', executor.includes('condicaoPagamentoId: ap.campos.condicaoPagamentoId'))
 
   const aplicar = readFileSync(join(RAIZ, 'lib/financeiro/aplicar-condicao.ts'), 'utf8')
   ok('ponto único usa o motor de cronograma', aplicar.includes('gerarCronograma'))
@@ -266,10 +271,15 @@ secao('FinanceRuleEngine consome a Condição de Pagamento')
   ok('matriz econômica usa o ponto único', matriz.includes('aplicarCondicaoPagamento'))
   ok('matriz não chama mais gerarParcelas', !matriz.includes('gerarParcelas'))
 
-  const reparcelar = readFileSync(join(RAIZ, 'src/app/api/financeiro/receitas/[id]/parcelas/route.ts'), 'utf8')
-  ok('reparcelamento aceita condição', reparcelar.includes('condicaoPagamentoId'))
-  ok('reparcelamento usa o motor', reparcelar.includes('gerarCronograma'))
-  ok('reparcelamento preserva o total', reparcelar.includes('Falha de arredondamento'))
+  // O reparcelamento da Receita deixou de existir como rota própria: na base ÚNICA
+  // a Receita é o contrato e QUEM parcela é a Cobrança. O invariante migrou junto.
+  ok('rota antiga de reparcelamento da Receita não existe', !existsSync(join(RAIZ, 'src/app/api/financeiro/receitas/[id]/parcelas/route.ts')))
+  const cobrancas = readFileSync(join(RAIZ, 'src/app/api/financeiro/receitas/[id]/cobrancas/route.ts'), 'utf8')
+  ok('parcelamento aceita condição (na Cobrança)', cobrancas.includes('condicaoPagamentoId'))
+  ok('parcelamento usa o motor (gerarCronograma)', cobrancas.includes('gerarCronograma'))
+  ok('parcelamento nunca altera a Receita (contrato intacto)', /Nunca altera a Receita/.test(cobrancas))
+  const cond = readFileSync(join(RAIZ, 'lib/financeiro/condicao-pagamento.ts'), 'utf8')
+  ok('cronograma preserva o total (soma exata é invariante do motor)', cond.includes('Falha de arredondamento'))
 
   const schema = readFileSync(join(RAIZ, 'prisma/schema.prisma'), 'utf8')
   ok('config financeira aponta para a condição', schema.includes('condicaoPagamentoId'))

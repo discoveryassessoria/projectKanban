@@ -392,7 +392,10 @@ async function criarCusto(pid: number, descricao: string, c: Congelado, v: Vinc)
   // documento continua garantida pela automaticKey do MotorArtefato (…::doc:<id>).
   const ap = await aplicarCondicaoPagamento({ configId: c.configId, natureza: 'CUSTO', moeda: String(c.moeda), valor: Number(c.valor), dataBase })
   const docRef = v.documentoId ? ` · doc#${v.documentoId}` : ''
-  const observacoes = `Custo do motor (Matriz)${docRef}: ${descricao}`.slice(0, 300)
+  // A condição APLICADA precisa ficar rastreável na própria obrigação — mesma
+  // regra do executor. Sem isto, custo nascido pela Matriz perdia a auditoria
+  // de qual condição definiu o vencimento.
+  const observacoes = `Custo do motor (Matriz)${docRef}: ${descricao}${ap.resumo}`.slice(0, 300)
   // V3-native: nasce DIRETO como ObrigacaoEconomica + Ledger. NÃO grava no model Custo legado.
   const { obrigacaoId } = await criarObrigacaoEconomicaComLedger({
     natureza: 'CUSTO', valorContratado: Number(c.valor), moedaContratual: String(c.moeda), codigoOperacional: codigo,
