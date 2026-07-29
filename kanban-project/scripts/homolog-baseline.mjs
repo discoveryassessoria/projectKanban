@@ -133,11 +133,20 @@ try {
   let idxUltimaRefletida = -1
   linhas.forEach((l, i) => { if (l.estado === 'REFLETIDA') idxUltimaRefletida = i })
   const cabeca = linhas.slice(0, idxUltimaRefletida + 1)
-  const cauda = linhas.slice(idxUltimaRefletida + 1)
+  // A cauda é o que AINDA NÃO foi aplicado. Uma migration já registrada em
+  // `_prisma_migrations` não é pendente por definição — mesmo que o parser não
+  // consiga classificá-la (SQL com bloco dollar-quoted, por exemplo). Sem esta
+  // regra, a primeira migration aplicada por um Preview derrubava todos os
+  // Previews seguintes acusando "pendente marcada indevidamente".
+  const cauda = linhas.slice(idxUltimaRefletida + 1).filter((l) => !jaAplicadas.has(l.nome))
+  const jaAplicadasNaCauda = linhas.slice(idxUltimaRefletida + 1).filter((l) => jaAplicadas.has(l.nome))
   const caudaLimpa = cauda.filter((l) => l.estado === 'REFLETIDA')
   const cabecaSuja = cabeca.filter((l) => l.estado !== 'REFLETIDA')
 
   console.log(`\nCORTE: após ${cabeca.at(-1)?.nome ?? '(nenhuma)'}`)
+  if (jaAplicadasNaCauda.length) {
+    console.log(`  (${jaAplicadasNaCauda.length} depois do corte JÁ estão aplicadas — não são pendentes: ${jaAplicadasNaCauda.map((l) => l.nome).join(', ')})`)
+  }
 
   // Registra o corte para a validação pós-`migrate deploy` do MESMO build.
   try {
@@ -228,8 +237,11 @@ try {
     if (inacabadas.length) abortar(`linhas inacabadas em _prisma_migrations: ${inacabadas.map((r) => r.migration_name).join(', ')}`)
     const indevidas = depois.filter((r) => cauda.some((l) => l.nome === r.migration_name))
     if (indevidas.length) abortar(`migration pendente marcada indevidamente: ${indevidas.map((r) => r.migration_name).join(', ')}`)
-    if (depois.length !== cabeca.length) {
-      abortar(`esperado ${cabeca.length} linhas, encontrado ${depois.length}.`)
+    // O esperado é o prefixo baselinado MAIS o que já havia sido aplicado por
+    // `migrate deploy` em builds anteriores (que não é pendente nem baseline).
+    const esperado = cabeca.length + jaAplicadasNaCauda.length
+    if (depois.length !== esperado) {
+      abortar(`esperado ${esperado} linhas (${cabeca.length} do prefixo + ${jaAplicadasNaCauda.length} já aplicadas), encontrado ${depois.length}.`)
     }
     console.log('[baseline] VALIDADO — baseline correto, pendentes intactas.')
   }

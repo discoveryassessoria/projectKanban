@@ -32,7 +32,10 @@ export const sqlDaMigration = (dir, nome) => fs.readFileSync(path.join(dir, nome
  */
 export function statements(sql) {
   const semComentario = sql.replace(/\/\*[\s\S]*?\*\//g, ' ').replace(/--[^\n]*/g, ' ')
-  const semDo = semComentario.replace(/DO\s*\$\$[\s\S]*?\$\$/gi, ' ')
+  // Remove QUALQUER bloco dollar-quoted, não só `DO $$…$$`: corpo de função
+  // (`AS $$…$$`) também usa a sintaxe, e antes fazia o arquivo inteiro virar
+  // INDETERMINADA — foi o que quebrou o Preview ao migrar as constraints.
+  const semDo = semComentario.replace(/\$\$[\s\S]*?\$\$/g, ' ')
   if (semDo.includes('$$')) return null
   return semDo
     .split(';')
