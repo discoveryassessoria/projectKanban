@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useCallback } from "react"
 import { 
   Smartphone, 
   Loader2, 
@@ -49,14 +49,15 @@ export function AcessoAppTab({ clienteId, clienteTipo, clienteEmail, clienteNome
   const [revogando, setRevogando] = useState(false)
   const [erro, setErro] = useState<string | null>(null)
 
-  // Verificar se já tem acesso ao abrir
-  const verificarAcesso = async () => {
+  const verificarAcesso = useCallback(async () => {
     setCarregando(true)
     setErro(null)
     try {
-      const response = await fetch(`/api/app/gerar-acesso?tipo=${clienteTipo}&id=${clienteId}`)
+      const response = await fetch(`/api/app/gerar-acesso?tipo=${clienteTipo}&id=${clienteId}`, {
+        headers: { Authorization: `Bearer ${localStorage.getItem("authToken")}` },
+      })
       const data = await response.json()
-      
+
       if (data.temAcesso) {
         setTemAcesso(true)
         setAcesso(data.acesso)
@@ -71,23 +72,26 @@ export function AcessoAppTab({ clienteId, clienteTipo, clienteEmail, clienteNome
     } finally {
       setCarregando(false)
     }
-  }
+  }, [clienteTipo, clienteId])
 
+  // Verificar se já tem acesso ao abrir
   useEffect(() => {
     if (clienteId) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       verificarAcesso()
     } else {
       setCarregando(false)
     }
-  }, [clienteId])
+  }, [clienteId, verificarAcesso])
 
   // Atualizar email quando mudar
   useEffect(() => {
     if (clienteEmail && !temAcesso) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setEmail(clienteEmail)
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [clienteEmail])
-
 
   const gerarAcesso = async () => {
     if (!email.trim()) {
@@ -109,7 +113,10 @@ export function AcessoAppTab({ clienteId, clienteTipo, clienteEmail, clienteNome
 
       const response = await fetch("/api/app/gerar-acesso", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${localStorage.getItem("authToken")}`,
+        },
         body: JSON.stringify(body),
       })
 
@@ -140,7 +147,10 @@ export function AcessoAppTab({ clienteId, clienteTipo, clienteEmail, clienteNome
     try {
       const response = await fetch("/api/app/gerar-acesso", {
         method: "PUT",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${localStorage.getItem("authToken")}`,
+        },
         body: JSON.stringify({ acessoId: acesso.id }),
       })
 
@@ -170,6 +180,7 @@ export function AcessoAppTab({ clienteId, clienteTipo, clienteEmail, clienteNome
     try {
       const response = await fetch(`/api/app/gerar-acesso?id=${acesso.id}`, {
         method: "DELETE",
+        headers: { Authorization: `Bearer ${localStorage.getItem("authToken")}` },
       })
 
       if (!response.ok) {
