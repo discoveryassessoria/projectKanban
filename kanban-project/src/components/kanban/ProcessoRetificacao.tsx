@@ -21,11 +21,12 @@
 
 "use client"
 
-import { useState, useEffect, useCallback, type ReactNode } from "react"
+import { useState, useEffect, useCallback, type ReactNode, useMemo } from "react"
 import {
   Loader2, Scale, Building2, FileText, AlertTriangle, Check, X, Plus,
   ArrowRight, Eye, Download, Trash2, Upload, Paperclip,
 } from "lucide-react"
+import { useApi } from "@/src/lib/dados"
 
 // ============================================================
 // CONSTANTES (literais do mockup)
@@ -233,8 +234,6 @@ const pkgStepCur = (pk: Pacote) =>
 // ============================================================
 
 export function ProcessoRetificacao({ processoId, onConcluido }: Props) {
-  const [data, setData] = useState<RetData | null>(null)
-  const [loading, setLoading] = useState(true)
   const [erro, setErro] = useState<string | null>(null)
   const [aviso, setAviso] = useState<string | null>(null)
   const [focusId, setFocusId] = useState<string | number | null>(null)
@@ -244,25 +243,20 @@ export function ProcessoRetificacao({ processoId, onConcluido }: Props) {
   const [posting, setPosting] = useState(false)
   const [modalErro, setModalErro] = useState<string | null>(null)
 
-  const carregar = useCallback(async () => {
-    setLoading(true)
-    try {
-      const res = await fetch(`/api/processos/${processoId}/retificacao`, { headers: authHeaders() })
-      const json = await res.json()
-      const packages = Array.isArray(json.packages) ? json.packages.map(mapPacote) : []
-      setData({
-        packages,
-        kpis: json.kpis ?? calcKpis(packages),
-        progress: json.progress ?? calcProgress(packages),
-      })
-    } catch {
-      setErro("Erro ao carregar a fase de Retificação.")
-    } finally {
-      setLoading(false)
-    }
-  }, [processoId])
-
-  useEffect(() => { carregar() }, [carregar])
+  // Consulta em cache (src/lib/dados).
+  const { dados: bruto, carregando: loading, erro: erroCarregar, recarregar: carregar } =
+    useApi<any>(`/api/processos/${processoId}/retificacao`)
+  // A transformação que rodava DENTRO do loader virou derivação memoizada da
+  // resposta em cache: mesmo resultado, sem setState em efeito.
+  const data: RetData | null = useMemo(() => {
+    if (!bruto) return null
+    const packages = Array.isArray(bruto.packages) ? bruto.packages.map(mapPacote) : []
+    return {
+      packages,
+      kpis: bruto.kpis ?? calcKpis(packages),
+      progress: bruto.progress ?? calcProgress(packages),
+    } as RetData
+  }, [bruto])
 
   const criarPacote = async (tipo: "judicial" | "administrativa") => {
     setTipoModal(false)

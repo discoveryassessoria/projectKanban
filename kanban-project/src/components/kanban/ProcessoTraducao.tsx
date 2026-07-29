@@ -5,6 +5,7 @@ import { useState, useEffect, useCallback, type ReactNode } from "react"
 import {
   Loader2, FolderOpen, Users, CheckCircle2, AlertTriangle, Check, X, Upload,
 } from "lucide-react"
+import { useApi } from "@/src/lib/dados"
 
 interface TrDoc {
   id: number
@@ -111,30 +112,18 @@ const PROX: Record<string, string> = {
 }
 
 export function ProcessoTraducao({ processoId, onConcluido }: Props) {
-  const [pasta, setPasta] = useState<Pasta | null>(null)
-  const [progress, setProgress] = useState(0)
-  const [loading, setLoading] = useState(true)
   const [erro, setErro] = useState<string | null>(null)
   const [aviso, setAviso] = useState<string | null>(null)
   const [modalStep, setModalStep] = useState<string | null>(null)
   const [posting, setPosting] = useState(false)
   const [modalErro, setModalErro] = useState<string | null>(null)
 
-  const carregar = useCallback(async () => {
-    setLoading(true)
-    try {
-      const res = await fetch(`/api/processos/${processoId}/traducao`, { headers: authHeaders() })
-      const data = await res.json()
-      setPasta(data.pasta ?? null)
-      setProgress(data.progress ?? 0)
-    } catch {
-      setErro("Erro ao carregar a pasta de tradução.")
-    } finally {
-      setLoading(false)
-    }
-  }, [processoId])
-
-  useEffect(() => { carregar() }, [carregar])
+  // Consulta em cache (src/lib/dados): loading e erro vêm da camada, e a
+  // revalidação pós-ação é o mesmo `carregar()` de antes.
+  const { dados, carregando: loading, erro: erroCarregar, recarregar: carregar } =
+    useApi<{ pasta?: Pasta | null; progress?: number }>(`/api/processos/${processoId}/traducao`)
+  const pasta = dados?.pasta ?? null
+  const progress = dados?.progress ?? 0
 
   const postEtapa = async (stepId: string, payload: Record<string, unknown>) => {
     setPosting(true); setModalErro(null)

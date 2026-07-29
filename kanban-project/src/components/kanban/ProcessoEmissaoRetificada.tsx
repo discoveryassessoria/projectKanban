@@ -22,11 +22,12 @@
 
 "use client"
 
-import { useState, useEffect, useCallback, type ReactNode } from "react"
+import { useState, useEffect, useCallback, type ReactNode, useMemo } from "react"
 import {
   Loader2, FileText, AlertTriangle, Check, X, ArrowRight, Upload,
   Eye, Download, CheckCircle2,
 } from "lucide-react"
+import { useApi } from "@/src/lib/dados"
 
 // ============================================================
 // CONSTANTES (literais do mockup)
@@ -162,8 +163,6 @@ const reDone = (d: ReDoc) => d.status === "validada"
 // ============================================================
 
 export function ProcessoEmissaoRetificada({ processoId, onConcluido }: Props) {
-  const [data, setData] = useState<ReData | null>(null)
-  const [loading, setLoading] = useState(true)
   const [erro, setErro] = useState<string | null>(null)
   const [aviso, setAviso] = useState<string | null>(null)
   const [drawerId, setDrawerId] = useState<string | number | null>(null)
@@ -172,21 +171,15 @@ export function ProcessoEmissaoRetificada({ processoId, onConcluido }: Props) {
   const [posting, setPosting] = useState(false)
   const [modalErro, setModalErro] = useState<string | null>(null)
 
-  const carregar = useCallback(async () => {
-    setLoading(true)
-    try {
-      const res = await fetch(`/api/processos/${processoId}/emissao-retificada`, { headers: authHeaders() })
-      const json = await res.json()
-      const documentos = Array.isArray(json.documentos) ? json.documentos.map(mapDoc) : []
-      setData({ documentos, kpis: json.kpis ?? calcKpis(documentos), progress: json.progress ?? calcProgress(documentos) })
-    } catch {
-      setErro("Erro ao carregar a fase de Emissão documental retificada.")
-    } finally {
-      setLoading(false)
-    }
-  }, [processoId])
-
-  useEffect(() => { carregar() }, [carregar])
+  // Consulta em cache (src/lib/dados).
+  const { dados: bruto, carregando: loading, erro: erroCarregar, recarregar: carregar } =
+    useApi<any>(`/api/processos/${processoId}/emissao-retificada`)
+  // Transformação virou derivação memoizada da resposta em cache.
+  const data: ReData | null = useMemo(() => {
+    if (!bruto) return null
+    const documentos = Array.isArray(bruto.documentos) ? bruto.documentos.map(mapDoc) : []
+    return { documentos, kpis: bruto.kpis ?? calcKpis(documentos), progress: bruto.progress ?? calcProgress(documentos) } as ReData
+  }, [bruto])
 
   const aplicarEtapa = async (docId: string | number, stepId: string, payload: Record<string, unknown>) => {
     setPosting(true); setModalErro(null)

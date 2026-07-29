@@ -4,6 +4,7 @@
 import { useState, useEffect, useCallback, type ReactNode } from "react"
 import { Loader2, ArrowRight, FileText, Check, X, Upload, Flag } from "lucide-react"
 import { FINAL_CFG, type FaseKey } from "@/src/lib/process-stage/final-engine"
+import { useApi } from "@/src/lib/dados"
 
 interface FinalStep { id: string; title: string; status: string; doneAt: string | null }
 interface Fase {
@@ -24,32 +25,19 @@ const authHeaders = () => ({ Authorization: `Bearer ${localStorage.getItem("auth
 const jsonHeaders = () => ({ "Content-Type": "application/json", ...authHeaders() })
 
 export function ProcessoFaseFinal({ processoId, onConcluido }: Props) {
-  const [fase, setFase] = useState<Fase | null>(null)
-  const [faseKey, setFaseKey] = useState<FaseKey | null>(null)
-  const [progress, setProgress] = useState(0)
-  const [loading, setLoading] = useState(true)
   const [erro, setErro] = useState<string | null>(null)
   const [aviso, setAviso] = useState<string | null>(null)
   const [modalStep, setModalStep] = useState<string | null>(null)
   const [posting, setPosting] = useState(false)
   const [modalErro, setModalErro] = useState<string | null>(null)
 
-  const carregar = useCallback(async () => {
-    setLoading(true)
-    try {
-      const res = await fetch(`/api/processos/${processoId}/fase-final`, { headers: authHeaders() })
-      const data = await res.json()
-      setFase(data.fase ?? null)
-      setFaseKey(data.faseKey ?? null)
-      setProgress(data.progress ?? 0)
-    } catch {
-      setErro("Erro ao carregar a fase.")
-    } finally {
-      setLoading(false)
-    }
-  }, [processoId])
-
-  useEffect(() => { carregar() }, [carregar])
+  // Consulta em cache (src/lib/dados): loading e erro vêm da camada, e a
+  // revalidação pós-ação é o mesmo `carregar()` de antes.
+  const { dados, carregando: loading, erro: erroCarregar, recarregar: carregar } =
+    useApi<{ fase?: Fase | null; faseKey?: FaseKey | null; progress?: number }>(`/api/processos/${processoId}/fase-final`)
+  const fase = dados?.fase ?? null
+  const faseKey = dados?.faseKey ?? null
+  const progress = dados?.progress ?? 0
 
   const postEtapa = async (stepId: string, payload: Record<string, unknown>) => {
     setPosting(true); setModalErro(null)
