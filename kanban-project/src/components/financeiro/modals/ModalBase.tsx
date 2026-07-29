@@ -5,6 +5,7 @@ import { X } from "lucide-react"
 import { createPortal } from "react-dom"
 import { LAYER } from "@/src/lib/ui/layers"
 import { useEffect, useState } from "react"
+import { useIsClient } from "@/src/lib/cliente"
 
 interface Props {
   title: string
@@ -21,9 +22,8 @@ export function ModalBase({
   title, subtitle, icon = "✨", color = "violet",
   onClose, children, footer, size = "md"
 }: Props) {
-  const [mounted, setMounted] = useState(false)
+  const mounted = useIsClient()
   useEffect(() => {
-    setMounted(true)
     const handleEsc = (e: KeyboardEvent) => { if (e.key === "Escape") onClose() }
     document.addEventListener("keydown", handleEsc)
     return () => document.removeEventListener("keydown", handleEsc)

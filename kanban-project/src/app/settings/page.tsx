@@ -22,6 +22,7 @@ import {
 } from "@/components/ui/alert-dialog"
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { useIsClient } from "@/src/lib/cliente"
 
 // ========================================
 // MAPA DE PERMISSÕES PARA EXIBIÇÃO
@@ -136,7 +137,7 @@ export default function SettingsPage() {
   const { showToast } = useToast()
   const router = useRouter()
   const [user, setUser] = useState<UserData | null>(getStoredUser())
-  const [mounted, setMounted] = useState(false)
+  const mounted = useIsClient()
 
   // Estados para dados do HeaderBar
   const [projetos, setProjetos] = useState<any[]>([])
@@ -200,7 +201,6 @@ export default function SettingsPage() {
   }
 
   useEffect(() => {
-    setMounted(true)
     fetchHeaderData()
     fetchPermissoes()
   }, [fetchPermissoes])

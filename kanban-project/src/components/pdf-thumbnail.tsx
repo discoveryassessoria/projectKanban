@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react"
 import dynamic from "next/dynamic"
 import { FileText } from "lucide-react"
+import { useIsClient } from "@/src/lib/cliente"
 
 // Importar react-pdf dinamicamente só no cliente
 const Document = dynamic(
@@ -22,14 +23,13 @@ interface PDFThumbnailProps {
 
 export function PDFThumbnail({ url, className }: PDFThumbnailProps) {
   const [error, setError] = useState(false)
-  const [isClient, setIsClient] = useState(false)
+  const isClient = useIsClient()
 
   useEffect(() => {
-    // Configurar worker apenas no cliente
+    // Worker do PDF só existe no cliente — o import dinâmico continua no efeito.
     import("react-pdf").then((pdfjs) => {
       pdfjs.pdfjs.GlobalWorkerOptions.workerSrc = `//unpkg.com/pdfjs-dist@${pdfjs.pdfjs.version}/build/pdf.worker.min.mjs`
     })
-    setIsClient(true)
   }, [])
 
   if (!isClient) {

@@ -40,6 +40,7 @@ import { Upload, CheckCircle2, XCircle, FileImage, Shield, Home, CreditCard as C
 import RelatorioClientesButton from "@/src/components/contratantesComponents/RelatorioClientesButton"
 import { AcessoAppTab } from "./contratantesComponents/AcessoAppTab"
 import { usePermissoes } from "@/src/hooks/use-permissoes"
+import { useIsClient } from "@/src/lib/cliente"
 
 interface Contratante {
   id: number
@@ -131,11 +132,7 @@ function ProcessosTooltip({
   const timeoutRef = useRef<NodeJS.Timeout | null>(null)
   const hideTimeoutRef = useRef<NodeJS.Timeout | null>(null)
   const containerRef = useRef<HTMLDivElement>(null)
-  const [mounted, setMounted] = useState(false)
-
-  useEffect(() => {
-    setMounted(true)
-  }, [])
+  const mounted = useIsClient()
 
   // Controlar visibilidade combinando hover do trigger e do tooltip
   const isVisible = isHovering || isTooltipHovering
@@ -414,7 +411,7 @@ export function ContratanteModal({
   setErrors?: (errors: { nome?: string; cpf?: string; geral?: string }) => void
 }) {
   const [activeTab, setActiveTab] = useState<"dados" | "endereco" | "observacoes" | "acesso">("dados")
-  const [mounted, setMounted] = useState(false)
+  const mounted = useIsClient()
   const [buscandoCep, setBuscandoCep] = useState(false)
   const [isUploading, setIsUploading] = useState(false)  // ← R2: controla estado de upload manualmente
   
@@ -683,9 +680,6 @@ const removerDocumentoObrigatorio = async (categoria: string) => {
     return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i]
   }
 
-  useEffect(() => {
-    setMounted(true)
-  }, [])
 
   useEffect(() => {
     if (!isOpen) {

@@ -6,13 +6,12 @@ import AuthComponent from "@/src/components/auth"
 import backgroundImage from "@/public/imagemfundo.jpg"
 import discoveryLogo from "@/public/discoverylogo.svg"
 import { motion } from "framer-motion"
+import { useIsClient } from "@/src/lib/cliente"
 
 export default function AuthPage() {
-  const [mounted, setMounted] = useState(false)
-
-  useEffect(() => {
-    setMounted(true)
-  }, [])
+  // `mounted` virou useIsClient: mesmo contrato (false no servidor e no primeiro
+  // render, true depois), sem o render em cascata que o setState no efeito causa.
+  const mounted = useIsClient()
 
   return (
     <div className="fixed inset-0 z-50">

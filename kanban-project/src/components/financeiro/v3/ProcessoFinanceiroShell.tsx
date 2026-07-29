@@ -31,6 +31,7 @@ import { ValorBrl, AvisoNaoConvertido, semCotacao } from "./ValorBrl"
 import { ROTULO_ESTADO_CUSTO, ESTADOS_REPROVAVEIS } from "@/lib/financeiro/dominio/estado-custo"
 import { authHeaders } from "@/src/lib/financeiro/http"
 import { fmtMoeda as fmt } from "@/src/lib/financeiro/formato"
+import { gravarLocal, useJsonLocalStorage } from "@/src/lib/cliente"
 
 // F4.3 — cor semântica do estado de negócio do custo (badge; SÓ ícone/badge tem cor, kit DS).
 const COR_ESTADO_CUSTO: Record<string, string> = {
@@ -55,6 +56,15 @@ function baixarCSV(nome: string, rows: Record<string, any>[]) {
   const blob = new Blob(["﻿" + csv], { type: "text/csv;charset=utf-8;" })
   const url = URL.createObjectURL(blob)
   const a = document.createElement("a"); a.href = url; a.download = `${nome}.csv`; a.click(); URL.revokeObjectURL(url)
+}
+
+interface FiltrosSalvos {
+  sub: "todos" | "pagos" | "apagar"
+  busca: string
+  fMoeda: string
+  fEstado: string
+  ordenar: "vencimento" | "valor" | "estado" | "descricao"
+  ordem: "asc" | "desc"
 }
 
 export function ProcessoFinanceiroShell({ processoId }: { processoId: number }) {
@@ -134,16 +144,16 @@ function CustosTab({ processoId, fx, onAbrirDetalhe }: { processoId: number; fx:
   const [obrs, setObrs] = useState<any[] | null>(null)
   const [novo, setNovo] = useState(false)
   const [pagar, setPagar] = useState<any | null>(null)
-  const [sub, setSub] = useState<"todos" | "pagos" | "apagar">("todos")
+  const [subEscolhido, setSub] = useState<"todos" | "pagos" | "apagar" | undefined>(undefined)
   const [vista, setVista] = useState<"lista" | "painel">("lista")
   // F5-UI.3 — lista rica (paridade com ReceitasTab): busca, filtros, ordenação, paginação,
   // persistência de filtros, RowMenu de ações (reuso dos modais compartilhados).
-  const [busca, setBusca] = useState("")
+  const [buscaEscolhida, setBusca] = useState<string | undefined>(undefined)
   const [fFornecedor, setFFornecedor] = useState("")
-  const [fMoeda, setFMoeda] = useState("Todas")
-  const [fEstado, setFEstado] = useState("Todos")
-  const [ordenar, setOrdenar] = useState<"vencimento" | "valor" | "estado" | "descricao">("vencimento")
-  const [ordem, setOrdem] = useState<"asc" | "desc">("asc")
+  const [fMoedaEscolhida, setFMoeda] = useState<string | undefined>(undefined)
+  const [fEstadoEscolhido, setFEstado] = useState<string | undefined>(undefined)
+  const [ordenarEscolhido, setOrdenar] = useState<"vencimento" | "valor" | "estado" | "descricao" | undefined>(undefined)
+  const [ordemEscolhida, setOrdem] = useState<"asc" | "desc" | undefined>(undefined)
   const [page, setPage] = useState(1)
   const [acao, setAcao] = useState<{ tipo: string; o: any } | null>(null)
   // F6 — permissões EFETIVAS de custo (consumo da UI; server-side é a fonte de verdade).
@@ -153,9 +163,24 @@ function CustosTab({ processoId, fx, onAbrirDetalhe }: { processoId: number; fx:
   const PAGE = 12
   const chaveFiltros = `cp-filtros-${processoId}`
   const carregar = () => { fetch(`/api/financeiro/v3/obrigacoes?processoId=${processoId}&natureza=CUSTO`, { headers: authHeaders() }).then((r) => r.json()).then((j) => setObrs(j.obrigacoes ?? [])).catch(() => setObrs([])) }
-  // persistência de filtros (localStorage por processo)
-  useEffect(() => { try { const s = JSON.parse(localStorage.getItem(chaveFiltros) || "{}"); if (s.sub) setSub(s.sub); if (s.busca) setBusca(s.busca); if (s.fMoeda) setFMoeda(s.fMoeda); if (s.fEstado) setFEstado(s.fEstado); if (s.ordenar) setOrdenar(s.ordenar); if (s.ordem) setOrdem(s.ordem) } catch { /* ignore */ } }, [chaveFiltros])
-  useEffect(() => { try { localStorage.setItem(chaveFiltros, JSON.stringify({ sub, busca, fMoeda, fEstado, ordenar, ordem })) } catch { /* ignore */ } }, [chaveFiltros, sub, busca, fMoeda, fEstado, ordenar, ordem])
+  // PERSISTÊNCIA DE FILTROS (por processo). Restaurar num efeito exigia seis
+  // setState logo após a montagem — render em cascata e, no servidor, acesso a
+  // um localStorage que não existe. Agora o valor salvo é LIDO pela abstração
+  // oficial (null no servidor, por contrato) e o filtro em vigor é derivado:
+  // o que o usuário escolheu nesta sessão vence; sem escolha, vale o salvo;
+  // sem salvo, o padrão. Nenhum estado é sincronizado por efeito.
+  const salvos = useJsonLocalStorage<Partial<FiltrosSalvos>>(chaveFiltros)
+  const sub = subEscolhido ?? salvos?.sub ?? "todos"
+  const busca = buscaEscolhida ?? salvos?.busca ?? ""
+  const fMoeda = fMoedaEscolhida ?? salvos?.fMoeda ?? "Todas"
+  const fEstado = fEstadoEscolhido ?? salvos?.fEstado ?? "Todos"
+  const ordenar = ordenarEscolhido ?? salvos?.ordenar ?? "vencimento"
+  const ordem = ordemEscolhida ?? salvos?.ordem ?? "asc"
+  // A escrita continua sendo efeito — é sincronizar o React COM um sistema
+  // externo, que é exatamente para o que o efeito serve.
+  useEffect(() => {
+    gravarLocal(chaveFiltros, { sub, busca, fMoeda, fEstado, ordenar, ordem })
+  }, [chaveFiltros, sub, busca, fMoeda, fEstado, ordenar, ordem])
   // conclusão de uma ação de linha: fecha, recarrega, propaga no bus.
   const aoConcluir = () => { setAcao(null); carregar(); emitirMutacaoFinanceira() }
   // F4.3 — avança o estado de negócio do custo (Aprovar/Contratar/Executar) via ação server-side.

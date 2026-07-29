@@ -20,6 +20,7 @@ import { CentralFinanceira } from "@/src/components/financeiro/CentralFinanceira
 import { PagamentosView } from "@/src/components/financeiro/PagamentosView"
 import { CreditosView } from "@/src/components/financeiro/CreditosView"
 import { encerrarSessao } from "@/src/lib/sessao/cliente"
+import { useIsClient, useJsonLocalStorage } from "@/src/lib/cliente"
 
 const TesourariaTab = dynamic(() => import("@/src/components/financeiroComponents/TesourariaTab"), {
   ssr: false,
@@ -92,8 +93,10 @@ const TABS_VISIVEIS = TABS.filter((t) => !("avancada" in t && t.avancada))
 export default function FinanceiroPage() {
   const router = useRouter()
   const { pode, carregando } = usePermissoes()
-  const [mounted, setMounted] = useState(false)
-  const [user, setUser] = useState<any>({ nome: "Usuário" })
+  const mounted = useIsClient()
+  // Usuário do localStorage pela abstração oficial (contrato de hidratação).
+  const userSalvo = useJsonLocalStorage<{ nome?: string; tipo?: string; email?: string }>("user")
+  const user = userSalvo ?? { nome: "Usuário" }
   const [tab, setTab] = useState<TabKey>("central")
   const [processos, setProcessos] = useState<any[]>([])
   const [arvores, setArvores] = useState<any[]>([])
@@ -111,11 +114,6 @@ export default function FinanceiroPage() {
   }
 
   useEffect(() => {
-    setMounted(true)
-    if (typeof window !== "undefined") {
-      const u = localStorage.getItem("user")
-      if (u) { try { setUser(JSON.parse(u)) } catch {} }
-    }
     carregarDashboard()
     fetch("/api/processos").then(r => r.ok ? r.json() : null).then(d => setProcessos(d?.processos || [])).catch(() => {})
     fetch("/api/arvore").then(r => r.ok ? r.json() : null).then(d => setArvores(Array.isArray(d) ? d : [])).catch(() => {})

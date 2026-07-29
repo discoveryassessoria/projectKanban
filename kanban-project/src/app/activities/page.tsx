@@ -28,6 +28,7 @@ import type { Atividade } from "@/src/hooks/useActivitiesData"
 import { DatePickerField } from "@/components/ui/date-picker-field"
 import { usePermissoes } from "@/src/hooks/use-permissoes"
 import { encerrarSessao } from "@/src/lib/sessao/cliente"
+import { useIsClient, useJsonLocalStorage } from "@/src/lib/cliente"
 
 // Interfaces
 interface UserData {
@@ -64,8 +65,11 @@ function ActivitiesPageInner() {
     status: 'all',
     responsavel: 'all'
   })
-  const [mounted, setMounted] = useState(false)
-  const [user, setUser] = useState<UserData>({ nome: "Usuário" })
+  const mounted = useIsClient()
+  // Usuário vem do localStorage pela abstração oficial: `null` no servidor e no
+  // primeiro render (contrato de hidratação), o nome padrão depois.
+  const userSalvo = useJsonLocalStorage<UserData>("user")
+  const user: UserData = userSalvo ?? { nome: "Usuário" }
   // Aba controlada — permite deep-link vindo da Central Operacional (?tab=).
   const [tabValue, setTabValue] = useState("list")
   const searchParams = useSearchParams()
@@ -127,17 +131,6 @@ function ActivitiesPageInner() {
   }
 
   useEffect(() => {
-    setMounted(true)
-    if (typeof window !== 'undefined') {
-      const storedUser = localStorage.getItem('user')
-      if (storedUser) {
-        try {
-          setUser(JSON.parse(storedUser))
-        } catch {
-          setUser({ nome: "Usuário" })
-        }
-      }
-    }
     // Buscar dados para o HeaderBar
     buscarArvores()
     buscarProcessos()
