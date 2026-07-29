@@ -88,7 +88,6 @@ function ActivitiesPageInner() {
     })
     if (tab === "list" || tab === "deadline" || tab === "calendar") setTabValue(tab)
     else if (status === "vencidas") setTabValue("deadline")
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchParams])
 
   // Estados para árvores e processos (para o HeaderBar)

@@ -21,6 +21,7 @@ import {
   AlertCircle,
 } from "lucide-react"
 import { usePermissoes } from "@/src/hooks/use-permissoes"
+import { useApi } from "@/src/lib/dados"
 
 interface Evento {
   id: number
@@ -52,8 +53,13 @@ const TIPOS_EVENTO = [
 ]
 
 export function ProcessoEventos({ processoId, onUpdate }: ProcessoEventosProps) {
-  const [eventos, setEventos] = useState<Evento[]>([])
-  const [isLoading, setIsLoading] = useState(true)
+  // A lista vem da CAMADA DE DADOS: cache, deduplicação e revalidação por
+  // conta dela. Não há mais `useState` + `useEffect` de montagem para isto —
+  // era exatamente o setState-em-efeito que o React Compiler apontava.
+  const { dados, carregando: isLoading, recarregar: fetchEventos } = useApi<{ eventos?: Evento[] }>(
+    processoId ? `/api/eventos?processoId=${processoId}` : null,
+  )
+  const eventos: Evento[] = dados?.eventos ?? []
   const [showForm, setShowForm] = useState(false)
   const [editingId, setEditingId] = useState<number | null>(null)
   const [isSaving, setIsSaving] = useState(false)
@@ -70,22 +76,6 @@ export function ProcessoEventos({ processoId, onUpdate }: ProcessoEventosProps) 
   const [local, setLocal] = useState("")
   const [lembreteDias, setLembreteDias] = useState("")
   const { pode } = usePermissoes()
-
-  const fetchEventos = async () => {
-    try {
-      const res = await fetch(`/api/eventos?processoId=${processoId}`)
-      const data = await res.json()
-      setEventos(data.eventos || [])
-    } catch (error) {
-      console.error("Erro ao buscar eventos:", error)
-    } finally {
-      setIsLoading(false)
-    }
-  }
-
-  useEffect(() => {
-    fetchEventos()
-  }, [processoId])
 
 
   const resetForm = () => {
@@ -149,7 +139,7 @@ export function ProcessoEventos({ processoId, onUpdate }: ProcessoEventosProps) 
 
       if (res.ok) {
         resetForm()
-        fetchEventos()
+        void fetchEventos()
         onUpdate?.()
       } else {
         alert("Erro ao salvar evento")
@@ -193,7 +183,7 @@ export function ProcessoEventos({ processoId, onUpdate }: ProcessoEventosProps) 
         },
       })
       if (res.ok) {
-        fetchEventos()
+        void fetchEventos()
         onUpdate?.()
       }
     } catch (error) {
