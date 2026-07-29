@@ -2,6 +2,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { extrairToken } from '@/src/lib/app-auth';
+import { FASES, phaseKeyToFaseCode } from '@/src/lib/process-stage/fases-catalog';
 
 export async function GET(
   request: NextRequest,
@@ -65,6 +66,23 @@ export async function GET(
       return NextResponse.json({ error: 'Acesso negado' }, { status: 403 });
     }
 
+    // ── Timeline de etapas, montada a partir do catálogo de fases ──────────
+    // fases-catalog.ts é a fonte única da verdade. faseAtualKey do banco é a
+    // chave estável (ex.: "genealogia") → converter pro código da fase.
+    const faseAtualCode = phaseKeyToFaseCode(processo.faseAtualKey);
+    const faseAtual = faseAtualCode ? FASES[faseAtualCode] : null;
+    const ordemAtual = faseAtual ? faseAtual.ordem : -1;
+
+    const etapas = Object.values(FASES)
+      .sort((a, b) => a.ordem - b.ordem)
+      .map((f) => ({
+        id: f.ordem,
+        nome: f.label,
+        ordem: f.ordem,
+        atual: f.ordem === ordemAtual,
+        concluida: ordemAtual >= 0 && f.ordem < ordemAtual,
+      }));
+
     // Formatar tarefas em hierarquia
     const tarefasFormatadas = processo.tarefas.map((tarefa) => {
       const subtarefas = tarefa.subtarefas.map((sub) => {
@@ -117,14 +135,15 @@ export async function GET(
       id: processo.id,
       nome: processo.nome,
       pais: processo.pais,
-      etapaAtual: processo.faseAtualKey ?? null,
+      etapaAtual: faseAtual ? faseAtual.label : null,
+      etapaAtualOrdem: ordemAtual,
       dataInicio: processo.dataInicio,
       previsaoTermino: processo.previsaoTermino,
       progressoGeral,
       totalTarefas,
       tarefasConcluidas,
-      // Timeline de etapas (legado removido junto com Processo.statusId)
-      etapas: [],
+      // Timeline de etapas (montada do catálogo de fases)
+      etapas,
       // Tarefas com hierarquia
       tarefas: tarefasFormatadas,
       // Pessoas envolvidas
