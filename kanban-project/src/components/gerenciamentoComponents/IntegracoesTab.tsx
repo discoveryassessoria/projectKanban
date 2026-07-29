@@ -9,6 +9,7 @@
 // Backend: /api/gerenciamento/integracoes (GET)
 
 import { useCallback, useEffect, useState } from "react"
+import { useApi } from "@/src/lib/dados"
 
 interface Integracao {
   chave: string
@@ -74,24 +75,17 @@ function valorLegivel(v: unknown): string {
   return JSON.stringify(v)
 }
 
-export default function IntegracoesTab() {
-  const [itens, setItens] = useState<Integracao[]>([])
-  const [ambiente, setAmbiente] = useState("")
-  const [loading, setLoading] = useState(true)
-  const [erro, setErro] = useState<string | null>(null)
+// Identidade estável para a ausência de dados (evita recomputar memos).
+const SEM_ITENS: never[] = Object.freeze([]) as never[]
 
-  const load = useCallback(async () => {
-    setLoading(true); setErro(null)
-    try {
-      const res = await fetch("/api/gerenciamento/integracoes", { headers: authHeaders(), cache: "no-store" })
-      const j = await res.json().catch(() => ({}))
-      if (res.ok) { setItens(j.integracoes || []); setAmbiente(j.ambiente || "") }
-      else setErro(j.error || "Não foi possível carregar o status das integrações.")
-    } catch {
-      setErro("Não foi possível carregar o status das integrações.")
-    } finally { setLoading(false) }
-  }, [])
-  useEffect(() => { load() }, [load])
+export default function IntegracoesTab() {
+
+  // Consulta em cache (src/lib/dados): loading e erro derivam da camada.
+  const { dados, carregando: loading, erro: erroCarregar, recarregar: load } =
+    useApi<{ integracoes?: Integracao[]; ambiente?: string }>("/api/gerenciamento/integracoes")
+  const itens = dados?.integracoes ?? SEM_ITENS
+  const ambiente = dados?.ambiente ?? ""
+  const erro = erroCarregar ? (erroCarregar.message || 'Não foi possível carregar o status das integrações.') : null
 
   if (loading) return <div className="py-24 text-center text-white/50">Carregando…</div>
 
@@ -99,7 +93,7 @@ export default function IntegracoesTab() {
     <div className="space-y-5">
       {erro && (
         <div className="rounded-xl border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-200">
-          {erro} <button onClick={load} className="ml-2 underline hover:text-white">Tentar de novo</button>
+          {erro} <button onClick={() => void load()} className="ml-2 underline hover:text-white">Tentar de novo</button>
         </div>
       )}
 
@@ -118,7 +112,7 @@ export default function IntegracoesTab() {
                 ambiente: {ambiente}
               </span>
             )}
-            <button onClick={load} className="rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-xs text-white/80 hover:bg-white/10">
+            <button onClick={() => void load()} className="rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-xs text-white/80 hover:bg-white/10">
               Atualizar
             </button>
           </div>

@@ -1,6 +1,7 @@
 "use client"
 
 import { useEffect, useState, useCallback, useMemo, Fragment } from "react"
+import { useApi } from "@/src/lib/dados"
 
 interface Log {
   id: number; acao: string; entidade: string; entidadeId: number | null
@@ -39,23 +40,21 @@ const ESCOPOS: Record<string, { titulo: string; descricao: string; entidades: Re
   },
 }
 
+// Identidade estável para a ausência de dados (evita recomputar memos).
+const SEM_ITENS: never[] = Object.freeze([]) as never[]
+
 export default function LogAuditoriaTab({ escopo }: { escopo?: string }) {
   const cfg = escopo ? ESCOPOS[escopo] : undefined
-  const [logs, setLogs] = useState<Log[]>([])
-  const [loading, setLoading] = useState(true)
   const [fEntidade, setFEntidade] = useState("")
   const [fAcao, setFAcao] = useState("")
   const [busca, setBusca] = useState("")
   const [aberto, setAberto] = useState<number | null>(null)
 
-  const load = useCallback(async () => {
-    setLoading(true)
-    try {
-      const res = await fetch("/api/gerenciamento/auditoria", { headers: authHeaders() })
-      if (res.ok) setLogs((await res.json()).logs || [])
-    } finally { setLoading(false) }
-  }, [])
-  useEffect(() => { load() }, [load])
+  // Consulta em cache (src/lib/dados): loading e erro derivam da camada.
+  const { dados, carregando: loading, erro: erroCarregar, recarregar: load } =
+    useApi<{ logs?: Log[] }>("/api/gerenciamento/auditoria")
+  const logs = dados?.logs ?? SEM_ITENS
+  const erro = erroCarregar ? (erroCarregar.message || 'Não foi possível carregar a auditoria.') : null
 
   // recorte do escopo (quando houver): tudo o mais abaixo opera sobre ele
   const logsEscopo = useMemo(
@@ -86,7 +85,7 @@ export default function LogAuditoriaTab({ escopo }: { escopo?: string }) {
               {cfg?.descricao ?? "Registro das ações no sistema."} Mostrando {logsEscopo.length} de {logs.length} registros recentes.
             </p>
           </div>
-          <button onClick={load} className="flex-none rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-xs text-white/80 hover:bg-white/10">Atualizar</button>
+          <button onClick={() => void load()} className="flex-none rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-xs text-white/80 hover:bg-white/10">Atualizar</button>
         </div>
         <div className="mt-4 flex flex-wrap gap-2">
           <select value={fEntidade} onChange={e => setFEntidade(e.target.value)} className={inputCls}>

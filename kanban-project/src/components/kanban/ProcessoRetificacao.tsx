@@ -159,6 +159,10 @@ interface RetKpis {
 }
 interface RetData { packages: Pacote[]; kpis: RetKpis; progress: number }
 
+// Resposta CRUA do endpoint: itens ainda não passaram pelo mapeador, então
+// chegam como `unknown[]` — o map adiante é quem lhes dá tipo.
+interface RetificacaoResposta { packages?: Record<string, unknown>[]; kpis?: RetKpis; progress?: number }
+
 interface Props {
   processoId: number
   onConcluido?: () => void
@@ -245,7 +249,7 @@ export function ProcessoRetificacao({ processoId, onConcluido }: Props) {
 
   // Consulta em cache (src/lib/dados).
   const { dados: bruto, carregando: loading, erro: erroCarregar, recarregar: carregar } =
-    useApi<any>(`/api/processos/${processoId}/retificacao`)
+    useApi<RetificacaoResposta>(`/api/processos/${processoId}/retificacao`)
   // A transformação que rodava DENTRO do loader virou derivação memoizada da
   // resposta em cache: mesmo resultado, sem setState em efeito.
   const data: RetData | null = useMemo(() => {

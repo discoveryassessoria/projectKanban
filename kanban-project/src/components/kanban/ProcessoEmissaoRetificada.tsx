@@ -115,6 +115,10 @@ interface ReDoc {
 interface ReKpis { total: number; averb: number; solic: number; aguard: number; receb: number; conf: number; valid: number; bloq: number }
 interface ReData { documentos: ReDoc[]; kpis: ReKpis; progress: number }
 
+// Resposta CRUA do endpoint: itens ainda não passaram pelo mapeador, então
+// chegam como `unknown[]` — o map adiante é quem lhes dá tipo.
+interface EmissaoResposta { documentos?: Record<string, unknown>[]; kpis?: ReKpis; progress?: number }
+
 interface Props {
   processoId: number
   onConcluido?: () => void
@@ -173,7 +177,7 @@ export function ProcessoEmissaoRetificada({ processoId, onConcluido }: Props) {
 
   // Consulta em cache (src/lib/dados).
   const { dados: bruto, carregando: loading, erro: erroCarregar, recarregar: carregar } =
-    useApi<any>(`/api/processos/${processoId}/emissao-retificada`)
+    useApi<EmissaoResposta>(`/api/processos/${processoId}/emissao-retificada`)
   // Transformação virou derivação memoizada da resposta em cache.
   const data: ReData | null = useMemo(() => {
     if (!bruto) return null

@@ -7,6 +7,7 @@
 
 import { useState, useEffect, useMemo, useCallback } from 'react'
 import { PERMISSOES, MODULOS_PERMISSOES } from '@/src/lib/permissoes'
+import { useApi } from "@/src/lib/dados"
 
 type MapaPermissoes = Record<string, boolean>
 
@@ -58,10 +59,10 @@ async function jsonFetch(url: string, options: RequestInit = {}) {
   return data
 }
 
+// Identidade estável para a ausência de dados (evita recomputar memos).
+const SEM_ITENS: never[] = Object.freeze([]) as never[]
+
 export default function RolesTab() {
-  const [perfis, setPerfis] = useState<Perfil[]>([])
-  const [loading, setLoading] = useState(true)
-  const [erroLista, setErroLista] = useState<string | null>(null)
   const [busca, setBusca] = useState('')
 
   // modal
@@ -75,18 +76,11 @@ export default function RolesTab() {
   const [salvando, setSalvando] = useState(false)
   const [erroModal, setErroModal] = useState<string | null>(null)
 
-  const carregar = useCallback(async () => {
-    setLoading(true)
-    setErroLista(null)
-    try {
-      const data = await jsonFetch('/api/perfis', { cache: 'no-store' })
-      setPerfis((data as any).perfis || [])
-    } catch (e: any) {
-      setErroLista(e.message || 'Não foi possível carregar os perfis.')
-    } finally {
-      setLoading(false)
-    }
-  }, [])
+  // Consulta em cache (src/lib/dados): loading e erro derivam da camada.
+  const { dados, carregando: loading, erro: erroCarregar, recarregar: carregar } =
+    useApi<{ perfis?: Perfil[] }>("/api/perfis")
+  const perfis = dados?.perfis ?? SEM_ITENS
+  const erroLista = erroCarregar ? (erroCarregar.message || 'Não foi possível carregar os perfis.') : null
 
   useEffect(() => {
     carregar()
@@ -239,7 +233,7 @@ export default function RolesTab() {
       {!loading && erroLista && (
         <div className="rounded-lg border border-red-500/30 bg-red-500/10 p-4 text-sm text-red-200">
           {erroLista}
-          <button onClick={carregar} className="ml-3 underline hover:text-white">
+          <button onClick={() => void carregar()} className="ml-3 underline hover:text-white">
             Tentar de novo
           </button>
         </div>

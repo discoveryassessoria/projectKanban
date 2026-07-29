@@ -8,6 +8,7 @@
 // Backend: /api/gerenciamento/paises (GET/POST) + /[countryKey] (PUT/DELETE)
 
 import { useEffect, useState, useCallback } from "react"
+import { useApi } from "@/src/lib/dados"
 
 interface Pais {
   id: number
@@ -55,24 +56,20 @@ const vazio = (): Form => ({
   defaultCurrency: "EUR", judicial: true, administrativa: true,
 })
 
+// Identidade estável para a ausência de dados (evita recomputar memos).
+const SEM_ITENS: never[] = Object.freeze([]) as never[]
+
 export default function PaisesRegioesTab() {
-  const [rows, setRows] = useState<Pais[]>([])
-  const [loading, setLoading] = useState(true)
   const [busy, setBusy] = useState(false)
-  const [erro, setErro] = useState<string | null>(null)
   const [flash, setFlash] = useState("")
   const [form, setForm] = useState<Form | null>(null)
 
-  const load = useCallback(async () => {
-    setLoading(true); setErro(null)
-    try {
-      const d = await jsonFetch("/api/gerenciamento/paises", { cache: "no-store" })
-      setRows((d as { paises?: Pais[] }).paises || [])
-    } catch (e) {
-      setErro(e instanceof Error ? e.message : "Não foi possível carregar os países.")
-    } finally { setLoading(false) }
-  }, [])
-  useEffect(() => { load() }, [load])
+  // Consulta em cache (src/lib/dados): loading e erro derivam da camada.
+  const { dados, carregando: loading, erro: erroCarregar, recarregar: load } =
+    useApi<{ paises?: Pais[] }>("/api/gerenciamento/paises")
+  const rows = dados?.paises ?? SEM_ITENS
+  const [erroSalvar, setErroSalvar] = useState<string | null>(null)
+  const erro = erroSalvar ?? erroCarregar?.message ?? null
 
   const showFlash = (m: string) => { setFlash(m); setTimeout(() => setFlash(""), 3000) }
 
@@ -80,11 +77,11 @@ export default function PaisesRegioesTab() {
     if (!form) return
     const label = form.countryLabel.trim()
     const nat = form.nationalityLabel.trim()
-    if (!label) { setErro("Informe o nome do país."); return }
-    if (!nat) { setErro("Informe a nacionalidade."); return }
-    if (!form.editando && !form.judicial && !form.administrativa) { setErro("Selecione ao menos uma modalidade."); return }
+    if (!label) { setErroSalvar("Informe o nome do país."); return }
+    if (!nat) { setErroSalvar("Informe a nacionalidade."); return }
+    if (!form.editando && !form.judicial && !form.administrativa) { setErroSalvar("Selecione ao menos uma modalidade."); return }
 
-    setBusy(true); setErro(null)
+    setBusy(true); setErroSalvar(null)
     try {
       if (form.editando) {
         await jsonFetch(`/api/gerenciamento/paises/${form.editando.countryKey}`, {
@@ -116,7 +113,7 @@ export default function PaisesRegioesTab() {
       setForm(null); showFlash("País salvo.")
       await load()
     } catch (e) {
-      setErro(e instanceof Error ? e.message : "Não foi possível salvar o país.")
+      setErroSalvar(e instanceof Error ? e.message : "Não foi possível salvar o país.")
     } finally { setBusy(false) }
   }
 
@@ -124,17 +121,17 @@ export default function PaisesRegioesTab() {
     try {
       await jsonFetch(`/api/gerenciamento/paises/${p.countryKey}`, { method: "PUT", body: JSON.stringify({ ativo: !(p.ativo ?? true) }) })
       await load()
-    } catch (e) { setErro(e instanceof Error ? e.message : "Não foi possível alterar o país.") }
+    } catch (e) { setErroSalvar(e instanceof Error ? e.message : "Não foi possível alterar o país.") }
   }
 
   async function excluir(p: Pais) {
     if (!confirm(`Excluir o país "${p.countryLabel}"? Só é possível se ele não tiver tipos nem processos.`)) return
-    setErro(null)
+    setErroSalvar(null)
     try {
       await jsonFetch(`/api/gerenciamento/paises/${p.countryKey}`, { method: "DELETE" })
       showFlash("País excluído.")
       await load()
-    } catch (e) { setErro(e instanceof Error ? e.message : "Não foi possível excluir o país.") }
+    } catch (e) { setErroSalvar(e instanceof Error ? e.message : "Não foi possível excluir o país.") }
   }
 
   if (loading) return <div className="py-24 text-center text-white/50">Carregando…</div>
@@ -144,7 +141,7 @@ export default function PaisesRegioesTab() {
       {flash && <div className="rounded-xl border border-green-400/30 bg-green-500/15 px-4 py-3 text-sm text-green-200">{flash}</div>}
       {erro && (
         <div className="rounded-xl border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-200">
-          {erro} <button onClick={() => { setErro(null); load() }} className="ml-2 underline hover:text-white">Recarregar</button>
+          {erro} <button onClick={() => { setErroSalvar(null); load() }} className="ml-2 underline hover:text-white">Recarregar</button>
         </div>
       )}
 
@@ -157,7 +154,7 @@ export default function PaisesRegioesTab() {
               cada país são geridas em <span className="text-white/80">Processos › Cadastros › Modalidades</span>.
             </p>
           </div>
-          <button onClick={() => { setErro(null); setForm(vazio()) }} className="flex-none rounded-lg bg-blue-600 px-3 py-2 text-xs font-medium text-white hover:bg-blue-500">
+          <button onClick={() => { setErroSalvar(null); setForm(vazio()) }} className="flex-none rounded-lg bg-blue-600 px-3 py-2 text-xs font-medium text-white hover:bg-blue-500">
             + Novo país
           </button>
         </div>
