@@ -172,12 +172,6 @@ export default function SettingsPage() {
     }
   }, [])
 
-  useEffect(() => {
-    setMounted(true)
-    fetchHeaderData()
-    fetchPermissoes()
-  }, [fetchPermissoes])
-
   const fetchHeaderData = async () => {
     try {
       const [projetosRes, processosRes, arvoresRes] = await Promise.all([
@@ -204,6 +198,13 @@ export default function SettingsPage() {
       console.error("Erro ao buscar dados:", error)
     }
   }
+
+  useEffect(() => {
+    setMounted(true)
+    fetchHeaderData()
+    fetchPermissoes()
+  }, [fetchPermissoes])
+
 
   const handleLogout = () => {
     logout()

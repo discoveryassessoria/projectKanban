@@ -99,23 +99,6 @@ function ActivitiesPageInner() {
   // Dados
   const { activities } = useActivities()
 
-  useEffect(() => {
-    setMounted(true)
-    if (typeof window !== 'undefined') {
-      const storedUser = localStorage.getItem('user')
-      if (storedUser) {
-        try {
-          setUser(JSON.parse(storedUser))
-        } catch {
-          setUser({ nome: "Usuário" })
-        }
-      }
-    }
-    // Buscar dados para o HeaderBar
-    buscarArvores()
-    buscarProcessos()
-  }, [])
-
   const buscarArvores = async () => {
     try {
       const response = await fetch("/api/arvore", {
@@ -143,6 +126,25 @@ function ActivitiesPageInner() {
       console.error("Erro ao buscar processos:", error)
     }
   }
+
+  useEffect(() => {
+    setMounted(true)
+    if (typeof window !== 'undefined') {
+      const storedUser = localStorage.getItem('user')
+      if (storedUser) {
+        try {
+          setUser(JSON.parse(storedUser))
+        } catch {
+          setUser({ nome: "Usuário" })
+        }
+      }
+    }
+    // Buscar dados para o HeaderBar
+    buscarArvores()
+    buscarProcessos()
+  }, [])
+
+
 
   const handleLogout = () => { void encerrarSessao("manual") }
 

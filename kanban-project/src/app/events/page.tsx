@@ -121,6 +121,18 @@ const [lembreteDias, setLembreteDias] = useState("")
   const router = useRouter()
   const { pode } = usePermissoes()
 
+  const fetchEventos = async () => {
+    try {
+      const res = await fetch("/api/eventos")
+      const data = await res.json()
+      setEventos(data.eventos || [])
+    } catch (error) {
+      console.error("Erro ao buscar eventos:", error)
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
   useEffect(() => {
     const token = localStorage.getItem("authToken")
     const userData = localStorage.getItem("user")
@@ -140,17 +152,6 @@ const [lembreteDias, setLembreteDias] = useState("")
     }
   }, [router])
 
-  const fetchEventos = async () => {
-    try {
-      const res = await fetch("/api/eventos")
-      const data = await res.json()
-      setEventos(data.eventos || [])
-    } catch (error) {
-      console.error("Erro ao buscar eventos:", error)
-    } finally {
-      setIsLoading(false)
-    }
-  }
 
   const handleLogout = () => { void encerrarSessao("manual") }
 

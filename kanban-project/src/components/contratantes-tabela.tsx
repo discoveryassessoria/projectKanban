@@ -458,12 +458,6 @@ export function ContratanteModal({
   }
 
   // Carregar anexos existentes quando abrir para editar/visualizar
-  useEffect(() => {
-    if (isOpen && editingId) {
-      carregarAnexos()
-    }
-  }, [isOpen, editingId])
-
   const carregarAnexos = async () => {
     if (!editingId) return
     
@@ -499,6 +493,13 @@ export function ContratanteModal({
       setCarregandoAnexos(false)
     }
   }
+
+  useEffect(() => {
+    if (isOpen && editingId) {
+      carregarAnexos()
+    }
+  }, [isOpen, editingId])
+
 
   // ⬇️ R2: upload de documento obrigatório (RG, CNH, Comprovante)
   const handleDocumentoUpload = async (categoria: string, file: File) => {

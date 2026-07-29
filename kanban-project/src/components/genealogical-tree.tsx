@@ -338,6 +338,39 @@ const GenealogicalTreeComponent = forwardRef<GenealogicalTreeHandle, Genealogica
     return 'id' in data && typeof data.id === 'number';
   }
 
+  // ESTADO DOS DIÁLOGOS — declarado ANTES dos callbacks que o atualizam.
+  // Um setter lido antes da própria declaração impede o React Compiler de
+  // acompanhar mudanças do valor ao longo do tempo.
+  const [showPersonDialog, setShowPersonDialog] = useState(false)
+  const [dialogConfig, setDialogConfig] = useState<{
+    title: string
+    description: string
+    person?: Pessoa
+    fixedSexo?: "Masculino" | "Feminino"
+    relationshipType?: "pai" | "mae" | "filho" | "conjuge"
+    currentPersonId?: number
+    onSubmit: (data: PersonFormData | ExistingPersonFormData) => Promise<void>
+  }>({
+    title: "",
+    description: "",
+    person: undefined,
+    fixedSexo: undefined,
+    relationshipType: undefined,
+    currentPersonId: undefined,
+    onSubmit: async () => {},
+  })
+
+  const [showSpouseModal, setShowSpouseModal] = useState(false)
+  const [currentPersonForSpouse, setCurrentPersonForSpouse] = useState<number | null>(null)
+  const [spouseSearchTerm, setSpouseSearchTerm] = useState("")
+  const [newSpouseData, setNewSpouseData] = useState({
+    nome: "",
+    sobrenome: "",
+    sexo: "",
+    data_nasc: "",
+    local_nasc: "",
+  })
+
   const handleAddChild = useCallback(
     (parentId: number) => {
       setDialogConfig({
@@ -742,24 +775,6 @@ const GenealogicalTreeComponent = forwardRef<GenealogicalTreeHandle, Genealogica
   const onConnect = useCallback((params: Connection) => setEdges((eds) => addEdge(params, eds)), [setEdges])
 
   // Dialog state and config
-  const [showPersonDialog, setShowPersonDialog] = useState(false)
-  const [dialogConfig, setDialogConfig] = useState<{
-    title: string
-    description: string
-    person?: Pessoa
-    fixedSexo?: "Masculino" | "Feminino"
-    relationshipType?: "pai" | "mae" | "filho" | "conjuge"
-    currentPersonId?: number
-    onSubmit: (data: PersonFormData | ExistingPersonFormData) => Promise<void>
-  }>({
-    title: "",
-    description: "",
-    person: undefined,
-    fixedSexo: undefined,
-    relationshipType: undefined,
-    currentPersonId: undefined,
-    onSubmit: async () => {},
-  })
 
   const handleAddUnlinkedPerson = useCallback(() => {
     setDialogConfig({
@@ -792,16 +807,6 @@ const GenealogicalTreeComponent = forwardRef<GenealogicalTreeHandle, Genealogica
   }));
 
   // Estado para modal de cônjuge personalizado
-  const [showSpouseModal, setShowSpouseModal] = useState(false)
-  const [currentPersonForSpouse, setCurrentPersonForSpouse] = useState<number | null>(null)
-  const [spouseSearchTerm, setSpouseSearchTerm] = useState("")
-  const [newSpouseData, setNewSpouseData] = useState({
-    nome: "",
-    sobrenome: "",
-    sexo: "",
-    data_nasc: "",
-    local_nasc: "",
-  })
 
   // Função para criar nova pessoa e união
   const handleCreateNewSpouse = useCallback(async () => {
@@ -1134,5 +1139,9 @@ const GenealogicalTreeComponent = forwardRef<GenealogicalTreeHandle, Genealogica
   )
 }
 )
+
+// forwardRef apaga o nome da função no DevTools e nas mensagens de erro do
+// React. O displayName devolve a identidade do componente ao diagnóstico.
+GenealogicalTreeComponent.displayName = "GenealogicalTree"
 
 export const genealogicalTree = GenealogicalTreeComponent;

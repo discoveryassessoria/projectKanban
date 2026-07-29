@@ -1151,6 +1151,8 @@ export function EditorAguardarRetorno({
   onClose,
   onSaved,
 }: StepEditorBaseProps) {
+  // Instante de referência do editor, fixado na montagem (ver fmtRelative).
+  const [agoraRef] = useState(() => Date.now())
   const [trackingCode, setTrackingCode] = useState("")
   const [notes, setNotes] = useState("")
   const [solicit, setSolicit] = useState<SolicitacaoSummary | null>(null)
@@ -1293,10 +1295,12 @@ export function EditorAguardarRetorno({
     }
   }
 
+  // "há quanto tempo" a partir de um instante fixado na montagem: o relógio não
+  // é lido durante o render (impuro), e o texto não muda sozinho entre renders.
   const fmtRelative = (iso: string) => {
     try {
       const d = new Date(iso)
-      const diffMs = Date.now() - d.getTime()
+      const diffMs = agoraRef - d.getTime()
       const diffH = Math.floor(diffMs / (1000 * 60 * 60))
       const diffD = Math.floor(diffH / 24)
       if (diffD === 0 && diffH === 0) return "agora há pouco"

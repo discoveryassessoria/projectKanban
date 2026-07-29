@@ -66,10 +66,6 @@ export default function ContasReceberPage() {
   const [searchTerm, setSearchTerm] = useState("")
   const [statusFilter, setStatusFilter] = useState<string>("todos")
 
-  useEffect(() => {
-    fetchFaturas()
-  }, [])
-
   const fetchFaturas = async () => {
     try {
       const response = await fetch('/api/faturas')
@@ -83,6 +79,11 @@ export default function ContasReceberPage() {
       setLoading(false)
     }
   }
+
+  useEffect(() => {
+    fetchFaturas()
+  }, [])
+
 
   const formatCurrency = (value: number) => {
     return new Intl.NumberFormat('pt-BR', {

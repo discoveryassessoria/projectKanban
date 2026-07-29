@@ -288,10 +288,6 @@ export function ProcessoFaturas({ processoId, nomeFamilia, onUpdate }: ProcessoF
   // ========================================
   // DATA LOADING
   // ========================================
-  useEffect(() => {
-    carregarDados()
-  }, [processoId])
-
   const carregarDados = async () => {
     try {
       setLoading(true)
@@ -324,6 +320,11 @@ export function ProcessoFaturas({ processoId, nomeFamilia, onUpdate }: ProcessoF
       setLoading(false)
     }
   }
+
+  useEffect(() => {
+    carregarDados()
+  }, [processoId])
+
 
   // ========================================
   // HANDLERS

@@ -11,6 +11,7 @@ import * as React from 'react'
 import { X, ArrowRight, ArrowLeft, Check, CreditCard, CalendarClock, Wallet, Landmark, ReceiptText, Sparkles } from 'lucide-react'
 import { authToken } from "@/src/lib/financeiro/http"
 import { fmtMoeda as brl } from "@/src/lib/financeiro/formato"
+import { useChaveIdempotencia } from "@/src/lib/financeiro/useChaveIdempotencia"
 
 const OURO = '#D2A948'
 const GLASS = 'rounded-xl border border-white/10 bg-white/[0.05] backdrop-blur-md'
@@ -25,6 +26,19 @@ async function jf(url: string, opts: RequestInit = {}) {
 type Cfg = any
 type Detalhe = any
 type Cobranca = any
+
+
+// Cartão de valor da simulação. Vive no MÓDULO, não dentro do render: declarar
+// um componente durante o render cria um TIPO novo a cada passagem e o React
+// remonta a subárvore inteira — perde estado, foco e anima do zero.
+function Card({ label, children, destaque }: { label: string; children: React.ReactNode; destaque?: boolean }) {
+  return (
+    <div className="rounded-xl border p-3" style={destaque ? { borderColor: `${OURO}55`, background: `${OURO}12` } : { borderColor: 'rgba(255,255,255,0.10)', background: 'rgba(255,255,255,0.03)' }}>
+      <p className="text-[10px] font-semibold uppercase tracking-wide text-white/45">{label}</p>
+      <div className="mt-1 text-sm font-semibold">{children}</div>
+    </div>
+  )
+}
 
 export function ReceitaCobrancaModal({ receitaId, onClose, onChanged }: { receitaId: number; onClose: () => void; onChanged?: () => void }) {
   const [det, setDet] = React.useState<Detalhe | null>(null)
@@ -170,7 +184,7 @@ function CobrancaWizard({ receitaId, valor, moeda, receita, onClose, onCriada }:
   const [sim, setSim] = React.useState<any>(null)
   const [simulando, setSimulando] = React.useState(false)
   // Chave de idempotência: uma por sessão do wizard (retry/duplo-clique não duplica).
-  const idemKey = React.useMemo(() => (typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : `idem-${Date.now()}-${Math.round(Math.random() * 1e9)}`), [])
+  const idemKeyRef = useChaveIdempotencia('idem')
   // Campos de câmbio comuns às requisições de simular/criar.
   const camposCambio = () => ({
     moedaRecebimento: f.moedaRecebimento ?? undefined,
@@ -240,7 +254,7 @@ function CobrancaWizard({ receitaId, valor, moeda, receita, onClose, onCriada }:
     try {
       const d = await jf(`/api/financeiro/receitas/${receitaId}/cobrancas`, {
         method: 'POST',
-        body: JSON.stringify({ ...f, ...camposCambio(), idempotencyKey: idemKey, nParcelas: nParcelas === '' ? undefined : nParcelas, politicaTaxasEscolhida: politicaEscolha ?? undefined }),
+        body: JSON.stringify({ ...f, ...camposCambio(), idempotencyKey: idemKeyRef.current, nParcelas: nParcelas === '' ? undefined : nParcelas, politicaTaxasEscolhida: politicaEscolha ?? undefined }),
       })
       setSucesso(d) // tela de sucesso (não fecha direto)
     } catch (e: any) { setErro(e.message) } finally { setSalvando(false) }
@@ -271,16 +285,14 @@ function CobrancaWizard({ receitaId, valor, moeda, receita, onClose, onCriada }:
     { n: 3, label: 'Recebimento', desc: 'Conta, moeda e cotação', icon: Landmark },
     { n: 4, label: 'Simulação e geração', desc: 'Revise, valide e gere', icon: Wallet },
   ]
-  const Card = ({ label, children, destaque }: { label: string; children: React.ReactNode; destaque?: boolean }) => (
-    <div className="rounded-xl border p-3" style={destaque ? { borderColor: `${OURO}55`, background: `${OURO}12` } : { borderColor: 'rgba(255,255,255,0.10)', background: 'rgba(255,255,255,0.03)' }}>
-      <p className="text-[10px] font-semibold uppercase tracking-wide text-white/45">{label}</p>
-      <div className="mt-1 text-sm font-semibold">{children}</div>
-    </div>
-  )
 
   // Painel da SIMULAÇÃO (etapa 4). Cards + cronograma em EUR e na moeda de
   // destino. A cotação/valores vêm do runtime — o frontend só apresenta.
-  const Simulacao = () => (
+  // NÃO é um componente: é um trecho de JSX. Declarar `const Simulacao = () => ...`
+  // dentro do render cria um TIPO de componente novo a cada render — o React
+  // desmonta e remonta a subárvore, perdendo estado e foco. Como valor JSX, o
+  // mesmo conteúdo apenas re-renderiza.
+  const simulacao = (
     <div className="space-y-4">
       {simulando && <p className="text-sm text-white/50">Simulando no servidor…</p>}
       {!simulando && sim && !sim.ok && (
@@ -474,7 +486,7 @@ function CobrancaWizard({ receitaId, valor, moeda, receita, onClose, onCriada }:
               <h4 className="text-base font-semibold">Simulação da cobrança</h4>
               <p className="text-xs text-white/50">Confira os valores, o cronograma e as conversões antes de gerar a cobrança.</p>
             </div>
-            <Simulacao />
+            {simulacao}
           </div>)}
           </div>{/* fim conteúdo esquerdo */}
 

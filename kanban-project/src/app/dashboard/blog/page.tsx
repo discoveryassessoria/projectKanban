@@ -84,6 +84,19 @@ export default function BlogAdminPage() {
   })
   const [saving, setSaving] = useState(false)
 
+  const fetchPosts = async () => {
+    try {
+      const response = await fetch('/api/admin/blog')
+      const data = await response.json()
+      setPosts(Array.isArray(data) ? data : [])
+    } catch (error) {
+      console.error('Erro ao buscar posts:', error)
+      setPosts([])
+    } finally {
+      setLoading(false)
+    }
+  }
+
   useEffect(() => {
     const token = localStorage.getItem("authToken")
     const userData = localStorage.getItem("user")
@@ -103,18 +116,6 @@ export default function BlogAdminPage() {
     }
   }, [router])
 
-  const fetchPosts = async () => {
-    try {
-      const response = await fetch('/api/admin/blog')
-      const data = await response.json()
-      setPosts(Array.isArray(data) ? data : [])
-    } catch (error) {
-      console.error('Erro ao buscar posts:', error)
-      setPosts([])
-    } finally {
-      setLoading(false)
-    }
-  }
 
   const handleLogout = () => { void encerrarSessao("manual") }
 

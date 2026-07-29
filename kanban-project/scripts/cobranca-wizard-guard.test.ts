@@ -37,7 +37,10 @@ ok('frontend NÃO recalcula taxa (usa sim.*)', src.includes('sim.valorTaxa') && 
 // ── full-page + sucesso ──
 ok('layout full-page (não modal pequeno)', src.includes('max-w-[1400px]') && src.includes('h-[92vh]') && !src.includes('max-w-lg'))
 ok('resumo lateral persistente (aside)', src.includes('<aside') && src.includes('Valores de referência'))
-ok('cards de valores (total/entrada/saldo/líquido)', src.includes('const Card =') && src.includes('Saldo financiado') && src.includes('Valor líquido'))
+// O cartão de valores existe — e vive no ESCOPO DE MÓDULO. Declarar componente
+// dentro do render cria um tipo novo a cada passagem e remonta a subárvore.
+ok('cards de valores (total/entrada/saldo/líquido)', /function Card\(|const Card =/.test(src) && src.includes('Saldo financiado') && src.includes('Valor líquido'))
+ok('Card não é declarado dentro do render', !/^\s+const Card = /m.test(src))
 ok('tela de sucesso pós-geração', src.includes('Cobrança criada com sucesso') && src.includes('setSucesso'))
 ok('barra "Etapa X de 4"', src.includes('Etapa {step} de 4'))
 

@@ -54,8 +54,11 @@ export function CentralFinanceira({ onIrPara }: { onIrPara?: (tab: string) => vo
 
   const aReceber = obrs.filter((o) => o.direcao === "A_RECEBER")
   const emAberto = aReceber.filter((o) => o.saldo > 0.005 && o.status !== "CANCELADA")
-  const agora = Date.now()
-  const vencidas = useMemo(() => emAberto.filter((o) => o.vencimento && new Date(o.vencimento).getTime() < agora).sort((a, b) => new Date(a.vencimento!).getTime() - new Date(b.vencimento!).getTime()), [obrs])
+  // Instante de referência do painel, fixado na montagem. Ler o relógio durante
+  // o render dá um valor diferente a cada passagem — a lista "vencidas" mudaria
+  // sozinha entre renders sem nada ter mudado nos dados.
+  const [agora] = useState(() => Date.now())
+  const vencidas = useMemo(() => emAberto.filter((o) => o.vencimento && new Date(o.vencimento).getTime() < agora).sort((a, b) => new Date(a.vencimento!).getTime() - new Date(b.vencimento!).getTime()), [obrs, agora])
   const vencendo = useMemo(() => emAberto.filter((o) => { const dd = diasAte(o.vencimento); return dd != null && dd >= 0 && dd <= horizonte }).sort((a, b) => new Date(a.vencimento!).getTime() - new Date(b.vencimento!).getTime()), [obrs, horizonte])
 
   const totalReceber = resumo?.aReceber?.saldo ?? emAberto.reduce((s, o) => s + o.saldo, 0)

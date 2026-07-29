@@ -166,6 +166,9 @@ export function PessoaOperacionalDrawer({
   onAddConjuge,
   onAddFilho,
 }: PessoaOperacionalDrawerProps) {
+  // "Hoje" fixado na montagem: ler o relógio durante o render faria a mesma
+  // lista mudar de status entre dois renders sem mudança de dado.
+  const [agoraMs] = useState(() => Date.now())
   const [pessoa, setPessoa] = useState<Pessoa | null>(null)
   const [loading, setLoading] = useState(false)
   const [erro, setErro] = useState<string | null>(null)
@@ -235,9 +238,7 @@ export function PessoaOperacionalDrawer({
   // SLA crítico: algum doc tem prazo vencido em mais de 5 dias?
   const slaCritico = docs.some((d) => {
     if (!d.dataPrazoOperacao) return false
-    const dias = Math.floor(
-      (new Date(d.dataPrazoOperacao).getTime() - Date.now()) / 86400000
-    )
+    const dias = Math.floor((new Date(d.dataPrazoOperacao).getTime() - agoraMs) / 86400000)
     return dias < -5
   })
 

@@ -14,6 +14,7 @@ import { LAYER } from "@/src/lib/ui/layers"
 import { uploadFiles } from "@/src/lib/storage"
 import { authHeaders } from "@/src/lib/financeiro/http"
 import { fmtMoeda as money } from "@/src/lib/financeiro/formato"
+import { useChaveIdempotencia } from "@/src/lib/financeiro/useChaveIdempotencia"
 
 const dataBR = (s?: string | null) => (s ? new Date(s).toLocaleDateString("pt-BR") : "—")
 const num = (v: unknown) => { const n = Number(String(v ?? "").replace(/\./g, "").replace(",", ".")); return Number.isFinite(n) ? n : Number(v) || 0 }
@@ -43,7 +44,7 @@ export default function EstornoModal({ obrigacaoId, moeda, pagamento, onClose, o
   const [erro, setErro] = useState<string | null>(null)
   const [ok, setOk] = useState(false)
   const fileRef = useRef<HTMLInputElement>(null)
-  const idemKey = useRef(`estorno-${pagamento.id}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`)
+  const idemKey = useChaveIdempotencia(`estorno-${pagamento.id}`)
 
   useEffect(() => {
     const onEsc = (e: KeyboardEvent) => { if (e.key === "Escape") onClose() }

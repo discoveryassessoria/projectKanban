@@ -227,32 +227,6 @@ export default function AdministratorPage() {
     }
   }, [])
 
-  useEffect(() => {
-    if (typeof window !== "undefined") {
-      const storedUser = localStorage.getItem("user")
-      if (storedUser) {
-        try {
-          setUser(JSON.parse(storedUser))
-        } catch {
-          setUser({ nome: "Usuário" })
-        }
-      }
-    }
-
-    const token = localStorage.getItem("authToken")
-    if (!token) {
-      router.push("/login")
-      return
-    }
-
-    if (!isAdminLoading && !isAdmin) {
-      router.push("/dashboard")
-    }
-
-    fetchHeaderData()
-    fetchPerfis()
-  }, [isAdmin, isAdminLoading, router, fetchPerfis])
-
   const fetchHeaderData = async () => {
     try {
       const [projetosRes, processosRes, arvoresRes] = await Promise.all([
@@ -288,6 +262,33 @@ export default function AdministratorPage() {
       setArvores([])
     }
   }
+
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      const storedUser = localStorage.getItem("user")
+      if (storedUser) {
+        try {
+          setUser(JSON.parse(storedUser))
+        } catch {
+          setUser({ nome: "Usuário" })
+        }
+      }
+    }
+
+    const token = localStorage.getItem("authToken")
+    if (!token) {
+      router.push("/login")
+      return
+    }
+
+    if (!isAdminLoading && !isAdmin) {
+      router.push("/dashboard")
+    }
+
+    fetchHeaderData()
+    fetchPerfis()
+  }, [isAdmin, isAdminLoading, router, fetchPerfis])
+
 
   // Carregar usuários
   const loadUsers = async () => {

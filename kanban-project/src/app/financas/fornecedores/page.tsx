@@ -93,10 +93,6 @@ export default function FornecedoresPage() {
     observacoes: "",
   })
 
-  useEffect(() => {
-    fetchFornecedores()
-  }, [])
-
   const fetchFornecedores = async () => {
     try {
       const response = await fetch('/api/fornecedores')
@@ -118,6 +114,11 @@ export default function FornecedoresPage() {
       setLoading(false)
     }
   }
+
+  useEffect(() => {
+    fetchFornecedores()
+  }, [])
+
 
   const formatCurrency = (value: number) => {
     return new Intl.NumberFormat('pt-BR', {

@@ -467,30 +467,6 @@ export function ProcessoCentralOperacional({
 
   // Delega o passo localizar_registro de uma necessidade (fila) SEM abrir a operação
   // nem criar Documento. Grava o responsável direto no passo.
-  const delegar = useCallback(
-    async (necessidadeId: number, responsavelId: number | null) => {
-      try {
-        const res = await fetch(`/api/processos/${processo.id}/genealogia/delegar`, {
-          method: "PATCH",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${localStorage.getItem("authToken")}`,
-          },
-          body: JSON.stringify({ necessidadeId, responsavelId }),
-        })
-        if (!res.ok) {
-          const j = await res.json().catch(() => ({}))
-          setErroOperacao(j?.error || `Não foi possível delegar (HTTP ${res.status}).`)
-          return
-        }
-        carregar(true)
-      } catch {
-        setErroOperacao("Falha de rede ao delegar.")
-      }
-    },
-    [processo.id]
-  )
-
   const getUserId = (): number | null => {
     try {
       const stored = localStorage.getItem("user")
@@ -502,6 +478,8 @@ export function ProcessoCentralOperacional({
     return null
   }
 
+  // `carregar` é declarada ANTES de quem a chama: leitura antecipada não
+  // acompanha mudanças do valor ao longo do tempo.
   const carregar = useCallback(
     async (modoSilencioso = false) => {
       if (!modoSilencioso) setLoading(true)
@@ -540,6 +518,32 @@ export function ProcessoCentralOperacional({
     },
     [processo.id]
   )
+
+  const delegar = useCallback(
+    async (necessidadeId: number, responsavelId: number | null) => {
+      try {
+        const res = await fetch(`/api/processos/${processo.id}/genealogia/delegar`, {
+          method: "PATCH",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${localStorage.getItem("authToken")}`,
+          },
+          body: JSON.stringify({ necessidadeId, responsavelId }),
+        })
+        if (!res.ok) {
+          const j = await res.json().catch(() => ({}))
+          setErroOperacao(j?.error || `Não foi possível delegar (HTTP ${res.status}).`)
+          return
+        }
+        carregar(true)
+      } catch {
+        setErroOperacao("Falha de rede ao delegar.")
+      }
+    },
+    [processo.id]
+  )
+
+
 
   // Lista de fases materializadas (para clicabilidade + navegação por instância).
   // Leitura pura; NUNCA materializa. Recarregada junto com a Central.

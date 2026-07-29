@@ -55,10 +55,6 @@ export default function FluxoCaixaPage() {
   const [mesAtual, setMesAtual] = useState(new Date())
   const [filtroTipo, setFiltroTipo] = useState<string>("todos")
 
-  useEffect(() => {
-    fetchDados()
-  }, [mesAtual])
-
   const fetchDados = async () => {
     try {
       // TODO: Implementar API
@@ -123,6 +119,11 @@ export default function FluxoCaixaPage() {
       setLoading(false)
     }
   }
+
+  useEffect(() => {
+    fetchDados()
+  }, [mesAtual])
+
 
   const formatCurrency = (value: number) => {
     return new Intl.NumberFormat('pt-BR', {

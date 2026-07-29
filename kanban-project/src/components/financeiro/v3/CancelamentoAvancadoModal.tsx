@@ -17,6 +17,7 @@ import { vocabularioFinanceiro } from "@/lib/financeiro/vocabulario"
 import { X, Loader2, CheckCircle2, AlertTriangle, Ban, Info as InfoIcon, ArrowRight } from "lucide-react"
 import { authHeaders } from "@/src/lib/financeiro/http"
 import { fmtMoeda as money } from "@/src/lib/financeiro/formato"
+import { useChaveIdempotencia } from "@/src/lib/financeiro/useChaveIdempotencia"
 
 const dataBR = (s?: string | null) => (s ? new Date(s).toLocaleDateString("pt-BR") : "—")
 const num = (v: unknown) => { const n = Number(String(v ?? "").replace(/\./g, "").replace(",", ".")); return Number.isFinite(n) ? n : Number(v) || 0 }
@@ -66,7 +67,7 @@ export default function CancelamentoAvancadoModal({ receitaRef, participantes, n
   const [erro, setErro] = useState<string | null>(null)
   const [ok, setOk] = useState(false)
   const debounce = useRef<ReturnType<typeof setTimeout> | null>(null)
-  const idemKey = useRef(`cancel-adv-${receitaRef}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`)
+  const idemKey = useChaveIdempotencia(`cancel-adv-${receitaRef}`)
 
   // ESC + scroll lock + carga inicial (parcelas pendentes + participantes + moeda).
   useEffect(() => {

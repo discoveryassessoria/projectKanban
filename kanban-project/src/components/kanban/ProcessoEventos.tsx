@@ -71,10 +71,6 @@ export function ProcessoEventos({ processoId, onUpdate }: ProcessoEventosProps) 
   const [lembreteDias, setLembreteDias] = useState("")
   const { pode } = usePermissoes()
 
-  useEffect(() => {
-    fetchEventos()
-  }, [processoId])
-
   const fetchEventos = async () => {
     try {
       const res = await fetch(`/api/eventos?processoId=${processoId}`)
@@ -86,6 +82,11 @@ export function ProcessoEventos({ processoId, onUpdate }: ProcessoEventosProps) 
       setIsLoading(false)
     }
   }
+
+  useEffect(() => {
+    fetchEventos()
+  }, [processoId])
+
 
   const resetForm = () => {
     setTitulo("")

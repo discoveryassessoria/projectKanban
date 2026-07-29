@@ -22,6 +22,7 @@ import { uploadFiles } from "@/src/lib/storage"
 import { calcularRecebimento } from "@/lib/financeiro/dominio/calculo-recebimento"
 import { authHeaders } from "@/src/lib/financeiro/http"
 import { fmtMoeda as fmt } from "@/src/lib/financeiro/formato"
+import { useChaveIdempotencia } from "@/src/lib/financeiro/useChaveIdempotencia"
 
 const dataBR = (s?: string | null) => (s ? new Date(s).toLocaleDateString("pt-BR") : "—")
 const fmtTamanho = (b?: number | null) => { if (b == null) return ""; if (b < 1024) return `${b} B`; if (b < 1048576) return `${(b / 1024).toFixed(0)} KB`; return `${(b / 1048576).toFixed(1)} MB` }
@@ -62,7 +63,7 @@ export default function PagarCustoView({ obrigacaoId, fornecedor, onClose, onDon
   const [ok, setOk] = useState(false)
   const fileRef = useRef<HTMLInputElement>(null)
   // idempotência estável por sessão da tela: duplo-clique/retry não duplica pagamento.
-  const idemKey = useRef(`custo-${obrigacaoId}-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`)
+  const idemKey = useChaveIdempotencia(`custo-${obrigacaoId}`)
 
   useEffect(() => {
     let vivo = true
@@ -107,20 +108,30 @@ export default function PagarCustoView({ obrigacaoId, fornecedor, onClose, onDon
 
   // Quais parcelas pagáveis este pagamento quita (ordem de vencimento) — informativo:
   // o status da ParcelaPagavel é DERIVADO do Ledger, nunca escrito pela tela.
-  const quitacaoPrevista = useMemo(() => {
-    let restante = totalPago
-    return parcelas
+  // Sem useMemo manual: a memoização artesanal aqui bloqueava a otimização do
+  // componente inteiro pelo React Compiler. O cálculo é barato e derivado.
+  const quitacaoPrevista = (() => {
+    // Consome o valor pago pelas parcelas em ordem de vencimento. O saldo
+    // restante caminha dentro do próprio reduce em vez de mutar uma variável do
+    // escopo — mesma conta, sem estado escapando do cálculo.
+    const abertas = parcelas
       .filter((p) => (p.status ?? "").toUpperCase() !== "PAGA" && (p.status ?? "").toUpperCase() !== "CANCELADA")
       .sort((a, b) => String(a.vencimento).localeCompare(String(b.vencimento)))
-      .map((p) => {
-        const aplica = cent(Math.min(restante, Number(p.valor)))
-        restante = cent(restante - aplica)
-        return { ...p, aplica }
-      })
-      .filter((p) => p.aplica > 0)
-  }, [parcelas, totalPago])
 
-  const pendencias = useMemo(() => {
+    const { itens } = abertas.reduce<{ restante: number; itens: (typeof abertas[number] & { aplica: number })[] }>(
+      (acc, p) => {
+        const aplica = cent(Math.min(acc.restante, Number(p.valor)))
+        acc.itens.push({ ...p, aplica })
+        return { restante: cent(acc.restante - aplica), itens: acc.itens }
+      },
+      { restante: totalPago, itens: [] },
+    )
+    return itens.filter((p) => p.aplica > 0)
+  })()
+
+  // Sem useMemo manual: a memoização artesanal aqui bloqueava a otimização do
+  // componente inteiro pelo React Compiler. O cálculo é barato e derivado.
+  const pendencias = (() => {
     const p: string[] = []
     const comValor = linhas.filter((l) => num(l.valor) > 0)
     if (!comValor.length) p.push("Adicione ao menos uma forma de pagamento com valor.")
@@ -131,7 +142,7 @@ export default function PagarCustoView({ obrigacaoId, fornecedor, onClose, onDon
     }
     if (desconto > saldoAberto + 0.01) p.push("O desconto não pode exceder o saldo em aberto.")
     return [...new Set(p)]
-  }, [linhas, desconto, saldoAberto])
+  })()
   const valido = pendencias.length === 0
 
   const setLinha = (id: number, patch: Partial<Linha>) => setLinhas((ls) => ls.map((l) => (l._id === id ? { ...l, ...patch } : l)))

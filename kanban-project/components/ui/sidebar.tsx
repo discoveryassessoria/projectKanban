@@ -565,10 +565,16 @@ function SidebarMenuSkeleton({
 }: React.ComponentProps<"div"> & {
   showIcon?: boolean
 }) {
-  // Random width between 50 to 90%.
+  // Largura variável do esqueleto (50–90%). Derivada do useId em vez de
+  // Math.random(): o esqueleto continua irregular como antes, mas o valor é
+  // determinístico por instância — aleatoriedade durante o render diverge entre
+  // servidor e cliente e quebra a hidratação.
+  const id = React.useId()
   const width = React.useMemo(() => {
-    return `${Math.floor(Math.random() * 40) + 50}%`
-  }, [])
+    let h = 0
+    for (let i = 0; i < id.length; i++) h = (h * 31 + id.charCodeAt(i)) >>> 0
+    return `${50 + (h % 40)}%`
+  }, [id])
 
   return (
     <div

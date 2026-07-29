@@ -20,6 +20,7 @@ import { calcularTaxas, type TaxaView } from "@/lib/financeiro/taxas-pagamento"
 import { calcularRecebimento } from "@/lib/financeiro/dominio/calculo-recebimento"
 import { authHeaders } from "@/src/lib/financeiro/http"
 import { fmtMoeda as fmt } from "@/src/lib/financeiro/formato"
+import { useChaveIdempotencia } from "@/src/lib/financeiro/useChaveIdempotencia"
 
 const brl = (v: number) => fmt(v || 0, "BRL")
 const eur = (v: number) => fmt(v || 0, "EUR")
@@ -88,7 +89,7 @@ export default function RegistrarPagamentoView({ obrigacaoId, receitaRef, escopo
   const [ok, setOk] = useState(false)
   const fileRef = useRef<HTMLInputElement>(null)
   // chave de idempotência estável por sessão da tela (double-click/retry não duplica)
-  const idemKey = useRef(`ui-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`)
+  const idemKey = useChaveIdempotencia("ui")
 
   // ── carregar dados ────────────────────────────────────────────────────────
   useEffect(() => {
@@ -174,7 +175,9 @@ export default function RegistrarPagamentoView({ obrigacaoId, receitaRef, escopo
   const pagadorNome = pagadorTipo === "EXTERNO" ? (ext.nome || "Externo") : (participantes.find((p) => p.pessoaId === pagadorPessoaId)?.nome ?? (pagadorTipo === "EMPRESA" ? "Empresa" : pagadorTipo === "TERCEIRO" ? "Terceiro" : "—"))
 
   // ── validação ─────────────────────────────────────────────────────────────
-  const pendencias = useMemo(() => {
+  // Sem useMemo manual: a memoização artesanal aqui bloqueava a otimização do
+  // componente inteiro pelo React Compiler. O cálculo é barato e derivado.
+  const pendencias = (() => {
     const p: string[] = []
     const comValor = linhas.filter((l) => num(l.valor) > 0)
     if (!comValor.length) p.push("Adicione ao menos uma forma de pagamento com valor.")
@@ -188,7 +191,7 @@ export default function RegistrarPagamentoView({ obrigacaoId, receitaRef, escopo
     if (creditoUtilizado > creditoDisponivel + 0.005) p.push(`Crédito utilizado (${brl(creditoUtilizado)}) excede o disponível (${brl(creditoDisponivel)}).`)
     if (geralInvalido) p.push("No pagamento geral, a soma das alocações deve ser igual ao total informado.")
     return [...new Set(p)]
-  }, [linhas, pagadorTipo, ext.nome, manualInvalido, creditoUtilizado, creditoDisponivel, geralInvalido])
+  })()
   const valido = pendencias.length === 0
 
   // ── ações ─────────────────────────────────────────────────────────────────

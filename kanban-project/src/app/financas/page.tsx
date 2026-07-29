@@ -53,11 +53,7 @@ export default function FinancasDashboard() {
   const [contasVencendo, setContasVencendo] = useState<ContaVencendo[]>([])
   const [loading, setLoading] = useState(true)
 
-  useEffect(() => {
-    fetchDados()
-  }, [])
-
-  const fetchDados = async () => {
+  async function fetchDados() {
     try {
       // Por enquanto, dados de exemplo
       // TODO: Implementar API
@@ -83,6 +79,11 @@ export default function FinancasDashboard() {
       setLoading(false)
     }
   }
+
+  useEffect(() => {
+    fetchDados()
+  }, [])
+
 
   const formatCurrency = (value: number) => {
     return new Intl.NumberFormat('pt-BR', {

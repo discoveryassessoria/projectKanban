@@ -63,15 +63,6 @@ export default function ActivityFilters({ onFiltersChange, activeFilters }: Acti
   const [usuarios, setUsuarios] = useState<Usuario[]>([])
   const [localFilters, setLocalFilters] = useState<FilterOptions>(activeFilters)
 
-  useEffect(() => {
-    fetchProcessos()
-    fetchUsuarios()
-  }, [])
-
-  useEffect(() => {
-    setLocalFilters(activeFilters)
-  }, [activeFilters])
-
   const fetchProcessos = async () => {
     try {
       const response = await fetch('/api/processos')
@@ -95,6 +86,17 @@ export default function ActivityFilters({ onFiltersChange, activeFilters }: Acti
       console.error('Erro ao carregar usuários:', error)
     }
   }
+
+  useEffect(() => {
+    fetchProcessos()
+    fetchUsuarios()
+  }, [])
+
+  useEffect(() => {
+    setLocalFilters(activeFilters)
+  }, [activeFilters])
+
+
 
   const handleFilterChange = (key: keyof FilterOptions, value: string) => {
     const newFilters = {

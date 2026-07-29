@@ -50,21 +50,6 @@ export function AcessoAppTab({ clienteId, clienteTipo, clienteEmail, clienteNome
   const [erro, setErro] = useState<string | null>(null)
 
   // Verificar se já tem acesso ao abrir
-  useEffect(() => {
-    if (clienteId) {
-      verificarAcesso()
-    } else {
-      setCarregando(false)
-    }
-  }, [clienteId])
-
-  // Atualizar email quando mudar
-  useEffect(() => {
-    if (clienteEmail && !temAcesso) {
-      setEmail(clienteEmail)
-    }
-  }, [clienteEmail])
-
   const verificarAcesso = async () => {
     setCarregando(true)
     setErro(null)
@@ -87,6 +72,22 @@ export function AcessoAppTab({ clienteId, clienteTipo, clienteEmail, clienteNome
       setCarregando(false)
     }
   }
+
+  useEffect(() => {
+    if (clienteId) {
+      verificarAcesso()
+    } else {
+      setCarregando(false)
+    }
+  }, [clienteId])
+
+  // Atualizar email quando mudar
+  useEffect(() => {
+    if (clienteEmail && !temAcesso) {
+      setEmail(clienteEmail)
+    }
+  }, [clienteEmail])
+
 
   const gerarAcesso = async () => {
     if (!email.trim()) {

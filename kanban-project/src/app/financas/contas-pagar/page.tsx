@@ -88,10 +88,6 @@ export default function ContasPagarPage() {
     observacoes: "",
   })
 
-  useEffect(() => {
-    fetchContas()
-  }, [])
-
   const fetchContas = async () => {
     setErro(null)
     try {
@@ -114,6 +110,11 @@ export default function ContasPagarPage() {
       setLoading(false)
     }
   }
+
+  useEffect(() => {
+    fetchContas()
+  }, [])
+
 
   const formatCurrency = (value: number) => {
     return new Intl.NumberFormat('pt-BR', {

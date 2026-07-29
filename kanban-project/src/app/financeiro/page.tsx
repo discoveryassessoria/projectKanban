@@ -100,6 +100,16 @@ export default function FinanceiroPage() {
   const [dash, setDash] = useState<DashboardData | null>(null)
   const [loading, setLoading] = useState(true)
 
+  async function carregarDashboard() {
+    setLoading(true)
+    try {
+      const token = localStorage.getItem("authToken")
+      const res = await fetch("/api/financas/dashboard", { headers: { Authorization: `Bearer ${token}` } })
+      if (res.ok) setDash(await res.json())
+    } catch (e) { console.error(e) }
+    finally { setLoading(false) }
+  }
+
   useEffect(() => {
     setMounted(true)
     if (typeof window !== "undefined") {
@@ -111,15 +121,6 @@ export default function FinanceiroPage() {
     fetch("/api/arvore").then(r => r.ok ? r.json() : null).then(d => setArvores(Array.isArray(d) ? d : [])).catch(() => {})
   }, [])
 
-  async function carregarDashboard() {
-    setLoading(true)
-    try {
-      const token = localStorage.getItem("authToken")
-      const res = await fetch("/api/financas/dashboard", { headers: { Authorization: `Bearer ${token}` } })
-      if (res.ok) setDash(await res.json())
-    } catch (e) { console.error(e) }
-    finally { setLoading(false) }
-  }
 
   const handleLogout = () => { void encerrarSessao("manual") }
 

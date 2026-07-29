@@ -129,7 +129,10 @@ export default function EditarDistribuicaoView({ obrigacaoId, receitaRef, onClos
   const fechaBrl = soma100 // BRL é partição exata do total; fechamento vem da base
   const disponiveisRestantes = (dist?.disponiveis ?? []).filter((d: any) => !rows.some((r) => r.requerenteId === d.requerenteId))
 
-  const pendencias = useMemo(() => {
+  // Sem useMemo manual: `incluidos` é derivado de `rows` a cada render e a lista
+  // de pendências é barata. A memoização manual aqui impedia o React Compiler de
+  // otimizar o componente INTEIRO — trocar uma memo de string por nada é lucro.
+  const pendencias = (() => {
     const p: string[] = []
     if (!incluidos.length) p.push("Inclua ao menos um participante.")
     if (!soma100) p.push(`A distribuição soma ${money(totalDistribuido, moedaBase)}, deve ser ${money(totalBase, moedaBase)} (100%).`)
@@ -137,7 +140,7 @@ export default function EditarDistribuicaoView({ obrigacaoId, receitaRef, onClos
     for (const r of incluidos) if (r.valorBase < r.recebidoBase - 0.005) p.push(`${r.nome}: valor abaixo do já recebido (${money(r.recebidoBase, moedaBase)}).`)
     for (const r of incluidos) if (r.valorBase < 0) p.push(`${r.nome}: valor negativo.`)
     return [...new Set(p)]
-  }, [incluidos, soma100, totalDistribuido, totalBase, moedaBase, fechaBrl, totalDistribuidoBrl, alvoBrl])
+  })()
   const valido = pendencias.length === 0 && !!dist
 
   const salvar = async () => {

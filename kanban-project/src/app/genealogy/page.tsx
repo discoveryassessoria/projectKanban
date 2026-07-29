@@ -109,25 +109,6 @@ export default function GenealogyPage() {
   const [estatisticas, setEstatisticas] = useState<Estatisticas>({ totalPessoas: 0, totalDocumentos: 0, totalArvores: 0 })
   const [pesquisasRecentes, setPesquisasRecentes] = useState<string[]>([])
 
-  useEffect(() => {
-    const token = localStorage.getItem("authToken")
-    const userData = localStorage.getItem("user")
-
-    if (!token || !userData) {
-      router.push("/login")
-      return
-    }
-
-    try {
-      const user = JSON.parse(userData)
-      setUsuario(user)
-      fetchData()
-    } catch (error) {
-      console.error("Erro ao carregar dados do usuário:", error)
-      router.push("/login")
-    }
-  }, [router])
-
   const fetchData = async () => {
     try {
       const estatRes = await fetch("/api/genealogy/estatisticas")
@@ -156,6 +137,26 @@ export default function GenealogyPage() {
       setIsLoading(false)
     }
   }
+
+  useEffect(() => {
+    const token = localStorage.getItem("authToken")
+    const userData = localStorage.getItem("user")
+
+    if (!token || !userData) {
+      router.push("/login")
+      return
+    }
+
+    try {
+      const user = JSON.parse(userData)
+      setUsuario(user)
+      fetchData()
+    } catch (error) {
+      console.error("Erro ao carregar dados do usuário:", error)
+      router.push("/login")
+    }
+  }, [router])
+
 
   const handleLogout = () => { void encerrarSessao("manual") }
   
