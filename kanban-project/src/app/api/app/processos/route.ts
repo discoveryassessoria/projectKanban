@@ -2,6 +2,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { extrairToken } from '@/src/lib/app-auth';
+import { FASES, phaseKeyToFaseCode } from '@/src/lib/process-stage/fases-catalog';
 
 export async function GET(request: NextRequest) {
   try {
@@ -96,11 +97,17 @@ export async function GET(request: NextRequest) {
       if (progresso === 100) statusVisual = 'finalizado';
       else if (progresso > 0) statusVisual = 'em_execucao';
 
+      // Nome da fase atual pelo catálogo (label bonito, ex.: "Genealogia"),
+      // não a chave crua do banco ("genealogia"). Mesma fonte usada na rota
+      // de detalhe do processo — mantém as duas telas consistentes.
+      const faseAtualCode = phaseKeyToFaseCode(processo.faseAtualKey);
+      const etapaAtualLabel = faseAtualCode ? FASES[faseAtualCode].label : null;
+
       return {
         id: processo.id,
         nome: processo.nome,
         pais: processo.pais,
-        etapaAtual: processo.faseAtualKey ?? null,
+        etapaAtual: etapaAtualLabel,
         progresso,
         totalTarefas,
         tarefasConcluidas,
