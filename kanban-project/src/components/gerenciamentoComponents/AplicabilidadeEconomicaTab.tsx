@@ -3,6 +3,7 @@
 // LOTE D — Aplicabilidade Econômica (PhaseEconomicRule): liga FASE → COMPONENTE → produtos
 // (custo/receita). É aqui que o Marco liga Tradução/Apostila/Retificação SEM seed/código.
 import { useState, useEffect, useCallback } from 'react'
+import { useApi } from "@/src/lib/dados"
 
 type Regra = {
   id: number; tipoProcessoId: number | null; phaseKey: string; documentTypeCode: string | null
@@ -35,22 +36,20 @@ async function jsonFetch(url: string, options: RequestInit = {}) {
 const VAZIO: Form = { tipoProcessoId: null, phaseKey: 'emissao_documental', documentTypeCode: null, appliesTo: 'any', componentKey: '', componentName: '', custoProdutoCode: null, receitaProdutoCode: null, participaPlanilha: true, ordem: 0, ativo: true }
 
 export default function AplicabilidadeEconomicaTab() {
-  const [d, setD] = useState<Data | null>(null)
-  const [loading, setLoading] = useState(true)
-  const [erro, setErro] = useState<string | null>(null)
+  // A resposta inteira vem da camada de dados. `erroSalvar` continua sendo
+  // estado: é erro de ESCRITA, que não pertence à consulta — e `erro` combina os
+  // dois para a tela, que só precisa saber "deu problema e qual".
+  const { dados: d, carregando: loading, erro: erroCarregar, recarregar: carregar } =
+    useApi<Data>('/api/gerenciamento/aplicabilidade-economica')
+  const [erroSalvar, setErroSalvar] = useState<string | null>(null)
+  const erro = erroSalvar ?? erroCarregar?.message ?? null
   const [form, setForm] = useState<Form | null>(null)
   const [salvando, setSalvando] = useState(false)
 
-  const carregar = useCallback(async () => {
-    setLoading(true); setErro(null)
-    try { setD(await jsonFetch('/api/gerenciamento/aplicabilidade-economica')) }
-    catch (e: any) { setErro(e.message) } finally { setLoading(false) }
-  }, [])
-  useEffect(() => { carregar() }, [carregar])
 
   async function salvar() {
     if (!form) return
-    setSalvando(true); setErro(null)
+    setSalvando(true); setErroSalvar(null)
     try {
       const url = form.id ? `/api/gerenciamento/aplicabilidade-economica/${form.id}` : '/api/gerenciamento/aplicabilidade-economica'
       // F3.3 — envia os FKs canônicos (id) além dos códigos; o backend prioriza os ids.
@@ -59,7 +58,7 @@ export default function AplicabilidadeEconomicaTab() {
       const tipoDocumentoId = (d?.docTypes || []).find(t => t.code === form.documentTypeCode)?.id ?? null
       await jsonFetch(url, { method: form.id ? 'PUT' : 'POST', body: JSON.stringify({ ...form, custoConfigId, receitaConfigId, tipoDocumentoId }) })
       setForm(null); await carregar()
-    } catch (e: any) { setErro(e.message) } finally { setSalvando(false) }
+    } catch (e: any) { setErroSalvar(e.message) } finally { setSalvando(false) }
   }
   async function excluir(r: Regra) {
     if (!confirm(`Excluir a regra "${r.componentName}" (${faseLabel(r.phaseKey)})?`)) return

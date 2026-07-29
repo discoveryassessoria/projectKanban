@@ -6,6 +6,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { usePermissoes } from '@/src/hooks/use-permissoes'
 import { ExclusaoDefinitivaModal } from './ExclusaoDefinitivaModal'
+import { useApi } from "@/src/lib/dados"
 
 type Item = {
   id: number; code: string; name: string; descricao: string | null
@@ -29,12 +30,19 @@ async function jsonFetch(url: string, options: RequestInit = {}) {
 
 const VAZIO: Form = { code: '', name: '', descricao: '', natureza: 'DOCUMENTO', categoria: '', unidade: 'UNIDADE', ativo: true }
 
+// Identidade estável para a ausência de dados (evita recomputar memos).
+const SEM_ITENS: never[] = Object.freeze([]) as never[]
+
 export default function CatalogoMestreTab() {
-  const [itens, setItens] = useState<Item[]>([])
-  const [naturezas, setNaturezas] = useState<string[]>([])
-  const [unidades, setUnidades] = useState<string[]>([])
-  const [loading, setLoading] = useState(true)
-  const [erro, setErro] = useState<string | null>(null)
+  // Uma consulta, três listas derivadas da mesma resposta. `erroSalvar` fica
+  // como estado (erro de escrita) e `erro` combina os dois para a tela.
+  const { dados, carregando: loading, erro: erroCarregar, recarregar: carregar } =
+    useApi<{ itens?: Item[]; naturezas?: string[]; unidades?: string[] }>('/api/gerenciamento/catalogo-mestre')
+  const itens: Item[] = dados?.itens ?? SEM_ITENS
+  const naturezas: string[] = dados?.naturezas ?? SEM_ITENS
+  const unidades: string[] = dados?.unidades ?? SEM_ITENS
+  const [erroSalvar, setErroSalvar] = useState<string | null>(null)
+  const erro = erroSalvar ?? erroCarregar?.message ?? null
   const [form, setForm] = useState<Form | null>(null)
   const [salvando, setSalvando] = useState(false)
   const [busca, setBusca] = useState('')
@@ -42,25 +50,17 @@ export default function CatalogoMestreTab() {
   const podeExcluirDefinitivo = pode('sistema.exclusaoDefinitiva')
   const [modalExcluir, setModalExcluir] = useState<Item | null>(null)
 
-  const carregar = useCallback(async () => {
-    setLoading(true); setErro(null)
-    try {
-      const d = await jsonFetch('/api/gerenciamento/catalogo-mestre')
-      setItens(d.itens || []); setNaturezas(d.naturezas || []); setUnidades(d.unidades || [])
-    } catch (e: any) { setErro(e.message) } finally { setLoading(false) }
-  }, [])
-  useEffect(() => { carregar() }, [carregar])
 
   async function salvar() {
     if (!form) return
-    setSalvando(true); setErro(null)
+    setSalvando(true); setErroSalvar(null)
     try {
       const url = form.id ? `/api/gerenciamento/catalogo-mestre/${form.id}` : '/api/gerenciamento/catalogo-mestre'
       // Chave técnica interna gerada/mantida no backend — o frontend nunca envia `code`.
       const { code: _code, ...payload } = form
       await jsonFetch(url, { method: form.id ? 'PUT' : 'POST', body: JSON.stringify(payload) })
       setForm(null); await carregar()
-    } catch (e: any) { setErro(e.message) } finally { setSalvando(false) }
+    } catch (e: any) { setErroSalvar(e.message) } finally { setSalvando(false) }
   }
   async function excluir(it: Item) {
     // Com permissão sistema.exclusaoDefinitiva: modal de exclusão definitiva (limpeza de dados de teste).
