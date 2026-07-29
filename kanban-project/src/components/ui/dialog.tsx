@@ -47,10 +47,13 @@ function useRemoveBodyPadding(isOpen: boolean) {
 
 const Dialog = ({ children, ...props }: React.ComponentProps<typeof DialogPrimitive.Root>) => {
   const [isOpen, setIsOpen] = React.useState(props.open ?? false)
-  
-  React.useEffect(() => {
+
+  // O estado interno segue o `open` controlado: ajuste durante o render.
+  const [openAplicado, setOpenAplicado] = React.useState(props.open)
+  if (openAplicado !== props.open) {
+    setOpenAplicado(props.open)
     setIsOpen(props.open ?? false)
-  }, [props.open])
+  }
   
   useRemoveBodyPadding(isOpen)
   

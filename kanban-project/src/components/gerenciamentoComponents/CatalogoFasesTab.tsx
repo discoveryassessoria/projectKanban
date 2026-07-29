@@ -54,18 +54,28 @@ export default function CatalogoFasesTab() {
   const [erro, setErro] = useState<string | null>(null)
   const [form, setForm] = useState<Form | null>(null)
 
+  // BUSCA (só rede) × APLICAÇÃO (só estado).
+  const buscar = useCallback(async (sinal?: AbortSignal) => {
+    const res = await fetch("/api/gerenciamento/catalogo-fases", { headers: authHeaders(), cache: "no-store", signal: sinal })
+    const j = await res.json().catch(() => ({}))
+    if (!res.ok) throw new Error(j.error || "Não foi possível carregar o catálogo de fases.")
+    return j.fases || []
+  }, [])
+  const aplicar = useCallback((fases: any[]) => { setRows(fases) }, [])
+  useEffect(() => {
+    const ac = new AbortController()
+    buscar(ac.signal)
+      .then((fases) => { if (!ac.signal.aborted) aplicar(fases) })
+      .catch((e: any) => { if (!ac.signal.aborted) setErro(e?.message || "Não foi possível carregar o catálogo de fases.") })
+      .finally(() => { if (!ac.signal.aborted) setLoading(false) })
+    return () => ac.abort()
+  }, [buscar, aplicar])
   const load = useCallback(async () => {
     setLoading(true); setErro(null)
-    try {
-      const res = await fetch("/api/gerenciamento/catalogo-fases", { headers: authHeaders(), cache: "no-store" })
-      const j = await res.json().catch(() => ({}))
-      if (res.ok) setRows(j.fases || [])
-      else setErro(j.error || "Não foi possível carregar o catálogo de fases.")
-    } catch {
-      setErro("Não foi possível carregar o catálogo de fases.")
-    } finally { setLoading(false) }
-  }, [])
-  useEffect(() => { load() }, [load])
+    try { aplicar(await buscar()) }
+    catch (e: any) { setErro(e?.message || "Não foi possível carregar o catálogo de fases.") }
+    finally { setLoading(false) }
+  }, [buscar, aplicar])
 
   const showFlash = (m: string) => { setFlash(m); setTimeout(() => setFlash(""), 3000) }
 

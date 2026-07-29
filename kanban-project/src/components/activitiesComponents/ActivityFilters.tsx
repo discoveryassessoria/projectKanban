@@ -63,14 +63,26 @@ export default function ActivityFilters({ onFiltersChange, activeFilters }: Acti
   const [usuarios, setUsuarios] = useState<Usuario[]>([])
   const [localFilters, setLocalFilters] = useState<FilterOptions>(activeFilters)
 
+  // MONTAGEM: buscas no efeito; estado só na continuação das promessas.
   useEffect(() => {
-    fetchProcessos()
-    fetchUsuarios()
+    const ac = new AbortController()
+    fetch('/api/processos', { signal: ac.signal })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((data) => { if (!ac.signal.aborted && data) setProcessos(data.processos || data || []) })
+      .catch((error) => { if (!ac.signal.aborted) console.error('Erro ao carregar processos:', error) })
+    fetch('/api/usuarios', { signal: ac.signal })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((data) => { if (!ac.signal.aborted && data) setUsuarios(data.usuarios || data || []) })
+      .catch((error) => { if (!ac.signal.aborted) console.error('Erro ao carregar usuários:', error) })
+    return () => ac.abort()
   }, [])
 
-  useEffect(() => {
+  // Rascunho local segue os filtros aplicados: ajuste durante o render.
+  const [filtrosAplicados, setFiltrosAplicados] = useState(activeFilters)
+  if (filtrosAplicados !== activeFilters) {
+    setFiltrosAplicados(activeFilters)
     setLocalFilters(activeFilters)
-  }, [activeFilters])
+  }
 
   const fetchProcessos = async () => {
     try {

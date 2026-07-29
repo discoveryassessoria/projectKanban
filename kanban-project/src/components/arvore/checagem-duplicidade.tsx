@@ -79,11 +79,14 @@ export function ChecagemDuplicidade({
   const podeBuscar = nome.trim().length >= 2
 
   // Trocar o nome invalida a checagem: a liberação valia para AQUELE nome.
-  useEffect(() => {
+  // Ajuste de estado durante o render (derivado do nome digitado), sem efeito.
+  const [nomeChecado, setNomeChecado] = useState(termo)
+  if (nomeChecado !== termo) {
+    setNomeChecado(termo)
     setCandidatos(null)
     setNivel("LIVRE")
     aoLiberarCriacao(false, null)
-  }, [nome, sobrenome, aoLiberarCriacao])
+  }
 
   const buscar = useCallback(async () => {
     if (!podeBuscar) return
@@ -115,7 +118,7 @@ export function ChecagemDuplicidade({
     } finally {
       setBuscando(false)
     }
-  }, [authFetch, nome, podeBuscar])
+  }, [authFetch, nome, sobrenome, dataNasc, podeBuscar])
 
   // Ordena por semelhança real com o que está sendo digitado, não por ordem de
   // banco — o candidato certo precisa aparecer primeiro.

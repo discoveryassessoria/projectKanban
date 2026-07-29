@@ -66,7 +66,10 @@ export default function CancelamentoAvancadoModal({ receitaRef, participantes, n
   const [erro, setErro] = useState<string | null>(null)
   const [ok, setOk] = useState(false)
   const debounce = useRef<ReturnType<typeof setTimeout> | null>(null)
-  const idemKey = useRef(`cancel-adv-${receitaRef}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`)
+  const idemRef = useRef<string | null>(null)
+  // Chave gerada SOB DEMANDA, no envio: gerar durante o render seria impuro
+  // (Date.now/Math.random) e instável entre renders.
+  const idemKey = () => (idemRef.current ??= `cancel-adv-${receitaRef}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`)
 
   // ESC + scroll lock + carga inicial (parcelas pendentes + participantes + moeda).
   useEffect(() => {
@@ -120,10 +123,11 @@ export default function CancelamentoAvancadoModal({ receitaRef, participantes, n
   }, [receitaRef, patch])
 
   useEffect(() => {
-    setPrevisao(null); setPreviewErro(null)
     if (!entradaMinima) return
     if (debounce.current) clearTimeout(debounce.current)
-    debounce.current = setTimeout(() => { rodarPreview() }, 450)
+    // A limpeza da previsão anterior acontece junto do recálculo (no timer),
+    // nunca de forma síncrona no corpo do efeito.
+    debounce.current = setTimeout(() => { setPrevisao(null); setPreviewErro(null); rodarPreview() }, 450)
     return () => { if (debounce.current) clearTimeout(debounce.current) }
   }, [entradaMinima, rodarPreview])
 
@@ -136,7 +140,7 @@ export default function CancelamentoAvancadoModal({ receitaRef, participantes, n
     try {
       const r = await fetch(`/api/financeiro/v3/receita/${encodeURIComponent(receitaRef)}/cancelamento-avancado`, {
         method: "POST", headers: { "Content-Type": "application/json", ...authHeaders() },
-        body: JSON.stringify({ ...patch, motivo: motivo.trim(), idempotencyKey: idemKey.current }),
+        body: JSON.stringify({ ...patch, motivo: motivo.trim(), idempotencyKey: idemKey() }),
       })
       const j = await r.json().catch(() => ({}))
       if (!r.ok || j.ok === false) { setErro(j?.erro || (j?.erros?.[0]) || `Falha ao cancelar (HTTP ${r.status}).`); setEnviando(false); return }

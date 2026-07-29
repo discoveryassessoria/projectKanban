@@ -105,7 +105,20 @@ export default function ModosInternosFasesTab() {
     }
   }, [])
 
-  useEffect(() => { carregar() }, [carregar])
+  // MONTAGEM: sem escrita síncrona de estado no efeito.
+  useEffect(() => {
+    const ac = new AbortController()
+    jsonFetch(BASE, { cache: 'no-store', signal: ac.signal })
+      .then((d) => {
+        if (ac.signal.aborted) return
+        setTipos((d as any).tiposProcesso || [])
+        setModos((d as any).modos || [])
+        setModelos((d as any).modelosInternos || [])
+      })
+      .catch((e: any) => { if (!ac.signal.aborted) setErroCarregar(e.message || 'Não foi possível carregar.') })
+      .finally(() => { if (!ac.signal.aborted) setLoading(false) })
+    return () => ac.abort()
+  }, [])
 
   function flashSucesso(msg: string) {
     setSucesso(msg)

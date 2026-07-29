@@ -55,7 +55,11 @@ export function RequerenteModal({
   const [camposPersonalizados, setCamposPersonalizados] = useState<CampoPersonalizado[]>([])
 
   // Atualizar campos personalizados quando o requerente, mode ou isOpen mudarem
-  useEffect(() => {
+  // Sincroniza o formulário com o registro/modo de abertura: ajuste de estado
+  // durante o render (derivado de props), sem efeito.
+  const [entradaAtual, setEntradaAtual] = useState(`${isOpen}|${mode}|${requerente?.id ?? 'novo'}`)
+  if (entradaAtual !== `${isOpen}|${mode}|${requerente?.id ?? 'novo'}`) {
+    setEntradaAtual(`${isOpen}|${mode}|${requerente?.id ?? 'novo'}`)
     if (isOpen) {
       if (requerente?.campos_personalizados && (mode === 'view' || mode === 'edit')) {
         try {
@@ -77,10 +81,10 @@ export function RequerenteModal({
         setCamposPersonalizados([])
       }
     }
-  }, [requerente, mode, isOpen])
+  }
 
   // Atualizar formData quando requerente, mode ou isOpen mudarem
-  useEffect(() => {
+  if (entradaAtual === `${isOpen}|${mode}|${requerente?.id ?? 'novo'}`) {
     if (isOpen) {
       if (requerente && (mode === 'view' || mode === 'edit')) {
         setFormData({
@@ -101,7 +105,7 @@ export function RequerenteModal({
         })
       }
     }
-  }, [requerente, mode, isOpen])
+  }
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()

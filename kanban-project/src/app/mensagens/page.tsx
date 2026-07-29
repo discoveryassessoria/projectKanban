@@ -7,6 +7,7 @@ import { getStoredUser, isAuthenticated } from "@/lib/auth"
 import { usePermissoes } from "@/src/hooks/use-permissoes"
 import { HeaderBar } from "@/src/components/header-bar"
 import { Send, MessageCircle, ArrowLeft, Pencil, Trash2, X, Check } from "lucide-react"
+import { useMontadoNoCliente } from "@/src/hooks/use-dados-headerbar"
 
 interface User {
   id: number
@@ -78,8 +79,10 @@ function formatarDataSeparador(dataStr: string): string {
 export default function MensagensPage() {
   const router = useRouter()
   const { pode } = usePermissoes()
-  const [user, setUser] = useState<User | null>(null)
-  const [loading, setLoading] = useState(true)
+  // Sessão é estado EXTERNO (armazenamento do navegador): derivada, não copiada.
+  const montado = useMontadoNoCliente()
+  const user = (montado ? getStoredUser() : null) as User | null
+  const loading = !montado
 
   const [conversas, setConversas] = useState<Conversa[]>([])
   const [loadingConversas, setLoadingConversas] = useState(true)
@@ -99,20 +102,10 @@ export default function MensagensPage() {
   const inputRef = useRef<HTMLTextAreaElement>(null)
   const editInputRef = useRef<HTMLTextAreaElement>(null)
 
-  // Auth
+  // Porteiro: sem sessão válida, volta ao login. Só navegação.
   useEffect(() => {
-    if (!isAuthenticated()) {
-      router.push("/login")
-      return
-    }
-    const userData = getStoredUser()
-    if (!userData) {
-      router.push("/login")
-      return
-    }
-    setUser(userData)
-    setLoading(false)
-  }, [router])
+    if (montado && (!isAuthenticated() || !getStoredUser())) router.push("/login")
+  }, [montado, router])
 
   // Buscar conversas
   const buscarConversas = useCallback(async () => {
@@ -129,13 +122,22 @@ export default function MensagensPage() {
     }
   }, [])
 
+  // Conversas: primeira carga + atualização a cada 15s. A escrita de estado
+  // acontece sempre na continuação da promessa, nunca no corpo do efeito.
   useEffect(() => {
-    if (!loading) {
-      buscarConversas()
-      const interval = setInterval(buscarConversas, 15000)
-      return () => clearInterval(interval)
+    if (loading) return
+    const ac = new AbortController()
+    const puxar = () => {
+      fetch("/api/admin/mensagens", { signal: ac.signal })
+        .then((res) => (res.ok ? res.json() : null))
+        .then((data) => { if (!ac.signal.aborted && data) setConversas(data.conversas || []) })
+        .catch((error) => { if (!ac.signal.aborted) console.error("Erro ao buscar conversas:", error) })
+        .finally(() => { if (!ac.signal.aborted) setLoadingConversas(false) })
     }
-  }, [loading, buscarConversas])
+    puxar()
+    const interval = setInterval(puxar, 15000)
+    return () => { clearInterval(interval); ac.abort() }
+  }, [loading])
 
   // Abrir conversa
   const abrirConversa = useCallback(

@@ -37,7 +37,7 @@ interface AcessoAppTabProps {
 }
 
 export function AcessoAppTab({ clienteId, clienteTipo, clienteEmail, clienteNome, isViewMode }: AcessoAppTabProps) {
-  const [carregando, setCarregando] = useState(true)
+  const [carregando, setCarregando] = useState(!!clienteId)
   const [temAcesso, setTemAcesso] = useState(false)
   const [acesso, setAcesso] = useState<AcessoInfo | null>(null)
   const [email, setEmail] = useState(clienteEmail || "")
@@ -49,21 +49,40 @@ export function AcessoAppTab({ clienteId, clienteTipo, clienteEmail, clienteNome
   const [revogando, setRevogando] = useState(false)
   const [erro, setErro] = useState<string | null>(null)
 
-  // Verificar se já tem acesso ao abrir
+  // Verificação do acesso ao abrir. O corpo vive DENTRO do efeito: nenhuma
+  // escrita de estado acontece no corpo síncrono.
   useEffect(() => {
-    if (clienteId) {
-      verificarAcesso()
-    } else {
-      setCarregando(false)
-    }
-  }, [clienteId])
+    if (!clienteId) return
+    void (async () => {
+      setCarregando(true)
+      setErro(null)
+      try {
+        const response = await fetch(`/api/app/gerar-acesso?tipo=${clienteTipo}&id=${clienteId}`)
+        const data = await response.json()
+      
+        if (data.temAcesso) {
+          setTemAcesso(true)
+          setAcesso(data.acesso)
+          setEmail(data.acesso.email)
+        } else {
+          setTemAcesso(false)
+          setAcesso(null)
+        }
+      } catch (error) {
+        console.error("Erro ao verificar acesso:", error)
+        setErro("Erro ao verificar acesso ao app")
+      } finally {
+        setCarregando(false)
+      }
+    })()
+  }, [clienteId, clienteTipo])
 
-  // Atualizar email quando mudar
-  useEffect(() => {
-    if (clienteEmail && !temAcesso) {
-      setEmail(clienteEmail)
-    }
-  }, [clienteEmail])
+  // E-mail do cliente semeia o campo enquanto não há acesso: ajuste no render.
+  const [emailSemeado, setEmailSemeado] = useState(clienteEmail)
+  if (emailSemeado !== clienteEmail) {
+    setEmailSemeado(clienteEmail)
+    if (clienteEmail && !temAcesso) setEmail(clienteEmail)
+  }
 
   const verificarAcesso = async () => {
     setCarregando(true)
@@ -450,7 +469,7 @@ export function AcessoAppTab({ clienteId, clienteTipo, clienteEmail, clienteNome
         <div className="space-y-2 text-sm text-gray-600">
           <div className="flex items-start gap-2">
             <span className="text-indigo-500 font-bold text-xs mt-0.5">1</span>
-            <p>Clique em <strong>"Gerar acesso ao app"</strong> para criar login e senha temporária</p>
+            <p>Clique em <strong>&quot;Gerar acesso ao app&quot;</strong> para criar login e senha temporária</p>
           </div>
           <div className="flex items-start gap-2">
             <span className="text-indigo-500 font-bold text-xs mt-0.5">2</span>

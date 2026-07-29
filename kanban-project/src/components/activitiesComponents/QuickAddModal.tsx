@@ -71,23 +71,11 @@ export default function QuickAddModal({
   const [loadingProcessos, setLoadingProcessos] = useState(false)
   const [errors, setErrors] = useState<{[key: string]: string}>({})
 
-  // Carregar dados quando modal abrir
-  useEffect(() => {
-    if (isOpen) {
-      fetchUsuarios()
-      fetchProcessos()
-      // Auto-focus no campo nome
-      setTimeout(() => {
-        const nomeInput = document.getElementById('quick-add-nome')
-        if (nomeInput) {
-          nomeInput.focus()
-        }
-      }, 100)
-    }
-  }, [isOpen])
 
-  // Reset form quando fechar
-  useEffect(() => {
+  // Reset ao FECHAR: ajuste de estado durante o render (derivado de `isOpen`).
+  const [abertoAnterior, setAbertoAnterior] = useState(isOpen)
+  if (abertoAnterior !== isOpen) {
+    setAbertoAnterior(isOpen)
     if (!isOpen) {
       setFormData({
         nome: '',
@@ -99,7 +87,7 @@ export default function QuickAddModal({
       })
       setErrors({})
     }
-  }, [isOpen, classification.category])
+  }
 
   const fetchUsuarios = async () => {
     try {

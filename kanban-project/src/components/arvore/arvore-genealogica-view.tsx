@@ -109,14 +109,16 @@ export function ArvoreGenealogicaView({
     }
   }, [pessoaIdParaFocar, sidebarTabParaFocar, pessoas, pessoaFocada])
 
-  useEffect(() => {
+  // A pessoa selecionada acompanha a lista recarregada: ajuste de estado durante
+  // o render (derivado de `pessoas`), sem efeito.
+  const [pessoasAplicadas, setPessoasAplicadas] = useState(pessoas)
+  if (pessoasAplicadas !== pessoas) {
+    setPessoasAplicadas(pessoas)
     if (selectedPerson) {
       const pessoaAtualizada = pessoas.find(p => p.id === selectedPerson.id)
-      if (pessoaAtualizada && pessoaAtualizada !== selectedPerson) {
-        setSelectedPerson(pessoaAtualizada)
-      }
+      if (pessoaAtualizada && pessoaAtualizada !== selectedPerson) setSelectedPerson(pessoaAtualizada)
     }
-  }, [pessoas])
+  }
 
   // Exportação em PDF.
   //
@@ -324,12 +326,21 @@ export function ArvoreGenealogicaView({
     }
   }, [processoId])
 
+  // Indicadores documentais: busca no efeito, estado só na continuação.
   useEffect(() => {
-    fetchNecessidades()
-  }, [fetchNecessidades])
+    if (!processoId) return
+    const ac = new AbortController()
+    authFetch(`/api/processos/${processoId}/necessidades`, { signal: ac.signal })
+      .then((r) => (r.ok ? r.json() : null)) // sem permissão documental: segue sem indicador
+      .then((data) => { if (!ac.signal.aborted && data) setNecessidades(Array.isArray(data?.necessidades) ? data.necessidades : []) })
+      .catch((error) => { if (!ac.signal.aborted) console.error('Erro ao carregar indicadores documentais:', error) })
+    return () => ac.abort()
+  }, [processoId])
 
-  const fetchArvore = async () => {
-    if (!arvoreId) return
+
+  // Recarga da árvore por ação do usuário (adicionar/editar/excluir pessoa).
+  const fetchArvore = useCallback(async () => {
+if (!arvoreId) return
 
     try {
       const response = await authFetch(`/api/arvore/${arvoreId}`)
@@ -372,14 +383,56 @@ export function ArvoreGenealogicaView({
     } finally {
       setLoading(false)
     }
-  }
+  }, [arvoreId])
 
+  // Carga da árvore. O corpo vive DENTRO do efeito: nenhuma escrita de estado
+  // acontece no corpo síncrono — todas ficam na continuação assíncrona.
   useEffect(() => {
-    if (!arvoreId) {
-      setLoading(false)
-      return
-    }
-    fetchArvore()
+    void (async () => {
+      if (!arvoreId) return
+
+      try {
+        const response = await authFetch(`/api/arvore/${arvoreId}`)
+
+        if (response.ok) {
+          const data = await response.json()
+          setPessoas(data.pessoas || [])
+          setPosicoesNodes(data.posicoesNodes || null)  // ✅ NOVO
+
+          if (!data.pessoas || data.pessoas.length === 0) {
+            setShowOnboarding(true)
+          } else {
+            setShowOnboarding(false)
+          }
+
+          const todasUnioes: UniaoArvore[] = []
+          data.pessoas?.forEach((p: PessoaArvore) => {
+            p.unioesComoPessoa1?.forEach((u: UniaoArvore) => {
+              if (!todasUnioes.find(x => x.id === u.id)) {
+                todasUnioes.push(u)
+              }
+            })
+            p.unioesComoPessoa2?.forEach((u: UniaoArvore) => {
+              if (!todasUnioes.find(x => x.id === u.id)) {
+                todasUnioes.push(u)
+              }
+            })
+          })
+          setUnioes(todasUnioes)
+
+          if (data.pessoaPrincipalId) {
+            const principal = data.pessoas?.find((p: PessoaArvore) => p.id === data.pessoaPrincipalId)
+            setPessoaPrincipal(principal || null)
+          } else if (data.pessoas?.length > 0) {
+            setPessoaPrincipal(data.pessoas[0])
+          }
+        }
+      } catch (error) {
+        console.error('Erro ao carregar árvore:', error)
+      } finally {
+        setLoading(false)
+      }
+    })()
   }, [arvoreId])
 
   const handleToggleFullscreen = async () => {
@@ -852,9 +905,12 @@ function AddPersonModal({
     backgroundPosition: 'right 12px center'
   }
 
-  useEffect(() => {
+  // Adição de cônjuge implica casamento: derivado do tipo, ajustado no render.
+  const [tipoAplicado, setTipoAplicado] = useState(type)
+  if (tipoAplicado !== type) {
+    setTipoAplicado(type)
     if (type === 'conjuge') setIsCasado(true)
-  }, [type])
+  }
 
   // Relação estrutural do tipo de adição, para o caminho de REUSO do requerente:
   // ao vincular a Pessoa existente, propaga os mesmos vínculos que o form aplicaria.

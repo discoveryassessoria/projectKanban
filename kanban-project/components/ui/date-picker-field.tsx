@@ -81,7 +81,11 @@ export function DatePickerField({
     return isNaN(parsed.getTime()) ? undefined : parsed
   }, [value])
 
-  React.useEffect(() => {
+  // Campo e mês/ano visíveis seguem o valor controlado: ajuste de estado durante
+  // o render (derivado de prop), sem efeito.
+  const [valorAplicado, setValorAplicado] = React.useState(dateValue?.getTime() ?? null)
+  if (valorAplicado !== (dateValue?.getTime() ?? null)) {
+    setValorAplicado(dateValue?.getTime() ?? null)
     if (dateValue) {
       setInputValue(format(dateValue, "dd/MM/yyyy"))
       setViewMonth(dateValue.getMonth())
@@ -89,7 +93,7 @@ export function DatePickerField({
     } else {
       setInputValue("")
     }
-  }, [dateValue])
+  }
 
   // ✅ CORREÇÃO: Gerar todos os anos disponíveis para permitir navegação completa
   const years = React.useMemo(() => {

@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useMemo, useSyncExternalStore } from "react"
 
 interface User {
   id: number
@@ -9,27 +9,32 @@ interface User {
   tipo: string
 }
 
-export function useIsAdmin() {
-  const [isAdmin, setIsAdmin] = useState(false)
-  const [isLoading, setIsLoading] = useState(true)
-  const [user, setUser] = useState<User | null>(null)
+// O usuário logado é um estado EXTERNO ao React (localStorage). Ler com
+// useSyncExternalStore em vez de copiar para o estado num efeito: não há render
+// intermediário com valor errado, o hook reage a login/logout em outra aba e o
+// snapshot do servidor (undefined) representa honestamente "ainda não sei".
+const CHAVE = "user"
 
-  useEffect(() => {
+function subscrever(aoMudar: () => void) {
+  window.addEventListener("storage", aoMudar)
+  return () => window.removeEventListener("storage", aoMudar)
+}
+const lerNoCliente = () => localStorage.getItem(CHAVE)
+const lerNoServidor = () => undefined
+
+export function useIsAdmin() {
+  const bruto = useSyncExternalStore(subscrever, lerNoCliente, lerNoServidor)
+
+  const user = useMemo<User | null>(() => {
+    if (!bruto) return null
     try {
-      const userData = localStorage.getItem("user")
-      if (userData) {
-        const parsedUser = JSON.parse(userData) as User
-        setUser(parsedUser)
-        setIsAdmin(parsedUser.tipo === "admin")
-      }
+      return JSON.parse(bruto) as User
     } catch (error) {
       console.error("Erro ao verificar tipo de usuário:", error)
-      setIsAdmin(false)
-      setUser(null)
-    } finally {
-      setIsLoading(false)
+      return null
     }
-  }, [])
+  }, [bruto])
 
-  return { isAdmin, isLoading, user }
+  // undefined = servidor/hidratação (ainda não lemos o armazenamento do navegador).
+  return { isAdmin: user?.tipo === "admin", isLoading: bruto === undefined, user }
 }

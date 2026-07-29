@@ -75,8 +75,10 @@ export function PhaseProgressHeader({
     }
   }, [processoId])
 
+  // Carga/recarga: o corpo vive DENTRO do efeito — nenhuma escrita de estado no
+  // corpo síncrono, todas na continuação assíncrona.
   useEffect(() => {
-    carregar()
+    void (async () => { await carregar() })()
   }, [carregar, refreshKey])
 
   // Skeleton enquanto carrega

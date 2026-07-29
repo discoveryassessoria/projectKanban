@@ -45,14 +45,37 @@ export default function MigracaoMotorTab() {
       }
     } finally { setLoading(false) }
   }, [])
-  useEffect(() => { load() }, [load])
+  // MONTAGEM: sem escrita síncrona de estado no efeito.
+  useEffect(() => {
+    const ac = new AbortController()
+    fetch("/api/gerenciamento/migracao-motor", { headers: authHeaders(), signal: ac.signal })
+      .then((res) => (res.ok ? res.json() : null))
+      .then((d) => {
+        if (ac.signal.aborted || !d) return
+        setTotal(d.total || 0); setConectados(d.conectados || 0)
+        setPorPais(d.porPais || []); setTipos(d.tipos || [])
+      })
+      .catch(() => {})
+      .finally(() => { if (!ac.signal.aborted) setLoading(false) })
+    return () => ac.abort()
+  }, [])
 
-  // recalcula a prévia quando muda país/overwrite
+  // Recalcula a prévia (usado também após conectar/desconectar).
   const calcPreview = useCallback(async (p: string, ow: boolean) => {
     const res = await fetch("/api/gerenciamento/migracao-motor", { method: "POST", headers: authHeaders(), body: JSON.stringify({ action: "preview", pais: p, overwrite: ow }) })
     if (res.ok) { const d = await res.json(); setPreview(d.count ?? null) }
   }, [])
-  useEffect(() => { if (!loading) calcPreview(pais, overwrite) }, [pais, overwrite, loading, calcPreview])
+
+  // recalcula a prévia quando muda país/overwrite (só depois da carga inicial)
+  useEffect(() => {
+    if (loading) return
+    const ac = new AbortController()
+    fetch("/api/gerenciamento/migracao-motor", { method: "POST", headers: authHeaders(), body: JSON.stringify({ action: "preview", pais, overwrite }), signal: ac.signal })
+      .then((res) => (res.ok ? res.json() : null))
+      .then((d) => { if (!ac.signal.aborted && d) setPreview(d.count ?? null) })
+      .catch(() => {})
+    return () => ac.abort()
+  }, [pais, overwrite, loading])
 
   async function conectar() {
     if (tipoId === "") { setErro("Escolha um tipo de processo."); return }

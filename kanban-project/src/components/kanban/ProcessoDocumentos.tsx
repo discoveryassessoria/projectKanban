@@ -266,9 +266,27 @@ export function ProcessoDocumentos({ processo }: ProcessoDocumentosProps) {
     [processo.id]
   )
 
+  // MONTAGEM: busca no efeito; estado só na continuação da promessa.
   useEffect(() => {
-    carregar()
-  }, [carregar])
+    const ac = new AbortController()
+    fetch(`/api/processos/${processo.id}/documentos`, {
+      headers: { Authorization: `Bearer ${localStorage.getItem("authToken")}` },
+      signal: ac.signal,
+    })
+      .then(async (res) => {
+        if (res.status === 404) throw new Error("Endpoint /api/processos/[id]/documentos ainda não existe.")
+        if (!res.ok) throw new Error(`HTTP ${res.status}`)
+        const json: ProcessoDocumentosData = await res.json()
+        if (!ac.signal.aborted) setData(json)
+      })
+      .catch((e) => {
+        if (ac.signal.aborted) return
+        console.warn("[ProcessoDocumentos] falha:", e)
+        setErro((e as Error)?.message ?? "Erro ao carregar Pasta Documental.")
+      })
+      .finally(() => { if (!ac.signal.aborted) setLoading(false) })
+    return () => ac.abort()
+  }, [processo.id])
 
   // -- Renderização
 

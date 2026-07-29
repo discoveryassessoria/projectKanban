@@ -28,6 +28,7 @@ import {
 } from "@/src/types/kanban"
 import { usePermissoes } from "@/src/hooks/use-permissoes"
 import { Shield } from "lucide-react"
+import { useMontadoNoCliente } from "@/src/hooks/use-dados-headerbar"
 
 interface User {
   id: number
@@ -43,7 +44,9 @@ export function KanbanContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
 
-  const [user, setUser] = useState<User | null>(null)
+  // Sessão é estado EXTERNO do navegador: derivada, não copiada num efeito.
+  const montado = useMontadoNoCliente()
+  const user = (montado ? getStoredUser() : null) as User | null
   const [loading, setLoading] = useState(true)
 
   // Tabs
@@ -114,14 +117,18 @@ export function KanbanContent() {
     }
   }, [searchParams])
 
-  // Ler parâmetros da URL para abertura automática do modal
-  useEffect(() => {
+  // Parâmetros da URL → estado de abertura do modal. Ajuste de estado durante o
+  // render (padrão do React para estado derivado de prop que muda): uma vez por
+  // combinação de querystring, sem efeito e sem render descartado.
+  const chaveParams = searchParams.toString()
+  const [paramsAplicados, setParamsAplicados] = useState<string | null>(null)
+  if (chaveParams !== paramsAplicados) {
+    setParamsAplicados(chaveParams)
     const processoId = searchParams.get("processoId")
     const tab = searchParams.get("tab")
     const pessoaId = searchParams.get("pessoaId")
     const sidebarTab = searchParams.get("sidebarTab")
     const tarefaPaiId = searchParams.get("tarefaPaiId")
-
     if (processoId) setInitialProcessoId(parseInt(processoId))
     if (tab) setInitialTab(tab)
     if (pessoaId) setInitialPessoaId(parseInt(pessoaId))
@@ -129,20 +136,16 @@ export function KanbanContent() {
     if (tarefaPaiId) setInitialTarefaPaiId(parseInt(tarefaPaiId))
     const atividadeId = searchParams.get("atividadeId")
     if (atividadeId) setInitialAtividadeId(parseInt(atividadeId))
-  }, [searchParams])
-
-  // Atualizar país quando URL mudar (depois da config carregada)
-  useEffect(() => {
     const urlPais = (searchParams.get("pais") || "").toLowerCase()
-    if (urlPais && paisesDisponiveis.some(p => p.countryKey === urlPais)) {
-      setPaisSelecionado(urlPais)
-    }
-  }, [searchParams, paisesDisponiveis])
+    if (urlPais && paisesDisponiveis.some(p => p.countryKey === urlPais)) setPaisSelecionado(urlPais)
+  }
 
-  // Ao trocar de país, seleciona o primeiro tipo dele
-  useEffect(() => {
+  // Ao trocar de país, a seleção de tipo volta ao padrão: derivado no render.
+  const [paisDoTipo, setPaisDoTipo] = useState(paisSelecionado)
+  if (paisDoTipo !== paisSelecionado) {
+    setPaisDoTipo(paisSelecionado)
     setTipoSelecionadoId(null)
-  }, [paisSelecionado])
+  }
 
   // Ambiente visual: o país selecionado no Kanban é uma FONTE CONFIÁVEL do fundo
   // (sem processo aberto = lista filtrada por país). Só decora — não altera layout.
@@ -242,38 +245,54 @@ export function KanbanContent() {
     }
   }
 
-  // Efeito inicial - autenticação e dados globais
+  // Porteiro: sem sessão válida, volta ao login. Só navegação.
   useEffect(() => {
-    if (!isAuthenticated()) {
-      router.push("/login")
-      return
-    }
+    if (montado && (!isAuthenticated() || !getStoredUser())) router.push("/login")
+  }, [montado, router])
 
-    const userData = getStoredUser()
-    if (!userData) {
-      router.push("/login")
-      return
-    }
-
-    setUser(userData)
-
-    // Buscar dados globais (não dependem do país)
+  // Dados globais (não dependem do país): as buscas acontecem no efeito e o
+  // estado só é escrito na continuação das promessas.
+  useEffect(() => {
+    if (!montado || !isAuthenticated()) return
+    const ac = new AbortController()
+    const vivo = () => !ac.signal.aborted
+    const json = (url: string) => fetch(url, { signal: ac.signal }).then((r) => (r.ok ? r.json() : null))
     Promise.all([
-      carregarConfig(),
-      buscarContratantes(),
-      buscarRequerentes(),
-      buscarArvores()
-    ]).finally(() => {
-      setLoading(false)
-    })
+      json("/api/kanban-config"),
+      json("/api/contratantes"),
+      json("/api/requerentes"),
+      json("/api/arvore"),
+    ])
+      .then(([config, cts, reqs, arv]) => {
+        if (!vivo()) return
+        if (config) {
+          const paises: PaisKanban[] = config.paises || []
+          setPaisesDisponiveis(paises)
+          setTipos(config.tipos || [])
+          const urlPais = (searchParams.get("pais") || "").toLowerCase()
+          const inicial = paises.find(p => p.countryKey === urlPais)?.countryKey ?? paises[0]?.countryKey ?? null
+          setPaisSelecionado(prev => prev ?? inicial)
+        }
+        if (cts) setContratantes(cts.contratantes || [])
+        if (reqs) setRequerentes(reqs.requerentes || [])
+        if (arv) setArvores(Array.isArray(arv) ? arv : [])
+      })
+      .catch((error) => { if (vivo()) console.error("Erro ao carregar dados do kanban:", error) })
+      .finally(() => { if (vivo()) setLoading(false) })
+    return () => ac.abort()
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [router])
+  }, [montado])
 
-  // Efeito quando país muda - buscar processos do país
+  // País mudou → processos daquele país. Busca no efeito, estado na continuação.
   useEffect(() => {
     if (!paisSelecionado) return
-    buscarProcessos(paisSelecionado)
-  }, [paisSelecionado, buscarProcessos])
+    const ac = new AbortController()
+    fetch(`/api/processos?pais=${paisSelecionado}`, { signal: ac.signal })
+      .then((response) => (response.ok ? response.json() : null))
+      .then((data) => { if (!ac.signal.aborted && data) setProcessos(data.processos || []) })
+      .catch((error) => { if (!ac.signal.aborted) console.error("Erro ao buscar processos:", error) })
+    return () => ac.abort()
+  }, [paisSelecionado])
 
   // Refresh apenas do país atual
   const handleRefresh = useCallback(() => {

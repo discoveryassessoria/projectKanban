@@ -108,26 +108,44 @@ export default function CategoriasTab() {
   // categoria com mestre já vinculado → origem/mestre travados na edição
   const origemTravada = !!editando && editando.origem !== 'LEGADO'
 
-  const carregar = useCallback(async () => {
-    setLoading(true); setErroLista(null)
-    try {
-      const data = await jsonFetch('/api/gerenciamento/categorias', { cache: 'no-store' })
-      setCategorias((data as any).categorias || [])
+  // Carga da tela em UM lugar: `aplicar` só escreve estado; quem chama decide
+  // se mostra o estado de carregamento. `sinal` cancela a escrita se a tela sair.
+  // BUSCA: só entrada/saída de rede, nenhuma escrita de estado.
+  const buscar = useCallback(async (sinal?: AbortSignal) => {
+      const data = await jsonFetch('/api/gerenciamento/categorias', { cache: 'no-store', signal: sinal })
       const m = (data as any).mestres || {}
+    return { data, m }
+  }, [])
+  // APLICAÇÃO: ponto único de escrita do estado da carga.
+  const aplicar = useCallback(({ data, m }: any) => {
+      setCategorias((data as any).categorias || [])
       setMestres({
         documento: (m.tiposDocumento || []).map((d: any) => ({ id: d.id, label: d.name, code: d.code ?? null })),
         servico: (m.servicos || []).map((x: any) => ({ id: x.id, label: x.publicCode ? `${x.publicCode} — ${x.name}` : x.name, code: x.code ?? null })),
         honorario: [], // mestre legado: sem lista de seleção (só leitura do vínculo antigo)
         processo: (m.tiposProcesso || []).map((p: any) => ({ id: p.id, label: p.name, code: null })),
       })
-    } catch (e: any) {
-      setErroLista(e.message || 'Não foi possível carregar as categorias.')
-    } finally {
-      setLoading(false)
-    }
   }, [])
 
-  useEffect(() => { carregar() }, [carregar])
+  // MONTAGEM: o efeito não escreve estado de forma síncrona (`Loading` já nasce
+  // true e `ErroLista` nasce null) — a escrita acontece na continuação da promessa.
+  useEffect(() => {
+    const ac = new AbortController()
+    buscar(ac.signal)
+      .then((d) => { if (!ac.signal.aborted) aplicar(d) })
+      .catch((e: any) => { if (!ac.signal.aborted) setErroLista(e.message || 'Não foi possível carregar as categorias.') })
+      .finally(() => { if (!ac.signal.aborted) setLoading(false) })
+    return () => ac.abort()
+  }, [buscar, aplicar])
+
+  // RECARGA por ação do usuário (salvar/excluir/atualizar): aí sim volta ao
+  // estado de carregamento antes de buscar de novo.
+  const carregar = useCallback(async () => {
+    setLoading(true); setErroLista(null)
+    try { aplicar(await buscar()) }
+    catch (e: any) { setErroLista(e.message || 'Não foi possível carregar as categorias.') }
+    finally { setLoading(false) }
+  }, [buscar, aplicar])
 
   const filtradas = useMemo(() => {
     const q = busca.trim().toLowerCase()

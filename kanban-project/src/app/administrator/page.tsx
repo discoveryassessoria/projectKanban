@@ -64,6 +64,7 @@ import {
   ExecMatrixTab, SystemHealthTab, RoleCatalogTab,
   DocMatrixTab, ConfigVersionsTab, ConfigDiagnosisTab,
 } from "@/src/components/gerenciamentoComponents/GerenciamentoScaffolds6"
+import { useDadosHeaderBar } from "@/src/hooks/use-dados-headerbar"
 
 // ============================================================
 // MAPA DE TELAS (screen key → componente). Inalterado — só as views que o
@@ -357,9 +358,8 @@ export default function GerenciamentoPage() {
   const [navCollapsed, setNavCollapsed] = useState(false)                // árvore recolhida (rail)
   const [mobileNav, setMobileNav] = useState(false)
 
-  const [user, setUser] = useState<UserData>({ nome: "Usuário" })
-  const [processos, setProcessos] = useState<any[]>([])
-  const [arvores, setArvores] = useState<any[]>([])
+  // Usuário + processos + árvores do HeaderBar: hook único (sem efeito por tela).
+  const { user, processos, arvores } = useDadosHeaderBar()
 
   // resolve a primeira tela útil de um módulo (defaultRoute). Se o módulo não tiver
   // tela ativa (não deveria, entre os visíveis), devolve null.
@@ -462,13 +462,6 @@ export default function GerenciamentoPage() {
     localStorage.removeItem("authToken"); localStorage.removeItem("user"); router.push("/login")
   }
 
-  const fetchHeaderData = useCallback(async () => {
-    try {
-      const [pr, a] = await Promise.all([fetch("/api/processos"), fetch("/api/arvore")])
-      if (pr.ok) setProcessos((await pr.json()).processos || [])
-      if (a.ok) { const ad = await a.json(); setArvores(Array.isArray(ad) ? ad : []) }
-    } catch { /* silencioso */ }
-  }, [])
 
   // montagem: deep-link + sincronização com botão voltar/avançar do browser.
   // CRÍTICO (accordion): este sync SÓ pode rodar no MOUNT e no POPSTATE — nunca a
@@ -486,16 +479,13 @@ export default function GerenciamentoPage() {
     return () => window.removeEventListener("popstate", onPop)
   }, [])
 
+  // Porteiro da rota: sem token vai para o login; sem perfil de administrador
+  // volta para o painel. Só navegação — nenhuma escrita de estado.
   useEffect(() => {
-    if (typeof window !== "undefined") {
-      const stored = localStorage.getItem("user")
-      if (stored) { try { setUser(JSON.parse(stored)) } catch { setUser({ nome: "Usuário" }) } }
-    }
     const token = localStorage.getItem("authToken")
     if (!token) { router.push("/login"); return }
-    if (!permLoading && !isAdmin) { router.push("/dashboard"); return }
-    fetchHeaderData()
-  }, [isAdmin, permLoading, router, fetchHeaderData])
+    if (!permLoading && !isAdmin) router.push("/dashboard")
+  }, [isAdmin, permLoading, router])
 
   if (permLoading) {
     return (

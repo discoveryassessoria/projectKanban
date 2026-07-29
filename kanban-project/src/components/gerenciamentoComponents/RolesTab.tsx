@@ -75,22 +75,29 @@ export default function RolesTab() {
   const [salvando, setSalvando] = useState(false)
   const [erroModal, setErroModal] = useState<string | null>(null)
 
+  // BUSCA (só rede) × APLICAÇÃO (só estado).
+  const buscar = useCallback(async (sinal?: AbortSignal) => {
+    const data = await jsonFetch('/api/perfis', { cache: 'no-store', signal: sinal })
+    return (data as any).perfis || []
+  }, [])
+  const aplicar = useCallback((ps: any[]) => { setPerfis(ps) }, [])
+
+  useEffect(() => {
+    const ac = new AbortController()
+    buscar(ac.signal)
+      .then((ps) => { if (!ac.signal.aborted) aplicar(ps) })
+      .catch((e: any) => { if (!ac.signal.aborted) setErroLista(e.message || 'Não foi possível carregar os perfis.') })
+      .finally(() => { if (!ac.signal.aborted) setLoading(false) })
+    return () => ac.abort()
+  }, [buscar, aplicar])
+
   const carregar = useCallback(async () => {
     setLoading(true)
     setErroLista(null)
-    try {
-      const data = await jsonFetch('/api/perfis', { cache: 'no-store' })
-      setPerfis((data as any).perfis || [])
-    } catch (e: any) {
-      setErroLista(e.message || 'Não foi possível carregar os perfis.')
-    } finally {
-      setLoading(false)
-    }
-  }, [])
-
-  useEffect(() => {
-    carregar()
-  }, [carregar])
+    try { aplicar(await buscar()) }
+    catch (e: any) { setErroLista(e.message || 'Não foi possível carregar os perfis.') }
+    finally { setLoading(false) }
+  }, [buscar, aplicar])
 
   const perfisFiltrados = useMemo(() => {
     const q = busca.trim().toLowerCase()

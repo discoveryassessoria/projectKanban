@@ -54,6 +54,10 @@ export function MiniLinhaSVG({
   formatY,
   ariaLabel,
 }: MiniLinhaSVGProps) {
+  // ID único do gradiente (evita conflito com outros gráficos na mesma página).
+  // Declarado ANTES de qualquer retorno antecipado: hook não pode ser condicional.
+  const gradId = React.useId()
+
   // Guard: sem pontos
   if (!points || points.length === 0) {
     return (
@@ -115,9 +119,6 @@ export function MiniLinhaSVG({
 
   // Y ticks (3 linhas horizontais de referência)
   const yTicks = [yMin, (yMin + yMax) / 2, yMax]
-
-  // ID único pro gradient (evita conflito quando há múltiplos gráficos)
-  const gradId = React.useId()
 
   return (
     <div className="fin-linha" aria-label={ariaLabel}>

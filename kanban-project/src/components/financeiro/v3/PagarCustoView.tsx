@@ -62,7 +62,10 @@ export default function PagarCustoView({ obrigacaoId, fornecedor, onClose, onDon
   const [ok, setOk] = useState(false)
   const fileRef = useRef<HTMLInputElement>(null)
   // idempotência estável por sessão da tela: duplo-clique/retry não duplica pagamento.
-  const idemKey = useRef(`custo-${obrigacaoId}-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`)
+  const idemRef = useRef<string | null>(null)
+  // Chave gerada SOB DEMANDA, no envio: gerar durante o render seria impuro
+  // (Date.now/Math.random) e instável entre renders.
+  const idemKey = () => (idemRef.current ??= `custo-${obrigacaoId}-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`)
 
   useEffect(() => {
     let vivo = true
@@ -91,14 +94,18 @@ export default function PagarCustoView({ obrigacaoId, fornecedor, onClose, onDon
 
   const moeda = custo?.moeda ?? "BRL"
   const saldoAberto = Number(custo?.saldoBrl ?? custo?.saldo ?? 0)
-  const desconto = num(ajustes.desconto), juros = num(ajustes.juros), multa = num(ajustes.multa), acrescimo = num(ajustes.acrescimo)
+  const desconto = num(ajustes.desconto)
+  const juros = num(ajustes.juros)
+  const multa = num(ajustes.multa)
+  const acrescimo = num(ajustes.acrescimo)
 
-  // FONTE ÚNICA de cálculo — a MESMA função revalidada no backend.
-  const calc = calcularRecebimento({
+  // FONTE ÚNICA de cálculo — a MESMA função revalidada no backend. Memorizada
+  // para que os valores derivados dela sejam dependências estáveis.
+  const calc = useMemo(() => calcularRecebimento({
     saldoSelecionado: saldoAberto,
     linhas: linhas.map((l) => ({ valor: num(l.valor) })),
     desconto, juros, multa, acrescimo, creditoUtilizado: 0,
-  })
+  }), [saldoAberto, linhas, desconto, juros, multa, acrescimo])
   const totalPago = calc.totalInformado
   const devido = calc.valorLiquidoDevido
   const saldoRestante = calc.saldoRestante
@@ -108,16 +115,19 @@ export default function PagarCustoView({ obrigacaoId, fornecedor, onClose, onDon
   // Quais parcelas pagáveis este pagamento quita (ordem de vencimento) — informativo:
   // o status da ParcelaPagavel é DERIVADO do Ledger, nunca escrito pela tela.
   const quitacaoPrevista = useMemo(() => {
-    let restante = totalPago
-    return parcelas
+    // Percorre em ordem de vencimento consumindo o valor informado. O acumulador
+    // é local ao laço (não é reatribuído de dentro de um callback).
+    const abertas = parcelas
       .filter((p) => (p.status ?? "").toUpperCase() !== "PAGA" && (p.status ?? "").toUpperCase() !== "CANCELADA")
       .sort((a, b) => String(a.vencimento).localeCompare(String(b.vencimento)))
-      .map((p) => {
-        const aplica = cent(Math.min(restante, Number(p.valor)))
-        restante = cent(restante - aplica)
-        return { ...p, aplica }
-      })
-      .filter((p) => p.aplica > 0)
+    const resultado: (typeof abertas[number] & { aplica: number })[] = []
+    let restante = totalPago
+    for (const p of abertas) {
+      const aplica = cent(Math.min(restante, Number(p.valor)))
+      restante = cent(restante - aplica)
+      if (aplica > 0) resultado.push({ ...p, aplica })
+    }
+    return resultado
   }, [parcelas, totalPago])
 
   const pendencias = useMemo(() => {
@@ -182,7 +192,7 @@ export default function PagarCustoView({ obrigacaoId, fornecedor, onClose, onDon
         parcialTratamento: null,
         saldoSelecionado: saldoAberto,
         totais: { totalInformado: totalPago, saldoRestante, excedente },
-        idempotencyKey: idemKey.current,
+        idempotencyKey: idemKey(),
         comprovantes,
         observacao: observacao || null,
       }

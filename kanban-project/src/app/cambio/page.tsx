@@ -27,13 +27,23 @@ export default function CambioHistoricoPage() {
   const [rodando, setRodando] = React.useState(false)
   const [msg, setMsg] = React.useState<string | null>(null)
 
+  // BUSCA (só rede) × APLICAÇÃO (só estado).
+  const buscar = React.useCallback((sinal?: AbortSignal) => Promise.all([
+    jf('/api/cambio/snapshot', { signal: sinal }),
+    jf('/api/gerenciamento/cambio', { signal: sinal }).catch(() => ({ cotacoes: [] })),
+  ]), [])
+  const aplicar = React.useCallback(([s, h]: any[]) => { setSnap(s); setHist(((h as any).cotacoes || []) as Cot[]) }, [])
+  React.useEffect(() => {
+    const ac = new AbortController()
+    buscar(ac.signal)
+      .then((r) => { if (!ac.signal.aborted) aplicar(r) })
+      .catch((e: any) => { if (!ac.signal.aborted) setErro(e.message || 'erro') })
+    return () => ac.abort()
+  }, [buscar, aplicar])
   const carregar = React.useCallback(async () => {
-    try {
-      const [s, h] = await Promise.all([jf('/api/cambio/snapshot'), jf('/api/gerenciamento/cambio').catch(() => ({ cotacoes: [] }))])
-      setSnap(s); setHist(((h as any).cotacoes || []) as Cot[])
-    } catch (e: any) { setErro(e.message || 'erro') }
-  }, [])
-  React.useEffect(() => { carregar() }, [carregar])
+    try { aplicar(await buscar()) }
+    catch (e: any) { setErro(e.message || 'erro') }
+  }, [buscar, aplicar])
 
   async function atualizarAgora() {
     setRodando(true); setMsg(null)

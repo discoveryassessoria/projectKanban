@@ -51,9 +51,11 @@ sec('2 — nenhum overlay residual capturando cliques')
   ok('menu é DESMONTADO ao fechar (não fica escondido)', ui.includes('const menu = aberto && pos') && ui.includes('{menu}'))
   ok('sem pointer-events forçado', !ui.includes('pointerEvents'))
   ok('listeners removidos no cleanup', ui.includes("document.removeEventListener('mousedown', fora)") && ui.includes("document.removeEventListener('keydown', tecla)") && ui.includes("window.removeEventListener('scroll', reposicionar, true)"))
-  ok('registro limpo no unmount', ui.includes('React.useEffect(() => () => { abertos.delete(fecharRef.current) }, [])'))
+  // `fechar` é estável (useCallback com deps []): a ref intermediária foi removida
+  // (escrever em ref durante o render é proibido) sem mudar o comportamento.
+  ok('registro limpo no unmount', ui.includes('React.useEffect(() => () => { abertos.delete(fechar) }, [fechar])'))
   ok('fecha ao clicar fora (campo e menu)', ui.includes('raiz.current?.contains(alvo)') && ui.includes('menuRef.current?.contains(alvo)'))
-  ok('fecha com Escape', ui.includes("if (e.key === 'Escape') fecharRef.current()"))
+  ok('fecha com Escape', ui.includes("if (e.key === 'Escape') fechar()"))
 }
 
 sec('3 — um seletor aberto por vez; troca de etapa fecha tudo')

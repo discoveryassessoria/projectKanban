@@ -39,50 +39,29 @@ interface ContaVencendo {
   tipo: 'receber' | 'pagar'
 }
 
+const RESUMO_EXEMPLO: ResumoFinanceiro = {
+  totalReceber: 45000,
+  totalReceberVencido: 5000,
+  totalPagar: 12000,
+  totalPagarVencido: 2000,
+  saldoContas: 78500,
+  entradasMes: 32000,
+  saidasMes: 18000,
+  saldoMes: 14000,
+}
+const CONTAS_VENCENDO_EXEMPLO: ContaVencendo[] = [
+  { id: 1, descricao: "Processo Silva - Parcela 2/6", valor: 2500, dataVencimento: "2026-01-05", tipo: 'receber' },
+  { id: 2, descricao: "Aluguel escritório", valor: 3500, dataVencimento: "2026-01-10", tipo: 'pagar' },
+  { id: 3, descricao: "Processo Oliveira - Entrada", valor: 5000, dataVencimento: "2026-01-08", tipo: 'receber' },
+]
+
 export default function FinancasDashboard() {
-  const [resumo, setResumo] = useState<ResumoFinanceiro>({
-    totalReceber: 0,
-    totalReceberVencido: 0,
-    totalPagar: 0,
-    totalPagarVencido: 0,
-    saldoContas: 0,
-    entradasMes: 0,
-    saidasMes: 0,
-    saldoMes: 0,
-  })
-  const [contasVencendo, setContasVencendo] = useState<ContaVencendo[]>([])
-  const [loading, setLoading] = useState(true)
+  // TODO: implementar API. Enquanto isso os números são CONSTANTES de exemplo —
+  // por serem constantes, entram como valor inicial do estado (não é carregamento).
+  const [resumo, setResumo] = useState<ResumoFinanceiro>(RESUMO_EXEMPLO)
+  const [contasVencendo, setContasVencendo] = useState<ContaVencendo[]>(CONTAS_VENCENDO_EXEMPLO)
+  const [loading, setLoading] = useState(false)
 
-  useEffect(() => {
-    fetchDados()
-  }, [])
-
-  const fetchDados = async () => {
-    try {
-      // Por enquanto, dados de exemplo
-      // TODO: Implementar API
-      setResumo({
-        totalReceber: 45000,
-        totalReceberVencido: 5000,
-        totalPagar: 12000,
-        totalPagarVencido: 2000,
-        saldoContas: 78500,
-        entradasMes: 32000,
-        saidasMes: 18000,
-        saldoMes: 14000,
-      })
-
-      setContasVencendo([
-        { id: 1, descricao: "Processo Silva - Parcela 2/6", valor: 2500, dataVencimento: "2026-01-05", tipo: 'receber' },
-        { id: 2, descricao: "Aluguel escritório", valor: 3500, dataVencimento: "2026-01-10", tipo: 'pagar' },
-        { id: 3, descricao: "Processo Oliveira - Entrada", valor: 5000, dataVencimento: "2026-01-08", tipo: 'receber' },
-      ])
-    } catch (error) {
-      console.error("Erro ao carregar dados:", error)
-    } finally {
-      setLoading(false)
-    }
-  }
 
   const formatCurrency = (value: number) => {
     return new Intl.NumberFormat('pt-BR', {

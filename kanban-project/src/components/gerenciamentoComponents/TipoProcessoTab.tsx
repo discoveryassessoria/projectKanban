@@ -50,8 +50,10 @@ export default function TipoProcessoTab() {
   const [editando, setEditando] = useState<Tipo | null>(null)
   const [countryKey, setCountryKey] = useState('')
   const [modalityKey, setModalityKey] = useState('')
-  const [code, setCode] = useState('')
-  const [name, setName] = useState('')
+  // Valor DIGITADO pelo usuário. O que a tela mostra é derivado no render: a
+  // sugestão automática vale enquanto o campo não foi tocado (sem efeito).
+  const [codeDigitado, setCode] = useState('')
+  const [nameDigitado, setName] = useState('')
   const [ativo, setAtivo] = useState(true)
   const [codeTouched, setCodeTouched] = useState(false)
   const [nameTouched, setNameTouched] = useState(false)
@@ -86,19 +88,29 @@ export default function TipoProcessoTab() {
   const [salvandoMod, setSalvandoMod] = useState(false)
   const [erroMod, setErroMod] = useState<string | null>(null)
 
-  const carregar = useCallback(async () => {
-    setLoading(true); setErroLista(null)
-    try {
-      const d = await jsonFetch('/api/gerenciamento/tipos-processo', { cache: 'no-store' })
-      setItens((d as any).tipos || [])
-      setPaises((d as any).paises || [])
-      setModalidades((d as any).modalidades || [])
-    } catch (e: any) {
-      setErroLista(e.message || 'Não foi possível carregar os tipos de processo.')
-    } finally { setLoading(false) }
+  // BUSCA (só rede) × APLICAÇÃO (só estado).
+  const buscar = useCallback((sinal?: AbortSignal) => jsonFetch('/api/gerenciamento/tipos-processo', { cache: 'no-store', signal: sinal }), [])
+  const aplicar = useCallback((d: any) => {
+    setItens((d as any).tipos || [])
+    setPaises((d as any).paises || [])
+    setModalidades((d as any).modalidades || [])
   }, [])
 
-  useEffect(() => { carregar() }, [carregar])
+  useEffect(() => {
+    const ac = new AbortController()
+    buscar(ac.signal)
+      .then((d) => { if (!ac.signal.aborted) aplicar(d) })
+      .catch((e: any) => { if (!ac.signal.aborted) setErroLista(e.message || 'Não foi possível carregar os tipos de processo.') })
+      .finally(() => { if (!ac.signal.aborted) setLoading(false) })
+    return () => ac.abort()
+  }, [buscar, aplicar])
+
+  const carregar = useCallback(async () => {
+    setLoading(true); setErroLista(null)
+    try { aplicar(await buscar()) }
+    catch (e: any) { setErroLista(e.message || 'Não foi possível carregar os tipos de processo.') }
+    finally { setLoading(false) }
+  }, [buscar, aplicar])
 
   const carregarPaisesAdmin = useCallback(async () => {
     setCarregandoPaises(true)
@@ -139,12 +151,8 @@ export default function TipoProcessoTab() {
     return `Nacionalidade ${paisSel.nationalityLabel} · ${modSel.modalityLabel}`
   }, [paisSel, modSel])
 
-  useEffect(() => {
-    if (!codeTouched) setCode(sugCode)
-  }, [sugCode, codeTouched])
-  useEffect(() => {
-    if (!nameTouched) setName(sugName)
-  }, [sugName, nameTouched])
+  const code = codeTouched ? codeDigitado : sugCode
+  const name = nameTouched ? nameDigitado : sugName
 
   const filtrados = useMemo(() => {
     const q = busca.trim().toLowerCase()
@@ -390,7 +398,7 @@ export default function TipoProcessoTab() {
 
       {!loading && !erroLista && paises.length === 0 && (
         <div className="rounded-lg border border-amber-500/30 bg-amber-500/10 p-3 text-sm text-amber-200">
-          Nenhum país ativo no catálogo. Crie ou reative um em "Gerenciar países".
+          Nenhum país ativo no catálogo. Crie ou reative um em &quot;Gerenciar países&quot;.
         </div>
       )}
 
@@ -578,7 +586,7 @@ export default function TipoProcessoTab() {
                 )}
 
                 <p className="text-[11px] text-white/40">
-                  Excluir só funciona para país sem tipos e sem processos. Se já estiver em uso, use "Inativar" — ele some do kanban e dos cadastros, sem apagar nada.
+                  Excluir só funciona para país sem tipos e sem processos. Se já estiver em uso, use &quot;Inativar&quot; — ele some do kanban e dos cadastros, sem apagar nada.
                 </p>
 
                 {erroPais && <div className="rounded-lg border border-red-500/30 bg-red-500/10 p-3 text-sm text-red-200">{erroPais}</div>}
@@ -726,7 +734,7 @@ export default function TipoProcessoTab() {
                 )}
 
                 <p className="text-[11px] text-white/40">
-                  Excluir só funciona para modalidade que nenhum tipo de processo usa. Se já estiver em uso, use "Inativar" — ela some do dropdown de novo processo, sem apagar nada.
+                  Excluir só funciona para modalidade que nenhum tipo de processo usa. Se já estiver em uso, use &quot;Inativar&quot; — ela some do dropdown de novo processo, sem apagar nada.
                 </p>
 
                 {erroMod && <div className="rounded-lg border border-red-500/30 bg-red-500/10 p-3 text-sm text-red-200">{erroMod}</div>}

@@ -52,11 +52,14 @@ export function CentralFinanceira({ onIrPara }: { onIrPara?: (tab: string) => vo
     return () => { vivo = false }
   }, [])
 
-  const aReceber = obrs.filter((o) => o.direcao === "A_RECEBER")
-  const emAberto = aReceber.filter((o) => o.saldo > 0.005 && o.status !== "CANCELADA")
-  const agora = Date.now()
-  const vencidas = useMemo(() => emAberto.filter((o) => o.vencimento && new Date(o.vencimento).getTime() < agora).sort((a, b) => new Date(a.vencimento!).getTime() - new Date(b.vencimento!).getTime()), [obrs])
-  const vencendo = useMemo(() => emAberto.filter((o) => { const dd = diasAte(o.vencimento); return dd != null && dd >= 0 && dd <= horizonte }).sort((a, b) => new Date(a.vencimento!).getTime() - new Date(b.vencimento!).getTime()), [obrs, horizonte])
+  // Memorizados para que as listas derivadas abaixo tenham dependência estável.
+  const aReceber = useMemo(() => obrs.filter((o) => o.direcao === "A_RECEBER"), [obrs])
+  const emAberto = useMemo(() => aReceber.filter((o) => o.saldo > 0.005 && o.status !== "CANCELADA"), [aReceber])
+  // "Agora" é impuro no render: fixado uma vez por montagem da tela, o que também
+  // torna a lista estável entre renders (não muda debaixo do usuário).
+  const [agora] = useState(() => Date.now())
+  const vencidas = useMemo(() => emAberto.filter((o) => o.vencimento && new Date(o.vencimento).getTime() < agora).sort((a, b) => new Date(a.vencimento!).getTime() - new Date(b.vencimento!).getTime()), [emAberto, agora])
+  const vencendo = useMemo(() => emAberto.filter((o) => { const dd = diasAte(o.vencimento); return dd != null && dd >= 0 && dd <= horizonte }).sort((a, b) => new Date(a.vencimento!).getTime() - new Date(b.vencimento!).getTime()), [emAberto, horizonte])
 
   const totalReceber = resumo?.aReceber?.saldo ?? emAberto.reduce((s, o) => s + o.saldo, 0)
   const totalRecebido = resumo?.aReceber?.recebido ?? aReceber.reduce((s, o) => s + o.recebido, 0)

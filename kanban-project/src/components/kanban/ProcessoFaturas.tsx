@@ -288,8 +288,27 @@ export function ProcessoFaturas({ processoId, nomeFamilia, onUpdate }: ProcessoF
   // ========================================
   // DATA LOADING
   // ========================================
+  // MONTAGEM: a carga acontece no efeito (a função é declarada abaixo e só é
+  // usada nas ações do usuário). Estado só na continuação das promessas.
   useEffect(() => {
-    carregarDados()
+    const ac = new AbortController()
+    const auth = { Authorization: `Bearer ${localStorage.getItem('authToken')}` }
+    Promise.all([
+      fetch(`/api/processos/${processoId}/faturas`, { headers: auth, signal: ac.signal }).then((r) => (r.ok ? r.json() : null)),
+      fetch(`/api/processos/${processoId}`, { headers: auth, signal: ac.signal }).then((r) => (r.ok ? r.json() : null)),
+    ])
+      .then(([faturasData, processoData]) => {
+        if (ac.signal.aborted) return
+        if (faturasData) {
+          setFaturas(faturasData.faturas || [])
+          setTotais(faturasData.totais || { total: 0, pago: 0, pendente: 0, vencido: 0 })
+          setTotaisGeralBRL(faturasData.totaisGeralBRL || { total: 0, pago: 0, pendente: 0, vencido: 0 })
+        }
+        if (processoData) setRequerentes(processoData.processo?.requerentes || [])
+      })
+      .catch((error) => { if (!ac.signal.aborted) console.error('Erro ao carregar dados:', error) })
+      .finally(() => { if (!ac.signal.aborted) setLoading(false) })
+    return () => ac.abort()
   }, [processoId])
 
   const carregarDados = async () => {
@@ -810,7 +829,7 @@ export function ProcessoFaturas({ processoId, nomeFamilia, onUpdate }: ProcessoF
                 </div>
                 <h4 className="text-gray-700 font-medium mb-1">Nenhuma fatura</h4>
                 <p className="text-gray-500 text-sm max-w-xs mb-4">
-                  Clique em "Nova Fatura" para adicionar
+                  Clique em &quot;Nova Fatura&quot; para adicionar
                 </p>
               </div>
             ) : (
@@ -1130,7 +1149,7 @@ export function ProcessoFaturas({ processoId, nomeFamilia, onUpdate }: ProcessoF
                                       )}
                                       {pag.observacao && (
                                         <span className="text-gray-500 italic truncate max-w-xs">
-                                          "{pag.observacao}"
+                                          &quot;{pag.observacao}&quot;
                                         </span>
                                       )}
                                     </div>

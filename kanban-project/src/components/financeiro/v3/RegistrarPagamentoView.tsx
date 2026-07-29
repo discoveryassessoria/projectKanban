@@ -88,7 +88,10 @@ export default function RegistrarPagamentoView({ obrigacaoId, receitaRef, escopo
   const [ok, setOk] = useState(false)
   const fileRef = useRef<HTMLInputElement>(null)
   // chave de idempotência estável por sessão da tela (double-click/retry não duplica)
-  const idemKey = useRef(`ui-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`)
+  const idemRef = useRef<string | null>(null)
+  // Chave gerada SOB DEMANDA, no envio: gerar durante o render seria impuro
+  // (Date.now/Math.random) e instável entre renders.
+  const idemKey = () => (idemRef.current ??= `ui-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`)
 
   // ── carregar dados ────────────────────────────────────────────────────────
   useEffect(() => {
@@ -124,10 +127,10 @@ export default function RegistrarPagamentoView({ obrigacaoId, receitaRef, escopo
 
   // ── cálculos live ─────────────────────────────────────────────────────────
   const totalInformado = useMemo(() => linhas.reduce((s, l) => s + num(l.valor), 0), [linhas])
-  const formaDe = (l: Linha) => formasCad.find((f) => f.id === Number(l.formaPagamentoId)) ?? null
+  const formaDe = useCallback((l: Linha) => formasCad.find((f) => f.id === Number(l.formaPagamentoId)) ?? null, [formasCad])
   const ehCartao = (l: Linha) => !!formaDe(l)?.exigeAdquirente
   const bandeirasDe = (adqId: number | "") => bandeiras.filter((b) => !adqId || !b.adquirentesCompativeis?.length || b.adquirentesCompativeis.includes(Number(adqId)))
-  const tarifaDe = (l: Linha): number => {
+  const tarifaDe = useCallback((l: Linha): number => {
     const forma = formaDe(l)
     if (!forma?.exigeAdquirente || !l.adquirenteId) return 0
     const relevantes: TaxaView[] = taxas.filter((t) =>
@@ -136,14 +139,22 @@ export default function RegistrarPagamentoView({ obrigacaoId, receitaRef, escopo
       (t.bandeiraId == null || t.bandeiraId === Number(l.bandeiraId)))
     if (!relevantes.length) return 0
     return calcularTaxas(relevantes, { valorBruto: num(l.valor), nParcelas: Number(l.parcelas) || 1 }).valorTaxas
-  }
-  const totalTarifas = useMemo(() => linhas.reduce((s, l) => s + tarifaDe(l), 0), [linhas, taxas, formasCad, bandeiras])
-  const desconto = num(ajustes.desconto), juros = num(ajustes.juros), multa = num(ajustes.multa), acrescimo = num(ajustes.acrescimo), creditoUtilizado = num(ajustes.creditoUtilizado)
+  }, [taxas, formaDe])
+  const totalTarifas = useMemo(() => linhas.reduce((s, l) => s + tarifaDe(l), 0), [linhas, tarifaDe])
+  const desconto = num(ajustes.desconto)
+  const juros = num(ajustes.juros)
+  const multa = num(ajustes.multa)
+  const acrescimo = num(ajustes.acrescimo)
+  const creditoUtilizado = num(ajustes.creditoUtilizado)
   const acrescimos = juros + multa + acrescimo
   // Saldo do ESCOPO selecionado (cobrança/participante/geral). Sem escopo → saldo da obrigação.
   const saldoCobranca = escopo ? Number(escopo.saldoBrl ?? 0) : Number(det?.saldoBrl ?? 0)
   // FONTE ÚNICA de cálculo (mesma função revalidada no backend)
-  const calc = calcularRecebimento({ saldoSelecionado: saldoCobranca, linhas: linhas.map((l) => ({ valor: num(l.valor) })), desconto, juros, multa, acrescimo, creditoUtilizado })
+  // Memorizado: os valores derivados dele são dependências das validações.
+  const calc = useMemo(
+    () => calcularRecebimento({ saldoSelecionado: saldoCobranca, linhas: linhas.map((l) => ({ valor: num(l.valor) })), desconto, juros, multa, acrescimo, creditoUtilizado }),
+    [saldoCobranca, linhas, desconto, juros, multa, acrescimo, creditoUtilizado],
+  )
   const liquidoAReceber = calc.valorLiquidoDevido
   const recebido = calc.totalInformado
   const saldoRestante = calc.saldoRestante
@@ -227,7 +238,7 @@ export default function RegistrarPagamentoView({ obrigacaoId, receitaRef, escopo
         const pagadorG = pagadorTipo === "EXTERNO" ? { tipo: "EXTERNO" as const, parteExterna: { nome: ext.nome, documento: ext.documento || null, telefone: ext.telefone || null, observacao: ext.observacao || null } } : { tipo: pagadorTipo, pessoaId: pagadorTipo === "REQUERENTE" ? (pagadorPessoaId || null) : null }
         const r = await fetch(`/api/financeiro/v3/receita/${receitaRef}/registrar-pagamento-geral`, {
           method: "POST", headers: { "Content-Type": "application/json", ...authHeaders() },
-          body: JSON.stringify({ alocacoes: alocacoesGeral.map((a) => ({ obrigacaoId: a.obrigacaoId, valor: a.valor })), formas, ajustes: { desconto, juros, multa, acrescimo, creditoUtilizado }, pagador: pagadorG, observacao: observacao || "[Pagamento geral da Receita]", idempotencyKey: idemKey.current }),
+          body: JSON.stringify({ alocacoes: alocacoesGeral.map((a) => ({ obrigacaoId: a.obrigacaoId, valor: a.valor })), formas, ajustes: { desconto, juros, multa, acrescimo, creditoUtilizado }, pagador: pagadorG, observacao: observacao || "[Pagamento geral da Receita]", idempotencyKey: idemKey() }),
         }).then((x) => x.json())
         if (!r?.ok) { setErroSubmit(r?.erro ?? "Falha no pagamento geral."); setEnviando(false); return }
         setOk(true); setTimeout(() => { onDone?.(); onClose() }, 700); return
@@ -261,7 +272,7 @@ export default function RegistrarPagamentoView({ obrigacaoId, receitaRef, escopo
         parcialTratamento: situacao === "PARCIAL" ? parcialTrat : null,
         saldoSelecionado: saldoCobranca,
         totais: { totalInformado: recebido, saldoRestante, excedente },
-        idempotencyKey: idemKey.current,
+        idempotencyKey: idemKey(),
         escopo: escopo?.tipo ?? null, escopoTag: escopo?.tag ?? null,
         comprovantes, observacao: [escopo?.tag ? `[${escopo.tag}]` : null, observacao || null].filter(Boolean).join(" ") || null,
       }
@@ -412,7 +423,7 @@ export default function RegistrarPagamentoView({ obrigacaoId, receitaRef, escopo
                   ))}
                   <div><label className={`${labelCls} flex items-center gap-1`}>Crédito Gerado (BRL) <InfoIcon className="h-3 w-3 text-[var(--text-muted)]" /></label><div className="mt-1 rounded-[var(--radius-sm)] border border-[var(--border-default)] bg-[var(--surface-secondary)] px-3 py-2 text-right text-sm text-[var(--text-secondary)]">{brl(creditoGerado)}</div></div>
                 </div>
-                {creditoDisponivel > 0.005 && <p className="mt-2 text-[11px] text-[var(--text-muted)]">Crédito financeiro disponível: <span className="text-[var(--success)]">{brl(creditoDisponivel)}</span> — informe em "Crédito Utilizado" para abater neste recebimento.</p>}
+                {creditoDisponivel > 0.005 && <p className="mt-2 text-[11px] text-[var(--text-muted)]">Crédito financeiro disponível: <span className="text-[var(--success)]">{brl(creditoDisponivel)}</span> — informe em &quot;Crédito Utilizado&quot; para abater neste recebimento.</p>}
                 {/* resumo matemático */}
                 <div className="mt-4 grid grid-cols-2 gap-3 rounded-[var(--radius-sm)] bg-[var(--surface-secondary)] px-4 py-3 text-center sm:grid-cols-6">
                   <Mini label="Valor Original">{brl(saldoCobranca)}</Mini>

@@ -63,16 +63,27 @@ export default function PaisesRegioesTab() {
   const [flash, setFlash] = useState("")
   const [form, setForm] = useState<Form | null>(null)
 
+  const MSG = "Não foi possível carregar os países."
+  // BUSCA (só rede) × APLICAÇÃO (só estado).
+  const buscar = useCallback(async (sinal?: AbortSignal) => {
+    const d = await jsonFetch("/api/gerenciamento/paises", { cache: "no-store", signal: sinal })
+    return (d as { paises?: Pais[] }).paises || []
+  }, [])
+  const aplicar = useCallback((paises: Pais[]) => { setRows(paises) }, [])
+  useEffect(() => {
+    const ac = new AbortController()
+    buscar(ac.signal)
+      .then((paises) => { if (!ac.signal.aborted) aplicar(paises) })
+      .catch((e) => { if (!ac.signal.aborted) setErro(e instanceof Error ? e.message : MSG) })
+      .finally(() => { if (!ac.signal.aborted) setLoading(false) })
+    return () => ac.abort()
+  }, [buscar, aplicar])
   const load = useCallback(async () => {
     setLoading(true); setErro(null)
-    try {
-      const d = await jsonFetch("/api/gerenciamento/paises", { cache: "no-store" })
-      setRows((d as { paises?: Pais[] }).paises || [])
-    } catch (e) {
-      setErro(e instanceof Error ? e.message : "Não foi possível carregar os países.")
-    } finally { setLoading(false) }
-  }, [])
-  useEffect(() => { load() }, [load])
+    try { aplicar(await buscar()) }
+    catch (e) { setErro(e instanceof Error ? e.message : MSG) }
+    finally { setLoading(false) }
+  }, [buscar, aplicar])
 
   const showFlash = (m: string) => { setFlash(m); setTimeout(() => setFlash(""), 3000) }
 

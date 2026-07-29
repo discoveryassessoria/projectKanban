@@ -107,19 +107,37 @@ export default function FornecedoresTab() {
 
   const set = (k: keyof FormState, v: any) => setForm((f) => ({ ...f, [k]: v }))
 
-  const carregar = useCallback(async () => {
-    setLoading(true); setErroLista(null)
-    try {
-      const data = await jsonFetch('/api/gerenciamento/fornecedores', { cache: 'no-store' })
+  // Carga da tela em UM lugar: `aplicar` só escreve estado; quem chama decide
+  // se mostra o estado de carregamento. `sinal` cancela a escrita se a tela sair.
+  // BUSCA: só entrada/saída de rede, nenhuma escrita de estado.
+  const buscar = useCallback(async (sinal?: AbortSignal) => {
+      const data = await jsonFetch('/api/gerenciamento/fornecedores', { cache: 'no-store', signal: sinal })
+    return data
+  }, [])
+  // APLICAÇÃO: ponto único de escrita do estado da carga.
+  const aplicar = useCallback((data: any) => {
       setFornecedores((data as any).fornecedores || [])
-    } catch (e: any) {
-      setErroLista(e.message || 'Não foi possível carregar os fornecedores.')
-    } finally {
-      setLoading(false)
-    }
   }, [])
 
-  useEffect(() => { carregar() }, [carregar])
+  // MONTAGEM: o efeito não escreve estado de forma síncrona (`Loading` já nasce
+  // true e `ErroLista` nasce null) — a escrita acontece na continuação da promessa.
+  useEffect(() => {
+    const ac = new AbortController()
+    buscar(ac.signal)
+      .then((d) => { if (!ac.signal.aborted) aplicar(d) })
+      .catch((e: any) => { if (!ac.signal.aborted) setErroLista(e.message || 'Não foi possível carregar os fornecedores.') })
+      .finally(() => { if (!ac.signal.aborted) setLoading(false) })
+    return () => ac.abort()
+  }, [buscar, aplicar])
+
+  // RECARGA por ação do usuário (salvar/excluir/atualizar): aí sim volta ao
+  // estado de carregamento antes de buscar de novo.
+  const carregar = useCallback(async () => {
+    setLoading(true); setErroLista(null)
+    try { aplicar(await buscar()) }
+    catch (e: any) { setErroLista(e.message || 'Não foi possível carregar os fornecedores.') }
+    finally { setLoading(false) }
+  }, [buscar, aplicar])
 
   const filtrados = useMemo(() => {
     const q = busca.trim().toLowerCase()

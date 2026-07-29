@@ -20,6 +20,7 @@ import { useSearchParams } from "next/navigation"
 import { ArvoreInteligente } from "@/src/components/arvore/motor/arvore-inteligente"
 import { PessoaDetailsPage } from "@/src/components/arvore/pessoa-details-page"
 import type { PessoaArvore, UniaoArvore } from "@/src/components/arvore/types"
+import { useMontadoNoCliente } from "@/src/hooks/use-dados-headerbar"
 
 export default function Pagina() {
   if (process.env.NODE_ENV === "production") return null
@@ -148,8 +149,12 @@ function montarCaso(caso: string): { pessoas: PessoaArvore[]; unioes: UniaoArvor
 
 function Render() {
   const params = useSearchParams()
-  const [montado, setMontado] = useState(false)
-  const [selecionada, setSelecionada] = useState<PessoaArvore | null>(null)
+  // A árvore só desenha depois da hidratação (a preferência de vista é gravada
+  // antes do primeiro quadro, senão a foto do harness compara vistas diferentes).
+  const montado = useMontadoNoCliente()
+  // Seleção: escolha explícita do usuário; com a gaveta aberta e sem escolha,
+  // vale a pessoa principal. Derivada no render — sem efeito.
+  const [selecionadaEscolhida, setSelecionada] = useState<PessoaArvore | null>(null)
   const [pagina, setPagina] = useState<PessoaArvore | null>(null)
 
   const caso = params.get("caso") ?? "base"
@@ -162,6 +167,7 @@ function Render() {
     () => dados.pessoas.find((x) => x.id === dados.raiz) ?? null,
     [dados],
   )
+  const selecionada = selecionadaEscolhida ?? (gaveta ? principal : null)
 
   // A vista é preferência persistida; o harness precisa forçá-la ANTES de a
   // árvore montar, senão o primeiro quadro sai na vista da sessão anterior e a
@@ -175,12 +181,9 @@ function Render() {
     } catch {
       // sem localStorage a árvore usa o padrão; o harness segue funcionando
     }
-    setMontado(true)
   }, [vista])
 
-  useEffect(() => {
-    if (gaveta && principal) setSelecionada(principal)
-  }, [gaveta, principal])
+
 
   if (!montado) return null
 

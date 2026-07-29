@@ -98,7 +98,6 @@ export async function PUT(
     }
 
     const temMestre = atual.origem !== 'LEGADO'
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const dataMestre: any = {}
     let nome = atual.nome
 

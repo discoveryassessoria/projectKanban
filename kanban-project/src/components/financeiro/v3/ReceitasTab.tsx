@@ -96,21 +96,40 @@ export function ReceitasTab({ processoId, onAbrirDetalhe }: { processoId?: numbe
   // avisamos e oferecemos "Ver em Todas" — o filtro do operador é preservado.
   const [movida, setMovida] = useState<{ id: number; nome: string } | null>(null)
 
-  const carregar = () => {
+  const carregar = useCallback(() => {
     setLoading(true); setErro(null)
     fetch(`/api/financeiro/v3/receitas${processoId ? `?processoId=${processoId}` : ""}`, { headers: authHeaders() })
       .then(async (r) => { if (!r.ok) throw new Error(`HTTP ${r.status}`); return r.json() })
       .then((j) => setD(j))
       .catch(() => setErro("Não foi possível carregar as receitas."))
       .finally(() => setLoading(false))
+  }, [processoId])
+
+  // MONTAGEM/troca de processo: busca no efeito, estado só na continuação.
+  useEffect(() => {
+    const ac = new AbortController()
+    fetch(`/api/financeiro/v3/receitas${processoId ? `?processoId=${processoId}` : ""}`, { headers: authHeaders(), signal: ac.signal })
+      .then(async (r) => { if (!r.ok) throw new Error(`HTTP ${r.status}`); return r.json() })
+      .then((j) => { if (!ac.signal.aborted) setD(j) })
+      .catch(() => { if (!ac.signal.aborted) setErro("Não foi possível carregar as receitas.") })
+      .finally(() => { if (!ac.signal.aborted) setLoading(false) })
+    return () => ac.abort()
+  }, [processoId])
+
+  // Paginação e aviso "saiu da aba" são DERIVADOS da busca/aba: ajuste de estado
+  // durante o render, sem efeito.
+  const [filtroPaginado, setFiltroPaginado] = useState(`${busca}|${aba}`)
+  if (filtroPaginado !== `${busca}|${aba}`) {
+    setFiltroPaginado(`${busca}|${aba}`)
+    setPage(1)
+    setMovida(null)
   }
-  useEffect(() => { carregar() }, [processoId])
-  useEffect(() => { setPage(1) }, [busca, aba])
   // Revalidação automática: recarrega a lista quando QUALQUER mutação financeira ocorre
   // (registrar pagamento, editar, redistribuir, estornar, arquivar…) — sem recarregar a página.
-  useRevalidacaoFinanceira(useCallback(() => carregar(), [processoId]))
+  useRevalidacaoFinanceira(carregar)
 
-  const grupos: Grupo[] = d?.receitas ?? []
+  // Memorizado: é dependência dos cálculos de contagem/filtro abaixo.
+  const grupos: Grupo[] = useMemo(() => d?.receitas ?? [], [d])
   const k = d?.kpis ?? {}
   const nomeProc = d?.processo?.nome ?? d?.processo?.codigo ?? "deste processo"
 
@@ -123,8 +142,6 @@ export function ReceitasTab({ processoId, onAbrirDetalhe }: { processoId?: numbe
     setAcao(null); carregar(); emitirMutacaoFinanceira()
     setMovida({ id: g.id, nome: g.descricao ?? g.codigo ?? `#${g.id}` })
   }, [carregar])
-  // o aviso vale só para a aba corrente; trocar de aba (ou limpar) o dispensa.
-  useEffect(() => { setMovida(null) }, [aba])
 
   // contagem por aba (sobre TODOS os grupos, independente da busca)
   const contagem = useMemo(() => {

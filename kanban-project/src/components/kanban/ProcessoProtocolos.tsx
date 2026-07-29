@@ -22,6 +22,7 @@ import {
   Eye
 } from "lucide-react"
 import { usePermissoes } from "@/src/hooks/use-permissoes"
+import { ImagemRemota } from '@/src/components/ui/imagem-remota'
 
 // Tipos compatíveis com os do modal
 interface PessoaBase {
@@ -148,10 +149,27 @@ export function ProcessoProtocolos({
     }
   }
 
+  // MONTAGEM: busca no efeito; estado só na continuação das promessas.
   useEffect(() => {
-    if (processoId) {
-      fetchProtocolos()
-    }
+    if (!processoId) return
+    const ac = new AbortController()
+    fetch(`/api/protocolos?processoId=${processoId}`, { signal: ac.signal })
+      .then((response) => response.json())
+      .then(async (data) => {
+        if (ac.signal.aborted || !data.protocolos) return
+        const comAnexos = await Promise.all(
+          data.protocolos.map(async (protocolo: Protocolo) => {
+            try {
+              const anexosRes = await fetch(`/api/protocolos/${protocolo.id}/anexos`, { signal: ac.signal })
+              return { ...protocolo, anexos: (await anexosRes.json()).anexos || [] }
+            } catch { return { ...protocolo, anexos: [] } }
+          }),
+        )
+        if (!ac.signal.aborted) setProtocolos(comAnexos)
+      })
+      .catch((error) => { if (!ac.signal.aborted) console.error("Erro ao buscar protocolos:", error) })
+      .finally(() => { if (!ac.signal.aborted) setLoading(false) })
+    return () => ac.abort()
   }, [processoId])
 
   // Resetar form
@@ -681,7 +699,7 @@ export function ProcessoProtocolos({
                                   className="block aspect-square relative overflow-hidden"
                                 >
                                   {isImage ? (
-                                    <img
+                                    <ImagemRemota
                                       src={anexo.urlArquivo}
                                       alt={anexo.nome}
                                       className="w-full h-full object-cover"

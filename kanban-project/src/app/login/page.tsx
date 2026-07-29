@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react"
+import { useMontadoNoCliente } from "@/src/hooks/use-dados-headerbar"
 import Image from "next/image"
 import AuthComponent from "@/src/components/auth"
 import backgroundImage from "@/public/imagemfundo.jpg"
@@ -8,11 +8,8 @@ import discoveryLogo from "@/public/discoverylogo.svg"
 import { motion } from "framer-motion"
 
 export default function AuthPage() {
-  const [mounted, setMounted] = useState(false)
-
-  useEffect(() => {
-    setMounted(true)
-  }, [])
+  // Hidratação: valor vem do próprio React (snapshot servidor × cliente).
+  const mounted = useMontadoNoCliente()
 
   return (
     <div className="fixed inset-0 z-50">

@@ -19,6 +19,7 @@ import { DashboardCorporativo, OURO, type DashboardData } from "@/src/components
 import { CentralFinanceira } from "@/src/components/financeiro/CentralFinanceira"
 import { PagamentosView } from "@/src/components/financeiro/PagamentosView"
 import { CreditosView } from "@/src/components/financeiro/CreditosView"
+import { useDadosHeaderBar, useMontadoNoCliente } from "@/src/hooks/use-dados-headerbar"
 
 const TesourariaTab = dynamic(() => import("@/src/components/financeiroComponents/TesourariaTab"), {
   ssr: false,
@@ -91,23 +92,23 @@ const TABS_VISIVEIS = TABS.filter((t) => !("avancada" in t && t.avancada))
 export default function FinanceiroPage() {
   const router = useRouter()
   const { pode, carregando } = usePermissoes()
-  const [mounted, setMounted] = useState(false)
-  const [user, setUser] = useState<any>({ nome: "Usuário" })
+  const mounted = useMontadoNoCliente()
+  // Usuário + processos + árvores do HeaderBar: hook único (sem efeito por tela).
+  const { user, processos, arvores } = useDadosHeaderBar()
   const [tab, setTab] = useState<TabKey>("central")
-  const [processos, setProcessos] = useState<any[]>([])
-  const [arvores, setArvores] = useState<any[]>([])
   const [dash, setDash] = useState<DashboardData | null>(null)
   const [loading, setLoading] = useState(true)
 
+  // MONTAGEM: o painel é buscado no efeito; estado só na continuação da promessa.
   useEffect(() => {
-    setMounted(true)
-    if (typeof window !== "undefined") {
-      const u = localStorage.getItem("user")
-      if (u) { try { setUser(JSON.parse(u)) } catch {} }
-    }
-    carregarDashboard()
-    fetch("/api/processos").then(r => r.ok ? r.json() : null).then(d => setProcessos(d?.processos || [])).catch(() => {})
-    fetch("/api/arvore").then(r => r.ok ? r.json() : null).then(d => setArvores(Array.isArray(d) ? d : [])).catch(() => {})
+    const ac = new AbortController()
+    const token = localStorage.getItem("authToken")
+    fetch("/api/financas/dashboard", { headers: { Authorization: `Bearer ${token}` }, signal: ac.signal })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => { if (!ac.signal.aborted && d) setDash(d) })
+      .catch(() => {})
+      .finally(() => { if (!ac.signal.aborted) setLoading(false) })
+    return () => ac.abort()
   }, [])
 
   async function carregarDashboard() {

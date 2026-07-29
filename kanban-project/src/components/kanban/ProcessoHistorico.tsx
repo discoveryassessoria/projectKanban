@@ -86,10 +86,18 @@ export function ProcessoHistorico({ processoId }: ProcessoHistoricoProps) {
   const [busca, setBusca] = useState("")
   const [limite, setLimite] = useState(20)
 
+  // Trocar de processo volta ao estado de carregamento: ajuste durante o render.
+  const [processoCarregado, setProcessoCarregado] = useState(processoId)
+  if (processoCarregado !== processoId) { setProcessoCarregado(processoId); setLoading(true) }
+
   useEffect(() => {
-    setLoading(true)
-    fetch(`/api/processos/${processoId}/logs?limite=200`)
-      .then((r) => r.ok ? r.json() : { logs: [] }).then((d) => setLogs(d.logs || [])).catch(() => setLogs([])).finally(() => setLoading(false))
+    const ac = new AbortController()
+    fetch(`/api/processos/${processoId}/logs?limite=200`, { signal: ac.signal })
+      .then((r) => r.ok ? r.json() : { logs: [] })
+      .then((d) => { if (!ac.signal.aborted) setLogs(d.logs || []) })
+      .catch(() => { if (!ac.signal.aborted) setLogs([]) })
+      .finally(() => { if (!ac.signal.aborted) setLoading(false) })
+    return () => ac.abort()
   }, [processoId])
 
   const contagem = useMemo(() => {

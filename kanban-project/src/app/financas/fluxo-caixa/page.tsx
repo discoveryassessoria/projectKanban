@@ -43,34 +43,13 @@ interface ResumoFluxo {
   saldoAtual: number
 }
 
-export default function FluxoCaixaPage() {
-  const [transacoes, setTransacoes] = useState<Transacao[]>([])
-  const [resumo, setResumo] = useState<ResumoFluxo>({
-    saldoAnterior: 0,
-    entradas: 0,
-    saidas: 0,
-    saldoAtual: 0
-  })
-  const [loading, setLoading] = useState(true)
-  const [mesAtual, setMesAtual] = useState(new Date())
-  const [filtroTipo, setFiltroTipo] = useState<string>("todos")
-
-  useEffect(() => {
-    fetchDados()
-  }, [mesAtual])
-
-  const fetchDados = async () => {
-    try {
-      // TODO: Implementar API
-      // Por enquanto, dados de exemplo
-      setResumo({
+const RESUMO_EXEMPLO: ResumoFluxo = {
         saldoAnterior: 65000,
         entradas: 32000,
         saidas: 18000,
         saldoAtual: 79000
-      })
-
-      setTransacoes([
+      }
+const TRANSACOES_EXEMPLO: Transacao[] = [
         {
           id: 1,
           tipo: 'ENTRADA',
@@ -116,13 +95,17 @@ export default function FluxoCaixaPage() {
           categoria: { id: 1, nome: 'Serviços' },
           contaBancaria: { id: 1, nome: 'Conta Principal' }
         },
-      ])
-    } catch (error) {
-      console.error("Erro ao carregar dados:", error)
-    } finally {
-      setLoading(false)
-    }
-  }
+      ]
+
+export default function FluxoCaixaPage() {
+  const [transacoes, setTransacoes] = useState<Transacao[]>(TRANSACOES_EXEMPLO)
+  // TODO: implementar API. Números de exemplo são CONSTANTES → valor inicial.
+  const [resumo, setResumo] = useState<ResumoFluxo>(RESUMO_EXEMPLO)
+  const [loading, setLoading] = useState(false)
+  const [mesAtual, setMesAtual] = useState(new Date())
+  const [filtroTipo, setFiltroTipo] = useState<string>("todos")
+
+
 
   const formatCurrency = (value: number) => {
     return new Intl.NumberFormat('pt-BR', {

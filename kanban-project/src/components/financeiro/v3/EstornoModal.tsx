@@ -43,7 +43,10 @@ export default function EstornoModal({ obrigacaoId, moeda, pagamento, onClose, o
   const [erro, setErro] = useState<string | null>(null)
   const [ok, setOk] = useState(false)
   const fileRef = useRef<HTMLInputElement>(null)
-  const idemKey = useRef(`estorno-${pagamento.id}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`)
+  const idemRef = useRef<string | null>(null)
+  // Chave gerada SOB DEMANDA, no envio: gerar durante o render seria impuro
+  // (Date.now/Math.random) e instável entre renders.
+  const idemKey = () => (idemRef.current ??= `estorno-${pagamento.id}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`)
 
   useEffect(() => {
     const onEsc = (e: KeyboardEvent) => { if (e.key === "Escape") onClose() }
@@ -83,7 +86,7 @@ export default function EstornoModal({ obrigacaoId, moeda, pagamento, onClose, o
       const res = await fetch("/api/financeiro/v3/ocorrencias", {
         method: "POST", headers: { "Content-Type": "application/json", ...authHeaders() },
         body: JSON.stringify({
-          obrigacaoId, tipo: "ESTORNO", valor: valorEstorno, estornaOcorrenciaId: pagamento.id, data, idempotencyKey: idemKey.current,
+          obrigacaoId, tipo: "ESTORNO", valor: valorEstorno, estornaOcorrenciaId: pagamento.id, data, idempotencyKey: idemKey(),
           // categoria estruturada + observação legível (categoria vai p/ timeline + auditoria).
           categoria,
           observacao: [`[${categoria}]`, motivo === "Outro" ? detalhe : null, obs].filter(Boolean).join(" — ").slice(0, 300),

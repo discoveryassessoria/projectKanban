@@ -131,7 +131,9 @@ export function LancamentoManualModal({ natureza, processoId, onClose, onCriado 
 
   // requerentes elegíveis ao rateio (têm pessoa vinculada)
   // chave de idempotência estável por sessão (duplo clique/retry não duplica)
-  const idemKey = useRef(`manual-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`)
+  const idemRef = useRef<string | null>(null)
+  // Gerada SOB DEMANDA, no envio: gerar durante o render seria impuro.
+  const idemKey = () => (idemRef.current ??= `manual-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`)
   const reqSelecionados = useMemo(() => requerentes.filter((r) => selReq.has(r.id)), [requerentes, selReq])
   const distribuicao = useMemo(() => {
     if (vinculo !== "requerentes" || reqSelecionados.length === 0) return []
@@ -197,7 +199,7 @@ export function LancamentoManualModal({ natureza, processoId, onClose, onCriado 
           descricao: [descricao.trim(), observacoes.trim()].filter(Boolean).join(" — ") || undefined,
           quantidade: qtd, valorUnitario: unit, desconto: desc || undefined,
           faseLabel: faseLabel || undefined, vinculo: vinc, participantes,
-          idempotencyKey: idemKey.current,
+          idempotencyKey: idemKey(),
         }
       } else {
         body = {

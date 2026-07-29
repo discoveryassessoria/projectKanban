@@ -172,13 +172,17 @@ export function DonutSVG({
     )
   }
 
-  // Geração das fatias
-  let acc = 0
+  // Geração das fatias. O ângulo acumulado é pré-calculado num laço (não é
+  // reatribuído de dentro do callback de map, o que escaparia do render).
+  const inicios: number[] = []
+  {
+    let acc = 0
+    for (const s of slices) { inicios.push(acc); acc += s.value / total }
+  }
   const paths = slices.map((s, i) => {
     const pct = s.value / total
-    const startAngle = acc * 360
-    const endAngle = (acc + pct) * 360
-    acc += pct
+    const startAngle = inicios[i] * 360
+    const endAngle = (inicios[i] + pct) * 360
 
     // Ajuste: se for 1 fatia única (pct=1), SVG não desenha arco completo.
     // Nesse caso, desenhamos como um círculo com stroke.

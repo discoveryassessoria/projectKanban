@@ -7,7 +7,7 @@
 
 "use client"
 
-import { useEffect, useState, useCallback } from "react"
+import { useEffect, useState, useCallback, useMemo } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -86,10 +86,22 @@ export default function UsersTab() {
   const [isSubmitting, setIsSubmitting] = useState(false)
 
   const [selectedPerfilId, setSelectedPerfilId] = useState<number | null>(null)
-  const [permissoesEfetivas, setPermissoesEfetivas] = useState<Record<string, boolean>>({})
   const [permissoesCustom, setPermissoesCustom] = useState<Record<string, boolean>>({})
   const [showPermissoes, setShowPermissoes] = useState(false)
   const [expandedModulos, setExpandedModulos] = useState<string[]>([])
+
+  // Permissões efetivas são 100% DERIVADAS (perfil + overrides + tipo admin):
+  // valor calculado, não estado espelhado por efeito.
+  const permissoesEfetivas = useMemo(() => {
+    const perfil = perfis.find(p => p.id === selectedPerfilId)
+    const perfilPerms = perfil?.permissoes || {}
+    const resultado: Record<string, boolean> = {}
+    for (const c of TODAS_CHAVES) resultado[c] = false
+    for (const [k, v] of Object.entries(perfilPerms)) if (k in resultado) resultado[k] = !!v
+    for (const [k, v] of Object.entries(permissoesCustom)) if (k in resultado) resultado[k] = !!v
+    if (formData.tipo === "admin") for (const c of TODAS_CHAVES) resultado[c] = true
+    return resultado
+  }, [selectedPerfilId, permissoesCustom, perfis, formData.tipo])
 
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false)
   const [userToDelete, setUserToDelete] = useState<Usuario | null>(null)
@@ -115,24 +127,23 @@ export default function UsersTab() {
     } finally { setIsLoading(false) }
   }, [searchTerm])
 
-  useEffect(() => { fetchPerfis() }, [fetchPerfis])
-  useEffect(() => { loadUsers() }, []) // eslint-disable-line
+  // Perfis: busca na montagem, sem escrita síncrona de estado no efeito.
+  useEffect(() => {
+    const ac = new AbortController()
+    const token = localStorage.getItem("authToken")
+    fetch("/api/perfis", { headers: token ? { Authorization: `Bearer ${token}` } : {}, signal: ac.signal })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((j) => { if (!ac.signal.aborted && j) setPerfis(j.perfis || []) })
+      .catch(() => {})
+    return () => ac.abort()
+  }, [])
+
+  // Usuários: recarrega a cada busca (com folga de digitação). O timer garante
+  // que a escrita de estado nunca acontece no corpo síncrono do efeito.
   useEffect(() => {
     const t = setTimeout(() => { loadUsers() }, 500)
     return () => clearTimeout(t)
-  }, [searchTerm]) // eslint-disable-line
-
-  // recalcular permissões efetivas
-  useEffect(() => {
-    const perfil = perfis.find(p => p.id === selectedPerfilId)
-    const perfilPerms = perfil?.permissoes || {}
-    const resultado: Record<string, boolean> = {}
-    for (const c of TODAS_CHAVES) resultado[c] = false
-    for (const [k, v] of Object.entries(perfilPerms)) if (k in resultado) resultado[k] = !!v
-    for (const [k, v] of Object.entries(permissoesCustom)) if (k in resultado) resultado[k] = !!v
-    if (formData.tipo === "admin") for (const c of TODAS_CHAVES) resultado[c] = true
-    setPermissoesEfetivas(resultado)
-  }, [selectedPerfilId, permissoesCustom, perfis, formData.tipo])
+  }, [searchTerm, loadUsers])
 
   const togglePermissao = (chave: string) => {
     if (formData.tipo === "admin") return

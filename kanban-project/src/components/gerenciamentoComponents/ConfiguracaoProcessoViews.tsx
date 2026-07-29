@@ -58,18 +58,28 @@ function useConfiguracaoProcesso() {
   const [loading, setLoading] = useState(true)
   const [erro, setErro] = useState<string | null>(null)
 
+  const MSG = "Não foi possível carregar a configuração dos processos."
+  // BUSCA (só rede) × APLICAÇÃO (só estado).
+  const buscar = useCallback(async (sinal?: AbortSignal) => {
+    const res = await fetch("/api/gerenciamento/configuracao-processo", { headers: authHeaders(), cache: "no-store", signal: sinal })
+    const j = await res.json().catch(() => ({}))
+    if (!res.ok) throw new Error(j.error || MSG)
+    return j.tipos || []
+  }, [])
+  const aplicar = useCallback((tps: Tipo[]) => { setTipos(tps) }, [])
+  useEffect(() => {
+    const ac = new AbortController()
+    buscar(ac.signal)
+      .then((tps) => { if (!ac.signal.aborted) aplicar(tps) })
+      .catch((e: any) => { if (!ac.signal.aborted) setErro(e?.message || MSG) })
+      .finally(() => { if (!ac.signal.aborted) setLoading(false) })
+    return () => ac.abort()
+  }, [buscar, aplicar])
   const load = useCallback(async () => {
     setLoading(true); setErro(null)
-    try {
-      const res = await fetch("/api/gerenciamento/configuracao-processo", { headers: authHeaders(), cache: "no-store" })
-      const j = await res.json().catch(() => ({}))
-      if (res.ok) setTipos(j.tipos || [])
-      else setErro(j.error || "Não foi possível carregar a configuração dos processos.")
-    } catch {
-      setErro("Não foi possível carregar a configuração dos processos.")
-    } finally { setLoading(false) }
-  }, [])
-  useEffect(() => { load() }, [load])
+    try { aplicar(await buscar()) }
+    catch (e: any) { setErro(e?.message || MSG) } finally { setLoading(false) }
+  }, [buscar, aplicar])
 
   return { tipos, loading, erro, reload: load }
 }
@@ -86,12 +96,12 @@ function Consulta({
   seletor?: boolean
 }) {
   const { tipos, loading, erro, reload } = useConfiguracaoProcesso()
-  const [tipoId, setTipoId] = useState<number | null>(null)
+  // Escolha explícita do usuário; enquanto não houver, vale o primeiro visível.
+  // Seleção DERIVADA no render — sem efeito para "selecionar o primeiro".
+  const [tipoEscolhido, setTipoEscolhido] = useState<number | null>(null)
 
   const visiveis = useMemo(() => tipos.filter((t) => !t.arquivado), [tipos])
-  useEffect(() => {
-    if (tipoId == null && visiveis.length) setTipoId(visiveis[0].id)
-  }, [visiveis, tipoId])
+  const tipoId = tipoEscolhido ?? visiveis[0]?.id ?? null
 
   const tipo = useMemo(() => visiveis.find((t) => t.id === tipoId) ?? null, [visiveis, tipoId])
 
@@ -121,7 +131,7 @@ function Consulta({
             <label className="text-sm text-white/60">Processo:</label>
             <select
               value={tipoId ?? ""}
-              onChange={(e) => setTipoId(e.target.value ? Number(e.target.value) : null)}
+              onChange={(e) => setTipoEscolhido(e.target.value ? Number(e.target.value) : null)}
               className={`${selectCls} min-w-[280px]`}
             >
               {visiveis.length === 0 && <option value="" className="bg-zinc-900">— nenhum tipo de processo —</option>}

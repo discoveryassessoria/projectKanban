@@ -12,6 +12,7 @@
 import * as React from "react"
 import { useRouter } from "next/navigation"
 import { HeaderBar } from "@/src/components/header-bar"
+import { useUsuarioLogado } from "@/src/hooks/use-dados-headerbar"
 
 export function HomeShell({
   titulo = "Centro Operacional",
@@ -23,19 +24,9 @@ export function HomeShell({
   children: React.ReactNode
 }) {
   const router = useRouter()
-  const [user, setUser] = React.useState<{ nome?: string; tipo?: string; email?: string }>({ nome: "Usuário" })
+  // Usuário logado: estado EXTERNO (armazenamento do navegador), não copiado.
+  const user = useUsuarioLogado()
 
-  React.useEffect(() => {
-    if (typeof window === "undefined") return
-    const u = localStorage.getItem("user")
-    if (u) {
-      try {
-        setUser(JSON.parse(u))
-      } catch {
-        /* payload inválido: mantém o placeholder */
-      }
-    }
-  }, [])
 
   function sair() {
     localStorage.removeItem("authToken")

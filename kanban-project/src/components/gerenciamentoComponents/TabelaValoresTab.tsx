@@ -120,17 +120,27 @@ export default function TabelaValoresTab() {
   const [erroModal, setErroModal] = useState<string | null>(null)
   const set = (k: keyof FormState, v: any) => setForm((f) => ({ ...f, [k]: v }))
 
+  // BUSCA (só rede) × APLICAÇÃO (só estado).
+  const buscar = useCallback((sinal?: AbortSignal) => jsonFetch('/api/gerenciamento/tabela-valores', { cache: 'no-store', signal: sinal }), [])
+  const aplicar = useCallback((d: any) => {
+    setItens((d as any).tabelaValores || [])
+    setConfigs((d as any).configs || [])
+    setFornecedores((d as any).fornecedores || [])
+  }, [])
+  useEffect(() => {
+    const ac = new AbortController()
+    buscar(ac.signal)
+      .then((d) => { if (!ac.signal.aborted) aplicar(d) })
+      .catch((e: any) => { if (!ac.signal.aborted) setErroLista(e.message || 'Não foi possível carregar os preços.') })
+      .finally(() => { if (!ac.signal.aborted) setLoading(false) })
+    return () => ac.abort()
+  }, [buscar, aplicar])
   const carregar = useCallback(async () => {
     setLoading(true); setErroLista(null)
-    try {
-      const d = await jsonFetch('/api/gerenciamento/tabela-valores', { cache: 'no-store' })
-      setItens((d as any).tabelaValores || [])
-      setConfigs((d as any).configs || [])
-      setFornecedores((d as any).fornecedores || [])
-    } catch (e: any) { setErroLista(e.message || 'Não foi possível carregar os preços.') }
+    try { aplicar(await buscar()) }
+    catch (e: any) { setErroLista(e.message || 'Não foi possível carregar os preços.') }
     finally { setLoading(false) }
-  }, [])
-  useEffect(() => { carregar() }, [carregar])
+  }, [buscar, aplicar])
 
   const filtrados = useMemo(() => {
     const q = busca.trim().toLowerCase()

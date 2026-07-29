@@ -194,13 +194,36 @@ export function PessoaOperacionalDrawer({
     }
   }, [pessoaId])
 
+  // Reset ao (re)abrir: ajuste de estado durante o render.
+  // "Agora" é impuro no render: fixado uma vez por montagem do painel.
+  const [agora] = useState(() => Date.now())
+  const [aberturaAtual, setAberturaAtual] = useState(`${isOpen}|${pessoaId}`)
+  if (aberturaAtual !== `${isOpen}|${pessoaId}`) {
+    setAberturaAtual(`${isOpen}|${pessoaId}`)
+    if (isOpen && pessoaId) { setActiveTab("docs"); setConfirmDelete(false) }
+  }
+
+  // Carga da pessoa: busca no efeito; estado só na continuação da promessa.
   useEffect(() => {
-    if (isOpen && pessoaId) {
-      setActiveTab("docs")
-      setConfirmDelete(false)
-      carregar()
-    }
-  }, [isOpen, pessoaId, carregar])
+    if (!isOpen || !pessoaId) return
+    const ac = new AbortController()
+    fetch(`/api/pessoas/${pessoaId}`, {
+      headers: { Authorization: `Bearer ${localStorage.getItem("authToken")}` },
+      signal: ac.signal,
+    })
+      .then(async (res) => {
+        if (!res.ok) throw new Error(`HTTP ${res.status}`)
+        const data: Pessoa = await res.json()
+        if (!ac.signal.aborted) setPessoa({ ...data, documentos: data.documentos || [] })
+      })
+      .catch((e) => {
+        if (ac.signal.aborted) return
+        console.warn("[PessoaOperacionalDrawer] falha:", e)
+        setErro("Erro ao carregar pessoa.")
+      })
+      .finally(() => { if (!ac.signal.aborted) setLoading(false) })
+    return () => ac.abort()
+  }, [isOpen, pessoaId])
 
   // Trava scroll do body
   useEffect(() => {
@@ -236,7 +259,7 @@ export function PessoaOperacionalDrawer({
   const slaCritico = docs.some((d) => {
     if (!d.dataPrazoOperacao) return false
     const dias = Math.floor(
-      (new Date(d.dataPrazoOperacao).getTime() - Date.now()) / 86400000
+      (new Date(d.dataPrazoOperacao).getTime() - agora) / 86400000
     )
     return dias < -5
   })

@@ -88,9 +88,12 @@ export function KanbanBoard({
 }: KanbanBoardProps) {
   const [localProcessos, setLocalProcessos] = useState<Processo[]>(processosFromProps)
 
-  useEffect(() => {
+  // A lista local segue a lista recebida: ajuste de estado durante o render.
+  const [processosAplicados, setProcessosAplicados] = useState(processosFromProps)
+  if (processosAplicados !== processosFromProps) {
+    setProcessosAplicados(processosFromProps)
     setLocalProcessos(processosFromProps)
-  }, [processosFromProps])
+  }
 
   const [activeProcesso, setActiveProcesso] = useState<Processo | null>(null)
   const [selectedProcesso, setSelectedProcesso] = useState<Processo | null>(null)
@@ -113,16 +116,17 @@ export function KanbanBoard({
 
   const [initialParamsProcessed, setInitialParamsProcessed] = useState(false)
 
-  useEffect(() => {
-    if (initialProcessoId !== null) {
-      setInitialParamsProcessed(false)
-    }
-  }, [initialProcessoId])
+  // Novo deep-link reabre o processamento dos parâmetros: ajuste no render.
+  const [processoDeepLink, setProcessoDeepLink] = useState(initialProcessoId)
+  if (processoDeepLink !== initialProcessoId) {
+    setProcessoDeepLink(initialProcessoId)
+    if (initialProcessoId !== null) setInitialParamsProcessed(false)
+  }
 
   const corPais = corDoPais(pais.countryKey)
 
   // Fases visíveis (colunas) — já vêm ordenadas do config
-  const fases = tipo?.fases ?? []
+  const fases = useMemo(() => tipo?.fases ?? [], [tipo])
 
   // Sensores
   const sensors = useSensors(
@@ -134,8 +138,9 @@ export function KanbanBoard({
     })
   )
 
-  // Abrir modal automaticamente (deep-link)
-  useEffect(() => {
+  // Abrir modal automaticamente (deep-link): ajuste de estado durante o render,
+  // uma única vez por conjunto de parâmetros.
+  {
     if (initialProcessoId && localProcessos.length > 0 && !initialParamsProcessed) {
       const processo = localProcessos.find(p => p.id === initialProcessoId)
       if (processo) {
@@ -147,10 +152,15 @@ export function KanbanBoard({
         setModalInitialAtividadeId(initialAtividadeId || undefined)
         setIsDetailsModalOpen(true)
         setInitialParamsProcessed(true)
-        onModalOpened?.()
       }
     }
-  }, [initialProcessoId, initialTab, initialPessoaId, initialSidebarTab, localProcessos, initialParamsProcessed, onModalOpened])
+  }
+
+  // Avisa o pai DEPOIS que o modal abriu (efeito de notificação: não escreve
+  // estado local e não pode acontecer durante o render).
+  useEffect(() => {
+    if (initialParamsProcessed && isDetailsModalOpen) onModalOpened?.()
+  }, [initialParamsProcessed, isDetailsModalOpen, onModalOpened])
 
   // Processos agrupados por fase (A-Z dentro da fase)
   const processosByFase = useMemo(() => {

@@ -39,20 +39,31 @@ function useConfiguracao(grupo: "geral" | "identidade") {
   const [loading, setLoading] = useState(true)
   const [erro, setErro] = useState<string | null>(null)
 
+  const MSG = "Não foi possível carregar as configurações."
+  // BUSCA (só rede) × APLICAÇÃO (só estado).
+  const buscar = useCallback(async (sinal?: AbortSignal) => {
+    const res = await fetch("/api/gerenciamento/configuracao-sistema", { headers: authHeaders(), cache: "no-store", signal: sinal })
+    const j = await res.json().catch(() => ({}))
+    if (!res.ok) throw new Error(j.error || MSG)
+    return j
+  }, [])
+  const aplicar = useCallback((j: any) => {
+    setChaves((j.chaves as ChaveSpec[]).filter((c) => c.grupo === grupo))
+    setValores(j.valores || {}); setInicial(j.valores || {}); setAtualizadoEm(j.atualizadoEm ?? null)
+  }, [grupo])
+  useEffect(() => {
+    const ac = new AbortController()
+    buscar(ac.signal)
+      .then((j) => { if (!ac.signal.aborted) aplicar(j) })
+      .catch((e: any) => { if (!ac.signal.aborted) setErro(e?.message || MSG) })
+      .finally(() => { if (!ac.signal.aborted) setLoading(false) })
+    return () => ac.abort()
+  }, [buscar, aplicar])
   const load = useCallback(async () => {
     setLoading(true); setErro(null)
-    try {
-      const res = await fetch("/api/gerenciamento/configuracao-sistema", { headers: authHeaders(), cache: "no-store" })
-      const j = await res.json().catch(() => ({}))
-      if (res.ok) {
-        setChaves((j.chaves as ChaveSpec[]).filter((c) => c.grupo === grupo))
-        setValores(j.valores || {}); setInicial(j.valores || {}); setAtualizadoEm(j.atualizadoEm ?? null)
-      } else setErro(j.error || "Não foi possível carregar as configurações.")
-    } catch {
-      setErro("Não foi possível carregar as configurações.")
-    } finally { setLoading(false) }
-  }, [grupo])
-  useEffect(() => { load() }, [load])
+    try { aplicar(await buscar()) }
+    catch (e: any) { setErro(e?.message || MSG) } finally { setLoading(false) }
+  }, [buscar, aplicar])
 
   return { chaves, valores, setValores, inicial, setInicial, atualizadoEm, setAtualizadoEm, loading, erro, setErro, load }
 }

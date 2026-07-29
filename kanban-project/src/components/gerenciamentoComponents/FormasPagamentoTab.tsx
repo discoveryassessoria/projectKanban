@@ -78,15 +78,25 @@ export default function FormasPagamentoTab() {
   const [erroModal, setErroModal] = useState<string | null>(null)
   const set = <K extends keyof Omit<Forma, 'id'>>(k: K, v: Omit<Forma, 'id'>[K]) => setF((p) => ({ ...p, [k]: v }))
 
+  // BUSCA (só rede) × APLICAÇÃO (só estado).
+  const buscar = useCallback((sinal?: AbortSignal) => jf('/api/gerenciamento/formas-pagamento', { cache: 'no-store', signal: sinal }), [])
+  const aplicar = useCallback((d: any) => {
+    setItens(d.formasPagamento || []); setMoedas(d.moedas || []); setCarteiras(d.carteiras || []); setContas(d.contas || [])
+  }, [])
+  useEffect(() => {
+    const ac = new AbortController()
+    buscar(ac.signal)
+      .then((d) => { if (!ac.signal.aborted) aplicar(d) })
+      .catch((e: any) => { if (!ac.signal.aborted) setErroLista(e.message || 'Não foi possível carregar.') })
+      .finally(() => { if (!ac.signal.aborted) setLoading(false) })
+    return () => ac.abort()
+  }, [buscar, aplicar])
   const carregar = useCallback(async () => {
     setLoading(true); setErroLista(null)
-    try {
-      const d = await jf('/api/gerenciamento/formas-pagamento', { cache: 'no-store' })
-      setItens(d.formasPagamento || []); setMoedas(d.moedas || []); setCarteiras(d.carteiras || []); setContas(d.contas || [])
-    } catch (e: any) { setErroLista(e.message || 'Não foi possível carregar.') }
+    try { aplicar(await buscar()) }
+    catch (e: any) { setErroLista(e.message || 'Não foi possível carregar.') }
     finally { setLoading(false) }
-  }, [])
-  useEffect(() => { carregar() }, [carregar])
+  }, [buscar, aplicar])
 
   const filtrados = useMemo(() => {
     const q = busca.trim().toLowerCase()

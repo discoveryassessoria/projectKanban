@@ -135,9 +135,39 @@ export function TabelaCustos({ processoId, nomeFamilia, onTotaisChange }: Tabela
     }
   }, [processoId])
 
+  // MONTAGEM/troca de processo: busca no efeito; o estado é escrito na
+  // continuação da promessa e descartado se a tela sair antes da resposta.
   useEffect(() => {
-    carregarDados()
-  }, [carregarDados])
+    const ac = new AbortController()
+    fetch(`/api/processos/${processoId}/custos`, {
+      headers: { Authorization: `Bearer ${localStorage.getItem('authToken')}` },
+      signal: ac.signal,
+    })
+      .then((response) => (response.ok ? response.json() : null))
+      .then((data) => {
+        if (ac.signal.aborted || !data) return
+        setLinhas(data.linhas || [])
+        setServicos(data.servicos || [])
+        setTotaisPorServico(data.totaisPorServico || {})
+        setTotalGeral(data.totalGeral || 0)
+        const valores: Record<string, string> = {}
+        data.linhas?.forEach((linha: LinhaTabela) => {
+          data.servicos?.forEach((s: TipoServico) => {
+            valores[`${linha.pessoaId}-${linha.tipoRegistro}-${s.id}`] = (linha.valores[s.id] || 0).toString()
+          })
+        })
+        setValoresEditados(valores)
+        setTemAlteracoes(false)
+        const ordemInicial: Record<number, number> = {}
+        data.linhas?.forEach((linha: LinhaTabela) => {
+          if (linha.isPrimeiraLinha) ordemInicial[linha.pessoaId] = linha.ordemCusto ?? 0
+        })
+        setOrdemPessoas(ordemInicial)
+      })
+      .catch((error) => { if (!ac.signal.aborted) console.error("Erro ao carregar dados:", error) })
+      .finally(() => { if (!ac.signal.aborted) setLoading(false) })
+    return () => ac.abort()
+  }, [processoId])
 
   // 🆕 LOTE 4: Notifica o pai sempre que os valores editados mudam,
   // permitindo que os cards "Custos por Tipo" (em Custos.tsx) atualizem
@@ -749,7 +779,7 @@ export function TabelaCustos({ processoId, nomeFamilia, onTotaisChange }: Tabela
         <FileText className="w-12 h-12 mx-auto text-gray-300 mb-4" />
         <h3 className="text-lg font-medium text-gray-600 mb-2">Nenhuma pessoa na árvore</h3>
         <p className="text-sm text-gray-400 max-w-md mx-auto">
-          Adicione pessoas na aba "Árvore Genealógica" para que elas apareçam aqui na planilha de custos.
+          Adicione pessoas na aba &quot;Árvore Genealógica&quot; para que elas apareçam aqui na planilha de custos.
         </p>
       </div>
     )

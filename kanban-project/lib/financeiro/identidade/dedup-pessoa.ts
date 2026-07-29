@@ -54,6 +54,5 @@ export function dedupPorPessoa<T extends ComIdentidade>(lista: T[]): DedupResult
 /** Log técnico padronizado de pendência de reconciliação (não bloqueia fluxo). */
 export function registrarPendenciaReconciliacao(contexto: string, duplicatas: PendenciaReconciliacao[]): void {
   if (!duplicatas.length) return
-  // eslint-disable-next-line no-console
   console.warn(`[identidade][reconciliacao-pendente][${contexto}] mesma Pessoa em múltiplos requerentes (dedup VISUAL aplicado; sem merge):`, JSON.stringify(duplicatas))
 }

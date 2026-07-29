@@ -88,8 +88,27 @@ export default function ContasPagarPage() {
     observacoes: "",
   })
 
+  // MONTAGEM: a busca acontece no efeito e o estado só é escrito na continuação
+  // da promessa (nunca de forma síncrona); a resposta é descartada se a tela sair.
   useEffect(() => {
-    fetchContas()
+    const ac = new AbortController()
+    fetch('/api/contas-pagar', { signal: ac.signal })
+      .then(async (response) => {
+        if (ac.signal.aborted) return
+        if (response.ok) { setContas(await response.json()); setErro(null) }
+        else {
+          // ETAPA 1A — SEM FALLBACK SILENCIOSO: falha de API não vira dado fabricado.
+          console.error("Falha ao carregar contas a pagar:", response.status)
+          setErro("Não foi possível carregar as contas a pagar."); setContas([])
+        }
+      })
+      .catch((error) => {
+        if (ac.signal.aborted) return
+        console.error("Erro ao carregar contas:", error)
+        setErro("Não foi possível carregar as contas a pagar."); setContas([])
+      })
+      .finally(() => { if (!ac.signal.aborted) setLoading(false) })
+    return () => ac.abort()
   }, [])
 
   const fetchContas = async () => {

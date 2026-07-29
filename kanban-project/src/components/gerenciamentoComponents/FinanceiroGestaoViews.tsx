@@ -24,15 +24,28 @@ function useGestao<T>(visao: string) {
   const [dados, setDados] = useState<T | null>(null)
   const [loading, setLoading] = useState(true)
   const [erro, setErro] = useState<string | null>(null)
+  const MSG = "Não foi possível carregar."
+  // BUSCA (só rede) × APLICAÇÃO (só estado).
+  const buscar = useCallback(async (sinal?: AbortSignal) => {
+    const res = await fetch(`/api/gerenciamento/financeiro-gestao?visao=${visao}`, { headers: authHeaders(), cache: "no-store", signal: sinal })
+    const j = await res.json().catch(() => ({}))
+    if (!res.ok) throw new Error(j.error || MSG)
+    return j as T
+  }, [visao])
+  const aplicar = useCallback((j: T) => { setDados(j) }, [])
+  useEffect(() => {
+    const ac = new AbortController()
+    buscar(ac.signal)
+      .then((j) => { if (!ac.signal.aborted) aplicar(j) })
+      .catch((e: any) => { if (!ac.signal.aborted) setErro(e?.message || MSG) })
+      .finally(() => { if (!ac.signal.aborted) setLoading(false) })
+    return () => ac.abort()
+  }, [buscar, aplicar])
   const load = useCallback(async () => {
     setLoading(true); setErro(null)
-    try {
-      const res = await fetch(`/api/gerenciamento/financeiro-gestao?visao=${visao}`, { headers: authHeaders(), cache: "no-store" })
-      const j = await res.json().catch(() => ({}))
-      if (res.ok) setDados(j); else setErro(j.error || "Não foi possível carregar.")
-    } catch { setErro("Não foi possível carregar.") } finally { setLoading(false) }
-  }, [visao])
-  useEffect(() => { load() }, [load])
+    try { aplicar(await buscar()) }
+    catch (e: any) { setErro(e?.message || MSG) } finally { setLoading(false) }
+  }, [buscar, aplicar])
   return { dados, loading, erro, load }
 }
 

@@ -146,16 +146,21 @@ export default function ProdutosTab() {
 
   const set = (k: keyof FormState, v: any) => setForm((f) => ({ ...f, [k]: v }))
 
-  const carregar = useCallback(async () => {
-    setLoading(true); setErroLista(null)
-    try {
+  // Carga da tela em UM lugar: `aplicar` só escreve estado; quem chama decide
+  // se mostra o estado de carregamento. `sinal` cancela a escrita se a tela sair.
+  // BUSCA: só entrada/saída de rede, nenhuma escrita de estado.
+  const buscar = useCallback(async (sinal?: AbortSignal) => {
       const [dProd, dCat, dContas] = await Promise.all([
-        jsonFetch('/api/gerenciamento/produtos', { cache: 'no-store' }),
-        jsonFetch('/api/gerenciamento/categorias', { cache: 'no-store' }).catch(() => ({ categorias: [] })),
-        jsonFetch('/api/gerenciamento/plano-contas', { cache: 'no-store' }).catch(() => ({ contas: [] })),
+        jsonFetch('/api/gerenciamento/produtos', { cache: 'no-store', signal: sinal }),
+        jsonFetch('/api/gerenciamento/categorias', { cache: 'no-store', signal: sinal }).catch(() => ({ categorias: [] })),
+        jsonFetch('/api/gerenciamento/plano-contas', { cache: 'no-store', signal: sinal }).catch(() => ({ contas: [] })),
       ])
-      setProdutos((dProd as any).produtos || [])
       const m = (dProd as any).mestres || {}
+    return { dProd, dCat, dContas, m }
+  }, [])
+  // APLICAÇÃO: ponto único de escrita do estado da carga.
+  const aplicar = useCallback(({ dProd, dCat, dContas, m }: any) => {
+      setProdutos((dProd as any).produtos || [])
       setMestres({
         documento: (m.tiposDocumento || []).map((d: any) => ({ id: d.id, label: d.name, code: d.code ?? null })),
         servico: (m.servicos || []).map((x: any) => ({ id: x.id, label: x.publicCode ? `${x.publicCode} — ${x.name}` : x.name, code: x.code ?? null })),
@@ -165,14 +170,27 @@ export default function ProdutosTab() {
       setFornecedores((m.fornecedores || []).map((f: any) => ({ id: f.id, nome: f.nome, publicCode: f.publicCode ?? null })))
       setCategorias((dCat as any).categorias || [])
       setContas((dContas as any).contas || [])
-    } catch (e: any) {
-      setErroLista(e.message || 'Não foi possível carregar as configurações.')
-    } finally {
-      setLoading(false)
-    }
   }, [])
 
-  useEffect(() => { carregar() }, [carregar])
+  // MONTAGEM: o efeito não escreve estado de forma síncrona (`Loading` já nasce
+  // true e `ErroLista` nasce null) — a escrita acontece na continuação da promessa.
+  useEffect(() => {
+    const ac = new AbortController()
+    buscar(ac.signal)
+      .then((d) => { if (!ac.signal.aborted) aplicar(d) })
+      .catch((e: any) => { if (!ac.signal.aborted) setErroLista(e.message || 'Não foi possível carregar as configurações.') })
+      .finally(() => { if (!ac.signal.aborted) setLoading(false) })
+    return () => ac.abort()
+  }, [buscar, aplicar])
+
+  // RECARGA por ação do usuário (salvar/excluir/atualizar): aí sim volta ao
+  // estado de carregamento antes de buscar de novo.
+  const carregar = useCallback(async () => {
+    setLoading(true); setErroLista(null)
+    try { aplicar(await buscar()) }
+    catch (e: any) { setErroLista(e.message || 'Não foi possível carregar as configurações.') }
+    finally { setLoading(false) }
+  }, [buscar, aplicar])
 
   const filtrados = useMemo(() => {
     const base = mostrarInativos ? produtos : produtos.filter((p) => p.ativo)

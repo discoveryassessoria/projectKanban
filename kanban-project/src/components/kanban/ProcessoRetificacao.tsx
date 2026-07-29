@@ -262,7 +262,21 @@ export function ProcessoRetificacao({ processoId, onConcluido }: Props) {
     }
   }, [processoId])
 
-  useEffect(() => { carregar() }, [carregar])
+  // MONTAGEM: busca no efeito; estado só na continuação da promessa e descartado
+  // se a tela sair antes da resposta.
+  useEffect(() => {
+    const ac = new AbortController()
+    fetch(`/api/processos/${processoId}/retificacao`, { headers: authHeaders(), signal: ac.signal })
+      .then((res) => res.json())
+      .then((data) => {
+        if (ac.signal.aborted) return
+        const packages = Array.isArray(data.packages) ? data.packages.map(mapPacote) : []
+        setData({ packages, kpis: data.kpis ?? calcKpis(packages), progress: data.progress ?? calcProgress(packages) })
+      })
+      .catch(() => { if (!ac.signal.aborted) setErro("Erro ao carregar a fase de Retificação.") })
+      .finally(() => { if (!ac.signal.aborted) setLoading(false) })
+    return () => ac.abort()
+  }, [processoId])
 
   const criarPacote = async (tipo: "judicial" | "administrativa") => {
     setTipoModal(false)

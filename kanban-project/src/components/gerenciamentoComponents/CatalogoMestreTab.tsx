@@ -27,6 +27,7 @@ async function jsonFetch(url: string, options: RequestInit = {}) {
   return data
 }
 
+const URL_CATALOGO = '/api/gerenciamento/catalogo-mestre'
 const VAZIO: Form = { code: '', name: '', descricao: '', natureza: 'DOCUMENTO', categoria: '', unidade: 'UNIDADE', ativo: true }
 
 export default function CatalogoMestreTab() {
@@ -42,14 +43,30 @@ export default function CatalogoMestreTab() {
   const podeExcluirDefinitivo = pode('sistema.exclusaoDefinitiva')
   const [modalExcluir, setModalExcluir] = useState<Item | null>(null)
 
+  // Aplicação do resultado — ponto ÚNICO de escrita de estado da carga.
+  const aplicar = useCallback((d: any) => {
+    setItens(d.itens || []); setNaturezas(d.naturezas || []); setUnidades(d.unidades || [])
+    setErro(null)
+  }, [])
+
+  // MONTAGEM: o efeito não escreve estado de forma síncrona (`loading` já nasce
+  // true e `erro` nasce null) e cancela a resposta se a tela sair antes.
+  useEffect(() => {
+    const ac = new AbortController()
+    jsonFetch(URL_CATALOGO, { signal: ac.signal })
+      .then((d) => { if (!ac.signal.aborted) aplicar(d) })
+      .catch((e: any) => { if (!ac.signal.aborted) setErro(e.message) })
+      .finally(() => { if (!ac.signal.aborted) setLoading(false) })
+    return () => ac.abort()
+  }, [aplicar])
+
+  // RECARGA (após salvar/excluir): aí sim a tela volta ao estado de carregamento.
   const carregar = useCallback(async () => {
     setLoading(true); setErro(null)
-    try {
-      const d = await jsonFetch('/api/gerenciamento/catalogo-mestre')
-      setItens(d.itens || []); setNaturezas(d.naturezas || []); setUnidades(d.unidades || [])
-    } catch (e: any) { setErro(e.message) } finally { setLoading(false) }
-  }, [])
-  useEffect(() => { carregar() }, [carregar])
+    try { aplicar(await jsonFetch(URL_CATALOGO)) }
+    catch (e: any) { setErro(e.message) }
+    finally { setLoading(false) }
+  }, [aplicar])
 
   async function salvar() {
     if (!form) return
@@ -93,7 +110,7 @@ export default function CatalogoMestreTab() {
       {loading ? (
         <div className="py-10 text-center text-white/40">Carregando…</div>
       ) : filtrados.length === 0 ? (
-        <div className="py-10 text-center text-white/40">Nenhum item. Clique em "+ Novo item".</div>
+        <div className="py-10 text-center text-white/40">Nenhum item. Clique em &quot;+ Novo item&quot;.</div>
       ) : (
         <div className="overflow-hidden rounded-xl ring-1 ring-white/10">
           <table className="w-full text-sm">

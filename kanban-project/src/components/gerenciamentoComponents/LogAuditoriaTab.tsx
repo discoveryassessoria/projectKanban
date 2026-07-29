@@ -48,14 +48,24 @@ export default function LogAuditoriaTab({ escopo }: { escopo?: string }) {
   const [busca, setBusca] = useState("")
   const [aberto, setAberto] = useState<number | null>(null)
 
+  // BUSCA (só rede) × APLICAÇÃO (só estado).
+  const buscar = useCallback(async (sinal?: AbortSignal) => {
+    const res = await fetch("/api/gerenciamento/auditoria", { headers: authHeaders(), signal: sinal })
+    return res.ok ? ((await res.json()).logs || []) : null
+  }, [])
+  const aplicar = useCallback((logs: Log[] | null) => { if (logs) setLogs(logs) }, [])
+  useEffect(() => {
+    const ac = new AbortController()
+    buscar(ac.signal)
+      .then((logs) => { if (!ac.signal.aborted) aplicar(logs) })
+      .catch(() => {})
+      .finally(() => { if (!ac.signal.aborted) setLoading(false) })
+    return () => ac.abort()
+  }, [buscar, aplicar])
   const load = useCallback(async () => {
     setLoading(true)
-    try {
-      const res = await fetch("/api/gerenciamento/auditoria", { headers: authHeaders() })
-      if (res.ok) setLogs((await res.json()).logs || [])
-    } finally { setLoading(false) }
-  }, [])
-  useEffect(() => { load() }, [load])
+    try { aplicar(await buscar()) } finally { setLoading(false) }
+  }, [buscar, aplicar])
 
   // recorte do escopo (quando houver): tudo o mais abaixo opera sobre ele
   const logsEscopo = useMemo(

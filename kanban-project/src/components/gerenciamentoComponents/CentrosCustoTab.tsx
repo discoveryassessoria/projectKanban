@@ -57,20 +57,27 @@ export default function CentrosCustoTab() {
   const [salvando, setSalvando] = useState(false)
   const [erroModal, setErroModal] = useState<string | null>(null)
 
+  // BUSCA (só rede) × APLICAÇÃO (só estado).
+  const buscar = useCallback(async (sinal?: AbortSignal) => {
+    const data = await jsonFetch('/api/gerenciamento/centros-custo', { cache: 'no-store', signal: sinal })
+    return (data as any).centros || []
+  }, [])
+  const aplicar = useCallback((centros: any[]) => { setCentros(centros) }, [])
+  useEffect(() => {
+    const ac = new AbortController()
+    buscar(ac.signal)
+      .then((centros) => { if (!ac.signal.aborted) aplicar(centros) })
+      .catch((e: any) => { if (!ac.signal.aborted) setErroLista(e.message || 'Não foi possível carregar os centros de custo.') })
+      .finally(() => { if (!ac.signal.aborted) setLoading(false) })
+    return () => ac.abort()
+  }, [buscar, aplicar])
   const carregar = useCallback(async () => {
     setLoading(true)
     setErroLista(null)
-    try {
-      const data = await jsonFetch('/api/gerenciamento/centros-custo', { cache: 'no-store' })
-      setCentros((data as any).centros || [])
-    } catch (e: any) {
-      setErroLista(e.message || 'Não foi possível carregar os centros de custo.')
-    } finally {
-      setLoading(false)
-    }
-  }, [])
-
-  useEffect(() => { carregar() }, [carregar])
+    try { aplicar(await buscar()) }
+    catch (e: any) { setErroLista(e.message || 'Não foi possível carregar os centros de custo.') }
+    finally { setLoading(false) }
+  }, [buscar, aplicar])
 
   const filtrados = useMemo(() => {
     const q = busca.trim().toLowerCase()

@@ -83,7 +83,20 @@ export function ProcessoAnalise({ processoId, onConcluido, readOnly = false }: P
     }
   }, [processoId])
 
-  useEffect(() => { carregar() }, [carregar])
+  // MONTAGEM: busca no efeito; estado só na continuação da promessa e descartado
+  // se a tela sair antes da resposta.
+  useEffect(() => {
+    const ac = new AbortController()
+    fetch(`/api/processos/${processoId}/analise`, { headers: authHeaders(), signal: ac.signal })
+      .then((res) => res.json())
+      .then((data) => {
+        if (ac.signal.aborted) return
+        setAnalise(data.analise ?? null)
+      })
+      .catch(() => { if (!ac.signal.aborted) setErro("Erro ao carregar a análise.") })
+      .finally(() => { if (!ac.signal.aborted) setLoading(false) })
+    return () => ac.abort()
+  }, [processoId])
 
   const rodar = async () => {
     setRunning(true); setErro(null); setResultado(null)

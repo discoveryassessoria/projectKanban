@@ -15,6 +15,7 @@
 import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
 import { useHomeData } from "@/src/components/home/use-home"
+import { useMontadoNoCliente } from "@/src/hooks/use-dados-headerbar"
 import { HomeContent } from "@/src/components/home/home-content"
 import { HomeShell } from "@/src/components/home/home-shell"
 import { HomeSkeleton } from "@/src/components/home/home-skeleton"
@@ -22,18 +23,17 @@ import { BlocoCard, ErrorState } from "@/src/components/home/home-primitives"
 
 export default function DashboardPage() {
   const router = useRouter()
-  const [autorizado, setAutorizado] = useState(false)
   const { data, error, isLoading, recarregar } = useHomeData()
 
+  // Autorização é DERIVADA das credenciais no navegador (estado externo), não
+  // copiada para o estado do React num efeito.
+  const montado = useMontadoNoCliente()
+  const autorizado = montado && !!localStorage.getItem("authToken") && !!localStorage.getItem("user")
+
+  // Sem credenciais no cliente → login.
   useEffect(() => {
-    const token = localStorage.getItem("authToken")
-    const userData = localStorage.getItem("user")
-    if (!token || !userData) {
-      router.replace("/login")
-      return
-    }
-    setAutorizado(true)
-  }, [router])
+    if (montado && !autorizado) router.replace("/login")
+  }, [montado, autorizado, router])
 
   // Sessão expirada durante a chamada → volta pro login.
   useEffect(() => {
