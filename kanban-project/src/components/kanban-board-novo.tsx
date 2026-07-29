@@ -38,6 +38,11 @@ import {
 } from "@/src/types/kanban"
 import { usePermissoes } from "@/src/hooks/use-permissoes"
 
+// Identidade ESTÁVEL para a ausência de dados. `?? []` criava um array novo a
+// cada render, e qualquer useMemo que dependesse dele recomputava sempre —
+// era a memoização se anulando sozinha. Congelado: ninguém pode mutá-lo.
+const SEM_FASES: any[] = Object.freeze([]) as unknown as any[]
+
 interface KanbanBoardProps {
   pais: PaisKanban
   tipo: TipoKanban                    // tipo selecionado — as fases dele são as colunas
@@ -122,7 +127,7 @@ export function KanbanBoard({
   const corPais = corDoPais(pais.countryKey)
 
   // Fases visíveis (colunas) — já vêm ordenadas do config
-  const fases = tipo?.fases ?? []
+  const fases = tipo?.fases ?? SEM_FASES
 
   // Sensores
   const sensors = useSensors(

@@ -33,6 +33,11 @@ import { authHeaders } from "@/src/lib/financeiro/http"
 import { fmtBrl as brl } from "@/src/lib/financeiro/formato"
 import { fmtMoeda } from "@/src/lib/financeiro/formato"
 
+// Identidade ESTÁVEL para a ausência de dados. `?? []` criava um array novo a
+// cada render, e qualquer useMemo que dependesse dele recomputava sempre —
+// era a memoização se anulando sozinha. Congelado: ninguém pode mutá-lo.
+const SEM_GRUPOS: Grupo[] = Object.freeze([]) as unknown as Grupo[]
+
 const dataBR = (s?: string | null) => (s ? new Date(s).toLocaleDateString("pt-BR") : null)
 const iniciais = (nome: string) => nome.split(/\s+/).filter(Boolean).slice(0, 2).map((p) => p[0]?.toUpperCase() ?? "").join("") || "?"
 
@@ -110,7 +115,7 @@ export function ReceitasTab({ processoId, onAbrirDetalhe }: { processoId?: numbe
   // (registrar pagamento, editar, redistribuir, estornar, arquivar…) — sem recarregar a página.
   useRevalidacaoFinanceira(useCallback(() => carregar(), [processoId]))
 
-  const grupos: Grupo[] = d?.receitas ?? []
+  const grupos: Grupo[] = d?.receitas ?? SEM_GRUPOS
   const k = d?.kpis ?? {}
   const nomeProc = d?.processo?.nome ?? d?.processo?.codigo ?? "deste processo"
 

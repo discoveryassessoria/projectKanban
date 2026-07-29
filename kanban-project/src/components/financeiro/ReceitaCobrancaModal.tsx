@@ -185,13 +185,15 @@ function CobrancaWizard({ receitaId, valor, moeda, receita, onClose, onCriada }:
   const [simulando, setSimulando] = React.useState(false)
   // Chave de idempotência: uma por sessão do wizard (retry/duplo-clique não duplica).
   const idemKeyRef = useChaveIdempotencia('idem')
-  // Campos de câmbio comuns às requisições de simular/criar.
-  const camposCambio = () => ({
+  // Campos de câmbio comuns às requisições de simular/criar. Memoizado porque o
+  // useCallback de simular() depende dele: recriar a cada render tornaria
+  // `simular` instável e o efeito que o dispara re-executaria sem motivo.
+  const camposCambio = React.useCallback(() => ({
     moedaRecebimento: f.moedaRecebimento ?? undefined,
     cotacaoManual: f.cotacaoManualAtiva && f.cotacaoManual != null ? f.cotacaoManual : undefined,
     justificativaCotacaoManual: f.cotacaoManualAtiva ? (f.justificativaCotacao ?? undefined) : undefined,
     fonteCotacao: f.cotacaoManualAtiva ? 'Manual' : undefined,
-  })
+  }), [f])
 
   React.useEffect(() => { jf('/api/financeiro/config').then(setCfg).catch((e) => setErro(e.message)) }, [])
 
@@ -242,7 +244,7 @@ function CobrancaWizard({ receitaId, valor, moeda, receita, onClose, onCriada }:
       })
       setSim(d.simulacao)
     } catch (e: any) { setSim(null); setErro(e.message) } finally { setSimulando(false) }
-  }, [receitaId, f, nParcelas, politicaEscolha])
+  }, [receitaId, f, nParcelas, politicaEscolha, camposCambio])
 
   React.useEffect(() => { if (step >= 3) simular() }, [step, f.formaPagamentoId, f.condicaoPagamentoId, f.carteiraId, f.contaBancariaId, f.bandeiraId, f.adquirenteId, f.entradaValor, f.moedaRecebimento, f.cotacaoManual, f.cotacaoManualAtiva, nParcelas, politicaEscolha]) // eslint-disable-line
 

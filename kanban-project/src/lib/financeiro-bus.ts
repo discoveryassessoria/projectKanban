@@ -9,7 +9,7 @@
 // ============================================================================
 "use client"
 
-import { useEffect } from "react"
+import { useCallback, useEffect, useMemo } from "react"
 
 export type EscopoFinanceiro =
   | "receita" | "participantes" | "cobrancas" | "pagamentos" | "creditos"
@@ -45,18 +45,26 @@ export function useRevalidacaoFinanceira(
   onMutacao: (m: MutacaoFinanceira) => void,
   escopos: EscopoFinanceiro[] = ["tudo"],
 ): void {
+  // `escopos` chega como array literal na maioria das chamadas, então sua
+  // identidade muda a cada render do assinante. A CHAVE textual é o que
+  // realmente identifica o filtro — extraída para uma variável (o array de deps
+  // precisa ser estaticamente verificável) e memoizada.
+  const chaveEscopos = escopos.join(",")
+  const escoposEstaveis = useMemo(() => chaveEscopos.split(",") as EscopoFinanceiro[], [chaveEscopos])
+
+  // O handler é reconstruído só quando o filtro ou o callback mudam de verdade.
+  const handler = useCallback((ev: Event) => {
+    const m = (ev as CustomEvent<MutacaoFinanceira>).detail
+    if (!m) return
+    const querTudo = escoposEstaveis.includes("tudo")
+    const relevante = querTudo || m.escopos.includes("tudo") || m.escopos.some((e) => escoposEstaveis.includes(e))
+    if (relevante) onMutacao(m)
+  }, [onMutacao, escoposEstaveis])
+
   useEffect(() => {
-    const handler = (ev: Event) => {
-      const m = (ev as CustomEvent<MutacaoFinanceira>).detail
-      if (!m) return
-      const querTudo = escopos.includes("tudo")
-      const relevante = querTudo || m.escopos.includes("tudo") || m.escopos.some((e) => escopos.includes(e))
-      if (relevante) onMutacao(m)
-    }
     window.addEventListener(EVENTO, handler)
     return () => window.removeEventListener(EVENTO, handler)
-    // onMutacao é recriado a cada render; o componente deve memoizar ou aceitar o rebind.
-  }, [onMutacao, escopos.join(",")])
+  }, [handler])
 }
 
 /** Núcleo PURO (testável sem DOM): decide se uma mutação é relevante p/ um assinante. */

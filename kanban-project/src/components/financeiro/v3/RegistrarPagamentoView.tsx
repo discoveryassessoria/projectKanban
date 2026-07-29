@@ -125,10 +125,18 @@ export default function RegistrarPagamentoView({ obrigacaoId, receitaRef, escopo
 
   // ── cálculos live ─────────────────────────────────────────────────────────
   const totalInformado = useMemo(() => linhas.reduce((s, l) => s + num(l.valor), 0), [linhas])
-  const formaDe = (l: Linha) => formasCad.find((f) => f.id === Number(l.formaPagamentoId)) ?? null
+  // Também estabilizada: `tarifaDe` depende dela, então uma identidade nova a
+  // cada render propagaria a instabilidade adiante.
+  const formaDe = useCallback(
+    (l: Linha) => formasCad.find((f) => f.id === Number(l.formaPagamentoId)) ?? null,
+    [formasCad],
+  )
   const ehCartao = (l: Linha) => !!formaDe(l)?.exigeAdquirente
   const bandeirasDe = (adqId: number | "") => bandeiras.filter((b) => !adqId || !b.adquirentesCompativeis?.length || b.adquirentesCompativeis.includes(Number(adqId)))
-  const tarifaDe = (l: Linha): number => {
+  // Estabilizada na origem: era recriada a cada render e o useMemo abaixo
+  // dependia dela por closure, declarando as deps na mão. Com useCallback a
+  // identidade só muda quando muda o que ela de fato lê.
+  const tarifaDe = useCallback((l: Linha): number => {
     const forma = formaDe(l)
     if (!forma?.exigeAdquirente || !l.adquirenteId) return 0
     const relevantes: TaxaView[] = taxas.filter((t) =>
@@ -137,8 +145,8 @@ export default function RegistrarPagamentoView({ obrigacaoId, receitaRef, escopo
       (t.bandeiraId == null || t.bandeiraId === Number(l.bandeiraId)))
     if (!relevantes.length) return 0
     return calcularTaxas(relevantes, { valorBruto: num(l.valor), nParcelas: Number(l.parcelas) || 1 }).valorTaxas
-  }
-  const totalTarifas = useMemo(() => linhas.reduce((s, l) => s + tarifaDe(l), 0), [linhas, taxas, formasCad, bandeiras])
+  }, [formaDe, taxas])
+  const totalTarifas = useMemo(() => linhas.reduce((s, l) => s + tarifaDe(l), 0), [linhas, tarifaDe])
   const desconto = num(ajustes.desconto), juros = num(ajustes.juros), multa = num(ajustes.multa), acrescimo = num(ajustes.acrescimo), creditoUtilizado = num(ajustes.creditoUtilizado)
   const acrescimos = juros + multa + acrescimo
   // Saldo do ESCOPO selecionado (cobrança/participante/geral). Sem escopo → saldo da obrigação.

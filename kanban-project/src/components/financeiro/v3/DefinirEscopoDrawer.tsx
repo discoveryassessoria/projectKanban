@@ -13,6 +13,11 @@ import { X, Loader2, Receipt, Layers, User as UserIcon, Wallet, ArrowDownCircle,
 import { authHeaders } from "@/src/lib/financeiro/http"
 import { fmtBrl as brl } from "@/src/lib/financeiro/formato"
 
+// Identidade ESTÁVEL para a ausência de dados. `?? []` criava um array novo a
+// cada render, e qualquer useMemo que dependesse dele recomputava sempre —
+// era a memoização se anulando sozinha. Congelado: ninguém pode mutá-lo.
+const SEM_COBRANCAS: any[] = Object.freeze([]) as unknown as any[]
+
 const dataBR = (s?: string | null) => (s ? new Date(s).toLocaleDateString("pt-BR") : "—")
 
 export type EscopoTipo = "COBRANCA" | "VARIAS" | "PARTICIPANTE" | "GERAL" | "ADIANTAMENTO" | "CREDITO"
@@ -58,7 +63,7 @@ export default function DefinirEscopoDrawer({ receitaRef, onEscolher, onClose }:
     return () => { vivo = false; document.body.style.overflow = orig }
   }, [receitaRef])
 
-  const cobrancas: any[] = esc?.cobrancas ?? []
+  const cobrancas: any[] = esc?.cobrancas ?? SEM_COBRANCAS
   const participantes: any[] = esc?.participantes ?? []
   const cobrancasDoParticipante = useMemo(() => cobrancas.filter((c) => c.obrigacaoId === selParticipante), [cobrancas, selParticipante])
 

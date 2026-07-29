@@ -2,7 +2,7 @@
 
 "use client"
 
-import { useState, useEffect, useRef } from "react"
+import { useState, useEffect, useRef, useCallback } from "react"
 import { createPortal } from "react-dom"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -342,11 +342,13 @@ export function ProcessoDetailsModal({
     return () => document.removeEventListener('mousedown', handleClickOutside)
   }, [])
 
-  const handleClose = () => {
+  // Memoizado porque o efeito do ESC depende dele: recriado a cada render, o
+  // listener era removido e readicionado em toda passagem.
+  const handleClose = useCallback(() => {
     setIsEditing(false)
     setActiveTab("geral")
     onClose()
-  }
+  }, [onClose])
 
   useEffect(() => {
     const handleEsc = (e: KeyboardEvent) => {

@@ -16,6 +16,11 @@ import {
   KpiCard, StatusBadge, FilterChip, ActionMenu, type Tone,
 } from "@/src/components/financeiroComponents/ui/kit"
 
+// Identidade ESTÁVEL para a ausência de dados. `?? []` criava um array novo a
+// cada render, e qualquer useMemo que dependesse dele recomputava sempre —
+// era a memoização se anulando sozinha. Congelado: ninguém pode mutá-lo.
+const SEM_ATIVIDADES: any[] = Object.freeze([]) as unknown as any[]
+
 // Mapeamento de países para exibição
 const PAIS_LABELS: Record<string, string> = {
   PORTUGAL: 'Portugal',
@@ -66,7 +71,7 @@ export default function ListaActivities({ filters }: ListaActivitiesProps) {
   const { pode } = usePermissoes()
 
   // Garantir que atividades é sempre um array
-  const atividadesTodas = Array.isArray(activities) ? activities : []
+  const atividadesTodas = Array.isArray(activities) ? activities : SEM_ATIVIDADES
   const atividades = filtroTipo === "TODAS" ? atividadesTodas : atividadesTodas.filter((a: Atividade) => (a.tipo ?? "NORMAL") === filtroTipo)
   
   // Status para tarefas (Pendente/Concluída)

@@ -2,7 +2,7 @@
 
 "use client"
 
-import { useState, useEffect, useRef, useCallback } from "react"
+import { useState, useEffect, useRef, useCallback, useMemo } from "react"
 import { jsPDF } from "jspdf"
 import dagre from "dagre"
 import type { PessoaArvore, UniaoArvore, DocumentoArvore } from "./types"
@@ -71,7 +71,19 @@ export function ArvoreGenealogicaView({
   const [creating, setCreating] = useState(false)
   const [arvoreId, setArvoreId] = useState<number | null>(initialArvoreId || null)
   const [showOnboarding, setShowOnboarding] = useState(false)
-  const [selectedPerson, setSelectedPerson] = useState<PessoaArvore | null>(null)
+  // CAUSA RAIZ: guardar uma CÓPIA da pessoa em estado obrigava um efeito a
+  // re-sincronizá-la sempre que `pessoas` era recarregada — cópia velha na tela
+  // até o efeito rodar. Guardamos o ID (primitivo, estável) e DERIVAMOS a pessoa
+  // da lista viva: sem efeito, sem cópia defasada, sem setState em cascata.
+  const [selectedPersonId, setSelectedPersonId] = useState<number | null>(null)
+  const selectedPerson = useMemo<PessoaArvore | null>(
+    () => (selectedPersonId == null ? null : pessoas.find((p) => p.id === selectedPersonId) ?? null),
+    [selectedPersonId, pessoas],
+  )
+  const setSelectedPerson = useCallback(
+    (p: PessoaArvore | null) => setSelectedPersonId(p?.id ?? null),
+    [],
+  )
   const [fullDetailsPerson, setFullDetailsPerson] = useState<PessoaArvore | null>(null)
   const [isFullscreen, setIsFullscreen] = useState(false)
   const [isTransitioning, setIsTransitioning] = useState(false)
@@ -107,16 +119,7 @@ export function ArvoreGenealogicaView({
         }, 300)
       }
     }
-  }, [pessoaIdParaFocar, sidebarTabParaFocar, pessoas, pessoaFocada])
-
-  useEffect(() => {
-    if (selectedPerson) {
-      const pessoaAtualizada = pessoas.find(p => p.id === selectedPerson.id)
-      if (pessoaAtualizada && pessoaAtualizada !== selectedPerson) {
-        setSelectedPerson(pessoaAtualizada)
-      }
-    }
-  }, [pessoas])
+  }, [pessoaIdParaFocar, sidebarTabParaFocar, pessoas, pessoaFocada, setSelectedPerson])
 
   // ✅ FUNÇÃO handleExportPDF ATUALIZADA
   const handleExportPDF = useCallback(async () => {
@@ -495,7 +498,7 @@ export function ArvoreGenealogicaView({
         reactFlowTreeRef.current?.centerOnPerson(pessoa.id)
       }, 50)
     }
-  }, [pessoas])
+  }, [pessoas, setSelectedPerson])
 
   const findConjuge = (pessoa: PessoaArvore): PessoaArvore | null => {
     const uniao = unioes.find(u => u.pessoa1Id === pessoa.id || u.pessoa2Id === pessoa.id)
