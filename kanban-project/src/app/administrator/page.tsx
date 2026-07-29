@@ -76,12 +76,6 @@ const UsersTab = dynamic(() => import("@/src/components/gerenciamentoComponents/
   ssr: false, loading: () => <CarregandoTela />,
 })
 const RolesTab = dynamic(() => import("@/src/components/gerenciamentoComponents/RolesTab"), { ssr: false })
-const PrecificacaoTab = dynamic(() => import("@/src/components/gerenciamentoComponents/PrecificacaoTab"), { ssr: false, loading: () => <CarregandoTela /> })
-const FornecedoresConcentradoraTab = dynamic(() => import("@/src/components/gerenciamentoComponents/FornecedoresConcentradoraTab"), { ssr: false, loading: () => <CarregandoTela /> })
-const ComercialTab = dynamic(() => import("@/src/components/gerenciamentoComponents/ComercialTab"), { ssr: false, loading: () => <CarregandoTela /> })
-const PagamentosTab = dynamic(() => import("@/src/components/gerenciamentoComponents/PagamentosTab"), { ssr: false, loading: () => <CarregandoTela /> })
-const IntegracaoFinanceiraTab = dynamic(() => import("@/src/components/gerenciamentoComponents/IntegracaoFinanceiraTab"), { ssr: false, loading: () => <CarregandoTela /> })
-const EstruturaFinanceiraTab = dynamic(() => import("@/src/components/gerenciamentoComponents/EstruturaFinanceiraTab"), { ssr: false, loading: () => <CarregandoTela /> })
 const AplicabilidadeEconomicaTab = dynamic(() => import("@/src/components/gerenciamentoComponents/AplicabilidadeEconomicaTab"), { ssr: false, loading: () => <CarregandoTela /> })
 const CatalogoMestreTab = dynamic(() => import("@/src/components/gerenciamentoComponents/CatalogoMestreTab"), { ssr: false, loading: () => <CarregandoTela /> })
 const CatalogTab = dynamic(() => import("@/src/components/gerenciamentoComponents/CatalogTab"), {
@@ -98,7 +92,6 @@ const ImpostosTab = dynamic(() => import("@/src/components/gerenciamentoComponen
 const PlanoContasTab = dynamic(() => import("@/src/components/gerenciamentoComponents/PlanoContasTab"), { ssr: false, loading: () => <CarregandoTela /> })
 const CarteirasTab = dynamic(() => import("@/src/components/gerenciamentoComponents/CarteirasTab"), { ssr: false, loading: () => <CarregandoTela /> })
 const ProdutosTab = dynamic(() => import("@/src/components/gerenciamentoComponents/ProdutosTab"), { ssr: false, loading: () => <CarregandoTela /> })
-const HonorariosTab = dynamic(() => import("@/src/components/gerenciamentoComponents/HonorariosTab"), { ssr: false, loading: () => <CarregandoTela /> })
 const TabelaValoresTab = dynamic(() => import("@/src/components/gerenciamentoComponents/TabelaValoresTab"), { ssr: false, loading: () => <CarregandoTela /> })
 const CondicoesPagamentoTab = dynamic(() => import("@/src/components/gerenciamentoComponents/CondicoesPagamentoTab"), { ssr: false, loading: () => <CarregandoTela /> })
 const RegrasComissaoTab = dynamic(() => import("@/src/components/gerenciamentoComponents/RegrasComissaoTab"), { ssr: false, loading: () => <CarregandoTela /> })
@@ -190,12 +183,9 @@ const TELAS: Record<string, React.ComponentType> = {
   accounts: ContasTab,
   wallets: CarteirasTab,
   coa: PlanoContasTab,
-  estruturafin: EstruturaFinanceiraTab,
-  precificacao: PrecificacaoTab,
-  fornecedoresconc: FornecedoresConcentradoraTab,
-  comercial: ComercialTab,
-  pagamentos: PagamentosTab,
-  integracaofin: IntegracaoFinanceiraTab,
+  // As concentradoras legadas (estruturafin, precificacao, fornecedoresconc, comercial,
+  // pagamentos, integracaofin) foram removidas: eram invólucros de abas que só reusavam
+  // as telas reais. Os deep-links continuam vivos por ALIAS_TELAS → tela dona da função.
   categories: CategoriasTab,
   costcenters: CentrosCustoTab,
   taxes: ImpostosTab,
@@ -221,8 +211,8 @@ const TELAS: Record<string, React.ComponentType> = {
   servcats: cad("categorias-servico"),
   orgcats: cad("categorias-organizacao"),
   // Automações por fase — MESMA tela para os itens oficiais "Financeiras" e
-  // "Eventos" (só muda a aba inicial). `opauto` continua válido como deep-link.
-  opauto: PhaseAutomationsFasesTab,
+  // "Eventos" (só muda a aba inicial). A key antiga `opauto` não tem mais registro
+  // próprio: vira alias para `autofin` (deep-link preservado).
   autofin: function AutomacoesFinanceiras() { return <PhaseAutomationsFasesTab kindInicial="financial" /> },
   autoevt: function AutomacoesEventos() { return <PhaseAutomationsFasesTab kindInicial="event" /> },
   protocols: ProtocolsTab,
@@ -260,7 +250,8 @@ const TELAS: Record<string, React.ComponentType> = {
   catalog: ProdutosTab,
   catalogmestre: CatalogoMestreTab,
   products: ProdutosServicosTab,
-  honorariums: HonorariosTab,
+  // honorariums (CRUD legado da tabela Honorario) removido: honorário é item do
+  // Catálogo Mestre + Configuração Financeira + Tabela de Preços. Alias abaixo.
   paycond: CondicoesPagamentoTab,
   commrules: RegrasComissaoTab,
   discrules: RegrasDescontoTab,
@@ -338,7 +329,19 @@ export default function GerenciamentoPage() {
   //  • certtypes  → doctypes  (Tipos de Certidão consolidado em Tipos de Documento)
   //  • opauto     → autofin   (Automações por Fase virou Automações › Financeiras;
   //                            é a MESMA tela, só muda a aba inicial)
-  const ALIAS_TELAS: Record<string, string> = { certtypes: "doctypes", opauto: "autofin" }
+  // Removidas as telas LEGADAS (concentradoras que só reusavam abas + CRUD de
+  // Honorário): cada key antiga aponta para a tela que hoje é dona da função.
+  const ALIAS_TELAS: Record<string, string> = {
+    certtypes: "doctypes",
+    opauto: "autofin",
+    estruturafin: "currencies",      // Estrutura Financeira → Moedas (1ª aba real)
+    precificacao: "pricingtable",    // Precificação → Tabelas de Preços
+    comercial: "paycond",            // Comercial → Condições de Pagamento
+    pagamentos: "methods",           // Pagamentos → Formas de Pagamento
+    fornecedoresconc: "suppliers",   // Fornecedores (concentradora) → Fornecedores
+    integracaofin: "pricing",        // Integração Financeira → Aplicabilidade Econômica
+    honorariums: "catalogmestre",    // Honorários (legado) → Catálogo Mestre
+  }
   const resolverTela = useCallback((k: string | null): string => {
     if (!k) return "overview"
     return ALIAS_TELAS[k] || k

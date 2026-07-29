@@ -6,7 +6,7 @@
 // Invariante testado em TODOS os cenários: a soma das parcelas fecha
 // exatamente o total contratado.
 // ============================================================================
-import { readFileSync } from 'node:fs'
+import { readFileSync, existsSync } from 'node:fs'
 import { join } from 'node:path'
 import {
   type CondicaoPagamentoView,
@@ -254,9 +254,12 @@ secao('FinanceRuleEngine consome a Condição de Pagamento')
   ok('executor não chama mais gerarParcelas', !executor.includes('gerarParcelas'))
   // ARQUITETURA base ÚNICA: o CUSTO ainda aplica a condição (cronograma/parcelas); a
   // RECEITA virou CONTRATO puro — não nasce com parcelas/condição (isso vive na Cobrança).
-  ok('custo ainda aplica condição (nParcelas do cronograma)', executor.includes('nParcelas: ap.campos.nParcelas'))
+  // V3-native (Custos F3.5): o Custo é UMA obrigação A_PAGAR — a quebra em parcelas
+  // saiu do lançamento e vive no Ledger. A condição continua sendo aplicada: define o
+  // VENCIMENTO da obrigação e deixa o resumo auditável em observacoes.
+  ok('custo ainda aplica condição (vencimento vem do cronograma)', executor.includes('vencimento: ap.data1'))
   ok('Receita = contrato: motor NÃO gera parcelas/condição na receita', /a Receita é SÓ o CONTRATO/.test(executor))
-  ok('condição congelada no CUSTO', executor.includes('condicaoPagamentoId: ap.campos.condicaoPagamentoId'))
+  ok('condição registrada no CUSTO (resumo auditável)', executor.includes('${ap.resumo}'))
 
   const aplicar = readFileSync(join(RAIZ, 'lib/financeiro/aplicar-condicao.ts'), 'utf8')
   ok('ponto único usa o motor de cronograma', aplicar.includes('gerarCronograma'))
@@ -266,10 +269,10 @@ secao('FinanceRuleEngine consome a Condição de Pagamento')
   ok('matriz econômica usa o ponto único', matriz.includes('aplicarCondicaoPagamento'))
   ok('matriz não chama mais gerarParcelas', !matriz.includes('gerarParcelas'))
 
-  const reparcelar = readFileSync(join(RAIZ, 'src/app/api/financeiro/receitas/[id]/parcelas/route.ts'), 'utf8')
-  ok('reparcelamento aceita condição', reparcelar.includes('condicaoPagamentoId'))
-  ok('reparcelamento usa o motor', reparcelar.includes('gerarCronograma'))
-  ok('reparcelamento preserva o total', reparcelar.includes('Falha de arredondamento'))
+  // O reparcelamento por rota própria (receitas/[id]/parcelas) foi REMOVIDO como
+  // legado morto: o cronograma nasce do motor (aplicarCondicaoPagamento). A guarda
+  // agora é a ausência da rota — se ela voltar, volta um segundo dono do cronograma.
+  ok('rota legada de reparcelamento continua removida', !existsSync(join(RAIZ, 'src/app/api/financeiro/receitas/[id]/parcelas/route.ts')))
 
   const schema = readFileSync(join(RAIZ, 'prisma/schema.prisma'), 'utf8')
   ok('config financeira aponta para a condição', schema.includes('condicaoPagamentoId'))

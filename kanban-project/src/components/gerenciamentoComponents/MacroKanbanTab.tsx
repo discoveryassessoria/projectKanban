@@ -10,9 +10,9 @@ import { useState, useEffect, useMemo, useCallback } from 'react'
 
 type Tipo = { id: number; code: string; name: string; countryKey: string; countryLabel: string; modalityLabel: string; ativo: boolean; temWorkflow: boolean }
 type CatFase = { id: number; phaseKey: string; label: string; ordemPadrao: number; requiredPadrao: boolean; conditionalPadrao: boolean; slaDiasPadrao: number }
-// exitRule DESCONTINUADO como condição de avanço: a condição de conclusão de fase é do Workflow Interno + BlockingEngine.
-// Mantido opcional só p/ LEITURA de legado — o backend não grava mais exitRule novos e a UI não o edita nem o reenvia.
-type Fase = { phaseKey: string; label: string; ordem: number; required: boolean; conditional: boolean; entryRule: string; exitRule?: string | null; slaDays: number; showInKanban: boolean }
+// exitRule DESCONTINUADO: a condição de conclusão de fase é do Workflow Interno + BlockingEngine.
+// A tela não lê, não exibe, não edita e não reenvia o campo — o backend também não grava mais.
+type Fase = { phaseKey: string; label: string; ordem: number; required: boolean; conditional: boolean; entryRule: string; slaDays: number; showInKanban: boolean }
 type MacroWf = { id: number; tipoProcessoId: number; name: string; ativo: boolean; fases: Fase[] }
 
 async function jsonFetch(url: string, options: RequestInit = {}) {
@@ -284,11 +284,6 @@ export default function MacroKanbanTab() {
                         <input type="number" min="0" value={f.slaDays} onChange={(e) => patch(idx, { slaDays: Number(e.target.value) })} className="w-16 rounded border border-white/10 bg-white/5 px-2 py-1 text-white outline-none focus:border-white/20" />
                         dias
                       </span>
-                      {f.exitRule && (
-                        <span className="text-[11px] text-white/30" title="Campo descontinuado — somente leitura. A condição de conclusão vem do Workflow Interno.">
-                          Regra de saída (legado): {f.exitRule}
-                        </span>
-                      )}
                     </div>
                   </div>
                 ))}

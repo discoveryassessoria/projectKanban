@@ -27,9 +27,9 @@ export async function GET(req: NextRequest) {
     include: { categoria: true, fornecedorPadrao: true, condicaoPagamento: true },
   }).catch(() => null)
 
-  // Valor unitário padrão: via Tabela de Preços por Configuração Financeira.
-  // NaturezaPreco canônica: VENDA (receita) | CUSTO (custo). Fallback explícito:
-  // valorPadrao/moedaPadrao da config (legado), só se > 0.
+  // Valor unitário padrão: SÓ via Tabela de Preços por Configuração Financeira.
+  // NaturezaPreco canônica: VENDA (receita) | CUSTO (custo). SEM fallback para o
+  // valor legado da configuração (valorPadrao) — preço tem fonte única.
   let valorUnitario: number | null = null
   let moeda: string = cfg?.moedaPadrao ? String(cfg.moedaPadrao) : 'BRL'
   let precoRazao = 'sem preço cadastrado'
@@ -39,11 +39,10 @@ export async function GET(req: NextRequest) {
       natureza: naturezaPreco as any,
       processoId: processoId ?? undefined,
       quantidade,
-      fallbackValorPadrao: cfg.valorPadrao ? Number(cfg.valorPadrao) : null,
+      fallbackValorPadrao: null,
       fallbackMoeda: cfg.moedaPadrao ?? null,
     }).catch(() => null)
     if (r && r.ok) { valorUnitario = r.valorUnitario; moeda = String(r.moeda); precoRazao = r.razao }
-    else if (cfg.valorPadrao && Number(cfg.valorPadrao) > 0) { valorUnitario = Number(cfg.valorPadrao); precoRazao = 'valor padrão da configuração' }
   }
 
   return NextResponse.json({

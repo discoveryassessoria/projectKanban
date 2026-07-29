@@ -210,9 +210,8 @@ export const MANAGEMENT_NAVIGATION: ManagementNavigationItem[] = [
       a(30, "simfase", "Simulação", ["simulacao", "simulação", "fase", "teste"], "Configurações"),
       a(40, "execmatrix", "Histórico de Execuções", ["historico", "histórico", "execucao", "execução", "log"], "Configurações"),
 
-      // key legada da tela unificada de automações por fase (deep-link vira alias).
-      h(900, "opauto", "Automações por Fase (legado)"),
-      h(910, "execmatrix-rascunho", "Painel Executivo de Configuração (rascunho do mockup)"),
+      // ?screen=opauto (key antiga da tela unificada) resolve por ALIAS_TELAS → autofin.
+      h(900, "execmatrix-rascunho", "Painel Executivo de Configuração (rascunho do mockup)"),
     ],
   },
 
@@ -285,14 +284,10 @@ export const MANAGEMENT_NAVIGATION: ManagementNavigationItem[] = [
       a(190, "docfin", "Documentos Financeiros", ["recibo", "fatura", "nota", "documento", "financeiro", "numeracao"]),
       a(200, "governanca", "Governança", ["governanca", "governança", "auditoria", "trilha", "alteracao", "historico"]),
 
-      // LEGADOS — telas antigas mantidas acessíveis por ?screen= (sem cadastro paralelo no menu).
-      h(900, "honorariums", "Honorários (legado)"),
-      h(910, "estruturafin", "Estrutura Financeira (concentradora legada)"),
-      h(920, "precificacao", "Precificação (concentradora legada)"),
-      h(930, "comercial", "Comercial (concentradora legada)"),
-      h(940, "pagamentos", "Pagamentos (concentradora legada)"),
-      h(950, "fornecedoresconc", "Concentradoras e Adquirentes (legado)"),
-      h(960, "integracaofin", "Integração com o Financeiro Geral (legado)"),
+      // Sem telas legadas: as concentradoras e o CRUD de Honorário foram REMOVIDOS.
+      // Os deep-links antigos (?screen=estruturafin|precificacao|comercial|pagamentos|
+      // fornecedoresconc|integracaofin|honorariums) são resolvidos por ALIAS_TELAS
+      // para a tela que hoje é dona da função.
     ],
   },
 

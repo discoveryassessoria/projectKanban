@@ -5,12 +5,15 @@ import { prisma } from '@/lib/prisma'
 import { verificarPermissao } from '@/src/lib/verificar-permissao'
 import { registrarAuditoria } from '@/lib/gerenciamento/auditoria'
 import { NaturezaItem, UnidadeItem } from '@prisma/client'
+import { NATUREZAS_ITEM_OFICIAIS } from '@/lib/financeiro/catalogo-oficial'
 
 function toStrOrNull(v: any): string | null {
   if (v === undefined || v === null) return null
   const s = String(v).trim(); return s === '' ? null : s
 }
-const NATUREZAS = Object.values(NaturezaItem)
+// Só naturezas OFICIAIS podem ser gravadas — as eliminadas (PRODUTO/HONORARIO)
+// sobrevivem apenas nos itens históricos já existentes.
+const NATUREZAS = NATUREZAS_ITEM_OFICIAIS.map((n) => NaturezaItem[n])
 const UNIDADES = Object.values(UnidadeItem)
 
 export async function PUT(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
@@ -24,7 +27,12 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
     if (b.name !== undefined) data.name = toStrOrNull(b.name)
     if (b.descricao !== undefined) data.descricao = toStrOrNull(b.descricao)
     if (b.categoria !== undefined) data.categoria = toStrOrNull(b.categoria)
-    if (b.natureza !== undefined && NATUREZAS.includes(b.natureza)) data.natureza = b.natureza
+    if (b.natureza !== undefined && b.natureza !== null) {
+      if (!NATUREZAS.includes(b.natureza)) {
+        return NextResponse.json({ error: `Natureza "${b.natureza}" não existe mais no Cadastro Mestre. Use uma das oficiais: ${NATUREZAS.join(', ')}.` }, { status: 400 })
+      }
+      data.natureza = b.natureza
+    }
     if (b.unidade !== undefined && UNIDADES.includes(b.unidade)) data.unidade = b.unidade
     if (b.ativo !== undefined) data.ativo = !!b.ativo
     const item = await prisma.itemCatalogo.update({ where: { id: parseInt(id) }, data })

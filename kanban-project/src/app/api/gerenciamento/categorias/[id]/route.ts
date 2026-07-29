@@ -53,9 +53,8 @@ async function resolverMestre(b: any): Promise<Resolvido | { error: string } | n
     return { origem: 'SERVICO', nome: m.name, data: { itemCatalogoId: ids.itemCatalogoId } }
   }
   if (ids.honorarioId != null) {
-    const m = await prisma.honorario.findUnique({ where: { id: ids.honorarioId }, select: { name: true } })
-    if (!m) return { error: 'Honorário (mestre) não encontrado.' }
-    return { origem: 'HONORARIO', nome: m.name, data: { honorarioId: ids.honorarioId } }
+    // MESTRE LEGADO (tabela Honorario): fora da arquitetura — sem novo vínculo.
+    return { error: 'Honorário não é mais um cadastro mestre: use o Serviço correspondente do Catálogo Mestre.' }
   }
   const m = await prisma.tipoProcessoNacionalidade.findUnique({ where: { id: ids.tipoProcessoId! }, select: { name: true } })
   if (!m) return { error: 'Processo / Modalidade (mestre) não encontrado.' }

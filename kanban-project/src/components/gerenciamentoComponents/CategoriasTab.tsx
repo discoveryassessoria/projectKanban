@@ -6,7 +6,7 @@
 // cadastro mestre por FK real (Documento/Serviço/Honorário/Processo). O nome é
 // DERIVADO do mestre e fica READ-ONLY (não é possível redigitar/recriar a entidade).
 // Backend: /api/gerenciamento/categorias (GET/POST) + /[id] (PUT/DELETE).
-//   GET -> { categorias: [...], mestres: { tiposDocumento, servicos, honorarios, tiposProcesso } }
+//   GET -> { categorias: [...], mestres: { tiposDocumento, servicos, tiposProcesso } }
 
 import { useState, useEffect, useMemo, useCallback } from 'react'
 
@@ -41,6 +41,9 @@ const CORES = [
 const ORIGENS: [OrigemKey, string][] = [
   ['documento', 'Documento'], ['servico', 'Serviço'], ['honorario', 'Honorário'], ['processo', 'Processo / Modalidade'],
 ]
+// Origens CRIÁVEIS — "Honorário" saiu da arquitetura (é Serviço do Catálogo Mestre).
+// O rótulo permanece acima só para LER categorias antigas; o backend recusa vínculo novo.
+const ORIGENS_CRIAVEIS: [OrigemKey, string][] = ORIGENS.filter(([k]) => k !== 'honorario')
 type OrigemKey = 'documento' | 'servico' | 'honorario' | 'processo'
 // mapeia origem (UI) → campo FK enviado no POST/PUT
 const FK_POR_ORIGEM: Record<OrigemKey, 'tipoDocumentoId' | 'itemCatalogoId' | 'honorarioId' | 'tipoProcessoId'> = {
@@ -114,7 +117,7 @@ export default function CategoriasTab() {
       setMestres({
         documento: (m.tiposDocumento || []).map((d: any) => ({ id: d.id, label: d.name, code: d.code ?? null })),
         servico: (m.servicos || []).map((x: any) => ({ id: x.id, label: x.publicCode ? `${x.publicCode} — ${x.name}` : x.name, code: x.code ?? null })),
-        honorario: (m.honorarios || []).map((h: any) => ({ id: h.id, label: h.name, code: h.code ?? null })),
+        honorario: [], // mestre legado: sem lista de seleção (só leitura do vínculo antigo)
         processo: (m.tiposProcesso || []).map((p: any) => ({ id: p.id, label: p.name, code: null })),
       })
     } catch (e: any) {
@@ -141,7 +144,11 @@ export default function CategoriasTab() {
     if (!q) return arr.slice(0, 50)
     return arr.filter((m) => m.label.toLowerCase().includes(q) || (m.code ?? '').toLowerCase().includes(q)).slice(0, 50)
   }, [mestres, origem, masterBusca])
-  const masterSelecionado = (mestres[origem] ?? []).find((m) => String(m.id) === masterId) || null
+  // Na edição o mestre está travado: exibe o vínculo que a própria categoria guarda,
+  // sem depender da lista selecionável (que só traz cadastros mestres oficiais).
+  const masterSelecionado =
+    (mestres[origem] ?? []).find((m) => String(m.id) === masterId)
+    ?? (origemTravada && masterId ? { id: Number(masterId), label: mestreDe(editando!), code: null } : null)
 
   function selecionarMaster(m: MestreRef) {
     setMasterId(String(m.id)); setNome(m.label); setMasterBusca('')
@@ -330,7 +337,7 @@ export default function CategoriasTab() {
               <div>
                 <label className="mb-1 block text-xs text-white/60">Origem</label>
                 <select value={origem} onChange={(e) => mudarOrigem(e.target.value as OrigemKey)} disabled={origemTravada} className={inputCls + (origemTravada ? ' opacity-60' : '')}>
-                  {ORIGENS.map(([k, label]) => <option key={k} value={k} className="bg-zinc-900">{label}</option>)}
+                  {(origemTravada ? ORIGENS : ORIGENS_CRIAVEIS).map(([k, label]) => <option key={k} value={k} className="bg-zinc-900">{label}</option>)}
                 </select>
               </div>
 

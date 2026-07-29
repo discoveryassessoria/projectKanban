@@ -220,8 +220,11 @@ secao('Integração com o FinanceRuleEngine')
   for (const f of ['src/lib/motor/executor.ts', 'src/lib/motor/matriz-economica.ts']) {
     const src = readFileSync(join(RAIZ, f), 'utf8')
     ok(`${f} usa o ponto único`, src.includes('aplicarCondicaoPagamento'))
-    ok(`${f} persiste a condição aplicada`, src.includes('condicaoPagamentoId: ap.campos.condicaoPagamentoId'))
-    ok(`${f} persiste valor líquido`, src.includes('valorLiquido: ap.campos.valorLiquido'))
+    // V3-native (Custos F3.5): o Custo é UMA obrigação A_PAGAR. Os campos de parcela
+    // (condicaoPagamentoId/valorLiquido do model legado) saíram do lançamento; o que a
+    // condição produz e PRECISA sobreviver é o vencimento calculado pelo ponto único.
+    ok(`${f} persiste o vencimento vindo da condição`, src.includes('vencimento: ap.data1'))
+    ok(`${f} não recria campos de parcela do modelo legado`, !src.includes('ap.campos.'))
     ok(`${f} não monta parcelamento na mão`, !src.includes('gerarParcelas'))
   }
 

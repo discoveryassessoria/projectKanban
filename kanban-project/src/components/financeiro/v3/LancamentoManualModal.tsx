@@ -18,7 +18,10 @@ import { authHeaders } from "@/src/lib/financeiro/http"
 import { fmtMoeda as fmt } from "@/src/lib/financeiro/formato"
 
 const cent = (v: number) => Math.round((Number(v) || 0) * 100) / 100
-const NATUREZA_LABEL: Record<string, string> = { DOCUMENTO: "Documento", PRODUTO: "Produto", SERVICO: "Serviço", HONORARIO: "Honorário", TAXA: "Taxa", DESPESA: "Despesa", LOGISTICA: "Logística", OUTRO: "Outro" }
+// Rótulos das naturezas OFICIAIS do Cadastro Mestre. As eliminadas (Produto,
+// Honorário) não aparecem aqui porque a API não retorna itens assim classificados
+// — o filtro é do servidor, não da tela.
+const NATUREZA_LABEL: Record<string, string> = { DOCUMENTO: "Documento", SERVICO: "Serviço", TAXA: "Taxa", DESPESA: "Despesa", LOGISTICA: "Logística", OUTRO: "Outro" }
 
 type Natureza = "RECEITA" | "CUSTO"
 type Vinculo = "processo" | "requerentes"

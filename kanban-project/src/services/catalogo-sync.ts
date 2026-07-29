@@ -40,8 +40,14 @@ export async function sincronizarItemDeServico(
 }
 
 /**
- * Garante o ItemCatalogo (natureza PRODUTO) espelho de um ProdutoFinanceiro e retorna
- * seu id, para gravar em ProdutoFinanceiro.itemCatalogoId.
+ * Garante o ItemCatalogo espelho de um ProdutoFinanceiro (Configuração Financeira
+ * cujo mestre não é, ele próprio, um item) e retorna seu id.
+ *
+ * A natureza é OUTRO — genérica e OFICIAL. Antes o espelho nascia como PRODUTO,
+ * nomenclatura ELIMINADA da arquitetura (a empresa cadastra Serviços): isso fazia
+ * itens fantasma de cadastros legados aparecerem no seletor de lançamento. Itens
+ * já gravados como PRODUTO/HONORARIO são preservados para leitura histórica e
+ * ficam fora da elegibilidade por `lib/financeiro/catalogo-oficial`.
  */
 export async function sincronizarItemDeProduto(
   tx: Prisma.TransactionClient,
@@ -50,7 +56,7 @@ export async function sincronizarItemDeProduto(
   const code = codeProdutoMestre(p.codigo)
   const item = await tx.itemCatalogo.upsert({
     where: { code },
-    create: { code, name: p.nome, natureza: NaturezaItem.PRODUTO, categoria: p.categoria ?? null },
+    create: { code, name: p.nome, natureza: NaturezaItem.OUTRO, categoria: p.categoria ?? null },
     update: { name: p.nome, categoria: p.categoria ?? null },
     select: { id: true },
   })
