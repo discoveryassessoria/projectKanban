@@ -18,6 +18,7 @@ import {
   TIPOS_FORMA, TIPOS_FORMA_LABEL, TIPOS_INTEGRACAO, TIPOS_INTEGRACAO_LABEL,
   PRAZOS_LIQUIDACAO, PRAZOS_LIQUIDACAO_LABEL, CATEGORIAS_FORMA, CATEGORIAS_FORMA_LABEL,
 } from '@/lib/financeiro/payment-method-constants'
+import { useApi } from "@/src/lib/dados"
 
 const OURO = '#D2A948'
 const GLASS = 'rounded-xl border border-white/10 bg-white/[0.05] backdrop-blur-md'
@@ -62,13 +63,10 @@ async function jf(url: string, options: RequestInit = {}) {
   return data
 }
 
+// Identidade estável para a ausência de dados (evita recomputar memos).
+const SEM_ITENS: never[] = Object.freeze([]) as never[]
+
 export default function FormasPagamentoTab() {
-  const [itens, setItens] = useState<Forma[]>([])
-  const [moedas, setMoedas] = useState<MoedaRef[]>([])
-  const [carteiras, setCarteiras] = useState<DestinoRef[]>([])
-  const [contas, setContas] = useState<DestinoRef[]>([])
-  const [loading, setLoading] = useState(true)
-  const [erroLista, setErroLista] = useState<string | null>(null)
   const [busca, setBusca] = useState('')
 
   const [aberto, setAberto] = useState(false)
@@ -78,15 +76,14 @@ export default function FormasPagamentoTab() {
   const [erroModal, setErroModal] = useState<string | null>(null)
   const set = <K extends keyof Omit<Forma, 'id'>>(k: K, v: Omit<Forma, 'id'>[K]) => setF((p) => ({ ...p, [k]: v }))
 
-  const carregar = useCallback(async () => {
-    setLoading(true); setErroLista(null)
-    try {
-      const d = await jf('/api/gerenciamento/formas-pagamento', { cache: 'no-store' })
-      setItens(d.formasPagamento || []); setMoedas(d.moedas || []); setCarteiras(d.carteiras || []); setContas(d.contas || [])
-    } catch (e: any) { setErroLista(e.message || 'Não foi possível carregar.') }
-    finally { setLoading(false) }
-  }, [])
-  useEffect(() => { carregar() }, [carregar])
+  // UMA consulta, várias listas derivadas da MESMA resposta — o endpoint já
+  // devolve tudo junto. loading/erro vêm da camada; nada de setState em efeito.
+  const { dados, carregando: loading, erro, recarregar: carregar } = useApi<{ formasPagamento?: Forma[], moedas?: any[], carteiras?: any[], contas?: any[] }>('/api/gerenciamento/formas-pagamento')
+  const itens: Forma[] = dados?.formasPagamento ?? SEM_ITENS
+  const moedas: any[] = dados?.moedas ?? SEM_ITENS
+  const carteiras: any[] = dados?.carteiras ?? SEM_ITENS
+  const contas: any[] = dados?.contas ?? SEM_ITENS
+  const erroLista = erro ? (erro.message || 'Não foi possível carregar.') : null
 
   const filtrados = useMemo(() => {
     const q = busca.trim().toLowerCase()
@@ -145,7 +142,7 @@ export default function FormasPagamentoTab() {
       {loading ? (
         <div className="flex items-center justify-center py-16"><Loader2 className="h-8 w-8 animate-spin text-white/50" /></div>
       ) : erroLista ? (
-        <div className="rounded-lg border border-red-500/30 bg-red-500/10 p-4 text-sm text-red-200">{erroLista}<button onClick={carregar} className="ml-3 underline hover:text-white">Tentar de novo</button></div>
+        <div className="rounded-lg border border-red-500/30 bg-red-500/10 p-4 text-sm text-red-200">{erroLista}<button onClick={() => void carregar()} className="ml-3 underline hover:text-white">Tentar de novo</button></div>
       ) : filtrados.length === 0 ? (
         <div className={`${GLASS} flex flex-col items-center gap-2 py-16 text-center`}>
           <CreditCard className="h-10 w-10 text-white/20" />

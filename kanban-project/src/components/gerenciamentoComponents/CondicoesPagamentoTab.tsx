@@ -23,6 +23,7 @@ import {
   DIA_INEXISTENTE, DIA_INEXISTENTE_LABEL, AJUSTE_DATA, AJUSTE_DATA_LABEL,
   MULTA_TIPOS, JUROS_TIPOS, JUROS_PERIODOS, DESCONTO_TIPOS,
 } from '@/lib/financeiro/condicao-constants'
+import { useApi } from "@/src/lib/dados"
 
 type Ref = { id: number; name: string; code?: string | null; icone?: string | null }
 type CarteiraRef = { id: number; nome: string }
@@ -66,31 +67,26 @@ const VAZIO = () => ({
 })
 type Form = ReturnType<typeof VAZIO>
 
+// Identidade estável para a ausência de dados (evita recomputar memos).
+const SEM_ITENS: never[] = Object.freeze([]) as never[]
+
 export default function CondicoesPagamentoTab() {
-  const [itens, setItens] = useState<Condicao[]>([])
-  const [carteiras, setCarteiras] = useState<CarteiraRef[]>([])
-  const [formas, setFormas] = useState<Ref[]>([])
-  const [taxas, setTaxas] = useState<TaxaRef[]>([])
-  const [servicos, setServicos] = useState<Ref[]>([])
-  const [moedas, setMoedas] = useState<MoedaRef[]>([])
-  const [paises, setPaises] = useState<PaisRef[]>([])
-  const [modalidades, setModalidades] = useState<ModalidadeRef[]>([])
-  const [loading, setLoading] = useState(true)
-  const [erroLista, setErroLista] = useState<string | null>(null)
   const [busca, setBusca] = useState('')
   const [aberto, setAberto] = useState(false)
   const [editando, setEditando] = useState<Condicao | null>(null)
 
-  const carregar = useCallback(async () => {
-    setLoading(true); setErroLista(null)
-    try {
-      const d = await jf('/api/gerenciamento/condicoes-pagamento', { cache: 'no-store' })
-      setItens(d.condicoes || []); setCarteiras(d.carteiras || []); setFormas(d.formasPagamento || []); setTaxas(d.taxas || []); setServicos(d.servicos || [])
-      setMoedas(d.moedas || []); setPaises(d.paises || []); setModalidades(d.modalidades || [])
-    } catch (e: any) { setErroLista(e.message || 'Não foi possível carregar.') }
-    finally { setLoading(false) }
-  }, [])
-  useEffect(() => { carregar() }, [carregar])
+  // UMA consulta, várias listas derivadas da MESMA resposta — o endpoint já
+  // devolve tudo junto. loading/erro vêm da camada; nada de setState em efeito.
+  const { dados, carregando: loading, erro, recarregar: carregar } = useApi<{ condicoes?: Condicao[], carteiras?: any[], formasPagamento?: any[], taxas?: any[], servicos?: any[], moedas?: any[], paises?: any[], modalidades?: any[] }>('/api/gerenciamento/condicoes-pagamento')
+  const itens: Condicao[] = dados?.condicoes ?? SEM_ITENS
+  const carteiras: any[] = dados?.carteiras ?? SEM_ITENS
+  const formas: any[] = dados?.formasPagamento ?? SEM_ITENS
+  const taxas: any[] = dados?.taxas ?? SEM_ITENS
+  const servicos: any[] = dados?.servicos ?? SEM_ITENS
+  const moedas: any[] = dados?.moedas ?? SEM_ITENS
+  const paises: any[] = dados?.paises ?? SEM_ITENS
+  const modalidades: any[] = dados?.modalidades ?? SEM_ITENS
+  const erroLista = erro ? (erro.message || 'Não foi possível carregar.') : null
 
   const filtrados = useMemo(() => {
     const q = busca.trim().toLowerCase()
@@ -127,7 +123,7 @@ export default function CondicoesPagamentoTab() {
       {loading ? (
         <div className="flex items-center justify-center py-16"><Loader2 className="h-8 w-8 animate-spin text-white/50" /></div>
       ) : erroLista ? (
-        <div className="rounded-lg border border-red-500/30 bg-red-500/10 p-4 text-sm text-red-200">{erroLista}<button onClick={carregar} className="ml-3 underline hover:text-white">Tentar de novo</button></div>
+        <div className="rounded-lg border border-red-500/30 bg-red-500/10 p-4 text-sm text-red-200">{erroLista}<button onClick={() => void carregar()} className="ml-3 underline hover:text-white">Tentar de novo</button></div>
       ) : filtrados.length === 0 ? (
         <div className={`${GLASS} flex flex-col items-center gap-2 py-16 text-center`}>
           <CalendarClock className="h-10 w-10 text-white/20" />

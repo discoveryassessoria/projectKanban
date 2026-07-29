@@ -11,6 +11,7 @@
 // ESTE é o TEMPLATE do padrão de cadastro — Categorias/Contas/Fornecedores seguem igual.
 
 import { useState, useEffect, useMemo, useCallback } from 'react'
+import { useApi } from "@/src/lib/dados"
 
 type CentroCusto = {
   id: number
@@ -41,10 +42,10 @@ async function jsonFetch(url: string, options: RequestInit = {}) {
   return data
 }
 
+// Identidade estável para a ausência de dados (evita recomputar memos).
+const SEM_ITENS: never[] = Object.freeze([]) as never[]
+
 export default function CentrosCustoTab() {
-  const [centros, setCentros] = useState<CentroCusto[]>([])
-  const [loading, setLoading] = useState(true)
-  const [erroLista, setErroLista] = useState<string | null>(null)
   const [busca, setBusca] = useState('')
 
   // modal
@@ -57,20 +58,11 @@ export default function CentrosCustoTab() {
   const [salvando, setSalvando] = useState(false)
   const [erroModal, setErroModal] = useState<string | null>(null)
 
-  const carregar = useCallback(async () => {
-    setLoading(true)
-    setErroLista(null)
-    try {
-      const data = await jsonFetch('/api/gerenciamento/centros-custo', { cache: 'no-store' })
-      setCentros((data as any).centros || [])
-    } catch (e: any) {
-      setErroLista(e.message || 'Não foi possível carregar os centros de custo.')
-    } finally {
-      setLoading(false)
-    }
-  }, [])
-
-  useEffect(() => { carregar() }, [carregar])
+  // UMA consulta, várias listas derivadas da MESMA resposta — o endpoint já
+  // devolve tudo junto. loading/erro vêm da camada; nada de setState em efeito.
+  const { dados, carregando: loading, erro, recarregar: carregar } = useApi<{ centros?: CentroCusto[] }>('/api/gerenciamento/centros-custo')
+  const centros: CentroCusto[] = dados?.centros ?? SEM_ITENS
+  const erroLista = erro ? (erro.message || 'Não foi possível carregar os centros de custo.') : null
 
   const filtrados = useMemo(() => {
     const q = busca.trim().toLowerCase()
@@ -157,7 +149,7 @@ export default function CentrosCustoTab() {
       {!loading && erroLista && (
         <div className="rounded-lg border border-red-500/30 bg-red-500/10 p-4 text-sm text-red-200">
           {erroLista}
-          <button onClick={carregar} className="ml-3 underline hover:text-white">Tentar de novo</button>
+          <button onClick={() => void carregar()} className="ml-3 underline hover:text-white">Tentar de novo</button>
         </div>
       )}
 
