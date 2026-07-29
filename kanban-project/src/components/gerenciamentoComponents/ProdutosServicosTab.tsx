@@ -13,6 +13,7 @@ import { useState, useEffect, useMemo, useCallback } from 'react'
 import { usePermissoes } from '@/src/hooks/use-permissoes'
 import { ExclusaoDefinitivaModal } from './ExclusaoDefinitivaModal'
 import { CodigoPublicoField } from './CodigoPublicoField'
+import { useApi } from "@/src/lib/dados"
 
 type Servico = {
   id: number
@@ -49,10 +50,10 @@ async function jsonFetch(url: string, options: RequestInit = {}) {
   return data
 }
 
+// Identidade estável para a ausência de dados (evita recomputar memos).
+const SEM_ITENS: never[] = Object.freeze([]) as never[]
+
 export default function ProdutosServicosTab() {
-  const [servicos, setServicos] = useState<Servico[]>([])
-  const [loading, setLoading] = useState(true)
-  const [erroLista, setErroLista] = useState<string | null>(null)
   const [busca, setBusca] = useState('')
 
   const [modalAberto, setModalAberto] = useState(false)
@@ -68,19 +69,12 @@ export default function ProdutosServicosTab() {
   const [salvando, setSalvando] = useState(false)
   const [erroModal, setErroModal] = useState<string | null>(null)
 
-  const carregar = useCallback(async () => {
-    setLoading(true); setErroLista(null)
-    try {
-      const d = await jsonFetch('/api/gerenciamento/produtos-servicos', { cache: 'no-store' })
-      setServicos((d as any).servicos || [])
-    } catch (e: any) {
-      setErroLista(e.message || 'Não foi possível carregar os serviços.')
-    } finally {
-      setLoading(false)
-    }
-  }, [])
-
-  useEffect(() => { carregar() }, [carregar])
+  // Consulta em cache pela camada oficial (src/lib/dados): loading, erro,
+  // deduplicação e revalidação vêm dela. Some o par useState + useEffect de
+  // montagem, que era a origem do setState-em-efeito.
+  const { dados, carregando: loading, erro, recarregar: carregar } = useApi<{ servicos?: Servico[] }>('/api/gerenciamento/produtos-servicos')
+  const servicos: Servico[] = dados?.servicos ?? SEM_ITENS
+  const erroLista = erro ? (erro.message || 'Não foi possível carregar os serviços.') : null
 
   const filtrados = useMemo(() => {
     const q = busca.trim().toLowerCase()
@@ -173,7 +167,7 @@ export default function ProdutosServicosTab() {
       {!loading && erroLista && (
         <div className="rounded-lg border border-red-500/30 bg-red-500/10 p-4 text-sm text-red-200">
           {erroLista}
-          <button onClick={carregar} className="ml-3 underline hover:text-white">Tentar de novo</button>
+          <button onClick={() => void carregar()} className="ml-3 underline hover:text-white">Tentar de novo</button>
         </div>
       )}
 

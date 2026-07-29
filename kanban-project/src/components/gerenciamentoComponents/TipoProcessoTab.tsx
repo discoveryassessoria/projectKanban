@@ -11,6 +11,7 @@
 // - O dropdown de modalidade do "Novo processo" agora esconde inativas.
 
 import { useState, useEffect, useMemo, useCallback } from 'react'
+import { useApi } from "@/src/lib/dados"
 
 type Pais = {
   id: number; countryKey: string; countryLabel: string
@@ -38,12 +39,10 @@ async function jsonFetch(url: string, options: RequestInit = {}) {
   return data
 }
 
+// Identidade estável para a ausência de dados (evita recomputar memos).
+const SEM_ITENS: never[] = Object.freeze([]) as never[]
+
 export default function TipoProcessoTab() {
-  const [itens, setItens] = useState<Tipo[]>([])
-  const [paises, setPaises] = useState<Pais[]>([])
-  const [modalidades, setModalidades] = useState<Modalidade[]>([])
-  const [loading, setLoading] = useState(true)
-  const [erroLista, setErroLista] = useState<string | null>(null)
   const [busca, setBusca] = useState('')
 
   const [modalAberto, setModalAberto] = useState(false)
@@ -86,19 +85,13 @@ export default function TipoProcessoTab() {
   const [salvandoMod, setSalvandoMod] = useState(false)
   const [erroMod, setErroMod] = useState<string | null>(null)
 
-  const carregar = useCallback(async () => {
-    setLoading(true); setErroLista(null)
-    try {
-      const d = await jsonFetch('/api/gerenciamento/tipos-processo', { cache: 'no-store' })
-      setItens((d as any).tipos || [])
-      setPaises((d as any).paises || [])
-      setModalidades((d as any).modalidades || [])
-    } catch (e: any) {
-      setErroLista(e.message || 'Não foi possível carregar os tipos de processo.')
-    } finally { setLoading(false) }
-  }, [])
-
-  useEffect(() => { carregar() }, [carregar])
+  // UMA consulta, várias listas derivadas da MESMA resposta — o endpoint já
+  // devolve tudo junto. loading/erro vêm da camada; nada de setState em efeito.
+  const { dados, carregando: loading, erro, recarregar: carregar } = useApi<{ tipos?: Tipo[], paises?: any[], modalidades?: any[] }>('/api/gerenciamento/tipos-processo')
+  const itens: Tipo[] = dados?.tipos ?? SEM_ITENS
+  const paises: any[] = dados?.paises ?? SEM_ITENS
+  const modalidades: any[] = dados?.modalidades ?? SEM_ITENS
+  const erroLista = erro ? (erro.message || 'Não foi possível carregar os tipos de processo.') : null
 
   const carregarPaisesAdmin = useCallback(async () => {
     setCarregandoPaises(true)
@@ -405,7 +398,7 @@ export default function TipoProcessoTab() {
 
       {!loading && erroLista && (
         <div className="rounded-lg border border-red-500/30 bg-red-500/10 p-4 text-sm text-red-200">
-          {erroLista}<button onClick={carregar} className="ml-3 underline hover:text-white">Tentar de novo</button>
+          {erroLista}<button onClick={() => void carregar()} className="ml-3 underline hover:text-white">Tentar de novo</button>
         </div>
       )}
 

@@ -9,6 +9,7 @@ import { useState, useEffect, useMemo, useCallback } from 'react'
 // FONTE ÚNICA do mapeamento modo → unidade (compartilhada com a API).
 import { ESTRATEGIAS_CALCULO, rotuloEstrategia, estrategiaDoModo, estrategiaUsaPrimeiroAdicional, estrategiaUsaFaixaQuantidade } from '@/lib/financeiro/modo-calculo'
 import { UNIDADES_COBRANCA_OPCOES, rotuloUnidade, rotuloUnidadeMinuscula } from '@/lib/financeiro/unidade-cobranca'
+import { useApi } from "@/src/lib/dados"
 
 type ConfigRef = { id: number; publicCode: string | null; possuiCusto: boolean; possuiReceita: boolean; origem: string; mestre: string; label: string; moedaPadrao: string }
 type FornecedorRef = { id: number; nome: string; publicCode?: string | null }
@@ -105,12 +106,10 @@ const EMPTY = {
 }
 type FormState = typeof EMPTY
 
+// Identidade estável para a ausência de dados (evita recomputar memos).
+const SEM_ITENS: never[] = Object.freeze([]) as never[]
+
 export default function TabelaValoresTab() {
-  const [itens, setItens] = useState<Item[]>([])
-  const [configs, setConfigs] = useState<ConfigRef[]>([])
-  const [fornecedores, setFornecedores] = useState<FornecedorRef[]>([])
-  const [loading, setLoading] = useState(true)
-  const [erroLista, setErroLista] = useState<string | null>(null)
   const [busca, setBusca] = useState('')
 
   const [modalAberto, setModalAberto] = useState(false)
@@ -120,17 +119,13 @@ export default function TabelaValoresTab() {
   const [erroModal, setErroModal] = useState<string | null>(null)
   const set = (k: keyof FormState, v: any) => setForm((f) => ({ ...f, [k]: v }))
 
-  const carregar = useCallback(async () => {
-    setLoading(true); setErroLista(null)
-    try {
-      const d = await jsonFetch('/api/gerenciamento/tabela-valores', { cache: 'no-store' })
-      setItens((d as any).tabelaValores || [])
-      setConfigs((d as any).configs || [])
-      setFornecedores((d as any).fornecedores || [])
-    } catch (e: any) { setErroLista(e.message || 'Não foi possível carregar os preços.') }
-    finally { setLoading(false) }
-  }, [])
-  useEffect(() => { carregar() }, [carregar])
+  // UMA consulta, várias listas derivadas da MESMA resposta — o endpoint já
+  // devolve tudo junto. loading/erro vêm da camada; nada de setState em efeito.
+  const { dados, carregando: loading, erro, recarregar: carregar } = useApi<{ tabelaValores?: Item[], configs?: any[], fornecedores?: any[] }>('/api/gerenciamento/tabela-valores')
+  const itens: Item[] = dados?.tabelaValores ?? SEM_ITENS
+  const configs: any[] = dados?.configs ?? SEM_ITENS
+  const fornecedores: any[] = dados?.fornecedores ?? SEM_ITENS
+  const erroLista = erro ? (erro.message || 'Não foi possível carregar os preços.') : null
 
   const filtrados = useMemo(() => {
     const q = busca.trim().toLowerCase()
@@ -281,7 +276,7 @@ export default function TabelaValoresTab() {
       <input value={busca} onChange={(e) => setBusca(e.target.value)} placeholder="Buscar por cadastro mestre, papel ou contexto..." className="w-full rounded-lg border border-white/10 bg-white/5 px-4 py-2 text-sm text-white placeholder-white/30 outline-none backdrop-blur focus:border-white/20" />
 
       {loading && <div className="py-12 text-center text-sm text-white/40">Carregando...</div>}
-      {!loading && erroLista && <div className="rounded-lg border border-red-500/30 bg-red-500/10 p-4 text-sm text-red-200">{erroLista}<button onClick={carregar} className="ml-3 underline hover:text-white">Tentar de novo</button></div>}
+      {!loading && erroLista && <div className="rounded-lg border border-red-500/30 bg-red-500/10 p-4 text-sm text-red-200">{erroLista}<button onClick={() => void carregar()} className="ml-3 underline hover:text-white">Tentar de novo</button></div>}
       {!loading && !erroLista && filtrados.length === 0 && <div className="rounded-xl border border-white/10 bg-white/5 py-12 text-center text-sm text-white/40 backdrop-blur">{busca ? 'Nenhum preço encontrado.' : 'Nenhum preço ainda. Crie o primeiro em “Novo valor”.'}</div>}
 
       {!loading && !erroLista && filtrados.length > 0 && (

@@ -7,6 +7,7 @@
 //   maxAmountWithoutApproval, requiresApprovalAboveLimit.
 
 import { useState, useEffect, useMemo, useCallback } from 'react'
+import { useApi } from "@/src/lib/dados"
 
 type Regra = {
   id: number
@@ -35,10 +36,10 @@ async function jsonFetch(url: string, options: RequestInit = {}) {
 const fmtPct = (v: any) => (v === null || v === undefined || v === '' ? '—' : `${Number(v)}%`)
 const fmtNum = (v: any) => (v === null || v === undefined || v === '' ? '—' : Number(v).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }))
 
+// Identidade estável para a ausência de dados (evita recomputar memos).
+const SEM_ITENS: never[] = Object.freeze([]) as never[]
+
 export default function RegrasDescontoTab() {
-  const [regras, setRegras] = useState<Regra[]>([])
-  const [loading, setLoading] = useState(true)
-  const [erroLista, setErroLista] = useState<string | null>(null)
   const [busca, setBusca] = useState('')
 
   const [modalAberto, setModalAberto] = useState(false)
@@ -51,19 +52,12 @@ export default function RegrasDescontoTab() {
   const [salvando, setSalvando] = useState(false)
   const [erroModal, setErroModal] = useState<string | null>(null)
 
-  const carregar = useCallback(async () => {
-    setLoading(true); setErroLista(null)
-    try {
-      const d = await jsonFetch('/api/gerenciamento/regras-desconto', { cache: 'no-store' })
-      setRegras((d as any).regras || [])
-    } catch (e: any) {
-      setErroLista(e.message || 'Não foi possível carregar as regras.')
-    } finally {
-      setLoading(false)
-    }
-  }, [])
-
-  useEffect(() => { carregar() }, [carregar])
+  // Consulta em cache pela camada oficial (src/lib/dados): loading, erro,
+  // deduplicação e revalidação vêm dela. Some o par useState + useEffect de
+  // montagem, que era a origem do setState-em-efeito.
+  const { dados, carregando: loading, erro, recarregar: carregar } = useApi<{ regras?: Regra[] }>('/api/gerenciamento/regras-desconto')
+  const regras: Regra[] = dados?.regras ?? SEM_ITENS
+  const erroLista = erro ? (erro.message || 'Não foi possível carregar as regras.') : null
 
   const filtradas = useMemo(() => {
     const q = busca.trim().toLowerCase()
@@ -146,7 +140,7 @@ export default function RegrasDescontoTab() {
       {!loading && erroLista && (
         <div className="rounded-lg border border-red-500/30 bg-red-500/10 p-4 text-sm text-red-200">
           {erroLista}
-          <button onClick={carregar} className="ml-3 underline hover:text-white">Tentar de novo</button>
+          <button onClick={() => void carregar()} className="ml-3 underline hover:text-white">Tentar de novo</button>
         </div>
       )}
 
