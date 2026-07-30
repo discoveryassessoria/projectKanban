@@ -336,6 +336,14 @@ async function main() {
     ok(analise.resumo.geracoes >= 4, "quatro gerações saíram de três fotografias", analise.resumo.geracoes)
 
     console.log("\n4) OS DADOS LIDOS, COM A EVIDÊNCIA")
+    for (const n of [joao, giuseppe]) {
+      if (!n) continue
+      console.log(`  [${[n.nome, n.sobrenome].filter(Boolean).join(" ")}] ${n.dados.map((d) => `${d.campo}=${d.valor}${d.bloqueado ? "(TRAVADO)" : ""}`).join(" | ")}`)
+      if (n.conflitos.length) console.log(`     conflitos: ${n.conflitos.join(" · ")}`)
+    }
+    for (const a of analise.arquivos) {
+      if (a.divergencias.length) console.log(`  divergências em ${a.nome}: ${a.divergencias.map((d) => `${d.campo}: A="${d.leituraA}" B="${d.leituraB}"`).join(" | ")}`)
+    }
     const dataJoao = joao?.dados.find((d) => d.campo === "DATA_NASCIMENTO")
     ok(dataJoao?.valor === "1990-05-10", "a data do requerente foi lida da imagem e normalizada", dataJoao?.valor)
     ok((dataJoao?.evidencias[0]?.trecho ?? "").length > 0, "com o trecho transcrito", dataJoao?.evidencias[0]?.trecho)

@@ -3,7 +3,7 @@
   "arquivos": {
     "src/components/arvore/arvore-genealogica-view.tsx": "82f353ef23ce3adf7e91a153f6a81b358e97cc52ffcd1d56c50f5fed878abef3",
     "src/components/arvore/couple-card.tsx": "533c6ffa2d9405512c4837b409d89a8509fa73b8d984da239a03f0cbecea9faf",
-    "src/components/arvore/importar-certidoes.tsx": "9294d3cc51160aea7a252ce130e7922d094d2f7eb8818291c17c1d2d7a490f73",
+    "src/components/arvore/importar-certidoes.tsx": "4c2003013cc3fa8684c90cc48ac024f0f723563e8cc8812995c4a6c687f99e3e",
     "src/components/arvore/index.tsx": "d07330ee495215bab3b9d1a101d9e220fb208575a02d872762f3464b720cfca4",
     "src/components/arvore/inteligencia/painel-inteligencia.tsx": "0d259d670c46eec930a2359b134d216941d016341b539864778b02e7da41b5e2",
     "src/components/arvore/inteligencia/paleta-comandos.tsx": "0ac22f6aad5709c3eff30f55b772475d3204cdd6661361358f3b29d235d6caa3",

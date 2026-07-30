@@ -216,7 +216,18 @@ function extrairInteiro(texto: string, min: number, max: number): number | null 
 function mesDeTexto(t: string): number | null {
   const n = normalizar(t)
   if (!n) return null
+  // ARMADILHA REAL, encontrada lendo certidão de verdade: a regra de abreviação
+  // por 3 letras faz o NUMERAL virar mês. "dez" (10) casa com dezembro, "sete"
+  // com setembro e "nove" com novembro — e são exatamente os dias 7, 9 e 10, os
+  // mais escritos por extenso no assento brasileiro ("aos dez dias do mês de
+  // maio..."). O efeito era silencioso e pior que um erro: a segunda leitura
+  // devolvia dezembro, a primeira devolvia maio, e o campo travava como
+  // divergente — uma discordância inventada pelo normalizador, não pelo
+  // documento. Numeral escrito nunca é abreviação de mês.
+  if (UNIDADES[n] != null) return null
+
   if (MESES[n] != null) return MESES[n]
+
   // prefixo de 3 letras cobre abreviações com ponto ("jan.", "fev.")
   const abrev = n.slice(0, 3)
   for (const [k, v] of Object.entries(MESES)) {

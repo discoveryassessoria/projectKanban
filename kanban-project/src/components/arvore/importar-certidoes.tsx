@@ -176,6 +176,33 @@ interface ArquivoEnviado {
 
 type Etapa = "envio" | "analisando" | "revisao" | "confirmando" | "fim" | "revertendo"
 
+/** Situação de UM arquivo dentro da fila. O operador vê isto por documento. */
+type SituacaoArquivo =
+  | { fase: "AGUARDANDO" }
+  | { fase: "ENVIANDO"; pct: number }
+  | { fase: "LENDO" }
+  | { fase: "CONCLUIDO"; tipo: string; pessoas: number }
+  | { fase: "ERRO"; motivo: string }
+
+const ROTULO_FASE: Record<string, string> = {
+  AGUARDANDO: "Aguardando",
+  ENVIANDO: "Enviando",
+  LENDO: "Lendo",
+  CONCLUIDO: "Concluído",
+  ERRO: "Erro",
+}
+
+/**
+ * Quantos arquivos por requisição.
+ *
+ * Vinte e quatro certidões numa requisição só significam vinte e quatro downloads
+ * e quarenta e oito leituras visuais dentro do mesmo timeout — e, se qualquer uma
+ * estourar, perde-se o lote inteiro sem saber onde parou. Em blocos pequenos cada
+ * bloco responde rápido, o progresso é real e o que falhou pode ser repetido
+ * sozinho.
+ */
+const POR_BLOCO = 4
+
 const ROTULO_TIPO: Record<string, string> = {
   NASCIMENTO: "Nascimento",
   CASAMENTO: "Casamento",
@@ -255,7 +282,7 @@ export function ImportarCertidoes({ processoId, pessoas, aberto, onFechar, onImp
   const [etapa, setEtapa] = useState<Etapa>("envio")
   const [arrastando, setArrastando] = useState(false)
   const [selecionados, setSelecionados] = useState<File[]>([])
-  const [progresso, setProgresso] = useState<Record<string, number>>({})
+  const [situacoes, setSituacoes] = useState<Record<string, SituacaoArquivo>>({})
   const [enviados, setEnviados] = useState<ArquivoEnviado[]>([])
   const [analise, setAnalise] = useState<ResultadoAnalise | null>(null)
   const [resultado, setResultado] = useState<ResultadoConfirmacao | null>(null)
@@ -276,7 +303,7 @@ export function ImportarCertidoes({ processoId, pessoas, aberto, onFechar, onImp
   const limpar = useCallback(() => {
     setEtapa("envio")
     setSelecionados([])
-    setProgresso({})
+    setSituacoes({})
     setEnviados([])
     setAnalise(null)
     setResultado(null)
@@ -325,68 +352,185 @@ export function ImportarCertidoes({ processoId, pessoas, aberto, onFechar, onImp
 
   // ---- envio + análise -----------------------------------------------------
 
-  const enviarEAnalisar = useCallback(async () => {
-    if (selecionados.length === 0) return
-    setErro(null)
-    setEtapa("analisando")
-    try {
-      const subidos = await uploadFiles(selecionados, {
-        prefix: "documentos",
-        onProgress: (file, pct) => setProgresso((p) => ({ ...p, [file.name]: pct })),
-      })
-      const arquivos: ArquivoEnviado[] = subidos.map((s) => ({
-        url: s.url,
-        nome: s.name,
-        mimeType: s.type || null,
-        tamanho: s.size ?? null,
-      }))
-      setEnviados(arquivos)
+  /**
+   * Envia e lê, EM BLOCOS, com a situação de cada arquivo à vista.
+   *
+   * Três coisas que a versão anterior errava e que mudam aqui:
+   *
+   *   · vinte e quatro certidões iam numa requisição só — bastava uma estourar o
+   *     timeout para o lote inteiro se perder, sem dizer onde parou;
+   *   · os arquivos escolhidos eram descartados no erro, e o operador tinha de
+   *     selecionar tudo de novo;
+   *   · quando NADA era lido, a tela ainda avançava e mostrava uma árvore vazia,
+   *     como se vazio fosse resultado. Não é: é falha, e agora ela para aqui.
+   */
+  const enviarEAnalisar = useCallback(
+    async (apenasIndices?: number[]) => {
+      const alvo = apenasIndices ?? selecionados.map((_, i) => i)
+      if (alvo.length === 0) return
+      setErro(null)
+      setEtapa("analisando")
 
-      const res = await authFetch(`/api/processos/${processoId}/registral/importar/analisar`, {
-        method: "POST",
-        body: JSON.stringify({ arquivos }),
-      })
-      const dados = await res.json()
-      if (!res.ok) throw new Error(dados?.error || "Falha ao analisar os documentos.")
+      const situacaoDe = (nome: string, s: SituacaoArquivo) =>
+        setSituacoes((atual) => ({ ...atual, [nome]: s }))
+      for (const i of alvo) situacaoDe(selecionados[i].name, { fase: "AGUARDANDO" })
 
-      const a = dados as ResultadoAnalise
-      setAnalise(a)
+      try {
+        // ---- 1. upload, um a um, com progresso real
+        const enviadosAgora: ArquivoEnviado[] = []
+        for (const i of alvo) {
+          const file = selecionados[i]
+          situacaoDe(file.name, { fase: "ENVIANDO", pct: 0 })
+          try {
+            const [subido] = await uploadFiles([file], {
+              prefix: "documentos",
+              onProgress: (_f, pct) => situacaoDe(file.name, { fase: "ENVIANDO", pct }),
+            })
+            enviadosAgora.push({
+              url: subido.url,
+              nome: subido.name,
+              mimeType: subido.type || null,
+              tamanho: subido.size ?? null,
+            })
+            situacaoDe(file.name, { fase: "AGUARDANDO" })
+          } catch (e) {
+            situacaoDe(file.name, { fase: "ERRO", motivo: e instanceof Error ? e.message : String(e) })
+          }
+        }
+        setEnviados(enviadosAgora)
 
-      // Estado inicial das decisões = a proposta do sistema.
-      const acoesIniciais: Record<string, "CRIAR" | "VINCULAR" | "IGNORAR"> = {}
-      const camposIniciais: Record<string, Set<string>> = {}
-      for (const n of a.nos) {
-        acoesIniciais[n.chave] = n.nova ? "CRIAR" : "VINCULAR"
-        const marcados = new Set<string>()
-        for (const d of n.dados) {
-          if (d.bloqueado) continue
-          if (n.nova) {
-            marcados.add(d.campo)
+        if (enviadosAgora.length === 0) {
+          setErro("Nenhum arquivo chegou ao armazenamento. Os arquivos continuam selecionados — tente de novo.")
+          setEtapa("envio")
+          return
+        }
+
+        // ---- 2. leitura em blocos; cada bloco é uma requisição curta
+        const arquivosLidos: ArquivoAnalisado[] = []
+        const nos: NoProposto[] = []
+        const vinculos: VinculoProposto[] = []
+        let leitura: ResultadoAnalise["leitura"] | null = null
+        const avisos = new Set<string>()
+
+        for (let inicio = 0; inicio < enviadosAgora.length; inicio += POR_BLOCO) {
+          const bloco = enviadosAgora.slice(inicio, inicio + POR_BLOCO)
+          for (const a of bloco) situacaoDe(a.nome, { fase: "LENDO" })
+
+          let parcial: ResultadoAnalise
+          try {
+            const res = await authFetch(`/api/processos/${processoId}/registral/importar/analisar`, {
+              method: "POST",
+              body: JSON.stringify({ arquivos: bloco }),
+            })
+            const dados = await res.json()
+            if (!res.ok) throw new Error(dados?.error || `Falha ao ler (HTTP ${res.status}).`)
+            parcial = dados as ResultadoAnalise
+          } catch (e) {
+            const motivo = e instanceof Error ? e.message : String(e)
+            for (const a of bloco) situacaoDe(a.nome, { fase: "ERRO", motivo })
             continue
           }
-          // Em pessoa existente: preencher vazio sim, sobrescrever não.
-          const alt = n.alteracoes.find((x) => x.campo === d.campo)
-          if (alt?.aplicarPorPadrao) marcados.add(d.campo)
+
+          // Os índices vêm por bloco; reindexa para o lote inteiro.
+          const deslocamento = arquivosLidos.length
+          for (const a of parcial.arquivos) {
+            const reindexado: ArquivoAnalisado = { ...a, indice: deslocamento + a.indice }
+            arquivosLidos.push(reindexado)
+            situacaoDe(
+              a.nome,
+              a.legivel
+                ? { fase: "CONCLUIDO", tipo: a.tipo, pessoas: parcial.nos.filter((n) => n.documentos.includes(a.indice)).length }
+                : { fase: "ERRO", motivo: a.motivoIlegivel ?? "Não foi possível ler este documento." },
+            )
+          }
+          for (const n of parcial.nos) {
+            const existente = nos.find((x) => x.chave === n.chave)
+            const documentos = n.documentos.map((d) => d + deslocamento)
+            if (existente) {
+              existente.documentos = [...new Set([...existente.documentos, ...documentos])]
+              for (const d of n.dados) if (!existente.dados.some((x) => x.campo === d.campo)) existente.dados.push(d)
+              existente.conflitos = [...new Set([...existente.conflitos, ...n.conflitos])]
+            } else {
+              nos.push({ ...n, documentos })
+            }
+          }
+          for (const v of parcial.vinculos) {
+            const chave = `${v.tipo}|${v.deChave}|${v.paraChave}`
+            if (!vinculos.some((x) => `${x.tipo}|${x.deChave}|${x.paraChave}` === chave)) {
+              vinculos.push({ ...v, documentos: v.documentos.map((d) => d + deslocamento) })
+            }
+          }
+          leitura = parcial.leitura
+          for (const a of parcial.avisos) avisos.add(a)
         }
-        camposIniciais[n.chave] = marcados
+
+        const legiveis = arquivosLidos.filter((a) => a.legivel).length
+
+        // ---- 3. vazio NÃO é resultado
+        if (legiveis === 0) {
+          setErro(
+            "Nenhum documento foi lido, então não há árvore para revisar. " +
+              "O motivo de cada arquivo está na lista abaixo. Os arquivos continuam selecionados — corrija e tente de novo.",
+          )
+          setEtapa("envio")
+          return
+        }
+
+        setAnalise({
+          processoId,
+          arvoreId: null,
+          arquivos: arquivosLidos,
+          nos,
+          vinculos,
+          resumo: {
+            total: arquivosLidos.length,
+            legiveis,
+            ilegiveis: arquivosLidos.length - legiveis,
+            pessoasNovas: nos.filter((n) => n.nova).length,
+            pessoasVinculadas: nos.filter((n) => !n.nova).length,
+            vinculosNovos: vinculos.filter((v) => !v.jaExiste).length,
+            divergencias: arquivosLidos.reduce((s2, a) => s2 + a.divergencias.length, 0),
+            alteracoesEmDadosExistentes: nos.reduce(
+              (s2, n) => s2 + n.alteracoes.filter((x) => x.tipo === "ALTERA_EXISTENTE").length,
+              0,
+            ),
+            geracoes: 0,
+          },
+          leitura: leitura ?? { provedor: "?", modelo: null, disponivel: false, motivo: null, custo: null },
+          avisos: [...avisos],
+        })
+
+        const acoesIniciais: Record<string, "CRIAR" | "VINCULAR" | "IGNORAR"> = {}
+        const camposIniciais: Record<string, Set<string>> = {}
+        for (const n of nos) {
+          acoesIniciais[n.chave] = n.nova ? "CRIAR" : "VINCULAR"
+          const marcados = new Set<string>()
+          for (const d of n.dados) {
+            if (d.bloqueado) continue
+            if (n.nova) {
+              marcados.add(d.campo)
+              continue
+            }
+            const alt = n.alteracoes.find((x) => x.campo === d.campo)
+            if (alt?.aplicarPorPadrao) marcados.add(d.campo)
+          }
+          camposIniciais[n.chave] = marcados
+        }
+        const vinculosIniciais: Record<string, boolean> = {}
+        for (const v of vinculos) vinculosIniciais[chaveVinculo(v)] = !v.jaExiste && !v.conflito
+        setAcoes(acoesIniciais)
+        setCamposAprovados(camposIniciais)
+        setVinculosAprovados(vinculosIniciais)
+        setDescartados(Object.fromEntries(arquivosLidos.filter((x) => !x.legivel).map((x) => [x.indice, true])))
+        setEtapa("revisao")
+        setAba("arvore")
+      } catch (e) {
+        setErro(e instanceof Error ? e.message : String(e))
+        setEtapa("envio")
       }
-      const vinculosIniciais: Record<string, boolean> = {}
-      for (const v of a.vinculos) {
-        // Vínculo já existente não precisa ser reaplicado; conflitante não entra
-        // sem o operador dizer que sim.
-        vinculosIniciais[chaveVinculo(v)] = !v.jaExiste && !v.conflito
-      }
-      setAcoes(acoesIniciais)
-      setCamposAprovados(camposIniciais)
-      setVinculosAprovados(vinculosIniciais)
-      setDescartados(Object.fromEntries(a.arquivos.filter((x) => !x.legivel).map((x) => [x.indice, true])))
-      setEtapa("revisao")
-      setAba("arvore")
-    } catch (e) {
-      setErro(e instanceof Error ? e.message : String(e))
-      setEtapa("envio")
-    }
-  }, [processoId, selecionados])
+    },
+    [processoId, selecionados],
+  )
 
   // ---- confirmação ---------------------------------------------------------
 
@@ -512,7 +656,7 @@ export function ImportarCertidoes({ processoId, pessoas, aberto, onFechar, onImp
               etapa={etapa}
               arrastando={arrastando}
               selecionados={selecionados}
-              progresso={progresso}
+              situacoes={situacoes}
               inputRef={inputRef}
               onArrastar={setArrastando}
               onDrop={onDrop}
@@ -655,8 +799,23 @@ export function ImportarCertidoes({ processoId, pessoas, aberto, onFechar, onImp
                 <button onClick={fechar} className="px-3 py-2 text-sm text-gray-600 hover:bg-gray-100 rounded">
                   Cancelar
                 </button>
+                {/* Repetir só o que falhou — reenviar o que já deu certo custa
+                    dinheiro à toa e demora. */}
+                {selecionados.some((f) => situacoes[f.name]?.fase === "ERRO") && (
+                  <button
+                    onClick={() =>
+                      void enviarEAnalisar(
+                        selecionados.map((f, i) => (situacoes[f.name]?.fase === "ERRO" ? i : -1)).filter((i) => i >= 0),
+                      )
+                    }
+                    className="flex items-center gap-2 rounded border border-gray-300 px-3 py-2 text-sm text-gray-700 hover:bg-gray-100"
+                  >
+                    <RotateCcw className="h-4 w-4" />
+                    Tentar novamente os que falharam
+                  </button>
+                )}
                 <button
-                  onClick={enviarEAnalisar}
+                  onClick={() => void enviarEAnalisar()}
                   disabled={selecionados.length === 0}
                   className="flex items-center gap-2 rounded bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-40 disabled:cursor-not-allowed"
                 >
@@ -809,7 +968,7 @@ function TelaEnvio({
   etapa,
   arrastando,
   selecionados,
-  progresso,
+  situacoes,
   inputRef,
   onArrastar,
   onDrop,
@@ -819,7 +978,7 @@ function TelaEnvio({
   etapa: Etapa
   arrastando: boolean
   selecionados: File[]
-  progresso: Record<string, number>
+  situacoes: Record<string, SituacaoArquivo>
   inputRef: React.RefObject<HTMLInputElement | null>
   onArrastar: (v: boolean) => void
   onDrop: (e: React.DragEvent) => void
@@ -865,18 +1024,22 @@ function TelaEnvio({
       {selecionados.length > 0 && (
         <ul className="mt-4 space-y-1">
           {selecionados.map((f) => (
-            <li key={`${f.name}-${f.size}`} className="flex items-center gap-3 rounded border px-3 py-2 text-sm">
+            <li key={`${f.name}-${f.size}`} className="rounded border px-3 py-2 text-sm">
+              <div className="flex items-center gap-3">
               <FileText className="h-4 w-4 text-gray-400 shrink-0" />
               <span className="flex-1 truncate text-gray-800">{f.name}</span>
-              <span className="text-xs text-gray-500">{(f.size / 1024).toFixed(0)} KB</span>
-              {etapa === "analisando" ? (
-                <span className="w-20 text-right text-xs text-gray-500">
-                  {progresso[f.name] === 100 ? "enviado" : `${progresso[f.name] ?? 0}%`}
-                </span>
-              ) : (
-                <button onClick={() => onRemover(f)} className="p-1 hover:bg-gray-100 rounded" title="Remover">
+              <span className="text-xs text-gray-500 shrink-0">{(f.size / 1024).toFixed(0)} KB</span>
+              <SituacaoDoArquivo situacao={situacoes[f.name]} />
+              {etapa !== "analisando" && (
+                <button onClick={() => onRemover(f)} className="p-1 hover:bg-gray-100 rounded shrink-0" title="Remover">
                   <Trash2 className="h-3.5 w-3.5 text-gray-400" />
                 </button>
+              )}
+              </div>
+              {situacoes[f.name]?.fase === "ERRO" && (
+                <p className="mt-1 pl-7 text-xs text-red-700">
+                  {(situacoes[f.name] as { motivo: string }).motivo}
+                </p>
               )}
             </li>
           ))}
@@ -891,6 +1054,33 @@ function TelaEnvio({
         </div>
       )}
     </div>
+  )
+}
+
+/** A situação de UM arquivo, com o vocabulário que o operador entende. */
+function SituacaoDoArquivo({ situacao }: { situacao: SituacaoArquivo | undefined }) {
+  const s = situacao ?? { fase: "AGUARDANDO" as const }
+  const cor =
+    s.fase === "ERRO"
+      ? "text-red-700"
+      : s.fase === "CONCLUIDO"
+        ? "text-green-700"
+        : s.fase === "AGUARDANDO"
+          ? "text-gray-400"
+          : "text-blue-600"
+  const texto =
+    s.fase === "ENVIANDO"
+      ? `Enviando ${s.pct}%`
+      : s.fase === "CONCLUIDO"
+        ? `${ROTULO_TIPO[s.tipo] ?? s.tipo}`
+        : ROTULO_FASE[s.fase]
+  return (
+    <span className={`flex w-28 shrink-0 items-center justify-end gap-1 text-xs ${cor}`}>
+      {s.fase === "LENDO" && <Loader2 className="h-3 w-3 animate-spin" />}
+      {s.fase === "CONCLUIDO" && <Check className="h-3 w-3" />}
+      {s.fase === "ERRO" && <AlertTriangle className="h-3 w-3" />}
+      {texto}
+    </span>
   )
 }
 
