@@ -11,6 +11,8 @@
     "test:cp-sec": "tsx scripts/cp-sec.test.ts",
     "test:sessao": "tsx scripts/sessao.test.ts",
     "test:ssr": "tsx scripts/ssr-hidratacao.test.ts",
+    "test:componentes": "vitest run",
+    "test:componentes:watch": "vitest",
     "test:usuarios": "tsx scripts/usuarios-acessos.test.ts",
     "test:auth": "tsx scripts/cp-sec.test.ts && tsx scripts/sessao.test.ts && tsx scripts/usuarios-acessos.test.ts && tsx scripts/ssr-hidratacao.test.ts",
     "test:cp1": "tsx scripts/cp1.test.ts",
@@ -182,6 +184,9 @@
   "devDependencies": {
     "@eslint/eslintrc": "^3.3.6",
     "@tailwindcss/postcss": "^4",
+    "@testing-library/jest-dom": "^7.0.0",
+    "@testing-library/react": "^16.3.2",
+    "@testing-library/user-event": "^14.6.1",
     "@types/bcrypt": "^6.0.0",
     "@types/bcryptjs": "^2.4.6",
     "@types/date-fns": "^2.5.3",
@@ -191,12 +196,15 @@
     "@types/react": "^19",
     "@types/react-datepicker": "^6.2.0",
     "@types/react-dom": "^19",
+    "@vitejs/plugin-react": "^6.0.4",
     "eslint": "^9.39.5",
     "eslint-config-next": "^16.2.9",
+    "jsdom": "^30.0.1",
     "prisma": "^6.16.2",
     "tailwindcss": "^4",
     "tsx": "^4.22.3",
     "tw-animate-css": "^1.3.8",
-    "typescript": "5.9.3"
+    "typescript": "5.9.3",
+    "vitest": "^3.2.7"
   }
 }
