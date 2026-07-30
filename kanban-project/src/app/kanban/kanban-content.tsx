@@ -10,8 +10,9 @@
 "use client"
 
 import { useEffect, useState, useCallback, useMemo } from "react"
+import { useApi } from "@/src/lib/dados"
+import { useIsClient, useJsonLocalStorage, useLocalStorage } from "@/src/lib/cliente"
 import { useRouter, useSearchParams } from "next/navigation"
-import { getStoredUser, isAuthenticated } from "@/lib/auth"
 import { useAmbiente } from "@/src/contexts/ambiente-context"
 import { KanbanBoard } from "@/src/components/kanban-board-novo"
 import { ProcessosLista } from "@/src/components/processos-lista"
@@ -40,35 +41,89 @@ interface User {
 type TabPrincipal = "processos" | "contratantes"
 type SubTab = "kanban" | "lista"
 
+/** Inteiro de um parâmetro de URL; ausente ou inválido vira `null`. */
+function inteiroDaUrl(valor: string | null): number | null {
+  if (!valor) return null
+  const n = Number.parseInt(valor, 10)
+  return Number.isNaN(n) ? null : n
+}
+
+/** Forma mínima que o HeaderBar consome das árvores. */
+interface ArvoreResumo { id: number | string; nome: string; descricao?: string | null }
+
+const SEM_PAISES: PaisKanban[] = []
+const SEM_TIPOS: TipoKanban[] = []
+const SEM_PROCESSOS: Processo[] = []
+const SEM_CONTRATANTES: Contratante[] = []
+const SEM_REQUERENTES: Requerente[] = []
+const SEM_ARVORES: ArvoreResumo[] = []
+
 export function KanbanContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
 
-  const [user, setUser] = useState<User | null>(null)
-  const [loading, setLoading] = useState(true)
+  // Sessão e usuário pela leitura oficial do localStorage.
+  const noCliente = useIsClient()
+  const token = useLocalStorage("authToken")
+  const user = useJsonLocalStorage<User>("user")
+  const autenticado = Boolean(token && user)
 
   // Tabs
   const [tabPrincipal, setTabPrincipal] = useState<TabPrincipal>("processos")
   const [subTab, setSubTab] = useState<SubTab>("kanban")
 
-  // ✅ Config do kanban (vem do Gerenciamento)
-  const [paisesDisponiveis, setPaisesDisponiveis] = useState<PaisKanban[]>([])
-  const [tipos, setTipos] = useState<TipoKanban[]>([])
-  const [paisSelecionado, setPaisSelecionado] = useState<string | null>(null) // countryKey
-  const [tipoSelecionadoId, setTipoSelecionadoId] = useState<number | null>(null)
+  // ✅ Config do kanban (vem do Gerenciamento), pela camada oficial.
+  const configReq = useApi<{ paises?: PaisKanban[]; tipos?: TipoKanban[] }>(
+    autenticado ? "/api/kanban-config" : null,
+  )
+  const paisesDisponiveis = configReq.dados?.paises ?? SEM_PAISES
+  const tipos = configReq.dados?.tipos ?? SEM_TIPOS
+  // País: a escolha do usuário vence; sem escolha, o da URL (se existir na config);
+  // sem URL, o primeiro disponível. Antes eram dois efeitos concorrendo pelo mesmo
+  // estado — um vindo da config, outro da URL — e a ordem entre eles definia o
+  // resultado.
+  const [paisEscolhido, setPaisSelecionado] = useState<string | null>(null)
+  const paisDaUrl = (searchParams.get("pais") || "").toLowerCase()
+  const paisSelecionado =
+    paisEscolhido
+    ?? (paisesDisponiveis.some(p => p.countryKey === paisDaUrl) ? paisDaUrl : null)
+    ?? paisesDisponiveis[0]?.countryKey
+    ?? null
+  // O tipo escolhido pertence ao país em que foi escolhido: trocar de país volta ao
+  // primeiro tipo do novo país, que era o papel do efeito `setTipoSelecionadoId(null)`.
+  const [tipoEscolhido, setTipoEscolhido] = useState<{ pais: string | null; id: number } | null>(null)
+  const tipoSelecionadoId = tipoEscolhido?.pais === paisSelecionado ? tipoEscolhido.id : null
+  const setTipoSelecionadoId = (id: number | null) => {
+    setTipoEscolhido(id === null ? null : { pais: paisSelecionado, id })
+  }
 
-  const [processos, setProcessos] = useState<Processo[]>([])
-  const [contratantes, setContratantes] = useState<Contratante[]>([])
-  const [requerentes, setRequerentes] = useState<Requerente[]>([])
-  const [arvores, setArvores] = useState<any[]>([])
+  // Processos do país selecionado: o país está na CHAVE, então trocar de país já
+  // dispara a busca — era um efeito em `[paisSelecionado]`.
+  const processosReq = useApi<{ processos?: Processo[] }>(
+    paisSelecionado ? `/api/processos?pais=${paisSelecionado}` : null,
+  )
+  const processos = processosReq.dados?.processos ?? SEM_PROCESSOS
+  const contratantesReq = useApi<{ contratantes?: Contratante[] }>(autenticado ? "/api/contratantes" : null)
+  const requerentesReq = useApi<{ requerentes?: Requerente[] }>(autenticado ? "/api/requerentes" : null)
+  const arvoresReq = useApi<ArvoreResumo[]>(autenticado ? "/api/arvore" : null)
+  const contratantes = contratantesReq.dados?.contratantes ?? SEM_CONTRATANTES
+  const requerentes = requerentesReq.dados?.requerentes ?? SEM_REQUERENTES
+  const arvores = Array.isArray(arvoresReq.dados) ? arvoresReq.dados : SEM_ARVORES
+  const loading = !noCliente || (autenticado && configReq.carregando)
 
-  // Parâmetros para abrir modal automaticamente
-  const [initialProcessoId, setInitialProcessoId] = useState<number | null>(null)
-  const [initialTab, setInitialTab] = useState<string | null>(null)
-  const [initialPessoaId, setInitialPessoaId] = useState<number | null>(null)
-  const [initialSidebarTab, setInitialSidebarTab] = useState<string | null>(null)
-  const [initialTarefaPaiId, setInitialTarefaPaiId] = useState<number | null>(null)
-  const [initialAtividadeId, setInitialAtividadeId] = useState<number | null>(null)
+  // Parâmetros para abrir modal automaticamente. São LEITURA DA URL, não estado: copiá-los
+  // para seis `useState` dentro de um efeito só adiava em um render o que a URL já dizia.
+  // Depois que o modal abriu, o link já foi CONSUMIDO — um sinalizador, no lugar dos
+  // seis `setInitial*(null)` que existiam para o mesmo fim. (A limpeza da barra de
+  // endereços é `history.replaceState`, que de propósito não re-renderiza: por isso o
+  // sinalizador é necessário, e não basta reler a URL.)
+  const [linkConsumido, setLinkConsumido] = useState(false)
+  const initialProcessoId = linkConsumido ? null : inteiroDaUrl(searchParams.get("processoId"))
+  const initialTab = linkConsumido ? null : searchParams.get("tab")
+  const initialPessoaId = linkConsumido ? null : inteiroDaUrl(searchParams.get("pessoaId"))
+  const initialSidebarTab = linkConsumido ? null : searchParams.get("sidebarTab")
+  const initialTarefaPaiId = linkConsumido ? null : inteiroDaUrl(searchParams.get("tarefaPaiId"))
+  const initialAtividadeId = linkConsumido ? null : inteiroDaUrl(searchParams.get("atividadeId"))
 
   // Modal de processo na aba Clientes
   const [clientesProcessoModal, setClientesProcessoModal] = useState<Processo | null>(null)
@@ -94,66 +149,6 @@ export function KanbanContent() {
     [processos, tipoSelecionado]
   )
 
-  // ✅ Carregar a config do kanban (países + tipos com fases) do Gerenciamento
-  const carregarConfig = useCallback(async () => {
-    try {
-      const response = await fetch("/api/kanban-config", {
-        headers: { Authorization: `Bearer ${localStorage.getItem("authToken")}` },
-      })
-      if (!response.ok) return
-      const data = await response.json()
-      const paises: PaisKanban[] = data.paises || []
-      setPaisesDisponiveis(paises)
-      setTipos(data.tipos || [])
-
-      // país inicial: o da URL (se existir na lista) senão o primeiro
-      const urlPais = (searchParams.get("pais") || "").toLowerCase()
-      const inicial = paises.find(p => p.countryKey === urlPais)?.countryKey ?? paises[0]?.countryKey ?? null
-      setPaisSelecionado(prev => prev ?? inicial)
-    } catch (error) {
-      console.error("Erro ao carregar config do kanban:", error)
-    }
-  }, [searchParams])
-
-  // Ler parâmetros da URL para abertura automática do modal
-  useEffect(() => {
-    const processoId = searchParams.get("processoId")
-    const tab = searchParams.get("tab")
-    const pessoaId = searchParams.get("pessoaId")
-    const sidebarTab = searchParams.get("sidebarTab")
-    const tarefaPaiId = searchParams.get("tarefaPaiId")
-
-    if (processoId) setInitialProcessoId(parseInt(processoId))
-    if (tab) setInitialTab(tab)
-    if (pessoaId) setInitialPessoaId(parseInt(pessoaId))
-    if (sidebarTab) setInitialSidebarTab(sidebarTab)
-    if (tarefaPaiId) setInitialTarefaPaiId(parseInt(tarefaPaiId))
-    const atividadeId = searchParams.get("atividadeId")
-    if (atividadeId) setInitialAtividadeId(parseInt(atividadeId))
-  }, [searchParams])
-
-  // Atualizar país quando URL mudar (depois da config carregada)
-  useEffect(() => {
-    const urlPais = (searchParams.get("pais") || "").toLowerCase()
-    if (urlPais && paisesDisponiveis.some(p => p.countryKey === urlPais)) {
-      setPaisSelecionado(urlPais)
-    }
-  }, [searchParams, paisesDisponiveis])
-
-  // Ao trocar de país, seleciona o primeiro tipo dele
-  useEffect(() => {
-    setTipoSelecionadoId(null)
-  }, [paisSelecionado])
-
-  // Ambiente visual: o país selecionado no Kanban é uma FONTE CONFIÁVEL do fundo
-  // (sem processo aberto = lista filtrada por país). Só decora — não altera layout.
-  const { focarPais } = useAmbiente()
-  useEffect(() => {
-    focarPais(paisSelecionado)
-  }, [paisSelecionado, focarPais])
-
-  const handleLogout = () => { void encerrarSessao("manual") }
-
   // Callback para limpar URL params depois que o modal abriu
   const handleModalOpened = useCallback(() => {
     const newUrl = new URL(window.location.href)
@@ -165,12 +160,7 @@ export function KanbanContent() {
     newUrl.searchParams.delete("atividadeId")
     window.history.replaceState({}, "", newUrl.toString())
 
-    setInitialProcessoId(null)
-    setInitialTab(null)
-    setInitialPessoaId(null)
-    setInitialSidebarTab(null)
-    setInitialTarefaPaiId(null)
-    setInitialAtividadeId(null)
+    setLinkConsumido(true)
   }, [])
 
   // Abrir processo a partir da aba Clientes (abre modal sem mudar de aba)
@@ -190,95 +180,21 @@ export function KanbanContent() {
     }
   }, [])
 
-  // Buscar processos por país (countryKey)
-  const buscarProcessos = useCallback(async (pais: string) => {
-    try {
-      const response = await fetch(`/api/processos?pais=${pais}`)
-      if (response.ok) {
-        const data = await response.json()
-        setProcessos(data.processos || [])
-      }
-    } catch (error) {
-      console.error("Erro ao buscar processos:", error)
-    }
-  }, [])
-
-  const buscarContratantes = async () => {
-    try {
-      const response = await fetch("/api/contratantes")
-      if (response.ok) {
-        const { contratantes } = await response.json()
-        setContratantes(contratantes || [])
-      }
-    } catch (error) {
-      console.error("Erro ao buscar contratantes:", error)
-    }
-  }
-
-  const buscarRequerentes = async () => {
-    try {
-      const response = await fetch("/api/requerentes")
-      if (response.ok) {
-        const { requerentes } = await response.json()
-        setRequerentes(requerentes || [])
-      }
-    } catch (error) {
-      console.error("Erro ao buscar requerentes:", error)
-    }
-  }
-
-  const buscarArvores = async () => {
-    try {
-      const response = await fetch("/api/arvore")
-      if (response.ok) {
-        const data = await response.json()
-        setArvores(Array.isArray(data) ? data : [])
-      }
-    } catch (error) {
-      console.error("Erro ao buscar árvores:", error)
-    }
-  }
-
-  // Efeito inicial - autenticação e dados globais
+  // A guarda de sessão continua sendo efeito, porque navegar é efeito.
   useEffect(() => {
-    if (!isAuthenticated()) {
-      router.push("/login")
-      return
-    }
+    if (!noCliente) return
+    if (!autenticado) router.push("/login")
+  }, [noCliente, autenticado, router])
 
-    const userData = getStoredUser()
-    if (!userData) {
-      router.push("/login")
-      return
-    }
-
-    setUser(userData)
-
-    // Buscar dados globais (não dependem do país)
-    Promise.all([
-      carregarConfig(),
-      buscarContratantes(),
-      buscarRequerentes(),
-      buscarArvores()
-    ]).finally(() => {
-      setLoading(false)
-    })
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [router])
-
-  // Efeito quando país muda - buscar processos do país
-  useEffect(() => {
-    if (!paisSelecionado) return
-    buscarProcessos(paisSelecionado)
-  }, [paisSelecionado, buscarProcessos])
+  // Recarregar listas depois de escrever — nome preservado nos pontos de uso.
+  const buscarContratantes = () => { void contratantesReq.recarregar() }
+  const buscarRequerentes = () => { void requerentesReq.recarregar() }
 
   // Refresh apenas do país atual
   const handleRefresh = useCallback(() => {
-    if (paisSelecionado) {
-      buscarProcessos(paisSelecionado)
-    }
-    buscarContratantes()
-  }, [paisSelecionado, buscarProcessos])
+    void processosReq.recarregar()
+    void contratantesReq.recarregar()
+  }, [processosReq, contratantesReq])
 
   if (loading) {
     return (
@@ -308,7 +224,7 @@ export function KanbanContent() {
         projetos={[]}
         processos={processos as any}
         arvores={arvores}
-        onLogout={handleLogout}
+        onLogout={() => { void encerrarSessao("manual") }}
       />
 
       <div className="min-h-screen relative">

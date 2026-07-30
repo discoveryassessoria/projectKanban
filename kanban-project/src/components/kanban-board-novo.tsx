@@ -91,11 +91,16 @@ export function KanbanBoard({
   initialTarefaPaiId = null,
   initialAtividadeId = null,
 }: KanbanBoardProps) {
-  const [localProcessos, setLocalProcessos] = useState<Processo[]>(processosFromProps)
-
-  useEffect(() => {
-    setLocalProcessos(processosFromProps)
-  }, [processosFromProps])
+  // A lista local existe para o drag-and-drop responder na hora, antes de o servidor
+  // confirmar. Ela é um RASCUNHO sobre a prop: enquanto a prop for a mesma, vale o
+  // arranjo local; quando o pai traz dados novos, o rascunho é descartado — que é o
+  // que o efeito de sincronia fazia, só que um render depois.
+  const [rascunhoProcessos, setRascunhoProcessos] = useState<{ base: Processo[]; lista: Processo[] } | null>(null)
+  const localProcessos = rascunhoProcessos?.base === processosFromProps ? rascunhoProcessos.lista : processosFromProps
+  const setLocalProcessos = (proximos: Processo[] | ((anteriores: Processo[]) => Processo[])) => {
+    const lista = typeof proximos === 'function' ? proximos(localProcessos) : proximos
+    setRascunhoProcessos({ base: processosFromProps, lista })
+  }
 
   const [activeProcesso, setActiveProcesso] = useState<Processo | null>(null)
   const [selectedProcesso, setSelectedProcesso] = useState<Processo | null>(null)
@@ -116,13 +121,6 @@ export function KanbanBoard({
   // timeout com a MESMA chave ⇒ o backend devolve o MESMO processo (sem duplicar).
   const [criarIdemKey, setCriarIdemKey] = useState<string>("")
 
-  const [initialParamsProcessed, setInitialParamsProcessed] = useState(false)
-
-  useEffect(() => {
-    if (initialProcessoId !== null) {
-      setInitialParamsProcessed(false)
-    }
-  }, [initialProcessoId])
 
   const corPais = corDoPais(pais.countryKey)
 
@@ -139,23 +137,33 @@ export function KanbanBoard({
     })
   )
 
-  // Abrir modal automaticamente (deep-link)
+  // Abertura por deep-link. Antes isto copiava SETE valores para o estado dentro de um
+  // efeito, guardado por um flag `initialParamsProcessed` que outro efeito zerava
+  // quando o link mudava. O modal só aparecia um render depois de a lista chegar.
+  //
+  // Agora é derivação: enquanto o link não foi dispensado (fechar o modal dispensa),
+  // ele determina o processo aberto e as abas iniciais. Uma abertura MANUAL vence,
+  // porque quem clicou quis outra coisa.
+  const linkDeepId = initialProcessoId ?? null
+  const [linkDispensado, setLinkDispensado] = useState<number | null>(null)
+  const processoDoLink = linkDeepId !== null && linkDispensado !== linkDeepId
+    ? localProcessos.find(p => p.id === linkDeepId) ?? null
+    : null
+  const aberturaPorLink = processoDoLink !== null && selectedProcesso === null
+
+  const processoDoModal = aberturaPorLink ? processoDoLink : selectedProcesso
+  const modalAberto = aberturaPorLink || isDetailsModalOpen
+  const abaInicialDoModal = aberturaPorLink ? (initialTab || undefined) : modalInitialTab
+  const pessoaInicialDoModal = aberturaPorLink ? (initialPessoaId || undefined) : modalInitialPessoaId
+  const sidebarInicialDoModal = aberturaPorLink ? (initialSidebarTab || undefined) : modalInitialSidebarTab
+  const tarefaPaiInicialDoModal = aberturaPorLink ? (initialTarefaPaiId || undefined) : modalInitialTarefaPaiId
+  const atividadeInicialDoModal = aberturaPorLink ? (initialAtividadeId || undefined) : modalInitialAtividadeId
+
+  // Avisar o pai que o modal abriu é EFEITO (é comunicação para fora), e continua
+  // sendo — só não carrega mais estado nenhum junto.
   useEffect(() => {
-    if (initialProcessoId && localProcessos.length > 0 && !initialParamsProcessed) {
-      const processo = localProcessos.find(p => p.id === initialProcessoId)
-      if (processo) {
-        setSelectedProcesso(processo)
-        setModalInitialTab(initialTab || undefined)
-        setModalInitialPessoaId(initialPessoaId || undefined)
-        setModalInitialSidebarTab(initialSidebarTab || undefined)
-        setModalInitialTarefaPaiId(initialTarefaPaiId || undefined)
-        setModalInitialAtividadeId(initialAtividadeId || undefined)
-        setIsDetailsModalOpen(true)
-        setInitialParamsProcessed(true)
-        onModalOpened?.()
-      }
-    }
-  }, [initialProcessoId, initialTab, initialPessoaId, initialSidebarTab, initialTarefaPaiId, initialAtividadeId, localProcessos, initialParamsProcessed, onModalOpened])
+    if (aberturaPorLink) onModalOpened?.()
+  }, [aberturaPorLink, onModalOpened])
 
   // Processos agrupados por fase (A-Z dentro da fase)
   const processosByFase = useMemo(() => {
@@ -184,6 +192,9 @@ export function KanbanBoard({
   const handleProcessoSave = () => onRefresh()
 
   const handleModalClose = () => {
+    // Fechar também DISPENSA o deep-link: sem isso, o link reabriria o modal no render
+    // seguinte, que é exatamente o que o flag `initialParamsProcessed` evitava antes.
+    if (linkDeepId !== null) setLinkDispensado(linkDeepId)
     setIsDetailsModalOpen(false)
     setModalInitialTab(undefined)
     setModalInitialPessoaId(undefined)
@@ -428,15 +439,15 @@ export function KanbanBoard({
       )}
 
       <ProcessoDetailsModal
-        processo={selectedProcesso as any}
-        isOpen={isDetailsModalOpen}
+        processo={processoDoModal as any}
+        isOpen={modalAberto}
         onClose={handleModalClose}
         onSave={handleProcessoSave}
-        initialTab={modalInitialTab}
-        initialPessoaId={modalInitialPessoaId}
-        initialSidebarTab={modalInitialSidebarTab}
-        initialTarefaPaiId={modalInitialTarefaPaiId}
-        initialAtividadeId={modalInitialAtividadeId}
+        initialTab={abaInicialDoModal}
+        initialPessoaId={pessoaInicialDoModal}
+        initialSidebarTab={sidebarInicialDoModal}
+        initialTarefaPaiId={tarefaPaiInicialDoModal}
+        initialAtividadeId={atividadeInicialDoModal}
       />
     </>
   )
