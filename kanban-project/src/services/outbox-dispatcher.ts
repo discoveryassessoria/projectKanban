@@ -17,6 +17,9 @@ import type { EventoRequerentePayload } from "@/src/lib/motor/executor"
 import { reconciliarEconomicoDoProcesso } from "@/src/lib/motor/matriz-economica"
 import { espelharCustosDoProcesso } from "@/lib/financeiro/dual-write"
 import { reconciliarOperacoesAntecipadas } from "@/src/services/operacao-antecipada"
+// MRG — reconciliação contínua do motor registral (evento registral.reconciliar.processo).
+import { reconciliarDocumentalDoProcesso } from "@/src/services/registral/reconciliacao-documental"
+import { recalcularLinhagem, registrarRecalculo } from "@/src/services/registral/consultas"
 
 const MAX_TENTATIVAS = 5
 // Reserva "presa" há mais que isto (worker morreu no meio) volta a ser reivindicável.
@@ -98,7 +101,14 @@ export async function processarOutbox(opts?: {
 }): Promise<OutboxProcessResumo> {
   const limite = opts?.limite ?? 50
   // phase.completed entra por padrão só para ARQUIVAR (marca ENVIADO) — não acumula.
-  const tipos = opts?.tipos ?? ["phase.entered", "phase.completed", "requerente.adicionado"]
+  const tipos = opts?.tipos ?? [
+    "phase.entered",
+    "phase.completed",
+    "requerente.adicionado",
+    // MRG — reconciliação contínua: nova certidão / necessidade transicionada /
+    // árvore alterada disparam revalidação fora do caminho crítico do upload.
+    "registral.reconciliar.processo",
+  ]
 
   const pendentes = await prisma.domainOutbox.findMany({
     where: {
@@ -132,6 +142,26 @@ export async function processarOutbox(opts?: {
         const p = (evt.payload ?? {}) as Partial<EventoRequerentePayload>
         if (p.processoId && p.pessoaId) {
           await processarRequerenteAdicionado({ ...p, processoId: p.processoId, pessoaId: p.pessoaId })
+        }
+      } else if (evt.tipo === "registral.reconciliar.processo") {
+        // EFEITO: reconciliar a Pasta Documental do processo com o que o motor
+        // registral apurou e recalcular a linhagem. Idempotente e convergente:
+        // reprocessar o mesmo evento não duplica proposta nem reabre necessidade
+        // atendida. Uma falha transitória PROPAGA → o evento volta a PENDENTE.
+        const p = (evt.payload ?? {}) as { processoId?: number; motivo?: string; usuarioId?: number | null }
+        if (p.processoId) {
+          const docs = await reconciliarDocumentalDoProcesso({
+            processoId: p.processoId,
+            usuarioId: p.usuarioId ?? null,
+          })
+          const linhagem = await recalcularLinhagem(p.processoId)
+          if (linhagem) {
+            await registrarRecalculo(
+              p.processoId,
+              p.usuarioId ?? null,
+              `${linhagem.elegibilidade.resultado} · ${linhagem.inconsistencias.length} inconsistência(s) · ${docs.necessidadesAtendidas} necessidade(s) atendida(s) · motivo=${p.motivo ?? "-"}`,
+            )
+          }
         }
       } else if (!TIPOS_SEM_EFEITO.has(evt.tipo)) {
         // tipo conhecido sem efeito conectado ainda: no-op (será marcado ENVIADO/arquivado).
