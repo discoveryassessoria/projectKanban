@@ -7,6 +7,7 @@ import { TipoDocumento, StatusDocumento } from "@prisma/client"
 import { verificarPermissao } from '@/src/lib/verificar-permissao'
 import { resolverNecessidadeDeDocumento } from '@/src/services/necessidade-documental'
 import { reconciliarEconomicoDoProcesso } from '@/src/lib/motor/matriz-economica'
+import { notificarDocumentoAlterado } from '@/src/services/registral/gancho-documental'
 
 // Helper para obter label do tipo de documento
 function getTipoDocumentoLabel(tipo: string): string {
@@ -346,6 +347,14 @@ export async function POST(request: NextRequest) {
     // GRANULARIDADE POR DOCUMENTO: documento criado → o motor recalcula o econômico
     // do processo (cria os lançamentos do novo documento). Best-effort, não bloqueia.
     if (processoId) reconciliarEconomicoDoProcesso(processoId).catch((e) => console.error('[doc criado → reconcile econômico]', e))
+
+    // MRG — RECONCILIAÇÃO CONTÍNUA: nova certidão na Pasta Documental publica o
+    // evento que dispara revalidação registral (identidade, fatos, integridade,
+    // linhagem, necessidades). Fora do caminho crítico: falha aqui NÃO derruba o
+    // upload nem altera esta resposta.
+    notificarDocumentoAlterado({ documentoId: documento.id, motivo: 'documento_anexado' }).catch((e) =>
+      console.error('[doc criado → gancho registral]', e),
+    )
 
     return NextResponse.json(documento, { status: 201 })
   } catch (error) {

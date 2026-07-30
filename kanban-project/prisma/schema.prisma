@@ -32,6 +32,16 @@ model Usuario {
 
   @@index([perfilId])
   decisoesDedupTomadas DecisaoDeduplicacao[] @relation("DecisaoDedupResponsavel")
+
+  // MRG - back-relations (autoria e assinatura das decisoes registrais)
+  lotesRegistrais            LoteRegistral[]              @relation("LoteRegistralAutor")
+  fatosRegistraisAfirmados   FatoRegistral[]              @relation("FatoRegistralResponsavel")
+  correspondenciasDecididas  CorrespondenciaIdentidade[]  @relation("CorrespondenciaDecisor")
+  propostasDecididas         PropostaReconciliacao[]      @relation("PropostaDecisor")
+  propostasRevertidas        PropostaReconciliacao[]      @relation("PropostaRevertePor")
+  conflitosResolvidos        ConflitoRegistral[]          @relation("ConflitoResolvedor")
+  decisoesRegistrais         DecisaoRevisaoRegistral[]    @relation("DecisaoRegistralResponsavel")
+  versoesGenealogicas        VersaoGenealogica[]          @relation("VersaoGenealogicaAutor")
 }
 
 model Pessoa {
@@ -103,6 +113,13 @@ model Pessoa {
   @@index([maeId])
   @@index([paiId])
   decisoesDedup DecisaoDeduplicacao[] @relation("PessoaDecisaoDedup")
+
+  // MRG — back-relations (referencia, nunca duplicacao de dominio)
+  ocorrenciasResolvidas OcorrenciaDocumental[]       @relation("OcorrenciaPessoaResolvida")
+  correspondencias      CorrespondenciaIdentidade[]  @relation("CorrespondenciaPessoa")
+  fatosRegistrais       FatoRegistral[]
+  evidenciasRegistrais  EvidenciaRegistral[]         @relation("EvidenciaPessoa")
+  conflitosRegistrais   ConflitoRegistral[]          @relation("ConflitoPessoa")
 }
 
 model Uniao {
@@ -132,6 +149,11 @@ model Uniao {
 
   @@index([pessoa1Id])
   @@index([pessoa2Id])
+
+  // MRG — back-relations
+  fatosRegistrais      FatoRegistral[]
+  evidenciasRegistrais EvidenciaRegistral[] @relation("EvidenciaUniao")
+  conflitosRegistrais  ConflitoRegistral[]  @relation("ConflitoUniao")
 }
 
 model Arvore {
@@ -151,6 +173,12 @@ model Arvore {
   familia   Familia? @relation(fields: [familiaId], references: [id], onDelete: SetNull)
 
   @@index([familiaId])
+
+  // MRG — back-relations
+  lotesRegistrais     LoteRegistral[]
+  propostasRegistrais PropostaReconciliacao[]
+  conflitosRegistrais ConflitoRegistral[]
+  versoesGenealogicas VersaoGenealogica[]
 }
 
 // CP-1 â FamÃ­lia: entidade administrativa prÃ³pria (Regras 10/11/12).
@@ -263,6 +291,25 @@ model Documento {
   tarefasVinculadas Tarefa[]                    @relation("TarefaDocumento")
   stepInstances     PhaseWorkflowStepInstance[]
 
+  // ============================================================
+  // MRG - TRANSCRICAO REGISTRAL (pertence ao Sistema Documental, nao a arvore).
+  // O texto lido do documento mora aqui, ao lado do arquivo, porque e atributo
+  // DO DOCUMENTO. O motor registral apenas LE. Sem estes campos o pipeline
+  // dependeria de uma copia do documento dentro do dominio genealogico -
+  // exatamente o que a arquitetura proibe.
+  // transcricaoPaginas: [{ pagina: number, texto: string }] - e o que permite
+  // citar pagina e offset em cada evidencia.
+  // ============================================================
+  transcricaoTexto   String?   @db.Text
+  transcricaoPaginas Json?
+  transcricaoFonte   String?   @db.VarChar(40)
+  transcricaoEm      DateTime?
+
+  // MRG - back-relations (o motor referencia o documento; nunca o copia)
+  execucoesRegistrais   ExecucaoRegistral[]
+  ocorrenciasRegistrais OcorrenciaDocumental[]
+  evidenciasRegistrais  EvidenciaRegistral[]
+
   @@index([documentTypeId])
   @@index([necessidadeId])
   @@index([pessoaId])
@@ -361,6 +408,11 @@ model Processo {
   tipoProcessoMotor     TipoProcessoNacionalidade? @relation("ProcessoTipoMotor", fields: [tipoProcessoMotorId], references: [id], onDelete: SetNull)
   motorArtefatos        MotorArtefato[]            @relation("ProcessoMotorArtefatos")
   pendenciasFinanceiras PendenciaFinanceira[]      @relation("ProcessoPendenciasFinanceiras")
+
+  // MRG - back-relations
+  lotesRegistrais     LoteRegistral[]
+  propostasRegistrais PropostaReconciliacao[]
+  conflitosRegistrais ConflitoRegistral[]
 
   @@index([pais])
   @@index([arvoreId])
@@ -3207,6 +3259,9 @@ model ItemCatalogo {
   necessidades   NecessidadeDocumental[] // CP-3 â Documento Mestre requerido
   categoriasFin  CategoriaFinanceira[]   @relation("CatFinItemCatalogo") // serviÃ§o (natureza SERVICO)
 
+  // MRG - evidencias que citam este Documento Mestre
+  evidenciasRegistrais EvidenciaRegistral[]
+
   @@index([natureza])
   @@index([ativo])
 }
@@ -3292,6 +3347,10 @@ model NecessidadeDocumental {
   tarefasVinculadas Tarefa[]                    @relation("TarefaNecessidade")
   stepInstances     PhaseWorkflowStepInstance[]
   nomesEvidenciados NomePessoa[]
+
+  // MRG - back-relations
+  execucoesRegistrais  ExecucaoRegistral[]
+  evidenciasRegistrais EvidenciaRegistral[]
 
   @@index([processoId])
   @@index([itemCatalogoId])
@@ -4628,4 +4687,739 @@ model DecisaoDeduplicacao {
   @@index([chaveDedup])
   @@index([pessoaResultanteId])
   @@index([decididoEm])
+  correspondencias CorrespondenciaIdentidade[] @relation("DedupCorrespondencia")
+}
+
+// ############################################################################
+// MRG — MOTOR REGISTRAL GENEALOGICO
+// ############################################################################
+//
+// O que este bloco NAO faz (regra de escopo permanente, verificada por teste):
+//   · nao armazena arquivo, nao copia Documento, nao cria pasta paralela;
+//   · nao tem status documental proprio — quem decide status de documento e de
+//     necessidade continua sendo o Sistema Documental (Documento,
+//     NecessidadeDocumental, ItemCatalogo);
+//   · nao substitui Pessoa/Uniao como estrutura: paiId/maeId e Uniao seguem
+//     sendo a UNICA fonte da estrutura genealogica. FatoRegistral e a
+//     AFIRMACAO auditavel sobre essa estrutura, nunca uma segunda estrutura.
+//
+// O que ele acrescenta: o rastro completo entre "chegou uma certidao" e
+// "a arvore mudou" — pipeline, ocorrencias, evidencias, fatos, identidade,
+// conflitos, propostas, impacto, versao e decisao humana.
+//
+// Reuso deliberado, para nao duplicar dominio:
+//   · aliases de nome            -> NomePessoa (MDM-5)
+//   · triagem de duplicidade     -> DecisaoDeduplicacao (MDM-3) + lib/cadastro-mestre/dedup
+//   · fila assincrona            -> DomainOutbox (claim atomico ja existente)
+//   · auditoria                  -> LogAuditoria
+//   · permissoes                 -> Perfil/Usuario.permissoesCustom
+// ############################################################################
+
+/// Etapas do pipeline registral. Nenhuma etapa desaparece: a transicao e
+/// registrada em EtapaExecucaoRegistral (append-only) e a atual fica em
+/// ExecucaoRegistral.etapa.
+enum EtapaRegistral {
+  RECEBIDO
+  CLASSIFICANDO
+  EXTRAINDO
+  REEXTRAINDO
+  NORMALIZANDO
+  RESOLVENDO_IDENTIDADES
+  CRUZANDO_EVIDENCIAS
+  VALIDANDO
+  REVALIDANDO
+  ANALISANDO_IMPACTO
+  AGUARDANDO_REVISAO
+  APLICADO
+  AUDITADO
+  FALHA_LEITURA
+  DOCUMENTO_INSUFICIENTE
+  DOCUMENTO_CONFLITANTE
+  REPROCESSAMENTO
+  REJEITADO
+  CANCELADO
+}
+
+enum StatusLoteRegistral {
+  RECEBIDO
+  EM_PROCESSAMENTO
+  AGUARDANDO_REVISAO
+  CONCLUIDO
+  CONCLUIDO_COM_FALHAS
+  CANCELADO
+}
+
+/// Estado proprio de CADA fato registral (nunca um status generico por pessoa).
+enum EstadoFatoRegistral {
+  NAO_INFORMADO
+  INFORMADO_PELO_CLIENTE
+  EXTRAIDO
+  NAO_COMPROVADO
+  INCOMPLETO
+  PROVAVEL
+  CONFIRMADO
+  CONFIRMADO_MULTIPLAS_EVIDENCIAS
+  DIVERGENTE
+  CONFLITANTE
+  EM_REVISAO
+  REJEITADO
+  SUBSTITUIDO_COM_HISTORICO
+}
+
+/// Campos registrais. Os marcados como criticos em lib/genealogia/registral/campos.ts
+/// exigem extracao dupla + revalidacao antes de virar fato.
+enum CampoRegistral {
+  NOME_REGISTRAL
+  NOME_CASADO
+  SEXO
+  DATA_NASCIMENTO
+  LOCAL_NASCIMENTO
+  PAIS_NASCIMENTO
+  FILIACAO_PAI
+  FILIACAO_MAE
+  DATA_CASAMENTO
+  LOCAL_CASAMENTO
+  CONJUGE
+  DATA_OBITO
+  LOCAL_OBITO
+  DATA_BATISMO
+  LOCAL_BATISMO
+  PROFISSAO
+  NACIONALIDADE
+  NATURALIZACAO
+  IDADE_DECLARADA
+  RESIDENCIA_HISTORICA
+  REFERENCIA_REGISTRAL
+  DATA_EMIGRACAO
+  IDENTIDADE_PESSOA
+  IDENTIDADE_PAI
+  IDENTIDADE_MAE
+  VINCULO_ASCENDENTE_TRANSMISSOR
+}
+
+/// Papel em que a pessoa APARECE no documento. Pessoa != ocorrencia documental:
+/// a mesma identidade humana aparece como registrado numa certidao e como mae
+/// noutra, com grafias diferentes.
+enum PapelOcorrencia {
+  REGISTRADO
+  PAI
+  MAE
+  CONJUGE
+  FILHO
+  AVO_PATERNO
+  AVOA_PATERNA
+  AVO_MATERNO
+  AVOA_MATERNA
+  DECLARANTE
+  TESTEMUNHA
+  OFICIANTE
+  PADRINHO
+  MADRINHA
+  OUTRO
+}
+
+enum ClasseCorrespondencia {
+  CORRESPONDENCIA_CONFIRMADA
+  ALTAMENTE_PROVAVEL
+  POSSIVEL
+  REGISTROS_CONFLITANTES
+  PESSOAS_DISTINTAS
+}
+
+enum TipoPropostaRegistral {
+  CONFIRMAR_DADO
+  COMPLETAR_DADO
+  CORRIGIR_DADO
+  ADICIONAR_NOME_ALTERNATIVO
+  CRIAR_PESSOA
+  VINCULAR_PESSOA_EXISTENTE
+  CRIAR_RELACIONAMENTO
+  CORRIGIR_RELACIONAMENTO
+  REMOVER_RELACIONAMENTO
+  MESCLAR_PESSOAS
+  SEPARAR_PESSOAS
+  SATISFAZER_NECESSIDADE
+  REABRIR_NECESSIDADE
+  CRIAR_NECESSIDADE
+  MARCAR_DOCUMENTO_DIVERGENTE
+  SOLICITAR_RETIFICACAO
+}
+
+/// Matriz de automacao (requisito 12): o que o motor pode aplicar sozinho, o que
+/// exige assinatura humana e o que e proibido sem desbloqueio explicito.
+enum CriticidadeRegistral {
+  AUTOMATICA
+  APROVACAO_HUMANA
+  BLOQUEIO
+}
+
+enum StatusPropostaRegistral {
+  PENDENTE
+  APROVADA
+  REJEITADA
+  ADIADA
+  APLICADA
+  REVERTIDA
+  ABORTADA
+}
+
+enum SeveridadeRegistral {
+  CRITICO
+  ALTO
+  MEDIO
+  BAIXO
+  INFO
+}
+
+enum StatusConflitoRegistral {
+  ABERTO
+  EM_REVISAO
+  RESOLVIDO
+  DESCARTADO
+}
+
+enum ResultadoLinhagemRegistral {
+  LINHA_COMPLETA_COMPROVADA
+  LINHA_COMPLETA_COM_PENDENCIAS
+  LINHA_ESTRUTURAL_INCOMPLETA
+  LINHA_CONFLITANTE
+  ASCENDENTE_ELEGIVEL_NAO_IDENTIFICADO
+  REVISAO_OBRIGATORIA
+}
+
+/// LOTE — uma passada do motor sobre a Pasta Documental de um processo.
+/// Idempotente por chaveIdempotencia: reenviar o mesmo lote nao reprocessa nem
+/// duplica; devolve o lote existente.
+model LoteRegistral {
+  id         Int      @id @default(autoincrement())
+  processoId Int
+  processo   Processo @relation(fields: [processoId], references: [id], onDelete: Cascade)
+  arvoreId   Int?
+  arvore     Arvore?  @relation(fields: [arvoreId], references: [id], onDelete: SetNull)
+
+  status        StatusLoteRegistral @default(RECEBIDO)
+  correlationId String              @db.VarChar(60)
+  versaoMotor   String              @db.VarChar(20)
+
+  totalDocumentos Int @default(0)
+  processados     Int @default(0)
+  falhos          Int @default(0)
+  aguardando      Int @default(0)
+
+  pessoasCriadas    Int @default(0)
+  vinculosCriados   Int @default(0)
+  evidenciasCriadas Int @default(0)
+  propostasCriadas  Int @default(0)
+  conflitosAbertos  Int @default(0)
+
+  metricas Json?
+  resumo   String? @db.Text
+
+  criadoPorId Int?
+  criadoPor   Usuario? @relation("LoteRegistralAutor", fields: [criadoPorId], references: [id], onDelete: SetNull)
+
+  chaveIdempotencia String    @unique @db.VarChar(200)
+  criadoEm          DateTime  @default(now())
+  iniciadoEm        DateTime?
+  finalizadoEm      DateTime?
+  atualizadoEm      DateTime  @updatedAt
+
+  execucoes  ExecucaoRegistral[]
+  propostas  PropostaReconciliacao[]
+  conflitos  ConflitoRegistral[]
+
+  @@index([processoId, status])
+  @@index([correlationId])
+  @@index([criadoEm])
+}
+
+/// EXECUCAO — o pipeline de UM documento dentro de um lote. Estado atual +
+/// controle de retomada (tentativas, backoff, claim atomico).
+model ExecucaoRegistral {
+  id      Int           @id @default(autoincrement())
+  loteId  Int
+  lote    LoteRegistral @relation(fields: [loteId], references: [id], onDelete: Cascade)
+
+  documentoId Int
+  documento   Documento @relation(fields: [documentoId], references: [id], onDelete: Cascade)
+
+  necessidadeId Int?
+  necessidade   NecessidadeDocumental? @relation(fields: [necessidadeId], references: [id], onDelete: SetNull)
+
+  etapa       EtapaRegistral @default(RECEBIDO)
+  /// Classificacao resolvida (code do ItemCatalogo / natureza da certidao).
+  tipoDetectado    String? @db.VarChar(60)
+  confiancaTipo    Float?
+  versaoExtrator   String  @db.VarChar(20)
+  fonteTexto       String? @db.VarChar(30)
+
+  tentativas    Int       @default(0)
+  proximaEm     DateTime?
+  reservadoEm   DateTime?
+  erro          String?   @db.Text
+  /// Contadores do que ESTA execucao produziu — base das metricas do lote.
+  ocorrenciasDetectadas Int @default(0)
+  camposExtraidos       Int @default(0)
+  camposDivergentes     Int @default(0)
+  evidenciasCriadas     Int @default(0)
+
+  correlationId     String   @db.VarChar(60)
+  chaveIdempotencia String   @unique @db.VarChar(200)
+  criadoEm          DateTime @default(now())
+  atualizadoEm      DateTime @updatedAt
+  finalizadoEm      DateTime?
+
+  etapas        EtapaExecucaoRegistral[]
+  ocorrencias   OcorrenciaDocumental[]
+  evidencias    EvidenciaRegistral[]
+  propostas     PropostaReconciliacao[]
+  conflitos     ConflitoRegistral[]
+
+  @@index([loteId, etapa])
+  @@index([documentoId])
+  @@index([etapa, proximaEm])
+  @@index([correlationId])
+}
+
+/// Trilha append-only de CADA transicao de etapa — inclusive as que falharam.
+model EtapaExecucaoRegistral {
+  id          Int               @id @default(autoincrement())
+  execucaoId  Int
+  execucao    ExecucaoRegistral @relation(fields: [execucaoId], references: [id], onDelete: Cascade)
+
+  etapa     EtapaRegistral
+  ok        Boolean
+  mensagem  String? @db.VarChar(500)
+  duracaoMs Int?
+  tentativa Int     @default(1)
+  dados     Json?
+
+  criadoEm DateTime @default(now())
+
+  @@index([execucaoId, criadoEm])
+  @@index([etapa])
+}
+
+/// OCORRENCIA DOCUMENTAL — uma pessoa COMO ELA APARECE num documento.
+/// Nunca e uma Pessoa: e a mencao. A ligacao com a identidade humana acontece
+/// em CorrespondenciaIdentidade e, quando resolvida, em pessoaResolvidaId.
+model OcorrenciaDocumental {
+  id         Int               @id @default(autoincrement())
+  execucaoId Int
+  execucao   ExecucaoRegistral @relation(fields: [execucaoId], references: [id], onDelete: Cascade)
+
+  documentoId Int
+  documento   Documento @relation(fields: [documentoId], references: [id], onDelete: Cascade)
+
+  papel PapelOcorrencia
+
+  nomeBruto       String  @db.VarChar(300)
+  nomeNormalizado String  @db.VarChar(300)
+  chaveFonetica   String? @db.VarChar(80)
+  sexoInferido    String? @db.VarChar(10)
+
+  /// Atributos brutos da mencao (datas, locais, idade, profissao, filiacao
+  /// citada...). E o insumo do motor de identidade, nao um cadastro paralelo.
+  atributos Json?
+
+  pessoaResolvidaId Int?
+  pessoaResolvida   Pessoa? @relation("OcorrenciaPessoaResolvida", fields: [pessoaResolvidaId], references: [id], onDelete: SetNull)
+
+  classe        ClasseCorrespondencia?
+  scoreIdentidade Float?
+  /// Resolucao automatica so acontece quando classe=CONFIRMADA e sem impacto
+  /// estrutural. Fora disso fica null e nasce proposta/conflito.
+  resolvidaAutomaticamente Boolean @default(false)
+
+  chaveIdempotencia String   @unique @db.VarChar(200)
+  criadoEm          DateTime @default(now())
+  atualizadoEm      DateTime @updatedAt
+
+  correspondencias CorrespondenciaIdentidade[]
+  evidencias       EvidenciaRegistral[]
+
+  @@index([execucaoId])
+  @@index([documentoId, papel])
+  @@index([chaveFonetica])
+  @@index([pessoaResolvidaId])
+}
+
+/// FATO REGISTRAL — a afirmacao auditavel sobre um campo de uma pessoa/uniao.
+/// Append-only: corrigir e criar nova versao e supersedir a anterior.
+model FatoRegistral {
+  id       Int     @id @default(autoincrement())
+  pessoaId Int?
+  pessoa   Pessoa? @relation(fields: [pessoaId], references: [id], onDelete: Cascade)
+  uniaoId  Int?
+  uniao    Uniao?  @relation(fields: [uniaoId], references: [id], onDelete: Cascade)
+
+  campo CampoRegistral
+
+  valorBruto       String? @db.VarChar(400)
+  valorNormalizado String? @db.VarChar(400)
+  /// Valor tipado quando aplicavel (data ISO, id de pessoa em filiacao...).
+  valorData      DateTime?
+  valorPessoaId  Int?
+
+  estado    EstadoFatoRegistral @default(NAO_INFORMADO)
+  /// Escala UNICA do Discovery (lib/cadastro-mestre/afirmacao): CONFIRMADO |
+  /// PROVAVEL | HIPOTESE | CONTESTADO.
+  confianca String              @db.VarChar(12)
+
+  // ---- afirmacao auditavel (os seis campos obrigatorios) ----
+  origem        String   @db.VarChar(16)
+  responsavelId Int?
+  responsavel   Usuario? @relation("FatoRegistralResponsavel", fields: [responsavelId], references: [id], onDelete: SetNull)
+  afirmadoEm    DateTime @default(now())
+  justificativa String?  @db.VarChar(500)
+  regraAplicada String?  @db.VarChar(80)
+
+  totalEvidencias      Int @default(0)
+  evidenciasFavoraveis Int @default(0)
+  evidenciasContrarias Int @default(0)
+
+  // ---- versionamento append-only ----
+  versao           Int            @default(1)
+  ativo            Boolean        @default(true)
+  supersedidoPorId Int?           @unique
+  supersedidoPor   FatoRegistral? @relation("FatoSupersessao", fields: [supersedidoPorId], references: [id], onDelete: SetNull)
+  supersede        FatoRegistral? @relation("FatoSupersessao")
+
+  chaveIdempotencia String   @unique @db.VarChar(200)
+  criadoEm          DateTime @default(now())
+  atualizadoEm      DateTime @updatedAt
+
+  evidencias EvidenciaRegistral[]
+  propostas  PropostaReconciliacao[]
+
+  @@index([pessoaId, campo, ativo])
+  @@index([uniaoId, campo, ativo])
+  @@index([estado])
+  @@index([campo])
+}
+
+/// EVIDENCIA REGISTRAL — granular, imutavel, sempre rastreavel ao documento.
+/// Sem uma destas, nenhum fato pode chegar a CONFIRMADO.
+model EvidenciaRegistral {
+  id         Int                @id @default(autoincrement())
+  execucaoId Int?
+  execucao   ExecucaoRegistral? @relation(fields: [execucaoId], references: [id], onDelete: SetNull)
+
+  /// Documento do Processo (dono do arquivo — o motor apenas referencia).
+  documentoId Int
+  documento   Documento @relation(fields: [documentoId], references: [id], onDelete: Cascade)
+  /// Documento Mestre (ItemCatalogo) e Necessidade que o documento atende.
+  itemCatalogoId Int?
+  itemCatalogo   ItemCatalogo? @relation(fields: [itemCatalogoId], references: [id], onDelete: SetNull)
+  necessidadeId  Int?
+  necessidade    NecessidadeDocumental? @relation(fields: [necessidadeId], references: [id], onDelete: SetNull)
+
+  ocorrenciaId Int?
+  ocorrencia   OcorrenciaDocumental? @relation(fields: [ocorrenciaId], references: [id], onDelete: SetNull)
+  fatoId       Int?
+  fato         FatoRegistral?        @relation(fields: [fatoId], references: [id], onDelete: SetNull)
+
+  pessoaId Int?
+  pessoa   Pessoa? @relation("EvidenciaPessoa", fields: [pessoaId], references: [id], onDelete: SetNull)
+  uniaoId  Int?
+  uniao    Uniao?  @relation("EvidenciaUniao", fields: [uniaoId], references: [id], onDelete: SetNull)
+
+  campo CampoRegistral
+
+  pagina        Int?
+  /// Regiao/trecho localizavel: "linha 12-14", "offset 1840-1902".
+  regiao        String? @db.VarChar(60)
+  trechoTexto   String? @db.VarChar(600)
+  valorBruto    String? @db.VarChar(400)
+  valorNormalizado String? @db.VarChar(400)
+
+  metodoExtracao      String  @db.VarChar(40)
+  versaoProcessamento String  @db.VarChar(20)
+  confiancaExtracao   Float
+  confiancaAssociacao Float
+  regraAplicada       String? @db.VarChar(80)
+  /// Evidencia pode ser CONTRARIA (o documento contradiz o fato).
+  favoravel Boolean @default(true)
+
+  chaveIdempotencia String   @unique @db.VarChar(200)
+  criadoEm          DateTime @default(now())
+
+  @@index([documentoId, campo])
+  @@index([fatoId])
+  @@index([ocorrenciaId])
+  @@index([pessoaId, campo])
+  @@index([necessidadeId])
+}
+
+/// CORRESPONDENCIA DE IDENTIDADE — candidato "esta ocorrencia e esta Pessoa",
+/// com classe conservadora e evidencias explicitas dos dois lados.
+model CorrespondenciaIdentidade {
+  id           Int                  @id @default(autoincrement())
+  ocorrenciaId Int
+  ocorrencia   OcorrenciaDocumental @relation(fields: [ocorrenciaId], references: [id], onDelete: Cascade)
+
+  pessoaId Int
+  pessoa   Pessoa @relation("CorrespondenciaPessoa", fields: [pessoaId], references: [id], onDelete: Cascade)
+
+  classe ClasseCorrespondencia
+  score  Float
+  /// Evidencias favoraveis e contrarias que produziram a classe (snapshot).
+  evidencias Json
+
+  /// Decisao humana quando exigida: ACEITA | RECUSADA | ADIADA.
+  decisao       String?  @db.VarChar(12)
+  decididoPorId Int?
+  decididoPor   Usuario? @relation("CorrespondenciaDecisor", fields: [decididoPorId], references: [id], onDelete: SetNull)
+  decididoEm    DateTime?
+
+  /// Liga a triagem MDM-3 quando a decisao passou pelo fluxo de dedup.
+  decisaoDedupId Int?
+  decisaoDedup   DecisaoDeduplicacao? @relation("DedupCorrespondencia", fields: [decisaoDedupId], references: [id], onDelete: SetNull)
+
+  chaveIdempotencia String   @unique @db.VarChar(200)
+  criadoEm          DateTime @default(now())
+  atualizadoEm      DateTime @updatedAt
+
+  @@index([ocorrenciaId, classe])
+  @@index([pessoaId])
+  @@index([score])
+}
+
+/// PROPOSTA DE RECONCILIACAO — nenhuma alteracao registral sensivel acontece
+/// sem passar por aqui. Guarda antes, depois e porque.
+model PropostaReconciliacao {
+  id         Int      @id @default(autoincrement())
+  processoId Int
+  processo   Processo @relation(fields: [processoId], references: [id], onDelete: Cascade)
+  arvoreId   Int?
+  arvore     Arvore?  @relation(fields: [arvoreId], references: [id], onDelete: SetNull)
+
+  loteId     Int?
+  lote       LoteRegistral?     @relation(fields: [loteId], references: [id], onDelete: SetNull)
+  execucaoId Int?
+  execucao   ExecucaoRegistral? @relation(fields: [execucaoId], references: [id], onDelete: SetNull)
+
+  tipo        TipoPropostaRegistral
+  criticidade CriticidadeRegistral
+  status      StatusPropostaRegistral @default(PENDENTE)
+
+  /// Alvo da alteracao. entidadeAlvo: PESSOA | UNIAO | FATO | NECESSIDADE | DOCUMENTO.
+  entidadeAlvo String @db.VarChar(20)
+  alvoId       Int?
+  campo        CampoRegistral?
+  fatoId       Int?
+  fato         FatoRegistral? @relation(fields: [fatoId], references: [id], onDelete: SetNull)
+
+  valorAtual          String? @db.VarChar(400)
+  valorProposto       String? @db.VarChar(400)
+  origemValorAtual    String? @db.VarChar(120)
+  origemValorProposto String? @db.VarChar(120)
+
+  evidenciasFavoraveis Json
+  evidenciasContrarias Json
+  confianca            Float
+  justificativa        String  @db.Text
+  regraAplicada        String  @db.VarChar(80)
+  recomendacao         String? @db.VarChar(300)
+  risco                SeveridadeRegistral @default(BAIXO)
+
+  /// Payload canonico da alteracao (o que aplicar). Interpretado pelo aplicador,
+  /// nunca por tela.
+  operacao Json
+
+  pessoasAfetadas     Json?
+  vinculosAfetados    Json?
+  documentosAfetados  Json?
+  processosAfetados   Json?
+  necessidadesAfetadas Json?
+  /// true so quando a matriz de automacao permite aplicar sem humano.
+  aplicavelAutomaticamente Boolean @default(false)
+
+  decididoPorId Int?
+  decididoPor   Usuario?  @relation("PropostaDecisor", fields: [decididoPorId], references: [id], onDelete: SetNull)
+  decididoEm    DateTime?
+  decisaoNota   String?   @db.VarChar(500)
+
+  aplicadoEm    DateTime?
+  revertidoEm   DateTime?
+  revertidaPorId Int?
+  revertidaPor   Usuario? @relation("PropostaRevertePor", fields: [revertidaPorId], references: [id], onDelete: SetNull)
+  motivoAbortoRevalidacao String? @db.Text
+
+  versaoArvoreAntes  Int?
+  versaoArvoreDepois Int?
+
+  correlationId     String   @db.VarChar(60)
+  chaveIdempotencia String   @unique @db.VarChar(200)
+  criadoEm          DateTime @default(now())
+  atualizadoEm      DateTime @updatedAt
+
+  impactos  ImpactoAplicacaoRegistral[]
+  decisoes  DecisaoRevisaoRegistral[]
+  conflitos ConflitoRegistral[]
+
+  @@index([processoId, status])
+  @@index([loteId])
+  @@index([tipo, status])
+  @@index([criticidade, status])
+  @@index([correlationId])
+}
+
+/// CONFLITO — divergencia que o motor NAO tem direito de resolver sozinho.
+model ConflitoRegistral {
+  id         Int      @id @default(autoincrement())
+  processoId Int
+  processo   Processo @relation(fields: [processoId], references: [id], onDelete: Cascade)
+  arvoreId   Int?
+  arvore     Arvore?  @relation(fields: [arvoreId], references: [id], onDelete: SetNull)
+
+  loteId     Int?
+  lote       LoteRegistral?     @relation(fields: [loteId], references: [id], onDelete: SetNull)
+  execucaoId Int?
+  execucao   ExecucaoRegistral? @relation(fields: [execucaoId], references: [id], onDelete: SetNull)
+
+  /// Codigo estavel da regra que abriu o conflito (ex.: LEITURA_DIVERGENTE,
+  /// FILIACAO_CONTRADITORIA, CICLO_GENEALOGICO).
+  codigo     String @db.VarChar(60)
+  severidade SeveridadeRegistral
+  status     StatusConflitoRegistral @default(ABERTO)
+
+  campo    CampoRegistral?
+  pessoaId Int?
+  pessoa   Pessoa? @relation("ConflitoPessoa", fields: [pessoaId], references: [id], onDelete: SetNull)
+  uniaoId  Int?
+  uniao    Uniao?  @relation("ConflitoUniao", fields: [uniaoId], references: [id], onDelete: SetNull)
+
+  descricao     String  @db.VarChar(300)
+  explicacao    String  @db.Text
+  acaoSugerida  String? @db.VarChar(300)
+  evidencias    Json
+  documentoIds  Json?
+
+  propostaId Int?
+  proposta   PropostaReconciliacao? @relation(fields: [propostaId], references: [id], onDelete: SetNull)
+
+  resolvidoPorId Int?
+  resolvidoPor   Usuario?  @relation("ConflitoResolvedor", fields: [resolvidoPorId], references: [id], onDelete: SetNull)
+  resolvidoEm    DateTime?
+  resolucaoNota  String?   @db.VarChar(500)
+
+  chaveIdempotencia String   @unique @db.VarChar(200)
+  criadoEm          DateTime @default(now())
+  atualizadoEm      DateTime @updatedAt
+
+  decisoes DecisaoRevisaoRegistral[]
+
+  @@index([processoId, status])
+  @@index([severidade, status])
+  @@index([codigo])
+  @@index([pessoaId])
+}
+
+/// ANALISE DE IMPACTO — calculada ANTES de aplicar proposta sensivel.
+/// `bloqueado` = a aplicacao seria abortada (inconsistencia critica).
+model ImpactoAplicacaoRegistral {
+  id         Int                   @id @default(autoincrement())
+  propostaId Int
+  proposta   PropostaReconciliacao @relation(fields: [propostaId], references: [id], onDelete: Cascade)
+
+  calculadoEm DateTime @default(now())
+  /// PREVIO (antes de aplicar) | POSTERIOR (revalidacao pos-aplicacao).
+  momento     String   @db.VarChar(10)
+
+  pessoasAfetadas         Int @default(0)
+  arvoresAfetadas         Int @default(0)
+  requerentesAfetados     Int @default(0)
+  processosAfetados       Int @default(0)
+  vinculosAlterados       Int @default(0)
+  documentosRelacionados  Int @default(0)
+  necessidadesRecalculadas Int @default(0)
+  inconsistenciasCriadas  Int @default(0)
+  inconsistenciasResolvidas Int @default(0)
+
+  linhaAntes  Json?
+  linhaDepois Json?
+  elegibilidadeAntes  ResultadoLinhagemRegistral?
+  elegibilidadeDepois ResultadoLinhagemRegistral?
+
+  riscoDuplicidade SeveridadeRegistral @default(INFO)
+  riscoDocumental  SeveridadeRegistral @default(INFO)
+  riscoOperacional SeveridadeRegistral @default(INFO)
+
+  bloqueado      Boolean @default(false)
+  motivoBloqueio String? @db.Text
+  detalhes       Json?
+
+  chaveIdempotencia String @unique @db.VarChar(200)
+
+  @@index([propostaId, momento])
+  @@index([bloqueado])
+}
+
+/// DECISAO DE REVISAO — quem decidiu o que, quando e por que. Append-only.
+model DecisaoRevisaoRegistral {
+  id         Int                    @id @default(autoincrement())
+  propostaId Int?
+  proposta   PropostaReconciliacao? @relation(fields: [propostaId], references: [id], onDelete: Cascade)
+  conflitoId Int?
+  conflito   ConflitoRegistral?     @relation(fields: [conflitoId], references: [id], onDelete: Cascade)
+
+  /// APROVAR | REJEITAR | ADIAR | REVERTER | RESOLVER_CONFLITO | DESCARTAR_CONFLITO
+  decisao  String @db.VarChar(24)
+  motivo   String @db.VarChar(500)
+  /// Permissao efetivamente exercida — auditoria de autorizacao.
+  permissao String @db.VarChar(60)
+
+  responsavelId Int?
+  responsavel   Usuario? @relation("DecisaoRegistralResponsavel", fields: [responsavelId], references: [id], onDelete: SetNull)
+
+  correlationId     String?  @db.VarChar(60)
+  chaveIdempotencia String   @unique @db.VarChar(200)
+  criadoEm          DateTime @default(now())
+
+  @@index([propostaId])
+  @@index([conflitoId])
+  @@index([responsavelId])
+  @@index([criadoEm])
+}
+
+/// VERSAO GENEALOGICA — snapshot logico da arvore. Base da comparacao entre
+/// versoes e da reversao segura. Nunca apagado por exclusao comum.
+model VersaoGenealogica {
+  id       Int    @id @default(autoincrement())
+  arvoreId Int
+  arvore   Arvore @relation(fields: [arvoreId], references: [id], onDelete: Cascade)
+
+  versao Int
+  motivo String @db.VarChar(200)
+  /// Snapshot determinístico: pessoas, vinculos, fatos ativos e linha apurada.
+  snapshot Json
+  hash     String @db.VarChar(64)
+
+  propostaId Int?
+  correlationId String? @db.VarChar(60)
+
+  criadoPorId Int?
+  criadoPor   Usuario? @relation("VersaoGenealogicaAutor", fields: [criadoPorId], references: [id], onDelete: SetNull)
+  criadoEm    DateTime @default(now())
+
+  @@unique([arvoreId, versao])
+  @@index([arvoreId, criadoEm])
+  @@index([hash])
+}
+
+/// METRICA REGISTRAL — contadores de observabilidade agregados por janela.
+/// Nunca guarda conteudo do documento (so contagem/tempo).
+model MetricaRegistral {
+  id     Int    @id @default(autoincrement())
+  chave  String @db.VarChar(60)
+  escopo String @db.VarChar(40)
+
+  janelaInicio DateTime
+  valor        Float    @default(0)
+  amostras     Int      @default(0)
+  atualizadoEm DateTime @updatedAt
+
+  @@unique([chave, escopo, janelaInicio])
+  @@index([chave, janelaInicio])
 }

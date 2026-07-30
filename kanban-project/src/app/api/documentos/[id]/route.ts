@@ -8,6 +8,7 @@ import { prisma } from "@/lib/prisma"
 import { Prisma, TipoDocumento, StatusDocumento } from "@prisma/client"
 import { verificarPermissao } from '@/src/lib/verificar-permissao'
 import { reconciliarEconomicoDoProcesso } from '@/src/lib/motor/matriz-economica'
+import { notificarDocumentoAlterado } from '@/src/services/registral/gancho-documental'
 
 // Helper para obter label do tipo de documento
 function getTipoDocumentoLabel(tipo: string): string {
@@ -342,6 +343,13 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
       }
     }
 
+    // MRG — RECONCILIAÇÃO CONTÍNUA: documento alterado (dados registrais, status,
+    // tradução, apostila) revalida identidade, fatos, integridade e linhagem.
+    // Best-effort e sem efeito na resposta.
+    notificarDocumentoAlterado({ documentoId: documentoAtualizado.id, motivo: 'documento_alterado' }).catch((e) =>
+      console.error('[doc alterado → gancho registral]', e),
+    )
+
     return NextResponse.json(documentoAtualizado)
   } catch (error) {
     console.error("Erro ao atualizar documento:", error)
@@ -528,6 +536,13 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
     // GRANULARIDADE POR DOCUMENTO: mudança de status (ex.: cancelado/invalidado) muda a
     // elegibilidade → reconcilia (cria/remove os lançamentos). Best-effort.
     if (processoId) reconciliarEconomicoDoProcesso(processoId).catch((e) => console.error('[doc alterado → reconcile econômico]', e))
+
+    // MRG — mudança de status documental (inválido, não encontrado, cancelado)
+    // muda o que está comprovado: revalida a linhagem e as necessidades.
+    notificarDocumentoAlterado({
+      documentoId: documentoAtualizado.id,
+      motivo: body.status === 'INVALIDO' || body.status === 'CANCELADO' ? 'documento_invalidado' : 'documento_alterado',
+    }).catch((e) => console.error('[status doc → gancho registral]', e))
 
     return NextResponse.json(documentoAtualizado)
   } catch (error) {

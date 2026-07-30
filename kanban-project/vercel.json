@@ -1,5 +1,12 @@
 {
   "crons": [
-    { "path": "/api/cron/cambio", "schedule": "0 12 * * *" }
+    {
+      "path": "/api/cron/cambio",
+      "schedule": "0 12 * * *"
+    },
+    {
+      "path": "/api/cron/registral",
+      "schedule": "*/10 * * * *"
+    }
   ]
 }

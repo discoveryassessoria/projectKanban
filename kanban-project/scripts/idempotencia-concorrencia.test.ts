@@ -12,6 +12,9 @@
  * Não cria mecanismo novo: a simulação existe só no teste.
  */
 
+export {} // módulo: sem isto, os identificadores de topo colidem com os de outros
+          // scripts de teste no MESMO programa do tsc (erro TS2451/TS2393).
+
 let passed = 0
 let failed = 0
 const falhas: string[] = []
