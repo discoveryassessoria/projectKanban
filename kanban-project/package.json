@@ -106,6 +106,7 @@
     "test:mrg-e2e": "tsx scripts/mrg-e2e.test.ts",
     "test:mrg-full": "node scripts/mrg-banco-teste.mjs up && npm run test:mrg && node scripts/mrg-banco-teste.mjs run-e2e",
     "test:mrg-guard": "tsx scripts/mrg-arquitetura-guard.test.ts",
+    "test:mrg-importacao": "tsx scripts/mrg-importacao.test.ts",
     "test:mrg-identidade": "tsx scripts/mrg-identidade.test.ts",
     "test:mrg-leitura": "tsx scripts/mrg-leitura.test.ts",
     "test:nav": "tsx scripts/management-nav.test.ts",

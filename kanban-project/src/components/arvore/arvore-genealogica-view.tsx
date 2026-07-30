@@ -15,6 +15,7 @@ import { PainelInteligencia } from "./inteligencia/painel-inteligencia"
 import { PaletaComandos } from "./inteligencia/paleta-comandos"
 import { TreeOnboarding } from "./tree-onboarding"
 import { RequerenteSelector } from "./requerente-selector"
+import { ImportarCertidoes } from "./importar-certidoes"
 import { DatePickerField } from "@/components/ui/date-picker-field"
 import {
   Plus,
@@ -25,6 +26,7 @@ import {
   FileDown,
   Search,
   Sparkles,
+  UploadCloud,
 } from "lucide-react"
 import { usePermissoes } from "@/src/hooks/use-permissoes"
 
@@ -112,6 +114,9 @@ export function ArvoreGenealogicaView({
   })
   const [painelAberto, setPainelAberto] = useState(false)
   const [paletaAberta, setPaletaAberta] = useState(false)
+  // Importar certidões: a entrada de acervo mora AQUI, na árvore. Os arquivos vão
+  // para a Pasta Documental existente — a aba Documentos segue sendo o repositório.
+  const [importarAberto, setImportarAberto] = useState(false)
 
   // ⌘K / Ctrl+K abre a busca. Atalho global é assinatura de teclado — efeito é a
   // ferramenta certa, e o cleanup impede listener órfão ao trocar de árvore.
@@ -632,12 +637,35 @@ export function ArvoreGenealogicaView({
   // Onboarding
   if (showOnboarding && arvoreId) {
     return (
-      <div ref={containerRef} className="h-full">
+      <div ref={containerRef} className="h-full relative">
         <TreeOnboarding
           arvoreId={arvoreId}
           processoId={processoId}
           paisProcesso={paisProcesso}
           onComplete={handleOnboardingComplete}
+        />
+        {/* Quem já tem as certidões não precisa preencher a árvore à mão primeiro:
+            a importação também é um começo válido. Entrada discreta, sem alterar
+            o onboarding em si. */}
+        {pode('arvore.criar_documento') && (
+          <button
+            className="absolute top-4 right-4 z-10 flex items-center gap-2 px-3 py-2 rounded bg-white/90 backdrop-blur border shadow-sm text-gray-700 hover:bg-white transition-colors"
+            onClick={() => setImportarAberto(true)}
+            title="Enviar certidões e alimentar a árvore"
+          >
+            <UploadCloud className="h-4 w-4" />
+            <span className="text-sm font-medium">Importar certidões</span>
+          </button>
+        )}
+        <ImportarCertidoes
+          processoId={processoId}
+          pessoas={pessoas}
+          aberto={importarAberto}
+          onFechar={() => setImportarAberto(false)}
+          onImportado={() => {
+            void fetchArvore()
+            setShowOnboarding(false)
+          }}
         />
       </div>
     )
@@ -684,6 +712,19 @@ export function ArvoreGenealogicaView({
         </div>
 
         <div className="flex items-center gap-1">
+          {/* Botão Importar certidões — ação principal do acervo, aqui na árvore */}
+          {pode('arvore.criar_documento') && (
+            <button
+              className="flex items-center gap-2 px-3 py-2 mr-1 rounded bg-blue-600 text-white hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              onClick={() => setImportarAberto(true)}
+              disabled={!arvoreId}
+              title={arvoreId ? "Enviar certidões e alimentar a árvore" : "Crie a árvore antes de importar certidões"}
+            >
+              <UploadCloud className="h-4 w-4" />
+              <span className="text-sm font-medium">Importar certidões</span>
+            </button>
+          )}
+
           {/* Botão Exportar PDF */}
           <button
             className="flex items-center gap-2 px-3 py-2 hover:bg-gray-100 rounded transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
@@ -813,6 +854,14 @@ export function ArvoreGenealogicaView({
           onEscolher={irParaPessoa}
         />
       </div>
+
+      <ImportarCertidoes
+        processoId={processoId}
+        pessoas={pessoas}
+        aberto={importarAberto}
+        onFechar={() => setImportarAberto(false)}
+        onImportado={() => void fetchArvore()}
+      />
 
       {/* Overlay para sidebar */}
       {selectedPerson && (

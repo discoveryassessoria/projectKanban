@@ -8,6 +8,17 @@
  *  1. O VISUAL DA ÁRVORE NÃO MUDA. Os arquivos de interface da árvore têm
  *     hash registrado em `tests/manifesto-visual-arvore.json`. Qualquer byte
  *     alterado reprova — e a mensagem diz exatamente qual arquivo.
+ *
+ *     EXCEÇÃO APROVADA (30/07/2026) — "Importar certidões" na Árvore. O usuário
+ *     pediu explicitamente que a entrada de acervo passasse a viver DENTRO da
+ *     tela da árvore, em posição visível. O manifesto foi rebaseado uma única vez
+ *     para registrar exatamente três coisas, e nada mais:
+ *       · `importar-certidoes.tsx` (componente novo, modal em portal);
+ *       · o botão "Importar certidões" na toolbar (grupo da direita) e a entrada
+ *         discreta no onboarding, ambos atrás de `arvore.criar_documento`;
+ *       · o render do modal e o estado que o abre.
+ *     O resto do layout — cards, cores, navegação, canvas, sidebar — segue
+ *     intocado, e a guarda continua valendo: qualquer byte novo reprova.
  *  2. O motor registral PURO não importa Prisma, React nem rede.
  *  3. A árvore NÃO duplica o Sistema Documental: nenhuma tabela nova guarda
  *     arquivo, status documental ou pasta paralela.

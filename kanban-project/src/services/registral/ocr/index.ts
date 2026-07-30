@@ -47,6 +47,65 @@ export interface ResultadoOperacao {
 }
 
 /**
+ * Transcreve um ARQUIVO — sem Documento, sem banco.
+ *
+ * Existe para a IMPORTAÇÃO poder analisar a certidão ANTES de gravá-la: só se
+ * sabe de quem é o documento depois de ler, e `Documento.pessoaId` é obrigatório.
+ * Criar o registro antes da leitura obrigaria a pendurá-lo numa pessoa provisória
+ * — documento no dossiê errado, ainda que por um instante, é exatamente o tipo de
+ * coisa que um sistema registral não pode fazer.
+ */
+export async function transcreverArquivo(arquivo: {
+  nome: string | null
+  mimeType: string | null
+  conteudo: Uint8Array
+  /** Só para log e para o payload do provedor externo. */
+  referencia?: number
+}): Promise<{ resultado: ResultadoTranscricao | null; tentativas: ResultadoOperacao["tentativas"] }> {
+  const tentativas: ResultadoOperacao["tentativas"] = []
+  const entrada = {
+    documentoId: arquivo.referencia ?? 0,
+    url: "",
+    nome: arquivo.nome,
+    mimeType: arquivo.mimeType,
+    conteudo: arquivo.conteudo,
+  }
+
+  for (const provedor of PROVEDORES) {
+    if (!provedor.suporta({ mimeType: arquivo.mimeType, nome: arquivo.nome })) continue
+    const disp = provedor.disponivel()
+    if (!disp.ok) {
+      tentativas.push({ provedor: provedor.nome, ok: false, motivo: disp.motivo })
+      continue
+    }
+    const r = await provedor.transcrever(entrada)
+    tentativas.push({ provedor: provedor.nome, ok: r.ok, motivo: r.motivo })
+    if (r.ok && r.paginas.length) return { resultado: r, tentativas }
+  }
+  return { resultado: null, tentativas }
+}
+
+/** Baixa um arquivo pela URL, com o mesmo teto de tamanho da transcrição. */
+export async function baixarArquivo(
+  url: string,
+): Promise<{ ok: true; conteudo: Uint8Array } | { ok: false; motivo: string }> {
+  try {
+    const res = await fetch(url)
+    if (!res.ok) return { ok: false, motivo: `Não foi possível baixar o arquivo (HTTP ${res.status}).` }
+    const buffer = await res.arrayBuffer()
+    if (buffer.byteLength > MAX_BYTES) {
+      return {
+        ok: false,
+        motivo: `Arquivo maior que o limite de transcrição (${Math.round(buffer.byteLength / 1024 / 1024)} MB).`,
+      }
+    }
+    return { ok: true, conteudo: new Uint8Array(buffer) }
+  } catch (e) {
+    return { ok: false, motivo: `Falha ao baixar o arquivo: ${e instanceof Error ? e.message : String(e)}` }
+  }
+}
+
+/**
  * Garante a transcrição de UM documento.
  * `forcar` refaz mesmo se já houver texto (usado no reprocessamento explícito).
  */
@@ -86,45 +145,16 @@ export async function transcreverDocumento(
   }
 
   // ---- baixar
-  let conteudo: Uint8Array
-  try {
-    const res = await fetch(doc.arquivo_url)
-    if (!res.ok) return { ...base, motivo: `Não foi possível baixar o arquivo (HTTP ${res.status}).` }
-    const buffer = await res.arrayBuffer()
-    if (buffer.byteLength > MAX_BYTES) {
-      return { ...base, motivo: `Arquivo maior que o limite de transcrição (${Math.round(buffer.byteLength / 1024 / 1024)} MB).` }
-    }
-    conteudo = new Uint8Array(buffer)
-  } catch (e) {
-    return { ...base, motivo: `Falha ao baixar o arquivo: ${e instanceof Error ? e.message : String(e)}` }
-  }
-
-  const arquivo = {
-    documentoId,
-    url: doc.arquivo_url,
-    nome: doc.arquivo_nome,
-    mimeType: doc.arquivo_mime_type,
-    conteudo,
-  }
+  const download = await baixarArquivo(doc.arquivo_url)
+  if (!download.ok) return { ...base, motivo: download.motivo }
 
   // ---- tentar os provedores, em ordem
-  const tentativas: ResultadoOperacao["tentativas"] = []
-  let vencedor: ResultadoTranscricao | null = null
-
-  for (const provedor of PROVEDORES) {
-    if (!provedor.suporta({ mimeType: doc.arquivo_mime_type, nome: doc.arquivo_nome })) continue
-    const disp = provedor.disponivel()
-    if (!disp.ok) {
-      tentativas.push({ provedor: provedor.nome, ok: false, motivo: disp.motivo })
-      continue
-    }
-    const r = await provedor.transcrever(arquivo)
-    tentativas.push({ provedor: provedor.nome, ok: r.ok, motivo: r.motivo })
-    if (r.ok && r.paginas.length) {
-      vencedor = r
-      break
-    }
-  }
+  const { resultado: vencedor, tentativas } = await transcreverArquivo({
+    nome: doc.arquivo_nome,
+    mimeType: doc.arquivo_mime_type,
+    conteudo: download.conteudo,
+    referencia: documentoId,
+  })
 
   if (!vencedor) {
     const motivo = tentativas.length
