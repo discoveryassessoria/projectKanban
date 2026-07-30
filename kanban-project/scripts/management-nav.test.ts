@@ -39,6 +39,11 @@ const todosItens = MANAGEMENT_NAVIGATION.flatMap((g) => g.children ?? [])
 const itemDe = (key: string) => todosItens.find((i) => i.key === key)
 const moduloDe = (key: string) => MANAGEMENT_NAVIGATION.find((g) => (g.children ?? []).some((c) => c.key === key))?.key
 const gDe = (k: string) => MANAGEMENT_NAVIGATION.find((g) => g.key === k)
+// todos os rótulos que o operador LÊ no menu (módulos + itens não ocultos)
+const rotulosMenu = () => [
+  ...MANAGEMENT_NAVIGATION.map((g) => `${g.label} ${g.fullLabel ?? ""}`),
+  ...todosItens.filter((i) => i.status !== "hidden").map((i) => i.label),
+].join(" | ")
 
 // keys registradas no mapa TELAS do page.tsx (screen → componente)
 const blocoTelas = pageSrc.split("const TELAS: Record<string, React.ComponentType>")[1]?.split("\n}")[0] ?? ""
@@ -186,7 +191,13 @@ ok(moduloDe("execmotor") === "grp_workflow" && itemDe("execmotor")?.status === "
 ok(moduloDe("runtimediag") === "grp_workflow" && itemDe("runtimediag")?.status === "active", "Diagnóstico de Runtime deixou de ser órfão (Workflow › Configurações)")
 ok(moduloDe("migmotor") === "grp_workflow" && TELAS_KEYS.has("migmotor"), "Migração do Motor deixou de ser órfã (registrada + no menu)")
 ok(moduloDe("permmotor") === "grp_usuarios" && TELAS_KEYS.has("permmotor"), "Perfis de Permissão do Motor deixou de ser órfão (Usuários › Permissões)")
-ok(moduloDe("catalogmestre") === "grp_sistema" && itemDe("catalogmestre")?.status === "active", "Catálogo Mestre deixou de ser órfão (Sistema › Cadastros Auxiliares)")
+// Catálogo Mestre: a tela técnica SAIU da navegação (o cadastro mestre virou
+// estrutura interna). A key antiga não é mais item de menu e resolve por alias
+// para a tela oficial — Serviços › Catálogo de Serviços.
+ok(!itemDe("catalogmestre"), "Catálogo Mestre não é mais item de menu (cadastro mestre é estrutura técnica interna)")
+ok(ALIAS_KEYS.has("catalogmestre") && ALIAS_MAP["catalogmestre"] === "products", "?screen=catalogmestre → Catálogo de Serviços (URL antiga preservada)")
+ok(ALIAS_MAP["honorariums"] === "products", "?screen=honorariums → Catálogo de Serviços (não aponta mais para a tela técnica)")
+ok(!/Cat[aá]logo Mestre/.test(rotulosMenu()), 'nomenclatura "Catálogo Mestre" ausente do menu')
 ok(moduloDe("audit") === "grp_sistema" && itemDe("audit")?.status === "active", "Auditoria e Logs tem casa oficial (Sistema)")
 
 // ═══════════════ 5) SEM DUPLICAÇÃO E SEM NOMENCLATURA ANTIGA ═══════════════════
@@ -195,10 +206,7 @@ const keysNaoOcultas = todosItens.filter((i) => i.status !== "hidden").map((i) =
 ok(new Set(keysNaoOcultas).size === keysNaoOcultas.length, "nenhuma tela aparece duas vezes no menu (sem conceito duplicado)")
 const gkeys = MANAGEMENT_NAVIGATION.map((g) => g.key)
 ok(new Set(gkeys).size === gkeys.length, "chaves de módulo únicas")
-const rotulos = [
-  ...MANAGEMENT_NAVIGATION.map((g) => `${g.label} ${g.fullLabel ?? ""}`),
-  ...todosItens.filter((i) => i.status !== "hidden").map((i) => i.label),
-].join(" | ")
+const rotulos = rotulosMenu()
 for (const proibido of ["Pessoas e Organizações", "Produtos Financeiros", "Produtos e Serviços"]) {
   ok(!rotulos.includes(proibido), `nomenclatura antiga ausente do menu: "${proibido}"`)
 }

@@ -78,7 +78,6 @@ const UsersTab = dynamic(() => import("@/src/components/gerenciamentoComponents/
 })
 const RolesTab = dynamic(() => import("@/src/components/gerenciamentoComponents/RolesTab"), { ssr: false })
 const AplicabilidadeEconomicaTab = dynamic(() => import("@/src/components/gerenciamentoComponents/AplicabilidadeEconomicaTab"), { ssr: false, loading: () => <CarregandoTela /> })
-const CatalogoMestreTab = dynamic(() => import("@/src/components/gerenciamentoComponents/CatalogoMestreTab"), { ssr: false, loading: () => <CarregandoTela /> })
 const CatalogTab = dynamic(() => import("@/src/components/gerenciamentoComponents/CatalogTab"), {
   ssr: false, loading: () => <CarregandoTela />,
 })
@@ -249,10 +248,12 @@ const TELAS: Record<string, React.ComponentType> = {
 
   // bespoke (lote 4)
   catalog: ProdutosTab,
-  catalogmestre: CatalogoMestreTab,
+  // `catalogmestre` (tela técnica sobre ItemCatalogo) foi REMOVIDA: o cadastro
+  // mestre continua como estrutura interna (dados/ids/vínculos intactos), mas a
+  // única tela de usuário é `products` (Catálogo de Serviços). Alias abaixo.
   products: ProdutosServicosTab,
   // honorariums (CRUD legado da tabela Honorario) removido: honorário é item do
-  // Catálogo Mestre + Configuração Financeira + Tabela de Preços. Alias abaixo.
+  // cadastro mestre + Configuração Financeira + Tabela de Preços. Alias abaixo.
   paycond: CondicoesPagamentoTab,
   commrules: RegrasComissaoTab,
   discrules: RegrasDescontoTab,
@@ -341,7 +342,10 @@ export default function GerenciamentoPage() {
     pagamentos: "methods",           // Pagamentos → Formas de Pagamento
     fornecedoresconc: "suppliers",   // Fornecedores (concentradora) → Fornecedores
     integracaofin: "pricing",        // Integração Financeira → Aplicabilidade Econômica
-    honorariums: "catalogmestre",    // Honorários (legado) → Catálogo Mestre
+    // Cadastro mestre: a tela técnica saiu da navegação; o cadastro segue vivo por
+    // baixo. Toda URL antiga cai na tela oficial (Serviços › Catálogo de Serviços).
+    catalogmestre: "products",       // Catálogo Mestre (tela técnica) → Catálogo de Serviços
+    honorariums: "products",         // Honorários (legado) → Catálogo de Serviços
   }
   const resolverTela = useCallback((k: string | null): string => {
     if (!k) return "overview"

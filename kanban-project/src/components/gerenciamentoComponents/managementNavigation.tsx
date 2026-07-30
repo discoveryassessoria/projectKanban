@@ -238,11 +238,13 @@ export const MANAGEMENT_NAVIGATION: ManagementNavigationItem[] = [
 
   // ══════════════════════════════ 6. SERVIÇOS ═════════════════════════════════
   // REGRA: "Serviços" (nunca "Produtos") e SEM preço — preço só na Tabela de Valores.
+  // O "Catálogo de Serviços" é a ÚNICA face de usuário do cadastro mestre: serviços
+  // e itens técnicos cobráveis (documentos, taxas, etapas, pacotes) no mesmo cadastro.
   {
     key: "grp_servicos", label: "Serviços", icon: Briefcase, order: 60, status: "active",
     description: "Catálogo operacional de serviços prestados (sem preço).",
     children: [
-      a(10, "products", "Catálogo de Serviços", ["servico", "serviço", "traducao", "tradução", "apostilamento", "retificacao", "cidadania", "genealogia", "logistica", "assessoria"]),
+      a(10, "products", "Catálogo de Serviços", ["servico", "serviço", "traducao", "tradução", "apostilamento", "retificacao", "cidadania", "genealogia", "logistica", "assessoria", "catalogo", "catálogo", "mestre", "item", "cadastro", "documento", "taxa", "pacote"]),
       a(20, "servcats", "Categorias", ["categoria", "servico", "serviço", "organizacao"]),
     ],
   },
@@ -336,7 +338,10 @@ export const MANAGEMENT_NAVIGATION: ManagementNavigationItem[] = [
     children: [
       a(10, "settings", "Configurações Gerais", ["configuracao", "configuração", "geral", "empresa", "moeda", "fuso"]),
 
-      a(20, "catalogmestre", "Catálogo Mestre", ["catalogo", "catálogo", "mestre", "item", "cadastro"], "Cadastros Auxiliares"),
+      // "Catálogo Mestre" SAIU do menu: o cadastro mestre (ItemCatalogo) é
+      // ESTRUTURA TÉCNICA INTERNA — todos os registros, ids e vínculos seguem
+      // intactos, mas a única tela de usuário sobre ele é Serviços › Catálogo de
+      // Serviços. ?screen=catalogmestre resolve por ALIAS_TELAS → products.
       a(30, "templates", "Modelos", ["modelo", "template"], "Cadastros Auxiliares"),
 
       a(40, "identidade", "Identidade Visual", ["identidade", "visual", "tema", "cor", "logo", "marca"]),

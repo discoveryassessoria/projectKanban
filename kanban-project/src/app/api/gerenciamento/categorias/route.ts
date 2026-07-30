@@ -83,7 +83,7 @@ async function resolverMestre(b: any): Promise<OrigemResolvida | { error: string
   if (ids.honorarioId != null) {
     // MESTRE LEGADO (tabela Honorario): fora da arquitetura. Categorias antigas de
     // origem HONORARIO continuam legíveis; nenhuma nova nasce daqui.
-    return { error: 'Honorário não é mais um cadastro mestre: use o Serviço correspondente do Catálogo Mestre.' }
+    return { error: 'Honorário não é mais um cadastro mestre: use o Serviço correspondente do Catálogo de Serviços.' }
   }
   const m = await prisma.tipoProcessoNacionalidade.findUnique({ where: { id: ids.tipoProcessoId! }, select: { name: true } })
   if (!m) return { error: 'Processo / Modalidade (mestre) não encontrado.' }
