@@ -9,6 +9,7 @@
 //   DocumentosFinanceirosTab→ Financeiro › Documentos Financeiros
 
 import { useCallback, useEffect, useState } from "react"
+import { useApi } from "@/src/lib/dados"
 
 function authHeaders(): HeadersInit {
   const t = typeof window !== "undefined" ? localStorage.getItem("authToken") : null
@@ -20,20 +21,16 @@ const dinheiro = (v: number, moeda = "BRL") =>
   new Intl.NumberFormat("pt-BR", { style: "currency", currency: moeda }).format(Number(v) || 0)
 const data = (iso: string) => new Date(iso).toLocaleDateString("pt-BR")
 
+// Uma consulta por visão, com a visão na CHAVE: trocar de visão troca de cache em
+// vez de sobrescrever o mesmo estado, e voltar para uma visão já aberta é instantâneo.
 function useGestao<T>(visao: string) {
-  const [dados, setDados] = useState<T | null>(null)
-  const [loading, setLoading] = useState(true)
-  const [erro, setErro] = useState<string | null>(null)
-  const load = useCallback(async () => {
-    setLoading(true); setErro(null)
-    try {
-      const res = await fetch(`/api/gerenciamento/financeiro-gestao?visao=${visao}`, { headers: authHeaders(), cache: "no-store" })
-      const j = await res.json().catch(() => ({}))
-      if (res.ok) setDados(j); else setErro(j.error || "Não foi possível carregar.")
-    } catch { setErro("Não foi possível carregar.") } finally { setLoading(false) }
-  }, [visao])
-  useEffect(() => { load() }, [load])
-  return { dados, loading, erro, load }
+  const consulta = useApi<T>(`/api/gerenciamento/financeiro-gestao?visao=${visao}`)
+  return {
+    dados: consulta.dados ?? null,
+    loading: consulta.carregando,
+    erro: consulta.erro ? consulta.erro.message : null,
+    load: consulta.recarregar,
+  }
 }
 
 function Kpi({ valor, label }: { valor: string | number; label: string }) {
@@ -79,7 +76,7 @@ export function CreditoTab() {
     <div className="space-y-5">
       {erro && (
         <div className="rounded-xl border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-200">
-          {erro} <button onClick={load} className="ml-2 underline hover:text-white">Tentar de novo</button>
+          {erro} <button onClick={() => { void load() }} className="ml-2 underline hover:text-white">Tentar de novo</button>
         </div>
       )}
       <Cabecalho
@@ -150,7 +147,7 @@ export function DocumentosFinanceirosTab() {
     <div className="space-y-5">
       {erro && (
         <div className="rounded-xl border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-200">
-          {erro} <button onClick={load} className="ml-2 underline hover:text-white">Tentar de novo</button>
+          {erro} <button onClick={() => { void load() }} className="ml-2 underline hover:text-white">Tentar de novo</button>
         </div>
       )}
       <Cabecalho

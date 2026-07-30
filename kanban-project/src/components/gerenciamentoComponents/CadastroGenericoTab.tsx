@@ -8,6 +8,7 @@
 // Backend: /api/gerenciamento/cadastros/<entidade> (+ /[id])
 
 import { useCallback, useEffect, useMemo, useState } from "react"
+import { useApi } from "@/src/lib/dados"
 
 type Registro = Record<string, unknown>
 interface CampoSpec {
@@ -42,28 +43,23 @@ const IEdit = () => (<svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" st
 const ITrash = () => (<svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 6h18" /><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" /></svg>)
 
 export default function CadastroGenericoTab({ entidade }: { entidade: string }) {
-  const [spec, setSpec] = useState<Spec | null>(null)
-  const [fontes, setFontes] = useState<Fontes>({})
-  const [rows, setRows] = useState<Registro[]>([])
-  const [loading, setLoading] = useState(true)
   const [busy, setBusy] = useState(false)
-  const [erro, setErro] = useState<string | null>(null)
+  // Erro de ESCRITA em estado; o de LEITURA vem da consulta.
+  const [erroEscrita, setErroEscrita] = useState<string | null>(null)
   const [flash, setFlash] = useState("")
   const [busca, setBusca] = useState("")
   const [form, setForm] = useState<Registro | null>(null)
 
-  const load = useCallback(async () => {
-    setLoading(true); setErro(null)
-    try {
-      const res = await fetch(`/api/gerenciamento/cadastros/${entidade}`, { headers: authHeaders(), cache: "no-store" })
-      const j = await res.json().catch(() => ({}))
-      if (res.ok) { setSpec(j.spec); setRows(j.registros || []); setFontes(j.fontes || {}) }
-      else setErro(j.error || "Não foi possível carregar o cadastro.")
-    } catch {
-      setErro("Não foi possível carregar o cadastro.")
-    } finally { setLoading(false) }
-  }, [entidade])
-  useEffect(() => { load() }, [load])
+  // A chave inclui a entidade, então trocar de cadastro troca de cache — e voltar
+  // para um já visitado não pisca a tela.
+  const consulta = useApi<{ spec?: Spec; registros?: Registro[]; fontes?: Fontes }>(`/api/gerenciamento/cadastros/${entidade}`)
+  const spec = consulta.dados?.spec ?? null
+  const rows = consulta.dados?.registros ?? []
+  const fontes: Fontes = consulta.dados?.fontes ?? {}
+  const loading = consulta.carregando
+  const erro = erroEscrita ?? (consulta.erro ? consulta.erro.message : null)
+  const setErro = setErroEscrita
+  const load = consulta.recarregar
 
   const showFlash = (m: string) => { setFlash(m); setTimeout(() => setFlash(""), 3000) }
 
@@ -155,7 +151,7 @@ export default function CadastroGenericoTab({ entidade }: { entidade: string }) 
     return (
       <div className={`${CARD} p-8 text-center text-sm text-white/60`}>
         {erro || "Cadastro não encontrado."}
-        <button onClick={load} className="ml-2 underline hover:text-white">Tentar de novo</button>
+        <button onClick={() => { void load() }} className="ml-2 underline hover:text-white">Tentar de novo</button>
       </div>
     )
   }

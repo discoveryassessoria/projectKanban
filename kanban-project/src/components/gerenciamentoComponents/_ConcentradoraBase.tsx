@@ -4,6 +4,7 @@
 // Reusa componentes existentes; abas sem componente mostram "Em breve" (fiéis ao
 // desenho do Marco). Persiste a aba na URL (?tab=). Abas NÃO viram item lateral.
 import { useState, useEffect, useCallback, Suspense } from 'react'
+import { useIsClient } from '@/src/lib/cliente'
 
 export type AbaDef = { key: string; label: string; Comp: React.ComponentType | null }
 
@@ -19,7 +20,15 @@ export function EmBreveAba({ titulo }: { titulo: string }) {
 
 export function Concentradora({ titulo, subtitulo, abas }: { titulo: string; subtitulo: string; abas: AbaDef[] }) {
   const primeira = abas[0]?.key || ''
-  const [aba, setAba] = useState<string>(primeira)
+  // A aba vem do deep-link `?tab=`, mas NÃO pode ser lida no primeiro render: no
+  // servidor não existe URL de navegador, e ler ali daria divergência de hidratação.
+  // Era isso que o `useEffect(() => setAba(lerURL()))` contornava — ao custo de um
+  // render extra e de um setState em efeito.
+  //
+  // Aqui a aba é DERIVADA: enquanto o usuário não escolheu nada, vale a URL (só no
+  // cliente); depois de escolher, vale a escolha. Sem efeito, sem render perdido.
+  const noCliente = useIsClient()
+  const [abaEscolhida, setAbaEscolhida] = useState<string | null>(null)
 
   const lerURL = useCallback(() => {
     if (typeof window === 'undefined') return primeira
@@ -27,10 +36,10 @@ export function Concentradora({ titulo, subtitulo, abas }: { titulo: string; sub
     return abas.some(a => a.key === p) ? (p as string) : primeira
   }, [abas, primeira])
 
-  useEffect(() => { setAba(lerURL()) }, [lerURL])
+  const aba = abaEscolhida ?? (noCliente ? lerURL() : primeira)
 
   const trocar = useCallback((key: string) => {
-    setAba(key)
+    setAbaEscolhida(key)
     if (typeof window !== 'undefined') {
       const url = new URL(window.location.href)
       url.searchParams.set('tab', key)

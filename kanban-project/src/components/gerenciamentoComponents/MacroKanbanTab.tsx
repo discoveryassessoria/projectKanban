@@ -7,6 +7,7 @@
 // Backend: /api/gerenciamento/workflow-macro (GET bootstrap, POST criar) + /[tipoProcessoId] (GET, PUT sync, DELETE)
 
 import { useState, useEffect, useMemo, useCallback } from 'react'
+import { useApi } from '@/src/lib/dados'
 
 type Tipo = { id: number; code: string; name: string; countryKey: string; countryLabel: string; modalityLabel: string; ativo: boolean; temWorkflow: boolean }
 type CatFase = { id: number; phaseKey: string; label: string; ordemPadrao: number; requiredPadrao: boolean; conditionalPadrao: boolean; slaDiasPadrao: number }
@@ -26,12 +27,34 @@ async function jsonFetch(url: string, options: RequestInit = {}) {
   return data
 }
 
+const SEM_TIPOS: Tipo[] = []
+const SEM_CAT_FASES: CatFase[] = []
+const SEM_PAISES: { countryKey: string; flag: string | null }[] = []
+
 export default function MacroKanbanTab() {
-  const [tipos, setTipos] = useState<Tipo[]>([])
-  const [catFases, setCatFases] = useState<CatFase[]>([])
-  const [paises, setPaises] = useState<{ countryKey: string; flag: string | null }[]>([])
-  const [loading, setLoading] = useState(true)
-  const [erro, setErro] = useState<string | null>(null)
+  // Bootstrap pela camada oficial: os três catálogos vêm do MESMO endpoint, então
+  // são uma consulta só — antes eram três `useState` alimentados por um efeito.
+  const bootstrapReq = useApi<{ tipos?: Tipo[]; catalogoFases?: CatFase[]; paises?: { countryKey: string; flag: string | null }[] }>('/api/gerenciamento/workflow-macro')
+  // As listas vazias são CONSTANTES de módulo, não `?? []`: um literal novo a cada
+  // render trocaria a identidade da dependência e faria os `useMemo`/`useCallback`
+  // abaixo recalcularem sempre — exatamente o desperdício que eles existem p/ evitar.
+  const tipos = bootstrapReq.dados?.tipos ?? SEM_TIPOS
+  const catFases = bootstrapReq.dados?.catalogoFases ?? SEM_CAT_FASES
+  const paises = bootstrapReq.dados?.paises ?? SEM_PAISES
+  const loading = bootstrapReq.carregando
+  const bootstrap = bootstrapReq.recarregar
+  const [erroEscrita, setErroEscrita] = useState<string | null>(null)
+  const erro = erroEscrita ?? (bootstrapReq.erro ? bootstrapReq.erro.message : null)
+  const setErro = setErroEscrita
+  // Marcar/desmarcar "tem workflow" era um `setTipos` local depois de criar ou
+  // excluir. Continua imediato — a transformação entra no cache como dado otimista
+  // e o servidor confirma em seguida.
+  const marcarTemWorkflow = (id: number, temWorkflow: boolean) => {
+    void bootstrapReq.recarregar({
+      ...bootstrapReq.dados,
+      tipos: tipos.map((t) => (t.id === id ? { ...t, temWorkflow } : t)),
+    })
+  }
 
   const [tipoId, setTipoId] = useState<number | null>(null)
   const [wf, setWf] = useState<MacroWf | null>(null)
@@ -42,20 +65,6 @@ export default function MacroKanbanTab() {
   const [salvando, setSalvando] = useState(false)
   const [criando, setCriando] = useState(false)
   const [salvoMsg, setSalvoMsg] = useState<string | null>(null)
-
-  const bootstrap = useCallback(async () => {
-    setLoading(true); setErro(null)
-    try {
-      const d = await jsonFetch('/api/gerenciamento/workflow-macro', { cache: 'no-store' })
-      setTipos((d as any).tipos || [])
-      setCatFases((d as any).catalogoFases || [])
-      setPaises((d as any).paises || [])
-    } catch (e: any) {
-      setErro(e.message || 'Não foi possível carregar.')
-    } finally { setLoading(false) }
-  }, [])
-
-  useEffect(() => { bootstrap() }, [bootstrap])
 
   const carregarWf = useCallback(async (id: number) => {
     setCarregandoWf(true)
@@ -93,7 +102,7 @@ export default function MacroKanbanTab() {
     try {
       await jsonFetch('/api/gerenciamento/workflow-macro', { method: 'POST', body: JSON.stringify({ tipoProcessoId: tipoId, seedDefaults }) })
       await carregarWf(tipoId)
-      setTipos((prev) => prev.map((t) => (t.id === tipoId ? { ...t, temWorkflow: true } : t)))
+      marcarTemWorkflow(tipoId, true)
     } catch (e: any) {
       alert(e.message || 'Erro ao criar o workflow.')
     } finally { setCriando(false) }
@@ -158,7 +167,7 @@ export default function MacroKanbanTab() {
     if (!confirm('Excluir o workflow inteiro deste processo? As fases serão perdidas.')) return
     try {
       await jsonFetch(`/api/gerenciamento/workflow-macro/${tipoId}`, { method: 'DELETE' })
-      setTipos((prev) => prev.map((t) => (t.id === tipoId ? { ...t, temWorkflow: false } : t)))
+      marcarTemWorkflow(tipoId, false)
       await carregarWf(tipoId)
     } catch (e: any) {
       alert(e.message || 'Erro ao excluir.')
@@ -187,7 +196,7 @@ export default function MacroKanbanTab() {
       {loading && <div className="py-12 text-center text-sm text-white/40">Carregando...</div>}
       {!loading && erro && (
         <div className="rounded-lg border border-red-500/30 bg-red-500/10 p-4 text-sm text-red-200">{erro}
-          <button onClick={bootstrap} className="ml-3 underline hover:text-white">Tentar de novo</button>
+          <button onClick={() => { void bootstrap() }} className="ml-3 underline hover:text-white">Tentar de novo</button>
         </div>
       )}
 

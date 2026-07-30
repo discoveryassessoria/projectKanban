@@ -8,6 +8,7 @@
 // Backend: /api/gerenciamento/catalogo-fases (GET/POST) + /[id] (PUT/DELETE)
 
 import { useEffect, useState, useCallback } from "react"
+import { useApi } from "@/src/lib/dados"
 
 interface Fase {
   id: number
@@ -47,25 +48,26 @@ const vazio = (ordem: number): Form => ({
 })
 
 export default function CatalogoFasesTab() {
-  const [rows, setRows] = useState<Fase[]>([])
-  const [loading, setLoading] = useState(true)
   const [busy, setBusy] = useState(false)
   const [flash, setFlash] = useState("")
-  const [erro, setErro] = useState<string | null>(null)
+  // Erro de ESCRITA continua em estado; o de LEITURA vem da consulta.
+  const [erroEscrita, setErroEscrita] = useState<string | null>(null)
   const [form, setForm] = useState<Form | null>(null)
 
-  const load = useCallback(async () => {
-    setLoading(true); setErro(null)
-    try {
-      const res = await fetch("/api/gerenciamento/catalogo-fases", { headers: authHeaders(), cache: "no-store" })
-      const j = await res.json().catch(() => ({}))
-      if (res.ok) setRows(j.fases || [])
-      else setErro(j.error || "Não foi possível carregar o catálogo de fases.")
-    } catch {
-      setErro("Não foi possível carregar o catálogo de fases.")
-    } finally { setLoading(false) }
-  }, [])
-  useEffect(() => { load() }, [load])
+  // Leitura pela camada oficial: cache, dedupe e revalidação únicos, em lugar do
+  // `load` + `useEffect(() => load(), [load])` que cada aba reimplementava.
+  const consulta = useApi<{ fases?: Fase[] }>("/api/gerenciamento/catalogo-fases")
+  const rows = consulta.dados?.fases ?? []
+  const loading = consulta.carregando
+  // A mensagem original era a mesma para falha de rede e para erro do servidor.
+  const erro = erroEscrita ?? (consulta.erro ? consulta.erro.message : null)
+  const setErro = setErroEscrita
+  const load = consulta.recarregar
+  // As telas atualizavam a lista na mão depois de salvar/excluir, com a entidade
+  // que o servidor devolveu. Isso continua: a mesma transformação entra no cache
+  // como dado otimista e o SWR confirma com o servidor em seguida — a tela responde
+  // na hora e não fica divergindo do banco.
+  const atualizarLista = (fn: (rs: Fase[]) => Fase[]) => { void consulta.recarregar({ fases: fn(rows) }) }
 
   const showFlash = (m: string) => { setFlash(m); setTimeout(() => setFlash(""), 3000) }
 
@@ -78,7 +80,7 @@ export default function CatalogoFasesTab() {
       const res = await fetch(url, { method: form.id ? "PUT" : "POST", headers: authHeaders(), body: JSON.stringify(form) })
       const j = await res.json().catch(() => ({}))
       if (res.ok && j.fase) {
-        setRows(rs => {
+        atualizarLista(rs => {
           const i = rs.findIndex(x => x.id === j.fase.id)
           const next = i < 0 ? [...rs, j.fase] : rs.map(x => (x.id === j.fase.id ? j.fase : x))
           return next.sort((x, y) => x.ordemPadrao - y.ordemPadrao || x.label.localeCompare(y.label))
@@ -93,7 +95,7 @@ export default function CatalogoFasesTab() {
     if (!confirm(`Excluir a fase "${f.label}" do catálogo? Só é possível porque nenhum fluxo a utiliza.`)) return
     const res = await fetch(`/api/gerenciamento/catalogo-fases/${f.id}`, { method: "DELETE", headers: authHeaders() })
     const j = await res.json().catch(() => ({}))
-    if (res.ok) { setRows(rs => rs.filter(x => x.id !== f.id)); showFlash("Fase excluída.") }
+    if (res.ok) { atualizarLista(rs => rs.filter(x => x.id !== f.id)); showFlash("Fase excluída.") }
     else showFlash(j.error || "Erro ao excluir a fase.")
   }
 
@@ -102,7 +104,7 @@ export default function CatalogoFasesTab() {
       method: "PUT", headers: authHeaders(), body: JSON.stringify({ ativo: !f.ativo }),
     })
     const j = await res.json().catch(() => ({}))
-    if (res.ok && j.fase) { setRows(rs => rs.map(x => (x.id === f.id ? j.fase : x))); showFlash(j.fase.ativo ? "Fase ativada." : "Fase inativada.") }
+    if (res.ok && j.fase) { atualizarLista(rs => rs.map(x => (x.id === f.id ? j.fase : x))); showFlash(j.fase.ativo ? "Fase ativada." : "Fase inativada.") }
     else showFlash(j.error || "Erro ao alterar a fase.")
   }
 
@@ -115,7 +117,7 @@ export default function CatalogoFasesTab() {
       {flash && <div className="rounded-xl border border-green-400/30 bg-green-500/15 px-4 py-3 text-sm text-green-200">{flash}</div>}
       {erro && (
         <div className="rounded-xl border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-200">
-          {erro} <button onClick={load} className="ml-2 underline hover:text-white">Tentar de novo</button>
+          {erro} <button onClick={() => { void load() }} className="ml-2 underline hover:text-white">Tentar de novo</button>
         </div>
       )}
 

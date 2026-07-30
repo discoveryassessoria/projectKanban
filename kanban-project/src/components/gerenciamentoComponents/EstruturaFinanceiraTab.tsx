@@ -4,6 +4,7 @@
 // REUSA os componentes existentes como ABAS internas (não recria, não duplica).
 // Persiste a aba ativa na URL (?tab=...). Nenhuma dessas abas vira item lateral.
 import { useState, useEffect, useCallback, Suspense } from 'react'
+import { useIsClient } from '@/src/lib/cliente'
 import dynamic from 'next/dynamic'
 
 const CarregandoAba = () => <div className="py-10 text-center text-white/40">Carregando…</div>
@@ -44,9 +45,13 @@ function escreverTabNaURL(key: string) {
 }
 
 export default function EstruturaFinanceiraTab() {
-  const [aba, setAba] = useState<string>(ABAS[0].key)
-  useEffect(() => { setAba(lerTabDaURL()) }, [])
-  const trocar = useCallback((key: string) => { setAba(key); escreverTabNaURL(key) }, [])
+  // Mesma decisão da Concentradora: a aba do deep-link só pode ser lida no cliente,
+  // então é DERIVADA (URL enquanto o usuário não escolheu, escolha depois) em vez de
+  // copiada para o estado por um efeito de montagem.
+  const noCliente = useIsClient()
+  const [abaEscolhida, setAbaEscolhida] = useState<string | null>(null)
+  const aba = abaEscolhida ?? (noCliente ? lerTabDaURL() : ABAS[0].key)
+  const trocar = useCallback((key: string) => { setAbaEscolhida(key); escreverTabNaURL(key) }, [])
 
   const Atual = ABAS.find(a => a.key === aba)?.Comp || ABAS[0].Comp
 

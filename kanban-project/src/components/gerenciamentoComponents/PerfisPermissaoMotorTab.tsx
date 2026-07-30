@@ -2,6 +2,7 @@
 "use client"
 
 import { useEffect, useState, useCallback, type ReactNode } from "react"
+import { useApi } from "@/src/lib/dados"
 
 const PERMISSOES: [string, string][] = [
   ["manageProcessTypes", "Gerenciar Processos de Nacionalidade"],
@@ -43,23 +44,18 @@ function authHeaders(): Record<string, string> {
 }
 
 export default function PerfisPermissaoMotorTab() {
-  const [perfis, setPerfis] = useState<Perfil[]>([])
-  const [loading, setLoading] = useState(true)
+  // Leitura pela camada oficial. A falha segue silenciosa de propósito: a tela
+  // mostra a lista vazia em vez de um erro, como antes.
+  const consulta = useApi<{ perfis?: Perfil[] }>("/api/gerenciamento/perfis-permissao-motor")
+  const perfis = consulta.dados?.perfis ?? []
+  const loading = consulta.carregando
+  const carregar = consulta.recarregar
   const [busca, setBusca] = useState("")
   const [filtro, setFiltro] = useState<"" | "active" | "archived">("")
   const [modalOpen, setModalOpen] = useState(false)
   const [form, setForm] = useState<any>(novoForm())
   const [salvando, setSalvando] = useState(false)
 
-  const carregar = useCallback(async () => {
-    try {
-      const r = await fetch("/api/gerenciamento/perfis-permissao-motor")
-      if (r.ok) setPerfis((await r.json()).perfis || [])
-    } catch { /* silencioso */ }
-    finally { setLoading(false) }
-  }, [])
-
-  useEffect(() => { carregar() }, [carregar])
 
   const contaOn = (p: Perfil) => PERMISSOES.filter(([k]) => p.permissoes && p.permissoes[k]).length
 
