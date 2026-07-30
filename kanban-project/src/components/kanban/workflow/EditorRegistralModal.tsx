@@ -11,6 +11,7 @@
 "use client"
 
 import { useState, useEffect, useCallback } from "react"
+import { useApi } from "@/src/lib/dados"
 import { createPortal } from "react-dom"
 import { X, Loader2, AlertTriangle, BookOpen, ChevronDown, ChevronUp } from "lucide-react"
 
@@ -215,7 +216,16 @@ const docToForm = (doc: Documento): FormState => ({
 // COMPONENTE PRINCIPAL
 // ============================================================
 
-export function EditorRegistralModal({
+/**
+ * Casca fina: o editor só existe aberto, com identidade no documento. Cada abertura
+ * carrega o documento e monta o formulário do zero.
+ */
+export function EditorRegistralModal(props: EditorRegistralModalProps) {
+  if (!props.isOpen || !props.documentoId) return null
+  return <ConteudoModal key={props.documentoId} {...props} />
+}
+
+function ConteudoModal({
   documentoId,
   stepKey,
   stepId,
@@ -223,11 +233,7 @@ export function EditorRegistralModal({
   onClose,
   onSaved,
 }: EditorRegistralModalProps) {
-  const [doc, setDoc] = useState<Documento | null>(null)
-  const [form, setForm] = useState<FormState>(emptyForm())
-  const [loading, setLoading] = useState(false)
   const [saving, setSaving] = useState(false)
-  const [erro, setErro] = useState<string | null>(null)
 
   // Seções colapsadas (todas abertas por default no modo completo)
   const [openSections, setOpenSections] = useState<Record<string, boolean>>({
@@ -242,32 +248,26 @@ export function EditorRegistralModal({
   // Modo "Localizar registro" = banner amarelo + esconde campos extras
   const isModoBuscar = stepKey === "localizar_registro"
 
-  // -- Carrega documento
-  const carregar = useCallback(async () => {
-    if (!documentoId) return
-    setLoading(true)
-    setErro(null)
-    try {
-      const res = await fetch(`/api/documentos/${documentoId}`, {
-        headers: { Authorization: `Bearer ${localStorage.getItem("authToken")}` },
-      })
-      if (!res.ok) throw new Error(`HTTP ${res.status}`)
-      const data: Documento = await res.json()
-      setDoc(data)
-      setForm(docToForm(data))
-    } catch (e) {
-      console.warn("[EditorRegistralModal] falha:", e)
-      setErro("Erro ao carregar documento.")
-    } finally {
-      setLoading(false)
-    }
-  }, [documentoId])
+  // -- Carrega documento pela camada oficial
+  const consulta = useApi<Documento>(documentoId ? `/api/documentos/${documentoId}` : null)
+  const doc = consulta.dados ?? null
+  const loading = consulta.carregando
+  const erro = consulta.erro ? "Erro ao carregar documento." : null
+  const carregar = consulta.recarregar
 
-  useEffect(() => {
-    if (isOpen && documentoId) {
-      carregar()
-    }
-  }, [isOpen, documentoId, carregar])
+  // O formulário é RASCUNHO sobre o documento carregado. `rascunho` guarda só o que
+  // foi editado, e carrega a versão do documento em que foi editado: quando o
+  // servidor devolve um documento novo (recarga após salvar), o rascunho deixa de
+  // casar e o formulário volta a refletir o que está gravado — sem efeito.
+  // A "versão" é o próprio conteúdo que o formulário reflete: se o documento voltar
+  // diferente do servidor, o rascunho baseado no anterior é descartado.
+  const versaoDoc = doc ? JSON.stringify(docToForm(doc)) : ''
+  const [rascunho, setRascunho] = useState<{ versao: string; form: FormState } | null>(null)
+  const form = rascunho?.versao === versaoDoc ? rascunho.form : (doc ? docToForm(doc) : emptyForm())
+  const setForm = (proximo: FormState | ((anterior: FormState) => FormState)) => {
+    const valor = typeof proximo === 'function' ? proximo(form) : proximo
+    setRascunho({ versao: versaoDoc, form: valor })
+  }
 
   // -- Trava scroll body e ESC
   useEffect(() => {
@@ -386,7 +386,6 @@ export function EditorRegistralModal({
     }
   }
 
-  if (!isOpen) return null
 
   const tipoLabel = doc ? TIPO_LABELS[doc.tipo] || doc.tipo : ""
   const pessoaNome = nomeCompleto(doc?.pessoa)

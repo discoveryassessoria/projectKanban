@@ -9,7 +9,8 @@
 
 "use client"
 
-import { useState, useEffect, useCallback } from "react"
+import { useState, useEffect, useCallback, useMemo } from "react"
+import { useApi } from "@/src/lib/dados"
 import { createPortal } from "react-dom"
 import {
   X,
@@ -190,18 +191,24 @@ const fmtSla = (
 // COMPONENTE PRINCIPAL
 // ============================================================
 
-export function CentralDaEtapaDrawer({
+/**
+ * Casca fina: identidade em (documento, etapa). Abrir, trocar de etapa ou reabrir monta
+ * de novo — é o que substitui o bloco "Trigger inicial + reset" que zerava aba e os
+ * dois formulários inline antes de cada carga.
+ */
+export function CentralDaEtapaDrawer(props: CentralDaEtapaDrawerProps) {
+  if (!props.isOpen) return null
+  return <ConteudoDrawer key={`${props.documentoId ?? 'sem-doc'}-${props.stepId ?? 'sem-step'}`} {...props} />
+}
+
+function ConteudoDrawer({
   documentoId,
   stepId,
   isOpen,
   onClose,
   onUpdate,
 }: CentralDaEtapaDrawerProps) {
-  const [workflow, setWorkflow] = useState<Workflow | null>(null)
-  const [loading, setLoading] = useState(false)
-  const [erro, setErro] = useState<string | null>(null)
   const [activeTab, setActiveTab] = useState<TabId>("campos")
-  const [usuarios, setUsuarios] = useState<UserRef[]>([])
   const [saving, setSaving] = useState<string | null>(null)
 
   // -- Estados dos formulários inline (bloquear, transferir)
@@ -213,49 +220,22 @@ export function CentralDaEtapaDrawer({
   // -- Estado pro editor da etapa (registral pra etapa 1, router pras outras)
   const [editorAberto, setEditorAberto] = useState(false)
 
-  // -- Carregar workflow inteiro (depois pegamos o step específico)
-  const carregar = useCallback(async () => {
-    if (!documentoId || !isOpen) return
-    setLoading(true)
-    setErro(null)
-    try {
-      const res = await fetch(`/api/documentos/${documentoId}/workflow`, {
-        headers: { Authorization: `Bearer ${localStorage.getItem("authToken")}` },
-      })
-      if (!res.ok) throw new Error(`HTTP ${res.status}`)
-      const json = await res.json()
-      setWorkflow(json.workflow)
-    } catch (e) {
-      console.warn("[CentralDaEtapaDrawer] falha:", e)
-      setErro("Erro ao carregar etapa.")
-    } finally {
-      setLoading(false)
-    }
-  }, [documentoId, isOpen])
+  // -- Workflow inteiro pela camada oficial (o passo específico sai dele). A chave é o
+  // documento, então este drawer COMPARTILHA a requisição com a aba de workflow em vez
+  // de refazer a mesma leitura.
+  const consulta = useApi<{ workflow?: Workflow | null }>(documentoId ? `/api/documentos/${documentoId}/workflow` : null)
+  const workflow = consulta.dados?.workflow ?? null
+  const loading = consulta.carregando
+  const erro = consulta.erro ? "Erro ao carregar etapa." : null
+  const carregar = consulta.recarregar
 
-  // -- Carregar usuários pra transferir
-  useEffect(() => {
-    if (!isOpen) return
-    fetch("/api/usuarios", {
-      headers: { Authorization: `Bearer ${localStorage.getItem("authToken")}` },
-    })
-      .then((r) => r.json())
-      .then((d) => setUsuarios(d.usuarios || d || []))
-      .catch((e) => console.warn("[CentralDaEtapaDrawer] usuarios:", e))
-  }, [isOpen])
-
-  // -- Trigger inicial + reset
-  useEffect(() => {
-    if (isOpen) {
-      setActiveTab("campos")
-      setShowBlockForm(false)
-      setShowTransferForm(false)
-      setBlockReason("")
-      setTransferUserId(null)
-      setEditorAberto(false)
-      carregar()
-    }
-  }, [isOpen, stepId, carregar])
+  // -- Usuários para transferir: leitura independente, com o seu cache.
+  const usuariosReq = useApi<{ usuarios?: UserRef[] } | UserRef[]>("/api/usuarios")
+  const usuarios = useMemo<UserRef[]>(() => {
+    const d = usuariosReq.dados
+    if (!d) return []
+    return Array.isArray(d) ? d : (d.usuarios ?? [])
+  }, [usuariosReq.dados])
 
   // -- ESC fecha
   useEffect(() => {
@@ -283,7 +263,9 @@ export function CentralDaEtapaDrawer({
       )
       if (!res.ok) throw new Error(`HTTP ${res.status}`)
       const json = await res.json()
-      if (json.workflow) setWorkflow(json.workflow)
+      // O PATCH devolve o workflow atualizado: entra no cache como dado otimista e o
+      // servidor confirma na revalidação — a tela responde na hora, sem estado paralelo.
+      if (json.workflow) void consulta.recarregar({ workflow: json.workflow })
       onUpdate?.()
       return true
     } catch (e) {
@@ -396,7 +378,6 @@ export function CentralDaEtapaDrawer({
   }, [isOpen, loading, workflow, stepId, onClose])
 
   // -- Render
-  if (!isOpen) return null
 
   const drawerContent = (
     <>

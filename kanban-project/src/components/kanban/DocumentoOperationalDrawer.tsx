@@ -2,7 +2,9 @@
 
 "use client"
 
-import { useState, useEffect, useCallback, useRef } from "react"
+import { useState, useEffect, useCallback, useMemo, useRef } from "react"
+import { useApi } from "@/src/lib/dados"
+import type { WorkflowShape } from "./TabOperationCockpit"
 import { createPortal } from "react-dom"
 import { X, Loader2, AlertTriangle, UserRound, Clock, CalendarDays, FileText } from "lucide-react"
 import { usePermissoes } from "@/src/hooks/use-permissoes"
@@ -233,7 +235,23 @@ const relativeTime = (s: string | null): string => {
 // COMPONENTE PRINCIPAL
 // ============================================================
 
-export function DocumentoOperationalDrawer({
+/**
+ * Casca fina: o drawer só existe aberto, com identidade no documento. Substitui o
+ * "Reset explícito ao (re)abrir" que zerava projeção, workflow, aba e estado antes de
+ * cada carga — e que, entre abrir e o efeito rodar, deixava aparecer a projeção do
+ * documento anterior.
+ */
+// A forma do workflow vem do próprio consumidor (o cockpit), em vez de ser
+// redeclarada aqui: uma definição, não duas que podem divergir em silêncio. Antes isto
+// trafegava como `any`.
+type WorkflowDoDrawer = WorkflowShape
+
+export function DocumentoOperationalDrawer(props: DocumentoOperationalDrawerProps) {
+  if (!props.isOpen) return null
+  return <ConteudoDrawer key={props.documentoId ?? 'sem-documento'} {...props} />
+}
+
+function ConteudoDrawer({
   documentoId,
   isOpen,
   onClose,
@@ -243,91 +261,47 @@ export function DocumentoOperationalDrawer({
   bannerAntecipada,
 }: DocumentoOperationalDrawerProps) {
   const { pode } = usePermissoes()
-  const [doc, setDoc] = useState<Documento | null>(null)
-  const [usuarios, setUsuarios] = useState<Usuario[]>([])
   const [delegandoResp, setDelegandoResp] = useState(false)
-  const [erro, setErro] = useState<string | null>(null)
   const [activeTab, setActiveTab] = useState<TabId>("operation")
   const [salvando, setSalvando] = useState(false)
   const [initModalOpen, setInitModalOpen] = useState(false)
-  const [workflow, setWorkflow] = useState<any | null>(null)
-  const [projection, setProjection] = useState<DocumentOperationalProjection | null>(null)
+
+  // FONTE ÚNICA: uma projeção agregada (cabeçalho + estado operacional), pela camada
+  // oficial. O guard de corrida manual (contador de sequência + AbortController +
+  // função `vigente()`) SAIU: a chave da consulta é o documento, então uma resposta
+  // atrasada de outro documento não tem onde ser aplicada. Era código correto
+  // resolvendo, à mão, o que a chave resolve por construção.
+  const consulta = useApi<{
+    document?: Documento | null
+    workflow?: WorkflowDoDrawer | null
+    projection?: DocumentOperationalProjection | null
+  }>(documentoId ? `/api/documentos/${documentoId}/operational-projection` : null)
+  const doc = consulta.dados?.document ?? null
+  const workflow = consulta.dados?.workflow ?? null
+  const projection = consulta.dados?.projection ?? null
+  const carregar = consulta.recarregar
+  const erro = !documentoId
+    ? "Operação sem documento associado."
+    : (consulta.erro ? "Erro ao carregar operação." : null)
+
+  // Usuários para delegação — leitura independente, com o seu cache.
+  const usuariosReq = useApi<{ usuarios?: Usuario[] } | Usuario[]>("/api/usuarios")
+  const usuarios = useMemo<Usuario[]>(() => {
+    const d = usuariosReq.dados
+    if (!d) return []
+    return Array.isArray(d) ? d : (d.usuarios ?? [])
+  }, [usuariosReq.dados])
 
   // MÁQUINA DE ESTADOS EXPLÍCITA do Drawer — nunca inferir "sem operação" só porque a
-  // projeção ainda não chegou. LOADING = resolvendo; OPERATIONAL = operação materializada;
-  // NOT_MATERIALIZED = backend CONFIRMOU que não há operação; ERROR = falha.
-  const [opState, setOpState] = useState<"LOADING" | "OPERATIONAL" | "NOT_MATERIALIZED" | "ERROR">("LOADING")
-
-  // Guard de corrida por seq + AbortController: ao trocar rápido de documento ou fechar,
-  // a requisição anterior é CANCELADA e respostas antigas são DESCARTADAS (nunca aplicadas
-  // sobre uma seleção mais recente nem sobre outro documento).
-  const reqSeq = useRef(0)
-  const abortRef = useRef<AbortController | null>(null)
-
-  const carregar = useCallback(async () => {
-    if (!documentoId) {
-      setErro("Operação sem documento associado.")
-      setOpState("ERROR")
-      return
-    }
-    // Cancela a requisição anterior (troca rápida / reabertura).
-    abortRef.current?.abort()
-    const controller = new AbortController()
-    abortRef.current = controller
-    const seq = ++reqSeq.current
-    const meuDoc = documentoId
-    const vigente = () => seq === reqSeq.current && meuDoc === documentoId && !controller.signal.aborted
-    setOpState("LOADING")
-    setErro(null)
-    try {
-      // FONTE ÚNICA: uma única projeção agregada (cabeçalho + estado operacional).
-      const res = await fetch(`/api/documentos/${documentoId}/operational-projection`, {
-        headers: { Authorization: `Bearer ${localStorage.getItem("authToken")}` },
-        signal: controller.signal,
-      })
-      if (!vigente()) return
-      if (!res.ok) throw new Error(`HTTP ${res.status}`)
-      const json = await res.json()
-      if (!vigente()) return
-      const proj: DocumentOperationalProjection | null = json.projection ?? null
-      setDoc(json.document ?? null)
-      setWorkflow(json.workflow ?? null)
-      setProjection(proj)
-      setOpState(proj?.state === "OPERATIONAL" ? "OPERATIONAL" : "NOT_MATERIALIZED")
-    } catch (e) {
-      if (controller.signal.aborted) return // resposta cancelada — ignora silenciosamente
-      console.warn("[DocumentoOperationalDrawer] falha:", e)
-      if (vigente()) {
-        setErro("Erro ao carregar operação.")
-        setOpState("ERROR")
-      }
-    }
-  }, [documentoId])
-
-  // Lista de usuários (uma vez, ao abrir)
-  useEffect(() => {
-    if (!isOpen) return
-    fetch("/api/usuarios", {
-      headers: { Authorization: `Bearer ${localStorage.getItem("authToken")}` },
-    })
-      .then((r) => r.json())
-      .then((d) => setUsuarios(d.usuarios || d || []))
-      .catch(console.error)
-  }, [isOpen])
-
-  useEffect(() => {
-    if (isOpen && documentoId) {
-      setActiveTab("operation")
-      // Reset explícito ao (re)abrir: entra em LOADING, nunca herda projeção antiga.
-      setProjection(null)
-      setWorkflow(null)
-      setOpState("LOADING")
-      carregar()
-    }
-    // Cancela a requisição em voo ao fechar/trocar/desmontar — resposta atrasada
-    // NUNCA é aplicada depois de fechar nem sobre outra seleção.
-    return () => { abortRef.current?.abort() }
-  }, [isOpen, documentoId, carregar])
+  // projeção ainda não chegou. Agora ela é DERIVADA da consulta, e por isso não pode
+  // mais divergir dela: LOADING enquanto não há resposta; ERROR em falha;
+  // OPERATIONAL quando o backend confirma a operação; NOT_MATERIALIZED quando ele
+  // confirma que não há.
+  const opState: "LOADING" | "OPERATIONAL" | "NOT_MATERIALIZED" | "ERROR" =
+    erro ? "ERROR"
+      : !consulta.dados ? "LOADING"
+      : projection?.state === "OPERATIONAL" ? "OPERATIONAL"
+      : "NOT_MATERIALIZED"
 
   // Trava scroll do body
   useEffect(() => {
@@ -389,7 +363,6 @@ export function DocumentoOperationalDrawer({
     }
   }
 
-  if (!isOpen) return null
 
   const sla = doc ? computeSla(doc.dataPrazoOperacao) : { text: "—", cls: "" }
   const statusCls = doc ? (STATUS_PILL_CLS[doc.status] || STATUS_NEUTRAL_PILL) : ""

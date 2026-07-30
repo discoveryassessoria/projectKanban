@@ -34,7 +34,10 @@ interface DocumentoShape {
   responsavel?: { id: number; nome: string } | null
 }
 
-interface StepShape {
+// Exportadas porque o Drawer que alimenta este cockpit precisa descrever a MESMA
+// forma na resposta da projeção — antes ele trafegava `any` e a divergência ficava
+// invisível até alguém ler o JSON na mão.
+export interface StepShape {
   id: number
   ordem: number
   stepKey: string
@@ -51,12 +54,13 @@ interface StepShape {
   externalProtocol?: string | null
 }
 
-interface WorkflowShape {
+export interface WorkflowShape {
   id: number
   status: string
   progress: number
   prioridade?: string | null      // normal | urgente | critica
   startedAt: string | Date | null
+  cancelledAt?: string | Date | null
   steps: StepShape[]
 }
 
