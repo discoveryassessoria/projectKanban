@@ -8,6 +8,8 @@
 // aparecem sozinhos no filtro.
 
 import { useEffect, useState, useCallback, useMemo, Suspense } from "react"
+import { useApi } from "@/src/lib/dados"
+import type { ProcessoWithStatus } from "@/src/types/kanban"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -53,90 +55,63 @@ interface ActivityFormData {
   status_id: string
 }
 
+/** Forma mínima que o HeaderBar consome das árvores. */
+interface ItemNomeado { id: number | string; nome: string; descricao?: string | null }
+const SEM_ARVORES: ItemNomeado[] = []
+const SEM_PROCESSOS: ProcessoWithStatus[] = []
+
 function ActivitiesPageInner() {
   const router = useRouter()
   const [searchModalOpen, setSearchModalOpen] = useState(false)
   const [searchTerm, setSearchTerm] = useState('')
   const [filterModalOpen, setFilterModalOpen] = useState(false)
-  const [filters, setFilters] = useState<Filters>({
-    dataInicio: '',
-    dataFim: '',
-    pais: 'all',
-    status: 'all',
-    responsavel: 'all'
-  })
+  // Filtros: os da URL são a SEMENTE (deep-link da Home), a escolha do usuário
+  // sobrepõe. Antes um efeito costurava a querystring por cima do estado depois do
+  // primeiro render — a lista aparecia sem filtro e mudava em seguida.
+  const [filtrosEscolhidos, setFiltrosEscolhidos] = useState<Filters | null>(null)
   const mounted = useIsClient()
   // Usuário vem do localStorage pela abstração oficial: `null` no servidor e no
   // primeiro render (contrato de hidratação), o nome padrão depois.
   const userSalvo = useJsonLocalStorage<UserData>("user")
   const user: UserData = userSalvo ?? { nome: "Usuário" }
   // Aba controlada — permite deep-link vindo da Central Operacional (?tab=).
-  const [tabValue, setTabValue] = useState("list")
+  const [abaEscolhida, setTabValue] = useState<string | null>(null)
   const searchParams = useSearchParams()
 
-  // Seed ADITIVO de filtros/aba a partir da URL (deep-link da Home). Só altera
-  // o que veio na querystring; sem params, o comportamento padrão é idêntico.
-  useEffect(() => {
-    if (!searchParams) return
-    const status = searchParams.get("status")
+  // Seed ADITIVO a partir da URL: só o que veio na querystring muda; sem params, o
+  // padrão é idêntico ao de antes.
+  const statusDaUrl = searchParams?.get("status") ?? null
+  const filtrosDaUrl = useMemo<Filters>(() => {
+    const base: Filters = { dataInicio: '', dataFim: '', pais: 'all', status: 'all', responsavel: 'all' }
+    if (!searchParams) return base
     const responsavel = searchParams.get("responsavel")
     const pais = searchParams.get("pais")
-    const tab = searchParams.get("tab")
-    setFilters((f) => {
-      const next = { ...f }
-      if (status === "vencidas") next.status = "pendente"
-      else if (status === "pendente" || status === "concluida") next.status = status
-      if (responsavel) next.responsavel = responsavel
-      if (pais) next.pais = pais
-      return next
-    })
-    if (tab === "list" || tab === "deadline" || tab === "calendar") setTabValue(tab)
-    else if (status === "vencidas") setTabValue("deadline")
-  }, [searchParams])
+    if (statusDaUrl === "vencidas") base.status = "pendente"
+    else if (statusDaUrl === "pendente" || statusDaUrl === "concluida") base.status = statusDaUrl
+    if (responsavel) base.responsavel = responsavel
+    if (pais) base.pais = pais
+    return base
+  }, [searchParams, statusDaUrl])
+  const filters = filtrosEscolhidos ?? filtrosDaUrl
+  const setFilters = (proximos: Filters | ((anteriores: Filters) => Filters)) => {
+    setFiltrosEscolhidos(typeof proximos === 'function' ? proximos(filters) : proximos)
+  }
 
-  // Estados para árvores e processos (para o HeaderBar)
-  const [arvores, setArvores] = useState<any[]>([])
-  const [processos, setProcessos] = useState<any[]>([])
+  const abaDaUrl = searchParams?.get("tab") ?? null
+  const tabValue =
+    abaEscolhida
+    ?? (abaDaUrl === "list" || abaDaUrl === "deadline" || abaDaUrl === "calendar" ? abaDaUrl : null)
+    ?? (statusDaUrl === "vencidas" ? "deadline" : "list")
+
+  // Árvores e processos alimentam a busca do HeaderBar.
+  const arvoresReq = useApi<ItemNomeado[]>("/api/arvore")
+  const processosReq = useApi<{ processos?: ProcessoWithStatus[] }>("/api/processos")
+  const arvores = Array.isArray(arvoresReq.dados) ? arvoresReq.dados : SEM_ARVORES
+  const processos = processosReq.dados?.processos ?? SEM_PROCESSOS
   const { pode } = usePermissoes()
 
   // Dados
   const { activities } = useActivities()
-
-  const buscarArvores = async () => {
-    try {
-      const response = await fetch("/api/arvore", {
-        headers: { 'Authorization': `Bearer ${localStorage.getItem('authToken')}` }
-      })
-      if (response.ok) {
-        const data = await response.json()
-        setArvores(Array.isArray(data) ? data : [])
-      }
-    } catch (error) {
-      console.error("Erro ao buscar árvores:", error)
-    }
-  }
-
-  const buscarProcessos = async () => {
-    try {
-      const response = await fetch("/api/processos", {
-        headers: { 'Authorization': `Bearer ${localStorage.getItem('authToken')}` }
-      })
-      if (response.ok) {
-        const data = await response.json()
-        setProcessos(data.processos || [])
-      }
-    } catch (error) {
-      console.error("Erro ao buscar processos:", error)
-    }
-  }
-
-  useEffect(() => {
-    // Buscar dados para o HeaderBar
-    buscarArvores()
-    buscarProcessos()
-  }, [])
-
-
 
   const handleLogout = () => { void encerrarSessao("manual") }
 
@@ -303,11 +278,15 @@ function FilterModal({
   const { paises } = usePaises()
   const { users } = useUsers()
 
-  const [localFilters, setLocalFilters] = useState<Filters>(filters)
-
-  useEffect(() => {
-    if (open) setLocalFilters(filters)
-  }, [open])
+  // Rascunho dos filtros carimbado com os filtros aplicados: abrir o modal parte do que
+  // está valendo, e um filtro trocado por fora não sobrescreve o que se está editando.
+  const baseFiltros = JSON.stringify(filters)
+  const [rascunho, setRascunho] = useState<{ base: string; filtros: Filters } | null>(null)
+  const localFilters = rascunho?.base === baseFiltros ? rascunho.filtros : filters
+  const setLocalFilters = (proximos: Filters | ((anteriores: Filters) => Filters)) => {
+    const valor = typeof proximos === 'function' ? proximos(localFilters) : proximos
+    setRascunho({ base: baseFiltros, filtros: valor })
+  }
 
   const handleApplyFilters = () => {
     onFiltersChange(localFilters)

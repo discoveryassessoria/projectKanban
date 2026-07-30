@@ -1,6 +1,7 @@
 "use client"
 
-import { useState, useEffect, useRef } from "react"
+import { useState, useEffect, useRef, useMemo } from "react"
+import { useApi } from "@/src/lib/dados"
 import { createPortal } from "react-dom"
 import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
@@ -377,7 +378,36 @@ const PAISES_OPTIONS = [
 ]
 
 // ✅ EXPORTADO - Componente do Modal separado para usar Portal
-export function ContratanteModal({
+interface ContratanteModalProps {
+  isOpen: boolean
+  onClose: () => void
+  isViewMode: boolean
+  setIsViewMode: (v: boolean) => void
+  editingId: number | null
+  editingTipo: string
+  codigoPublico?: string | null
+  formData: typeof initialFormData
+  setFormData: (data: typeof initialFormData) => void
+  onSave: () => void
+  isLoading: boolean
+  podeEditar?: boolean
+  errors?: { nome?: string; cpf?: string; geral?: string }
+  setErrors?: (errors: { nome?: string; cpf?: string; geral?: string }) => void
+}
+
+const SEM_ANEXOS: Anexo[] = []
+
+/**
+ * Casca fina: o conteúdo só existe aberto, com identidade no registro. Substitui o
+ * efeito "resetar ao fechar", que zerava arquivos, anexos, progresso, aba e os três
+ * documentos obrigatórios um a um.
+ */
+export function ContratanteModal(props: ContratanteModalProps) {
+  if (!props.isOpen) return null
+  return <ConteudoModal key={`${props.editingId ?? 'novo'}-${props.editingTipo ?? ''}`} {...props} />
+}
+
+function ConteudoModal({
   isOpen,
   onClose,
   isViewMode,
@@ -393,39 +423,15 @@ export function ContratanteModal({
   // ✅ NOVO: Props para erros
   errors = {},
   setErrors,
-}: {
-  isOpen: boolean
-  onClose: () => void
-  isViewMode: boolean
-  setIsViewMode: (v: boolean) => void
-  editingId: number | null
-  editingTipo: string
-  codigoPublico?: string | null
-  formData: typeof initialFormData
-  setFormData: (data: typeof initialFormData) => void
-  onSave: () => void
-  isLoading: boolean
-  podeEditar?: boolean  // ← NOVO
-  // ✅ NOVO: Tipagem dos erros
-  errors?: { nome?: string; cpf?: string; geral?: string }
-  setErrors?: (errors: { nome?: string; cpf?: string; geral?: string }) => void
-}) {
+}: ContratanteModalProps) {
   const [activeTab, setActiveTab] = useState<"dados" | "endereco" | "observacoes" | "acesso">("dados")
   const mounted = useIsClient()
   const [buscandoCep, setBuscandoCep] = useState(false)
   const [isUploading, setIsUploading] = useState(false)  // ← R2: controla estado de upload manualmente
   
-  const [documentosObrigatorios, setDocumentosObrigatorios] = useState<Record<string, Anexo | null>>({
-  RG: null,
-  CNH: null,
-  COMPROVANTE_ENDERECO: null,
-  })
-
   // Estados para upload de arquivos
   const [arquivos, setArquivos] = useState<File[]>([])
-  const [anexosExistentes, setAnexosExistentes] = useState<Anexo[]>([])
   const [uploadProgress, setUploadProgress] = useState(0)
-  const [carregandoAnexos, setCarregandoAnexos] = useState(false)
 
   // Verificar se é Brasil para aplicar máscaras específicas
   const isBrasil = formData.pais === "Brasil"
@@ -454,48 +460,36 @@ export function ContratanteModal({
     return exemplos[nomePais] || "Código postal"
   }
 
-  // Carregar anexos existentes quando abrir para editar/visualizar
-  const carregarAnexos = async () => {
-    if (!editingId) return
-    
-    setCarregandoAnexos(true)
-    try {
-      const response = await fetch(`/api/anexos?tipoCliente=${editingTipo}&id=${editingId}`)
-      if (response.ok) {
-        const data = await response.json()
-        const todosAnexos: Anexo[] = data.anexos || []
-        
-        // Separar documentos obrigatórios dos genéricos
-        const docs: Record<string, Anexo | null> = {
-          RG: null,
-          CNH: null,
-          COMPROVANTE_ENDERECO: null,
-        }
-        const genericos: Anexo[] = []
-        
-        for (const anexo of todosAnexos) {
-          const cat = (anexo as any).categoria
-          if (cat && docs.hasOwnProperty(cat)) {
-            docs[cat] = anexo
-          }
-          genericos.push(anexo) // sempre adiciona (era dentro do else)
-        }
-        
-        setDocumentosObrigatorios(docs)
-        setAnexosExistentes(genericos)
-      }
-    } catch (error) {
-      console.error("Erro ao carregar anexos:", error)
-    } finally {
-      setCarregandoAnexos(false)
+  // Anexos do cliente pela camada oficial. A separação entre documentos OBRIGATÓRIOS
+  // (RG, CNH, comprovante) e a lista geral é derivação da mesma resposta — eram dois
+  // estados preenchidos pelo mesmo laço.
+  const anexosReq = useApi<{ anexos?: Anexo[] }>(
+    editingId ? `/api/anexos?tipoCliente=${editingTipo}&id=${editingId}` : null,
+  )
+  const carregandoAnexos = anexosReq.carregando
+  const carregarAnexos = () => { void anexosReq.recarregar() }
+  const anexosDoServidor = anexosReq.dados?.anexos ?? SEM_ANEXOS
+  const documentosObrigatorios = useMemo<Record<string, Anexo | null>>(() => {
+    const docs: Record<string, Anexo | null> = { RG: null, CNH: null, COMPROVANTE_ENDERECO: null }
+    for (const anexo of anexosDoServidor) {
+      const cat = (anexo as { categoria?: string }).categoria
+      if (cat && cat in docs) docs[cat] = anexo
     }
+    return docs
+  }, [anexosDoServidor])
+  // Cliente ainda NÃO salvo não tem anexos no servidor: os arquivos enviados ficam em
+  // memória só para a interface, como antes. Com cliente salvo, a fonte é o servidor.
+  const [anexosLocais, setAnexosLocais] = useState<Anexo[]>([])
+  const anexosExistentes = editingId ? anexosDoServidor : anexosLocais
+  /**
+   * Mantido com o nome antigo para os pontos de uso. Com cliente salvo, mexer na lista
+   * é REVALIDAR — splice local sobre dado do servidor era a chance de divergir dele.
+   */
+  const setAnexosExistentes = (proximos: Anexo[] | ((anteriores: Anexo[]) => Anexo[])) => {
+    if (editingId) { void anexosReq.recarregar(); return }
+    setAnexosLocais(typeof proximos === 'function' ? proximos(anexosLocais) : proximos)
   }
-
-  useEffect(() => {
-    if (isOpen && editingId) {
-      carregarAnexos()
-    }
-  }, [isOpen, editingId])
+  const setDocumentosObrigatorios = () => { void anexosReq.recarregar() }
 
 
   // ⬇️ R2: upload de documento obrigatório (RG, CNH, Comprovante)
@@ -532,11 +526,8 @@ export function ContratanteModal({
 
         if (response.ok) {
           const data = await response.json()
-          setDocumentosObrigatorios(prev => ({
-            ...prev,
-            [categoria]: data.anexo,
-          }))
-          setAnexosExistentes(prev => [...prev, data.anexo])
+          // A lista e os obrigatórios saem da MESMA consulta: recarregá-la basta.
+          void anexosReq.recarregar()
         }
       }
     } catch (error) {
@@ -558,10 +549,7 @@ const removerDocumentoObrigatorio = async (categoria: string) => {
     })
     
     if (response.ok) {
-      setDocumentosObrigatorios(prev => ({
-        ...prev,
-        [categoria]: null,
-      }))
+      setDocumentosObrigatorios()
     } else {
       alert("Erro ao excluir documento")
     }
@@ -665,11 +653,9 @@ const removerDocumentoObrigatorio = async (categoria: string) => {
       setAnexosExistentes(prev => prev.filter((_, i) => i !== index))
     }
 
-    // Se era documento obrigatório, limpa de lá também
-    const cat = (anexo as any).categoria
-    if (cat && documentosObrigatorios[cat]?.id === anexo.id) {
-      setDocumentosObrigatorios(prev => ({ ...prev, [cat]: null }))
-    }
+    // Documentos obrigatórios e lista geral saem da MESMA consulta: revalidar cobre os
+    // dois. Antes era preciso lembrar de limpar "de lá também".
+    setDocumentosObrigatorios()
   }
 
   const formatFileSize = (bytes: number | null | undefined) => {
@@ -681,15 +667,6 @@ const removerDocumentoObrigatorio = async (categoria: string) => {
   }
 
 
-  useEffect(() => {
-    if (!isOpen) {
-      setArquivos([])
-      setAnexosExistentes([])
-      setUploadProgress(0)
-      setActiveTab("dados")
-      setDocumentosObrigatorios({ RG: null, CNH: null, COMPROVANTE_ENDERECO: null }) // ← ADICIONAR
-    }
-  }, [isOpen])
 
   // Formatar CPF
   const formatCPF = (value: string) => {
