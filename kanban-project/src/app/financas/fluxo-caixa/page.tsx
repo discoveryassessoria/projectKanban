@@ -43,86 +43,72 @@ interface ResumoFluxo {
   saldoAtual: number
 }
 
+// PLACEHOLDER — esta tela ainda não tem API (ver o TODO que estava no loader).
+// Os valores são CONSTANTES: viram constantes de módulo, sem efeito de montagem
+// nem setState para entregar dados que nunca mudam.
+const RESUMO_PLACEHOLDER: ResumoFluxo = {
+  saldoAnterior: 65000,
+  entradas: 32000,
+  saidas: 18000,
+  saldoAtual: 79000
+}
+
+const TRANSACOES_PLACEHOLDER: Transacao[] = [
+  {
+    id: 1,
+    tipo: 'ENTRADA',
+    descricao: 'Recebimento - Processo Silva',
+    valor: 5000,
+    data: '2026-01-03',
+    categoria: { id: 1, nome: 'Serviços' },
+    contaBancaria: { id: 1, nome: 'Conta Principal' }
+  },
+  {
+    id: 2,
+    tipo: 'SAIDA',
+    descricao: 'Pagamento - Internet Vivo',
+    valor: 450,
+    data: '2026-01-03',
+    categoria: { id: 2, nome: 'Telecomunicações' },
+    contaBancaria: { id: 1, nome: 'Conta Principal' }
+  },
+  {
+    id: 3,
+    tipo: 'ENTRADA',
+    descricao: 'Recebimento - Processo Oliveira',
+    valor: 2500,
+    data: '2026-01-02',
+    categoria: { id: 1, nome: 'Serviços' },
+    contaBancaria: { id: 1, nome: 'Conta Principal' }
+  },
+  {
+    id: 4,
+    tipo: 'SAIDA',
+    descricao: 'Pagamento - Material escritório',
+    valor: 350,
+    data: '2026-01-02',
+    categoria: { id: 3, nome: 'Material' },
+    contaBancaria: { id: 1, nome: 'Conta Principal' }
+  },
+  {
+    id: 5,
+    tipo: 'ENTRADA',
+    descricao: 'Recebimento - Processo Ferreira',
+    valor: 8000,
+    data: '2026-01-01',
+    categoria: { id: 1, nome: 'Serviços' },
+    contaBancaria: { id: 1, nome: 'Conta Principal' }
+  },
+]
+
 export default function FluxoCaixaPage() {
-  const [transacoes, setTransacoes] = useState<Transacao[]>([])
-  const [resumo, setResumo] = useState<ResumoFluxo>({
-    saldoAnterior: 0,
-    entradas: 0,
-    saidas: 0,
-    saldoAtual: 0
-  })
-  const [loading, setLoading] = useState(true)
+  const resumo = RESUMO_PLACEHOLDER
+  const transacoes = TRANSACOES_PLACEHOLDER
+  const loading = false
   const [mesAtual, setMesAtual] = useState(new Date())
   const [filtroTipo, setFiltroTipo] = useState<string>("todos")
 
-  const fetchDados = async () => {
-    try {
-      // TODO: Implementar API
-      // Por enquanto, dados de exemplo
-      setResumo({
-        saldoAnterior: 65000,
-        entradas: 32000,
-        saidas: 18000,
-        saldoAtual: 79000
-      })
 
-      setTransacoes([
-        {
-          id: 1,
-          tipo: 'ENTRADA',
-          descricao: 'Recebimento - Processo Silva',
-          valor: 5000,
-          data: '2026-01-03',
-          categoria: { id: 1, nome: 'Serviços' },
-          contaBancaria: { id: 1, nome: 'Conta Principal' }
-        },
-        {
-          id: 2,
-          tipo: 'SAIDA',
-          descricao: 'Pagamento - Internet Vivo',
-          valor: 450,
-          data: '2026-01-03',
-          categoria: { id: 2, nome: 'Telecomunicações' },
-          contaBancaria: { id: 1, nome: 'Conta Principal' }
-        },
-        {
-          id: 3,
-          tipo: 'ENTRADA',
-          descricao: 'Recebimento - Processo Oliveira',
-          valor: 2500,
-          data: '2026-01-02',
-          categoria: { id: 1, nome: 'Serviços' },
-          contaBancaria: { id: 1, nome: 'Conta Principal' }
-        },
-        {
-          id: 4,
-          tipo: 'SAIDA',
-          descricao: 'Pagamento - Material escritório',
-          valor: 350,
-          data: '2026-01-02',
-          categoria: { id: 3, nome: 'Material' },
-          contaBancaria: { id: 1, nome: 'Conta Principal' }
-        },
-        {
-          id: 5,
-          tipo: 'ENTRADA',
-          descricao: 'Recebimento - Processo Ferreira',
-          valor: 8000,
-          data: '2026-01-01',
-          categoria: { id: 1, nome: 'Serviços' },
-          contaBancaria: { id: 1, nome: 'Conta Principal' }
-        },
-      ])
-    } catch (error) {
-      console.error("Erro ao carregar dados:", error)
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  useEffect(() => {
-    fetchDados()
-  }, [mesAtual])
 
 
   const formatCurrency = (value: number) => {

@@ -39,50 +39,31 @@ interface ContaVencendo {
   tipo: 'receber' | 'pagar'
 }
 
+// PLACEHOLDER — esta tela ainda não tem API (ver o TODO que estava no loader).
+// Como os números são CONSTANTES, não há nada a carregar: viram constantes de
+// módulo. Antes um efeito de montagem os "buscava" e chamava setState, o que
+// custava um render em cascata para entregar valores que nunca mudam.
+const RESUMO_PLACEHOLDER: ResumoFinanceiro = {
+  totalReceber: 45000,
+  totalReceberVencido: 5000,
+  totalPagar: 12000,
+  totalPagarVencido: 2000,
+  saldoContas: 78500,
+  entradasMes: 32000,
+  saidasMes: 18000,
+  saldoMes: 14000,
+}
+
+const CONTAS_PLACEHOLDER: ContaVencendo[] = [
+  { id: 1, descricao: "Processo Silva - Parcela 2/6", valor: 2500, dataVencimento: "2026-01-05", tipo: 'receber' },
+  { id: 2, descricao: "Aluguel escritório", valor: 3500, dataVencimento: "2026-01-10", tipo: 'pagar' },
+  { id: 3, descricao: "Processo Oliveira - Entrada", valor: 5000, dataVencimento: "2026-01-08", tipo: 'receber' },
+]
+
 export default function FinancasDashboard() {
-  const [resumo, setResumo] = useState<ResumoFinanceiro>({
-    totalReceber: 0,
-    totalReceberVencido: 0,
-    totalPagar: 0,
-    totalPagarVencido: 0,
-    saldoContas: 0,
-    entradasMes: 0,
-    saidasMes: 0,
-    saldoMes: 0,
-  })
-  const [contasVencendo, setContasVencendo] = useState<ContaVencendo[]>([])
-  const [loading, setLoading] = useState(true)
-
-  async function fetchDados() {
-    try {
-      // Por enquanto, dados de exemplo
-      // TODO: Implementar API
-      setResumo({
-        totalReceber: 45000,
-        totalReceberVencido: 5000,
-        totalPagar: 12000,
-        totalPagarVencido: 2000,
-        saldoContas: 78500,
-        entradasMes: 32000,
-        saidasMes: 18000,
-        saldoMes: 14000,
-      })
-
-      setContasVencendo([
-        { id: 1, descricao: "Processo Silva - Parcela 2/6", valor: 2500, dataVencimento: "2026-01-05", tipo: 'receber' },
-        { id: 2, descricao: "Aluguel escritório", valor: 3500, dataVencimento: "2026-01-10", tipo: 'pagar' },
-        { id: 3, descricao: "Processo Oliveira - Entrada", valor: 5000, dataVencimento: "2026-01-08", tipo: 'receber' },
-      ])
-    } catch (error) {
-      console.error("Erro ao carregar dados:", error)
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  useEffect(() => {
-    fetchDados()
-  }, [])
+  const resumo = RESUMO_PLACEHOLDER
+  const contasVencendo = CONTAS_PLACEHOLDER
+  const loading = false
 
 
   const formatCurrency = (value: number) => {

@@ -36,6 +36,7 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import Link from "next/link"
+import { useApi } from "@/src/lib/dados"
 
 interface Fatura {
   id: number
@@ -60,29 +61,18 @@ const statusConfig = {
   PARCIAL: { label: 'Parcial', color: 'bg-blue-500/20 text-blue-400', icon: Clock },
 }
 
+// Identidade estável para a ausência de dados (evita recomputar memos).
+const SEM_ITENS: never[] = Object.freeze([]) as never[]
+
 export default function ContasReceberPage() {
-  const [faturas, setFaturas] = useState<Fatura[]>([])
-  const [loading, setLoading] = useState(true)
   const [searchTerm, setSearchTerm] = useState("")
   const [statusFilter, setStatusFilter] = useState<string>("todos")
 
-  const fetchFaturas = async () => {
-    try {
-      const response = await fetch('/api/faturas')
-      if (response.ok) {
-        const data = await response.json()
-        setFaturas(data)
-      }
-    } catch (error) {
-      console.error("Erro ao carregar faturas:", error)
-    } finally {
-      setLoading(false)
-    }
-  }
+  // Consulta em cache (src/lib/dados): o endpoint devolve a lista direto,
+  // então a resposta É a lista. loading e erro derivam da camada.
+  const { dados, carregando: loading, erro: erroApi, recarregar: fetchFaturas } = useApi<Fatura[]>('/api/faturas')
+  const faturas: Fatura[] = dados ?? SEM_ITENS
 
-  useEffect(() => {
-    fetchFaturas()
-  }, [])
 
 
   const formatCurrency = (value: number) => {

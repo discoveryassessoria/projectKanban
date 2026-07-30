@@ -45,6 +45,7 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { useApi } from "@/src/lib/dados"
 
 interface Fornecedor {
   id: number
@@ -62,10 +63,10 @@ interface Fornecedor {
   totalPago: number
 }
 
+// Identidade estável para a ausência de dados (evita recomputar memos).
+const SEM_ITENS: never[] = Object.freeze([]) as never[]
+
 export default function FornecedoresPage() {
-  const [fornecedores, setFornecedores] = useState<Fornecedor[]>([])
-  const [loading, setLoading] = useState(true)
-  const [erro, setErro] = useState<string | null>(null)
   const [searchTerm, setSearchTerm] = useState("")
   const [isDialogOpen, setIsDialogOpen] = useState(false)
   
@@ -93,31 +94,12 @@ export default function FornecedoresPage() {
     observacoes: "",
   })
 
-  const fetchFornecedores = async () => {
-    try {
-      const response = await fetch('/api/fornecedores')
-      if (response.ok) {
-        const data = await response.json()
-        setFornecedores(data)
-      } else {
-        // ETAPA 1A — SEM FALLBACK SILENCIOSO: falha de API não vira cadastro
-        // fabricado na tela. Mostra erro e lista vazia.
-        console.error("Falha ao carregar fornecedores:", response.status)
-        setErro("Não foi possível carregar os fornecedores.")
-        setFornecedores([])
-      }
-    } catch (error) {
-      console.error("Erro ao carregar fornecedores:", error)
-      setErro("Não foi possível carregar os fornecedores.")
-      setFornecedores([])
-    } finally {
-      setLoading(false)
-    }
-  }
+  // Consulta em cache (src/lib/dados): o endpoint devolve a lista direto,
+  // então a resposta É a lista. loading e erro derivam da camada.
+  const { dados, carregando: loading, erro: erroApi, recarregar: fetchFornecedores } = useApi<Fornecedor[]>('/api/fornecedores')
+  const fornecedores: Fornecedor[] = dados ?? SEM_ITENS
+  const erro = erroApi ? (erroApi.message || 'Não foi possível carregar os fornecedores.') : null
 
-  useEffect(() => {
-    fetchFornecedores()
-  }, [])
 
 
   const formatCurrency = (value: number) => {

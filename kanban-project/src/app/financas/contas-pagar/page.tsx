@@ -47,6 +47,7 @@ import {
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { DatePickerField } from "@/components/ui/date-picker-field"
+import { useApi } from "@/src/lib/dados"
 
 interface ContaPagar {
   id: number
@@ -70,10 +71,10 @@ const statusConfig = {
   AGENDADO: { label: 'Agendado', color: 'bg-blue-500/20 text-blue-400', icon: Calendar },
 }
 
+// Identidade estável para a ausência de dados (evita recomputar memos).
+const SEM_ITENS: never[] = Object.freeze([]) as never[]
+
 export default function ContasPagarPage() {
-  const [contas, setContas] = useState<ContaPagar[]>([])
-  const [loading, setLoading] = useState(true)
-  const [erro, setErro] = useState<string | null>(null)
   const [searchTerm, setSearchTerm] = useState("")
   const [statusFilter, setStatusFilter] = useState<string>("todos")
   const [isDialogOpen, setIsDialogOpen] = useState(false)
@@ -88,32 +89,12 @@ export default function ContasPagarPage() {
     observacoes: "",
   })
 
-  const fetchContas = async () => {
-    setErro(null)
-    try {
-      const response = await fetch('/api/contas-pagar')
-      if (response.ok) {
-        const data = await response.json()
-        setContas(data)
-      } else {
-        // ETAPA 1A — SEM FALLBACK SILENCIOSO: falha de API não pode virar dado
-        // financeiro fabricado na tela. Mostra erro e lista vazia.
-        console.error("Falha ao carregar contas a pagar:", response.status)
-        setErro("Não foi possível carregar as contas a pagar.")
-        setContas([])
-      }
-    } catch (error) {
-      console.error("Erro ao carregar contas:", error)
-      setErro("Não foi possível carregar as contas a pagar.")
-      setContas([])
-    } finally {
-      setLoading(false)
-    }
-  }
+  // Consulta em cache (src/lib/dados): o endpoint devolve a lista direto,
+  // então a resposta É a lista. loading e erro derivam da camada.
+  const { dados, carregando: loading, erro: erroApi, recarregar: fetchContas } = useApi<ContaPagar[]>('/api/contas-pagar')
+  const contas: ContaPagar[] = dados ?? SEM_ITENS
+  const erro = erroApi ? (erroApi.message || 'Não foi possível carregar as contas a pagar.') : null
 
-  useEffect(() => {
-    fetchContas()
-  }, [])
 
 
   const formatCurrency = (value: number) => {
