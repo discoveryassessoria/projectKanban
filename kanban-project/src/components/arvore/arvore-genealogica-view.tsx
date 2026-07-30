@@ -10,6 +10,9 @@ import type { PessoaArvore, UniaoArvore, DocumentoArvore } from "./types"
 import { PessoaSidebar } from "./pessoa-sidebar"
 import { PessoaDetailsPage } from "./pessoa-details-page"
 import { ReactFlowTree, ReactFlowTreeRef } from "./react-flow-tree"
+import { useAnaliseArvore, paisAlvoDe } from "./inteligencia/use-analise-arvore"
+import { PainelInteligencia } from "./inteligencia/painel-inteligencia"
+import { PaletaComandos } from "./inteligencia/paleta-comandos"
 import { TreeOnboarding } from "./tree-onboarding"
 import { RequerenteSelector } from "./requerente-selector"
 import { DatePickerField } from "@/components/ui/date-picker-field"
@@ -20,6 +23,8 @@ import {
   Minimize2,
   Maximize2,
   FileDown,
+  Search,
+  Sparkles,
 } from "lucide-react"
 import { usePermissoes } from "@/src/hooks/use-permissoes"
 
@@ -96,6 +101,44 @@ export function ArvoreGenealogicaView({
     return pessoas[0] ?? null
   }, [arvoreReq.dados, pessoas])
   const loading = Boolean(arvoreId) && arvoreReq.carregando
+
+  // ── INTELIGÊNCIA DA ÁRVORE ────────────────────────────────────────────────
+  // O motor genealógico já existia e estava órfão. Ligado aqui, ele NÃO participa
+  // do desenho: quem renderiza a árvore continua sendo o <ReactFlowTree> abaixo,
+  // intocado. O que estas telas fazem é ler a análise e navegar.
+  const { analise, indice } = useAnaliseArvore(pessoas, unioes, {
+    paisAlvo: paisAlvoDe(paisProcesso),
+    raizId: pessoaPrincipal?.id ?? null,
+  })
+  const [painelAberto, setPainelAberto] = useState(false)
+  const [paletaAberta, setPaletaAberta] = useState(false)
+
+  // ⌘K / Ctrl+K abre a busca. Atalho global é assinatura de teclado — efeito é a
+  // ferramenta certa, e o cleanup impede listener órfão ao trocar de árvore.
+  useEffect(() => {
+    const atalho = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") {
+        e.preventDefault()
+        setPaletaAberta((v) => !v)
+      }
+    }
+    document.addEventListener("keydown", atalho)
+    return () => document.removeEventListener("keydown", atalho)
+  }, [])
+
+  const nomeDePessoa = useCallback(
+    (id: number) => {
+      const p = pessoas.find((x) => x.id === id)
+      return p ? `${p.nome}${p.sobrenome ? ` ${p.sobrenome}` : ""}` : `#${id}`
+    },
+    [pessoas],
+  )
+
+  // Ir até a pessoa no canvas: o próprio componente da árvore já expõe isso, então
+  // navegar não redesenha nada.
+  const irParaPessoa = useCallback((pessoaId: number) => {
+    reactFlowTreeRef.current?.centerOnPerson(pessoaId)
+  }, [])
   const fetchArvore = async () => { await arvoreReq.recarregar() }
   // Onboarding aparece quando a árvore existe e está VAZIA — derivação, não um estado
   // que o carregador precisava ligar e desligar. Continua podendo ser aberto e fechado
@@ -722,6 +765,53 @@ export function ArvoreGenealogicaView({
             onAddConjuge={pode('arvore.criar') ? handleAddConjugeById : undefined}
           />
         )}
+
+        {/* TELAS NOVAS — sobrepostas ao canvas, NUNCA dentro dele. Ficam em
+            `absolute` no canto superior direito, longe dos controles que já
+            existiam no canto inferior esquerdo. O <ReactFlowTree> acima não sabe
+            que elas existem: abrir ou fechar não move um card sequer. */}
+        {pessoas.length > 0 && (
+          <div className="absolute right-4 top-4 z-20 flex items-center gap-2">
+            <button
+              onClick={() => setPaletaAberta(true)}
+              title="Buscar pessoa (⌘K)"
+              className="flex items-center gap-2 rounded-lg border border-gray-200 bg-white px-3 py-2 text-[13px] text-gray-600 shadow-sm transition hover:border-gray-300 hover:text-gray-900"
+            >
+              <Search className="h-4 w-4" />
+              <span className="hidden sm:inline">Buscar</span>
+              <kbd className="hidden rounded border border-gray-200 px-1 text-[10px] text-gray-400 sm:inline">⌘K</kbd>
+            </button>
+            <button
+              onClick={() => setPainelAberto(true)}
+              title="Inteligência da árvore"
+              className="flex items-center gap-2 rounded-lg border border-gray-200 bg-white px-3 py-2 text-[13px] text-gray-600 shadow-sm transition hover:border-gray-300 hover:text-gray-900"
+            >
+              <Sparkles className="h-4 w-4" />
+              <span className="hidden sm:inline">Análise</span>
+              {/* Contagem só dos achados que exigem ação — número no botão que não
+                  significa urgência vira ruído e o usuário para de olhar. */}
+              {analise && analise.insights.some((i) => i.severidade === "critico" || i.severidade === "alto") && (
+                <span className="rounded-full bg-red-50 px-1.5 text-[11px] font-semibold text-red-600">
+                  {analise.insights.filter((i) => i.severidade === "critico" || i.severidade === "alto").length}
+                </span>
+              )}
+            </button>
+          </div>
+        )}
+
+        <PainelInteligencia
+          analise={analise}
+          aberto={painelAberto}
+          onFechar={() => setPainelAberto(false)}
+          onIrParaPessoa={irParaPessoa}
+          nomeDePessoa={nomeDePessoa}
+        />
+        <PaletaComandos
+          indice={indice}
+          aberto={paletaAberta}
+          onFechar={() => setPaletaAberta(false)}
+          onEscolher={irParaPessoa}
+        />
       </div>
 
       {/* Overlay para sidebar */}
