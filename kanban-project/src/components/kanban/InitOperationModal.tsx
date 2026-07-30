@@ -2,7 +2,8 @@
 
 "use client"
 
-import { useState, useEffect, useCallback } from "react"
+import { useState, useEffect, useCallback, useMemo } from "react"
+import { useApi } from "@/src/lib/dados"
 import { createPortal } from "react-dom"
 import {
   X,
@@ -85,17 +86,22 @@ const tomorrowPlusDays = (days: number): string => {
 // COMPONENTE PRINCIPAL
 // ============================================================
 
-export function InitOperationModal({
+/**
+ * Casca fina: o conteúdo só existe aberto, com identidade no documento. É o que
+ * substitui o "Reset state" que zerava cinco campos à mão antes de cada carga.
+ */
+export function InitOperationModal(props: InitOperationModalProps) {
+  if (!props.isOpen || !props.documentoId) return null
+  return <ConteudoModal key={props.documentoId} {...props} />
+}
+
+function ConteudoModal({
   documentoId,
   isOpen,
   onClose,
   onSuccess,
 }: InitOperationModalProps) {
-  const [doc, setDoc] = useState<Documento | null>(null)
-  const [usuarios, setUsuarios] = useState<Usuario[]>([])
-  const [loading, setLoading] = useState(false)
   const [saving, setSaving] = useState(false)
-  const [erro, setErro] = useState<string | null>(null)
 
   // Estado do formulário
   const [tipoOperacao, setTipoOperacao] = useState<TipoOperacao | null>(null)
@@ -104,44 +110,20 @@ export function InitOperationModal({
   const [prioridade, setPrioridade] = useState<Prioridade>("normal")
   const [observacaoInicial, setObservacaoInicial] = useState<string>("")
 
-  // -- Carrega documento + usuários ao abrir
-  const carregar = useCallback(async () => {
-    if (!documentoId) return
-    setLoading(true)
-    setErro(null)
-    try {
-      const [docRes, userRes] = await Promise.all([
-        fetch(`/api/documentos/${documentoId}`, {
-          headers: { Authorization: `Bearer ${localStorage.getItem("authToken")}` },
-        }),
-        fetch("/api/usuarios", {
-          headers: { Authorization: `Bearer ${localStorage.getItem("authToken")}` },
-        }),
-      ])
-      if (!docRes.ok) throw new Error(`HTTP ${docRes.status}`)
-      const docData = await docRes.json()
-      setDoc(docData)
-      const userData = await userRes.json()
-      setUsuarios(userData.usuarios || userData || [])
-    } catch (e) {
-      console.warn("[InitOperationModal] falha:", e)
-      setErro("Erro ao carregar documento.")
-    } finally {
-      setLoading(false)
-    }
-  }, [documentoId])
-
-  useEffect(() => {
-    if (isOpen && documentoId) {
-      // Reset state
-      setTipoOperacao(null)
-      setResponsavelId("auto")
-      setDataPrazoInicial(tomorrowPlusDays(7))
-      setPrioridade("normal")
-      setObservacaoInicial("")
-      carregar()
-    }
-  }, [isOpen, documentoId, carregar])
+  // Documento e usuários pela camada oficial: duas leituras independentes, cada uma
+  // com o seu cache, em lugar do `Promise.all` dentro de um efeito. A lista de
+  // usuários aceita os dois formatos que a rota já devolvia.
+  const docReq = useApi<Documento>(documentoId ? `/api/documentos/${documentoId}` : null)
+  const usuariosReq = useApi<{ usuarios?: Usuario[] } | Usuario[]>("/api/usuarios")
+  const doc = docReq.dados ?? null
+  const usuarios = useMemo<Usuario[]>(() => {
+    const d = usuariosReq.dados
+    if (!d) return []
+    return Array.isArray(d) ? d : (d.usuarios ?? [])
+  }, [usuariosReq.dados])
+  const loading = docReq.carregando || usuariosReq.carregando
+  // A falha que interessa é a do documento — sem ele o modal não tem o que abrir.
+  const erro = docReq.erro ? "Erro ao carregar documento." : null
 
   // -- Trava scroll do body
   useEffect(() => {
@@ -196,7 +178,6 @@ export function InitOperationModal({
     }
   }
 
-  if (!isOpen) return null
 
   // -- Opções disponíveis (apenas Buscar e Desnecessário)
   const opcoes: Array<{

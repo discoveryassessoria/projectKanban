@@ -9,6 +9,7 @@
 "use client"
 
 import { useState, useEffect, useMemo } from "react"
+import { useApi } from "@/src/lib/dados"
 import {
   GitBranch, FileText, CheckSquare, Users, Mail, CalendarDays, Edit3, Paperclip,
   Download, Filter, Search, RotateCcw, ChevronDown, BarChart3, ExternalLink, Info,
@@ -79,18 +80,19 @@ function diaLabel(s: string): string {
 
 const CARD = "rounded-xl border border-white/10 bg-[#1b2027]"
 
+const SEM_LOGS: LogItem[] = []
+
 export function ProcessoHistorico({ processoId }: ProcessoHistoricoProps) {
-  const [logs, setLogs] = useState<LogItem[]>([])
-  const [loading, setLoading] = useState(true)
   const [tipo, setTipo] = useState<TipoKey | "todos">("todos")
   const [busca, setBusca] = useState("")
   const [limite, setLimite] = useState(20)
 
-  useEffect(() => {
-    setLoading(true)
-    fetch(`/api/processos/${processoId}/logs?limite=200`)
-      .then((r) => r.ok ? r.json() : { logs: [] }).then((d) => setLogs(d.logs || [])).catch(() => setLogs([])).finally(() => setLoading(false))
-  }, [processoId])
+  // Leitura pela camada oficial. A tolerância original fica: qualquer falha mostra
+  // histórico vazio em vez de derrubar a aba (o `.catch(() => setLogs([]))`).
+  // Lista vazia como constante, porque alimenta dependências de `useMemo` aqui.
+  const consulta = useApi<{ logs?: LogItem[] }>(`/api/processos/${processoId}/logs?limite=200`)
+  const logs = consulta.dados?.logs ?? SEM_LOGS
+  const loading = consulta.carregando
 
   const contagem = useMemo(() => {
     const c: Record<string, number> = {}

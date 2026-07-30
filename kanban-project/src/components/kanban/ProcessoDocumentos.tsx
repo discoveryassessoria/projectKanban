@@ -3,6 +3,7 @@
 "use client"
 
 import { useState, useEffect, useCallback } from "react"
+import { useApi } from "@/src/lib/dados"
 import { Loader2 } from "lucide-react"
 import { usePermissoes } from "@/src/hooks/use-permissoes"
 import type { ProcessoWithStatus, Processo } from "@/src/types/kanban"
@@ -226,49 +227,25 @@ function mapearBiblioteca(data: ProcessoDocumentosData) {
 
 export function ProcessoDocumentos({ processo }: ProcessoDocumentosProps) {
   const { pode } = usePermissoes()
-  const [data, setData] = useState<ProcessoDocumentosData | null>(null)
-  const [loading, setLoading] = useState(true)
-  const [refreshing, setRefreshing] = useState(false)
-  const [erro, setErro] = useState<string | null>(null)
-
   const [drawerDocId, setDrawerDocId] = useState<number | null>(null)
   const [drawerPessoaId, setDrawerPessoaId] = useState<number | null>(null)
 
-  const carregar = useCallback(
-    async (modoSilencioso = false) => {
-      if (!modoSilencioso) setLoading(true)
-      else setRefreshing(true)
-      setErro(null)
-
-      try {
-        const res = await fetch(`/api/processos/${processo.id}/documentos`, {
-          headers: {
-            Authorization: `Bearer ${localStorage.getItem("authToken")}`,
-          },
-        })
-
-        if (res.status === 404) {
-          setErro("Endpoint /api/processos/[id]/documentos ainda não existe.")
-          return
-        }
-        if (!res.ok) throw new Error(`HTTP ${res.status}`)
-
-        const json: ProcessoDocumentosData = await res.json()
-        setData(json)
-      } catch (e) {
-        console.warn("[ProcessoDocumentos] falha:", e)
-        setErro("Erro ao carregar Pasta Documental.")
-      } finally {
-        setLoading(false)
-        setRefreshing(false)
-      }
-    },
-    [processo.id]
-  )
-
-  useEffect(() => {
-    carregar()
-  }, [carregar])
+  // Leitura pela camada oficial. Os dois modos que o `carregar(modoSilencioso)`
+  // distinguia continuam existindo, agora como estados derivados da consulta:
+  // `carregando` é a primeira carga (mostra esqueleto) e `revalidando` é o refresh
+  // com dado já em tela (não pisca). Quem chamava `carregar(true)` chama `recarregar`.
+  const consulta = useApi<ProcessoDocumentosData>(`/api/processos/${processo.id}/documentos`)
+  const data = consulta.dados ?? null
+  const loading = consulta.carregando
+  const refreshing = consulta.revalidando && !consulta.carregando
+  // O 404 tem mensagem PRÓPRIA de propósito: distingue "endpoint não existe" de
+  // "falhou ao carregar" — é diagnóstico, não decoração.
+  const erro = consulta.erro
+    ? (consulta.erro.status === 404
+        ? "Endpoint /api/processos/[id]/documentos ainda não existe."
+        : "Erro ao carregar Pasta Documental.")
+    : null
+  const carregar = consulta.recarregar
 
   // -- Renderização
 

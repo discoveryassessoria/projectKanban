@@ -2,6 +2,7 @@
 "use client"
 
 import { useState, useEffect, useCallback } from "react"
+import { useApi } from "@/src/lib/dados"
 import {
   Check,
   Circle,
@@ -132,40 +133,20 @@ const STATUS_LABEL: Record<StatusStep, string> = {
 // ============================================================
 
 export function WorkflowTab({ documentoId, onChange }: WorkflowTabProps) {
-  const [workflow, setWorkflow] = useState<Workflow | null>(null)
-  const [loading, setLoading] = useState(true)
-  const [erro, setErro] = useState<string | null>(null)
   // fase atual não tem Workflow Interno configurado (nunca cai no de outra fase)
-  const [semWorkflowInterno, setSemWorkflowInterno] = useState(false)
 
   // ✅ NOVO: stepId aberto na Central da Etapa (drawer empilhado)
   const [centralStepId, setCentralStepId] = useState<number | null>(null)
 
   // -- Carrega o workflow
-  const carregar = useCallback(async () => {
-    setLoading(true)
-    setErro(null)
-    try {
-      const res = await fetch(`/api/documentos/${documentoId}/workflow`, {
-        headers: {
-          Authorization: `Bearer ${localStorage.getItem("authToken")}`,
-        },
-      })
-      if (!res.ok) throw new Error(`HTTP ${res.status}`)
-      const json = await res.json()
-      setWorkflow(json.workflow)
-      setSemWorkflowInterno(json.semWorkflowInterno === true)
-    } catch (e) {
-      console.warn("[WorkflowTab] falha:", e)
-      setErro("Erro ao carregar workflow.")
-    } finally {
-      setLoading(false)
-    }
-  }, [documentoId])
-
-  useEffect(() => {
-    carregar()
-  }, [carregar])
+  // Leitura pela camada oficial: o token e o tratamento de erro deixam de ser
+  // montados aqui à mão. A mensagem exibida continua a mesma de antes.
+  const consulta = useApi<{ workflow?: Workflow | null; semWorkflowInterno?: boolean }>(`/api/documentos/${documentoId}/workflow`)
+  const workflow = consulta.dados?.workflow ?? null
+  const semWorkflowInterno = consulta.dados?.semWorkflowInterno === true
+  const loading = consulta.carregando
+  const erro = consulta.erro ? "Erro ao carregar workflow." : null
+  const carregar = consulta.recarregar
 
   // "Iniciar operação" manual foi removido do fluxo: o backend materializa a operação
   // da fase atual automaticamente ao carregar o workflow (garantirOperacaoDocumentoV2).
@@ -219,7 +200,7 @@ export function WorkflowTab({ documentoId, onChange }: WorkflowTabProps) {
           Recarregue para tentar montar a operação desta fase.
         </p>
         <button
-          onClick={carregar}
+          onClick={() => { void carregar() }}
           className="px-4 py-2 bg-blue-500 hover:bg-blue-600 text-white text-xs font-semibold rounded-md inline-flex items-center gap-1.5"
         >
           ↻ Recarregar

@@ -57,15 +57,20 @@ interface Props {
 // DRAWER
 // ============================================================
 
+/**
+ * Casca fina: o conteúdo só existe aberto, e a sua identidade é o documento. Trocar
+ * de documento ou reabrir monta de novo — é o que substitui o efeito que voltava a
+ * aba para "Visão geral" "ao abrir".
+ */
 export function DocumentoBibliotecaDrawer({ item, context, isOpen, onClose }: Props) {
-  const [tab, setTab] = useState<Tab>("Visão geral")
-
-  // ao abrir um documento novo, sempre volta para "Visão geral"
-  useEffect(() => {
-    if (isOpen) setTab("Visão geral")
-  }, [isOpen, item?.id])
-
   if (!isOpen || !item) return null
+  return <ConteudoDrawer key={item.id} item={item} context={context} isOpen={isOpen} onClose={onClose} />
+}
+
+function ConteudoDrawer({ item, context, onClose }: Props) {
+  // Cada abertura começa na primeira aba porque o componente é novo.
+  const [tab, setTab] = useState<Tab>("Visão geral")
+  if (!item) return null
 
   const badge =
     item.finalStatus === "pronta_protocolo"

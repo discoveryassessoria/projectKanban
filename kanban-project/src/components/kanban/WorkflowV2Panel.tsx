@@ -6,6 +6,7 @@
 "use client"
 
 import { useState, useEffect, useCallback } from "react"
+import { useApi } from "@/src/lib/dados"
 import { Loader2, RefreshCw } from "lucide-react"
 import { usePermissoes } from "@/src/hooks/use-permissoes"
 
@@ -36,23 +37,15 @@ function authHeaders(): HeadersInit {
 
 export function WorkflowV2Panel({ processoId }: Props) {
   const { pode } = usePermissoes()
-  const [view, setView] = useState<OperationalView | null>(null)
-  const [loading, setLoading] = useState(true)
   const [acao, setAcao] = useState<string | null>(null)
   const [msg, setMsg] = useState<string | null>(null)
 
-  const carregar = useCallback(async () => {
-    setLoading(true)
-    try {
-      const res = await fetch(`/api/processos/${processoId}/operational-workflow`, { headers: authHeaders() })
-      if (res.ok) setView(await res.json())
-      else setView(null)
-    } finally {
-      setLoading(false)
-    }
-  }, [processoId])
-
-  useEffect(() => { carregar() }, [carregar])
+  // Leitura pela camada oficial. Falha → sem projeção (era o `else setView(null)`),
+  // e o painel mostra o seu estado vazio em vez de um erro.
+  const consulta = useApi<OperationalView>(`/api/processos/${processoId}/operational-workflow`)
+  const view = consulta.erro ? null : (consulta.dados ?? null)
+  const loading = consulta.carregando
+  const carregar = consulta.recarregar
 
   const chamar = useCallback(async (path: string, body?: Record<string, unknown>) => {
     setAcao(path); setMsg(null)
@@ -98,7 +91,7 @@ export function WorkflowV2Panel({ processoId }: Props) {
           </span>
           <span className="rounded bg-gray-100 px-2 py-0.5 text-xs text-gray-500">source: {view.source}</span>
         </div>
-        <button onClick={carregar} className="flex items-center gap-1 text-xs text-gray-500 hover:text-gray-700">
+        <button onClick={() => { void carregar() }} className="flex items-center gap-1 text-xs text-gray-500 hover:text-gray-700">
           <RefreshCw className="h-3 w-3" /> atualizar
         </button>
       </div>

@@ -2,7 +2,8 @@
 
 "use client"
 
-import { useState, useEffect, useCallback } from "react"
+import { useState, useEffect, useCallback, useMemo } from "react"
+import { useApi } from "@/src/lib/dados"
 import { createPortal } from "react-dom"
 import { X, Loader2, AlertTriangle, Plus, Pencil, Trash2, FileText, ChevronRight, PlayCircle } from "lucide-react"
 
@@ -154,7 +155,22 @@ const linhagemLabel = (p: Pessoa): string => {
 // COMPONENTE PRINCIPAL
 // ============================================================
 
-export function PessoaOperacionalDrawer({
+/**
+ * Casca fina. O conteúdo só EXISTE enquanto o drawer está aberto, e a sua
+ * identidade é a pessoa: fechar desmonta, abrir monta de novo.
+ *
+ * Isso é o que substitui o efeito que zerava aba e confirmação "ao abrir". Aquele
+ * efeito era o contorno de um problema estrutural — o componente ficava montado
+ * com `return null`, então o estado da abertura anterior sobrevivia e precisava ser
+ * apagado à mão. Montar do zero resolve por construção, e não há o render
+ * intermediário em que o drawer aparecia na aba do registro ANTERIOR.
+ */
+export function PessoaOperacionalDrawer(props: PessoaOperacionalDrawerProps) {
+  if (!props.isOpen || !props.pessoaId) return null
+  return <ConteudoDrawer key={props.pessoaId} {...props} />
+}
+
+function ConteudoDrawer({
   pessoaId,
   isOpen,
   onClose,
@@ -169,41 +185,20 @@ export function PessoaOperacionalDrawer({
   // "Hoje" fixado na montagem: ler o relógio durante o render faria a mesma
   // lista mudar de status entre dois renders sem mudança de dado.
   const [agoraMs] = useState(() => Date.now())
-  const [pessoa, setPessoa] = useState<Pessoa | null>(null)
-  const [loading, setLoading] = useState(false)
-  const [erro, setErro] = useState<string | null>(null)
+  // Cada abertura começa na primeira aba e sem confirmação pendente — agora porque o
+  // componente é NOVO, não porque um efeito apagou o estado do anterior.
   const [activeTab, setActiveTab] = useState<TabId>("docs")
   const [confirmDelete, setConfirmDelete] = useState(false)
 
-  const carregar = useCallback(async () => {
-    if (!pessoaId) return
-    setLoading(true)
-    setErro(null)
-    try {
-      const res = await fetch(`/api/pessoas/${pessoaId}`, {
-        headers: { Authorization: `Bearer ${localStorage.getItem("authToken")}` },
-      })
-      if (!res.ok) throw new Error(`HTTP ${res.status}`)
-      const data: Pessoa = await res.json()
-      setPessoa({
-        ...data,
-        documentos: data.documentos || [],
-      })
-    } catch (e) {
-      console.warn("[PessoaOperacionalDrawer] falha:", e)
-      setErro("Erro ao carregar pessoa.")
-    } finally {
-      setLoading(false)
-    }
-  }, [pessoaId])
-
-  useEffect(() => {
-    if (isOpen && pessoaId) {
-      setActiveTab("docs")
-      setConfirmDelete(false)
-      carregar()
-    }
-  }, [isOpen, pessoaId, carregar])
+  const consulta = useApi<Pessoa>(pessoaId ? `/api/pessoas/${pessoaId}` : null)
+  // `documentos` sempre lista: o resto da tela conta e filtra em cima disso.
+  const pessoa = useMemo(
+    () => (consulta.dados ? { ...consulta.dados, documentos: consulta.dados.documentos || [] } : null),
+    [consulta.dados],
+  )
+  const loading = consulta.carregando
+  const erro = consulta.erro ? "Erro ao carregar pessoa." : null
+  const carregar = consulta.recarregar
 
   // Trava scroll do body
   useEffect(() => {
@@ -224,8 +219,6 @@ export function PessoaOperacionalDrawer({
     document.addEventListener("keydown", onEsc)
     return () => document.removeEventListener("keydown", onEsc)
   }, [isOpen, onClose])
-
-  if (!isOpen) return null
 
   // Stats
   const docs = pessoa?.documentos || []

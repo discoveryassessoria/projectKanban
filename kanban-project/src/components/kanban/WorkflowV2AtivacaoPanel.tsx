@@ -6,6 +6,7 @@
 "use client"
 
 import { useState, useEffect, useCallback } from "react"
+import { useApi } from "@/src/lib/dados"
 import { Loader2, ShieldCheck } from "lucide-react"
 import { usePermissoes } from "@/src/hooks/use-permissoes"
 
@@ -32,30 +33,18 @@ function authHeaders(): HeadersInit {
 
 export function WorkflowV2AtivacaoPanel({ processoId }: Props) {
   const { pode } = usePermissoes()
-  const [prep, setPrep] = useState<Prep | null>(null)
-  const [loading, setLoading] = useState(true)
   const [ativando, setAtivando] = useState(false)
   const [msg, setMsg] = useState<string | null>(null)
 
-  const carregar = useCallback(async () => {
-    setLoading(true)
-    try {
-      const res = await fetch(`/api/processos/${processoId}/workflow-runtime`, { headers: authHeaders() })
-      if (res.ok) setPrep(await res.json())
-      else setPrep(null)
-    } finally {
-      setLoading(false)
-    }
-  }, [processoId])
-
-  useEffect(() => {
-    if (pode("workflow.ativarV2")) carregar()
-    else setLoading(false)
-    // `pode` fora das deps DE PROPÓSITO: sua identidade muda a cada render
-    // (usePermissoes) e reincluí-la causava refetch em LOOP de /workflow-runtime
-    // (que roda o backfill dry-run no servidor) → flicker. Reavalia por processoId.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [carregar])
+  // Sem permissão, não há consulta: a chave `null` é o que antes exigia um efeito
+  // com `pode` fora das dependências e um `eslint-disable-next-line`. O motivo
+  // daquele contorno era real — `pode` troca de identidade a cada render e o efeito
+  // refazia /workflow-runtime em loop (ele roda backfill dry-run no servidor). Como
+  // chave, o problema desaparece: a URL é estável, então a requisição é uma só.
+  const consulta = useApi<Prep>(pode("workflow.ativarV2") ? `/api/processos/${processoId}/workflow-runtime` : null)
+  const prep = consulta.erro ? null : (consulta.dados ?? null)
+  const loading = consulta.carregando
+  const carregar = consulta.recarregar
 
   const ativar = useCallback(async () => {
     const justificativa = window.prompt("Justificativa da ativação do runtime v2:")

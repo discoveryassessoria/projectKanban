@@ -64,7 +64,17 @@ interface OpManageModalProps {
 // COMPONENTE
 // ============================================================
 
-export function OpManageModal({
+/**
+ * Casca fina: o conteúdo só existe aberto, com identidade em (documento, modo).
+ * Trocar de documento ou de modo monta um formulário novo, em vez de apagar o
+ * anterior campo por campo num efeito.
+ */
+export function OpManageModal(props: OpManageModalProps) {
+  if (!props.isOpen || !props.documentoId) return null
+  return <ConteudoModal key={`${props.documentoId}-${props.mode}`} {...props} />
+}
+
+function ConteudoModal({
   isOpen,
   mode,
   documentoId,
@@ -74,24 +84,15 @@ export function OpManageModal({
   const reasonsMap = mode === "cancel" ? CANCEL_REASONS : INVALIDATE_REASONS
   const reasonKeys = Object.keys(reasonsMap)
 
+  // O formulário nasce em branco a cada abertura porque a casca abaixo monta este
+  // componente de novo. O efeito de "reset ao abrir" — com `eslint-disable` para
+  // esconder as dependências que ele não queria observar — deixa de ser necessário.
   const [reason, setReason] = useState<string>(reasonKeys[0])
   const [notes, setNotes] = useState("")
   const [impact, setImpact] = useState("")
   const [cancelSla, setCancelSla] = useState(true)
   const [saving, setSaving] = useState(false)
   const [erro, setErro] = useState<string | null>(null)
-
-  // Reset ao abrir
-  useEffect(() => {
-    if (isOpen) {
-      setReason(reasonKeys[0])
-      setNotes("")
-      setImpact("")
-      setCancelSla(true)
-      setErro(null)
-    }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isOpen, mode])
 
   // ESC fecha
   useEffect(() => {
@@ -100,8 +101,6 @@ export function OpManageModal({
     document.addEventListener("keydown", onEsc)
     return () => document.removeEventListener("keydown", onEsc)
   }, [isOpen, onClose])
-
-  if (!isOpen || !documentoId) return null
 
   const titles: Record<Mode, string> = {
     cancel:     "CANCELAR OPERAÇÃO",
