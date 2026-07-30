@@ -10,6 +10,7 @@
 "use client"
 
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react"
+import { useApi } from "@/src/lib/dados"
 import { createPortal } from "react-dom"
 import { useRevalidacaoFinanceira, emitirMutacaoFinanceira } from "@/src/lib/financeiro-bus"
 import { useRouter } from "next/navigation"
@@ -72,6 +73,24 @@ interface Participante {
   naoConvertido?: number
   proximoVencimento: string | null; status: string; parcelas: number; parcelasRecebidas: number
 }
+/**
+ * Resposta da lista de receitas. Antes o estado era `any`, e o `any` escondia que os
+ * KPIs podem vir ausentes — os `?? 0` espalhados pelos cards existem por isso.
+ */
+const SEM_KPIS: NonNullable<RespostaReceitas["kpis"]> = {}
+
+interface RespostaReceitas {
+  receitas?: Grupo[]
+  kpis?: {
+    receitas?: number
+    participantesFinanceiros?: number
+    totalContratadoBrl?: number
+    recebidoBrl?: number
+    saldoBrl?: number
+  }
+  processo?: { nome?: string | null; codigo?: string | null }
+}
+
 interface Grupo {
   id: number; codigo: string | null; descricao: string | null; servico: string | null
   moedaBase: string; valorBaseTotal: number | null; valorContratadoBrlTotal: number
@@ -85,12 +104,26 @@ type AcaoRow = "editar" | "distribuicao" | "vencimento" | "pagamento" | "duplica
 
 export function ReceitasTab({ processoId, onAbrirDetalhe }: { processoId?: number; onAbrirDetalhe?: (id: number) => void }) {
   const router = useRouter()
-  const [d, setD] = useState<any>(null)
-  const [loading, setLoading] = useState(true)
-  const [erro, setErro] = useState<string | null>(null)
+  // Leitura pela camada oficial: o processo (quando há) entra na chave.
+  const consulta = useApi<RespostaReceitas>(
+    `/api/financeiro/v3/receitas${processoId ? `?processoId=${processoId}` : ""}`,
+  )
+  const d = consulta.dados ?? null
+  const loading = consulta.carregando
+  const erro = consulta.erro ? "Não foi possível carregar as receitas." : null
+  const carregar = () => { void consulta.recarregar() }
   const [busca, setBusca] = useState("")
   const [aba, setAba] = useState("todas")
-  const [page, setPage] = useState(1)
+  // A página pertence ao par (busca, aba): mudar qualquer um deles volta à primeira.
+  // Antes isso era um efeito `setPage(1)`, que deixava um render com a página velha
+  // sobre a lista nova — a tela podia aparecer vazia por um quadro numa busca curta.
+  const [paginaEscolhida, setPaginaEscolhida] = useState<{ chave: string; page: number } | null>(null)
+  const chavePagina = `${busca}|${aba}`
+  const page = paginaEscolhida?.chave === chavePagina ? paginaEscolhida.page : 1
+  const setPage = (proxima: number | ((anterior: number) => number)) => {
+    const valor = typeof proxima === 'function' ? proxima(page) : proxima
+    setPaginaEscolhida({ chave: chavePagina, page: valor })
+  }
   const [expandido, setExpandido] = useState<Set<number>>(new Set())
   const [novo, setNovo] = useState(false)
   // ação rápida de estado disparada no menu "3 pontos" de uma linha (Receita consolidada).
@@ -99,24 +132,14 @@ export function ReceitasTab({ processoId, onAbrirDetalhe }: { processoId?: numbe
   // Após uma ação da lista, a receita pode mudar de situação (ex.: alterar vencimento
   // → aging VENCIDO→A VENCER) e sair da aba filtrada. Em vez de "sumir" em silêncio,
   // avisamos e oferecemos "Ver em Todas" — o filtro do operador é preservado.
-  const [movida, setMovida] = useState<{ id: number; nome: string } | null>(null)
+  const [movidaBruta, setMovidaBruta] = useState<{ id: number; nome: string; aba: string } | null>(null)
 
-  const carregar = () => {
-    setLoading(true); setErro(null)
-    fetch(`/api/financeiro/v3/receitas${processoId ? `?processoId=${processoId}` : ""}`, { headers: authHeaders() })
-      .then(async (r) => { if (!r.ok) throw new Error(`HTTP ${r.status}`); return r.json() })
-      .then((j) => setD(j))
-      .catch(() => setErro("Não foi possível carregar as receitas."))
-      .finally(() => setLoading(false))
-  }
-  useEffect(() => { carregar() }, [processoId])
-  useEffect(() => { setPage(1) }, [busca, aba])
   // Revalidação automática: recarrega a lista quando QUALQUER mutação financeira ocorre
   // (registrar pagamento, editar, redistribuir, estornar, arquivar…) — sem recarregar a página.
   useRevalidacaoFinanceira(useCallback(() => carregar(), [processoId]))
 
   const grupos: Grupo[] = d?.receitas ?? SEM_GRUPOS
-  const k = d?.kpis ?? {}
+  const k = d?.kpis ?? SEM_KPIS
   const nomeProc = d?.processo?.nome ?? d?.processo?.codigo ?? "deste processo"
 
   const abrir = (id: number) => (onAbrirDetalhe ? onAbrirDetalhe(id) : router.push(`/financeiro/v3/receita/${id}`))
@@ -126,10 +149,11 @@ export function ReceitasTab({ processoId, onAbrirDetalhe }: { processoId?: numbe
   // passa a observar a receita (para avisar caso ela saia da aba filtrada após a mutação).
   const aoConcluir = useCallback((g: Grupo) => {
     setAcao(null); carregar(); emitirMutacaoFinanceira()
-    setMovida({ id: g.id, nome: g.descricao ?? g.codigo ?? `#${g.id}` })
+    setMovidaBruta({ id: g.id, nome: g.descricao ?? g.codigo ?? `#${g.id}`, aba })
   }, [carregar])
-  // o aviso vale só para a aba corrente; trocar de aba (ou limpar) o dispensa.
-  useEffect(() => { setMovida(null) }, [aba])
+  // o aviso vale só para a aba corrente; trocar de aba (ou limpar) o dispensa — agora
+  // por derivação, sem o render intermediário em que ele ainda aparecia na aba nova.
+  const movida = movidaBruta?.aba === aba ? movidaBruta : null
 
   // contagem por aba (sobre TODOS os grupos, independente da busca)
   const contagem = useMemo(() => {
@@ -228,7 +252,7 @@ export function ReceitasTab({ processoId, onAbrirDetalhe }: { processoId?: numbe
             <span>A receita <span className="font-medium text-[var(--text-primary)]">{movida.nome}</span> mudou de situação e saiu deste filtro.</span>
             <div className="flex items-center gap-2">
               <button onClick={() => setAba("todas")} className="rounded-[var(--radius-sm)] border border-[var(--info)] px-2.5 py-1 text-xs font-medium text-[var(--info)] hover:bg-[var(--surface-hover)]">Ver em Todas</button>
-              <button onClick={() => setMovida(null)} title="Dispensar" className="rounded-[var(--radius-sm)] p-1 text-[var(--text-muted)] hover:bg-[var(--surface-hover)] hover:text-[var(--text-secondary)]"><X className="h-4 w-4" /></button>
+              <button onClick={() => setMovidaBruta(null)} title="Dispensar" className="rounded-[var(--radius-sm)] p-1 text-[var(--text-muted)] hover:bg-[var(--surface-hover)] hover:text-[var(--text-secondary)]"><X className="h-4 w-4" /></button>
             </div>
           </div>
         )}

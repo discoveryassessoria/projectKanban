@@ -9,6 +9,8 @@
 "use client"
 
 import { useEffect, useMemo, useState } from "react"
+import { useApi } from "@/src/lib/dados"
+import { useDebounce } from "@/src/hooks/use-debounce"
 import { Loader2, Search, Receipt, Building2, User, Calendar, Filter } from "lucide-react"
 import { ReceitaCobrancaModal } from "@/src/components/financeiro/ReceitaCobrancaModal"
 import {
@@ -46,38 +48,28 @@ interface Resumo {
 
 const STATUS_FILTROS = ["", "ABERTA", "PARCIAL", "QUITADA", "CANCELADA", "RENEGOCIADA"]
 
+const SEM_COBRANCAS: Cobranca[] = []
+
 export default function CobrancasTab() {
-  const [cobrancas, setCobrancas] = useState<Cobranca[]>([])
-  const [resumo, setResumo] = useState<Resumo | null>(null)
-  const [loading, setLoading] = useState(true)
   const [status, setStatus] = useState("")
   const [q, setQ] = useState("")
-  const [busca, setBusca] = useState("")
   const [aberta, setAberta] = useState<number | null>(null)
 
-  useEffect(() => {
-    const t = setTimeout(() => setBusca(q.trim()), 300)
-    return () => clearTimeout(t)
-  }, [q])
-
-  async function carregar() {
-    setLoading(true)
-    try {
-      const params = new URLSearchParams()
-      if (status) params.set("status", status)
-      if (busca) params.set("q", busca)
-      const token = typeof window !== "undefined" ? localStorage.getItem("token") : null
-      const r = await fetch(`/api/financeiro/cobrancas?${params.toString()}`, {
-        headers: token ? { Authorization: `Bearer ${token}` } : {},
-      })
-      const j = await r.json()
-      setCobrancas(j.cobrancas || [])
-      setResumo(j.resumo || null)
-    } catch { setCobrancas([]); setResumo(null) }
-    finally { setLoading(false) }
-  }
-
-  useEffect(() => { carregar() }, [status, busca])
+  // Status e busca (com atraso) fazem parte da CHAVE: mudar qualquer um deles já busca.
+  // Eram dois efeitos — um só para atrasar o termo, outro para recarregar.
+  const busca = useDebounce(q.trim(), 300)
+  const chave = (() => {
+    const params = new URLSearchParams()
+    if (status) params.set("status", status)
+    if (busca) params.set("q", busca)
+    return `/api/financeiro/cobrancas?${params.toString()}`
+  })()
+  const consulta = useApi<{ cobrancas?: Cobranca[]; resumo?: Resumo | null }>(chave, { keepPreviousData: true })
+  // Falha mostra lista vazia e sem resumo, como antes — a aba não vira uma tela de erro.
+  const cobrancas = consulta.erro ? SEM_COBRANCAS : (consulta.dados?.cobrancas ?? SEM_COBRANCAS)
+  const resumo = consulta.erro ? null : (consulta.dados?.resumo ?? null)
+  const loading = consulta.carregando
+  const carregar = () => { void consulta.recarregar() }
 
   const kpis = useMemo(() => {
     if (!resumo) return null
