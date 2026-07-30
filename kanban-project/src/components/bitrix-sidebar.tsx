@@ -21,6 +21,7 @@ import { CalendarIcon } from "@/src/components/icons/calendar-icon"
 import { DollarIcon } from "@/src/components/icons/dollar-icon"
 import { usePermissoes } from "@/src/hooks/use-permissoes"
 import { ManagementIcon } from "@/src/components/icons/management-icon"
+import { ScrollIcon } from "@/src/components/icons/scroll-icon"
 
 const menuItems = [
   {
@@ -69,6 +70,17 @@ const menuItems = [
     textOffset: "",
     iconOffset: "",
     permissao: "arvore.ver",
+  },
+  {
+    // Superfície operacional do Motor Registral: revisar o que as certidões
+    // dizem, decidir divergências e acompanhar a linha de cidadania. Entra logo
+    // depois da Árvore porque é a continuação natural do trabalho dela.
+    title: "Revisão Registral",
+    url: "/registral",
+    icon: ScrollIcon,
+    textOffset: "",
+    iconOffset: "",
+    permissao: "registral.ver_evidencias",
   },
   {
     title: "Configurações",

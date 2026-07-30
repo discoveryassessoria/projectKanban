@@ -33,6 +33,7 @@ import { processarExecucao } from "./pipeline"
 import { reconstruirDoLote } from "./reconstrucao"
 import { reconciliarDocumentalDoProcesso } from "./reconciliacao-documental"
 import { aplicarProposta } from "./aplicar"
+import { garantirTranscricoes } from "./ocr"
 
 export interface ResumoLote {
   loteId: number
@@ -288,6 +289,28 @@ export async function processarLote(p: {
     select: { id: true },
   })
 
+  // TRANSCRIÇÃO ANTES DA LEITURA: o motor lê texto, e quem produz texto é o
+  // provedor de transcrição. Fazer isto aqui (e não dentro de cada execução em
+  // paralelo) evita baixar o mesmo arquivo duas vezes e deixa o custo do OCR
+  // visível num ponto só. Best-effort: documento que não transcreve segue o
+  // fluxo e termina em DOCUMENTO_INSUFICIENTE, com o motivo na trilha.
+  const documentosDoCiclo = await prisma.execucaoRegistral.findMany({
+    where: { id: { in: pendentes.map((e) => e.id) } },
+    select: { documentoId: true },
+  })
+  const transcricao = await garantirTranscricoes(
+    [...new Set(documentosDoCiclo.map((d) => d.documentoId))],
+    { usuarioId: p.usuarioId ?? null },
+  )
+  if (transcricao.transcritos > 0 || transcricao.semTranscricao > 0) {
+    logRegistral("info", "transcricao_do_lote", {
+      loteId: lote.id,
+      transcritos: transcricao.transcritos,
+      jaTinham: transcricao.jaTinham,
+      semTranscricao: transcricao.semTranscricao,
+    })
+  }
+
   let processadosNesteCiclo = 0
   let camposExtraidos = 0
   let camposDivergentes = 0
@@ -380,6 +403,11 @@ export async function processarLote(p: {
         metricas: {
           camposExtraidos,
           camposDivergentes,
+          transcricao: {
+            transcritos: transcricao.transcritos,
+            jaTinham: transcricao.jaTinham,
+            semTranscricao: transcricao.semTranscricao,
+          },
           duracaoUltimoCicloMs: Date.now() - inicio,
           reconstrucao: recon.resumo,
           documental: docs,

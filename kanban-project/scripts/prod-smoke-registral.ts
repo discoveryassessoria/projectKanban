@@ -17,7 +17,19 @@
 //      sem escrever — e sem quebrar quando a árvore não tem requerente.
 // ============================================================================
 import { prisma } from '@/lib/prisma'
+import { withRetry } from '@/lib/db-retry'
 import { CHAVE_REGISTRAL, MATRIZ_REGISTRAL, OPERACOES_REGISTRAIS } from '@/lib/genealogia/permissoes-registral'
+
+/**
+ * Toda leitura do smoke passa por aqui.
+ *
+ * Motivo concreto: este script é o ÚLTIMO da cadeia de build. Quando dois builds
+ * rodam ao mesmo tempo (deploy manual em cima de um deploy do Git), o banco chega
+ * saturado e a primeira consulta falha com "Can't reach database server" — e um
+ * smoke de leitura derrubava um deploy que estava correto. Retry cobre a
+ * saturação; erro que não é de conexão continua subindo intacto.
+ */
+const ler = <T>(consulta: () => Promise<T>): Promise<T> => withRetry(consulta, 4, 2000)
 
 let ok = 0
 let falhas = 0
@@ -71,28 +83,28 @@ async function main() {
   console.log('\nSMOKE REGISTRAL (somente leitura)\n')
 
   // ---------------------------------------------------------------- 1. tabelas
-  const tabelas = await prisma.$queryRaw<Array<{ table_name: string }>>`
+  const tabelas = await ler(() => prisma.$queryRaw<Array<{ table_name: string }>>`
     SELECT table_name FROM information_schema.tables
     WHERE table_schema = current_schema() AND table_type = 'BASE TABLE'
-  `
+  `)
   const nomes = new Set(tabelas.map((t) => t.table_name))
   for (const t of TABELAS) checar(nomes.has(t), `tabela ${t} existe`)
 
   // ---------------------------------------------------------------- 2. enums
-  const tipos = await prisma.$queryRaw<Array<{ typname: string }>>`
+  const tipos = await ler(() => prisma.$queryRaw<Array<{ typname: string }>>`
     SELECT t.typname FROM pg_type t
     JOIN pg_namespace n ON n.oid = t.typnamespace
     WHERE n.nspname = current_schema() AND t.typtype = 'e'
-  `
+  `)
   const enums = new Set(tipos.map((t) => t.typname))
   for (const e of ENUMS) checar(enums.has(e), `enum ${e} existe`)
 
   // ------------------------------------------------- 3. transcrição no Documento
-  const colsDoc = await prisma.$queryRaw<Array<{ column_name: string; is_nullable: string }>>`
+  const colsDoc = await ler(() => prisma.$queryRaw<Array<{ column_name: string; is_nullable: string }>>`
     SELECT column_name, is_nullable FROM information_schema.columns
     WHERE table_schema = current_schema() AND table_name = 'Documento'
       AND column_name IN ('transcricaoTexto','transcricaoPaginas','transcricaoFonte','transcricaoEm')
-  `
+  `)
   checar(colsDoc.length === 4, 'Documento tem as 4 colunas de transcrição', colsDoc.length)
   checar(
     colsDoc.every((c) => c.is_nullable === 'YES'),
@@ -101,10 +113,10 @@ async function main() {
   )
 
   // ------------------------------------------------------ 4. índices de idempotência
-  const indices = await prisma.$queryRaw<Array<{ tablename: string; indexdef: string }>>`
+  const indices = await ler(() => prisma.$queryRaw<Array<{ tablename: string; indexdef: string }>>`
     SELECT tablename, indexdef FROM pg_indexes
     WHERE schemaname = current_schema() AND indexdef LIKE '%UNIQUE%'
-  `
+  `)
   for (const t of TABELAS) {
     if (SEM_CHAVE_IDEMPOTENCIA.has(t)) continue
     const temChave = indices.some((i) => i.tablename === t && i.indexdef.includes('chaveIdempotencia'))
@@ -126,7 +138,7 @@ async function main() {
   // explicitamente — é para isso que OPT-IN existe. Afirmar sobre todos derrubaria
   // o build por uma configuração legítima que o motor nem toca.
   const nomesDaMatriz = Object.keys(MATRIZ_REGISTRAL)
-  const perfis = await prisma.perfil.findMany({ select: { nome: true, permissoes: true } })
+  const perfis = await ler(() => prisma.perfil.findMany({ select: { nome: true, permissoes: true } }))
   const daMatriz = perfis.filter((p) => nomesDaMatriz.includes(p.nome.trim()))
   checar(perfis.length > 0, `${perfis.length} perfil(is) no banco (${daMatriz.length} na matriz)`)
 
@@ -170,7 +182,7 @@ async function main() {
   }
 
   // --------------------------------------- 6. a árvore não virou repositório documental
-  const proibidas = await prisma.$queryRaw<Array<{ table_name: string; column_name: string }>>`
+  const proibidas = await ler(() => prisma.$queryRaw<Array<{ table_name: string; column_name: string }>>`
     SELECT table_name, column_name FROM information_schema.columns
     WHERE table_schema = current_schema()
       AND table_name IN (
@@ -179,20 +191,22 @@ async function main() {
         'DecisaoRevisaoRegistral','VersaoGenealogica','MetricaRegistral'
       )
       AND column_name IN ('arquivo_url','arquivo_nome','arquivo_tamanho','arquivo_mime_type','status_documento')
-  `
+  `)
   checar(proibidas.length === 0, 'nenhuma tabela do MRG guarda arquivo/status documental', proibidas)
 
   // ------------------------------------------------- 7. motores puros respondem
   const { recalcularLinhagem } = await import('@/src/services/registral/consultas')
-  const processo = await prisma.processo.findFirst({
-    where: { arvoreId: { not: null } },
-    orderBy: { id: 'desc' },
-    select: { id: true, nome: true },
-  })
+  const processo = await ler(() =>
+    prisma.processo.findFirst({
+      where: { arvoreId: { not: null } },
+      orderBy: { id: 'desc' },
+      select: { id: true, nome: true },
+    }),
+  )
   if (!processo) {
     checar(true, 'nenhum processo com árvore em produção — nada a apurar (não é falha)')
   } else {
-    const r = await recalcularLinhagem(processo.id)
+    const r = await ler(() => recalcularLinhagem(processo.id))
     checar(r !== null, `linhagem apurada para o processo #${processo.id}`)
     checar(
       r == null || typeof r.elegibilidade.resultado === 'string',
@@ -210,13 +224,15 @@ async function main() {
   }
 
   // Contadores de volume: o motor nasce vazio em produção; isto é informativo.
-  const [lotes, evidencias, propostas, conflitos, fatos] = await Promise.all([
-    prisma.loteRegistral.count(),
-    prisma.evidenciaRegistral.count(),
-    prisma.propostaReconciliacao.count(),
-    prisma.conflitoRegistral.count(),
-    prisma.fatoRegistral.count(),
-  ])
+  const [lotes, evidencias, propostas, conflitos, fatos] = await ler(() =>
+    Promise.all([
+      prisma.loteRegistral.count(),
+      prisma.evidenciaRegistral.count(),
+      prisma.propostaReconciliacao.count(),
+      prisma.conflitoRegistral.count(),
+      prisma.fatoRegistral.count(),
+    ]),
+  )
   console.log(
     `\n  volume atual — lotes=${lotes} evidências=${evidencias} propostas=${propostas} conflitos=${conflitos} fatos=${fatos}`,
   )

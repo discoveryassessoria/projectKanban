@@ -50,6 +50,7 @@ import type {
 import { auditar, logRegistral } from "./auditoria"
 import { ACOES_AUDITORIA, MAX_TENTATIVAS_EXECUCAO, TETO_CANDIDATOS_IDENTIDADE, VERSAO_MOTOR, backoffMs } from "./constantes"
 import { lerDocumento, temMaterialParaLer } from "./leitura-documento"
+import { transcreverDocumento } from "./ocr"
 import { carregarContexto } from "./estado"
 import { persistirProposta } from "./propostas-db"
 
@@ -150,7 +151,35 @@ export async function processarExecucao(execucaoId: number): Promise<ResultadoEx
       paginas: leitura.paginas.length,
     })
 
-    if (!temMaterialParaLer(leitura)) {
+    // SEM MATERIAL: antes de desistir, tenta TRANSCREVER. É aqui que o OCR entra
+    // no pipeline — como um passo do próprio fluxo, com o resultado na trilha.
+    // Idempotente: documento já transcrito não é transcrito de novo.
+    let leituraAtual = leitura
+    if (!temMaterialParaLer(leituraAtual)) {
+      t = Date.now()
+      const transc = await transcreverDocumento(exec.documentoId)
+      await transicionar(
+        execucaoId,
+        "RECEBIDO",
+        transc.transcrito || transc.jaTinha,
+        transc.transcrito
+          ? `Transcrição obtida por ${transc.provedor} (${transc.caracteres} caracteres).`
+          : (transc.motivo ?? "Não foi possível transcrever o documento."),
+        t,
+        tentativa,
+        {
+          provedor: transc.provedor,
+          caracteres: transc.caracteres,
+          tentativas: transc.tentativas.map((x) => ({ provedor: x.provedor, ok: x.ok })),
+        },
+      )
+      if (transc.transcrito) {
+        const relida = await lerDocumento(prisma, exec.documentoId)
+        if (relida) leituraAtual = relida
+      }
+    }
+
+    if (!temMaterialParaLer(leituraAtual)) {
       t = Date.now()
       await transicionar(
         execucaoId,
@@ -162,20 +191,20 @@ export async function processarExecucao(execucaoId: number): Promise<ResultadoEx
       )
       await prisma.execucaoRegistral.update({
         where: { id: execucaoId },
-        data: { fonteTexto: leitura.fonte, finalizadoEm: new Date(), tentativas: tentativa },
+        data: { fonteTexto: leituraAtual.fonte, finalizadoEm: new Date(), tentativas: tentativa },
       })
       return { ...vazio, etapaFinal: "DOCUMENTO_INSUFICIENTE" }
     }
 
     // ------------------------------------------------------------ CLASSIFICANDO
     t = Date.now()
-    const classificacao = classificarDocumento(leitura)
+    const classificacao = classificarDocumento(leituraAtual)
     await prisma.execucaoRegistral.update({
       where: { id: execucaoId },
       data: {
         tipoDetectado: classificacao.natureza,
         confiancaTipo: classificacao.confianca,
-        fonteTexto: leitura.fonte,
+        fonteTexto: leituraAtual.fonte,
       },
     })
     await transicionar(
@@ -235,7 +264,7 @@ export async function processarExecucao(execucaoId: number): Promise<ResultadoEx
 
     // ---------------------------------------------------- EXTRAINDO / REEXTRAINDO
     t = Date.now()
-    const leituraA = extrairAncorado(leitura, natureza)
+    const leituraA = extrairAncorado(leituraAtual, natureza)
     await transicionar(
       execucaoId,
       "EXTRAINDO",
@@ -247,7 +276,7 @@ export async function processarExecucao(execucaoId: number): Promise<ResultadoEx
     )
 
     t = Date.now()
-    const leituraB = extrairEstrutural(leitura, natureza)
+    const leituraB = extrairEstrutural(leituraAtual, natureza)
     await transicionar(
       execucaoId,
       "REEXTRAINDO",
@@ -280,7 +309,7 @@ export async function processarExecucao(execucaoId: number): Promise<ResultadoEx
     // pessoa E, ao mesmo tempo, ter leituras divergentes num campo crítico. Se a
     // insuficiência interrompesse o fluxo antes disto, a divergência (que é a
     // informação mais valiosa do documento ruim) seria perdida em silêncio.
-    const sujeitoDeclarado = leitura.pessoaId
+    const sujeitoDeclarado = leituraAtual.pessoaId
     for (const c of conferencia.bloqueados) {
       conflitos += await abrirConflito({
         processoId,
@@ -349,7 +378,7 @@ export async function processarExecucao(execucaoId: number): Promise<ResultadoEx
         paiResolvidoId: resolvidas.get("PAI")?.pessoaId ?? null,
         maeResolvidoId: resolvidas.get("MAE")?.pessoaId ?? null,
         conjugeResolvidoId: resolvidas.get("CONJUGE")?.pessoaId ?? null,
-        pessoaDoDocumentoId: leitura.pessoaId,
+        pessoaDoDocumentoId: leituraAtual.pessoaId,
         // Desempate: entre candidatos empatados, o da árvore deste processo vem
         // primeiro e não é cortado pelo teto da lista.
         arvorePreferidaId: arvoreId,
@@ -437,10 +466,10 @@ export async function processarExecucao(execucaoId: number): Promise<ResultadoEx
 
     // ------------------------------------------------------- CRUZANDO_EVIDENCIAS
     t = Date.now()
-    const sujeitoPrincipal = resolvidas.get("REGISTRADO")?.pessoaId ?? leitura.pessoaId ?? null
+    const sujeitoPrincipal = resolvidas.get("REGISTRADO")?.pessoaId ?? leituraAtual.pessoaId ?? null
     const { evidencias, fatos } = await persistirEvidenciasEFatos({
       execucaoId,
-      leitura,
+      leitura: leituraAtual,
       conferencia: conferencia.campos,
       sujeitoPrincipal,
       resolvidas,
@@ -492,7 +521,7 @@ export async function processarExecucao(execucaoId: number): Promise<ResultadoEx
       execucaoId,
       documentoId: exec.documentoId,
       correlationId,
-      leitura,
+      leitura: leituraAtual,
       conferencia: conferencia.campos,
       ocorrencias: conferencia.ocorrencias,
       resolvidas,

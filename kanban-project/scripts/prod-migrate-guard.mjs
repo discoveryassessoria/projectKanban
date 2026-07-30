@@ -135,7 +135,7 @@ try {
   // executado precisa estar no log ANTES de ser executado.
   try {
     const { default: path } = await import('node:path')
-    const { listarMigrations, sqlDaMigration } = await import('../lib/db/leitura-migrations.mjs')
+    const { listarMigrations, sqlDaMigration, analisarRisco } = await import('../lib/db/leitura-migrations.mjs')
     const DIR = path.join(process.cwd(), 'prisma', 'migrations')
     const todas = listarMigrations(DIR)
     const registradas = new Set(
@@ -143,11 +143,13 @@ try {
     )
     const pendentes = todas.filter((m) => !registradas.has(m))
     console.log(`[migrate-guard] PLANO: ${todas.length} no repositório · ${registradas.size} registradas · ${pendentes.length} pendentes`)
-    const DESTRUTIVO = /\b(DROP\s+(TABLE|COLUMN|SCHEMA|DATABASE)|TRUNCATE|DELETE\s+FROM)\b/i
-    const MUTACAO = /\bUPDATE\s+"?\w+"?\s+SET\b/i
+    // A análise roda sobre o SQL SEM COMENTÁRIOS e vive em `analisarRisco`
+    // (lib/db/leitura-migrations.mjs), com teste próprio. Cabeçalho que documenta
+    // "esta migration não contém DROP TABLE" não é instrução — classificá-lo como
+    // destrutivo treina quem lê o log a ignorar o aviso, que é o pior resultado
+    // possível para um alerta de produção.
     for (const m of pendentes) {
-      const sql = sqlDaMigration(DIR, m)
-      const marcas = [DESTRUTIVO.test(sql) && 'DESTRUTIVO', MUTACAO.test(sql) && 'UPDATE de dado'].filter(Boolean)
+      const marcas = analisarRisco(sqlDaMigration(DIR, m))
       console.log(`[migrate-guard]   ○ ${m}${marcas.length ? `  ⚠ ${marcas.join(' + ')}` : ''}`)
     }
     if (!pendentes.length) console.log('[migrate-guard]   (nada pendente — migrate deploy será no-op)')

@@ -231,6 +231,59 @@ ok(!/ADD COLUMN IF NOT EXISTS\s+"\w+"[^,;]*NOT NULL(?!\s+DEFAULT)/i.test(sql), "
 ok(alters.length > 0, "migração contém as instruções esperadas")
 
 // ============================================================================
+console.log("\n5b) ANÁLISE DE RISCO DA MIGRATION — sem falso positivo, sem buraco")
+// `analisarRisco` é a fonte única do aviso do guard de produção. Um alerta que
+// dispara à toa treina quem lê o log a ignorá-lo — e um que não dispara deixa
+// passar o que importa. Os dois lados ficam travados aqui.
+const { analisarRisco, semComentarios } = require("../lib/db/leitura-migrations.mjs") as {
+  analisarRisco: (sql: string) => string[]
+  semComentarios: (sql: string) => string
+}
+
+const CASOS: Array<[string, boolean, string]> = [
+  ["-- esta migration nao contem DROP TABLE\nCREATE TABLE x();", false, "comentário de linha citando DROP não é destrutivo"],
+  ["/* DROP COLUMN documentado */ ALTER TABLE a ADD COLUMN IF NOT EXISTS b int;", false, "comentário de bloco citando DROP não é destrutivo"],
+  ["CREATE TABLE IF NOT EXISTS x (id serial);", false, "criação de tabela é segura"],
+  ["ALTER TABLE a ADD COLUMN IF NOT EXISTS b int;", false, "coluna nova é segura"],
+  ["DROP TABLE x;", true, "DROP TABLE real é detectado"],
+  ["DROP INDEX i;", true, "DROP INDEX é detectado"],
+  ["ALTER TABLE a DROP CONSTRAINT c;", true, "DROP CONSTRAINT é detectado"],
+  ["ALTER TABLE a RENAME COLUMN b TO c;", true, "RENAME é detectado"],
+  ["ALTER TABLE a ALTER COLUMN b TYPE text;", true, "troca de tipo é detectada"],
+  ["TRUNCATE x;", true, "TRUNCATE é detectado"],
+  ["DELETE FROM x WHERE 1=1;", true, "DELETE FROM é detectado"],
+  ["UPDATE x SET y = 1;", true, "UPDATE de dado é detectado"],
+  ["DO $$ BEGIN DROP TABLE x; END $$;", true, "DROP dentro de bloco DO NÃO escapa"],
+  ["EXECUTE 'DROP TABLE x';", true, "SQL dinâmico destrutivo NÃO escapa"],
+]
+for (const [sql, arriscado, nome] of CASOS) {
+  ok(analisarRisco(sql).length > 0 === arriscado, nome, analisarRisco(sql))
+}
+ok(
+  semComentarios("DO $$ BEGIN DROP TABLE x; END $$;").includes("DROP"),
+  "semComentarios NÃO remove bloco $$ (removê-lo abriria um buraco)",
+)
+ok(
+  semComentarios("EXECUTE 'DROP TABLE x';").includes("DROP"),
+  "semComentarios NÃO remove literal entre aspas (idem)",
+)
+ok(
+  analisarRisco(ler(`${DIR_MIG}/migration.sql`)).length === 0,
+  "a migration do MRG é classificada como NÃO arriscada",
+  analisarRisco(ler(`${DIR_MIG}/migration.sql`)),
+)
+const smokeProd = ler("scripts/prod-smoke-registral.ts")
+ok(smokeProd.includes("withRetry") && smokeProd.includes("db-retry"), "o smoke de produção usa retry de conexão")
+ok(
+  !/await prisma\.\$queryRaw</.test(smokeProd),
+  "nenhuma consulta do smoke roda fora do retry (deploy correto não cai por saturação)",
+)
+
+const guardProd = ler("scripts/prod-migrate-guard.mjs")
+ok(guardProd.includes("analisarRisco"), "o guard de produção usa a fonte única de análise")
+ok(!/const DESTRUTIVO\s*=/.test(guardProd), "e não mantém uma cópia própria da regex")
+
+// ============================================================================
 console.log("\n6) SEM TODO / STUB / MOCK no código do motor")
 const TODO_CODIGO = [...PUROS, ...SERVICOS, ...arquivos("src/app/api/registral"), ...arquivos("src/app/api/cron/registral")]
 for (const f of TODO_CODIGO) {
@@ -329,6 +382,74 @@ ok(
   calcularPermissoes("usuario")["registral.aprovar"] === false,
   "usuário comum sem perfil não recebe nenhuma permissão registral",
 )
+
+// ============================================================================
+console.log("\n7c) INTERFACE E OCR — sem duplicar domínio, sem botão morto")
+
+const UI = arquivos("src/components/registral")
+ok(UI.length >= 3, `interface registral tem ${UI.length} módulos`)
+
+// A tela não pode reimplementar regra nem falar com o banco.
+for (const f of UI) {
+  const src = ler(f)
+  ok(!/from ["']@prisma\/client["']/.test(src) && !/@\/lib\/prisma/.test(src), `${f}: a tela não fala com o banco`)
+  ok(!/criticidadeDaAlteracao|estadoDoFato|verificarIntegridade|apurarElegibilidade/.test(src), `${f}: a tela não reimplementa regra do motor`)
+}
+
+// Design System: a tela usa o kit e os tokens, nunca cor/valor cravado.
+const telas = [...UI, "src/app/registral/page.tsx"]
+for (const f of telas) {
+  const src = ler(f)
+  const hexForaDeComentario = src
+    .replace(/\/\*[\s\S]*?\*\//g, " ")
+    .replace(/\/\/[^\n]*/g, " ")
+    .match(/#[0-9a-fA-F]{6}\b/g)
+  ok(!hexForaDeComentario, `${f}: sem cor cravada (tudo vem de token)`, hexForaDeComentario)
+  ok(!/z-\[\d+\]/.test(src), `${f}: sem z-index cravado (usa o SSOT de layers)`)
+}
+const painel = ler("src/components/registral/painel-proposta.tsx")
+ok(painel.includes("LAYER.aboveProcessDrawer"), "o drawer usa a camada do SSOT")
+ok(painel.includes("SURFACE_OVERLAY"), "e superfície OPACA de overlay (token global do DS)")
+ok(painel.includes("createPortal"), "e é portal em body (abre por cima do modal do processo)")
+
+// Sem botão morto: toda ação da tela chama uma rota que existe.
+const central = ler("src/components/registral/central-registral.tsx")
+const ROTAS_USADAS = [
+  ...central.matchAll(/["'`]\/api\/([a-z0-9\-\/\[\]$~{}.]+)/gi),
+  ...painel.matchAll(/["'`]\/api\/([a-z0-9\-\/\[\]$~{}.]+)/gi),
+].map((m) => m[0].replace(/["'`]/g, ""))
+ok(ROTAS_USADAS.length >= 5, `a tela consome ${ROTAS_USADAS.length} rota(s) do motor`)
+ok(
+  ROTAS_USADAS.every((r) => r.startsWith("/api/registral") || r.startsWith("/api/processos")),
+  "e todas são rotas do motor ou do processo",
+  ROTAS_USADAS,
+)
+ok(central.includes("motivo"), "decisão pela tela sempre manda motivo")
+ok(painel.includes("desbloqueioExplicito"), "bloqueio exige desbloqueio explícito também na tela")
+
+// A entrada no menu existe e é gated por permissão.
+const sidebar = ler("src/components/bitrix-sidebar.tsx")
+ok(sidebar.includes('url: "/registral"'), "a tela tem entrada na navegação")
+ok(/url: "\/registral"[\s\S]{0,200}permissao: "registral\.ver_evidencias"/.test(sidebar), "e a entrada é gated por permissão")
+
+// OCR: provedores reais, sem simulação.
+const OCR = arquivos("src/services/registral/ocr")
+ok(OCR.length >= 4, `camada de transcrição tem ${OCR.length} módulos`)
+const orquestrador = ler("src/services/registral/ocr/index.ts")
+ok(orquestrador.includes("documento.update"), "a transcrição é gravada NO DOCUMENTO")
+ok(!/model\s+Transcricao/.test(schema), "e não existe tabela de transcrição paralela")
+ok(orquestrador.includes("jaTinha"), "transcrever é idempotente")
+const externo = ler("src/services/registral/ocr/http-externo.ts")
+ok(externo.includes("OCR_ENDPOINT"), "o provedor externo é configurável por ambiente")
+ok(/disponivel\(\)[\s\S]{0,400}motivo/.test(externo), "e declara o motivo quando indisponível")
+for (const f of OCR) {
+  const src = ler(f)
+  ok(!/texto simulado|lorem ipsum|FAKE|dummy/i.test(src), `${f}: sem texto simulado`)
+}
+const pipelineSrc = ler("src/services/registral/pipeline.ts")
+ok(pipelineSrc.includes("transcreverDocumento"), "o pipeline tenta transcrever antes de desistir")
+const loteSrc = ler("src/services/registral/lote.ts")
+ok(loteSrc.includes("garantirTranscricoes"), "o lote transcreve antes de ler")
 
 // ============================================================================
 console.log("\n8) IDEMPOTÊNCIA — toda escrita nova passa por chave")

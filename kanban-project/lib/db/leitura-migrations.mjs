@@ -26,6 +26,45 @@ export function listarMigrations(dir) {
 export const sqlDaMigration = (dir, nome) => fs.readFileSync(path.join(dir, nome, 'migration.sql'), 'utf8')
 
 /**
+ * Remove SOMENTE comentários (`-- linha` e `/* bloco *\/`).
+ *
+ * Existe para a análise de risco não confundir DOCUMENTAÇÃO com INSTRUÇÃO: uma
+ * migration que escreve no cabeçalho "não contém DROP TABLE" era classificada
+ * como destrutiva por citar a palavra.
+ *
+ * O que esta função DELIBERADAMENTE não remove, para não enfraquecer a proteção:
+ *   · blocos `$$ … $$` — o corpo é executado, e um DROP ali dentro é real;
+ *   · literais entre aspas — `EXECUTE 'DROP TABLE x'` executa de verdade.
+ */
+export function semComentarios(sql) {
+  return String(sql ?? '')
+    .replace(/\/\*[\s\S]*?\*\//g, ' ')
+    .replace(/--[^\n]*/g, ' ')
+}
+
+/**
+ * ANÁLISE DE RISCO de uma migration — fonte ÚNICA (o guard de produção e o teste
+ * leem daqui; duas cópias divergem no dia em que uma delas é ajustada).
+ *
+ * Roda sobre o SQL sem COMENTÁRIOS, e só isso: bloco `$$ … $$` e literais entre
+ * aspas continuam sendo analisados, porque o que está lá dentro executa.
+ *
+ * Devolve as marcas encontradas (vazio = nada arriscado detectado).
+ */
+export function analisarRisco(sql) {
+  const limpo = semComentarios(sql)
+  const REGRAS = [
+    [/\b(DROP\s+(TABLE|COLUMN|SCHEMA|DATABASE|INDEX|CONSTRAINT|TYPE|VIEW|SEQUENCE)|TRUNCATE|DELETE\s+FROM)\b/i, 'DESTRUTIVO'],
+    [/\bALTER\s+TABLE\b[\s\S]{0,200}?\b(DROP|RENAME)\b/i, 'ALTER TABLE com DROP/RENAME'],
+    [/\bALTER\s+COLUMN\b[\s\S]{0,80}?\bTYPE\b/i, 'troca de tipo de coluna'],
+    [/\bRENAME\s+(TO|COLUMN)\b/i, 'RENAME'],
+    [/\bEXECUTE\b[\s\S]{0,200}?\b(DROP|TRUNCATE|DELETE)\b/i, 'SQL dinâmico destrutivo'],
+    [/\bUPDATE\s+"?\w+"?\s+SET\b/i, 'UPDATE de dado'],
+  ]
+  return REGRAS.filter(([re]) => re.test(limpo)).map(([, marca]) => marca)
+}
+
+/**
  * Comentários fora primeiro (um `--` pode citar `$$`), depois os blocos DO $$…$$
  * — idempotentes por construção neste repositório. O resto vira statements.
  * Retorna null se sobrar um `$$` que não soubemos delimitar.
