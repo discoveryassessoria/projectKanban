@@ -3,6 +3,7 @@
 "use client"
 
 import { useState, useEffect, useRef, useCallback, useMemo } from "react"
+import { useApi } from '@/src/lib/dados'
 import { jsPDF } from "jspdf"
 import dagre from "dagre"
 import type { PessoaArvore, UniaoArvore, DocumentoArvore } from "./types"
@@ -53,6 +54,15 @@ const fsColors = {
   line: '#9CA3AF'
 }
 
+/** Resposta da árvore como a API a devolve. */
+type PosicoesNodes = Record<string, Record<string, { x: number; y: number }>>
+interface RespostaArvore {
+  pessoas?: PessoaArvore[]
+  pessoaPrincipalId?: number | null
+  posicoesNodes?: PosicoesNodes | null
+}
+const SEM_PESSOAS: PessoaArvore[] = []
+
 export function ArvoreGenealogicaView({ 
   processoId, 
   arvoreId: initialArvoreId, 
@@ -64,13 +74,34 @@ export function ArvoreGenealogicaView({
 }: ArvoreGenealogicaViewProps) {
   const { pode } = usePermissoes()
   const [viewMode, setViewMode] = useState<ViewMode>('paisagem')
-  const [pessoas, setPessoas] = useState<PessoaArvore[]>([])
-  const [unioes, setUnioes] = useState<UniaoArvore[]>([])
-  const [pessoaPrincipal, setPessoaPrincipal] = useState<PessoaArvore | null>(null)
-  const [loading, setLoading] = useState(true)
   const [creating, setCreating] = useState(false)
   const [arvoreId, setArvoreId] = useState<number | null>(initialArvoreId || null)
-  const [showOnboarding, setShowOnboarding] = useState(false)
+  // A árvore inteira vem de uma leitura só; pessoas, uniões e pessoa principal são
+  // DERIVAÇÕES dela. Antes eram quatro estados preenchidos pelo mesmo carregador, e o
+  // laço que junta as uniões rodava dentro do fetch.
+  const arvoreReq = useApi<RespostaArvore>(arvoreId ? `/api/arvore/${arvoreId}` : null)
+  const pessoas = arvoreReq.dados?.pessoas ?? SEM_PESSOAS
+  const unioes = useMemo<UniaoArvore[]>(() => {
+    const todas: UniaoArvore[] = []
+    for (const p of pessoas) {
+      for (const u of [...(p.unioesComoPessoa1 ?? []), ...(p.unioesComoPessoa2 ?? [])]) {
+        if (!todas.some((x) => x.id === u.id)) todas.push(u)
+      }
+    }
+    return todas
+  }, [pessoas])
+  const pessoaPrincipal = useMemo<PessoaArvore | null>(() => {
+    const idPrincipal = arvoreReq.dados?.pessoaPrincipalId
+    if (idPrincipal) return pessoas.find((p) => p.id === idPrincipal) ?? null
+    return pessoas[0] ?? null
+  }, [arvoreReq.dados, pessoas])
+  const loading = Boolean(arvoreId) && arvoreReq.carregando
+  const fetchArvore = async () => { await arvoreReq.recarregar() }
+  // Onboarding aparece quando a árvore existe e está VAZIA — derivação, não um estado
+  // que o carregador precisava ligar e desligar. Continua podendo ser aberto e fechado
+  // à mão (botão "como começar" / concluir).
+  const [onboardingManual, setShowOnboarding] = useState<boolean | null>(null)
+  const showOnboarding = onboardingManual ?? (Boolean(arvoreReq.dados) && pessoas.length === 0)
   // CAUSA RAIZ: guardar uma CÓPIA da pessoa em estado obrigava um efeito a
   // re-sincronizá-la sempre que `pessoas` era recarregada — cópia velha na tela
   // até o efeito rodar. Guardamos o ID (primitivo, estável) e DERIVAMOS a pessoa
@@ -104,7 +135,10 @@ export function ArvoreGenealogicaView({
   const [pessoaFocada, setPessoaFocada] = useState(false)
   const [sidebarTabInicial, setSidebarTabInicial] = useState<string | undefined>(undefined)
 
-  const [posicoesNodes, setPosicoesNodes] = useState<Record<string, any> | null>(null)
+  // Posições dos nós: o arrasto responde na hora e o salvamento é debounced, então o
+  // valor local é um RASCUNHO sobre o que o servidor devolveu.
+  const [posicoesLocais, setPosicoesNodes] = useState<PosicoesNodes | null>(null)
+  const posicoesNodes = posicoesLocais ?? arvoreReq.dados?.posicoesNodes ?? null
 
   useEffect(() => {
     if (pessoaIdParaFocar && pessoas.length > 0 && !pessoaFocada) {
@@ -382,60 +416,6 @@ export function ArvoreGenealogicaView({
         console.error('Erro ao salvar posições:', error)
       }
     }, 1000)
-  }, [arvoreId])
-
-  const fetchArvore = async () => {
-    if (!arvoreId) return
-
-    try {
-      const response = await authFetch(`/api/arvore/${arvoreId}`)
-
-      if (response.ok) {
-        const data = await response.json()
-        setPessoas(data.pessoas || [])
-        setPosicoesNodes(data.posicoesNodes || null)  // ✅ NOVO
-
-        if (!data.pessoas || data.pessoas.length === 0) {
-          setShowOnboarding(true)
-        } else {
-          setShowOnboarding(false)
-        }
-
-        const todasUnioes: UniaoArvore[] = []
-        data.pessoas?.forEach((p: PessoaArvore) => {
-          p.unioesComoPessoa1?.forEach((u: UniaoArvore) => {
-            if (!todasUnioes.find(x => x.id === u.id)) {
-              todasUnioes.push(u)
-            }
-          })
-          p.unioesComoPessoa2?.forEach((u: UniaoArvore) => {
-            if (!todasUnioes.find(x => x.id === u.id)) {
-              todasUnioes.push(u)
-            }
-          })
-        })
-        setUnioes(todasUnioes)
-
-        if (data.pessoaPrincipalId) {
-          const principal = data.pessoas?.find((p: PessoaArvore) => p.id === data.pessoaPrincipalId)
-          setPessoaPrincipal(principal || null)
-        } else if (data.pessoas?.length > 0) {
-          setPessoaPrincipal(data.pessoas[0])
-        }
-      }
-    } catch (error) {
-      console.error('Erro ao carregar árvore:', error)
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  useEffect(() => {
-    if (!arvoreId) {
-      setLoading(false)
-      return
-    }
-    fetchArvore()
   }, [arvoreId])
 
   const handleToggleFullscreen = async () => {
@@ -869,7 +849,7 @@ function AddPersonModal({
   const [isFalecido, setIsFalecido] = useState(false)
   const [dataObito, setDataObito] = useState('')
   const [localObito, setLocalObito] = useState('')
-  const [isCasado, setIsCasado] = useState(false)
+  const [isCasado, setIsCasado] = useState(type === 'conjuge')
   const [dataCasamento, setDataCasamento] = useState('')
   const [localCasamento, setLocalCasamento] = useState('')
   const [conjugeId, setConjugeId] = useState<number | string>('')
@@ -893,9 +873,9 @@ function AddPersonModal({
     backgroundPosition: 'right 12px center'
   }
 
-  useEffect(() => {
-    if (type === 'conjuge') setIsCasado(true)
-  }, [type])
+  // Adicionar cônjuge implica casado — é derivação do tipo de adição, não um estado
+  // que precise ser corrigido depois. Antes o formulário aparecia por um render com o
+  // "casado" desmarcado, e só então o efeito o marcava.
 
   // Relação estrutural do tipo de adição, para o caminho de REUSO do requerente:
   // ao vincular a Pessoa existente, propaga os mesmos vínculos que o form aplicaria.

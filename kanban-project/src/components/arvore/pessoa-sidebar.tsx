@@ -393,7 +393,18 @@ function FamiliarCard({
 // ========================================
 // COMPONENTE PRINCIPAL
 // ========================================
-export function PessoaSidebar({ 
+/**
+ * Casca fina: o painel só existe com pessoa, e a sua identidade é ela. Substitui os
+ * DOIS efeitos que decidiam a aba inicial — um aplicava a aba do deep-link "uma vez
+ * só", guardado por um flag; o outro voltava para "info" quando a pessoa mudava e
+ * zerava o flag. Montar do zero por pessoa faz as duas coisas por construção.
+ */
+export function PessoaSidebar(props: PessoaSidebarProps) {
+  if (!props.pessoa) return null
+  return <ConteudoSidebar key={props.pessoa.id} {...props} />
+}
+
+function ConteudoSidebar({ 
   pessoa, 
   conjuges = [], 
   casamentos = [], 
@@ -411,33 +422,14 @@ export function PessoaSidebar({
   onSelectPerson,
   initialTab
 }: PessoaSidebarProps) {
-  const [activeTab, setActiveTab] = useState<"info" | "familia" | "docs">("info")
+  // Aba inicial: a do deep-link, quando veio uma reconhecida; senão "info".
+  const [activeTab, setActiveTab] = useState<"info" | "familia" | "docs">(() => {
+    if (initialTab === "documentos" || initialTab === "docs") return "docs"
+    if (initialTab === "familia") return "familia"
+    return "info"
+  })
   const [confirmDelete, setConfirmDelete] = useState(false)
-  const [initialTabProcessed, setInitialTabProcessed] = useState(false)
   const { pode } = usePermissoes()
-  
-  // Efeito para definir aba inicial quando a sidebar abre (vindo da pesquisa)
-  useEffect(() => {
-    if (pessoa && initialTab && !initialTabProcessed) {
-      if (initialTab === "documentos" || initialTab === "docs") {
-        setActiveTab("docs")
-      } else if (initialTab === "familia") {
-        setActiveTab("familia")
-      } else if (initialTab === "info") {
-        setActiveTab("info")
-      }
-      setInitialTabProcessed(true)
-    }
-  }, [pessoa, initialTab, initialTabProcessed])
-
-  // Reset quando a pessoa muda (clique manual em outra pessoa)
-  useEffect(() => {
-    if (pessoa && !initialTab) {
-      setActiveTab("info")
-    }
-    // Reset flag quando pessoa muda
-    setInitialTabProcessed(false)
-  }, [pessoa?.id])
   
   if (!pessoa) return null
   
