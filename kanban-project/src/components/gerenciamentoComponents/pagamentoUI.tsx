@@ -171,7 +171,11 @@ export function MultiSelect({
   // Enquanto aberto: registra a instância, mede, reposiciona em scroll/resize e
   // fecha ao clicar fora / Escape. TUDO é removido no cleanup (sem listener órfão).
   React.useLayoutEffect(() => {
-    if (!aberto) { abertos.delete(fecharRef.current); setPos(null); return }
+    // Fechado: só desregistra. O `setPos(null)` que morava aqui era um setState em
+    // efeito — e desnecessário, porque o menu já só é renderizado com `aberto`. A
+    // medição obsoleta é DESCARTADA na renderização (`posEfetiva`), não apagada do
+    // estado, e a próxima abertura mede de novo antes de pintar.
+    if (!aberto) { abertos.delete(fecharRef.current); return }
     const fechaEsta = () => fecharRef.current()
     abertos.add(fechaEsta)
     medir()
@@ -222,11 +226,13 @@ export function MultiSelect({
     else if (e.key === 'Enter' || (e.key === ' ' && e.target !== buscaRef.current)) { e.preventDefault(); const o = visiveis[foco]; if (o) alternar(o.id) }
   }
 
-  const menu = aberto && pos && typeof document !== 'undefined' ? createPortal(
+  // Posição só vale para a abertura corrente.
+  const posEfetiva = aberto ? pos : null
+  const menu = aberto && posEfetiva && typeof document !== 'undefined' ? createPortal(
     <div
       ref={menuRef}
       // z acima do modal (z-50/z-[60]); sem backdrop — nada cobre a página.
-      style={{ position: 'fixed', left: pos.left, top: pos.top, width: pos.width, maxHeight: pos.maxH, zIndex: 120 }}
+      style={{ position: 'fixed', left: posEfetiva.left, top: posEfetiva.top, width: posEfetiva.width, maxHeight: posEfetiva.maxH, zIndex: 120 }}
       className="flex flex-col overflow-hidden rounded-lg border border-white/15 bg-zinc-900 shadow-2xl"
       onKeyDown={teclado}
     >

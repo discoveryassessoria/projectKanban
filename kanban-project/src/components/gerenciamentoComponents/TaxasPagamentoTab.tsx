@@ -11,6 +11,7 @@
 //   Backend: /api/gerenciamento/taxas-pagamento/formas (GET) + /formas/[id] (GET/PUT)
 // ============================================================================
 import { useState, useEffect, useMemo, useCallback, type ReactNode } from 'react'
+import { useApi } from '@/src/lib/dados'
 import {
   Percent, Search, X, Check, Loader2, Settings2, CreditCard, Landmark, Banknote, Coins, ArrowLeft,
 } from 'lucide-react'
@@ -28,20 +29,19 @@ type FormaAgrupada = {
 const iconForma = (type: string | null) =>
   type?.startsWith('CARTAO') ? CreditCard : type === 'BOLETO' ? Landmark : type === 'DINHEIRO' ? Banknote : Coins
 
+const SEM_FORMAS: FormaAgrupada[] = []
+
 export default function TaxasPagamentoTab() {
-  const [formas, setFormas] = useState<FormaAgrupada[]>([])
-  const [loading, setLoading] = useState(true)
-  const [erro, setErro] = useState<string | null>(null)
   const [busca, setBusca] = useState('')
   const [configId, setConfigId] = useState<number | null>(null)
 
-  const carregar = useCallback(async () => {
-    setLoading(true); setErro(null)
-    try { const d = await jf('/api/gerenciamento/taxas-pagamento/formas', { cache: 'no-store' }); setFormas(d.formas || []) }
-    catch (e: any) { setErro(e.message || 'Não foi possível carregar.') }
-    finally { setLoading(false) }
-  }, [])
-  useEffect(() => { carregar() }, [carregar])
+  // Leitura pela camada oficial. Lista vazia como constante: literal novo por render
+  // desestabilizaria a dependência do `useMemo` do filtro logo abaixo.
+  const consulta = useApi<{ formas?: FormaAgrupada[] }>('/api/gerenciamento/taxas-pagamento/formas')
+  const formas = consulta.dados?.formas ?? SEM_FORMAS
+  const loading = consulta.carregando
+  const carregar = consulta.recarregar
+  const erro = consulta.erro ? consulta.erro.message : null
 
   const filtrados = useMemo(() => {
     const q = busca.trim().toLowerCase()
@@ -76,7 +76,7 @@ export default function TaxasPagamentoTab() {
       {loading ? (
         <div className="flex items-center justify-center py-16"><Loader2 className="h-8 w-8 animate-spin text-white/50" /></div>
       ) : erro ? (
-        <div className="rounded-lg border border-red-500/30 bg-red-500/10 p-4 text-sm text-red-200">{erro}<button onClick={carregar} className="ml-3 underline hover:text-white">Tentar de novo</button></div>
+        <div className="rounded-lg border border-red-500/30 bg-red-500/10 p-4 text-sm text-red-200">{erro}<button onClick={() => { void carregar() }} className="ml-3 underline hover:text-white">Tentar de novo</button></div>
       ) : filtrados.length === 0 ? (
         <div className={`${GLASS} flex flex-col items-center gap-2 py-16 text-center`}>
           <Percent className="h-10 w-10 text-white/20" />

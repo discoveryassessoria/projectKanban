@@ -8,6 +8,7 @@
 // Backend: /api/gerenciamento/produtos (GET/POST) + /[id] (PUT/DELETE).
 
 import { useState, useEffect, useMemo, useCallback } from 'react'
+import { useApi } from '@/src/lib/dados'
 import { usePermissoes } from '@/src/hooks/use-permissoes'
 import { ExclusaoDefinitivaModal } from './ExclusaoDefinitivaModal'
 
@@ -58,6 +59,24 @@ type MestreRef = { id: number; label: string; code: string | null }
 type Mestres = { documento: MestreRef[]; servico: MestreRef[]; honorario: MestreRef[]; processo: MestreRef[] }
 type FornecedorRef = { id: number; nome: string; publicCode: string | null }
 const MESTRES_VAZIO: Mestres = { documento: [], servico: [], honorario: [], processo: [] }
+// Forma da resposta de /produtos. Antes era lida com `(d as any).x` — o `as any`
+// escondia justamente os campos opcionais que a normalização abaixo trata.
+type MestreBruto = { id: number; name: string; code?: string | null; publicCode?: string | null }
+type RespostaProdutos = {
+  produtos?: Produto[]
+  mestres?: {
+    tiposDocumento?: MestreBruto[]
+    servicos?: MestreBruto[]
+    honorarios?: MestreBruto[]
+    tiposProcesso?: MestreBruto[]
+    fornecedores?: { id: number; nome: string; publicCode?: string | null }[]
+  }
+}
+// Listas vazias como constantes: literal novo por render trocaria a identidade da
+// dependência e faria os memos desta tela recalcularem sempre.
+const SEM_PRODUTOS: Produto[] = []
+const SEM_CATEGORIAS: CategoriaRef[] = []
+const SEM_CONTAS: ContaRef[] = []
 // Rótulo da ORIGEM estrutural do mestre (Documento/Serviço/...). Usado na coluna e busca.
 const ORIGEM_LABEL: Record<string, string> = { documento: 'Documento', servico: 'Serviço', honorario: 'Honorário', processo: 'Processo', item: 'Item' }
 const origemLabel = (o?: string | null) => (o ? (ORIGEM_LABEL[o] ?? o) : '—')
@@ -119,14 +138,37 @@ const Check = ({ ok }: { ok: boolean }) =>
   ok ? <span className="text-green-300">✓</span> : <span className="text-white/25">—</span>
 
 export default function ProdutosTab() {
-  const [produtos, setProdutos] = useState<Produto[]>([])
-  const [categorias, setCategorias] = useState<CategoriaRef[]>([])
-  const [contas, setContas] = useState<ContaRef[]>([])
-  const [mestres, setMestres] = useState<Mestres>(MESTRES_VAZIO)
-  const [fornecedores, setFornecedores] = useState<FornecedorRef[]>([])
+  // Três leituras pela camada oficial. Categorias e plano de contas seguem
+  // TOLERANTES (os `.catch(() => …)` originais): são listas de apoio do formulário,
+  // e falha nelas não pode impedir a tela de mostrar os produtos.
+  const produtosReq = useApi<RespostaProdutos>('/api/gerenciamento/produtos')
+  const categoriasReq = useApi<{ categorias?: CategoriaRef[] }>('/api/gerenciamento/categorias')
+  const contasReq = useApi<{ contas?: ContaRef[] }>('/api/gerenciamento/plano-contas')
+  const produtos = produtosReq.dados?.produtos ?? SEM_PRODUTOS
+  const categorias = categoriasReq.dados?.categorias ?? SEM_CATEGORIAS
+  const contas = contasReq.dados?.contas ?? SEM_CONTAS
+  // A resposta dos mestres é normalizada para o formato dos selects. Como isso é
+  // derivação pura, vive num useMemo e não em estado copiado por efeito.
+  const mestres = useMemo<Mestres>(() => {
+    const m = produtosReq.dados?.mestres
+    if (!m) return MESTRES_VAZIO
+    return {
+      documento: (m.tiposDocumento ?? []).map((d) => ({ id: d.id, label: d.name, code: d.code ?? null })),
+      servico: (m.servicos ?? []).map((x) => ({ id: x.id, label: x.publicCode ? `${x.publicCode} — ${x.name}` : x.name, code: x.code ?? null })),
+      honorario: (m.honorarios ?? []).map((h) => ({ id: h.id, label: h.name, code: h.code ?? null })),
+      processo: (m.tiposProcesso ?? []).map((p) => ({ id: p.id, label: p.name, code: null })),
+    }
+  }, [produtosReq.dados])
+  const fornecedores = useMemo<FornecedorRef[]>(
+    () => (produtosReq.dados?.mestres?.fornecedores ?? []).map((f) => ({ id: f.id, nome: f.nome, publicCode: f.publicCode ?? null })),
+    [produtosReq.dados],
+  )
+  const loading = produtosReq.carregando
+  const carregar = produtosReq.recarregar
   const [masterBusca, setMasterBusca] = useState('')
-  const [loading, setLoading] = useState(true)
-  const [erroLista, setErroLista] = useState<string | null>(null)
+  const [erroEscritaLista, setErroEscritaLista] = useState<string | null>(null)
+  const erroLista = erroEscritaLista ?? (produtosReq.erro ? produtosReq.erro.message : null)
+  const setErroLista = setErroEscritaLista
   const [busca, setBusca] = useState('')
   const [mostrarInativos, setMostrarInativos] = useState(false)
 
@@ -140,34 +182,6 @@ export default function ProdutosTab() {
   const [erroModal, setErroModal] = useState<string | null>(null)
 
   const set = (k: keyof FormState, v: any) => setForm((f) => ({ ...f, [k]: v }))
-
-  const carregar = useCallback(async () => {
-    setLoading(true); setErroLista(null)
-    try {
-      const [dProd, dCat, dContas] = await Promise.all([
-        jsonFetch('/api/gerenciamento/produtos', { cache: 'no-store' }),
-        jsonFetch('/api/gerenciamento/categorias', { cache: 'no-store' }).catch(() => ({ categorias: [] })),
-        jsonFetch('/api/gerenciamento/plano-contas', { cache: 'no-store' }).catch(() => ({ contas: [] })),
-      ])
-      setProdutos((dProd as any).produtos || [])
-      const m = (dProd as any).mestres || {}
-      setMestres({
-        documento: (m.tiposDocumento || []).map((d: any) => ({ id: d.id, label: d.name, code: d.code ?? null })),
-        servico: (m.servicos || []).map((x: any) => ({ id: x.id, label: x.publicCode ? `${x.publicCode} — ${x.name}` : x.name, code: x.code ?? null })),
-        honorario: (m.honorarios || []).map((h: any) => ({ id: h.id, label: h.name, code: h.code ?? null })),
-        processo: (m.tiposProcesso || []).map((p: any) => ({ id: p.id, label: p.name, code: null })),
-      })
-      setFornecedores((m.fornecedores || []).map((f: any) => ({ id: f.id, nome: f.nome, publicCode: f.publicCode ?? null })))
-      setCategorias((dCat as any).categorias || [])
-      setContas((dContas as any).contas || [])
-    } catch (e: any) {
-      setErroLista(e.message || 'Não foi possível carregar as configurações.')
-    } finally {
-      setLoading(false)
-    }
-  }, [])
-
-  useEffect(() => { carregar() }, [carregar])
 
   const filtrados = useMemo(() => {
     const base = mostrarInativos ? produtos : produtos.filter((p) => p.ativo)
@@ -321,7 +335,7 @@ export default function ProdutosTab() {
       {!loading && erroLista && (
         <div className="rounded-lg border border-red-500/30 bg-red-500/10 p-4 text-sm text-red-200">
           {erroLista}
-          <button onClick={carregar} className="ml-3 underline hover:text-white">Tentar de novo</button>
+          <button onClick={() => { void carregar() }} className="ml-3 underline hover:text-white">Tentar de novo</button>
         </div>
       )}
 

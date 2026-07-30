@@ -15,6 +15,7 @@
 //   DiagnosticoConfiguracaoTab→ Relatórios e Indicadores › Diagnóstico de Configuração
 
 import { useCallback, useEffect, useMemo, useState } from "react"
+import { useApi } from "@/src/lib/dados"
 
 // ─────────────────────────── tipos do read-model ────────────────────────────
 interface Passo {
@@ -53,25 +54,20 @@ const CARD = "rounded-2xl border border-white/10 bg-white/5 backdrop-blur-sm"
 const TH = "px-4 py-3 font-medium"
 const selectCls = "rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-white outline-none focus:border-white/20"
 
+const SEM_TIPOS: Tipo[] = []
+
 function useConfiguracaoProcesso() {
-  const [tipos, setTipos] = useState<Tipo[]>([])
-  const [loading, setLoading] = useState(true)
-  const [erro, setErro] = useState<string | null>(null)
-
-  const load = useCallback(async () => {
-    setLoading(true); setErro(null)
-    try {
-      const res = await fetch("/api/gerenciamento/configuracao-processo", { headers: authHeaders(), cache: "no-store" })
-      const j = await res.json().catch(() => ({}))
-      if (res.ok) setTipos(j.tipos || [])
-      else setErro(j.error || "Não foi possível carregar a configuração dos processos.")
-    } catch {
-      setErro("Não foi possível carregar a configuração dos processos.")
-    } finally { setLoading(false) }
-  }, [])
-  useEffect(() => { load() }, [load])
-
-  return { tipos, loading, erro, reload: load }
+  // Uma consulta na camada oficial substitui o trio `useState` + `load` + efeito.
+  // Todas as views desta tela usam a MESMA chave, então elas compartilham uma única
+  // requisição em vez de cada uma buscar o seu.
+  const consulta = useApi<{ tipos?: Tipo[] }>("/api/gerenciamento/configuracao-processo")
+  return {
+    // Constante, não `?? []`: a lista alimenta dependência de `useMemo` abaixo.
+    tipos: consulta.dados?.tipos ?? SEM_TIPOS,
+    loading: consulta.carregando,
+    erro: consulta.erro ? consulta.erro.message : null,
+    reload: consulta.recarregar,
+  }
 }
 
 /** Casca comum: título, descrição, erro, seletor de tipo e estado vazio. */
@@ -89,11 +85,12 @@ function Consulta({
   const [tipoId, setTipoId] = useState<number | null>(null)
 
   const visiveis = useMemo(() => tipos.filter((t) => !t.arquivado), [tipos])
-  useEffect(() => {
-    if (tipoId == null && visiveis.length) setTipoId(visiveis[0].id)
-  }, [visiveis, tipoId])
+  // O primeiro tipo vem pré-selecionado — comportamento original, agora DERIVADO em
+  // vez de escrito por efeito: enquanto o usuário não escolher, vale o primeiro
+  // visível. Sem o render extra e sem o instante de tela sem tipo selecionado.
+  const tipoIdEfetivo = tipoId ?? visiveis[0]?.id ?? null
 
-  const tipo = useMemo(() => visiveis.find((t) => t.id === tipoId) ?? null, [visiveis, tipoId])
+  const tipo = useMemo(() => visiveis.find((t) => t.id === tipoIdEfetivo) ?? null, [visiveis, tipoIdEfetivo])
 
   if (loading) return <div className="py-24 text-center text-white/50">Carregando…</div>
 
@@ -101,7 +98,7 @@ function Consulta({
     <div className="space-y-5">
       {erro && (
         <div className="rounded-xl border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-200">
-          {erro} <button onClick={reload} className="ml-2 underline hover:text-white">Tentar de novo</button>
+          {erro} <button onClick={() => { void reload() }} className="ml-2 underline hover:text-white">Tentar de novo</button>
         </div>
       )}
 
@@ -120,7 +117,7 @@ function Consulta({
           <div className="mt-4 flex flex-wrap items-center gap-3 border-t border-white/10 pt-4">
             <label className="text-sm text-white/60">Processo:</label>
             <select
-              value={tipoId ?? ""}
+              value={tipoIdEfetivo ?? ""}
               onChange={(e) => setTipoId(e.target.value ? Number(e.target.value) : null)}
               className={`${selectCls} min-w-[280px]`}
             >

@@ -8,6 +8,7 @@
 // Visual segue o padrão do app (tema escuro/glass, modal bg-zinc-900/95, options bg-zinc-900).
 
 import { useState, useEffect, useMemo, useCallback } from 'react'
+import { useApi } from '@/src/lib/dados'
 
 type Fase = { phaseKey: string; label: string; ordem: number }
 type TipoProcesso = { id: number; name: string; fases: Fase[] }
@@ -67,12 +68,23 @@ function novoForm() {
   return { label: '', active: true, description: '', condition: '', impactOperational: '', impactDocument: '', impactFinancial: '', impactProtocol: '' }
 }
 
+/** Bootstrap da tela, como o endpoint devolve. */
+type RespostaModos = { tiposProcesso?: TipoProcesso[]; modos?: Modo[]; modelosInternos?: ModeloInterno[] }
+const SEM_TIPOS: TipoProcesso[] = []
+const SEM_MODOS: Modo[] = []
+const SEM_MODELOS: ModeloInterno[] = []
+
 export default function ModosInternosFasesTab() {
-  const [tipos, setTipos] = useState<TipoProcesso[]>([])
-  const [modos, setModos] = useState<Modo[]>([])
-  const [modelos, setModelos] = useState<ModeloInterno[]>([])
-  const [loading, setLoading] = useState(true)
-  const [erroCarregar, setErroCarregar] = useState<string | null>(null)
+  // Os três catálogos vêm do MESMO endpoint: uma consulta, não três `useState`
+  // alimentados por efeito. Listas vazias como constantes de módulo, porque elas
+  // alimentam dependências de `useMemo` desta tela.
+  const consulta = useApi<RespostaModos>(BASE)
+  const tipos = consulta.dados?.tiposProcesso ?? SEM_TIPOS
+  const modos = consulta.dados?.modos ?? SEM_MODOS
+  const modelos = consulta.dados?.modelosInternos ?? SEM_MODELOS
+  const loading = consulta.carregando
+  const carregar = consulta.recarregar
+  const erroCarregar = consulta.erro ? consulta.erro.message : null
   const [sucesso, setSucesso] = useState('')
 
   const [ptId, setPtId] = useState<number | ''>('')
@@ -89,23 +101,6 @@ export default function ModosInternosFasesTab() {
   const [aplicarAberto, setAplicarAberto] = useState(false)
   const [selecionados, setSelecionados] = useState<number[]>([])
   const [aplicando, setAplicando] = useState(false)
-
-  const carregar = useCallback(async () => {
-    setLoading(true)
-    setErroCarregar(null)
-    try {
-      const d = await jsonFetch(BASE, { cache: 'no-store' })
-      setTipos((d as any).tiposProcesso || [])
-      setModos((d as any).modos || [])
-      setModelos((d as any).modelosInternos || [])
-    } catch (e: any) {
-      setErroCarregar(e.message || 'Não foi possível carregar.')
-    } finally {
-      setLoading(false)
-    }
-  }, [])
-
-  useEffect(() => { carregar() }, [carregar])
 
   function flashSucesso(msg: string) {
     setSucesso(msg)
@@ -308,7 +303,7 @@ export default function ModosInternosFasesTab() {
       ) : erroCarregar ? (
         <div className="rounded-lg border border-red-500/30 bg-red-500/10 p-4 text-sm text-red-200">
           {erroCarregar}
-          <button onClick={carregar} className="ml-3 underline hover:text-white">Tentar de novo</button>
+          <button onClick={() => { void carregar() }} className="ml-3 underline hover:text-white">Tentar de novo</button>
         </div>
       ) : !ptId ? (
         <div className="rounded-xl border border-white/10 bg-white/5 py-12 text-center text-sm text-white/40 backdrop-blur">

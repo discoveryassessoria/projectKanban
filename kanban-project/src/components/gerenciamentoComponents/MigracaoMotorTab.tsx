@@ -1,6 +1,7 @@
 "use client"
 
 import { useEffect, useState, useCallback } from "react"
+import { useApi } from "@/src/lib/dados"
 
 interface Tipo { id: number; name: string; countryLabel: string }
 interface PaisStat { pais: string; total: number; conectados: number }
@@ -15,12 +16,12 @@ const inputCls = "w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 
 const labelCls = "mb-1 block text-xs text-white/60"
 const opt = "bg-zinc-900"
 
+/** Panorama da migração, como o endpoint devolve. */
+interface Panorama { total?: number; conectados?: number; porPais?: PaisStat[]; tipos?: Tipo[] }
+const SEM_POR_PAIS: PaisStat[] = []
+const SEM_TIPOS: Tipo[] = []
+
 export default function MigracaoMotorTab() {
-  const [loading, setLoading] = useState(true)
-  const [total, setTotal] = useState(0)
-  const [conectados, setConectados] = useState(0)
-  const [porPais, setPorPais] = useState<PaisStat[]>([])
-  const [tipos, setTipos] = useState<Tipo[]>([])
 
   const [pais, setPais] = useState("all")
   const [tipoId, setTipoId] = useState<number | "">("")
@@ -35,17 +36,15 @@ export default function MigracaoMotorTab() {
 
   const showFlash = (m: string) => { setFlash(m); setTimeout(() => setFlash(""), 3500) }
 
-  const load = useCallback(async () => {
-    try {
-      const res = await fetch("/api/gerenciamento/migracao-motor", { headers: authHeaders() })
-      if (res.ok) {
-        const d = await res.json()
-        setTotal(d.total || 0); setConectados(d.conectados || 0)
-        setPorPais(d.porPais || []); setTipos(d.tipos || [])
-      }
-    } finally { setLoading(false) }
-  }, [])
-  useEffect(() => { load() }, [load])
+  // Panorama pela camada oficial. Falha segue silenciosa (a tela mostra zeros), como
+  // no `if (res.ok)` sem ramo de erro que havia aqui.
+  const panorama = useApi<Panorama>("/api/gerenciamento/migracao-motor")
+  const total = panorama.dados?.total ?? 0
+  const conectados = panorama.dados?.conectados ?? 0
+  const porPais = panorama.dados?.porPais ?? SEM_POR_PAIS
+  const tipos = panorama.dados?.tipos ?? SEM_TIPOS
+  const loading = panorama.carregando
+  const load = panorama.recarregar
 
   // recalcula a prévia quando muda país/overwrite
   const calcPreview = useCallback(async (p: string, ow: boolean) => {
