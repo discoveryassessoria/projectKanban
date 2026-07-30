@@ -49,8 +49,12 @@ export default function TipoProcessoTab() {
   const [editando, setEditando] = useState<Tipo | null>(null)
   const [countryKey, setCountryKey] = useState('')
   const [modalityKey, setModalityKey] = useState('')
-  const [code, setCode] = useState('')
-  const [name, setName] = useState('')
+  // Código e nome são SUGESTÃO com direito de sobrescrever. Antes dois efeitos
+  // copiavam a sugestão para o estado; o campo ficava um render atrás da escolha de
+  // país/modalidade — dava para ver a sugestão velha depois de trocar o país.
+  // Agora o estado guarda só o que foi DIGITADO, e o campo é derivado.
+  const [codeDigitado, setCode] = useState('')
+  const [nameDigitado, setName] = useState('')
   const [ativo, setAtivo] = useState(true)
   const [codeTouched, setCodeTouched] = useState(false)
   const [nameTouched, setNameTouched] = useState(false)
@@ -132,12 +136,9 @@ export default function TipoProcessoTab() {
     return `Nacionalidade ${paisSel.nationalityLabel} · ${modSel.modalityLabel}`
   }, [paisSel, modSel])
 
-  useEffect(() => {
-    if (!codeTouched) setCode(sugCode)
-  }, [sugCode, codeTouched])
-  useEffect(() => {
-    if (!nameTouched) setName(sugName)
-  }, [sugName, nameTouched])
+  // Enquanto o usuário não mexeu, vale a sugestão; depois de mexer, vale o dele.
+  const code = codeTouched ? codeDigitado : sugCode
+  const name = nameTouched ? nameDigitado : sugName
 
   const filtrados = useMemo(() => {
     const q = busca.trim().toLowerCase()

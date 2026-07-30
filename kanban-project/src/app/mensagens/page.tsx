@@ -3,7 +3,8 @@
 
 import { useEffect, useState, useCallback, useRef } from "react"
 import { useRouter } from "next/navigation"
-import { getStoredUser, isAuthenticated } from "@/lib/auth"
+import { useApi } from "@/src/lib/dados"
+import { useIsClient, useJsonLocalStorage, useLocalStorage } from "@/src/lib/cliente"
 import { usePermissoes } from "@/src/hooks/use-permissoes"
 import { HeaderBar } from "@/src/components/header-bar"
 import { Send, MessageCircle, ArrowLeft, Pencil, Trash2, X, Check } from "lucide-react"
@@ -76,14 +77,27 @@ function formatarDataSeparador(dataStr: string): string {
   return data.toLocaleDateString("pt-BR", { day: "2-digit", month: "long", year: "numeric" })
 }
 
+const SEM_CONVERSAS: Conversa[] = []
+
 export default function MensagensPage() {
   const router = useRouter()
   const { pode } = usePermissoes()
-  const [user, setUser] = useState<User | null>(null)
-  const [loading, setLoading] = useState(true)
+  // Sessão e usuário derivados da leitura oficial — sem copiar para o estado.
+  const noCliente = useIsClient()
+  const token = useLocalStorage("authToken")
+  const user = useJsonLocalStorage<User>("user")
+  const autenticado = Boolean(token && user)
+  const loading = !noCliente
 
-  const [conversas, setConversas] = useState<Conversa[]>([])
-  const [loadingConversas, setLoadingConversas] = useState(true)
+  // Conversas: a camada faz o polling de 15s (`refreshInterval`), no lugar de
+  // `setInterval` + `useState` + efeito. Só busca autenticado.
+  const conversasReq = useApi<{ conversas?: Conversa[] }>(
+    autenticado && noCliente ? "/api/admin/mensagens" : null,
+    { refreshInterval: 15_000 },
+  )
+  const conversas = conversasReq.dados?.conversas ?? SEM_CONVERSAS
+  const loadingConversas = conversasReq.carregando
+  const buscarConversas = conversasReq.recarregar
 
   const [conversaAberta, setConversaAberta] = useState<number | null>(null)
   const [processoNome, setProcessoNome] = useState("")
@@ -100,43 +114,12 @@ export default function MensagensPage() {
   const inputRef = useRef<HTMLTextAreaElement>(null)
   const editInputRef = useRef<HTMLTextAreaElement>(null)
 
-  // Auth
+  // Sem sessão, volta ao login. Navegar é efeito; a identidade não era.
   useEffect(() => {
-    if (!isAuthenticated()) {
-      router.push("/login")
-      return
-    }
-    const userData = getStoredUser()
-    if (!userData) {
-      router.push("/login")
-      return
-    }
-    setUser(userData)
-    setLoading(false)
-  }, [router])
+    if (!noCliente) return
+    if (!autenticado) router.push("/login")
+  }, [noCliente, autenticado, router])
 
-  // Buscar conversas
-  const buscarConversas = useCallback(async () => {
-    try {
-      const res = await fetch("/api/admin/mensagens")
-      if (res.ok) {
-        const data = await res.json()
-        setConversas(data.conversas || [])
-      }
-    } catch (error) {
-      console.error("Erro ao buscar conversas:", error)
-    } finally {
-      setLoadingConversas(false)
-    }
-  }, [])
-
-  useEffect(() => {
-    if (!loading) {
-      buscarConversas()
-      const interval = setInterval(buscarConversas, 15000)
-      return () => clearInterval(interval)
-    }
-  }, [loading, buscarConversas])
 
   // Abrir conversa
   const abrirConversa = useCallback(

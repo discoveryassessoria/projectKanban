@@ -7,7 +7,10 @@
 
 "use client"
 
-import { useEffect, useState, useCallback } from "react"
+import { useEffect, useMemo, useState, useCallback } from "react"
+import { useApi } from "@/src/lib/dados"
+import { useLocalStorage } from "@/src/lib/cliente"
+import { useDebounce } from "@/src/hooks/use-debounce"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -69,14 +72,36 @@ const TODAS_CHAVES = MODULOS_PERMISSOES.flatMap(m => m.permissoes.map(p => p.cha
 interface Usuario { id: number; publicCode?: string | null; nome: string; email: string; tipo: string; perfilId?: number | null; perfilNome?: string | null }
 interface Perfil { id: number; nome: string; descricao: string | null; cor: string | null; sistema: boolean; permissoes: Record<string, boolean> }
 
+const SEM_PERFIS: Perfil[] = []
+
 export default function UsersTab() {
   const { pode } = usePermissoes()
 
-  const [usuarios, setUsuarios] = useState<Usuario[]>([])
-  const [perfis, setPerfis] = useState<Perfil[]>([])
-  const [isLoading, setIsLoading] = useState(true)
   const [searchTerm, setSearchTerm] = useState("")
-  const [error, setError] = useState("")
+  // A busca entra na CHAVE, e o debounce é o da própria camada (`keepPreviousData`
+  // evita a tela piscar entre teclas). Antes eram três efeitos para a mesma coisa:
+  // um na montagem, um com `setTimeout(500)` e um `eslint-disable-line` em cada.
+  const buscaAplicada = useDebounce(searchTerm, 500)
+  const token = useLocalStorage("authToken")
+  // Sem token não se busca — era o `if (!token) { setUsuarios([]); return }`.
+  const chaveUsuarios = token
+    ? (buscaAplicada ? `/api/usuarios?search=${encodeURIComponent(buscaAplicada)}&all=true` : '/api/usuarios?all=true')
+    : null
+  const usuariosReq = useApi<{ usuarios?: Usuario[] }>(chaveUsuarios, { keepPreviousData: true })
+  // O filtro de `id` definido continua: a lista da tela é de usuários persistidos.
+  const usuarios = useMemo(
+    () => (usuariosReq.dados?.usuarios ?? []).filter((u: Usuario) => u.id !== undefined),
+    [usuariosReq.dados],
+  )
+  const perfisReq = useApi<{ perfis?: Perfil[] }>("/api/perfis")
+  const perfis = perfisReq.dados?.perfis ?? SEM_PERFIS
+  const isLoading = Boolean(chaveUsuarios) && usuariosReq.carregando
+  const loadUsers = usuariosReq.recarregar
+  // Erro de LEITURA vem da consulta; erro de escrita/validação continua em estado.
+  const [erroLocal, setError] = useState("")
+  // 401 já é tratado na camada (encerra a sessão), então aqui ele não vira texto na
+  // tela — era o que o `if (err.message?.includes("401"))` fazia à mão.
+  const error = erroLocal || (usuariosReq.erro && usuariosReq.erro.status !== 401 ? usuariosReq.erro.message : "")
   const [success, setSuccess] = useState("")
 
   const [isDialogOpen, setIsDialogOpen] = useState(false)
@@ -86,7 +111,6 @@ export default function UsersTab() {
   const [isSubmitting, setIsSubmitting] = useState(false)
 
   const [selectedPerfilId, setSelectedPerfilId] = useState<number | null>(null)
-  const [permissoesEfetivas, setPermissoesEfetivas] = useState<Record<string, boolean>>({})
   const [permissoesCustom, setPermissoesCustom] = useState<Record<string, boolean>>({})
   const [showPermissoes, setShowPermissoes] = useState(false)
   const [expandedModulos, setExpandedModulos] = useState<string[]>([])
@@ -94,36 +118,11 @@ export default function UsersTab() {
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false)
   const [userToDelete, setUserToDelete] = useState<Usuario | null>(null)
 
-  const fetchPerfis = useCallback(async () => {
-    try {
-      const token = localStorage.getItem("authToken")
-      const r = await fetch("/api/perfis", { headers: token ? { Authorization: `Bearer ${token}` } : {} })
-      if (r.ok) setPerfis((await r.json()).perfis || [])
-    } catch (e) { console.error(e) }
-  }, [])
-
-  const loadUsers = useCallback(async () => {
-    try {
-      setIsLoading(true); setError("")
-      const token = localStorage.getItem("authToken")
-      if (!token) { setUsuarios([]); return }
-      const users = await getUsers(searchTerm)
-      setUsuarios(users.filter((u): u is Usuario => u.id !== undefined) as Usuario[])
-    } catch (err: any) {
-      if (err.message?.includes("autenticado") || err.message?.includes("401")) setUsuarios([])
-      else setError(err.message || "Erro ao carregar usuários")
-    } finally { setIsLoading(false) }
-  }, [searchTerm])
-
-  useEffect(() => { fetchPerfis() }, [fetchPerfis])
-  useEffect(() => { loadUsers() }, []) // eslint-disable-line
-  useEffect(() => {
-    const t = setTimeout(() => { loadUsers() }, 500)
-    return () => clearTimeout(t)
-  }, [searchTerm]) // eslint-disable-line
-
-  // recalcular permissões efetivas
-  useEffect(() => {
+  // Permissões efetivas são DERIVAÇÃO PURA de (perfil escolhido + customizações +
+  // tipo admin). Como estado escrito por efeito, a tela exibia por um render as
+  // permissões da combinação ANTERIOR — no formulário de acesso, mostrar permissão
+  // errada por um instante é o pior tipo de detalhe.
+  const permissoesEfetivas = useMemo<Record<string, boolean>>(() => {
     const perfil = perfis.find(p => p.id === selectedPerfilId)
     const perfilPerms = perfil?.permissoes || {}
     const resultado: Record<string, boolean> = {}
@@ -131,7 +130,7 @@ export default function UsersTab() {
     for (const [k, v] of Object.entries(perfilPerms)) if (k in resultado) resultado[k] = !!v
     for (const [k, v] of Object.entries(permissoesCustom)) if (k in resultado) resultado[k] = !!v
     if (formData.tipo === "admin") for (const c of TODAS_CHAVES) resultado[c] = true
-    setPermissoesEfetivas(resultado)
+    return resultado
   }, [selectedPerfilId, permissoesCustom, perfis, formData.tipo])
 
   const togglePermissao = (chave: string) => {

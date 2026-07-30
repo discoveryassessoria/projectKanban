@@ -3,6 +3,7 @@
 "use client"
 
 import { useEffect, useState, useCallback } from "react"
+import { useApi } from "@/src/lib/dados"
 import { Loader2 } from "lucide-react"
 
 /**
@@ -46,38 +47,17 @@ export function PhaseProgressHeader({
   refreshKey = 0,
   variant = "light",
 }: PhaseProgressHeaderProps) {
-  const [data, setData] = useState<PhaseProgress | null>(null)
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
-
-  const carregar = useCallback(async () => {
-    setLoading(true)
-    setError(null)
-    try {
-      const res = await fetch(`/api/processos/${processoId}/phase`, {
-        headers: {
-          Authorization: `Bearer ${
-            typeof window !== "undefined"
-              ? localStorage.getItem("authToken") ?? ""
-              : ""
-          }`,
-        },
-      })
-      if (!res.ok) throw new Error(`HTTP ${res.status}`)
-      const json: PhaseProgress = await res.json()
-      setData(json)
-    } catch (e) {
-      const msg = e instanceof Error ? e.message : "erro"
-      console.warn("[PhaseProgressHeader] falha:", e)
-      setError(msg)
-    } finally {
-      setLoading(false)
-    }
-  }, [processoId])
-
-  useEffect(() => {
-    carregar()
-  }, [carregar, refreshKey])
+  // Projeção da fase pela camada oficial. A chave carrega o `refreshKey`: quando o
+  // pai o incrementa (salvou algo que muda a fase), a chave muda e a consulta é
+  // refeita — sem um efeito que chame o carregador, e sem perder o dado anterior de
+  // vista enquanto a nova volta.
+  const consulta = useApi<PhaseProgress>(
+    `/api/processos/${processoId}/phase${refreshKey ? `?r=${refreshKey}` : ''}`,
+    { keepPreviousData: true },
+  )
+  const data = consulta.dados ?? null
+  const loading = consulta.carregando
+  const error = consulta.erro ? consulta.erro.message : null
 
   // Skeleton enquanto carrega
   if (loading && !data) {

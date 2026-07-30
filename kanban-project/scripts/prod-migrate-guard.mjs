@@ -54,14 +54,32 @@ if (process.env.VERCEL_ENV === 'preview') {
   if (/db\.prisma\.io/i.test(identificador(urlPrev))) {
     abortar('PRISMA_DATABASE_URL do Preview aponta para db.prisma.io (Prisma Postgres = produção). Preview só pode migrar homologação.')
   }
-  try {
-    execSync('npx prisma migrate deploy', {
-      stdio: 'inherit',
-      env: { ...process.env, DIRECT_DATABASE_URL: urlPrev },
-    })
-    console.log('[migrate-guard] PREVIEW · migrate deploy concluído.')
-  } catch (err) {
-    abortar(`migrate deploy falhou no Preview: ${String(err?.message ?? err).slice(0, 200)}`)
+  // O banco de homologação é COMPARTILHADO com outras branches. Quando dois builds
+  // migram ao mesmo tempo, o segundo morre em P1002 — timeout do advisory lock que o
+  // próprio Prisma usa para serializar migrations. Não é defeito de código nem do
+  // schema: é fila. Sem retry, uma Preview vermelha só significa "chegou junto".
+  //
+  // Repetir é seguro exatamente por causa desse lock: quem não o obteve NÃO escreveu
+  // nada, e `migrate deploy` é idempotente. Qualquer outro erro aborta na primeira.
+  const TENTATIVAS = 3
+  for (let tentativa = 1; tentativa <= TENTATIVAS; tentativa++) {
+    try {
+      execSync('npx prisma migrate deploy', {
+        stdio: 'inherit',
+        env: { ...process.env, DIRECT_DATABASE_URL: urlPrev },
+      })
+      console.log('[migrate-guard] PREVIEW · migrate deploy concluído.')
+      break
+    } catch (err) {
+      const texto = String(err?.message ?? err)
+      const disputaDeLock = /P1002|advisory lock/i.test(texto)
+      if (!disputaDeLock || tentativa === TENTATIVAS) {
+        abortar(`migrate deploy falhou no Preview${disputaDeLock ? ` após ${TENTATIVAS} tentativas` : ''}: ${texto.slice(0, 200)}`)
+      }
+      const esperaMs = tentativa * 15_000
+      console.log(`[migrate-guard] PREVIEW · lock ocupado por outro build (P1002). Tentativa ${tentativa}/${TENTATIVAS}; nova tentativa em ${esperaMs / 1000}s.`)
+      execSync(`sleep ${esperaMs / 1000}`)
+    }
   }
   process.exit(0)
 }
