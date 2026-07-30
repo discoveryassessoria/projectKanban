@@ -115,10 +115,10 @@ function ActivitiesPageInner() {
 
   const handleLogout = () => { void encerrarSessao("manual") }
 
-  // Handlers para os modais
-  const handleFiltersChange = useCallback((newFilters: Filters) => {
-    setFilters(newFilters)
-  }, [])
+  // Handlers para os modais. Sem `useCallback`: `setFilters` agora é uma função
+  // declarada no corpo (o rascunho de filtros), então memoizar com lista vazia mentiria
+  // sobre a dependência — e o React Compiler já cuida da identidade.
+  const handleFiltersChange = (newFilters: Filters) => setFilters(newFilters)
 
   const handleSearchTermChange = useCallback((term: string) => {
     setSearchTerm(term)

@@ -11,6 +11,8 @@
 "use client"
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
+import { useConsulta } from "@/src/lib/dados"
+import { useDebounce } from "@/src/hooks/use-debounce"
 import { createPortal } from "react-dom"
 import { LAYER } from "@/src/lib/ui/layers"
 import { vocabularioFinanceiro } from "@/lib/financeiro/vocabulario"
@@ -60,13 +62,10 @@ export default function CancelamentoAvancadoModal({ receitaRef, participantes, n
   const [parcelas, setParcelas] = useState<{ id: number; numero: number; totalParcelas: number; vencimento: string; valorBrl: number; status: string }[]>([])
   const [moeda, setMoeda] = useState("BRL")
 
-  const [previsao, setPrevisao] = useState<Previsao | null>(null)
-  const [previewing, setPreviewing] = useState(false)
-  const [previewErro, setPreviewErro] = useState<string | null>(null)
+
   const [enviando, setEnviando] = useState(false)
   const [erro, setErro] = useState<string | null>(null)
   const [ok, setOk] = useState(false)
-  const debounce = useRef<ReturnType<typeof setTimeout> | null>(null)
   const idemKey = useChaveIdempotencia(`cancel-adv-${receitaRef}`)
 
   // ESC + scroll lock + carga inicial (parcelas pendentes + participantes + moeda).
@@ -108,25 +107,32 @@ export default function CancelamentoAvancadoModal({ receitaRef, participantes, n
     return true // TOTAL
   }, [modo, valor, percentual, participanteId, parcelaIds])
 
-  const rodarPreview = useCallback(async () => {
-    setPreviewing(true); setPreviewErro(null)
-    try {
+  // A previsão é uma LEITURA feita por POST (`?preview=1` não persiste nada). Vira
+  // consulta com o patch na CHAVE, e o atraso passa a ser do VALOR: o efeito com
+  // `setTimeout` + ref de debounce, que ainda limpava previsão e erro por fora antes de
+  // cada disparo, deixa de existir. Enquanto a entrada mínima não está satisfeita, a
+  // chave é `null` — nenhuma requisição inútil, como o guard antigo garantia.
+  const patchEstavel = useDebounce(JSON.stringify(patch), 450)
+  const previewReq = useConsulta<{ ok?: boolean; previsao?: Previsao; erro?: string }>(
+    entradaMinima ? `cancelamento-preview:${receitaRef}:${patchEstavel}` : null,
+    async () => {
       const r = await fetch(`/api/financeiro/v3/receita/${encodeURIComponent(receitaRef)}/cancelamento-avancado?preview=1`, {
-        method: "POST", headers: { "Content-Type": "application/json", ...authHeaders() }, body: JSON.stringify(patch),
+        method: "POST", headers: { "Content-Type": "application/json", ...authHeaders() }, body: patchEstavel,
       })
       const j = await r.json().catch(() => ({}))
-      if (r.ok && j.ok && j.previsao) { setPrevisao(j.previsao); setPreviewErro(null) }
-      else { setPrevisao(null); setPreviewErro(j?.erro || `Falha ao calcular a previsão (HTTP ${r.status}).`) }
-    } catch { setPrevisao(null); setPreviewErro("Falha de rede ao calcular a previsão.") } finally { setPreviewing(false) }
-  }, [receitaRef, patch])
-
-  useEffect(() => {
-    setPrevisao(null); setPreviewErro(null)
-    if (!entradaMinima) return
-    if (debounce.current) clearTimeout(debounce.current)
-    debounce.current = setTimeout(() => { rodarPreview() }, 450)
-    return () => { if (debounce.current) clearTimeout(debounce.current) }
-  }, [entradaMinima, rodarPreview])
+      // Erro de NEGÓCIO vem no corpo com 200: continua sendo tratado como erro exibido,
+      // e não como falha de rede.
+      if (!r.ok || !j?.ok || !j?.previsao) {
+        throw new Error(j?.erro || `Falha ao calcular a previsão (HTTP ${r.status}).`)
+      }
+      return j
+    },
+  )
+  const previsao = entradaMinima ? (previewReq.dados?.previsao ?? null) : null
+  const previewing = Boolean(entradaMinima) && previewReq.carregando
+  const previewErro = entradaMinima && previewReq.erro
+    ? (previewReq.erro.message || "Falha de rede ao calcular a previsão.")
+    : null
 
   const previewValido = !!previsao && previsao.ok && previsao.erros.length === 0
   const valido = previewValido && motivo.trim().length > 0 && !previewing

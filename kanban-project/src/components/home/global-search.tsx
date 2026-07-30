@@ -72,14 +72,16 @@ export function GlobalSearch({ autoFocusRef }: { autoFocusRef?: React.RefObject<
   const resultadosVisiveis = buscavel ? resultados : SEM_RESULTADOS
   const carregandoVisivel = buscavel && carregando
 
-  // Fecha ao clicar fora
+  // Fecha ao clicar fora. `dispensar` é a única coisa de que este efeito depende, e
+  // depende MESMO: fechar carimba o termo atual como dispensado.
+  const dispensar = React.useCallback(() => setDispensado(termo), [termo])
   React.useEffect(() => {
     function onClick(e: MouseEvent) {
-      if (containerRef.current && !containerRef.current.contains(e.target as Node)) setAberto(false)
+      if (containerRef.current && !containerRef.current.contains(e.target as Node)) dispensar()
     }
     document.addEventListener("mousedown", onClick)
     return () => document.removeEventListener("mousedown", onClick)
-  }, [])
+  }, [dispensar])
 
   function irPara(r: SearchResult) {
     // Limpar o termo já esconde a lista (`buscavel` fica falso) — não há estado de

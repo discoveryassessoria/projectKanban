@@ -8,6 +8,7 @@
 "use client"
 
 import { useEffect, useMemo, useState } from "react"
+import { useApi } from "@/src/lib/dados"
 import { useRouter } from "next/navigation"
 import { ReceitasTab } from "./ReceitasTab"
 import { ReceitaDetalheView } from "./ReceitaDetalheView"
@@ -66,6 +67,36 @@ interface FiltrosSalvos {
   ordenar: "vencimento" | "valor" | "estado" | "descricao"
   ordem: "asc" | "desc"
 }
+
+/**
+ * Obrigação como esta lista a consome. Campos abertos porque a rota devolve o
+ * read-model inteiro; os usados aqui estão nomeados, o resto passa adiante.
+ */
+interface ObrigacaoLista {
+  id: number
+  obrigacaoId?: number
+  codigoOperacional?: string | null
+  descricao?: string | null
+  categoria?: string | null
+  fornecedor?: string | null
+  requerente?: string | null
+  responsavel?: string | null
+  direcao?: string | null
+  estadoCusto?: string | null
+  status?: string | null
+  moeda?: string | null
+  valorContratado?: number | null
+  contratadoBrl?: number | null
+  recebido?: number | null
+  recebidoBrl?: number | null
+  saldo?: number | null
+  saldoBrl?: number | null
+  naoConvertido?: number | null
+  vencimento?: string | null
+  criadoEm?: string | null
+  timeline?: unknown
+}
+const SEM_OBRIGACOES: ObrigacaoLista[] = []
 
 export function ProcessoFinanceiroShell({ processoId }: { processoId: number }) {
   const [t, setT] = useState("visao")
@@ -141,7 +172,10 @@ function RowMenuCusto({ onAcao, pode, estadoCusto }: { onAcao: (tipo: string) =>
 
 // Etapa 3: abre o MESMO Detalhe da Obrigação (parametrizado por direção) usado por Receitas.
 function CustosTab({ processoId, fx, onAbrirDetalhe }: { processoId: number; fx: number; onAbrirDetalhe?: (id: number) => void }) {
-  const [obrs, setObrs] = useState<any[] | null>(null)
+  // Obrigações de CUSTO do processo, pela camada oficial.
+  const obrsReq = useApi<{ obrigacoes?: ObrigacaoLista[] }>(`/api/financeiro/v3/obrigacoes?processoId=${processoId}&natureza=CUSTO`)
+  const obrs = obrsReq.erro ? SEM_OBRIGACOES : (obrsReq.dados?.obrigacoes ?? null)
+  const carregar = () => { void obrsReq.recarregar() }
   const [novo, setNovo] = useState(false)
   const [pagar, setPagar] = useState<any | null>(null)
   const [subEscolhido, setSub] = useState<"todos" | "pagos" | "apagar" | undefined>(undefined)
@@ -162,7 +196,6 @@ function CustosTab({ processoId, fx, onAbrirDetalhe }: { processoId: number; fx:
   const pode = (op: string) => !perm || perm[op] === true
   const PAGE = 12
   const chaveFiltros = `cp-filtros-${processoId}`
-  const carregar = () => { fetch(`/api/financeiro/v3/obrigacoes?processoId=${processoId}&natureza=CUSTO`, { headers: authHeaders() }).then((r) => r.json()).then((j) => setObrs(j.obrigacoes ?? [])).catch(() => setObrs([])) }
   // PERSISTÊNCIA DE FILTROS (por processo). Restaurar num efeito exigia seis
   // setState logo após a montagem — render em cascata e, no servidor, acesso a
   // um localStorage que não existe. Agora o valor salvo é LIDO pela abstração
@@ -195,7 +228,6 @@ function CustosTab({ processoId, fx, onAbrirDetalhe }: { processoId: number; fx:
   const proximoAvanco: Record<string, { estado: string; label: string }> = { PREVISTO: { estado: "APROVADO", label: "Aprovar" }, APROVADO: { estado: "CONTRATADO", label: "Contratar" }, CONTRATADO: { estado: "EXECUTADO", label: "Marcar executado" } }
   // Cancelamento (com motivo auditável) mora no Detalhe único da Obrigação — paridade
   // com Receita, sem duplicar lógica nem cancelar sem justificativa a partir da lista.
-  useEffect(() => { carregar() }, [processoId])
   useEffect(() => { fetch(`/api/financeiro/v3/permissoes-custo`, { headers: authHeaders() }).then((r) => r.json()).then((j) => setPerm(j?.permissoes ?? null)).catch(() => setPerm(null)) }, [])
   if (!obrs) return <div className="py-8 text-sm text-[var(--text-muted)]">carregando…</div>
 
@@ -205,7 +237,7 @@ function CustosTab({ processoId, fx, onAbrirDetalhe }: { processoId: number; fx:
   // PAGA). Comparar "recebido vs contratado" ignorava ABATIMENTOS: um custo com desconto
   // obtido ficava com saldo 0, badge Pago e ainda assim oferecia o botão "Pagar".
   const quitado = (o: any) => Number(o.saldo ?? 0) <= 0.005
-  const emAtraso = obrs.filter((o) => o.vencimento && new Date(o.vencimento) < hoje && o.saldo > 0.005)
+  const emAtraso = obrs.filter((o) => o.vencimento && new Date(o.vencimento) < hoje && Number(o.saldo ?? 0) > 0.005)
   const totais = {
     total: obrs.reduce((s, o) => s + (o.contratadoBrl ?? 0), 0),
     pago: obrs.reduce((s, o) => s + (o.recebidoBrl ?? 0), 0),
@@ -307,19 +339,19 @@ function CustosTab({ processoId, fx, onAbrirDetalhe }: { processoId: number; fx:
             <tbody>{lista.map((o) => {
               // Progresso = quanto da dívida foi LIQUIDADA (pagamento + abatimento), não só o
               // pago: assim 100% ⟺ quitado, sem barra travada em 90% num custo já fechado.
-              const prog = o.valorContratado > 0 ? Math.min(100, Math.max(0, Math.round(((o.valorContratado - Number(o.saldo ?? 0)) / o.valorContratado) * 100))) : 0
+              const contratado = Number(o.valorContratado ?? 0); const prog = contratado > 0 ? Math.min(100, Math.max(0, Math.round(((contratado - Number(o.saldo ?? 0)) / contratado) * 100))) : 0
               const quit = quitado(o)
               return (
                 <tr key={o.obrigacaoId} className="border-t border-[var(--border-default)] hover:bg-[var(--surface-hover)]">
                   <td className="px-5 py-4"><div className="max-w-[220px] text-[var(--text-primary)]">{o.descricao ?? o.codigoOperacional ?? `#${o.obrigacaoId}`}</div>{o.fornecedor && <div className="max-w-[220px] truncate text-xs text-[var(--text-secondary)]" title={o.fornecedor}>{o.fornecedor}</div>}{o.codigoOperacional && <div className="text-xs text-[var(--text-muted)]">{o.codigoOperacional}</div>}</td>
                   <td className="px-5 text-[var(--text-secondary)]">{o.categoria ?? "—"}</td>
-                  <td className="px-5 text-[var(--text-primary)]">{fmt(o.valorContratado, o.moeda)}</td>
+                  <td className="px-5 text-[var(--text-primary)]">{fmt(o.valorContratado ?? 0, o.moeda ?? undefined)}</td>
                   <td className="px-5 text-[var(--text-secondary)]"><ValorBrl valor={o.contratadoBrl ?? 0} naoConvertido={o.naoConvertido} moeda={o.moeda} /></td>
                   <td className="px-5"><span className="rounded-[var(--radius-sm)] px-1.5 py-0.5 text-[11px] text-[var(--text-secondary)]" style={{ background: "var(--surface-active)" }}>{o.moeda}</span></td>
                   <td className="px-5 text-[var(--text-secondary)]">{o.vencimento ? dataBR(o.vencimento) : "—"}</td>
                   <td className="px-5"><div className="flex items-center gap-2"><div className="h-1.5 w-16 overflow-hidden rounded-full" style={{ background: "var(--surface-active)" }}><span className="block h-full rounded-full" style={{ background: "var(--success)", width: `${prog}%` }} /></div><span className="text-[11px] text-[var(--text-muted)]">{prog}%</span></div></td>
                   <td className="px-5">{o.estadoCusto ? <EstadoCustoBadge estado={o.estadoCusto} /> : (quit ? <span className="rounded-[var(--radius-sm)] px-2 py-0.5 text-[11px] font-semibold" style={{ background: "color-mix(in srgb, var(--success) 16%, transparent)", color: "var(--success)" }}>Pago</span> : <span className="rounded-[var(--radius-sm)] px-2 py-0.5 text-[11px] font-semibold" style={{ background: "color-mix(in srgb, var(--warning) 16%, transparent)", color: "var(--warning)" }}>A pagar</span>)}</td>
-                  <td className="px-5"><div className="flex items-center gap-2"><button onClick={() => onAbrirDetalhe?.(o.obrigacaoId)} className="inline-flex items-center gap-1.5 rounded-[var(--radius-sm)] border border-[var(--border-strong)] bg-[var(--surface-hover)] px-2.5 py-1 text-xs font-medium text-[var(--text-primary)] hover:bg-[var(--surface-active)]"><Eye className="h-3.5 w-3.5" /> Abrir</button>{o.estadoCusto && proximoAvanco[o.estadoCusto] && (() => { const opAv = proximoAvanco[o.estadoCusto].estado === "APROVADO" ? "aprovar" : "editar"; const okAv = pode(opAv); return <button disabled={!okAv} title={okAv ? undefined : "Você não tem permissão para esta ação"} onClick={() => mudarEstado(o.obrigacaoId, proximoAvanco[o.estadoCusto].estado)} className="rounded-[var(--radius-sm)] border border-[var(--border-strong)] bg-[var(--surface-hover)] px-2.5 py-1 text-xs font-medium text-[var(--text-secondary)] hover:bg-[var(--surface-active)] disabled:cursor-not-allowed disabled:opacity-40">{proximoAvanco[o.estadoCusto].label}</button> })()}{!quit && <button onClick={() => setPagar(o)} disabled={!pode("pagar")} title={pode("pagar") ? undefined : "Você não tem permissão para pagar"} className="rounded-[var(--radius-sm)] px-2.5 py-1 text-xs font-medium text-[var(--accent-ink)] hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40" style={{ background: "var(--success)" }}>Pagar</button>}<RowMenuCusto pode={pode} estadoCusto={o.estadoCusto} onAcao={(tipo) => setAcao({ tipo, o })} /></div></td>
+                  <td className="px-5"><div className="flex items-center gap-2"><button onClick={() => { if (o.obrigacaoId != null) onAbrirDetalhe?.(o.obrigacaoId) }} className="inline-flex items-center gap-1.5 rounded-[var(--radius-sm)] border border-[var(--border-strong)] bg-[var(--surface-hover)] px-2.5 py-1 text-xs font-medium text-[var(--text-primary)] hover:bg-[var(--surface-active)]"><Eye className="h-3.5 w-3.5" /> Abrir</button>{o.estadoCusto && proximoAvanco[o.estadoCusto] && (() => { const opAv = proximoAvanco[o.estadoCusto].estado === "APROVADO" ? "aprovar" : "editar"; const okAv = pode(opAv); return <button disabled={!okAv} title={okAv ? undefined : "Você não tem permissão para esta ação"} onClick={() => { if (o.obrigacaoId != null && o.estadoCusto) mudarEstado(o.obrigacaoId, proximoAvanco[o.estadoCusto].estado) }} className="rounded-[var(--radius-sm)] border border-[var(--border-strong)] bg-[var(--surface-hover)] px-2.5 py-1 text-xs font-medium text-[var(--text-secondary)] hover:bg-[var(--surface-active)] disabled:cursor-not-allowed disabled:opacity-40">{proximoAvanco[o.estadoCusto].label}</button> })()}{!quit && <button onClick={() => setPagar(o)} disabled={!pode("pagar")} title={pode("pagar") ? undefined : "Você não tem permissão para pagar"} className="rounded-[var(--radius-sm)] px-2.5 py-1 text-xs font-medium text-[var(--accent-ink)] hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40" style={{ background: "var(--success)" }}>Pagar</button>}<RowMenuCusto pode={pode} estadoCusto={o.estadoCusto} onAcao={(tipo) => setAcao({ tipo, o })} /></div></td>
                 </tr>
               )
             })}{lista.length === 0 && <tr><td colSpan={9} className="px-5 py-8 text-center text-[var(--text-muted)]">Nenhum custo neste processo.</td></tr>}</tbody>

@@ -8,6 +8,7 @@
 //   • Com cobrança → resumo + parcelas + registrar pagamento + histórico.
 // ============================================================================
 import * as React from 'react'
+import { useApi, useConsulta } from '@/src/lib/dados'
 import { X, ArrowRight, ArrowLeft, Check, CreditCard, CalendarClock, Wallet, Landmark, ReceiptText, Sparkles } from 'lucide-react'
 import { authToken } from "@/src/lib/financeiro/http"
 import { fmtMoeda as brl } from "@/src/lib/financeiro/formato"
@@ -40,19 +41,50 @@ function Card({ label, children, destaque }: { label: string; children: React.Re
   )
 }
 
+const SEM_COBRANCAS: Cobranca[] = []
+
+/**
+ * Simulação como o backend a devolve. Antes era `any`; os campos abaixo são os que a
+ * tela realmente lê, e os opcionais explicam os `?.` espalhados no render.
+ */
+interface Simulacao {
+  ok?: boolean
+  erros?: { codigo?: string; mensagem?: string }[]
+  valorBase?: number
+  valorTaxa?: number
+  valorLiquido?: number
+  totalCobrado?: number
+  politicaTaxas?: string
+  taxaAplicada?: { nome?: string | null } | null
+  memoria?: unknown
+  parcelas?: { entrada?: boolean; valor?: number; [campo: string]: unknown }[]
+  cambio?: {
+    cotacao?: number | string | null
+    moedaOrigem?: string | null
+    moedaDestino?: string | null
+    fonte?: string | null
+    data?: string | null
+    tipo?: string | null
+    estimado?: boolean
+    [campo: string]: unknown
+  }
+}
+
 export function ReceitaCobrancaModal({ receitaId, onClose, onChanged }: { receitaId: number; onClose: () => void; onChanged?: () => void }) {
-  const [det, setDet] = React.useState<Detalhe | null>(null)
-  const [cobrancas, setCobrancas] = React.useState<Cobranca[]>([])
-  const [erro, setErro] = React.useState<string | null>(null)
+  const [erroLocal, setErro] = React.useState<string | null>(null)
   const [wizard, setWizard] = React.useState(false)
 
-  const carregar = React.useCallback(async () => {
-    try {
-      const [d, c] = await Promise.all([jf(`/api/financeiro/receitas/${receitaId}/detalhe`), jf(`/api/financeiro/receitas/${receitaId}/cobrancas`)])
-      setDet(d.receita ? d : { receita: d }); setCobrancas((c as any).cobrancas || [])
-    } catch (e: any) { setErro(e.message || 'erro') }
-  }, [receitaId])
-  React.useEffect(() => { carregar() }, [carregar])
+  // Duas leituras independentes pela camada oficial, cada uma com o seu cache.
+  const detalheReq = useApi<Detalhe & { receita?: Detalhe['receita'] }>(`/api/financeiro/receitas/${receitaId}/detalhe`)
+  const cobrancasReq = useApi<{ cobrancas?: Cobranca[] }>(`/api/financeiro/receitas/${receitaId}/cobrancas`)
+  // A rota do detalhe já devolveu os dois formatos ao longo do tempo (com e sem o
+  // invólucro `receita`); a normalização que estava no carregador continua aqui.
+  const det: Detalhe | null = detalheReq.dados
+    ? (detalheReq.dados.receita ? detalheReq.dados : ({ receita: detalheReq.dados } as Detalhe))
+    : null
+  const cobrancas = cobrancasReq.dados?.cobrancas ?? SEM_COBRANCAS
+  const erro = erroLocal ?? (detalheReq.erro?.message ?? cobrancasReq.erro?.message ?? null)
+  const carregar = async () => { await Promise.all([detalheReq.recarregar(), cobrancasReq.recarregar()]) }
 
   const r = det?.receita ?? {}
   const moeda = r.moeda || 'EUR'
@@ -181,8 +213,7 @@ function CobrancaWizard({ receitaId, valor, moeda, receita, onClose, onCriada }:
   const [f, setF] = React.useState<{ formaPagamentoId?: number; condicaoPagamentoId?: number; contaBancariaId?: number; carteiraId?: number; gateway?: string; adquirenteId?: number; bandeiraId?: number; entradaValor?: number; moedaRecebimento?: string; cotacaoManual?: number; cotacaoManualAtiva?: boolean; justificativaCotacao?: string }>({})
   const [nParcelas, setNParcelas] = React.useState<number | ''>('')
   const [politicaEscolha, setPoliticaEscolha] = React.useState<string | null>(null)
-  const [sim, setSim] = React.useState<any>(null)
-  const [simulando, setSimulando] = React.useState(false)
+
   // Chave de idempotência: uma por sessão do wizard (retry/duplo-clique não duplica).
   const idemKeyRef = useChaveIdempotencia('idem')
   // Campos de câmbio comuns às requisições de simular/criar. Memoizado porque o
@@ -198,55 +229,62 @@ function CobrancaWizard({ receitaId, valor, moeda, receita, onClose, onCriada }:
   React.useEffect(() => { jf('/api/financeiro/config').then(setCfg).catch((e) => setErro(e.message)) }, [])
 
   const condicao = cfg?.condicoesPagamento?.find((c: any) => c.id === f.condicaoPagamentoId)
-  const formaSel = cfg?.formasPagamento?.find((x: any) => x.id === f.formaPagamentoId)
+  const permitidas: number[] = condicao?.formasPermitidas ?? []
+  // A forma de pagamento EFETIVA depende da condição escolhida: se a escolhida não é
+  // permitida por ela, vale a forma padrão da condição; se nada foi escolhido, também.
+  // Isso é derivação, e como derivação não existe o render em que o formulário mostrava
+  // uma forma proibida antes de o efeito corrigi-la — nem o `eslint-disable` que
+  // escondia a lista de dependências real.
+  const formaPadraoValida = condicao?.formaPadraoId && (!permitidas.length || permitidas.includes(condicao.formaPadraoId))
+    ? condicao.formaPadraoId
+    : undefined
+  const formaEscolhidaProibida = Boolean(
+    condicao && f.formaPagamentoId && permitidas.length && !permitidas.includes(f.formaPagamentoId),
+  )
+  const formaEfetivaId = !condicao
+    ? f.formaPagamentoId
+    : formaEscolhidaProibida || !f.formaPagamentoId
+      ? formaPadraoValida
+      : f.formaPagamentoId
+  const avisoForma = formaEscolhidaProibida
+    ? 'A forma escolhida não é permitida por esta condição — selecione uma das formas permitidas.'
+    : null
+  // O formulário EFETIVO é o que a tela mostra e o que vai ao backend. `f` guarda a
+  // escolha crua; a correção pela condição não é gravada de volta nele.
+  const fEfetivo = { ...f, formaPagamentoId: formaEfetivaId }
+
+  const formaSel = cfg?.formasPagamento?.find((x: any) => x.id === formaEfetivaId)
   // Cartão de crédito exige adquirente + bandeira (o motor desempata a taxa por
   // bandeira). Débito também usa bandeira; demais formas não.
   const ehCartaoCredito = formaSel?.type === 'CARTAO_CREDITO'
   const ehCartao = formaSel?.type === 'CARTAO_CREDITO' || formaSel?.type === 'CARTAO_DEBITO'
-  const adqOpcoes = React.useMemo(
-    () => (cfg?.adquirentes ?? []).filter((a: any) => !a.formasSuportadas?.length || (f.formaPagamentoId && a.formasSuportadas.includes(f.formaPagamentoId))),
-    [cfg, f.formaPagamentoId],
-  )
+  // Sem `useMemo` de propósito: são filtros baratos sobre listas de cadastro, e a
+  // memoização manual aqui BLOQUEAVA o React Compiler ("existing memoization could not
+  // be preserved"). Em `formasDisponiveis` ela ainda vinha com a lista de dependências
+  // errada, calada por um `eslint-disable` — dependia de `permitidas`, declarava
+  // `condicao`.
+  const adqOpcoes = (cfg?.adquirentes ?? []).filter((a: any) => !a.formasSuportadas?.length || (formaEfetivaId && a.formasSuportadas.includes(formaEfetivaId)))
 
   // Formas que a condição permite (vazio = sem restrição → qualquer forma ativa
   // compatível). A compatibilidade real (moeda/direção/parcelas/adquirente) é do
   // backend: aqui só se restringe a lista e se sugere a padrão.
-  const permitidas: number[] = condicao?.formasPermitidas ?? []
-  const formasDisponiveis = React.useMemo(
-    () => (cfg?.formasPagamento ?? []).filter((x: any) => !permitidas.length || permitidas.includes(x.id)),
-    [cfg, condicao], // eslint-disable-line
+  const formasDisponiveis = (cfg?.formasPagamento ?? []).filter((x: any) => !permitidas.length || permitidas.includes(x.id))
+
+  // SIMULAÇÃO oficial no backend (não persiste): é LEITURA por POST, e por isso vira
+  // consulta. O corpo enviado É a chave — enumerar dez campos numa lista de dependências
+  // (com `eslint-disable` para calar o que faltava) era a maneira antiga de dizer a
+  // mesma coisa, e qualquer campo novo no formulário passava despercebido.
+  const corpoSimulacao = JSON.stringify({
+    receitaId, ...fEfetivo, ...camposCambio(),
+    nParcelas: nParcelas === '' ? undefined : nParcelas,
+    politicaTaxasEscolhida: politicaEscolha ?? undefined,
+  })
+  const simReq = useConsulta<{ simulacao?: Simulacao }>(
+    step >= 3 && formaEfetivaId ? `simular-cobranca:${corpoSimulacao}` : null,
+    () => jf('/api/financeiro/cobrancas/simular', { method: 'POST', body: corpoSimulacao }),
   )
-  const [avisoForma, setAvisoForma] = React.useState<string | null>(null)
-
-  // Ao escolher a condição: pré-seleciona a FORMA PADRÃO e descarta uma forma
-  // que a condição não permita (o operador pode trocar por qualquer permitida).
-  React.useEffect(() => {
-    if (!condicao) return
-    const atual = f.formaPagamentoId
-    if (atual && permitidas.length && !permitidas.includes(atual)) {
-      const padrao = condicao.formaPadraoId && permitidas.includes(condicao.formaPadraoId) ? condicao.formaPadraoId : undefined
-      setF((p) => ({ ...p, formaPagamentoId: padrao }))
-      setAvisoForma('A forma escolhida não é permitida por esta condição — selecione uma das formas permitidas.')
-      return
-    }
-    setAvisoForma(null)
-    if (!atual && condicao.formaPadraoId) setF((p) => ({ ...p, formaPagamentoId: condicao.formaPadraoId }))
-  }, [f.condicaoPagamentoId]) // eslint-disable-line
-
-  // SIMULAÇÃO oficial no backend (não persiste). Recalcula ao mudar seleção/parcelas/política.
-  const simular = React.useCallback(async () => {
-    if (!f.formaPagamentoId) return
-    setSimulando(true)
-    try {
-      const d = await jf('/api/financeiro/cobrancas/simular', {
-        method: 'POST',
-        body: JSON.stringify({ receitaId, ...f, ...camposCambio(), nParcelas: nParcelas === '' ? undefined : nParcelas, politicaTaxasEscolhida: politicaEscolha ?? undefined }),
-      })
-      setSim(d.simulacao)
-    } catch (e: any) { setSim(null); setErro(e.message) } finally { setSimulando(false) }
-  }, [receitaId, f, nParcelas, politicaEscolha, camposCambio])
-
-  React.useEffect(() => { if (step >= 3) simular() }, [step, f.formaPagamentoId, f.condicaoPagamentoId, f.carteiraId, f.contaBancariaId, f.bandeiraId, f.adquirenteId, f.entradaValor, f.moedaRecebimento, f.cotacaoManual, f.cotacaoManualAtiva, nParcelas, politicaEscolha]) // eslint-disable-line
+  const sim = simReq.dados?.simulacao ?? null
+  const simulando = simReq.carregando
 
   const precisaEscolha = !!sim && !sim.ok && sim.erros?.some((e: any) => e.codigo === 'ESCOLHA_TAXA_OBRIGATORIA')
   const podeConfirmar = !!sim && sim.ok
@@ -256,7 +294,7 @@ function CobrancaWizard({ receitaId, valor, moeda, receita, onClose, onCriada }:
     try {
       const d = await jf(`/api/financeiro/receitas/${receitaId}/cobrancas`, {
         method: 'POST',
-        body: JSON.stringify({ ...f, ...camposCambio(), idempotencyKey: idemKeyRef.current, nParcelas: nParcelas === '' ? undefined : nParcelas, politicaTaxasEscolhida: politicaEscolha ?? undefined }),
+        body: JSON.stringify({ ...fEfetivo, ...camposCambio(), idempotencyKey: idemKeyRef.current, nParcelas: nParcelas === '' ? undefined : nParcelas, politicaTaxasEscolhida: politicaEscolha ?? undefined }),
       })
       setSucesso(d) // tela de sucesso (não fecha direto)
     } catch (e: any) { setErro(e.message) } finally { setSalvando(false) }
@@ -299,7 +337,7 @@ function CobrancaWizard({ receitaId, valor, moeda, receita, onClose, onCriada }:
       {simulando && <p className="text-sm text-white/50">Simulando no servidor…</p>}
       {!simulando && sim && !sim.ok && (
         <div className="rounded-lg border border-red-500/30 bg-red-500/10 p-3 text-sm text-red-200">
-          {sim.erros.map((e: any, i: number) => <div key={i}>• {e.mensagem}</div>)}
+          {(sim.erros ?? []).map((e, i) => <div key={i}>• {e.mensagem}</div>)}
           {precisaEscolha && (
             <div className="mt-2 flex flex-wrap gap-2">
               {['IGNORAR', 'REPASSAR', 'ABSORVER'].map((p) => (
@@ -311,24 +349,24 @@ function CobrancaWizard({ receitaId, valor, moeda, receita, onClose, onCriada }:
       )}
       {!simulando && sim && sim.ok && (<>
         <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
-          <Card label="Valor contratado">{dual(sim.valorBase)}</Card>
+          <Card label="Valor contratado">{dual(sim.valorBase ?? 0)}</Card>
           {entradaSim > 0 && <Card label="Entrada">{dual(entradaSim)}</Card>}
           {entradaSim > 0 && <Card label="Saldo financiado">{dual(saldoSim)}</Card>}
-          <Card label={`Taxa da operação (${POL_LABEL[sim.politicaTaxas] ?? sim.politicaTaxas})`}>{sim.valorTaxa > 0 ? dual(sim.valorTaxa) : '—'}</Card>
-          <Card label="Total cobrado" destaque>{dual(sim.totalCobrado, true)}</Card>
-          <Card label="Valor líquido">{dual(sim.valorLiquido)}</Card>
+          <Card label={`Taxa da operação (${(sim.politicaTaxas ? POL_LABEL[sim.politicaTaxas] : null) ?? sim.politicaTaxas ?? '—'})`}>{(sim.valorTaxa ?? 0) > 0 ? dual(sim.valorTaxa ?? 0) : '—'}</Card>
+          <Card label="Total cobrado" destaque>{dual(sim.totalCobrado ?? 0, true)}</Card>
+          <Card label="Valor líquido">{dual(sim.valorLiquido ?? 0)}</Card>
         </div>
         {temConv && (
           <div className={`${GLASS} flex flex-wrap items-center justify-between gap-2 p-3 text-[12px]`}>
             <span className="text-white/70">Cotação: <b>1 {origem} = {cotacao} {destino}</b></span>
-            <span className="text-white/45">{sim.cambio.fonte ?? '—'}{sim.cambio.data ? ` · ${dt(sim.cambio.data)}` : ''} · {(sim.cambio.tipo || '').toLowerCase() || (sim.cambio.estimado ? 'estimada — congelada ao gerar' : 'congelada nesta cobrança')}</span>
+            <span className="text-white/45">{sim.cambio?.fonte ?? '—'}{sim.cambio?.data ? ` · ${dt(sim.cambio.data)}` : ''} · {(sim.cambio?.tipo || '').toLowerCase() || (sim.cambio?.estimado ? 'estimada — congelada ao gerar' : 'congelada nesta cobrança')}</span>
           </div>
         )}
         <div>
           <p className="mb-1.5 text-[11px] font-semibold uppercase tracking-wide text-white/50">Cronograma de parcelas</p>
           <div className="overflow-x-auto rounded-lg border border-white/10">
             <table className="w-full text-[13px]"><thead><tr className="bg-white/5 text-left text-[11px] uppercase tracking-wide text-white/45"><th className="px-3 py-2">#</th><th className="px-3 py-2">Descrição</th><th className="px-3 py-2">Vencimento</th><th className="px-3 py-2 text-right">Valor ({moeda})</th>{temConv && <th className="px-3 py-2 text-right">Valor ({destino})</th>}</tr></thead><tbody>
-              {sim.parcelas.map((p: any) => <tr key={p.numero} className="border-t border-white/5"><td className="px-3 py-1.5 text-white/60">{p.numero}</td><td className="px-3 py-1.5 text-white/70">{p.entrada ? 'Entrada' : `Parcela ${p.entrada ? '' : p.numero}`}</td><td className="px-3 py-1.5 text-white/70">{dt(p.vencimento)}</td><td className="px-3 py-1.5 text-right tabular-nums">{brl(p.valor, moeda)}</td>{temConv && <td className="px-3 py-1.5 text-right tabular-nums text-white/70">{brl(emDest(p.valor), destino!)}</td>}</tr>)}
+              {(sim.parcelas ?? []).map((p: any) => <tr key={p.numero} className="border-t border-white/5"><td className="px-3 py-1.5 text-white/60">{p.numero}</td><td className="px-3 py-1.5 text-white/70">{p.entrada ? 'Entrada' : `Parcela ${p.entrada ? '' : p.numero}`}</td><td className="px-3 py-1.5 text-white/70">{dt(p.vencimento)}</td><td className="px-3 py-1.5 text-right tabular-nums">{brl(p.valor, moeda)}</td>{temConv && <td className="px-3 py-1.5 text-right tabular-nums text-white/70">{brl(emDest(p.valor), destino!)}</td>}</tr>)}
             </tbody></table>
           </div>
         </div>
@@ -397,7 +435,7 @@ function CobrancaWizard({ receitaId, valor, moeda, receita, onClose, onCriada }:
           {erro && <div className="rounded-lg border border-red-500/30 bg-red-500/10 p-2 text-sm text-red-200">{erro}</div>}
 
           {cfg && step === 1 && (<div className="space-y-3"><div><label className="mb-1 block text-xs text-white/60">Forma de pagamento</label>
-            <select className={sel} value={f.formaPagamentoId ?? ''} onChange={(e) => { const id = Number(e.target.value) || undefined; setF({ ...f, formaPagamentoId: id, adquirenteId: undefined, bandeiraId: undefined }) }}>
+            <select className={sel} value={formaEfetivaId ?? ''} onChange={(e) => { const id = Number(e.target.value) || undefined; setF({ ...f, formaPagamentoId: id, adquirenteId: undefined, bandeiraId: undefined }) }}>
               <option value="" className="bg-zinc-900">Selecione</option>
               {formasDisponiveis.map((x: any) => <option key={x.id} value={x.id} className="bg-zinc-900">{x.name}{condicao?.formaPadraoId === x.id ? ' · padrão' : ''}</option>)}
             </select>
@@ -524,7 +562,7 @@ function CobrancaWizard({ receitaId, valor, moeda, receita, onClose, onCriada }:
                 <div className="mt-2 space-y-1 text-sm">
                   {linha('Cotação', `1 ${origem} = ${cotacao} ${destino}`)}
                   {linha(`Contratado (${destino})`, brl(emDest(valor), destino!))}
-                  {sim?.ok && linha(`Total a receber (${destino})`, brl(emDest(sim.totalCobrado), destino!))}
+                  {sim?.ok && linha(`Total a receber (${destino})`, brl(emDest(sim.totalCobrado ?? 0), destino!))}
                 </div>
               </div>
             )}

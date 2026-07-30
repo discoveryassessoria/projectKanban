@@ -135,8 +135,10 @@ function FormaConfig({ formaId, onClose, onSalvo }: { formaId: number; onClose: 
   const [salvando, setSalvando] = useState(false)
   const [adqSel, setAdqSel] = useState<number | null>(null)
   // grade: bandeiraId -> { [parcela]: string }  (crédito) / { 1: taxa } (débito)
-  const [grade, setGrade] = useState<Record<number, Record<number, string>>>({})
-  const [gradeMeta, setGradeMeta] = useState<Record<number, { taxaId?: number; ativo: boolean }>>({})
+  // A grade editável é um RASCUNHO sobre o que o servidor devolveu para o adquirente
+  // selecionado. Antes um efeito a reconstruía inteira a cada mudança de `det`/`adqSel`
+  // — o que apagava, sem aviso, o que o operador tivesse acabado de digitar.
+  const [rascunhoGrade, setRascunhoGrade] = useState<{ base: string; grade: Record<number, Record<number, string>> } | null>(null)
   // formas simples / boleto
   const [simples, setSimples] = useState<{ taxaId?: number; feePercent: string; fixedFee: string }>({ feePercent: '', fixedFee: '' })
   const [boleto, setBoleto] = useState<{ emissaoId?: number; liquidacaoId?: number; emissao: string; liquidacao: string; multa: string; juros: string; carencia: string }>({ emissao: '', liquidacao: '', multa: '', juros: '', carencia: '' })
@@ -157,10 +159,13 @@ function FormaConfig({ formaId, onClose, onSalvo }: { formaId: number; onClose: 
     }).catch((e) => setErro(e.message))
   }, [formaId])
 
-  // Reconstrói a grade quando muda o adquirente selecionado (crédito/débito).
-  useEffect(() => {
-    if (!det || !det.perfil.mostraBandeira) return
-    const g: Record<number, Record<number, string>> = {}, meta: Record<number, { taxaId?: number; ativo: boolean }> = {}
+  // Grade e metadados vindos do servidor para (forma, adquirente). Derivação pura da
+  // mesma fonte que o efeito lia — inclusive o desempate: taxa específica do adquirente
+  // primeiro, taxa sem adquirente como fallback.
+  const gradeDoServidor = useMemo(() => {
+    const g: Record<number, Record<number, string>> = {}
+    const meta: Record<number, { taxaId?: number; ativo: boolean }> = {}
+    if (!det || !det.perfil.mostraBandeira) return { g, meta }
     for (const band of det.bandeiras) {
       const t = det.taxas.find((x) => x.bandeiraId === band.id && (x.adquirenteId ?? null) === (adqSel ?? null))
         ?? det.taxas.find((x) => x.bandeiraId === band.id && x.adquirenteId == null)
@@ -173,11 +178,18 @@ function FormaConfig({ formaId, onClose, onSalvo }: { formaId: number; onClose: 
       }
       g[band.id] = cells
     }
-    setGrade(g); setGradeMeta(meta)
+    return { g, meta }
   }, [det, adqSel])
 
+  // A base identifica de QUE dados o rascunho nasceu: trocar de adquirente (ou receber
+  // dados novos) descarta o rascunho, como o efeito fazia — só que sem o render em que
+  // a grade antiga ainda estava na tela.
+  const baseGrade = JSON.stringify(gradeDoServidor.g)
+  const grade = rascunhoGrade?.base === baseGrade ? rascunhoGrade.grade : gradeDoServidor.g
+  const gradeMeta = gradeDoServidor.meta
+
   const setCell = (bandId: number, parcela: number, v: string) =>
-    setGrade((p) => ({ ...p, [bandId]: { ...p[bandId], [parcela]: v } }))
+    setRascunhoGrade({ base: baseGrade, grade: { ...grade, [bandId]: { ...grade[bandId], [parcela]: v } } })
 
   async function salvar() {
     if (!det) return

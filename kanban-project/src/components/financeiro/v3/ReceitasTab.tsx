@@ -136,7 +136,9 @@ export function ReceitasTab({ processoId, onAbrirDetalhe }: { processoId?: numbe
 
   // Revalidação automática: recarrega a lista quando QUALQUER mutação financeira ocorre
   // (registrar pagamento, editar, redistribuir, estornar, arquivar…) — sem recarregar a página.
-  useRevalidacaoFinanceira(useCallback(() => carregar(), [processoId]))
+  // A chave da consulta já contém o processo; o que este bus faz é REVALIDAR quando
+  // qualquer mutação financeira acontece em outra tela.
+  useRevalidacaoFinanceira(carregar)
 
   const grupos: Grupo[] = d?.receitas ?? SEM_GRUPOS
   const k = d?.kpis ?? SEM_KPIS
@@ -147,10 +149,13 @@ export function ReceitasTab({ processoId, onAbrirDetalhe }: { processoId?: numbe
 
   // conclusão padrão de uma ação da lista: fecha o modal, recarrega, propaga no bus e
   // passa a observar a receita (para avisar caso ela saia da aba filtrada após a mutação).
-  const aoConcluir = useCallback((g: Grupo) => {
+  // Sem `useCallback`: ele declarava `[carregar]` e usava também `aba` — memoização que
+  // mente sobre as dependências é pior que memoização nenhuma. O React Compiler cuida
+  // da identidade.
+  const aoConcluir = (g: Grupo) => {
     setAcao(null); carregar(); emitirMutacaoFinanceira()
     setMovidaBruta({ id: g.id, nome: g.descricao ?? g.codigo ?? `#${g.id}`, aba })
-  }, [carregar])
+  }
   // o aviso vale só para a aba corrente; trocar de aba (ou limpar) o dispensa — agora
   // por derivação, sem o render intermediário em que ele ainda aparecia na aba nova.
   const movida = movidaBruta?.aba === aba ? movidaBruta : null

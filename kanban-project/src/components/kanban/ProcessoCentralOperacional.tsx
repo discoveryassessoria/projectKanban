@@ -385,10 +385,10 @@ export function ProcessoCentralOperacional({
         ? "Endpoint /api/processos/[id]/central-operacional ainda não existe."
         : "Erro ao carregar Central Operacional.")
     : null)
-  const setData = (proximos: CentralOpData | null | ((anteriores: CentralOpData | null) => CentralOpData | null)) => {
+  const setData = useCallback((proximos: CentralOpData | null | ((anteriores: CentralOpData | null) => CentralOpData | null)) => {
     const valor = typeof proximos === 'function' ? proximos(data) : proximos
     void centralReq.recarregar(valor ?? undefined)
-  }
+  }, [data, centralReq])
   // `carregar(silencioso)` continua existindo para os ~10 pontos que o chamam depois de
   // escrever; a distinção entre carga inicial e refresh agora vem da própria consulta.
   const carregar = useCallback((_modoSilencioso = false) => { void centralReq.recarregar() }, [centralReq])
@@ -419,7 +419,7 @@ export function ProcessoCentralOperacional({
   const [novaTransversalCtx, setNovaTransversalCtx] = useState<{ necessidadeId?: number | null; pessoaId?: number | null; label?: string } | null>(null)
   const operacoesReq = useApi<{ operacoes?: OpAntecipada[] }>(`/api/processos/${processo.id}/operacoes-antecipadas`)
   const operacoes = operacoesReq.dados?.operacoes ?? SEM_OPERACOES
-  const carregarOperacoes = async () => { await operacoesReq.recarregar() }
+  const carregarOperacoes = useCallback(async () => { await operacoesReq.recarregar() }, [operacoesReq])
   // Banner "executada antecipadamente para atender…" exibido na tela oficial (drawer) reusada.
   const [bannerAntecipada, setBannerAntecipada] = useState<string | null>(null)
 
@@ -529,7 +529,9 @@ export function ProcessoCentralOperacional({
         setErroOperacao("Falha de rede ao delegar.")
       }
     },
-    [processo.id]
+    // `carregar` entra de verdade: a memoização anterior declarava só `processo.id` e
+    // fechava sobre um `carregar` mais antigo.
+    [processo.id, carregar]
   )
 
 
@@ -544,7 +546,7 @@ export function ProcessoCentralOperacional({
   const avaliarOperacao = useCallback(async (id: number, resultado: "SIM" | "PARCIAL" | "NAO" | "CANCELAR", resultadoObtido: string, resultadoDados?: Record<string, unknown>) => {
     await fetch(`/api/operacoes-antecipadas/${id}`, { method: "PATCH", headers: { "Content-Type": "application/json", Authorization: `Bearer ${localStorage.getItem("authToken")}` }, body: JSON.stringify({ resultado, resultadoObtido: resultadoObtido || null, resultadoDados: resultadoDados ?? null }) })
     await carregarOperacoes(); carregar(true)
-  }, [carregarOperacoes])
+  }, [carregarOperacoes, carregar])
 
   // "Abrir operação" da antecipada: reusa a MESMA tela oficial (drawer) + banner de contexto.
   const abrirOperacaoAntecipada = useCallback((op: OpAntecipada) => {
@@ -587,7 +589,7 @@ export function ProcessoCentralOperacional({
           }
         : prev,
     )
-  }, [])
+  }, [setData])
 
   useEffect(() => {
     carregar()

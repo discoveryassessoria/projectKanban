@@ -11,6 +11,8 @@
 "use client"
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
+import { useConsulta } from "@/src/lib/dados"
+import { useDebounce } from "@/src/hooks/use-debounce"
 import { createPortal } from "react-dom"
 import { LAYER } from "@/src/lib/ui/layers"
 import {
@@ -86,12 +88,10 @@ export default function EditarReceitaView({ obrigacaoId, receitaRef, natureza, o
 
   const [estrategia, setEstrategia] = useState<"ATUALIZAR_ABERTAS" | "AJUSTE_COMPENSATORIO">("ATUALIZAR_ABERTAS")
   const [justificativa, setJustificativa] = useState("")
-  const [previa, setPrevia] = useState<Previa | null>(null)
-  const [previewing, setPreviewing] = useState(false)
+
   const [salvando, setSalvando] = useState(false)
   const [erroSave, setErroSave] = useState<string | null>(null)
   const [ok, setOk] = useState(false)
-  const debounce = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   // ── carregar estado ──
   useEffect(() => {
@@ -206,25 +206,25 @@ export default function EditarReceitaView({ obrigacaoId, receitaRef, natureza, o
   }, [patchFinanceiro, seededOk, responsavelId, vencimento])
 
   // preview com debounce quando muda o financeiro OU o responsável/vencimento
-  const rodarPreview = useCallback(async () => {
-    setPreviewing(true)
-    try {
+  // Prévia da edição: LEITURA por POST (`?preview=1` não persiste). O patch entra na
+  // chave e o atraso é do VALOR — sai o efeito com `setTimeout`, a ref de debounce e o
+  // `setPrevia(null)` que rodava antes de cada disparo. Sem mudança financeira ou de
+  // responsável/vencimento não há o que prever: chave `null`, nenhuma requisição.
+  const precisaPrevia = Boolean(rec) && (mudouFinanceiro || mudouRespVenc)
+  const patchEstavel = useDebounce(JSON.stringify(patchPreview), 450)
+  const previaReq = useConsulta<{ ok?: boolean; previa?: Previa }>(
+    precisaPrevia ? `editar-receita-preview:${receitaRef}:${patchEstavel}` : null,
+    async () => {
       const r = await fetch(`/api/financeiro/v3/receita/${receitaRef}/editar?preview=1`, {
         method: "POST", headers: { "Content-Type": "application/json", ...authHeaders() },
-        body: JSON.stringify(patchPreview),
+        body: patchEstavel,
       }).then((x) => x.json())
-      if (r?.ok && r?.previa) setPrevia(r.previa)
-      else setPrevia(null)
-    } catch { setPrevia(null) } finally { setPreviewing(false) }
-  }, [receitaRef, patchPreview])
-
-  useEffect(() => {
-    if (!rec) return
-    if (!mudouFinanceiro && !mudouRespVenc) { setPrevia(null); return }
-    if (debounce.current) clearTimeout(debounce.current)
-    debounce.current = setTimeout(() => { rodarPreview() }, 450)
-    return () => { if (debounce.current) clearTimeout(debounce.current) }
-  }, [rec, mudouFinanceiro, mudouRespVenc, rodarPreview])
+      return r
+    },
+  )
+  // Resposta sem `ok`/`previa` vale como "sem prévia", como antes — não vira erro.
+  const previa = precisaPrevia && previaReq.dados?.ok ? (previaReq.dados.previa ?? null) : null
+  const previewing = precisaPrevia && previaReq.carregando
 
   const bloqueado = (previa?.bloqueios?.length ?? 0) > 0
   const mudouTextual = useMemo(() => {

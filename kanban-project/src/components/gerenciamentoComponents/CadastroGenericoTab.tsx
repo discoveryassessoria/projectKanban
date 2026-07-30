@@ -42,6 +42,9 @@ const CARD = "rounded-2xl border border-white/10 bg-white/5 backdrop-blur-sm"
 const IEdit = () => (<svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 20h9" /><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z" /></svg>)
 const ITrash = () => (<svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 6h18" /><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" /></svg>)
 
+const SEM_REGISTROS: Registro[] = []
+const SEM_FONTES: Fontes = {}
+
 export default function CadastroGenericoTab({ entidade }: { entidade: string }) {
   const [busy, setBusy] = useState(false)
   // Erro de ESCRITA em estado; o de LEITURA vem da consulta.
@@ -54,8 +57,10 @@ export default function CadastroGenericoTab({ entidade }: { entidade: string }) 
   // para um já visitado não pisca a tela.
   const consulta = useApi<{ spec?: Spec; registros?: Registro[]; fontes?: Fontes }>(`/api/gerenciamento/cadastros/${entidade}`)
   const spec = consulta.dados?.spec ?? null
-  const rows = consulta.dados?.registros ?? []
-  const fontes: Fontes = consulta.dados?.fontes ?? {}
+  // Constantes, não literais: alimentam dependências de `useMemo`/`useCallback` abaixo,
+  // e um objeto novo por render faria os dois recalcularem sempre.
+  const rows = consulta.dados?.registros ?? SEM_REGISTROS
+  const fontes: Fontes = consulta.dados?.fontes ?? SEM_FONTES
   const loading = consulta.carregando
   const erro = erroEscrita ?? (consulta.erro ? consulta.erro.message : null)
   const setErro = setErroEscrita

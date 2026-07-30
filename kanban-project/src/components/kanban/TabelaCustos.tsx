@@ -1,6 +1,7 @@
 "use client"
 
-import { useState, useEffect, useCallback, useRef } from "react"
+import { useState, useEffect, useCallback, useRef, useMemo } from "react"
+import { useApi } from "@/src/lib/dados"
 import { 
   Plus, Trash2, Loader2, Save, DollarSign, FileText, Pencil, Check, X,
   Download, FileDown, ChevronDown, ChevronUp, CheckSquare, Square,
@@ -50,19 +51,56 @@ interface TabelaCustosProps {
   }) => void
 }
 
+/** Resposta da tabela de custos. */
+interface RespostaCustos {
+  linhas?: LinhaTabela[]
+  servicos?: TipoServico[]
+  totaisPorServico?: Record<number, number>
+  totalGeral?: number
+}
+const SEM_LINHAS: LinhaTabela[] = []
+const SEM_SERVICOS: TipoServico[] = []
+const SEM_TOTAIS: Record<number, number> = {}
+
 export function TabelaCustos({ processoId, nomeFamilia, onTotaisChange }: TabelaCustosProps) {
   const { pode } = usePermissoes()
 
-  const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
-  const [linhas, setLinhas] = useState<LinhaTabela[]>([])
-  const [servicos, setServicos] = useState<TipoServico[]>([])
-  const [totaisPorServico, setTotaisPorServico] = useState<Record<number, number>>({})
-  const [totalGeral, setTotalGeral] = useState(0)
-  
-  // Estado para edição de valores
-  const [valoresEditados, setValoresEditados] = useState<Record<string, string>>({})
-  const [temAlteracoes, setTemAlteracoes] = useState(false)
+
+  // A tabela inteira vem de uma leitura só.
+  const custosReq = useApi<RespostaCustos>(`/api/processos/${processoId}/custos`)
+  const linhas = custosReq.dados?.linhas ?? SEM_LINHAS
+  const servicos = custosReq.dados?.servicos ?? SEM_SERVICOS
+  const totaisPorServico = custosReq.dados?.totaisPorServico ?? SEM_TOTAIS
+  const totalGeral = custosReq.dados?.totalGeral ?? 0
+  const loading = custosReq.carregando
+  const carregarDados = () => { void custosReq.recarregar() }
+
+  // Os valores da grade são um RASCUNHO sobre o que veio do servidor. Antes o
+  // carregador os semeava e zerava `temAlteracoes` — o que apagava, sem aviso, o que o
+  // operador tivesse digitado se a tabela recarregasse.
+  const valoresDoServidor = useMemo<Record<string, string>>(() => {
+    const valores: Record<string, string> = {}
+    for (const linha of linhas) {
+      for (const s of servicos) {
+        // A chave inclui o tipo de registro para separar documentos da mesma pessoa.
+        valores[`${linha.pessoaId}-${linha.tipoRegistro}-${s.id}`] = (linha.valores[s.id] || 0).toString()
+      }
+    }
+    return valores
+  }, [linhas, servicos])
+  const baseValores = JSON.stringify(valoresDoServidor)
+  const [rascunhoValores, setRascunhoValores] = useState<{ base: string; valores: Record<string, string> } | null>(null)
+  const rascunhoVigente = rascunhoValores?.base === baseValores ? rascunhoValores : null
+  const valoresEditados = rascunhoVigente?.valores ?? valoresDoServidor
+  // "Tem alterações" deixa de ser um sinalizador para virar o que ele sempre significou:
+  // existe rascunho diferente do gravado.
+  const temAlteracoes = rascunhoVigente !== null
+  const setValoresEditados = (proximos: Record<string, string> | ((anteriores: Record<string, string>) => Record<string, string>)) => {
+    const valores = typeof proximos === 'function' ? proximos(valoresEditados) : proximos
+    setRascunhoValores({ base: baseValores, valores })
+  }
+  const setTemAlteracoes = (v: boolean) => { if (!v) setRascunhoValores(null) }
   
   // Modal para adicionar serviço
   const [showAddServico, setShowAddServico] = useState(false)
@@ -83,61 +121,20 @@ export function TabelaCustos({ processoId, nomeFamilia, onTotaisChange }: Tabela
   
   // ✅ NOVO: Ordem customizada das pessoas dentro de cada grupo de linhagem
   // Chave: pessoaId, Valor: posição dentro do grupo
-  const [ordemPessoas, setOrdemPessoas] = useState<Record<number, number>>({})
-  
-  const carregandoRef = useRef(false)
-  const tabelaRef = useRef<HTMLDivElement>(null)
-
-  // Carregar dados
-  const carregarDados = useCallback(async () => {
-    if (carregandoRef.current) return
-    carregandoRef.current = true
-    
-    try {
-      setLoading(true)
-      const response = await fetch(`/api/processos/${processoId}/custos`, {
-        headers: { 'Authorization': `Bearer ${localStorage.getItem('authToken')}` }
-      })
-      if (response.ok) {
-        const data = await response.json()
-        setLinhas(data.linhas || [])
-        setServicos(data.servicos || [])
-        setTotaisPorServico(data.totaisPorServico || {})
-        setTotalGeral(data.totalGeral || 0)
-        
-        // ✅ ATUALIZADO: Inicializar valores por linha (incluindo tipoRegistro)
-        const valores: Record<string, string> = {}
-        
-        data.linhas?.forEach((linha: LinhaTabela) => {
-          data.servicos?.forEach((s: TipoServico) => {
-            // Chave inclui tipoRegistro para diferenciar documentos da mesma pessoa
-            const key = `${linha.pessoaId}-${linha.tipoRegistro}-${s.id}`
-            valores[key] = (linha.valores[s.id] || 0).toString()
-          })
-        })
-        setValoresEditados(valores)
-        setTemAlteracoes(false)
-        
-        // ✅ ATUALIZADO: Inicializar ordem das pessoas usando ordemCusto do servidor
-        const ordemInicial: Record<number, number> = {}
-        data.linhas?.forEach((linha: LinhaTabela) => {
-          if (linha.isPrimeiraLinha) {
-            ordemInicial[linha.pessoaId] = linha.ordemCusto ?? 0
-          }
-        })
-        setOrdemPessoas(ordemInicial)
-      }
-    } catch (error) {
-      console.error("Erro ao carregar dados:", error)
-    } finally {
-      setLoading(false)
-      carregandoRef.current = false
+  // Ordem das pessoas: a do servidor (ordemCusto), com a reordenação local por cima.
+  const ordemDoServidor = useMemo<Record<number, number>>(() => {
+    const ordem: Record<number, number> = {}
+    for (const linha of linhas) {
+      if (linha.isPrimeiraLinha) ordem[linha.pessoaId] = linha.ordemCusto ?? 0
     }
-  }, [processoId])
-
-  useEffect(() => {
-    carregarDados()
-  }, [carregarDados])
+    return ordem
+  }, [linhas])
+  const baseOrdem = JSON.stringify(ordemDoServidor)
+  const [rascunhoOrdem, setRascunhoOrdem] = useState<{ base: string; ordem: Record<number, number> } | null>(null)
+  const ordemPessoas = rascunhoOrdem?.base === baseOrdem ? rascunhoOrdem.ordem : ordemDoServidor
+  const setOrdemPessoas = (ordem: Record<number, number>) => setRascunhoOrdem({ base: baseOrdem, ordem })
+  
+  const tabelaRef = useRef<HTMLDivElement>(null)
 
   // 🆕 LOTE 4: Notifica o pai sempre que os valores editados mudam,
   // permitindo que os cards "Custos por Tipo" (em Custos.tsx) atualizem
