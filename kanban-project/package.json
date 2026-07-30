@@ -110,6 +110,7 @@
     "test:mrg-identidade": "tsx scripts/mrg-identidade.test.ts",
     "test:mrg-leitura": "tsx scripts/mrg-leitura.test.ts",
     "test:mrg-visao": "tsx scripts/mrg-visao.test.ts",
+    "test:mrg-visao-ao-vivo": "tsx scripts/mrg-visao-ao-vivo.test.ts",
     "test:nav": "tsx scripts/management-nav.test.ts",
     "test:operational-projection": "tsx scripts/operational-projection.test.ts",
     "test:overview": "tsx scripts/overview-projecao.test.ts",

@@ -394,6 +394,14 @@ async function motivoDoErro(res: Response): Promise<string> {
   } catch {
     detalhe = ""
   }
+  // Saldo zerado chega como 400 genérico. É o erro mais provável de todos no
+  // primeiro uso, e "requisição recusada (400)" não diz ao operador o que fazer.
+  if (/credit balance|insufficient.*credit|billing/i.test(detalhe)) {
+    return (
+      "A conta da API de leitura está sem saldo. Nenhuma certidão foi lida e nada foi cobrado. " +
+      "Adicione créditos em console.anthropic.com → Plans & Billing e tente de novo."
+    )
+  }
   const rotulo =
     res.status === 401
       ? "credencial recusada"

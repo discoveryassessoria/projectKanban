@@ -449,6 +449,23 @@ async function main() {
     !permanente.ok ? permanente.motivo : null,
   )
 
+  // ---- saldo zerado: 400 genérico que precisa virar instrução
+  definirTransporte(async () =>
+    new Response(
+      JSON.stringify({
+        error: { type: "invalid_request_error", message: "Your credit balance is too low to access the Anthropic API." },
+      }),
+      { status: 400 },
+    ),
+  )
+  const semSaldo = await chamarVisao({ sistema: "s", blocos: [], esquema: {} }, new Orcamento(1), CFG)
+  ok(
+    !semSaldo.ok && /sem saldo/i.test(semSaldo.motivo) && /console\.anthropic\.com/.test(semSaldo.motivo),
+    "saldo zerado vira instrução em português, não '400 requisição recusada'",
+    !semSaldo.ok ? semSaldo.motivo : null,
+  )
+  ok(!semSaldo.ok && semSaldo.permanente, "e não fica repetindo uma chamada que nunca vai passar")
+
   // ---- 5xx é transitório
   chamadas = 0
   definirTransporte(async () => {
