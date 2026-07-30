@@ -23,6 +23,8 @@ const ROTULO: Record<SearchResult["tipo"], string> = {
  * Busca global integrada (família, requerente, código/nome do processo, cliente).
  * Debounce + navegação por teclado + acessível (combobox/listbox).
  */
+const SEM_RESULTADOS: SearchResult[] = []
+
 export function GlobalSearch({ autoFocusRef }: { autoFocusRef?: React.RefObject<HTMLInputElement | null> }) {
   const router = useRouter()
   const [q, setQ] = React.useState("")
@@ -35,14 +37,18 @@ export function GlobalSearch({ autoFocusRef }: { autoFocusRef?: React.RefObject<
   const inputRef = autoFocusRef ?? internalRef
   const reqId = React.useRef(0)
 
+  // Termo curto não busca — e, principalmente, não mostra resultado velho. Isso é
+  // DERIVAÇÃO, não estado: limpar por efeito (`setResultados([])`) fazia a lista
+  // antiga aparecer por um render antes de sumir.
+  const termo = q.trim()
+  const buscavel = termo.length >= 2
+  const resultadosVisiveis = buscavel ? resultados : SEM_RESULTADOS
+  const carregandoVisivel = buscavel && carregando
+
   // Debounce da busca
   React.useEffect(() => {
     const termo = q.trim()
-    if (termo.length < 2) {
-      setResultados([])
-      setCarregando(false)
-      return
-    }
+    if (termo.length < 2) return
     setCarregando(true)
     const id = ++reqId.current
     const timer = setTimeout(async () => {
@@ -79,20 +85,20 @@ export function GlobalSearch({ autoFocusRef }: { autoFocusRef?: React.RefObject<
   }
 
   function onKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
-    if (!aberto && (e.key === "ArrowDown" || e.key === "ArrowUp") && resultados.length) {
+    if (!aberto && (e.key === "ArrowDown" || e.key === "ArrowUp") && resultadosVisiveis.length) {
       setAberto(true)
       return
     }
     if (e.key === "ArrowDown") {
       e.preventDefault()
-      setAtivo((i) => Math.min(i + 1, resultados.length - 1))
+      setAtivo((i) => Math.min(i + 1, resultadosVisiveis.length - 1))
     } else if (e.key === "ArrowUp") {
       e.preventDefault()
       setAtivo((i) => Math.max(i - 1, 0))
     } else if (e.key === "Enter") {
-      if (ativo >= 0 && resultados[ativo]) {
+      if (ativo >= 0 && resultadosVisiveis[ativo]) {
         e.preventDefault()
-        irPara(resultados[ativo])
+        irPara(resultadosVisiveis[ativo])
       }
     } else if (e.key === "Escape") {
       setAberto(false)
@@ -115,12 +121,12 @@ export function GlobalSearch({ autoFocusRef }: { autoFocusRef?: React.RefObject<
           aria-label="Buscar família, requerente, processo ou cliente"
           value={q}
           onChange={(e) => setQ(e.target.value)}
-          onFocus={() => resultados.length && setAberto(true)}
+          onFocus={() => resultadosVisiveis.length && setAberto(true)}
           onKeyDown={onKeyDown}
           placeholder="Buscar família, requerente, processo ou cliente…"
           className="h-10 w-full rounded-lg border border-white/15 bg-white/[0.06] pl-9 pr-9 text-sm text-white backdrop-blur-md placeholder:text-white/40 focus:border-white/30 focus:outline-none focus:ring-2 focus:ring-white/15"
         />
-        {carregando && <Loader2 className="absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 animate-spin text-white/40" />}
+        {carregandoVisivel && <Loader2 className="absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 animate-spin text-white/40" />}
       </div>
 
       {mostrarDropdown && (
@@ -129,10 +135,10 @@ export function GlobalSearch({ autoFocusRef }: { autoFocusRef?: React.RefObject<
           role="listbox"
           className="absolute z-50 mt-1 max-h-80 w-full overflow-auto rounded-lg border border-white/15 bg-[#0b1020]/95 py-1 shadow-2xl backdrop-blur-xl"
         >
-          {resultados.length === 0 && !carregando && (
+          {resultadosVisiveis.length === 0 && !carregandoVisivel && (
             <li className="px-3 py-3 text-sm text-white/50">Nenhum resultado para “{q}”.</li>
           )}
-          {resultados.map((r, i) => {
+          {resultadosVisiveis.map((r, i) => {
             const Icon = ICONE[r.tipo]
             return (
               <li

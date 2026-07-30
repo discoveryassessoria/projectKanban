@@ -70,10 +70,6 @@ export function DatePickerField({
   toYear = new Date().getFullYear(),
 }: DatePickerFieldProps) {
   const [open, setOpen] = React.useState(false)
-  const [inputValue, setInputValue] = React.useState("")
-  const [viewMonth, setViewMonth] = React.useState(new Date().getMonth())
-  const [viewYear, setViewYear] = React.useState(new Date().getFullYear())
-  
   const dateValue = React.useMemo(() => {
     if (!value) return undefined
     if (value instanceof Date) return value
@@ -81,15 +77,42 @@ export function DatePickerField({
     return isNaN(parsed.getTime()) ? undefined : parsed
   }, [value])
 
-  React.useEffect(() => {
-    if (dateValue) {
-      setInputValue(format(dateValue, "dd/MM/yyyy"))
-      setViewMonth(dateValue.getMonth())
-      setViewYear(dateValue.getFullYear())
-    } else {
-      setInputValue("")
-    }
-  }, [dateValue])
+  // O texto do campo e o mês/ano do calendário são RASCUNHOS sobre o valor que veio
+  // de fora. Antes um efeito reescrevia os três estados a cada mudança de `value`;
+  // era o padrão "prop copiada para estado", com o defeito clássico: por um render
+  // a tela mostrava o texto antigo com o valor novo.
+  //
+  // Aqui o rascunho carrega a BASE em que ele foi digitado. Enquanto a base é a
+  // atual, vale o que o usuário fez; quando `value` muda, a base deixa de casar e o
+  // rascunho é descartado por construção — sem efeito e sem render intermediário.
+  const textoDoValor = dateValue ? format(dateValue, "dd/MM/yyyy") : ""
+  const [rascunhoTexto, setRascunhoTexto] = React.useState<{ base: string; texto: string } | null>(null)
+  const [rascunhoVista, setRascunhoVista] = React.useState<{ base: string; mes: number; ano: number } | null>(null)
+
+  const inputValue = rascunhoTexto?.base === textoDoValor ? rascunhoTexto.texto : textoDoValor
+  const hoje = new Date()
+  const vistaDoValor = { mes: dateValue?.getMonth() ?? hoje.getMonth(), ano: dateValue?.getFullYear() ?? hoje.getFullYear() }
+  const vistaAtual = rascunhoVista?.base === textoDoValor
+    ? { mes: rascunhoVista.mes, ano: rascunhoVista.ano }
+    : vistaDoValor
+  const viewMonth = vistaAtual.mes
+  const viewYear = vistaAtual.ano
+
+  // Mês e ano viraram UM estado, então os dois setters têm de COMPOR: "mês anterior"
+  // chama `setViewMonth(11)` e `setViewYear(ano - 1)` no mesmo handler, e a segunda
+  // chamada não pode reintroduzir o mês do render anterior. Por isso a atualização é
+  // funcional — ela lê o valor já atualizado pela primeira.
+  const aplicarVista = (mudar: (v: { mes: number; ano: number }) => { mes: number; ano: number }) =>
+    setRascunhoVista((atual) => {
+      const efetiva = atual?.base === textoDoValor ? { mes: atual.mes, ano: atual.ano } : vistaDoValor
+      return { base: textoDoValor, ...mudar(efetiva) }
+    })
+
+  // Mesmos nomes de antes: os ~20 pontos que já chamavam estes setters continuam
+  // valendo, e a mudança fica contida aqui.
+  const setInputValue = (texto: string) => setRascunhoTexto({ base: textoDoValor, texto })
+  const setViewMonth = (mes: number) => aplicarVista((v) => ({ ...v, mes }))
+  const setViewYear = (ano: number) => aplicarVista((v) => ({ ...v, ano }))
 
   // ✅ CORREÇÃO: Gerar todos os anos disponíveis para permitir navegação completa
   const years = React.useMemo(() => {
@@ -310,6 +333,7 @@ export function DatePickerField({
           <button
             type="button"
             disabled={disabled}
+            aria-label="Abrir calendário"
             className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             onClick={() => setOpen(true)}
           >
@@ -331,6 +355,7 @@ export function DatePickerField({
           <button
             type="button"
             onClick={handlePrevMonth}
+            aria-label="Mês anterior"
             className="p-1.5 hover:bg-gray-100 rounded-md transition-colors text-gray-500 hover:text-gray-700"
           >
             <ChevronLeft className="h-4 w-4" />
@@ -363,6 +388,7 @@ export function DatePickerField({
           <button
             type="button"
             onClick={handleNextMonth}
+            aria-label="Mês seguinte"
             className="p-1.5 hover:bg-gray-100 rounded-md transition-colors text-gray-500 hover:text-gray-700"
           >
             <ChevronRight className="h-4 w-4" />

@@ -3,6 +3,7 @@
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { useState, useRef, useEffect, useCallback } from "react"
+import { useApi } from '@/src/lib/dados'
 import {
   Menu,
   MessageCircle,
@@ -108,28 +109,13 @@ export function BitrixSidebar() {
   // =====================================================
   // 🔴 Badge de mensagens não lidas
   // =====================================================
-  const [mensagensNaoLidas, setMensagensNaoLidas] = useState(0)
+  // Contador de não lidas: a camada oficial faz o polling (`refreshInterval`), em
+  // lugar de um `setInterval` mais um `useState` mais um efeito de montagem. A falha
+  // continua SILENCIOSA de propósito — o badge da sidebar não pode virar um erro na
+  // cara do usuário.
+  const naoLidas = useApi<{ totalNaoLidas?: number }>('/api/admin/mensagens/nao-lidas', { refreshInterval: 30_000 })
+  const mensagensNaoLidas = naoLidas.dados?.totalNaoLidas ?? 0
 
-  const fetchMensagensNaoLidas = useCallback(async () => {
-    try {
-      const token = typeof window !== 'undefined' ? localStorage.getItem('authToken') : null
-      const response = await fetch('/api/admin/mensagens/nao-lidas', {
-        headers: token ? { 'Authorization': `Bearer ${token}` } : {}
-      })
-      if (!response.ok) return
-      const data = await response.json()
-      setMensagensNaoLidas(data.totalNaoLidas || 0)
-    } catch (error) {
-      // Silencioso - não bloqueia a UI
-    }
-  }, [])
-
-  useEffect(() => {
-    fetchMensagensNaoLidas()
-    // Polling a cada 30 segundos (mesmo intervalo das notificações do header)
-    const interval = setInterval(fetchMensagensNaoLidas, 30000)
-    return () => clearInterval(interval)
-  }, [fetchMensagensNaoLidas])
   // =====================================================
 
   const isExpanded = !isCollapsed || isHovered

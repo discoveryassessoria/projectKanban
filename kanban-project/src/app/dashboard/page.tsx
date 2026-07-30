@@ -20,21 +20,23 @@ import { HomeShell } from "@/src/components/home/home-shell"
 import { HomeSkeleton } from "@/src/components/home/home-skeleton"
 import { BlocoCard, ErrorState } from "@/src/components/home/home-primitives"
 import { encerrarSessao } from "@/src/lib/sessao/cliente"
+import { useIsClient, useLocalStorage } from "@/src/lib/cliente"
 
 export default function DashboardPage() {
   const router = useRouter()
-  const [autorizado, setAutorizado] = useState(false)
   const { data, error, isLoading, recarregar } = useHomeData()
+  // "Autorizado" é uma LEITURA de sessão, não um estado da tela: token e usuário
+  // presentes. Como estado escrito por efeito, custava um render em que a Home já
+  // existia mostrando o esqueleto mesmo com a sessão válida em mãos.
+  const noCliente = useIsClient()
+  const token = useLocalStorage("authToken")
+  const usuario = useLocalStorage("user")
+  const autorizado = noCliente && Boolean(token && usuario)
 
+  // Sem sessão, volta para o login. Navegar é efeito; a autorização não era.
   useEffect(() => {
-    const token = localStorage.getItem("authToken")
-    const userData = localStorage.getItem("user")
-    if (!token || !userData) {
-      router.replace("/login")
-      return
-    }
-    setAutorizado(true)
-  }, [router])
+    if (noCliente && !autorizado) router.replace("/login")
+  }, [noCliente, autorizado, router])
 
   // Sessão expirada durante a chamada → volta pro login.
   useEffect(() => {

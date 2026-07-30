@@ -46,19 +46,25 @@ function useRemoveBodyPadding(isOpen: boolean) {
 }
 
 const Dialog = ({ children, ...props }: React.ComponentProps<typeof DialogPrimitive.Root>) => {
-  const [isOpen, setIsOpen] = React.useState(props.open ?? false)
-  
-  React.useEffect(() => {
-    setIsOpen(props.open ?? false)
-  }, [props.open])
-  
+  // O único motivo de saber se está aberto é alimentar `useRemoveBodyPadding`.
+  // Espelhar `props.open` no estado por efeito era pior do que parece: o espelho
+  // fica UM RENDER atrasado e, num Dialog controlado, dessincroniza se a prop muda
+  // e volta na mesma passagem.
+  //
+  // Então: quando o Dialog é CONTROLADO, o valor vem da prop (não há o que
+  // espelhar); quando é NÃO CONTROLADO, quem manda é o Radix e o estado local
+  // apenas acompanha o `onOpenChange`.
+  const controlado = props.open !== undefined
+  const [abertoInterno, setAbertoInterno] = React.useState(props.defaultOpen ?? false)
+  const isOpen = controlado ? (props.open ?? false) : abertoInterno
+
   useRemoveBodyPadding(isOpen)
   
   return (
     <DialogPrimitive.Root 
       {...props} 
       onOpenChange={(open) => {
-        setIsOpen(open)
+        if (!controlado) setAbertoInterno(open)
         props.onOpenChange?.(open)
       }}
     >

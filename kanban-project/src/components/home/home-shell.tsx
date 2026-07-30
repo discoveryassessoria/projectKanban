@@ -13,6 +13,7 @@ import * as React from "react"
 import { useRouter } from "next/navigation"
 import { HeaderBar } from "@/src/components/header-bar"
 import { encerrarSessao } from "@/src/lib/sessao/cliente"
+import { useJsonLocalStorage } from "@/src/lib/cliente"
 
 export function HomeShell({
   titulo = "Centro Operacional",
@@ -24,19 +25,11 @@ export function HomeShell({
   children: React.ReactNode
 }) {
   const router = useRouter()
-  const [user, setUser] = React.useState<{ nome?: string; tipo?: string; email?: string }>({ nome: "Usuário" })
-
-  React.useEffect(() => {
-    if (typeof window === "undefined") return
-    const u = localStorage.getItem("user")
-    if (u) {
-      try {
-        setUser(JSON.parse(u))
-      } catch {
-        /* payload inválido: mantém o placeholder */
-      }
-    }
-  }, [])
+  // Leitura oficial do localStorage: segura na hidratação, referência estável e
+  // reagindo a troca de usuário em outra aba. Payload inválido devolve `null` — o
+  // placeholder continua sendo o fallback, como antes.
+  const userSalvo = useJsonLocalStorage<{ nome?: string; tipo?: string; email?: string }>("user")
+  const user = userSalvo ?? { nome: "Usuário" }
 
   function sair() { void encerrarSessao("manual") }
 
