@@ -1,9 +1,8 @@
 {
   "_leiaMe": "Hash SHA-256 de cada arquivo da superfície visual da Árvore Genealógica. Regenerar SÓ quando a mudança visual for intencional e aprovada: npx tsx scripts/mrg-arquitetura-guard.test.ts --aprovar",
   "arquivos": {
-    "src/components/arvore/arvore-genealogica-view.tsx": "82f353ef23ce3adf7e91a153f6a81b358e97cc52ffcd1d56c50f5fed878abef3",
+    "src/components/arvore/arvore-genealogica-view.tsx": "2aea1525b8553c8a0a9356f8e205d49830c2d5a2d03f948b90d079ff4770fec1",
     "src/components/arvore/couple-card.tsx": "533c6ffa2d9405512c4837b409d89a8509fa73b8d984da239a03f0cbecea9faf",
-    "src/components/arvore/importar-certidoes.tsx": "711d6f90bd6443028c9e77f3015a724ed01b42747a3924184cd9a7744ea285c9",
     "src/components/arvore/index.tsx": "d07330ee495215bab3b9d1a101d9e220fb208575a02d872762f3464b720cfca4",
     "src/components/arvore/inteligencia/painel-inteligencia.tsx": "0d259d670c46eec930a2359b134d216941d016341b539864778b02e7da41b5e2",
     "src/components/arvore/inteligencia/paleta-comandos.tsx": "0ac22f6aad5709c3eff30f55b772475d3204cdd6661361358f3b29d235d6caa3",

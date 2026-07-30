@@ -9,22 +9,16 @@
  *     hash registrado em `tests/manifesto-visual-arvore.json`. Qualquer byte
  *     alterado reprova — e a mensagem diz exatamente qual arquivo.
  *
- *     EXCEÇÃO APROVADA (30/07/2026) — "Importar certidões" na Árvore. O usuário
- *     pediu explicitamente que a entrada de acervo passasse a viver DENTRO da
- *     tela da árvore, em posição visível. O manifesto foi rebaseado uma única vez
- *     para registrar exatamente três coisas, e nada mais:
- *       · `importar-certidoes.tsx` (componente novo, modal em portal);
- *       · o botão "Importar certidões" na toolbar (grupo da direita) e a entrada
- *         discreta no onboarding, ambos atrás de `arvore.criar_documento`;
- *       · o render do modal e o estado que o abre.
- *     O resto do layout — cards, cores, navegação, canvas, sidebar — segue
- *     intocado, e a guarda continua valendo: qualquer byte novo reprova.
+ *     EXCEÇÃO ENCERRADA (30/07/2026). A ação "Importar certidões" chegou a viver
+ *     na Árvore e foi REMOVIDA por decisão de produto — o custo por família não
+ *     se justificava no volume atual. `arvore-genealogica-view.tsx` voltou ao
+ *     estado anterior à funcionalidade (o commit dela foi o único a tocá-lo), e
+ *     `importar-certidoes.tsx` deixou de existir. O manifesto foi rebaseado sobre
+ *     esse retorno, então a guarda volta a valer sem exceção nenhuma: qualquer
+ *     byte alterado na superfície visual da Árvore reprova.
  *
- *     Segunda rebase, mesma exceção: `importar-certidoes.tsx` passou a montar a
- *     ÁRVORE PROPOSTA com o próprio `ReactFlowTree` — o mesmo componente que
- *     desenha a árvore de verdade, consumido sem alteração. A prévia herda cards,
- *     cores, linhas, cônjuges e gerações porque É a árvore, não uma imitação.
- *     Nenhum outro arquivo de `src/components/arvore` foi tocado.
+ *     O código removido está no tag `leitura-automatica-certidoes`, íntegro.
+ *
  *  2. O motor registral PURO não importa Prisma, React nem rede.
  *  3. A árvore NÃO duplica o Sistema Documental: nenhuma tabela nova guarda
  *     arquivo, status documental ou pasta paralela.

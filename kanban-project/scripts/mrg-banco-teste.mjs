@@ -99,8 +99,6 @@ function down() {
 
 function runE2e() {
   rodar('npx', ['tsx', 'scripts/mrg-e2e.test.ts'], { PRISMA_DATABASE_URL: URL, DIRECT_DATABASE_URL: URL })
-  // Importação pela Árvore: mesmo banco, mesma trava de segurança.
-  rodar('npx', ['tsx', 'scripts/mrg-importacao.test.ts'], { PRISMA_DATABASE_URL: URL, DIRECT_DATABASE_URL: URL })
 }
 
 /**
