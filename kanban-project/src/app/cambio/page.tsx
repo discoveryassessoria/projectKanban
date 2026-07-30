@@ -5,6 +5,7 @@
 // MESMO serviço do cron (contingência). Lê só o banco; nunca consulta a Confidence na tela.
 import * as React from 'react'
 import Link from 'next/link'
+import { enviar, useApi } from '@/src/lib/dados'
 
 type Snap = { moedas: any[]; fonte: string }
 type Cot = { id: number; moedaDe: string; moedaPara: string; taxa: string | number; data: string | null; fonte: string | null; ativo: boolean; origem?: string | null; modalidade?: string | null; dataReferencia?: string | null; consultadoEm?: string | null; vigente?: boolean }
@@ -13,32 +14,32 @@ const brl = (v: any) => (v == null || v === '' ? '—' : Number(v).toLocaleStrin
 const dt = (s: string | null | undefined) => (s ? new Date(s).toLocaleDateString('pt-BR') : '—')
 const dth = (s: string | null | undefined) => (s ? new Date(s).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' }) : '—')
 
-function tok() { return typeof window !== 'undefined' ? localStorage.getItem('authToken') : null }
-async function jf(url: string, opts: RequestInit = {}) {
-  const t = tok()
-  const r = await fetch(url, { ...opts, headers: { 'Content-Type': 'application/json', ...(t ? { Authorization: `Bearer ${t}` } : {}), ...(opts.headers || {}) }, cache: 'no-store' })
-  const d = await r.json().catch(() => ({})); if (!r.ok) throw new Error((d as any)?.error || `Erro ${r.status}`); return d
-}
+/** Resposta de "Atualizar agora": por moeda, o que o serviço fez. */
+type Execucao = { moedas?: { moeda: string; status: string }[] }
 
 export default function CambioHistoricoPage() {
-  const [snap, setSnap] = React.useState<Snap | null>(null)
-  const [hist, setHist] = React.useState<Cot[]>([])
-  const [erro, setErro] = React.useState<string | null>(null)
+  // Leitura pela camada oficial: o `jf` local (token + parse + erro) era a 25ª
+  // cópia do mesmo fetcher; o cache também evita rebuscar ao voltar para a tela.
+  const snapshot = useApi<Snap>('/api/cambio/snapshot')
+  const historico = useApi<{ cotacoes?: Cot[] }>('/api/gerenciamento/cambio')
+  const snap = snapshot.dados ?? null
+  const hist = historico.dados?.cotacoes ?? []
+  // Só o snapshot derruba a tela com mensagem de erro. O histórico continua
+  // tolerante como antes (`.catch(() => ({ cotacoes: [] }))`): sem ele a tela
+  // ainda serve, mostrando as cotações vigentes e a tabela vazia.
+  const erro = snapshot.erro?.message ?? null
   const [rodando, setRodando] = React.useState(false)
   const [msg, setMsg] = React.useState<string | null>(null)
 
-  const carregar = React.useCallback(async () => {
-    try {
-      const [s, h] = await Promise.all([jf('/api/cambio/snapshot'), jf('/api/gerenciamento/cambio').catch(() => ({ cotacoes: [] }))])
-      setSnap(s); setHist(((h as any).cotacoes || []) as Cot[])
-    } catch (e: any) { setErro(e.message || 'erro') }
-  }, [])
-  React.useEffect(() => { carregar() }, [carregar])
-
   async function atualizarAgora() {
     setRodando(true); setMsg(null)
-    try { const r = await jf('/api/gerenciamento/cambio/atualizar-agora', { method: 'POST' }); setMsg('Execução concluída: ' + (r.moedas || []).map((m: any) => `${m.moeda}=${m.status}`).join(' · ')); await carregar() }
-    catch (e: any) { setMsg('Falha: ' + (e.message || 'erro')) }
+    try {
+      const r = await enviar<Execucao>('/api/gerenciamento/cambio/atualizar-agora', { metodo: 'POST' })
+      setMsg('Execução concluída: ' + (r.moedas || []).map((m) => `${m.moeda}=${m.status}`).join(' · '))
+      // A execução mexe nas duas consultas — as duas revalidam.
+      await Promise.all([snapshot.recarregar(), historico.recarregar()])
+    }
+    catch (e) { setMsg('Falha: ' + (e instanceof Error ? e.message : 'erro')) }
     finally { setRodando(false) }
   }
 

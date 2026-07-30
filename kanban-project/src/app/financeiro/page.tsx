@@ -21,6 +21,8 @@ import { PagamentosView } from "@/src/components/financeiro/PagamentosView"
 import { CreditosView } from "@/src/components/financeiro/CreditosView"
 import { encerrarSessao } from "@/src/lib/sessao/cliente"
 import { useIsClient, useJsonLocalStorage } from "@/src/lib/cliente"
+import { useApi } from "@/src/lib/dados"
+import type { ProcessoWithStatus } from "@/src/types/kanban"
 
 const TesourariaTab = dynamic(() => import("@/src/components/financeiroComponents/TesourariaTab"), {
   ssr: false,
@@ -90,6 +92,13 @@ const TABS_VISIVEIS = TABS.filter((t) => !("avancada" in t && t.avancada))
 // ============================================================
 // PAGE
 // ============================================================
+/** Forma mínima que o HeaderBar consome das árvores. */
+interface ItemNomeado {
+  id: number | string
+  nome: string
+  descricao?: string | null
+}
+
 export default function FinanceiroPage() {
   const router = useRouter()
   const { pode, carregando } = usePermissoes()
@@ -98,26 +107,18 @@ export default function FinanceiroPage() {
   const userSalvo = useJsonLocalStorage<{ nome?: string; tipo?: string; email?: string }>("user")
   const user = userSalvo ?? { nome: "Usuário" }
   const [tab, setTab] = useState<TabKey>("central")
-  const [processos, setProcessos] = useState<any[]>([])
-  const [arvores, setArvores] = useState<any[]>([])
-  const [dash, setDash] = useState<DashboardData | null>(null)
-  const [loading, setLoading] = useState(true)
-
-  async function carregarDashboard() {
-    setLoading(true)
-    try {
-      const token = localStorage.getItem("authToken")
-      const res = await fetch("/api/financas/dashboard", { headers: { Authorization: `Bearer ${token}` } })
-      if (res.ok) setDash(await res.json())
-    } catch (e) { console.error(e) }
-    finally { setLoading(false) }
-  }
-
-  useEffect(() => {
-    carregarDashboard()
-    fetch("/api/processos").then(r => r.ok ? r.json() : null).then(d => setProcessos(d?.processos || [])).catch(() => {})
-    fetch("/api/arvore").then(r => r.ok ? r.json() : null).then(d => setArvores(Array.isArray(d) ? d : [])).catch(() => {})
-  }, [])
+  // As três leituras da tela pela camada oficial. Antes: um efeito de montagem com
+  // `carregarDashboard()` mais dois `fetch().then()` soltos, quatro `useState` para
+  // guardar o que o cache guarda, e o token montado à mão em cada chamada.
+  const dashboard = useApi<DashboardData>("/api/financas/dashboard")
+  const processosReq = useApi<{ processos?: ProcessoWithStatus[] }>("/api/processos")
+  const arvoresReq = useApi<ItemNomeado[]>("/api/arvore")
+  const dash = dashboard.dados ?? null
+  // Processos e árvores alimentam a busca do HeaderBar: falha ali não pode derrubar
+  // a tela, e é por isso que os `.catch(() => {})` originais existiam.
+  const processos = processosReq.dados?.processos ?? []
+  const arvores = Array.isArray(arvoresReq.dados) ? arvoresReq.dados : []
+  const loading = dashboard.carregando
 
 
   const handleLogout = () => { void encerrarSessao("manual") }

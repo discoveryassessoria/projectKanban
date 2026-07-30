@@ -23,6 +23,8 @@ import {
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { useIsClient } from "@/src/lib/cliente"
+import { useApi } from "@/src/lib/dados"
+import type { ProcessoWithStatus } from "@/src/types/kanban"
 
 // ========================================
 // MAPA DE PERMISSÕES PARA EXIBIÇÃO
@@ -133,78 +135,41 @@ interface UserData {
   createdAt?: string
 }
 
+/** Forma mínima que o HeaderBar consome de projetos e árvores. */
+interface ItemNomeado {
+  id: number | string
+  nome: string
+  descricao?: string | null
+}
+
 export default function SettingsPage() {
   const { showToast } = useToast()
   const router = useRouter()
-  const [user, setUser] = useState<UserData | null>(getStoredUser())
+  const user = getStoredUser() as UserData | null
   const mounted = useIsClient()
 
-  // Estados para dados do HeaderBar
-  const [projetos, setProjetos] = useState<any[]>([])
-  const [processos, setProcessos] = useState<any[]>([])
-  const [arvores, setArvores] = useState<any[]>([])
+  // Dados do HeaderBar pela camada oficial: três leituras independentes, cada uma
+  // com o seu cache. Eram um `Promise.all` dentro de um efeito de montagem, com
+  // três `useState` para guardar o que o cache já guarda.
+  const projetosReq = useApi<{ projetos?: ItemNomeado[] }>("/api/projetos")
+  const processosReq = useApi<{ processos?: ProcessoWithStatus[] }>("/api/processos")
+  const arvoresReq = useApi<ItemNomeado[]>("/api/arvore")
+  // Os `|| []` originais eram tolerância deliberada: resposta inesperada do
+  // HeaderBar não pode derrubar a tela de configurações.
+  const projetos = projetosReq.dados?.projetos ?? []
+  const processos = processosReq.dados?.processos ?? []
+  const arvores = Array.isArray(arvoresReq.dados) ? arvoresReq.dados : []
 
   // Permissões do usuário
-  const [permissoes, setPermissoes] = useState<Record<string, boolean>>({})
-  const [perfilNome, setPerfilNome] = useState<string | null>(null)
-  const [loadingPermissoes, setLoadingPermissoes] = useState(true)
+  const permissoesReq = useApi<{ permissoes?: Record<string, boolean>; perfilNome?: string | null }>("/api/me/permissoes")
+  const permissoes = permissoesReq.dados?.permissoes ?? {}
+  const perfilNome = permissoesReq.dados?.perfilNome ?? null
+  const loadingPermissoes = permissoesReq.carregando
 
   // Estado para modal de exclusão
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false)
   const [deleteConfirmation, setDeleteConfirmation] = useState('')
   const [isDeleting, setIsDeleting] = useState(false)
-
-  const fetchPermissoes = useCallback(async () => {
-    try {
-      setLoadingPermissoes(true)
-      const token = typeof window !== 'undefined' ? localStorage.getItem('authToken') : null
-      const response = await fetch('/api/me/permissoes', {
-        headers: token ? { 'Authorization': `Bearer ${token}` } : {}
-      })
-      if (response.ok) {
-        const data = await response.json()
-        setPermissoes(data.permissoes || {})
-        setPerfilNome(data.perfilNome || null)
-      }
-    } catch (error) {
-      console.error('Erro ao buscar permissões:', error)
-    } finally {
-      setLoadingPermissoes(false)
-    }
-  }, [])
-
-  const fetchHeaderData = async () => {
-    try {
-      const [projetosRes, processosRes, arvoresRes] = await Promise.all([
-        fetch("/api/projetos"),
-        fetch("/api/processos"),
-        fetch("/api/arvore")
-      ])
-
-      if (projetosRes.ok) {
-        const projetosData = await projetosRes.json()
-        setProjetos(projetosData.projetos || [])
-      }
-
-      if (processosRes.ok) {
-        const processosData = await processosRes.json()
-        setProcessos(processosData.processos || [])
-      }
-
-      if (arvoresRes.ok) {
-        const arvoresData = await arvoresRes.json()
-        setArvores(Array.isArray(arvoresData) ? arvoresData : [])
-      }
-    } catch (error) {
-      console.error("Erro ao buscar dados:", error)
-    }
-  }
-
-  useEffect(() => {
-    fetchHeaderData()
-    fetchPermissoes()
-  }, [fetchPermissoes])
-
 
   const handleLogout = () => {
     logout()

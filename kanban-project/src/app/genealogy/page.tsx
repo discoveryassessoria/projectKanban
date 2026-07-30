@@ -19,6 +19,9 @@ import {
 } from "lucide-react"
 import { HeaderBar } from "@/src/components/header-bar"
 import { encerrarSessao } from "@/src/lib/sessao/cliente"
+import { gravarLocal, useIsClient, useJsonLocalStorage, useLocalStorage } from "@/src/lib/cliente"
+import { useApi } from "@/src/lib/dados"
+import type { ProcessoWithStatus } from "@/src/types/kanban"
 
 interface Usuario {
   id: number
@@ -81,10 +84,10 @@ interface Estatisticas {
 
 export default function GenealogyPage() {
   const router = useRouter()
-  const [usuario, setUsuario] = useState<Usuario | null>(null)
-  const [isLoading, setIsLoading] = useState(true)
-  const [arvores, setArvores] = useState<Arvore[]>([])
-  const [processos, setProcessos] = useState<any[]>([])
+  // Sessão e usuário derivados da leitura oficial — sem copiar para o estado.
+  const noCliente = useIsClient()
+  const token = useLocalStorage("authToken")
+  const usuario = useJsonLocalStorage<Usuario>("user")
   
   const [activeTab, setActiveTab] = useState<'pessoa' | 'documento'>('pessoa')
   const [showAdvanced, setShowAdvanced] = useState(false)
@@ -106,56 +109,30 @@ export default function GenealogyPage() {
   const [loading, setLoading] = useState(false)
   const [searched, setSearched] = useState(false)
   
-  const [estatisticas, setEstatisticas] = useState<Estatisticas>({ totalPessoas: 0, totalDocumentos: 0, totalArvores: 0 })
-  const [pesquisasRecentes, setPesquisasRecentes] = useState<string[]>([])
+  // As três leituras de apoio da tela, pela camada oficial. Eram sequenciais
+  // dentro de um `fetchData` — agora são paralelas por construção, cada uma com o
+  // seu cache. Os `|| []` e o `Array.isArray` continuam: resposta inesperada de
+  // qualquer uma delas não pode derrubar a tela de busca.
+  const autenticado = Boolean(token && usuario)
+  const estat = useApi<Estatisticas>(autenticado ? "/api/genealogy/estatisticas" : null)
+  const arvoresReq = useApi<Arvore[]>(autenticado ? "/api/arvore" : null)
+  const processosReq = useApi<{ processos?: ProcessoWithStatus[] }>(autenticado ? "/api/processos" : null)
+  const estatisticas = estat.dados ?? { totalPessoas: 0, totalDocumentos: 0, totalArvores: 0 }
+  const arvores = Array.isArray(arvoresReq.dados) ? arvoresReq.dados : []
+  const processos = processosReq.dados?.processos ?? []
+  const isLoading = !noCliente || (autenticado && (estat.carregando || arvoresReq.carregando || processosReq.carregando))
 
-  const fetchData = async () => {
-    try {
-      const estatRes = await fetch("/api/genealogy/estatisticas")
-      if (estatRes.ok) {
-        const estatData = await estatRes.json()
-        setEstatisticas(estatData)
-      }
+  // Pesquisas recentes vivem no localStorage: a leitura é a abstração oficial (que
+  // já cobre hidratação e JSON corrompido) e a escrita passa por `gravarLocal`,
+  // que avisa a própria aba — antes o valor era lido dentro do `fetchData`.
+  const recentesSalvas = useJsonLocalStorage<string[]>('pesquisasRecentes')
+  const pesquisasRecentes = Array.isArray(recentesSalvas) ? recentesSalvas : []
 
-      const arvoresRes = await fetch("/api/arvore")
-      const arvoresData = await arvoresRes.json()
-      setArvores(Array.isArray(arvoresData) ? arvoresData : [])
-
-      const processosRes = await fetch("/api/processos")
-      const processosData = await processosRes.json()
-      setProcessos(processosData.processos || [])
-
-      if (typeof window !== 'undefined') {
-        const saved = localStorage.getItem('pesquisasRecentes')
-        if (saved) {
-          setPesquisasRecentes(JSON.parse(saved))
-        }
-      }
-    } catch (error) {
-      console.error("Erro ao buscar dados:", error)
-    } finally {
-      setIsLoading(false)
-    }
-  }
-
+  // Navegar é efeito. Guardar o usuário em estado não era.
   useEffect(() => {
-    const token = localStorage.getItem("authToken")
-    const userData = localStorage.getItem("user")
-
-    if (!token || !userData) {
-      router.push("/login")
-      return
-    }
-
-    try {
-      const user = JSON.parse(userData)
-      setUsuario(user)
-      fetchData()
-    } catch (error) {
-      console.error("Erro ao carregar dados do usuário:", error)
-      router.push("/login")
-    }
-  }, [router])
+    if (!noCliente) return
+    if (!token || !usuario) router.push("/login")
+  }, [noCliente, token, usuario, router])
 
 
   const handleLogout = () => { void encerrarSessao("manual") }
@@ -163,10 +140,9 @@ export default function GenealogyPage() {
   const savePesquisaRecente = (termo: string) => {
     if (!termo.trim()) return
     const novas = [termo, ...pesquisasRecentes.filter(p => p !== termo)].slice(0, 5)
-    setPesquisasRecentes(novas)
-    if (typeof window !== 'undefined') {
-      localStorage.setItem('pesquisasRecentes', JSON.stringify(novas))
-    }
+    // Uma escrita só: `gravarLocal` persiste E notifica os leitores desta aba, então
+    // a lista na tela se atualiza sem um estado paralelo ao localStorage.
+    gravarLocal('pesquisasRecentes', novas)
   }
   
   const pesquisarPessoas = async () => {

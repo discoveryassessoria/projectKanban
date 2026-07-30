@@ -57,6 +57,9 @@ import { HealthTab } from "@/src/components/gerenciamentoComponents/Gerenciament
 // Lote 4 — Diagnóstico do Sistema
 import { DiagnosticsTab } from "@/src/components/gerenciamentoComponents/GerenciamentoScaffolds4"
 import { encerrarSessao } from "@/src/lib/sessao/cliente"
+import { useIsClient, useJsonLocalStorage, useLocalStorage } from "@/src/lib/cliente"
+import { useApi } from "@/src/lib/dados"
+import type { ProcessoWithStatus } from "@/src/types/kanban"
 
 // Lote 5 — Biblioteca de Modelos: REMOVIDA (legado eliminado).
 
@@ -327,6 +330,9 @@ const resolverModulo = (k: string): string => ALIAS_MODULOS[k] || k
 
 interface UserData { nome: string; email?: string; tipo?: string }
 
+/** Forma mínima que o HeaderBar consome das árvores. */
+interface ItemNomeado { id: number | string; nome: string; descricao?: string | null }
+
 type View = "home" | "screen"
 
 export default function GerenciamentoPage() {
@@ -355,9 +361,19 @@ export default function GerenciamentoPage() {
   const [navCollapsed, setNavCollapsed] = useState(false)                // árvore recolhida (rail)
   const [mobileNav, setMobileNav] = useState(false)
 
-  const [user, setUser] = useState<UserData>({ nome: "Usuário" })
-  const [processos, setProcessos] = useState<any[]>([])
-  const [arvores, setArvores] = useState<any[]>([])
+  // Identidade e sessão pela leitura oficial do localStorage. O efeito de montagem
+  // copiava o usuário para o estado — um render a mais e uma janela em que a barra
+  // dizia "Usuário" mesmo já havendo dado. O fallback continua o mesmo.
+  const noCliente = useIsClient()
+  const token = useLocalStorage("authToken")
+  const userSalvo = useJsonLocalStorage<UserData>("user")
+  const user: UserData = userSalvo ?? { nome: "Usuário" }
+  // Busca do HeaderBar: leitura pela camada oficial, silenciosa como antes — falha
+  // aqui não pode atrapalhar o Gerenciamento.
+  const processosReq = useApi<{ processos?: ProcessoWithStatus[] }>("/api/processos")
+  const arvoresReq = useApi<ItemNomeado[]>("/api/arvore")
+  const processos = processosReq.dados?.processos ?? []
+  const arvores = Array.isArray(arvoresReq.dados) ? arvoresReq.dados : []
 
   // resolve a primeira tela útil de um módulo (defaultRoute). Se o módulo não tiver
   // tela ativa (não deveria, entre os visíveis), devolve null.
@@ -458,14 +474,6 @@ export default function GerenciamentoPage() {
 
   const handleLogout = () => { void encerrarSessao("manual") }
 
-  const fetchHeaderData = useCallback(async () => {
-    try {
-      const [pr, a] = await Promise.all([fetch("/api/processos"), fetch("/api/arvore")])
-      if (pr.ok) setProcessos((await pr.json()).processos || [])
-      if (a.ok) { const ad = await a.json(); setArvores(Array.isArray(ad) ? ad : []) }
-    } catch { /* silencioso */ }
-  }, [])
-
   // montagem: deep-link + sincronização com botão voltar/avançar do browser.
   // CRÍTICO (accordion): este sync SÓ pode rodar no MOUNT e no POPSTATE — nunca a
   // cada render. `pode` (usePermissoes) não é memoizado → sincronizarDaURL muda de
@@ -482,16 +490,12 @@ export default function GerenciamentoPage() {
     return () => window.removeEventListener("popstate", onPop)
   }, [])
 
+  // Guarda de acesso: navegar é efeito, e só isso sobrou aqui.
   useEffect(() => {
-    if (typeof window !== "undefined") {
-      const stored = localStorage.getItem("user")
-      if (stored) { try { setUser(JSON.parse(stored)) } catch { setUser({ nome: "Usuário" }) } }
-    }
-    const token = localStorage.getItem("authToken")
+    if (!noCliente) return
     if (!token) { router.push("/login"); return }
-    if (!permLoading && !isAdmin) { router.push("/dashboard"); return }
-    fetchHeaderData()
-  }, [isAdmin, permLoading, router, fetchHeaderData])
+    if (!permLoading && !isAdmin) router.push("/dashboard")
+  }, [noCliente, token, isAdmin, permLoading, router])
 
   if (permLoading) {
     return (

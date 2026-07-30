@@ -1,5 +1,7 @@
 "use client"
 import { encerrarSessao } from "@/src/lib/sessao/cliente"
+import { useIsClient, useJsonLocalStorage, useLocalStorage } from "@/src/lib/cliente"
+import { useApi } from "@/src/lib/dados"
 
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
@@ -61,9 +63,12 @@ const categorias = [
 
 export default function BlogAdminPage() {
   const router = useRouter()
-  const [usuario, setUsuario] = useState<Usuario | null>(null)
-  const [posts, setPosts] = useState<BlogPost[]>([])
-  const [loading, setLoading] = useState(true)
+  // Sessão e usuário derivados da leitura oficial do localStorage. Antes o efeito
+  // de montagem copiava o usuário para o estado (setState em efeito): um render a
+  // mais e uma janela em que a tela existia sem saber de quem era.
+  const noCliente = useIsClient()
+  const token = useLocalStorage("authToken")
+  const usuario = useJsonLocalStorage<Usuario>("user")
   const [filtroStatus, setFiltroStatus] = useState<string>('todos')
   const [busca, setBusca] = useState('')
   
@@ -84,37 +89,20 @@ export default function BlogAdminPage() {
   })
   const [saving, setSaving] = useState(false)
 
-  const fetchPosts = async () => {
-    try {
-      const response = await fetch('/api/admin/blog')
-      const data = await response.json()
-      setPosts(Array.isArray(data) ? data : [])
-    } catch (error) {
-      console.error('Erro ao buscar posts:', error)
-      setPosts([])
-    } finally {
-      setLoading(false)
-    }
-  }
+  // Só busca depois de autenticado — a chave `null` mantém a ordem original sem
+  // hook condicional. A rota devolve um array; resposta inesperada vira lista vazia,
+  // exatamente como o `Array.isArray(data) ? data : []` que substitui.
+  const autenticado = Boolean(token && usuario)
+  const requisicao = useApi<BlogPost[]>(autenticado ? '/api/admin/blog' : null)
+  const posts = Array.isArray(requisicao.dados) ? requisicao.dados : []
+  const fetchPosts = requisicao.recarregar
+  const loading = !noCliente || (autenticado && requisicao.carregando)
 
+  // Navegar é efeito; guardar estado não era necessário.
   useEffect(() => {
-    const token = localStorage.getItem("authToken")
-    const userData = localStorage.getItem("user")
-
-    if (!token || !userData) {
-      router.push('/login')
-      return
-    }
-
-    try {
-      const user = JSON.parse(userData)
-      setUsuario(user)
-      fetchPosts()
-    } catch (error) {
-      console.error("Erro ao carregar dados do usuário:", error)
-      router.push('/login')
-    }
-  }, [router])
+    if (!noCliente) return
+    if (!token || !usuario) router.push('/login')
+  }, [noCliente, token, usuario, router])
 
 
   const handleLogout = () => { void encerrarSessao("manual") }

@@ -1,6 +1,16 @@
 "use client"
 
-import { useEffect, useState } from "react"
+// src/hooks/use-is-admin.ts
+// O papel do usuário vem do localStorage — mas lido pela abstração oficial de
+// cliente, não por um efeito de montagem. A leitura direta obrigava a copiar o
+// valor para o estado depois de montar (setState em efeito), o que rendia um
+// render extra e um instante em que a tela já dizia "não é admin" sem saber.
+//
+// `useJsonLocalStorage` resolve os três pontos de uma vez: é seguro na
+// hidratação, devolve referência estável e reage a mudança em OUTRAS abas —
+// então trocar de usuário numa aba não deixa a outra com o papel antigo.
+
+import { useIsClient, useJsonLocalStorage } from "@/src/lib/cliente"
 
 interface User {
   id: number
@@ -10,26 +20,16 @@ interface User {
 }
 
 export function useIsAdmin() {
-  const [isAdmin, setIsAdmin] = useState(false)
-  const [isLoading, setIsLoading] = useState(true)
-  const [user, setUser] = useState<User | null>(null)
+  // No servidor e no primeiro render não existe localStorage: `isLoading` cobre
+  // exatamente essa janela, como antes.
+  const noCliente = useIsClient()
+  // JSON corrompido devolve `null` pela própria abstração — o `try/catch` que
+  // vivia aqui terminava em `isAdmin: false`, que é o mesmo resultado.
+  const user = useJsonLocalStorage<User>("user")
 
-  useEffect(() => {
-    try {
-      const userData = localStorage.getItem("user")
-      if (userData) {
-        const parsedUser = JSON.parse(userData) as User
-        setUser(parsedUser)
-        setIsAdmin(parsedUser.tipo === "admin")
-      }
-    } catch (error) {
-      console.error("Erro ao verificar tipo de usuário:", error)
-      setIsAdmin(false)
-      setUser(null)
-    } finally {
-      setIsLoading(false)
-    }
-  }, [])
-
-  return { isAdmin, isLoading, user }
+  return {
+    isAdmin: user?.tipo === "admin",
+    isLoading: !noCliente,
+    user,
+  }
 }

@@ -36,6 +36,8 @@ import {
 } from "@/src/components/financeiroComponents/ui/kit"
 import { Search, ChevronDown } from "lucide-react"
 import { encerrarSessao } from "@/src/lib/sessao/cliente"
+import { useIsClient, useJsonLocalStorage, useLocalStorage } from "@/src/lib/cliente"
+import { useApi } from "@/src/lib/dados"
 
 interface Usuario {
   id: number
@@ -92,9 +94,12 @@ const MESES = [
 ]
 
 export default function EventosPage() {
-  const [usuario, setUsuario] = useState<Usuario | null>(null)
-  const [isLoading, setIsLoading] = useState(true)
-  const [eventos, setEventos] = useState<Evento[]>([])
+  // Sessão e usuário pelas abstrações oficiais: antes o efeito de montagem lia o
+  // localStorage e COPIAVA o usuário para o estado, o que rendia um render extra
+  // e um instante de tela sem identidade. Aqui o valor é derivado da leitura.
+  const noCliente = useIsClient()
+  const token = useLocalStorage("authToken")
+  const usuario = useJsonLocalStorage<Usuario>("user")
   const [viewMode, setViewMode] = useState<"lista" | "calendario">("lista")
   const [mesAtual, setMesAtual] = useState(new Date())
   const [filtroTipo, setFiltroTipo] = useState<string | null>(null)
@@ -121,36 +126,23 @@ const [lembreteDias, setLembreteDias] = useState("")
   const router = useRouter()
   const { pode } = usePermissoes()
 
-  const fetchEventos = async () => {
-    try {
-      const res = await fetch("/api/eventos")
-      const data = await res.json()
-      setEventos(data.eventos || [])
-    } catch (error) {
-      console.error("Erro ao buscar eventos:", error)
-    } finally {
-      setIsLoading(false)
-    }
-  }
+  // A consulta só existe para quem está autenticado: chave `null` enquanto não
+  // há sessão preserva a ordem original (autenticar primeiro, buscar depois) sem
+  // precisar de hook condicional.
+  const autenticado = Boolean(token && usuario)
+  const requisicao = useApi<{ eventos?: Evento[] }>(autenticado ? "/api/eventos" : null)
+  const eventos = requisicao.dados?.eventos ?? []
+  const fetchEventos = requisicao.recarregar
+  // Carregando até saber quem é o usuário (no servidor não há localStorage) e
+  // enquanto a primeira busca não volta — igual ao `isLoading` que substitui.
+  const isLoading = !noCliente || (autenticado && requisicao.carregando)
 
+  // A guarda de sessão continua sendo efeito, porque navegar é efeito. O que saiu
+  // dela foi o `setState` — o usuário agora vem da leitura, não de uma cópia.
   useEffect(() => {
-    const token = localStorage.getItem("authToken")
-    const userData = localStorage.getItem("user")
-
-    if (!token || !userData) {
-      router.push("/login")
-      return
-    }
-
-    try {
-      const user = JSON.parse(userData)
-      setUsuario(user)
-      fetchEventos()
-    } catch (error) {
-      console.error("Erro ao carregar dados do usuário:", error)
-      router.push("/login")
-    }
-  }, [router])
+    if (!noCliente) return
+    if (!token || !usuario) router.push("/login")
+  }, [noCliente, token, usuario, router])
 
 
   const handleLogout = () => { void encerrarSessao("manual") }
