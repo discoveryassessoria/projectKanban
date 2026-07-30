@@ -58,16 +58,21 @@ try {
     `SELECT migration_name, finished_at, rolled_back_at, applied_steps_count FROM _prisma_migrations ORDER BY migration_name`,
   )
   const porNome = new Map(rows.map((r) => [r.migration_name, r]))
-  if (rows.length === migrations.length) passar(`${rows.length} linhas = ${migrations.length} migrations do repositório`)
-  else falhar(`${rows.length} linhas ≠ ${migrations.length} migrations do repositório`)
+  // O banco de homologação é COMPARTILHADO: outras branches aplicam as suas
+  // migrations nele. Exigir paridade exata com este checkout derrubaria o build
+  // por trabalho legítimo de outra branch. O que se exige é cobertura — toda
+  // migration DESTE repositório registrada e íntegra — não exclusividade.
+  const doRepo = rows.filter((r) => migrations.includes(r.migration_name))
+  if (doRepo.length === migrations.length) passar(`${migrations.length} migrations do repositório registradas`)
+  else falhar(`${doRepo.length} das ${migrations.length} migrations do repositório registradas`)
 
   const ausentes = migrations.filter((m) => !porNome.has(m))
   if (ausentes.length) falhar(`migrations sem registro: ${ausentes.join(', ')}`)
   else passar('nenhuma migration do repositório ficou sem registro')
 
-  const intrusas = rows.filter((r) => !migrations.includes(r.migration_name))
-  if (intrusas.length) falhar(`registros sem migration no repositório: ${intrusas.map((r) => r.migration_name).join(', ')}`)
-  else passar('nenhum registro órfão')
+  const deFora = rows.filter((r) => !migrations.includes(r.migration_name))
+  if (deFora.length) console.log(`· ${deFora.length} de outra(s) branch(es), fora deste checkout: ${deFora.map((r) => r.migration_name).join(', ')}`)
+  else console.log('· nenhum registro de fora deste checkout')
 
   const inacabadas = rows.filter((r) => !r.finished_at)
   if (inacabadas.length) falhar(`inacabadas: ${inacabadas.map((r) => r.migration_name).join(', ')}`)
