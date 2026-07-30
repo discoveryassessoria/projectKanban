@@ -14,6 +14,7 @@ import { criarObrigacaoEconomicaComLedger } from '@/lib/financeiro/ledger/ledger
 import { gerarCodigoReceita } from '@/lib/financeiro/codigos'
 import { resolverPrecoPorConfigDB } from '@/src/lib/motor/resolver-preco-financeiro.prisma'
 import { snapshotCotacoes } from '@/src/lib/cambio/servico-cambio'
+import { elegibilidadeParaLancamento, hojeISO } from '@/lib/financeiro/catalogo-oficial'
 
 const cent = (v: number) => Math.round((Number(v) || 0) * 100) / 100
 
@@ -50,21 +51,29 @@ export async function criarReceitaManualCanonica(input: CriarReceitaManualInput)
   const vazio: CriarReceitaManualResultado = { ok: false, erros: [], receitaIds: [], obrigacaoIds: [], obrigacaoRef: null, moeda: 'BRL', totalContratado: 0, totalBrl: 0, grupo: '', idempotente: false }
   const criadoPorId = input.criadoPorId ?? null
 
-  // 1) ITEM do Cadastro Mestre — precisa estar ATIVO e ser elegível a RECEITA.
-  const item = await prisma.itemCatalogo.findUnique({ where: { id: input.itemCatalogoId }, select: { id: true, name: true, natureza: true, categoria: true, unidade: true, ativo: true } })
-  if (!item) return { ...vazio, erros: ['Item do Cadastro Mestre inexistente.'] }
-  if (!item.ativo) return { ...vazio, erros: ['Item do Cadastro Mestre inativo — não pode gerar Receita.'] }
+  // 1+2) ITEM + CONFIGURAÇÃO FINANCEIRA — a MESMA regra da listagem e do custo
+  // (lib/financeiro/catalogo-oficial): Cadastro Mestre oficial, ativo, config ativa
+  // que admita RECEITA e preço vigente na Tabela de Valores. Item de estrutura
+  // legada não gera Receita nova nem por POST direto.
+  const item = await prisma.itemCatalogo.findUnique({
+    where: { id: input.itemCatalogoId },
+    select: {
+      id: true, name: true, natureza: true, categoria: true, unidade: true, ativo: true,
+      precos: { where: { arquivado: false, legadoPendente: false }, select: { natureza: true, arquivado: true, legadoPendente: true, vigenciaInicio: true, vigenciaFim: true } },
+    },
+  })
+  const cfg = item ? await prisma.produtoFinanceiro.findUnique({ where: { itemCatalogoId: item.id }, select: { id: true, ativo: true, moedaPadrao: true, naturezaFin: true, possuiCusto: true, possuiReceita: true, condicaoPagamentoId: true, categoriaId: true } }) : null
+  const eleg = elegibilidadeParaLancamento({
+    item, config: cfg, precos: item?.precos, natureza: 'RECEITA', hoje: hojeISO(new Date()),
+  })
+  if (!eleg.ok || !item || !cfg) return { ...vazio, erros: [eleg.detalhe ?? 'Item do Cadastro Mestre inválido para Receita.'] }
 
-  // 2) CONFIGURAÇÃO FINANCEIRA (ProdutoFinanceiro) do item — fonte de moeda/regra.
-  const cfg = await prisma.produtoFinanceiro.findUnique({ where: { itemCatalogoId: item.id }, select: { id: true, moedaPadrao: true, naturezaFin: true, condicaoPagamentoId: true, categoriaId: true, valorPadrao: true } })
-  if (!cfg) return { ...vazio, erros: ['Item sem Configuração Financeira no Cadastro Mestre — não pode gerar Receita.'] }
-  if (cfg.naturezaFin === 'SOMENTE_CUSTO') return { ...vazio, erros: ['Item marcado como SOMENTE CUSTO no Cadastro Mestre.'] }
-
-  // 3) PREÇO/MOEDA canônicos via Tabela de Preços (resolver oficial — nunca findFirst/zero silencioso).
-  const preco = await resolverPrecoPorConfigDB(cfg.id, { natureza: 'VENDA' as never, processoId: input.processoId, quantidade: input.quantidade ?? 1, fallbackValorPadrao: cfg.valorPadrao ? Number(cfg.valorPadrao) : null, fallbackMoeda: cfg.moedaPadrao ?? null }).catch(() => null)
+  // 3) PREÇO/MOEDA canônicos via Tabela de Preços (resolver oficial — nunca findFirst/zero
+  //    silencioso e SEM fallback para o valor legado da Configuração Financeira).
+  const preco = await resolverPrecoPorConfigDB(cfg.id, { natureza: 'VENDA' as never, processoId: input.processoId, quantidade: input.quantidade ?? 1, fallbackValorPadrao: null, fallbackMoeda: cfg.moedaPadrao ?? null }).catch(() => null)
   const moeda = String((preco && preco.ok ? preco.moeda : cfg.moedaPadrao) ?? 'BRL')
   const tabelaValorId = preco && preco.ok ? preco.tabelaValorId : null
-  const valorMestre = preco && preco.ok ? Number(preco.valorUnitario) : (cfg.valorPadrao ? Number(cfg.valorPadrao) : null)
+  const valorMestre = preco && preco.ok ? Number(preco.valorUnitario) : null
 
   // 4) valor unitário contratado = override (com permissão) OU o do Cadastro Mestre.
   let valorUnitario = valorMestre

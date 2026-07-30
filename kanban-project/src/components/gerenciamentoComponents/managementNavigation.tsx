@@ -210,9 +210,8 @@ export const MANAGEMENT_NAVIGATION: ManagementNavigationItem[] = [
       a(30, "simfase", "Simulação", ["simulacao", "simulação", "fase", "teste"], "Configurações"),
       a(40, "execmatrix", "Histórico de Execuções", ["historico", "histórico", "execucao", "execução", "log"], "Configurações"),
 
-      // key legada da tela unificada de automações por fase (deep-link vira alias).
-      h(900, "opauto", "Automações por Fase (legado)"),
-      h(910, "execmatrix-rascunho", "Painel Executivo de Configuração (rascunho do mockup)"),
+      // ?screen=opauto (key antiga da tela unificada) resolve por ALIAS_TELAS → autofin.
+      h(900, "execmatrix-rascunho", "Painel Executivo de Configuração (rascunho do mockup)"),
     ],
   },
 
@@ -239,11 +238,13 @@ export const MANAGEMENT_NAVIGATION: ManagementNavigationItem[] = [
 
   // ══════════════════════════════ 6. SERVIÇOS ═════════════════════════════════
   // REGRA: "Serviços" (nunca "Produtos") e SEM preço — preço só na Tabela de Valores.
+  // O "Catálogo de Serviços" é a ÚNICA face de usuário do cadastro mestre: serviços
+  // e itens técnicos cobráveis (documentos, taxas, etapas, pacotes) no mesmo cadastro.
   {
     key: "grp_servicos", label: "Serviços", icon: Briefcase, order: 60, status: "active",
     description: "Catálogo operacional de serviços prestados (sem preço).",
     children: [
-      a(10, "products", "Catálogo de Serviços", ["servico", "serviço", "traducao", "tradução", "apostilamento", "retificacao", "cidadania", "genealogia", "logistica", "assessoria"]),
+      a(10, "products", "Catálogo de Serviços", ["servico", "serviço", "traducao", "tradução", "apostilamento", "retificacao", "cidadania", "genealogia", "logistica", "assessoria", "catalogo", "catálogo", "mestre", "item", "cadastro", "documento", "taxa", "pacote"]),
       a(20, "servcats", "Categorias", ["categoria", "servico", "serviço", "organizacao"]),
     ],
   },
@@ -285,14 +286,10 @@ export const MANAGEMENT_NAVIGATION: ManagementNavigationItem[] = [
       a(190, "docfin", "Documentos Financeiros", ["recibo", "fatura", "nota", "documento", "financeiro", "numeracao"]),
       a(200, "governanca", "Governança", ["governanca", "governança", "auditoria", "trilha", "alteracao", "historico"]),
 
-      // LEGADOS — telas antigas mantidas acessíveis por ?screen= (sem cadastro paralelo no menu).
-      h(900, "honorariums", "Honorários (legado)"),
-      h(910, "estruturafin", "Estrutura Financeira (concentradora legada)"),
-      h(920, "precificacao", "Precificação (concentradora legada)"),
-      h(930, "comercial", "Comercial (concentradora legada)"),
-      h(940, "pagamentos", "Pagamentos (concentradora legada)"),
-      h(950, "fornecedoresconc", "Concentradoras e Adquirentes (legado)"),
-      h(960, "integracaofin", "Integração com o Financeiro Geral (legado)"),
+      // Sem telas legadas: as concentradoras e o CRUD de Honorário foram REMOVIDOS.
+      // Os deep-links antigos (?screen=estruturafin|precificacao|comercial|pagamentos|
+      // fornecedoresconc|integracaofin|honorariums) são resolvidos por ALIAS_TELAS
+      // para a tela que hoje é dona da função.
     ],
   },
 
@@ -341,7 +338,10 @@ export const MANAGEMENT_NAVIGATION: ManagementNavigationItem[] = [
     children: [
       a(10, "settings", "Configurações Gerais", ["configuracao", "configuração", "geral", "empresa", "moeda", "fuso"]),
 
-      a(20, "catalogmestre", "Catálogo Mestre", ["catalogo", "catálogo", "mestre", "item", "cadastro"], "Cadastros Auxiliares"),
+      // "Catálogo Mestre" SAIU do menu: o cadastro mestre (ItemCatalogo) é
+      // ESTRUTURA TÉCNICA INTERNA — todos os registros, ids e vínculos seguem
+      // intactos, mas a única tela de usuário sobre ele é Serviços › Catálogo de
+      // Serviços. ?screen=catalogmestre resolve por ALIAS_TELAS → products.
       a(30, "templates", "Modelos", ["modelo", "template"], "Cadastros Auxiliares"),
 
       a(40, "identidade", "Identidade Visual", ["identidade", "visual", "tema", "cor", "logo", "marca"]),

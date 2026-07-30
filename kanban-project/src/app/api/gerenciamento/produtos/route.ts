@@ -65,7 +65,10 @@ export async function GET(request: NextRequest) {
     if (erro) return erro
 
     // F3.2 — além dos itens, devolve os MESTRES para o select pesquisável por origem.
-    const [produtosRaw, tiposDocumento, servicosRaw, honorarios, tiposProcesso, fornecedores] = await Promise.all([
+    // A tabela legada Honorario NÃO é consultada: honorário deixou de ser cadastro
+    // mestre (é Serviço do Catálogo Mestre). Configurações antigas seguem legíveis
+    // pelo próprio vínculo do registro, sem lista de seleção.
+    const [produtosRaw, tiposDocumento, servicosRaw, tiposProcesso, fornecedores] = await Promise.all([
       prisma.produtoFinanceiro.findMany({
         orderBy: { nome: 'asc' },
         include: MASTER_INCLUDE,
@@ -74,7 +77,6 @@ export async function GET(request: NextRequest) {
       // Serviços mestres: o SELECT expõe o código/nome REAIS do ServicoProduto (nunca SRV_).
       // `id` é o do item-pivô (ItemCatalogo) — a FK que a config grava para Serviço.
       prisma.servicoProduto.findMany({ where: { ativo: true, itemCatalogoId: { not: null } }, select: { itemCatalogoId: true, code: true, name: true, publicCode: true }, orderBy: { name: 'asc' } }),
-      prisma.honorario.findMany({ where: { ativo: true }, select: { id: true, code: true, name: true }, orderBy: { name: 'asc' } }),
       prisma.tipoProcessoNacionalidade.findMany({ where: { ativo: true }, select: { id: true, code: true, name: true }, orderBy: { name: 'asc' } }),
       prisma.fornecedor.findMany({ where: { ativo: true }, select: { id: true, nome: true, publicCode: true }, orderBy: { nome: "asc" } }),
     ])
@@ -83,7 +85,7 @@ export async function GET(request: NextRequest) {
     const produtos = produtosRaw.map((p) => ({ ...p, mestre: resolverMestre(p) }))
     const servicos = servicosRaw.map((x) => ({ id: x.itemCatalogoId, code: x.code, name: x.name, publicCode: x.publicCode }))
 
-    return NextResponse.json({ produtos, mestres: { tiposDocumento, servicos, honorarios, tiposProcesso, fornecedores } })
+    return NextResponse.json({ produtos, mestres: { tiposDocumento, servicos, tiposProcesso, fornecedores } })
   } catch (error) {
     console.error('Erro ao listar produtos:', error)
     return NextResponse.json({ error: 'Erro interno' }, { status: 500 })
@@ -135,9 +137,11 @@ export async function POST(request: NextRequest) {
       if (!td) return NextResponse.json({ error: 'Documento mestre não encontrado' }, { status: 400 })
       origem = 'documento'; masterFkId = Number(b.tipoDocumentoId); masterNome = td.name; docItemCatalogoId = td.itemCatalogoId
     } else if (b.honorarioId) {
-      const h = await prisma.honorario.findUnique({ where: { id: Number(b.honorarioId) }, select: { name: true } })
-      if (!h) return NextResponse.json({ error: 'Honorário mestre não encontrado' }, { status: 400 })
-      origem = 'honorario'; masterFkId = Number(b.honorarioId); masterNome = h.name
+      // MESTRE LEGADO: a tabela Honorario saiu da arquitetura — honorário é um
+      // SERVIÇO do Catálogo Mestre + esta Configuração Financeira + preço na
+      // Tabela de Valores. Configurações antigas continuam legíveis; nenhuma nova
+      // nasce daqui (senão o espelho volta a alimentar o seletor de lançamento).
+      return NextResponse.json({ error: 'Honorário não é mais um cadastro mestre: cadastre o serviço no Catálogo Mestre e configure o preço na Tabela de Valores.' }, { status: 400 })
     } else if (b.tipoProcessoId) {
       const tp = await prisma.tipoProcessoNacionalidade.findUnique({ where: { id: Number(b.tipoProcessoId) }, select: { name: true } })
       if (!tp) return NextResponse.json({ error: 'Processo mestre não encontrado' }, { status: 400 })
@@ -190,7 +194,7 @@ export async function POST(request: NextRequest) {
           valorCustoPadrao: parseDecimal(b.valorCustoPadrao),
           valorReceitaPadrao: parseDecimal(b.valorReceitaPadrao),
           tipoDocumentoId: b.tipoDocumentoId ? Number(b.tipoDocumentoId) : null,
-          honorarioId: b.honorarioId ? Number(b.honorarioId) : null,
+          honorarioId: null, // mestre legado: nenhuma configuração NOVA aponta para ele
           tipoProcessoId: b.tipoProcessoId ? Number(b.tipoProcessoId) : null,
           fornecedorPadraoId: b.fornecedorPadraoId ? Number(b.fornecedorPadraoId) : null,
           itemCatalogoId,

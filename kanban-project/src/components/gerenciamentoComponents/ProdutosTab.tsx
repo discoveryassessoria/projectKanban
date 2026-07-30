@@ -55,6 +55,11 @@ const MOEDAS: [string, string][] = [['BRL', 'Real (BRL)'], ['EUR', 'Euro (EUR)']
 const ORIGENS: [string, string][] = [
   ['documento', 'Documento'], ['servico', 'Serviço'], ['honorario', 'Honorário'], ['processo', 'Processo / Modalidade'],
 ]
+// Origens CRIÁVEIS — só cadastros mestres oficiais. "Honorário" saiu da arquitetura
+// (honorário é Serviço do Catálogo Mestre + Configuração Financeira + preço na Tabela
+// de Valores). O rótulo continua em ORIGENS apenas para LER as configurações antigas
+// que ainda apontam para o mestre legado — o backend recusa novos vínculos.
+const ORIGENS_CRIAVEIS: [string, string][] = ORIGENS.filter(([k]) => k !== 'honorario')
 type MestreRef = { id: number; label: string; code: string | null }
 type Mestres = { documento: MestreRef[]; servico: MestreRef[]; honorario: MestreRef[]; processo: MestreRef[] }
 type FornecedorRef = { id: number; nome: string; publicCode: string | null }
@@ -203,7 +208,11 @@ export default function ProdutosTab() {
     if (!q) return arr.slice(0, 50)
     return arr.filter((m) => m.label.toLowerCase().includes(q) || (m.code ?? '').toLowerCase().includes(q)).slice(0, 50)
   }, [mestres, form.origem, masterBusca])
-  const masterSelecionado = (mestres[form.origem as keyof Mestres] ?? []).find((m) => String(m.id) === form.masterId) || null
+  // Na EDIÇÃO o mestre já está travado: exibe o que a própria configuração guarda,
+  // sem depender da lista de mestres selecionáveis (que só traz cadastros oficiais).
+  const masterSelecionado =
+    (mestres[form.origem as keyof Mestres] ?? []).find((m) => String(m.id) === form.masterId)
+    ?? (editando && form.masterId ? { id: Number(form.masterId), label: form.nome, code: editando.mestre?.codigo ?? null } : null)
 
   // O nome/código de negócio vêm do MESTRE (não são montados aqui). Só guardamos o
   // vínculo (masterId) e o nome real do mestre para exibição; o código real é do mestre.
@@ -405,7 +414,7 @@ export default function ProdutosTab() {
                 <div>
                   <label className="mb-1 block text-xs text-white/60">Origem do cadastro</label>
                   <select value={form.origem} onChange={(e) => mudarOrigem(e.target.value)} disabled={!!editando} className={inputCls + (editando ? ' opacity-60' : '')}>
-                    {ORIGENS.map(([k, label]) => <option key={k} value={k} className="bg-zinc-900">{label}</option>)}
+                    {(editando ? ORIGENS : ORIGENS_CRIAVEIS).map(([k, label]) => <option key={k} value={k} className="bg-zinc-900">{label}</option>)}
                   </select>
                 </div>
                 <div>

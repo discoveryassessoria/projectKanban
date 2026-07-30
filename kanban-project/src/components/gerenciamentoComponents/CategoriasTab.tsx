@@ -6,10 +6,9 @@
 // cadastro mestre por FK real (Documento/Serviço/Honorário/Processo). O nome é
 // DERIVADO do mestre e fica READ-ONLY (não é possível redigitar/recriar a entidade).
 // Backend: /api/gerenciamento/categorias (GET/POST) + /[id] (PUT/DELETE).
-//   GET -> { categorias: [...], mestres: { tiposDocumento, servicos, honorarios, tiposProcesso } }
+//   GET -> { categorias: [...], mestres: { tiposDocumento, servicos, tiposProcesso } }
 
 import { useState, useEffect, useMemo, useCallback } from 'react'
-import { useApi } from "@/src/lib/dados"
 
 type MestreEmbed = { id: number; name: string; code?: string | null } | null
 type Categoria = {
@@ -42,6 +41,9 @@ const CORES = [
 const ORIGENS: [OrigemKey, string][] = [
   ['documento', 'Documento'], ['servico', 'Serviço'], ['honorario', 'Honorário'], ['processo', 'Processo / Modalidade'],
 ]
+// Origens CRIÁVEIS — "Honorário" saiu da arquitetura (é Serviço do Catálogo Mestre).
+// O rótulo permanece acima só para LER categorias antigas; o backend recusa vínculo novo.
+const ORIGENS_CRIAVEIS: [OrigemKey, string][] = ORIGENS.filter(([k]) => k !== 'honorario')
 type OrigemKey = 'documento' | 'servico' | 'honorario' | 'processo'
 // mapeia origem (UI) → campo FK enviado no POST/PUT
 const FK_POR_ORIGEM: Record<OrigemKey, 'tipoDocumentoId' | 'itemCatalogoId' | 'honorarioId' | 'tipoProcessoId'> = {
@@ -80,11 +82,11 @@ async function jsonFetch(url: string, options: RequestInit = {}) {
   return data
 }
 
-// Identidade estável para a ausência de dados (evita recomputar memos).
-const SEM_ITENS: never[] = Object.freeze([]) as never[]
-
 export default function CategoriasTab() {
+  const [categorias, setCategorias] = useState<Categoria[]>([])
   const [mestres, setMestres] = useState<Mestres>(MESTRES_VAZIO)
+  const [loading, setLoading] = useState(true)
+  const [erroLista, setErroLista] = useState<string | null>(null)
   const [busca, setBusca] = useState('')
   const [filtroTipo, setFiltroTipo] = useState<'TODOS' | 'ENTRADA' | 'SAIDA'>('TODOS')
 
@@ -106,12 +108,44 @@ export default function CategoriasTab() {
   // categoria com mestre já vinculado → origem/mestre travados na edição
   const origemTravada = !!editando && editando.origem !== 'LEGADO'
 
-  // Consulta em cache pela camada oficial (src/lib/dados): loading, erro,
-  // deduplicação e revalidação vêm dela. Some o par useState + useEffect de
-  // montagem, que era a origem do setState-em-efeito.
-  const { dados, carregando: loading, erro, recarregar: carregar } = useApi<{ categorias?: Categoria[] }>('/api/gerenciamento/categorias')
-  const categorias: Categoria[] = dados?.categorias ?? SEM_ITENS
-  const erroLista = erro ? (erro.message || 'Não foi possível carregar as categorias.') : null
+  // Carga da tela em UM lugar: `aplicar` só escreve estado; quem chama decide
+  // se mostra o estado de carregamento. `sinal` cancela a escrita se a tela sair.
+  // BUSCA: só entrada/saída de rede, nenhuma escrita de estado.
+  const buscar = useCallback(async (sinal?: AbortSignal) => {
+      const data = await jsonFetch('/api/gerenciamento/categorias', { cache: 'no-store', signal: sinal })
+      const m = (data as any).mestres || {}
+    return { data, m }
+  }, [])
+  // APLICAÇÃO: ponto único de escrita do estado da carga.
+  const aplicar = useCallback(({ data, m }: any) => {
+      setCategorias((data as any).categorias || [])
+      setMestres({
+        documento: (m.tiposDocumento || []).map((d: any) => ({ id: d.id, label: d.name, code: d.code ?? null })),
+        servico: (m.servicos || []).map((x: any) => ({ id: x.id, label: x.publicCode ? `${x.publicCode} — ${x.name}` : x.name, code: x.code ?? null })),
+        honorario: [], // mestre legado: sem lista de seleção (só leitura do vínculo antigo)
+        processo: (m.tiposProcesso || []).map((p: any) => ({ id: p.id, label: p.name, code: null })),
+      })
+  }, [])
+
+  // MONTAGEM: o efeito não escreve estado de forma síncrona (`Loading` já nasce
+  // true e `ErroLista` nasce null) — a escrita acontece na continuação da promessa.
+  useEffect(() => {
+    const ac = new AbortController()
+    buscar(ac.signal)
+      .then((d) => { if (!ac.signal.aborted) aplicar(d) })
+      .catch((e: any) => { if (!ac.signal.aborted) setErroLista(e.message || 'Não foi possível carregar as categorias.') })
+      .finally(() => { if (!ac.signal.aborted) setLoading(false) })
+    return () => ac.abort()
+  }, [buscar, aplicar])
+
+  // RECARGA por ação do usuário (salvar/excluir/atualizar): aí sim volta ao
+  // estado de carregamento antes de buscar de novo.
+  const carregar = useCallback(async () => {
+    setLoading(true); setErroLista(null)
+    try { aplicar(await buscar()) }
+    catch (e: any) { setErroLista(e.message || 'Não foi possível carregar as categorias.') }
+    finally { setLoading(false) }
+  }, [buscar, aplicar])
 
   const filtradas = useMemo(() => {
     const q = busca.trim().toLowerCase()
@@ -128,7 +162,11 @@ export default function CategoriasTab() {
     if (!q) return arr.slice(0, 50)
     return arr.filter((m) => m.label.toLowerCase().includes(q) || (m.code ?? '').toLowerCase().includes(q)).slice(0, 50)
   }, [mestres, origem, masterBusca])
-  const masterSelecionado = (mestres[origem] ?? []).find((m) => String(m.id) === masterId) || null
+  // Na edição o mestre está travado: exibe o vínculo que a própria categoria guarda,
+  // sem depender da lista selecionável (que só traz cadastros mestres oficiais).
+  const masterSelecionado =
+    (mestres[origem] ?? []).find((m) => String(m.id) === masterId)
+    ?? (origemTravada && masterId ? { id: Number(masterId), label: mestreDe(editando!), code: null } : null)
 
   function selecionarMaster(m: MestreRef) {
     setMasterId(String(m.id)); setNome(m.label); setMasterBusca('')
@@ -243,7 +281,7 @@ export default function CategoriasTab() {
       {!loading && erroLista && (
         <div className="rounded-lg border border-red-500/30 bg-red-500/10 p-4 text-sm text-red-200">
           {erroLista}
-          <button onClick={() => void carregar()} className="ml-3 underline hover:text-white">Tentar de novo</button>
+          <button onClick={carregar} className="ml-3 underline hover:text-white">Tentar de novo</button>
         </div>
       )}
 
@@ -317,7 +355,7 @@ export default function CategoriasTab() {
               <div>
                 <label className="mb-1 block text-xs text-white/60">Origem</label>
                 <select value={origem} onChange={(e) => mudarOrigem(e.target.value as OrigemKey)} disabled={origemTravada} className={inputCls + (origemTravada ? ' opacity-60' : '')}>
-                  {ORIGENS.map(([k, label]) => <option key={k} value={k} className="bg-zinc-900">{label}</option>)}
+                  {(origemTravada ? ORIGENS : ORIGENS_CRIAVEIS).map(([k, label]) => <option key={k} value={k} className="bg-zinc-900">{label}</option>)}
                 </select>
               </div>
 

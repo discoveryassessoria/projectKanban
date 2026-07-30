@@ -38,7 +38,7 @@ export async function POST(req: NextRequest) {
   const moeda = MOEDAS.has(b?.moeda) ? b.moeda : 'BRL'
 
   if (!processoId) return NextResponse.json({ ok: false, erro: 'processoId é obrigatório.' }, { status: 400 })
-  if (!itemCatalogoId) return NextResponse.json({ ok: false, erro: 'Selecione um item do Catálogo Mestre.' }, { status: 400 })
+  if (!itemCatalogoId) return NextResponse.json({ ok: false, erro: 'Selecione um item do Catálogo de Serviços.' }, { status: 400 })
   if (!isFinite(valorUnitario) || valorUnitario <= 0) return NextResponse.json({ ok: false, erro: 'Informe um valor maior que zero.' }, { status: 400 })
 
   const actor = await extrairUsuarioComPermissoes(req)

@@ -1,7 +1,16 @@
+// AUTORIZAÇÃO SERVER-SIDE (B1).
+// O middleware já exige JWT em toda rota /api, mas autenticado ≠ autorizado:
+// sem esta guarda, qualquer usuário logado — independente do perfil — podia
+// apagar a árvore inteira ou criar/excluir Pessoa. A UI escondia os botões; a
+// API aceitava a chamada. Permissão de tela não é permissão de sistema.
 import { type NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
+import { verificarPermissao } from "@/src/lib/verificar-permissao"
 
 export async function GET(request: NextRequest, { params }: { params: Promise<{ arvoreid: string }> }) {
+  const semPermissao = await verificarPermissao(request, "arvore.ver")
+  if (semPermissao) return semPermissao
+
   try {
     const { arvoreid } = await params
     const id = Number.parseInt(arvoreid)
@@ -50,6 +59,9 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
 }
 
 export async function PUT(request: NextRequest, { params }: { params: Promise<{ arvoreid: string }> }) {
+  const semPermissao = await verificarPermissao(request, "arvore.editar")
+  if (semPermissao) return semPermissao
+
   try {
     const { arvoreid } = await params
     const id = Number.parseInt(arvoreid)
@@ -85,6 +97,9 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
 }
 
 export async function DELETE(request: NextRequest, { params }: { params: Promise<{ arvoreid: string }> }) {
+  const semPermissao = await verificarPermissao(request, "arvore.excluir")
+  if (semPermissao) return semPermissao
+
   try {
     const { arvoreid } = await params
     const id = Number.parseInt(arvoreid)

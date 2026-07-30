@@ -18,7 +18,21 @@ export async function GET(request: NextRequest) {
 
     // A relação M2M legada (itensFinanceiros) permanece no banco (dados preservados),
     // mas NÃO é exibida/gerenciada aqui — o vínculo financeiro é feito em Configurações Financeiras.
-    const servicos = await prisma.servicoProduto.findMany({ orderBy: { code: 'asc' } })
+    //
+    // ADITIVO: o espelho no Cadastro Mestre vem junto (natureza/unidade + contadores
+    // de vínculo). É o que permite ao Catálogo de Serviços ser a ÚNICA tela sobre o
+    // mestre — mostrando tipo, unidade e vínculos sem uma segunda tela técnica.
+    const servicos = await prisma.servicoProduto.findMany({
+      orderBy: { code: 'asc' },
+      include: {
+        itemCatalogo: {
+          select: {
+            id: true, natureza: true, unidade: true,
+            _count: { select: { tiposDocumento: true, produtos: true, servicos: true, precos: true } },
+          },
+        },
+      },
+    })
 
     return NextResponse.json({ servicos })
   } catch (error) {

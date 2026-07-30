@@ -1,9 +1,18 @@
+// AUTORIZAÇÃO SERVER-SIDE (B1).
+// O middleware já exige JWT em toda rota /api, mas autenticado ≠ autorizado:
+// sem esta guarda, qualquer usuário logado — independente do perfil — podia
+// apagar a árvore inteira ou criar/excluir Pessoa. A UI escondia os botões; a
+// API aceitava a chamada. Permissão de tela não é permissão de sistema.
 import { type NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import { garantirFamiliaParaArvore } from "@/src/services/familia"
+import { verificarPermissao } from "@/src/lib/verificar-permissao"
 
 // GET - Listar todas as árvores
-export async function GET() {
+export async function GET(request: NextRequest) {
+  const semPermissao = await verificarPermissao(request, "arvore.ver")
+  if (semPermissao) return semPermissao
+
   try {
     const arvores = await prisma.arvore.findMany({
       include: {
@@ -25,6 +34,9 @@ export async function GET() {
 
 // POST - Criar nova árvore
 export async function POST(request: NextRequest) {
+  const semPermissao = await verificarPermissao(request, "arvore.criar")
+  if (semPermissao) return semPermissao
+
   try {
     const { nome, descricao, processoId } = await request.json()
 

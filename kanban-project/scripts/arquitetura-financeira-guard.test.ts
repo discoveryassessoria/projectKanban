@@ -97,7 +97,12 @@ secao('Item 5 — view Cobranças no Financeiro Geral (base única)')
   const tab = readFileSync(join(RAIZ, 'src/components/financeiroComponents/CobrancasTab.tsx'), 'utf8')
   ok('reutiliza o MESMO modal do processo', tab.includes('ReceitaCobrancaModal'))
   ok('consome a API consolidada', tab.includes('/api/financeiro/cobrancas'))
-  ok('tem busca + filtro de status', tab.includes('setBusca') && tab.includes('STATUS_FILTROS'))
+  // O guard afirma a CAPACIDADE, não o nome da variável: a aba filtra por status e
+  // busca por um termo que entra na consulta. Antes exigia `setBusca` — e quebrou quando
+  // o termo passou a ser atrasado por `useDebounce` em vez de guardado em estado
+  // próprio, sem que a busca tivesse deixado de existir um instante sequer.
+  ok('tem filtro de status', tab.includes('STATUS_FILTROS'))
+  ok('tem busca que chega na consulta', /params\.set\("q",\s*busca\)/.test(tab) && /value=\{q\}/.test(tab))
 
   const page = readFileSync(join(RAIZ, 'src/app/financeiro/page.tsx'), 'utf8')
   ok('aba Cobranças registrada', /key:\s*"cobrancas"/.test(page))

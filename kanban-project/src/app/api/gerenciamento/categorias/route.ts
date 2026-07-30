@@ -32,18 +32,19 @@ export async function GET(request: NextRequest) {
 
     // Além das categorias, devolve os MESTRES para o select pesquisável por origem
     // (mesmo padrão de Configurações Financeiras / ProdutosTab).
-    const [categorias, tiposDocumento, servicos, honorarios, tiposProcesso] = await Promise.all([
+    // A tabela legada Honorario NÃO entra: honorário deixou de ser cadastro mestre.
+    // Categorias antigas de origem HONORARIO continuam legíveis pelo próprio vínculo.
+    const [categorias, tiposDocumento, servicos, tiposProcesso] = await Promise.all([
       prisma.categoriaFinanceira.findMany({
         orderBy: [{ tipo: 'asc' }, { nome: 'asc' }],
         include: CAT_INCLUDE,
       }),
       prisma.tipoDocumentoCadastro.findMany({ where: { ativo: true }, select: { id: true, code: true, name: true }, orderBy: { name: 'asc' } }),
       prisma.itemCatalogo.findMany({ where: { natureza: 'SERVICO', ativo: true }, select: { id: true, code: true, name: true }, orderBy: { name: 'asc' } }),
-      prisma.honorario.findMany({ where: { ativo: true }, select: { id: true, code: true, name: true }, orderBy: { name: 'asc' } }),
       prisma.tipoProcessoNacionalidade.findMany({ where: { ativo: true }, select: { id: true, name: true }, orderBy: { name: 'asc' } }),
     ])
 
-    return NextResponse.json({ categorias, mestres: { tiposDocumento, servicos, honorarios, tiposProcesso } })
+    return NextResponse.json({ categorias, mestres: { tiposDocumento, servicos, tiposProcesso } })
   } catch (error) {
     console.error('Erro ao listar categorias:', error)
     return NextResponse.json({ error: 'Erro interno' }, { status: 500 })
@@ -80,9 +81,9 @@ async function resolverMestre(b: any): Promise<OrigemResolvida | { error: string
     return { origem: 'SERVICO', nome: m.name, data: { itemCatalogoId: ids.itemCatalogoId } }
   }
   if (ids.honorarioId != null) {
-    const m = await prisma.honorario.findUnique({ where: { id: ids.honorarioId }, select: { name: true } })
-    if (!m) return { error: 'Honorário (mestre) não encontrado.' }
-    return { origem: 'HONORARIO', nome: m.name, data: { honorarioId: ids.honorarioId } }
+    // MESTRE LEGADO (tabela Honorario): fora da arquitetura. Categorias antigas de
+    // origem HONORARIO continuam legíveis; nenhuma nova nasce daqui.
+    return { error: 'Honorário não é mais um cadastro mestre: use o Serviço correspondente do Catálogo de Serviços.' }
   }
   const m = await prisma.tipoProcessoNacionalidade.findUnique({ where: { id: ids.tipoProcessoId! }, select: { name: true } })
   if (!m) return { error: 'Processo / Modalidade (mestre) não encontrado.' }

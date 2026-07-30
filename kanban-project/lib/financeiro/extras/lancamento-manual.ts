@@ -9,6 +9,7 @@
 import { prisma } from '@/lib/prisma'
 import { criarLancamentoExtra } from './lancamento-extra-service'
 import { resolverDistribuicao, type ModoDistribuicao } from '../dominio/obrigacao-economica'
+import { elegibilidadeParaLancamento, hojeISO } from '../catalogo-oficial'
 
 const cent = (v: number) => Math.round((Number(v) || 0) * 100) / 100
 
@@ -49,9 +50,36 @@ export async function criarLancamentoManual(e: EntradaLancamentoManual): Promise
 
   const moeda = e.moeda ?? 'BRL'
 
-  // Item é a FONTE do lançamento — obrigatório e válido.
-  const item = await prisma.itemCatalogo.findUnique({ where: { id: e.itemCatalogoId }, select: { name: true, ativo: true } })
-  if (!item || !item.ativo) throw new Error('Item do Catálogo Mestre inválido ou inativo.')
+  // Item é a FONTE do lançamento — obrigatório e ELEGÍVEL. A validação é a MESMA
+  // regra da listagem (lib/financeiro/catalogo-oficial): item do Cadastro Mestre
+  // oficial, ativo, com Configuração Financeira ativa que admita esta natureza e
+  // — quando a natureza exige — preço vigente na Tabela de Valores. Item de
+  // estrutura legada continua legível no histórico, mas não origina lançamento
+  // novo nem por POST direto.
+  const item = await prisma.itemCatalogo.findUnique({
+    where: { id: e.itemCatalogoId },
+    select: {
+      name: true, ativo: true, natureza: true,
+      produtos: { where: { ativo: true }, select: { ativo: true, naturezaFin: true, possuiCusto: true, possuiReceita: true, valorCustoPadrao: true, valorReceitaPadrao: true } },
+      precos: { where: { arquivado: false, legadoPendente: false }, select: { natureza: true, arquivado: true, legadoPendente: true, vigenciaInicio: true, vigenciaFim: true } },
+    },
+  })
+  const cfg = item?.produtos[0]
+  const eleg = elegibilidadeParaLancamento({
+    item,
+    config: cfg && {
+      ativo: cfg.ativo,
+      naturezaFin: cfg.naturezaFin,
+      possuiCusto: cfg.possuiCusto,
+      possuiReceita: cfg.possuiReceita,
+      valorCustoPadrao: cfg.valorCustoPadrao != null ? Number(cfg.valorCustoPadrao) : null,
+      valorReceitaPadrao: cfg.valorReceitaPadrao != null ? Number(cfg.valorReceitaPadrao) : null,
+    },
+    precos: item?.precos,
+    natureza: e.natureza,
+    hoje: hojeISO(new Date()),
+  })
+  if (!eleg.ok || !item) throw new Error(eleg.detalhe ?? 'Item do Cadastro Mestre inválido para lançamento.')
 
   // Rateio: valida ANTES (o service não checa .ok). Participantes só incluídos.
   let distribuicao: { modo: ModoDistribuicao; participantes: { pessoaId: number; percentual?: number; valor?: number; incluido?: boolean }[] } | null = null

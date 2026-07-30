@@ -2,6 +2,7 @@
 "use client"
 
 import { ModalBase } from "./ModalBase"
+import { ImagemRemota } from '@/src/components/ui/imagem-remota'
 
 interface Props {
   url: string
@@ -37,7 +38,7 @@ export function ComprovanteModal({ url, nome, onClose }: Props) {
         ) : ehPDF ? (
           <iframe src={url} className="w-full h-[60vh] border rounded-lg" />
         ) : (
-          <img src={url} alt={nome} className="max-w-full max-h-[60vh] mx-auto rounded-lg" />
+          <ImagemRemota src={url} alt={nome} className="w-auto h-auto max-w-full max-h-[60vh] mx-auto rounded-lg" />
         )}
       </div>
     </ModalBase>

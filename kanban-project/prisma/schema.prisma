@@ -28,8 +28,10 @@ model Usuario {
   documentosResponsavel Documento[]          @relation("DocumentoResponsavel")
   eventosResponsavel    Evento[]             @relation("EventoResponsavel")
   gruposUsuario         GrupoUsuarioMembro[]
+  nomesPessoaAfirmados  NomePessoa[]         @relation("NomePessoaResponsavel")
 
   @@index([perfilId])
+  decisoesDedupTomadas DecisaoDeduplicacao[] @relation("DecisaoDedupResponsavel")
 }
 
 model Pessoa {
@@ -94,11 +96,13 @@ model Pessoa {
 
   // CP-3 â necessidades documentais desta pessoa
   necessidades NecessidadeDocumental[]
+  nomePessoas  NomePessoa[]
 
   @@index([arvoreId])
   @@index([pais_nasc])
   @@index([maeId])
   @@index([paiId])
+  decisoesDedup DecisaoDeduplicacao[] @relation("PessoaDecisaoDedup")
 }
 
 model Uniao {
@@ -884,38 +888,38 @@ model ContaBancaria {
 }
 
 model Fornecedor {
-  publicCode         String?             @unique @db.VarChar(20) // CodeGeneratorService central â aditivo, Ãºnico, nÃ£o editÃ¡vel
-  id                 Int                 @id @default(autoincrement())
-  nome               String              @db.VarChar(150)
-  nomeFantasia       String?             @db.VarChar(150)
-  tipo               String              @db.VarChar(20)
-  cpfCnpj            String?             @db.VarChar(20)
-  inscricaoEstadual  String?             @db.VarChar(20)
-  inscricaoMunicipal String?             @db.VarChar(20)
-  telefone           String?             @db.VarChar(20)
-  celular            String?             @db.VarChar(20)
-  email              String?             @db.VarChar(100)
-  website            String?             @db.VarChar(200)
-  cep                String?             @db.VarChar(10)
-  endereco           String?             @db.VarChar(200)
-  numero             String?             @db.VarChar(20)
-  complemento        String?             @db.VarChar(100)
-  bairro             String?             @db.VarChar(100)
-  cidade             String?             @db.VarChar(100)
-  estado             String?             @db.VarChar(2)
-  banco              String?             @db.VarChar(100)
-  agencia            String?             @db.VarChar(20)
-  conta              String?             @db.VarChar(30)
-  tipoConta          String?             @db.VarChar(20)
-  chavePix           String?             @db.VarChar(100)
-  tipoChavePix       String?             @db.VarChar(20)
-  observacoes        String?
-  ativo              Boolean             @default(true)
-  createdAt          DateTime            @default(now())
-  updatedAt          DateTime            @updatedAt
-  contasPagar        ContaPagar[]
-  tabelasValor       TabelaValor[]
-  configFinanceiras  ProdutoFinanceiro[] @relation("ConfigFinFornecedor")
+  publicCode           String?              @unique @db.VarChar(20) // CodeGeneratorService central â aditivo, Ãºnico, nÃ£o editÃ¡vel
+  id                   Int                  @id @default(autoincrement())
+  nome                 String               @db.VarChar(150)
+  nomeFantasia         String?              @db.VarChar(150)
+  tipo                 String               @db.VarChar(20)
+  cpfCnpj              String?              @db.VarChar(20)
+  inscricaoEstadual    String?              @db.VarChar(20)
+  inscricaoMunicipal   String?              @db.VarChar(20)
+  telefone             String?              @db.VarChar(20)
+  celular              String?              @db.VarChar(20)
+  email                String?              @db.VarChar(100)
+  website              String?              @db.VarChar(200)
+  cep                  String?              @db.VarChar(10)
+  endereco             String?              @db.VarChar(200)
+  numero               String?              @db.VarChar(20)
+  complemento          String?              @db.VarChar(100)
+  bairro               String?              @db.VarChar(100)
+  cidade               String?              @db.VarChar(100)
+  estado               String?              @db.VarChar(2)
+  banco                String?              @db.VarChar(100)
+  agencia              String?              @db.VarChar(20)
+  conta                String?              @db.VarChar(30)
+  tipoConta            String?              @db.VarChar(20)
+  chavePix             String?              @db.VarChar(100)
+  tipoChavePix         String?              @db.VarChar(20)
+  observacoes          String?
+  ativo                Boolean              @default(true)
+  createdAt            DateTime             @default(now())
+  updatedAt            DateTime             @updatedAt
+  contasPagar          ContaPagar[]
+  tabelasValor         TabelaValor[]
+  configFinanceiras    ProdutoFinanceiro[]  @relation("ConfigFinFornecedor")
   obrigacoesEconomicas ObrigacaoEconomica[] // custos V3 (A_PAGAR) vinculados a este fornecedor
 
   // --- novos campos para bater com o mockup ---
@@ -1570,8 +1574,6 @@ model ReceitaDocumento {
   receita     Receita? @relation(fields: [receitaId], references: [id], onDelete: Cascade)
 
   @@index([receitaId])
-  // Fonte única atual das buscas de documento (comprovante de custo/receita) é a obrigação:
-  // sem este índice toda consulta por obrigacaoId varria a tabela inteira.
   @@index([obrigacaoId])
 }
 
@@ -3289,6 +3291,7 @@ model NecessidadeDocumental {
   // CP-4A â vÃ­nculos operacionais do runtime v2 (back-relations)
   tarefasVinculadas Tarefa[]                    @relation("TarefaNecessidade")
   stepInstances     PhaseWorkflowStepInstance[]
+  nomesEvidenciados NomePessoa[]
 
   @@index([processoId])
   @@index([itemCatalogoId])
@@ -4033,7 +4036,7 @@ model ObrigacaoEconomica {
   ocorrencias      OcorrenciaFinanceira[]
   distribuicoes    DistribuicaoEconomica[]
   parcelasPagaveis ParcelaPagavel[] // F5 — cronograma de vencimentos de PAGÁVEIS (Contas a Pagar). Saldo continua no Ledger.
-  repasses         RepasseCusto[]   @relation("RepassesDoCusto") // F5 — vínculos explícitos de repasse/reembolso deste custo a cobranças do cliente
+  repasses         RepasseCusto[]          @relation("RepassesDoCusto") // F5 — vínculos explícitos de repasse/reembolso deste custo a cobranças do cliente
   fornecedor       Fornecedor?             @relation(fields: [fornecedorId], references: [id], onDelete: SetNull) // custo: beneficiário a quem se paga (reuso do cadastro central; antes era int órfão)
 
   @@unique([origemTipo, origemId]) // 1:1 com a Receita/Custo de origem (idempotÃªncia do backfill/dual-write)
@@ -4541,4 +4544,88 @@ model RegraNotificacao {
   ativo         Boolean  @default(true)
   criadoEm      DateTime @default(now())
   atualizadoEm  DateTime @updatedAt
+}
+
+// ============================================================================
+// MDM-5 â NOMES ALTERNATIVOS (aliases)
+// ============================================================================
+// Uma pessoa tem vÃ¡rias formas de nome: registral, de nascimento, de casada,
+// religioso, a grafia que aparece na certidÃ£o, o aportuguesado. Todas precisam
+// ser pesquisÃ¡veis, e a forma antiga nÃ£o pode se perder quando o principal muda.
+//
+// NÃ£o Ã© cÃ³pia do Cadastro Mestre: Ã© INVERSÃO DE FONTE. NomePessoa passa a ser
+// o dono do nome e Pessoa.nome/sobrenome viram projeÃ§Ã£o do principal (fase 3).
+//
+// Carrega os seis campos de afirmaÃ§Ã£o auditÃ¡vel (complemento 2): origem,
+// confianÃ§a, responsÃ¡vel, data da afirmaÃ§Ã£o, justificativa e evidÃªncia.
+model NomePessoa {
+  id       Int    @id @default(autoincrement())
+  pessoaId Int
+  pessoa   Pessoa @relation(fields: [pessoaId], references: [id], onDelete: Cascade)
+
+  nome      String  @db.VarChar(50)
+  sobrenome String? @db.VarChar(40)
+
+  // REGISTRAL | NASCIMENTO | CASADA | RELIGIOSO | GRAFIA_DOCUMENTO | APORTUGUESADO | IMPORTADO
+  tipo      String  @db.VarChar(20)
+  principal Boolean @default(false)
+
+  // Chave fonÃ©tica DERIVADA (motor/texto.ts) â nunca editÃ¡vel. Indexada porque
+  // Ã© o que faz a busca achar Bianqui procurando Bianchi.
+  chaveFonetica String? @db.VarChar(60)
+
+  // ---- afirmaÃ§Ã£o auditÃ¡vel (complemento 2) ----
+  origem                 String                 @db.VarChar(16)
+  confianca              String                 @db.VarChar(12)
+  responsavelId          Int?
+  responsavel            Usuario?               @relation("NomePessoaResponsavel", fields: [responsavelId], references: [id])
+  afirmadoEm             DateTime               @default(now())
+  justificativa          String?                @db.VarChar(300)
+  evidenciaNecessidadeId Int?
+  evidencia              NecessidadeDocumental? @relation(fields: [evidenciaNecessidadeId], references: [id], onDelete: SetNull)
+
+  // ---- histÃ³rico append-only ----
+  ativo            Boolean     @default(true)
+  supersedidoPorId Int?        @unique
+  supersedidoPor   NomePessoa? @relation("NomeSupersessao", fields: [supersedidoPorId], references: [id], onDelete: SetNull)
+  supersede        NomePessoa? @relation("NomeSupersessao")
+
+  chaveIdempotencia String   @unique @db.VarChar(200)
+  criadoEm          DateTime @default(now())
+  atualizadoEm      DateTime @updatedAt
+
+  @@index([pessoaId])
+  @@index([chaveFonetica])
+  @@index([pessoaId, principal])
+}
+
+// ============================================================================
+// MDM-3 â DECISÃO DE DEDUPLICAÃÃO
+// ============================================================================
+// Registro auditÃ¡vel de CADA criaÃ§Ã£o de Pessoa que passou por triagem. Guarda
+// os candidatos EXIBIDOS e o score de cada um: sem isso nÃ£o hÃ¡ como distinguir
+// erro humano de falha do algoritmo de similaridade quando uma duplicata entra.
+model DecisaoDeduplicacao {
+  id         Int    @id @default(autoincrement())
+  chaveDedup String @db.VarChar(200)
+
+  // Snapshot IMUTÃVEL do que foi apresentado ao operador (ids + scores +
+  // evidÃªncias). Mesmo padrÃ£o de NecessidadeDocumental.matrizSnapshot.
+  candidatosAvaliados Json
+  nivelTriagem        String @db.VarChar(14) // BLOQUEIO | CONFIRMACAO | INFORMATIVO | LIVRE
+
+  decisao            String  @db.VarChar(20) // CRIOU_NOVA | VINCULOU_EXISTENTE
+  pessoaResultanteId Int?
+  pessoaResultante   Pessoa? @relation("PessoaDecisaoDedup", fields: [pessoaResultanteId], references: [id], onDelete: SetNull)
+  justificativa      String? @db.VarChar(500)
+
+  decididoPorId Int?
+  decididoPor   Usuario? @relation("DecisaoDedupResponsavel", fields: [decididoPorId], references: [id])
+  decididoEm    DateTime @default(now())
+
+  chaveIdempotencia String @unique @db.VarChar(200)
+
+  @@index([chaveDedup])
+  @@index([pessoaResultanteId])
+  @@index([decididoEm])
 }

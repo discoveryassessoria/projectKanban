@@ -57,9 +57,6 @@ import { HealthTab } from "@/src/components/gerenciamentoComponents/Gerenciament
 // Lote 4 — Diagnóstico do Sistema
 import { DiagnosticsTab } from "@/src/components/gerenciamentoComponents/GerenciamentoScaffolds4"
 import { encerrarSessao } from "@/src/lib/sessao/cliente"
-import { useIsClient, useJsonLocalStorage, useLocalStorage } from "@/src/lib/cliente"
-import { useApi } from "@/src/lib/dados"
-import type { ProcessoWithStatus } from "@/src/types/kanban"
 
 // Lote 5 — Biblioteca de Modelos: REMOVIDA (legado eliminado).
 
@@ -68,6 +65,7 @@ import {
   ExecMatrixTab, SystemHealthTab, RoleCatalogTab,
   DocMatrixTab, ConfigVersionsTab, ConfigDiagnosisTab,
 } from "@/src/components/gerenciamentoComponents/GerenciamentoScaffolds6"
+import { useDadosHeaderBar } from "@/src/hooks/use-dados-headerbar"
 
 // ============================================================
 // MAPA DE TELAS (screen key → componente). Inalterado — só as views que o
@@ -80,14 +78,7 @@ const UsersTab = dynamic(() => import("@/src/components/gerenciamentoComponents/
   ssr: false, loading: () => <CarregandoTela />,
 })
 const RolesTab = dynamic(() => import("@/src/components/gerenciamentoComponents/RolesTab"), { ssr: false })
-const PrecificacaoTab = dynamic(() => import("@/src/components/gerenciamentoComponents/PrecificacaoTab"), { ssr: false, loading: () => <CarregandoTela /> })
-const FornecedoresConcentradoraTab = dynamic(() => import("@/src/components/gerenciamentoComponents/FornecedoresConcentradoraTab"), { ssr: false, loading: () => <CarregandoTela /> })
-const ComercialTab = dynamic(() => import("@/src/components/gerenciamentoComponents/ComercialTab"), { ssr: false, loading: () => <CarregandoTela /> })
-const PagamentosTab = dynamic(() => import("@/src/components/gerenciamentoComponents/PagamentosTab"), { ssr: false, loading: () => <CarregandoTela /> })
-const IntegracaoFinanceiraTab = dynamic(() => import("@/src/components/gerenciamentoComponents/IntegracaoFinanceiraTab"), { ssr: false, loading: () => <CarregandoTela /> })
-const EstruturaFinanceiraTab = dynamic(() => import("@/src/components/gerenciamentoComponents/EstruturaFinanceiraTab"), { ssr: false, loading: () => <CarregandoTela /> })
 const AplicabilidadeEconomicaTab = dynamic(() => import("@/src/components/gerenciamentoComponents/AplicabilidadeEconomicaTab"), { ssr: false, loading: () => <CarregandoTela /> })
-const CatalogoMestreTab = dynamic(() => import("@/src/components/gerenciamentoComponents/CatalogoMestreTab"), { ssr: false, loading: () => <CarregandoTela /> })
 const CatalogTab = dynamic(() => import("@/src/components/gerenciamentoComponents/CatalogTab"), {
   ssr: false, loading: () => <CarregandoTela />,
 })
@@ -102,7 +93,6 @@ const ImpostosTab = dynamic(() => import("@/src/components/gerenciamentoComponen
 const PlanoContasTab = dynamic(() => import("@/src/components/gerenciamentoComponents/PlanoContasTab"), { ssr: false, loading: () => <CarregandoTela /> })
 const CarteirasTab = dynamic(() => import("@/src/components/gerenciamentoComponents/CarteirasTab"), { ssr: false, loading: () => <CarregandoTela /> })
 const ProdutosTab = dynamic(() => import("@/src/components/gerenciamentoComponents/ProdutosTab"), { ssr: false, loading: () => <CarregandoTela /> })
-const HonorariosTab = dynamic(() => import("@/src/components/gerenciamentoComponents/HonorariosTab"), { ssr: false, loading: () => <CarregandoTela /> })
 const TabelaValoresTab = dynamic(() => import("@/src/components/gerenciamentoComponents/TabelaValoresTab"), { ssr: false, loading: () => <CarregandoTela /> })
 const CondicoesPagamentoTab = dynamic(() => import("@/src/components/gerenciamentoComponents/CondicoesPagamentoTab"), { ssr: false, loading: () => <CarregandoTela /> })
 const RegrasComissaoTab = dynamic(() => import("@/src/components/gerenciamentoComponents/RegrasComissaoTab"), { ssr: false, loading: () => <CarregandoTela /> })
@@ -194,12 +184,9 @@ const TELAS: Record<string, React.ComponentType> = {
   accounts: ContasTab,
   wallets: CarteirasTab,
   coa: PlanoContasTab,
-  estruturafin: EstruturaFinanceiraTab,
-  precificacao: PrecificacaoTab,
-  fornecedoresconc: FornecedoresConcentradoraTab,
-  comercial: ComercialTab,
-  pagamentos: PagamentosTab,
-  integracaofin: IntegracaoFinanceiraTab,
+  // As concentradoras legadas (estruturafin, precificacao, fornecedoresconc, comercial,
+  // pagamentos, integracaofin) foram removidas: eram invólucros de abas que só reusavam
+  // as telas reais. Os deep-links continuam vivos por ALIAS_TELAS → tela dona da função.
   categories: CategoriasTab,
   costcenters: CentrosCustoTab,
   taxes: ImpostosTab,
@@ -225,8 +212,8 @@ const TELAS: Record<string, React.ComponentType> = {
   servcats: cad("categorias-servico"),
   orgcats: cad("categorias-organizacao"),
   // Automações por fase — MESMA tela para os itens oficiais "Financeiras" e
-  // "Eventos" (só muda a aba inicial). `opauto` continua válido como deep-link.
-  opauto: PhaseAutomationsFasesTab,
+  // "Eventos" (só muda a aba inicial). A key antiga `opauto` não tem mais registro
+  // próprio: vira alias para `autofin` (deep-link preservado).
   autofin: function AutomacoesFinanceiras() { return <PhaseAutomationsFasesTab kindInicial="financial" /> },
   autoevt: function AutomacoesEventos() { return <PhaseAutomationsFasesTab kindInicial="event" /> },
   protocols: ProtocolsTab,
@@ -262,9 +249,12 @@ const TELAS: Record<string, React.ComponentType> = {
 
   // bespoke (lote 4)
   catalog: ProdutosTab,
-  catalogmestre: CatalogoMestreTab,
+  // `catalogmestre` (tela técnica sobre ItemCatalogo) foi REMOVIDA: o cadastro
+  // mestre continua como estrutura interna (dados/ids/vínculos intactos), mas a
+  // única tela de usuário é `products` (Catálogo de Serviços). Alias abaixo.
   products: ProdutosServicosTab,
-  honorariums: HonorariosTab,
+  // honorariums (CRUD legado da tabela Honorario) removido: honorário é item do
+  // cadastro mestre + Configuração Financeira + Tabela de Preços. Alias abaixo.
   paycond: CondicoesPagamentoTab,
   commrules: RegrasComissaoTab,
   discrules: RegrasDescontoTab,
@@ -330,9 +320,6 @@ const resolverModulo = (k: string): string => ALIAS_MODULOS[k] || k
 
 interface UserData { nome: string; email?: string; tipo?: string }
 
-/** Forma mínima que o HeaderBar consome das árvores. */
-interface ItemNomeado { id: number | string; nome: string; descricao?: string | null }
-
 type View = "home" | "screen"
 
 export default function GerenciamentoPage() {
@@ -345,7 +332,22 @@ export default function GerenciamentoPage() {
   //  • certtypes  → doctypes  (Tipos de Certidão consolidado em Tipos de Documento)
   //  • opauto     → autofin   (Automações por Fase virou Automações › Financeiras;
   //                            é a MESMA tela, só muda a aba inicial)
-  const ALIAS_TELAS: Record<string, string> = { certtypes: "doctypes", opauto: "autofin" }
+  // Removidas as telas LEGADAS (concentradoras que só reusavam abas + CRUD de
+  // Honorário): cada key antiga aponta para a tela que hoje é dona da função.
+  const ALIAS_TELAS: Record<string, string> = {
+    certtypes: "doctypes",
+    opauto: "autofin",
+    estruturafin: "currencies",      // Estrutura Financeira → Moedas (1ª aba real)
+    precificacao: "pricingtable",    // Precificação → Tabelas de Preços
+    comercial: "paycond",            // Comercial → Condições de Pagamento
+    pagamentos: "methods",           // Pagamentos → Formas de Pagamento
+    fornecedoresconc: "suppliers",   // Fornecedores (concentradora) → Fornecedores
+    integracaofin: "pricing",        // Integração Financeira → Aplicabilidade Econômica
+    // Cadastro mestre: a tela técnica saiu da navegação; o cadastro segue vivo por
+    // baixo. Toda URL antiga cai na tela oficial (Serviços › Catálogo de Serviços).
+    catalogmestre: "products",       // Catálogo Mestre (tela técnica) → Catálogo de Serviços
+    honorariums: "products",         // Honorários (legado) → Catálogo de Serviços
+  }
   const resolverTela = useCallback((k: string | null): string => {
     if (!k) return "overview"
     return ALIAS_TELAS[k] || k
@@ -361,19 +363,8 @@ export default function GerenciamentoPage() {
   const [navCollapsed, setNavCollapsed] = useState(false)                // árvore recolhida (rail)
   const [mobileNav, setMobileNav] = useState(false)
 
-  // Identidade e sessão pela leitura oficial do localStorage. O efeito de montagem
-  // copiava o usuário para o estado — um render a mais e uma janela em que a barra
-  // dizia "Usuário" mesmo já havendo dado. O fallback continua o mesmo.
-  const noCliente = useIsClient()
-  const token = useLocalStorage("authToken")
-  const userSalvo = useJsonLocalStorage<UserData>("user")
-  const user: UserData = userSalvo ?? { nome: "Usuário" }
-  // Busca do HeaderBar: leitura pela camada oficial, silenciosa como antes — falha
-  // aqui não pode atrapalhar o Gerenciamento.
-  const processosReq = useApi<{ processos?: ProcessoWithStatus[] }>("/api/processos")
-  const arvoresReq = useApi<ItemNomeado[]>("/api/arvore")
-  const processos = processosReq.dados?.processos ?? []
-  const arvores = Array.isArray(arvoresReq.dados) ? arvoresReq.dados : []
+  // Usuário + processos + árvores do HeaderBar: hook único (sem efeito por tela).
+  const { user, processos, arvores } = useDadosHeaderBar()
 
   // resolve a primeira tela útil de um módulo (defaultRoute). Se o módulo não tiver
   // tela ativa (não deveria, entre os visíveis), devolve null.
@@ -474,6 +465,7 @@ export default function GerenciamentoPage() {
 
   const handleLogout = () => { void encerrarSessao("manual") }
 
+
   // montagem: deep-link + sincronização com botão voltar/avançar do browser.
   // CRÍTICO (accordion): este sync SÓ pode rodar no MOUNT e no POPSTATE — nunca a
   // cada render. `pode` (usePermissoes) não é memoizado → sincronizarDaURL muda de
@@ -490,12 +482,13 @@ export default function GerenciamentoPage() {
     return () => window.removeEventListener("popstate", onPop)
   }, [])
 
-  // Guarda de acesso: navegar é efeito, e só isso sobrou aqui.
+  // Porteiro da rota: sem token vai para o login; sem perfil de administrador
+  // volta para o painel. Só navegação — nenhuma escrita de estado.
   useEffect(() => {
-    if (!noCliente) return
+    const token = localStorage.getItem("authToken")
     if (!token) { router.push("/login"); return }
     if (!permLoading && !isAdmin) router.push("/dashboard")
-  }, [noCliente, token, isAdmin, permLoading, router])
+  }, [isAdmin, permLoading, router])
 
   if (permLoading) {
     return (

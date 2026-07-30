@@ -28,6 +28,7 @@ console.log(`[smokes] alvo: ${identificador(url)}`)
 const SUITES = [
   ['Componentes (jsdom + testing-library)', 'test:componentes'],
   ['Autenticação e sessão', 'test:auth'],
+  ['Catálogo de Serviços', 'test:catalogo-servicos-homolog'],
   ['Receitas', 'test:receitas-processo'],
   ['Receitas · exclusão', 'test:excluir-receita'],
   ['Receitas · exclusão (lista)', 'test:excluir-receita-lista'],
