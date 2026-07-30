@@ -10,6 +10,7 @@
 //          .../[modalityKey] (PUT/DELETE)
 
 import { useEffect, useState, useCallback } from "react"
+import { useApi } from "@/src/lib/dados"
 
 interface Pais { countryKey: string; countryLabel: string; flag: string | null; ativo?: boolean }
 interface Modalidade {
@@ -41,48 +42,41 @@ const ITrash = () => (<svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" s
 
 type Form = { editando: Modalidade | null; modalityLabel: string; codeSuffix: string }
 
+const SEM_PAISES: Pais[] = []
+const SEM_MODALIDADES: Modalidade[] = []
+
 export default function ModalidadesTab() {
-  const [paises, setPaises] = useState<Pais[]>([])
-  const [countryKey, setCountryKey] = useState("")
-  const [rows, setRows] = useState<Modalidade[]>([])
-  const [loading, setLoading] = useState(true)
-  const [carregandoMods, setCarregandoMods] = useState(false)
+  // Países e, DEPENDENTE do país escolhido, as suas modalidades. Antes isso era uma
+  // cadeia dentro de um efeito: carrega países → escolhe o primeiro → chama o segundo
+  // carregador. Aqui a dependência é a CHAVE da segunda consulta, então ela dispara
+  // sozinha quando o país muda — e trocar de país e voltar usa o cache em vez de
+  // refazer a requisição.
+  const paisesReq = useApi<{ paises?: Pais[] }>("/api/gerenciamento/paises")
+  const paises = paisesReq.dados?.paises ?? SEM_PAISES
+  // O primeiro país vem pré-selecionado, como antes — agora DERIVADO em vez de escrito
+  // por efeito, então não existe o render em que a tela já tem países e nenhum escolhido.
+  const [paisEscolhido, setCountryKey] = useState("")
+  const countryKey = paisEscolhido || paises[0]?.countryKey || ""
+  const modsReq = useApi<{ modalidades?: Modalidade[] }>(
+    countryKey ? `/api/gerenciamento/paises/${countryKey}/modalidades` : null,
+  )
+  const rows = modsReq.dados?.modalidades ?? SEM_MODALIDADES
+  const loading = paisesReq.carregando
+  const carregandoMods = modsReq.carregando
+  const carregarMods = modsReq.recarregar
   const [busy, setBusy] = useState(false)
-  const [erro, setErro] = useState<string | null>(null)
+  // Erro de validação/escrita fica em estado; o de LEITURA vem das consultas — as duas
+  // apareciam neste mesmo banner antes e continuam aparecendo.
+  const [erroLocal, setErro] = useState<string | null>(null)
+  const erro = erroLocal ?? (paisesReq.erro?.message ?? modsReq.erro?.message ?? null)
   const [flash, setFlash] = useState("")
   const [form, setForm] = useState<Form | null>(null)
 
   const showFlash = (m: string) => { setFlash(m); setTimeout(() => setFlash(""), 3000) }
 
-  const carregarMods = useCallback(async (ck: string) => {
-    if (!ck) { setRows([]); return }
-    setCarregandoMods(true)
-    try {
-      const d = await jsonFetch(`/api/gerenciamento/paises/${ck}/modalidades`, { cache: "no-store" })
-      setRows((d as { modalidades?: Modalidade[] }).modalidades || [])
-    } catch (e) {
-      setErro(e instanceof Error ? e.message : "Não foi possível carregar as modalidades.")
-    } finally { setCarregandoMods(false) }
-  }, [])
-
-  const bootstrap = useCallback(async () => {
-    setLoading(true); setErro(null)
-    try {
-      const d = await jsonFetch("/api/gerenciamento/paises", { cache: "no-store" })
-      const lista = ((d as { paises?: Pais[] }).paises || [])
-      setPaises(lista)
-      const inicial = lista[0]?.countryKey || ""
-      setCountryKey(inicial)
-      if (inicial) await carregarMods(inicial)
-    } catch (e) {
-      setErro(e instanceof Error ? e.message : "Não foi possível carregar os países.")
-    } finally { setLoading(false) }
-  }, [carregarMods])
-  useEffect(() => { bootstrap() }, [bootstrap])
-
   function trocarPais(ck: string) {
+    // Trocar o país já troca a chave da consulta de modalidades: nada a recarregar aqui.
     setCountryKey(ck); setErro(null); setForm(null)
-    carregarMods(ck)
   }
 
   async function salvar() {
@@ -104,7 +98,7 @@ export default function ModalidadesTab() {
         })
       }
       setForm(null); showFlash("Modalidade salva.")
-      await carregarMods(countryKey)
+      await carregarMods()
     } catch (e) {
       setErro(e instanceof Error ? e.message : "Não foi possível salvar a modalidade.")
     } finally { setBusy(false) }
@@ -115,7 +109,7 @@ export default function ModalidadesTab() {
       await jsonFetch(`/api/gerenciamento/paises/${countryKey}/modalidades/${m.modalityKey}`, {
         method: "PUT", body: JSON.stringify({ ativo: !(m.ativo ?? true) }),
       })
-      await carregarMods(countryKey)
+      await carregarMods()
     } catch (e) { setErro(e instanceof Error ? e.message : "Não foi possível alterar a modalidade.") }
   }
 
@@ -125,7 +119,7 @@ export default function ModalidadesTab() {
     try {
       await jsonFetch(`/api/gerenciamento/paises/${countryKey}/modalidades/${m.modalityKey}`, { method: "DELETE" })
       showFlash("Modalidade excluída.")
-      await carregarMods(countryKey)
+      await carregarMods()
     } catch (e) { setErro(e instanceof Error ? e.message : "Não foi possível excluir a modalidade.") }
   }
 
@@ -136,7 +130,7 @@ export default function ModalidadesTab() {
       {flash && <div className="rounded-xl border border-green-400/30 bg-green-500/15 px-4 py-3 text-sm text-green-200">{flash}</div>}
       {erro && (
         <div className="rounded-xl border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-200">
-          {erro} <button onClick={() => { setErro(null); carregarMods(countryKey) }} className="ml-2 underline hover:text-white">Recarregar</button>
+          {erro} <button onClick={() => { setErro(null); void carregarMods() }} className="ml-2 underline hover:text-white">Recarregar</button>
         </div>
       )}
 

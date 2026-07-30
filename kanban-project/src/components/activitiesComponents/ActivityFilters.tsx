@@ -1,6 +1,7 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useMemo } from "react"
+import { useApi } from '@/src/lib/dados'
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -59,42 +60,33 @@ const PRIORIDADES = [
 
 export default function ActivityFilters({ onFiltersChange, activeFilters }: ActivityFiltersProps) {
   const [isOpen, setIsOpen] = useState(false)
-  const [processos, setProcessos] = useState<Processo[]>([])
-  const [usuarios, setUsuarios] = useState<Usuario[]>([])
-  const [localFilters, setLocalFilters] = useState<FilterOptions>(activeFilters)
+  // Listas de apoio dos seletores, pela camada oficial. As duas rotas já devolviam
+  // ora `{ lista }` ora o array direto, e essa tolerância continua.
+  const processosReq = useApi<{ processos?: Processo[] } | Processo[]>('/api/processos')
+  const usuariosReq = useApi<{ usuarios?: Usuario[] } | Usuario[]>('/api/usuarios')
+  const processos = useMemo<Processo[]>(() => {
+    const d = processosReq.dados
+    if (!d) return []
+    return Array.isArray(d) ? d : (d.processos ?? [])
+  }, [processosReq.dados])
+  const usuarios = useMemo<Usuario[]>(() => {
+    const d = usuariosReq.dados
+    if (!d) return []
+    return Array.isArray(d) ? d : (d.usuarios ?? [])
+  }, [usuariosReq.dados])
 
-  const fetchProcessos = async () => {
-    try {
-      const response = await fetch('/api/processos')
-      if (response.ok) {
-        const data = await response.json()
-        setProcessos(data.processos || data || [])
-      }
-    } catch (error) {
-      console.error('Erro ao carregar processos:', error)
-    }
+  // Os filtros em edição são um RASCUNHO sobre os filtros aplicados: enquanto o
+  // usuário não mexeu neste painel, vale o que está aplicado; depois de mexer, vale o
+  // dele — até aplicar ou o pai mudar os filtros por fora. Antes um efeito copiava
+  // `activeFilters` para o estado, e um filtro aplicado em outro lugar sobrescrevia o
+  // que o usuário tinha acabado de digitar aqui.
+  const baseFiltros = JSON.stringify(activeFilters)
+  const [rascunho, setRascunho] = useState<{ base: string; filtros: FilterOptions } | null>(null)
+  const localFilters = rascunho?.base === baseFiltros ? rascunho.filtros : activeFilters
+  const setLocalFilters = (proximos: FilterOptions | ((anteriores: FilterOptions) => FilterOptions)) => {
+    const valor = typeof proximos === 'function' ? proximos(localFilters) : proximos
+    setRascunho({ base: baseFiltros, filtros: valor })
   }
-
-  const fetchUsuarios = async () => {
-    try {
-      const response = await fetch('/api/usuarios')
-      if (response.ok) {
-        const data = await response.json()
-        setUsuarios(data.usuarios || data || [])
-      }
-    } catch (error) {
-      console.error('Erro ao carregar usuários:', error)
-    }
-  }
-
-  useEffect(() => {
-    fetchProcessos()
-    fetchUsuarios()
-  }, [])
-
-  useEffect(() => {
-    setLocalFilters(activeFilters)
-  }, [activeFilters])
 
 
 

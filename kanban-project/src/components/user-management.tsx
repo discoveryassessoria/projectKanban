@@ -1,6 +1,8 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useMemo } from "react"
+import { useApi } from "@/src/lib/dados"
+import { useDebounce } from "@/src/hooks/use-debounce"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -39,10 +41,25 @@ interface Usuario {
 }
 
 export function UserManagement() {
-  const [usuarios, setUsuarios] = useState<Usuario[]>([])
-  const [isLoading, setIsLoading] = useState(true)
   const [searchTerm, setSearchTerm] = useState("")
-  const [error, setError] = useState("")
+  // Mesma solução já aplicada em UsersTab: a busca entra na CHAVE e o atraso é do
+  // VALOR, não da chamada. Isso substitui os DOIS efeitos daqui — o da montagem e o
+  // do `setTimeout(500)` que testava `isLoading` para não atropelar a si mesmo.
+  const buscaAplicada = useDebounce(searchTerm, 500)
+  const chaveUsuarios = buscaAplicada
+    ? `/api/usuarios?search=${encodeURIComponent(buscaAplicada)}&all=true`
+    : '/api/usuarios?all=true'
+  const usuariosReq = useApi<{ usuarios?: Usuario[] }>(chaveUsuarios, { keepPreviousData: true })
+  // Só usuários persistidos entram na lista — era o filtro por `id` definido.
+  const usuarios = useMemo(
+    () => (usuariosReq.dados?.usuarios ?? []).filter((u: Usuario) => u.id !== undefined),
+    [usuariosReq.dados],
+  )
+  const isLoading = usuariosReq.carregando
+  const loadUsers = usuariosReq.recarregar
+  const [erroLocal, setError] = useState("")
+  // 401 já encerra a sessão na camada; aqui não vira texto de tela.
+  const error = erroLocal || (usuariosReq.erro && usuariosReq.erro.status !== 401 ? usuariosReq.erro.message : "")
   const [success, setSuccess] = useState("")
 
   // Estados para modal de criar/editar
@@ -61,36 +78,6 @@ export function UserManagement() {
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false)
   const [userToDelete, setUserToDelete] = useState<Usuario | null>(null)
 
-  // Carregar usuários
-  const loadUsers = async () => {
-    try {
-      setIsLoading(true)
-      setError("")
-      const users = await getUsers(searchTerm)
-      // Filtrar apenas usuários com id definido
-      const validUsers = users.filter((u): u is Usuario => u.id !== undefined) as Usuario[]
-      setUsuarios(validUsers)
-    } catch (err: any) {
-      setError(err.message || "Erro ao carregar usuários")
-    } finally {
-      setIsLoading(false)
-    }
-  }
-
-  useEffect(() => {
-    loadUsers()
-  }, [])
-
-  // Buscar com debounce
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      if (!isLoading) {
-        loadUsers()
-      }
-    }, 500)
-
-    return () => clearTimeout(timer)
-  }, [searchTerm])
 
   // Abrir modal para criar usuário
   const handleCreate = () => {

@@ -11,7 +11,8 @@
 // A Identidade Visual mostra ainda, em leitura, o ambiente visual por país — que
 // é gerado em build (motor de ambiente) e não é editável por tela.
 
-import { useCallback, useEffect, useState } from "react"
+import { useCallback, useEffect, useMemo, useState } from "react"
+import { useApi } from "@/src/lib/dados"
 
 interface ChaveSpec {
   chave: string
@@ -31,36 +32,56 @@ const inputCls = "w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 
 const labelCls = "mb-1 block text-xs text-white/60"
 const CARD = "rounded-2xl border border-white/10 bg-white/5 backdrop-blur-sm"
 
+const SEM_VALORES: Record<string, string> = {}
+const SEM_CHAVES: ChaveSpec[] = []
+
 function useConfiguracao(grupo: "geral" | "identidade") {
-  const [chaves, setChaves] = useState<ChaveSpec[]>([])
-  const [valores, setValores] = useState<Record<string, string>>({})
-  const [inicial, setInicial] = useState<Record<string, string>>({})
-  const [atualizadoEm, setAtualizadoEm] = useState<string | null>(null)
-  const [loading, setLoading] = useState(true)
-  const [erro, setErro] = useState<string | null>(null)
+  // As configurações GRAVADAS vêm da camada oficial; o formulário é um rascunho sobre
+  // elas. Antes havia dois estados espelhando a mesma resposta (`valores` para editar,
+  // `inicial` para detectar alteração) e um efeito que preenchia os dois.
+  const consulta = useApi<{ chaves?: ChaveSpec[]; valores?: Record<string, string>; atualizadoEm?: string | null }>(
+    "/api/gerenciamento/configuracao-sistema",
+  )
+  const chaves = useMemo(
+    () => (consulta.dados?.chaves ?? SEM_CHAVES).filter((c) => c.grupo === grupo),
+    [consulta.dados, grupo],
+  )
+  const inicial = consulta.dados?.valores ?? SEM_VALORES
+  const atualizadoEm = consulta.dados?.atualizadoEm ?? null
 
-  const load = useCallback(async () => {
-    setLoading(true); setErro(null)
-    try {
-      const res = await fetch("/api/gerenciamento/configuracao-sistema", { headers: authHeaders(), cache: "no-store" })
-      const j = await res.json().catch(() => ({}))
-      if (res.ok) {
-        setChaves((j.chaves as ChaveSpec[]).filter((c) => c.grupo === grupo))
-        setValores(j.valores || {}); setInicial(j.valores || {}); setAtualizadoEm(j.atualizadoEm ?? null)
-      } else setErro(j.error || "Não foi possível carregar as configurações.")
-    } catch {
-      setErro("Não foi possível carregar as configurações.")
-    } finally { setLoading(false) }
-  }, [grupo])
-  useEffect(() => { load() }, [load])
+  // O rascunho carrega a versão gravada em que foi editado: se o servidor devolver
+  // valores novos, o rascunho baseado nos antigos é descartado por construção.
+  const base = JSON.stringify(inicial)
+  const [rascunho, setRascunho] = useState<{ base: string; valores: Record<string, string> } | null>(null)
+  const valores = rascunho?.base === base ? rascunho.valores : inicial
+  const setValores = (proximos: Record<string, string>) => setRascunho({ base, valores: proximos })
 
-  return { chaves, valores, setValores, inicial, setInicial, atualizadoEm, setAtualizadoEm, loading, erro, setErro, load }
+  /**
+   * Confirma o que acabou de ser gravado. É UMA escrita no cache, não duas: `valores` e
+   * `atualizadoEm` mudam juntos, e dois `mutate` encadeados fariam o segundo sobrescrever
+   * o primeiro com a versão anterior dos dados.
+   */
+  const marcarSalvo = (payload: Record<string, string>) => {
+    void consulta.recarregar({
+      ...consulta.dados,
+      valores: { ...inicial, ...payload },
+      atualizadoEm: new Date().toISOString(),
+    })
+  }
+
+  const [erroLocal, setErro] = useState<string | null>(null)
+  const erro = erroLocal ?? (consulta.erro ? consulta.erro.message : null)
+
+  return {
+    chaves, valores, setValores, inicial, atualizadoEm, marcarSalvo,
+    loading: consulta.carregando, erro, setErro, load: consulta.recarregar,
+  }
 }
 
 function FormularioConfig({
   titulo, descricao, grupo, extra,
 }: { titulo: string; descricao: string; grupo: "geral" | "identidade"; extra?: (valores: Record<string, string>) => React.ReactNode }) {
-  const { chaves, valores, setValores, inicial, setInicial, atualizadoEm, setAtualizadoEm, loading, erro, setErro, load } = useConfiguracao(grupo)
+  const { chaves, valores, setValores, inicial, atualizadoEm, marcarSalvo, loading, erro, setErro, load } = useConfiguracao(grupo)
   const [busy, setBusy] = useState(false)
   const [flash, setFlash] = useState("")
 
@@ -75,8 +96,7 @@ function FormularioConfig({
       })
       const j = await res.json().catch(() => ({}))
       if (!res.ok) { setErro(j.error || "Erro ao salvar."); return }
-      setInicial({ ...inicial, ...payload })
-      setAtualizadoEm(new Date().toISOString())
+      marcarSalvo(payload)
       setFlash("Configurações salvas."); setTimeout(() => setFlash(""), 3000)
     } finally { setBusy(false) }
   }
@@ -88,7 +108,7 @@ function FormularioConfig({
       {flash && <div className="rounded-xl border border-green-400/30 bg-green-500/15 px-4 py-3 text-sm text-green-200">{flash}</div>}
       {erro && (
         <div className="rounded-xl border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-200">
-          {erro} <button onClick={() => { setErro(null); load() }} className="ml-2 underline hover:text-white">Recarregar</button>
+          {erro} <button onClick={() => { setErro(null); void load() }} className="ml-2 underline hover:text-white">Recarregar</button>
         </div>
       )}
 
