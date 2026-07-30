@@ -193,15 +193,27 @@ const ROTULO_FASE: Record<string, string> = {
 }
 
 /**
- * Quantos arquivos por requisição.
+ * UM documento por requisição.
  *
- * Vinte e quatro certidões numa requisição só significam vinte e quatro downloads
- * e quarenta e oito leituras visuais dentro do mesmo timeout — e, se qualquer uma
- * estourar, perde-se o lote inteiro sem saber onde parou. Em blocos pequenos cada
- * bloco responde rápido, o progresso é real e o que falhou pode ser repetido
- * sozinho.
+ * Começou em quatro e travou com certidão de verdade: quatro documentos são OITO
+ * leituras visuais dentro do mesmo teto de tempo da função, e foto de celular é
+ * bem mais densa que documento gerado. O bloco inteiro passava do limite e o
+ * navegador ficava pendurado sem nunca receber resposta — "Lendo" para sempre.
+ *
+ * Com um por requisição, cada chamada faz duas leituras em paralelo e volta em
+ * dezenas de segundos, o progresso é real documento a documento, e uma certidão
+ * problemática derruba só a si mesma.
  */
-const POR_BLOCO = 4
+const POR_BLOCO = 1
+
+/**
+ * Teto de espera do NAVEGADOR por documento.
+ *
+ * Existe porque a função pode morrer sem responder (timeout de plataforma,
+ * instância reciclada). Sem isto o operador fica olhando um "Lendo" que nunca
+ * termina, que é a pior falha possível: a que não se declara.
+ */
+const ESPERA_MAXIMA_MS = 180_000
 
 const ROTULO_TIPO: Record<string, string> = {
   NASCIMENTO: "Nascimento",
@@ -382,10 +394,22 @@ export function ImportarCertidoes({ processoId, pessoas, aberto, onFechar, onImp
           const file = selecionados[i]
           situacaoDe(file.name, { fase: "ENVIANDO", pct: 0 })
           try {
-            const [subido] = await uploadFiles([file], {
-              prefix: "documentos",
-              onProgress: (_f, pct) => situacaoDe(file.name, { fase: "ENVIANDO", pct }),
-            })
+            // Soluço de rede no PUT é falha transitória: três tentativas com
+            // espera crescente, como já se faz na chamada de leitura.
+            let subido: Awaited<ReturnType<typeof uploadFiles>>[number] | undefined
+            let ultimoErro: unknown = null
+            for (let tentativa = 1; tentativa <= 3 && !subido; tentativa++) {
+              try {
+                ;[subido] = await uploadFiles([file], {
+                  prefix: "documentos",
+                  onProgress: (_f, pct) => situacaoDe(file.name, { fase: "ENVIANDO", pct }),
+                })
+              } catch (err) {
+                ultimoErro = err
+                if (tentativa < 3) await new Promise((r) => setTimeout(r, 500 * 2 ** (tentativa - 1)))
+              }
+            }
+            if (!subido) throw ultimoErro instanceof Error ? ultimoErro : new Error(String(ultimoErro))
             enviadosAgora.push({
               url: subido.url,
               nome: subido.name,
@@ -417,18 +441,28 @@ export function ImportarCertidoes({ processoId, pessoas, aberto, onFechar, onImp
           for (const a of bloco) situacaoDe(a.nome, { fase: "LENDO" })
 
           let parcial: ResultadoAnalise
+          const relogio = new AbortController()
+          const alarme = setTimeout(() => relogio.abort(), ESPERA_MAXIMA_MS)
           try {
             const res = await authFetch(`/api/processos/${processoId}/registral/importar/analisar`, {
               method: "POST",
               body: JSON.stringify({ arquivos: bloco }),
+              signal: relogio.signal,
             })
             const dados = await res.json()
             if (!res.ok) throw new Error(dados?.error || `Falha ao ler (HTTP ${res.status}).`)
             parcial = dados as ResultadoAnalise
           } catch (e) {
-            const motivo = e instanceof Error ? e.message : String(e)
+            const abortado = e instanceof Error && e.name === "AbortError"
+            const motivo = abortado
+              ? `A leitura passou de ${Math.round(ESPERA_MAXIMA_MS / 1000)}s e foi interrompida. Tente este documento de novo.`
+              : e instanceof Error
+                ? e.message
+                : String(e)
             for (const a of bloco) situacaoDe(a.nome, { fase: "ERRO", motivo })
             continue
+          } finally {
+            clearTimeout(alarme)
           }
 
           // Os índices vêm por bloco; reindexa para o lote inteiro.
