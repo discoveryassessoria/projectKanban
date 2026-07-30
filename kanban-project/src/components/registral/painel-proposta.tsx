@@ -18,6 +18,7 @@
 "use client"
 
 import * as React from "react"
+import { useIsClient } from "@/src/lib/cliente"
 import { createPortal } from "react-dom"
 import {
   AlertTriangle,
@@ -99,11 +100,10 @@ export function PainelProposta({
   const [enviando, setEnviando] = React.useState<AcaoProposta | null>(null)
   const [erro, setErro] = React.useState<string | null>(null)
   const [aviso, setAviso] = React.useState<string | null>(null)
-  const [montado, setMontado] = React.useState(false)
-
-  React.useEffect(() => {
-    setMontado(true)
-  }, [])
+  // "Montado" é o contrato de hidratação, e o projeto já tem a abstração oficial
+  // para ele — `useIsClient` usa useSyncExternalStore com snapshot de servidor
+  // próprio, em vez de um setState no primeiro efeito.
+  const montado = useIsClient()
 
   const favoraveis = evidenciasDe(proposta.evidenciasFavoraveis)
   const contrarias = evidenciasDe(proposta.evidenciasContrarias)

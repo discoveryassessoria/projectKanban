@@ -28,6 +28,9 @@ interface ItemNomeado {
   descricao?: string | null
 }
 
+const SEM_PROCESSOS: ProcessoWithStatus[] = []
+const SEM_ARVORES: ItemNomeado[] = []
+
 export default function RegistralPage() {
   const router = useRouter()
   const { pode, carregando } = usePermissoes()
@@ -35,12 +38,19 @@ export default function RegistralPage() {
   const userSalvo = useJsonLocalStorage<{ nome?: string; tipo?: string; email?: string }>("user")
   const user = userSalvo ?? { nome: "Usuário" }
 
-  const [processoId, setProcessoId] = useState<number | null>(null)
+  const [processoEscolhido, setProcessoId] = useState<number | null>(null)
 
   const processosReq = useApi<{ processos?: ProcessoWithStatus[] }>("/api/processos")
   const arvoresReq = useApi<ItemNomeado[]>("/api/arvore")
-  const processos = processosReq.dados?.processos ?? []
-  const arvores = Array.isArray(arvoresReq.dados) ? arvoresReq.dados : []
+  // Constantes, não `?? []`: um literal novo por render trocaria a identidade e
+  // faria os hooks abaixo recalcularem sempre.
+  const processos = processosReq.dados?.processos ?? SEM_PROCESSOS
+  const arvores = Array.isArray(arvoresReq.dados) ? arvoresReq.dados : SEM_ARVORES
+
+  // O primeiro processo da lista é o padrão — a tela sem processo não mostra nada
+  // útil. Isso é DERIVAÇÃO: como estado escrito por efeito, a tela aparecia vazia
+  // por um render antes de escolher sozinha.
+  const processoId = processoEscolhido ?? (processos.length ? Number(processos[0].id) : null)
 
   // Ver evidência é o piso: quem não tem isso não entra na tela.
   const autorizado = pode("registral.ver_evidencias") || pode("registral.revisar")
@@ -48,12 +58,6 @@ export default function RegistralPage() {
   useEffect(() => {
     if (mounted && !carregando && !autorizado) router.push("/")
   }, [mounted, carregando, autorizado, router])
-
-  // Primeiro processo da lista como padrão — a tela sem processo não mostra nada
-  // útil, e escolher o primeiro é melhor que exigir um clique para ver qualquer coisa.
-  useEffect(() => {
-    if (processoId == null && processos.length > 0) setProcessoId(Number(processos[0].id))
-  }, [processoId, processos])
 
   const handleLogout = () => {
     void encerrarSessao("manual")
