@@ -112,6 +112,7 @@
     "test:mrg-visao": "tsx scripts/mrg-visao.test.ts",
     "test:mrg-visao-ao-vivo": "tsx scripts/mrg-visao-ao-vivo.test.ts",
     "test:nav": "tsx scripts/management-nav.test.ts",
+    "test:pool": "tsx scripts/prisma-pool-guard.test.ts",
     "test:operational-projection": "tsx scripts/operational-projection.test.ts",
     "test:overview": "tsx scripts/overview-projecao.test.ts",
     "test:participante-conta": "tsx scripts/participante-conta.test.ts",

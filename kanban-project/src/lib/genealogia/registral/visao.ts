@@ -105,9 +105,7 @@ export const ESQUEMA_LEITURA_VISUAL = {
     },
     confiancaNatureza: {
       type: "number",
-      minimum: 0,
-      maximum: 1,
-      description: "0 a 1. Abaixo de 0,5 significa que a classificação é um palpite.",
+      description: "Número entre 0 e 1. Abaixo de 0,5 significa que a classificação é um palpite.",
     },
     legibilidade: {
       type: "object",
@@ -121,7 +119,6 @@ export const ESQUEMA_LEITURA_VISUAL = {
         },
         problemas: {
           type: "array",
-          maxItems: 12,
           items: {
             type: "string",
             enum: [
@@ -144,7 +141,6 @@ export const ESQUEMA_LEITURA_VISUAL = {
     },
     pessoas: {
       type: "array",
-      maxItems: 24,
       description: "Cada pessoa CITADA no documento, uma vez, com o papel que ela tem no assento.",
       items: {
         type: "object",
@@ -156,10 +152,11 @@ export const ESQUEMA_LEITURA_VISUAL = {
             type: "string",
             description: "Nome como está ESCRITO no documento. Não corrija grafia, não modernize, não traduza.",
           },
-          sexo: { type: ["string", "null"], enum: ["M", "F", null] },
+          // Enum e `null` no mesmo campo a gramática não aceita; o conjunto
+          // permitido vai na descrição e é imposto na validação do servidor.
+          sexo: { type: ["string", "null"], description: "\"M\", \"F\" ou null quando o documento não diz." },
           campos: {
             type: "array",
-            maxItems: 24,
             description: "Cada informação lida sobre esta pessoa, com a evidência de onde ela saiu.",
             items: {
               type: "object",
@@ -198,11 +195,10 @@ export const ESQUEMA_LEITURA_VISUAL = {
                 },
                 trecho: {
                   type: ["string", "null"],
-                  maxLength: 400,
                   description: "O trecho transcrito de onde este valor saiu. É a evidência citável.",
                 },
-                pagina: { type: ["integer", "null"], minimum: 1 },
-                confianca: { type: "number", minimum: 0, maximum: 1 },
+                pagina: { type: ["integer", "null"], description: "Página do documento, a partir de 1." },
+                confianca: { type: "number", description: "Número entre 0 e 1." },
               },
             },
           },
@@ -228,7 +224,6 @@ export const ESQUEMA_LEITURA_VISUAL = {
     },
     averbacoes: {
       type: "array",
-      maxItems: 12,
       description: "Averbações, anotações à margem e retificações. Transcreva; não interprete o efeito jurídico.",
       items: {
         type: "object",
@@ -239,14 +234,14 @@ export const ESQUEMA_LEITURA_VISUAL = {
           data: { type: ["string", "null"] },
           tipo: {
             type: ["string", "null"],
-            enum: ["CASAMENTO", "OBITO", "DIVORCIO", "RETIFICACAO", "RECONHECIMENTO", "ADOCAO", "OUTRO", null],
+            description:
+              "Um de: CASAMENTO, OBITO, DIVORCIO, RETIFICACAO, RECONHECIMENTO, ADOCAO, OUTRO — ou null.",
           },
         },
       },
     },
     observacoes: {
       type: "array",
-      maxItems: 8,
       description: "O que impediu uma leitura completa. Vazio quando nada impediu.",
       items: { type: "string", maxLength: 300 },
     },

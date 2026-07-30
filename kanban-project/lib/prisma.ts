@@ -5,9 +5,53 @@ import { escopoDe } from "./codigos/code-patterns"
 
 const globalForPrisma = globalThis as unknown as { prisma?: ReturnType<typeof buildPrisma>; prismaBase?: PrismaClient }
 
+/**
+ * URL do runtime, com o pool contido.
+ *
+ * CAUSA RAIZ do "too many database connections": cada instância de função
+ * serverless abre o SEU pool, e o padrão do Prisma é `num_cpus * 2 + 1` — algo
+ * como 5 a 9 conexões POR INSTÂNCIA. Com dezenas de instâncias vivas (Fluid
+ * Compute reaproveita, mas escala horizontalmente sob carga) mais os scripts que
+ * rodam durante builds concorrentes, o banco chega ao teto e passa a recusar
+ * `findUnique` como se fosse erro da aplicação.
+ *
+ * Enquanto a URL do runtime for uma conexão TCP direta, cada instância fica com
+ * UMA conexão. É o ajuste padrão para serverless: a concorrência vem do número
+ * de instâncias, não do tamanho do pool de cada uma.
+ *
+ * Se a URL já for pooled (`prisma+postgres://`, Accelerate, PgBouncer), nada é
+ * alterado — quem gerencia o pool ali é o proxy, e mexer no limite atrapalha.
+ *
+ * O valor nunca é lido, comparado ou registrado: só se acrescentam parâmetros.
+ */
+function urlDoRuntime(): string | undefined {
+  const bruta = process.env.PRISMA_DATABASE_URL
+  if (!bruta) return undefined
+
+  const pooled =
+    bruta.startsWith("prisma+postgres://") ||
+    bruta.includes("accelerate.prisma-data.net") ||
+    bruta.includes("pooler.") ||
+    bruta.includes("pgbouncer=true")
+  if (pooled) return bruta
+
+  const jaTem = bruta.includes("connection_limit=")
+  if (jaTem) return bruta
+
+  const separador = bruta.includes("?") ? "&" : "?"
+  // `pool_timeout` alto o bastante para uma requisição esperar a vez em vez de
+  // falhar na hora, e baixo o bastante para não segurar a função até o limite.
+  return `${bruta}${separador}connection_limit=1&pool_timeout=20`
+}
+
 // Client BASE (sem extensão) — usado pela geração de código p/ rodar o INSERT atômico da sequência
 // (o gerador usa $queryRaw, não create → sem recursão do hook).
-const base = globalForPrisma.prismaBase ?? new PrismaClient({ log: ["warn", "error"] })
+const base =
+  globalForPrisma.prismaBase ??
+  new PrismaClient({
+    log: ["warn", "error"],
+    ...(urlDoRuntime() ? { datasources: { db: { url: urlDoRuntime() as string } } } : {}),
+  })
 
 // EXTENSÃO ÚNICA: gera publicCode automaticamente no create de QUALQUER modelo registrado no
 // CODE_REGISTRY, sempre pelo CodeGeneratorService central. Uniforme p/ todas as entidades — nenhum
@@ -86,10 +130,16 @@ function buildPrisma() {
 
 const _prisma = globalForPrisma.prisma ?? buildPrisma()
 
-if (process.env.NODE_ENV !== "production") {
-  globalForPrisma.prisma = _prisma
-  globalForPrisma.prismaBase = base
-}
+// O cache no globalThis vale TAMBÉM em produção.
+//
+// Antes ele existia só fora de produção, para sobreviver ao hot reload. Mas o
+// módulo é avaliado mais de uma vez dentro da MESMA instância serverless (route
+// handlers, middleware e instrumentação entram em bundles distintos), e sem o
+// cache cada avaliação criava outro PrismaClient — outro pool inteiro, sobre o
+// mesmo banco, sem ninguém fechar o anterior. Guardar aqui é o que garante um
+// cliente por instância, que é a conta que o limite de conexões pressupõe.
+globalForPrisma.prisma = _prisma
+globalForPrisma.prismaBase = base
 
 // Runtime = client ESTENDIDO (gera publicCode no create). Tipo exposto = PrismaClient — o hook é
 // transparente (mesma assinatura) e evita propagar o tipo estendido por todo o código.
