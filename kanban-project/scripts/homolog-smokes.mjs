@@ -27,6 +27,9 @@ console.log(`[smokes] alvo: ${identificador(url)}`)
 
 const SUITES = [
   ['Componentes (jsdom + testing-library)', 'test:componentes'],
+  // O layout da Árvore é decisão do usuário, não detalhe de implementação: entra no
+  // smoke para que nenhuma sessão o mude em silêncio como aconteceu em 30/07.
+  ['Árvore · layout congelado', 'test:arvore-layout'],
   ['Autenticação e sessão', 'test:auth'],
   ['Catálogo de Serviços', 'test:catalogo-servicos-homolog'],
   ['Receitas', 'test:receitas-processo'],
