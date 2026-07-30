@@ -3,6 +3,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
+import { useApi } from "@/src/lib/dados"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { DatePickerField } from "@/components/ui/date-picker-field"
@@ -98,8 +99,7 @@ export function ProcessoInformacoes({
   processoId, 
   onUpdate 
 }: ProcessoInformacoesProps) {
-  const [informacao, setInformacao] = useState<InformacaoItalia | null>(null)
-  const [loading, setLoading] = useState(true)
+
   const [showForm, setShowForm] = useState(false)
   const [editando, setEditando] = useState(false)
   const [salvando, setSalvando] = useState(false)
@@ -122,28 +122,16 @@ export function ProcessoInformacoes({
     observacoes: ""
   })
 
-  // Buscar informação
-  const fetchInformacao = async () => {
-    try {
-      const response = await fetch(`/api/informacoes-italia?processoId=${processoId}`)
-      const data = await response.json()
-      if (data.informacao) {
-        setInformacao(data.informacao)
-      } else {
-        setInformacao(null)
-      }
-    } catch (error) {
-      console.error("Erro ao buscar informação:", error)
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  useEffect(() => {
-    if (processoId) {
-      fetchInformacao()
-    }
-  }, [processoId])
+  // Leitura pela camada oficial: sem processo não há consulta (chave `null`), o que
+  // substitui o `if (processoId)` dentro do efeito.
+  const consulta = useApi<{ informacao?: InformacaoItalia | null }>(
+    processoId ? `/api/informacoes-italia?processoId=${processoId}` : null,
+  )
+  const informacao = consulta.dados?.informacao ?? null
+  const loading = consulta.carregando
+  const fetchInformacao = consulta.recarregar
+  // Excluir limpa a informação em tela na hora; o servidor confirma na revalidação.
+  const setInformacao = (valor: InformacaoItalia | null) => { void consulta.recarregar({ informacao: valor }) }
 
   // Resetar form
   const resetForm = () => {

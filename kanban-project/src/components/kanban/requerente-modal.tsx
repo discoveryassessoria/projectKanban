@@ -37,7 +37,39 @@ interface RequerenteModalProps {
   mode: 'view' | 'create' | 'edit'
 }
 
-export function RequerenteModal({ 
+/**
+ * Casca fina com identidade em (requerente, modo): abrir, trocar de requerente ou
+ * alternar ver/editar monta um formulário novo. É o que substitui os DOIS efeitos que
+ * reescreviam formulário e campos personalizados "quando requerente, mode ou isOpen
+ * mudarem" — e que exibiam, por um render, os dados do requerente anterior.
+ */
+/**
+ * Lê os campos personalizados do requerente. Tolerante de propósito: o campo pode vir
+ * como string JSON ou objeto, e um payload inválido não pode derrubar o modal — vira
+ * lista vazia, como antes.
+ */
+function lerCamposPersonalizados(
+  requerente: RequerenteModalProps['requerente'],
+  mode: RequerenteModalProps['mode'],
+): CampoPersonalizado[] {
+  if (!requerente?.campos_personalizados || (mode !== 'view' && mode !== 'edit')) return []
+  try {
+    const dados = typeof requerente.campos_personalizados === 'string'
+      ? JSON.parse(requerente.campos_personalizados)
+      : requerente.campos_personalizados
+    return dados?.campos && Array.isArray(dados.campos) ? dados.campos : []
+  } catch (error) {
+    console.error('Erro ao parsear campos personalizados:', error)
+    return []
+  }
+}
+
+export function RequerenteModal(props: RequerenteModalProps) {
+  if (!props.isOpen) return null
+  return <ConteudoModal key={`${props.requerente?.id ?? 'novo'}-${props.mode}`} {...props} />
+}
+
+function ConteudoModal({ 
   requerente, 
   isOpen, 
   onClose, 
@@ -52,56 +84,11 @@ export function RequerenteModal({
     telefone: requerente?.telefone ? (mode === 'view' ? requerente.telefone : applyTelefoneMask(requerente.telefone)) : '',
   })
 
-  const [camposPersonalizados, setCamposPersonalizados] = useState<CampoPersonalizado[]>([])
-
-  // Atualizar campos personalizados quando o requerente, mode ou isOpen mudarem
-  useEffect(() => {
-    if (isOpen) {
-      if (requerente?.campos_personalizados && (mode === 'view' || mode === 'edit')) {
-        try {
-          const dados = typeof requerente.campos_personalizados === 'string' 
-            ? JSON.parse(requerente.campos_personalizados)
-            : requerente.campos_personalizados
-          
-          if (dados?.campos && Array.isArray(dados.campos)) {
-            setCamposPersonalizados(dados.campos)
-          } else {
-            setCamposPersonalizados([])
-          }
-        } catch (error) {
-          console.error('Erro ao parsear campos personalizados:', error)
-          setCamposPersonalizados([])
-        }
-      } else {
-        // Resetar campos personalizados para modo de criação ou se não houver dados
-        setCamposPersonalizados([])
-      }
-    }
-  }, [requerente, mode, isOpen])
-
-  // Atualizar formData quando requerente, mode ou isOpen mudarem
-  useEffect(() => {
-    if (isOpen) {
-      if (requerente && (mode === 'view' || mode === 'edit')) {
-        setFormData({
-          nome: requerente.nome || '',
-          cpf: requerente.cpf ? (mode === 'view' ? requerente.cpf : applyCPFMask(requerente.cpf)) : '',
-          rg: requerente.rg ? (mode === 'view' ? requerente.rg : applyRGMask(requerente.rg)) : '',
-          endereco: requerente.endereco || '',
-          telefone: requerente.telefone ? (mode === 'view' ? requerente.telefone : applyTelefoneMask(requerente.telefone)) : '',
-        })
-      } else if (mode === 'create') {
-        // Resetar formulário para modo de criação
-        setFormData({
-          nome: '',
-          cpf: '',
-          rg: '',
-          endereco: '',
-          telefone: '',
-        })
-      }
-    }
-  }, [requerente, mode, isOpen])
+  // O estado inicial já é o do requerente (ver o `useState` acima), e a remontagem
+  // pela `key` cobre a troca de registro — os dois efeitos deixam de existir.
+  const [camposPersonalizados, setCamposPersonalizados] = useState<CampoPersonalizado[]>(
+    () => lerCamposPersonalizados(requerente, mode),
+  )
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()

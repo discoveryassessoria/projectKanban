@@ -100,7 +100,10 @@ const faturaTemDestinatario = (fatura: Fatura, destinatarioId: number): boolean 
 // ========================================
 export function ExportarFaturaModal({ faturas, requerentes, onClose }: ExportarFaturaModalProps) {
   const [destinatarioSelecionado, setDestinatarioSelecionado] = useState<Requerente | null>(null)
-  const [faturasSelecionadas, setFaturasSelecionadas] = useState<Set<number>>(new Set())
+  // A seleção é um RASCUNHO sobre o destinatário escolhido: por padrão, todas as
+  // faturas dele. Guardar a seleção crua e sincronizá-la por efeito fazia a lista
+  // aparecer por um render com a seleção do destinatário ANTERIOR.
+  const [selecaoManual, setSelecaoManual] = useState<{ destinatarioId: number; ids: Set<number> } | null>(null)
   const [gerando, setGerando] = useState(false)
   
   // Scroll indicator
@@ -132,15 +135,20 @@ export function ExportarFaturaModal({ faturas, requerentes, onClose }: ExportarF
     )
   }, [faturas, destinatarioSelecionado])
 
-  // Quando mudar destinatário, selecionar todas as faturas dele por padrão
-  useEffect(() => {
-    if (destinatarioSelecionado) {
-      const ids = faturasFiltradas.map(f => f.id)
-      setFaturasSelecionadas(new Set(ids))
-    } else {
-      setFaturasSelecionadas(new Set())
-    }
-  }, [destinatarioSelecionado, faturasFiltradas])
+  // Sem destinatário não há seleção; com destinatário, vale o que o usuário marcou
+  // PARA ELE — e, enquanto não mexeu, todas as faturas dele.
+  const faturasSelecionadas = useMemo<Set<number>>(() => {
+    if (!destinatarioSelecionado) return new Set()
+    if (selecaoManual?.destinatarioId === destinatarioSelecionado.id) return selecaoManual.ids
+    return new Set(faturasFiltradas.map(f => f.id))
+  }, [destinatarioSelecionado, selecaoManual, faturasFiltradas])
+
+  // Escrever na seleção sempre carimba de quem ela é.
+  const setFaturasSelecionadas = (proxima: Set<number> | ((anterior: Set<number>) => Set<number>)) => {
+    if (!destinatarioSelecionado) return
+    const ids = typeof proxima === 'function' ? proxima(faturasSelecionadas) : proxima
+    setSelecaoManual({ destinatarioId: destinatarioSelecionado.id, ids })
+  }
 
   // Faturas que serão exportadas (filtradas + selecionadas)
   const faturasParaExportar = useMemo(() => {

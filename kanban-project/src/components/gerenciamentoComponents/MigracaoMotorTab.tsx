@@ -1,7 +1,7 @@
 "use client"
 
 import { useEffect, useState, useCallback } from "react"
-import { useApi } from "@/src/lib/dados"
+import { enviar, useApi, useConsulta } from "@/src/lib/dados"
 
 interface Tipo { id: number; name: string; countryLabel: string }
 interface PaisStat { pais: string; total: number; conectados: number }
@@ -26,7 +26,6 @@ export default function MigracaoMotorTab() {
   const [pais, setPais] = useState("all")
   const [tipoId, setTipoId] = useState<number | "">("")
   const [overwrite, setOverwrite] = useState(false)
-  const [preview, setPreview] = useState<number | null>(null)
 
   const [confirmando, setConfirmando] = useState(false)
   const [confirmandoDesc, setConfirmandoDesc] = useState(false)
@@ -46,12 +45,22 @@ export default function MigracaoMotorTab() {
   const loading = panorama.carregando
   const load = panorama.recarregar
 
-  // recalcula a prévia quando muda país/overwrite
-  const calcPreview = useCallback(async (p: string, ow: boolean) => {
-    const res = await fetch("/api/gerenciamento/migracao-motor", { method: "POST", headers: authHeaders(), body: JSON.stringify({ action: "preview", pais: p, overwrite: ow }) })
-    if (res.ok) { const d = await res.json(); setPreview(d.count ?? null) }
-  }, [])
-  useEffect(() => { if (!loading) calcPreview(pais, overwrite) }, [pais, overwrite, loading, calcPreview])
+  // A prévia é uma LEITURA feita por POST: o servidor calcula quantos processos a
+  // migração afetaria, recebendo os parâmetros no corpo. Não é escrita — `action:
+  // "preview"` não muda nada. Por isso entra como consulta, com país e overwrite na
+  // CHAVE: trocar de país é uma consulta nova, e voltar a um já visto vem do cache.
+  const previewReq = useConsulta<number | null>(
+    loading ? null : `migracao-preview:${pais}:${overwrite}`,
+    async () => {
+      const d = await enviar<{ count?: number }>("/api/gerenciamento/migracao-motor", {
+        metodo: "POST",
+        corpo: { action: "preview", pais, overwrite },
+      })
+      return d.count ?? null
+    },
+  )
+  // Falha na prévia mostra "—" em vez de erro: era o `if (res.ok)` sem ramo de erro.
+  const preview = previewReq.erro ? null : (previewReq.dados ?? null)
 
   async function conectar() {
     if (tipoId === "") { setErro("Escolha um tipo de processo."); return }
@@ -59,7 +68,7 @@ export default function MigracaoMotorTab() {
     try {
       const res = await fetch("/api/gerenciamento/migracao-motor", { method: "POST", headers: authHeaders(), body: JSON.stringify({ action: "connect", pais, tipoProcessoId: tipoId, overwrite }) })
       const d = await res.json().catch(() => ({}))
-      if (res.ok) { showFlash(`${d.count} processo(s) conectado(s).`); load(); calcPreview(pais, overwrite) }
+      if (res.ok) { showFlash(`${d.count} processo(s) conectado(s).`); void load(); void previewReq.recarregar() }
       else setErro(d.error || "Erro ao conectar.")
     } finally { setBusy(false) }
   }
@@ -69,7 +78,7 @@ export default function MigracaoMotorTab() {
     try {
       const res = await fetch("/api/gerenciamento/migracao-motor", { method: "POST", headers: authHeaders(), body: JSON.stringify({ action: "disconnect", pais }) })
       const d = await res.json().catch(() => ({}))
-      if (res.ok) { showFlash(`${d.count} processo(s) desconectado(s).`); load(); calcPreview(pais, overwrite) }
+      if (res.ok) { showFlash(`${d.count} processo(s) desconectado(s).`); void load(); void previewReq.recarregar() }
       else setErro(d.error || "Erro ao desconectar.")
     } finally { setBusy(false) }
   }

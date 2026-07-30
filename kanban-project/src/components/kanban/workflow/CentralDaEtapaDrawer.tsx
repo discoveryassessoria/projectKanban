@@ -716,7 +716,12 @@ export function CentralDaEtapaDrawer({
                   onOpenEditor={() => setEditorAberto(true)}
                 />
               )}
-              {activeTab === "sla" && <TabSla step={step} onPatch={patchStep} saving={saving} />}
+              {activeTab === "sla" && (
+                // A `key` inclui prazo e notas de propósito: o formulário abaixo
+                // reinicia exatamente quando o efeito antigo reiniciava — ao trocar de
+                // passo OU quando o servidor devolve valores novos para o mesmo passo.
+                <TabSla key={`${step.id}-${step.dueAt ?? ''}-${step.notes ?? ''}`} step={step} onPatch={patchStep} saving={saving} />
+              )}
               {activeTab === "timeline" && <TabTimeline step={step} />}
               {activeTab === "anexos" && (
                 <Placeholder
@@ -883,14 +888,12 @@ function TabSla({
   onPatch: (body: Record<string, unknown>) => Promise<boolean>
   saving: string | null
 }) {
+  // O rascunho nasce do passo. Quem garante que ele é REINICIADO quando o passo muda
+  // é a `key` no ponto de uso — não um efeito que sobrescreve o que o usuário digitou
+  // um render depois de a tela já ter aparecido com o valor velho.
   const [dueAt, setDueAt] = useState(step.dueAt ? step.dueAt.slice(0, 10) : "")
   const [notes, setNotes] = useState(step.notes || "")
   const sla = fmtSla(step.dueAt)
-
-  useEffect(() => {
-    setDueAt(step.dueAt ? step.dueAt.slice(0, 10) : "")
-    setNotes(step.notes || "")
-  }, [step.id, step.dueAt, step.notes])
 
   const salvar = async () => {
     await onPatch({

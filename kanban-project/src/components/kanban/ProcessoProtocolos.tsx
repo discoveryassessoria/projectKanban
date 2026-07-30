@@ -3,6 +3,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
+import { buscar, useConsulta } from "@/src/lib/dados"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { DatePickerField } from "@/components/ui/date-picker-field"
@@ -89,14 +90,15 @@ const formatFileSize = (bytes?: number | null) => {
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
 }
 
+const SEM_PROTOCOLOS: Protocolo[] = []
+
 export function ProcessoProtocolos({ 
   processoId, 
   contratantes, 
   requerentes,
   onUpdate 
 }: ProcessoProtocolosProps) {
-  const [protocolos, setProtocolos] = useState<Protocolo[]>([])
-  const [loading, setLoading] = useState(true)
+
   const [showForm, setShowForm] = useState(false)
   const [editando, setEditando] = useState<Protocolo | null>(null)
   const [salvando, setSalvando] = useState(false)
@@ -122,37 +124,30 @@ export function ProcessoProtocolos({
   })
 
   // Buscar protocolos
-  const fetchProtocolos = async () => {
-    try {
-      const response = await fetch(`/api/protocolos?processoId=${processoId}`)
-      const data = await response.json()
-      if (data.protocolos) {
-        // Buscar anexos para cada protocolo
-        const protocolosComAnexos = await Promise.all(
-          data.protocolos.map(async (protocolo: Protocolo) => {
-            try {
-              const anexosRes = await fetch(`/api/protocolos/${protocolo.id}/anexos`)
-              const anexosData = await anexosRes.json()
-              return { ...protocolo, anexos: anexosData.anexos || [] }
-            } catch {
-              return { ...protocolo, anexos: [] }
-            }
-          })
-        )
-        setProtocolos(protocolosComAnexos)
-      }
-    } catch (error) {
-      console.error("Erro ao buscar protocolos:", error)
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  useEffect(() => {
-    if (processoId) {
-      fetchProtocolos()
-    }
-  }, [processoId])
+  // Leitura COMPOSTA: a lista de protocolos e, para cada um, os seus anexos. Em tela
+  // isso é um resultado único, então é uma consulta única — `useConsulta` existe na
+  // camada oficial exatamente para este caso, com o mesmo cache e a mesma política.
+  // A tolerância por item fica: um anexo que falha vira lista vazia naquele protocolo,
+  // sem derrubar a aba inteira.
+  const consulta = useConsulta<Protocolo[]>(
+    processoId ? `protocolos-com-anexos:${processoId}` : null,
+    async () => {
+      const lista = await buscar<{ protocolos?: Protocolo[] }>(`/api/protocolos?processoId=${processoId}`)
+      return Promise.all(
+        (lista.protocolos ?? []).map(async (protocolo) => {
+          try {
+            const anexos = await buscar<{ anexos?: Protocolo['anexos'] }>(`/api/protocolos/${protocolo.id}/anexos`)
+            return { ...protocolo, anexos: anexos.anexos || [] }
+          } catch {
+            return { ...protocolo, anexos: [] }
+          }
+        }),
+      )
+    },
+  )
+  const protocolos = consulta.dados ?? SEM_PROTOCOLOS
+  const loading = consulta.carregando
+  const fetchProtocolos = consulta.recarregar
 
   // Resetar form
   const resetForm = () => {

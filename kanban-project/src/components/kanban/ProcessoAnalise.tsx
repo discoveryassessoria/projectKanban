@@ -2,6 +2,7 @@
 "use client"
 
 import { useState, useEffect, useCallback } from "react"
+import { useApi } from "@/src/lib/dados"
 import { Loader2, Sparkles, CheckCircle2, AlertTriangle, ArrowRight, Check, X } from "lucide-react"
 
 interface Divergencia {
@@ -62,28 +63,23 @@ const ini = (nome: string) => {
 }
 
 export function ProcessoAnalise({ processoId, onConcluido, readOnly = false }: Props) {
-  const [analise, setAnalise] = useState<Analise | null>(null)
-  const [loading, setLoading] = useState(true)
   const [running, setRunning] = useState(false)
   const [concluding, setConcluding] = useState(false)
   const [erro, setErro] = useState<string | null>(null)
   const [resultado, setResultado] = useState<string | null>(null)
   const [drawerDiv, setDrawerDiv] = useState<Divergencia | null>(null)
 
-  const carregar = useCallback(async () => {
-    setLoading(true)
-    try {
-      const res = await fetch(`/api/processos/${processoId}/analise`, { headers: authHeaders() })
-      const data = await res.json()
-      setAnalise(data.analise ?? null)
-    } catch {
-      setErro("Erro ao carregar a análise.")
-    } finally {
-      setLoading(false)
-    }
-  }, [processoId])
-
-  useEffect(() => { carregar() }, [carregar])
+  // Leitura pela camada oficial.
+  const consulta = useApi<{ analise?: Analise | null }>(`/api/processos/${processoId}/analise`)
+  const analise = consulta.dados?.analise ?? null
+  const loading = consulta.carregando
+  const carregar = consulta.recarregar
+  // Rodar a análise e decidir divergências devolvem a análise NOVA. Ela entra no
+  // cache como dado otimista (a tela responde na hora) e o servidor confirma depois.
+  const setAnalise = (proxima: Analise | null | ((anterior: Analise | null) => Analise | null)) => {
+    const valor = typeof proxima === 'function' ? proxima(analise) : proxima
+    void consulta.recarregar({ analise: valor })
+  }
 
   const rodar = async () => {
     setRunning(true); setErro(null); setResultado(null)

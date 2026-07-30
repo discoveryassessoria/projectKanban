@@ -33,7 +33,22 @@ interface ContratanteModalProps {
   mode: 'view' | 'create' | 'edit'
 }
 
-export function ContratanteModal({ 
+/**
+ * Casca fina: o formulário só existe com o modal ABERTO, e a sua identidade é
+ * (contratante, modo). Trocar de contratante, alternar ver/editar ou reabrir monta um
+ * formulário novo — em lugar do efeito que reescrevia os cinco campos e limpava os
+ * erros "quando contratante ou mode mudam".
+ *
+ * A diferença não é estética: com o efeito, o modal aparecia por um render com os
+ * dados do contratante ANTERIOR, e um `mode` recém-trocado ainda exibia o valor
+ * mascarado do modo antigo.
+ */
+export function ContratanteModal(props: ContratanteModalProps) {
+  if (!props.isOpen) return null
+  return <ConteudoModal key={`${props.contratante?.id ?? 'novo'}-${props.mode}`} {...props} />
+}
+
+function ConteudoModal({ 
   contratante, 
   isOpen, 
   onClose, 
@@ -50,20 +65,6 @@ export function ContratanteModal({
   
   const [errors, setErrors] = useState<{ nome?: string; cpf?: string; geral?: string }>({})
   const [isSubmitting, setIsSubmitting] = useState(false)
-
-  // Sincronizar formData quando contratante ou mode mudam
-  useEffect(() => {
-    if (isOpen) {
-      setFormData({
-        nome: contratante?.nome || '',
-        cpf: contratante?.cpf ? (mode === 'view' ? contratante.cpf : applyCPFMask(contratante.cpf)) : '',
-        rg: contratante?.rg ? (mode === 'view' ? contratante.rg : applyRGMask(contratante.rg)) : '',
-        endereco: contratante?.endereco || '',
-        telefone: contratante?.telefone ? (mode === 'view' ? contratante.telefone : applyTelefoneMask(contratante.telefone)) : '',
-      })
-      setErrors({})
-    }
-  }, [contratante, mode, isOpen])
 
   // Limpar erro do campo quando usuário digita
   const clearFieldError = (field: 'nome' | 'cpf') => {

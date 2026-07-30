@@ -107,6 +107,46 @@ export function useApi<T = unknown>(chave: string | null, opcoes?: SWRConfigurat
 }
 
 /**
+ * Consulta de leitura cuja LEITURA não é um GET simples numa URL.
+ *
+ * Existe porque três formas legítimas de ler não cabem em `useApi`, e sem um lugar
+ * oficial cada tela voltaria a inventar o seu fetcher — a duplicação que esta camada
+ * existe para acabar:
+ *
+ *   • leitura COMPOSTA — uma lista e, para cada item, um complemento (protocolos e
+ *     os seus anexos), que só faz sentido em tela como um resultado único;
+ *   • leitura por POST — cálculo no servidor que recebe parâmetros no corpo
+ *     (prévias, simulações), sem efeito colateral;
+ *   • leitura através de um SERVIÇO já existente, que não vale reescrever.
+ *
+ * O que NÃO muda: é o mesmo SWR, a mesma política, o mesmo cache. A `chave`
+ * continua sendo a identidade do resultado — precisa conter TODO parâmetro que
+ * muda a resposta, senão duas consultas diferentes compartilham cache.
+ *
+ * Se a leitura é um GET numa URL, use `useApi`. Esta função não é a porta larga.
+ */
+export function useConsulta<T = unknown>(
+  chave: string | null,
+  ler: () => Promise<T>,
+  opcoes?: SWRConfiguration,
+): Resultado<T> {
+  const { data, error, isLoading, isValidating, mutate } = useSWR<T, ErroApi>(
+    chave,
+    // A chave identifica; quem sabe ler é o chamador. Ignorar o argumento aqui é
+    // deliberado — a chave já está fechada dentro de `ler`.
+    () => ler(),
+    { ...POLITICA_PADRAO, ...opcoes },
+  )
+  return {
+    dados: data,
+    carregando: isLoading,
+    revalidando: isValidating,
+    erro: error,
+    recarregar: (dados?: T) => mutate(dados as T | undefined),
+  }
+}
+
+/**
  * Invalida por PREFIXO de chave: `invalidar('/api/processos/42')` refaz tudo que
  * pende daquele processo. Chamar depois de escrever é o que mantém a tela
  * coerente sem cada componente recarregar a si mesmo na mão.
