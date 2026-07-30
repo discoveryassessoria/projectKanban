@@ -3,6 +3,7 @@
 
 "use client"
 
+import { useApi } from "@/src/lib/dados"
 import { useState, useEffect, useMemo } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -176,15 +177,32 @@ const MOEDA_SYMBOLS: Record<string, string> = {
 // ========================================
 // COMPONENT
 // ========================================
+const SEM_FATURAS: Fatura[] = []
+const SEM_REQUERENTES: Requerente[] = []
+// Zerado como CONSTANTE: um literal novo por render trocaria a identidade e faria os
+// memos de totais desta tela recalcularem sempre.
+const TOTAIS_ZERADOS = { total: 0, pago: 0, pendente: 0, vencido: 0 }
+
 export function ProcessoFaturas({ processoId, nomeFamilia, onUpdate }: ProcessoFaturasProps) {
   const { pode } = usePermissoes()
 
-  const [faturas, setFaturas] = useState<Fatura[]>([])
-  const [totais, setTotais] = useState<Totais>({ total: 0, pago: 0, pendente: 0, vencido: 0 })
+  // Faturas (com os totais que a API já calcula) e o processo (de onde vêm os
+  // requerentes): duas leituras independentes, cada uma com o seu cache, no lugar do
+  // `Promise.all` dentro de um efeito e dos cinco `useState` que guardavam a resposta.
+  const faturasReq = useApi<{ faturas?: Fatura[]; totais?: Totais; totaisGeralBRL?: TotaisGeralBRL }>(
+    processoId ? `/api/processos/${processoId}/faturas` : null,
+  )
+  const processoReq = useApi<{ processo?: { requerentes?: Requerente[] } }>(
+    processoId ? `/api/processos/${processoId}` : null,
+  )
+  const faturas = faturasReq.dados?.faturas ?? SEM_FATURAS
+  const totais = faturasReq.dados?.totais ?? TOTAIS_ZERADOS
+  const totaisGeralBRL = faturasReq.dados?.totaisGeralBRL ?? TOTAIS_ZERADOS
+  const requerentes = processoReq.dados?.processo?.requerentes ?? SEM_REQUERENTES
+  const loading = faturasReq.carregando
+  // Escrever numa fatura muda as duas leituras (totais do processo inclusive).
+  const carregarDados = () => { void faturasReq.recarregar(); void processoReq.recarregar() }
   // ✅ NOVO: Totais gerais em BRL vindos da API
-  const [totaisGeralBRL, setTotaisGeralBRL] = useState<TotaisGeralBRL>({ total: 0, pago: 0, pendente: 0, vencido: 0 })
-  const [requerentes, setRequerentes] = useState<Requerente[]>([])
-  const [loading, setLoading] = useState(true)
   
   // Controle de seções
   const [showCustos, setShowCustos] = useState(true)
@@ -288,44 +306,6 @@ export function ProcessoFaturas({ processoId, nomeFamilia, onUpdate }: ProcessoF
   // ========================================
   // DATA LOADING
   // ========================================
-  const carregarDados = async () => {
-    try {
-      setLoading(true)
-      
-      const [faturasRes, processoRes] = await Promise.all([
-        fetch(`/api/processos/${processoId}/faturas`, {
-          headers: { 'Authorization': `Bearer ${localStorage.getItem('authToken')}` }
-        }),
-        fetch(`/api/processos/${processoId}`, {
-          headers: { 'Authorization': `Bearer ${localStorage.getItem('authToken')}` }
-        })
-      ])
-      
-      if (faturasRes.ok) {
-        const data = await faturasRes.json()
-        setFaturas(data.faturas || [])
-        setTotais(data.totais || { total: 0, pago: 0, pendente: 0, vencido: 0 })
-        // ✅ NOVO: Usar totais gerais da API
-        setTotaisGeralBRL(data.totaisGeralBRL || { total: 0, pago: 0, pendente: 0, vencido: 0 })
-      }
-      
-      if (processoRes.ok) {
-        const data = await processoRes.json()
-        const reqs = data.processo?.requerentes || []
-        setRequerentes(reqs)
-      }
-    } catch (error) {
-      console.error('Erro ao carregar dados:', error)
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  useEffect(() => {
-    carregarDados()
-  }, [processoId])
-
-
   // ========================================
   // HANDLERS
   // ========================================

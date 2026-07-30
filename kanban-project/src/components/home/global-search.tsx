@@ -4,6 +4,8 @@ import * as React from "react"
 import { useRouter } from "next/navigation"
 import { Search, Loader2, FolderOpen, Users, User, Building2 } from "lucide-react"
 import { buscarGlobal } from "@/src/components/home/use-home"
+import { useConsulta } from "@/src/lib/dados"
+import { useDebounce } from "@/src/hooks/use-debounce"
 import type { SearchResult } from "@/src/app/api/home/search/route"
 
 const ICONE: Record<SearchResult["tipo"], React.ComponentType<{ className?: string }>> = {
@@ -28,45 +30,47 @@ const SEM_RESULTADOS: SearchResult[] = []
 export function GlobalSearch({ autoFocusRef }: { autoFocusRef?: React.RefObject<HTMLInputElement | null> }) {
   const router = useRouter()
   const [q, setQ] = React.useState("")
-  const [resultados, setResultados] = React.useState<SearchResult[]>([])
-  const [aberto, setAberto] = React.useState(false)
-  const [carregando, setCarregando] = React.useState(false)
-  const [ativo, setAtivo] = React.useState(-1)
+  // "Aberto" é o inverso de "dispensado PARA ESTE TERMO": digitar outra coisa reabre a
+  // lista sozinho — que era o efeito de `setAberto(true)` quando os resultados
+  // chegavam. Fechar (Esc, clique fora, navegar) marca o termo atual como dispensado.
+  const [dispensado, setDispensado] = React.useState<string | null>(null)
+  // Idem para o item destacado pelo teclado: ele pertence ao termo em que foi
+  // escolhido, então trocar o termo volta a -1 sem efeito nenhum.
+  const [destaque, setDestaque] = React.useState<{ termo: string; i: number } | null>(null)
   const containerRef = React.useRef<HTMLDivElement>(null)
   const internalRef = React.useRef<HTMLInputElement>(null)
   const inputRef = autoFocusRef ?? internalRef
-  const reqId = React.useRef(0)
 
   // Termo curto não busca — e, principalmente, não mostra resultado velho. Isso é
   // DERIVAÇÃO, não estado: limpar por efeito (`setResultados([])`) fazia a lista
   // antiga aparecer por um render antes de sumir.
   const termo = q.trim()
   const buscavel = termo.length >= 2
+  const aberto = buscavel && dispensado !== termo
+  const setAberto = (v: boolean) => setDispensado(v ? null : termo)
+  const ativo = destaque?.termo === termo ? destaque.i : -1
+  const setAtivo = (proximo: number | ((anterior: number) => number)) => {
+    const i = typeof proximo === 'function' ? proximo(ativo) : proximo
+    setDestaque({ termo, i })
+  }
+  // A busca é uma CONSULTA com o termo na chave, não um efeito com cronômetro e
+  // contador de requisição. O `reqId` que existia aqui — para descartar a resposta de
+  // um termo já superado — deixa de ser necessário: uma resposta antiga pertence a
+  // outra chave e não tem onde ser aplicada. E digitar de novo o mesmo termo vem do
+  // cache, sem ir à rede.
+  const termoBuscado = useDebounce(termo, 250)
+  const consulta = useConsulta<SearchResult[]>(
+    termoBuscado.length >= 2 ? `busca-global:${termoBuscado}` : null,
+    () => buscarGlobal(termoBuscado),
+    { keepPreviousData: true },
+  )
+  const resultados = consulta.dados ?? SEM_RESULTADOS
+  const carregando = consulta.carregando
+  // Termo curto não mostra resultado velho: com `keepPreviousData`, a lista anterior
+  // continua no cache de propósito (não pisca entre teclas), então quem decide o que
+  // aparece é esta derivação.
   const resultadosVisiveis = buscavel ? resultados : SEM_RESULTADOS
   const carregandoVisivel = buscavel && carregando
-
-  // Debounce da busca
-  React.useEffect(() => {
-    const termo = q.trim()
-    if (termo.length < 2) return
-    setCarregando(true)
-    const id = ++reqId.current
-    const timer = setTimeout(async () => {
-      try {
-        const res = await buscarGlobal(termo)
-        if (id === reqId.current) {
-          setResultados(res)
-          setAberto(true)
-          setAtivo(-1)
-        }
-      } catch {
-        if (id === reqId.current) setResultados([])
-      } finally {
-        if (id === reqId.current) setCarregando(false)
-      }
-    }, 250)
-    return () => clearTimeout(timer)
-  }, [q])
 
   // Fecha ao clicar fora
   React.useEffect(() => {
@@ -78,9 +82,10 @@ export function GlobalSearch({ autoFocusRef }: { autoFocusRef?: React.RefObject<
   }, [])
 
   function irPara(r: SearchResult) {
+    // Limpar o termo já esconde a lista (`buscavel` fica falso) — não há estado de
+    // resultado para zerar.
     setAberto(false)
     setQ("")
-    setResultados([])
     router.push(r.href)
   }
 

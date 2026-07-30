@@ -82,7 +82,26 @@ const checkIfDescendant = (
   return false
 }
 
-export function PersonFormDialog({
+/**
+ * Casca fina. O `<Dialog>` fica montado (o Radix precisa dele para a animação de
+ * saída), mas o CONTEÚDO só existe aberto e tem identidade em (pessoa, sexo fixo).
+ *
+ * É o que substitui o efeito que, a cada abertura, voltava a aba para "new", limpava a
+ * pessoa selecionada e dava `reset()` nos dois formulários. Aquele efeito rodava DEPOIS
+ * do primeiro render aberto — então o diálogo aparecia, por um quadro, com o que havia
+ * sido digitado na abertura anterior.
+ */
+export function PersonFormDialog(props: PersonFormDialogProps) {
+  return (
+    <Dialog open={props.open} onOpenChange={props.onOpenChange}>
+      {props.open && (
+        <ConteudoDialog key={`${props.person?.id ?? 'novo'}-${props.fixedSexo ?? 'sem-sexo'}`} {...props} />
+      )}
+    </Dialog>
+  )
+}
+
+function ConteudoDialog({
   open,
   onOpenChange,
   onSubmit,
@@ -118,25 +137,10 @@ export function PersonFormDialog({
     },
   })
 
-  React.useEffect(() => {
-    if (open) {
-      setActiveTab("new")
-      setSelectedPersonId("")
-      newPersonForm.reset({
-        nome: person?.nome || "",
-        sobrenome: person?.sobrenome || "",
-        sexo: fixedSexo || person?.sexo || undefined,
-        data_nasc: person?.data_nasc ? new Date(person.data_nasc) : undefined,
-        local_nasc: person?.local_nasc || "",
-        data_obito: person?.data_obito ? new Date(person.data_obito) : undefined,
-        batizado: person?.batizado || undefined,
-      })
-      existingPersonForm.reset({ id: undefined })
-      if (fixedSexo) {
-        newPersonForm.setValue("sexo", fixedSexo)
-      }
-    }
-  }, [open, person, fixedSexo, newPersonForm, existingPersonForm])
+  // Nada a reiniciar: os `defaultValues` acima já são os da pessoa recebida, e o
+  // componente é novo a cada abertura. O `setValue("sexo", fixedSexo)` também sai —
+  // `fixedSexo` já entra no valor padrão, e como ele faz parte da `key`, mudá-lo monta
+  // um formulário novo em vez de corrigir o antigo.
 
   const handleNewPersonSubmit = async (data: PersonFormData) => {
     setIsSubmitting(true)
@@ -207,389 +211,387 @@ export function PersonFormDialog({
       title.toLowerCase().includes("cônjuge"))
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[500px] max-h-[90vh] overflow-y-auto">
-        <DialogHeader>
-          <DialogTitle className="text-[#123C73]">{title}</DialogTitle>
-          <DialogDescription className="text-[#9AA0A6]">{description}</DialogDescription>
-        </DialogHeader>
+    <DialogContent className="sm:max-w-[500px] max-h-[90vh] overflow-y-auto">
+      <DialogHeader>
+        <DialogTitle className="text-[#123C73]">{title}</DialogTitle>
+        <DialogDescription className="text-[#9AA0A6]">{description}</DialogDescription>
+      </DialogHeader>
 
-        {canUseExistingPerson ? (
-          <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-            <TabsList className="grid w-full grid-cols-2">
-              <TabsTrigger value="new">Nova Pessoa</TabsTrigger>
-              <TabsTrigger value="existing">Pessoa Existente</TabsTrigger>
-            </TabsList>
-            
-            <TabsContent value="new" className="space-y-4 mt-4">
-              <Form {...newPersonForm}>
-                <form onSubmit={newPersonForm.handleSubmit(handleNewPersonSubmit)} className="space-y-4">
-                  <FormField
-                    control={newPersonForm.control}
-                    name="nome"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Nome *</FormLabel>
-                        <FormControl>
-                          <Input placeholder="Digite o nome" {...field} />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-
-                  <FormField
-                    control={newPersonForm.control}
-                    name="sobrenome"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Sobrenome</FormLabel>
-                        <FormControl>
-                          <Input placeholder="Digite o sobrenome" {...field} />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-
-                  {!fixedSexo && (
-                    <FormField
-                      control={newPersonForm.control}
-                      name="sexo"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Sexo</FormLabel>
-                          <Select onValueChange={field.onChange} value={field.value || undefined}>
-                            <FormControl>
-                              <SelectTrigger>
-                                <SelectValue placeholder="Selecione o sexo" />
-                              </SelectTrigger>
-                            </FormControl>
-                            <SelectContent>
-                              <SelectItem value="Masculino">Masculino</SelectItem>
-                              <SelectItem value="Feminino">Feminino</SelectItem>
-                            </SelectContent>
-                          </Select>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
+      {canUseExistingPerson ? (
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+          <TabsList className="grid w-full grid-cols-2">
+            <TabsTrigger value="new">Nova Pessoa</TabsTrigger>
+            <TabsTrigger value="existing">Pessoa Existente</TabsTrigger>
+          </TabsList>
+          
+          <TabsContent value="new" className="space-y-4 mt-4">
+            <Form {...newPersonForm}>
+              <form onSubmit={newPersonForm.handleSubmit(handleNewPersonSubmit)} className="space-y-4">
+                <FormField
+                  control={newPersonForm.control}
+                  name="nome"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Nome *</FormLabel>
+                      <FormControl>
+                        <Input placeholder="Digite o nome" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
                   )}
+                />
 
-                  {fixedSexo && (
-                    <div>
-                      <Label>Sexo</Label>
-                      <div className="text-sm text-gray-600 bg-gray-50 p-2 rounded border">
-                        {fixedSexo}
-                      </div>
-                    </div>
+                <FormField
+                  control={newPersonForm.control}
+                  name="sobrenome"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Sobrenome</FormLabel>
+                      <FormControl>
+                        <Input placeholder="Digite o sobrenome" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
                   )}
+                />
 
+                {!fixedSexo && (
                   <FormField
                     control={newPersonForm.control}
-                    name="data_nasc"
-                    render={({ field }) => (
-                      <FormItem className="flex flex-col">
-                        <FormLabel>Data de Nascimento</FormLabel>
-                        <FormControl>
-                          <GenealogyDatePicker
-                            value={field.value}
-                            onChange={field.onChange}
-                            placeholder="Selecione a data de nascimento"
-                          />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-
-                  <FormField
-                    control={newPersonForm.control}
-                    name="local_nasc"
+                    name="sexo"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Local de Nascimento</FormLabel>
-                        <FormControl>
-                          <Input placeholder="Cidade, Estado" {...field} />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-
-                  <FormField
-                    control={newPersonForm.control}
-                    name="data_obito"
-                    render={({ field }) => (
-                      <FormItem className="flex flex-col">
-                        <FormLabel>Data de Falecimento</FormLabel>
-                        <FormControl>
-                          <GenealogyDatePicker
-                            value={field.value}
-                            onChange={field.onChange}
-                            placeholder="Ainda vivo"
-                          />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-
-                  <FormField
-                    control={newPersonForm.control}
-                    name="batizado"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Status de Batismo</FormLabel>
+                        <FormLabel>Sexo</FormLabel>
                         <Select onValueChange={field.onChange} value={field.value || undefined}>
                           <FormControl>
                             <SelectTrigger>
-                              <SelectValue placeholder="Selecione" />
+                              <SelectValue placeholder="Selecione o sexo" />
                             </SelectTrigger>
                           </FormControl>
                           <SelectContent>
-                            <SelectItem value="Sim">Batizado</SelectItem>
-                            <SelectItem value="Não">Não batizado</SelectItem>
+                            <SelectItem value="Masculino">Masculino</SelectItem>
+                            <SelectItem value="Feminino">Feminino</SelectItem>
                           </SelectContent>
                         </Select>
                         <FormMessage />
                       </FormItem>
                     )}
                   />
+                )}
 
-                  <DialogFooter>
-                    <Button type="button" variant="outline" onClick={() => onOpenChange(false)} disabled={isSubmitting}>
-                      Cancelar
-                    </Button>
-                    <Button
-                      type="submit"
-                      className="bg-[#123C73] hover:bg-[#0f2d5a] text-white"
-                      disabled={isSubmitting}
-                    >
-                      {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                      {person ? "Atualizar" : "Adicionar"} Pessoa
-                    </Button>
-                  </DialogFooter>
-                </form>
-              </Form>
-            </TabsContent>
-
-            <TabsContent value="existing" className="space-y-4 mt-4">
-              <Form {...existingPersonForm}>
-                <form onSubmit={existingPersonForm.handleSubmit(handleExistingPersonSubmit)} className="space-y-4">
-                  <div className="space-y-4 p-4 bg-blue-50 rounded-lg border border-blue-200">
-                    <FormField
-                      control={existingPersonForm.control}
-                      name="id"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel className="text-blue-700 font-semibold">Selecione a Pessoa</FormLabel>
-                          <Select
-                            onValueChange={(value) => {
-                              field.onChange(Number.parseInt(value, 10))
-                              setSelectedPersonId(value)
-                            }}
-                            value={selectedPersonId}
-                          >
-                            <FormControl>
-                              <SelectTrigger className="border-blue-300 focus:border-blue-500 bg-white">
-                                <SelectValue placeholder="Selecione uma pessoa da árvore" />
-                              </SelectTrigger>
-                            </FormControl>
-                            <SelectContent className="max-h-60">
-                              {availablePessoas.map((p) => (
-                                <SelectItem key={p.id} value={p.id.toString()}>
-                                  <div className="flex items-center gap-2 py-1">
-                                    <span className="font-medium">
-                                      {p.nome} {p.sobrenome || ""}
-                                    </span>
-                                    {p.sexo && (
-                                      <span
-                                        className={`text-xs px-2 py-1 rounded-full ${
-                                          p.sexo === "Masculino" ? "bg-blue-100 text-blue-700" : "bg-pink-100 text-pink-700"
-                                        }`}
-                                      >
-                                        {p.sexo}
-                                      </span>
-                                    )}
-                                    {p.data_nasc && (
-                                      <span className="text-xs text-gray-500 bg-gray-100 px-2 py-1 rounded">
-                                        {new Date(p.data_nasc).getFullYear()}
-                                      </span>
-                                    )}
-                                  </div>
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                          {availablePessoas.length === 0 && (
-                            <div className="flex items-center gap-2 p-3 bg-yellow-50 border border-yellow-200 rounded-md">
-                              <span className="text-sm text-yellow-700">
-                                ⚠️ Nenhuma pessoa disponível para este relacionamento.
-                              </span>
-                            </div>
-                          )}
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
+                {fixedSexo && (
+                  <div>
+                    <Label>Sexo</Label>
+                    <div className="text-sm text-gray-600 bg-gray-50 p-2 rounded border">
+                      {fixedSexo}
+                    </div>
                   </div>
-
-                  <DialogFooter>
-                    <Button type="button" variant="outline" onClick={() => onOpenChange(false)} disabled={isSubmitting}>
-                      Cancelar
-                    </Button>
-                    <Button
-                      type="submit"
-                      className="bg-[#123C73] hover:bg-[#0f2d5a] text-white"
-                      disabled={isSubmitting}
-                    >
-                      {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                      Selecionar Pessoa
-                    </Button>
-                  </DialogFooter>
-                </form>
-              </Form>
-            </TabsContent>
-          </Tabs>
-        ) : (
-          <Form {...newPersonForm}>
-            <form onSubmit={newPersonForm.handleSubmit(handleNewPersonSubmit)} className="space-y-4">
-              <FormField
-                control={newPersonForm.control}
-                name="nome"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Nome *</FormLabel>
-                    <FormControl>
-                      <Input placeholder="Digite o nome" {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
                 )}
-              />
 
-              <FormField
-                control={newPersonForm.control}
-                name="sobrenome"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Sobrenome</FormLabel>
-                    <FormControl>
-                      <Input placeholder="Digite o sobrenome" {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              <FormField
-                control={newPersonForm.control}
-                name="sexo"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Sexo</FormLabel>
-                    <Select onValueChange={field.onChange} value={field.value || undefined} disabled={!!fixedSexo || isSubmitting}>
+                <FormField
+                  control={newPersonForm.control}
+                  name="data_nasc"
+                  render={({ field }) => (
+                    <FormItem className="flex flex-col">
+                      <FormLabel>Data de Nascimento</FormLabel>
                       <FormControl>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Selecione o sexo" />
-                        </SelectTrigger>
+                        <GenealogyDatePicker
+                          value={field.value}
+                          onChange={field.onChange}
+                          placeholder="Selecione a data de nascimento"
+                        />
                       </FormControl>
-                      <SelectContent>
-                        <SelectItem value="Masculino">Masculino</SelectItem>
-                        <SelectItem value="Feminino">Feminino</SelectItem>
-                      </SelectContent>
-                    </Select>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
 
-              <FormField
-                control={newPersonForm.control}
-                name="data_nasc"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Data de Nascimento</FormLabel>
-                    <FormControl>
-                      <GenealogyDatePicker
-                        value={field.value}
-                        onChange={field.onChange}
-                        placeholder="Selecione a data de nascimento"
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              <FormField
-                control={newPersonForm.control}
-                name="local_nasc"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Local de Nascimento</FormLabel>
-                    <FormControl>
-                      <Input placeholder="Cidade, Estado" {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              <FormField
-                control={newPersonForm.control}
-                name="data_obito"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Data de Falecimento</FormLabel>
-                    <FormControl>
-                      <GenealogyDatePicker value={field.value} onChange={field.onChange} placeholder="Ainda vivo" />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              <FormField
-                control={newPersonForm.control}
-                name="batizado"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Status de Batismo</FormLabel>
-                    <Select onValueChange={field.onChange} value={field.value || undefined}>
+                <FormField
+                  control={newPersonForm.control}
+                  name="local_nasc"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Local de Nascimento</FormLabel>
                       <FormControl>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Selecione" />
-                        </SelectTrigger>
+                        <Input placeholder="Cidade, Estado" {...field} />
                       </FormControl>
-                      <SelectContent>
-                        <SelectItem value="Sim">Batizado</SelectItem>
-                        <SelectItem value="Não">Não Batizado</SelectItem>
-                      </SelectContent>
-                    </Select>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
 
-              <DialogFooter>
-                <Button type="button" variant="outline" onClick={() => onOpenChange(false)} disabled={isSubmitting}>
-                  Cancelar
-                </Button>
-                <Button
-                  type="submit"
-                  className="bg-[#123C73] hover:bg-[#0f2d5a] text-white"
-                  disabled={isSubmitting}
-                >
-                  {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                  {person ? "Atualizar" : "Adicionar"} Pessoa
-                </Button>
-              </DialogFooter>
-            </form>
-          </Form>
-        )}
-      </DialogContent>
-    </Dialog>
+                <FormField
+                  control={newPersonForm.control}
+                  name="data_obito"
+                  render={({ field }) => (
+                    <FormItem className="flex flex-col">
+                      <FormLabel>Data de Falecimento</FormLabel>
+                      <FormControl>
+                        <GenealogyDatePicker
+                          value={field.value}
+                          onChange={field.onChange}
+                          placeholder="Ainda vivo"
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={newPersonForm.control}
+                  name="batizado"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Status de Batismo</FormLabel>
+                      <Select onValueChange={field.onChange} value={field.value || undefined}>
+                        <FormControl>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Selecione" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          <SelectItem value="Sim">Batizado</SelectItem>
+                          <SelectItem value="Não">Não batizado</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <DialogFooter>
+                  <Button type="button" variant="outline" onClick={() => onOpenChange(false)} disabled={isSubmitting}>
+                    Cancelar
+                  </Button>
+                  <Button
+                    type="submit"
+                    className="bg-[#123C73] hover:bg-[#0f2d5a] text-white"
+                    disabled={isSubmitting}
+                  >
+                    {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                    {person ? "Atualizar" : "Adicionar"} Pessoa
+                  </Button>
+                </DialogFooter>
+              </form>
+            </Form>
+          </TabsContent>
+
+          <TabsContent value="existing" className="space-y-4 mt-4">
+            <Form {...existingPersonForm}>
+              <form onSubmit={existingPersonForm.handleSubmit(handleExistingPersonSubmit)} className="space-y-4">
+                <div className="space-y-4 p-4 bg-blue-50 rounded-lg border border-blue-200">
+                  <FormField
+                    control={existingPersonForm.control}
+                    name="id"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel className="text-blue-700 font-semibold">Selecione a Pessoa</FormLabel>
+                        <Select
+                          onValueChange={(value) => {
+                            field.onChange(Number.parseInt(value, 10))
+                            setSelectedPersonId(value)
+                          }}
+                          value={selectedPersonId}
+                        >
+                          <FormControl>
+                            <SelectTrigger className="border-blue-300 focus:border-blue-500 bg-white">
+                              <SelectValue placeholder="Selecione uma pessoa da árvore" />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent className="max-h-60">
+                            {availablePessoas.map((p) => (
+                              <SelectItem key={p.id} value={p.id.toString()}>
+                                <div className="flex items-center gap-2 py-1">
+                                  <span className="font-medium">
+                                    {p.nome} {p.sobrenome || ""}
+                                  </span>
+                                  {p.sexo && (
+                                    <span
+                                      className={`text-xs px-2 py-1 rounded-full ${
+                                        p.sexo === "Masculino" ? "bg-blue-100 text-blue-700" : "bg-pink-100 text-pink-700"
+                                      }`}
+                                    >
+                                      {p.sexo}
+                                    </span>
+                                  )}
+                                  {p.data_nasc && (
+                                    <span className="text-xs text-gray-500 bg-gray-100 px-2 py-1 rounded">
+                                      {new Date(p.data_nasc).getFullYear()}
+                                    </span>
+                                  )}
+                                </div>
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        {availablePessoas.length === 0 && (
+                          <div className="flex items-center gap-2 p-3 bg-yellow-50 border border-yellow-200 rounded-md">
+                            <span className="text-sm text-yellow-700">
+                              ⚠️ Nenhuma pessoa disponível para este relacionamento.
+                            </span>
+                          </div>
+                        )}
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
+
+                <DialogFooter>
+                  <Button type="button" variant="outline" onClick={() => onOpenChange(false)} disabled={isSubmitting}>
+                    Cancelar
+                  </Button>
+                  <Button
+                    type="submit"
+                    className="bg-[#123C73] hover:bg-[#0f2d5a] text-white"
+                    disabled={isSubmitting}
+                  >
+                    {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                    Selecionar Pessoa
+                  </Button>
+                </DialogFooter>
+              </form>
+            </Form>
+          </TabsContent>
+        </Tabs>
+      ) : (
+        <Form {...newPersonForm}>
+          <form onSubmit={newPersonForm.handleSubmit(handleNewPersonSubmit)} className="space-y-4">
+            <FormField
+              control={newPersonForm.control}
+              name="nome"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Nome *</FormLabel>
+                  <FormControl>
+                    <Input placeholder="Digite o nome" {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            <FormField
+              control={newPersonForm.control}
+              name="sobrenome"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Sobrenome</FormLabel>
+                  <FormControl>
+                    <Input placeholder="Digite o sobrenome" {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            <FormField
+              control={newPersonForm.control}
+              name="sexo"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Sexo</FormLabel>
+                  <Select onValueChange={field.onChange} value={field.value || undefined} disabled={!!fixedSexo || isSubmitting}>
+                    <FormControl>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Selecione o sexo" />
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                      <SelectItem value="Masculino">Masculino</SelectItem>
+                      <SelectItem value="Feminino">Feminino</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            <FormField
+              control={newPersonForm.control}
+              name="data_nasc"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Data de Nascimento</FormLabel>
+                  <FormControl>
+                    <GenealogyDatePicker
+                      value={field.value}
+                      onChange={field.onChange}
+                      placeholder="Selecione a data de nascimento"
+                    />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            <FormField
+              control={newPersonForm.control}
+              name="local_nasc"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Local de Nascimento</FormLabel>
+                  <FormControl>
+                    <Input placeholder="Cidade, Estado" {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            <FormField
+              control={newPersonForm.control}
+              name="data_obito"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Data de Falecimento</FormLabel>
+                  <FormControl>
+                    <GenealogyDatePicker value={field.value} onChange={field.onChange} placeholder="Ainda vivo" />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            <FormField
+              control={newPersonForm.control}
+              name="batizado"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Status de Batismo</FormLabel>
+                  <Select onValueChange={field.onChange} value={field.value || undefined}>
+                    <FormControl>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Selecione" />
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                      <SelectItem value="Sim">Batizado</SelectItem>
+                      <SelectItem value="Não">Não Batizado</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            <DialogFooter>
+              <Button type="button" variant="outline" onClick={() => onOpenChange(false)} disabled={isSubmitting}>
+                Cancelar
+              </Button>
+              <Button
+                type="submit"
+                className="bg-[#123C73] hover:bg-[#0f2d5a] text-white"
+                disabled={isSubmitting}
+              >
+                {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                {person ? "Atualizar" : "Adicionar"} Pessoa
+              </Button>
+            </DialogFooter>
+          </form>
+        </Form>
+      )}
+    </DialogContent>
   )
 }
