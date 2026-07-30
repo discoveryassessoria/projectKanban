@@ -233,15 +233,24 @@ try {
 
     const depois = await q(`SELECT migration_name, finished_at, rolled_back_at FROM _prisma_migrations ORDER BY migration_name`)
     console.log(`[baseline] _prisma_migrations agora tem ${depois.length} linhas.`)
-    const inacabadas = depois.filter((r) => !r.finished_at || r.rolled_back_at)
+    // O banco de homologação acumula migrations de OUTRAS branches, igual à
+    // produção. Só as deste repositório entram na conferência de contagem; as de
+    // fora são legítimas e viram informação, não erro.
+    const noRepo = new Set(migrations)
+    const deFora = depois.filter((r) => !noRepo.has(r.migration_name))
+    const doRepo = depois.filter((r) => noRepo.has(r.migration_name))
+    if (deFora.length) {
+      console.log(`[baseline] ${deFora.length} registrada(s) no banco e ausente(s) neste repositório (de outras branches): ${deFora.map((r) => r.migration_name).join(', ')}`)
+    }
+    const inacabadas = doRepo.filter((r) => !r.finished_at || r.rolled_back_at)
     if (inacabadas.length) abortar(`linhas inacabadas em _prisma_migrations: ${inacabadas.map((r) => r.migration_name).join(', ')}`)
-    const indevidas = depois.filter((r) => cauda.some((l) => l.nome === r.migration_name))
+    const indevidas = doRepo.filter((r) => cauda.some((l) => l.nome === r.migration_name))
     if (indevidas.length) abortar(`migration pendente marcada indevidamente: ${indevidas.map((r) => r.migration_name).join(', ')}`)
     // O esperado é o prefixo baselinado MAIS o que já havia sido aplicado por
     // `migrate deploy` em builds anteriores (que não é pendente nem baseline).
     const esperado = cabeca.length + jaAplicadasNaCauda.length
-    if (depois.length !== esperado) {
-      abortar(`esperado ${esperado} linhas (${cabeca.length} do prefixo + ${jaAplicadasNaCauda.length} já aplicadas), encontrado ${depois.length}.`)
+    if (doRepo.length !== esperado) {
+      abortar(`esperado ${esperado} linhas deste repositório (${cabeca.length} do prefixo + ${jaAplicadasNaCauda.length} já aplicadas), encontrado ${doRepo.length}.`)
     }
     console.log('[baseline] VALIDADO — baseline correto, pendentes intactas.')
   }
