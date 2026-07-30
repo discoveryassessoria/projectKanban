@@ -30,6 +30,6 @@
     "src/lib/genealogia/navegacao/historico.ts": "513e2f2c794670fc8d6d65816b7aa85eaffa0ebc9a9fb342c453c5bf369148da",
     "src/lib/genealogia/navegacao/ramos.ts": "1b1dc77f301711545d885a3b07e028aa446dec90a8c9e5de62c6afb11e083476",
     "src/app/arvore-render/page.tsx": "abe7266d781680410fec1dee646feec97cc72dbc35f0fcd3ecadb85553541dbd",
-    "src/app/genealogy/page.tsx": "ddb317a3e20b4859f7b32369f24c0db543da7d584aa18b3db58695a69882b615"
+    "src/app/genealogy/page.tsx": "e474118985db72385a0f7133c48b6ba575ef8b081bb8e9d7210a1d0b3066bdce"
   }
 }
