@@ -3,6 +3,7 @@
 "use client"
 
 import { useState, useEffect, useRef } from "react"
+import { useApi } from "@/src/lib/dados"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { DatePickerField } from "@/components/ui/date-picker-field"
@@ -145,13 +146,23 @@ interface SubtarefaLineProps {
   mostrarBotaoIniciar?: boolean  // ← NOVO
 }
 
+const SEM_HISTORICO: HistoricoEntry[] = []
+const SEM_SUBTAREFAS: Tarefa[] = []
+
 function SubtarefaLine({ tarefa, onUpdate, usuarios, isProcuracaoAdm = false, mostrarBotaoIniciar = true }: SubtarefaLineProps) {
   const { pode } = usePermissoes()
   const [processando, setProcessando] = useState(false)
   const [expandido, setExpandido] = useState(false)
   const [editando, setEditando] = useState(false)
   const [salvando, setSalvando] = useState(false)
-  const [subtarefas, setSubtarefas] = useState<Tarefa[]>(tarefa.subtarefas || [])
+  // Subtarefas desta linha: as da prop, atualizadas pela consulta quando a linha é
+  // expandida ou depois de uma escrita. Antes havia uma lista em estado sincronizada
+  // com a prop por efeito — e a mesma URL era buscada aqui e no modal, em duplicidade.
+  const subtarefasReq = useApi<{ tarefa?: { subtarefas?: Tarefa[] } }>(
+    expandido ? `/api/tarefas/${tarefa.id}` : null,
+  )
+  const subtarefas = subtarefasReq.dados?.tarefa?.subtarefas ?? tarefa.subtarefas ?? SEM_SUBTAREFAS
+  const fetchSubtarefas = () => { void subtarefasReq.recarregar() }
 
   const [editForm, setEditForm] = useState({
     titulo: tarefa.titulo,
@@ -166,23 +177,6 @@ function SubtarefaLine({ tarefa, onUpdate, usuarios, isProcuracaoAdm = false, mo
   const isCobranca = tarefa.tipoSubtarefa === "COBRANCA"
   const isConferencia = tarefa.tipoSubtarefa === "CONFERENCIA"
 
-  useEffect(() => {
-    setSubtarefas(tarefa.subtarefas || [])
-  }, [tarefa.subtarefas])
-
-  const fetchSubtarefas = async () => {
-    try {
-      const response = await fetch(`/api/tarefas/${tarefa.id}`, {
-        headers: { 'Authorization': `Bearer ${localStorage.getItem('authToken')}` }
-      })
-      const data = await response.json()
-      if (data.tarefa?.subtarefas) {
-        setSubtarefas(data.tarefa.subtarefas)
-      }
-    } catch (error) {
-      console.error("Erro ao buscar subtarefas:", error)
-    }
-  }
 
   const calcularStatus = () => {
     if (tarefa.concluida) {
@@ -549,8 +543,9 @@ export function TarefaDetailModal({ tarefa, onClose, onUpdate, usuarios, isProcu
   const [tituloEditado, setTituloEditado] = useState(tarefa.titulo)  // ← Adicionar esta linha
   const [salvandoTitulo, setSalvandoTitulo] = useState(false)
 
-  // Subtarefas
-  const [subtarefas, setSubtarefas] = useState<Tarefa[]>(tarefa.subtarefas || [])
+  // Subtarefas: o servidor manda, a tela mostra. A lista local que existia aqui era
+  // atualizada em quatro pontos diferentes depois de cada escrita — agora quem
+  // atualiza é a revalidação da consulta.
   const [novaTarefa, setNovaTarefa] = useState("")
   const [criandoTarefa, setCriandoTarefa] = useState(false)
 
@@ -571,9 +566,14 @@ export function TarefaDetailModal({ tarefa, onClose, onUpdate, usuarios, isProcu
     observacoes: tarefa.observacoes
   })
 
-  // Histórico
-  const [historico, setHistorico] = useState<HistoricoEntry[]>([])
-  const [loadingHistorico, setLoadingHistorico] = useState(true)
+  // Subtarefas e histórico pela camada oficial. As duas leituras eram feitas por um
+  // efeito em `[tarefa.id]` e guardadas em estado; a de subtarefas ainda usava a MESMA
+  // URL de `fetchTarefaCompleta`, então a requisição saía duas vezes. Agora é uma só,
+  // compartilhada pela chave.
+  const tarefaReq = useApi<{ tarefa?: { subtarefas?: Tarefa[] } }>(`/api/tarefas/${tarefa.id}`)
+  const historicoReq = useApi<{ historico?: HistoricoEntry[] }>(`/api/tarefas/${tarefa.id}/historico`)
+  const historico = historicoReq.dados?.historico ?? SEM_HISTORICO
+  const loadingHistorico = historicoReq.carregando
   const [novoComentario, setNovoComentario] = useState("")
   const [enviandoComentario, setEnviandoComentario] = useState(false)
   const feedRef = useRef<HTMLDivElement>(null)
@@ -593,42 +593,10 @@ export function TarefaDetailModal({ tarefa, onClose, onUpdate, usuarios, isProcu
   }
   const porcentagem = calcularProgresso()
 
-  // Fetch subtarefas atualizadas
-  const fetchSubtarefas = async () => {
-    try {
-      const response = await fetch(`/api/tarefas/${tarefa.id}`, {
-        headers: { 'Authorization': `Bearer ${localStorage.getItem('authToken')}` }
-      })
-      const data = await response.json()
-      if (data.tarefa?.subtarefas) {
-        setSubtarefas(data.tarefa.subtarefas)
-      }
-    } catch (error) {
-      console.error("Erro ao buscar subtarefas:", error)
-    }
-  }
-
-  // Fetch histórico
-  const fetchHistorico = async () => {
-    try {
-      const response = await fetch(`/api/tarefas/${tarefa.id}/historico`, {
-        headers: { 'Authorization': `Bearer ${localStorage.getItem('authToken')}` }
-      })
-      const data = await response.json()
-      if (data.historico) {
-        setHistorico(data.historico)
-      }
-    } catch (error) {
-      console.error("Erro ao buscar histórico:", error)
-    } finally {
-      setLoadingHistorico(false)
-    }
-  }
-
-  useEffect(() => {
-    fetchSubtarefas()
-    fetchHistorico()
-  }, [tarefa.id])
+  // A lista mostrada é a do servidor; enquanto ela não volta, a que veio por prop.
+  const subtarefas = tarefaReq.dados?.tarefa?.subtarefas ?? tarefa.subtarefas ?? SEM_SUBTAREFAS
+  const fetchSubtarefas = () => { void tarefaReq.recarregar() }
+  const fetchHistorico = () => { void historicoReq.recarregar() }
 
   // Adicionar:
   const fetchTarefaCompleta = async () => {
@@ -641,7 +609,8 @@ export function TarefaDetailModal({ tarefa, onClose, onUpdate, usuarios, isProcu
         const t = data.tarefa
         setTituloLocal(t.titulo)
         setTituloEditado(t.titulo)
-        setSubtarefas(t.subtarefas || [])
+        // A lista vem da consulta; recarregá-la é o que a mantém em dia.
+        void tarefaReq.recarregar()
         setDadosLocais({
           prioridade: t.prioridade || "MEDIA",
           dataPrazo: t.dataPrazo,

@@ -5,7 +5,8 @@
  * Com opção de vincular a um processo do kanban
  */
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useMemo } from "react"
+import { useApi } from '@/src/lib/dados'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -49,7 +50,17 @@ export interface QuickAddFormData {
   status_id?: number
 }
 
-export default function QuickAddModal({ 
+/**
+ * Casca fina: o formulário só existe aberto, e a sua identidade é a classificação de
+ * prazo com que foi aberto. Substitui os DOIS efeitos — o de carregar ao abrir e o de
+ * "resetar ao fechar", que apagava campo por campo o que ficara da vez anterior.
+ */
+export default function QuickAddModal(props: QuickAddModalProps) {
+  if (!props.isOpen) return null
+  return <ConteudoModal key={props.classification.category} {...props} />
+}
+
+function ConteudoModal({ 
   isOpen, 
   onClose, 
   classification, 
@@ -65,71 +76,30 @@ export default function QuickAddModal({
     prazo_category: classification.category
   })
   
-  const [usuarios, setUsuarios] = useState<Usuario[]>([])
-  const [processos, setProcessos] = useState<Processo[]>([])
-  const [loadingUsuarios, setLoadingUsuarios] = useState(false)
-  const [loadingProcessos, setLoadingProcessos] = useState(false)
+  // Listas dos seletores, pela camada oficial — as duas rotas devolvem ora `{ lista }`
+  // ora o array direto, e essa tolerância continua.
+  const usuariosReq = useApi<{ usuarios?: Usuario[] } | Usuario[]>('/api/usuarios')
+  const processosReq = useApi<{ processos?: Processo[] } | Processo[]>('/api/processos')
+  const usuarios = useMemo<Usuario[]>(() => {
+    const d = usuariosReq.dados
+    if (!d) return []
+    return Array.isArray(d) ? d : (d.usuarios ?? [])
+  }, [usuariosReq.dados])
+  const processos = useMemo<Processo[]>(() => {
+    const d = processosReq.dados
+    if (!d) return []
+    return Array.isArray(d) ? d : (d.processos ?? [])
+  }, [processosReq.dados])
+  const loadingUsuarios = usuariosReq.carregando
+  const loadingProcessos = processosReq.carregando
   const [errors, setErrors] = useState<{[key: string]: string}>({})
 
-  // Carregar dados quando modal abrir
-  const fetchUsuarios = async () => {
-    try {
-      setLoadingUsuarios(true)
-      const response = await fetch('/api/usuarios')
-      if (response.ok) {
-        const data = await response.json()
-        setUsuarios(data.usuarios || data || [])
-      }
-    } catch (error) {
-      console.error('Erro ao carregar usuários:', error)
-    } finally {
-      setLoadingUsuarios(false)
-    }
-  }
-
-  const fetchProcessos = async () => {
-    try {
-      setLoadingProcessos(true)
-      const response = await fetch('/api/processos')
-      if (response.ok) {
-        const data = await response.json()
-        setProcessos(data.processos || data || [])
-      }
-    } catch (error) {
-      console.error('Erro ao carregar processos:', error)
-    } finally {
-      setLoadingProcessos(false)
-    }
-  }
-
+  // Foco inicial no nome. Continua sendo efeito porque mexer no DOM É efeito — mas
+  // agora roda na MONTAGEM do formulário, que é o momento em que ele aparece.
   useEffect(() => {
-    if (isOpen) {
-      fetchUsuarios()
-      fetchProcessos()
-      // Auto-focus no campo nome
-      setTimeout(() => {
-        const nomeInput = document.getElementById('quick-add-nome')
-        if (nomeInput) {
-          nomeInput.focus()
-        }
-      }, 100)
-    }
-  }, [isOpen])
-
-  // Reset form quando fechar
-  useEffect(() => {
-    if (!isOpen) {
-      setFormData({
-        nome: '',
-        descricao: '',
-        prioridade: 'MEDIA',
-        responsavelId: null,
-        processoId: null,
-        prazo_category: classification.category
-      })
-      setErrors({})
-    }
-  }, [isOpen, classification.category])
+    const timer = setTimeout(() => document.getElementById('quick-add-nome')?.focus(), 100)
+    return () => clearTimeout(timer)
+  }, [])
 
 
 

@@ -101,7 +101,17 @@ interface TarefaDetailsModalProps {
   onSave: () => void
 }
 
-export function TarefaDetailsModal({ 
+/**
+ * Casca fina: o formulário só existe aberto, com identidade na tarefa. Substitui os
+ * DOIS efeitos — o que copiava a tarefa para oito campos ao abrir e o que os zerava um
+ * a um ao fechar. Entre abrir e o primeiro efeito rodar, o modal aparecia vazio.
+ */
+export function TarefaDetailsModal(props: TarefaDetailsModalProps) {
+  if (!props.isOpen || !props.tarefa) return null
+  return <ConteudoModal key={props.tarefa.id} {...props} />
+}
+
+function ConteudoModal({ 
   tarefa, 
   isOpen, 
   onClose, 
@@ -114,45 +124,16 @@ export function TarefaDetailsModal({
   const [isSaving, setIsSaving] = useState(false)
   const [isDeleting, setIsDeleting] = useState(false)
   
-  // Form state
-  const [titulo, setTitulo] = useState('')
-  const [descricao, setDescricao] = useState('')
-  const [concluida, setConcluida] = useState(false)
-  const [prioridade, setPrioridade] = useState<'BAIXA' | 'MEDIA' | 'ALTA' | 'URGENTE'>('MEDIA')
-  const [dataPrazo, setDataPrazo] = useState('')
-  const [pais, setPais] = useState('')
-  const [responsavelId, setResponsavelId] = useState<string>('none')
-  const [subtarefas, setSubtarefas] = useState<Subtarefa[]>([])
+  // Form state — os valores da tarefa SÃO o estado inicial.
+  const [titulo, setTitulo] = useState(tarefa?.titulo || tarefa?.nome || '')
+  const [descricao, setDescricao] = useState(tarefa?.descricao || '')
+  const [concluida, setConcluida] = useState(tarefa?.concluida || false)
+  const [prioridade, setPrioridade] = useState<'BAIXA' | 'MEDIA' | 'ALTA' | 'URGENTE'>(tarefa?.prioridade || 'MEDIA')
+  const [dataPrazo, setDataPrazo] = useState(tarefa?.dataPrazo || tarefa?.data_termino || '')
+  const [pais, setPais] = useState(tarefa?.pais || '')
+  const [responsavelId, setResponsavelId] = useState<string>(tarefa?.responsavel?.id?.toString() || 'none')
+  const [subtarefas, setSubtarefas] = useState<Subtarefa[]>(tarefa?.subtarefas || [])
   const [novaSubtarefa, setNovaSubtarefa] = useState('')
-  
-  // Carregar dados da tarefa quando abrir o modal
-  useEffect(() => {
-    if (tarefa && isOpen) {
-      setTitulo(tarefa.titulo || tarefa.nome || '')
-      setDescricao(tarefa.descricao || '')
-      setConcluida(tarefa.concluida || false)
-      setPrioridade(tarefa.prioridade || 'MEDIA')
-      setDataPrazo(tarefa.dataPrazo || tarefa.data_termino || '')
-      setPais(tarefa.pais || '')
-      setResponsavelId(tarefa.responsavel?.id?.toString() || 'none')
-      setSubtarefas(tarefa.subtarefas || [])
-    }
-  }, [tarefa, isOpen])
-
-  // Resetar form ao fechar
-  useEffect(() => {
-    if (!isOpen) {
-      setTitulo('')
-      setDescricao('')
-      setConcluida(false)
-      setPrioridade('MEDIA')
-      setDataPrazo('')
-      setPais('')
-      setResponsavelId('none')
-      setSubtarefas([])
-      setNovaSubtarefa('')
-    }
-  }, [isOpen])
 
   const handleSave = async () => {
     if (!tarefa?.id) return

@@ -37,7 +37,12 @@ interface PhaseProgress {
 export interface PhaseProgressHeaderProps {
   processoId: number
   /** Incrementa pra forçar refetch. */
-  refreshKey?: number
+  /**
+   * Identidade da leitura. Aceita texto porque quem chama costuma ter algo mais honesto
+   * que um contador — a aba ativa, por exemplo — e assim voltar a um estado já visto usa
+   * o cache em vez de refazer a requisição do zero.
+   */
+  refreshKey?: number | string
   /** Estilo visual: "light" (header claro) ou "dark" (header escuro). */
   variant?: "light" | "dark"
 }

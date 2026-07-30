@@ -83,7 +83,41 @@ interface ProcessoDetailsModalProps {
   initialAtividadeId?: number  // ← ADICIONAR
 }
 
-export function ProcessoDetailsModal({ 
+/** País do processo — usado tanto no valor inicial da aba quanto no corpo do modal. */
+function ehEspanha(processo: ProcessoWithStatus | Processo | null): boolean {
+  return processo?.pais === "ESPANHA"
+}
+function ehItalia(processo: ProcessoWithStatus | Processo | null): boolean {
+  return processo?.pais === "ITALIA"
+}
+
+/** Abas válidas do modal. */
+type AbaProcesso = "geral" | "central" | "documentos" | "faturas" | "financeiroV2" | "historico" | "arvore" | "protocolos" | "informacoes" | "eventos"
+
+/**
+ * Aba inicial a partir do deep-link. Puro: mesma entrada, mesma saída — era isto que a
+ * cadeia de `else if` dentro do efeito fazia, com um flag `initialParamsProcessed` para
+ * não repetir. Sem efeito, não há o que repetir.
+ */
+function abaInicial(initialTab: string | undefined, isEspanha: boolean, isItalia: boolean): AbaProcesso {
+  const permitidas: AbaProcesso[] = ["documentos", "central", "arvore", "geral", "faturas", "historico", "eventos"]
+  if (initialTab && (permitidas as string[]).includes(initialTab)) return initialTab as AbaProcesso
+  if (initialTab === "protocolos" && isEspanha) return "protocolos"
+  if (initialTab === "informacoes" && isItalia) return "informacoes"
+  return "geral"
+}
+
+/**
+ * Casca fina: o conteúdo do modal só existe ABERTO, e a sua identidade é o processo.
+ * Substitui três efeitos — o que aplicava os parâmetros do deep-link uma única vez, o
+ * que limpava tudo ao fechar, e o que copiava `processo` para os campos editáveis.
+ */
+export function ProcessoDetailsModal(props: ProcessoDetailsModalProps) {
+  if (!props.isOpen || !props.processo) return null
+  return <ConteudoModal key={props.processo.id} {...props} />
+}
+
+function ConteudoModal({ 
   processo, 
   isOpen, 
   onClose, 
@@ -98,7 +132,9 @@ export function ProcessoDetailsModal({
 }: ProcessoDetailsModalProps) {
   // ✅ ATUALIZADO: Adicionado "informacoes" como possível aba
   const { pode } = usePermissoes()
-  const [activeTab, setActiveTab] = useState<"geral" | "central" | "documentos" | "faturas" | "financeiroV2" | "historico" | "arvore" | "protocolos" | "informacoes" | "eventos">("geral")
+  const [activeTab, setActiveTab] = useState<AbaProcesso>(
+    () => abaInicial(initialTab, ehEspanha(processo), ehItalia(processo)),
+  )
   // Financeiro V3 no processo: quando a flag posicaoRead está ativa, a aba usa a
   // tela V3 (Ledger); senão, o legado como fallback temporário.
   const [financeiroV3Ativo, setFinanceiroV3Ativo] = useState<boolean | null>(null)
@@ -108,8 +144,12 @@ export function ProcessoDetailsModal({
       .then((r) => r.json()).then((d) => setFinanceiroV3Ativo(!!d?.flags?.posicaoRead)).catch(() => setFinanceiroV3Ativo(false))
   }, [])
 
-  // ✅ NOVO: força refetch do PhaseProgressHeader quando algo muda
-  const [phaseRefreshKey, setPhaseRefreshKey] = useState(0)
+  // A fase é relida quando a aba muda — o usuário pode ter mexido em docs/pessoas em
+  // outra aba. Antes isso era um contador incrementado por efeito; agora a própria aba
+  // IDENTIFICA a leitura, e voltar a uma aba já vista mostra o valor em cache enquanto
+  // revalida, em vez de piscar.
+  const [phaseRefreshExtra, setPhaseRefreshExtra] = useState(0)
+  const phaseRefreshKey = `${activeTab}:${phaseRefreshExtra}`
 
   // Modo edição
   const [isEditing, setIsEditing] = useState(false)
@@ -131,8 +171,10 @@ export function ProcessoDetailsModal({
   const [arvoreIdLocal, setArvoreIdLocal] = useState<number | null>(processo?.arvoreId || null)
   
   // Estado para pessoa selecionada na árvore
-  const [pessoaIdParaFocar, setPessoaIdParaFocar] = useState<number | undefined>(undefined)
-  const [sidebarTabParaFocar, setSidebarTabParaFocar] = useState<string | undefined>(undefined)
+  // Vindos do deep-link: valor inicial desta abertura. Como o conteúdo desmonta ao
+  // fechar, não existe mais o efeito que os limpava.
+  const [pessoaIdParaFocar, setPessoaIdParaFocar] = useState<number | undefined>(initialPessoaId)
+  const [sidebarTabParaFocar, setSidebarTabParaFocar] = useState<string | undefined>(initialSidebarTab)
   
   // ✅ NOVO: Estados para o modal de detalhes do cliente
   const [clienteModalOpen, setClienteModalOpen] = useState(false)
@@ -144,14 +186,13 @@ export function ProcessoDetailsModal({
   const contratanteRef = useRef<HTMLDivElement>(null)
   const requerenteRef = useRef<HTMLDivElement>(null)
   
-  const [initialParamsProcessed, setInitialParamsProcessed] = useState(false)
 
   // Classes padrão para formulários
   const inputClass = "w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white text-sm h-[42px]"
 
   // ✅ Verificar se o processo é da Espanha ou Itália
-  const isEspanha = processo?.pais === "ESPANHA"
-  const isItalia = processo?.pais === "ITALIA"
+  const isEspanha = ehEspanha(processo)
+  const isItalia = ehItalia(processo)
 
   // ✅ NOVO: Função para abrir o modal de detalhes do cliente
   const abrirDetalhesCliente = (cliente: Contratante | Requerente, tipo: "contratante" | "requerente") => {
@@ -259,60 +300,6 @@ export function ProcessoDetailsModal({
     }
   }
 
-  useEffect(() => {
-    if (isOpen && initialTab && !initialParamsProcessed) {
-      if (initialTab === "documentos") {
-        setActiveTab("documentos")
-      } else if (initialTab === "central") {
-        setActiveTab("central")
-      } else if (initialTab === "arvore") {
-        setActiveTab("arvore")
-      } else if (initialTab === "geral") {
-        setActiveTab("geral")
-      } else if (initialTab === "faturas") {
-        setActiveTab("faturas")
-      } else if (initialTab === "historico") {
-        setActiveTab("historico")
-      } else if (initialTab === "protocolos" && isEspanha) {
-        setActiveTab("protocolos")
-      } else if (initialTab === "informacoes" && isItalia) {
-        setActiveTab("informacoes")
-      } else if (initialTab === "eventos") {
-        setActiveTab("eventos")
-      }
-      
-      if (initialPessoaId) {
-        setPessoaIdParaFocar(initialPessoaId)
-      }
-      
-      if (initialSidebarTab) {
-        setSidebarTabParaFocar(initialSidebarTab)
-      }
-      
-      setInitialParamsProcessed(true)
-    }
-  }, [isOpen, initialTab, initialPessoaId, initialSidebarTab, initialParamsProcessed, isEspanha, isItalia])
-
-  useEffect(() => {
-    if (!isOpen) {
-      setInitialParamsProcessed(false)
-      setPessoaIdParaFocar(undefined)
-      setSidebarTabParaFocar(undefined)
-    }
-  }, [isOpen])
-
-  useEffect(() => {
-    setNomeEditado(processo?.nome || "")
-    setContratantesSelecionados(processo?.contratantes || [])
-    setRequerentesSelecionados(processo?.requerentes || [])
-    setArvoreIdLocal(processo?.arvoreId || null)
-  }, [processo])
-
-  // ✅ NOVO: re-fetch da fase quando troca de aba
-  // (o usuário pode ter mexido em docs / pessoas em outra aba)
-  useEffect(() => {
-    setPhaseRefreshKey((k) => k + 1)
-  }, [activeTab])
 
   useEffect(() => {
     if (isOpen && contratantesProp.length === 0) {
@@ -383,7 +370,7 @@ export function ProcessoDetailsModal({
       
       if (response.ok) {
         setIsEditing(false)
-        setPhaseRefreshKey((k) => k + 1)  // ✅ NOVO: refresh fase após salvar
+        setPhaseRefreshExtra((k) => k + 1)  // ✅ NOVO: refresh fase após salvar
         onSave?.()
       } else {
         alert('Erro ao salvar alterações')
@@ -936,7 +923,7 @@ export function ProcessoDetailsModal({
                 onProcessoMudou={() => {
                   // Retorno de fase (ou outra mudança da fase ATIVA): invalida a
                   // projeção — Header (refreshKey) + Kanban/Drawer (onSave).
-                  setPhaseRefreshKey((k) => k + 1)
+                  setPhaseRefreshExtra((k) => k + 1)
                   onSave?.()
                 }}
               />
