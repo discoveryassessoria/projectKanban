@@ -19,6 +19,12 @@
  *       · o render do modal e o estado que o abre.
  *     O resto do layout — cards, cores, navegação, canvas, sidebar — segue
  *     intocado, e a guarda continua valendo: qualquer byte novo reprova.
+ *
+ *     Segunda rebase, mesma exceção: `importar-certidoes.tsx` passou a montar a
+ *     ÁRVORE PROPOSTA com o próprio `ReactFlowTree` — o mesmo componente que
+ *     desenha a árvore de verdade, consumido sem alteração. A prévia herda cards,
+ *     cores, linhas, cônjuges e gerações porque É a árvore, não uma imitação.
+ *     Nenhum outro arquivo de `src/components/arvore` foi tocado.
  *  2. O motor registral PURO não importa Prisma, React nem rede.
  *  3. A árvore NÃO duplica o Sistema Documental: nenhuma tabela nova guarda
  *     arquivo, status documental ou pasta paralela.
