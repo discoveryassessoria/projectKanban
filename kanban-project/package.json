@@ -88,6 +88,7 @@
     "test:arquitetura-financeira": "tsx scripts/arquitetura-financeira-guard.test.ts",
     "test:cadastro-mestre": "tsx scripts/cadastro-mestre-guard.test.ts",
     "test:catalogo-servicos": "tsx scripts/catalogo-servicos-unificado.test.ts",
+    "test:catalogo-servicos-homolog": "tsx scripts/catalogo-servicos-homolog.test.ts",
     "test:taxa-aplicabilidade": "tsx scripts/taxa-aplicabilidade.test.ts",
     "test:condicao-formas": "tsx scripts/condicao-formas.test.ts",
     "test:wizard-multiselect": "tsx scripts/wizard-multiselect-guard.test.ts",
