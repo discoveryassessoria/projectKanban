@@ -92,14 +92,18 @@ export default function PagarCustoView({ obrigacaoId, fornecedor, onClose, onDon
 
   const moeda = custo?.moeda ?? "BRL"
   const saldoAberto = Number(custo?.saldoBrl ?? custo?.saldo ?? 0)
-  const desconto = num(ajustes.desconto), juros = num(ajustes.juros), multa = num(ajustes.multa), acrescimo = num(ajustes.acrescimo)
+  const desconto = num(ajustes.desconto)
+  const juros = num(ajustes.juros)
+  const multa = num(ajustes.multa)
+  const acrescimo = num(ajustes.acrescimo)
 
-  // FONTE ÚNICA de cálculo — a MESMA função revalidada no backend.
-  const calc = calcularRecebimento({
+  // FONTE ÚNICA de cálculo — a MESMA função revalidada no backend. Memorizada
+  // para que os valores derivados dela sejam dependências estáveis.
+  const calc = useMemo(() => calcularRecebimento({
     saldoSelecionado: saldoAberto,
     linhas: linhas.map((l) => ({ valor: num(l.valor) })),
     desconto, juros, multa, acrescimo, creditoUtilizado: 0,
-  })
+  }), [saldoAberto, linhas, desconto, juros, multa, acrescimo])
   const totalPago = calc.totalInformado
   const devido = calc.valorLiquidoDevido
   const saldoRestante = calc.saldoRestante

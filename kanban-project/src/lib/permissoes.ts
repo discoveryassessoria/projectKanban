@@ -108,7 +108,7 @@ export const PERMISSOES = {
 
   // SISTEMA — ações destrutivas de infraestrutura. OPT-IN: NÃO é concedida pelo "admin tem tudo"
   // nem pelos perfis padrão; precisa ser atribuída EXPLICITAMENTE a um perfil/usuário.
-  'sistema.exclusaoDefinitiva': 'Excluir DEFINITIVAMENTE dados de teste (hard delete de Config Financeira / Catálogo Mestre)',
+  'sistema.exclusaoDefinitiva': 'Excluir DEFINITIVAMENTE dados de teste (hard delete de Config Financeira / Catálogo de Serviços)',
   // FINANCEIRO V3 — ativação por DATA DE CORTE (Ledger vira a fonte). OPT-IN: ação
   // operacional sensível (grava aberturas/estornos no Ledger); exige permissão explícita.
   'financeiro.dataCorte': 'Administrar a DATA DE CORTE do Motor Financeiro V3 (ativar/reverter aberturas no Ledger)',

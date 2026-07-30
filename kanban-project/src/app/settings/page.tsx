@@ -22,6 +22,7 @@ import {
 } from "@/components/ui/alert-dialog"
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { useMontadoNoCliente } from "@/src/hooks/use-dados-headerbar"
 
 // ========================================
 // MAPA DE PERMISSÕES PARA EXIBIÇÃO
@@ -136,7 +137,7 @@ export default function SettingsPage() {
   const { showToast } = useToast()
   const router = useRouter()
   const [user, setUser] = useState<UserData | null>(getStoredUser())
-  const [mounted, setMounted] = useState(false)
+  const mounted = useMontadoNoCliente()
 
   // Estados para dados do HeaderBar
   const [projetos, setProjetos] = useState<any[]>([])
@@ -172,38 +173,41 @@ export default function SettingsPage() {
     }
   }, [])
 
-  const fetchHeaderData = async () => {
-    try {
-      const [projetosRes, processosRes, arvoresRes] = await Promise.all([
-        fetch("/api/projetos"),
-        fetch("/api/processos"),
-        fetch("/api/arvore")
-      ])
-
-      if (projetosRes.ok) {
-        const projetosData = await projetosRes.json()
-        setProjetos(projetosData.projetos || [])
-      }
-
-      if (processosRes.ok) {
-        const processosData = await processosRes.json()
-        setProcessos(processosData.processos || [])
-      }
-
-      if (arvoresRes.ok) {
-        const arvoresData = await arvoresRes.json()
-        setArvores(Array.isArray(arvoresData) ? arvoresData : [])
-      }
-    } catch (error) {
-      console.error("Erro ao buscar dados:", error)
-    }
-  }
-
+  // MONTAGEM: as três listas do HeaderBar são buscadas no efeito e escritas só
+  // na continuação das promessas; a resposta é descartada se a tela sair antes.
   useEffect(() => {
-    setMounted(true)
-    fetchHeaderData()
-    fetchPermissoes()
-  }, [fetchPermissoes])
+    const ac = new AbortController()
+    const vivo = () => !ac.signal.aborted
+    Promise.all([
+      fetch("/api/projetos", { signal: ac.signal }).then((r) => (r.ok ? r.json() : null)),
+      fetch("/api/processos", { signal: ac.signal }).then((r) => (r.ok ? r.json() : null)),
+      fetch("/api/arvore", { signal: ac.signal }).then((r) => (r.ok ? r.json() : null)),
+    ])
+      .then(([projetosData, processosData, arvoresData]) => {
+        if (!vivo()) return
+        if (projetosData) setProjetos(projetosData.projetos || [])
+        if (processosData) setProcessos(processosData.processos || [])
+        if (arvoresData) setArvores(Array.isArray(arvoresData) ? arvoresData : [])
+      })
+      .catch((error) => { if (vivo()) console.error("Erro ao buscar dados:", error) })
+    return () => ac.abort()
+  }, [])
+
+  // Permissões do usuário: busca na montagem, sem escrita síncrona no efeito.
+  useEffect(() => {
+    const ac = new AbortController()
+    const token = typeof window !== 'undefined' ? localStorage.getItem('authToken') : null
+    fetch('/api/me/permissoes', { headers: token ? { 'Authorization': `Bearer ${token}` } : {}, signal: ac.signal })
+      .then((response) => (response.ok ? response.json() : null))
+      .then((data) => {
+        if (ac.signal.aborted || !data) return
+        setPermissoes(data.permissoes || {})
+        setPerfilNome(data.perfilNome || null)
+      })
+      .catch((error) => { if (!ac.signal.aborted) console.error('Erro ao buscar permissões:', error) })
+      .finally(() => { if (!ac.signal.aborted) setLoadingPermissoes(false) })
+    return () => ac.abort()
+  }, [])
 
 
   const handleLogout = () => {

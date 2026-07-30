@@ -81,16 +81,26 @@ export default function CondicoesPagamentoTab() {
   const [aberto, setAberto] = useState(false)
   const [editando, setEditando] = useState<Condicao | null>(null)
 
+  // BUSCA (só rede) × APLICAÇÃO (só estado).
+  const buscar = useCallback((sinal?: AbortSignal) => jf('/api/gerenciamento/condicoes-pagamento', { cache: 'no-store', signal: sinal }), [])
+  const aplicar = useCallback((d: any) => {
+    setItens(d.condicoes || []); setCarteiras(d.carteiras || []); setFormas(d.formasPagamento || []); setTaxas(d.taxas || []); setServicos(d.servicos || [])
+    setMoedas(d.moedas || []); setPaises(d.paises || []); setModalidades(d.modalidades || [])
+  }, [])
+  useEffect(() => {
+    const ac = new AbortController()
+    buscar(ac.signal)
+      .then((d) => { if (!ac.signal.aborted) aplicar(d) })
+      .catch((e: any) => { if (!ac.signal.aborted) setErroLista(e.message || 'Não foi possível carregar.') })
+      .finally(() => { if (!ac.signal.aborted) setLoading(false) })
+    return () => ac.abort()
+  }, [buscar, aplicar])
   const carregar = useCallback(async () => {
     setLoading(true); setErroLista(null)
-    try {
-      const d = await jf('/api/gerenciamento/condicoes-pagamento', { cache: 'no-store' })
-      setItens(d.condicoes || []); setCarteiras(d.carteiras || []); setFormas(d.formasPagamento || []); setTaxas(d.taxas || []); setServicos(d.servicos || [])
-      setMoedas(d.moedas || []); setPaises(d.paises || []); setModalidades(d.modalidades || [])
-    } catch (e: any) { setErroLista(e.message || 'Não foi possível carregar.') }
+    try { aplicar(await buscar()) }
+    catch (e: any) { setErroLista(e.message || 'Não foi possível carregar.') }
     finally { setLoading(false) }
-  }, [])
-  useEffect(() => { carregar() }, [carregar])
+  }, [buscar, aplicar])
 
   const filtrados = useMemo(() => {
     const q = busca.trim().toLowerCase()

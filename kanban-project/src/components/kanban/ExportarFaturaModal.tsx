@@ -132,15 +132,13 @@ export function ExportarFaturaModal({ faturas, requerentes, onClose }: ExportarF
     )
   }, [faturas, destinatarioSelecionado])
 
-  // Quando mudar destinatário, selecionar todas as faturas dele por padrão
-  useEffect(() => {
-    if (destinatarioSelecionado) {
-      const ids = faturasFiltradas.map(f => f.id)
-      setFaturasSelecionadas(new Set(ids))
-    } else {
-      setFaturasSelecionadas(new Set())
-    }
-  }, [destinatarioSelecionado, faturasFiltradas])
+  // Trocar de destinatário volta a seleção para "todas as faturas dele":
+  // ajuste de estado durante o render (derivado da seleção), sem efeito.
+  const [destinatarioAplicado, setDestinatarioAplicado] = useState<number | null>(destinatarioSelecionado?.id ?? null)
+  if (destinatarioAplicado !== (destinatarioSelecionado?.id ?? null)) {
+    setDestinatarioAplicado(destinatarioSelecionado?.id ?? null)
+    setFaturasSelecionadas(destinatarioSelecionado ? new Set(faturasFiltradas.map(f => f.id)) : new Set())
+  }
 
   // Faturas que serão exportadas (filtradas + selecionadas)
   const faturasParaExportar = useMemo(() => {

@@ -257,7 +257,7 @@ export default function ExecutorMotorTab() {
                 <div key={a.id} className="flex flex-wrap items-center gap-2 rounded-lg border border-white/5 bg-white/5 px-3 py-2 text-sm">
                   <span className="rounded bg-white/10 px-1.5 py-0.5 text-[10px] text-white/60">{a.targetTable}</span>
                   <span className={a.status === "active" ? "text-white" : "text-white/40 line-through"}>{a.descricao}</span>
-                  <span className="text-white/30 text-xs">fase "{a.phaseKey}" · {fmtData(a.criadoEm)}</span>
+                  <span className="text-white/30 text-xs">fase &quot;{a.phaseKey}&quot; · {fmtData(a.criadoEm)}</span>
                   <span className="flex-1" />
                   {a.status === "active"
                     ? <button onClick={() => desfazer(a.id)} className="rounded-lg border border-white/10 px-2.5 py-1 text-xs text-white/70 hover:bg-white/5 hover:text-white">Desfazer</button>

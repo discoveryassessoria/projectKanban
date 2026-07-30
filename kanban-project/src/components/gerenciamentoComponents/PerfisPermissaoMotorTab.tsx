@@ -51,15 +51,26 @@ export default function PerfisPermissaoMotorTab() {
   const [form, setForm] = useState<any>(novoForm())
   const [salvando, setSalvando] = useState(false)
 
-  const carregar = useCallback(async () => {
-    try {
-      const r = await fetch("/api/gerenciamento/perfis-permissao-motor")
-      if (r.ok) setPerfis((await r.json()).perfis || [])
-    } catch { /* silencioso */ }
-    finally { setLoading(false) }
+  // BUSCA (só rede) × APLICAÇÃO (só estado).
+  const buscar = useCallback(async (sinal?: AbortSignal) => {
+    const r = await fetch("/api/gerenciamento/perfis-permissao-motor", { signal: sinal })
+    return r.ok ? ((await r.json()).perfis || []) : null
   }, [])
+  const aplicar = useCallback((ps: Perfil[] | null) => { if (ps) setPerfis(ps) }, [])
+  useEffect(() => {
+    const ac = new AbortController()
+    buscar(ac.signal)
+      .then((ps) => { if (!ac.signal.aborted) aplicar(ps) })
+      .catch(() => {})
+      .finally(() => { if (!ac.signal.aborted) setLoading(false) })
+    return () => ac.abort()
+  }, [buscar, aplicar])
 
-  useEffect(() => { carregar() }, [carregar])
+  const carregar = useCallback(async () => {
+    try { aplicar(await buscar()) }
+    catch { /* silencioso */ }
+    finally { setLoading(false) }
+  }, [buscar, aplicar])
 
   const contaOn = (p: Perfil) => PERMISSOES.filter(([k]) => p.permissoes && p.permissoes[k]).length
 

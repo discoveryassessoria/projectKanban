@@ -66,7 +66,7 @@ export default function ListaActivities({ filters }: ListaActivitiesProps) {
   const { pode } = usePermissoes()
 
   // Garantir que atividades é sempre um array
-  const atividadesTodas = Array.isArray(activities) ? activities : []
+  const atividadesTodas = useMemo(() => (Array.isArray(activities) ? activities : []), [activities])
   const atividades = filtroTipo === "TODAS" ? atividadesTodas : atividadesTodas.filter((a: Atividade) => (a.tipo ?? "NORMAL") === filtroTipo)
   
   // Status para tarefas (Pendente/Concluída)

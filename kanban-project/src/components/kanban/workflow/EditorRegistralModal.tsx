@@ -263,11 +263,28 @@ export function EditorRegistralModal({
     }
   }, [documentoId])
 
+  // Carga do documento: busca no efeito; estado só na continuação da promessa.
   useEffect(() => {
-    if (isOpen && documentoId) {
-      carregar()
-    }
-  }, [isOpen, documentoId, carregar])
+    if (!isOpen || !documentoId) return
+    const ac = new AbortController()
+    fetch(`/api/documentos/${documentoId}`, {
+      headers: { Authorization: `Bearer ${localStorage.getItem("authToken")}` },
+      signal: ac.signal,
+    })
+      .then(async (res) => {
+        if (!res.ok) throw new Error(`HTTP ${res.status}`)
+        const data: Documento = await res.json()
+        if (ac.signal.aborted) return
+        setDoc(data); setForm(docToForm(data))
+      })
+      .catch((e) => {
+        if (ac.signal.aborted) return
+        console.warn("[EditorRegistralModal] falha:", e)
+        setErro("Erro ao carregar documento.")
+      })
+      .finally(() => { if (!ac.signal.aborted) setLoading(false) })
+    return () => ac.abort()
+  }, [isOpen, documentoId])
 
   // -- Trava scroll body e ESC
   useEffect(() => {

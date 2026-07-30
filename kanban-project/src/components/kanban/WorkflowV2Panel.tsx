@@ -52,7 +52,15 @@ export function WorkflowV2Panel({ processoId }: Props) {
     }
   }, [processoId])
 
-  useEffect(() => { carregar() }, [carregar])
+  // MONTAGEM: busca no efeito; estado só na continuação da promessa.
+  useEffect(() => {
+    const ac = new AbortController()
+    fetch(`/api/processos/${processoId}/operational-workflow`, { headers: authHeaders(), signal: ac.signal })
+      .then(async (res) => { if (!ac.signal.aborted) setView(res.ok ? await res.json() : null) })
+      .catch(() => { if (!ac.signal.aborted) setView(null) })
+      .finally(() => { if (!ac.signal.aborted) setLoading(false) })
+    return () => ac.abort()
+  }, [processoId])
 
   const chamar = useCallback(async (path: string, body?: Record<string, unknown>) => {
     setAcao(path); setMsg(null)

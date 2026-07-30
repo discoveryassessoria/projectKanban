@@ -10,9 +10,9 @@ import { useState, useEffect, useMemo, useCallback } from 'react'
 
 type Tipo = { id: number; code: string; name: string; countryKey: string; countryLabel: string; modalityLabel: string; ativo: boolean; temWorkflow: boolean }
 type CatFase = { id: number; phaseKey: string; label: string; ordemPadrao: number; requiredPadrao: boolean; conditionalPadrao: boolean; slaDiasPadrao: number }
-// exitRule DESCONTINUADO como condição de avanço: a condição de conclusão de fase é do Workflow Interno + BlockingEngine.
-// Mantido opcional só p/ LEITURA de legado — o backend não grava mais exitRule novos e a UI não o edita nem o reenvia.
-type Fase = { phaseKey: string; label: string; ordem: number; required: boolean; conditional: boolean; entryRule: string; exitRule?: string | null; slaDays: number; showInKanban: boolean }
+// exitRule DESCONTINUADO: a condição de conclusão de fase é do Workflow Interno + BlockingEngine.
+// A tela não lê, não exibe, não edita e não reenvia o campo — o backend também não grava mais.
+type Fase = { phaseKey: string; label: string; ordem: number; required: boolean; conditional: boolean; entryRule: string; slaDays: number; showInKanban: boolean }
 type MacroWf = { id: number; tipoProcessoId: number; name: string; ativo: boolean; fases: Fase[] }
 
 async function jsonFetch(url: string, options: RequestInit = {}) {
@@ -43,19 +43,28 @@ export default function MacroKanbanTab() {
   const [criando, setCriando] = useState(false)
   const [salvoMsg, setSalvoMsg] = useState<string | null>(null)
 
+  // BUSCA (só rede) × APLICAÇÃO (só estado).
+  const buscar = useCallback((sinal?: AbortSignal) => jsonFetch('/api/gerenciamento/workflow-macro', { cache: 'no-store', signal: sinal }), [])
+  const aplicar = useCallback((d: any) => {
+    setTipos((d as any).tipos || [])
+    setCatFases((d as any).catalogoFases || [])
+    setPaises((d as any).paises || [])
+  }, [])
+  useEffect(() => {
+    const ac = new AbortController()
+    buscar(ac.signal)
+      .then((d) => { if (!ac.signal.aborted) aplicar(d) })
+      .catch((e: any) => { if (!ac.signal.aborted) setErro(e.message || 'Não foi possível carregar.') })
+      .finally(() => { if (!ac.signal.aborted) setLoading(false) })
+    return () => ac.abort()
+  }, [buscar, aplicar])
+
   const bootstrap = useCallback(async () => {
     setLoading(true); setErro(null)
-    try {
-      const d = await jsonFetch('/api/gerenciamento/workflow-macro', { cache: 'no-store' })
-      setTipos((d as any).tipos || [])
-      setCatFases((d as any).catalogoFases || [])
-      setPaises((d as any).paises || [])
-    } catch (e: any) {
-      setErro(e.message || 'Não foi possível carregar.')
-    } finally { setLoading(false) }
-  }, [])
-
-  useEffect(() => { bootstrap() }, [bootstrap])
+    try { aplicar(await buscar()) }
+    catch (e: any) { setErro(e.message || 'Não foi possível carregar.') }
+    finally { setLoading(false) }
+  }, [buscar, aplicar])
 
   const carregarWf = useCallback(async (id: number) => {
     setCarregandoWf(true)
@@ -239,7 +248,7 @@ export default function MacroKanbanTab() {
               <div className="rounded-xl border border-white/10 bg-white/5 p-4 backdrop-blur">
                 <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-white/40">Prévia do kanban ({colunas.length} colunas)</div>
                 {colunas.length === 0 ? (
-                  <div className="text-sm text-white/40">Nenhuma coluna — adicione fases ou marque "no kanban".</div>
+                  <div className="text-sm text-white/40">Nenhuma coluna — adicione fases ou marque &quot;no kanban&quot;.</div>
                 ) : (
                   <div className="flex gap-2 overflow-x-auto pb-1">
                     {colunas.map((c, i) => (
@@ -284,11 +293,6 @@ export default function MacroKanbanTab() {
                         <input type="number" min="0" value={f.slaDays} onChange={(e) => patch(idx, { slaDays: Number(e.target.value) })} className="w-16 rounded border border-white/10 bg-white/5 px-2 py-1 text-white outline-none focus:border-white/20" />
                         dias
                       </span>
-                      {f.exitRule && (
-                        <span className="text-[11px] text-white/30" title="Campo descontinuado — somente leitura. A condição de conclusão vem do Workflow Interno.">
-                          Regra de saída (legado): {f.exitRule}
-                        </span>
-                      )}
                     </div>
                   </div>
                 ))}

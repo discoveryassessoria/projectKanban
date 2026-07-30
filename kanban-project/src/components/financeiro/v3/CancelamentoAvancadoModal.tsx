@@ -121,10 +121,11 @@ export default function CancelamentoAvancadoModal({ receitaRef, participantes, n
   }, [receitaRef, patch])
 
   useEffect(() => {
-    setPrevisao(null); setPreviewErro(null)
     if (!entradaMinima) return
     if (debounce.current) clearTimeout(debounce.current)
-    debounce.current = setTimeout(() => { rodarPreview() }, 450)
+    // A limpeza da previsão anterior acontece junto do recálculo (no timer),
+    // nunca de forma síncrona no corpo do efeito.
+    debounce.current = setTimeout(() => { setPrevisao(null); setPreviewErro(null); rodarPreview() }, 450)
     return () => { if (debounce.current) clearTimeout(debounce.current) }
   }, [entradaMinima, rodarPreview])
 

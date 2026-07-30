@@ -41,12 +41,24 @@ export default function AplicabilidadeEconomicaTab() {
   const [form, setForm] = useState<Form | null>(null)
   const [salvando, setSalvando] = useState(false)
 
+  // BUSCA (só rede) × APLICAÇÃO (só estado): o efeito de montagem não escreve
+  // estado de forma síncrona e cancela a resposta se a tela sair antes.
+  const buscar = useCallback((sinal?: AbortSignal) => jsonFetch('/api/gerenciamento/aplicabilidade-economica', { signal: sinal }), [])
+  const aplicar = useCallback((d: any) => { setD(d) }, [])
+  useEffect(() => {
+    const ac = new AbortController()
+    buscar(ac.signal)
+      .then((d) => { if (!ac.signal.aborted) aplicar(d) })
+      .catch((e: any) => { if (!ac.signal.aborted) setErro(e.message) })
+      .finally(() => { if (!ac.signal.aborted) setLoading(false) })
+    return () => ac.abort()
+  }, [buscar, aplicar])
+  // Recarga por ação do usuário: aí sim volta ao estado de carregamento.
   const carregar = useCallback(async () => {
     setLoading(true); setErro(null)
-    try { setD(await jsonFetch('/api/gerenciamento/aplicabilidade-economica')) }
+    try { aplicar(await buscar()) }
     catch (e: any) { setErro(e.message) } finally { setLoading(false) }
-  }, [])
-  useEffect(() => { carregar() }, [carregar])
+  }, [buscar, aplicar])
 
   async function salvar() {
     if (!form) return
@@ -85,7 +97,7 @@ export default function AplicabilidadeEconomicaTab() {
 
       {erro && <div className="mb-3 rounded-lg bg-red-500/10 px-3 py-2 text-sm text-red-300 ring-1 ring-red-500/20">{erro}</div>}
       {loading ? <div className="py-10 text-center text-white/40">Carregando…</div>
-      : (d?.regras.length ?? 0) === 0 ? <div className="py-10 text-center text-white/40">Nenhuma regra. Clique em "+ Nova regra".</div>
+      : (d?.regras.length ?? 0) === 0 ? <div className="py-10 text-center text-white/40">Nenhuma regra. Clique em &quot;+ Nova regra&quot;.</div>
       : (
         <div className="overflow-hidden rounded-xl ring-1 ring-white/10">
           <table className="w-full text-sm">

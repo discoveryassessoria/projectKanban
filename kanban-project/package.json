@@ -53,6 +53,7 @@
     "backfill:codigos-publicos:dry": "tsx prisma/backfill-codigos-publicos.ts",
     "backfill:codigos-publicos": "tsx prisma/backfill-codigos-publicos.ts --execute",
     "test:preco-fonte-unica": "tsx scripts/preco-fonte-unica.test.ts",
+    "test:catalogo-oficial": "tsx scripts/catalogo-oficial.test.ts",
     "test:resolver-preco": "tsx scripts/resolver-preco-financeiro.test.ts",
     "test:calculo-preco": "tsx scripts/calculo-preco.test.ts",
     "test:unidade-cobranca": "tsx scripts/unidade-cobranca-guard.test.ts",
@@ -60,7 +61,7 @@
     "test:arvore-dedup": "tsx scripts/arvore-dedup-requerente.test.ts",
     "test:cambio": "tsx scripts/cambio-confidence-guard.test.ts",
     "test:financeiro-geral": "tsx scripts/financeiro-geral.test.ts",
-    "test:financeiro": "tsx scripts/calculo-preco.test.ts && tsx scripts/unidade-cobranca-guard.test.ts && tsx scripts/automacao-requerente-guard.test.ts && tsx scripts/preco-fonte-unica.test.ts && tsx scripts/resolver-preco-financeiro.test.ts && tsx scripts/financeiro-geral.test.ts && tsx scripts/acoes-lancamento.test.ts && tsx scripts/condicao-pagamento.test.ts && tsx scripts/taxas-encargos.test.ts && tsx scripts/receitas-processo.test.ts && tsx scripts/receitas-processo-view.test.ts && tsx scripts/dossie-receita-guard.test.ts && tsx scripts/arquitetura-financeira-guard.test.ts && tsx scripts/forma-pagamento-guard.test.ts && tsx scripts/taxa-pagamento-guard.test.ts && tsx scripts/adquirente-bandeira-guard.test.ts && tsx scripts/seed-condicoes-taxas-guard.test.ts && tsx scripts/regras-pagamento.test.ts && tsx scripts/tabela-taxas-runtime.test.ts && tsx scripts/taxa-identidade.test.ts && tsx scripts/taxa-agrupamento-forma.test.ts && tsx scripts/condicoes-runtime.test.ts && tsx scripts/cobranca-wizard-guard.test.ts && tsx scripts/cambio-grossup.test.ts && tsx scripts/cambio-idempotencia-guard.test.ts && tsx scripts/motor-financeiro-fase1.test.ts && tsx scripts/motor-financeiro-fase1-guard.test.ts && tsx scripts/motor-financeiro-fase2.test.ts && tsx scripts/motor-financeiro-fase2-guard.test.ts && tsx scripts/motor-financeiro-fase3.test.ts && tsx scripts/motor-financeiro-fase3-guard.test.ts && tsx scripts/condicao-regra-guard.test.ts && tsx scripts/condicao-aplicabilidade.test.ts && tsx scripts/charge-calculation.test.ts && tsx scripts/cadastro-mestre-guard.test.ts && tsx scripts/taxa-aplicabilidade.test.ts && tsx scripts/condicao-formas.test.ts && tsx scripts/wizard-multiselect-guard.test.ts && tsx scripts/taxa-parcelamento.test.ts",
+    "test:financeiro": "tsx scripts/calculo-preco.test.ts && tsx scripts/unidade-cobranca-guard.test.ts && tsx scripts/automacao-requerente-guard.test.ts && tsx scripts/preco-fonte-unica.test.ts && tsx scripts/catalogo-oficial.test.ts && tsx scripts/resolver-preco-financeiro.test.ts && tsx scripts/financeiro-geral.test.ts && tsx scripts/acoes-lancamento.test.ts && tsx scripts/condicao-pagamento.test.ts && tsx scripts/taxas-encargos.test.ts && tsx scripts/receitas-processo.test.ts && tsx scripts/receitas-processo-view.test.ts && tsx scripts/dossie-receita-guard.test.ts && tsx scripts/arquitetura-financeira-guard.test.ts && tsx scripts/forma-pagamento-guard.test.ts && tsx scripts/taxa-pagamento-guard.test.ts && tsx scripts/adquirente-bandeira-guard.test.ts && tsx scripts/seed-condicoes-taxas-guard.test.ts && tsx scripts/regras-pagamento.test.ts && tsx scripts/tabela-taxas-runtime.test.ts && tsx scripts/taxa-identidade.test.ts && tsx scripts/taxa-agrupamento-forma.test.ts && tsx scripts/condicoes-runtime.test.ts && tsx scripts/cobranca-wizard-guard.test.ts && tsx scripts/cambio-grossup.test.ts && tsx scripts/cambio-idempotencia-guard.test.ts && tsx scripts/motor-financeiro-fase1.test.ts && tsx scripts/motor-financeiro-fase1-guard.test.ts && tsx scripts/motor-financeiro-fase2.test.ts && tsx scripts/motor-financeiro-fase2-guard.test.ts && tsx scripts/motor-financeiro-fase3.test.ts && tsx scripts/motor-financeiro-fase3-guard.test.ts && tsx scripts/condicao-regra-guard.test.ts && tsx scripts/condicao-aplicabilidade.test.ts && tsx scripts/charge-calculation.test.ts && tsx scripts/cadastro-mestre-guard.test.ts && tsx scripts/taxa-aplicabilidade.test.ts && tsx scripts/condicao-formas.test.ts && tsx scripts/wizard-multiselect-guard.test.ts && tsx scripts/taxa-parcelamento.test.ts",
     "test:receitas-processo": "tsx scripts/receitas-processo.test.ts",
     "test:lancamento": "tsx scripts/lancamento-financeiro.test.ts",
     "test:participante-conta": "tsx scripts/participante-conta.test.ts",
@@ -90,6 +91,8 @@
     "test:taxas-encargos": "tsx scripts/taxas-encargos.test.ts",
     "test:arquitetura-financeira": "tsx scripts/arquitetura-financeira-guard.test.ts",
     "test:cadastro-mestre": "tsx scripts/cadastro-mestre-guard.test.ts",
+    "test:catalogo-servicos": "tsx scripts/catalogo-servicos-unificado.test.ts",
+    "test:catalogo-servicos-homolog": "tsx scripts/catalogo-servicos-homolog.test.ts",
     "test:taxa-aplicabilidade": "tsx scripts/taxa-aplicabilidade.test.ts",
     "test:condicao-formas": "tsx scripts/condicao-formas.test.ts",
     "test:wizard-multiselect": "tsx scripts/wizard-multiselect-guard.test.ts",
@@ -110,7 +113,19 @@
     "seed:permissoes-custo": "tsx scripts/seed-permissoes-custo.ts",
     "validar:perfis-custo": "tsx scripts/prod-validar-perfis-custo.ts",
     "smoke:prod-custos": "tsx scripts/prod-smoke-custos.ts",
-    "seed:permissoes-custo:dry": "tsx scripts/seed-permissoes-custo.ts --dry-run"
+    "seed:permissoes-custo:dry": "tsx scripts/seed-permissoes-custo.ts --dry-run",
+    "test:arvore-guard": "tsx scripts/genealogia-arvore-guard.test.ts",
+    "test:arvore-b1": "tsx scripts/genealogia-b1.test.ts",
+    "test:arvore-escala": "tsx --expose-gc scripts/genealogia-escala.test.ts",
+    "test:arvore-fs": "tsx scripts/genealogia-arvore-fs.test.ts",
+    "test:arvore": "tsx scripts/genealogia-motor.test.ts && tsx scripts/genealogia-b1.test.ts && tsx scripts/genealogia-arvore-fs.test.ts && tsx scripts/arvore-casal-cards.test.ts && tsx scripts/genealogia-arvore-guard.test.ts && tsx --expose-gc scripts/genealogia-escala.test.ts",
+    "test:mdm5": "tsx scripts/mdm5-nome-pessoa.test.ts",
+    "test:mdm3": "tsx scripts/mdm3-dedup.test.ts",
+    "test:mdm": "tsx scripts/mdm5-nome-pessoa.test.ts && tsx scripts/mdm3-dedup.test.ts",
+    "test:arvore-visual": "node scripts/arvore-visual.test.mjs",
+    "test:arvore-casal": "tsx scripts/arvore-casal-cards.test.ts",
+    "test:arvore-visual:aprovar": "node scripts/arvore-visual.test.mjs --aprovar",
+    "test:arvore-e2e": "node scripts/arvore-e2e.mjs"
   },
   "prisma": {
     "seed": "tsx prisma/seed.ts"
@@ -149,7 +164,6 @@
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "cmdk": "^1.1.1",
-    "dagre": "^0.8.5",
     "date-fns": "^4.1.0",
     "exceljs": "^4.4.0",
     "framer-motion": "^12.23.24",
@@ -169,7 +183,6 @@
     "react-dom": "19.1.0",
     "react-hook-form": "^7.63.0",
     "react-pdf": "^10.2.0",
-    "reactflow": "^11.11.4",
     "recharts": "^3.7.0",
     "socket.io-client": "^4.8.1",
     "sweetalert2": "^11.23.0",
@@ -196,6 +209,7 @@
     "tailwindcss": "^4",
     "tsx": "^4.22.3",
     "tw-animate-css": "^1.3.8",
-    "typescript": "5.9.3"
+    "typescript": "5.9.3",
+    "pngjs": "^7.0.0"
   }
 }

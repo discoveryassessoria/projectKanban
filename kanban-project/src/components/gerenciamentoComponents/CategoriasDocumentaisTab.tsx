@@ -25,15 +25,26 @@ export default function CategoriasDocumentaisTab() {
   const [q, setQ] = useState("")
   const [form, setForm] = useState<Form | null>(null)
 
+  // BUSCA (só rede) × APLICAÇÃO (só estado). Refaz a cada mudança de filtro.
+  const buscar = useCallback(async (sinal?: AbortSignal) => {
+    const res = await fetch(`/api/gerenciamento/categorias-documentais?status=${status}&q=${encodeURIComponent(q)}`, { headers: authHeaders(), signal: sinal })
+    if (!res.ok) throw new Error(`HTTP ${res.status}`)
+    return (await res.json()).categorias || []
+  }, [status, q])
+  const aplicar = useCallback((categorias: any[]) => { setRows(categorias); setErro("") }, [])
+  useEffect(() => {
+    const ac = new AbortController()
+    buscar(ac.signal)
+      .then((categorias) => { if (!ac.signal.aborted) aplicar(categorias) })
+      .catch(() => { if (!ac.signal.aborted) setErro("Falha ao carregar categorias.") })
+      .finally(() => { if (!ac.signal.aborted) setLoading(false) })
+    return () => ac.abort()
+  }, [buscar, aplicar])
   const load = useCallback(async () => {
     setErro("")
-    try {
-      const res = await fetch(`/api/gerenciamento/categorias-documentais?status=${status}&q=${encodeURIComponent(q)}`, { headers: authHeaders() })
-      if (!res.ok) throw new Error(`HTTP ${res.status}`)
-      setRows((await res.json()).categorias || [])
-    } catch { setErro("Falha ao carregar categorias.") } finally { setLoading(false) }
-  }, [status, q])
-  useEffect(() => { load() }, [load])
+    try { aplicar(await buscar()) }
+    catch { setErro("Falha ao carregar categorias.") } finally { setLoading(false) }
+  }, [buscar, aplicar])
 
   const showFlash = (m: string) => { setFlash(m); setTimeout(() => setFlash(""), 2800) }
 

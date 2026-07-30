@@ -27,6 +27,7 @@ import { usePaises, useUsers, useActivities, invalidateActivities } from "@/src/
 import type { Atividade } from "@/src/hooks/useActivitiesData"
 import { DatePickerField } from "@/components/ui/date-picker-field"
 import { usePermissoes } from "@/src/hooks/use-permissoes"
+import { useDadosHeaderBar, useMontadoNoCliente } from "@/src/hooks/use-dados-headerbar"
 import { encerrarSessao } from "@/src/lib/sessao/cliente"
 
 // Interfaces
@@ -64,16 +65,20 @@ function ActivitiesPageInner() {
     status: 'all',
     responsavel: 'all'
   })
-  const [mounted, setMounted] = useState(false)
-  const [user, setUser] = useState<UserData>({ nome: "Usuário" })
+  const mounted = useMontadoNoCliente()
   // Aba controlada — permite deep-link vindo da Central Operacional (?tab=).
   const [tabValue, setTabValue] = useState("list")
   const searchParams = useSearchParams()
 
   // Seed ADITIVO de filtros/aba a partir da URL (deep-link da Home). Só altera
   // o que veio na querystring; sem params, o comportamento padrão é idêntico.
-  useEffect(() => {
-    if (!searchParams) return
+  // Ajuste de estado DURANTE O RENDER (padrão do React para estado derivado de um
+  // prop que muda): semeia filtros/aba uma vez por combinação de parâmetros da URL.
+  // Sem efeito, sem render descartado.
+  const chaveParams = searchParams?.toString() ?? ""
+  const [paramsAplicados, setParamsAplicados] = useState<string | null>(null)
+  if (searchParams && chaveParams !== paramsAplicados) {
+    setParamsAplicados(chaveParams)
     const status = searchParams.get("status")
     const responsavel = searchParams.get("responsavel")
     const pais = searchParams.get("pais")
@@ -88,62 +93,14 @@ function ActivitiesPageInner() {
     })
     if (tab === "list" || tab === "deadline" || tab === "calendar") setTabValue(tab)
     else if (status === "vencidas") setTabValue("deadline")
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [searchParams])
+  }
 
-  // Estados para árvores e processos (para o HeaderBar)
-  const [arvores, setArvores] = useState<any[]>([])
-  const [processos, setProcessos] = useState<any[]>([])
+  // Usuário + árvores + processos do HeaderBar: ponto único, sem efeito por tela.
+  const { user, arvores, processos } = useDadosHeaderBar()
   const { pode } = usePermissoes()
 
   // Dados
   const { activities } = useActivities()
-
-  const buscarArvores = async () => {
-    try {
-      const response = await fetch("/api/arvore", {
-        headers: { 'Authorization': `Bearer ${localStorage.getItem('authToken')}` }
-      })
-      if (response.ok) {
-        const data = await response.json()
-        setArvores(Array.isArray(data) ? data : [])
-      }
-    } catch (error) {
-      console.error("Erro ao buscar árvores:", error)
-    }
-  }
-
-  const buscarProcessos = async () => {
-    try {
-      const response = await fetch("/api/processos", {
-        headers: { 'Authorization': `Bearer ${localStorage.getItem('authToken')}` }
-      })
-      if (response.ok) {
-        const data = await response.json()
-        setProcessos(data.processos || [])
-      }
-    } catch (error) {
-      console.error("Erro ao buscar processos:", error)
-    }
-  }
-
-  useEffect(() => {
-    setMounted(true)
-    if (typeof window !== 'undefined') {
-      const storedUser = localStorage.getItem('user')
-      if (storedUser) {
-        try {
-          setUser(JSON.parse(storedUser))
-        } catch {
-          setUser({ nome: "Usuário" })
-        }
-      }
-    }
-    // Buscar dados para o HeaderBar
-    buscarArvores()
-    buscarProcessos()
-  }, [])
-
 
 
   const handleLogout = () => { void encerrarSessao("manual") }
@@ -313,9 +270,14 @@ function FilterModal({
 
   const [localFilters, setLocalFilters] = useState<Filters>(filters)
 
-  useEffect(() => {
+  // Ao ABRIR, o rascunho local parte dos filtros aplicados. Ajuste de estado
+  // durante o render (padrão do React para "estado derivado ao mudar um prop"):
+  // não gera render extra e não usa efeito.
+  const [abertoAnterior, setAbertoAnterior] = useState(open)
+  if (open !== abertoAnterior) {
+    setAbertoAnterior(open)
     if (open) setLocalFilters(filters)
-  }, [open])
+  }
 
   const handleApplyFilters = () => {
     onFiltersChange(localFilters)

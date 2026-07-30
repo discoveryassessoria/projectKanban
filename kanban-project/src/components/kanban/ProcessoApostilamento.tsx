@@ -137,7 +137,21 @@ export function ProcessoApostilamento({ processoId, onConcluido }: Props) {
     }
   }, [processoId])
 
-  useEffect(() => { carregar() }, [carregar])
+  // MONTAGEM: busca no efeito; estado só na continuação da promessa e descartado
+  // se a tela sair antes da resposta.
+  useEffect(() => {
+    const ac = new AbortController()
+    fetch(`/api/processos/${processoId}/apostilamento`, { headers: authHeaders(), signal: ac.signal })
+      .then((res) => res.json())
+      .then((data) => {
+        if (ac.signal.aborted) return
+        setPasta(data.pasta ?? null)
+        setProgress(data.progress ?? 0)
+      })
+      .catch(() => { if (!ac.signal.aborted) setErro("Erro ao carregar a pasta de apostilamento.") })
+      .finally(() => { if (!ac.signal.aborted) setLoading(false) })
+    return () => ac.abort()
+  }, [processoId])
 
   const postEtapa = async (stepId: string, payload: Record<string, unknown>) => {
     setPosting(true); setModalErro(null)

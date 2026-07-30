@@ -13,6 +13,9 @@ import { processarOutbox } from "@/src/services/outbox-dispatcher"
 // aditiva/idempotente e não cria Documento.
 
 export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  const semPermissao = await verificarPermissao(request, "arvore.ver")
+  if (semPermissao) return semPermissao
+
   try {
     const { id: idParam } = await params
     const id = Number.parseInt(idParam)

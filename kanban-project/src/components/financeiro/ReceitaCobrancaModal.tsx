@@ -52,7 +52,20 @@ export function ReceitaCobrancaModal({ receitaId, onClose, onChanged }: { receit
       setDet(d.receita ? d : { receita: d }); setCobrancas((c as any).cobrancas || [])
     } catch (e: any) { setErro(e.message || 'erro') }
   }, [receitaId])
-  React.useEffect(() => { carregar() }, [carregar])
+  // MONTAGEM: busca no efeito; estado só na continuação das promessas.
+  React.useEffect(() => {
+    const ac = new AbortController()
+    Promise.all([
+      jf(`/api/financeiro/receitas/${receitaId}/detalhe`, { signal: ac.signal }),
+      jf(`/api/financeiro/receitas/${receitaId}/cobrancas`, { signal: ac.signal }),
+    ])
+      .then(([d, c]) => {
+        if (ac.signal.aborted) return
+        setDet(d.receita ? d : { receita: d }); setCobrancas((c as any).cobrancas || [])
+      })
+      .catch((e: any) => { if (!ac.signal.aborted) setErro(e.message || 'erro') })
+    return () => ac.abort()
+  }, [receitaId])
 
   const r = det?.receita ?? {}
   const moeda = r.moeda || 'EUR'
@@ -186,12 +199,13 @@ function CobrancaWizard({ receitaId, valor, moeda, receita, onClose, onCriada }:
   // Chave de idempotência: uma por sessão do wizard (retry/duplo-clique não duplica).
   const idemKeyRef = useChaveIdempotencia('idem')
   // Campos de câmbio comuns às requisições de simular/criar.
-  const camposCambio = () => ({
+  // Memorizado: entra como dependência das chamadas de simular/criar.
+  const camposCambio = React.useCallback(() => ({
     moedaRecebimento: f.moedaRecebimento ?? undefined,
     cotacaoManual: f.cotacaoManualAtiva && f.cotacaoManual != null ? f.cotacaoManual : undefined,
     justificativaCotacaoManual: f.cotacaoManualAtiva ? (f.justificativaCotacao ?? undefined) : undefined,
     fonteCotacao: f.cotacaoManualAtiva ? 'Manual' : undefined,
-  })
+  }), [f.moedaRecebimento, f.cotacaoManualAtiva, f.cotacaoManual, f.justificativaCotacao])
 
   React.useEffect(() => { jf('/api/financeiro/config').then(setCfg).catch((e) => setErro(e.message)) }, [])
 
@@ -218,18 +232,21 @@ function CobrancaWizard({ receitaId, valor, moeda, receita, onClose, onCriada }:
 
   // Ao escolher a condição: pré-seleciona a FORMA PADRÃO e descarta uma forma
   // que a condição não permita (o operador pode trocar por qualquer permitida).
-  React.useEffect(() => {
-    if (!condicao) return
+  // Trocar a CONDIÇÃO reavalia a forma escolhida: ajuste de estado durante o
+  // render (derivado de uma seleção que mudou), não efeito.
+  const [condicaoAvaliada, setCondicaoAvaliada] = React.useState(f.condicaoPagamentoId)
+  if (condicao && f.condicaoPagamentoId !== condicaoAvaliada) {
+    setCondicaoAvaliada(f.condicaoPagamentoId)
     const atual = f.formaPagamentoId
     if (atual && permitidas.length && !permitidas.includes(atual)) {
       const padrao = condicao.formaPadraoId && permitidas.includes(condicao.formaPadraoId) ? condicao.formaPadraoId : undefined
       setF((p) => ({ ...p, formaPagamentoId: padrao }))
       setAvisoForma('A forma escolhida não é permitida por esta condição — selecione uma das formas permitidas.')
-      return
+    } else {
+      setAvisoForma(null)
+      if (!atual && condicao.formaPadraoId) setF((p) => ({ ...p, formaPagamentoId: condicao.formaPadraoId }))
     }
-    setAvisoForma(null)
-    if (!atual && condicao.formaPadraoId) setF((p) => ({ ...p, formaPagamentoId: condicao.formaPadraoId }))
-  }, [f.condicaoPagamentoId]) // eslint-disable-line
+  }
 
   // SIMULAÇÃO oficial no backend (não persiste). Recalcula ao mudar seleção/parcelas/política.
   const simular = React.useCallback(async () => {
@@ -242,7 +259,7 @@ function CobrancaWizard({ receitaId, valor, moeda, receita, onClose, onCriada }:
       })
       setSim(d.simulacao)
     } catch (e: any) { setSim(null); setErro(e.message) } finally { setSimulando(false) }
-  }, [receitaId, f, nParcelas, politicaEscolha])
+  }, [receitaId, f, nParcelas, politicaEscolha, camposCambio])
 
   React.useEffect(() => { if (step >= 3) simular() }, [step, f.formaPagamentoId, f.condicaoPagamentoId, f.carteiraId, f.contaBancariaId, f.bandeiraId, f.adquirenteId, f.entradaValor, f.moedaRecebimento, f.cotacaoManual, f.cotacaoManualAtiva, nParcelas, politicaEscolha]) // eslint-disable-line
 

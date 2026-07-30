@@ -71,7 +71,24 @@ export default function QuickAddModal({
   const [loadingProcessos, setLoadingProcessos] = useState(false)
   const [errors, setErrors] = useState<{[key: string]: string}>({})
 
-  // Carregar dados quando modal abrir
+
+  // Reset ao FECHAR: ajuste de estado durante o render (derivado de `isOpen`).
+  const [abertoAnterior, setAbertoAnterior] = useState(isOpen)
+  if (abertoAnterior !== isOpen) {
+    setAbertoAnterior(isOpen)
+    if (!isOpen) {
+      setFormData({
+        nome: '',
+        descricao: '',
+        prioridade: 'MEDIA',
+        responsavelId: null,
+        processoId: null,
+        prazo_category: classification.category
+      })
+      setErrors({})
+    }
+  }
+
   const fetchUsuarios = async () => {
     try {
       setLoadingUsuarios(true)
@@ -101,37 +118,6 @@ export default function QuickAddModal({
       setLoadingProcessos(false)
     }
   }
-
-  useEffect(() => {
-    if (isOpen) {
-      fetchUsuarios()
-      fetchProcessos()
-      // Auto-focus no campo nome
-      setTimeout(() => {
-        const nomeInput = document.getElementById('quick-add-nome')
-        if (nomeInput) {
-          nomeInput.focus()
-        }
-      }, 100)
-    }
-  }, [isOpen])
-
-  // Reset form quando fechar
-  useEffect(() => {
-    if (!isOpen) {
-      setFormData({
-        nome: '',
-        descricao: '',
-        prioridade: 'MEDIA',
-        responsavelId: null,
-        processoId: null,
-        prazo_category: classification.category
-      })
-      setErrors({})
-    }
-  }, [isOpen, classification.category])
-
-
 
   const validateForm = () => {
     const newErrors: {[key: string]: string} = {}

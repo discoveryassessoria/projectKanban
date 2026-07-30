@@ -77,18 +77,25 @@ export function UserManagement() {
     }
   }
 
-  useEffect(() => {
-    loadUsers()
-  }, [])
-
-  // Buscar com debounce
+  // Carga inicial e busca (com folga de digitação). O corpo vive DENTRO do
+  // efeito: nenhuma escrita de estado acontece no corpo síncrono.
   useEffect(() => {
     const timer = setTimeout(() => {
-      if (!isLoading) {
-        loadUsers()
-      }
-    }, 500)
-
+      void (async () => {
+        try {
+          setIsLoading(true)
+          setError("")
+          const users = await getUsers(searchTerm)
+          // Filtrar apenas usuários com id definido
+          const validUsers = users.filter((u): u is Usuario => u.id !== undefined) as Usuario[]
+          setUsuarios(validUsers)
+        } catch (err: any) {
+          setError(err.message || "Erro ao carregar usuários")
+        } finally {
+          setIsLoading(false)
+        }
+      })()
+    }, searchTerm ? 500 : 0)
     return () => clearTimeout(timer)
   }, [searchTerm])
 

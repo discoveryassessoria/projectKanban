@@ -5,7 +5,7 @@ import { Input } from "@/components/ui/input"
 import { DatePickerField } from "@/components/ui/date-picker-field"
 import { X, Check } from "lucide-react"
 import { Edit2 } from "lucide-react"
-import { useEffect, useState } from "react"
+import { useEffect, useState, useCallback } from "react"
 import { useRouter } from "next/navigation"
 import { HeaderBar } from "@/src/components/header-bar"
 import { Card, CardContent } from "@/components/ui/card"
@@ -35,6 +35,7 @@ import {
   Thead, Th, Tr, EmptyState, SearchInput, SecondaryButton, type Tone,
 } from "@/src/components/financeiroComponents/ui/kit"
 import { Search, ChevronDown } from "lucide-react"
+import { useUsuarioLogado } from "@/src/hooks/use-dados-headerbar"
 import { encerrarSessao } from "@/src/lib/sessao/cliente"
 
 interface Usuario {
@@ -92,7 +93,7 @@ const MESES = [
 ]
 
 export default function EventosPage() {
-  const [usuario, setUsuario] = useState<Usuario | null>(null)
+  const usuario = useUsuarioLogado() as unknown as Usuario
   const [isLoading, setIsLoading] = useState(true)
   const [eventos, setEventos] = useState<Evento[]>([])
   const [viewMode, setViewMode] = useState<"lista" | "calendario">("lista")
@@ -121,36 +122,32 @@ const [lembreteDias, setLembreteDias] = useState("")
   const router = useRouter()
   const { pode } = usePermissoes()
 
-  const fetchEventos = async () => {
+  // Porteiro: sem credenciais no navegador, volta ao login. Só navegação.
+  useEffect(() => {
+    if (!localStorage.getItem("authToken") || !localStorage.getItem("user")) router.push("/login")
+  }, [router])
+
+  // Recarga por ação do usuário (criar/editar/excluir evento).
+  const fetchEventos = useCallback(async () => {
     try {
       const res = await fetch("/api/eventos")
       const data = await res.json()
       setEventos(data.eventos || [])
     } catch (error) {
       console.error("Erro ao buscar eventos:", error)
-    } finally {
-      setIsLoading(false)
-    }
-  }
+    } finally { setIsLoading(false) }
+  }, [])
 
+  // MONTAGEM: busca no efeito; estado só na continuação da promessa.
   useEffect(() => {
-    const token = localStorage.getItem("authToken")
-    const userData = localStorage.getItem("user")
-
-    if (!token || !userData) {
-      router.push("/login")
-      return
-    }
-
-    try {
-      const user = JSON.parse(userData)
-      setUsuario(user)
-      fetchEventos()
-    } catch (error) {
-      console.error("Erro ao carregar dados do usuário:", error)
-      router.push("/login")
-    }
-  }, [router])
+    const ac = new AbortController()
+    fetch("/api/eventos", { signal: ac.signal })
+      .then((res) => res.json())
+      .then((data) => { if (!ac.signal.aborted) setEventos(data.eventos || []) })
+      .catch((error) => { if (!ac.signal.aborted) console.error("Erro ao buscar eventos:", error) })
+      .finally(() => { if (!ac.signal.aborted) setIsLoading(false) })
+    return () => ac.abort()
+  }, [])
 
 
   const handleLogout = () => { void encerrarSessao("manual") }

@@ -81,8 +81,10 @@ export function OpManageModal({
   const [saving, setSaving] = useState(false)
   const [erro, setErro] = useState<string | null>(null)
 
-  // Reset ao abrir
-  useEffect(() => {
+  // Reset ao ABRIR: ajuste de estado durante o render (derivado de `isOpen`).
+  const [abertoAnterior, setAbertoAnterior] = useState(isOpen)
+  if (isOpen !== abertoAnterior) {
+    setAbertoAnterior(isOpen)
     if (isOpen) {
       setReason(reasonKeys[0])
       setNotes("")
@@ -90,8 +92,7 @@ export function OpManageModal({
       setCancelSla(true)
       setErro(null)
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isOpen, mode])
+  }
 
   // ESC fecha
   useEffect(() => {

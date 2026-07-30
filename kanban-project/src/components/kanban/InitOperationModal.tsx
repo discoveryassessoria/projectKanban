@@ -131,17 +131,43 @@ export function InitOperationModal({
     }
   }, [documentoId])
 
-  useEffect(() => {
+  // Reset do formulário ao ABRIR: ajuste de estado durante o render.
+  const [aberturaAtual, setAberturaAtual] = useState(`${isOpen}|${documentoId}`)
+  if (aberturaAtual !== `${isOpen}|${documentoId}`) {
+    setAberturaAtual(`${isOpen}|${documentoId}`)
     if (isOpen && documentoId) {
-      // Reset state
       setTipoOperacao(null)
       setResponsavelId("auto")
       setDataPrazoInicial(tomorrowPlusDays(7))
       setPrioridade("normal")
       setObservacaoInicial("")
-      carregar()
     }
-  }, [isOpen, documentoId, carregar])
+  }
+
+  // Carga do documento + usuários: busca no efeito, estado na continuação.
+  useEffect(() => {
+    if (!isOpen || !documentoId) return
+    const ac = new AbortController()
+    const auth = { Authorization: `Bearer ${localStorage.getItem("authToken")}` }
+    Promise.all([
+      fetch(`/api/documentos/${documentoId}`, { headers: auth, signal: ac.signal }),
+      fetch("/api/usuarios", { headers: auth, signal: ac.signal }),
+    ])
+      .then(async ([docRes, userRes]) => {
+        if (ac.signal.aborted) return
+        if (!docRes.ok) throw new Error(`HTTP ${docRes.status}`)
+        setDoc(await docRes.json())
+        const userData = await userRes.json()
+        setUsuarios(userData.usuarios || userData || [])
+      })
+      .catch((e) => {
+        if (ac.signal.aborted) return
+        console.warn("[InitOperationModal] falha:", e)
+        setErro("Erro ao carregar documento.")
+      })
+      .finally(() => { if (!ac.signal.aborted) setLoading(false) })
+    return () => ac.abort()
+  }, [isOpen, documentoId])
 
   // -- Trava scroll do body
   useEffect(() => {

@@ -112,7 +112,8 @@ export default function EditarDistribuicaoView({ obrigacaoId, receitaRef, onClos
   }])
 
   // ── cálculos ──────────────────────────────────────────────────────────────
-  const incluidos = rows.filter((r) => r.incluido)
+  // Memorizado: é dependência das validações abaixo (precisa de identidade estável).
+  const incluidos = useMemo(() => rows.filter((r) => r.incluido), [rows])
   const totalDistribuido = cent(incluidos.reduce((s, r) => s + r.valorBase, 0))
   const diferenca = cent(totalDistribuido - totalBase)
   const soma100 = Math.abs(diferenca) < 0.01
@@ -122,7 +123,8 @@ export default function EditarDistribuicaoView({ obrigacaoId, receitaRef, onClos
   // logo a soma dos BRL das linhas é SEMPRE = totalBrl. O fechamento é governado pela BASE
   // (soma == totalBase); o BRL nunca diverge por arredondamento de taxa.
   const alvoBrl = cent(totalBrl)
-  const brlAlocList = ratearBrlPorBase(incluidos.map((r) => r.valorBase), alvoBrl)
+  // Memorizado: alimenta o total em BRL, que é dependência das validações.
+  const brlAlocList = useMemo(() => ratearBrlPorBase(incluidos.map((r) => r.valorBase), alvoBrl), [incluidos, alvoBrl])
   const brlAloc = new Map<string, number>(incluidos.map((r, i) => [r.key, brlAlocList[i]]))
   const brlDeRow = (r: Row) => (r.incluido ? brlAloc.get(r.key) ?? 0 : 0)
   const totalDistribuidoBrl = cent(brlAlocList.reduce((s, v) => s + v, 0))

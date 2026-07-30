@@ -186,7 +186,21 @@ export function ProcessoEmissaoRetificada({ processoId, onConcluido }: Props) {
     }
   }, [processoId])
 
-  useEffect(() => { carregar() }, [carregar])
+  // MONTAGEM: busca no efeito; estado só na continuação da promessa e descartado
+  // se a tela sair antes da resposta.
+  useEffect(() => {
+    const ac = new AbortController()
+    fetch(`/api/processos/${processoId}/emissao-retificada`, { headers: authHeaders(), signal: ac.signal })
+      .then((res) => res.json())
+      .then((data) => {
+        if (ac.signal.aborted) return
+        const documentos = Array.isArray(data.documentos) ? data.documentos.map(mapDoc) : []
+        setData({ documentos, kpis: data.kpis ?? calcKpis(documentos), progress: data.progress ?? calcProgress(documentos) })
+      })
+      .catch(() => { if (!ac.signal.aborted) setErro("Erro ao carregar a fase de Emissão documental retificada.") })
+      .finally(() => { if (!ac.signal.aborted) setLoading(false) })
+    return () => ac.abort()
+  }, [processoId])
 
   const aplicarEtapa = async (docId: string | number, stepId: string, payload: Record<string, unknown>) => {
     setPosting(true); setModalErro(null)

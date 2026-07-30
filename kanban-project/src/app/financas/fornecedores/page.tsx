@@ -93,6 +93,28 @@ export default function FornecedoresPage() {
     observacoes: "",
   })
 
+  // MONTAGEM: busca no efeito, escrita de estado só na continuação da promessa.
+  useEffect(() => {
+    const ac = new AbortController()
+    fetch('/api/fornecedores', { signal: ac.signal })
+      .then(async (response) => {
+        if (ac.signal.aborted) return
+        if (response.ok) { setFornecedores(await response.json()); setErro(null) }
+        else {
+          // ETAPA 1A — SEM FALLBACK SILENCIOSO: falha de API não vira cadastro fabricado.
+          console.error("Falha ao carregar fornecedores:", response.status)
+          setErro("Não foi possível carregar os fornecedores."); setFornecedores([])
+        }
+      })
+      .catch((error) => {
+        if (ac.signal.aborted) return
+        console.error("Erro ao carregar fornecedores:", error)
+        setErro("Não foi possível carregar os fornecedores."); setFornecedores([])
+      })
+      .finally(() => { if (!ac.signal.aborted) setLoading(false) })
+    return () => ac.abort()
+  }, [])
+
   const fetchFornecedores = async () => {
     try {
       const response = await fetch('/api/fornecedores')
@@ -114,11 +136,6 @@ export default function FornecedoresPage() {
       setLoading(false)
     }
   }
-
-  useEffect(() => {
-    fetchFornecedores()
-  }, [])
-
 
   const formatCurrency = (value: number) => {
     return new Intl.NumberFormat('pt-BR', {

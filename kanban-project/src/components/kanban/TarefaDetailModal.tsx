@@ -166,9 +166,12 @@ function SubtarefaLine({ tarefa, onUpdate, usuarios, isProcuracaoAdm = false, mo
   const isCobranca = tarefa.tipoSubtarefa === "COBRANCA"
   const isConferencia = tarefa.tipoSubtarefa === "CONFERENCIA"
 
-  useEffect(() => {
+  // Subtarefas seguem a tarefa recebida: ajuste de estado durante o render.
+  const [subtarefasDaTarefa, setSubtarefasDaTarefa] = useState(tarefa.subtarefas)
+  if (subtarefasDaTarefa !== tarefa.subtarefas) {
+    setSubtarefasDaTarefa(tarefa.subtarefas)
     setSubtarefas(tarefa.subtarefas || [])
-  }, [tarefa.subtarefas])
+  }
 
   const fetchSubtarefas = async () => {
     try {
@@ -625,9 +628,20 @@ export function TarefaDetailModal({ tarefa, onClose, onUpdate, usuarios, isProcu
     }
   }
 
+  // MONTAGEM/troca de tarefa: buscas no efeito; estado só na continuação.
   useEffect(() => {
-    fetchSubtarefas()
-    fetchHistorico()
+    const ac = new AbortController()
+    const auth = { Authorization: `Bearer ${localStorage.getItem('authToken')}` }
+    fetch(`/api/tarefas/${tarefa.id}`, { headers: auth, signal: ac.signal })
+      .then((r) => r.json())
+      .then((data) => { if (!ac.signal.aborted && data.tarefa?.subtarefas) setSubtarefas(data.tarefa.subtarefas) })
+      .catch((error) => { if (!ac.signal.aborted) console.error("Erro ao buscar subtarefas:", error) })
+    fetch(`/api/tarefas/${tarefa.id}/historico`, { headers: auth, signal: ac.signal })
+      .then((r) => r.json())
+      .then((data) => { if (!ac.signal.aborted && data.historico) setHistorico(data.historico) })
+      .catch((error) => { if (!ac.signal.aborted) console.error("Erro ao buscar histórico:", error) })
+      .finally(() => { if (!ac.signal.aborted) setLoadingHistorico(false) })
+    return () => ac.abort()
   }, [tarefa.id])
 
   // Adicionar:
@@ -1112,7 +1126,7 @@ export function TarefaDetailModal({ tarefa, onClose, onUpdate, usuarios, isProcu
                                 {entry.descricao}
                                 {isSubtarefa && entry.tarefa && (
                                   <span className="text-white/40 ml-1">
-                                    em "{entry.tarefa.titulo}"
+                                    em &quot;{entry.tarefa.titulo}&quot;
                                   </span>
                                 )}
                               </p>

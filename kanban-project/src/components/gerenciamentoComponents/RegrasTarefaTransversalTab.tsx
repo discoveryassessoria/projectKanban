@@ -98,21 +98,31 @@ export default function RegrasTarefaTransversalTab() {
   const [form, setForm] = useState<any>(novoForm())
   const [salvando, setSalvando] = useState(false)
 
-  const carregar = useCallback(async () => {
-    try {
-      const r = await fetch("/api/gerenciamento/regras-tarefa-transversal")
-      if (r.ok) setRegras((await r.json()).regras || [])
-    } catch { /* silencioso */ }
-    finally { setLoading(false) }
+  // BUSCA (só rede) × APLICAÇÃO (só estado).
+  const buscar = useCallback(async (sinal?: AbortSignal) => {
+    const r = await fetch("/api/gerenciamento/regras-tarefa-transversal", { signal: sinal })
+    return r.ok ? ((await r.json()).regras || []) : null
   }, [])
+  const aplicar = useCallback((rs: Regra[] | null) => { if (rs) setRegras(rs) }, [])
 
   useEffect(() => {
-    carregar()
-    fetch("/api/gerenciamento/modelos-tarefa-transversal")
-      .then(r => (r.ok ? r.json() : { modelos: [] }))
-      .then(d => setModelos((d.modelos || []).map((m: any) => ({ id: m.id, name: m.name }))))
+    const ac = new AbortController()
+    buscar(ac.signal)
+      .then((rs) => { if (!ac.signal.aborted) aplicar(rs) })
       .catch(() => {})
-  }, [carregar])
+      .finally(() => { if (!ac.signal.aborted) setLoading(false) })
+    fetch("/api/gerenciamento/modelos-tarefa-transversal", { signal: ac.signal })
+      .then(r => (r.ok ? r.json() : { modelos: [] }))
+      .then(d => { if (!ac.signal.aborted) setModelos((d.modelos || []).map((m: any) => ({ id: m.id, name: m.name }))) })
+      .catch(() => {})
+    return () => ac.abort()
+  }, [buscar, aplicar])
+
+  const carregar = useCallback(async () => {
+    try { aplicar(await buscar()) }
+    catch { /* silencioso */ }
+    finally { setLoading(false) }
+  }, [buscar, aplicar])
 
   const modeloNome = (id: number | null) => (id ? modelos.find(m => m.id === id)?.name || "—" : "—")
 

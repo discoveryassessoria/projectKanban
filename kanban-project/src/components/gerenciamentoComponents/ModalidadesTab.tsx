@@ -65,20 +65,24 @@ export default function ModalidadesTab() {
     } finally { setCarregandoMods(false) }
   }, [])
 
-  const bootstrap = useCallback(async () => {
-    setLoading(true); setErro(null)
-    try {
-      const d = await jsonFetch("/api/gerenciamento/paises", { cache: "no-store" })
-      const lista = ((d as { paises?: Pais[] }).paises || [])
-      setPaises(lista)
-      const inicial = lista[0]?.countryKey || ""
-      setCountryKey(inicial)
-      if (inicial) await carregarMods(inicial)
-    } catch (e) {
-      setErro(e instanceof Error ? e.message : "Não foi possível carregar os países.")
-    } finally { setLoading(false) }
+  // MONTAGEM: busca os países e, com o primeiro deles, as modalidades. Nenhuma
+  // escrita de estado acontece de forma síncrona no corpo do efeito.
+  useEffect(() => {
+    const ac = new AbortController()
+    jsonFetch("/api/gerenciamento/paises", { cache: "no-store", signal: ac.signal })
+      .then((d) => {
+        if (ac.signal.aborted) return null
+        const lista = ((d as { paises?: Pais[] }).paises || [])
+        setPaises(lista)
+        const inicial = lista[0]?.countryKey || ""
+        setCountryKey(inicial)
+        return inicial || null
+      })
+      .then((inicial) => { if (inicial && !ac.signal.aborted) return carregarMods(inicial) })
+      .catch((e) => { if (!ac.signal.aborted) setErro(e instanceof Error ? e.message : "Não foi possível carregar os países.") })
+      .finally(() => { if (!ac.signal.aborted) setLoading(false) })
+    return () => ac.abort()
   }, [carregarMods])
-  useEffect(() => { bootstrap() }, [bootstrap])
 
   function trocarPais(ck: string) {
     setCountryKey(ck); setErro(null); setForm(null)

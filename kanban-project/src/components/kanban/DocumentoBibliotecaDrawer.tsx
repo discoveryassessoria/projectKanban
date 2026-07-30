@@ -60,10 +60,13 @@ interface Props {
 export function DocumentoBibliotecaDrawer({ item, context, isOpen, onClose }: Props) {
   const [tab, setTab] = useState<Tab>("Visão geral")
 
-  // ao abrir um documento novo, sempre volta para "Visão geral"
-  useEffect(() => {
+  // Ao abrir um documento novo, volta para "Visão geral": ajuste de estado
+  // durante o render (derivado de props que mudam), não efeito.
+  const [aberturaAtual, setAberturaAtual] = useState(`${isOpen}|${item?.id}`)
+  if (aberturaAtual !== `${isOpen}|${item?.id}`) {
+    setAberturaAtual(`${isOpen}|${item?.id}`)
     if (isOpen) setTab("Visão geral")
-  }, [isOpen, item?.id])
+  }
 
   if (!isOpen || !item) return null
 

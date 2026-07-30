@@ -52,7 +52,11 @@ export function ContratanteModal({
   const [isSubmitting, setIsSubmitting] = useState(false)
 
   // Sincronizar formData quando contratante ou mode mudam
-  useEffect(() => {
+  // Sincroniza o formulário com o registro/modo de abertura: ajuste de estado
+  // durante o render (derivado de props), sem efeito.
+  const [entradaAtual, setEntradaAtual] = useState(`${isOpen}|${mode}|${contratante?.id ?? 'novo'}`)
+  if (entradaAtual !== `${isOpen}|${mode}|${contratante?.id ?? 'novo'}`) {
+    setEntradaAtual(`${isOpen}|${mode}|${contratante?.id ?? 'novo'}`)
     if (isOpen) {
       setFormData({
         nome: contratante?.nome || '',
@@ -63,7 +67,7 @@ export function ContratanteModal({
       })
       setErrors({})
     }
-  }, [contratante, mode, isOpen])
+  }
 
   // Limpar erro do campo quando usuário digita
   const clearFieldError = (field: 'nome' | 'cpf') => {

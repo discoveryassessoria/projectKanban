@@ -23,6 +23,7 @@ import {
   Info
 } from "lucide-react"
 import { usePermissoes } from "@/src/hooks/use-permissoes"
+import { ImagemRemota } from '@/src/components/ui/imagem-remota'
 
 interface Anexo {
   id: number
@@ -139,10 +140,16 @@ export function ProcessoInformacoes({
     }
   }
 
+  // MONTAGEM: busca no efeito; estado só na continuação da promessa.
   useEffect(() => {
-    if (processoId) {
-      fetchInformacao()
-    }
+    if (!processoId) return
+    const ac = new AbortController()
+    fetch(`/api/informacoes-italia?processoId=${processoId}`, { signal: ac.signal })
+      .then((response) => response.json())
+      .then((data) => { if (!ac.signal.aborted) setInformacao(data.informacao ?? null) })
+      .catch((error) => { if (!ac.signal.aborted) console.error("Erro ao buscar informação:", error) })
+      .finally(() => { if (!ac.signal.aborted) setLoading(false) })
+    return () => ac.abort()
   }, [processoId])
 
   // Resetar form
@@ -581,7 +588,7 @@ export function ProcessoInformacoes({
                               className="block aspect-square relative overflow-hidden"
                             >
                               {isImage ? (
-                                <img
+                                <ImagemRemota
                                   src={anexo.urlArquivo}
                                   alt={anexo.nome}
                                   className="w-full h-full object-cover"

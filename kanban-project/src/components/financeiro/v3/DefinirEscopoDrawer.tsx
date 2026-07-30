@@ -58,8 +58,9 @@ export default function DefinirEscopoDrawer({ receitaRef, onEscolher, onClose }:
     return () => { vivo = false; document.body.style.overflow = orig }
   }, [receitaRef])
 
-  const cobrancas: any[] = esc?.cobrancas ?? []
-  const participantes: any[] = esc?.participantes ?? []
+  // Memorizados: são dependências dos cálculos abaixo (identidade estável).
+  const cobrancas: any[] = useMemo(() => esc?.cobrancas ?? [], [esc])
+  const participantes: any[] = useMemo(() => esc?.participantes ?? [], [esc])
   const cobrancasDoParticipante = useMemo(() => cobrancas.filter((c) => c.obrigacaoId === selParticipante), [cobrancas, selParticipante])
 
   const podeConfirmar = useMemo(() => {

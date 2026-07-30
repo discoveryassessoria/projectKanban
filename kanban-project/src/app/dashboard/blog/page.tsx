@@ -1,7 +1,6 @@
 "use client"
-import { encerrarSessao } from "@/src/lib/sessao/cliente"
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from "react"
 import { useRouter } from 'next/navigation'
 import { HeaderBar } from "@/src/components/header-bar"
 import { Card, CardContent } from "@/components/ui/card"
@@ -25,6 +24,9 @@ import {
   Image as ImageIcon,
   Tag
 } from 'lucide-react'
+import { ImagemRemota } from '@/src/components/ui/imagem-remota'
+import { useUsuarioLogado } from "@/src/hooks/use-dados-headerbar"
+import { encerrarSessao } from "@/src/lib/sessao/cliente"
 
 interface Usuario {
   id: number
@@ -61,7 +63,7 @@ const categorias = [
 
 export default function BlogAdminPage() {
   const router = useRouter()
-  const [usuario, setUsuario] = useState<Usuario | null>(null)
+  const usuario = useUsuarioLogado() as unknown as Usuario
   const [posts, setPosts] = useState<BlogPost[]>([])
   const [loading, setLoading] = useState(true)
   const [filtroStatus, setFiltroStatus] = useState<string>('todos')
@@ -84,7 +86,13 @@ export default function BlogAdminPage() {
   })
   const [saving, setSaving] = useState(false)
 
-  const fetchPosts = async () => {
+  // Porteiro: sem credenciais no navegador, volta ao login. Só navegação.
+  useEffect(() => {
+    if (!localStorage.getItem("authToken") || !localStorage.getItem("user")) router.push('/login')
+  }, [router])
+
+  // Recarga por ação do usuário (criar/editar/excluir post).
+  const fetchPosts = useCallback(async () => {
     try {
       const response = await fetch('/api/admin/blog')
       const data = await response.json()
@@ -92,29 +100,19 @@ export default function BlogAdminPage() {
     } catch (error) {
       console.error('Erro ao buscar posts:', error)
       setPosts([])
-    } finally {
-      setLoading(false)
-    }
-  }
+    } finally { setLoading(false) }
+  }, [])
 
+  // MONTAGEM: busca no efeito; estado só na continuação da promessa.
   useEffect(() => {
-    const token = localStorage.getItem("authToken")
-    const userData = localStorage.getItem("user")
-
-    if (!token || !userData) {
-      router.push('/login')
-      return
-    }
-
-    try {
-      const user = JSON.parse(userData)
-      setUsuario(user)
-      fetchPosts()
-    } catch (error) {
-      console.error("Erro ao carregar dados do usuário:", error)
-      router.push('/login')
-    }
-  }, [router])
+    const ac = new AbortController()
+    fetch('/api/admin/blog', { signal: ac.signal })
+      .then((response) => response.json())
+      .then((data) => { if (!ac.signal.aborted) setPosts(Array.isArray(data) ? data : []) })
+      .catch((error) => { if (!ac.signal.aborted) { console.error('Erro ao buscar posts:', error); setPosts([]) } })
+      .finally(() => { if (!ac.signal.aborted) setLoading(false) })
+    return () => ac.abort()
+  }, [])
 
 
   const handleLogout = () => { void encerrarSessao("manual") }
@@ -368,7 +366,7 @@ export default function BlogAdminPage() {
               <CardContent className="p-12 text-center">
                 <FileText className="w-16 h-16 text-white/30 mx-auto mb-4" />
                 <p className="text-white/70 text-lg">Nenhum post encontrado</p>
-                <p className="text-white/50 text-sm mt-1">Clique em "Novo Post" para criar seu primeiro post</p>
+                <p className="text-white/50 text-sm mt-1">Clique em &quot;Novo Post&quot; para criar seu primeiro post</p>
               </CardContent>
             </Card>
           ) : (
@@ -380,8 +378,8 @@ export default function BlogAdminPage() {
                       {/* Imagem */}
                       <div className="w-32 h-24 flex-shrink-0 rounded-lg overflow-hidden bg-white/10">
                         {post.imagemUrl ? (
-                          <img 
-                            src={post.imagemUrl} 
+                          <ImagemRemota
+                            src={post.imagemUrl}
                             alt={post.imagemAlt || post.titulo}
                             className="w-full h-full object-cover"
                           />

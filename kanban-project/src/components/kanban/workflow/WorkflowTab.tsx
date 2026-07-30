@@ -163,9 +163,28 @@ export function WorkflowTab({ documentoId, onChange }: WorkflowTabProps) {
     }
   }, [documentoId])
 
+  // MONTAGEM: busca no efeito; estado só na continuação da promessa.
   useEffect(() => {
-    carregar()
-  }, [carregar])
+    const ac = new AbortController()
+    fetch(`/api/documentos/${documentoId}/workflow`, {
+      headers: { Authorization: `Bearer ${localStorage.getItem("authToken")}` },
+      signal: ac.signal,
+    })
+      .then(async (res) => {
+        if (!res.ok) throw new Error(`HTTP ${res.status}`)
+        const json = await res.json()
+        if (ac.signal.aborted) return
+        setWorkflow(json.workflow)
+        setSemWorkflowInterno(json.semWorkflowInterno === true)
+      })
+      .catch((e) => {
+        if (ac.signal.aborted) return
+        console.warn("[WorkflowTab] falha:", e)
+        setErro("Erro ao carregar workflow.")
+      })
+      .finally(() => { if (!ac.signal.aborted) setLoading(false) })
+    return () => ac.abort()
+  }, [documentoId])
 
   // "Iniciar operação" manual foi removido do fluxo: o backend materializa a operação
   // da fase atual automaticamente ao carregar o workflow (garantirOperacaoDocumentoV2).

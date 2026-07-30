@@ -124,12 +124,21 @@ export function BitrixSidebar() {
     }
   }, [])
 
+  // Não lidas: primeira leitura + atualização a cada 30s (mesmo intervalo das
+  // notificações do header). A escrita de estado fica na continuação da promessa.
   useEffect(() => {
-    fetchMensagensNaoLidas()
-    // Polling a cada 30 segundos (mesmo intervalo das notificações do header)
-    const interval = setInterval(fetchMensagensNaoLidas, 30000)
-    return () => clearInterval(interval)
-  }, [fetchMensagensNaoLidas])
+    const ac = new AbortController()
+    const puxar = () => {
+      const token = typeof window !== 'undefined' ? localStorage.getItem('authToken') : null
+      fetch('/api/admin/mensagens/nao-lidas', { headers: token ? { Authorization: `Bearer ${token}` } : {}, signal: ac.signal })
+        .then((response) => (response.ok ? response.json() : null))
+        .then((data) => { if (!ac.signal.aborted && data) setMensagensNaoLidas(data.totalNaoLidas || 0) })
+        .catch(() => { /* silencioso: não bloqueia a UI */ })
+    }
+    puxar()
+    const interval = setInterval(puxar, 30000)
+    return () => { clearInterval(interval); ac.abort() }
+  }, [])
   // =====================================================
 
   const isExpanded = !isCollapsed || isHovered

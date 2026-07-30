@@ -4,6 +4,9 @@ import { verificarPermissao } from '@/src/lib/verificar-permissao'
 
 // GET - Listar todas as uniões
 export async function GET(request: NextRequest) {
+  const semPermissao = await verificarPermissao(request, "arvore.ver")
+  if (semPermissao) return semPermissao
+
   try {
     const { searchParams } = new URL(request.url)
     const arvoreId = searchParams.get('arvoreId')

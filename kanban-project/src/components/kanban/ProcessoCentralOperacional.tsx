@@ -382,7 +382,6 @@ export function ProcessoCentralOperacional({
   // corpo renderiza `viewData ?? data` — mesmo layout, só leitura. `data` (fase ATIVA)
   // segue intacto para a trilha/resumo. Nunca snapshot; sempre dados reais da instância.
   const [viewData, setViewData] = useState<CentralOpData | null>(null)
-  const [viewLoading, setViewLoading] = useState(false)
   const [viewErro, setViewErro] = useState<string | null>(null)
 
   // Operação Antecipada: contexto (necessidade) para o modal de criação + lista por necessidade.
@@ -467,6 +466,7 @@ export function ProcessoCentralOperacional({
 
   // Delega o passo localizar_registro de uma necessidade (fila) SEM abrir a operação
   // nem criar Documento. Grava o responsável direto no passo.
+
   const getUserId = (): number | null => {
     try {
       const stored = localStorage.getItem("user")
@@ -478,8 +478,6 @@ export function ProcessoCentralOperacional({
     return null
   }
 
-  // `carregar` é declarada ANTES de quem a chama: leitura antecipada não
-  // acompanha mudanças do valor ao longo do tempo.
   const carregar = useCallback(
     async (modoSilencioso = false) => {
       if (!modoSilencioso) setLoading(true)
@@ -540,10 +538,8 @@ export function ProcessoCentralOperacional({
         setErroOperacao("Falha de rede ao delegar.")
       }
     },
-    [processo.id]
+    [processo.id, carregar]
   )
-
-
 
   // Lista de fases materializadas (para clicabilidade + navegação por instância).
   // Leitura pura; NUNCA materializa. Recarregada junto com a Central.
@@ -559,7 +555,14 @@ export function ProcessoCentralOperacional({
     } catch { /* silencioso: a trilha degrada para não-clicável */ }
   }, [processo.id])
 
-  useEffect(() => { carregarFases() }, [carregarFases])
+  useEffect(() => {
+    const ac = new AbortController()
+    fetch(`/api/processos/${processo.id}/phases`, { headers: { Authorization: `Bearer ${localStorage.getItem("authToken")}` }, signal: ac.signal })
+      .then((res) => (res.ok ? res.json() : null))
+      .then((j) => { if (!ac.signal.aborted && j) setPhases((j.phases ?? []) as PhaseMeta[]) })
+      .catch(() => { /* silencioso: a trilha degrada para não-clicável */ })
+    return () => ac.abort()
+  }, [processo.id])
 
   // Operações antecipadas do processo — exibidas INLINE dentro do documento/necessidade a que
   // pertencem. Recarregadas junto com a Central.
@@ -569,7 +572,14 @@ export function ProcessoCentralOperacional({
       if (res.ok) { const j = await res.json(); setOperacoes((j.operacoes ?? []) as OpAntecipada[]) }
     } catch { /* silencioso */ }
   }, [processo.id])
-  useEffect(() => { carregarOperacoes() }, [carregarOperacoes])
+  useEffect(() => {
+    const ac = new AbortController()
+    fetch(`/api/processos/${processo.id}/operacoes-antecipadas`, { headers: { Authorization: `Bearer ${localStorage.getItem("authToken")}` }, signal: ac.signal })
+      .then((res) => (res.ok ? res.json() : null))
+      .then((j) => { if (!ac.signal.aborted && j) setOperacoes((j.operacoes ?? []) as OpAntecipada[]) })
+      .catch(() => { /* silencioso */ })
+    return () => ac.abort()
+  }, [processo.id])
 
   const operacoesPorNec = new Map<number, OpAntecipada[]>()
   for (const o of operacoes) {
@@ -581,7 +591,7 @@ export function ProcessoCentralOperacional({
   const avaliarOperacao = useCallback(async (id: number, resultado: "SIM" | "PARCIAL" | "NAO" | "CANCELAR", resultadoObtido: string, resultadoDados?: Record<string, unknown>) => {
     await fetch(`/api/operacoes-antecipadas/${id}`, { method: "PATCH", headers: { "Content-Type": "application/json", Authorization: `Bearer ${localStorage.getItem("authToken")}` }, body: JSON.stringify({ resultado, resultadoObtido: resultadoObtido || null, resultadoDados: resultadoDados ?? null }) })
     await carregarOperacoes(); carregar(true)
-  }, [carregarOperacoes])
+  }, [carregarOperacoes, carregar])
 
   // "Abrir operação" da antecipada: reusa a MESMA tela oficial (drawer) + banner de contexto.
   const abrirOperacaoAntecipada = useCallback((op: OpAntecipada) => {
@@ -592,45 +602,45 @@ export function ProcessoCentralOperacional({
   // Carrega a fase PASSADA consultada (dados VIVOS, escopados por instância/ciclo) na
   // MESMA rota da Central, com ?faseCode&instanceId&ciclo. selectedPhaseKey só é != null
   // quando a fase selecionada NÃO é a ativa (onSelectPhase zera ao clicar na ativa).
-  const carregarView = useCallback(async (signal?: AbortSignal) => {
-    if (!selectedPhaseKey) { setViewData(null); setViewErro(null); setViewLoading(false); return }
-    const faseCode = phaseKeyToFaseCode(selectedPhaseKey)
-    if (!faseCode) { setViewData(null); return }
-    const meta = phases.find((p) => p.phaseKey === selectedPhaseKey)
-    setViewLoading(true); setViewErro(null)
-    try {
-      const userId = getUserId()
-      const params = new URLSearchParams({ queue: "all", sort: "priority", faseCode })
-      if (userId) params.set("userId", String(userId))
-      if (meta?.workflowInstanceId != null) params.set("instanceId", String(meta.workflowInstanceId))
-      if (meta?.ciclo != null) params.set("ciclo", String(meta.ciclo))
-      const res = await fetch(`/api/processos/${processo.id}/central-operacional?${params.toString()}`, {
-        headers: { Authorization: `Bearer ${localStorage.getItem("authToken")}` },
-        signal,
-      })
-      if (!res.ok) throw new Error(`HTTP ${res.status}`)
-      const json: CentralOpData = await res.json()
-      if (signal?.aborted) return // troca de fase mais recente venceu — descarta resposta antiga
-      setViewData(json)
-    } catch (e) {
-      // Requisição SUPERADA (fase trocou antes de resolver): ignora silenciosamente —
-      // NUNCA sobrescreve os dados/erro da consulta atual com uma resposta obsoleta.
-      if (signal?.aborted || (e as Error)?.name === "AbortError") return
-      console.warn("[ProcessoCentralOperacional] falha ao consultar fase:", e)
-      setViewErro("Não foi possível carregar os dados desta fase.")
-      setViewData(null)
-    } finally {
-      if (!signal?.aborted) setViewLoading(false)
-    }
-  }, [processo.id, selectedPhaseKey, phases])
 
   // Cada troca de fase ABORTA a consulta anterior — só a mais recente sobrevive (sem
-  // vazamento de dados de uma fase na outra por resposta fora de ordem).
+  // vazamento de dados de uma fase na outra por resposta fora de ordem). O estado de
+  // carregamento é DERIVADO da chave da consulta, não escrito no corpo do efeito.
+  const chaveView = `${processo.id}|${selectedPhaseKey ?? ""}`
+  const [viewCarregada, setViewCarregada] = useState<string | null>(null)
+  const viewLoading = !!selectedPhaseKey && viewCarregada !== chaveView
+
   useEffect(() => {
+    if (!selectedPhaseKey) return
     const ctrl = new AbortController()
-    carregarView(ctrl.signal)
+    const faseCode = phaseKeyToFaseCode(selectedPhaseKey)
+    if (!faseCode) return
+    const meta = phases.find((p) => p.phaseKey === selectedPhaseKey)
+    const userId = getUserId()
+    const params = new URLSearchParams({ queue: "all", sort: "priority", faseCode })
+    if (userId) params.set("userId", String(userId))
+    if (meta?.workflowInstanceId != null) params.set("instanceId", String(meta.workflowInstanceId))
+    if (meta?.ciclo != null) params.set("ciclo", String(meta.ciclo))
+    fetch(`/api/processos/${processo.id}/central-operacional?${params.toString()}`, {
+      headers: { Authorization: `Bearer ${localStorage.getItem("authToken")}` },
+      signal: ctrl.signal,
+    })
+      .then(async (res) => {
+        if (!res.ok) throw new Error(`HTTP ${res.status}`)
+        const json: CentralOpData = await res.json()
+        if (ctrl.signal.aborted) return
+        setViewData(json); setViewErro(null)
+      })
+      .catch((e) => {
+        // Requisição SUPERADA (fase trocou antes de resolver): ignora silenciosamente.
+        if (ctrl.signal.aborted || (e as Error)?.name === "AbortError") return
+        console.warn("[ProcessoCentralOperacional] falha ao consultar fase:", e)
+        setViewErro("Não foi possível carregar os dados desta fase.")
+        setViewData(null)
+      })
+      .finally(() => { if (!ctrl.signal.aborted) setViewCarregada(chaveView) })
     return () => ctrl.abort()
-  }, [carregarView])
+  }, [chaveView, processo.id, selectedPhaseKey, phases])
 
   // Otimista: marca o doc recém-mexido como "Atualizando…" na fila enquanto
   // a Central recarrega em 2º plano — evita a sensação de "concluí e nada mudou".
@@ -648,9 +658,30 @@ export function ProcessoCentralOperacional({
     )
   }, [])
 
+  // MONTAGEM: busca no efeito; estado só na continuação da promessa.
   useEffect(() => {
-    carregar()
-  }, [carregar])
+    const ac = new AbortController()
+    const userId = getUserId()
+    const params = new URLSearchParams({ queue: "all", sort: "priority" })
+    if (userId) params.set("userId", String(userId))
+    fetch(`/api/processos/${processo.id}/central-operacional?${params.toString()}`, {
+      headers: { Authorization: `Bearer ${localStorage.getItem("authToken")}` },
+      signal: ac.signal,
+    })
+      .then(async (res) => {
+        if (res.status === 404) throw new Error("Endpoint /api/processos/[id]/central-operacional ainda não existe.")
+        if (!res.ok) throw new Error(`HTTP ${res.status}`)
+        const json: CentralOpData = await res.json()
+        if (!ac.signal.aborted) setData(json)
+      })
+      .catch((e) => {
+        if (ac.signal.aborted) return
+        console.warn("[ProcessoCentralOperacional] falha:", e)
+        setErro((e as Error)?.message ?? "Não foi possível carregar a Central Operacional.")
+      })
+      .finally(() => { if (!ac.signal.aborted) setLoading(false) })
+    return () => ac.abort()
+  }, [processo.id])
 
   // Loading inicial
   if (loading && !data) {

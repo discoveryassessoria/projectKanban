@@ -38,14 +38,15 @@ export function GlobalSearch({ autoFocusRef }: { autoFocusRef?: React.RefObject<
   // Debounce da busca
   React.useEffect(() => {
     const termo = q.trim()
-    if (termo.length < 2) {
-      setResultados([])
-      setCarregando(false)
-      return
-    }
-    setCarregando(true)
     const id = ++reqId.current
+    // Toda escrita de estado acontece no timer (fora do corpo síncrono do efeito).
     const timer = setTimeout(async () => {
+      if (termo.length < 2) {
+        setResultados([])
+        setCarregando(false)
+        return
+      }
+      setCarregando(true)
       try {
         const res = await buscarGlobal(termo)
         if (id === reqId.current) {
@@ -58,7 +59,7 @@ export function GlobalSearch({ autoFocusRef }: { autoFocusRef?: React.RefObject<
       } finally {
         if (id === reqId.current) setCarregando(false)
       }
-    }, 250)
+    }, termo.length < 2 ? 0 : 250)
     return () => clearTimeout(timer)
   }, [q])
 

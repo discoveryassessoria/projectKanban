@@ -54,6 +54,11 @@ const MOEDAS: [string, string][] = [['BRL', 'Real (BRL)'], ['EUR', 'Euro (EUR)']
 const ORIGENS: [string, string][] = [
   ['documento', 'Documento'], ['servico', 'Serviço'], ['honorario', 'Honorário'], ['processo', 'Processo / Modalidade'],
 ]
+// Origens CRIÁVEIS — só cadastros mestres oficiais. "Honorário" saiu da arquitetura
+// (honorário é Serviço do Catálogo Mestre + Configuração Financeira + preço na Tabela
+// de Valores). O rótulo continua em ORIGENS apenas para LER as configurações antigas
+// que ainda apontam para o mestre legado — o backend recusa novos vínculos.
+const ORIGENS_CRIAVEIS: [string, string][] = ORIGENS.filter(([k]) => k !== 'honorario')
 type MestreRef = { id: number; label: string; code: string | null }
 type Mestres = { documento: MestreRef[]; servico: MestreRef[]; honorario: MestreRef[]; processo: MestreRef[] }
 type FornecedorRef = { id: number; nome: string; publicCode: string | null }
@@ -141,16 +146,21 @@ export default function ProdutosTab() {
 
   const set = (k: keyof FormState, v: any) => setForm((f) => ({ ...f, [k]: v }))
 
-  const carregar = useCallback(async () => {
-    setLoading(true); setErroLista(null)
-    try {
+  // Carga da tela em UM lugar: `aplicar` só escreve estado; quem chama decide
+  // se mostra o estado de carregamento. `sinal` cancela a escrita se a tela sair.
+  // BUSCA: só entrada/saída de rede, nenhuma escrita de estado.
+  const buscar = useCallback(async (sinal?: AbortSignal) => {
       const [dProd, dCat, dContas] = await Promise.all([
-        jsonFetch('/api/gerenciamento/produtos', { cache: 'no-store' }),
-        jsonFetch('/api/gerenciamento/categorias', { cache: 'no-store' }).catch(() => ({ categorias: [] })),
-        jsonFetch('/api/gerenciamento/plano-contas', { cache: 'no-store' }).catch(() => ({ contas: [] })),
+        jsonFetch('/api/gerenciamento/produtos', { cache: 'no-store', signal: sinal }),
+        jsonFetch('/api/gerenciamento/categorias', { cache: 'no-store', signal: sinal }).catch(() => ({ categorias: [] })),
+        jsonFetch('/api/gerenciamento/plano-contas', { cache: 'no-store', signal: sinal }).catch(() => ({ contas: [] })),
       ])
-      setProdutos((dProd as any).produtos || [])
       const m = (dProd as any).mestres || {}
+    return { dProd, dCat, dContas, m }
+  }, [])
+  // APLICAÇÃO: ponto único de escrita do estado da carga.
+  const aplicar = useCallback(({ dProd, dCat, dContas, m }: any) => {
+      setProdutos((dProd as any).produtos || [])
       setMestres({
         documento: (m.tiposDocumento || []).map((d: any) => ({ id: d.id, label: d.name, code: d.code ?? null })),
         servico: (m.servicos || []).map((x: any) => ({ id: x.id, label: x.publicCode ? `${x.publicCode} — ${x.name}` : x.name, code: x.code ?? null })),
@@ -160,14 +170,27 @@ export default function ProdutosTab() {
       setFornecedores((m.fornecedores || []).map((f: any) => ({ id: f.id, nome: f.nome, publicCode: f.publicCode ?? null })))
       setCategorias((dCat as any).categorias || [])
       setContas((dContas as any).contas || [])
-    } catch (e: any) {
-      setErroLista(e.message || 'Não foi possível carregar as configurações.')
-    } finally {
-      setLoading(false)
-    }
   }, [])
 
-  useEffect(() => { carregar() }, [carregar])
+  // MONTAGEM: o efeito não escreve estado de forma síncrona (`Loading` já nasce
+  // true e `ErroLista` nasce null) — a escrita acontece na continuação da promessa.
+  useEffect(() => {
+    const ac = new AbortController()
+    buscar(ac.signal)
+      .then((d) => { if (!ac.signal.aborted) aplicar(d) })
+      .catch((e: any) => { if (!ac.signal.aborted) setErroLista(e.message || 'Não foi possível carregar as configurações.') })
+      .finally(() => { if (!ac.signal.aborted) setLoading(false) })
+    return () => ac.abort()
+  }, [buscar, aplicar])
+
+  // RECARGA por ação do usuário (salvar/excluir/atualizar): aí sim volta ao
+  // estado de carregamento antes de buscar de novo.
+  const carregar = useCallback(async () => {
+    setLoading(true); setErroLista(null)
+    try { aplicar(await buscar()) }
+    catch (e: any) { setErroLista(e.message || 'Não foi possível carregar as configurações.') }
+    finally { setLoading(false) }
+  }, [buscar, aplicar])
 
   const filtrados = useMemo(() => {
     const base = mostrarInativos ? produtos : produtos.filter((p) => p.ativo)
@@ -189,7 +212,11 @@ export default function ProdutosTab() {
     if (!q) return arr.slice(0, 50)
     return arr.filter((m) => m.label.toLowerCase().includes(q) || (m.code ?? '').toLowerCase().includes(q)).slice(0, 50)
   }, [mestres, form.origem, masterBusca])
-  const masterSelecionado = (mestres[form.origem as keyof Mestres] ?? []).find((m) => String(m.id) === form.masterId) || null
+  // Na EDIÇÃO o mestre já está travado: exibe o que a própria configuração guarda,
+  // sem depender da lista de mestres selecionáveis (que só traz cadastros oficiais).
+  const masterSelecionado =
+    (mestres[form.origem as keyof Mestres] ?? []).find((m) => String(m.id) === form.masterId)
+    ?? (editando && form.masterId ? { id: Number(form.masterId), label: form.nome, code: editando.mestre?.codigo ?? null } : null)
 
   // O nome/código de negócio vêm do MESTRE (não são montados aqui). Só guardamos o
   // vínculo (masterId) e o nome real do mestre para exibição; o código real é do mestre.
@@ -391,7 +418,7 @@ export default function ProdutosTab() {
                 <div>
                   <label className="mb-1 block text-xs text-white/60">Origem do cadastro</label>
                   <select value={form.origem} onChange={(e) => mudarOrigem(e.target.value)} disabled={!!editando} className={inputCls + (editando ? ' opacity-60' : '')}>
-                    {ORIGENS.map(([k, label]) => <option key={k} value={k} className="bg-zinc-900">{label}</option>)}
+                    {(editando ? ORIGENS : ORIGENS_CRIAVEIS).map(([k, label]) => <option key={k} value={k} className="bg-zinc-900">{label}</option>)}
                   </select>
                 </div>
                 <div>

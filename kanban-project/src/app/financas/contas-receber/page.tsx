@@ -66,6 +66,16 @@ export default function ContasReceberPage() {
   const [searchTerm, setSearchTerm] = useState("")
   const [statusFilter, setStatusFilter] = useState<string>("todos")
 
+  // MONTAGEM: busca no efeito, escrita de estado só na continuação da promessa.
+  useEffect(() => {
+    const ac = new AbortController()
+    fetch('/api/faturas', { signal: ac.signal })
+      .then(async (response) => { if (!ac.signal.aborted && response.ok) setFaturas(await response.json()) })
+      .catch((error) => { if (!ac.signal.aborted) console.error("Erro ao carregar faturas:", error) })
+      .finally(() => { if (!ac.signal.aborted) setLoading(false) })
+    return () => ac.abort()
+  }, [])
+
   const fetchFaturas = async () => {
     try {
       const response = await fetch('/api/faturas')
@@ -79,11 +89,6 @@ export default function ContasReceberPage() {
       setLoading(false)
     }
   }
-
-  useEffect(() => {
-    fetchFaturas()
-  }, [])
-
 
   const formatCurrency = (value: number) => {
     return new Intl.NumberFormat('pt-BR', {

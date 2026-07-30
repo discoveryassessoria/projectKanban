@@ -71,6 +71,16 @@ export function ProcessoEventos({ processoId, onUpdate }: ProcessoEventosProps) 
   const [lembreteDias, setLembreteDias] = useState("")
   const { pode } = usePermissoes()
 
+  // MONTAGEM: busca no efeito; estado só na continuação da promessa.
+  useEffect(() => {
+    const ac = new AbortController()
+    fetch(`/api/eventos?processoId=${processoId}`, { signal: ac.signal })
+      .then((res) => res.json())
+      .then((data) => { if (!ac.signal.aborted) setEventos(data.eventos || []) })
+      .catch((error) => { if (!ac.signal.aborted) console.error("Erro ao buscar eventos:", error) })
+    return () => ac.abort()
+  }, [processoId])
+
   const fetchEventos = async () => {
     try {
       const res = await fetch(`/api/eventos?processoId=${processoId}`)
@@ -82,11 +92,6 @@ export function ProcessoEventos({ processoId, onUpdate }: ProcessoEventosProps) 
       setIsLoading(false)
     }
   }
-
-  useEffect(() => {
-    fetchEventos()
-  }, [processoId])
-
 
   const resetForm = () => {
     setTitulo("")
@@ -425,7 +430,7 @@ export function ProcessoEventos({ processoId, onUpdate }: ProcessoEventosProps) 
             <Calendar className="h-12 w-12 mx-auto mb-4 text-gray-300" />
             <p className="text-gray-500">Nenhum evento cadastrado</p>
             <p className="text-sm text-gray-400 mt-1">
-              Clique em "Novo Evento" para adicionar
+              Clique em &quot;Novo Evento&quot; para adicionar
             </p>
           </div>
         ) : (

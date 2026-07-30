@@ -488,81 +488,82 @@ export function EditorSolicitarCertidao({
   const readOnly = stepStatus === "concluida"
 
   // Carrega doc + step
-  const carregar = useCallback(async () => {
-    if (!documentoId || !isOpen) return
-    setLoading(true)
-    try {
-      // Doc
-      const resDoc = await fetch(`/api/documentos/${documentoId}`, { headers: authHeader() })
-      if (resDoc.ok) {
-        const d = await resDoc.json()
-        const snap: DocSnapshot = {
-          id: d.id,
-          tipo: d.tipo,
-          cartorio: d.cartorio,
-          livro: d.livro,
-          folha: d.folha,
-          termo: d.termo,
-          nome_registrado: d.nome_registrado,
-          data_evento: d.data_evento,
-          pessoa: d.pessoa
-            ? { id: d.pessoa.id, nome: d.pessoa.nome, sobrenome: d.pessoa.sobrenome }
-            : null,
-          canal_solicitacao: d.canal_solicitacao,
-          protocolo: d.protocolo,
-          nro_pedido: d.nro_pedido,
-          link_acompanhamento: d.link_acompanhamento,
-          observacoes: d.observacoes,
-        }
-        setDoc(snap)
-
-        // Carrega step pra recuperar detalhes do envio se já tiver sido salvo
-        const resWf = await fetch(`/api/documentos/${documentoId}/workflow`, {
-          headers: authHeader(),
-        })
-        let stepData: {
-          externalEntityName?: string | null
-          costPaid?: string | number | null
-          paymentMethod?: string | null
-          trackingCode?: string | null
-          externalProtocol?: string | null
-        } = {}
-        if (resWf.ok) {
-          const wfData = await resWf.json()
-          stepData =
-            wfData.workflow?.steps?.find((s: { id: number }) => s.id === stepId) || {}
-        }
-
-        // Determina canal salvo (se houver) — só aceita se for canal válido
-        const canalSalvo = (snap.canal_solicitacao || "").toLowerCase()
-        const canalValido = CANAIS.find((c) => c.id === canalSalvo)?.id || null
-
-        // ✅ PRÉ-SELEÇÃO: se não há canal salvo, usa o recomendado
-        // (mesma lógica do HTML — assim as seções "Evidências" e
-        //  "Detalhes do envio" aparecem automaticamente ao abrir)
-        const canalInicial = canalValido || getRecomendacao(snap).canal
-
-        setForm({
-          canal: canalInicial,
-          attachmentUrl: snap.link_acompanhamento || "",
-          protocolo: snap.protocolo || stepData.externalProtocol || "",
-          trackingCode: stepData.trackingCode || "",
-          observacao: snap.observacoes || "",
-          externalEntityName: stepData.externalEntityName || "",
-          costPaid: stepData.costPaid != null ? String(stepData.costPaid) : "",
-          paymentMethod: stepData.paymentMethod || "",
-        })
-      }
-    } catch (e) {
-      console.warn("[EditorSolicitarCertidao] carregar:", e)
-    } finally {
-      setLoading(false)
-    }
-  }, [documentoId, isOpen, stepId])
-
+  // Carga ao ABRIR. O corpo vive DENTRO do efeito: nenhuma escrita de estado
+  // acontece no corpo síncrono — todas ficam na continuação assíncrona.
   useEffect(() => {
-    if (isOpen) carregar()
-  }, [isOpen, carregar])
+    if (!isOpen) return
+    void (async () => {
+      if (!documentoId || !isOpen) return
+      setLoading(true)
+      try {
+        // Doc
+        const resDoc = await fetch(`/api/documentos/${documentoId}`, { headers: authHeader() })
+        if (resDoc.ok) {
+          const d = await resDoc.json()
+          const snap: DocSnapshot = {
+            id: d.id,
+            tipo: d.tipo,
+            cartorio: d.cartorio,
+            livro: d.livro,
+            folha: d.folha,
+            termo: d.termo,
+            nome_registrado: d.nome_registrado,
+            data_evento: d.data_evento,
+            pessoa: d.pessoa
+              ? { id: d.pessoa.id, nome: d.pessoa.nome, sobrenome: d.pessoa.sobrenome }
+              : null,
+            canal_solicitacao: d.canal_solicitacao,
+            protocolo: d.protocolo,
+            nro_pedido: d.nro_pedido,
+            link_acompanhamento: d.link_acompanhamento,
+            observacoes: d.observacoes,
+          }
+          setDoc(snap)
+
+          // Carrega step pra recuperar detalhes do envio se já tiver sido salvo
+          const resWf = await fetch(`/api/documentos/${documentoId}/workflow`, {
+            headers: authHeader(),
+          })
+          let stepData: {
+            externalEntityName?: string | null
+            costPaid?: string | number | null
+            paymentMethod?: string | null
+            trackingCode?: string | null
+            externalProtocol?: string | null
+          } = {}
+          if (resWf.ok) {
+            const wfData = await resWf.json()
+            stepData =
+              wfData.workflow?.steps?.find((s: { id: number }) => s.id === stepId) || {}
+          }
+
+          // Determina canal salvo (se houver) — só aceita se for canal válido
+          const canalSalvo = (snap.canal_solicitacao || "").toLowerCase()
+          const canalValido = CANAIS.find((c) => c.id === canalSalvo)?.id || null
+
+          // ✅ PRÉ-SELEÇÃO: se não há canal salvo, usa o recomendado
+          // (mesma lógica do HTML — assim as seções "Evidências" e
+          //  "Detalhes do envio" aparecem automaticamente ao abrir)
+          const canalInicial = canalValido || getRecomendacao(snap).canal
+
+          setForm({
+            canal: canalInicial,
+            attachmentUrl: snap.link_acompanhamento || "",
+            protocolo: snap.protocolo || stepData.externalProtocol || "",
+            trackingCode: stepData.trackingCode || "",
+            observacao: snap.observacoes || "",
+            externalEntityName: stepData.externalEntityName || "",
+            costPaid: stepData.costPaid != null ? String(stepData.costPaid) : "",
+            paymentMethod: stepData.paymentMethod || "",
+          })
+        }
+      } catch (e) {
+        console.warn("[EditorSolicitarCertidao] carregar:", e)
+      } finally {
+        setLoading(false)
+      }
+    })()
+  }, [documentoId, isOpen, stepId])
 
   const canalConfig = form.canal ? CANAIS.find((c) => c.id === form.canal)! : null
   const recomendacao = doc ? getRecomendacao(doc) : null
@@ -1167,61 +1168,62 @@ export function EditorAguardarRetorno({
 
   const readOnly = stepStatus === "concluida"
 
-  const carregar = useCallback(async () => {
-    if (!documentoId || !stepId || !isOpen) return
-    setLoading(true)
-    try {
-      const [resWf, resDoc] = await Promise.all([
-        fetch(`/api/documentos/${documentoId}/workflow`, { headers: authHeader() }),
-        fetch(`/api/documentos/${documentoId}`, { headers: authHeader() }),
-      ])
-
-      let currentStep: Record<string, unknown> | null = null
-      let prevStep: Record<string, unknown> | null = null
-      if (resWf.ok) {
-        const d = await resWf.json()
-        const steps = d.workflow?.steps || []
-        currentStep = steps.find((s: { id: number }) => s.id === stepId) || null
-        prevStep = steps.find((s: { stepKey: string }) => s.stepKey === "solicitar_certidao") || null
-      }
-      if (currentStep) {
-        setTrackingCode((currentStep.trackingCode as string) || "")
-        setNotes((currentStep.notes as string) || "")
-      }
-
-      let doc: Record<string, unknown> = {}
-      if (resDoc.ok) doc = await resDoc.json()
-
-      setSolicit({
-        atendente: (prevStep?.externalEntityName as string) || null,
-        cartorio: (doc.cartorio as string) || null,
-        canal:
-          (doc.canal_solicitacao as string) ||
-          (prevStep?.requestChannel as string) ||
-          null,
-        protocolo:
-          (doc.protocolo as string) ||
-          (prevStep?.externalProtocol as string) ||
-          null,
-        link: (doc.link_acompanhamento as string) || null,
-        observacao: (doc.observacoes as string) || null,
-        sentAt:
-          (prevStep?.completedAt as string) ||
-          (prevStep?.startedAt as string) ||
-          null,
-        custoPago: (prevStep?.costPaid as number) ?? null,
-        formaPagamento: (prevStep?.paymentMethod as string) || null,
-      })
-    } catch (e) {
-      console.warn("[EditorAguardarRetorno]", e)
-    } finally {
-      setLoading(false)
-    }
-  }, [documentoId, stepId, isOpen])
-
+  // Carga ao ABRIR. O corpo vive DENTRO do efeito: nenhuma escrita de estado
+  // acontece no corpo síncrono — todas ficam na continuação assíncrona.
   useEffect(() => {
-    if (isOpen) carregar()
-  }, [isOpen, carregar])
+    if (!isOpen) return
+    void (async () => {
+      if (!documentoId || !stepId || !isOpen) return
+      setLoading(true)
+      try {
+        const [resWf, resDoc] = await Promise.all([
+          fetch(`/api/documentos/${documentoId}/workflow`, { headers: authHeader() }),
+          fetch(`/api/documentos/${documentoId}`, { headers: authHeader() }),
+        ])
+
+        let currentStep: Record<string, unknown> | null = null
+        let prevStep: Record<string, unknown> | null = null
+        if (resWf.ok) {
+          const d = await resWf.json()
+          const steps = d.workflow?.steps || []
+          currentStep = steps.find((s: { id: number }) => s.id === stepId) || null
+          prevStep = steps.find((s: { stepKey: string }) => s.stepKey === "solicitar_certidao") || null
+        }
+        if (currentStep) {
+          setTrackingCode((currentStep.trackingCode as string) || "")
+          setNotes((currentStep.notes as string) || "")
+        }
+
+        let doc: Record<string, unknown> = {}
+        if (resDoc.ok) doc = await resDoc.json()
+
+        setSolicit({
+          atendente: (prevStep?.externalEntityName as string) || null,
+          cartorio: (doc.cartorio as string) || null,
+          canal:
+            (doc.canal_solicitacao as string) ||
+            (prevStep?.requestChannel as string) ||
+            null,
+          protocolo:
+            (doc.protocolo as string) ||
+            (prevStep?.externalProtocol as string) ||
+            null,
+          link: (doc.link_acompanhamento as string) || null,
+          observacao: (doc.observacoes as string) || null,
+          sentAt:
+            (prevStep?.completedAt as string) ||
+            (prevStep?.startedAt as string) ||
+            null,
+          custoPago: (prevStep?.costPaid as number) ?? null,
+          formaPagamento: (prevStep?.paymentMethod as string) || null,
+        })
+      } catch (e) {
+        console.warn("[EditorAguardarRetorno]", e)
+      } finally {
+        setLoading(false)
+      }
+    })()
+  }, [documentoId, stepId, isOpen])
 
   const followups = parseFollowups(notes)
 
@@ -1659,41 +1661,42 @@ export function EditorReceberCertidao({
 
   const readOnly = stepStatus === "concluida"
 
-  const carregar = useCallback(async () => {
-    if (!documentoId || !stepId || !isOpen) return
-    setLoading(true)
-    try {
-      const [resDoc, resWf] = await Promise.all([
-        fetch(`/api/documentos/${documentoId}`, { headers: authHeader() }),
-        fetch(`/api/documentos/${documentoId}/workflow`, { headers: authHeader() }),
-      ])
-      if (resDoc.ok) {
-        const d = await resDoc.json()
-        setArquivoUrl(d.arquivo_url || "")
-        setArquivoNome(d.arquivo_nome || "")
-        setArquivoTamanho(d.arquivo_tamanho ?? null)
-        setArquivoMime(d.arquivo_mime_type ?? null)
-        setPhysicalLocation(d.localizacao_fisica || "")
-      }
-      if (resWf.ok) {
-        const d = await resWf.json()
-        const step = d.workflow?.steps?.find((s: { id: number }) => s.id === stepId)
-        if (step) {
-          setMedium((step.documentMedium as DocumentMedium) || null)
-          if (step.physicalLocation) setPhysicalLocation(step.physicalLocation)
-          if (step.stepObservation) setObservacao(step.stepObservation)
-        }
-      }
-    } catch (e) {
-      console.warn("[EditorReceberCertidao]", e)
-    } finally {
-      setLoading(false)
-    }
-  }, [documentoId, stepId, isOpen])
-
+  // Carga ao ABRIR. O corpo vive DENTRO do efeito: nenhuma escrita de estado
+  // acontece no corpo síncrono — todas ficam na continuação assíncrona.
   useEffect(() => {
-    if (isOpen) carregar()
-  }, [isOpen, carregar])
+    if (!isOpen) return
+    void (async () => {
+      if (!documentoId || !stepId || !isOpen) return
+      setLoading(true)
+      try {
+        const [resDoc, resWf] = await Promise.all([
+          fetch(`/api/documentos/${documentoId}`, { headers: authHeader() }),
+          fetch(`/api/documentos/${documentoId}/workflow`, { headers: authHeader() }),
+        ])
+        if (resDoc.ok) {
+          const d = await resDoc.json()
+          setArquivoUrl(d.arquivo_url || "")
+          setArquivoNome(d.arquivo_nome || "")
+          setArquivoTamanho(d.arquivo_tamanho ?? null)
+          setArquivoMime(d.arquivo_mime_type ?? null)
+          setPhysicalLocation(d.localizacao_fisica || "")
+        }
+        if (resWf.ok) {
+          const d = await resWf.json()
+          const step = d.workflow?.steps?.find((s: { id: number }) => s.id === stepId)
+          if (step) {
+            setMedium((step.documentMedium as DocumentMedium) || null)
+            if (step.physicalLocation) setPhysicalLocation(step.physicalLocation)
+            if (step.stepObservation) setObservacao(step.stepObservation)
+          }
+        }
+      } catch (e) {
+        console.warn("[EditorReceberCertidao]", e)
+      } finally {
+        setLoading(false)
+      }
+    })()
+  }, [documentoId, stepId, isOpen])
 
   const showPhysicalLocation = medium === "fisico" || medium === "ambos"
   const podeConcluir =
@@ -2025,74 +2028,75 @@ export function EditorConferirCertidao({
 
   const readOnly = stepStatus === "concluida"
 
-  const carregar = useCallback(async () => {
-    if (!documentoId || !stepId || !isOpen) return
-    setLoading(true)
-    try {
-      const [resDoc, resWf] = await Promise.all([
-        fetch(`/api/documentos/${documentoId}`, { headers: authHeader() }),
-        fetch(`/api/documentos/${documentoId}/workflow`, { headers: authHeader() }),
-      ])
+  // Carga ao ABRIR. O corpo vive DENTRO do efeito: nenhuma escrita de estado
+  // acontece no corpo síncrono — todas ficam na continuação assíncrona.
+  useEffect(() => {
+    if (!isOpen) return
+    void (async () => {
+      if (!documentoId || !stepId || !isOpen) return
+      setLoading(true)
+      try {
+        const [resDoc, resWf] = await Promise.all([
+          fetch(`/api/documentos/${documentoId}`, { headers: authHeader() }),
+          fetch(`/api/documentos/${documentoId}/workflow`, { headers: authHeader() }),
+        ])
 
-      if (resDoc.ok) {
-        const d = await resDoc.json()
-        setDocTipo(d.tipo || null)
-        setArquivoUrl(d.arquivo_url || null)
-        setArquivoNome(d.arquivo_nome || null)
-        setNomeRegistrado(d.nome_registrado || "")
-        setPaiRegistrado(d.pai_registrado || "")
-        setMaeRegistrada(d.mae_registrada || "")
-        setConjugeRegistrado(d.conjuge_registrado || "")
-        setDataEventoDoc(
-          d.data_evento_documento ? d.data_evento_documento.slice(0, 10) : "",
-        )
-        setDataRegistroDoc(
-          d.data_registro_documento ? d.data_registro_documento.slice(0, 10) : "",
-        )
-        if (d.pessoa) {
-          setPessoa({
-            nome: d.pessoa.nome || null,
-            sobrenome: d.pessoa.sobrenome || null,
-            pai: d.pessoa.pai
-              ? { nome: d.pessoa.pai.nome, sobrenome: d.pessoa.pai.sobrenome }
-              : null,
-            mae: d.pessoa.mae
-              ? { nome: d.pessoa.mae.nome, sobrenome: d.pessoa.mae.sobrenome }
-              : null,
-          })
-        }
-      }
-      if (resWf.ok) {
-        const d = await resWf.json()
-        const step = d.workflow?.steps?.find((s: { id: number }) => s.id === stepId)
-        if (step) {
-          if (step.reviewChecklist) {
-            setChecklist({
-              legivel: !!step.reviewChecklist.legivel,
-              integro: !!step.reviewChecklist.integro,
-              dados_minimos: !!step.reviewChecklist.dados_minimos,
-              apostila_ok: !!step.reviewChecklist.apostila_ok,
-              traducao_ok: !!step.reviewChecklist.traducao_ok,
+        if (resDoc.ok) {
+          const d = await resDoc.json()
+          setDocTipo(d.tipo || null)
+          setArquivoUrl(d.arquivo_url || null)
+          setArquivoNome(d.arquivo_nome || null)
+          setNomeRegistrado(d.nome_registrado || "")
+          setPaiRegistrado(d.pai_registrado || "")
+          setMaeRegistrada(d.mae_registrada || "")
+          setConjugeRegistrado(d.conjuge_registrado || "")
+          setDataEventoDoc(
+            d.data_evento_documento ? d.data_evento_documento.slice(0, 10) : "",
+          )
+          setDataRegistroDoc(
+            d.data_registro_documento ? d.data_registro_documento.slice(0, 10) : "",
+          )
+          if (d.pessoa) {
+            setPessoa({
+              nome: d.pessoa.nome || null,
+              sobrenome: d.pessoa.sobrenome || null,
+              pai: d.pessoa.pai
+                ? { nome: d.pessoa.pai.nome, sobrenome: d.pessoa.pai.sobrenome }
+                : null,
+              mae: d.pessoa.mae
+                ? { nome: d.pessoa.mae.nome, sobrenome: d.pessoa.mae.sobrenome }
+                : null,
             })
           }
-          if (step.reviewResult) {
-            setResultado(step.reviewResult as ConferirResultado)
-          }
-          if (step.stepObservation) {
-            setObservacao(step.stepObservation)
+        }
+        if (resWf.ok) {
+          const d = await resWf.json()
+          const step = d.workflow?.steps?.find((s: { id: number }) => s.id === stepId)
+          if (step) {
+            if (step.reviewChecklist) {
+              setChecklist({
+                legivel: !!step.reviewChecklist.legivel,
+                integro: !!step.reviewChecklist.integro,
+                dados_minimos: !!step.reviewChecklist.dados_minimos,
+                apostila_ok: !!step.reviewChecklist.apostila_ok,
+                traducao_ok: !!step.reviewChecklist.traducao_ok,
+              })
+            }
+            if (step.reviewResult) {
+              setResultado(step.reviewResult as ConferirResultado)
+            }
+            if (step.stepObservation) {
+              setObservacao(step.stepObservation)
+            }
           }
         }
+      } catch (e) {
+        console.warn("[EditorConferirCertidao]", e)
+      } finally {
+        setLoading(false)
       }
-    } catch (e) {
-      console.warn("[EditorConferirCertidao]", e)
-    } finally {
-      setLoading(false)
-    }
+    })()
   }, [documentoId, stepId, isOpen])
-
-  useEffect(() => {
-    if (isOpen) carregar()
-  }, [isOpen, carregar])
 
   const ehCasamento = isCasamento(docTipo)
   const podeConcluir = nomeRegistrado.trim().length > 0 && resultado !== null
@@ -2555,73 +2559,79 @@ export function EditorValidarCertidao({
 
   const readOnly = stepStatus === "concluida"
 
-  const carregar = useCallback(async () => {
-    if (!documentoId || !stepId || !isOpen) return
-    setLoading(true)
-    try {
-      const [resDoc, resWf] = await Promise.all([
-        fetch(`/api/documentos/${documentoId}`, { headers: authHeader() }),
-        fetch(`/api/documentos/${documentoId}/workflow`, { headers: authHeader() }),
-      ])
+  // Carga ao ABRIR. O corpo vive DENTRO do efeito: nenhuma escrita de estado
+  // acontece no corpo síncrono — todas ficam na continuação assíncrona.
+  useEffect(() => {
+    if (!isOpen) return
+    void (async () => {
+      if (!documentoId || !stepId || !isOpen) return
+      setLoading(true)
+      try {
+        const [resDoc, resWf] = await Promise.all([
+          fetch(`/api/documentos/${documentoId}`, { headers: authHeader() }),
+          fetch(`/api/documentos/${documentoId}/workflow`, { headers: authHeader() }),
+        ])
 
-      if (resDoc.ok) {
-        const d = await resDoc.json()
-        setDocTipo(d.tipo || null)
-        setArquivoUrl(d.arquivo_url || null)
-        setArquivoNome(d.arquivo_nome || null)
-        if (d.pessoa) {
-          setPessoaNome(
-            `${d.pessoa.nome || ""} ${d.pessoa.sobrenome || ""}`.trim() || null,
+        if (resDoc.ok) {
+          const d = await resDoc.json()
+          setDocTipo(d.tipo || null)
+          setArquivoUrl(d.arquivo_url || null)
+          setArquivoNome(d.arquivo_nome || null)
+          if (d.pessoa) {
+            setPessoaNome(
+              `${d.pessoa.nome || ""} ${d.pessoa.sobrenome || ""}`.trim() || null,
+            )
+          }
+        }
+
+        if (resWf.ok) {
+          const d = await resWf.json()
+          const steps = d.workflow?.steps || []
+
+          // Recupera o step atual (validar)
+          const current = steps.find((s: { id: number }) => s.id === stepId)
+          if (current) {
+            if (current.validationResult) {
+              setDecisao(current.validationResult as ValidarDecisao)
+            }
+            if (current.legalOpinion) {
+              setParecer(current.legalOpinion)
+            }
+          }
+
+          // Recupera o step anterior (conferir) pra exibir como contexto
+          const conf = steps.find(
+            (s: { stepKey: string }) => s.stepKey === "conferir_certidao",
           )
-        }
-      }
-
-      if (resWf.ok) {
-        const d = await resWf.json()
-        const steps = d.workflow?.steps || []
-
-        // Recupera o step atual (validar)
-        const current = steps.find((s: { id: number }) => s.id === stepId)
-        if (current) {
-          if (current.validationResult) {
-            setDecisao(current.validationResult as ValidarDecisao)
-          }
-          if (current.legalOpinion) {
-            setParecer(current.legalOpinion)
+          if (conf) {
+            setConferencia({
+              resultado: conf.reviewResult || null,
+              observacao: conf.stepObservation || null,
+              completedBy: conf.completedBy?.nome || null,
+              completedAt: conf.completedAt || null,
+            })
           }
         }
-
-        // Recupera o step anterior (conferir) pra exibir como contexto
-        const conf = steps.find(
-          (s: { stepKey: string }) => s.stepKey === "conferir_certidao",
-        )
-        if (conf) {
-          setConferencia({
-            resultado: conf.reviewResult || null,
-            observacao: conf.stepObservation || null,
-            completedBy: conf.completedBy?.nome || null,
-            completedAt: conf.completedAt || null,
-          })
-        }
+      } catch (e) {
+        console.warn("[EditorValidarCertidao]", e)
+      } finally {
+        setLoading(false)
       }
-    } catch (e) {
-      console.warn("[EditorValidarCertidao]", e)
-    } finally {
-      setLoading(false)
-    }
+    })()
   }, [documentoId, stepId, isOpen])
 
-  useEffect(() => {
-    if (isOpen) carregar()
-  }, [isOpen, carregar])
-
-  // Pré-seleção: se conferência aprovou, sugere aprovado puro; se divergente, sugere rejeitado
-  useEffect(() => {
-    if (decisao || !conferencia?.resultado || loading) return
-    if (conferencia.resultado === "aprovado") setDecisao("aprovado")
-    else if (conferencia.resultado === "divergente") setDecisao("rejeitado")
-    else if (conferencia.resultado === "nova_via") setDecisao("nova_via")
-  }, [conferencia, decisao, loading])
+  // Pré-seleção derivada da conferência: ajuste de estado durante o render, uma
+  // única vez por resultado carregado (a escolha do usuário sempre prevalece).
+  const resultadoConferencia = conferencia?.resultado ?? null
+  const [conferenciaAplicada, setConferenciaAplicada] = useState<string | null>(null)
+  if (!loading && resultadoConferencia && conferenciaAplicada !== resultadoConferencia) {
+    setConferenciaAplicada(resultadoConferencia)
+    if (!decisao) {
+      if (resultadoConferencia === "aprovado") setDecisao("aprovado")
+      else if (resultadoConferencia === "divergente") setDecisao("rejeitado")
+      else if (resultadoConferencia === "nova_via") setDecisao("nova_via")
+    }
+  }
 
   const precisaParecer = decisao !== null && decisao !== "aprovado"
   const podeConcluir =

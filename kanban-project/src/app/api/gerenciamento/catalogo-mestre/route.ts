@@ -6,6 +6,7 @@ import { prisma } from '@/lib/prisma'
 import { verificarPermissao } from '@/src/lib/verificar-permissao'
 import { NaturezaItem, UnidadeItem } from '@prisma/client'
 import { slugTecnico, gerarChaveUnica } from '@/src/lib/catalogo/chave-tecnica-interna'
+import { NATUREZAS_ITEM_OFICIAIS } from '@/lib/financeiro/catalogo-oficial'
 import { parseConsulta, filtroBusca, filtroAtivo, ordenacao, meta } from '@/lib/gerenciamento/consulta'
 import { registrarAuditoria } from '@/lib/gerenciamento/auditoria'
 
@@ -14,7 +15,10 @@ function toStrOrNull(v: any): string | null {
   const s = String(v).trim()
   return s === '' ? null : s
 }
-const NATUREZAS = Object.values(NaturezaItem)
+// Só as naturezas OFICIAIS são cadastráveis. PRODUTO/HONORARIO continuam no enum
+// do banco para LEITURA de itens históricos, mas não são mais oferecidas nem
+// aceitas — são estruturas eliminadas da arquitetura (lib/financeiro/catalogo-oficial).
+const NATUREZAS = NATUREZAS_ITEM_OFICIAIS.map((n) => NaturezaItem[n])
 const UNIDADES = Object.values(UnidadeItem)
 
 // GET - lista itens do catálogo (+ contadores de uso, p/ mostrar ligações)
@@ -53,7 +57,12 @@ export async function POST(request: NextRequest) {
     const name = toStrOrNull(b.name)
     if (!name) return NextResponse.json({ error: 'Informe o nome do item.' }, { status: 400 })
 
-    const natureza = NATUREZAS.includes(b.natureza) ? b.natureza : NaturezaItem.OUTRO
+    // Natureza eliminada é RECUSADA (não vira OUTRO em silêncio): o operador precisa
+    // saber que aquele cadastro não existe mais na arquitetura.
+    if (b.natureza !== undefined && b.natureza !== null && !NATUREZAS.includes(b.natureza)) {
+      return NextResponse.json({ error: `Natureza "${b.natureza}" não existe mais no Cadastro Mestre. Use uma das oficiais: ${NATUREZAS.join(', ')}.` }, { status: 400 })
+    }
+    const natureza = b.natureza ?? NaturezaItem.OUTRO
     const unidade = UNIDADES.includes(b.unidade) ? b.unidade : UnidadeItem.UNIDADE
 
     // CHAVE TÉCNICA INTERNA: gerada no backend a partir do nome (o operador nunca informa `code`).

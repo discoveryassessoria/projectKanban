@@ -56,7 +56,7 @@ export function useRevalidacaoFinanceira(
     window.addEventListener(EVENTO, handler)
     return () => window.removeEventListener(EVENTO, handler)
     // onMutacao é recriado a cada render; o componente deve memoizar ou aceitar o rebind.
-  }, [onMutacao, escopos.join(",")])
+  }, [onMutacao, escopos])
 }
 
 /** Núcleo PURO (testável sem DOM): decide se uma mutação é relevante p/ um assinante. */

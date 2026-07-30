@@ -118,7 +118,10 @@ export function PersonFormDialog({
     },
   })
 
-  React.useEffect(() => {
+  // Reset ao ABRIR: ajuste de estado durante o render (derivado de `open`).
+  const [abertoAnterior, setAbertoAnterior] = React.useState(open)
+  if (abertoAnterior !== open) {
+    setAbertoAnterior(open)
     if (open) {
       setActiveTab("new")
       setSelectedPersonId("")
@@ -136,7 +139,7 @@ export function PersonFormDialog({
         newPersonForm.setValue("sexo", fixedSexo)
       }
     }
-  }, [open, person, fixedSexo, newPersonForm, existingPersonForm])
+  }
 
   const handleNewPersonSubmit = async (data: PersonFormData) => {
     setIsSubmitting(true)

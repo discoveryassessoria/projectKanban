@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react"
 import dynamic from "next/dynamic"
 import { FileText } from "lucide-react"
+import { useMontadoNoCliente } from "@/src/hooks/use-dados-headerbar"
 
 // Importar react-pdf dinamicamente só no cliente
 const Document = dynamic(
@@ -22,14 +23,14 @@ interface PDFThumbnailProps {
 
 export function PDFThumbnail({ url, className }: PDFThumbnailProps) {
   const [error, setError] = useState(false)
-  const [isClient, setIsClient] = useState(false)
+  // Só renderiza o PDF depois da hidratação (o visualizador precisa do DOM).
+  const isClient = useMontadoNoCliente()
 
   useEffect(() => {
     // Configurar worker apenas no cliente
     import("react-pdf").then((pdfjs) => {
       pdfjs.pdfjs.GlobalWorkerOptions.workerSrc = `//unpkg.com/pdfjs-dist@${pdfjs.pdfjs.version}/build/pdf.worker.min.mjs`
     })
-    setIsClient(true)
   }, [])
 
   if (!isClient) {

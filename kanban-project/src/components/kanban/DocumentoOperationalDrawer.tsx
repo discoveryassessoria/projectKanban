@@ -315,19 +315,49 @@ export function DocumentoOperationalDrawer({
       .catch(console.error)
   }, [isOpen])
 
-  useEffect(() => {
+  // Reset ao (re)abrir: ajuste de estado durante o render — entra em LOADING e
+  // nunca herda projeção antiga.
+  const [aberturaAtual, setAberturaAtual] = useState(`${isOpen}|${documentoId}`)
+  if (aberturaAtual !== `${isOpen}|${documentoId}`) {
+    setAberturaAtual(`${isOpen}|${documentoId}`)
     if (isOpen && documentoId) {
       setActiveTab("operation")
-      // Reset explícito ao (re)abrir: entra em LOADING, nunca herda projeção antiga.
       setProjection(null)
       setWorkflow(null)
       setOpState("LOADING")
-      carregar()
     }
-    // Cancela a requisição em voo ao fechar/trocar/desmontar — resposta atrasada
-    // NUNCA é aplicada depois de fechar nem sobre outra seleção.
-    return () => { abortRef.current?.abort() }
-  }, [isOpen, documentoId, carregar])
+  }
+
+  // Carga da projeção operacional: a busca acontece no efeito e o estado só é
+  // escrito na continuação da promessa. Resposta atrasada NUNCA é aplicada depois
+  // de fechar nem sobre outra seleção.
+  useEffect(() => {
+    if (!isOpen || !documentoId) return
+    const controller = new AbortController()
+    abortRef.current = controller
+    const seq = ++reqSeq.current
+    const vigente = () => seq === reqSeq.current && !controller.signal.aborted
+    fetch(`/api/documentos/${documentoId}/operational-projection`, {
+      headers: { Authorization: `Bearer ${localStorage.getItem("authToken")}` },
+      signal: controller.signal,
+    })
+      .then(async (res) => {
+        if (!res.ok) throw new Error(`HTTP ${res.status}`)
+        const json = await res.json()
+        if (!vigente()) return
+        const proj: DocumentOperationalProjection | null = json.projection ?? null
+        setDoc(json.document ?? null)
+        setWorkflow(json.workflow ?? null)
+        setProjection(proj)
+        setOpState(proj?.state === "OPERATIONAL" ? "OPERATIONAL" : "NOT_MATERIALIZED")
+      })
+      .catch(() => {
+        if (!vigente()) return
+        setErro("Erro ao carregar operação.")
+        setOpState("ERROR")
+      })
+    return () => controller.abort()
+  }, [isOpen, documentoId])
 
   // Trava scroll do body
   useEffect(() => {
@@ -749,11 +779,15 @@ function TabOperation({
   )
   const [motivoBloqueio, setMotivoBloqueio] = useState<string>(doc.motivoBloqueio || "")
 
-  useEffect(() => {
+  // Campos do formulário seguem o documento: ajuste durante o render.
+  const chaveDoc = `${doc.id}|${doc.responsavelId}|${doc.dataPrazoOperacao}|${doc.motivoBloqueio}`
+  const [docAplicado, setDocAplicado] = useState(chaveDoc)
+  if (docAplicado !== chaveDoc) {
+    setDocAplicado(chaveDoc)
     setResponsavelId(doc.responsavelId?.toString() || "")
     setDataPrazoOperacao(doc.dataPrazoOperacao ? doc.dataPrazoOperacao.split("T")[0] : "")
     setMotivoBloqueio(doc.motivoBloqueio || "")
-  }, [doc.id, doc.responsavelId, doc.dataPrazoOperacao, doc.motivoBloqueio])
+  }
 
   const handleSave = () => {
     onSave({

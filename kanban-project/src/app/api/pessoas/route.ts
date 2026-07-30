@@ -1,3 +1,8 @@
+// AUTORIZAÇÃO SERVER-SIDE (B1).
+// O middleware já exige JWT em toda rota /api, mas autenticado ≠ autorizado:
+// sem esta guarda, qualquer usuário logado — independente do perfil — podia
+// apagar a árvore inteira ou criar/excluir Pessoa. A UI escondia os botões; a
+// API aceitava a chamada. Permissão de tela não é permissão de sistema.
 // src/app/api/pessoas/route.ts
 
 import { type NextRequest, NextResponse } from "next/server"
@@ -6,19 +11,57 @@ import { dispararMaterializacaoPorArvore } from "@/src/services/genealogia/mater
 import { ehRequerente } from "@/lib/genealogia/requerente-flag"
 import { emitirEDrenarEventoRequerente } from "@/src/services/genealogia/emitir-evento-requerente"
 import { extrairUsuarioComPermissoes } from "@/src/lib/verificar-permissao"
+import { verificarPermissao } from "@/src/lib/verificar-permissao"
 // LEGADO_INATIVO (desativação Genealogia): a auto-geração de Documento ao criar
 // Pessoa foi DESLIGADA. Criar Pessoa NÃO gera mais Documento silenciosamente.
 // Import de reconcileDocsForPessoa removido de propósito — não reintroduzir.
 
 // GET - Listar pessoas (com filtros opcionais)
 export async function GET(request: NextRequest) {
+  const semPermissao = await verificarPermissao(request, "arvore.ver")
+  if (semPermissao) return semPermissao
+
   try {
     const { searchParams } = new URL(request.url)
     const arvoreId = searchParams.get('arvoreId')
+    // BUSCA NO CADASTRO MESTRE — usada pela checagem obrigatória de duplicidade
+    // antes de criar Pessoa. Sem `arvoreId`, procura na base inteira: é esse o
+    // ponto, achar a pessoa que já existe em OUTRA árvore/processo.
+    const busca = (searchParams.get('busca') || '').trim()
 
     const where: any = {}
     if (arvoreId) {
       where.arvoreId = parseInt(arvoreId)
+    }
+    if (busca) {
+      where.OR = [
+        { nome: { contains: busca, mode: 'insensitive' } },
+        { sobrenome: { contains: busca, mode: 'insensitive' } },
+      ]
+    }
+
+    if (busca) {
+      const candidatos = await prisma.pessoa.findMany({
+        where,
+        select: {
+          id: true,
+          nome: true,
+          sobrenome: true,
+          sexo: true,
+          data_nasc: true,
+          data_obito: true,
+          local_nasc: true,
+          pais_nasc: true,
+          arvoreId: true,
+          paiId: true,
+          maeId: true,
+          pai: { select: { id: true, nome: true, sobrenome: true } },
+          mae: { select: { id: true, nome: true, sobrenome: true } },
+        },
+        orderBy: { nome: 'asc' },
+        take: 40,
+      })
+      return NextResponse.json(candidatos)
     }
 
     const pessoas = await prisma.pessoa.findMany({
@@ -54,6 +97,52 @@ export async function GET(request: NextRequest) {
 
 // POST - Criar nova pessoa
 export async function POST(request: NextRequest) {
+  const semPermissao = await verificarPermissao(request, "arvore.criar")
+  if (semPermissao) return semPermissao
+
+  // MDM-3 F3 — TRAVA SERVER-SIDE DE DEDUPLICAÇÃO.
+  //
+  // Toda criação de Pessoa exige uma `DecisaoDeduplicacao` registrada. A trava
+  // vive aqui, não na tela: enquanto o serviço de FUSÃO (MDM-4) não existir,
+  // cada duplicata criada é permanente — e uma tela pode ser contornada por
+  // qualquer chamada direta à API.
+  //
+  // Retrocompatível por transição: sem `decisaoDedupId` a criação segue, mas o
+  // caso é REGISTRADO em log para o inventário de chamadores. Depois que os
+  // consumidores estiverem migrados, este bloco vira 409 — a linha está pronta
+  // logo abaixo, comentada, para a virada ser de uma linha só.
+  const corpoBruto = await request.clone().json().catch(() => ({} as Record<string, unknown>))
+  const decisaoDedupId = Number(corpoBruto?.decisaoDedupId ?? 0) || null
+
+  if (decisaoDedupId) {
+    const decisao = await prisma.decisaoDeduplicacao.findUnique({
+      where: { id: decisaoDedupId },
+      select: { id: true, decisao: true, nivelTriagem: true, pessoaResultanteId: true },
+    })
+    if (!decisao) {
+      return NextResponse.json(
+        { error: "decisaoDedupId inválido — refaça a triagem no Cadastro Mestre." },
+        { status: 409 },
+      )
+    }
+    if (decisao.decisao !== "CRIOU_NOVA") {
+      return NextResponse.json(
+        {
+          error:
+            "A decisão registrada foi VINCULAR uma Pessoa existente. Use o vínculo em vez de criar uma nova.",
+          pessoaExistenteId: decisao.pessoaResultanteId,
+        },
+        { status: 409 },
+      )
+    }
+  } else {
+    console.warn(
+      "[mdm-3] POST /api/pessoas sem decisaoDedupId — chamador ainda não migrado para a triagem oficial.",
+    )
+    // F3 final (após migrar todos os chamadores), trocar o warn acima por:
+    // return NextResponse.json({ error: "Criação exige triagem no Cadastro Mestre (decisaoDedupId)." }, { status: 409 })
+  }
+
   try {
     const body = await request.json()
 

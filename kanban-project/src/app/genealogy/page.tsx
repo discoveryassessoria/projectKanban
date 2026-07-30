@@ -18,6 +18,7 @@ import {
   ChevronUp
 } from "lucide-react"
 import { HeaderBar } from "@/src/components/header-bar"
+import { useUsuarioLogado } from "@/src/hooks/use-dados-headerbar"
 import { encerrarSessao } from "@/src/lib/sessao/cliente"
 
 interface Usuario {
@@ -81,7 +82,7 @@ interface Estatisticas {
 
 export default function GenealogyPage() {
   const router = useRouter()
-  const [usuario, setUsuario] = useState<Usuario | null>(null)
+  const usuario = useUsuarioLogado() as unknown as Usuario
   const [isLoading, setIsLoading] = useState(true)
   const [arvores, setArvores] = useState<Arvore[]>([])
   const [processos, setProcessos] = useState<any[]>([])
@@ -109,53 +110,32 @@ export default function GenealogyPage() {
   const [estatisticas, setEstatisticas] = useState<Estatisticas>({ totalPessoas: 0, totalDocumentos: 0, totalArvores: 0 })
   const [pesquisasRecentes, setPesquisasRecentes] = useState<string[]>([])
 
-  const fetchData = async () => {
-    try {
-      const estatRes = await fetch("/api/genealogy/estatisticas")
-      if (estatRes.ok) {
-        const estatData = await estatRes.json()
-        setEstatisticas(estatData)
-      }
-
-      const arvoresRes = await fetch("/api/arvore")
-      const arvoresData = await arvoresRes.json()
-      setArvores(Array.isArray(arvoresData) ? arvoresData : [])
-
-      const processosRes = await fetch("/api/processos")
-      const processosData = await processosRes.json()
-      setProcessos(processosData.processos || [])
-
-      if (typeof window !== 'undefined') {
-        const saved = localStorage.getItem('pesquisasRecentes')
-        if (saved) {
-          setPesquisasRecentes(JSON.parse(saved))
-        }
-      }
-    } catch (error) {
-      console.error("Erro ao buscar dados:", error)
-    } finally {
-      setIsLoading(false)
-    }
-  }
-
+  // Porteiro: sem credenciais no navegador, volta ao login. Só navegação.
   useEffect(() => {
-    const token = localStorage.getItem("authToken")
-    const userData = localStorage.getItem("user")
-
-    if (!token || !userData) {
-      router.push("/login")
-      return
-    }
-
-    try {
-      const user = JSON.parse(userData)
-      setUsuario(user)
-      fetchData()
-    } catch (error) {
-      console.error("Erro ao carregar dados do usuário:", error)
-      router.push("/login")
-    }
+    if (!localStorage.getItem("authToken") || !localStorage.getItem("user")) router.push("/login")
   }, [router])
+
+  // MONTAGEM: busca no efeito; estado só na continuação das promessas.
+  useEffect(() => {
+    const ac = new AbortController()
+    const vivo = () => !ac.signal.aborted
+    Promise.all([
+      fetch("/api/genealogy/estatisticas", { signal: ac.signal }).then((r) => (r.ok ? r.json() : null)),
+      fetch("/api/arvore", { signal: ac.signal }).then((r) => r.json()),
+      fetch("/api/processos", { signal: ac.signal }).then((r) => r.json()),
+    ])
+      .then(([estat, arvoresData, processosData]) => {
+        if (!vivo()) return
+        if (estat) setEstatisticas(estat)
+        setArvores(Array.isArray(arvoresData) ? arvoresData : [])
+        setProcessos(processosData.processos || [])
+        const saved = localStorage.getItem('pesquisasRecentes')
+        if (saved) setPesquisasRecentes(JSON.parse(saved))
+      })
+      .catch((error) => { if (vivo()) console.error("Erro ao buscar dados:", error) })
+      .finally(() => { if (vivo()) setIsLoading(false) })
+    return () => ac.abort()
+  }, [])
 
 
   const handleLogout = () => { void encerrarSessao("manual") }

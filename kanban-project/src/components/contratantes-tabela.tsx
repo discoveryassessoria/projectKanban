@@ -40,6 +40,8 @@ import { Upload, CheckCircle2, XCircle, FileImage, Shield, Home, CreditCard as C
 import RelatorioClientesButton from "@/src/components/contratantesComponents/RelatorioClientesButton"
 import { AcessoAppTab } from "./contratantesComponents/AcessoAppTab"
 import { usePermissoes } from "@/src/hooks/use-permissoes"
+import { ImagemRemota } from '@/src/components/ui/imagem-remota'
+import { useMontadoNoCliente } from "@/src/hooks/use-dados-headerbar"
 
 interface Contratante {
   id: number
@@ -131,11 +133,7 @@ function ProcessosTooltip({
   const timeoutRef = useRef<NodeJS.Timeout | null>(null)
   const hideTimeoutRef = useRef<NodeJS.Timeout | null>(null)
   const containerRef = useRef<HTMLDivElement>(null)
-  const [mounted, setMounted] = useState(false)
-
-  useEffect(() => {
-    setMounted(true)
-  }, [])
+  const mounted = useMontadoNoCliente()
 
   // Controlar visibilidade combinando hover do trigger e do tooltip
   const isVisible = isHovering || isTooltipHovering
@@ -457,7 +455,47 @@ export function ContratanteModal({
     return exemplos[nomePais] || "Código postal"
   }
 
-  // Carregar anexos existentes quando abrir para editar/visualizar
+  // Carregar anexos existentes ao abrir para editar/visualizar. O corpo vive
+  // DENTRO do efeito: nenhuma escrita de estado no corpo síncrono.
+  useEffect(() => {
+    if (!isOpen || !editingId) return
+    void (async () => {
+      if (!editingId) return
+    
+      setCarregandoAnexos(true)
+      try {
+        const response = await fetch(`/api/anexos?tipoCliente=${editingTipo}&id=${editingId}`)
+        if (response.ok) {
+          const data = await response.json()
+          const todosAnexos: Anexo[] = data.anexos || []
+        
+          // Separar documentos obrigatórios dos genéricos
+          const docs: Record<string, Anexo | null> = {
+            RG: null,
+            CNH: null,
+            COMPROVANTE_ENDERECO: null,
+          }
+          const genericos: Anexo[] = []
+        
+          for (const anexo of todosAnexos) {
+            const cat = (anexo as any).categoria
+            if (cat && docs.hasOwnProperty(cat)) {
+              docs[cat] = anexo
+            }
+            genericos.push(anexo) // sempre adiciona (era dentro do else)
+          }
+        
+          setDocumentosObrigatorios(docs)
+          setAnexosExistentes(genericos)
+        }
+      } catch (error) {
+        console.error("Erro ao carregar anexos:", error)
+      } finally {
+        setCarregandoAnexos(false)
+      }
+    })()
+  }, [isOpen, editingId, editingTipo])
+
   const carregarAnexos = async () => {
     if (!editingId) return
     
@@ -493,13 +531,6 @@ export function ContratanteModal({
       setCarregandoAnexos(false)
     }
   }
-
-  useEffect(() => {
-    if (isOpen && editingId) {
-      carregarAnexos()
-    }
-  }, [isOpen, editingId])
-
 
   // ⬇️ R2: upload de documento obrigatório (RG, CNH, Comprovante)
   const handleDocumentoUpload = async (categoria: string, file: File) => {
@@ -683,19 +714,18 @@ const removerDocumentoObrigatorio = async (categoria: string) => {
     return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i]
   }
 
-  useEffect(() => {
-    setMounted(true)
-  }, [])
-
-  useEffect(() => {
+  // Reset ao FECHAR: ajuste de estado durante o render (derivado de `isOpen`).
+  const [abertoAnterior, setAbertoAnterior] = useState(isOpen)
+  if (abertoAnterior !== isOpen) {
+    setAbertoAnterior(isOpen)
     if (!isOpen) {
       setArquivos([])
       setAnexosExistentes([])
       setUploadProgress(0)
       setActiveTab("dados")
-      setDocumentosObrigatorios({ RG: null, CNH: null, COMPROVANTE_ENDERECO: null }) // ← ADICIONAR
+      setDocumentosObrigatorios({ RG: null, CNH: null, COMPROVANTE_ENDERECO: null })
     }
-  }, [isOpen])
+  }
 
   // Formatar CPF
   const formatCPF = (value: string) => {
@@ -1691,8 +1721,8 @@ style={{
                               >
                                 <div className="relative aspect-[4/3] rounded-lg overflow-hidden bg-white border border-gray-200">
                                   {anexo.mimeType?.startsWith('image/') || /\.(jpg|jpeg|png|gif|webp)$/i.test(anexo.nomeArquivo) ? (
-                                    <img 
-                                      src={anexo.urlArquivo} 
+                                    <ImagemRemota
+                                      src={anexo.urlArquivo}
                                       alt={anexo.nomeArquivo}
                                       className="w-full h-full object-cover"
                                     />
@@ -1812,8 +1842,8 @@ style={{
                                 className="block aspect-square relative overflow-hidden"
                               >
                                 {isImage ? (
-                                  <img 
-                                    src={anexo.urlArquivo} 
+                                  <ImagemRemota
+                                    src={anexo.urlArquivo}
                                     alt={fileName}
                                     className="w-full h-full object-cover"
                                   />

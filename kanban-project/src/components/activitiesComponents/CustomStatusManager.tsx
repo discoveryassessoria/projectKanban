@@ -240,7 +240,7 @@ export default function CustomStatusManager({ onStatusCreated }: CustomStatusMan
           <Info className="h-5 w-5 text-white/50 mt-0.5" />
           <div>
             <p className="text-sm text-white/70">
-              <strong className="text-white">Nota:</strong> As fases dos processos (etapas como "Busca Documental", "Emissão de Documentos", etc.)
+              <strong className="text-white">Nota:</strong> As fases dos processos (etapas como &quot;Busca Documental&quot;, &quot;Emissão de Documentos&quot;, etc.)
               avançam automaticamente na página de <strong className="text-white">Processos</strong> e são diferentes dos status de tarefas geridos aqui.
             </p>
           </div>

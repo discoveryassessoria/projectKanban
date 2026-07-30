@@ -2,7 +2,7 @@
 
 "use client"
 
-import { useState, useEffect, useRef } from "react"
+import { useState, useEffect, useRef, useCallback } from "react"
 import { createPortal } from "react-dom"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -259,8 +259,19 @@ export function ProcessoDetailsModal({
     }
   }
 
-  useEffect(() => {
-    if (isOpen && initialTab && !initialParamsProcessed) {
+  // Parâmetros iniciais e reset ao fechar: derivados de props que mudam →
+  // ajuste de estado durante o render (sem efeito, sem render descartado).
+  const [aberturaAtual, setAberturaAtual] = useState(isOpen)
+  if (aberturaAtual !== isOpen) {
+    setAberturaAtual(isOpen)
+    if (!isOpen) {
+      setInitialParamsProcessed(false)
+      setPessoaIdParaFocar(undefined)
+      setSidebarTabParaFocar(undefined)
+    }
+  }
+  if (isOpen && initialTab && !initialParamsProcessed) {
+    {
       if (initialTab === "documentos") {
         setActiveTab("documentos")
       } else if (initialTab === "central") {
@@ -291,28 +302,24 @@ export function ProcessoDetailsModal({
       
       setInitialParamsProcessed(true)
     }
-  }, [isOpen, initialTab, initialPessoaId, initialSidebarTab, initialParamsProcessed, isEspanha, isItalia])
+  }
 
-  useEffect(() => {
-    if (!isOpen) {
-      setInitialParamsProcessed(false)
-      setPessoaIdParaFocar(undefined)
-      setSidebarTabParaFocar(undefined)
-    }
-  }, [isOpen])
-
-  useEffect(() => {
+  // Campos editáveis seguem o processo recebido: ajuste durante o render.
+  const [processoAplicado, setProcessoAplicado] = useState(processo)
+  if (processoAplicado !== processo) {
+    setProcessoAplicado(processo)
     setNomeEditado(processo?.nome || "")
     setContratantesSelecionados(processo?.contratantes || [])
     setRequerentesSelecionados(processo?.requerentes || [])
     setArvoreIdLocal(processo?.arvoreId || null)
-  }, [processo])
+  }
 
-  // ✅ NOVO: re-fetch da fase quando troca de aba
-  // (o usuário pode ter mexido em docs / pessoas em outra aba)
-  useEffect(() => {
+  // Trocar de aba força re-consulta da fase (o usuário pode ter mexido em outra aba).
+  const [abaAplicada, setAbaAplicada] = useState(activeTab)
+  if (abaAplicada !== activeTab) {
+    setAbaAplicada(activeTab)
     setPhaseRefreshKey((k) => k + 1)
-  }, [activeTab])
+  }
 
   useEffect(() => {
     if (isOpen && contratantesProp.length === 0) {
@@ -342,11 +349,11 @@ export function ProcessoDetailsModal({
     return () => document.removeEventListener('mousedown', handleClickOutside)
   }, [])
 
-  const handleClose = () => {
+  const handleClose = useCallback(() => {
     setIsEditing(false)
     setActiveTab("geral")
     onClose()
-  }
+  }, [onClose])
 
   useEffect(() => {
     const handleEsc = (e: KeyboardEvent) => {

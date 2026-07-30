@@ -7,7 +7,7 @@
 // ============================================================================
 "use client"
 
-import { useEffect, useMemo, useState } from "react"
+import { useEffect, useMemo, useState, useCallback } from "react"
 import { useRouter } from "next/navigation"
 import { ReceitasTab } from "./ReceitasTab"
 import { ReceitaDetalheView } from "./ReceitaDetalheView"
@@ -152,9 +152,19 @@ function CustosTab({ processoId, fx, onAbrirDetalhe }: { processoId: number; fx:
   const pode = (op: string) => !perm || perm[op] === true
   const PAGE = 12
   const chaveFiltros = `cp-filtros-${processoId}`
-  const carregar = () => { fetch(`/api/financeiro/v3/obrigacoes?processoId=${processoId}&natureza=CUSTO`, { headers: authHeaders() }).then((r) => r.json()).then((j) => setObrs(j.obrigacoes ?? [])).catch(() => setObrs([])) }
+  const carregar = useCallback(() => { fetch(`/api/financeiro/v3/obrigacoes?processoId=${processoId}&natureza=CUSTO`, { headers: authHeaders() }).then((r) => r.json()).then((j) => setObrs(j.obrigacoes ?? [])).catch(() => setObrs([])) }, [processoId])
   // persistência de filtros (localStorage por processo)
-  useEffect(() => { try { const s = JSON.parse(localStorage.getItem(chaveFiltros) || "{}"); if (s.sub) setSub(s.sub); if (s.busca) setBusca(s.busca); if (s.fMoeda) setFMoeda(s.fMoeda); if (s.fEstado) setFEstado(s.fEstado); if (s.ordenar) setOrdenar(s.ordenar); if (s.ordem) setOrdem(s.ordem) } catch { /* ignore */ } }, [chaveFiltros])
+  // Filtros salvos: aplicados como ajuste de estado durante o render (uma vez por
+  // processo), não por efeito — evita o render intermediário com filtro errado.
+  const [filtrosLidos, setFiltrosLidos] = useState<string | null>(null)
+  if (typeof window !== "undefined" && filtrosLidos !== chaveFiltros) {
+    setFiltrosLidos(chaveFiltros)
+    try {
+      const s = JSON.parse(localStorage.getItem(chaveFiltros) || "{}")
+      if (s.sub) setSub(s.sub); if (s.busca) setBusca(s.busca); if (s.fMoeda) setFMoeda(s.fMoeda)
+      if (s.fEstado) setFEstado(s.fEstado); if (s.ordenar) setOrdenar(s.ordenar); if (s.ordem) setOrdem(s.ordem)
+    } catch { /* ignore */ }
+  }
   useEffect(() => { try { localStorage.setItem(chaveFiltros, JSON.stringify({ sub, busca, fMoeda, fEstado, ordenar, ordem })) } catch { /* ignore */ } }, [chaveFiltros, sub, busca, fMoeda, fEstado, ordenar, ordem])
   // conclusão de uma ação de linha: fecha, recarrega, propaga no bus.
   const aoConcluir = () => { setAcao(null); carregar(); emitirMutacaoFinanceira() }
@@ -170,7 +180,14 @@ function CustosTab({ processoId, fx, onAbrirDetalhe }: { processoId: number; fx:
   const proximoAvanco: Record<string, { estado: string; label: string }> = { PREVISTO: { estado: "APROVADO", label: "Aprovar" }, APROVADO: { estado: "CONTRATADO", label: "Contratar" }, CONTRATADO: { estado: "EXECUTADO", label: "Marcar executado" } }
   // Cancelamento (com motivo auditável) mora no Detalhe único da Obrigação — paridade
   // com Receita, sem duplicar lógica nem cancelar sem justificativa a partir da lista.
-  useEffect(() => { carregar() }, [processoId])
+  useEffect(() => {
+    const ac = new AbortController()
+    fetch(`/api/financeiro/v3/obrigacoes?processoId=${processoId}&natureza=CUSTO`, { headers: authHeaders(), signal: ac.signal })
+      .then((r) => r.json())
+      .then((j) => { if (!ac.signal.aborted) setObrs(j.obrigacoes ?? []) })
+      .catch(() => { if (!ac.signal.aborted) setObrs([]) })
+    return () => ac.abort()
+  }, [processoId])
   useEffect(() => { fetch(`/api/financeiro/v3/permissoes-custo`, { headers: authHeaders() }).then((r) => r.json()).then((j) => setPerm(j?.permissoes ?? null)).catch(() => setPerm(null)) }, [])
   if (!obrs) return <div className="py-8 text-sm text-[var(--text-muted)]">carregando…</div>
 
@@ -430,7 +447,7 @@ function TimelineTab({ processoId, fx, onAbrirDetalhe }: { processoId: number; f
       return [...arr, { ...mv, saldoAcum: prev + (mv.receita ? mv.valorBRL : -mv.valorBRL) }]
     }, [])
     return comSaldo.reverse()
-  }, [obrs, fx])
+  }, [obrs])
   const cats = useMemo(() => ["Todas", ...Array.from(new Set(movsAll.map((mv) => mv.categoria)))], [movsAll])
   const respOpts = useMemo(() => ["Todos", ...Array.from(new Set(movsAll.map((mv) => mv.responsavel).filter((v): v is string => !!v)))], [movsAll])
   const movs = useMemo(() => movsAll.filter((mv) => (fCat === "Todas" || mv.categoria === fCat) && (fResp === "Todos" || mv.responsavel === fResp) && (!soPend || !mv.quitado) && (!busca || `${mv.descricao} ${mv.codigo} ${mv.categoria} ${mv.responsavel ?? ""}`.toLowerCase().includes(busca.toLowerCase()))), [movsAll, fCat, fResp, soPend, busca])

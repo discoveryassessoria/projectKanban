@@ -53,7 +53,9 @@ async function main() {
       await prisma.$transaction(async (tx) => {
         const item = await tx.itemCatalogo.upsert({
           where: { code: u.code },
-          create: { code: u.code, name: u.name, natureza: NaturezaItem.PRODUTO },
+          // natureza OFICIAL genérica: PRODUTO é nomenclatura eliminada e um item
+          // criado assim ficaria inelegível a lançamento (catalogo-oficial).
+          create: { code: u.code, name: u.name, natureza: NaturezaItem.OUTRO },
           update: {},
           select: { id: true },
         })

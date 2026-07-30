@@ -77,7 +77,20 @@ export default function CobrancasTab() {
     finally { setLoading(false) }
   }
 
-  useEffect(() => { carregar() /* eslint-disable-next-line */ }, [status, busca])
+  // Busca no efeito; estado só na continuação da promessa.
+  useEffect(() => {
+    const ac = new AbortController()
+    const params = new URLSearchParams()
+    if (status) params.set("status", status)
+    if (busca) params.set("busca", busca)
+    const token = typeof window !== "undefined" ? localStorage.getItem("authToken") : null
+    fetch(`/api/financeiro/cobrancas?${params.toString()}`, { headers: token ? { Authorization: `Bearer ${token}` } : {}, signal: ac.signal })
+      .then((r) => r.json())
+      .then((j) => { if (!ac.signal.aborted) { setCobrancas(j.cobrancas || []); setResumo(j.resumo || null) } })
+      .catch(() => { if (!ac.signal.aborted) { setCobrancas([]); setResumo(null) } })
+      .finally(() => { if (!ac.signal.aborted) setLoading(false) })
+    return () => ac.abort()
+  }, [status, busca])
 
   const kpis = useMemo(() => {
     if (!resumo) return null

@@ -125,8 +125,12 @@ export function TarefaDetailsModal({
   const [subtarefas, setSubtarefas] = useState<Subtarefa[]>([])
   const [novaSubtarefa, setNovaSubtarefa] = useState('')
   
-  // Carregar dados da tarefa quando abrir o modal
-  useEffect(() => {
+  // Formulário segue a tarefa/abertura recebidas: ajuste de estado durante o
+  // render (derivado de props), sem efeito.
+  const chaveAbertura = `${isOpen}|${tarefa?.id ?? ''}`
+  const [aberturaAplicada, setAberturaAplicada] = useState(chaveAbertura)
+  if (aberturaAplicada !== chaveAbertura) {
+    setAberturaAplicada(chaveAbertura)
     if (tarefa && isOpen) {
       setTitulo(tarefa.titulo || tarefa.nome || '')
       setDescricao(tarefa.descricao || '')
@@ -137,10 +141,6 @@ export function TarefaDetailsModal({
       setResponsavelId(tarefa.responsavel?.id?.toString() || 'none')
       setSubtarefas(tarefa.subtarefas || [])
     }
-  }, [tarefa, isOpen])
-
-  // Resetar form ao fechar
-  useEffect(() => {
     if (!isOpen) {
       setTitulo('')
       setDescricao('')
@@ -152,7 +152,7 @@ export function TarefaDetailsModal({
       setSubtarefas([])
       setNovaSubtarefa('')
     }
-  }, [isOpen])
+  }
 
   const handleSave = async () => {
     if (!tarefa?.id) return

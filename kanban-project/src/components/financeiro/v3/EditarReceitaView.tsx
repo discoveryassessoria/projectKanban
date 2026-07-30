@@ -120,7 +120,7 @@ export default function EditarReceitaView({ obrigacaoId, receitaRef, natureza, o
       } catch { if (vivo) setErro("Falha ao carregar.") } finally { if (vivo) setLoading(false) }
     })()
     return () => { vivo = false; document.body.style.overflow = orig }
-  }, [receitaRef])
+  }, [receitaRef, ehCusto])
 
   // Usuários para o seletor de Responsável (degrade gracioso → input de id se indisponível).
   useEffect(() => {
@@ -220,9 +220,14 @@ export default function EditarReceitaView({ obrigacaoId, receitaRef, natureza, o
 
   useEffect(() => {
     if (!rec) return
-    if (!mudouFinanceiro && !mudouRespVenc) { setPrevia(null); return }
     if (debounce.current) clearTimeout(debounce.current)
-    debounce.current = setTimeout(() => { rodarPreview() }, 450)
+    // Sem alteração relevante a prévia é descartada; com alteração, recalculada.
+    // Em ambos os casos a escrita de estado sai do corpo síncrono do efeito.
+    const semMudanca = !mudouFinanceiro && !mudouRespVenc
+    debounce.current = setTimeout(() => {
+      if (semMudanca) { setPrevia(null); return }
+      rodarPreview()
+    }, semMudanca ? 0 : 450)
     return () => { if (debounce.current) clearTimeout(debounce.current) }
   }, [rec, mudouFinanceiro, mudouRespVenc, rodarPreview])
 

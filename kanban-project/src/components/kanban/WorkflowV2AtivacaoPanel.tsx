@@ -33,24 +33,33 @@ function authHeaders(): HeadersInit {
 export function WorkflowV2AtivacaoPanel({ processoId }: Props) {
   const { pode } = usePermissoes()
   const [prep, setPrep] = useState<Prep | null>(null)
-  const [loading, setLoading] = useState(true)
   const [ativando, setAtivando] = useState(false)
   const [msg, setMsg] = useState<string | null>(null)
 
+  // Recarga por ação do usuário (após ativar).
   const carregar = useCallback(async () => {
-    setLoading(true)
     try {
       const res = await fetch(`/api/processos/${processoId}/workflow-runtime`, { headers: authHeaders() })
-      if (res.ok) setPrep(await res.json())
-      else setPrep(null)
+      setPrep(res.ok ? await res.json() : null)
     } finally {
-      setLoading(false)
+      setCarregou(true)
     }
   }, [processoId])
 
+  // Sem permissão não há o que carregar — o estado de carregamento é DERIVADO
+  // dessa condição, não escrito por efeito.
+  const podeAtivar = pode("workflow.ativarV2")
+  const [carregou, setCarregou] = useState(false)
+  const loading = podeAtivar && !carregou
+
   useEffect(() => {
-    if (pode("workflow.ativarV2")) carregar()
-    else setLoading(false)
+    if (!podeAtivar) return
+    const ac = new AbortController()
+    fetch(`/api/processos/${processoId}/workflow-runtime`, { headers: authHeaders(), signal: ac.signal })
+      .then(async (res) => { if (!ac.signal.aborted) setPrep(res.ok ? await res.json() : null) })
+      .catch(() => { if (!ac.signal.aborted) setPrep(null) })
+      .finally(() => { if (!ac.signal.aborted) setCarregou(true) })
+    return () => ac.abort()
     // `pode` fora das deps DE PROPÓSITO: sua identidade muda a cada render
     // (usePermissoes) e reincluí-la causava refetch em LOOP de /workflow-runtime
     // (que roda o backfill dry-run no servidor) → flicker. Reavalia por processoId.

@@ -245,7 +245,10 @@ export function CentralDaEtapaDrawer({
   }, [isOpen])
 
   // -- Trigger inicial + reset
-  useEffect(() => {
+  // Reset ao (re)abrir: ajuste de estado durante o render.
+  const [aberturaAtual, setAberturaAtual] = useState(`${isOpen}|${stepId}`)
+  if (aberturaAtual !== `${isOpen}|${stepId}`) {
+    setAberturaAtual(`${isOpen}|${stepId}`)
     if (isOpen) {
       setActiveTab("campos")
       setShowBlockForm(false)
@@ -253,9 +256,30 @@ export function CentralDaEtapaDrawer({
       setBlockReason("")
       setTransferUserId(null)
       setEditorAberto(false)
-      carregar()
     }
-  }, [isOpen, stepId, carregar])
+  }
+
+  // Carga da etapa: busca no efeito; estado só na continuação da promessa.
+  useEffect(() => {
+    if (!isOpen || !documentoId) return
+    const ac = new AbortController()
+    fetch(`/api/documentos/${documentoId}/workflow`, {
+      headers: { Authorization: `Bearer ${localStorage.getItem("authToken")}` },
+      signal: ac.signal,
+    })
+      .then(async (res) => {
+        if (!res.ok) throw new Error(`HTTP ${res.status}`)
+        const json = await res.json()
+        if (!ac.signal.aborted) setWorkflow(json.workflow)
+      })
+      .catch((e) => {
+        if (ac.signal.aborted) return
+        console.warn("[CentralDaEtapaDrawer] falha:", e)
+        setErro("Erro ao carregar etapa.")
+      })
+      .finally(() => { if (!ac.signal.aborted) setLoading(false) })
+    return () => ac.abort()
+  }, [isOpen, documentoId, stepId])
 
   // -- ESC fecha
   useEffect(() => {
@@ -887,10 +911,14 @@ function TabSla({
   const [notes, setNotes] = useState(step.notes || "")
   const sla = fmtSla(step.dueAt)
 
-  useEffect(() => {
+  // Campos seguem a etapa recebida: ajuste de estado durante o render.
+  const chaveStep = `${step.id}|${step.dueAt}|${step.notes}`
+  const [stepAplicado, setStepAplicado] = useState(chaveStep)
+  if (stepAplicado !== chaveStep) {
+    setStepAplicado(chaveStep)
     setDueAt(step.dueAt ? step.dueAt.slice(0, 10) : "")
     setNotes(step.notes || "")
-  }, [step.id, step.dueAt, step.notes])
+  }
 
   const salvar = async () => {
     await onPatch({

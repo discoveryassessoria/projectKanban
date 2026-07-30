@@ -37,7 +37,7 @@ interface AcessoAppTabProps {
 }
 
 export function AcessoAppTab({ clienteId, clienteTipo, clienteEmail, clienteNome, isViewMode }: AcessoAppTabProps) {
-  const [carregando, setCarregando] = useState(true)
+  const [carregando, setCarregando] = useState(!!clienteId)
   const [temAcesso, setTemAcesso] = useState(false)
   const [acesso, setAcesso] = useState<AcessoInfo | null>(null)
   const [email, setEmail] = useState(clienteEmail || "")
@@ -462,7 +462,7 @@ export function AcessoAppTab({ clienteId, clienteTipo, clienteEmail, clienteNome
         <div className="space-y-2 text-sm text-gray-600">
           <div className="flex items-start gap-2">
             <span className="text-indigo-500 font-bold text-xs mt-0.5">1</span>
-            <p>Clique em <strong>"Gerar acesso ao app"</strong> para criar login e senha temporária</p>
+            <p>Clique em <strong>&quot;Gerar acesso ao app&quot;</strong> para criar login e senha temporária</p>
           </div>
           <div className="flex items-start gap-2">
             <span className="text-indigo-500 font-bold text-xs mt-0.5">2</span>

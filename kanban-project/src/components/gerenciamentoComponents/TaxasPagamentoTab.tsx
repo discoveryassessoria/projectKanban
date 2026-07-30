@@ -35,13 +35,26 @@ export default function TaxasPagamentoTab() {
   const [busca, setBusca] = useState('')
   const [configId, setConfigId] = useState<number | null>(null)
 
+  // BUSCA (só rede) × APLICAÇÃO (só estado).
+  const buscar = useCallback(async (sinal?: AbortSignal) => {
+    const d = await jf('/api/gerenciamento/taxas-pagamento/formas', { cache: 'no-store', signal: sinal })
+    return d.formas || []
+  }, [])
+  const aplicar = useCallback((fs: FormaAgrupada[]) => { setFormas(fs) }, [])
+  useEffect(() => {
+    const ac = new AbortController()
+    buscar(ac.signal)
+      .then((fs) => { if (!ac.signal.aborted) aplicar(fs) })
+      .catch((e: any) => { if (!ac.signal.aborted) setErro(e.message || 'Não foi possível carregar.') })
+      .finally(() => { if (!ac.signal.aborted) setLoading(false) })
+    return () => ac.abort()
+  }, [buscar, aplicar])
   const carregar = useCallback(async () => {
     setLoading(true); setErro(null)
-    try { const d = await jf('/api/gerenciamento/taxas-pagamento/formas', { cache: 'no-store' }); setFormas(d.formas || []) }
+    try { aplicar(await buscar()) }
     catch (e: any) { setErro(e.message || 'Não foi possível carregar.') }
     finally { setLoading(false) }
-  }, [])
-  useEffect(() => { carregar() }, [carregar])
+  }, [buscar, aplicar])
 
   const filtrados = useMemo(() => {
     const q = busca.trim().toLowerCase()
@@ -157,8 +170,14 @@ function FormaConfig({ formaId, onClose, onSalvo }: { formaId: number; onClose: 
     }).catch((e) => setErro(e.message))
   }, [formaId])
 
-  // Reconstrói a grade quando muda o adquirente selecionado (crédito/débito).
-  useEffect(() => {
+  // Grade DERIVADA de (det, adqSel), porém editável pelo usuário: recalculada por
+  // ajuste de estado durante o render (não em efeito) sempre que a base muda.
+  const [baseGrade, setBaseGrade] = useState<{ det: typeof det; adq: typeof adqSel } | null>(null)
+  if (baseGrade?.det !== det || baseGrade?.adq !== adqSel) {
+    setBaseGrade({ det, adq: adqSel })
+    reconstruirGrade()
+  }
+  function reconstruirGrade() {
     if (!det || !det.perfil.mostraBandeira) return
     const g: Record<number, Record<number, string>> = {}, meta: Record<number, { taxaId?: number; ativo: boolean }> = {}
     for (const band of det.bandeiras) {
@@ -174,7 +193,7 @@ function FormaConfig({ formaId, onClose, onSalvo }: { formaId: number; onClose: 
       g[band.id] = cells
     }
     setGrade(g); setGradeMeta(meta)
-  }, [det, adqSel])
+  }
 
   const setCell = (bandId: number, parcela: number, v: string) =>
     setGrade((p) => ({ ...p, [bandId]: { ...p[bandId], [parcela]: v } }))
