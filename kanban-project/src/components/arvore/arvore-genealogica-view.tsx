@@ -2,19 +2,25 @@
 
 "use client"
 
-import { useState, useEffect, useMemo, useRef, useCallback } from "react"
-import { construirGrafo } from "@/src/lib/genealogia/motor/grafo"
-import { calcularParentesco, caminhoGenealogico } from "@/src/lib/genealogia/motor/parentesco"
+import { useState, useEffect, useRef, useCallback, useMemo } from "react"
+import { useApi } from '@/src/lib/dados'
 import { jsPDF } from "jspdf"
-import type { PessoaArvore, UniaoArvore } from "./types"
+import dagre from "dagre"
+import type { PessoaArvore, UniaoArvore, DocumentoArvore } from "./types"
+import { PessoaSidebar } from "./pessoa-sidebar"
 import { PessoaDetailsPage } from "./pessoa-details-page"
-import { ArvoreInteligente, type ArvoreInteligenteRef } from "./motor/arvore-inteligente"
-import type { NecessidadeOficial } from "@/src/lib/genealogia/documental/indicadores"
+import { ReactFlowTree, ReactFlowTreeRef } from "./react-flow-tree"
 import { TreeOnboarding } from "./tree-onboarding"
 import { RequerenteSelector } from "./requerente-selector"
-import { ChecagemDuplicidade, AvisoChecagemPendente, type CandidatoPessoa } from "./checagem-duplicidade"
 import { DatePickerField } from "@/components/ui/date-picker-field"
-import { Plus, User, Loader2, FileDown } from "lucide-react"
+import {
+  Plus,
+  User,
+  Loader2,
+  Minimize2,
+  Maximize2,
+  FileDown,
+} from "lucide-react"
 import { usePermissoes } from "@/src/hooks/use-permissoes"
 
 // Helper para fetch autenticado
@@ -39,12 +45,23 @@ interface ArvoreGenealogicaViewProps {
   paisProcesso?: "PORTUGAL" | "ESPANHA" | "ALEMANHA" | "ITALIA"
 }
 
+type ViewMode = 'paisagem' | 'retrato'
+
 const fsColors = {
   male: '#3073B5',
   female: '#BF3D79',
   green: '#87B940',
   line: '#9CA3AF'
 }
+
+/** Resposta da árvore como a API a devolve. */
+type PosicoesNodes = Record<string, Record<string, { x: number; y: number }>>
+interface RespostaArvore {
+  pessoas?: PessoaArvore[]
+  pessoaPrincipalId?: number | null
+  posicoesNodes?: PosicoesNodes | null
+}
+const SEM_PESSOAS: PessoaArvore[] = []
 
 export function ArvoreGenealogicaView({ 
   processoId, 
@@ -56,14 +73,48 @@ export function ArvoreGenealogicaView({
   paisProcesso
 }: ArvoreGenealogicaViewProps) {
   const { pode } = usePermissoes()
-  const [pessoas, setPessoas] = useState<PessoaArvore[]>([])
-  const [unioes, setUnioes] = useState<UniaoArvore[]>([])
-  const [pessoaPrincipal, setPessoaPrincipal] = useState<PessoaArvore | null>(null)
-  const [loading, setLoading] = useState(true)
+  const [viewMode, setViewMode] = useState<ViewMode>('paisagem')
   const [creating, setCreating] = useState(false)
   const [arvoreId, setArvoreId] = useState<number | null>(initialArvoreId || null)
-  const [showOnboarding, setShowOnboarding] = useState(false)
-  const [selectedPerson, setSelectedPerson] = useState<PessoaArvore | null>(null)
+  // A árvore inteira vem de uma leitura só; pessoas, uniões e pessoa principal são
+  // DERIVAÇÕES dela. Antes eram quatro estados preenchidos pelo mesmo carregador, e o
+  // laço que junta as uniões rodava dentro do fetch.
+  const arvoreReq = useApi<RespostaArvore>(arvoreId ? `/api/arvore/${arvoreId}` : null)
+  const pessoas = arvoreReq.dados?.pessoas ?? SEM_PESSOAS
+  const unioes = useMemo<UniaoArvore[]>(() => {
+    const todas: UniaoArvore[] = []
+    for (const p of pessoas) {
+      for (const u of [...(p.unioesComoPessoa1 ?? []), ...(p.unioesComoPessoa2 ?? [])]) {
+        if (!todas.some((x) => x.id === u.id)) todas.push(u)
+      }
+    }
+    return todas
+  }, [pessoas])
+  const pessoaPrincipal = useMemo<PessoaArvore | null>(() => {
+    const idPrincipal = arvoreReq.dados?.pessoaPrincipalId
+    if (idPrincipal) return pessoas.find((p) => p.id === idPrincipal) ?? null
+    return pessoas[0] ?? null
+  }, [arvoreReq.dados, pessoas])
+  const loading = Boolean(arvoreId) && arvoreReq.carregando
+  const fetchArvore = async () => { await arvoreReq.recarregar() }
+  // Onboarding aparece quando a árvore existe e está VAZIA — derivação, não um estado
+  // que o carregador precisava ligar e desligar. Continua podendo ser aberto e fechado
+  // à mão (botão "como começar" / concluir).
+  const [onboardingManual, setShowOnboarding] = useState<boolean | null>(null)
+  const showOnboarding = onboardingManual ?? (Boolean(arvoreReq.dados) && pessoas.length === 0)
+  // CAUSA RAIZ: guardar uma CÓPIA da pessoa em estado obrigava um efeito a
+  // re-sincronizá-la sempre que `pessoas` era recarregada — cópia velha na tela
+  // até o efeito rodar. Guardamos o ID (primitivo, estável) e DERIVAMOS a pessoa
+  // da lista viva: sem efeito, sem cópia defasada, sem setState em cascata.
+  const [selectedPersonId, setSelectedPersonId] = useState<number | null>(null)
+  const selectedPerson = useMemo<PessoaArvore | null>(
+    () => (selectedPersonId == null ? null : pessoas.find((p) => p.id === selectedPersonId) ?? null),
+    [selectedPersonId, pessoas],
+  )
+  const setSelectedPerson = useCallback(
+    (p: PessoaArvore | null) => setSelectedPersonId(p?.id ?? null),
+    [],
+  )
   const [fullDetailsPerson, setFullDetailsPerson] = useState<PessoaArvore | null>(null)
   const [isFullscreen, setIsFullscreen] = useState(false)
   const [isTransitioning, setIsTransitioning] = useState(false)
@@ -71,7 +122,7 @@ export function ArvoreGenealogicaView({
   const containerRef = useRef<HTMLDivElement>(null)
   const treeContainerRef = useRef<HTMLDivElement>(null)
   
-  const arvoreRef = useRef<ArvoreInteligenteRef>(null)
+  const reactFlowTreeRef = useRef<ReactFlowTreeRef>(null)
 
   const [showAddPersonModal, setShowAddPersonModal] = useState(false)
   const [addPersonType, setAddPersonType] = useState<'pai' | 'mae' | 'filho' | 'pessoa' | 'conjuge' | null>(null)
@@ -84,15 +135,10 @@ export function ArvoreGenealogicaView({
   const [pessoaFocada, setPessoaFocada] = useState(false)
   const [sidebarTabInicial, setSidebarTabInicial] = useState<string | undefined>(undefined)
 
-  const [posicoesNodes, setPosicoesNodes] = useState<
-    Record<string, Record<string, { x: number; y: number }>> | null
-  >(null)
-
-  // INDICADOR DOCUMENTAL — consumido do Sistema Documental, nunca derivado
-  // aqui. A árvore lia `Pessoa.documentos` (o Documento cru) e pintava semáforo
-  // por tipo; isso era regra documental morando na árvore. Agora ela lê o
-  // endpoint OFICIAL de necessidades e só agrupa por sujeito.
-  const [necessidades, setNecessidades] = useState<NecessidadeOficial[]>([])
+  // Posições dos nós: o arrasto responde na hora e o salvamento é debounced, então o
+  // valor local é um RASCUNHO sobre o que o servidor devolveu.
+  const [posicoesLocais, setPosicoesNodes] = useState<PosicoesNodes | null>(null)
+  const posicoesNodes = posicoesLocais ?? arvoreReq.dados?.posicoesNodes ?? null
 
   useEffect(() => {
     if (pessoaIdParaFocar && pessoas.length > 0 && !pessoaFocada) {
@@ -107,126 +153,184 @@ export function ArvoreGenealogicaView({
         }, 300)
       }
     }
-  }, [pessoaIdParaFocar, sidebarTabParaFocar, pessoas, pessoaFocada])
+  }, [pessoaIdParaFocar, sidebarTabParaFocar, pessoas, pessoaFocada, setSelectedPerson])
 
-  // A pessoa selecionada acompanha a lista recarregada: ajuste de estado durante
-  // o render (derivado de `pessoas`), sem efeito.
-  const [pessoasAplicadas, setPessoasAplicadas] = useState(pessoas)
-  if (pessoasAplicadas !== pessoas) {
-    setPessoasAplicadas(pessoas)
-    if (selectedPerson) {
-      const pessoaAtualizada = pessoas.find(p => p.id === selectedPerson.id)
-      if (pessoaAtualizada && pessoaAtualizada !== selectedPerson) setSelectedPerson(pessoaAtualizada)
-    }
-  }
-
-  // Exportação em PDF.
-  //
-  // Mudança relevante: a captura agora passa por `arvoreRef.capturar`, que
-  // desliga a virtualização e zera a transformação da câmera antes de gerar a
-  // imagem. Antes, o PDF era tirado do DOM como ele estava na tela — com a
-  // árvore nova (virtualizada) isso exportaria só a parte visível, com buracos.
+  // ✅ FUNÇÃO handleExportPDF ATUALIZADA
   const handleExportPDF = useCallback(async () => {
-    if (pessoas.length === 0 || !pessoaPrincipal || !arvoreRef.current) return
+    if (pessoas.length === 0 || !pessoaPrincipal || !treeContainerRef.current) return
+
     setIsExporting(true)
+
+    // Salvar zoom atual e resetar para 100%
+      const currentZoom = document.body.style.zoom
+      document.body.style.zoom = '100%'
 
     try {
       const { toPng } = await import('html-to-image')
 
-      let imgData = ''
-      let dims = { largura: 0, altura: 0 }
-
-      await arvoreRef.current.capturar(async (elemento, dimensoes) => {
-        dims = dimensoes
-
-        // Elementos de interface não entram no documento entregue ao cliente.
-        const ocultar = elemento.querySelectorAll<HTMLElement>('[data-no-pan] button, .group\\/doctip')
-        const restaurar: Array<() => void> = []
-        ocultar.forEach((el) => {
-          const anterior = el.style.display
-          el.style.setProperty('display', 'none', 'important')
-          restaurar.push(() => { el.style.display = anterior })
-        })
-
-        // Sombras viram borrões cinza na rasterização — saem também.
-        const comSombra = elemento.querySelectorAll<HTMLElement>('*')
-        comSombra.forEach((el) => {
-          if (!el.style.boxShadow && !el.className?.toString().includes('shadow')) return
-          const anterior = el.style.boxShadow
-          el.style.setProperty('box-shadow', 'none', 'important')
-          restaurar.push(() => { el.style.boxShadow = anterior })
-        })
-
-        // Nome truncado no card precisa aparecer inteiro no papel.
-        const nomes = elemento.querySelectorAll<HTMLElement>('h3')
-        nomes.forEach((el) => {
-          const anterior = el.getAttribute('style') || ''
-          el.style.setProperty('-webkit-line-clamp', 'unset', 'important')
-          el.style.setProperty('overflow', 'visible', 'important')
-          restaurar.push(() => el.setAttribute('style', anterior))
-        })
-
-        try {
-          imgData = await toPng(elemento, {
-            backgroundColor: '#ffffff',
-            pixelRatio: 2,
-            skipFonts: true,
-            width: Math.ceil(dimensoes.largura),
-            height: Math.ceil(dimensoes.altura),
-          })
-        } finally {
-          restaurar.forEach((f) => f())
-        }
-      })
-
-      if (!imgData) {
-        alert('Não foi possível gerar a imagem da árvore.')
+      const reactFlowContainer = treeContainerRef.current.querySelector('.react-flow') as HTMLElement
+      
+      if (!reactFlowContainer) {
+        alert('Erro: não foi possível encontrar a árvore')
+        setIsExporting(false)
         return
       }
 
-      const pxToMm = 0.264583
-      const imgWidthMM = dims.largura * pxToMm
-      const imgHeightMM = dims.altura * pxToMm
+      // Esconder elementos do ReactFlow (controles, minimap, etc)
+      const elementsToHide = reactFlowContainer.querySelectorAll(
+        '.react-flow__panel, .react-flow__minimap, .react-flow__controls, .react-flow__background'
+      )
+      elementsToHide.forEach((el) => {
+        (el as HTMLElement).style.setProperty('display', 'none', 'important')
+      })
+
+      // ✅ NOVO: Esconder indicadores de documento (círculos verdes/vermelhos)
+      const documentIndicators = reactFlowContainer.querySelectorAll('.group\\/doctip')
+      documentIndicators.forEach((el) => {
+        (el as HTMLElement).style.setProperty('display', 'none', 'important')
+      })
+
+      // ✅ Remover TODAS as sombras (removendo classes E estilos)
+      const shadowElements = reactFlowContainer.querySelectorAll('.shadow-md, .shadow-lg, .shadow-sm, .shadow, .shadow-xl');
+      shadowElements.forEach((el) => {
+        const htmlEl = el as HTMLElement;
+        htmlEl.classList.add('!shadow-none');
+        htmlEl.style.setProperty('box-shadow', 'none', 'important');
+        htmlEl.style.setProperty('filter', 'none', 'important');
+        htmlEl.style.setProperty('drop-shadow', 'none', 'important');
+        htmlEl.style.setProperty('-webkit-box-shadow', 'none', 'important');
+        // REMOVIDO: htmlEl.style.setProperty('background-color', '#ffffff', 'important');
+      });
+
+      await new Promise(resolve => setTimeout(resolve, 100))
+
+      // Forçar todos os nomes a aparecerem completos
+      const nameElements = reactFlowContainer.querySelectorAll('h3')
+      nameElements.forEach((el) => {
+        const htmlEl = el as HTMLElement
+        htmlEl.style.setProperty('overflow', 'visible', 'important')
+        htmlEl.style.setProperty('display', 'block', 'important')
+        htmlEl.style.setProperty('-webkit-line-clamp', 'unset', 'important')
+        htmlEl.style.setProperty('-webkit-box-orient', 'unset', 'important')
+        htmlEl.style.setProperty('white-space', 'normal', 'important')
+        htmlEl.style.setProperty('text-overflow', 'unset', 'important')
+      })
+
+      const imgData = await toPng(reactFlowContainer, {
+        backgroundColor: '#f9fafb',
+        pixelRatio: 2,
+        skipFonts: true,
+      })
+
+      // Restaurar estilos dos nomes
+      nameElements.forEach((el) => {
+        const htmlEl = el as HTMLElement
+        htmlEl.style.removeProperty('overflow')
+        htmlEl.style.removeProperty('display')
+        htmlEl.style.removeProperty('-webkit-line-clamp')
+        htmlEl.style.removeProperty('-webkit-box-orient')
+        htmlEl.style.removeProperty('white-space')
+        htmlEl.style.removeProperty('text-overflow')
+      })
+
+      // Restaurar elementos escondidos
+      elementsToHide.forEach((el) => {
+        (el as HTMLElement).style.removeProperty('display')
+      })
+
+      // ✅ Restaurar indicadores de documento
+      documentIndicators.forEach((el) => {
+        (el as HTMLElement).style.removeProperty('display')
+      })
+
+      // ✅ Restaurar sombras
+      shadowElements.forEach((el) => {
+        const htmlEl = el as HTMLElement;
+        htmlEl.classList.remove('!shadow-none');
+        htmlEl.style.removeProperty('box-shadow');
+        htmlEl.style.removeProperty('filter');
+        htmlEl.style.removeProperty('drop-shadow');
+        htmlEl.style.removeProperty('-webkit-box-shadow');
+        // REMOVIDO: htmlEl.style.removeProperty('background-color');
+      });
+
+      const img = new Image()
+      await new Promise((resolve, reject) => {
+        img.onload = resolve
+        img.onerror = reject
+        img.src = imgData
+      })
+
+      const imgWidth = img.width
+      const imgHeight = img.height
+
+      const pxToMm = 0.264583 / 2
+      const imgWidthMM = imgWidth * pxToMm
+      const imgHeightMM = imgHeight * pxToMm
 
       const marginX = 8
       const marginTop = 14
       const marginBottom = 8
+
       const pageWidth = Math.max(imgWidthMM + marginX * 2, 297)
       const pageHeight = Math.max(imgHeightMM + marginTop + marginBottom, 210)
 
       const pdf = new jsPDF({
         orientation: pageWidth > pageHeight ? 'landscape' : 'portrait',
         unit: 'mm',
-        format: [pageWidth, pageHeight],
+        format: [pageWidth, pageHeight]
       })
 
       const actualPageWidth = pdf.internal.pageSize.getWidth()
+
+      // ✅ ATUALIZADO: Título em italiano com nome da família
       pdf.setFontSize(14)
       pdf.setFont('helvetica', 'bold')
       pdf.setTextColor(30, 30, 30)
       const titulo = `Albero Genealogico - Famiglia ${nomeFamilia || pessoaPrincipal.sobrenome || pessoaPrincipal.nome}`
       pdf.text(titulo, actualPageWidth / 2, 10, { align: 'center' })
 
-      pdf.addImage(imgData, 'PNG', (actualPageWidth - imgWidthMM) / 2, marginTop, imgWidthMM, imgHeightMM)
+      // ✅ REMOVIDO: Data de geração
+      // ✅ REMOVIDO: Quantidade de pessoas
 
+      const imgX = (actualPageWidth - imgWidthMM) / 2
+      const imgY = marginTop
+
+      pdf.addImage(imgData, 'PNG', imgX, imgY, imgWidthMM, imgHeightMM)
+
+      // ✅ ATUALIZADO: Nome do arquivo
       const dataAtual = new Date().toLocaleDateString('pt-BR')
       const nomeArquivo = `arvore-${(nomeFamilia || pessoaPrincipal.nome).toLowerCase().replace(/\s+/g, '-')}-${dataAtual.replace(/\//g, '-')}.pdf`
       pdf.save(nomeArquivo)
+
     } catch (error) {
       console.error('Erro ao exportar PDF:', error)
       alert('Erro ao exportar PDF. Verifique o console para mais detalhes.')
     } finally {
+      // Restaurar zoom original
+      document.body.style.zoom = currentZoom
+      
       setIsExporting(false)
     }
   }, [pessoas, pessoaPrincipal, nomeFamilia])
 
-  // EXCLUSÃO DOCUMENTAL REMOVIDA DA ÁRVORE.
-  //
-  // A árvore chamava DELETE /api/documentos/:id sob a permissão
-  // `arvore.excluir_documento` — ou seja, reimplementava uma permissão
-  // documental e executava ciclo de vida de documento fora do módulo dono.
-  // Pela Constituição, documento pertence exclusivamente ao Sistema
-  // Documental. A árvore agora só ABRE a Pasta Documental no contexto certo.
+  const handleDeleteDocumento = async (documento: DocumentoArvore) => {
+    try {
+      const response = await authFetch(`/api/documentos/${documento.id}`, {
+        method: 'DELETE'
+      })
+
+      if (response.ok) {
+        await fetchArvore()
+      } else {
+        const error = await response.json()
+        alert(error.error || 'Erro ao excluir documento')
+      }
+    } catch (error) {
+      console.error('Erro ao excluir documento:', error)
+      alert('Erro ao excluir documento')
+    }
+  }
 
   const handleEditPerson = (pessoa: PessoaArvore) => {
     setEditingPerson(pessoa)
@@ -292,7 +396,7 @@ export function ArvoreGenealogicaView({
   // ✅ NOVO: Salvar posições com debounce
   const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null)
   
-  const handleSavePositions = useCallback((positions: Record<string, Record<string, { x: number; y: number }>>) => {
+  const handleSavePositions = useCallback((positions: Record<string, any>) => {
     setPosicoesNodes(positions)
     
     // Debounce de 1 segundo
@@ -312,127 +416,6 @@ export function ArvoreGenealogicaView({
         console.error('Erro ao salvar posições:', error)
       }
     }, 1000)
-  }, [arvoreId])
-
-  const fetchNecessidades = useCallback(async () => {
-    if (!processoId) return
-    try {
-      const r = await authFetch(`/api/processos/${processoId}/necessidades`)
-      if (!r.ok) return // sem permissão documental: a árvore segue sem o indicador
-      const data = await r.json()
-      setNecessidades(Array.isArray(data?.necessidades) ? data.necessidades : [])
-    } catch (error) {
-      console.error('Erro ao carregar indicadores documentais:', error)
-    }
-  }, [processoId])
-
-  // Indicadores documentais: busca no efeito, estado só na continuação.
-  useEffect(() => {
-    if (!processoId) return
-    const ac = new AbortController()
-    authFetch(`/api/processos/${processoId}/necessidades`, { signal: ac.signal })
-      .then((r) => (r.ok ? r.json() : null)) // sem permissão documental: segue sem indicador
-      .then((data) => { if (!ac.signal.aborted && data) setNecessidades(Array.isArray(data?.necessidades) ? data.necessidades : []) })
-      .catch((error) => { if (!ac.signal.aborted) console.error('Erro ao carregar indicadores documentais:', error) })
-    return () => ac.abort()
-  }, [processoId])
-
-
-  // Recarga da árvore por ação do usuário (adicionar/editar/excluir pessoa).
-  const fetchArvore = useCallback(async () => {
-if (!arvoreId) return
-
-    try {
-      const response = await authFetch(`/api/arvore/${arvoreId}`)
-
-      if (response.ok) {
-        const data = await response.json()
-        setPessoas(data.pessoas || [])
-        setPosicoesNodes(data.posicoesNodes || null)  // ✅ NOVO
-
-        if (!data.pessoas || data.pessoas.length === 0) {
-          setShowOnboarding(true)
-        } else {
-          setShowOnboarding(false)
-        }
-
-        const todasUnioes: UniaoArvore[] = []
-        data.pessoas?.forEach((p: PessoaArvore) => {
-          p.unioesComoPessoa1?.forEach((u: UniaoArvore) => {
-            if (!todasUnioes.find(x => x.id === u.id)) {
-              todasUnioes.push(u)
-            }
-          })
-          p.unioesComoPessoa2?.forEach((u: UniaoArvore) => {
-            if (!todasUnioes.find(x => x.id === u.id)) {
-              todasUnioes.push(u)
-            }
-          })
-        })
-        setUnioes(todasUnioes)
-
-        if (data.pessoaPrincipalId) {
-          const principal = data.pessoas?.find((p: PessoaArvore) => p.id === data.pessoaPrincipalId)
-          setPessoaPrincipal(principal || null)
-        } else if (data.pessoas?.length > 0) {
-          setPessoaPrincipal(data.pessoas[0])
-        }
-      }
-    } catch (error) {
-      console.error('Erro ao carregar árvore:', error)
-    } finally {
-      setLoading(false)
-    }
-  }, [arvoreId])
-
-  // Carga da árvore. O corpo vive DENTRO do efeito: nenhuma escrita de estado
-  // acontece no corpo síncrono — todas ficam na continuação assíncrona.
-  useEffect(() => {
-    void (async () => {
-      if (!arvoreId) return
-
-      try {
-        const response = await authFetch(`/api/arvore/${arvoreId}`)
-
-        if (response.ok) {
-          const data = await response.json()
-          setPessoas(data.pessoas || [])
-          setPosicoesNodes(data.posicoesNodes || null)  // ✅ NOVO
-
-          if (!data.pessoas || data.pessoas.length === 0) {
-            setShowOnboarding(true)
-          } else {
-            setShowOnboarding(false)
-          }
-
-          const todasUnioes: UniaoArvore[] = []
-          data.pessoas?.forEach((p: PessoaArvore) => {
-            p.unioesComoPessoa1?.forEach((u: UniaoArvore) => {
-              if (!todasUnioes.find(x => x.id === u.id)) {
-                todasUnioes.push(u)
-              }
-            })
-            p.unioesComoPessoa2?.forEach((u: UniaoArvore) => {
-              if (!todasUnioes.find(x => x.id === u.id)) {
-                todasUnioes.push(u)
-              }
-            })
-          })
-          setUnioes(todasUnioes)
-
-          if (data.pessoaPrincipalId) {
-            const principal = data.pessoas?.find((p: PessoaArvore) => p.id === data.pessoaPrincipalId)
-            setPessoaPrincipal(principal || null)
-          } else if (data.pessoas?.length > 0) {
-            setPessoaPrincipal(data.pessoas[0])
-          }
-        }
-      } catch (error) {
-        console.error('Erro ao carregar árvore:', error)
-      } finally {
-        setLoading(false)
-      }
-    })()
   }, [arvoreId])
 
   const handleToggleFullscreen = async () => {
@@ -492,10 +475,10 @@ if (!arvoreId) return
       setSidebarTabInicial("familia")
       
       setTimeout(() => {
-        arvoreRef.current?.centralizarPessoa(pessoa.id)
+        reactFlowTreeRef.current?.centerOnPerson(pessoa.id)
       }, 50)
     }
-  }, [pessoas])
+  }, [pessoas, setSelectedPerson])
 
   const findConjuge = (pessoa: PessoaArvore): PessoaArvore | null => {
     const uniao = unioes.find(u => u.pessoa1Id === pessoa.id || u.pessoa2Id === pessoa.id)
@@ -525,64 +508,6 @@ if (!arvoreId) return
   const findFilhos = (pessoa: PessoaArvore): PessoaArvore[] => {
     return pessoas.filter(p => p.paiId === pessoa.id || p.maeId === pessoa.id)
   }
-
-  const findPais = (pessoa: PessoaArvore): PessoaArvore[] => {
-    return [pessoa.paiId, pessoa.maeId]
-      .map(id => (id == null ? null : pessoas.find(p => p.id === id) ?? null))
-      .filter(Boolean) as PessoaArvore[]
-  }
-
-  // Irmão = compartilha PELO MENOS UM genitor. Exigir os dois apagaria o
-  // meio-irmão, que num processo de cidadania é justamente quem muda o escopo
-  // de certidão. A classificação fina (inteiro/meio) vive no motor genealógico;
-  // aqui a página só precisa da lista.
-  const findIrmaos = (pessoa: PessoaArvore): PessoaArvore[] => {
-    if (pessoa.paiId == null && pessoa.maeId == null) return []
-    return pessoas.filter(
-      p =>
-        p.id !== pessoa.id &&
-        ((pessoa.paiId != null && p.paiId === pessoa.paiId) ||
-          (pessoa.maeId != null && p.maeId === pessoa.maeId)),
-    )
-  }
-
-  /**
-   * PARENTESCO COM O REQUERENTE — para a página completa da pessoa.
-   *
-   * A ação "Ver parentesco" nascia permanentemente desabilitada porque ninguém
-   * calculava o grau: o motor existia, a página aceitava a prop, e o host não
-   * ligava os dois. Aqui o cálculo acontece sobre o MESMO grafo do domínio
-   * (nada de heurística nova) e devolve o grau mais a distância em gerações.
-   */
-  const grafoParentesco = useMemo(
-    () => construirGrafo(pessoas as never[], unioes as never[]),
-    [pessoas, unioes],
-  )
-
-  const parentescoComRequerente = useMemo(() => {
-    const alvo = fullDetailsPerson
-    const raiz = pessoaPrincipal
-    if (!alvo || !raiz || alvo.id === raiz.id) return null
-    const grau = calcularParentesco(grafoParentesco, raiz.id, alvo.id)?.rotulo ?? null
-    if (!grau) return null
-    const caminho = caminhoGenealogico(grafoParentesco, raiz.id, alvo.id)
-    return caminho && caminho.length > 1
-      ? `${grau} · ${caminho.length - 1} geração(ões) do requerente`
-      : grau
-  }, [fullDetailsPerson, pessoaPrincipal, grafoParentesco])
-
-  // "Ver árvore" a partir da página: fecha a ficha e reposiciona o desenho.
-  const handleVerArvoreDaPagina = useCallback((pessoaId: number) => {
-    setFullDetailsPerson(null)
-    arvoreRef.current?.centralizarPessoa(pessoaId)
-  }, [])
-
-  // ATALHO CONTEXTUAL — a árvore não gere documento; ela leva o operador até o
-  // módulo que gere, já no contexto certo (processo + pessoa).
-  const handleAbrirPastaDocumental = useCallback((pessoaId: number) => {
-    const url = `/dashboard/processos/${processoId}/documentos?pessoaId=${pessoaId}`
-    window.open(url, '_blank', 'noopener,noreferrer')
-  }, [processoId])
 
   const handleAddPai = (pessoaId: number) => {
     setAddPersonType('pai')
@@ -677,14 +602,74 @@ if (!arvoreId) return
 
   // Árvore principal
   return (
-    <div ref={containerRef} className="h-full flex flex-col relative" style={{ background: "#f4f5f6" }}>
+    <div ref={containerRef} className="h-full flex flex-col bg-gradient-to-b from-gray-100 to-gray-200 relative">
       {/* Overlay de transição */}
       <div className={`absolute inset-0 bg-white z-[9999] pointer-events-none transition-opacity duration-300 ${isTransitioning ? 'opacity-60' : 'opacity-0'}`} />
 
-      {/* Container da árvore — a barra de ferramentas agora pertence à própria
-          árvore (modos, orientação, densidade, busca, inteligência, câmera).
-          O PDF continua sendo responsabilidade desta view e entra como ação
-          extra na barra, sem duplicar barra em cima de barra. */}
+      {/* Toolbar */}
+      <div className="flex items-center justify-between px-4 py-2 bg-white border-b">
+        <div className="flex items-center gap-2">
+          {/* Botão Paisagem */}
+          <button
+            className={`flex items-center gap-2 px-3 py-2 rounded transition-colors ${viewMode === 'paisagem' ? 'bg-gray-100' : 'hover:bg-gray-50'}`}
+            onClick={() => setViewMode('paisagem')}
+          >
+            <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <rect x="2" y="9" width="6" height="6" rx="1" />
+              <rect x="14" y="3" width="6" height="6" rx="1" />
+              <rect x="14" y="15" width="6" height="6" rx="1" />
+              <path d="M8 12 L14 6" />
+              <path d="M8 12 L14 18" />
+            </svg>
+            <span className="text-sm font-medium">PAISAGEM</span>
+          </button>
+
+          {/* Botão Retrato */}
+          <button
+            className={`flex items-center gap-2 px-3 py-2 rounded transition-colors ${viewMode === 'retrato' ? 'bg-gray-100' : 'hover:bg-gray-50'}`}
+            onClick={() => setViewMode('retrato')}
+          >
+            <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <rect x="3" y="2" width="6" height="6" rx="1" />
+              <rect x="15" y="2" width="6" height="6" rx="1" />
+              <rect x="9" y="16" width="6" height="6" rx="1" />
+              <path d="M6 8 L12 16" />
+              <path d="M18 8 L12 16" />
+            </svg>
+            <span className="text-sm font-medium">RETRATO</span>
+          </button>
+        </div>
+
+        <div className="flex items-center gap-1">
+          {/* Botão Exportar PDF */}
+          <button
+            className="flex items-center gap-2 px-3 py-2 hover:bg-gray-100 rounded transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            onClick={handleExportPDF}
+            disabled={isExporting || pessoas.length === 0}
+            title="Exportar para PDF"
+          >
+            {isExporting ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <FileDown className="h-4 w-4" />
+            )}
+            <span className="text-sm font-medium">
+              {isExporting ? 'Exportando...' : 'PDF'}
+            </span>
+          </button>
+
+          {/* Botão Fullscreen */}
+          <button
+            className="p-2 hover:bg-gray-100 rounded transition-colors"
+            onClick={handleToggleFullscreen}
+            title={isFullscreen ? "Sair da tela cheia" : "Tela cheia"}
+          >
+            {isFullscreen ? <Minimize2 className="h-4 w-4" /> : <Maximize2 className="h-4 w-4" />}
+          </button>
+        </div>
+      </div>
+
+      {/* Container da árvore */}
       <div ref={treeContainerRef} className="flex-1 overflow-hidden relative">
         {pessoas.length === 0 && !showOnboarding && (
           <div className="absolute inset-0 flex items-center justify-center">
@@ -722,51 +707,47 @@ if (!arvoreId) return
         )}
 
         {pessoas.length > 0 && pessoaPrincipal && (
-          <ArvoreInteligente
-            ref={arvoreRef}
+          <ReactFlowTree
+            ref={reactFlowTreeRef}
             pessoas={pessoas}
             unioes={unioes}
             pessoaPrincipal={pessoaPrincipal}
-            paisProcesso={paisProcesso}
-            selecionadaId={selectedPerson?.id ?? null}
-            aoSelecionarPessoa={handlePersonClick}
-            aoAdicionarPai={pode('arvore.criar') ? handleAddPai : undefined}
-            aoAdicionarMae={pode('arvore.criar') ? handleAddMae : undefined}
-            aoAdicionarFilho={pode('arvore.criar') ? handleAddFilho : undefined}
-            aoAdicionarConjuge={pode('arvore.criar') ? handleAddConjugeById : undefined}
-            telaCheia={isFullscreen}
-            aoAlternarTelaCheia={handleToggleFullscreen}
-            posicoesSalvas={posicoesNodes}
-            aoSalvarPosicoes={handleSavePositions}
-            necessidades={necessidades}
-            aoAbrirPastaDocumental={handleAbrirPastaDocumental}
-            pessoaSelecionada={selectedPerson}
-            aoFecharPainel={handleCloseSidebar}
-            aoEditarPessoa={pode('arvore.editar') ? handleEditPerson : undefined}
-            aoAbrirPaginaPessoa={handleOpenFullDetails}
-            acoesExtras={
-              <button
-                type="button"
-                className="rounded-lg p-1.5 text-gray-500 transition-colors hover:bg-black/[0.06] disabled:cursor-not-allowed disabled:opacity-40"
-                onClick={handleExportPDF}
-                disabled={isExporting || pessoas.length === 0}
-                title="Exportar a árvore em PDF"
-                aria-label="Exportar a árvore em PDF"
-              >
-                {isExporting ? (
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                ) : (
-                  <FileDown className="h-4 w-4" />
-                )}
-              </button>
-            }
+            mode={viewMode}
+            savedPositions={posicoesNodes || undefined}
+            onSavePositions={handleSavePositions}
+            onPersonClick={handlePersonClick}
+            onAddPai={pode('arvore.criar') ? handleAddPai : undefined}
+            onAddMae={pode('arvore.criar') ? handleAddMae : undefined}
+            onAddFilho={pode('arvore.criar') ? handleAddFilho : undefined}
+            onAddConjuge={pode('arvore.criar') ? handleAddConjugeById : undefined}
           />
         )}
       </div>
 
-      {/* O painel lateral operacional vive DENTRO da árvore (ArvoreInteligente):
-          ele abre sobre o canvas sem overlay e sem tirar posição/zoom. O
-          PessoaSidebar antigo saiu — era outro componente para a mesma função. */}
+      {/* Overlay para sidebar */}
+      {selectedPerson && (
+        <div className="fixed inset-0 bg-black/20 z-[10000]" onClick={handleCloseSidebar} />
+      )}
+
+      {/* Sidebar */}
+      <PessoaSidebar
+        pessoa={selectedPerson}
+        conjuges={selectedPerson ? findConjuges(selectedPerson) : []}
+        casamentos={selectedPerson ? findCasamentos(selectedPerson) : []}
+        onClose={handleCloseSidebar}
+        onOpenFullDetails={handleOpenFullDetails}
+        onEdit={pode('arvore.editar') ? handleEditPerson : undefined}
+        onDelete={pode('arvore.excluir') ? handleDeletePerson : undefined}
+        onAddFilho={pode('arvore.criar') ? handleAddFilho : undefined}
+        onAddPai={pode('arvore.criar') ? handleAddPai : undefined}
+        onAddMae={pode('arvore.criar') ? handleAddMae : undefined}
+        onAddConjuge={pode('arvore.criar') ? handleAddConjugeById : undefined}
+        onAddDocumento={undefined}
+        onEditDocumento={undefined}
+        onDeleteDocumento={pode('arvore.excluir_documento') ? handleDeleteDocumento : undefined}
+        onSelectPerson={handleSelectPersonFromSidebar}
+        initialTab={sidebarTabInicial}
+      />
 
       {/* Full Details Page */}
       {fullDetailsPerson && (
@@ -775,19 +756,12 @@ if (!arvoreId) return
           conjuge={findConjuge(fullDetailsPerson)}
           casamento={findCasamento(fullDetailsPerson)}
           filhos={findFilhos(fullDetailsPerson)}
-          pais={findPais(fullDetailsPerson)}
-          irmaos={findIrmaos(fullDetailsPerson)}
-          necessidades={necessidades}
-          parentesco={parentescoComRequerente}
           onBack={handleCloseFullDetails}
           onPersonClick={handlePersonClickFromDetails}
-          onAddPai={pode('arvore.criar') ? handleAddPai : undefined}
-          onAddMae={pode('arvore.criar') ? handleAddMae : undefined}
-          onAddFilho={pode('arvore.criar') ? handleAddFilho : undefined}
-          onAddConjuge={pode('arvore.criar') ? handleAddConjugeById : undefined}
-          onEditar={pode('arvore.editar') ? handleEditPerson : undefined}
-          onAbrirPastaDocumental={handleAbrirPastaDocumental}
-          onVerArvore={handleVerArvoreDaPagina}
+          onAddPai={handleAddPai}
+          onAddMae={handleAddMae}
+          onAddFilho={handleAddFilho}
+          onAddConjuge={handleAddConjugeById}
         />
       )}
 
@@ -875,7 +849,7 @@ function AddPersonModal({
   const [isFalecido, setIsFalecido] = useState(false)
   const [dataObito, setDataObito] = useState('')
   const [localObito, setLocalObito] = useState('')
-  const [isCasado, setIsCasado] = useState(false)
+  const [isCasado, setIsCasado] = useState(type === 'conjuge')
   const [dataCasamento, setDataCasamento] = useState('')
   const [localCasamento, setLocalCasamento] = useState('')
   const [conjugeId, setConjugeId] = useState<number | string>('')
@@ -884,12 +858,6 @@ function AddPersonModal({
   
   // ✅ NOVOS CAMPOS
   const [requerente, setRequerente] = useState<string>('nao')
-  // Trava de deduplicação: a criação só destrava depois da checagem no
-  // Cadastro Mestre. Ver checagem-duplicidade.tsx para o porquê.
-  const [criacaoLiberada, setCriacaoLiberada] = useState(false)
-  // Id da decisão registrada no servidor — a API exige para criar.
-  const [decisaoDedupId, setDecisaoDedupId] = useState<number | null>(null)
-  const [vinculando, setVinculando] = useState(false)
   const [numeroLinhagem, setNumeroLinhagem] = useState<string>('')
   const [isLinhaReta, setIsLinhaReta] = useState<boolean>(type !== 'conjuge')
   const [precisaDocumentacao, setPrecisaDocumentacao] = useState<boolean>(true)
@@ -905,12 +873,9 @@ function AddPersonModal({
     backgroundPosition: 'right 12px center'
   }
 
-  // Adição de cônjuge implica casamento: derivado do tipo, ajustado no render.
-  const [tipoAplicado, setTipoAplicado] = useState(type)
-  if (tipoAplicado !== type) {
-    setTipoAplicado(type)
-    if (type === 'conjuge') setIsCasado(true)
-  }
+  // Adicionar cônjuge implica casado — é derivação do tipo de adição, não um estado
+  // que precise ser corrigido depois. Antes o formulário aparecia por um render com o
+  // "casado" desmarcado, e só então o efeito o marcava.
 
   // Relação estrutural do tipo de adição, para o caminho de REUSO do requerente:
   // ao vincular a Pessoa existente, propaga os mesmos vínculos que o form aplicaria.
@@ -962,65 +927,9 @@ function AddPersonModal({
     }
   }
 
-  // Vincular Pessoa EXISTENTE — nenhuma Pessoa nova é criada. Usa só endpoints
-  // oficiais já existentes: adoção na árvore + filiação + união.
-  const handleVincularExistente = async (c: CandidatoPessoa) => {
-    setVinculando(true)
-    try {
-      const patch: Record<string, unknown> = { arvoreId }
-      if (type === 'filho' && parentId) {
-        const pessoaPai = pessoas.find(p => p.id === parentId)
-        if (pessoaPai?.sexo === 'Feminino') patch.maeId = parentId
-        else patch.paiId = parentId
-        const uniaoExistente = unioes.find(u => u.pessoa1Id === parentId || u.pessoa2Id === parentId)
-        if (uniaoExistente) {
-          const cId = uniaoExistente.pessoa1Id === parentId ? uniaoExistente.pessoa2Id : uniaoExistente.pessoa1Id
-          const conjuge = pessoas.find(p => p.id === cId)
-          if (conjuge) {
-            if (conjuge.sexo === 'Feminino') patch.maeId = cId
-            else patch.paiId = cId
-          }
-        }
-      }
-
-      const r = await authFetch(`/api/pessoas/${c.id}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(patch),
-      })
-      if (!r.ok) {
-        const err = await r.json().catch(() => ({}))
-        alert(err.error || 'Não foi possível vincular esta pessoa.')
-        return
-      }
-
-      if ((type === 'pai' || type === 'mae') && parentId) {
-        await authFetch(`/api/pessoas/${parentId}`, {
-          method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(type === 'pai' ? { paiId: c.id } : { maeId: c.id }),
-        })
-      }
-      if (type === 'conjuge' && conjugeDePessoaId) {
-        await authFetch('/api/unioes', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ pessoa1Id: conjugeDePessoaId, pessoa2Id: c.id, tipo: 'casamento' }),
-        })
-      }
-      onSuccess()
-    } catch (error) {
-      console.error('Erro ao vincular pessoa existente:', error)
-      alert('Erro ao vincular pessoa existente')
-    } finally {
-      setVinculando(false)
-    }
-  }
-
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!nome.trim()) return
-    if (!criacaoLiberada) return
 
     setSaving(true)
     try {
@@ -1041,7 +950,6 @@ function AddPersonModal({
         numeroLinhagem: numeroLinhagem ? parseInt(numeroLinhagem) : null,  // ✅ pasta documental (todos)
         linhaReta: isLinhaReta,  // ✅ Central Operacional / Documentos
         documentacao: precisaDocumentacao,  // ✅ gera documentos ou não
-        decisaoDedupId,  // MDM-3: sem isso a API recusa a criação
         arvoreId
       }
 
@@ -1306,33 +1214,11 @@ function AddPersonModal({
             <textarea value={comentario} onChange={(e) => setComentario(e.target.value)} rows={2} className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500 resize-none text-sm" />
           </section>
 
-          {/* ===== Deduplicação obrigatória ===== */}
-          <section className="border-t border-gray-100 pt-5">
-            <ChecagemDuplicidade
-              nome={nome}
-              sobrenome={sobrenome}
-              dataNasc={dataNasc}
-              idsNaArvore={new Set(pessoas.map(p => p.id))}
-              authFetch={authFetch}
-              aoVincular={handleVincularExistente}
-              aoLiberarCriacao={(ok, id) => { setCriacaoLiberada(ok); setDecisaoDedupId(id) }}
-              liberado={criacaoLiberada}
-            />
-          </section>
-
-          <div className="flex items-center justify-between gap-3 pt-4 border-t border-gray-100">
-            <span>{!criacaoLiberada && nome.trim() && <AvisoChecagemPendente />}</span>
-            <span className="flex gap-3">
-              <button type="button" onClick={onClose} className="px-4 py-2 text-gray-600 hover:text-gray-800 transition-colors">Cancelar</button>
-              <button
-                type="submit"
-                disabled={saving || vinculando || !nome.trim() || !criacaoLiberada}
-                title={!criacaoLiberada ? 'Faça a checagem no Cadastro Mestre antes de criar' : undefined}
-                className="px-6 py-2 bg-teal-600 text-white rounded-lg hover:bg-teal-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                {saving ? 'Salvando...' : 'Criar Pessoa nova'}
-              </button>
-            </span>
+          <div className="flex justify-end gap-3 pt-4 border-t border-gray-100">
+            <button type="button" onClick={onClose} className="px-4 py-2 text-gray-600 hover:text-gray-800 transition-colors">Cancelar</button>
+            <button type="submit" disabled={saving || !nome.trim()} className="px-6 py-2 bg-teal-600 text-white rounded-lg hover:bg-teal-700 transition-colors disabled:opacity-50">
+              {saving ? 'Salvando...' : 'Adicionar'}
+            </button>
           </div>
         </form>
         )}

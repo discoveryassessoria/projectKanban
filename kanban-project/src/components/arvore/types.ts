@@ -43,13 +43,6 @@ export interface PessoaArvore {
   // ✅ NOVO: Requerente e Linhagem
   requerente?: string | null       // "nao" | "maior" | "menor"
   numeroLinhagem?: number | null   // Posição na linhagem (1, 2, 3...)
-  // Classificação no processo — existem no schema e são LIDAS pelo motor
-  // genealógico (linha de transmissão, exigência documental, casamento
-  // declarado sem união cadastrada). Estavam fora do tipo, o que obrigava
-  // cast em toda leitura e escondia o acoplamento.
-  linhaReta?: boolean
-  documentacao?: boolean
-  casado?: boolean
   // Posição no canvas
   x?: number | null
   y?: number | null
