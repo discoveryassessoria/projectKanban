@@ -159,9 +159,16 @@ export async function lerCertidaoDuasVezes(
   // entrar na árvore com leitura única é justamente o que este sistema não faz.
   if (!validA.leitura || !validB.leitura) {
     const quem = !validA.leitura ? "literal" : "registral"
+    // O MOTIVO da falha é o que permite consertar. Engoli-lo, como esta função
+    // fazia, transforma toda falha diferente na mesma frase inútil.
+    const porQue = !validA.leitura
+      ? (respA.ok ? validA.problemas.join(" · ") : respA.motivo)
+      : (respB.ok ? validB.problemas.join(" · ") : respB.motivo)
     return {
       ...vazio,
-      motivo: `Só uma das duas leituras independentes se completou (falhou a ${quem}). Sem as duas não há como conferir, e o documento não entra sem conferência.`,
+      motivo:
+        `Só uma das duas leituras independentes se completou (falhou a ${quem}): ${porQue || "sem detalhe"}. ` +
+        `Sem as duas não há como conferir, e o documento não entra sem conferência.`,
       paginas: validacao.paginas,
       visualA: validA.leitura,
       visualB: validB.leitura,
