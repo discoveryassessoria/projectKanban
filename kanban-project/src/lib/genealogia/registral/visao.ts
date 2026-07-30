@@ -195,8 +195,14 @@ export const ESQUEMA_LEITURA_VISUAL = {
                 },
                 trecho: {
                   type: ["string", "null"],
+                  // O teto vive na GRAMÁTICA, não só na instrução: `maxLength` em
+                  // string a API aceita (o que ela recusa é minimum/maximum em
+                  // number e maxItems em array). Isto é um PONTEIRO de evidência,
+                  // repetido em dezenas de campos — é a soma deles que estourava
+                  // a resposta, não o tamanho de um.
+                  maxLength: 200,
                   description:
-                    "O trecho transcrito de onde este valor saiu — NO MÁXIMO 200 caracteres, só o pedaço que sustenta o valor. É a evidência citável, não a transcrição do documento.",
+                    "O trecho de onde este valor saiu — só a oração que o sustenta, no máximo 200 caracteres. É a evidência citável, não a transcrição do documento.",
                 },
                 pagina: { type: ["integer", "null"], description: "Página do documento, a partir de 1." },
                 confianca: { type: "number", description: "Número entre 0 e 1." },
@@ -231,7 +237,10 @@ export const ESQUEMA_LEITURA_VISUAL = {
         additionalProperties: false,
         required: ["texto"],
         properties: {
-          texto: { type: "string", maxLength: 600 },
+          // Averbação é CONTEÚDO, não ponteiro: retificação de cartório vem em
+          // parágrafo inteiro, às vezes transcrevendo uma sentença. Cortar aqui
+          // é perder justamente o que interessa para a ação de retificação.
+          texto: { type: "string", maxLength: 2000 },
           data: { type: ["string", "null"] },
           tipo: {
             type: ["string", "null"],
@@ -438,7 +447,7 @@ export function validarLeituraVisual(bruto: unknown): {
   for (const a of (Array.isArray(o.averbacoes) ? o.averbacoes : []).slice(0, 12)) {
     if (!a || typeof a !== "object") continue
     const ar = a as Record<string, unknown>
-    const t = texto(ar.texto, 600)
+    const t = texto(ar.texto, 2000)
     if (!t) continue
     averbacoes.push({ texto: t, data: texto(ar.data), tipo: texto(ar.tipo, 40) })
   }
