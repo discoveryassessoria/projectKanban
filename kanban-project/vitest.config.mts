@@ -24,6 +24,10 @@ export default defineConfig({
   test: {
     environment: 'jsdom',
     globals: true,
+    // O React REMOVE `act` do bundle de produção. O build da Vercel roda com
+    // NODE_ENV=production, então sem forçar `test` aqui os testes de componente
+    // quebram apenas no CI com "React.act is not a function" — passando local.
+    env: { NODE_ENV: 'test' },
     setupFiles: ['./testes/setup.ts'],
     // Escopo deliberado: componentes. Os guards estruturais continuam em
     // scripts/*.test.ts rodando via tsx.
