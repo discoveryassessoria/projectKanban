@@ -77,6 +77,19 @@ export const PERMISSOES = {
   'arvore.editar_documento': 'Editar documentos na árvore',
   'arvore.excluir_documento': 'Excluir documentos na árvore',
 
+  // Motor Registral Genealógico (MRG) — revisão registral da Árvore.
+  // Segregação de funções: VER evidência ≠ REVISAR divergência ≠ APROVAR correção
+  // ≠ ALTERAR FILIAÇÃO ≠ MESCLAR pessoas ≠ REVERTER ≠ REPROCESSAR ≠ ADMINISTRAR.
+  // Enforcement é server-side (services/registral/aplicar.ts + rotas).
+  'registral.ver_evidencias': 'Ver evidências registrais (documento, página, trecho, confiança)',
+  'registral.revisar': 'Revisar divergências e conflitos registrais',
+  'registral.aprovar': 'Aprovar correções registrais (nome, datas, locais)',
+  'registral.alterar_filiacao': 'Criar, corrigir ou remover filiação (altera a estrutura da árvore)',
+  'registral.mesclar_pessoas': 'Mesclar ou separar identidades de pessoas',
+  'registral.reverter': 'Reverter alterações registrais aplicadas',
+  'registral.reprocessar': 'Processar e reprocessar a Pasta Documental no motor registral',
+  'registral.administrar_regras': 'Administrar regras registrais e descartar conflito crítico',
+
   // Administração
   'usuarios.gerenciar': 'Ver usuários',
   'usuarios.criar': 'Criar usuários',
@@ -227,6 +240,23 @@ export const MODULOS_PERMISSOES = [
     ],
   },
   {
+    // MRG — a revisão registral tem funções segregadas: quem lê evidência não é
+    // quem aprova correção, e quem aprova correção não é quem mescla identidade.
+    modulo: 'Árvore — Motor Registral',
+    icone: '📜',
+    permissoes: [
+      'registral.ver_evidencias',
+      'registral.revisar',
+      'registral.aprovar',
+      'registral.alterar_filiacao',
+      'registral.reprocessar',
+      'registral.reverter',
+      'registral.administrar_regras',
+      // OPT-IN: fusão/separação de identidade não vem em nenhum perfil padrão.
+      'registral.mesclar_pessoas',
+    ],
+  },
+  {
     modulo: 'Administração',
     icone: '🛡️',
     permissoes: [
@@ -246,7 +276,13 @@ export const MODULOS_PERMISSOES = [
 // "admin tem tudo", nem pelos perfis padrão (TODAS_PERMISSOES). Só valem se atribuídas
 // EXPLICITAMENTE no perfil ou nas permissões custom do usuário. Autorização por PERMISSÃO,
 // nunca por tipo de usuário.
-export const PERMISSOES_OPT_IN = new Set<string>(['sistema.exclusaoDefinitiva', 'financeiro.dataCorte'])
+export const PERMISSOES_OPT_IN = new Set<string>([
+  'sistema.exclusaoDefinitiva',
+  'financeiro.dataCorte',
+  // MRG — fusão/separação de identidade humana é a operação sem volta do motor
+  // registral. Fica FORA dos perfis padrão: só existe por concessão explícita.
+  'registral.mesclar_pessoas',
+])
 
 // Todas as permissões ligadas — EXCETO as opt-in (que exigem concessão explícita).
 const TODAS_PERMISSOES = Object.keys(PERMISSOES).reduce((acc, key) => {
@@ -317,6 +353,15 @@ export const PERFIS_PADRAO = [
       'financeiro.custo_estornar': false,
       'financeiro.custo_conciliar': false,
       'financeiro.custo_excluir': false,
+      // MATRIZ REGISTRAL: o Assistente OPERA a leitura (processa a pasta, revisa
+      // divergência e vê evidência) mas NÃO decide dado registral nem estrutura.
+      'registral.ver_evidencias': true,
+      'registral.revisar': true,
+      'registral.reprocessar': true,
+      'registral.aprovar': false,
+      'registral.alterar_filiacao': false,
+      'registral.reverter': false,
+      'registral.administrar_regras': false,
       // Sem admin
       'usuarios.gerenciar': false,
     },
@@ -337,6 +382,8 @@ export const PERFIS_PADRAO = [
       'mensagens.ver': true,
       'eventos.ver': true,
       'arvore.ver': true,
+      // Vê a evidência que sustenta um dado; não revisa, não aprova, não altera.
+      'registral.ver_evidencias': true,
     },
   },
 ]

@@ -5,6 +5,7 @@ import { prisma } from "@/lib/prisma"
 import { verificarPermissao } from "@/src/lib/verificar-permissao"
 import { marcarNaoLocalizada, reabrir, retornoGenealogia, dispensarNecessidade, atenderNecessidade, iniciarAtendimentoNecessidade } from "@/src/services/necessidade-documental"
 import { tentarAvancoAutomatico } from "@/src/lib/motor/auto-avanco"
+import { notificarNecessidadeTransicionada } from "@/src/services/registral/gancho-documental"
 
 // GET - detalhe da necessidade + histórico (eventos) + documentos que a atendem
 export async function GET(
@@ -55,29 +56,44 @@ export async function PATCH(
     // arrastar. Dispara após a transição (gancho idempotente e gated).
     const avancar = () => tentarAvancoAutomatico(isNaN(pid) ? null : pid)
 
+    // MRG — RECONCILIAÇÃO CONTÍNUA: transição de necessidade muda o que está
+    // comprovado, e portanto a linhagem. Publica evento (best-effort, fora do
+    // caminho crítico; não altera nenhuma resposta desta rota).
+    const reconciliarRegistral = () =>
+      notificarNecessidadeTransicionada({ necessidadeId: id }).catch((e) =>
+        console.error("[necessidade → gancho registral]", e),
+      )
+
     switch (acao) {
       case "nao_localizada": {
         const necessidade = await marcarNaoLocalizada(id)
         await avancar()
+        await reconciliarRegistral()
         return NextResponse.json({ necessidade })
       }
-      case "reabrir":
-        return NextResponse.json({ necessidade: await reabrir(id) }, { status: 201 })
+      case "reabrir": {
+        const nova = await reabrir(id)
+        await reconciliarRegistral()
+        return NextResponse.json({ necessidade: nova }, { status: 201 })
+      }
       case "retorno_genealogia":
         return NextResponse.json({ necessidade: await retornoGenealogia(id, body.motivo) })
       case "dispensar": {
         // Transição CANÔNICA pelo serviço de domínio (nenhuma escrita direta de status).
         await dispensarNecessidade(id, typeof body.motivo === "string" ? body.motivo : undefined)
         await avancar()
+        await reconciliarRegistral()
         return NextResponse.json({ necessidade: await prisma.necessidadeDocumental.findUnique({ where: { id } }) })
       }
       case "em_atendimento": {
         await iniciarAtendimentoNecessidade(id)
+        await reconciliarRegistral()
         return NextResponse.json({ necessidade: await prisma.necessidadeDocumental.findUnique({ where: { id } }) })
       }
       case "atender": {
         await atenderNecessidade(id)
         await avancar()
+        await reconciliarRegistral()
         return NextResponse.json({ necessidade: await prisma.necessidadeDocumental.findUnique({ where: { id } }) })
       }
       default:
