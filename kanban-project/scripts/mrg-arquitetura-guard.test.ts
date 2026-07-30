@@ -380,6 +380,16 @@ ok(/updateMany\([\s\S]{0,400}reservadoEm/.test(lote), "claim atômico por execu�
 const dispatcher = ler("src/services/outbox-dispatcher.ts")
 ok(dispatcher.includes("registral.reconciliar.processo"), "a reconciliação contínua está ligada à outbox existente")
 
+const cron = ler("src/app/api/cron/registral/route.ts")
+ok(
+  cron.includes("x-vercel-cron"),
+  "o worker aceita o header de cron da Vercel (sem isto, nunca roda agendado)",
+)
+ok(cron.includes("CRON_SECRET"), "e também o segredo de cron")
+ok(cron.includes('registral.reprocessar'), "e o operador com permissão pode disparar manualmente")
+const vercelJson = ler("vercel.json")
+ok(vercelJson.includes("/api/cron/registral"), "o worker está registrado no cron da Vercel")
+
 // ============================================================================
 console.log(`\n${"=".repeat(60)}`)
 console.log(`MRG guarda de arquitetura: ${passed} passou, ${failed} falhou`)
