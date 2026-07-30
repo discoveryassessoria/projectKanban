@@ -14,7 +14,8 @@
 
 "use client"
 
-import { useState, useEffect, useCallback, useRef } from "react"
+import { useState, useEffect, useCallback, useMemo, useRef } from "react"
+import { useApi } from "@/src/lib/dados"
 import { createPortal } from "react-dom"
 import {
   X,
@@ -53,6 +54,70 @@ interface StepEditorBaseProps {
 
 interface UserBrief {
   id: number
+}
+
+// ============================================================
+// CARREGAMENTO COMPARTILHADO DOS EDITORES
+// ============================================================
+//
+// Os cinco editores liam as MESMAS duas coisas — o documento e a etapa dentro do
+// workflow dele — cada um com o seu `carregar()` dentro de um efeito, e cada um
+// semeando meia dúzia de `useState` a partir da resposta.
+//
+// Aqui a leitura é uma só, pela camada oficial: as chaves são as mesmas para todos os
+// editores, então abrir um editor depois do outro no mesmo documento não refaz a
+// requisição. E como a semente do formulário passa a ser o valor INICIAL de um
+// componente montado por `key` (ver `versaoDe`), não sobra efeito nenhum.
+
+/** Etapa do workflow como os editores a consomem. */
+interface EtapaCarregada {
+  id: number
+  [campo: string]: unknown
+}
+
+function useDocumentoEEtapa(documentoId: number | null, stepId: number | null) {
+  const docReq = useApi<Record<string, unknown>>(documentoId ? `/api/documentos/${documentoId}` : null)
+  const wfReq = useApi<{ workflow?: { steps?: EtapaCarregada[] } }>(
+    documentoId ? `/api/documentos/${documentoId}/workflow` : null,
+  )
+  const etapa = useMemo(
+    () => wfReq.dados?.workflow?.steps?.find((s) => s.id === stepId) ?? null,
+    [wfReq.dados, stepId],
+  )
+  // Alguns editores precisam de OUTRA etapa como contexto (o de validar mostra o que a
+  // conferência decidiu), por isso a lista inteira também sai daqui.
+  const etapas = wfReq.dados?.workflow?.steps ?? SEM_ETAPAS
+  return {
+    doc: docReq.dados ?? null,
+    etapa,
+    etapas,
+    carregando: docReq.carregando || wfReq.carregando,
+    recarregar: () => { void docReq.recarregar(); void wfReq.recarregar() },
+  }
+}
+
+const SEM_ETAPAS: EtapaCarregada[] = []
+
+// Leitores tolerantes do payload. Os editores liam `d.campo || ""` sobre um `any`; com
+// a resposta tipada como `Record<string, unknown>`, a conversão fica explícita e num
+// lugar só — sem `any` e sem repetir o mesmo `|| ""` em trinta pontos.
+function texto(v: unknown): string {
+  return typeof v === "string" ? v : v == null ? "" : String(v)
+}
+function textoOuNulo(v: unknown): string | null {
+  return typeof v === "string" && v.length > 0 ? v : null
+}
+function numeroOuNulo(v: unknown): number | null {
+  return typeof v === "number" ? v : null
+}
+
+/**
+ * Identidade do que foi carregado. Serve de `key` do formulário: enquanto o servidor
+ * devolve o mesmo conteúdo, o rascunho do usuário é preservado; quando devolve
+ * conteúdo novo (recarga após salvar), o formulário renasce refletindo o gravado.
+ */
+function versaoDe(doc: unknown, etapa: unknown): string {
+  return JSON.stringify([doc ?? null, etapa ?? null])
 }
 
 // ============================================================
@@ -472,97 +537,76 @@ function getRecomendacao(doc: DocSnapshot): { canal: CanalId; razao: string } {
   }
 }
 
-export function EditorSolicitarCertidao({
+/** Converte o documento cru no retrato que este editor usa. */
+function lerDocSnapshot(bruto: Record<string, unknown> | null): DocSnapshot | null {
+  if (!bruto) return null
+  const p = bruto.pessoa as Record<string, unknown> | undefined
+  return {
+    id: Number(bruto.id),
+    tipo: texto(bruto.tipo),
+    cartorio: textoOuNulo(bruto.cartorio),
+    livro: textoOuNulo(bruto.livro),
+    folha: textoOuNulo(bruto.folha),
+    termo: textoOuNulo(bruto.termo),
+    nome_registrado: textoOuNulo(bruto.nome_registrado),
+    data_evento: textoOuNulo(bruto.data_evento),
+    pessoa: p ? { id: Number(p.id), nome: texto(p.nome), sobrenome: textoOuNulo(p.sobrenome) } : null,
+    canal_solicitacao: textoOuNulo(bruto.canal_solicitacao),
+    protocolo: textoOuNulo(bruto.protocolo),
+    nro_pedido: textoOuNulo(bruto.nro_pedido),
+    link_acompanhamento: textoOuNulo(bruto.link_acompanhamento),
+    observacoes: textoOuNulo(bruto.observacoes),
+  }
+}
+
+/** Casca: carrega, e monta o formulário com a semente já em mãos. */
+export function EditorSolicitarCertidao(props: StepEditorBaseProps) {
+  const { doc: bruto, etapa, carregando } = useDocumentoEEtapa(props.isOpen ? props.documentoId : null, props.stepId)
+  const doc = useMemo(() => lerDocSnapshot(bruto), [bruto])
+  if (!props.isOpen) return null
+  return (
+    <FormSolicitarCertidao
+      key={versaoDe(doc, etapa)}
+      {...props}
+      doc={doc}
+      etapa={etapa}
+      loading={carregando}
+    />
+  )
+}
+
+function FormSolicitarCertidao({
   documentoId,
   stepId,
   stepStatus,
   isOpen,
   onClose,
   onSaved,
-}: StepEditorBaseProps) {
-  const [doc, setDoc] = useState<DocSnapshot | null>(null)
-  const [form, setForm] = useState<SolicitarFormState>(emptySolicitarForm())
-  const [loading, setLoading] = useState(false)
+  doc,
+  etapa,
+  loading,
+}: StepEditorBaseProps & { doc: DocSnapshot | null; etapa: EtapaCarregada | null; loading: boolean }) {
+  // O formulário nasce do que está gravado. A PRÉ-SELEÇÃO do canal continua igual: se
+  // não há canal salvo, vale o recomendado — é isso que faz as seções "Evidências" e
+  // "Detalhes do envio" já aparecerem ao abrir.
+  const [form, setForm] = useState<SolicitarFormState>(() => {
+    if (!doc) return emptySolicitarForm()
+    const canalSalvo = (doc.canal_solicitacao || "").toLowerCase()
+    const canalValido = CANAIS.find((c) => c.id === canalSalvo)?.id || null
+    return {
+      canal: canalValido || getRecomendacao(doc).canal,
+      attachmentUrl: doc.link_acompanhamento || "",
+      protocolo: doc.protocolo || texto(etapa?.externalProtocol),
+      trackingCode: texto(etapa?.trackingCode),
+      observacao: doc.observacoes || "",
+      externalEntityName: texto(etapa?.externalEntityName),
+      costPaid: etapa?.costPaid != null ? String(etapa.costPaid) : "",
+      paymentMethod: texto(etapa?.paymentMethod),
+    }
+  })
   const [saving, setSaving] = useState(false)
 
   const readOnly = stepStatus === "concluida"
-
-  // Carrega doc + step
-  const carregar = useCallback(async () => {
-    if (!documentoId || !isOpen) return
-    setLoading(true)
-    try {
-      // Doc
-      const resDoc = await fetch(`/api/documentos/${documentoId}`, { headers: authHeader() })
-      if (resDoc.ok) {
-        const d = await resDoc.json()
-        const snap: DocSnapshot = {
-          id: d.id,
-          tipo: d.tipo,
-          cartorio: d.cartorio,
-          livro: d.livro,
-          folha: d.folha,
-          termo: d.termo,
-          nome_registrado: d.nome_registrado,
-          data_evento: d.data_evento,
-          pessoa: d.pessoa
-            ? { id: d.pessoa.id, nome: d.pessoa.nome, sobrenome: d.pessoa.sobrenome }
-            : null,
-          canal_solicitacao: d.canal_solicitacao,
-          protocolo: d.protocolo,
-          nro_pedido: d.nro_pedido,
-          link_acompanhamento: d.link_acompanhamento,
-          observacoes: d.observacoes,
-        }
-        setDoc(snap)
-
-        // Carrega step pra recuperar detalhes do envio se já tiver sido salvo
-        const resWf = await fetch(`/api/documentos/${documentoId}/workflow`, {
-          headers: authHeader(),
-        })
-        let stepData: {
-          externalEntityName?: string | null
-          costPaid?: string | number | null
-          paymentMethod?: string | null
-          trackingCode?: string | null
-          externalProtocol?: string | null
-        } = {}
-        if (resWf.ok) {
-          const wfData = await resWf.json()
-          stepData =
-            wfData.workflow?.steps?.find((s: { id: number }) => s.id === stepId) || {}
-        }
-
-        // Determina canal salvo (se houver) — só aceita se for canal válido
-        const canalSalvo = (snap.canal_solicitacao || "").toLowerCase()
-        const canalValido = CANAIS.find((c) => c.id === canalSalvo)?.id || null
-
-        // ✅ PRÉ-SELEÇÃO: se não há canal salvo, usa o recomendado
-        // (mesma lógica do HTML — assim as seções "Evidências" e
-        //  "Detalhes do envio" aparecem automaticamente ao abrir)
-        const canalInicial = canalValido || getRecomendacao(snap).canal
-
-        setForm({
-          canal: canalInicial,
-          attachmentUrl: snap.link_acompanhamento || "",
-          protocolo: snap.protocolo || stepData.externalProtocol || "",
-          trackingCode: stepData.trackingCode || "",
-          observacao: snap.observacoes || "",
-          externalEntityName: stepData.externalEntityName || "",
-          costPaid: stepData.costPaid != null ? String(stepData.costPaid) : "",
-          paymentMethod: stepData.paymentMethod || "",
-        })
-      }
-    } catch (e) {
-      console.warn("[EditorSolicitarCertidao] carregar:", e)
-    } finally {
-      setLoading(false)
-    }
-  }, [documentoId, isOpen, stepId])
-
-  useEffect(() => {
-    if (isOpen) carregar()
-  }, [isOpen, carregar])
 
   const canalConfig = form.canal ? CANAIS.find((c) => c.id === form.canal)! : null
   const recomendacao = doc ? getRecomendacao(doc) : null
@@ -1143,21 +1187,60 @@ const PAGAMENTO_LABEL: Record<string, string> = {
   cortesia: "Cortesia",
 }
 
-export function EditorAguardarRetorno({
+/** Casca: carrega, e monta o formulário com a semente já em mãos. */
+export function EditorAguardarRetorno(props: StepEditorBaseProps) {
+  const { doc, etapa, etapas, carregando } = useDocumentoEEtapa(props.isOpen ? props.documentoId : null, props.stepId)
+  // A solicitação (etapa anterior) é o contexto exibido no topo deste editor.
+  const solicitacaoEtapa = etapas.find((s) => s.stepKey === "solicitar_certidao") ?? null
+  if (!props.isOpen) return null
+  return (
+    <FormAguardarRetorno
+      key={versaoDe(doc, [etapa, solicitacaoEtapa])}
+      {...props}
+      doc={doc}
+      etapa={etapa}
+      solicitacaoEtapa={solicitacaoEtapa}
+      loading={carregando}
+    />
+  )
+}
+
+function FormAguardarRetorno({
   documentoId,
   stepId,
   stepStatus,
   isOpen,
   onClose,
   onSaved,
-}: StepEditorBaseProps) {
+  doc,
+  etapa,
+  solicitacaoEtapa,
+  loading,
+}: StepEditorBaseProps & {
+  doc: Record<string, unknown> | null
+  etapa: EtapaCarregada | null
+  solicitacaoEtapa: EtapaCarregada | null
+  loading: boolean
+}) {
   // Instante de referência do editor, fixado na montagem (ver fmtRelative).
   const [agoraRef] = useState(() => Date.now())
-  const [trackingCode, setTrackingCode] = useState("")
-  const [notes, setNotes] = useState("")
-  const [solicit, setSolicit] = useState<SolicitacaoSummary | null>(null)
+  const [trackingCode, setTrackingCode] = useState(() => texto(etapa?.trackingCode))
+  const [notes, setNotes] = useState(() => texto(etapa?.notes))
   const [saving, setSaving] = useState(false)
-  const [loading, setLoading] = useState(false)
+
+  // Retrato da solicitação: o documento manda, e a etapa anterior completa o que ele
+  // não tem. Mesma precedência de antes, agora como derivação.
+  const solicit = useMemo<SolicitacaoSummary | null>(() => ({
+    atendente: textoOuNulo(solicitacaoEtapa?.externalEntityName),
+    cartorio: textoOuNulo(doc?.cartorio),
+    canal: textoOuNulo(doc?.canal_solicitacao) || textoOuNulo(solicitacaoEtapa?.requestChannel),
+    protocolo: textoOuNulo(doc?.protocolo) || textoOuNulo(solicitacaoEtapa?.externalProtocol),
+    link: textoOuNulo(doc?.link_acompanhamento),
+    observacao: textoOuNulo(doc?.observacoes),
+    sentAt: textoOuNulo(solicitacaoEtapa?.completedAt) || textoOuNulo(solicitacaoEtapa?.startedAt),
+    custoPago: numeroOuNulo(solicitacaoEtapa?.costPaid),
+    formaPagamento: textoOuNulo(solicitacaoEtapa?.paymentMethod),
+  }), [doc, solicitacaoEtapa])
 
   // Form pra adicionar follow-up
   const [newDate, setNewDate] = useState<string>(todayIso())
@@ -1166,62 +1249,6 @@ export function EditorAguardarRetorno({
   const [addingFollowup, setAddingFollowup] = useState(false)
 
   const readOnly = stepStatus === "concluida"
-
-  const carregar = useCallback(async () => {
-    if (!documentoId || !stepId || !isOpen) return
-    setLoading(true)
-    try {
-      const [resWf, resDoc] = await Promise.all([
-        fetch(`/api/documentos/${documentoId}/workflow`, { headers: authHeader() }),
-        fetch(`/api/documentos/${documentoId}`, { headers: authHeader() }),
-      ])
-
-      let currentStep: Record<string, unknown> | null = null
-      let prevStep: Record<string, unknown> | null = null
-      if (resWf.ok) {
-        const d = await resWf.json()
-        const steps = d.workflow?.steps || []
-        currentStep = steps.find((s: { id: number }) => s.id === stepId) || null
-        prevStep = steps.find((s: { stepKey: string }) => s.stepKey === "solicitar_certidao") || null
-      }
-      if (currentStep) {
-        setTrackingCode((currentStep.trackingCode as string) || "")
-        setNotes((currentStep.notes as string) || "")
-      }
-
-      let doc: Record<string, unknown> = {}
-      if (resDoc.ok) doc = await resDoc.json()
-
-      setSolicit({
-        atendente: (prevStep?.externalEntityName as string) || null,
-        cartorio: (doc.cartorio as string) || null,
-        canal:
-          (doc.canal_solicitacao as string) ||
-          (prevStep?.requestChannel as string) ||
-          null,
-        protocolo:
-          (doc.protocolo as string) ||
-          (prevStep?.externalProtocol as string) ||
-          null,
-        link: (doc.link_acompanhamento as string) || null,
-        observacao: (doc.observacoes as string) || null,
-        sentAt:
-          (prevStep?.completedAt as string) ||
-          (prevStep?.startedAt as string) ||
-          null,
-        custoPago: (prevStep?.costPaid as number) ?? null,
-        formaPagamento: (prevStep?.paymentMethod as string) || null,
-      })
-    } catch (e) {
-      console.warn("[EditorAguardarRetorno]", e)
-    } finally {
-      setLoading(false)
-    }
-  }, [documentoId, stepId, isOpen])
-
-  useEffect(() => {
-    if (isOpen) carregar()
-  }, [isOpen, carregar])
 
   const followups = parseFollowups(notes)
 
@@ -1639,61 +1666,48 @@ const MEDIUM_OPTIONS: {
   },
 ]
 
-export function EditorReceberCertidao({
+/** Casca: carrega, e monta o formulário com a semente já em mãos. */
+export function EditorReceberCertidao(props: StepEditorBaseProps) {
+  const { doc, etapa, carregando } = useDocumentoEEtapa(props.isOpen ? props.documentoId : null, props.stepId)
+  if (!props.isOpen) return null
+  return (
+    <FormReceberCertidao
+      key={versaoDe(doc, etapa)}
+      {...props}
+      doc={doc}
+      etapa={etapa}
+      loading={carregando}
+    />
+  )
+}
+
+function FormReceberCertidao({
   documentoId,
   stepId,
   stepStatus,
   isOpen,
   onClose,
   onSaved,
-}: StepEditorBaseProps) {
-  const [arquivoUrl, setArquivoUrl] = useState("")
-  const [arquivoNome, setArquivoNome] = useState("")
-  const [arquivoTamanho, setArquivoTamanho] = useState<number | null>(null)
-  const [arquivoMime, setArquivoMime] = useState<string | null>(null)
-  const [medium, setMedium] = useState<DocumentMedium | null>(null)
-  const [physicalLocation, setPhysicalLocation] = useState("")
-  const [observacao, setObservacao] = useState("")
+  doc,
+  etapa,
+  loading,
+}: StepEditorBaseProps & { doc: Record<string, unknown> | null; etapa: EtapaCarregada | null; loading: boolean }) {
+  // Os valores iniciais SÃO os do servidor. A ordem de precedência é a mesma de antes:
+  // a etapa sobrepõe o documento em `physicalLocation` quando tem valor próprio.
+  const [arquivoUrl, setArquivoUrl] = useState(() => texto(doc?.arquivo_url))
+  const [arquivoNome, setArquivoNome] = useState(() => texto(doc?.arquivo_nome))
+  const [arquivoTamanho, setArquivoTamanho] = useState<number | null>(() => numeroOuNulo(doc?.arquivo_tamanho))
+  const [arquivoMime, setArquivoMime] = useState<string | null>(() => textoOuNulo(doc?.arquivo_mime_type))
+  const [medium, setMedium] = useState<DocumentMedium | null>(
+    () => (etapa?.documentMedium as DocumentMedium) || null,
+  )
+  const [physicalLocation, setPhysicalLocation] = useState(
+    () => texto(etapa?.physicalLocation) || texto(doc?.localizacao_fisica),
+  )
+  const [observacao, setObservacao] = useState(() => texto(etapa?.stepObservation))
   const [saving, setSaving] = useState(false)
-  const [loading, setLoading] = useState(false)
 
   const readOnly = stepStatus === "concluida"
-
-  const carregar = useCallback(async () => {
-    if (!documentoId || !stepId || !isOpen) return
-    setLoading(true)
-    try {
-      const [resDoc, resWf] = await Promise.all([
-        fetch(`/api/documentos/${documentoId}`, { headers: authHeader() }),
-        fetch(`/api/documentos/${documentoId}/workflow`, { headers: authHeader() }),
-      ])
-      if (resDoc.ok) {
-        const d = await resDoc.json()
-        setArquivoUrl(d.arquivo_url || "")
-        setArquivoNome(d.arquivo_nome || "")
-        setArquivoTamanho(d.arquivo_tamanho ?? null)
-        setArquivoMime(d.arquivo_mime_type ?? null)
-        setPhysicalLocation(d.localizacao_fisica || "")
-      }
-      if (resWf.ok) {
-        const d = await resWf.json()
-        const step = d.workflow?.steps?.find((s: { id: number }) => s.id === stepId)
-        if (step) {
-          setMedium((step.documentMedium as DocumentMedium) || null)
-          if (step.physicalLocation) setPhysicalLocation(step.physicalLocation)
-          if (step.stepObservation) setObservacao(step.stepObservation)
-        }
-      }
-    } catch (e) {
-      console.warn("[EditorReceberCertidao]", e)
-    } finally {
-      setLoading(false)
-    }
-  }, [documentoId, stepId, isOpen])
-
-  useEffect(() => {
-    if (isOpen) carregar()
-  }, [isOpen, carregar])
 
   const showPhysicalLocation = medium === "fisico" || medium === "ambos"
   const podeConcluir =
@@ -1987,112 +2001,86 @@ function fullName(p: { nome: string | null; sobrenome: string | null } | null): 
   return `${p.nome || ""} ${p.sobrenome || ""}`.trim()
 }
 
-export function EditorConferirCertidao({
+/** Casca: carrega, e monta o formulário com a semente já em mãos. */
+export function EditorConferirCertidao(props: StepEditorBaseProps) {
+  const { doc, etapa, carregando } = useDocumentoEEtapa(props.isOpen ? props.documentoId : null, props.stepId)
+  if (!props.isOpen) return null
+  return (
+    <FormConferirCertidao
+      key={versaoDe(doc, etapa)}
+      {...props}
+      doc={doc}
+      etapa={etapa}
+      loading={carregando}
+    />
+  )
+}
+
+/** Pessoa como o documento a traz, para comparar com o que está escrito na certidão. */
+function lerPessoa(bruto: unknown): PessoaSummary | null {
+  if (!bruto || typeof bruto !== "object") return null
+  const p = bruto as Record<string, unknown>
+  const parente = (v: unknown) => {
+    if (!v || typeof v !== "object") return null
+    const r = v as Record<string, unknown>
+    return { nome: texto(r.nome), sobrenome: texto(r.sobrenome) }
+  }
+  return {
+    nome: textoOuNulo(p.nome),
+    sobrenome: textoOuNulo(p.sobrenome),
+    pai: parente(p.pai),
+    mae: parente(p.mae),
+  }
+}
+
+function FormConferirCertidao({
   documentoId,
   stepId,
   stepStatus,
   isOpen,
   onClose,
   onSaved,
-}: StepEditorBaseProps) {
-  // Dados literais (do documento)
-  const [nomeRegistrado, setNomeRegistrado] = useState("")
-  const [paiRegistrado, setPaiRegistrado] = useState("")
-  const [maeRegistrada, setMaeRegistrada] = useState("")
-  const [conjugeRegistrado, setConjugeRegistrado] = useState("")
-  const [dataEventoDoc, setDataEventoDoc] = useState("")
-  const [dataRegistroDoc, setDataRegistroDoc] = useState("")
+  doc,
+  etapa,
+  loading,
+}: StepEditorBaseProps & { doc: Record<string, unknown> | null; etapa: EtapaCarregada | null; loading: boolean }) {
+  // Dados literais (do documento) — valores iniciais, não cópia por efeito.
+  const [nomeRegistrado, setNomeRegistrado] = useState(() => texto(doc?.nome_registrado))
+  const [paiRegistrado, setPaiRegistrado] = useState(() => texto(doc?.pai_registrado))
+  const [maeRegistrada, setMaeRegistrada] = useState(() => texto(doc?.mae_registrada))
+  const [conjugeRegistrado, setConjugeRegistrado] = useState(() => texto(doc?.conjuge_registrado))
+  const [dataEventoDoc, setDataEventoDoc] = useState(() => texto(doc?.data_evento_documento).slice(0, 10))
+  const [dataRegistroDoc, setDataRegistroDoc] = useState(() => texto(doc?.data_registro_documento).slice(0, 10))
 
-  // Contexto
-  const [docTipo, setDocTipo] = useState<string | null>(null)
-  const [arquivoUrl, setArquivoUrl] = useState<string | null>(null)
-  const [arquivoNome, setArquivoNome] = useState<string | null>(null)
-  const [pessoa, setPessoa] = useState<PessoaSummary | null>(null)
+  // Contexto (só leitura — vem do documento)
+  const docTipo = textoOuNulo(doc?.tipo)
+  const arquivoUrl = textoOuNulo(doc?.arquivo_url)
+  const arquivoNome = textoOuNulo(doc?.arquivo_nome)
+  const pessoa = useMemo(() => lerPessoa(doc?.pessoa), [doc])
 
-  // Checklist + resultado
-  const [checklist, setChecklist] = useState<ReviewChecklist>({
-    legivel: true,
-    integro: true,
-    dados_minimos: true,
-    apostila_ok: false,
-    traducao_ok: false,
+  // Checklist + resultado. O padrão só vale quando a etapa ainda não tem checklist
+  // gravado — era o `if (step.reviewChecklist)` do carregador.
+  const [checklist, setChecklist] = useState<ReviewChecklist>(() => {
+    const gravado = etapa?.reviewChecklist as Record<string, unknown> | undefined
+    if (!gravado) {
+      return { legivel: true, integro: true, dados_minimos: true, apostila_ok: false, traducao_ok: false }
+    }
+    return {
+      legivel: !!gravado.legivel,
+      integro: !!gravado.integro,
+      dados_minimos: !!gravado.dados_minimos,
+      apostila_ok: !!gravado.apostila_ok,
+      traducao_ok: !!gravado.traducao_ok,
+    }
   })
-  const [resultado, setResultado] = useState<ConferirResultado | null>(null)
-  const [observacao, setObservacao] = useState("")
+  const [resultado, setResultado] = useState<ConferirResultado | null>(
+    () => (etapa?.reviewResult as ConferirResultado) || null,
+  )
+  const [observacao, setObservacao] = useState(() => texto(etapa?.stepObservation))
 
   const [saving, setSaving] = useState(false)
-  const [loading, setLoading] = useState(false)
 
   const readOnly = stepStatus === "concluida"
-
-  const carregar = useCallback(async () => {
-    if (!documentoId || !stepId || !isOpen) return
-    setLoading(true)
-    try {
-      const [resDoc, resWf] = await Promise.all([
-        fetch(`/api/documentos/${documentoId}`, { headers: authHeader() }),
-        fetch(`/api/documentos/${documentoId}/workflow`, { headers: authHeader() }),
-      ])
-
-      if (resDoc.ok) {
-        const d = await resDoc.json()
-        setDocTipo(d.tipo || null)
-        setArquivoUrl(d.arquivo_url || null)
-        setArquivoNome(d.arquivo_nome || null)
-        setNomeRegistrado(d.nome_registrado || "")
-        setPaiRegistrado(d.pai_registrado || "")
-        setMaeRegistrada(d.mae_registrada || "")
-        setConjugeRegistrado(d.conjuge_registrado || "")
-        setDataEventoDoc(
-          d.data_evento_documento ? d.data_evento_documento.slice(0, 10) : "",
-        )
-        setDataRegistroDoc(
-          d.data_registro_documento ? d.data_registro_documento.slice(0, 10) : "",
-        )
-        if (d.pessoa) {
-          setPessoa({
-            nome: d.pessoa.nome || null,
-            sobrenome: d.pessoa.sobrenome || null,
-            pai: d.pessoa.pai
-              ? { nome: d.pessoa.pai.nome, sobrenome: d.pessoa.pai.sobrenome }
-              : null,
-            mae: d.pessoa.mae
-              ? { nome: d.pessoa.mae.nome, sobrenome: d.pessoa.mae.sobrenome }
-              : null,
-          })
-        }
-      }
-      if (resWf.ok) {
-        const d = await resWf.json()
-        const step = d.workflow?.steps?.find((s: { id: number }) => s.id === stepId)
-        if (step) {
-          if (step.reviewChecklist) {
-            setChecklist({
-              legivel: !!step.reviewChecklist.legivel,
-              integro: !!step.reviewChecklist.integro,
-              dados_minimos: !!step.reviewChecklist.dados_minimos,
-              apostila_ok: !!step.reviewChecklist.apostila_ok,
-              traducao_ok: !!step.reviewChecklist.traducao_ok,
-            })
-          }
-          if (step.reviewResult) {
-            setResultado(step.reviewResult as ConferirResultado)
-          }
-          if (step.stepObservation) {
-            setObservacao(step.stepObservation)
-          }
-        }
-      }
-    } catch (e) {
-      console.warn("[EditorConferirCertidao]", e)
-    } finally {
-      setLoading(false)
-    }
-  }, [documentoId, stepId, isOpen])
-
-  useEffect(() => {
-    if (isOpen) carregar()
-  }, [isOpen, carregar])
 
   const ehCasamento = isCasamento(docTipo)
   const podeConcluir = nomeRegistrado.trim().length > 0 && resultado !== null
@@ -2535,93 +2523,78 @@ interface ConferenciaSnapshot {
   completedAt: string | null
 }
 
-export function EditorValidarCertidao({
+/** Casca: carrega, e monta o formulário com a semente já em mãos. */
+export function EditorValidarCertidao(props: StepEditorBaseProps) {
+  const { doc, etapa, etapas, carregando } = useDocumentoEEtapa(props.isOpen ? props.documentoId : null, props.stepId)
+  // A conferência (etapa anterior) é contexto de decisão desta tela.
+  const conferenciaEtapa = etapas.find((s) => s.stepKey === "conferir_certidao") ?? null
+  if (!props.isOpen) return null
+  return (
+    <FormValidarCertidao
+      key={versaoDe(doc, [etapa, conferenciaEtapa])}
+      {...props}
+      doc={doc}
+      etapa={etapa}
+      conferenciaEtapa={conferenciaEtapa}
+      loading={carregando}
+    />
+  )
+}
+
+function FormValidarCertidao({
   documentoId,
   stepId,
   stepStatus,
   isOpen,
   onClose,
   onSaved,
-}: StepEditorBaseProps) {
-  const [decisao, setDecisao] = useState<ValidarDecisao | null>(null)
-  const [parecer, setParecer] = useState("")
-  const [docTipo, setDocTipo] = useState<string | null>(null)
-  const [arquivoUrl, setArquivoUrl] = useState<string | null>(null)
-  const [arquivoNome, setArquivoNome] = useState<string | null>(null)
-  const [conferencia, setConferencia] = useState<ConferenciaSnapshot | null>(null)
-  const [pessoaNome, setPessoaNome] = useState<string | null>(null)
+  doc,
+  etapa,
+  conferenciaEtapa,
+  loading,
+}: StepEditorBaseProps & {
+  doc: Record<string, unknown> | null
+  etapa: EtapaCarregada | null
+  conferenciaEtapa: EtapaCarregada | null
+  loading: boolean
+}) {
+  // Contexto vindo do documento — só leitura.
+  const docTipo = textoOuNulo(doc?.tipo)
+  const arquivoUrl = textoOuNulo(doc?.arquivo_url)
+  const arquivoNome = textoOuNulo(doc?.arquivo_nome)
+  const pessoaNome = useMemo(() => {
+    const p = doc?.pessoa as Record<string, unknown> | undefined
+    if (!p) return null
+    return `${texto(p.nome)} ${texto(p.sobrenome)}`.trim() || null
+  }, [doc])
+
+  // O que a conferência decidiu, exibido como contexto.
+  const conferencia = useMemo<ConferenciaSnapshot | null>(() => {
+    if (!conferenciaEtapa) return null
+    const completedBy = conferenciaEtapa.completedBy as Record<string, unknown> | undefined
+    return {
+      resultado: (conferenciaEtapa.reviewResult as ConferenciaSnapshot["resultado"]) || null,
+      observacao: textoOuNulo(conferenciaEtapa.stepObservation),
+      completedBy: completedBy ? textoOuNulo(completedBy.nome) : null,
+      completedAt: (conferenciaEtapa.completedAt as string) || null,
+    }
+  }, [conferenciaEtapa])
+
+  // Decisão: o que já está gravado na etapa; se não há nada gravado, a SUGESTÃO derivada
+  // da conferência. Antes isso eram dois efeitos em sequência — carregar e depois
+  // pré-selecionar — e a tela mostrava "nenhuma decisão" no meio do caminho.
+  const [decisao, setDecisao] = useState<ValidarDecisao | null>(() => {
+    const gravada = (etapa?.validationResult as ValidarDecisao) || null
+    if (gravada) return gravada
+    if (conferenciaEtapa?.reviewResult === "aprovado") return "aprovado"
+    if (conferenciaEtapa?.reviewResult === "divergente") return "rejeitado"
+    if (conferenciaEtapa?.reviewResult === "nova_via") return "nova_via"
+    return null
+  })
+  const [parecer, setParecer] = useState(() => texto(etapa?.legalOpinion))
   const [saving, setSaving] = useState(false)
-  const [loading, setLoading] = useState(false)
 
   const readOnly = stepStatus === "concluida"
-
-  const carregar = useCallback(async () => {
-    if (!documentoId || !stepId || !isOpen) return
-    setLoading(true)
-    try {
-      const [resDoc, resWf] = await Promise.all([
-        fetch(`/api/documentos/${documentoId}`, { headers: authHeader() }),
-        fetch(`/api/documentos/${documentoId}/workflow`, { headers: authHeader() }),
-      ])
-
-      if (resDoc.ok) {
-        const d = await resDoc.json()
-        setDocTipo(d.tipo || null)
-        setArquivoUrl(d.arquivo_url || null)
-        setArquivoNome(d.arquivo_nome || null)
-        if (d.pessoa) {
-          setPessoaNome(
-            `${d.pessoa.nome || ""} ${d.pessoa.sobrenome || ""}`.trim() || null,
-          )
-        }
-      }
-
-      if (resWf.ok) {
-        const d = await resWf.json()
-        const steps = d.workflow?.steps || []
-
-        // Recupera o step atual (validar)
-        const current = steps.find((s: { id: number }) => s.id === stepId)
-        if (current) {
-          if (current.validationResult) {
-            setDecisao(current.validationResult as ValidarDecisao)
-          }
-          if (current.legalOpinion) {
-            setParecer(current.legalOpinion)
-          }
-        }
-
-        // Recupera o step anterior (conferir) pra exibir como contexto
-        const conf = steps.find(
-          (s: { stepKey: string }) => s.stepKey === "conferir_certidao",
-        )
-        if (conf) {
-          setConferencia({
-            resultado: conf.reviewResult || null,
-            observacao: conf.stepObservation || null,
-            completedBy: conf.completedBy?.nome || null,
-            completedAt: conf.completedAt || null,
-          })
-        }
-      }
-    } catch (e) {
-      console.warn("[EditorValidarCertidao]", e)
-    } finally {
-      setLoading(false)
-    }
-  }, [documentoId, stepId, isOpen])
-
-  useEffect(() => {
-    if (isOpen) carregar()
-  }, [isOpen, carregar])
-
-  // Pré-seleção: se conferência aprovou, sugere aprovado puro; se divergente, sugere rejeitado
-  useEffect(() => {
-    if (decisao || !conferencia?.resultado || loading) return
-    if (conferencia.resultado === "aprovado") setDecisao("aprovado")
-    else if (conferencia.resultado === "divergente") setDecisao("rejeitado")
-    else if (conferencia.resultado === "nova_via") setDecisao("nova_via")
-  }, [conferencia, decisao, loading])
 
   const precisaParecer = decisao !== null && decisao !== "aprovado"
   const podeConcluir =
