@@ -9,6 +9,7 @@
 
 import { useCallback, useEffect, useState } from "react"
 import { LayoutDashboard, Columns3, DollarSign, GitBranch, Coins, Users2 } from "lucide-react"
+import { useApi } from "@/src/lib/dados"
 
 interface Diagnostico {
   sistema: { contagens: Record<string, number>; runtime: Record<string, number> }
@@ -22,19 +23,12 @@ function authHeaders(): HeadersInit {
 const CARD = "rounded-2xl border border-white/10 bg-white/5 backdrop-blur-sm"
 
 export default function DashboardsTab() {
-  const [d, setD] = useState<Diagnostico | null>(null)
-  const [loading, setLoading] = useState(true)
-  const [erro, setErro] = useState<string | null>(null)
 
-  const load = useCallback(async () => {
-    setLoading(true); setErro(null)
-    try {
-      const res = await fetch("/api/gerenciamento/diagnostico", { headers: authHeaders(), cache: "no-store" })
-      const j = await res.json().catch(() => ({}))
-      if (res.ok) setD(j); else setErro(j.error || "Não foi possível carregar os indicadores.")
-    } catch { setErro("Não foi possível carregar os indicadores.") } finally { setLoading(false) }
-  }, [])
-  useEffect(() => { load() }, [load])
+  // Consulta em cache (src/lib/dados): loading e erro derivam da camada.
+  const { dados, carregando: loading, erro: erroCarregar, recarregar: load } =
+    useApi<Diagnostico>("/api/gerenciamento/diagnostico")
+  const d = dados ?? null
+  const erro = erroCarregar ? (erroCarregar.message || 'Não foi possível carregar os indicadores.') : null
 
   const c = d?.sistema.contagens ?? {}
   const r = d?.sistema.runtime ?? {}
@@ -84,7 +78,7 @@ export default function DashboardsTab() {
     <div className="space-y-5">
       {erro && (
         <div className="rounded-xl border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-200">
-          {erro} <button onClick={load} className="ml-2 underline hover:text-white">Tentar de novo</button>
+          {erro} <button onClick={() => void load()} className="ml-2 underline hover:text-white">Tentar de novo</button>
         </div>
       )}
 

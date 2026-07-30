@@ -11,6 +11,7 @@
 //   HistoricoExecucoesTab   → o que o motor executou de fato
 
 import { useCallback, useEffect, useState } from "react"
+import { useApi } from "@/src/lib/dados"
 
 interface Achado { chave: string; nome: string; valor: number; sev: string; detalhe: string }
 interface TipoScore {
@@ -49,19 +50,13 @@ const SEV_LABEL: Record<string, string> = { ok: "OK", alerta: "Atenção", erro:
 const fmt = (iso: string) => new Date(iso).toLocaleString("pt-BR", { day: "2-digit", month: "2-digit", year: "2-digit", hour: "2-digit", minute: "2-digit" })
 
 function useDiagnostico() {
-  const [dados, setDados] = useState<Diagnostico | null>(null)
-  const [loading, setLoading] = useState(true)
-  const [erro, setErro] = useState<string | null>(null)
-  const load = useCallback(async () => {
-    setLoading(true); setErro(null)
-    try {
-      const res = await fetch("/api/gerenciamento/diagnostico", { headers: authHeaders(), cache: "no-store" })
-      const j = await res.json().catch(() => ({}))
-      if (res.ok) setDados(j); else setErro(j.error || "Não foi possível gerar o diagnóstico.")
-    } catch { setErro("Não foi possível gerar o diagnóstico.") } finally { setLoading(false) }
-  }, [])
-  useEffect(() => { load() }, [load])
-  return { dados, loading, erro, load }
+  // O hook inteiro virou uma consulta em cache: `dados`, `loading` e `erro`
+  // saem da camada oficial, e `load` é a revalidação. A interface devolvida
+  // é a MESMA — nenhum consumidor precisou mudar.
+  const { dados, carregando: loading, erro: erroApi, recarregar: load } =
+    useApi<Diagnostico>("/api/gerenciamento/diagnostico")
+  const erro = erroApi ? (erroApi.message || "Não foi possível gerar o diagnóstico.") : null
+  return { dados: dados ?? null, loading, erro, load }
 }
 
 function Casca({
@@ -73,7 +68,7 @@ function Casca({
     <div className="space-y-5">
       {erro && (
         <div className="rounded-xl border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-200">
-          {erro} <button onClick={load} className="ml-2 underline hover:text-white">Tentar de novo</button>
+          {erro} <button onClick={() => void load()} className="ml-2 underline hover:text-white">Tentar de novo</button>
         </div>
       )}
       <div className={`${CARD} p-5`}>
@@ -83,7 +78,7 @@ function Casca({
             <p className="mt-1 max-w-3xl text-sm text-white/60">{descricao}</p>
             {dados && <p className="mt-1 text-[11px] text-white/40">Apurado em {fmt(dados.geradoEm)}</p>}
           </div>
-          <button onClick={load} className="flex-none rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-xs text-white/80 hover:bg-white/10">
+          <button onClick={() => void load()} className="flex-none rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-xs text-white/80 hover:bg-white/10">
             Reexecutar
           </button>
         </div>

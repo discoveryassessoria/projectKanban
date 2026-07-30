@@ -2,6 +2,7 @@
 "use client"
 
 import { useEffect, useState, useCallback, type ReactNode } from "react"
+import { useApi } from "@/src/lib/dados"
 
 const FASES: [string, string][] = [
   ["genealogia", "Genealogia"],
@@ -88,23 +89,22 @@ function authHeaders(): Record<string, string> {
   return t ? { "Content-Type": "application/json", Authorization: `Bearer ${t}` } : { "Content-Type": "application/json" }
 }
 
+// Identidade estável para a ausência de dados (evita recomputar memos).
+const SEM_ITENS: never[] = Object.freeze([]) as never[]
+
 export default function RegrasTarefaTransversalTab() {
-  const [regras, setRegras] = useState<Regra[]>([])
   const [modelos, setModelos] = useState<Modelo[]>([])
-  const [loading, setLoading] = useState(true)
   const [busca, setBusca] = useState("")
   const [filtro, setFiltro] = useState<"" | "active" | "archived">("")
   const [modalOpen, setModalOpen] = useState(false)
   const [form, setForm] = useState<any>(novoForm())
   const [salvando, setSalvando] = useState(false)
 
-  const carregar = useCallback(async () => {
-    try {
-      const r = await fetch("/api/gerenciamento/regras-tarefa-transversal")
-      if (r.ok) setRegras((await r.json()).regras || [])
-    } catch { /* silencioso */ }
-    finally { setLoading(false) }
-  }, [])
+  // Consulta em cache (src/lib/dados): loading e erro derivam da camada.
+  const { dados, carregando: loading, erro: erroCarregar, recarregar: carregar } =
+    useApi<{ regras?: Regra[] }>("/api/gerenciamento/regras-tarefa-transversal")
+  const regras = dados?.regras ?? SEM_ITENS
+  const erro = erroCarregar ? (erroCarregar.message || 'Não foi possível carregar as regras.') : null
 
   useEffect(() => {
     carregar()

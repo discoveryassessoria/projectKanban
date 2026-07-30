@@ -4,6 +4,7 @@
 // Documento (sem processo/fase/workflow/financeiro/aplicabilidade). CRUD + filtros.
 
 import { useEffect, useState, useCallback } from "react"
+import { useApi } from "@/src/lib/dados"
 
 interface Cat { id: number; code: string; name: string; description?: string | null; ordem: number; ativo: boolean; sistema?: boolean; tiposCount: number; tiposCountFk?: number; tiposCountLegado?: number }
 type Form = { id?: number; code: string; name: string; description: string; ordem: number; ativo: boolean }
@@ -15,25 +16,25 @@ function authHeaders(): HeadersInit {
 const inputCls = "w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-white placeholder-white/30 outline-none focus:border-white/20"
 const labelCls = "mb-1 block text-xs text-white/60"
 
+// Identidade estável para a ausência de dados (evita recomputar memos).
+const SEM_ITENS: never[] = Object.freeze([]) as never[]
+
 export default function CategoriasDocumentaisTab() {
-  const [rows, setRows] = useState<Cat[]>([])
-  const [loading, setLoading] = useState(true)
+
   const [busy, setBusy] = useState(false)
   const [flash, setFlash] = useState("")
-  const [erro, setErro] = useState("")
   const [status, setStatus] = useState<"ativas" | "inativas" | "todas">("todas")
   const [q, setQ] = useState("")
   const [form, setForm] = useState<Form | null>(null)
 
-  const load = useCallback(async () => {
-    setErro("")
-    try {
-      const res = await fetch(`/api/gerenciamento/categorias-documentais?status=${status}&q=${encodeURIComponent(q)}`, { headers: authHeaders() })
-      if (!res.ok) throw new Error(`HTTP ${res.status}`)
-      setRows((await res.json()).categorias || [])
-    } catch { setErro("Falha ao carregar categorias.") } finally { setLoading(false) }
-  }, [status, q])
-  useEffect(() => { load() }, [load])
+  // A chave da consulta INCLUI os filtros, então trocar status/busca refaz a
+  // consulta e cacheia cada combinação — antes era um efeito redisparando por
+  // mudança de dependência. `erro` continua string ("" = sem erro), como a tela espera.
+  const { dados, carregando: loading, erro: erroApi, recarregar: load } = useApi<{ categorias?: Cat[] }>(
+    `/api/gerenciamento/categorias-documentais?status=${status}&q=${encodeURIComponent(q)}`,
+  )
+  const rows: Cat[] = dados?.categorias ?? SEM_ITENS
+  const erro = erroApi ? "Falha ao carregar categorias." : ""
 
   const showFlash = (m: string) => { setFlash(m); setTimeout(() => setFlash(""), 2800) }
 
