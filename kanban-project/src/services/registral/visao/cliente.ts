@@ -297,7 +297,10 @@ export async function chamarVisao(
 
   const corpo = JSON.stringify({
     model: cfg.modelo,
-    max_tokens: pedido.maxTokens ?? 8000,
+    // Teto de saída folgado: certidão real tem muitos campos, e resposta cortada
+    // no meio volta como JSON inválido — foi o que derrubava sistematicamente a
+    // leitura registral, que é a mais verbosa das duas.
+    max_tokens: pedido.maxTokens ?? 16000,
     system: pedido.sistema,
     messages: [{ role: "user", content: pedido.blocos }],
     output_config: { format: { type: "json_schema", schema: pedido.esquema } },
@@ -327,6 +330,7 @@ export async function chamarVisao(
           const dados = (await res.json()) as {
             content?: Array<{ type: string; text?: string }>
             usage?: { input_tokens?: number; output_tokens?: number }
+            stop_reason?: string
           }
           const entrada = dados.usage?.input_tokens ?? 0
           const saida = dados.usage?.output_tokens ?? 0
@@ -344,9 +348,12 @@ export async function chamarVisao(
           try {
             return { ok: true, json: JSON.parse(texto), tokensEntrada: entrada, tokensSaida: saida, tentativasFeitas: tentativa }
           } catch {
+            const cortada = dados.stop_reason === "max_tokens"
             return {
               ok: false,
-              motivo: "A resposta não é JSON válido apesar do esquema declarado.",
+              motivo: cortada
+                ? "A leitura foi cortada no meio por exceder o tamanho máximo de resposta. O documento é longo demais para uma leitura só."
+                : "A resposta não é JSON válido apesar do esquema declarado.",
               permanente: true,
               tentativasFeitas: tentativa,
             }

@@ -195,7 +195,8 @@ export const ESQUEMA_LEITURA_VISUAL = {
                 },
                 trecho: {
                   type: ["string", "null"],
-                  description: "O trecho transcrito de onde este valor saiu. É a evidência citável.",
+                  description:
+                    "O trecho transcrito de onde este valor saiu — NO MÁXIMO 200 caracteres, só o pedaço que sustenta o valor. É a evidência citável, não a transcrição do documento.",
                 },
                 pagina: { type: ["integer", "null"], description: "Página do documento, a partir de 1." },
                 confianca: { type: "number", description: "Número entre 0 e 1." },
@@ -286,7 +287,7 @@ export const INSTRUCAO_LEITURA_A = [
   "- Copie o valor que está ao lado ou abaixo do rótulo. Não vá procurar a informação em outro lugar da página.",
   "- Não use o corpo narrativo do assento para preencher um campo cujo rótulo está em branco.",
   "- Se o mesmo dado aparecer em dois lugares com valores diferentes, transcreva o do rótulo e registre o outro em observações.",
-  "- Em cada campo, `trecho` deve conter exatamente o texto que você copiou, com o rótulo.",
+  "- Em cada campo, `trecho` deve conter exatamente o texto que você copiou, com o rótulo, em no máximo 200 caracteres.",
 ].join("\n")
 
 /** Leitura B — leitor do assento: reconstrói pela fórmula registral. */
@@ -304,7 +305,8 @@ export const INSTRUCAO_LEITURA_B = [
   "  quem casou com quem), não pela posição na página.",
   "- IGNORE os rótulos impressos do formulário como fonte: se um dado só existe no rótulo e não no texto do",
   "  assento, deixe-o nulo nesta leitura.",
-  "- Em cada campo, `trecho` deve conter o pedaço da narrativa que sustenta o valor.",
+  "- Em cada campo, `trecho` deve conter o pedaço da narrativa que sustenta o valor, em no máximo 200 caracteres.",
+  "  Não transcreva o assento inteiro em cada campo: recorte só a oração que prova aquele dado.",
 ].join("\n")
 
 // ============================================================================
