@@ -133,8 +133,12 @@ export function PhaseProgressHeader({
 
       {/* Linha inferior: métrica detalhada da projeção (metrics) — sem recalcular */}
       <div className={`text-[10px] ${countsCls}`}>
+        {/* Sem item obrigatório, "Pendências obrigatórias em aberto" era mentira:
+            anunciava pendência de uma coisa que não existe. Com denominador zero a
+            fase pode estar bloqueada por OUTRO motivo (gate, passo, condição) —
+            então o texto diz o estado real e para de atribuir a causa ao documento. */}
         {required === 0
-          ? blocked ? "Pendências obrigatórias em aberto" : "Sem itens obrigatórios nesta fase"
+          ? blocked ? "Fase bloqueada · nenhum item obrigatório configurado" : "Sem itens obrigatórios nesta fase"
           : `${completed} / ${required} concluído(s) nesta fase`}
       </div>
     </div>

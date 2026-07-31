@@ -324,10 +324,16 @@ function mapearPainel(data: CentralOpData, faseNome: string) {
   const foraDaLinha = todas.filter((p) => !p.isLinha)
 
   const pct = matrix.percentage
+  // "Faltam 0 documentos" não é informação — é um contador falando sozinho. Com
+  // denominador zero a fase não tem documento configurado, e é ISSO que o operador
+  // precisa ler: o trabalho não começou porque não há o que exigir, e o caminho
+  // para resolver é a Matriz Documental, não esta tela.
   const progressoTexto =
-    validados >= total && total > 0
-      ? `${faseNome} concluída — todos os documentos validados.`
-      : `Solicite, receba, confira e valide cada certidão. Falta${total - validados === 1 ? "" : "m"} ${total - validados} documento${total - validados === 1 ? "" : "s"} para concluir a ${faseNome}.`
+    total === 0
+      ? `Nenhum documento obrigatório configurado para a ${faseNome}. Defina as regras em Gerenciamento › Documentos e Protocolos › Matriz Documental.`
+      : validados >= total
+        ? `${faseNome} concluída — todos os documentos validados.`
+        : `Solicite, receba, confira e valide cada certidão. Falta${total - validados === 1 ? "" : "m"} ${total - validados} documento${total - validados === 1 ? "" : "s"} para concluir a ${faseNome}.`
 
   return { kpis, steps, linhaPrincipal, foraDaLinha, pct, validados, total, progressoTexto }
 }

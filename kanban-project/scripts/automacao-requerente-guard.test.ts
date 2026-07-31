@@ -108,7 +108,12 @@ console.log('\nGuardas estruturais (arquitetura)')
 
   const disp = src('src/services/outbox-dispatcher.ts')
   ok('dispatcher processa requerente.adicionado', disp.includes('"requerente.adicionado"') && disp.includes('processarRequerenteAdicionado'))
-  ok('requerente.adicionado nos tipos default drenados', disp.includes('"requerente.adicionado"]') || /tipos = \[[^\]]*requerente\.adicionado/.test(disp))
+  // A asserção antiga exigia `tipos = [` literal e o código é
+  // `const tipos = opts?.tipos ?? [` — o guard acusava um defeito que não existia.
+  // Guard que mente sobre código correto é pior que guard nenhum: ensina a ignorar
+  // a suíte. O que importa é o tipo estar na lista DEFAULT, não a sintaxe dela.
+  const listaDefault = disp.slice(disp.indexOf('opts?.tipos ??'), disp.indexOf(']', disp.indexOf('opts?.tipos ??')))
+  ok('requerente.adicionado nos tipos default drenados', listaDefault.includes('"requerente.adicionado"'))
 
   const emit = src('src/services/genealogia/emitir-evento-requerente.ts')
   ok('evento publicado via DomainOutbox (não HTTP direto)', emit.includes('domainOutbox.create') && emit.includes("tipo: TIPO_EVENTO_REQUERENTE"))

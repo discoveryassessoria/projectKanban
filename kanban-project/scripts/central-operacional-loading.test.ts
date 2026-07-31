@@ -76,6 +76,23 @@ secao('5) Requisições obsoletas são canceladas')
   ok('loading do fetch manual sempre encerra', central.includes('} finally {'))
 }
 
+// ── 6) Denominador zero não vira frase contraditória ──────────────────────
+secao('6) Fase sem documento configurado diz a verdade')
+{
+  const header = src('src/components/processo/PhaseProgressHeader.tsx')
+  // "Faltam 0 documentos" é um contador falando sozinho; "Pendências obrigatórias
+  // em aberto" com zero obrigatórios anuncia pendência de algo que não existe.
+  ok('sem "Faltam 0 documentos"', central.includes('total === 0') && central.includes('Nenhum documento obrigatório configurado'))
+  ok('aponta onde resolver', central.includes('Matriz Documental'))
+  // Só o TEXTO de progresso; o passo "Validar certidão" continua exigindo total > 0
+  // de propósito — sem documento não há validação concluída.
+  const textoProgresso = central.slice(central.indexOf('const progressoTexto ='), central.indexOf('return { kpis'))
+  ok('texto de progresso trata denominador zero primeiro', textoProgresso.indexOf('total === 0') < textoProgresso.indexOf('validados >= total'))
+  ok('cabeçalho não anuncia pendência inexistente', !/\?\s*blocked \? "Pendências obrigatórias em aberto"/.test(header))
+  ok('cabeçalho separa bloqueio de documento', header.includes('Fase bloqueada · nenhum item obrigatório configurado'))
+  ok('sem obrigatório e sem bloqueio continua claro', header.includes('Sem itens obrigatórios nesta fase'))
+}
+
 console.log(`\n${'='.repeat(60)}`)
 console.log(`Central Operacional: ${passou} passaram, ${falhou} falharam`)
 if (falhou > 0) { console.log('\nFalhas:'); for (const f of falhas) console.log(`  · ${f}`); process.exit(1) }
