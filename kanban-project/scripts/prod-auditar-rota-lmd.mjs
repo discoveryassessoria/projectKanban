@@ -87,34 +87,49 @@ async function main() {
   for (const d of docs) L(`   #${d.id} ${d.code ?? '—'} · ${d.name} · país=${d.countryCode ?? '—'} · item=${d.itemCatalogoId ?? '—'} · ativo=${d.ativo}`)
 
   // ── 10) Matriz Documental ────────────────────────────────────────────────
-  const matriz = await prisma.matrizDocumental.count()
-  L(`\n10) MATRIZ DOCUMENTAL: ${matriz} regra(s)`)
+  const matriz = await prisma.matrizDocumental.findMany({
+    select: { id: true, tipoProcessoId: true, phaseKey: true, documentTypeCode: true, target: true, required: true, conditional: true },
+    orderBy: [{ tipoProcessoId: 'asc' }, { id: 'asc' }],
+  })
+  L(`\n10) MATRIZ DOCUMENTAL: ${matriz.length} regra(s)`)
+  const porTipo = new Map()
+  for (const m of matriz) porTipo.set(m.tipoProcessoId, [...(porTipo.get(m.tipoProcessoId) ?? []), m])
+  for (const [tp, regras] of porTipo) {
+    const nome = tipos.find((t) => t.id === tp)
+    L(`   tipoProcesso #${tp} (${nome?.name ?? '?'}): ${regras.length} regra(s)`)
+    for (const g of regras) L(`      ${g.documentTypeCode} · alvo=${g.target} · fase=${g.phaseKey ?? '—'}${g.required ? ' · obrigatório' : ''}${g.conditional ? ' · condicional' : ''}`)
+  }
 
   // ── 11) Órgãos e Organizações ────────────────────────────────────────────
-  const orgaos = await prisma.orgaoProtocolo.findMany({ select: { id: true, nome: true, ativo: true }, orderBy: { nome: 'asc' } })
-  L(`\n11) ÓRGÃOS: ${orgaos.length}`)
-  for (const o of orgaos.slice(0, 15)) L(`   #${o.id} ${o.nome} ativo=${o.ativo}`)
+  const orgaos = await prisma.orgaoProtocolo.findMany({ select: { id: true, name: true, type: true, country: true, city: true, ativo: true }, orderBy: { name: 'asc' } })
+  L(`\n11) ÓRGÃOS DE PROTOCOLO: ${orgaos.length}`)
+  for (const o of orgaos) L(`   #${o.id} ${o.name} · tipo=${o.type ?? '—'} · país=${o.country ?? '—'} · ${o.city ?? '—'} · ativo=${o.ativo}`)
+  const orgs = await prisma.organizacao.count().catch(() => 'n/d')
+  L(`   organizações: ${orgs}`)
 
   // ── 12) Protocolos ───────────────────────────────────────────────────────
-  const tprot = await prisma.tipoProtocoloCadastro.findMany({ select: { id: true, nome: true, ativo: true } })
+  const tprot = await prisma.tipoProtocoloCadastro.findMany({ select: { id: true, code: true, nome: true, escopo: true, nacionalidade: true, ativo: true }, orderBy: { ordem: 'asc' } })
   L(`\n12) TIPOS DE PROTOCOLO: ${tprot.length}`)
-  for (const t of tprot) L(`   #${t.id} ${t.nome} ativo=${t.ativo}`)
+  for (const t of tprot) L(`   #${t.id} ${t.code} · ${t.nome} · escopo=${t.escopo ?? '—'} · nac=${t.nacionalidade ?? '—'} · ativo=${t.ativo}`)
+  const protocolos = await prisma.protocolo.count().catch(() => 'n/d')
+  L(`   protocolos abertos: ${protocolos}`)
 
   // ── 13-14) Financeiro ────────────────────────────────────────────────────
   const cfgs = await prisma.produtoFinanceiro.count({ where: { ativo: true } })
   const precos = await prisma.tabelaValor.findMany({
     where: { arquivado: false },
-    select: { id: true, name: true, natureza: true, moeda: true, valor: true, valorBase: true, valorAdicional: true, modoCalculo: true,
+    select: { id: true, name: true, natureza: true, moeda: true, valor: true, valorBase: true, valorAdicional: true, modoCalculo: true, unidade: true,
       configuracaoFinanceiraItem: { select: { itemCatalogo: { select: { name: true, natureza: true } } } } },
   })
   L(`\n13) CONFIGURAÇÕES FINANCEIRAS ATIVAS: ${cfgs}`)
   L(`14) TABELA DE VALORES: ${precos.length} preço(s)`)
-  for (const p of precos) L(`   #${p.id} ${p.configuracaoFinanceiraItem?.itemCatalogo?.name ?? p.name} · ${p.natureza} · ${p.moeda} · ${p.modoCalculo} · base=${p.valorBase ?? p.valor} adic=${p.valorAdicional ?? '—'}`)
+  for (const p of precos) L(`   #${p.id} ${p.configuracaoFinanceiraItem?.itemCatalogo?.name ?? p.name} · ${p.natureza} · ${p.moeda} · ${p.modoCalculo}/${p.unidade ?? '—'} · base=${p.valorBase ?? p.valor} adic=${p.valorAdicional ?? '—'}`)
 
   // ── 15) Usuários e Acessos ───────────────────────────────────────────────
   const usuarios = await prisma.usuario.count()
   const perfis = await prisma.perfil.findMany({ select: { id: true, nome: true } })
-  L(`\n15) USUÁRIOS: ${usuarios} · PERFIS: ${perfis.map((p) => p.nome).join(', ') || '—'}`)
+  const equipes = await prisma.grupoUsuario.count().catch(() => 'n/d')
+  L(`\n15) USUÁRIOS: ${usuarios} · PERFIS: ${perfis.map((p) => `#${p.id} ${p.nome}`).join(', ') || '—'} · EQUIPES: ${equipes}`)
 
   // ── 16) Automações ───────────────────────────────────────────────────────
   const autos = await prisma.phaseAutomationRule.findMany({
@@ -126,7 +141,24 @@ async function main() {
 
   // ── 17) Papéis das pessoas ───────────────────────────────────────────────
   const req = await prisma.requerente.count()
-  L(`\n17) REQUERENTES: ${req}`)
+  const pessoas = await prisma.pessoa.count()
+  const papeis = await prisma.pessoa.groupBy({ by: ['requerente'], _count: true }).catch(() => [])
+  L(`\n17) PESSOAS: ${pessoas} · REQUERENTES: ${req}`)
+  for (const p of papeis) L(`   papel requerente="${p.requerente ?? '—'}": ${p._count}`)
+
+  // ── 18) MODALIDADE: via de tramitação ou modalidade legal? ───────────────
+  // Pergunta que decide a modelagem da LMD. Respondida por USO REAL, não por nome.
+  L(`\n18) USO REAL DAS MODALIDADES`)
+  const procs = await prisma.processo.groupBy({ by: ['tipoProcessoMotorId'], _count: true }).catch(() => [])
+  L(`   processos por tipo:`)
+  for (const p of procs) {
+    const t = tipos.find((x) => x.id === p.tipoProcessoMotorId)
+    L(`      tipoProcesso #${p.tipoProcessoMotorId ?? '—'} (${t ? `${t.countryKey}/${t.modalityKey}` : '?'}): ${p._count} processo(s)`)
+  }
+  const precoPorMod = await prisma.tabelaValor.groupBy({ by: ['modalidadeId'], _count: true }).catch(() => [])
+  L(`   preços por modalidade: ${precoPorMod.map((x) => `#${x.modalidadeId ?? 'nenhuma'}=${x._count}`).join(', ') || 'nenhum'}`)
+  const totalProc = await prisma.processo.count()
+  L(`   processos no total: ${totalProc}`)
 
   // ── VEREDITO ESPANHA/LMD ─────────────────────────────────────────────────
   L(`\n${'='.repeat(60)}`)
