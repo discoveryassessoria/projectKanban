@@ -380,10 +380,14 @@ export function ProcessoCentralOperacional({
   const loading = centralReq.carregando
   const refreshing = centralReq.revalidando && !centralReq.carregando
   const [erroLocal, setErro] = useState<string | null>(null)
+  // O erro mostra O QUE ACONTECEU, não um rótulo genérico: a camada oficial já traz a
+  // mensagem do servidor (ou "não respondeu no prazo" / "falha de rede"). Um "Erro ao
+  // carregar" sem fato nenhum obriga a abrir o DevTools para saber se foi 403, 500 ou
+  // rede — e é indistinguível de tela travada.
   const erro = erroLocal ?? (centralReq.erro
     ? (centralReq.erro.status === 404
         ? "Endpoint /api/processos/[id]/central-operacional ainda não existe."
-        : "Erro ao carregar Central Operacional.")
+        : `${centralReq.erro.message}${centralReq.erro.status > 0 ? ` (HTTP ${centralReq.erro.status})` : ""}`)
     : null)
   const setData = useCallback((proximos: CentralOpData | null | ((anteriores: CentralOpData | null) => CentralOpData | null)) => {
     const valor = typeof proximos === 'function' ? proximos(data) : proximos

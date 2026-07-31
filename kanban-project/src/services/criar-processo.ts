@@ -21,7 +21,7 @@ import { prisma } from "@/lib/prisma"
 import type { Prisma } from "@prisma/client"
 import { resolveWorkflowRuntime } from "@/src/lib/workflow-runtime"
 import { primeiraFasePorOrdem, montarEventoEntered } from "@/src/lib/motor/phase-advance-helpers"
-import { instanciarWorkflowDaFase, resolverWorkflowAplicavel } from "@/src/services/phase-workflow"
+import { instanciarWorkflowDaFase } from "@/src/services/phase-workflow"
 import { garantirTarefaDePasso } from "@/src/services/passo-tarefa"
 import { gerarCodigoPublico } from "@/lib/codigos/code-generator"
 
@@ -123,9 +123,12 @@ export async function criarProcessoV2(input: CriarProcessoInput): Promise<CriarP
   const primeiraFase = primeiraFasePorOrdem(wf.fases)
   if (!primeiraFase) return err("MACRO_SEM_FASE_INICIAL")
 
-  // Workflow Interno aplicável à 1ª fase é OBRIGATÓRIO no motor Discovery.
-  const resolvido = await resolverWorkflowAplicavel(tipoMotor.id, primeiraFase)
-  if ("erro" in resolvido) return err("SEM_WORKFLOW_INTERNO")
+  // O Workflow Interno da 1ª fase é OBRIGATÓRIO — mas quem confere é a própria
+  // instanciação, DENTRO da transação (3.1). A pré-validação que existia aqui
+  // resolvia o mesmo workflow uma segunda vez, com o client global, ANTES de
+  // abrir a transação: duas idas ao pool a mais numa operação que já é a mais
+  // longa do sistema. Com pool contido, era ela que estourava
+  // `Timed out fetching a new connection from the connection pool`.
 
   // ── 2) idempotência: mesma chave ⇒ devolve o processo já criado ────────────
   const chaveCriacao = input.idempotencyKey?.trim()
@@ -263,6 +266,9 @@ export async function criarProcessoV2(input: CriarProcessoInput): Promise<CriarP
       })
       if (existente) return await montarRespostaExistente(existente.id, chaveCriacao, correlationId)
     }
+    // Workflow interno ausente tem código PRÓPRIO no contrato — a mensagem diz o
+    // que fazer (configurar o workflow da fase), em vez do genérico de falha.
+    if (ex.__instFail === "WORKFLOW_NAO_ENCONTRADO") return err("SEM_WORKFLOW_INTERNO")
     if (ex.__instFail) return err("INSTANCIACAO_FALHOU", `${MSG.INSTANCIACAO_FALHOU} (${ex.__instFail})`)
     throw e
   }

@@ -1,5 +1,6 @@
 // src/app/api/processos/[processoId]/central-operacional/route.ts
 
+import { randomUUID } from "crypto"
 import { NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import { verificarPermissao } from "@/src/lib/verificar-permissao"
@@ -211,12 +212,18 @@ export async function GET(
   request: Request,
   { params }: { params: Promise<{ processoId: string }> }
 ) {
-  // Item 1 da auditoria — gate canônico de LEITURA: exige processos.ver
-  // (rota GET/consulta; as ações de avanço usam workflow.avancar).
-  const erro = await verificarPermissao(request, "processos.ver")
-  if (erro) return erro
-
+  // Identidade desta leitura: acompanha o erro até o log de runtime, e volta para a
+  // tela. Sem ela, "Erro ao buscar Central Operacional" é indistinguível de qualquer
+  // outra falha e não dá para achar a ocorrência exata nos logs.
+  const correlationId = randomUUID()
   try {
+    // Item 1 da auditoria — gate canônico de LEITURA: exige processos.ver
+    // (rota GET/consulta; as ações de avanço usam workflow.avancar).
+    // Dentro do try: falha no próprio gate (banco fora, sessão corrompida) também
+    // vira erro tratado, e não um 500 opaco do framework.
+    const erro = await verificarPermissao(request, "processos.ver")
+    if (erro) return erro
+
     const { processoId } = await params
     const id = parseInt(processoId)
 
@@ -796,10 +803,29 @@ export async function GET(
 
     return NextResponse.json(response)
   } catch (error) {
-    console.error("[GET /api/processos/[processoId]/central-operacional]", error)
+    // AUDITORIA TÉCNICA: um registro estruturado por ocorrência, com a identidade que
+    // a tela também exibe. É o que permite achar ESTA falha nos logs de runtime em vez
+    // de procurar um texto genérico repetido por toda requisição que já falhou.
+    const e = error as { message?: string; code?: string; name?: string }
+    console.error(
+      "[central-operacional] falha na leitura",
+      JSON.stringify({
+        correlationId,
+        rota: "GET /api/processos/[processoId]/central-operacional",
+        url: request.url,
+        erro: e?.message ?? String(error),
+        codigo: e?.code ?? e?.name ?? null,
+        em: new Date().toISOString(),
+      }),
+    )
+    console.error(error)
     return NextResponse.json(
-      { error: "Erro ao buscar Central Operacional" },
-      { status: 500 }
+      {
+        error: "Não foi possível carregar a Central Operacional.",
+        code: e?.code ?? "CENTRAL_OPERACIONAL_FALHOU",
+        correlationId,
+      },
+      { status: 500 },
     )
   }
 }

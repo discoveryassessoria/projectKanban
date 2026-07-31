@@ -142,7 +142,10 @@
     "test:arquitetura-referencias": "tsx scripts/arquitetura-referencias.test.ts",
     "audit:referencias": "tsx scripts/prod-auditar-referencias-textuais.mjs",
     "test:tabela-valores-tipos": "tsx scripts/tabela-valores-tipos.test.ts",
-    "test:central-loading": "tsx scripts/central-operacional-loading.test.ts"
+    "test:central-loading": "tsx scripts/central-operacional-loading.test.ts",
+    "test:tx-conexao": "tsx scripts/tx-conexao-unica.test.ts",
+    "test:tx-conexao:integracao": "tsx scripts/tx-conexao-unica-integracao.test.ts",
+    "test:criar-processo-conexao": "tsx scripts/criar-processo-conexao.test.ts"
   },
   "prisma": {
     "seed": "tsx prisma/seed.ts"

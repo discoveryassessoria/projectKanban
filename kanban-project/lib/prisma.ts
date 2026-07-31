@@ -39,9 +39,20 @@ function urlDoRuntime(): string | undefined {
   if (jaTem) return bruta
 
   const separador = bruta.includes("?") ? "&" : "?"
+  // POR QUE NÃO 1: com uma única conexão, QUALQUER concorrência dentro da mesma
+  // instância é fatal por construção. Uma transação longa — a criação de processo
+  // leva até 20s — segura a conexão inteira, e a requisição seguinte espera o
+  // `pool_timeout` e morre com "Timed out fetching a new connection from the
+  // connection pool". Foi exatamente esse o erro que bloqueou a criação de
+  // processo em produção.
+  //
+  // 5 é pequeno o bastante para o total continuar governado pelo número de
+  // instâncias (que é o raciocínio correto em serverless) e grande o bastante
+  // para uma transação em curso não bloquear as leituras ao lado.
+  //
   // `pool_timeout` alto o bastante para uma requisição esperar a vez em vez de
   // falhar na hora, e baixo o bastante para não segurar a função até o limite.
-  return `${bruta}${separador}connection_limit=1&pool_timeout=20`
+  return `${bruta}${separador}connection_limit=5&pool_timeout=20`
 }
 
 // Client BASE (sem extensão) — usado pela geração de código p/ rodar o INSERT atômico da sequência

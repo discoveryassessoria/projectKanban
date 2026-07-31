@@ -41,12 +41,53 @@ export class ErroApi extends Error {
 }
 
 /**
+ * PRAZO DA REQUISIÇÃO (ms).
+ *
+ * Não é "esconder o spinner depois de N segundos": é reconhecer que uma requisição
+ * HTTP que não responde é uma FALHA, e falha se mostra. Sem prazo, `fetch` fica
+ * pendurado para sempre — a promessa nunca resolve, o SWR nunca sai de `isLoading`,
+ * e a tela fica no spinner sem erro e sem saída. Foi assim que a aba pareceu
+ * "carregando infinito" enquanto o servidor segurava a resposta.
+ *
+ * Vencido o prazo, a requisição é ABORTADA (o servidor deixa de ser esperado) e vira
+ * um ErroApi normal: mensagem visível, "Tentar novamente" e retentativa do SWR —
+ * exatamente o mesmo caminho de um 500. Generoso o bastante para não cortar consulta
+ * legítima, curto o bastante para não virar espera eterna.
+ */
+export const PRAZO_REQUISICAO_MS = 45_000
+
+/** Status interno para "o servidor não respondeu no prazo" (RFC 7231: Request Timeout). */
+export const STATUS_SEM_RESPOSTA = 408
+
+/**
  * Fetcher ÚNICO. Autentica, entende JSON, e trata 401 no lugar certo: sessão
  * inválida encerra a sessão de verdade (auditada, propagada às outras abas) em
  * vez de cada tela redirecionar do seu jeito.
+ *
+ * Toda requisição tem PRAZO (ver PRAZO_REQUISICAO_MS): resposta que não vem é erro,
+ * nunca espera infinita.
  */
 export async function buscar<T = unknown>(chave: string): Promise<T> {
-  const res = await fetch(chave, { headers: authHeaders() })
+  const ctrl = new AbortController()
+  const prazo = setTimeout(() => ctrl.abort(), PRAZO_REQUISICAO_MS)
+  let res: Response
+  try {
+    res = await fetch(chave, { headers: authHeaders(), signal: ctrl.signal })
+  } catch (e) {
+    // Sem resposta: prazo vencido ou rede caída. Nos dois casos é falha explícita,
+    // com o fato preservado para a tela dizer o que houve.
+    if ((e as Error)?.name === "AbortError") {
+      throw new ErroApi(
+        STATUS_SEM_RESPOSTA,
+        `O servidor não respondeu em ${Math.round(PRAZO_REQUISICAO_MS / 1000)}s.`,
+        { chave },
+      )
+    }
+    throw new ErroApi(0, "Falha de rede: não foi possível falar com o servidor.", { chave })
+  } finally {
+    clearTimeout(prazo)
+  }
+
   const corpo = await res.json().catch(() => null)
 
   if (res.status === 401) {

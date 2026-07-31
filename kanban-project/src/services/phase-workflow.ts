@@ -74,22 +74,37 @@ const CODES = new Set<FailureCode>([
   "CICLO_DE_DEPENDENCIA", "CONFIGURACAO_TIPO_INVALIDA", "CONFIGURACAO_INVALIDA",
 ])
 
-/** Resolve o Workflow Interno aplicável (precedência: tipo específico > 'all'). */
+/**
+ * Resolve o Workflow Interno aplicável (precedência: tipo específico > 'all').
+ *
+ * `db` é OBRIGATORIAMENTE o cliente de quem chama. Quando a resolução acontece
+ * DENTRO de uma transação já aberta (criação V2-nativa, avanço de fase), ler pelo
+ * cliente global significa pedir uma SEGUNDA conexão enquanto a primeira está retida
+ * pela transação. O runtime roda com `connection_limit=1` por instância (ver
+ * lib/prisma.ts): a segunda conexão nunca chega, a espera consome o `pool_timeout`
+ * inteiro e a transação estoura — foi exatamente isso que derrubou "criar processo"
+ * e o avanço de fase em produção, e prendeu as demais requisições da instância na
+ * fila da única conexão.
+ *
+ * Ler pela MESMA transação também é o correto do ponto de vista de consistência: é a
+ * única forma de enxergar o que a própria transação acabou de escrever.
+ */
 export async function resolverWorkflowAplicavel(
   tipoProcessoId: number | null,
-  faseMacroKey: string
+  faseMacroKey: string,
+  db: Prisma.TransactionClient | typeof prisma = prisma,
 ): Promise<{ workflow: DefWorkflow; steps: DefStep[] } | { erro: FailureCode }> {
   const base = { phaseKey: faseMacroKey, arquivado: false, active: true }
   // 1) específico do tipo
   let wf =
     tipoProcessoId != null
-      ? await prisma.phaseInternalWorkflow.findFirst({ where: { ...base, tipoProcessoId } })
+      ? await db.phaseInternalWorkflow.findFirst({ where: { ...base, tipoProcessoId } })
       : null
   // 2) fallback 'all'
-  if (!wf) wf = await prisma.phaseInternalWorkflow.findFirst({ where: { ...base, tipoProcessoId: null } })
+  if (!wf) wf = await db.phaseInternalWorkflow.findFirst({ where: { ...base, tipoProcessoId: null } })
   if (!wf) return { erro: "WORKFLOW_NAO_ENCONTRADO" }
 
-  const passos = await prisma.phaseInternalWorkflowStep.findMany({
+  const passos = await db.phaseInternalWorkflowStep.findMany({
     where: { workflowId: wf.id },
     orderBy: { ordem: "asc" },
   })
@@ -141,8 +156,9 @@ export async function instanciarWorkflowDaFase(
   })
   if (!fase) return fail("CONFIGURACAO_INVALIDA", [{ code: "FASE_MACRO_INVALIDA", message: `Fase ${input.faseMacroKey} inexistente no macro do processo` }])
 
-  // 3) workflow aplicável
-  const resolvido = await resolverWorkflowAplicavel(processo.tipoProcessoMotorId, input.faseMacroKey)
+  // 3) workflow aplicável — pelo MESMO cliente das leituras acima (`db`). Sob txExterno
+  //    isso é o que impede a segunda conexão (e o deadlock com connection_limit=1).
+  const resolvido = await resolverWorkflowAplicavel(processo.tipoProcessoMotorId, input.faseMacroKey, db)
   if ("erro" in resolvido) return fail(resolvido.erro)
   const { workflow, steps } = resolvido
 
