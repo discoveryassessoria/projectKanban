@@ -81,6 +81,9 @@ const ARRAYS = [
 async function cadastro(nome, chaves) {
   if (!nome) return null
   const delegate = nome.charAt(0).toLowerCase() + nome.slice(1)
+  // Delegate inexistente (model renomeado/ausente) não pode derrubar a varredura
+  // inteira: a auditoria vale justamente por chegar até o fim da lista.
+  if (!prisma[delegate]?.findMany) return null
   const sel = Object.fromEntries(chaves.map((c) => [c, true]))
   const linhas = await prisma[delegate].findMany({ select: { id: true, ...sel } }).catch(() => null)
   if (!linhas) return null
@@ -129,13 +132,19 @@ async function main() {
 
   let vazias = 0, limpas = 0, bloqueadas = 0
   for (const d of DIVIDAS) {
-    const r = await auditar(d)
+    const r = await auditar(d).catch((e) => {
+      console.log(`[audit-ref] ${d.tabela}.${d.coluna} — falhou (${String(e?.message ?? e).slice(0, 80)})`)
+      return { linhas: 0, distintos: 0, resolvem: 0, naoResolvem: [] }
+    })
     if (r.linhas === 0) vazias++
     else if (r.naoResolvem.length === 0) limpas++
     else bloqueadas++
   }
   for (const d of ARRAYS) {
-    const r = await auditar(d, true)
+    const r = await auditar(d, true).catch((e) => {
+      console.log(`[audit-ref] ${d.tabela}.${d.coluna}[] — falhou (${String(e?.message ?? e).slice(0, 80)})`)
+      return { linhas: 0, distintos: 0, resolvem: 0, naoResolvem: [] }
+    })
     if (r.linhas === 0) vazias++
     else if (r.naoResolvem.length === 0) limpas++
     else bloqueadas++
