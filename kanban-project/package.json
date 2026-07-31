@@ -145,7 +145,8 @@
     "test:central-loading": "tsx scripts/central-operacional-loading.test.ts",
     "test:tx-conexao": "tsx scripts/tx-conexao-unica.test.ts",
     "test:tx-conexao:integracao": "tsx scripts/tx-conexao-unica-integracao.test.ts",
-    "test:criar-processo-conexao": "tsx scripts/criar-processo-conexao.test.ts"
+    "test:criar-processo-conexao": "tsx scripts/criar-processo-conexao.test.ts",
+    "test:dados-prazo": "tsx scripts/camada-dados-prazo.test.ts"
   },
   "prisma": {
     "seed": "tsx prisma/seed.ts"

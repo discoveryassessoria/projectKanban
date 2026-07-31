@@ -1,31 +1,34 @@
 /**
- * GUARDA — uma transação NUNCA pede uma segunda conexão.
+ * GUARDA — uma transação NUNCA pede uma conexão a mais.
  * Rodar: npm run test:tx-conexao
  *
  * DEFEITO QUE ISTO TRAVA (produção, 31/07): "Erro ao criar processo" (HTTP 500 após
  * 20 s) e, por tabela, a Central Operacional presa no spinner.
  *
- * O runtime roda com `connection_limit=1` por instância (lib/prisma.ts) — decisão
- * arquitetural tomada para conter o "too many database connections". Com UMA conexão,
- * vale um invariante duro:
+ * O runtime mantém um pool PEQUENO e explícito por instância (lib/prisma.ts) — em
+ * serverless o total de conexões é governado pelo número de instâncias, não pelo
+ * tamanho do pool de cada uma. Daí um invariante duro:
  *
  *     enquanto uma transação interativa estiver aberta, nenhum código dentro dela
- *     pode falar com o banco pelo cliente GLOBAL — a segunda conexão não existe.
+ *     pode falar com o banco pelo cliente GLOBAL — a conexão extra pode não existir.
  *
  * `instanciarWorkflowDaFase` chamava `resolverWorkflowAplicavel`, que lia pelo cliente
  * global. Dentro da transação de criação (e da de avanço de fase) isso virava
- * auto-deadlock: a transação segurava a única conexão, a leitura esperava o
- * `pool_timeout` inteiro (20 s) e a transação estourava. Pior: durante esses 20 s a
- * ÚNICA conexão da instância ficava retida, e toda outra requisição da mesma instância
- * — inclusive `/api/processos/[id]/central-operacional` — ficava na fila. Medido:
- * a Central passou de 0,6 s para 19 s (uma criação concorrente) e para 39 s + HTTP 500
- * (três criações concorrentes).
+ * auto-deadlock: a transação segurava a conexão, a leitura esperava o `pool_timeout`
+ * inteiro e a transação estourava. Pior: durante essa espera a conexão ficava retida,
+ * e toda outra requisição da mesma instância — inclusive
+ * `/api/processos/[id]/central-operacional` — ia para a fila. Medido com o pool no
+ * valor de então (1): a Central passou de 0,6 s para 19 s (uma criação concorrente) e
+ * para 39 s + HTTP 500 (três criações concorrentes).
+ *
+ * Aumentar o pool alivia, não cura: N transações simultâneas pedindo uma conexão extra
+ * cada esgotam qualquer N. A cura é a transação se bastar na própria conexão.
  *
  * Ler pela MESMA transação também é o correto por consistência: é a única forma de
  * enxergar o que a própria transação acabou de escrever.
  *
- * Este arquivo é ESTÁTICO (não precisa de banco). A prova dinâmica — criar processo
- * com connection_limit=1 — está em `npm run test:criar-processo` contra banco local.
+ * Este arquivo é ESTÁTICO (não precisa de banco). A prova dinâmica contra banco real
+ * está em `npm run test:tx-conexao:integracao`.
  */
 export {}
 
@@ -84,14 +87,18 @@ function corposDeTransacao(codigo: string): Array<{ linha: number; corpo: string
   return out
 }
 
-console.log("\nUma transação nunca pede uma segunda conexão\n")
+console.log("\nUma transação nunca pede uma conexão a mais\n")
 
-// ── 1) O invariante existe porque o pool é de UMA conexão ────────────────────
+// ── 1) O invariante existe porque o pool é PEQUENO ───────────────────────────
 secao("1) Por que o invariante é obrigatório")
 {
   const prismaTs = src("lib/prisma.ts")
-  ok("conexão direta continua limitada a UMA por instância", /connection_limit=1/.test(prismaTs))
+  const limite = Number(/connection_limit=(\d+)/.exec(prismaTs)?.[1] ?? NaN)
+  ok("o pool por instância é pequeno e explícito", Number.isFinite(limite) && limite <= 10, limite)
   ok("com espera pela vez (pool_timeout), não falha imediata", /pool_timeout=\d+/.test(prismaTs))
+  // Aumentar o pool alivia, não cura: N transações simultâneas que peçam uma
+  // conexão extra cada esgotam qualquer N. O invariante abaixo é o que cura.
+  ok("e o pool é pequeno o bastante para o invariante importar", Number.isFinite(limite) && limite < 50, limite)
 }
 
 // ── 2) Ninguém usa o cliente GLOBAL dentro do corpo de uma transação ─────────
@@ -119,7 +126,7 @@ secao("3) Os serviços que compõem dentro de transação threadam o cliente")
   ok("as três leituras passaram para `db`", (semComentarios(resolver).match(/\bdb\.phaseInternal/g) ?? []).length === 3)
   ok("instanciarWorkflowDaFase repassa o seu `db`", /resolverWorkflowAplicavel\(processo\.tipoProcessoMotorId,\s*input\.faseMacroKey,\s*db\)/.test(pw))
   ok("e `db` é a tx externa quando existe", /const db = txExterno \?\? prisma/.test(pw))
-  ok("a razão está escrita no código", /connection_limit=1/.test(pw))
+  ok("a razão está escrita no código", /connection_limit/.test(pw) && /pool_timeout/.test(pw))
 
   const pt = src("src/services/passo-tarefa.ts")
   ok("garantirTarefaDePasso já lia pela tx externa (segue assim)", /const db = txExterno \?\? prisma/.test(pt))
@@ -144,4 +151,4 @@ if (falhou > 0) {
   for (const f of falhas) console.log(`  · ${f}`)
   process.exit(1)
 }
-console.log("✅ Uma conexão por instância — e nenhuma transação pedindo a segunda.\n")
+console.log("✅ Pool pequeno por instância — e nenhuma transação pedindo uma conexão a mais.\n")

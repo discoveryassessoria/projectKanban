@@ -65,11 +65,12 @@ export const STATUS_SEM_RESPOSTA = 408
  * vez de cada tela redirecionar do seu jeito.
  *
  * Toda requisição tem PRAZO (ver PRAZO_REQUISICAO_MS): resposta que não vem é erro,
- * nunca espera infinita.
+ * nunca espera infinita. `prazoMs` existe para quem tem um prazo legítimo diferente
+ * (e para o teste do próprio prazo) — o padrão vale para todas as telas.
  */
-export async function buscar<T = unknown>(chave: string): Promise<T> {
+export async function buscar<T = unknown>(chave: string, prazoMs = PRAZO_REQUISICAO_MS): Promise<T> {
   const ctrl = new AbortController()
-  const prazo = setTimeout(() => ctrl.abort(), PRAZO_REQUISICAO_MS)
+  const prazo = setTimeout(() => ctrl.abort(), prazoMs)
   let res: Response
   try {
     res = await fetch(chave, { headers: authHeaders(), signal: ctrl.signal })
@@ -79,7 +80,7 @@ export async function buscar<T = unknown>(chave: string): Promise<T> {
     if ((e as Error)?.name === "AbortError") {
       throw new ErroApi(
         STATUS_SEM_RESPOSTA,
-        `O servidor não respondeu em ${Math.round(PRAZO_REQUISICAO_MS / 1000)}s.`,
+        `O servidor não respondeu em ${Math.round(prazoMs / 1000)}s.`,
         { chave },
       )
     }

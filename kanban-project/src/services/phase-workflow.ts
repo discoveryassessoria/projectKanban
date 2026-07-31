@@ -80,11 +80,13 @@ const CODES = new Set<FailureCode>([
  * `db` é OBRIGATORIAMENTE o cliente de quem chama. Quando a resolução acontece
  * DENTRO de uma transação já aberta (criação V2-nativa, avanço de fase), ler pelo
  * cliente global significa pedir uma SEGUNDA conexão enquanto a primeira está retida
- * pela transação. O runtime roda com `connection_limit=1` por instância (ver
- * lib/prisma.ts): a segunda conexão nunca chega, a espera consome o `pool_timeout`
- * inteiro e a transação estoura — foi exatamente isso que derrubou "criar processo"
- * e o avanço de fase em produção, e prendeu as demais requisições da instância na
- * fila da única conexão.
+ * pela transação. O pool por instância é pequeno e explícito (ver `connection_limit`
+ * em lib/prisma.ts): a transação fica esperando uma conexão que pode não vir, consome
+ * o `pool_timeout` e estoura — foi isso que derrubou "criar processo" e o avanço de
+ * fase em produção, e pôs as demais requisições da instância na fila.
+ *
+ * Aumentar o pool alivia mas NÃO cura: N transações simultâneas pedindo uma conexão
+ * extra cada esgotam qualquer N. A cura é a transação se bastar na própria conexão.
  *
  * Ler pela MESMA transação também é o correto do ponto de vista de consistência: é a
  * única forma de enxergar o que a própria transação acabou de escrever.

@@ -83,7 +83,16 @@ ok(
 )
 
 console.log("\n2) O POOL É CONTIDO QUANDO A CONEXÃO É DIRETA")
-ok(/connection_limit=1/.test(fonte), "conexão direta fica com UMA conexão por instância")
+// CONTIDO, não MÍNIMO. O limite era 1 — e 1 provou ser fatal por construção: uma
+// transação longa (criar processo leva até 20s) segurava a única conexão e a
+// requisição ao lado morria com "Timed out fetching a new connection from the
+// connection pool". O que precisa continuar valendo é que o pool seja PEQUENO e
+// EXPLÍCITO (o total em serverless é governado pelo nº de instâncias), não que
+// seja exatamente 1.
+const limite = Number(/connection_limit=(\d+)/.exec(fonte)?.[1] ?? NaN)
+ok(Number.isFinite(limite), "conexão direta declara um connection_limit explícito", limite)
+ok(limite > 1, "e maior que 1 — com uma só, qualquer concorrência na instância é fatal", limite)
+ok(limite <= 10, "porém pequeno: o total continua governado pelo nº de instâncias", limite)
 ok(/pool_timeout=/.test(fonte), "com espera pela vez em vez de falha imediata")
 ok(
   /datasources:\s*\{\s*db:\s*\{\s*url/.test(fonte),
