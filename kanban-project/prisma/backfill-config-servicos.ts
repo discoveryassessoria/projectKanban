@@ -7,7 +7,7 @@
 //   Aplicar:           npx tsx prisma/backfill-config-servicos.ts --execute
 
 import { PrismaClient } from '@prisma/client'
-import { garantirConfigFinanceiraDeServico } from '../src/services/config-financeira-auto'
+import { garantirConfigFinanceiraDeItem } from '../src/services/config-financeira-auto'
 
 const prisma = new PrismaClient()
 const EXECUTE = process.argv.includes('--execute')
@@ -34,7 +34,7 @@ async function main() {
       criados++
       continue
     }
-    const r = await prisma.$transaction((tx) => garantirConfigFinanceiraDeServico(tx, { itemCatalogoId: s.itemCatalogoId!, nome: s.name }))
+    const r = await prisma.$transaction((tx) => garantirConfigFinanceiraDeItem(tx, { itemCatalogoId: s.itemCatalogoId!, nome: s.name }))
     console.log(`  +  #${s.id} "${s.name}" → config #${r.id} ${r.criado ? 'CRIADA' : '(já existia)'}`)
     if (r.criado) criados++; else jaTinham++
   }

@@ -25,23 +25,23 @@ model Usuario {
   historicoTarefas   TarefaHistorico[]
   perfil             Perfil?            @relation(fields: [perfilId], references: [id])
 
-  documentosResponsavel Documento[]          @relation("DocumentoResponsavel")
-  eventosResponsavel    Evento[]             @relation("EventoResponsavel")
+  documentosResponsavel Documento[]           @relation("DocumentoResponsavel")
+  eventosResponsavel    Evento[]              @relation("EventoResponsavel")
   gruposUsuario         GrupoUsuarioMembro[]
-  nomesPessoaAfirmados  NomePessoa[]         @relation("NomePessoaResponsavel")
-
-  @@index([perfilId])
-  decisoesDedupTomadas DecisaoDeduplicacao[] @relation("DecisaoDedupResponsavel")
+  nomesPessoaAfirmados  NomePessoa[]          @relation("NomePessoaResponsavel")
+  decisoesDedupTomadas  DecisaoDeduplicacao[] @relation("DecisaoDedupResponsavel")
 
   // MRG - back-relations (autoria e assinatura das decisoes registrais)
-  lotesRegistrais            LoteRegistral[]              @relation("LoteRegistralAutor")
-  fatosRegistraisAfirmados   FatoRegistral[]              @relation("FatoRegistralResponsavel")
-  correspondenciasDecididas  CorrespondenciaIdentidade[]  @relation("CorrespondenciaDecisor")
-  propostasDecididas         PropostaReconciliacao[]      @relation("PropostaDecisor")
-  propostasRevertidas        PropostaReconciliacao[]      @relation("PropostaRevertePor")
-  conflitosResolvidos        ConflitoRegistral[]          @relation("ConflitoResolvedor")
-  decisoesRegistrais         DecisaoRevisaoRegistral[]    @relation("DecisaoRegistralResponsavel")
-  versoesGenealogicas        VersaoGenealogica[]          @relation("VersaoGenealogicaAutor")
+  lotesRegistrais           LoteRegistral[]             @relation("LoteRegistralAutor")
+  fatosRegistraisAfirmados  FatoRegistral[]             @relation("FatoRegistralResponsavel")
+  correspondenciasDecididas CorrespondenciaIdentidade[] @relation("CorrespondenciaDecisor")
+  propostasDecididas        PropostaReconciliacao[]     @relation("PropostaDecisor")
+  propostasRevertidas       PropostaReconciliacao[]     @relation("PropostaRevertePor")
+  conflitosResolvidos       ConflitoRegistral[]         @relation("ConflitoResolvedor")
+  decisoesRegistrais        DecisaoRevisaoRegistral[]   @relation("DecisaoRegistralResponsavel")
+  versoesGenealogicas       VersaoGenealogica[]         @relation("VersaoGenealogicaAutor")
+
+  @@index([perfilId])
 }
 
 model Pessoa {
@@ -105,21 +105,21 @@ model Pessoa {
   requerentesVinculados  Requerente[]  @relation("RequerentePessoa")
 
   // CP-3 â necessidades documentais desta pessoa
-  necessidades NecessidadeDocumental[]
-  nomePessoas  NomePessoa[]
+  necessidades  NecessidadeDocumental[]
+  nomePessoas   NomePessoa[]
+  decisoesDedup DecisaoDeduplicacao[]   @relation("PessoaDecisaoDedup")
+
+  // MRG — back-relations (referencia, nunca duplicacao de dominio)
+  ocorrenciasResolvidas OcorrenciaDocumental[]      @relation("OcorrenciaPessoaResolvida")
+  correspondencias      CorrespondenciaIdentidade[] @relation("CorrespondenciaPessoa")
+  fatosRegistrais       FatoRegistral[]
+  evidenciasRegistrais  EvidenciaRegistral[]        @relation("EvidenciaPessoa")
+  conflitosRegistrais   ConflitoRegistral[]         @relation("ConflitoPessoa")
 
   @@index([arvoreId])
   @@index([pais_nasc])
   @@index([maeId])
   @@index([paiId])
-  decisoesDedup DecisaoDeduplicacao[] @relation("PessoaDecisaoDedup")
-
-  // MRG — back-relations (referencia, nunca duplicacao de dominio)
-  ocorrenciasResolvidas OcorrenciaDocumental[]       @relation("OcorrenciaPessoaResolvida")
-  correspondencias      CorrespondenciaIdentidade[]  @relation("CorrespondenciaPessoa")
-  fatosRegistrais       FatoRegistral[]
-  evidenciasRegistrais  EvidenciaRegistral[]         @relation("EvidenciaPessoa")
-  conflitosRegistrais   ConflitoRegistral[]          @relation("ConflitoPessoa")
 }
 
 model Uniao {
@@ -147,13 +147,13 @@ model Uniao {
   // CP-3 â necessidades de vÃ­nculo (casamento/uniÃ£o) referenciam a UniÃ£o.
   necessidades NecessidadeDocumental[]
 
-  @@index([pessoa1Id])
-  @@index([pessoa2Id])
-
   // MRG — back-relations
   fatosRegistrais      FatoRegistral[]
   evidenciasRegistrais EvidenciaRegistral[] @relation("EvidenciaUniao")
   conflitosRegistrais  ConflitoRegistral[]  @relation("ConflitoUniao")
+
+  @@index([pessoa1Id])
+  @@index([pessoa2Id])
 }
 
 model Arvore {
@@ -172,13 +172,13 @@ model Arvore {
   familiaId Int?
   familia   Familia? @relation(fields: [familiaId], references: [id], onDelete: SetNull)
 
-  @@index([familiaId])
-
   // MRG — back-relations
   lotesRegistrais     LoteRegistral[]
   propostasRegistrais PropostaReconciliacao[]
   conflitosRegistrais ConflitoRegistral[]
   versoesGenealogicas VersaoGenealogica[]
+
+  @@index([familiaId])
 }
 
 // CP-1 â FamÃ­lia: entidade administrativa prÃ³pria (Regras 10/11/12).
@@ -406,6 +406,11 @@ model Processo {
 
   tipoProcessoMotorId   Int?
   tipoProcessoMotor     TipoProcessoNacionalidade? @relation("ProcessoTipoMotor", fields: [tipoProcessoMotorId], references: [id], onDelete: SetNull)
+  // ENQUADRAMENTO LEGAL — recorte oficial sob o qual o processo é requerido.
+  // O enquadramento já implica a modalidade legal e, por ela, o país: uma FK só
+  // carrega as três dimensões, sem campo redundante que possa divergir.
+  enquadramentoLegalId  Int?
+  enquadramentoLegal    EnquadramentoLegal?        @relation(fields: [enquadramentoLegalId], references: [id], onDelete: SetNull)
   motorArtefatos        MotorArtefato[]            @relation("ProcessoMotorArtefatos")
   pendenciasFinanceiras PendenciaFinanceira[]      @relation("ProcessoPendenciasFinanceiras")
 
@@ -418,6 +423,7 @@ model Processo {
   @@index([arvoreId])
   @@index([familiaId])
   @@index([tipoProcessoMotorId])
+  @@index([enquadramentoLegalId])
 }
 
 model ProcessoContratante {
@@ -2441,25 +2447,25 @@ model RegraDesconto {
 }
 
 model ServicoProduto {
-  publicCode       String?             @unique @db.VarChar(20) // CodeGeneratorService central â aditivo, Ãºnico, nÃ£o editÃ¡vel
-  id               Int                 @id @default(autoincrement())
-  code             String              @unique @db.VarChar(40)
-  name             String              @db.VarChar(200)
-  descricao        String?             @db.Text
+  publicCode       String?              @unique @db.VarChar(20) // CodeGeneratorService central â aditivo, Ãºnico, nÃ£o editÃ¡vel
+  id               Int                  @id @default(autoincrement())
+  code             String               @unique @db.VarChar(40)
+  name             String               @db.VarChar(200)
+  descricao        String?              @db.Text
   unidadePadrao    UnidadeItem?
   // APLICAÇÃO TERRITORIAL — indicador EXPLÍCITO de aplicação global. true = vale
   // para todos os países, inclusive os cadastrados no futuro, SEM criar vínculo
   // individual. false = valem exatamente os vínculos de `paises`; nenhum vínculo
   // = sem aplicação territorial. Não existe representação textual de território.
-  aplicacaoGlobal  Boolean             @default(true)
+  aplicacaoGlobal  Boolean              @default(true)
   paises           ServicoProdutoPais[]
-  ativo            Boolean             @default(true)
+  ativo            Boolean              @default(true)
   // relaÃ§Ã£o mantida no banco (dados preservados); NÃO exibida/gravada na tela mestre (F ServiÃ§os)
-  itensFinanceiros ProdutoFinanceiro[] @relation("ServicoProdutoItens")
-  criadoEm         DateTime            @default(now())
-  atualizadoEm     DateTime            @updatedAt
+  itensFinanceiros ProdutoFinanceiro[]  @relation("ServicoProdutoItens")
+  criadoEm         DateTime             @default(now())
+  atualizadoEm     DateTime             @updatedAt
   itemCatalogoId   Int?
-  itemCatalogo     ItemCatalogo?       @relation(fields: [itemCatalogoId], references: [id])
+  itemCatalogo     ItemCatalogo?        @relation(fields: [itemCatalogoId], references: [id])
 
   condicoesPagamento CondicaoPagamentoServico[]
 
@@ -2789,6 +2795,7 @@ model CatalogoPais {
   condicoesPagamento CondicaoPagamentoPais[]
   taxasPagamento     TaxaPagamentoPais[]
   servicos           ServicoProdutoPais[]
+  modalidadesLegais  ModalidadeLegal[]
 }
 
 model ModalidadePais {
@@ -3262,22 +3269,22 @@ model PhaseEconomicRule {
 }
 
 model ItemCatalogo {
-  id           Int          @id @default(autoincrement())
-  code         String       @unique @db.VarChar(60) // identidade Ãºnica (ex.: CERT_NASCIMENTO_IT)
-  name         String       @db.VarChar(200) // ex.: "CertidÃ£o de Nascimento - Inteiro Teor"
-  descricao    String?      @db.Text
-  natureza     NaturezaItem @default(OUTRO)
+  id           Int               @id @default(autoincrement())
+  code         String            @unique @db.VarChar(60) // identidade Ãºnica (ex.: CERT_NASCIMENTO_IT)
+  name         String            @db.VarChar(200) // ex.: "CertidÃ£o de Nascimento - Inteiro Teor"
+  descricao    String?           @db.Text
+  natureza     NaturezaItem      @default(OUTRO)
   // CATEGORIA — referência estrutural por FK ao cadastro oficial. É AQUI, no
   // mestre, que a categoria vive: portador único para as duas origens do
   // catálogo (serviço projetado e item técnico). Nenhum outro model guarda
   // categoria de item.
   categoriaId  Int?
   categoria    CategoriaServico? @relation(fields: [categoriaId], references: [id], onDelete: Restrict)
-  unidade      UnidadeItem  @default(UNIDADE)
-  ativo        Boolean      @default(true)
+  unidade      UnidadeItem       @default(UNIDADE)
+  ativo        Boolean           @default(true)
   metadata     Json? // extensÃ­vel, sem virar coluna por item novo
-  criadoEm     DateTime     @default(now())
-  atualizadoEm DateTime     @updatedAt
+  criadoEm     DateTime          @default(now())
+  atualizadoEm DateTime          @updatedAt
 
   // back-relations (as ilhas apontam pra cÃ¡)
   tiposDocumento TipoDocumentoCadastro[]
@@ -4507,6 +4514,49 @@ model MarcoProcesso {
   @@index([phaseKey])
 }
 
+/// MODALIDADE LEGAL — a base jurídica sob a qual a nacionalidade é requerida
+/// (ex.: Lei da Memória Democrática). NÃO se confunde com a VIA DE TRAMITAÇÃO
+/// (administrativa/consular/judicial), que é outra dimensão, nem com o tipo de
+/// processo, que é país + produto.
+model ModalidadeLegal {
+  id           Int          @id @default(autoincrement())
+  /// Identidade IMUTÁVEL. Vínculo é sempre por id — o code só identifica o registro.
+  code         String       @unique @db.VarChar(60)
+  nome         String       @db.VarChar(200)
+  descricao    String?      @db.Text
+  paisId       Int
+  pais         CatalogoPais @relation(fields: [paisId], references: [id], onDelete: Restrict)
+  ordem        Int          @default(0)
+  ativo        Boolean      @default(true)
+  criadoEm     DateTime     @default(now())
+  atualizadoEm DateTime     @updatedAt
+
+  enquadramentos EnquadramentoLegal[]
+
+  @@index([paisId])
+}
+
+/// ENQUADRAMENTO LEGAL — o recorte oficial dentro de uma modalidade legal
+/// (ex.: Anexo I e Anexo III da LMD). É o que determina conjunto documental e
+/// exigências próprias. Condições de elegibilidade pertencem ao enquadramento;
+/// não viram cadastro paralelo nem modalidade.
+model EnquadramentoLegal {
+  id                Int             @id @default(autoincrement())
+  code              String          @unique @db.VarChar(60)
+  nome              String          @db.VarChar(200)
+  descricao         String?         @db.Text
+  modalidadeLegalId Int
+  modalidadeLegal   ModalidadeLegal @relation(fields: [modalidadeLegalId], references: [id], onDelete: Restrict)
+  ordem             Int             @default(0)
+  ativo             Boolean         @default(true)
+  criadoEm          DateTime        @default(now())
+  atualizadoEm      DateTime        @updatedAt
+
+  processos Processo[]
+
+  @@index([modalidadeLegalId])
+}
+
 /// Categorias que organizam o Catálogo de Serviços (não guardam preço).
 model CategoriaServico {
   id           Int      @id @default(autoincrement())
@@ -4716,12 +4766,12 @@ model DecisaoDeduplicacao {
   decididoPor   Usuario? @relation("DecisaoDedupResponsavel", fields: [decididoPorId], references: [id])
   decididoEm    DateTime @default(now())
 
-  chaveIdempotencia String @unique @db.VarChar(200)
+  chaveIdempotencia String                      @unique @db.VarChar(200)
+  correspondencias  CorrespondenciaIdentidade[] @relation("DedupCorrespondencia")
 
   @@index([chaveDedup])
   @@index([pessoaResultanteId])
   @@index([decididoEm])
-  correspondencias CorrespondenciaIdentidade[] @relation("DedupCorrespondencia")
 }
 
 // ############################################################################
@@ -4958,9 +5008,9 @@ model LoteRegistral {
   finalizadoEm      DateTime?
   atualizadoEm      DateTime  @updatedAt
 
-  execucoes  ExecucaoRegistral[]
-  propostas  PropostaReconciliacao[]
-  conflitos  ConflitoRegistral[]
+  execucoes ExecucaoRegistral[]
+  propostas PropostaReconciliacao[]
+  conflitos ConflitoRegistral[]
 
   @@index([processoId, status])
   @@index([correlationId])
@@ -4970,9 +5020,9 @@ model LoteRegistral {
 /// EXECUCAO — o pipeline de UM documento dentro de um lote. Estado atual +
 /// controle de retomada (tentativas, backoff, claim atomico).
 model ExecucaoRegistral {
-  id      Int           @id @default(autoincrement())
-  loteId  Int
-  lote    LoteRegistral @relation(fields: [loteId], references: [id], onDelete: Cascade)
+  id     Int           @id @default(autoincrement())
+  loteId Int
+  lote   LoteRegistral @relation(fields: [loteId], references: [id], onDelete: Cascade)
 
   documentoId Int
   documento   Documento @relation(fields: [documentoId], references: [id], onDelete: Cascade)
@@ -4980,34 +5030,34 @@ model ExecucaoRegistral {
   necessidadeId Int?
   necessidade   NecessidadeDocumental? @relation(fields: [necessidadeId], references: [id], onDelete: SetNull)
 
-  etapa       EtapaRegistral @default(RECEBIDO)
+  etapa          EtapaRegistral @default(RECEBIDO)
   /// Classificacao resolvida (code do ItemCatalogo / natureza da certidao).
-  tipoDetectado    String? @db.VarChar(60)
-  confiancaTipo    Float?
-  versaoExtrator   String  @db.VarChar(20)
-  fonteTexto       String? @db.VarChar(30)
+  tipoDetectado  String?        @db.VarChar(60)
+  confiancaTipo  Float?
+  versaoExtrator String         @db.VarChar(20)
+  fonteTexto     String?        @db.VarChar(30)
 
-  tentativas    Int       @default(0)
-  proximaEm     DateTime?
-  reservadoEm   DateTime?
-  erro          String?   @db.Text
+  tentativas            Int       @default(0)
+  proximaEm             DateTime?
+  reservadoEm           DateTime?
+  erro                  String?   @db.Text
   /// Contadores do que ESTA execucao produziu — base das metricas do lote.
-  ocorrenciasDetectadas Int @default(0)
-  camposExtraidos       Int @default(0)
-  camposDivergentes     Int @default(0)
-  evidenciasCriadas     Int @default(0)
+  ocorrenciasDetectadas Int       @default(0)
+  camposExtraidos       Int       @default(0)
+  camposDivergentes     Int       @default(0)
+  evidenciasCriadas     Int       @default(0)
 
-  correlationId     String   @db.VarChar(60)
-  chaveIdempotencia String   @unique @db.VarChar(200)
-  criadoEm          DateTime @default(now())
-  atualizadoEm      DateTime @updatedAt
+  correlationId     String    @db.VarChar(60)
+  chaveIdempotencia String    @unique @db.VarChar(200)
+  criadoEm          DateTime  @default(now())
+  atualizadoEm      DateTime  @updatedAt
   finalizadoEm      DateTime?
 
-  etapas        EtapaExecucaoRegistral[]
-  ocorrencias   OcorrenciaDocumental[]
-  evidencias    EvidenciaRegistral[]
-  propostas     PropostaReconciliacao[]
-  conflitos     ConflitoRegistral[]
+  etapas      EtapaExecucaoRegistral[]
+  ocorrencias OcorrenciaDocumental[]
+  evidencias  EvidenciaRegistral[]
+  propostas   PropostaReconciliacao[]
+  conflitos   ConflitoRegistral[]
 
   @@index([loteId, etapa])
   @@index([documentoId])
@@ -5017,15 +5067,15 @@ model ExecucaoRegistral {
 
 /// Trilha append-only de CADA transicao de etapa — inclusive as que falharam.
 model EtapaExecucaoRegistral {
-  id          Int               @id @default(autoincrement())
-  execucaoId  Int
-  execucao    ExecucaoRegistral @relation(fields: [execucaoId], references: [id], onDelete: Cascade)
+  id         Int               @id @default(autoincrement())
+  execucaoId Int
+  execucao   ExecucaoRegistral @relation(fields: [execucaoId], references: [id], onDelete: Cascade)
 
   etapa     EtapaRegistral
   ok        Boolean
-  mensagem  String? @db.VarChar(500)
+  mensagem  String?        @db.VarChar(500)
   duracaoMs Int?
-  tentativa Int     @default(1)
+  tentativa Int            @default(1)
   dados     Json?
 
   criadoEm DateTime @default(now())
@@ -5059,11 +5109,11 @@ model OcorrenciaDocumental {
   pessoaResolvidaId Int?
   pessoaResolvida   Pessoa? @relation("OcorrenciaPessoaResolvida", fields: [pessoaResolvidaId], references: [id], onDelete: SetNull)
 
-  classe        ClasseCorrespondencia?
-  scoreIdentidade Float?
+  classe                   ClasseCorrespondencia?
+  scoreIdentidade          Float?
   /// Resolucao automatica so acontece quando classe=CONFIRMADA e sem impacto
   /// estrutural. Fora disso fica null e nasce proposta/conflito.
-  resolvidaAutomaticamente Boolean @default(false)
+  resolvidaAutomaticamente Boolean                @default(false)
 
   chaveIdempotencia String   @unique @db.VarChar(200)
   criadoEm          DateTime @default(now())
@@ -5089,11 +5139,11 @@ model FatoRegistral {
 
   campo CampoRegistral
 
-  valorBruto       String? @db.VarChar(400)
-  valorNormalizado String? @db.VarChar(400)
+  valorBruto       String?   @db.VarChar(400)
+  valorNormalizado String?   @db.VarChar(400)
   /// Valor tipado quando aplicavel (data ISO, id de pessoa em filiacao...).
-  valorData      DateTime?
-  valorPessoaId  Int?
+  valorData        DateTime?
+  valorPessoaId    Int?
 
   estado    EstadoFatoRegistral @default(NAO_INFORMADO)
   /// Escala UNICA do Discovery (lib/cadastro-mestre/afirmacao): CONFIRMADO |
@@ -5140,11 +5190,11 @@ model EvidenciaRegistral {
   execucao   ExecucaoRegistral? @relation(fields: [execucaoId], references: [id], onDelete: SetNull)
 
   /// Documento do Processo (dono do arquivo — o motor apenas referencia).
-  documentoId Int
-  documento   Documento @relation(fields: [documentoId], references: [id], onDelete: Cascade)
+  documentoId    Int
+  documento      Documento              @relation(fields: [documentoId], references: [id], onDelete: Cascade)
   /// Documento Mestre (ItemCatalogo) e Necessidade que o documento atende.
   itemCatalogoId Int?
-  itemCatalogo   ItemCatalogo? @relation(fields: [itemCatalogoId], references: [id], onDelete: SetNull)
+  itemCatalogo   ItemCatalogo?          @relation(fields: [itemCatalogoId], references: [id], onDelete: SetNull)
   necessidadeId  Int?
   necessidade    NecessidadeDocumental? @relation(fields: [necessidadeId], references: [id], onDelete: SetNull)
 
@@ -5160,11 +5210,11 @@ model EvidenciaRegistral {
 
   campo CampoRegistral
 
-  pagina        Int?
+  pagina           Int?
   /// Regiao/trecho localizavel: "linha 12-14", "offset 1840-1902".
-  regiao        String? @db.VarChar(60)
-  trechoTexto   String? @db.VarChar(600)
-  valorBruto    String? @db.VarChar(400)
+  regiao           String? @db.VarChar(60)
+  trechoTexto      String? @db.VarChar(600)
+  valorBruto       String? @db.VarChar(400)
   valorNormalizado String? @db.VarChar(400)
 
   metodoExtracao      String  @db.VarChar(40)
@@ -5173,7 +5223,7 @@ model EvidenciaRegistral {
   confiancaAssociacao Float
   regraAplicada       String? @db.VarChar(80)
   /// Evidencia pode ser CONTRARIA (o documento contradiz o fato).
-  favoravel Boolean @default(true)
+  favoravel           Boolean @default(true)
 
   chaveIdempotencia String   @unique @db.VarChar(200)
   criadoEm          DateTime @default(now())
@@ -5195,15 +5245,15 @@ model CorrespondenciaIdentidade {
   pessoaId Int
   pessoa   Pessoa @relation("CorrespondenciaPessoa", fields: [pessoaId], references: [id], onDelete: Cascade)
 
-  classe ClasseCorrespondencia
-  score  Float
+  classe     ClasseCorrespondencia
+  score      Float
   /// Evidencias favoraveis e contrarias que produziram a classe (snapshot).
   evidencias Json
 
   /// Decisao humana quando exigida: ACEITA | RECUSADA | ADIADA.
-  decisao       String?  @db.VarChar(12)
+  decisao       String?   @db.VarChar(12)
   decididoPorId Int?
-  decididoPor   Usuario? @relation("CorrespondenciaDecisor", fields: [decididoPorId], references: [id], onDelete: SetNull)
+  decididoPor   Usuario?  @relation("CorrespondenciaDecisor", fields: [decididoPorId], references: [id], onDelete: SetNull)
   decididoEm    DateTime?
 
   /// Liga a triagem MDM-3 quando a decisao passou pelo fluxo de dedup.
@@ -5238,11 +5288,11 @@ model PropostaReconciliacao {
   status      StatusPropostaRegistral @default(PENDENTE)
 
   /// Alvo da alteracao. entidadeAlvo: PESSOA | UNIAO | FATO | NECESSIDADE | DOCUMENTO.
-  entidadeAlvo String @db.VarChar(20)
+  entidadeAlvo String          @db.VarChar(20)
   alvoId       Int?
   campo        CampoRegistral?
   fatoId       Int?
-  fato         FatoRegistral? @relation(fields: [fatoId], references: [id], onDelete: SetNull)
+  fato         FatoRegistral?  @relation(fields: [fatoId], references: [id], onDelete: SetNull)
 
   valorAtual          String? @db.VarChar(400)
   valorProposto       String? @db.VarChar(400)
@@ -5252,20 +5302,20 @@ model PropostaReconciliacao {
   evidenciasFavoraveis Json
   evidenciasContrarias Json
   confianca            Float
-  justificativa        String  @db.Text
-  regraAplicada        String  @db.VarChar(80)
-  recomendacao         String? @db.VarChar(300)
+  justificativa        String              @db.Text
+  regraAplicada        String              @db.VarChar(80)
+  recomendacao         String?             @db.VarChar(300)
   risco                SeveridadeRegistral @default(BAIXO)
 
   /// Payload canonico da alteracao (o que aplicar). Interpretado pelo aplicador,
   /// nunca por tela.
   operacao Json
 
-  pessoasAfetadas     Json?
-  vinculosAfetados    Json?
-  documentosAfetados  Json?
-  processosAfetados   Json?
-  necessidadesAfetadas Json?
+  pessoasAfetadas          Json?
+  vinculosAfetados         Json?
+  documentosAfetados       Json?
+  processosAfetados        Json?
+  necessidadesAfetadas     Json?
   /// true so quando a matriz de automacao permite aplicar sem humano.
   aplicavelAutomaticamente Boolean @default(false)
 
@@ -5274,11 +5324,11 @@ model PropostaReconciliacao {
   decididoEm    DateTime?
   decisaoNota   String?   @db.VarChar(500)
 
-  aplicadoEm    DateTime?
-  revertidoEm   DateTime?
-  revertidaPorId Int?
-  revertidaPor   Usuario? @relation("PropostaRevertePor", fields: [revertidaPorId], references: [id], onDelete: SetNull)
-  motivoAbortoRevalidacao String? @db.Text
+  aplicadoEm              DateTime?
+  revertidoEm             DateTime?
+  revertidaPorId          Int?
+  revertidaPor            Usuario?  @relation("PropostaRevertePor", fields: [revertidaPorId], references: [id], onDelete: SetNull)
+  motivoAbortoRevalidacao String?   @db.Text
 
   versaoArvoreAntes  Int?
   versaoArvoreDepois Int?
@@ -5314,21 +5364,21 @@ model ConflitoRegistral {
 
   /// Codigo estavel da regra que abriu o conflito (ex.: LEITURA_DIVERGENTE,
   /// FILIACAO_CONTRADITORIA, CICLO_GENEALOGICO).
-  codigo     String @db.VarChar(60)
+  codigo     String                  @db.VarChar(60)
   severidade SeveridadeRegistral
   status     StatusConflitoRegistral @default(ABERTO)
 
   campo    CampoRegistral?
   pessoaId Int?
-  pessoa   Pessoa? @relation("ConflitoPessoa", fields: [pessoaId], references: [id], onDelete: SetNull)
+  pessoa   Pessoa?         @relation("ConflitoPessoa", fields: [pessoaId], references: [id], onDelete: SetNull)
   uniaoId  Int?
-  uniao    Uniao?  @relation("ConflitoUniao", fields: [uniaoId], references: [id], onDelete: SetNull)
+  uniao    Uniao?          @relation("ConflitoUniao", fields: [uniaoId], references: [id], onDelete: SetNull)
 
-  descricao     String  @db.VarChar(300)
-  explicacao    String  @db.Text
-  acaoSugerida  String? @db.VarChar(300)
-  evidencias    Json
-  documentoIds  Json?
+  descricao    String  @db.VarChar(300)
+  explicacao   String  @db.Text
+  acaoSugerida String? @db.VarChar(300)
+  evidencias   Json
+  documentoIds Json?
 
   propostaId Int?
   proposta   PropostaReconciliacao? @relation(fields: [propostaId], references: [id], onDelete: SetNull)
@@ -5361,18 +5411,18 @@ model ImpactoAplicacaoRegistral {
   /// PREVIO (antes de aplicar) | POSTERIOR (revalidacao pos-aplicacao).
   momento     String   @db.VarChar(10)
 
-  pessoasAfetadas         Int @default(0)
-  arvoresAfetadas         Int @default(0)
-  requerentesAfetados     Int @default(0)
-  processosAfetados       Int @default(0)
-  vinculosAlterados       Int @default(0)
-  documentosRelacionados  Int @default(0)
-  necessidadesRecalculadas Int @default(0)
-  inconsistenciasCriadas  Int @default(0)
+  pessoasAfetadas           Int @default(0)
+  arvoresAfetadas           Int @default(0)
+  requerentesAfetados       Int @default(0)
+  processosAfetados         Int @default(0)
+  vinculosAlterados         Int @default(0)
+  documentosRelacionados    Int @default(0)
+  necessidadesRecalculadas  Int @default(0)
+  inconsistenciasCriadas    Int @default(0)
   inconsistenciasResolvidas Int @default(0)
 
-  linhaAntes  Json?
-  linhaDepois Json?
+  linhaAntes          Json?
+  linhaDepois         Json?
   elegibilidadeAntes  ResultadoLinhagemRegistral?
   elegibilidadeDepois ResultadoLinhagemRegistral?
 
@@ -5399,8 +5449,8 @@ model DecisaoRevisaoRegistral {
   conflito   ConflitoRegistral?     @relation(fields: [conflitoId], references: [id], onDelete: Cascade)
 
   /// APROVAR | REJEITAR | ADIAR | REVERTER | RESOLVER_CONFLITO | DESCARTAR_CONFLITO
-  decisao  String @db.VarChar(24)
-  motivo   String @db.VarChar(500)
+  decisao   String @db.VarChar(24)
+  motivo    String @db.VarChar(500)
   /// Permissao efetivamente exercida — auditoria de autorizacao.
   permissao String @db.VarChar(60)
 
@@ -5424,13 +5474,13 @@ model VersaoGenealogica {
   arvoreId Int
   arvore   Arvore @relation(fields: [arvoreId], references: [id], onDelete: Cascade)
 
-  versao Int
-  motivo String @db.VarChar(200)
+  versao   Int
+  motivo   String @db.VarChar(200)
   /// Snapshot determinístico: pessoas, vinculos, fatos ativos e linha apurada.
   snapshot Json
   hash     String @db.VarChar(64)
 
-  propostaId Int?
+  propostaId    Int?
   correlationId String? @db.VarChar(60)
 
   criadoPorId Int?

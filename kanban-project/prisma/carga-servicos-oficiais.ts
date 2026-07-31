@@ -4,7 +4,7 @@
 // tela "Catálogo de Serviços":
 //   slugTecnico + gerarChaveUnica  → CÓDIGO gerado automaticamente (nunca hardcoded)
 //   sincronizarItemDeServico       → ItemCatalogo (pivô) vinculado
-//   garantirConfigFinanceiraDeServico → ProdutoFinanceiro (config) vinculado
+//   garantirConfigFinanceiraDeItem → ProdutoFinanceiro (config) vinculado
 //   TabelaValor                    → preço (fonte única) apontando para a config
 //
 // Serviço mestre = ServicoProduto (o que a tela lista) ↔ ItemCatalogo ↔
@@ -23,7 +23,7 @@ import { prisma } from '@/lib/prisma'
 import { NaturezaFinanceira, NaturezaPreco, Moeda, UnidadeItem } from '@prisma/client'
 import { slugTecnico, gerarChaveUnica } from '@/src/lib/catalogo/chave-tecnica-interna'
 import { sincronizarItemDeServico } from '@/src/services/catalogo-sync'
-import { garantirConfigFinanceiraDeServico } from '@/src/services/config-financeira-auto'
+import { garantirConfigFinanceiraDeItem } from '@/src/services/config-financeira-auto'
 import { garantirCategoriasServico, type CodeCategoriaServico } from './categorias-servico-oficiais'
 
 const DRY = process.argv.includes('--dry-run')
@@ -163,7 +163,7 @@ async function main() {
       // 2) CONFIGURAÇÃO FINANCEIRA (ProdutoFinanceiro) — camada oficial, vinculada ao mestre.
       let configId = -1
       if (!DRY) {
-        const cfg = await garantirConfigFinanceiraDeServico(tx, { itemCatalogoId, nome: s.nome })
+        const cfg = await garantirConfigFinanceiraDeItem(tx, { itemCatalogoId, nome: s.nome })
         configId = cfg.id
         if (cfg.criado) rel.configs++; else rel.configsReuso++
         await tx.produtoFinanceiro.update({ where: { id: configId }, data: { naturezaFin: NaturezaFinanceira.SOMENTE_RECEITA, possuiReceita: true, possuiCusto: false, moedaPadrao: s.moeda, cobravelDoCliente: true, ativo: true } })
