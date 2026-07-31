@@ -17,7 +17,7 @@
 import { prisma } from '@/lib/prisma'
 import { NaturezaItem, UnidadeItem } from '@prisma/client'
 import { sincronizarItemDeServico } from '@/src/services/catalogo-sync'
-import { garantirConfigFinanceiraDeServico, refletirEstadoNaConfigDeServico } from '@/src/services/config-financeira-auto'
+import { garantirConfigFinanceiraDeItem, refletirEstadoNaConfigDeServico } from '@/src/services/config-financeira-auto'
 import { slugTecnico, gerarChaveUnica } from '@/src/lib/catalogo/chave-tecnica-interna'
 import {
   NATUREZAS_ITEM_OFICIAIS, elegibilidadeParaLancamento, hojeISO,
@@ -157,7 +157,7 @@ async function main() {
     const s = await tx.servicoProduto.create({
       data: { code, name: nomeServico, descricao: 'registro de smoke', aplicacaoGlobal: true, ativo: true, itemCatalogoId },
     })
-    const cfg = await garantirConfigFinanceiraDeServico(tx, { itemCatalogoId, nome: nomeServico })
+    const cfg = await garantirConfigFinanceiraDeItem(tx, { itemCatalogoId, nome: nomeServico })
     return { servicoId: s.id, itemCatalogoId, configId: cfg.id, configCriada: cfg.criado }
   })
   chk(criado.servicoId > 0 && criado.itemCatalogoId > 0, `serviço criado (#${criado.servicoId}) com espelho no mestre (#${criado.itemCatalogoId})`)
@@ -211,7 +211,7 @@ async function main() {
     const atual = (await tx.servicoProduto.findUnique({ where: { id: criado.servicoId } }))!
     const itemId = await sincronizarItemDeServico(tx, { code: atual.code, name: nomeEditado, categoriaId: null }, atual.itemCatalogoId)
     await tx.servicoProduto.update({ where: { id: criado.servicoId }, data: { name: nomeEditado, itemCatalogoId: itemId } })
-    await garantirConfigFinanceiraDeServico(tx, { itemCatalogoId: itemId, nome: nomeEditado })
+    await garantirConfigFinanceiraDeItem(tx, { itemCatalogoId: itemId, nome: nomeEditado })
     await refletirEstadoNaConfigDeServico(tx, { itemCatalogoId: itemId, nome: nomeEditado, ativo: true })
   })
   const editado = await prisma.servicoProduto.findUnique({ where: { id: criado.servicoId } })

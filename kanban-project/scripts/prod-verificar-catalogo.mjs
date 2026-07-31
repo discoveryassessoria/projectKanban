@@ -126,6 +126,25 @@ async function main() {
   const semCategoria = await prisma.itemCatalogo.count({ where: { categoriaId: null } })
   console.log(`[catalogo-smoke] itens do mestre sem categoria: ${semCategoria} (estado válido — categoria é opcional)`)
 
+  // ── 7) Itens PRECIFICÁVEIS por natureza — o que a Tabela de Valores oferece ─
+  // Prova direta do campo "Tipo de item": a fonte é o cadastro mestre, então um
+  // Documento Mestre aparece mesmo sem nunca ter tido preço.
+  const precificaveis = await prisma.itemCatalogo.findMany({
+    where: { ativo: true, natureza: { in: ['SERVICO', 'DOCUMENTO', 'TAXA', 'DESPESA', 'LOGISTICA', 'OUTRO'] } },
+    select: { id: true, code: true, name: true, natureza: true, produtos: { where: { ativo: true }, select: { id: true }, take: 1 } },
+    orderBy: [{ natureza: 'asc' }, { name: 'asc' }],
+  })
+  const porNatureza = new Map()
+  for (const i of precificaveis) porNatureza.set(i.natureza, [...(porNatureza.get(i.natureza) ?? []), i])
+  console.log(`[catalogo-smoke] itens precificáveis: ${precificaveis.length}`)
+  for (const [nat, lista] of porNatureza) {
+    console.log(`[catalogo-smoke]   ${nat}: ${lista.length} item(ns)`)
+    for (const i of lista) console.log(`[catalogo-smoke]      #${i.id} ${i.code} — ${i.name}${i.produtos.length ? '' : ' (sem config; criada ao salvar preço)'}`)
+  }
+  const docs = porNatureza.get('DOCUMENTO') ?? []
+  if (docs.length > 0) okLog(`tipo Documentos oferece ${docs.length} item(ns) na Tabela de Valores`)
+  else alerta('tipo Documentos NÃO oferece item algum — certidões ficariam fora da Tabela de Valores')
+
   console.log(`[catalogo-smoke] ${alertas === 0 ? 'OK — catálogo íntegro.' : `${alertas} ALERTA(S) — conferir acima.`}`)
   await prisma.$disconnect()
 }

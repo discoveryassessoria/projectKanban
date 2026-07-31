@@ -140,7 +140,8 @@
     "catalogo:certidoes": "tsx scripts/catalogo-certidoes-vinculo.ts",
     "test:categorias-servico": "tsx scripts/cadastro-categorias.test.ts",
     "test:arquitetura-referencias": "tsx scripts/arquitetura-referencias.test.ts",
-    "audit:referencias": "tsx scripts/prod-auditar-referencias-textuais.mjs"
+    "audit:referencias": "tsx scripts/prod-auditar-referencias-textuais.mjs",
+    "test:tabela-valores-tipos": "tsx scripts/tabela-valores-tipos.test.ts"
   },
   "prisma": {
     "seed": "tsx prisma/seed.ts"

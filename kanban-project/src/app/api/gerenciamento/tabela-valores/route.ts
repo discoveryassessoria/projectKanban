@@ -8,6 +8,13 @@ import { modoCalculoValido, estrategiaDoModo, estrategiaUsaPrimeiroAdicional, es
 import { normalizarUnidade } from '@/lib/financeiro/unidade-cobranca'
 import { naturezasDeSelecao, usaNovoModeloSelecao } from '@/lib/financeiro/selecao-natureza'
 import { reprocessarPendenciasFinanceiras } from '@/src/lib/motor/executor'
+import { garantirConfigFinanceiraDeItem } from '@/src/services/config-financeira-auto'
+import { NATUREZAS_ITEM_OFICIAIS } from '@/lib/financeiro/catalogo-oficial'
+import { NaturezaItem } from '@prisma/client'
+
+// Naturezas OFICIAIS que podem receber preço. Vem da fonte única do catálogo —
+// nenhuma lista paralela de tipos é declarada aqui.
+const NATUREZAS_PRECIFICAVEIS = NATUREZAS_ITEM_OFICIAIS.map((n) => NaturezaItem[n])
 
 function toAmount(v: any): number {
   if (v === undefined || v === null || v === '') return 0
@@ -44,26 +51,47 @@ function mapDbError(e: any): NextResponse | null {
   return null
 }
 
-// Rótulo canônico "Origem · Cadastro mestre" de uma Configuração Financeira (UMA por
-// mestre). O papel NÃO faz parte da config: o preço escolhe a natureza (CUSTO/RECEITA)
-// dentre as que a config habilita (possuiCusto/possuiReceita).
-async function listarConfigs() {
-  const cfgs = await prisma.produtoFinanceiro.findMany({
-    where: { ativo: true },
+// ITENS PRECIFICÁVEIS — a fonte é o CADASTRO MESTRE (ItemCatalogo), não a lista
+// de Configurações Financeiras que por acaso já existem.
+//
+// Essa distinção é o defeito que esta função corrige: derivar os tipos das configs
+// existentes fazia a tela só oferecer o que já tinha preço, e um Documento Mestre
+// nunca precificado ficava invisível — o operador não tinha por onde começar.
+//
+// O TIPO vem de `ItemCatalogo.natureza` (enum oficial NaturezaItem), nunca de uma
+// cascata de campos legados. A config aparece quando existe; quando não existe, o
+// item continua ofertável e a config é criada no momento de salvar o preço.
+async function listarItensPrecificaveis() {
+  const itens = await prisma.itemCatalogo.findMany({
+    where: { ativo: true, natureza: { in: NATUREZAS_PRECIFICAVEIS } },
     select: {
-      id: true, possuiCusto: true, possuiReceita: true, moedaPadrao: true,
-      tipoDocumento: { select: { name: true } },
-      honorario: { select: { name: true } },
-      tipoProcesso: { select: { name: true } },
-      itemCatalogo: { select: { name: true, natureza: true } },
+      id: true, code: true, name: true, natureza: true, unidade: true,
+      categoria: { select: { nome: true } },
+      produtos: {
+        where: { ativo: true },
+        select: { id: true, possuiCusto: true, possuiReceita: true, moedaPadrao: true },
+        take: 1,
+      },
     },
-    orderBy: { id: 'asc' },
+    orderBy: [{ natureza: 'asc' }, { name: 'asc' }],
   })
-  return cfgs.map((c) => {
-    const origem = c.tipoDocumento ? 'Documento' : c.honorario ? 'Honorário' : c.tipoProcesso ? 'Processo' : (c.itemCatalogo?.natureza === 'SERVICO' ? 'Serviço' : 'Item')
-    const mestre = c.tipoDocumento?.name ?? c.honorario?.name ?? c.tipoProcesso?.name ?? c.itemCatalogo?.name ?? '—'
-    // Config Financeira NÃO tem código público (é config interna): identificada pelo mestre + natureza.
-    return { id: c.id, possuiCusto: c.possuiCusto, possuiReceita: c.possuiReceita, moedaPadrao: c.moedaPadrao, origem, mestre, label: mestre }
+  return itens.map((i) => {
+    const cfg = i.produtos[0] ?? null
+    return {
+      // Identidade OFICIAL do item. É por ela que o preço é gravado.
+      itemCatalogoId: i.id,
+      natureza: i.natureza,
+      mestre: i.name,
+      codigo: i.code,
+      categoria: i.categoria?.nome ?? null,
+      unidade: i.unidade,
+      // Config existente (quando houver). `null` não impede precificar.
+      id: cfg?.id ?? null,
+      possuiCusto: cfg?.possuiCusto ?? true,
+      possuiReceita: cfg?.possuiReceita ?? true,
+      moedaPadrao: cfg?.moedaPadrao ?? null,
+      label: i.name,
+    }
   })
 }
 
@@ -89,7 +117,7 @@ export async function GET(request: NextRequest) {
           },
         },
       }),
-      listarConfigs(),
+      listarItensPrecificaveis(),
       prisma.fornecedor.findMany({ where: { ativo: true }, orderBy: { nome: "asc" }, select: { id: true, nome: true, publicCode: true } }),
       prisma.tipoProcessoNacionalidade.findMany({ where: { ativo: true }, orderBy: { name: 'asc' }, select: { id: true, name: true } }),
       prisma.modalidadePais.findMany({ where: { ativo: true }, orderBy: { modalityLabel: 'asc' }, select: { id: true, modalityLabel: true } }),
@@ -109,8 +137,25 @@ export async function POST(request: NextRequest) {
     if (erro) return erro
 
     const b = await request.json()
-    const configId = toIntOrNull(b.configuracaoFinanceiraItemId)
-    if (!configId) return NextResponse.json({ error: 'Selecione a Configuração Financeira.' }, { status: 400 })
+
+    // O preço é gravado contra a Configuração Financeira, mas a tela seleciona o
+    // ITEM MESTRE — que é o que o operador conhece. Quando o item ainda não tem
+    // config, ela é criada aqui, no mesmo caminho oficial usado pelo Catálogo.
+    // Isso é o que permite precificar um Documento Mestre nunca precificado sem
+    // exigir um cadastro prévio que o operador não teria como adivinhar.
+    let configId = toIntOrNull(b.configuracaoFinanceiraItemId)
+    const itemCatalogoId = toIntOrNull(b.itemCatalogoId)
+    if (!configId && itemCatalogoId) {
+      const item = await prisma.itemCatalogo.findUnique({
+        where: { id: itemCatalogoId },
+        select: { id: true, name: true, ativo: true, natureza: true },
+      })
+      if (!item) return NextResponse.json({ error: `Item do catálogo inexistente (#${itemCatalogoId}).` }, { status: 400 })
+      if (!item.ativo) return NextResponse.json({ error: 'Item inativo não pode receber preço.' }, { status: 400 })
+      const criada = await garantirConfigFinanceiraDeItem(prisma, { itemCatalogoId: item.id, nome: item.name })
+      configId = criada.id
+    }
+    if (!configId) return NextResponse.json({ error: 'Selecione o item.' }, { status: 400 })
 
     const cfg = await prisma.produtoFinanceiro.findUnique({
       where: { id: configId },

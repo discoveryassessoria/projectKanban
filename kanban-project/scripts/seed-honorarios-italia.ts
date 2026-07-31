@@ -5,7 +5,7 @@
 // estrutura paralela, sem hardcode no motor. Rodar novamente NÃO duplica.
 import { prisma } from "@/lib/prisma";
 import { sincronizarItemDeServico } from "@/src/services/catalogo-sync";
-import { garantirConfigFinanceiraDeServico } from "@/src/services/config-financeira-auto";
+import { garantirConfigFinanceiraDeItem } from "@/src/services/config-financeira-auto";
 import { slugTecnico, gerarChaveUnica } from "@/src/lib/catalogo/chave-tecnica-interna";
 import { garantirCategoriasServico } from "@/prisma/categorias-servico-oficiais";
 const p: any = prisma;
@@ -38,7 +38,7 @@ async function main() {
   console.log(`Serviço: ${servico.publicCode ?? "?"} — ${servico.name} (id ${servico.id}, item ${servico.itemCatalogoId})`);
 
   // 2) Config Financeira (idempotente por itemCatalogoId) — natureza RECEITA, moeda EUR
-  const cfg = await garantirConfigFinanceiraDeServico(p, { itemCatalogoId: servico.itemCatalogoId, nome: NOME });
+  const cfg = await garantirConfigFinanceiraDeItem(p, { itemCatalogoId: servico.itemCatalogoId, nome: NOME });
   await p.produtoFinanceiro.update({ where: { id: cfg.id }, data: {
     possuiReceita: true, possuiCusto: false, moedaPadrao: "EUR", ativo: true,
   } });

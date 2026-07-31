@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { verificarPermissao } from '@/src/lib/verificar-permissao'
 import { sincronizarItemDeServico } from '@/src/services/catalogo-sync'
-import { garantirConfigFinanceiraDeServico } from '@/src/services/config-financeira-auto'
+import { garantirConfigFinanceiraDeItem } from '@/src/services/config-financeira-auto'
 import { slugTecnico, gerarChaveUnica } from '@/src/lib/catalogo/chave-tecnica-interna'
 import { resolverAplicacaoTerritorial, gravarAplicacaoTerritorial } from '@/src/services/aplicacao-territorial-servico'
 import { resolverCategoriaServico } from '@/src/services/categoria-servico-ref'
@@ -113,7 +113,7 @@ export async function POST(request: NextRequest) {
       await gravarAplicacaoTerritorial(tx, s.id, selecao)
       // FLUXO: Cadastro Mestre (Serviço) → Configuração Financeira criada AUTOMATICAMENTE
       // (vínculo estrutural itemCatalogoId; idempotente). Não cria preço — só a config.
-      await garantirConfigFinanceiraDeServico(tx, { itemCatalogoId, nome: name })
+      await garantirConfigFinanceiraDeItem(tx, { itemCatalogoId, nome: name })
       return s
     })
 

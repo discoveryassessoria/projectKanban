@@ -163,7 +163,7 @@ secao('5) Código morto fora; cadastro mestre intacto')
   ok('GET de serviços traz o espelho do mestre (aditivo, sem migration)',
     /include:\s*\{[\s\S]*itemCatalogo:/.test(rota) && /_count:/.test(rota))
   ok('criação de serviço continua criando o mestre e a config na MESMA transação',
-    /\$transaction/.test(rota) && /sincronizarItemDeServico/.test(rota) && /garantirConfigFinanceiraDeServico/.test(rota))
+    /\$transaction/.test(rota) && /sincronizarItemDeServico/.test(rota) && /garantirConfigFinanceiraDeItem/.test(rota))
 
   // nenhuma migration nova: a migração é só de exposição
   const mestre = src('src/app/api/gerenciamento/catalogo-mestre/[id]/route.ts')

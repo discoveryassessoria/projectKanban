@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { verificarPermissao } from '@/src/lib/verificar-permissao'
 import { sincronizarItemDeServico } from '@/src/services/catalogo-sync'
-import { garantirConfigFinanceiraDeServico, refletirEstadoNaConfigDeServico } from '@/src/services/config-financeira-auto'
+import { garantirConfigFinanceiraDeItem, refletirEstadoNaConfigDeServico } from '@/src/services/config-financeira-auto'
 import { resolverAplicacaoTerritorial, gravarAplicacaoTerritorial, selecaoDoRegistro } from '@/src/services/aplicacao-territorial-servico'
 import { resolverCategoriaServico } from '@/src/services/categoria-servico-ref'
 
@@ -67,7 +67,7 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
       await gravarAplicacaoTerritorial(tx, id, selecao)
       // Renomear NÃO cria nova config (mesmo itemCatalogoId → mesmo vínculo). Self-heal:
       // garante a config se faltar (legado); reflete nome/ativo sem apagar preços/histórico.
-      await garantirConfigFinanceiraDeServico(tx, { itemCatalogoId, nome: data.name })
+      await garantirConfigFinanceiraDeItem(tx, { itemCatalogoId, nome: data.name })
       await refletirEstadoNaConfigDeServico(tx, { itemCatalogoId, nome: data.name, ativo: data.ativo })
       return s
     })

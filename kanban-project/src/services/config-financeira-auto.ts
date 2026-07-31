@@ -8,12 +8,18 @@
 import { Prisma, NaturezaFinanceira } from '@prisma/client'
 
 /**
- * Garante a Configuração Financeira de um SERVIÇO. Vínculo estrutural: itemCatalogoId.
+ * Garante a Configuração Financeira de QUALQUER item do Cadastro Mestre —
+ * serviço, documento, taxa, protocolo. O vínculo é estrutural (itemCatalogoId) e
+ * a natureza do item não muda nada aqui: config é config.
+ *
+ * É o que permite precificar um Documento Mestre sem convertê-lo em Serviço: o
+ * preço pertence à config, a config pertence ao item, e o item continua sendo o
+ * que sempre foi.
  * Natureza padrão CUSTO_E_RECEITA — mesmo padrão das configs de Documento já existentes
  * (um serviço pode gerar custo operacional e valor de venda). Idempotente por item.
  * Retorna { id, criado } — criado=false quando a config já existia.
  */
-export async function garantirConfigFinanceiraDeServico(
+export async function garantirConfigFinanceiraDeItem(
   tx: Prisma.TransactionClient,
   s: { itemCatalogoId: number; nome: string },
 ): Promise<{ id: number; criado: boolean }> {
@@ -24,7 +30,7 @@ export async function garantirConfigFinanceiraDeServico(
   if (existente) return { id: existente.id, criado: false }
 
   // ID técnico interno (referencia o mestre por ID; a exibição resolve nome/código reais).
-  const codigo = `CFG_SRV_${s.itemCatalogoId}`.slice(0, 30)
+  const codigo = `CFG_ITEM_${s.itemCatalogoId}`.slice(0, 30)
   const cfg = await tx.produtoFinanceiro.create({
     data: {
       codigo,

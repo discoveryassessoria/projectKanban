@@ -22,6 +22,8 @@ type Item = {
   id: number; name: string
   // O papel (CUSTO/RECEITA) vive no PRÓPRIO preço, não na config.
   natureza: string | null
+  itemCatalogoId?: number
+  codigo?: string | null
   configuracaoFinanceiraItemId: number | null
   configuracaoFinanceiraItem?: CfgEmbed | null
   fornecedorId: number | null
@@ -43,14 +45,16 @@ type Item = {
 
 const MOEDAS: [string, string][] = [['EUR', 'EUR'], ['BRL', 'BRL'], ['USD', 'USD']]
 
-// CATEGORIA = origem ESTRUTURAL da Configuração Financeira (config.origem, derivada da FK
-// tipoDocumento/honorario/tipoProcesso/itemCatalogo no backend). NUNCA inferida por texto do nome.
-// É só um filtro de navegação da UI — não é gravada na Tabela de Preços.
-const CATEGORIA_LABEL: Record<string, string> = {
-  Documento: 'Documentos', 'Serviço': 'Serviços', 'Honorário': 'Honorários', Processo: 'Processos', Item: 'Itens',
+// TIPO DE ITEM = `ItemCatalogo.natureza` (enum oficial NaturezaItem). É a natureza
+// do próprio item mestre, não uma cascata de FKs da config — por isso um Documento
+// Mestre aparece aqui mesmo antes de ter qualquer preço.
+// Filtro de navegação: não é gravado na Tabela de Preços.
+const TIPO_ITEM_LABEL: Record<string, string> = {
+  SERVICO: 'Serviços', DOCUMENTO: 'Documentos', TAXA: 'Taxas',
+  DESPESA: 'Despesas', LOGISTICA: 'Logística', OUTRO: 'Outros',
 }
-const categoriaLabel = (origem: string) => CATEGORIA_LABEL[origem] ?? origem
-const ORDEM_CATEGORIA = ['Documento', 'Serviço'] // as demais origens vêm depois, em ordem alfabética
+const tipoItemLabel = (n: string) => TIPO_ITEM_LABEL[n] ?? n
+const ORDEM_TIPO = ['SERVICO', 'DOCUMENTO', 'TAXA', 'DESPESA', 'LOGISTICA', 'OUTRO']
 
 function origemMestre(cfg?: CfgEmbed | null): { origem: string; mestre: string; publicCode: string | null } {
   if (!cfg) return { origem: '—', mestre: '—', publicCode: null }
@@ -90,6 +94,7 @@ const rotuloValorUnico = (modo: string, u: string) => {
 
 const EMPTY = {
   categoria: '', // filtro de navegação (origem estrutural) — NÃO enviado no payload
+  itemCatalogoId: '',     // identidade OFICIAL do item precificado
   configuracaoFinanceiraItemId: '',
   // Naturezas do domínio (apenas duas). Cada uma marcada = 1 registro; ambas = 2 registros.
   precoCusto: false, precoVenda: false,
@@ -113,6 +118,8 @@ export default function TabelaValoresTab() {
   const [busca, setBusca] = useState('')
 
   const [modalAberto, setModalAberto] = useState(false)
+  // Busca dentro do campo Item — filtra a lista, nunca cria valor.
+  const [buscaItem, setBuscaItem] = useState('')
   const [editando, setEditando] = useState<Item | null>(null)
   const [form, setForm] = useState<FormState>(EMPTY)
   const [salvando, setSalvando] = useState(false)
@@ -140,24 +147,28 @@ export default function TabelaValoresTab() {
   // Categorias = origens ESTRUTURAIS distintas presentes nas configs (dinâmico, sem categorias fictícias).
   // Documentos/Serviços primeiro; demais origens reais depois, em ordem alfabética.
   const categorias = useMemo(() => {
-    const origens = Array.from(new Set(configs.map((c) => c.origem)))
-    return origens.sort((a, b) => {
-      const ia = ORDEM_CATEGORIA.indexOf(a), ib = ORDEM_CATEGORIA.indexOf(b)
-      if (ia !== -1 || ib !== -1) return (ia === -1 ? 99 : ia) - (ib === -1 ? 99 : ib)
-      return categoriaLabel(a).localeCompare(categoriaLabel(b))
+    const tipos = Array.from(new Set(configs.map((c) => c.natureza).filter(Boolean)))
+    return tipos.sort((a, b) => {
+      const ia = ORDEM_TIPO.indexOf(a), ib = ORDEM_TIPO.indexOf(b)
+      return (ia === -1 ? 99 : ia) - (ib === -1 ? 99 : ib)
     })
   }, [configs])
-  // Itens da categoria selecionada (ordenados pelo nome do cadastro mestre).
+  // Itens do tipo escolhido, com busca por nome ou código público do item.
   const itensDaCategoria = useMemo(() => {
     if (!form.categoria) return []
-    return configs.filter((c) => c.origem === form.categoria).sort((a, b) => a.mestre.localeCompare(b.mestre))
-  }, [configs, form.categoria])
+    const q = buscaItem.trim().toLowerCase()
+    return configs
+      .filter((c) => c.natureza === form.categoria)
+      .filter((c) => !q || `${c.mestre} ${c.codigo ?? ''}`.toLowerCase().includes(q))
+      .sort((a, b) => a.mestre.localeCompare(b.mestre))
+  }, [configs, form.categoria, buscaItem])
 
   function abrirNovo() { setEditando(null); setForm(EMPTY); setErroModal(null); setModalAberto(true) }
   function abrirEditar(i: Item) {
     setEditando(i)
     // Categoria derivada da ORIGEM estrutural da config vinculada (nunca por texto).
-    const categoria = configs.find((c) => c.id === i.configuracaoFinanceiraItemId)?.origem ?? ''
+    const daConfig = configs.find((c) => c.id === i.configuracaoFinanceiraItemId)
+    const categoria = daConfig?.natureza ?? ''
     // Edição é sempre de UM registro individual: exatamente uma natureza (RECEITA legado ≡ VENDA).
     const ehVenda = i.natureza === 'VENDA' || i.natureza === 'RECEITA'
     const valorStr = i.valor != null ? String(i.valor) : ''
@@ -165,6 +176,7 @@ export default function TabelaValoresTab() {
     const adicStr = i.valorAdicional != null ? String(i.valorAdicional) : ''
     setForm({
       categoria,
+      itemCatalogoId: daConfig?.itemCatalogoId ? String(daConfig.itemCatalogoId) : '',
       configuracaoFinanceiraItemId: i.configuracaoFinanceiraItemId ? String(i.configuracaoFinanceiraItemId) : '',
       precoCusto: i.natureza === 'CUSTO', precoVenda: ehVenda,
       // Custo usa fornecedor/moeda/valor; Venda usa moedaVenda/valorVenda.
@@ -186,8 +198,8 @@ export default function TabelaValoresTab() {
   }
 
   async function salvar() {
-    if (!form.categoria) { setErroModal('Selecione a categoria.'); return }
-    if (!form.configuracaoFinanceiraItemId) { setErroModal('Selecione o item.'); return }
+    if (!form.categoria) { setErroModal('Selecione o tipo de item.'); return }
+    if (!form.itemCatalogoId && !form.configuracaoFinanceiraItemId) { setErroModal('Selecione o item.'); return }
     if (!form.precoCusto && !form.precoVenda) { setErroModal('Marque pelo menos uma natureza: Preço de Custo e/ou Preço de Venda.'); return }
     // "Válido a partir de" é obrigatório (início da validade comercial).
     if (!form.vigenciaInicio) { setErroModal('Informe "Válido a partir de".'); return }
@@ -221,7 +233,7 @@ export default function TabelaValoresTab() {
       // NOVO CONTRATO: envia os CHECKBOXES + blocos custo/venda. A natureza é derivada no
       // backend (fonte única `naturezasDeSelecao`) — o componente NÃO decide natureza nem
       // envia o campo legado `natureza` no cadastro novo.
-      const { categoria: _c, precoCusto: _pc, precoVenda: _pv, moeda: _m, valor: _v, fornecedorId: _f, moedaVenda: _mv, valorVenda: _vv, valorBase: _vb, valorAdicional: _va, valorBaseVenda: _vbv, valorAdicionalVenda: _vav, ...compartilhados } = form
+      const { categoria: _c, itemCatalogoId: _ici, precoCusto: _pc, precoVenda: _pv, moeda: _m, valor: _v, fornecedorId: _f, moedaVenda: _mv, valorVenda: _vv, valorBase: _vb, valorAdicional: _va, valorBaseVenda: _vbv, valorAdicionalVenda: _vav, ...compartilhados } = form
       const num = (v: string) => (v === '' ? undefined : Number(v))
       // Bloco de preço: na estratégia primeiro+adicional envia valorBase/valorAdicional (o
       // backend usa valorBase como `valor` de compat); nas demais envia só `valor`.
@@ -237,7 +249,8 @@ export default function TabelaValoresTab() {
         : { natureza: 'VENDA', ...blocoVenda, fornecedorId: null }
       const body = JSON.stringify({
         ...compartilhados,
-        configuracaoFinanceiraItemId: Number(form.configuracaoFinanceiraItemId),
+        itemCatalogoId: Number(form.itemCatalogoId),
+        ...(form.configuracaoFinanceiraItemId ? { configuracaoFinanceiraItemId: Number(form.configuracaoFinanceiraItemId) } : {}),
         prioridade: 0, // não editável — fonte única de vigência dispensa prioridade
         ...(editando
           ? editPayload
@@ -350,29 +363,41 @@ export default function TabelaValoresTab() {
                   Categoria = origem estrutural (filtro de navegação); Item = a config em si. */}
               <div className="grid grid-cols-[35fr_65fr] gap-3">
                 <div>
-                  <label className="mb-1 block text-xs text-white/60">Categoria *</label>
+                  <label className="mb-1 block text-xs text-white/60">Tipo de item *</label>
                   <select
                     value={form.categoria}
                     disabled={!!editando}
-                    onChange={(e) => setForm((f) => ({ ...f, categoria: e.target.value, configuracaoFinanceiraItemId: '', precoCusto: false, precoVenda: false, moeda: '', valor: '', moedaVenda: '', valorVenda: '', valorBase: '', valorAdicional: '', valorBaseVenda: '', valorAdicionalVenda: '', fornecedorId: '' }))}
-                    // (unidade e estratégia preservadas — não dependem da categoria)
+                    onChange={(e) => { setBuscaItem(''); setForm((f) => ({ ...f, categoria: e.target.value, itemCatalogoId: '', configuracaoFinanceiraItemId: '', precoCusto: false, precoVenda: false, moeda: '', valor: '', moedaVenda: '', valorVenda: '', valorBase: '', valorAdicional: '', valorBaseVenda: '', valorAdicionalVenda: '', fornecedorId: '' })) }}
+                    // (unidade e estratégia preservadas — não dependem do tipo)
                     className={inputCls + (editando ? ' cursor-not-allowed opacity-60' : '')}
                   >
-                    <option value="" className="bg-zinc-900">Selecione uma categoria</option>
-                    {categorias.map((o) => <option key={o} value={o} className="bg-zinc-900">{categoriaLabel(o)}</option>)}
+                    <option value="" className="bg-zinc-900">Selecione um tipo</option>
+                    {categorias.map((o) => <option key={o} value={o} className="bg-zinc-900">{tipoItemLabel(o)}</option>)}
                   </select>
                 </div>
                 <div>
                   <label className="mb-1 block text-xs text-white/60">Item *</label>
+                  {/* Busca só reduz a lista — o vínculo continua sendo por id. */}
+                  {form.categoria && !editando && (
+                    <input
+                      value={buscaItem}
+                      onChange={(e) => setBuscaItem(e.target.value)}
+                      placeholder="Buscar item por nome ou código…"
+                      className={inputCls + ' mb-1.5'}
+                    />
+                  )}
                   <select
-                    value={form.configuracaoFinanceiraItemId}
+                    value={form.itemCatalogoId}
                     disabled={!form.categoria || !!editando}
                     onChange={(e) => {
                       const id = e.target.value
-                      const c = configs.find((x) => String(x.id) === id)
+                      const c = configs.find((x) => String(x.itemCatalogoId) === id)
                       setForm((f) => ({
                         ...f,
-                        configuracaoFinanceiraItemId: id,
+                        itemCatalogoId: id,
+                        // Config existente vai junto quando houver; sem ela, o
+                        // backend cria a config oficial ao salvar.
+                        configuracaoFinanceiraItemId: c?.id ? String(c.id) : '',
                         moeda: f.moeda || (c?.moedaPadrao ?? ''),
                         moedaVenda: f.moedaVenda || (c?.moedaPadrao ?? ''),
                         // marca por padrão as naturezas que a config habilita quando só uma;
@@ -383,10 +408,16 @@ export default function TabelaValoresTab() {
                     }}
                     className={inputCls + ((!form.categoria || editando) ? ' cursor-not-allowed opacity-60' : '')}
                   >
-                    <option value="" className="bg-zinc-900">{form.categoria ? 'Selecione um item' : 'Selecione uma categoria primeiro'}</option>
+                    <option value="" className="bg-zinc-900">
+                      {!form.categoria
+                        ? 'Selecione um tipo primeiro'
+                        : itensDaCategoria.length === 0
+                          ? (buscaItem ? 'Nenhum item encontrado para esta busca' : `Nenhum item ativo de ${tipoItemLabel(form.categoria).toLowerCase()}`)
+                          : 'Selecione um item'}
+                    </option>
                     {itensDaCategoria.map((c) => (
-                      <option key={c.id} value={c.id} className="bg-zinc-900">
-                        {c.mestre}{c.possuiCusto ? ' · custo' : ''}{c.possuiReceita ? ' · venda' : ''}
+                      <option key={c.itemCatalogoId} value={c.itemCatalogoId} className="bg-zinc-900">
+                        {c.mestre}{c.codigo ? ` · ${c.codigo}` : ''}
                       </option>
                     ))}
                   </select>
@@ -559,7 +590,14 @@ export default function TabelaValoresTab() {
             </div>
             <div className="flex items-center justify-end gap-2 border-t border-white/10 px-6 py-4">
               <button onClick={() => setModalAberto(false)} className="rounded-lg px-4 py-2 text-sm text-white/60 transition hover:text-white">Cancelar</button>
-              <button onClick={salvar} disabled={salvando} className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-blue-500 disabled:opacity-50">{salvando ? 'Salvando...' : 'Salvar'}</button>
+              {/* Sem item oficial selecionado não há o que salvar — o botão diz
+                  isso antes do clique, em vez de deixar o operador descobrir no erro. */}
+              <button
+                onClick={salvar}
+                disabled={salvando || (!form.itemCatalogoId && !form.configuracaoFinanceiraItemId)}
+                title={!form.itemCatalogoId && !form.configuracaoFinanceiraItemId ? 'Selecione o tipo e o item primeiro' : undefined}
+                className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-blue-500 disabled:opacity-50"
+              >{salvando ? 'Salvando...' : 'Salvar'}</button>
             </div>
           </div>
         </div>
