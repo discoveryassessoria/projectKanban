@@ -7,20 +7,22 @@
 
 import { prisma } from '@/lib/prisma'
 import { NaturezaItem, UnidadeItem } from '@prisma/client'
+import { garantirCategoriasServico, type CodeCategoriaServico } from './categorias-servico-oficiais'
 
 // --- Itens canônicos mínimos do domínio (identidade única) --------------------
-// code estável = chave de idempotência. Marco pode renomear name/categoria depois.
+// code estável = chave de idempotência. Categoria é REFERÊNCIA: declarada pelo
+// code imutável da categoria oficial e gravada como categoriaId.
 const ITENS_CANONICOS = [
-  { code: 'CERT_NASCIMENTO_IT', name: 'Certidão de Nascimento - Inteiro Teor', natureza: NaturezaItem.DOCUMENTO, categoria: 'Registro civil', unidade: UnidadeItem.DOCUMENTO, docCodes: ['IT - NAS', 'IT-NAS'] },
-  { code: 'CERT_CASAMENTO_IT',  name: 'Certidão de Casamento - Inteiro Teor',  natureza: NaturezaItem.DOCUMENTO, categoria: 'Registro civil', unidade: UnidadeItem.DOCUMENTO, docCodes: ['IT - CAS', 'IT-CAS'] },
-  { code: 'CERT_OBITO_IT',      name: 'Certidão de Óbito - Inteiro Teor',      natureza: NaturezaItem.DOCUMENTO, categoria: 'Registro civil', unidade: UnidadeItem.DOCUMENTO, docCodes: ['IT - OBI', 'IT-OBI'] },
+  { code: 'CERT_NASCIMENTO_IT', name: 'Certidão de Nascimento - Inteiro Teor', natureza: NaturezaItem.DOCUMENTO, categoriaCode: 'REGCIV' as CodeCategoriaServico, unidade: UnidadeItem.DOCUMENTO, docCodes: ['IT - NAS', 'IT-NAS'] },
+  { code: 'CERT_CASAMENTO_IT',  name: 'Certidão de Casamento - Inteiro Teor',  natureza: NaturezaItem.DOCUMENTO, categoriaCode: 'REGCIV' as CodeCategoriaServico, unidade: UnidadeItem.DOCUMENTO, docCodes: ['IT - CAS', 'IT-CAS'] },
+  { code: 'CERT_OBITO_IT',      name: 'Certidão de Óbito - Inteiro Teor',      natureza: NaturezaItem.DOCUMENTO, categoriaCode: 'REGCIV' as CodeCategoriaServico, unidade: UnidadeItem.DOCUMENTO, docCodes: ['IT - OBI', 'IT-OBI'] },
 ]
 
-async function upsertItem(i: typeof ITENS_CANONICOS[number]) {
+async function upsertItem(i: typeof ITENS_CANONICOS[number], categoriaId: number | null) {
   return prisma.itemCatalogo.upsert({
     where: { code: i.code },
-    update: { name: i.name, natureza: i.natureza, categoria: i.categoria, unidade: i.unidade, ativo: true },
-    create: { code: i.code, name: i.name, natureza: i.natureza, categoria: i.categoria, unidade: i.unidade, ativo: true },
+    update: { name: i.name, natureza: i.natureza, categoriaId, unidade: i.unidade, ativo: true },
+    create: { code: i.code, name: i.name, natureza: i.natureza, categoriaId, unidade: i.unidade, ativo: true },
   })
 }
 
@@ -28,8 +30,11 @@ async function main() {
   console.log('🗂️  Catálogo Mestre — migração idempotente\n')
   let ligTipos = 0, ligProdutos = 0, ligServicos = 0
 
+  // Categorias oficiais primeiro: o item referencia por id, nunca por texto.
+  const categorias = await garantirCategoriasServico(prisma)
+
   for (const i of ITENS_CANONICOS) {
-    const item = await upsertItem(i)
+    const item = await upsertItem(i, categorias.get(i.categoriaCode) ?? null)
     console.log(`• item #${item.id} ${item.code} — ${item.name}`)
 
     // LIGA TipoDocumentoCadastro (por code, tolerando com/sem espaços)

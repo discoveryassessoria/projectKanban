@@ -101,9 +101,26 @@ const semAcento = (s: string) => s.normalize('NFD').replace(/[\u0300-\u036f]/g, 
 
 interface PosMenu { left: number; top: number; width: number; maxH: number; acima: boolean }
 
+/**
+ * Opção ESPECIAL fixada no topo da lista (opt-in). Serve para um valor que não é
+ * um registro do cadastro — tipicamente "Todas", que significa aplicação global.
+ *
+ * O componente NÃO conhece a regra: ele só desenha o estado e avisa o clique.
+ * Quem decide o que "Todas" faz com a seleção individual é o dono do formulário,
+ * pela sua fonte única pura — aqui não existe segunda cópia da regra.
+ */
+export interface OpcaoEspecial {
+  label: string
+  /** Ligada? Quando ligada, as opções individuais aparecem apagadas. */
+  ativa: boolean
+  /** Clique na opção (na lista ou no "x" do chip). */
+  onToggle: () => void
+  hint?: string
+}
+
 export function MultiSelect({
   opcoes, selecionados, onChange, placeholder = 'Selecionar…', dicaVazio, vazioMsg = 'Nenhum registro cadastrado.', id,
-  busca = false, acoes = false, buscaPlaceholder = 'Filtrar…',
+  busca = false, acoes = false, buscaPlaceholder = 'Filtrar…', especial,
 }: {
   opcoes: OpcaoMulti[]
   selecionados: number[]
@@ -117,6 +134,8 @@ export function MultiSelect({
   /** Botões "Selecionar todas" / "Limpar seleção" (opt-in). */
   acoes?: boolean
   buscaPlaceholder?: string
+  /** Opção especial fixada no topo (ex.: "Todas" = aplicação global). */
+  especial?: OpcaoEspecial
 }) {
   const [aberto, setAberto] = React.useState(false)
   const [foco, setFoco] = React.useState(0)
@@ -246,6 +265,22 @@ export function MultiSelect({
           <button type="button" onClick={() => onChange([])} className="text-white/60 transition hover:text-white">Limpar seleção</button>
         </div>
       )}
+      {especial && (
+        // FIXADA no topo: não some com o filtro da busca, porque não é um
+        // registro do cadastro — é o modo de aplicação do item.
+        <div className="shrink-0 border-b border-white/10 p-1">
+          <button
+            type="button" role="option" aria-selected={especial.ativa} onClick={especial.onToggle}
+            className={`flex w-full cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm transition hover:bg-white/10 ${especial.ativa ? 'text-white' : 'text-white/70'}`}
+          >
+            <span className="grid h-4 w-4 shrink-0 place-items-center rounded border" style={especial.ativa ? { background: OURO, borderColor: OURO } : { borderColor: 'rgba(255,255,255,0.25)' }}>
+              {especial.ativa && <Check className="h-3 w-3 text-[#1b1508]" />}
+            </span>
+            <span className="truncate font-medium">{especial.label}</span>
+            {especial.hint && <span className="ml-auto shrink-0 text-[10px] text-white/35">{especial.hint}</span>}
+          </button>
+        </div>
+      )}
       <ul ref={listaRef} id={idLista} role="listbox" aria-multiselectable tabIndex={-1} className="min-h-0 flex-1 overflow-y-auto p-1">
         {opcoes.length === 0 ? (
           <li className="px-2 py-2 text-[11px] text-white/35">{vazioMsg}</li>
@@ -256,7 +291,10 @@ export function MultiSelect({
           return (
             <li key={o.id} data-i={i} role="option" aria-selected={on}
               onMouseEnter={() => setFoco(i)} onClick={() => alternar(o.id)}
-              className={`flex cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 text-sm transition ${foco === i ? 'bg-white/10' : ''} ${on ? 'text-white' : 'text-white/70'}`}
+              // Com a opção especial ligada, as individuais ficam apagadas — mas
+              // continuam CLICÁVEIS: clicar em uma é justamente como se sai do
+              // modo especial (quem trata isso é o `onChange` do formulário).
+              className={`flex cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 text-sm transition ${foco === i ? 'bg-white/10' : ''} ${on ? 'text-white' : 'text-white/70'} ${especial?.ativa ? 'opacity-45' : ''}`}
             >
               <span className="grid h-4 w-4 shrink-0 place-items-center rounded border" style={on ? { background: OURO, borderColor: OURO } : { borderColor: 'rgba(255,255,255,0.25)' }}>
                 {on && <Check className="h-3 w-3 text-[#1b1508]" />}
@@ -278,15 +316,27 @@ export function MultiSelect({
         onClick={() => (aberto ? fechar() : abrir())} onKeyDown={teclado}
         className={`${INPUT} flex items-center justify-between gap-2 text-left`}
       >
-        <span className={escolhidos.length ? 'text-white/85' : 'text-white/30'}>
-          {escolhidos.length ? `${escolhidos.length} selecionado${escolhidos.length > 1 ? 's' : ''}` : placeholder}
+        <span className={especial?.ativa || escolhidos.length ? 'text-white/85' : 'text-white/30'}>
+          {especial?.ativa
+            ? especial.label
+            : escolhidos.length ? `${escolhidos.length} selecionado${escolhidos.length > 1 ? 's' : ''}` : placeholder}
         </span>
         <ChevronDown className={`h-4 w-4 shrink-0 text-white/40 transition ${aberto ? 'rotate-180' : ''}`} />
       </button>
 
       {menu}
 
-      {escolhidos.length > 0 ? (
+      {/* A opção especial ocupa o lugar dos chips: ligada, ela É a seleção. */}
+      {especial?.ativa ? (
+        <div className="mt-2 flex flex-wrap gap-1.5">
+          <span className="inline-flex items-center gap-1 rounded-md border px-2 py-0.5 text-xs" style={{ background: `${OURO}1f`, borderColor: `${OURO}55`, color: OURO }}>
+            {especial.label}
+            <button type="button" aria-label={`Remover ${especial.label}`} onClick={especial.onToggle} className="opacity-70 transition hover:opacity-100">
+              <X className="h-3 w-3" />
+            </button>
+          </span>
+        </div>
+      ) : escolhidos.length > 0 ? (
         <div className="mt-2 flex flex-wrap gap-1.5">
           {escolhidos.map((o) => (
             <span key={o.id} className="inline-flex items-center gap-1 rounded-md border px-2 py-0.5 text-xs" style={{ background: `${OURO}1f`, borderColor: `${OURO}55`, color: OURO }}>

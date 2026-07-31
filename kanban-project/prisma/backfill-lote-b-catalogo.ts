@@ -18,7 +18,7 @@ async function main() {
     console.log(`[backfill:lote-b] ${execute ? 'EXECUÇÃO REAL' : 'DRY-RUN'}`)
 
     const [servicos, produtos] = await Promise.all([
-      prisma.servicoProduto.findMany({ select: { id: true, code: true, name: true, category: true, itemCatalogoId: true } }),
+      prisma.servicoProduto.findMany({ select: { id: true, code: true, name: true, itemCatalogoId: true } }),
       prisma.produtoFinanceiro.findMany({ select: { id: true, codigo: true, nome: true, itemCatalogoId: true } }),
     ])
 
@@ -40,7 +40,7 @@ async function main() {
       await prisma.$transaction(async (tx) => {
         const item = await tx.itemCatalogo.upsert({
           where: { code: u.code },
-          create: { code: u.code, name: u.name, natureza: NaturezaItem.SERVICO, categoria: u.categoria },
+          create: { code: u.code, name: u.name, natureza: NaturezaItem.SERVICO },
           update: {},
           select: { id: true },
         })

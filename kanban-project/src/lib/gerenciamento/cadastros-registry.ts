@@ -22,6 +22,11 @@ export interface CampoSpec {
   ajuda?: string
   /** não editável depois de criado (identidade estável) */
   imutavel?: boolean
+  /**
+   * Campo administrado pelo SISTEMA: aparece só para leitura e nunca é aceito
+   * do cliente. Usado pelo `code` (gerado do nome) e pela `ordem` (posição).
+   */
+  somenteLeitura?: boolean
   /** largura no formulário */
   largura?: "meia" | "cheia"
 }
@@ -34,6 +39,8 @@ export interface CadastroSpec {
   /** delegate do Prisma (nome da propriedade em prisma.*) */
   model: string
   titulo: string
+  /** Nome do registro no singular, para o título do modal ("Nova <singular>"). */
+  singular?: string
   descricao: string
   /** rótulo do botão de criação */
   novoLabel: string
@@ -41,6 +48,23 @@ export interface CadastroSpec {
   campos: CampoSpec[]
   /** campo usado para gerar `code` automaticamente quando vazio */
   codeDe?: string
+  /**
+   * Campo textual que IDENTIFICA o registro para o operador. Duplicidade é
+   * recusada por equivalência semântica (sem caixa, acento ou espaço excedente).
+   */
+  identidade?: string
+  /**
+   * Posição administrada pelo sistema: nasce no fim e é reordenada por arrasto
+   * (ou pelos botões de mover). O operador nunca digita número de ordem.
+   */
+  ordenavel?: boolean
+  /** Nome da entidade na trilha de auditoria. Sem isto, não se audita. */
+  auditoria?: string
+  /**
+   * Vínculos que IMPEDEM exclusão física. Havendo qualquer um, a API recusa a
+   * exclusão e orienta a inativar — o histórico nunca é quebrado.
+   */
+  protegerExclusao?: { model: string; campo: string; rotulo: string }[]
   /** ordenação padrão da listagem */
   ordenarPor?: { campo: string; direcao: "asc" | "desc" }[]
   /** relação N:N gerida junto do registro (ex.: membros do grupo) */
@@ -67,7 +91,9 @@ export const FONTES: Record<string, { model: string; valor: string; label: strin
 }
 
 const CAMPOS_BASE: CampoSpec[] = [
-  { key: "code", label: "Código", tipo: "text", ajuda: "Gerado do nome quando vazio. Não muda depois de criado.", imutavel: true, largura: "meia" },
+  // Código é do SISTEMA em todos os cadastros: gerado do nome na criação,
+  // exibido só para leitura e imutável depois — identidade não segue rótulo.
+  { key: "code", label: "Código", tipo: "text", ajuda: "Gerado automaticamente a partir do nome. Identificador oficial e imutável.", imutavel: true, somenteLeitura: true, largura: "meia" },
   { key: "ativo", label: "Ativo", tipo: "bool", largura: "meia" },
 ]
 
@@ -104,21 +130,31 @@ export const CADASTROS: Record<string, CadastroSpec> = {
     entidade: "categorias-servico",
     model: "categoriaServico",
     titulo: "Categorias de Serviço",
+    singular: "categoria de serviço",
     descricao:
       "Organizam o Catálogo de Serviços. Categoria não guarda preço — valores pertencem exclusivamente à Tabela de Valores do Financeiro.",
     novoLabel: "+ Nova categoria",
+    // Identidade e ordem são do SISTEMA: o operador digita nome e descrição, e
+    // mais nada. Código sai do nome; posição sai do arrasto na listagem.
     codeDe: "nome",
+    identidade: "nome",
+    ordenavel: true,
+    auditoria: "CategoriaServico",
+    protegerExclusao: [
+      { model: "itemCatalogo", campo: "categoriaId", rotulo: "itens do catálogo" },
+    ],
     ordenarPor: [{ campo: "ordem", direcao: "asc" }, { campo: "nome", direcao: "asc" }],
     colunas: [
-      { key: "ordem", label: "Ordem" },
       { key: "nome", label: "Categoria" },
       { key: "code", label: "Código" },
       { key: "descricao", label: "Descrição" },
     ],
     campos: [
       { key: "nome", label: "Nome da categoria", tipo: "text", obrigatorio: true, largura: "cheia" },
-      { key: "descricao", label: "Descrição", tipo: "textarea", largura: "cheia" },
-      { key: "ordem", label: "Ordem", tipo: "number", largura: "meia" },
+      {
+        key: "descricao", label: "Descrição", tipo: "textarea", largura: "cheia",
+        ajuda: "O que esta categoria agrupa no Catálogo de Serviços.",
+      },
       ...CAMPOS_BASE,
     ],
   },
@@ -131,18 +167,27 @@ export const CADASTROS: Record<string, CadastroSpec> = {
     descricao:
       "Classificam as entidades institucionais (cartório, consulado, tribunal, banco, tradutor, parceiro…). Uma organização pode ter várias categorias — não se cria cadastro separado por tipo de órgão.",
     novoLabel: "+ Nova categoria",
+    // Identidade e ordem são do SISTEMA: o operador digita nome e descrição, e
+    // mais nada. Código sai do nome; posição sai do arrasto na listagem.
     codeDe: "nome",
+    identidade: "nome",
+    ordenavel: true,
+    auditoria: "CategoriaServico",
+    protegerExclusao: [
+      { model: "itemCatalogo", campo: "categoriaId", rotulo: "itens do catálogo" },
+    ],
     ordenarPor: [{ campo: "ordem", direcao: "asc" }, { campo: "nome", direcao: "asc" }],
     colunas: [
-      { key: "ordem", label: "Ordem" },
       { key: "nome", label: "Categoria" },
       { key: "code", label: "Código" },
       { key: "descricao", label: "Descrição" },
     ],
     campos: [
       { key: "nome", label: "Nome da categoria", tipo: "text", obrigatorio: true, largura: "cheia" },
-      { key: "descricao", label: "Descrição", tipo: "textarea", largura: "cheia" },
-      { key: "ordem", label: "Ordem", tipo: "number", largura: "meia" },
+      {
+        key: "descricao", label: "Descrição", tipo: "textarea", largura: "cheia",
+        ajuda: "O que esta categoria agrupa no Catálogo de Serviços.",
+      },
       ...CAMPOS_BASE,
     ],
   },

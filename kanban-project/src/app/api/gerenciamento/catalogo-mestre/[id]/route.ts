@@ -6,6 +6,7 @@ import { verificarPermissao } from '@/src/lib/verificar-permissao'
 import { registrarAuditoria } from '@/lib/gerenciamento/auditoria'
 import { NaturezaItem, UnidadeItem } from '@prisma/client'
 import { NATUREZAS_ITEM_OFICIAIS } from '@/lib/financeiro/catalogo-oficial'
+import { resolverCategoriaServico } from '@/src/services/categoria-servico-ref'
 
 function toStrOrNull(v: any): string | null {
   if (v === undefined || v === null) return null
@@ -26,7 +27,11 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
     if (b.code !== undefined) data.code = toStrOrNull(b.code)
     if (b.name !== undefined) data.name = toStrOrNull(b.name)
     if (b.descricao !== undefined) data.descricao = toStrOrNull(b.descricao)
-    if (b.categoria !== undefined) data.categoria = toStrOrNull(b.categoria)
+    const categoria = await resolverCategoriaServico(b)
+    if (categoria.erros.length) {
+      return NextResponse.json({ error: categoria.erros[0].mensagem, erros: categoria.erros }, { status: 400 })
+    }
+    if (categoria.declarado) data.categoriaId = categoria.categoriaId
     if (b.natureza !== undefined && b.natureza !== null) {
       if (!NATUREZAS.includes(b.natureza)) {
         return NextResponse.json({ error: `Natureza "${b.natureza}" não existe mais no Cadastro Mestre. Use uma das oficiais: ${NATUREZAS.join(', ')}.` }, { status: 400 })

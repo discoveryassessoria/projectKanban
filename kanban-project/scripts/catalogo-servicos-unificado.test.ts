@@ -51,9 +51,12 @@ const conta = (c: Partial<{ tiposDocumento: number; produtos: number; servicos: 
 {
   // serviço com espelho no mestre (id 100) + o próprio espelho vindo do mestre
   const servicos = [svc({
-    id: 1, name: 'Tradução Juramentada', publicCode: 'SRV-1', category: 'traducao',
-    nationality: 'italiano', itemCatalogoId: 100,
-    itemCatalogo: { id: 100, natureza: 'SERVICO', unidade: 'PAGINA', _count: conta({ servicos: 1, produtos: 1, precos: 2 }) },
+    id: 1, name: 'Tradução Juramentada', publicCode: 'SRV-1', itemCatalogoId: 100,
+    itemCatalogo: {
+      id: 100, natureza: 'SERVICO', unidade: 'PAGINA',
+      categoriaId: 7, categoria: { id: 7, nome: 'Registro Civil' },
+      _count: conta({ servicos: 1, produtos: 1, precos: 2 }),
+    },
   })]
   const itens = [
     item({ id: 100, name: 'Tradução Juramentada', natureza: 'SERVICO', unidade: 'PAGINA', _count: conta({ servicos: 1, produtos: 1, precos: 2 }) }),
@@ -110,12 +113,15 @@ secao('3) "Comercializável pertinente" por estrutura')
     ],
     servicos: [svc({ id: 3, name: 'Apostilamento', itemCatalogo: { id: 5, natureza: 'SERVICO', _count: conta({ servicos: 1 }) } })],
   })
-  ok('escopo comercial exibe só o que é cobrável', filtrarCatalogo(linhas, { escopo: 'comercial' }).map((l) => l.nome).sort().join(',') === 'Apostilamento,Taxa consular')
-  ok('escopo técnico exibe o restante do MESMO cadastro', filtrarCatalogo(linhas, { escopo: 'tecnico' }).map((l) => l.nome).join(',') === 'Certidão')
+  // REGRA ATUAL: "Comercializáveis" é a família de VENDA (serviço/pacote), não
+  // "tudo que tem preço". Taxa e certidão precificadas são itens COBRADOS
+  // RELACIONADOS — preço não transforma documento em serviço.
+  ok('escopo comercial exibe só serviços e pacotes vendidos', filtrarCatalogo(linhas, { escopo: 'comercial' }).map((l) => l.nome).join(',') === 'Apostilamento')
+  ok('itens cobrados relacionados ficam na outra aba', filtrarCatalogo(linhas, { escopo: 'relacionados' }).map((l) => l.nome).sort().join(',') === 'Certidão,Taxa consular')
   ok('escopo todos não perde nenhuma linha', filtrarCatalogo(linhas, { escopo: 'todos' }).length === 3)
-  ok('escopo padrão é o comercial', filtrarCatalogo(linhas).length === 2)
+  ok('escopo padrão é o comercial', filtrarCatalogo(linhas).length === 1)
   const c = contarPorEscopo(linhas)
-  ok('contagem por escopo fecha com o total', c.comercial + c.tecnico === c.todos && c.todos === 3)
+  ok('contagem por escopo fecha com o total', c.comercial + c.relacionados === c.todos && c.todos === 3)
   ok('busca acento-insensível por nome', filtrarCatalogo(linhas, { escopo: 'todos', busca: 'certidao' }).length === 1)
   ok('busca alcança o tipo de negócio', filtrarCatalogo(linhas, { escopo: 'todos', busca: 'taxa' }).length === 1)
 }

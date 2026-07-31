@@ -21,22 +21,22 @@
 // Backend: /api/gerenciamento/produtos-servicos (serviços) e
 //          /api/gerenciamento/catalogo-mestre (itens técnicos do mesmo mestre).
 
-import { useState, useEffect, useMemo, useCallback } from 'react'
+import { Fragment, useState, useEffect, useMemo, useCallback } from 'react'
 import { usePermissoes } from '@/src/hooks/use-permissoes'
 import { ExclusaoDefinitivaModal } from './ExclusaoDefinitivaModal'
 import { CodigoPublicoField } from './CodigoPublicoField'
 import {
-  unificarCatalogo, filtrarCatalogo, contarPorEscopo,
-  rotuloTipo, TIPOS_CADASTRAVEIS, ESCOPOS,
+  unificarCatalogo, filtrarCatalogo, contarPorEscopo, rotuloTerritorio,
+  agruparParaExibicao, rotuloTipo, TIPOS_CADASTRAVEIS, ESCOPOS,
   type ItemUnificado, type EscopoCatalogo, type ServicoBruto, type ItemMestreBruto,
+  type FiltroPais, type CategoriaRef,
 } from '@/lib/gerenciamento/catalogo-servicos'
-
-// Nacionalidades/modalidades aplicáveis ao serviço (conjunto operacional fixo).
-const NACIONALIDADES: [string, string][] = [
-  ['all', 'Todas'], ['italiano', 'Italiana'], ['espanhol', 'Espanhola'],
-  ['portugues', 'Portuguesa'], ['alemao', 'Alemã'],
-]
-const nacLabel = (v: string) => NACIONALIDADES.find(([k]) => k === v)?.[1] || v || '—'
+import {
+  marcarTodas, alternarTodas, definirPaises, estadoTerritorial,
+  ROTULO_TODAS, ROTULO_GLOBAL, ROTULO_SEM_APLICACAO,
+  type SelecaoTerritorial, type PaisAplicavel,
+} from '@/lib/gerenciamento/aplicacao-territorial'
+import { MultiSelect } from './pagamentoUI'
 
 async function jsonFetch(url: string, options: RequestInit = {}) {
   const token = typeof window !== 'undefined' ? localStorage.getItem('authToken') : null
@@ -60,9 +60,15 @@ export default function ProdutosServicosTab() {
   const [servicos, setServicos] = useState<ServicoBruto[]>([])
   const [itens, setItens] = useState<ItemMestreBruto[]>([])
   const [unidades, setUnidades] = useState<string[]>([])
+  // Cadastro OFICIAL de Países e Regiões — a tela não mantém lista própria.
+  const [paisesCatalogo, setPaisesCatalogo] = useState<PaisAplicavel[]>([])
+  // Cadastro OFICIAL de Categorias de Serviço — idem: sem lista própria na tela.
+  const [categoriasCatalogo, setCategoriasCatalogo] = useState<CategoriaRef[]>([])
   const [loading, setLoading] = useState(true)
   const [erroLista, setErroLista] = useState<string | null>(null)
   const [busca, setBusca] = useState('')
+  const [filtroPais, setFiltroPais] = useState<FiltroPais>(null)
+  const [filtroCategoria, setFiltroCategoria] = useState<number | null>(null)
   const [escopo, setEscopo] = useState<EscopoCatalogo>('comercial')
 
   const [modalAberto, setModalAberto] = useState(false)
@@ -74,10 +80,13 @@ export default function ProdutosServicosTab() {
   // = registro operacional; demais = item técnico). Não há terceira via.
   const [tipo, setTipo] = useState<string>('SERVICO')
   const [name, setName] = useState('')
-  const [category, setCategory] = useState('')
+  // Categoria do formulário: o ID oficial. Não existe caixa de texto de categoria.
+  const [categoriaId, setCategoriaId] = useState<number | null>(null)
   const [descricao, setDescricao] = useState('')
   const [unidade, setUnidade] = useState('')
-  const [nationality, setNationality] = useState('all')
+  // Aplicação territorial do formulário — estado ÚNICO ("Todas" e a lista de
+  // países são a mesma informação, nunca dois campos que podem divergir).
+  const [territorio, setTerritorio] = useState<SelecaoTerritorial>(marcarTodas())
   const [ativo, setAtivo] = useState(true)
   const [salvando, setSalvando] = useState(false)
   const [erroModal, setErroModal] = useState<string | null>(null)
@@ -93,6 +102,8 @@ export default function ProdutosServicosTab() {
   }, [])
   const aplicar = useCallback((d: { s: any; m: any }) => {
     setServicos(d.s?.servicos || [])
+    setPaisesCatalogo(d.s?.paisesCatalogo || [])
+    setCategoriasCatalogo(d.s?.categoriasCatalogo || [])
     setItens(d.m?.itens || [])
     setUnidades(d.m?.unidades || [])
   }, [])
@@ -119,24 +130,34 @@ export default function ProdutosServicosTab() {
   // Derivados: unificação + filtro vêm da fonte única pura.
   const linhas = useMemo(() => unificarCatalogo({ servicos, itens }), [servicos, itens])
   const contagem = useMemo(() => contarPorEscopo(linhas), [linhas])
-  const filtrados = useMemo(() => filtrarCatalogo(linhas, { escopo, busca }), [linhas, escopo, busca])
+  const filtrados = useMemo(
+    () => filtrarCatalogo(linhas, { escopo, busca, pais: filtroPais, categoriaId: filtroCategoria }),
+    [linhas, escopo, busca, filtroPais, filtroCategoria],
+  )
+  // Na aba "Todos" a lista sai SEPARADA por família (venda × itens relacionados);
+  // nas demais, uma seção só — o recorte já é a própria família.
+  const secoes = useMemo(
+    () => (escopo === 'todos' ? agruparParaExibicao(filtrados) : [{ grupo: null, titulo: '', ajuda: '', linhas: filtrados }]),
+    [escopo, filtrados],
+  )
 
   const ehServico = tipo === 'SERVICO'
 
   function abrirNovo() {
     setEditando(null)
     setTipo('SERVICO')
-    setName(''); setCategory(''); setDescricao(''); setUnidade(''); setNationality('all'); setAtivo(true)
+    setName(''); setCategoriaId(null); setDescricao(''); setUnidade(''); setTerritorio(marcarTodas()); setAtivo(true)
     setErroModal(null); setModalAberto(true)
   }
   function abrirEditar(l: ItemUnificado) {
     setEditando(l)
     // Serviço não troca de tipo: o registro operacional é, por definição, serviço.
     setTipo(l.origem === 'servico' ? 'SERVICO' : l.natureza)
-    setName(l.nome); setCategory(l.categoria || '')
+    setName(l.nome); setCategoriaId(l.categoriaId)
     setDescricao(l.descricao || '')
     setUnidade(l.unidade || '')
-    setNationality(l.nacionalidade || 'all'); setAtivo(l.ativo)
+    // EDIÇÃO PRESERVA A SELEÇÃO: vem da relação real, não do campo legado.
+    setTerritorio(l.territorio ?? marcarTodas()); setAtivo(l.ativo)
     setErroModal(null); setModalAberto(true)
   }
 
@@ -149,10 +170,12 @@ export default function ProdutosServicosTab() {
       if (tipo === 'SERVICO' && (!editando || editando.origem === 'servico')) {
         const body = JSON.stringify({
           name: name.trim(),
-          category: category.trim() || null,
+          categoriaId,
           descricao: descricao.trim() || null,
           unidadePadrao: unidade || null,
-          nationality,
+          // Modelo oficial: indicador de global + ids do cadastro. Nada de texto.
+          aplicacaoGlobal: territorio.global,
+          paises: territorio.paisIds,
           ativo,
         })
         if (editando) await jsonFetch(`${URL_SERVICOS}/${editando.id}`, { method: 'PUT', body })
@@ -160,7 +183,7 @@ export default function ProdutosServicosTab() {
       } else {
         const body = JSON.stringify({
           name: name.trim(),
-          categoria: category.trim() || null,
+          categoriaId,
           descricao: descricao.trim() || null,
           natureza: tipo,
           unidade: unidade || undefined,
@@ -232,9 +255,34 @@ export default function ProdutosServicosTab() {
         <input
           value={busca}
           onChange={(e) => setBusca(e.target.value)}
-          placeholder="Buscar por código (SRV-n), nome, categoria ou tipo..."
+          placeholder="Buscar por código (SRV-n), nome ou descrição..."
           className="min-w-[240px] flex-1 rounded-lg border border-white/10 bg-white/5 px-4 py-2 text-sm text-white placeholder-white/30 outline-none backdrop-blur focus:border-white/20"
         />
+        {/* Filtros por REFERÊNCIA: categoria e país entram por id, nunca por texto. */}
+        <select
+          value={filtroCategoria == null ? '' : String(filtroCategoria)}
+          onChange={(e) => setFiltroCategoria(e.target.value === '' ? null : Number(e.target.value))}
+          className="rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-white outline-none backdrop-blur focus:border-white/20"
+          title="Filtrar por categoria"
+        >
+          <option value="" className="bg-zinc-900">Todas as categorias</option>
+          {categoriasCatalogo.map((c) => (
+            <option key={c.id} value={c.id} className="bg-zinc-900">{c.nome}</option>
+          ))}
+        </select>
+        {/* Filtro territorial: item global casa com QUALQUER país escolhido. */}
+        <select
+          value={filtroPais === null ? '' : String(filtroPais)}
+          onChange={(e) => setFiltroPais(e.target.value === '' ? null : e.target.value === 'global' ? 'global' : Number(e.target.value))}
+          className="rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-white outline-none backdrop-blur focus:border-white/20"
+          title="Filtrar por aplicação territorial"
+        >
+          <option value="" className="bg-zinc-900">Todos os territórios</option>
+          <option value="global" className="bg-zinc-900">Só aplicação global</option>
+          {paisesCatalogo.map((p) => (
+            <option key={p.id} value={p.id} className="bg-zinc-900">{p.countryLabel}</option>
+          ))}
+        </select>
       </div>
 
       {loading && <div className="py-12 text-center text-sm text-white/40">Carregando...</div>}
@@ -248,7 +296,13 @@ export default function ProdutosServicosTab() {
 
       {!loading && !erroLista && filtrados.length === 0 && (
         <div className="rounded-xl border border-white/10 bg-white/5 py-12 text-center text-sm text-white/40 backdrop-blur">
-          {busca ? 'Nenhum item encontrado.' : escopo === 'tecnico' ? 'Nenhum item técnico sem cobrança.' : 'Nenhum item ainda. Crie o primeiro.'}
+          {busca || filtroPais !== null
+            ? 'Nenhum item encontrado.'
+            : escopo === 'relacionados'
+              ? 'Nenhum item cobrado relacionado.'
+              : escopo === 'comercial'
+                ? 'Nenhum serviço ou pacote comercializável ainda.'
+                : 'Nenhum item ainda. Crie o primeiro.'}
         </div>
       )}
 
@@ -260,6 +314,7 @@ export default function ProdutosServicosTab() {
                 <th className="border-b border-white/10 px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wide text-white/50">Código</th>
                 <th className="border-b border-white/10 px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wide text-white/50">Nome</th>
                 <th className="border-b border-white/10 px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wide text-white/50">Tipo</th>
+                <th className="border-b border-white/10 px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wide text-white/50">Aplicação</th>
                 <th className="border-b border-white/10 px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wide text-white/50">Categoria</th>
                 <th className="border-b border-white/10 px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wide text-white/50">Unidade</th>
                 <th className="border-b border-white/10 px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wide text-white/50">Vínculos</th>
@@ -268,17 +323,39 @@ export default function ProdutosServicosTab() {
               </tr>
             </thead>
             <tbody>
-              {filtrados.map((l) => (
+              {secoes.map((s) => (
+                <Fragment key={s.grupo ?? 'unico'}>
+                  {/* Cabeçalho de FAMÍLIA: só na aba "Todos". É o que impede ler
+                      documento como serviço quando as duas famílias convivem. */}
+                  {s.grupo && (
+                    <tr>
+                      <td colSpan={9} className="border-b border-white/10 bg-white/[0.07] px-4 py-2">
+                        <div className="text-[11px] font-semibold uppercase tracking-wide text-white/70">{s.titulo}</div>
+                        <div className="text-[11px] text-white/40">{s.ajuda}</div>
+                      </td>
+                    </tr>
+                  )}
+                  {s.linhas.map((l) => (
                 <tr key={l.chave} className="border-b border-white/5 last:border-0 hover:bg-white/[0.03]">
                   <td className="px-4 py-2.5 font-mono text-[12px] font-bold text-white/90">{l.codigo ?? '—'}</td>
                   <td className="px-4 py-2.5">
                     <div className="font-medium text-white">{l.nome}</div>
                     {l.descricao && <div className="text-[11px] text-white/40">{l.descricao}</div>}
-                    {l.origem === 'servico' && l.nacionalidade && l.nacionalidade !== 'all' && (
-                      <div className="text-[11px] text-white/40">{nacLabel(l.nacionalidade)}</div>
+                    {/* Documento no catálogo é REFERÊNCIA ao Documento Mestre. A
+                        linha diz de onde ele vem — ou denuncia que não veio de lá. */}
+                    {l.documentoMestreVinculado === true && (
+                      <div className="text-[11px] text-white/40">Referência ao Documento Mestre · Documentos e Protocolos</div>
+                    )}
+                    {l.documentoMestreVinculado === false && (
+                      <div className="text-[11px] text-amber-300/70">Sem vínculo com Documentos e Protocolos — cadastre o documento oficial lá e vincule</div>
                     )}
                   </td>
-                  <td className="px-4 py-2.5 text-white/70">{l.tipo}</td>
+                  <td className="px-4 py-2.5">
+                    <span className={`rounded px-2 py-0.5 text-[11px] font-medium ${l.grupo === 'servico_pacote' ? 'bg-blue-500/15 text-blue-200' : 'bg-white/10 text-white/70'}`}>
+                      {l.tipo}
+                    </span>
+                  </td>
+                  <td className="px-4 py-2.5 text-white/70">{rotuloTerritorio(l, paisesCatalogo) ?? '—'}</td>
                   <td className="px-4 py-2.5 text-white/70">{l.categoria || '—'}</td>
                   <td className="px-4 py-2.5 text-white/70">{l.unidade || '—'}</td>
                   <td className="px-4 py-2.5">
@@ -298,6 +375,8 @@ export default function ProdutosServicosTab() {
                     </div>
                   </td>
                 </tr>
+                  ))}
+                </Fragment>
               ))}
             </tbody>
           </table>
@@ -345,17 +424,50 @@ export default function ProdutosServicosTab() {
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                 <div>
                   <label className="mb-1 block text-xs text-white/60">Categoria</label>
-                  <input value={category} onChange={(e) => setCategory(e.target.value)} placeholder="cidadania, traducao, apostilamento..." className={inputCls} />
+                  <select
+                    value={categoriaId == null ? '' : String(categoriaId)}
+                    onChange={(e) => setCategoriaId(e.target.value === '' ? null : Number(e.target.value))}
+                    className={inputCls}
+                  >
+                    <option value="" className="bg-zinc-900">— sem categoria</option>
+                    {categoriasCatalogo.map((c) => (
+                      <option key={c.id} value={c.id} className="bg-zinc-900">{c.nome}</option>
+                    ))}
+                  </select>
                 </div>
-                {ehServico && (
-                  <div>
-                    <label className="mb-1 block text-xs text-white/60">Nacionalidade / modalidade</label>
-                    <select value={nationality} onChange={(e) => setNationality(e.target.value)} className={inputCls}>
-                      {NACIONALIDADES.map(([k, label]) => <option key={k} value={k} className="bg-zinc-900">{label}</option>)}
-                    </select>
-                  </div>
-                )}
               </div>
+
+              {ehServico && (
+                <div>
+                  <label className="mb-1 block text-xs text-white/60">Países/Regiões aplicáveis</label>
+                  <MultiSelect
+                    busca
+                    buscaPlaceholder="Buscar país…"
+                    placeholder="Selecionar países…"
+                    vazioMsg="Nenhum país cadastrado em Países e Regiões."
+                    opcoes={paisesCatalogo.map((p) => ({
+                      id: p.id,
+                      label: p.flag ? `${p.flag} ${p.countryLabel}` : p.countryLabel,
+                    }))}
+                    selecionados={territorio.paisIds}
+                    // A REGRA vive na fonte única pura: a tela só encaminha o evento.
+                    onChange={(ids) => setTerritorio((t) => definirPaises(t, ids))}
+                    especial={{
+                      label: ROTULO_TODAS,
+                      ativa: territorio.global,
+                      hint: 'aplicação global',
+                      onToggle: () => setTerritorio((t) => alternarTodas(t)),
+                    }}
+                  />
+                  <p className="mt-1 text-[11px] text-white/35">
+                    {estadoTerritorial(territorio) === 'global'
+                      ? `${ROTULO_GLOBAL} — inclusive os que forem cadastrados depois. Nenhum vínculo individual é criado.`
+                      : estadoTerritorial(territorio) === 'sem_aplicacao'
+                        ? `${ROTULO_SEM_APLICACAO}.`
+                        : 'Vale exatamente para os países selecionados.'}
+                  </p>
+                </div>
+              )}
 
               <div>
                 <label className="mb-1 block text-xs text-white/60">Descrição</label>

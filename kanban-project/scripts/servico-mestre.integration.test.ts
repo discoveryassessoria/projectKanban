@@ -20,9 +20,9 @@ async function main() {
     await prisma.$transaction(async (tx) => {
       const code = `TEST_SRV_${Date.now()}`
       // (1) cadastrar serviço pelo MESMO caminho da API (dual-write ItemCatalogo)
-      const itemCatalogoId = await sincronizarItemDeServico(tx as never, { code, name: 'Serviço de Teste', category: 'teste' })
+      const itemCatalogoId = await sincronizarItemDeServico(tx as never, { code, name: 'Serviço de Teste', categoriaId: null })
       const servico = await tx.servicoProduto.create({
-        data: { code, name: 'Serviço de Teste', category: 'teste', descricao: 'desc', unidadePadrao: 'UNIDADE', nationality: 'all', ativo: true, itemCatalogoId },
+        data: { code, name: 'Serviço de Teste', descricao: 'desc', unidadePadrao: 'UNIDADE', aplicacaoGlobal: true, ativo: true, itemCatalogoId },
       })
       ok(servico.id > 0 && servico.itemCatalogoId === itemCatalogoId, '(1) Serviço criado e espelhado no ItemCatalogo')
       ok(servico.descricao === 'desc' && servico.unidadePadrao === 'UNIDADE', '(1b) campos operacionais (descrição/unidade) gravados')

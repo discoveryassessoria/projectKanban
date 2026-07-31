@@ -20,6 +20,12 @@ export interface Consulta {
   /** Prontos para o Prisma: `skip`/`take` só quando há paginação explícita. */
   skip: number | undefined
   take: number | undefined
+  /**
+   * Filtros por REFERÊNCIA ESTRUTURAL. Toda entidade se filtra por ID: qualquer
+   * query param terminado em `Id` com inteiro positivo entra aqui. Filtrar por
+   * nome/label de cadastro não é oferecido em lugar nenhum da camada.
+   */
+  refs: Record<string, number>
 }
 
 /** Lê a query string de forma tolerante. Sem `page`/`limit` → sem paginação. */
@@ -38,6 +44,15 @@ export function parseConsulta(searchParams: URLSearchParams): Consulta {
   const page = Number.isFinite(pageRaw) && pageRaw > 0 ? Math.trunc(pageRaw) : 1
   const limit = temPaginacao ? Math.min(500, Math.trunc(limitRaw)) : null
 
+  // Referências estruturais: `?categoriaId=3&paisId=7`. Valor não-inteiro é
+  // descartado — nunca vira filtro textual por aproximação.
+  const refs: Record<string, number> = {}
+  for (const [chave, valor] of searchParams.entries()) {
+    if (!chave.endsWith('Id')) continue
+    const n = Number(valor)
+    if (Number.isInteger(n) && n > 0) refs[chave] = n
+  }
+
   return {
     q,
     ativo,
@@ -47,7 +62,21 @@ export function parseConsulta(searchParams: URLSearchParams): Consulta {
     limit,
     skip: limit ? (page - 1) * limit : undefined,
     take: limit ?? undefined,
+    refs,
   }
+}
+
+/**
+ * Fragmento `where` com os filtros por referência estrutural que a rota permite.
+ * A allowlist é obrigatória: o cliente não escolhe por qual coluna filtrar.
+ */
+export function filtroRefs(c: Consulta, permitidos: readonly string[]): Record<string, number> {
+  const out: Record<string, number> = {}
+  for (const campo of permitidos) {
+    const v = c.refs[campo]
+    if (v !== undefined) out[campo] = v
+  }
+  return out
 }
 
 /**

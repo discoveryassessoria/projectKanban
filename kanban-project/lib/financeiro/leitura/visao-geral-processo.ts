@@ -63,7 +63,7 @@ export async function carregarVisaoGeralProcesso(processoId: number): Promise<{ 
   // Rótulo (nome/categoria) vem do Cadastro Mestre — nunca da observação livre.
   const itemIds = [...new Set(obrs.map((o) => o.itemCatalogoId).filter((v): v is number => v != null))]
   const itens = itemIds.length
-    ? await prisma.itemCatalogo.findMany({ where: { id: { in: itemIds } }, select: { id: true, name: true, categoria: true } }).catch(() => [])
+    ? await prisma.itemCatalogo.findMany({ where: { id: { in: itemIds } }, select: { id: true, name: true, categoria: { select: { nome: true } } } }).catch(() => [])
     : []
   const itemPor = new Map(itens.map((i) => [i.id, i]))
 
@@ -144,7 +144,7 @@ export async function carregarVisaoGeralProcesso(processoId: number): Promise<{ 
     const vg: ItemVG = {
       id: o.id,
       codigo: o.codigoOperacional ?? `#${o.id}`,
-      categoria: item?.categoria ?? undefined,
+      categoria: item?.categoria?.nome ?? undefined,
       descricao: item?.name ?? o.observacoes ?? '',
       moeda: o.moedaContratual as MoedaVG,
       valor: valorContratado,

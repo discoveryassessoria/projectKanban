@@ -10,7 +10,11 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { verificarPermissao } from '@/src/lib/verificar-permissao'
-import { CADASTROS, FONTES, slugify, type CadastroSpec } from '@/src/lib/gerenciamento/cadastros-registry'
+import { CADASTROS, FONTES, type CadastroSpec } from '@/src/lib/gerenciamento/cadastros-registry'
+import { registrarAuditoria } from '@/lib/gerenciamento/auditoria'
+import {
+  normalizarNome, chaveSemantica, gerarCodigo, proximaOrdem,
+} from '@/lib/gerenciamento/cadastro-identidade'
 
 type Delegate = {
   findMany: (args?: Record<string, unknown>) => Promise<Record<string, unknown>[]>
@@ -29,10 +33,13 @@ export function dadosDaSpec(cfg: CadastroSpec, body: Record<string, unknown>, cr
     if (campo.tipo === 'multiselect') continue // relação é tratada à parte
     if (!(campo.key in body)) continue
     if (campo.imutavel && !criando) continue
+    // Campo administrado pelo sistema NUNCA vem do cliente — nem na criação.
+    if (campo.somenteLeitura) continue
     const v = body[campo.key]
     if (campo.tipo === 'number') data[campo.key] = v === '' || v == null ? null : Number(v)
     else if (campo.tipo === 'bool') data[campo.key] = !!v
     else if (campo.tipo === 'select' && campo.fonte === 'tiposProcesso') data[campo.key] = v === '' || v == null ? null : Number(v)
+    else if (cfg.identidade && campo.key === cfg.identidade) data[campo.key] = normalizarNome(String(v ?? ''))
     else data[campo.key] = v === '' || v == null ? null : String(v)
   }
   return data
@@ -101,21 +108,46 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     }
     const data = dadosDaSpec(cfg, body, true)
 
-    // `code` estável: informado ou derivado do campo de identidade
-    const temCode = cfg.campos.some((c) => c.key === 'code')
-    if (temCode) {
-      const informado = String(body.code ?? '').trim()
-      const base = cfg.codeDe ? String(body[cfg.codeDe] ?? '') : ''
-      const code = informado || (base ? slugify(base) : '')
-      if (code) {
-        const jaExiste = await db[cfg.model].findUnique({ where: { code } }).catch(() => null)
-        if (jaExiste) return NextResponse.json({ error: `Já existe um registro com o código "${code}".` }, { status: 409 })
-        data.code = code
+    // Registros existentes: base para duplicidade, código único e próxima posição.
+    const existentes = cfg.identidade || cfg.ordenavel || cfg.codeDe
+      ? await db[cfg.model].findMany({ orderBy: { id: 'asc' } })
+      : []
+
+    // DUPLICIDADE por equivalência semântica — caixa, acento e espaço excedente
+    // não criam cadastro novo.
+    if (cfg.identidade) {
+      const nome = normalizarNome(String(body[cfg.identidade] ?? ''))
+      const chave = chaveSemantica(nome)
+      const colide = existentes.find((r) => chaveSemantica(String(r[cfg.identidade!] ?? '')) === chave)
+      if (colide) {
+        return NextResponse.json(
+          { error: `Já existe uma categoria equivalente: "${String(colide[cfg.identidade])}".`, campo: cfg.identidade },
+          { status: 409 },
+        )
       }
     }
+
+    // CÓDIGO gerado pelo sistema a partir do nome. Nunca vem do cliente.
+    const temCode = cfg.campos.some((c) => c.key === 'code')
+    if (temCode && cfg.codeDe) {
+      const base = normalizarNome(String(body[cfg.codeDe] ?? ''))
+      const code = gerarCodigo(base, existentes.map((r) => String(r.code ?? '')))
+      if (code) data.code = code
+    }
+
+    // ORDEM: nasce no fim da lista. O operador não digita posição.
+    if (cfg.ordenavel) data.ordem = proximaOrdem(existentes as { id: number; ordem?: number | null }[])
+
     if (data.ativo === undefined) data.ativo = true
 
     const criado = await db[cfg.model].create({ data })
+    if (cfg.auditoria) {
+      await registrarAuditoria(request, {
+        acao: 'CRIAR', entidade: cfg.auditoria, entidadeId: Number(criado.id),
+        descricao: `${cfg.titulo}: criado ${String(criado[cfg.identidade ?? 'id'] ?? criado.id)}`,
+        detalhes: data as Record<string, unknown>,
+      })
+    }
 
     // vínculos N:N (ex.: membros da equipe)
     if (cfg.relacao && Array.isArray(body[cfg.relacao.campoForm])) {

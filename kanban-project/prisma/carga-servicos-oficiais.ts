@@ -24,14 +24,20 @@ import { NaturezaFinanceira, NaturezaPreco, Moeda, UnidadeItem } from '@prisma/c
 import { slugTecnico, gerarChaveUnica } from '@/src/lib/catalogo/chave-tecnica-interna'
 import { sincronizarItemDeServico } from '@/src/services/catalogo-sync'
 import { garantirConfigFinanceiraDeServico } from '@/src/services/config-financeira-auto'
+import { garantirCategoriasServico, type CodeCategoriaServico } from './categorias-servico-oficiais'
 
 const DRY = process.argv.includes('--dry-run')
 const HOJE = new Date().toISOString().slice(0, 10)
 
 interface ServicoCarga {
   nome: string
-  categoria: string
-  nationality: string
+  /** CODE imutável da categoria oficial — resolvido para id antes de gravar. */
+  categoriaCode: CodeCategoriaServico
+  /**
+   * Aplicação territorial. `countryKey` do CatalogoPais (chave oficial imutável),
+   * resolvida para paisId; `null` = aplicação global.
+   */
+  paisKey: string | null
   unidadeItem: UnidadeItem
   modoCalculo: 'per_applicant' | 'per_document'
   moeda: Moeda
@@ -44,25 +50,25 @@ interface ServicoCarga {
 
 const SERVICOS: ServicoCarga[] = [
   {
-    nome: 'Assessoria para Nacionalidade Italiana', categoria: 'NACIONALIDADE', nationality: 'italiana',
+    nome: 'Assessoria para Nacionalidade Italiana', categoriaCode: 'CIDNAC', paisKey: 'italia',
     unidadeItem: UnidadeItem.REQUERENTE, modoCalculo: 'per_applicant', moeda: Moeda.EUR,
     valorBase: 6800, valorAdicional: 1800, unidadeTabela: 'requerente',
-    metadata: { nacionalidade: 'Italiana', iso: 'ITA', estrategiaCobranca: 'PRIMEIRO_REQUERENTE_E_ADICIONAIS', unidadeCobranca: 'REQUERENTE', faseReferencia: 'Genealogia', permiteLancamentoManual: true, permiteGeracaoAutomatica: true },
+    metadata: { estrategiaCobranca: 'PRIMEIRO_REQUERENTE_E_ADICIONAIS', unidadeCobranca: 'REQUERENTE', faseReferencia: 'Genealogia', permiteLancamentoManual: true, permiteGeracaoAutomatica: true },
   },
   {
-    nome: 'Assessoria para Nacionalidade Alemã', categoria: 'NACIONALIDADE', nationality: 'alema',
+    nome: 'Assessoria para Nacionalidade Alemã', categoriaCode: 'CIDNAC', paisKey: 'alemanha',
     unidadeItem: UnidadeItem.REQUERENTE, modoCalculo: 'per_applicant', moeda: Moeda.EUR,
     valorBase: 2800, valorAdicional: 1800, unidadeTabela: 'requerente',
-    metadata: { nacionalidade: 'Alemã', iso: 'DEU', estrategiaCobranca: 'PRIMEIRO_REQUERENTE_E_ADICIONAIS', unidadeCobranca: 'REQUERENTE', faseReferencia: 'Genealogia', permiteLancamentoManual: true, permiteGeracaoAutomatica: true },
+    metadata: { estrategiaCobranca: 'PRIMEIRO_REQUERENTE_E_ADICIONAIS', unidadeCobranca: 'REQUERENTE', faseReferencia: 'Genealogia', permiteLancamentoManual: true, permiteGeracaoAutomatica: true },
   },
   {
-    nome: 'Assessoria para Nacionalidade Espanhola', categoria: 'NACIONALIDADE', nationality: 'espanhola',
+    nome: 'Assessoria para Nacionalidade Espanhola', categoriaCode: 'CIDNAC', paisKey: 'espanha',
     unidadeItem: UnidadeItem.REQUERENTE, modoCalculo: 'per_applicant', moeda: Moeda.EUR,
     valorBase: 2800, valorAdicional: 2000, unidadeTabela: 'requerente',
-    metadata: { nacionalidade: 'Espanhola', iso: 'ESP', estrategiaCobranca: 'PRIMEIRO_REQUERENTE_E_ADICIONAIS', unidadeCobranca: 'REQUERENTE', faseReferencia: 'Genealogia', permiteLancamentoManual: true, permiteGeracaoAutomatica: true },
+    metadata: { estrategiaCobranca: 'PRIMEIRO_REQUERENTE_E_ADICIONAIS', unidadeCobranca: 'REQUERENTE', faseReferencia: 'Genealogia', permiteLancamentoManual: true, permiteGeracaoAutomatica: true },
   },
   {
-    nome: 'Transcrição de Registro Civil', categoria: 'SERVICO_DOCUMENTAL', nationality: 'all',
+    nome: 'Transcrição de Registro Civil', categoriaCode: 'REGCIV', paisKey: null,
     unidadeItem: UnidadeItem.DOCUMENTO, modoCalculo: 'per_document', moeda: Moeda.EUR,
     valorUnitario: 321, unidadeTabela: 'documento',
     metadata: {
@@ -99,7 +105,24 @@ async function main() {
     console.log(`[carga] ${DRY ? '(dry) ' : ''}limpeza: ${itensHard.length} ItemCatalogo + ${prodsHard.length} ProdutoFinanceiro SERV-* (hardcoded) removidos`)
   }
 
+  // Cadastros oficiais garantidos ANTES da carga: categoria e país são entidades,
+  // e a carga só pode referenciá-las por id.
+  const categorias = await garantirCategoriasServico(prisma)
+  const paises = new Map(
+    (await prisma.catalogoPais.findMany({ select: { id: true, countryKey: true } }))
+      .map((p) => [p.countryKey.toLowerCase(), p.id]),
+  )
+
   for (const s of SERVICOS) {
+    const categoriaId = categorias.get(s.categoriaCode) ?? null
+    // País declarado que NÃO existe no cadastro é erro de curadoria: a carga
+    // para, em vez de gravar um serviço com território errado.
+    let paisId: number | null = null
+    if (s.paisKey) {
+      paisId = paises.get(s.paisKey) ?? null
+      if (paisId == null) throw new Error(`[carga] País "${s.paisKey}" não está em CatalogoPais. Cadastre-o em Gerenciamento › Países e Regiões antes de rodar a carga.`)
+    }
+
     await prisma.$transaction(async (tx) => {
       // 1) SERVIÇO MESTRE (ServicoProduto) — idempotente por NOME NORMALIZADO.
       const candidatos = await tx.servicoProduto.findMany({ select: { id: true, code: true, name: true, itemCatalogoId: true } })
@@ -108,8 +131,8 @@ async function main() {
       let itemCatalogoId: number
       if (existente) {
         // CÓDIGO já gerado pelo sistema — preservado integralmente.
-        itemCatalogoId = existente.itemCatalogoId ?? (await sincronizarItemDeServico(tx, { code: existente.code, name: s.nome, category: s.categoria }))
-        if (!DRY) await tx.servicoProduto.update({ where: { id: existente.id }, data: { name: s.nome, category: s.categoria, nationality: s.nationality, ativo: true, itemCatalogoId, unidadePadrao: null } })
+        itemCatalogoId = existente.itemCatalogoId ?? (await sincronizarItemDeServico(tx, { code: existente.code, name: s.nome, categoriaId }))
+        if (!DRY) await tx.servicoProduto.update({ where: { id: existente.id }, data: { name: s.nome, aplicacaoGlobal: paisId == null, ativo: true, itemCatalogoId, unidadePadrao: null } })
         rel.servicosUpd++
       } else {
         // FLUXO OFICIAL: código gerado automaticamente (nunca hardcoded).
@@ -117,13 +140,25 @@ async function main() {
           !!(await tx.servicoProduto.findUnique({ where: { code: c }, select: { id: true } })) ||
           !!(await tx.itemCatalogo.findUnique({ where: { code: c }, select: { id: true } })),
         )
-        itemCatalogoId = await sincronizarItemDeServico(tx, { code, name: s.nome, category: s.categoria })
-        if (!DRY) await tx.servicoProduto.create({ data: { code, name: s.nome, category: s.categoria, nationality: s.nationality, ativo: true, itemCatalogoId } })
+        itemCatalogoId = await sincronizarItemDeServico(tx, { code, name: s.nome, categoriaId })
+        if (!DRY) await tx.servicoProduto.create({ data: { code, name: s.nome, aplicacaoGlobal: paisId == null, ativo: true, itemCatalogoId } })
         rel.servicos++
       }
 
-      // metadata oficial (nacionalidade/ISO/estratégia/critérios) no ItemCatalogo.
-      if (!DRY) await tx.itemCatalogo.update({ where: { id: itemCatalogoId }, data: { categoria: s.categoria, metadata: s.metadata as never } })
+      // Categoria por FK + metadata de estratégia/critérios no mestre. Nada de
+      // nacionalidade em texto aqui: o território é o vínculo N:N abaixo.
+      if (!DRY) await tx.itemCatalogo.update({ where: { id: itemCatalogoId }, data: { categoriaId, metadata: s.metadata as never } })
+
+      // APLICAÇÃO TERRITORIAL — estado final e idempotente. Global não cria vínculo.
+      if (!DRY) {
+        const servicoId = existente?.id ?? (await tx.servicoProduto.findFirst({ where: { itemCatalogoId }, select: { id: true } }))?.id
+        if (servicoId != null) {
+          await tx.servicoProdutoPais.deleteMany({ where: { servicoId, ...(paisId == null ? {} : { paisId: { not: paisId } }) } })
+          if (paisId != null) {
+            await tx.servicoProdutoPais.createMany({ data: [{ servicoId, paisId }], skipDuplicates: true })
+          }
+        }
+      }
 
       // 2) CONFIGURAÇÃO FINANCEIRA (ProdutoFinanceiro) — camada oficial, vinculada ao mestre.
       let configId = -1

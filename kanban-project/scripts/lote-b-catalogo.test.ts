@@ -30,8 +30,8 @@ ok(resolverItemCatalogoDeServico({ itemCatalogoId: 7 }) === 7 && resolverItemCat
 console.log("\nBackfill core (importável sem banco):")
 ok(typeof planejarServicos === "function" && typeof planejarProdutos === "function", "4. core importável sem abrir conexão")
 const planoS = planejarServicos([
-  { id: 1, code: "abc", name: "ABC", category: "cat", itemCatalogoId: null },
-  { id: 2, code: "xyz", name: "XYZ", category: null, itemCatalogoId: 99 }, // já vinculado → pula
+  { id: 1, code: "abc", name: "ABC", itemCatalogoId: null },
+  { id: 2, code: "xyz", name: "XYZ", itemCatalogoId: 99 }, // já vinculado → pula
 ])
 ok(planoS.length === 1 && planoS[0].code === "SRV_ABC" && planoS[0].id === 1, "5. planejarServicos: pula vinculados, deriva SRV_ code")
 const planoP = planejarProdutos([

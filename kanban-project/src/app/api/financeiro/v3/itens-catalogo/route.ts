@@ -45,7 +45,6 @@ export async function GET(req: NextRequest) {
           { name: { contains: q, mode: 'insensitive' as const } },
           { code: { contains: q, mode: 'insensitive' as const } },
           { descricao: { contains: q, mode: 'insensitive' as const } },
-          { categoria: { contains: q, mode: 'insensitive' as const } },
         ],
       }
     : {}
@@ -62,10 +61,11 @@ export async function GET(req: NextRequest) {
       produtos: { some: { ativo: true } },
       ...busca,
     },
-    orderBy: [{ categoria: 'asc' }, { name: 'asc' }],
+    orderBy: [{ categoria: { ordem: 'asc' } }, { categoria: { nome: 'asc' } }, { name: 'asc' }],
     take: janela,
     select: {
-      id: true, code: true, name: true, descricao: true, natureza: true, categoria: true, unidade: true,
+      id: true, code: true, name: true, descricao: true, natureza: true, unidade: true,
+      categoria: { select: { id: true, nome: true } },
       produtos: {
         where: { ativo: true },
         select: {
@@ -123,7 +123,7 @@ export async function GET(req: NextRequest) {
         descricao: i.descricao,
         natureza: i.natureza,
         // Categoria oficial: a da Configuração Financeira quando existe; senão a do próprio item.
-        categoria: c?.categoria?.nome ?? i.categoria ?? null,
+        categoria: c?.categoria?.nome ?? i.categoria?.nome ?? null,
         unidade: i.unidade,
         temConfig: !!c,
         temPreco: i.precos.some((p) => naturezasPreco.includes(String(p.natureza))),

@@ -4,6 +4,8 @@ import { verificarPermissao } from '@/src/lib/verificar-permissao'
 import { sincronizarItemDeServico } from '@/src/services/catalogo-sync'
 import { garantirConfigFinanceiraDeServico } from '@/src/services/config-financeira-auto'
 import { slugTecnico, gerarChaveUnica } from '@/src/lib/catalogo/chave-tecnica-interna'
+import { resolverAplicacaoTerritorial, gravarAplicacaoTerritorial } from '@/src/services/aplicacao-territorial-servico'
+import { resolverCategoriaServico } from '@/src/services/categoria-servico-ref'
 
 function toStrOrNull(v: any): string | null {
   if (v === undefined || v === null) return null
@@ -22,19 +24,38 @@ export async function GET(request: NextRequest) {
     // ADITIVO: o espelho no Cadastro Mestre vem junto (natureza/unidade + contadores
     // de vínculo). É o que permite ao Catálogo de Serviços ser a ÚNICA tela sobre o
     // mestre — mostrando tipo, unidade e vínculos sem uma segunda tela técnica.
-    const servicos = await prisma.servicoProduto.findMany({
-      orderBy: { code: 'asc' },
-      include: {
-        itemCatalogo: {
-          select: {
-            id: true, natureza: true, unidade: true,
-            _count: { select: { tiposDocumento: true, produtos: true, servicos: true, precos: true } },
+    // APLICAÇÃO TERRITORIAL: vem junto a seleção real (vínculos N:N, na ordem de
+    // criação) e o cadastro oficial de países que alimenta o seletor da tela —
+    // uma carga, sem segunda chamada e sem a tela manter lista própria de nacionalidades.
+    const [servicos, paisesCatalogo, categoriasCatalogo] = await Promise.all([
+      prisma.servicoProduto.findMany({
+        orderBy: { code: 'asc' },
+        include: {
+          itemCatalogo: {
+            select: {
+              id: true, natureza: true, unidade: true, categoriaId: true,
+              categoria: { select: { id: true, nome: true } },
+              _count: { select: { tiposDocumento: true, produtos: true, servicos: true, precos: true } },
+            },
           },
+          paises: { select: { paisId: true }, orderBy: { criadoEm: 'asc' } },
         },
-      },
-    })
+      }),
+      prisma.catalogoPais.findMany({
+        where: { ativo: true },
+        orderBy: { countryLabel: 'asc' },
+        select: { id: true, countryKey: true, countryLabel: true, nationalityKey: true, flag: true, ativo: true },
+      }),
+      // Cadastro oficial de categorias — alimenta o select do formulário. Só as
+      // ATIVAS: categoria inativa não pode ser escolhida (a API também recusa).
+      prisma.categoriaServico.findMany({
+        where: { ativo: true },
+        orderBy: [{ ordem: 'asc' }, { nome: 'asc' }],
+        select: { id: true, code: true, nome: true, ordem: true, ativo: true },
+      }),
+    ])
 
-    return NextResponse.json({ servicos })
+    return NextResponse.json({ servicos, paisesCatalogo, categoriasCatalogo })
   } catch (error) {
     console.error('Erro ao listar produtos e serviços:', error)
     return NextResponse.json({ error: 'Erro interno' }, { status: 500 })
@@ -53,8 +74,23 @@ export async function POST(request: NextRequest) {
     }
 
     const name = String(b.name).trim()
-    const category = toStrOrNull(b.category)
-    // dual-write: ItemCatalogo (mestre, natureza SERVICO) — é o que o Financeiro referencia.
+
+    // CATEGORIA — referência estrutural: só id oficial, conferido no cadastro.
+    const categoria = await resolverCategoriaServico(b)
+    if (categoria.erros.length) {
+      return NextResponse.json({ error: categoria.erros[0].mensagem, erros: categoria.erros }, { status: 400 })
+    }
+
+    // APLICAÇÃO TERRITORIAL — conferida contra o cadastro real ANTES de abrir a
+    // transação. Body que não declara nada nasce global (default do domínio).
+    const territorio = await resolverAplicacaoTerritorial(b)
+    if (territorio.erros.length) {
+      return NextResponse.json({ error: territorio.erros[0].mensagem, erros: territorio.erros }, { status: 400 })
+    }
+    const selecao = territorio.declarado ? territorio.selecao : { global: true, paisIds: [] }
+
+    // O mestre (ItemCatalogo, natureza SERVICO) é quem o Financeiro referencia —
+    // e é o portador ÚNICO da categoria.
     const servico = await prisma.$transaction(async (tx) => {
       // CHAVE TÉCNICA INTERNA: gerada no backend a partir do nome (o operador NUNCA
       // informa nem vê `code`). Igual ao publicCode — automática, única, invisível.
@@ -62,19 +98,19 @@ export async function POST(request: NextRequest) {
         !!(await tx.servicoProduto.findUnique({ where: { code: c }, select: { id: true } })) ||
         !!(await tx.itemCatalogo.findUnique({ where: { code: c }, select: { id: true } })),
       )
-      const itemCatalogoId = await sincronizarItemDeServico(tx, { code, name, category })
+      const itemCatalogoId = await sincronizarItemDeServico(tx, { code, name, categoriaId: categoria.categoriaId })
       const s = await tx.servicoProduto.create({
         data: {
           code,
           name,
-          category,
           descricao: toStrOrNull(b.descricao),
           unidadePadrao: b.unidadePadrao || null,
-          nationality: (b.nationality && String(b.nationality).trim()) || 'all',
+          aplicacaoGlobal: selecao.global,
           ativo: b.ativo !== undefined ? !!b.ativo : true,
           itemCatalogoId,
         },
       })
+      await gravarAplicacaoTerritorial(tx, s.id, selecao)
       // FLUXO: Cadastro Mestre (Serviço) → Configuração Financeira criada AUTOMATICAMENTE
       // (vínculo estrutural itemCatalogoId; idempotente). Não cria preço — só a config.
       await garantirConfigFinanceiraDeServico(tx, { itemCatalogoId, nome: name })

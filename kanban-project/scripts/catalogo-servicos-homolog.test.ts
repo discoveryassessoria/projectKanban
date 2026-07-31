@@ -139,9 +139,11 @@ async function main() {
   console.log(`     (${historicos} item(ns) histórico(s) PRODUTO/HONORARIO seguem no banco, só fora da tela)`)
   const docs = lista.filter((l) => l.natureza === 'DOCUMENTO')
   chk(docs.length > 0, `documentos do mestre continuam acessíveis na tela oficial (${docs.length})`)
-  const tecnicos = filtrarCatalogo(lista, { escopo: 'tecnico' })
+  const relacionados = filtrarCatalogo(lista, { escopo: 'relacionados' })
   const comerciais = filtrarCatalogo(lista, { escopo: 'comercial' })
-  chk(tecnicos.length + comerciais.length === lista.length, `escopos cobrem o cadastro inteiro (${comerciais.length} comercializáveis + ${tecnicos.length} técnicos = ${lista.length})`)
+  chk(relacionados.length + comerciais.length === lista.length, `escopos cobrem o cadastro inteiro (${comerciais.length} comercializáveis + ${relacionados.length} itens cobrados relacionados = ${lista.length})`)
+  // Nenhum documento pode aparecer na aba de VENDA.
+  chk(comerciais.every((l) => l.natureza !== 'DOCUMENTO'), 'nenhum documento aparece como comercializável')
 
   // ── 1) cadastrar (serviço) — mesmo caminho do POST da tela ────────────────
   secao('1) Cadastrar item — Serviço')
@@ -151,9 +153,9 @@ async function main() {
       !!(await tx.servicoProduto.findUnique({ where: { code: c }, select: { id: true } })) ||
       !!(await tx.itemCatalogo.findUnique({ where: { code: c }, select: { id: true } })),
     )
-    const itemCatalogoId = await sincronizarItemDeServico(tx, { code, name: nomeServico, category: 'smoke' })
+    const itemCatalogoId = await sincronizarItemDeServico(tx, { code, name: nomeServico, categoriaId: null })
     const s = await tx.servicoProduto.create({
-      data: { code, name: nomeServico, category: 'smoke', descricao: 'registro de smoke', nationality: 'all', ativo: true, itemCatalogoId },
+      data: { code, name: nomeServico, descricao: 'registro de smoke', aplicacaoGlobal: true, ativo: true, itemCatalogoId },
     })
     const cfg = await garantirConfigFinanceiraDeServico(tx, { itemCatalogoId, nome: nomeServico })
     return { servicoId: s.id, itemCatalogoId, configId: cfg.id, configCriada: cfg.criado }
@@ -171,7 +173,7 @@ async function main() {
     !!(await prisma.itemCatalogo.findUnique({ where: { code: c }, select: { id: true } })),
   )
   const taxa = await prisma.itemCatalogo.create({
-    data: { code: codeTaxa, name: nomeTaxa, natureza: NaturezaItem.TAXA, categoria: 'smoke', unidade: UnidadeItem.PROCESSO, ativo: true },
+    data: { code: codeTaxa, name: nomeTaxa, natureza: NaturezaItem.TAXA, unidade: UnidadeItem.PROCESSO, ativo: true },
   })
   chk(taxa.id > 0 && taxa.natureza === NaturezaItem.TAXA, `item técnico criado (#${taxa.id}, natureza TAXA, unidade PROCESSO)`)
 
@@ -207,7 +209,7 @@ async function main() {
   const nomeEditado = `${MARCA} — Serviço (editado)`
   await prisma.$transaction(async (tx) => {
     const atual = (await tx.servicoProduto.findUnique({ where: { id: criado.servicoId } }))!
-    const itemId = await sincronizarItemDeServico(tx, { code: atual.code, name: nomeEditado, category: 'smoke' }, atual.itemCatalogoId)
+    const itemId = await sincronizarItemDeServico(tx, { code: atual.code, name: nomeEditado, categoriaId: null }, atual.itemCatalogoId)
     await tx.servicoProduto.update({ where: { id: criado.servicoId }, data: { name: nomeEditado, itemCatalogoId: itemId } })
     await garantirConfigFinanceiraDeServico(tx, { itemCatalogoId: itemId, nome: nomeEditado })
     await refletirEstadoNaConfigDeServico(tx, { itemCatalogoId: itemId, nome: nomeEditado, ativo: true })

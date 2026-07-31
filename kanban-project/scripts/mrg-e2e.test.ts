@@ -120,7 +120,7 @@ async function main() {
     return prisma.itemCatalogo.upsert({
       where: { code },
       update: { name, ativo: true },
-      create: { code, name, natureza: "DOCUMENTO", categoria: "Registro civil", ativo: true },
+      create: { code, name, natureza: "DOCUMENTO", ativo: true },
       select: { id: true, code: true, name: true },
     })
   }

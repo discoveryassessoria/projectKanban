@@ -7,6 +7,7 @@ import { prisma } from "@/lib/prisma";
 import { sincronizarItemDeServico } from "@/src/services/catalogo-sync";
 import { garantirConfigFinanceiraDeServico } from "@/src/services/config-financeira-auto";
 import { slugTecnico, gerarChaveUnica } from "@/src/lib/catalogo/chave-tecnica-interna";
+import { garantirCategoriasServico } from "@/prisma/categorias-servico-oficiais";
 const p: any = prisma;
 
 const NOME = "Honorários Contratuais — Cidadania Italiana";
@@ -14,15 +15,26 @@ const VALOR_BASE = 6290.0;
 const VALOR_ADICIONAL = 1640.0;
 
 async function main() {
+  // Cadastros oficiais primeiro — o serviço referencia por id.
+  const categorias = await garantirCategoriasServico(p);
+  const categoriaId = categorias.get("CIDNAC") ?? null;
+  const paisItalia = await p.catalogoPais.findFirst({ where: { countryKey: "italia" }, select: { id: true } });
+  if (!paisItalia) throw new Error('País "italia" não está em CatalogoPais. Cadastre em Gerenciamento › Países e Regiões antes de rodar o seed.');
+
   // 1) Serviço (find-or-create por nome)
   let servico = await p.servicoProduto.findFirst({ where: { name: NOME } });
   if (!servico) {
     const code = await gerarChaveUnica(slugTecnico(NOME, "SERVICO"), async (c: string) =>
       !!(await p.servicoProduto.findUnique({ where: { code: c }, select: { id: true } })) ||
       !!(await p.itemCatalogo.findUnique({ where: { code: c }, select: { id: true } })));
-    const itemCatalogoId = await sincronizarItemDeServico(p, { code, name: NOME, category: "Honorários" });
-    servico = await p.servicoProduto.create({ data: { code, name: NOME, category: "Honorários", nationality: "italia", ativo: true, itemCatalogoId } });
+    const itemCatalogoId = await sincronizarItemDeServico(p, { code, name: NOME, categoriaId });
+    servico = await p.servicoProduto.create({ data: { code, name: NOME, aplicacaoGlobal: false, ativo: true, itemCatalogoId } });
   }
+  // APLICAÇÃO TERRITORIAL — Itália, por vínculo real. Idempotente.
+  await p.servicoProduto.update({ where: { id: servico.id }, data: { aplicacaoGlobal: false } });
+  await p.servicoProdutoPais.deleteMany({ where: { servicoId: servico.id, paisId: { not: paisItalia.id } } });
+  await p.servicoProdutoPais.createMany({ data: [{ servicoId: servico.id, paisId: paisItalia.id }], skipDuplicates: true });
+
   console.log(`Serviço: ${servico.publicCode ?? "?"} — ${servico.name} (id ${servico.id}, item ${servico.itemCatalogoId})`);
 
   // 2) Config Financeira (idempotente por itemCatalogoId) — natureza RECEITA, moeda EUR
@@ -38,7 +50,7 @@ async function main() {
     name: NOME, natureza: "VENDA", modoCalculo: "honorario_por_requerente",
     valor: VALOR_BASE, valorBase: VALOR_BASE, valorAdicional: VALOR_ADICIONAL,
     unidade: "requerente", itemCatalogoId: servico.itemCatalogoId, configuracaoFinanceiraItemId: cfg.id,
-    regiao: "italia", prioridade: 100, arquivado: false, legadoPendente: false,
+    prioridade: 100, arquivado: false, legadoPendente: false,
   };
   if (!preco) { preco = await p.tabelaValor.create({ data: dadosPreco }); }
   else { preco = await p.tabelaValor.update({ where: { id: preco.id }, data: dadosPreco }); }

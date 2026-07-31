@@ -7,7 +7,8 @@ import { verificarPermissao } from '@/src/lib/verificar-permissao'
 import { NaturezaItem, UnidadeItem } from '@prisma/client'
 import { slugTecnico, gerarChaveUnica } from '@/src/lib/catalogo/chave-tecnica-interna'
 import { NATUREZAS_ITEM_OFICIAIS } from '@/lib/financeiro/catalogo-oficial'
-import { parseConsulta, filtroBusca, filtroAtivo, ordenacao, meta } from '@/lib/gerenciamento/consulta'
+import { resolverCategoriaServico } from '@/src/services/categoria-servico-ref'
+import { parseConsulta, filtroBusca, filtroAtivo, filtroRefs, ordenacao, meta } from '@/lib/gerenciamento/consulta'
 import { registrarAuditoria } from '@/lib/gerenciamento/auditoria'
 
 function toStrOrNull(v: any): string | null {
@@ -28,15 +29,18 @@ export async function GET(request: NextRequest) {
     if (erro) return erro
     // Busca/ordenação/paginação/ativo via query params OPCIONAIS (retrocompatível).
     const c = parseConsulta(new URL(request.url).searchParams)
-    const where = { ...filtroBusca(c.q, ['name', 'code', 'categoria']), ...filtroAtivo(c) }
+    // Busca livre SÓ em conteúdo próprio do registro (nome, código, descrição).
+    // Categoria é entidade: filtra-se por id, nunca por texto.
+    const where = { ...filtroBusca(c.q, ['name', 'code', 'descricao']), ...filtroAtivo(c), ...filtroRefs(c, ['categoriaId']) }
     const [total, itens] = await Promise.all([
       prisma.itemCatalogo.count({ where }),
       prisma.itemCatalogo.findMany({
         where,
-        orderBy: ordenacao(c, ['name', 'code', 'natureza', 'categoria', 'criadoEm'], [{ natureza: 'asc' }, { name: 'asc' }]),
+        orderBy: ordenacao(c, ['name', 'code', 'natureza', 'criadoEm'], [{ natureza: 'asc' }, { name: 'asc' }]),
         skip: c.skip,
         take: c.take,
         include: {
+          categoria: { select: { id: true, code: true, nome: true } },
           _count: { select: { tiposDocumento: true, produtos: true, servicos: true, precos: true } },
         },
       }),
@@ -62,6 +66,11 @@ export async function POST(request: NextRequest) {
     if (b.natureza !== undefined && b.natureza !== null && !NATUREZAS.includes(b.natureza)) {
       return NextResponse.json({ error: `Natureza "${b.natureza}" não existe mais no Cadastro Mestre. Use uma das oficiais: ${NATUREZAS.join(', ')}.` }, { status: 400 })
     }
+    // CATEGORIA — referência estrutural: id oficial, conferido no cadastro.
+    const categoria = await resolverCategoriaServico(b)
+    if (categoria.erros.length) {
+      return NextResponse.json({ error: categoria.erros[0].mensagem, erros: categoria.erros }, { status: 400 })
+    }
     const natureza = b.natureza ?? NaturezaItem.OUTRO
     const unidade = UNIDADES.includes(b.unidade) ? b.unidade : UnidadeItem.UNIDADE
 
@@ -71,9 +80,9 @@ export async function POST(request: NextRequest) {
     )
 
     const item = await prisma.itemCatalogo.create({
-      data: { code, name, descricao: toStrOrNull(b.descricao), natureza, categoria: toStrOrNull(b.categoria), unidade, ativo: b.ativo !== false },
+      data: { code, name, descricao: toStrOrNull(b.descricao), natureza, categoriaId: categoria.categoriaId, unidade, ativo: b.ativo !== false },
     })
-    await registrarAuditoria(request, { acao: 'CRIAR', entidade: 'ItemCatalogo', entidadeId: item.id, descricao: `Item mestre criado: ${name}`, detalhes: { code, natureza, categoria: item.categoria } })
+    await registrarAuditoria(request, { acao: 'CRIAR', entidade: 'ItemCatalogo', entidadeId: item.id, descricao: `Item mestre criado: ${name}`, detalhes: { code, natureza, categoriaId: item.categoriaId } })
     return NextResponse.json(item, { status: 201 })
   } catch (error) {
     console.error('Erro ao criar item do catálogo:', error)

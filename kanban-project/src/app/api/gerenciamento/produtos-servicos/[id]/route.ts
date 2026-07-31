@@ -3,6 +3,8 @@ import { prisma } from '@/lib/prisma'
 import { verificarPermissao } from '@/src/lib/verificar-permissao'
 import { sincronizarItemDeServico } from '@/src/services/catalogo-sync'
 import { garantirConfigFinanceiraDeServico, refletirEstadoNaConfigDeServico } from '@/src/services/config-financeira-auto'
+import { resolverAplicacaoTerritorial, gravarAplicacaoTerritorial, selecaoDoRegistro } from '@/src/services/aplicacao-territorial-servico'
+import { resolverCategoriaServico } from '@/src/services/categoria-servico-ref'
 
 function toStrOrNull(v: any): string | null {
   if (v === undefined || v === null) return null
@@ -17,18 +19,39 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
 
     const { id: idStr } = await params
     const id = Number(idStr)
-    const atual = await prisma.servicoProduto.findUnique({ where: { id } })
+    const atual = await prisma.servicoProduto.findUnique({
+      where: { id },
+      include: {
+        paises: { select: { paisId: true }, orderBy: { criadoEm: 'asc' } },
+        itemCatalogo: { select: { categoriaId: true } },
+      },
+    })
     if (!atual) return NextResponse.json({ error: 'Serviço não encontrado' }, { status: 404 })
 
     const b = await request.json()
+
+    // CATEGORIA — só id oficial. PUT que não declara categoria preserva a atual.
+    const categoria = await resolverCategoriaServico(b)
+    if (categoria.erros.length) {
+      return NextResponse.json({ error: categoria.erros[0].mensagem, erros: categoria.erros }, { status: 400 })
+    }
+    const categoriaId = categoria.declarado ? categoria.categoriaId : (atual.itemCatalogo?.categoriaId ?? null)
+
+    // APLICAÇÃO TERRITORIAL — PUT PARCIAL: body que não declara território não
+    // mexe nos vínculos (editar o nome jamais apaga a seleção de países).
+    const territorio = await resolverAplicacaoTerritorial(b)
+    if (territorio.erros.length) {
+      return NextResponse.json({ error: territorio.erros[0].mensagem, erros: territorio.erros }, { status: 400 })
+    }
+    const selecao = territorio.declarado ? territorio.selecao : selecaoDoRegistro(atual)
+
     const data: any = {
       // Chave técnica interna é IMUTÁVEL e nunca vem do cliente: sempre preserva a atual.
       code: atual.code,
       name: b.name !== undefined ? String(b.name).trim() : atual.name,
-      category: b.category !== undefined ? toStrOrNull(b.category) : atual.category,
       descricao: b.descricao !== undefined ? toStrOrNull(b.descricao) : atual.descricao,
       unidadePadrao: b.unidadePadrao !== undefined ? (b.unidadePadrao || null) : atual.unidadePadrao,
-      nationality: b.nationality !== undefined ? ((String(b.nationality).trim()) || 'all') : atual.nationality,
+      aplicacaoGlobal: selecao.global,
       ativo: b.ativo !== undefined ? !!b.ativo : atual.ativo,
     }
 
@@ -36,11 +59,12 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
     // Renomeia o item JÁ vinculado no lugar (preserva itemCatalogoId dos consumidores,
     // ex.: Configuração Financeira) — editar o CÓDIGO do serviço não quebra o vínculo.
     const servico = await prisma.$transaction(async (tx) => {
-      const itemCatalogoId = await sincronizarItemDeServico(tx, { code: data.code, name: data.name, category: data.category }, atual.itemCatalogoId)
+      const itemCatalogoId = await sincronizarItemDeServico(tx, { code: data.code, name: data.name, categoriaId }, atual.itemCatalogoId)
       const s = await tx.servicoProduto.update({
         where: { id },
         data: { ...data, itemCatalogoId },
       })
+      await gravarAplicacaoTerritorial(tx, id, selecao)
       // Renomear NÃO cria nova config (mesmo itemCatalogoId → mesmo vínculo). Self-heal:
       // garante a config se faltar (legado); reflete nome/ativo sem apagar preços/histórico.
       await garantirConfigFinanceiraDeServico(tx, { itemCatalogoId, nome: data.name })

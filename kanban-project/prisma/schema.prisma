@@ -2445,10 +2445,14 @@ model ServicoProduto {
   id               Int                 @id @default(autoincrement())
   code             String              @unique @db.VarChar(40)
   name             String              @db.VarChar(200)
-  category         String?             @db.VarChar(80)
   descricao        String?             @db.Text
   unidadePadrao    UnidadeItem?
-  nationality      String              @default("all") @db.VarChar(40)
+  // APLICAÇÃO TERRITORIAL — indicador EXPLÍCITO de aplicação global. true = vale
+  // para todos os países, inclusive os cadastrados no futuro, SEM criar vínculo
+  // individual. false = valem exatamente os vínculos de `paises`; nenhum vínculo
+  // = sem aplicação territorial. Não existe representação textual de território.
+  aplicacaoGlobal  Boolean             @default(true)
+  paises           ServicoProdutoPais[]
   ativo            Boolean             @default(true)
   // relaÃ§Ã£o mantida no banco (dados preservados); NÃO exibida/gravada na tela mestre (F ServiÃ§os)
   itensFinanceiros ProdutoFinanceiro[] @relation("ServicoProdutoItens")
@@ -2460,6 +2464,25 @@ model ServicoProduto {
   condicoesPagamento CondicaoPagamentoServico[]
 
   @@index([itemCatalogoId])
+}
+
+// APLICAÇÃO TERRITORIAL DO SERVIÇO por RELACIONAMENTO REAL (N:N) com o cadastro
+// oficial de Países e Regiões. Substitui o campo textual único `nationality`.
+// Nada é digitado: só se seleciona país que existe em CatalogoPais.
+// "Todas" NÃO é representada aqui — é ServicoProduto.aplicacaoGlobal = true, que
+// abrange automaticamente qualquer país cadastrado no futuro (por isso nunca se
+// materializa um vínculo por país para representar o global).
+model ServicoProdutoPais {
+  id        Int            @id @default(autoincrement())
+  servicoId Int
+  servico   ServicoProduto @relation(fields: [servicoId], references: [id], onDelete: Cascade)
+  paisId    Int
+  pais      CatalogoPais   @relation(fields: [paisId], references: [id], onDelete: Cascade)
+  criadoEm  DateTime       @default(now())
+
+  @@unique([servicoId, paisId])
+  @@index([servicoId])
+  @@index([paisId])
 }
 
 model MoedaCadastro {
@@ -2765,6 +2788,7 @@ model CatalogoPais {
 
   condicoesPagamento CondicaoPagamentoPais[]
   taxasPagamento     TaxaPagamentoPais[]
+  servicos           ServicoProdutoPais[]
 }
 
 model ModalidadePais {
@@ -3243,7 +3267,12 @@ model ItemCatalogo {
   name         String       @db.VarChar(200) // ex.: "CertidÃ£o de Nascimento - Inteiro Teor"
   descricao    String?      @db.Text
   natureza     NaturezaItem @default(OUTRO)
-  categoria    String?      @db.VarChar(60) // ex.: "Registro civil"
+  // CATEGORIA — referência estrutural por FK ao cadastro oficial. É AQUI, no
+  // mestre, que a categoria vive: portador único para as duas origens do
+  // catálogo (serviço projetado e item técnico). Nenhum outro model guarda
+  // categoria de item.
+  categoriaId  Int?
+  categoria    CategoriaServico? @relation(fields: [categoriaId], references: [id], onDelete: Restrict)
   unidade      UnidadeItem  @default(UNIDADE)
   ativo        Boolean      @default(true)
   metadata     Json? // extensÃ­vel, sem virar coluna por item novo
@@ -3264,6 +3293,7 @@ model ItemCatalogo {
 
   @@index([natureza])
   @@index([ativo])
+  @@index([categoriaId])
 }
 
 // ============================================================
@@ -4487,6 +4517,10 @@ model CategoriaServico {
   ativo        Boolean  @default(true)
   criadoEm     DateTime @default(now())
   atualizadoEm DateTime @updatedAt
+
+  // Fonte ÚNICA de categoria do catálogo. O vínculo vive no mestre
+  // (ItemCatalogo) — serviço e item técnico compartilham o mesmo portador.
+  itens ItemCatalogo[]
 }
 
 /// Categorias das organizações (cartório, consulado, tribunal, banco, tradutor…).

@@ -135,7 +135,11 @@
     "test:usuarios": "tsx scripts/usuarios-acessos.test.ts",
     "test:wizard-multiselect": "tsx scripts/wizard-multiselect-guard.test.ts",
     "validar:perfis-custo": "tsx scripts/prod-validar-perfis-custo.ts",
-    "test:mrg-ocr": "tsx scripts/mrg-ocr.test.ts"
+    "test:mrg-ocr": "tsx scripts/mrg-ocr.test.ts",
+    "test:aplicacao-territorial": "tsx scripts/servico-aplicacao-territorial.test.ts",
+    "catalogo:certidoes": "tsx scripts/catalogo-certidoes-vinculo.ts",
+    "test:categorias-servico": "tsx scripts/cadastro-categorias.test.ts",
+    "test:arquitetura-referencias": "tsx scripts/arquitetura-referencias.test.ts"
   },
   "prisma": {
     "seed": "tsx prisma/seed.ts"

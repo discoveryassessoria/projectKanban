@@ -1,8 +1,12 @@
 // src/services/catalogo-sync.ts
-// LOTE B — DUAL-WRITE: mantém o ItemCatalogo (fonte canônica) em sincronia quando
-// as ilhas legadas (ServicoProduto, ProdutoFinanceiro) são criadas/editadas.
-// Idempotente por `code` canônico (upsert). NÃO remove nada. Deve rodar DENTRO da
-// mesma transação da escrita da ilha (recebe o tx client).
+// PROJEÇÃO no ItemCatalogo — o mestre é a fonte canônica de identidade do item.
+// Mantém o mestre em sincronia quando o registro operacional (ServicoProduto,
+// ProdutoFinanceiro) é criado ou editado. Idempotente por `code` (upsert), roda
+// DENTRO da transação da escrita (recebe o tx client) e não remove nada.
+//
+// A CATEGORIA é referência estrutural: viaja por `categoriaId` (FK para
+// CategoriaServico) e vive EXCLUSIVAMENTE no mestre. Nenhum ponto do sistema
+// transporta categoria como texto.
 
 import { Prisma, NaturezaItem } from '@prisma/client'
 import { codeServicoMestre, codeProdutoMestre } from './catalogo-helpers'
@@ -12,28 +16,28 @@ import { codeServicoMestre, codeProdutoMestre } from './catalogo-helpers'
  * seu id, para gravar em ServicoProduto.itemCatalogoId (o vínculo canônico).
  *
  * `existingItemId`: quando o ServicoProduto JÁ possui um item vinculado (edição),
- * renomeia ESSE item no lugar (code/name/categoria) em vez de criar um novo por
+ * renomeia ESSE item no lugar (code/name/categoriaId) em vez de criar um novo por
  * `code` mudado. Assim o vínculo dos consumidores (ex.: Configuração Financeira que
  * aponta itemCatalogoId) sobrevive à edição do CÓDIGO do mestre — a leitura do
  * Financeiro resolve o código real automaticamente, sem editar nada no Financeiro.
  */
 export async function sincronizarItemDeServico(
   tx: Prisma.TransactionClient,
-  s: { code: string; name: string; category?: string | null },
+  s: { code: string; name: string; categoriaId?: number | null },
   existingItemId?: number | null,
 ): Promise<number> {
   const code = codeServicoMestre(s.code)
   if (existingItemId != null) {
     await tx.itemCatalogo.update({
       where: { id: existingItemId },
-      data: { code, name: s.name, categoria: s.category ?? null },
+      data: { code, name: s.name, categoriaId: s.categoriaId ?? null },
     })
     return existingItemId
   }
   const item = await tx.itemCatalogo.upsert({
     where: { code },
-    create: { code, name: s.name, natureza: NaturezaItem.SERVICO, categoria: s.category ?? null },
-    update: { name: s.name, categoria: s.category ?? null },
+    create: { code, name: s.name, natureza: NaturezaItem.SERVICO, categoriaId: s.categoriaId ?? null },
+    update: { name: s.name, categoriaId: s.categoriaId ?? null },
     select: { id: true },
   })
   return item.id
@@ -51,13 +55,13 @@ export async function sincronizarItemDeServico(
  */
 export async function sincronizarItemDeProduto(
   tx: Prisma.TransactionClient,
-  p: { codigo: string; nome: string; categoria?: string | null },
+  p: { codigo: string; nome: string; categoriaId?: number | null },
 ): Promise<number> {
   const code = codeProdutoMestre(p.codigo)
   const item = await tx.itemCatalogo.upsert({
     where: { code },
-    create: { code, name: p.nome, natureza: NaturezaItem.OUTRO, categoria: p.categoria ?? null },
-    update: { name: p.nome, categoria: p.categoria ?? null },
+    create: { code, name: p.nome, natureza: NaturezaItem.OUTRO, categoriaId: p.categoriaId ?? null },
+    update: { name: p.nome, categoriaId: p.categoriaId ?? null },
     select: { id: true },
   })
   return item.id
