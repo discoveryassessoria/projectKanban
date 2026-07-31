@@ -82,9 +82,7 @@ export default function RolesTab() {
   const perfis = dados?.perfis ?? SEM_ITENS
   const erroLista = erroCarregar ? (erroCarregar.message || 'Não foi possível carregar os perfis.') : null
 
-  useEffect(() => {
-    carregar()
-  }, [carregar])
+  // Sem efeito de carga: a consulta oficial busca ao montar e ao trocar de chave.
 
   const perfisFiltrados = useMemo(() => {
     const q = busca.trim().toLowerCase()

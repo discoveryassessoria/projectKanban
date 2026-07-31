@@ -591,11 +591,12 @@ export function ProcessoCentralOperacional({
     )
   }, [setData])
 
-  useEffect(() => {
-    carregar()
-  }, [carregar])
+  // NÃO existe efeito de carga aqui: a consulta busca sozinha ao montar e ao
+  // trocar de chave. Um `useEffect(() => carregar(), [carregar])` só reabastecia
+  // o ciclo — era ele, somado à identidade instável do resultado, que prendia a
+  // aba no spinner.
 
-  // Loading inicial
+  // ── ESTADO 1: carregando ────────────────────────────────────────────────
   if (loading && !data) {
     return (
       <div className="h-full flex items-center justify-center">
@@ -604,18 +605,45 @@ export function ProcessoCentralOperacional({
     )
   }
 
-  // Erro fatal
+  // ── ESTADO 2: erro — sempre com saída, nunca um beco sem ação ───────────
   if (erro && !data) {
     return (
       <div className="h-full overflow-y-auto p-6">
         <div className="bg-[#d2a948]/12 border border-[#d2a948]/30 rounded-lg px-4 py-3 text-sm text-[#d2a948]">
-          ⚠ {erro}
+          <div>⚠ {erro}</div>
+          <button
+            onClick={() => { setErro(null); carregar() }}
+            className="mt-2 rounded-md border border-[#d2a948]/40 px-3 py-1 text-xs transition hover:bg-[#d2a948]/15"
+          >
+            Tentar novamente
+          </button>
         </div>
       </div>
     )
   }
 
-  if (!data) return null
+  // ── ESTADO 3: vazio — a consulta terminou e não há operação materializada ──
+  // Antes isto caía num `return null` mudo: a aba ficava em branco e era lida
+  // como travamento. Sem workflow, sem fase, sem documento ou sem tarefa, o
+  // carregamento TERMINA e a tela diz o que está acontecendo.
+  if (!data) {
+    return (
+      <div className="h-full overflow-y-auto p-6">
+        <div className="rounded-lg border border-white/10 bg-white/5 px-4 py-6 text-center text-sm text-white/60">
+          <div className="text-white/80">Nenhuma operação materializada para este processo.</div>
+          <div className="mt-1 text-xs text-white/45">
+            A Central aparece quando o processo tem fase e workflow ativos.
+          </div>
+          <button
+            onClick={() => carregar()}
+            className="mt-3 rounded-md border border-white/15 px-3 py-1 text-xs text-white/70 transition hover:bg-white/10 hover:text-white"
+          >
+            Tentar novamente
+          </button>
+        </div>
+      </div>
+    )
+  }
 
   // ====== CÁLCULOS (ordem importa: declarar ANTES de usar) ======
   // FONTE DA FASE = a resposta FRESCA da rota (data.faseProgress.faseCode), que lê

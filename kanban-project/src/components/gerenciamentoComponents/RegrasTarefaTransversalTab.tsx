@@ -107,7 +107,8 @@ export default function RegrasTarefaTransversalTab() {
   const erro = erroCarregar ? (erroCarregar.message || 'Não foi possível carregar as regras.') : null
 
   useEffect(() => {
-    carregar()
+    // `carregar()` saiu daqui: a consulta oficial já busca ao montar. Só o fetch
+    // avulso abaixo precisa de efeito.
     fetch("/api/gerenciamento/modelos-tarefa-transversal")
       .then(r => (r.ok ? r.json() : { modelos: [] }))
       .then(d => setModelos((d.modelos || []).map((m: any) => ({ id: m.id, name: m.name }))))

@@ -23,6 +23,7 @@
 // ============================================================================
 "use client"
 
+import { useCallback, useMemo } from 'react'
 import useSWR, { mutate as mutateGlobal, type SWRConfiguration } from "swr"
 import { authHeaders } from "@/src/lib/financeiro/http"
 import { encerrarSessao } from "@/src/lib/sessao/cliente"
@@ -97,13 +98,21 @@ export function useApi<T = unknown>(chave: string | null, opcoes?: SWRConfigurat
     buscar<T>,
     { ...POLITICA_PADRAO, ...opcoes },
   )
-  return {
-    dados: data,
-    carregando: isLoading,
-    revalidando: isValidating,
-    erro: error,
-    recarregar: (dados?: T) => mutate(dados as T | undefined),
-  }
+  // ESTABILIDADE REFERENCIAL — não é otimização, é correção.
+  //
+  // Devolver um objeto (e uma `recarregar`) novos a cada render fazia qualquer
+  // `useCallback`/`useEffect` que dependesse do resultado disparar em TODO render.
+  // Uma tela com `useEffect(() => carregar(), [carregar])` entrava em revalidação
+  // infinita: mutate → render → nova identidade → mutate. O spinner nunca
+  // terminava porque a consulta nunca estabilizava.
+  //
+  // `mutate` do SWR já é estável por chave; o que faltava era não embrulhá-lo numa
+  // função nova toda vez.
+  const recarregar = useCallback((dados?: T) => mutate(dados as T | undefined), [mutate])
+  return useMemo(
+    () => ({ dados: data, carregando: isLoading, revalidando: isValidating, erro: error, recarregar }),
+    [data, isLoading, isValidating, error, recarregar],
+  )
 }
 
 /**
@@ -137,13 +146,12 @@ export function useConsulta<T = unknown>(
     () => ler(),
     { ...POLITICA_PADRAO, ...opcoes },
   )
-  return {
-    dados: data,
-    carregando: isLoading,
-    revalidando: isValidating,
-    erro: error,
-    recarregar: (dados?: T) => mutate(dados as T | undefined),
-  }
+  // Mesma estabilidade referencial de `useApi` — ver a explicação lá.
+  const recarregar = useCallback((dados?: T) => mutate(dados as T | undefined), [mutate])
+  return useMemo(
+    () => ({ dados: data, carregando: isLoading, revalidando: isValidating, erro: error, recarregar }),
+    [data, isLoading, isValidating, error, recarregar],
+  )
 }
 
 /**
