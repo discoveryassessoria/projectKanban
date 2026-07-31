@@ -14,6 +14,18 @@ import { identificador, retratar } from '../lib/db/identidade-banco.mjs'
 const prisma = new PrismaClient()
 const url = process.env.PRISMA_DATABASE_URL || process.env.DATABASE_URL || ''
 const L = (m) => console.log(`[lmd] ${m}`)
+/** Contagem tolerante: model ausente vira 'n/d' em vez de derrubar a varredura. */
+const contar = async (model, args) => {
+  const d = prisma[model]
+  if (!d?.count) return 'n/d (model ausente)'
+  try { return await d.count(args) } catch { return 'n/d (erro)' }
+}
+/** groupBy tolerante — mesma razão. */
+const agrupar = async (model, args) => {
+  const d = prisma[model]
+  if (!d?.groupBy) return []
+  try { return await d.groupBy(args) } catch { return [] }
+}
 
 async function main() {
   const r = await retratar(prisma)
@@ -104,18 +116,19 @@ async function main() {
   const orgaos = await prisma.orgaoProtocolo.findMany({ select: { id: true, name: true, type: true, country: true, city: true, ativo: true }, orderBy: { name: 'asc' } })
   L(`\n11) ÓRGÃOS DE PROTOCOLO: ${orgaos.length}`)
   for (const o of orgaos) L(`   #${o.id} ${o.name} · tipo=${o.type ?? '—'} · país=${o.country ?? '—'} · ${o.city ?? '—'} · ativo=${o.ativo}`)
-  const orgs = await prisma.organizacao.count().catch(() => 'n/d')
-  L(`   organizações: ${orgs}`)
+  // Organização é o próprio OrgaoProtocolo (não há model separado).
+  const orgs = await contar('organizacaoCategoria')
+  L(`   vínculos organização×categoria: ${orgs}`)
 
   // ── 12) Protocolos ───────────────────────────────────────────────────────
   const tprot = await prisma.tipoProtocoloCadastro.findMany({ select: { id: true, code: true, nome: true, escopo: true, nacionalidade: true, ativo: true }, orderBy: { ordem: 'asc' } })
   L(`\n12) TIPOS DE PROTOCOLO: ${tprot.length}`)
   for (const t of tprot) L(`   #${t.id} ${t.code} · ${t.nome} · escopo=${t.escopo ?? '—'} · nac=${t.nacionalidade ?? '—'} · ativo=${t.ativo}`)
-  const protocolos = await prisma.protocolo.count().catch(() => 'n/d')
+  const protocolos = await contar('protocolo')
   L(`   protocolos abertos: ${protocolos}`)
 
   // ── 13-14) Financeiro ────────────────────────────────────────────────────
-  const cfgs = await prisma.produtoFinanceiro.count({ where: { ativo: true } })
+  const cfgs = await contar('produtoFinanceiro', { where: { ativo: true } })
   const precos = await prisma.tabelaValor.findMany({
     where: { arquivado: false },
     select: { id: true, name: true, natureza: true, moeda: true, valor: true, valorBase: true, valorAdicional: true, modoCalculo: true, unidade: true,
@@ -126,9 +139,9 @@ async function main() {
   for (const p of precos) L(`   #${p.id} ${p.configuracaoFinanceiraItem?.itemCatalogo?.name ?? p.name} · ${p.natureza} · ${p.moeda} · ${p.modoCalculo}/${p.unidade ?? '—'} · base=${p.valorBase ?? p.valor} adic=${p.valorAdicional ?? '—'}`)
 
   // ── 15) Usuários e Acessos ───────────────────────────────────────────────
-  const usuarios = await prisma.usuario.count()
+  const usuarios = await contar('usuario')
   const perfis = await prisma.perfil.findMany({ select: { id: true, nome: true } })
-  const equipes = await prisma.grupoUsuario.count().catch(() => 'n/d')
+  const equipes = await contar('grupoUsuario')
   L(`\n15) USUÁRIOS: ${usuarios} · PERFIS: ${perfis.map((p) => `#${p.id} ${p.nome}`).join(', ') || '—'} · EQUIPES: ${equipes}`)
 
   // ── 16) Automações ───────────────────────────────────────────────────────
@@ -140,24 +153,24 @@ async function main() {
   for (const a of autos) L(`   #${a.id} ${a.kind}/${a.trigger} fase=${a.phaseKey ?? '—'} tipoProc=${a.tipoProcessoId ?? 'TODOS'} ativo=${a.active}`)
 
   // ── 17) Papéis das pessoas ───────────────────────────────────────────────
-  const req = await prisma.requerente.count()
-  const pessoas = await prisma.pessoa.count()
-  const papeis = await prisma.pessoa.groupBy({ by: ['requerente'], _count: true }).catch(() => [])
+  const req = await contar('requerente')
+  const pessoas = await contar('pessoa')
+  const papeis = await agrupar('pessoa', { by: ['requerente'], _count: true })
   L(`\n17) PESSOAS: ${pessoas} · REQUERENTES: ${req}`)
   for (const p of papeis) L(`   papel requerente="${p.requerente ?? '—'}": ${p._count}`)
 
   // ── 18) MODALIDADE: via de tramitação ou modalidade legal? ───────────────
   // Pergunta que decide a modelagem da LMD. Respondida por USO REAL, não por nome.
   L(`\n18) USO REAL DAS MODALIDADES`)
-  const procs = await prisma.processo.groupBy({ by: ['tipoProcessoMotorId'], _count: true }).catch(() => [])
+  const procs = await agrupar('processo', { by: ['tipoProcessoMotorId'], _count: true })
   L(`   processos por tipo:`)
   for (const p of procs) {
     const t = tipos.find((x) => x.id === p.tipoProcessoMotorId)
     L(`      tipoProcesso #${p.tipoProcessoMotorId ?? '—'} (${t ? `${t.countryKey}/${t.modalityKey}` : '?'}): ${p._count} processo(s)`)
   }
-  const precoPorMod = await prisma.tabelaValor.groupBy({ by: ['modalidadeId'], _count: true }).catch(() => [])
+  const precoPorMod = await agrupar('tabelaValor', { by: ['modalidadeId'], _count: true })
   L(`   preços por modalidade: ${precoPorMod.map((x) => `#${x.modalidadeId ?? 'nenhuma'}=${x._count}`).join(', ') || 'nenhum'}`)
-  const totalProc = await prisma.processo.count()
+  const totalProc = await contar('processo')
   L(`   processos no total: ${totalProc}`)
 
   // ── VEREDITO ESPANHA/LMD ─────────────────────────────────────────────────
