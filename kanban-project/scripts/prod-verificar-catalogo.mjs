@@ -45,7 +45,7 @@ async function colunaExiste(tabela, coluna) {
 
 async function main() {
   const retrato = await retratar(prisma)
-  console.log(`[catalogo-smoke] alvo: ${identificador(url)} — ${classificar(url, retrato)} (tabelas=${retrato.tabelas}, migrations=${retrato.migrations})`)
+  console.log(`[catalogo-smoke] alvo: ${identificador(url)} — ${classificar(retrato)} (tabelas=${retrato.tabelas}, migrations=${retrato.migrations})`)
 
   let alertas = 0
   const alerta = (m) => { alertas++; console.log(`[catalogo-smoke] ⚠ ${m}`) }
