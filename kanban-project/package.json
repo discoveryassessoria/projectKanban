@@ -115,6 +115,7 @@
     "test:genealogia-fatia1": "tsx scripts/genealogia-fatia1-guard.test.ts",
     "test:genealogia-guard": "tsx scripts/genealogia-legado-guard.test.ts",
     "test:genealogia-materializacao": "tsx scripts/genealogia-materializacao.test.ts",
+    "test:guarda-producao": "tsx scripts/guarda-escrita-producao.test.ts",
     "test:home": "tsx scripts/home-logic.test.ts && tsx scripts/home-guard.test.ts",
     "test:home-guard": "tsx scripts/home-guard.test.ts",
     "test:home-logic": "tsx scripts/home-logic.test.ts",

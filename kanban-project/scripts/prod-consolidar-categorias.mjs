@@ -19,14 +19,17 @@
 //   • auditoria oficial registra a transferência e a remoção;
 //   • rodar de novo não faz nada (idempotente).
 //
-// Roda no build, onde a credencial existe. Não derruba o deployment: problema
-// aqui vira alerta no log.
+// NÃO roda no build. É operação administrativa explícita:
+//   npm run prod:consolidar-categorias
+// exigindo VERCEL_ENV=production, PROD_CONSOLIDAR_CATEGORIAS=APLICAR,
+// PRISMA_DATABASE_URL e identidade do banco classificada como PRODUCAO.
+// Falha aqui derruba o comando (exit != 0) — não vira alerta silencioso.
 // ============================================================================
 import { PrismaClient } from '@prisma/client'
-import { identificador, retratar } from '../lib/db/identidade-banco.mjs'
+import { rodarScriptProducao } from '../lib/db/guarda-escrita-producao.mjs'
 
-const prisma = new PrismaClient()
-const url = process.env.PRISMA_DATABASE_URL || process.env.DATABASE_URL || ''
+const NOME = 'consolidar-cat'
+const FLAG = 'PROD_CONSOLIDAR_CATEGORIAS'
 
 /**
  * Chave semântica: ignora caixa, acento, espaço excedente, hífen e sublinhado.
@@ -58,10 +61,7 @@ const EQUIVALENCIAS = new Map([
   ['retificacao', 'RETREG'],
 ])
 
-async function main() {
-  const retrato = await retratar(prisma)
-  console.log(`[consolidar-cat] alvo: ${identificador(url)} (tabelas=${retrato.tabelas}, migrations=${retrato.migrations})`)
-
+async function consolidar({ prisma }) {
   const categorias = await prisma.categoriaServico.findMany({
     orderBy: { id: 'asc' },
     select: { id: true, code: true, nome: true, _count: { select: { itens: true } } },
@@ -69,13 +69,13 @@ async function main() {
   const oficiais = new Map(categorias.filter((c) => CODES_OFICIAIS.includes(c.code)).map((c) => [c.code, c]))
   if (oficiais.size !== 3) {
     console.log(`[consolidar-cat] AVISO: as três categorias oficiais ainda não existem (${oficiais.size}/3). Nada a fazer.`)
-    await prisma.$disconnect(); return
+    return
   }
 
   const forasteiras = categorias.filter((c) => !CODES_OFICIAIS.includes(c.code))
   if (forasteiras.length === 0) {
     console.log('[consolidar-cat] OK — só existem as três categorias oficiais. Nada a consolidar.')
-    await prisma.$disconnect(); return
+    return
   }
 
   // ── DIAGNÓSTICO (sem escrita) ─────────────────────────────────────────────
@@ -90,7 +90,7 @@ async function main() {
     console.log(`[consolidar-cat] plano: #${c.id} [${c.code}] "${c.nome}" (${c._count.itens} item(ns)) → #${destino.id} [${destino.code}] "${destino.nome}"`)
     plano.push({ origem: c, destino })
   }
-  if (plano.length === 0) { console.log('[consolidar-cat] nada a executar.'); await prisma.$disconnect(); return }
+  if (plano.length === 0) { console.log('[consolidar-cat] nada a executar.'); return }
 
   // ── EXECUÇÃO (transação única) ────────────────────────────────────────────
   const totalAntes = await prisma.itemCatalogo.count({ where: { categoriaId: { not: null } } })
@@ -131,17 +131,19 @@ async function main() {
   // ── PROVA DE NÃO-PERDA ────────────────────────────────────────────────────
   const totalDepois = await prisma.itemCatalogo.count({ where: { categoriaId: { not: null } } })
   if (totalAntes !== totalDepois) {
-    console.log(`[consolidar-cat] ⚠ DIVERGÊNCIA: itens categorizados ${totalAntes} → ${totalDepois}`)
-  } else {
-    console.log(`[consolidar-cat] ✓ nenhum vínculo perdido: ${totalAntes} itens categorizados antes e depois`)
+    // Divergência aqui é perda de vínculo. Antes isso virava um aviso no log e o
+    // comando terminava verde — o defeito ficava invisível. Agora é falha.
+    throw new Error(`DIVERGÊNCIA: itens categorizados ${totalAntes} → ${totalDepois} (esperado: iguais)`)
   }
+  console.log(`[consolidar-cat] ✓ nenhum vínculo perdido: ${totalAntes} itens categorizados antes e depois`)
 
   const finais = await prisma.categoriaServico.count()
   console.log(`[consolidar-cat] categorias após consolidação: ${finais}`)
-  await prisma.$disconnect()
 }
 
-main().catch(async (e) => {
-  console.log(`[consolidar-cat] AVISO: consolidação não concluída, nada foi alterado (${String(e?.message ?? e).slice(0, 200)})`)
-  await prisma.$disconnect()
+await rodarScriptProducao({
+  nome: NOME,
+  flag: FLAG,
+  criarPrisma: () => new PrismaClient(),
+  operacao: consolidar,
 })

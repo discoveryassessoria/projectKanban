@@ -10,12 +10,17 @@
 // existe. Elas nunca são aplicadas — são dado morto que ainda aparece em
 // contagem e relatório. Não são APAGADAS: ficam `arquivado = true`, preservando
 // o conteúdo para reconciliação, e saem do caminho do motor.
+//
+// NÃO roda no build. É operação administrativa explícita:
+//   npm run prod:registrar-enquadramentos-lmd
+// exigindo VERCEL_ENV=production, PROD_REGISTRAR_ENQUADRAMENTOS_LMD=APLICAR,
+// PRISMA_DATABASE_URL e identidade do banco classificada como PRODUCAO.
 // ============================================================================
 import { PrismaClient } from '@prisma/client'
-import { identificador, retratar } from '../lib/db/identidade-banco.mjs'
+import { rodarScriptProducao } from '../lib/db/guarda-escrita-producao.mjs'
 
-const prisma = new PrismaClient()
-const url = process.env.PRISMA_DATABASE_URL || process.env.DATABASE_URL || ''
+const NOME = 'lmd-reg'
+const FLAG = 'PROD_REGISTRAR_ENQUADRAMENTOS_LMD'
 const L = (m) => console.log(`[lmd-reg] ${m}`)
 
 // Espelha prisma/enquadramentos-legais-oficiais.ts — o guard compara os dois.
@@ -29,10 +34,8 @@ const MODALIDADES = [
   },
 ]
 
-async function main() {
-  const r = await retratar(prisma)
-  L(`alvo: ${identificador(url)} (tabelas=${r.tabelas}, migrations=${r.migrations})`)
-  if (!prisma.modalidadeLegal) { L('AVISO: migration ainda não aplicada — nada a fazer.'); await prisma.$disconnect(); return }
+async function registrarEnquadramentos({ prisma }) {
+  if (!prisma.modalidadeLegal) { L('AVISO: migration ainda não aplicada — nada a fazer.'); return }
 
   // ── 1) Modalidade legal + enquadramentos ────────────────────────────────
   for (const m of MODALIDADES) {
@@ -66,7 +69,7 @@ async function main() {
   })
   const orfas = regras.filter((g) => !tipos.has(g.tipoProcessoId))
   L(`matriz documental: ${regras.length} regra(s) ativa(s) · órfãs: ${orfas.length}`)
-  if (orfas.length === 0) { L('OK — nenhuma regra órfã.'); await prisma.$disconnect(); return }
+  if (orfas.length === 0) { L('OK — nenhuma regra órfã.'); return }
   for (const o of orfas) L(`   órfã #${o.id} tipoProcesso=${o.tipoProcessoId} · ${o.documentTypeCode} · fase=${o.phaseKey ?? '—'}`)
 
   await prisma.$transaction(async (tx) => {
@@ -80,6 +83,20 @@ async function main() {
     })
   })
   L(`✓ ${orfas.length} regra(s) órfã(s) arquivada(s) — conteúdo preservado, fora do motor`)
-  await prisma.$disconnect()
+
+  // Conferência: nenhuma órfã pode ter sobrado ativa.
+  const tiposDepois = new Set((await prisma.tipoProcessoNacionalidade.findMany({ select: { id: true } })).map((t) => t.id))
+  const ativasDepois = await prisma.matrizDocumental.findMany({ where: { arquivado: false }, select: { id: true, tipoProcessoId: true } })
+  const orfasRestantes = ativasDepois.filter((g) => !tiposDepois.has(g.tipoProcessoId))
+  if (orfasRestantes.length > 0) {
+    throw new Error(`${orfasRestantes.length} regra(s) órfã(s) continuam ativas após o arquivamento`)
+  }
+  L('✓ conferido: nenhuma regra órfã ativa restante')
 }
-main().catch(async (e) => { L(`AVISO: não concluído (${String(e?.message ?? e).slice(0, 200)})`); await prisma.$disconnect() })
+
+await rodarScriptProducao({
+  nome: NOME,
+  flag: FLAG,
+  criarPrisma: () => new PrismaClient(),
+  operacao: registrarEnquadramentos,
+})

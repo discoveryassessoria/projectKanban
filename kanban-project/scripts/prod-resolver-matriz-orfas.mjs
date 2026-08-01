@@ -13,18 +13,20 @@
 // Então: audita tudo, remapeia o que tiver destino comprovado (hoje, nada),
 // elimina o que for inválido E sem dependência, e registra na auditoria oficial.
 // A auditoria guarda o conteúdo integral da regra removida.
+//
+// NÃO roda no build. É operação administrativa explícita:
+//   npm run prod:resolver-matriz-orfas
+// exigindo VERCEL_ENV=production, PROD_RESOLVER_MATRIZ_ORFAS=APLICAR,
+// PRISMA_DATABASE_URL e identidade do banco classificada como PRODUCAO.
 // ============================================================================
 import { PrismaClient } from '@prisma/client'
-import { identificador, retratar } from '../lib/db/identidade-banco.mjs'
+import { rodarScriptProducao } from '../lib/db/guarda-escrita-producao.mjs'
 
-const prisma = new PrismaClient()
-const url = process.env.PRISMA_DATABASE_URL || process.env.DATABASE_URL || ''
+const NOME = 'matriz'
+const FLAG = 'PROD_RESOLVER_MATRIZ_ORFAS'
 const L = (m) => console.log(`[matriz] ${m}`)
 
-async function main() {
-  const r = await retratar(prisma)
-  L(`alvo: ${identificador(url)} (tabelas=${r.tabelas}, migrations=${r.migrations})`)
-
+async function resolverOrfas({ prisma }) {
   const tipos = await prisma.tipoProcessoNacionalidade.findMany({ select: { id: true, name: true, countryKey: true } })
   const idsTipo = new Set(tipos.map((t) => t.id))
   L(`tipos de processo oficiais: ${tipos.map((t) => `#${t.id} ${t.countryKey}`).join(', ')}`)
@@ -57,7 +59,7 @@ async function main() {
   if (comUso.length) {
     L(`⚠ ${comUso.length} órfã(s) com usedByCount > 0 — PRESERVADAS para conferência humana: ${comUso.map((g) => `#${g.id}`).join(', ')}`)
   }
-  if (semUso.length === 0) { L('nada a eliminar.'); await prisma.$disconnect(); return }
+  if (semUso.length === 0) { L('nada a eliminar.'); return }
 
   // ── ELIMINAÇÃO definitiva das inválidas sem dependência ──────────────────
   await prisma.$transaction(async (tx) => {
@@ -81,10 +83,20 @@ async function main() {
   }, { timeout: 30000, maxWait: 10000 })
   L(`✓ ${semUso.length} regra(s) eliminada(s) — conteúdo integral preservado na auditoria`)
 
+  // Prova de não-perda: só podem ter saído as `semUso`, nada mais.
   const restante = await prisma.matrizDocumental.count()
+  const esperado = todas.length - semUso.length
+  if (restante !== esperado) {
+    throw new Error(`DIVERGÊNCIA: matriz tinha ${todas.length} regra(s), ${semUso.length} eliminada(s), esperado ${esperado}, encontrado ${restante}`)
+  }
   const arquivadas = await prisma.matrizDocumental.count({ where: { arquivado: true } })
   L(`matriz após limpeza: ${restante} regra(s) · arquivadas: ${arquivadas}`)
   L(restante === 0 ? 'matriz VAZIA — nenhuma regra morta, nenhum legado.' : 'conferir as remanescentes.')
-  await prisma.$disconnect()
 }
-main().catch(async (e) => { L(`AVISO: não concluído (${String(e?.message ?? e).slice(0, 200)})`); await prisma.$disconnect() })
+
+await rodarScriptProducao({
+  nome: NOME,
+  flag: FLAG,
+  criarPrisma: () => new PrismaClient(),
+  operacao: resolverOrfas,
+})

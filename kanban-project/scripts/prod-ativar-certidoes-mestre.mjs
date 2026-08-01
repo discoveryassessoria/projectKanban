@@ -12,20 +12,22 @@
 // imutável (nunca por nome). Não cria item, não mexe em preço, não mexe em
 // configuração financeira, não toca em nenhum outro registro. Reversível pela
 // própria tela (Ativo é estado, não exclusão). Auditado.
+//
+// NÃO roda no build. É operação administrativa explícita:
+//   npm run prod:ativar-certidoes-mestre
+// exigindo VERCEL_ENV=production, PROD_ATIVAR_CERTIDOES_MESTRE=APLICAR,
+// PRISMA_DATABASE_URL e identidade do banco classificada como PRODUCAO.
 // ============================================================================
 import { PrismaClient } from '@prisma/client'
-import { identificador, retratar } from '../lib/db/identidade-banco.mjs'
+import { rodarScriptProducao } from '../lib/db/guarda-escrita-producao.mjs'
 
-const prisma = new PrismaClient()
-const url = process.env.PRISMA_DATABASE_URL || process.env.DATABASE_URL || ''
+const NOME = 'ativar-certidoes'
+const FLAG = 'PROD_ATIVAR_CERTIDOES_MESTRE'
 
 /** Identidade imutável dos três documentos mestres. Nome não entra na busca. */
 const CODES = ['CERT_NASCIMENTO_IT', 'CERT_CASAMENTO_IT', 'CERT_OBITO_IT']
 
-async function main() {
-  const retrato = await retratar(prisma)
-  console.log(`[ativar-certidoes] alvo: ${identificador(url)} (tabelas=${retrato.tabelas})`)
-
+async function ativarCertidoes({ prisma }) {
   const itens = await prisma.itemCatalogo.findMany({
     where: { code: { in: CODES } },
     select: { id: true, code: true, name: true, ativo: true, natureza: true },
@@ -37,7 +39,7 @@ async function main() {
   console.log(`[ativar-certidoes] encontrados: ${itens.length}/3 · inativos: ${inativos.length}`)
   for (const i of itens) console.log(`[ativar-certidoes]   #${i.id} ${i.code} ativo=${i.ativo} — ${i.name}`)
 
-  if (inativos.length === 0) { console.log('[ativar-certidoes] OK — nada a reativar.'); await prisma.$disconnect(); return }
+  if (inativos.length === 0) { console.log('[ativar-certidoes] OK — nada a reativar.'); return }
 
   for (const i of inativos) {
     await prisma.$transaction(async (tx) => {
@@ -52,10 +54,18 @@ async function main() {
     })
     console.log(`[ativar-certidoes] ✓ reativado #${i.id} ${i.code} — ${i.name}`)
   }
-  await prisma.$disconnect()
+
+  // Conferência final: o estado alvo tem de valer para todos os encontrados.
+  const restantesInativos = await prisma.itemCatalogo.count({ where: { code: { in: CODES }, ativo: false } })
+  if (restantesInativos !== 0) {
+    throw new Error(`${restantesInativos} certidão(ões) continuam inativas após a reativação`)
+  }
+  console.log(`[ativar-certidoes] ✓ conferido: nenhuma das ${CODES.length} certidões canônicas está inativa`)
 }
 
-main().catch(async (e) => {
-  console.log(`[ativar-certidoes] AVISO: não concluído (${String(e?.message ?? e).slice(0, 200)})`)
-  await prisma.$disconnect()
+await rodarScriptProducao({
+  nome: NOME,
+  flag: FLAG,
+  criarPrisma: () => new PrismaClient(),
+  operacao: ativarCertidoes,
 })
