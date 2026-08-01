@@ -10,3 +10,8 @@ restore.log
 scripts/*.log
 .vercel
 .env*
+
+# Worktrees de sessão de agente. Chegaram a ser commitadas como gitlink
+# (modo 160000), o que transformava um diretório de trabalho local em
+# pseudo-submódulo do repositório. Diretório de sessão não se versiona.
+.claude/worktrees/
