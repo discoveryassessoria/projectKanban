@@ -1177,9 +1177,25 @@ model ClienteAuth {
   contratante      Contratante? @relation(fields: [contratanteId], references: [id], onDelete: Cascade)
   requerente       Requerente?  @relation(fields: [requerenteId], references: [id], onDelete: Cascade)
   mensagens        Mensagem[]
+  dispositivosPush DispositivoPush[]
 
   @@index([contratanteId])
   @@index([requerenteId])
+}
+
+// Token de push do app mobile (Expo). Um registro por dispositivo.
+// O token é a chave natural: o mesmo aparelho reinstalado/relogado com outra
+// conta reaproveita a linha e troca o clienteAuthId, em vez de duplicar.
+model DispositivoPush {
+  id            Int         @id @default(autoincrement())
+  clienteAuthId Int
+  expoPushToken String      @unique @db.VarChar(255)
+  plataforma    String?     @db.VarChar(20)
+  criadoEm      DateTime    @default(now())
+  atualizadoEm  DateTime    @updatedAt
+  clienteAuth   ClienteAuth @relation(fields: [clienteAuthId], references: [id], onDelete: Cascade)
+
+  @@index([clienteAuthId])
 }
 
 model Mensagem {
