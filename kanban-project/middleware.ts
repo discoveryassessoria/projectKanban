@@ -27,6 +27,13 @@ import { verifyAuthToken } from "@/lib/auth-jwt"
  *  - /api/blog/       → blog público do site institucional (somente leitura).
  *  - /api/cambio      → cotação de câmbio (somente leitura, sem PII).
  *  - /api/paises      → catálogo de países (somente leitura).
+ *  - /api/cron/cambio, /api/cron/registral
+ *                     → invocados pelo Vercel Cron, que não carrega JWT
+ *                       interno. Cada handler se auto-verifica: exige o header
+ *                       `x-vercel-cron` OU `Authorization: Bearer CRON_SECRET`
+ *                       (o registral aceita ainda operador com a permissão
+ *                       `registral.reprocessar`). Mesma convenção de /api/app/:
+ *                       o middleware libera, o handler decide.
  *
  * Observações:
  *  - /api/status NÃO é health check — é o CRUD de colunas do Kanban
@@ -45,6 +52,12 @@ const API_PUBLICA: string[] = [
   "/api/blog",
   "/api/cambio",
   "/api/paises",
+  // Listados um a um, NÃO por prefixo "/api/cron/": um cron novo nasce
+  // bloqueado e só entra aqui por decisão consciente, depois de conferir que
+  // o handler se auto-verifica. Prefixo isentaria automaticamente uma rota
+  // futura que esquecesse desse gate.
+  "/api/cron/cambio",
+  "/api/cron/registral",
 ]
 
 function isApiPublica(pathname: string): boolean {
