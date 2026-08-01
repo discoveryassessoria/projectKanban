@@ -25,7 +25,7 @@ const mig = migRaw.split('\n').filter((l) => !l.trim().startsWith('--')).join('\
 ok('migration idempotente (CREATE TABLE IF NOT EXISTS)', (mig.match(/CREATE TABLE IF NOT EXISTS/g) || []).length >= 16)
 ok('migration só aditiva (nenhum DROP/ALTER destrutivo em statements)', !/\bDROP TABLE\b/.test(mig) && !/\bDROP COLUMN\b/.test(mig) && mig.includes('ADD COLUMN IF NOT EXISTS "obrigacaoId"'))
 ok('migration registrada no aplicador de build', rd('scripts/prod-apply-cadastros-aditivas.mjs').includes('20260808000000_motor_financeiro_v3_fase1'))
-ok('seed plano de contas no build', rd('package.json').includes('prod-seed-plano-contas.mjs'))
+ok('seed plano de contas declarado como script administrativo', rd('package.json').includes('prod-seed-plano-contas.mjs'))
 
 const svc = rd('lib/financeiro/ledger/ledger-service.ts')
 ok('serviço transacional ($transaction) + replay', svc.includes('$transaction') && svc.includes('recomputarProjecao') && svc.includes('projetar'))

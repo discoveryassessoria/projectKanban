@@ -65,7 +65,7 @@ chk(gen.includes('LIKE $1'), 'prefixo do escopo entra como parâmetro, não conc
 const recon = ler('scripts/reconciliar-sequencias-codigo.ts')
 chk(recon.includes('--dry-run'), 'reconciliação tem dry-run')
 chk(recon.includes('CODE_REGISTRY'), 'reconcilia TODOS os escopos, não só o que quebrou')
-chk(ler('package.json').includes('prod-reconciliar-sequencias'), 'reconciliação roda no build')
+chk(ler('package.json').includes('prod-reconciliar-sequencias'), 'reconciliação declarada como script administrativo')
 
 // ── 4) a rota fala a verdade ─────────────────────────────────────────────────
 sec('4) mensagens honestas')

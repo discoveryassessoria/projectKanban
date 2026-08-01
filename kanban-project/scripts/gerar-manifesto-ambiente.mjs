@@ -5,7 +5,13 @@
 //
 // TOLERANTE A FALHAS: pasta/arquivo ausente NUNCA quebra o build — apenas gera
 // listas vazias (o fundo cai no céu procedural). Ignora .gitkeep e não-imagens.
-import { readdirSync, statSync, writeFileSync } from "node:fs";
+//
+// DETERMINÍSTICO E SEM ESCRITA CEGA: a saída é função apenas do conteúdo de
+// public/ambiente (listas fixas de país/enquadramento, arquivos ordenados). O
+// arquivo é rastreado pelo git, então só é regravado quando o conteúdo REALMENTE
+// muda — build nenhum suja a working tree por efeito colateral. Quando muda, o
+// log diz explicitamente que há um diff a commitar.
+import { readFileSync, readdirSync, statSync, writeFileSync } from "node:fs";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -60,9 +66,23 @@ ${corpo}
 }
 `;
 
+let atual = null;
 try {
-  writeFileSync(OUT, conteudo);
-  console.log(`[ambiente] manifesto gerado: ${total} imagem(ns).`);
-} catch (e) {
-  console.warn(`[ambiente] não foi possível escrever o manifesto (${e?.message}); build segue com o existente.`);
+  atual = readFileSync(OUT, "utf8");
+} catch {
+  atual = null; // ainda não existe — primeira geração
+}
+
+if (atual === conteudo) {
+  console.log(`[ambiente] manifesto já em dia: ${total} imagem(ns). Nada reescrito.`);
+} else {
+  try {
+    writeFileSync(OUT, conteudo);
+    console.log(
+      `[ambiente] manifesto ATUALIZADO: ${total} imagem(ns).` +
+      (atual === null ? " (arquivo criado)" : " Há um diff a commitar em src/lib/ambiente/manifest.generated.ts."),
+    );
+  } catch (e) {
+    console.warn(`[ambiente] não foi possível escrever o manifesto (${e?.message}); build segue com o existente.`);
+  }
 }

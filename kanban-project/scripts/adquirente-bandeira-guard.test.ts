@@ -70,7 +70,7 @@ sec('6 — seed idempotente + aplicador')
   const ap = ler('scripts/prod-apply-cadastros-aditivas.mjs')
   ok('migration no aplicador + sentinelas', ap.includes('20260805000000_adquirente_bandeira') && ap.includes("['Adquirente', ['slug'"))
   const pkg = ler('package.json')
-  ok('seed no build (após formas)', pkg.includes('prod-seed-adquirentes-bandeiras.mjs'))
+  ok('seed declarado como script administrativo', pkg.includes('prod-seed-adquirentes-bandeiras.mjs'))
 }
 
 console.log(`\n${'='.repeat(60)}`)
