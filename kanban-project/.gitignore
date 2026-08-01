@@ -46,6 +46,7 @@ next-env.d.ts
 backup-*.sql
 backup_*.sql
 
-# Scripts utilitários temporários
+# Scripts utilitï¿½rios temporï¿½rios
 reset-password.mjs
 .claude/worktrees/
+.env*.local
