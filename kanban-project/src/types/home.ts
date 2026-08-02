@@ -18,6 +18,8 @@
 // Documento, PendenciaFinanceira, Evento, DomainOutbox).
 // ============================================================================
 
+import type { ResumoSla } from "@/src/types/sla"
+
 export type NivelPrioridade = "critico" | "alto" | "medio" | "baixo"
 
 /** Módulo dono da informação — usado só para ícone/agrupamento visual. */
@@ -70,6 +72,17 @@ export interface FilaDetalhe {
   itens: FilaItem[]
   /** true quando a fila tem mais itens do que o limite retornado */
   truncado: boolean
+}
+
+// ---- 2b. SLA dos processos (bloco de prazo) -------------------------------
+// Mesma forma de FilaOperacional (card + drill-down por /dashboard/fila/[key]),
+// mas fora da lista de trabalho executável: prazo não é "ação da fila", é
+// situação do processo. As quatro faixas aparecem SEMPRE, inclusive zeradas.
+export interface PainelSla {
+  /** cards clicáveis: atrasados, vencem hoje, próximos 7 dias, no prazo */
+  cards: FilaOperacional[]
+  /** contagem crua da mesma leitura que gerou os cards */
+  resumo: ResumoSla
 }
 
 // ---- 3. Agenda -------------------------------------------------------------
@@ -140,6 +153,8 @@ export interface HomeData {
   permissions: HomePermissions
   status: StatusOperacional
   filas: FilaOperacional[]
+  /** null quando o usuário não vê processos */
+  sla: PainelSla | null
   agenda: Agenda
   /** vazio = o bloco de alertas não é renderizado */
   alertas: AlertaOperacional[]

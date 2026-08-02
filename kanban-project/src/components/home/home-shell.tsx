@@ -35,9 +35,25 @@ export function HomeShell({
 
   return (
     <div className="relative min-h-screen overflow-x-hidden text-white">
-      {/* Fundo arquitetônico desfocado e escurecido — idêntico ao Financeiro */}
-      <div className="pointer-events-none fixed inset-0 -z-10 scale-105 bg-[url('/espanha.jpg')] bg-cover bg-center bg-no-repeat blur-[6px]" />
-      <div className="pointer-events-none fixed inset-0 -z-10 bg-black/60" />
+      {/* ----------------------------------------------------------------------
+          AMBIENTE — a foto não é textura sob o texto, é HORIZONTE.
+          O borrão uniforme + preto 60% deixava a imagem passando por baixo do
+          conteúdo (contraste baixo em tudo, sem ganhar profundidade em nada).
+          Aqui o véu é quase opaco na faixa onde o conteúdo vive e só abre na
+          base: a cidade aparece nítida embaixo, como decisão de composição.
+          ---------------------------------------------------------------------- */}
+      <div
+        className="pointer-events-none fixed inset-0 -z-10 bg-[url('/espanha.jpg')] bg-cover bg-center bg-no-repeat"
+        style={{ filter: "saturate(.55) contrast(1.02) brightness(.92)" }}
+      />
+      <div
+        className="pointer-events-none fixed inset-0 -z-10"
+        style={{
+          background:
+            "linear-gradient(180deg, rgba(8,9,11,.985) 0%, rgba(8,9,11,.975) 46%, rgba(8,9,11,.95) 60%," +
+            " rgba(8,9,11,.86) 72%, rgba(8,9,11,.76) 86%, rgba(8,9,11,.88) 100%)",
+        }}
+      />
 
       <HeaderBar
         title={titulo}
@@ -49,8 +65,9 @@ export function HomeShell({
         onLogout={sair}
       />
 
+      {/* Sem véu extra aqui: quem controla a luz da tela é a camada de ambiente
+          acima. Um `bg-black/10` a mais só apagaria o horizonte. */}
       <div className="relative min-h-screen">
-        <div className="pointer-events-none absolute inset-0 bg-black/10" />
         <main className="relative">{children}</main>
       </div>
     </div>

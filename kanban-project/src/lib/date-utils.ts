@@ -143,3 +143,32 @@ export function hojeBrasilMaisDias(dias: number): Date {
   hoje.setUTCDate(hoje.getUTCDate() + dias)
   return hoje
 }
+
+/**
+ * Número do DIA CIVIL (dias desde a época) de um instante, no fuso do Brasil.
+ * Base de toda contagem de prazo: o servidor roda em UTC, então comparar
+ * timestamps crus faria "ontem 23h BRT" virar "hoje" e deslocar o prazo em um dia.
+ */
+function diaCivilBrasil(d: Date): number {
+  const [ano, mes, dia] = d
+    .toLocaleDateString('en-CA', { timeZone: 'America/Sao_Paulo' })
+    .split('-')
+    .map(Number)
+  return Date.UTC(ano, mes - 1, dia) / 86_400_000
+}
+
+/**
+ * Diferença em DIAS CIVIS entre dois instantes (a - b), no fuso do Brasil.
+ * Positivo quando `a` é posterior a `b`. Hora do dia é irrelevante.
+ */
+export function diasEntreDatas(a: Date, b: Date): number {
+  return diaCivilBrasil(a) - diaCivilBrasil(b)
+}
+
+/**
+ * `d` + N dias civis, devolvido como Date ao meio-dia UTC do dia resultante —
+ * mesma convenção de `hojeBrasil()`, segura para serializar e comparar.
+ */
+export function somarDiasCivis(d: Date, dias: number): Date {
+  return new Date((diaCivilBrasil(d) + dias) * 86_400_000 + 12 * 3_600_000)
+}

@@ -12,10 +12,12 @@
 // ============================================================================
 
 import { prisma } from "@/lib/prisma"
-import { snapshotCotacoes } from "@/src/lib/cambio/servico-cambio"
+import { resolveSlaProjectionBatch, resumirSla } from "@/src/lib/process-stage/sla-projection"
 import {
   FILAS_PASSO,
   FILAS_ESTADO,
+  FILAS_SLA,
+  faixaDaFilaSla,
   STATUS_PASSO_ACIONAVEL,
   STATUS_PASSO_VIVO,
   STATUS_TAREFA_TERMINAL,
@@ -40,8 +42,10 @@ import type {
   FilaItem,
   FilaOperacional,
   HomePermissions,
+  PainelSla,
   ResumoDia,
 } from "@/src/types/home"
+import type { SlaProcesso } from "@/src/types/sla"
 
 /** Dias sem movimentação a partir dos quais o processo entra na fila "parados". */
 export const DIAS_PROCESSO_PARADO = 15
@@ -105,6 +109,11 @@ export interface BaseOperacional {
   /** processos cuja fase atual está concluída no motor (prontos para avançar) */
   prontosParaAvancar: number[]
   parados: ProcessoBase[]
+  /**
+   * SLA por processo, vindo da ENGINE ÚNICA (resolveSlaProjectionBatch). A Home
+   * não calcula prazo: consome a mesma projeção da listagem e do detalhe.
+   */
+  sla: Map<number, SlaProcesso>
 }
 
 export async function carregarBase(ctx: ContextoHome): Promise<BaseOperacional> {
@@ -189,6 +198,14 @@ export async function carregarBase(ctx: ContextoHome): Promise<BaseOperacional> 
     (pr) => pr.faseAtualKey !== FASE_FINAL && pr.updatedAt < limiteParado,
   )
 
+  // SLA: uma chamada à engine oficial para TODOS os processos visíveis (3 queries
+  // agregadas, sem N+1). O card e o drill-down leem daqui — nunca recalculam.
+  const idsProcessos = [...processos.keys()]
+  const slaLista = p.verProcessos && idsProcessos.length > 0
+    ? await resolveSlaProjectionBatch(idsProcessos, agora)
+    : []
+  const sla = new Map<number, SlaProcesso>(slaLista.map((s) => [s.processoId, s]))
+
   return {
     processos,
     passos,
@@ -196,6 +213,7 @@ export async function carregarBase(ctx: ContextoHome): Promise<BaseOperacional> 
     pendencias: pendenciasRaw as PendenciaBase[],
     prontosParaAvancar: [...prontos],
     parados,
+    sla,
   }
 }
 
@@ -206,9 +224,23 @@ type Membro =
   | { tipo: "passo"; passo: PassoBase }
   | { tipo: "tarefa"; tarefa: TarefaBase }
   | { tipo: "processo"; processo: ProcessoBase }
+  | { tipo: "processo-sla"; processo: ProcessoBase; sla: SlaProcesso }
   | { tipo: "pendencia"; pendencia: PendenciaBase }
 
 function membrosDaFila(key: string, base: BaseOperacional, agora: Date): Membro[] {
+  // --- filas de SLA (faixa de prazo do processo) ---
+  const faixa = faixaDaFilaSla(key)
+  if (faixa) {
+    const membros: Membro[] = []
+    for (const sla of base.sla.values()) {
+      if (sla.faixa !== faixa) continue
+      const processo = base.processos.get(sla.processoId)
+      if (!processo) continue
+      membros.push({ tipo: "processo-sla", processo, sla })
+    }
+    return membros
+  }
+
   // --- filas de passo (trabalho do Workflow) ---
   if (FILAS_PASSO.some((f) => f.key === key)) {
     return base.passos
@@ -272,6 +304,7 @@ function membrosDaFila(key: string, base: BaseOperacional, agora: Date): Membro[
 function prazoDoMembro(m: Membro): Date | null {
   if (m.tipo === "passo") return m.passo.prazo
   if (m.tipo === "tarefa") return m.tarefa.dataPrazo
+  if (m.tipo === "processo-sla") return m.sla.prazoPrevisto ? new Date(m.sla.prazoPrevisto) : null
   return null
 }
 
@@ -304,6 +337,34 @@ export function montarFilas(base: BaseOperacional, ctx: ContextoHome): FilaOpera
     })
   }
   return ordenarFilas(filas)
+}
+
+// ---------------------------------------------------------------------------
+// SLA — bloco de prazo da Central Operacional
+// ---------------------------------------------------------------------------
+/**
+ * Os quatro cards de prazo. A contagem sai da MESMA definição de membros usada
+ * pelo drill-down (`membrosDaFila`), então o número do card e o tamanho da lista
+ * são o mesmo cálculo. Faixa zerada continua aparecendo — "0 atrasados" é
+ * resultado operacional, não ausência de bloco.
+ */
+export function montarSla(base: BaseOperacional, ctx: ContextoHome): PainelSla | null {
+  if (!ctx.permissoes.verProcessos) return null
+
+  const cards: FilaOperacional[] = FILAS_SLA.map((def) => {
+    const quantidade = membrosDaFila(def.key, base, ctx.agora).length
+    return {
+      key: def.key,
+      titulo: def.titulo,
+      descricao: def.descricao,
+      quantidade,
+      nivel: quantidade > 0 ? def.nivelBase : "baixo",
+      modulo: def.modulo,
+      href: `/dashboard/fila/${def.key}`,
+    }
+  })
+
+  return { cards, resumo: resumirSla([...base.sla.values()]) }
 }
 
 // ---------------------------------------------------------------------------
@@ -427,6 +488,24 @@ export async function listarFila(
         prazo: t.dataPrazo ? t.dataPrazo.toISOString() : null,
         atrasado: estaAtrasado(t.dataPrazo, ctx.agora),
         href: pr ? hrefProcesso(pr, `&tab=tarefas&atividadeId=${t.id}`) : "/activities",
+      }
+    }
+    if (m.tipo === "processo-sla") {
+      const pr = m.processo
+      const s = m.sla
+      return {
+        id: `sla-${pr.id}`,
+        titulo: pr.nome,
+        subtitulo: [s.rotuloDias, s.faseAtual?.label ?? pr.faseAtualKey?.replace(/_/g, " ") ?? null]
+          .filter(Boolean)
+          .join(" · "),
+        processoId: pr.id,
+        processoCodigo: pr.codigo,
+        processoNome: pr.nome,
+        pais: pr.pais,
+        prazo: s.prazoPrevisto,
+        atrasado: s.status === "atrasado",
+        href: hrefProcesso(pr),
       }
     }
     if (m.tipo === "processo") {
@@ -581,14 +660,13 @@ export async function montarAlertas(base: BaseOperacional, ctx: ContextoHome): P
     })
   }
 
-  const [documentosInvalidos, automacoesFalhas, cambio] = await Promise.all([
+  const [documentosInvalidos, automacoesFalhas] = await Promise.all([
     ctx.permissoes.verProcessos
       ? prisma.documento.count({ where: { status: { in: ["INVALIDO", "NAO_ENCONTRADO"] as any } } })
       : Promise.resolve(0),
     ctx.permissoes.isAdmin
       ? prisma.domainOutbox.count({ where: { status: "ERRO" as any } })
       : Promise.resolve(0),
-    ctx.permissoes.verProcessos ? snapshotCotacoes().catch(() => null) : Promise.resolve(null),
   ])
 
   // 2) Documento inválido / não encontrado — trava a esteira documental.
@@ -613,25 +691,21 @@ export async function montarAlertas(base: BaseOperacional, ctx: ContextoHome): P
       detalhe: `${automacoesFalhas} ${automacoesFalhas === 1 ? "evento não foi processado" : "eventos não foram processados"}`,
       nivel: "critico",
       quantidade: automacoesFalhas,
-      href: "/settings",
+      // O lugar onde essa falha é DIAGNOSTICADA e reprocessada é o motor, no
+      // Gerenciamento — não a antiga tela de conta do usuário (removida).
+      href: "/administrator?screen=runtimediag",
     })
   }
 
-  // 4) Integração indisponível — câmbio sem cotação vigente/atualizada.
-  const moedasRuins = (cambio?.moedas ?? []).filter(
-    (m: any) => m.estado === "INDISPONIVEL" || m.estado === "DESATUALIZADO" || m.estado === "CONFIGURACAO_PENDENTE",
-  )
-  if (moedasRuins.length > 0) {
-    alertas.push({
-      key: "integracao",
-      tipo: "integracao",
-      titulo: "Integração de câmbio indisponível",
-      detalhe: `${moedasRuins.map((m: any) => m.moeda).join(" e ")} sem cotação atualizada`,
-      nivel: "alto",
-      quantidade: moedasRuins.length,
-      href: "/cambio",
-    })
-  }
+  // 4) Câmbio defasado NÃO vira alerta da Home.
+  // ---------------------------------------------------------------------------
+  // O `CambioMini` do topo (presente em TODAS as telas) já mostra o estado do
+  // câmbio: cotação, ⚠ quando defasado e link para /cambio. Repetir isso como
+  // card de alerta dizia a mesma coisa duas vezes na mesma tela e, pior, gastava
+  // o bloco de Alertas — que existe para o que TRAVA a operação — com uma
+  // informação que não bloqueia trabalho nenhum. A informação não se perdeu:
+  // mudou de lugar (fonte única, no chip). `cambio` segue sendo lido pelo
+  // contexto para as demais leituras da Home.
 
   return alertas
 }

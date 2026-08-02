@@ -20,7 +20,6 @@ import Link from "next/link"
 import {
   AlertTriangle,
   ArrowRight,
-  CalendarClock,
   CheckCircle2,
   ChevronRight,
   ClipboardList,
@@ -31,16 +30,19 @@ import {
   ShieldAlert,
 } from "lucide-react"
 import type { AgendaItem, FilaOperacional, HomeData, ModuloFila } from "@/src/types/home"
-import { GlobalSearch } from "@/src/components/home/global-search"
+import { CommandPalette } from "@/src/components/home/command-palette"
 import {
   BlocoCard,
   BlocoHeader,
+  CARD_FOCAL,
   EmptyState,
   OURO,
   formatarHorario,
   nivelStyle,
   saudacao,
 } from "@/src/components/home/home-primitives"
+import { ESTILO_FAIXA_SLA } from "@/src/components/sla/sla-ui"
+import { faixaDaFilaSla } from "@/src/lib/home/home-logic"
 
 const ICONE_MODULO: Record<ModuloFila, React.ComponentType<{ className?: string }>> = {
   documentos: FileText,
@@ -52,6 +54,18 @@ const ICONE_MODULO: Record<ModuloFila, React.ComponentType<{ className?: string 
 // ===========================================================================
 // 1. CABEÇALHO — saudação, data, status operacional, busca global
 // ===========================================================================
+/** Pílula de status: a mensagem operacional vira UM objeto, com a cor do nível. */
+const PILULA_STATUS: Record<string, string> = {
+  critico: "border-red-400/25 bg-red-500/[0.13] text-red-300",
+  atencao: "border-amber-400/25 bg-amber-500/[0.12] text-amber-300",
+  ok: "border-emerald-400/25 bg-emerald-500/[0.12] text-emerald-300",
+}
+const PONTO_STATUS: Record<string, string> = {
+  critico: "bg-red-400",
+  atencao: "bg-amber-400",
+  ok: "bg-emerald-400",
+}
+
 function Cabecalho({ data }: { data: HomeData }) {
   const hoje = new Date(data.geradoEm).toLocaleDateString("pt-BR", {
     weekday: "long",
@@ -60,23 +74,25 @@ function Cabecalho({ data }: { data: HomeData }) {
     year: "numeric",
   })
   const s = data.status
-  const cor = s.nivel === "critico" ? "bg-red-400" : s.nivel === "atencao" ? "bg-amber-400" : "bg-emerald-400"
+  const nivel = s.nivel === "critico" ? "critico" : s.nivel === "atencao" ? "atencao" : "ok"
 
   return (
-    <header className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+    <header className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
       <div className="min-w-0">
-        <h1 className="truncate text-2xl font-bold tracking-tight text-white md:text-[28px]">
+        {/* O protagonista da tela é a fila de trabalho, não a saudação: ela
+            desce de tamanho e o status sobe para a mesma linha da data. */}
+        <h1 className="truncate text-[26px] font-semibold tracking-tight text-white">
           {saudacao()}, {data.usuario.nome.split(" ")[0]}
         </h1>
-        <p className="mt-1 text-sm capitalize text-white/50">{hoje}</p>
-        <p className="mt-2 flex items-center gap-2 text-sm text-white/80">
-          <span className={`h-2 w-2 rounded-full ${cor}`} />
-          {s.mensagem}
-        </p>
+        <div className="mt-1.5 flex flex-wrap items-center gap-2.5 text-sm text-white/55">
+          <span className="capitalize">{hoje}</span>
+          <span className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-0.5 text-xs font-medium ${PILULA_STATUS[nivel]}`}>
+            <span className={`h-1.5 w-1.5 rounded-full ${PONTO_STATUS[nivel]}`} />
+            {s.mensagem}
+          </span>
+        </div>
       </div>
-      <div className="w-full lg:max-w-md">
-        <GlobalSearch />
-      </div>
+      <CommandPalette />
     </header>
   )
 }
@@ -90,16 +106,18 @@ function LinhaFila({ fila }: { fila: FilaOperacional }) {
   return (
     <Link
       href={fila.href}
-      className="group flex items-center gap-3 rounded-lg border border-white/10 bg-white/[0.03] px-3 py-3 transition hover:border-white/20 hover:bg-white/[0.07] focus:outline-none focus:ring-2 focus:ring-white/20 md:gap-4 md:px-4"
+      className="group flex items-center gap-3 rounded-xl border border-transparent bg-white/[0.04] px-3 py-3 transition hover:border-white/10 hover:bg-white/[0.08] focus:outline-none focus:ring-2 focus:ring-white/20 md:gap-4"
     >
-      <span className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border ${st.chip}`}>
+      <span className={`flex h-[34px] w-[34px] shrink-0 items-center justify-center rounded-[10px] border ${st.chip}`}>
         <Icone className="h-4 w-4" />
       </span>
       <div className="min-w-0 flex-1">
         <p className="truncate text-sm font-semibold text-white">{fila.titulo}</p>
-        <p className="truncate text-xs text-white/50">{fila.descricao}</p>
+        <p className="truncate text-xs text-white/45">{fila.descricao}</p>
       </div>
-      <span className={`shrink-0 rounded-md border px-2 py-1 text-sm font-bold tabular-nums ${st.chip}`}>
+      {/* A quantidade é o dado que decide a prioridade: número grande e limpo,
+          sem chip — a cor do nível já vive no ícone. */}
+      <span className={`shrink-0 text-xl font-semibold tabular-nums ${fila.nivel === "critico" ? st.texto : "text-white"}`}>
         {fila.quantidade}
       </span>
       <ChevronRight className="h-4 w-4 shrink-0 text-white/30 transition-transform group-hover:translate-x-0.5 group-hover:text-white/60" />
@@ -108,28 +126,97 @@ function LinhaFila({ fila }: { fila: FilaOperacional }) {
 }
 
 function CentralOperacional({ data }: { data: HomeData }) {
+  const total = data.status.totalAcoes
   return (
-    <BlocoCard>
-      <BlocoHeader
-        titulo="Central Operacional"
-        descricao="O que precisa da sua ação agora"
-        acao={
-          data.status.totalAcoes > 0 ? (
-            <span className="text-xs font-medium tabular-nums text-white/50">
-              {data.status.totalAcoes} {data.status.totalAcoes === 1 ? "ação" : "ações"}
-            </span>
-          ) : null
-        }
+    <section className={`${CARD_FOCAL} flex h-full flex-col`}>
+      {/* Fio dourado no topo — a marca de que ESTE é o bloco principal da tela. */}
+      <span
+        aria-hidden
+        className="pointer-events-none absolute inset-x-0 top-0 h-px"
+        style={{ background: `linear-gradient(90deg, transparent, ${OURO}8C, transparent)` }}
       />
+      <div className="px-5 pb-3 pt-5">
+        <BlocoHeader
+          titulo="Central Operacional"
+          descricao="O que precisa da sua ação agora"
+          acao={
+            total > 0 ? (
+              <span className="rounded-md border border-red-400/30 bg-red-500/15 px-2 py-0.5 text-sm font-semibold tabular-nums text-red-300">
+                {total}
+              </span>
+            ) : null
+          }
+        />
+      </div>
       {data.filas.length === 0 ? (
-        <EmptyState icon={CheckCircle2}>Nenhuma fila com trabalho pendente para você.</EmptyState>
+        // Vazio aqui é CONQUISTA, não buraco: some o ícone apagado e entra a
+        // confirmação de que a fila está limpa.
+        <div className="flex flex-1 flex-col items-center justify-center gap-3 px-5 pb-10 pt-2 text-center">
+          <span className="flex h-[52px] w-[52px] items-center justify-center rounded-full border border-emerald-400/25 bg-emerald-500/10 text-emerald-300">
+            <CheckCircle2 className="h-6 w-6" />
+          </span>
+          <p className="text-[15px] font-medium text-white">Tudo limpo por aqui</p>
+          <p className="text-sm text-white/45">Nenhuma fila com trabalho pendente para você.</p>
+        </div>
       ) : (
-        <div className="space-y-2">
+        <div className="space-y-1.5 px-3 pb-3">
           {data.filas.map((f) => (
             <LinhaFila key={f.key} fila={f} />
           ))}
         </div>
       )}
+    </section>
+  )
+}
+
+// ===========================================================================
+// 2b. SLA DOS PROCESSOS — situação do prazo, clicável até a lista filtrada
+// ---------------------------------------------------------------------------
+// Bloco próprio: prazo não é fila de trabalho. Os quatro cards aparecem sempre
+// (inclusive zerados) e cada um abre EXATAMENTE os processos daquela faixa —
+// mesma engine, mesma contagem, sem recálculo na tela.
+// ===========================================================================
+function CardSla({ fila }: { fila: FilaOperacional }) {
+  const st = ESTILO_FAIXA_SLA[faixaDaFilaSla(fila.key) ?? "no-prazo"]
+  return (
+    <Link
+      href={fila.href}
+      className="group flex flex-col gap-1 rounded-lg border border-white/10 bg-white/[0.03] px-3 py-3 transition hover:border-white/20 hover:bg-white/[0.07] focus:outline-none focus:ring-2 focus:ring-white/20 md:px-4"
+    >
+      <div className="flex items-center gap-2">
+        <span className={`h-2 w-2 shrink-0 rounded-full ${st.ponto}`} />
+        <span className={`text-2xl font-bold tabular-nums ${fila.quantidade > 0 ? st.texto : "text-white/40"}`}>
+          {fila.quantidade}
+        </span>
+        <ChevronRight className="ml-auto h-4 w-4 shrink-0 text-white/25 transition-transform group-hover:translate-x-0.5 group-hover:text-white/60" />
+      </div>
+      <p className="truncate text-sm font-semibold text-white">{fila.titulo}</p>
+      <p className="truncate text-xs text-white/45">{fila.descricao}</p>
+    </Link>
+  )
+}
+
+function PainelSlaBloco({ data }: { data: HomeData }) {
+  const sla = data.sla
+  if (!sla) return null
+  return (
+    <BlocoCard>
+      <BlocoHeader
+        titulo="SLA dos processos"
+        descricao="Prazo previsto de conclusão, a partir do SLA configurado em cada fase"
+        acao={
+          sla.resumo.semPrazo > 0 ? (
+            <span className="text-xs font-medium tabular-nums text-white/45">
+              {sla.resumo.semPrazo} sem SLA configurado
+            </span>
+          ) : null
+        }
+      />
+      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+        {sla.cards.map((c) => (
+          <CardSla key={c.key} fila={c} />
+        ))}
+      </div>
     </BlocoCard>
   )
 }
@@ -194,7 +281,7 @@ function AgendaBloco({ data }: { data: HomeData }) {
         }
       />
       {vazia ? (
-        <EmptyState icon={CalendarClock}>Nenhum compromisso nos próximos dias.</EmptyState>
+        <LinhaQuieta>Nenhum compromisso nos próximos dias.</LinhaQuieta>
       ) : (
         <div className="space-y-4">
           <GrupoAgendaBloco titulo="Hoje" itens={hoje} />
@@ -209,8 +296,25 @@ function AgendaBloco({ data }: { data: HomeData }) {
 // ===========================================================================
 // 4. ALERTAS — o bloco só existe quando há alerta real
 // ===========================================================================
+/** Linha discreta de "nada aqui" — um bloco vazio não merece um vazio de card. */
+function LinhaQuieta({ children }: { children: React.ReactNode }) {
+  return (
+    <p className="flex items-center gap-2.5 px-0.5 py-1.5 text-sm text-white/40">
+      <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-white/20" />
+      {children}
+    </p>
+  )
+}
+
 function Alertas({ data }: { data: HomeData }) {
-  if (data.alertas.length === 0) return null
+  if (data.alertas.length === 0) {
+    return (
+      <BlocoCard>
+        <BlocoHeader titulo="Alertas" />
+        <LinhaQuieta>Nenhum evento travando a operação.</LinhaQuieta>
+      </BlocoCard>
+    )
+  }
   return (
     <BlocoCard className="border-red-400/20 bg-red-500/[0.06]">
       <BlocoHeader titulo="Alertas" descricao="Eventos críticos que travam a operação" />
@@ -273,15 +377,43 @@ function Indicador({
 
 function ResumoDoDia({ data }: { data: HomeData }) {
   const r = data.resumoDia
+  const itens = [
+    { valor: r.tarefasConcluidas, rotulo: "Tarefas concluídas hoje", curto: "concluídas", href: undefined },
+    { valor: r.aguardandoCliente, rotulo: "Aguardando cliente", curto: "aguardando cliente", href: "/dashboard/fila/aguardando-cliente" },
+    { valor: r.aguardandoCartorio, rotulo: "Aguardando cartório", curto: "aguardando cartório", href: undefined },
+    { valor: r.emValidacao, rotulo: "Em validação", curto: "em validação", href: "/dashboard/fila/validar" },
+    { valor: r.processosBloqueados, rotulo: "Processos bloqueados", curto: "bloqueados", href: "/dashboard/fila/bloqueios", destaque: true },
+  ]
+
+  // DENSIDADE ADAPTATIVA: cinco zeros em corpo 24 ocupam o espaço de um dia
+  // cheio de trabalho e não dizem nada. Sem movimento no dia, o bloco encolhe
+  // para uma faixa de uma linha — o espaço volta para a operação.
+  const semMovimento = itens.every((i) => i.valor === 0)
+  if (semMovimento) {
+    return (
+      <BlocoCard className="flex flex-wrap items-center gap-x-5 gap-y-2 !py-3">
+        <h2 className="text-[13px] font-semibold uppercase tracking-[0.14em] text-white/90">Operação de hoje</h2>
+        <span className="hidden h-3.5 w-px bg-white/10 sm:block" />
+        {itens.map((i) => (
+          <span key={i.rotulo} className="text-xs text-white/40">
+            <b className="font-semibold tabular-nums text-white/60">0</b> {i.curto}
+          </span>
+        ))}
+        <span className="ml-auto inline-flex items-center gap-2 text-xs font-medium text-emerald-300">
+          <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" />
+          Sem pendências no dia
+        </span>
+      </BlocoCard>
+    )
+  }
+
   return (
     <BlocoCard>
       <BlocoHeader titulo="Operação de hoje" descricao="O trabalho do dia, em tempo real" />
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
-        <Indicador valor={r.tarefasConcluidas} rotulo="Tarefas concluídas hoje" />
-        <Indicador valor={r.aguardandoCliente} rotulo="Aguardando cliente" href="/dashboard/fila/aguardando-cliente" />
-        <Indicador valor={r.aguardandoCartorio} rotulo="Aguardando cartório" />
-        <Indicador valor={r.emValidacao} rotulo="Em validação" href="/dashboard/fila/validar" />
-        <Indicador valor={r.processosBloqueados} rotulo="Processos bloqueados" href="/dashboard/fila/bloqueios" destaque />
+        {itens.map((i) => (
+          <Indicador key={i.rotulo} valor={i.valor} rotulo={i.rotulo} href={i.href} destaque={i.destaque} />
+        ))}
       </div>
     </BlocoCard>
   )
@@ -315,6 +447,8 @@ export function HomeContent({ data }: { data: HomeData }) {
               <AgendaBloco data={data} />
             </div>
           </div>
+
+          <PainelSlaBloco data={data} />
 
           <ResumoDoDia data={data} />
         </>

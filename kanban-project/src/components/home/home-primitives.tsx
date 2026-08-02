@@ -17,6 +17,14 @@ import type { NivelPrioridade } from "@/src/types/home"
 export const OURO = "#D2A948"
 /** Card glass — mesma composição do Financeiro. */
 export const CARD = "rounded-xl border border-white/10 bg-white/[0.05] backdrop-blur-md"
+/**
+ * Card FOCAL — a tela tem um assunto principal, e ele não pode ter o mesmo peso
+ * dos apoios. Superfície OPACA do DS (`--surface-overlay`, o mesmo token dos
+ * overlays) + sombra projetada: eleva de verdade, em vez de depender de mais
+ * uma camada translúcida sobre a foto.
+ */
+export const CARD_FOCAL =
+  "relative overflow-hidden rounded-2xl border border-white/[0.14] bg-[var(--surface-overlay)] shadow-[0_24px_60px_-20px_rgba(0,0,0,0.75)]"
 
 // ---- Estilos por nível -----------------------------------------------------
 export interface NivelStyle {
@@ -57,6 +65,10 @@ export function nivelStyle(nivel: NivelPrioridade | "critico" | "alto"): NivelSt
       }
   }
 }
+
+// O semáforo de SLA NÃO mora aqui: a paleta de prazo é uma só para o app inteiro
+// (src/components/sla/sla-ui.tsx), compartilhada com a listagem de processos e o
+// detalhe do processo. A Home importa de lá em vez de manter uma cópia.
 
 // ---- Card / cabeçalho de bloco --------------------------------------------
 export function BlocoCard({ children, className = "" }: { children: React.ReactNode; className?: string }) {

@@ -18,6 +18,7 @@ import type {
   NivelPrioridade,
   StatusOperacional,
 } from "@/src/types/home"
+import type { FaixaSla } from "@/src/types/sla"
 
 // ---- Datas -----------------------------------------------------------------
 export function inicioDoDia(d: Date): Date {
@@ -231,7 +232,60 @@ export const FILAS_ESTADO: FilaDef[] = [
   },
 ]
 
-export const TODAS_FILAS: FilaDef[] = [...FILAS_PASSO, ...FILAS_ESTADO]
+/**
+ * Filas de SLA — uma por faixa de prazo do processo. Não são "trabalho
+ * executável" (por isso ficam FORA da Central Operacional de filas e não passam
+ * por `ordenarFilas`): formam o bloco próprio de prazo da Home, sempre com as
+ * quatro faixas visíveis, inclusive zeradas — "0 atrasados" é informação.
+ *
+ * A faixa é a MESMA calculada pela engine (sla-core.faixaSla): o card e o
+ * drill-down leem o mesmo objeto, então a contagem nunca diverge da lista.
+ */
+export interface FilaSlaDef extends FilaDef {
+  faixa: FaixaSla
+}
+
+export const FILAS_SLA: FilaSlaDef[] = [
+  {
+    key: "sla-atrasados",
+    faixa: "atrasados",
+    titulo: "Processos atrasados",
+    descricao: "Prazo previsto de conclusão já vencido",
+    modulo: "processos",
+    nivelBase: "critico",
+  },
+  {
+    key: "sla-vencem-hoje",
+    faixa: "vencem-hoje",
+    titulo: "Vencem hoje",
+    descricao: "Prazo previsto de conclusão termina hoje",
+    modulo: "processos",
+    nivelBase: "alto",
+  },
+  {
+    key: "sla-proximos-7",
+    faixa: "proximos-7",
+    titulo: "Vencem nos próximos 7 dias",
+    descricao: "Janela de atenção do prazo do processo",
+    modulo: "processos",
+    nivelBase: "alto",
+  },
+  {
+    key: "sla-no-prazo",
+    faixa: "no-prazo",
+    titulo: "No prazo",
+    descricao: "Processos dentro do prazo contratado",
+    modulo: "processos",
+    nivelBase: "baixo",
+  },
+]
+
+/** Faixa de SLA atendida por uma fila; null quando a fila não é de SLA. */
+export function faixaDaFilaSla(key: string): FaixaSla | null {
+  return FILAS_SLA.find((f) => f.key === key)?.faixa ?? null
+}
+
+export const TODAS_FILAS: FilaDef[] = [...FILAS_PASSO, ...FILAS_ESTADO, ...FILAS_SLA]
 
 const FILA_POR_VERBO = new Map<string, string>()
 for (const f of FILAS_PASSO) for (const v of f.verbos ?? []) FILA_POR_VERBO.set(v, f.key)

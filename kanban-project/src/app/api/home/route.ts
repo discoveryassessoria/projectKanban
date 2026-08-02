@@ -15,7 +15,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import { extrairUsuarioComPermissoes } from "@/src/lib/verificar-permissao"
 import { temPermissao } from "@/src/lib/permissoes"
-import { carregarBase, montarAgenda, montarAlertas, montarFilas, montarResumoDia, type ContextoHome } from "@/src/lib/home/coleta"
+import { carregarBase, montarAgenda, montarAlertas, montarFilas, montarResumoDia, montarSla, type ContextoHome } from "@/src/lib/home/coleta"
 import { montarStatus } from "@/src/lib/home/home-logic"
 import type { HomeData, HomePermissions } from "@/src/types/home"
 
@@ -63,6 +63,7 @@ export async function GET(request: NextRequest) {
       permissions: permissoes,
       status: montarStatus({ totalAcoes, criticos, alertas: alertas.length }),
       filas,
+      sla: montarSla(base, ctx),
       agenda,
       alertas,
       resumoDia,
