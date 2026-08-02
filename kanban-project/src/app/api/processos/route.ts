@@ -13,6 +13,7 @@ import { garantirFamiliaParaProcesso } from '@/src/services/familia'
 import { criarProcessoV2 } from '@/src/services/criar-processo'
 import { processarOutbox } from '@/src/services/outbox-dispatcher'
 import { resolveOperationalProjectionBatch } from '@/src/lib/process-stage/operational-projection'
+import { resolveSlaProjectionBatch } from '@/src/lib/process-stage/sla-projection'
 
 // GET - Buscar processos (filtrado por país, requerente ou contratante)
 export async function GET(request: Request) {
@@ -90,8 +91,14 @@ export async function GET(request: Request) {
     // sem N+1). O Kanban Macro consome projection.progress.percentage; NÃO conta
     // tarefas/documentos/necessidades/steps.
     const ids = processos.map((p) => p.id)
-    const projecoes = await resolveOperationalProjectionBatch(ids)
+    const [projecoes, slas] = await Promise.all([
+      resolveOperationalProjectionBatch(ids),
+      // SLA OPERACIONAL da mesma engine única (sla-core), também em LOTE. A lista
+      // de processos exibe status/dias direto daqui — nunca recalcula prazo.
+      resolveSlaProjectionBatch(ids),
+    ])
     const projByProc = new Map(projecoes.map((pr) => [Number(pr.processId), pr]))
+    const slaByProc = new Map(slas.map((s) => [s.processoId, s]))
 
     // Formatar para incluir contratantes e requerentes como arrays simples
     const processosFormatados = processos.map(p => ({
@@ -99,6 +106,7 @@ export async function GET(request: Request) {
       contratantes: p.contratantes.map(c => c.contratante),
       requerentes: p.requerentes.map(r => r.requerente),
       projection: projByProc.get(p.id) ?? null,
+      sla: slaByProc.get(p.id) ?? null,
     }))
 
     return NextResponse.json({ processos: processosFormatados })

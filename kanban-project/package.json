@@ -118,6 +118,7 @@
     "test:genealogia-materializacao": "tsx scripts/genealogia-materializacao.test.ts",
     "test:guarda-producao": "tsx scripts/guarda-escrita-producao.test.ts",
     "test:home": "tsx scripts/home-logic.test.ts && tsx scripts/home-guard.test.ts",
+    "test:sla": "tsx scripts/sla-engine.test.ts && tsx scripts/sla-guard.test.ts",
     "test:home-guard": "tsx scripts/home-guard.test.ts",
     "test:home-logic": "tsx scripts/home-logic.test.ts",
     "test:lancamento": "tsx scripts/lancamento-financeiro.test.ts",

@@ -7,6 +7,10 @@
 //   código antigo fora do kanban). Não usar em código novo.
 // =====================================================
 
+import type { SlaProcesso } from "@/src/types/sla"
+
+export type { SlaProcesso } from "@/src/types/sla"
+
 // Enum de Prioridade de Tarefa (inalterado)
 export enum PrioridadeTarefa {
   BAIXA = 'BAIXA',
@@ -216,6 +220,12 @@ export interface Processo {
   }
   /** Projeção operacional oficial da fase atual (vinda do GET /api/processos em lote). */
   projection?: OperationalProjection | null
+  /**
+   * SLA operacional do processo (engine única — src/lib/motor/sla-core.ts),
+   * vindo do GET /api/processos em lote. A UI só EXIBE: status, dias e prazos
+   * já vêm calculados, nenhuma tela recalcula.
+   */
+  sla?: SlaProcesso | null
 }
 
 /** @deprecated LEGADO — alias de Processo (o kanban novo agrupa por faseAtualKey).

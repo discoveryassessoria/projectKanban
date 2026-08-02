@@ -19,6 +19,8 @@ import { ProcessoDocumentos } from "./ProcessoDocumentos"
 import { ProcessoProtocolos } from "./ProcessoProtocolos"
 import { ProcessoInformacoes } from "./ProcessoInformacoes"
 import { ProcessoHistorico } from "./ProcessoHistorico"
+// SLA operacional do processo (engine única — src/lib/motor/sla-core.ts)
+import { ProcessoSlaCard } from "./ProcessoSlaCard"
 import { ProcessoFinanceiroShell } from "@/src/components/financeiro/v3/ProcessoFinanceiroShell"
 // ✅ IMPORTAR o modal e o initialFormData
 import { ContratanteModal, initialFormData } from "../contratantes-tabela"
@@ -84,9 +86,6 @@ interface ProcessoDetailsModalProps {
 }
 
 /** País do processo — usado tanto no valor inicial da aba quanto no corpo do modal. */
-function ehEspanha(processo: ProcessoWithStatus | Processo | null): boolean {
-  return processo?.pais === "ESPANHA"
-}
 function ehItalia(processo: ProcessoWithStatus | Processo | null): boolean {
   return processo?.pais === "ITALIA"
 }
@@ -99,10 +98,11 @@ type AbaProcesso = "geral" | "central" | "documentos" | "faturas" | "financeiroV
  * cadeia de `else if` dentro do efeito fazia, com um flag `initialParamsProcessed` para
  * não repetir. Sem efeito, não há o que repetir.
  */
-function abaInicial(initialTab: string | undefined, isEspanha: boolean, isItalia: boolean): AbaProcesso {
+function abaInicial(initialTab: string | undefined, isItalia: boolean): AbaProcesso {
   const permitidas: AbaProcesso[] = ["documentos", "central", "arvore", "geral", "faturas", "historico", "eventos"]
   if (initialTab && (permitidas as string[]).includes(initialTab)) return initialTab as AbaProcesso
-  if (initialTab === "protocolos" && isEspanha) return "protocolos"
+  // Protocolo é ocorrência de QUALQUER processo — não é mais exclusivo da Espanha.
+  if (initialTab === "protocolos") return "protocolos"
   if (initialTab === "informacoes" && isItalia) return "informacoes"
   return "geral"
 }
@@ -133,7 +133,7 @@ function ConteudoModal({
   // ✅ ATUALIZADO: Adicionado "informacoes" como possível aba
   const { pode } = usePermissoes()
   const [activeTab, setActiveTab] = useState<AbaProcesso>(
-    () => abaInicial(initialTab, ehEspanha(processo), ehItalia(processo)),
+    () => abaInicial(initialTab, ehItalia(processo)),
   )
   // Financeiro V3 no processo: quando a flag posicaoRead está ativa, a aba usa a
   // tela V3 (Ledger); senão, o legado como fallback temporário.
@@ -190,8 +190,7 @@ function ConteudoModal({
   // Classes padrão para formulários
   const inputClass = "w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white text-sm h-[42px]"
 
-  // ✅ Verificar se o processo é da Espanha ou Itália
-  const isEspanha = ehEspanha(processo)
+  // ✅ Verificar se o processo é da Itália (aba Informações)
   const isItalia = ehItalia(processo)
 
   // ✅ NOVO: Função para abrir o modal de detalhes do cliente
@@ -465,7 +464,7 @@ function ConteudoModal({
     { id: "central", label: "Central Operacional" },
     ...(pode('arvore.ver') ? [{ id: "arvore", label: "Árvore Genealógica" }] : []),
     ...(isItalia && pode('processos.ver_paginas') ? [{ id: "informacoes", label: "Informações" }] : []),
-    ...(isEspanha && pode('processos.ver_paginas') ? [{ id: "protocolos", label: "Protocolos" }] : []),
+    ...(pode('processos.ver_paginas') ? [{ id: "protocolos", label: "Protocolos" }] : []),
     ...(pode('financeiro.ver') ? [{ id: "faturas", label: "Financeiro" }] : []),
     { id: "documentos", label: "Documentos" },           // ← NOVO
     ...(pode('eventos.ver') ? [{ id: "eventos", label: "Eventos" }] : []),
@@ -581,6 +580,11 @@ function ConteudoModal({
                       cancelar
                     </button>
                   )}
+                </div>
+
+                {/* ===== SLA — prazo do processo (engine única, só leitura) ===== */}
+                <div className="mb-6">
+                  <ProcessoSlaCard processoId={processo.id} />
                 </div>
 
                 {/* ===== MODO VISUALIZAÇÃO ===== */}
@@ -956,8 +960,8 @@ function ConteudoModal({
             />
           )}
 
-          {/* ✅ Aba Protocolos (apenas para Espanha) */}
-          {activeTab === "protocolos" && isEspanha && (
+          {/* Protocolizações do processo — o único lugar onde um protocolo é registrado */}
+          {activeTab === "protocolos" && (
             <ProcessoProtocolos
               processoId={processo.id}
               contratantes={contratantesSelecionados}
