@@ -31,7 +31,9 @@ async function autorizado(req: NextRequest): Promise<boolean> {
 
 /** RÁPIDO de hora em hora; COMPLETO à 1h; PROFUNDO no domingo à 1h. */
 function modoDoRelogio(agora: Date): ModoExecucao {
-  if (agora.getUTCHours() === 4) return agora.getUTCDay() === 0 ? 'PROFUNDO' : 'COMPLETO'
+  // PROFUNDO todo dia às 04h UTC: é o único modo que executa o smoke HTTP, e
+  // smoke semanal deixaria uma rota quebrada passar seis dias despercebida.
+  if (agora.getUTCHours() === 4) return 'PROFUNDO'
   return 'RAPIDO'
 }
 

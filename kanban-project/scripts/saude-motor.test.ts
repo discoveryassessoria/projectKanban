@@ -187,6 +187,7 @@ ok(/r\.criticos > 0/.test(notif) && /p\.reincidentes > 0/.test(notif), 'notifica
 console.log('\n12) Diagnóstico roda sozinho')
 const cron = ler('src/app/api/cron/saude/route.ts')
 ok(/modoDoRelogio/.test(cron), 'o modo é escolhido pelo relógio (rápido/completo/profundo)')
+ok(/return 'PROFUNDO'/.test(cron), 'o modo PROFUNDO — único que roda o smoke HTTP — acontece diariamente, não semanalmente')
 ok(/persistirDiagnostico/.test(cron) && /notificarAchados/.test(cron), 'execução agendada persiste e notifica')
 ok(/status: 500/.test(cron) && /INDISPONIVEL/.test(cron), 'falha do motor devolve erro ao agendador — nunca sucesso silencioso')
 const vercel = JSON.parse(ler('vercel.json')) as { crons: { path: string }[] }
