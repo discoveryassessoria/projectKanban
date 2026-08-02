@@ -83,8 +83,22 @@ async function garantirReceitaMockup() {
   try {
     const ja = await prisma.obrigacaoEconomica.findFirst({ where: { codigoOperacional: 'REC-SBX1-001' }, select: { id: true } })
     if (ja) {
-      await prisma.saldoProjecao.deleteMany({ where: { obrigacaoId: ja.id } })
-      await prisma.obrigacaoEconomica.delete({ where: { id: ja.id } }) // cascata: ledger/entries/ocorrências/distribuição
+      // NÃO existe cascata: a migration 20260808000000_motor_financeiro_v3_fase1
+      // cria as tabelas do V3 sem nenhum ADD CONSTRAINT, então o banco não tem as
+      // FKs que o schema.prisma declara. Apagar só a obrigação deixava ledger,
+      // entries, ocorrências e distribuição apontando para o nada. Os filhos vão
+      // explicitamente, em ordem de dependência — mesma sequência de
+      // removerObrigacaoOrfaTx (lib/financeiro/ledger/ledger-service.ts).
+      const obrigacaoId = ja.id
+      const dists = await prisma.distribuicaoEconomica.findMany({ where: { obrigacaoId }, select: { id: true } })
+      if (dists.length) await prisma.participacaoEconomica.deleteMany({ where: { distribuicaoId: { in: dists.map((d) => d.id) } } })
+      await prisma.distribuicaoEconomica.deleteMany({ where: { obrigacaoId } })
+      await prisma.ledgerEntry.deleteMany({ where: { obrigacaoId } })
+      await prisma.ocorrenciaFinanceira.deleteMany({ where: { obrigacaoId } })
+      await prisma.saldoProjecao.deleteMany({ where: { obrigacaoId } })
+      await prisma.ledgerFinanceiro.deleteMany({ where: { obrigacaoId } })
+      await prisma.domainOutbox.deleteMany({ where: { aggregateType: 'ObrigacaoEconomica', aggregateId: obrigacaoId } })
+      await prisma.obrigacaoEconomica.delete({ where: { id: obrigacaoId } })
       await prisma.receita.deleteMany({ where: { codigo: 'REC-SBX1-001' } })
       await prisma.pessoa.deleteMany({ where: { sobrenome: 'Silva', nome: { in: ['Joao', 'Maria'] } } })
       await prisma.tipoServico.deleteMany({ where: { nome: 'Genealogia' } })
