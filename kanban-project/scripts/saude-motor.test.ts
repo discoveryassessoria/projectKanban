@@ -279,6 +279,11 @@ async function assincronos() {
   ok(sup.itensDeMenu.length > 0, 'os itens de menu são descobertos do código de navegação')
   ok(Array.isArray(lacunasDeCobertura(sup)), 'as lacunas de cobertura são calculáveis')
   ok(lacunasDeCobertura(sup).every((l) => l.detalhe.length > 0), 'toda lacuna explica por que é lacuna')
+  ok(sup.crons.length === 3, 'os três jobs agendados são descobertos do vercel.json')
+  ok(lacunasDeCobertura(sup).every((l) => l.tipo !== 'CRON'), 'todo job agendado tem verificação que o vigie (inclusive o próprio cron da saúde)')
+  const agendados = ler('lib/saude/verificacoes/agendados.ts')
+  ok(/saudeExecucao/.test(agendados), 'a vigilância do cron da saúde é por EVIDÊNCIA de execução, não por ausência de erro')
+  ok(/status: \{ in: \['RECEBIDO', 'EM_PROCESSAMENTO'\] \}/.test(agendados), 'o worker registral é medido por backlog envelhecido — sistema ocioso não vira alarme')
   const matriz = matrizCobertura(new Set(capacidades().map((c) => c.codigo)))
   ok(matriz.length > 0 && matriz.every((m) => typeof m.verificacoes === 'number'), 'a matriz módulo × cobertura é montada')
 

@@ -93,11 +93,14 @@ export function lacunasDeCobertura(s: Superficie): LacunaCobertura[] {
   const textoCapacidades = capacidades().map((c) =>
     `${c.codigo} ${c.nome} ${c.descricao} ${c.modulo} ${c.dependencias.map((d) => `${d.nome} ${d.rota ?? ''}`).join(' ')}`,
   ).join(' ').toLowerCase()
-  const vigiado = `${textoVerificacoes} ${textoCapacidades}`
+  // acento não pode gerar lacuna falsa: "/api/cron/cambio" precisa casar com
+  // uma verificação chamada "Câmbio com cotação recente".
+  const semAcento = (t: string) => t.normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+  const vigiado = semAcento(`${textoVerificacoes} ${textoCapacidades}`)
 
   // crons sem monitoramento declarado
   for (const c of s.crons) {
-    if (!vigiado.includes(c.toLowerCase().replace('/api/cron/', ''))) {
+    if (!vigiado.includes(semAcento(c.toLowerCase().replace('/api/cron/', '')))) {
       lacunas.push({ tipo: 'CRON', alvo: c, detalhe: 'job agendado sem verificação de saúde que o vigie' })
     }
   }
