@@ -155,6 +155,46 @@ ok(/recorrencias: anterior\.recorrencias \+ 1/.test(persistSrc), 'conta recorrê
 ok(/codigosConclusivos/.test(persistSrc), 'só verificação CONCLUSIVA pode resolver um achado')
 ok(!/deleteMany|\.delete\(/.test(persistSrc), 'o histórico de saúde nunca é apagado')
 
+// ═══════════ 10) CORREÇÃO AUTOMÁTICA — SÓ O QUE É SEGURO ═══════════
+console.log('\n10) Correção automática')
+const corr = ler('lib/saude/correcoes.ts')
+ok(/reprocessar-outbox/.test(corr) && /reconciliar-sequencias/.test(corr), 'catálogo de correções seguras declarado')
+ok(/NUNCA_AUTOMATICO/.test(corr), 'o que NUNCA é automático está declarado explicitamente')
+for (const proibida of ['exclusão de registros', 'fusão de organizações', 'alteração de valor financeiro', 'alteração de permissões']) {
+  ok(corr.includes(proibida), `proibição declarada: ${proibida}`)
+}
+ok(!/\.delete\(|deleteMany|DROP /i.test(corr), 'nenhuma correção automática apaga dado')
+ok(/porqueSegura/.test(corr), 'toda correção declara POR QUE é segura')
+const rotaCorr = ler('src/app/api/gerenciamento/saude/corrigir/route.ts')
+ok(/correcaoPorId\(id\)/.test(rotaCorr) && /não existe no catálogo/.test(rotaCorr), 'correção fora do catálogo é recusada')
+ok(/registrarAuditoria/.test(rotaCorr), 'toda correção é auditada')
+ok(/CORRECAO_AUTOMATICA_FALHOU/.test(rotaCorr), 'falha de correção também é auditada')
+ok(/'EM_CORRECAO'/.test(rotaCorr), 'o achado vai para EM_CORREÇÃO — a correção não se autodeclara resolvida')
+
+// ═══════════ 11) NOTIFICAÇÃO SEM SPAM ═══════════
+console.log('\n11) Notificação agrupada e com cooldown')
+const notif = ler('lib/saude/notificacoes.ts')
+ok(/COOLDOWN_MIN/.test(notif), 'existe janela de cooldown')
+ok(/assinaturaDo/.test(notif), 'incidente tem assinatura estável (mesmo incidente não vira aviso novo)')
+ok(/repeticoes/.test(notif), 'incidente em curso é ATUALIZADO em vez de duplicado')
+ok(/r\.criticos > 0/.test(notif) && /p\.reincidentes > 0/.test(notif), 'notifica crítico e reincidência')
+
+// ═══════════ 12) EXECUÇÃO AGENDADA ═══════════
+console.log('\n12) Diagnóstico roda sozinho')
+const cron = ler('src/app/api/cron/saude/route.ts')
+ok(/modoDoRelogio/.test(cron), 'o modo é escolhido pelo relógio (rápido/completo/profundo)')
+ok(/persistirDiagnostico/.test(cron) && /notificarAchados/.test(cron), 'execução agendada persiste e notifica')
+ok(/status: 500/.test(cron) && /INDISPONIVEL/.test(cron), 'falha do motor devolve erro ao agendador — nunca sucesso silencioso')
+const vercel = JSON.parse(ler('vercel.json')) as { crons: { path: string }[] }
+ok(vercel.crons.some((c) => c.path === '/api/cron/saude'), 'cron da saúde registrado no vercel.json')
+
+// ═══════════ 13) FILA: TIPO SEM CONSUMIDOR ═══════════
+console.log('\n13) Evento sem consumidor é detectado')
+const disp = ler('src/services/outbox-dispatcher.ts')
+ok(/export const TIPOS_DRENADOS/.test(disp), 'os tipos drenados são declarados e exportados')
+ok(/phase-workflow\.instanced/.test(disp), 'o tipo que represou a fila por 12 dias agora é drenado')
+ok(/TIPOS_DRENADOS/.test(filaSrc), 'a verificação compara a fila com os tipos realmente drenados')
+
 console.log(`\n${passed} passaram, ${failed} falharam`)
 if (failed > 0) { console.log('FALHAS: ' + falhas.join('; ')); process.exit(1) }
 console.log('Motor da Saúde do Sistema: validado ✅')

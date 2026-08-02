@@ -10,6 +10,7 @@
 // com fila é crítico.
 
 import { prisma } from '@/lib/prisma'
+import { TIPOS_DRENADOS } from '@/src/services/outbox-dispatcher'
 import { registrar } from '../catalogo'
 import type { Achado, ResultadoVerificacao } from '../tipos'
 
@@ -212,6 +213,55 @@ registrar({
         evidencia: { orfaos: n },
       }],
       metricas: { orfaos: n },
+    }
+  },
+})
+
+
+registrar({
+  id: 'saude.filas.tipo-sem-consumidor',
+  codigo: 'FILA-003',
+  nome: 'Todo evento pendente tem consumidor registrado',
+  descricao: 'Detecta evento EMITIDO cujo tipo o dispatcher não drena — a fila cresce em silêncio, sem nada em estado de erro.',
+  dominio: 'FILAS',
+  modulo: 'Motor / Outbox',
+  severidadePadrao: 'CRITICO',
+  obrigatoria: true,
+  modos: ['RAPIDO', 'COMPLETO', 'PROFUNDO'],
+  introduzidaEm: '1.0.1',
+  timeoutMs: 15_000,
+  orientacao: 'Registre o tipo em TIPOS_DRENADOS do dispatcher — com efeito, se houver, ou em TIPOS_SEM_EFEITO para arquivar.',
+  rotaCorrecao: '/administrator?screen=execmotor',
+  responsavel: 'Motor',
+  ativo: true,
+  executar: async (): Promise<ResultadoVerificacao> => {
+    const pendentesPorTipo = await prisma.$queryRawUnsafe<{ tipo: string; n: number }[]>(
+      `SELECT tipo, COUNT(*)::int AS n FROM "DomainOutbox" WHERE status = 'PENDENTE' GROUP BY tipo`,
+    )
+    const drenados = new Set<string>(TIPOS_DRENADOS)
+    const orfaos = pendentesPorTipo.filter((t) => !drenados.has(t.tipo))
+    if (!orfaos.length) {
+      return {
+        achados: [],
+        metricas: { tiposDrenados: drenados.size, tiposPendentes: pendentesPorTipo.length },
+        resumo: 'Todo evento pendente tem consumidor registrado.',
+      }
+    }
+    return {
+      achados: orfaos.map((t): Achado => ({
+        chave: `tipo-sem-consumidor:${t.tipo}`,
+        severidade: 'CRITICO',
+        titulo: `Evento "${t.tipo}" não é consumido por ninguém`,
+        descricao: `${t.n} evento(s) do tipo "${t.tipo}" estão pendentes, mas o dispatcher não drena este tipo.`,
+        explicacao: 'O dispatcher só lê os tipos declarados. Tipo emitido e não declarado fica PENDENTE para sempre — sem erro, sem alarme, apenas acumulando.',
+        impacto: 'A fila cresce indefinidamente e qualquer efeito que dependa deste evento nunca acontece.',
+        entidade: 'DomainOutbox',
+        quantidade: t.n,
+        link: '/administrator?screen=execmotor',
+        recomendacao: `Declare "${t.tipo}" em TIPOS_DRENADOS — com consumidor, se houver efeito, ou em TIPOS_SEM_EFEITO para arquivar.`,
+        evidencia: { tipo: t.tipo, pendentes: t.n, tiposDrenados: [...drenados] },
+      })),
+      metricas: { tiposOrfaos: orfaos.length },
     }
   },
 })

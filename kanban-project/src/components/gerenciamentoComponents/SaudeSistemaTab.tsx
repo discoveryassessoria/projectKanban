@@ -37,6 +37,11 @@ interface VerificacaoMeta {
   obrigatoria: boolean; modos: string[]; orientacao: string; rotaCorrecao: string | null
   correcaoAutomatica: string | null; responsavel: string; ativo: boolean
 }
+interface Historico {
+  execucoes: { id: number; modo: string; estado: Estado; criadoEm: string; duracaoMs: number; coberturaPercentual: number; criticos: number; erros: number; alertas: number; falhasTecnicas: number }[]
+  tendencia: { totalAchados: number; abertos: number; resolvidos: number; recorrentes: number; reincidentes: number; tempoMedioResolucaoHoras: number | null }
+  porDominio: { dominio: string; total: number; abertos: number; criticos: number }[]
+}
 interface Resposta {
   execucao: Execucao | null
   estadoAtual: Estado
@@ -82,7 +87,7 @@ function Kpi({ valor, label, cor, destaque }: { valor: React.ReactNode; label: s
   )
 }
 
-type Aba = "visao" | "problemas" | "dominios" | "cobertura" | "execucao"
+type Aba = "visao" | "problemas" | "dominios" | "cobertura" | "execucao" | "historico"
 
 export function SaudeSistemaTab() {
   const { dados, carregando, erro: erroApi, recarregar } = useApi<Resposta>("/api/gerenciamento/saude")
@@ -91,6 +96,32 @@ export function SaudeSistemaTab() {
   const [mensagem, setMensagem] = useState<string | null>(null)
   const [filtroSev, setFiltroSev] = useState<"" | Severidade>("")
   const [filtroDominio, setFiltroDominio] = useState("")
+  const [corrigindo, setCorrigindo] = useState<string | null>(null)
+  const historicoReq = useApi<Historico>("/api/gerenciamento/saude/historico")
+
+  // CORREÇÃO AUTOMÁTICA — só existe para o que o catálogo declara seguro. O
+  // resultado NÃO se autodeclara resolvido: o achado vai para "em correção" e a
+  // próxima execução do diagnóstico é que decide.
+  const corrigir = useCallback(async (a: Achado) => {
+    if (!a.correcaoAutomatica) return
+    setCorrigindo(a.chave)
+    setMensagem(`Executando correção "${a.correcaoAutomatica}"…`)
+    try {
+      const res = await fetch("/api/gerenciamento/saude/corrigir", {
+        method: "POST", headers: authHeaders(),
+        body: JSON.stringify({ correcao: a.correcaoAutomatica, chaveAchado: a.chave }),
+      })
+      const j = await res.json().catch(() => ({}))
+      setMensagem(res.ok
+        ? `${j.correcao?.nome ?? "Correção"}: ${j.resultado?.mensagem ?? "concluída"} — rode o diagnóstico para confirmar a resolução.`
+        : (j.error ?? "A correção falhou."))
+      if (res.ok) recarregar()
+    } catch (e) {
+      setMensagem(`Falha ao corrigir: ${String((e as Error)?.message ?? e)}`)
+    } finally {
+      setCorrigindo(null)
+    }
+  }, [recarregar])
 
   const executar = useCallback(async (modo: "RAPIDO" | "COMPLETO" | "PROFUNDO") => {
     setExecutando(true)
@@ -185,7 +216,7 @@ export function SaudeSistemaTab() {
 
       {/* ── ABAS ─────────────────────────────────────────────────────────── */}
       <div className="flex flex-wrap gap-1 border-b border-white/10 text-sm">
-        {([["visao", "Visão geral"], ["problemas", `Problemas (${dados.achados.length})`], ["dominios", "Domínios"], ["cobertura", "Cobertura"], ["execucao", "Execução"]] as [Aba, string][]).map(([k, l]) => (
+        {([["visao", "Visão geral"], ["problemas", `Problemas (${dados.achados.length})`], ["dominios", "Domínios"], ["cobertura", "Cobertura"], ["execucao", "Execução"], ["historico", "Histórico e tendências"]] as [Aba, string][]).map(([k, l]) => (
           <button key={k} onClick={() => setAba(k)}
             className={`px-3 py-2 ${aba === k ? "border-b-2 border-blue-400 font-medium text-white" : "text-white/55 hover:text-white/80"}`}>
             {l}
@@ -204,7 +235,7 @@ export function SaudeSistemaTab() {
               </div>
             </div>
           )}
-          {dados.achados.slice(0, 8).map((a) => <LinhaAchado key={a.id} a={a} rot={rot} />)}
+          {dados.achados.slice(0, 8).map((a) => <LinhaAchado key={a.id} a={a} rot={rot} onCorrigir={corrigir} corrigindo={corrigindo === a.chave} />)}
           {dados.achados.length === 0 && e && (
             <div className={`${CARD} px-4 py-6 text-center text-sm text-white/60`}>
               Nenhum problema aberto nas verificações executadas.
@@ -232,7 +263,7 @@ export function SaudeSistemaTab() {
             </select>
             <span className="self-center text-xs text-white/40">{achadosFiltrados.length} problema(s)</span>
           </div>
-          {achadosFiltrados.map((a) => <LinhaAchado key={a.id} a={a} rot={rot} detalhado />)}
+          {achadosFiltrados.map((a) => <LinhaAchado key={a.id} a={a} rot={rot} detalhado onCorrigir={corrigir} corrigindo={corrigindo === a.chave} />)}
           {achadosFiltrados.length === 0 && (
             <div className={`${CARD} px-4 py-6 text-center text-sm text-white/60`}>Nenhum problema com estes filtros.</div>
           )}
@@ -287,6 +318,71 @@ export function SaudeSistemaTab() {
         </div>
       )}
 
+      {aba === "historico" && (
+        <div className="space-y-4">
+          {(() => {
+            const h = historicoReq.dados
+            if (historicoReq.carregando) return <div className="py-10 text-center text-white/50">Carregando histórico…</div>
+            if (!h) return <div className={`${CARD} px-4 py-6 text-center text-sm text-white/60`}>Sem histórico disponível.</div>
+            return (
+              <>
+                <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
+                  <Kpi valor={h.tendencia.totalAchados} label="Achados no histórico" />
+                  <Kpi valor={h.tendencia.abertos} label="Abertos" cor={h.tendencia.abertos > 0 ? "#fbbf24" : "#4ade80"} />
+                  <Kpi valor={h.tendencia.resolvidos} label="Resolvidos" cor="#4ade80" />
+                  <Kpi valor={h.tendencia.recorrentes} label="Recorrentes" />
+                  <Kpi valor={h.tendencia.reincidentes} label="Reincidentes" cor={h.tendencia.reincidentes > 0 ? "#f87171" : undefined} />
+                  <Kpi valor={h.tendencia.tempoMedioResolucaoHoras != null ? `${h.tendencia.tempoMedioResolucaoHoras}h` : "—"} label="Tempo médio de resolução" />
+                </div>
+
+                <div className={`${CARD} overflow-hidden`}>
+                  <div className="border-b border-white/10 px-4 py-3 text-xs uppercase tracking-wide text-white/45">Execuções (mais recente por último)</div>
+                  <table className="w-full text-sm">
+                    <thead className="border-b border-white/10 text-left text-xs text-white/50">
+                      <tr><th className="px-4 py-3">Quando</th><th className="px-4 py-3">Modo</th><th className="px-4 py-3">Estado</th><th className="px-4 py-3">Cobertura</th><th className="px-4 py-3">Achados</th><th className="px-4 py-3">Duração</th></tr>
+                    </thead>
+                    <tbody>
+                      {h.execucoes.map((x) => {
+                        const c = CORES_ESTADO[x.estado] ?? CORES_ESTADO.INDISPONIVEL
+                        return (
+                          <tr key={x.id} className="border-b border-white/5 last:border-0">
+                            <td className="px-4 py-2.5 text-white/70">{fmtData(x.criadoEm)}</td>
+                            <td className="px-4 py-2.5 text-white/60">{x.modo.toLowerCase()}</td>
+                            <td className="px-4 py-2.5"><span className={`rounded px-1.5 py-0.5 text-[10px] ${c.texto}`}>{rot.estados[x.estado] ?? x.estado}</span></td>
+                            <td className="px-4 py-2.5 text-white/60">{x.coberturaPercentual}%</td>
+                            <td className="px-4 py-2.5 text-white/70">{x.criticos}C · {x.erros}E · {x.alertas}A{x.falhasTecnicas ? ` · ${x.falhasTecnicas} falha(s)` : ""}</td>
+                            <td className="px-4 py-2.5 text-white/50">{fmtDur(x.duracaoMs)}</td>
+                          </tr>
+                        )
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+
+                <div className={`${CARD} overflow-hidden`}>
+                  <div className="border-b border-white/10 px-4 py-3 text-xs uppercase tracking-wide text-white/45">Domínios que mais falham</div>
+                  <table className="w-full text-sm">
+                    <thead className="border-b border-white/10 text-left text-xs text-white/50">
+                      <tr><th className="px-4 py-3">Domínio</th><th className="px-4 py-3">Abertos</th><th className="px-4 py-3">Total histórico</th><th className="px-4 py-3">Críticos</th></tr>
+                    </thead>
+                    <tbody>
+                      {h.porDominio.slice(0, 15).map((d) => (
+                        <tr key={d.dominio} className="border-b border-white/5 last:border-0">
+                          <td className="px-4 py-2.5 text-white">{rot.dominios[d.dominio] ?? d.dominio}</td>
+                          <td className="px-4 py-2.5 text-white/70">{d.abertos}</td>
+                          <td className="px-4 py-2.5 text-white/50">{d.total}</td>
+                          <td className="px-4 py-2.5 text-white/70">{d.criticos}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </>
+            )
+          })()}
+        </div>
+      )}
+
       {aba === "execucao" && (
         <div className={`${CARD} overflow-hidden`}>
           <table className="w-full text-sm">
@@ -323,7 +419,10 @@ export function SaudeSistemaTab() {
   )
 }
 
-function LinhaAchado({ a, rot, detalhado }: { a: Achado; rot: Resposta["rotulos"]; detalhado?: boolean }) {
+function LinhaAchado({ a, rot, detalhado, onCorrigir, corrigindo }: {
+  a: Achado; rot: Resposta["rotulos"]; detalhado?: boolean
+  onCorrigir?: (a: Achado) => void; corrigindo?: boolean
+}) {
   const [aberto, setAberto] = useState(false)
   return (
     <div className={`${CARD} overflow-hidden`}>
@@ -351,7 +450,12 @@ function LinhaAchado({ a, rot, detalhado }: { a: Achado; rot: Resposta["rotulos"
             {a.entidade && <span>Entidade: <span className="text-white/85">{a.entidade}</span>{a.registroNome ? ` — ${a.registroNome}` : ""}</span>}
             <span>Afetados: <span className="text-white/85">{a.quantidade}</span></span>
             <span>Última detecção: <span className="text-white/85">{fmtData(a.ultimaDeteccao)}</span></span>
-            {a.correcaoAutomatica && <span className="rounded bg-green-500/15 px-1.5 py-0.5 text-green-300">correção automática disponível</span>}
+            {a.correcaoAutomatica && onCorrigir && (
+              <button disabled={corrigindo} onClick={() => onCorrigir(a)}
+                className="rounded-lg border border-green-400/30 bg-green-500/15 px-2 py-1 font-medium text-green-200 hover:bg-green-500/25 disabled:opacity-50">
+                {corrigindo ? "Corrigindo…" : "Corrigir automaticamente"}
+              </button>
+            )}
             {a.link && (
               <a href={a.link} className="rounded-lg border border-white/10 bg-white/5 px-2 py-1 text-white/85 hover:bg-white/10">
                 Ir para o registro →

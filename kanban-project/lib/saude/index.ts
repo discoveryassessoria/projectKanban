@@ -17,5 +17,7 @@ import './verificacoes/ponta-a-ponta'
 
 export { catalogo, cobertura, dominiosSemCobertura, elegiveis, metadados, VERSAO_CATALOGO } from './catalogo'
 export { executarDiagnostico, consolidar } from './motor'
-export { persistirDiagnostico, ultimaExecucao, achadosAbertos } from './persistencia'
+export { persistirDiagnostico, ultimaExecucao, achadosAbertos, type ResumoPersistencia } from './persistencia'
+export { correcoes, correcaoPorId, NUNCA_AUTOMATICO } from './correcoes'
+export { notificarAchados } from './notificacoes'
 export * from './tipos'

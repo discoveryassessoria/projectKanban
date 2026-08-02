@@ -25,7 +25,28 @@ const MAX_TENTATIVAS = 5
 // Reserva "presa" há mais que isto (worker morreu no meio) volta a ser reivindicável.
 const CLAIM_STALE_MS = 5 * 60 * 1000
 // Tipos conhecidos SEM consumidor de efeito: arquivados (marcados ENVIADO) — não acumulam.
-const TIPOS_SEM_EFEITO = new Set(["phase.completed"])
+//
+// `phase-workflow.instanced` entrou aqui depois de um incidente real: ele era
+// EMITIDO mas não constava da lista de tipos drenados, então ficava PENDENTE para
+// sempre. A fila cresceu por 12 dias sem que nada estivesse "com erro" — só
+// represado. O efeito das tarefas já é garantido por `phase.entered`; este evento
+// é informativo, então arquivar é o comportamento correto.
+const TIPOS_SEM_EFEITO = new Set(["phase.completed", "phase-workflow.instanced"])
+
+/**
+ * TODOS os tipos que o dispatcher drena. Um tipo emitido e ausente daqui nunca é
+ * consumido — a fila cresce em silêncio. A verificação de saúde FILA-003 vigia
+ * exatamente isso, comparando o que está PENDENTE com esta lista.
+ */
+export const TIPOS_DRENADOS = [
+  "phase.entered",
+  "phase.completed",
+  "phase-workflow.instanced",
+  "requerente.adicionado",
+  // MRG — reconciliação contínua: nova certidão / necessidade transicionada /
+  // árvore alterada disparam revalidação fora do caminho crítico do upload.
+  "registral.reconciliar.processo",
+] as const
 
 export interface OutboxProcessResumo {
   lidos: number
@@ -101,14 +122,7 @@ export async function processarOutbox(opts?: {
 }): Promise<OutboxProcessResumo> {
   const limite = opts?.limite ?? 50
   // phase.completed entra por padrão só para ARQUIVAR (marca ENVIADO) — não acumula.
-  const tipos = opts?.tipos ?? [
-    "phase.entered",
-    "phase.completed",
-    "requerente.adicionado",
-    // MRG — reconciliação contínua: nova certidão / necessidade transicionada /
-    // árvore alterada disparam revalidação fora do caminho crítico do upload.
-    "registral.reconciliar.processo",
-  ]
+  const tipos = opts?.tipos ?? [...TIPOS_DRENADOS]
 
   const pendentes = await prisma.domainOutbox.findMany({
     where: {

@@ -11,7 +11,11 @@
 import { prisma } from '@/lib/prisma'
 import { extrairUsuarioComPermissoes } from '@/src/lib/verificar-permissao'
 
-export type AcaoAuditoria = 'CRIAR' | 'EDITAR' | 'EXCLUIR' | 'DESATIVAR' | 'REATIVAR'
+export type AcaoAuditoria =
+  | 'CRIAR' | 'EDITAR' | 'EXCLUIR' | 'DESATIVAR' | 'REATIVAR'
+  // Correção automática da Saúde do Sistema: ação executada PELO sistema a pedido
+  // do operador. Precisa de rótulo próprio — não é criar, editar nem excluir.
+  | 'CORRECAO_AUTOMATICA' | 'CORRECAO_AUTOMATICA_FALHOU'
 
 export interface EntradaAuditoria {
   acao: AcaoAuditoria
