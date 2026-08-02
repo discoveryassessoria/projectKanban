@@ -15,9 +15,14 @@
 
 import { NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
+import { verificarPermissao } from "@/src/lib/verificar-permissao"
 import { ENTIDADE_ACESSO, montarStrip } from "@/lib/gerenciamento/overview-projecao"
 
-export async function GET(_req: NextRequest) {
+export async function GET(request: NextRequest) {
+  // O painel expõe contagens de toda a operação: exige a mesma autorização das
+  // demais rotas administrativas. (Achado SEC/API-001 do diagnóstico de saúde.)
+  const erroPermissao = await verificarPermissao(request, 'usuarios.gerenciar')
+  if (erroPermissao) return erroPermissao
   try {
     const [usuarios, perfis, contas, fornecedores, configsFinanceiras, statusCols, ultimoLog, ultimaAlteracaoLog] =
       await Promise.all([
