@@ -140,7 +140,7 @@ secao('6) Modelagem no banco')
   ok('campo textual de nacionalidade ELIMINADO do schema', !/\n\s+nationality\s+String/.test(blocoServico))
   ok('campo textual de categoria ELIMINADO do schema', !/\n\s+category\s+String/.test(blocoServico))
 
-  const mig = src('prisma/migrations/20260830200000_catalogo_referencias_estruturais/migration.sql')
+  const mig = src('prisma/migrations-arquivo/20260830200000_catalogo_referencias_estruturais/migration.sql')
   ok('nenhuma tabela é derrubada (só as colunas migradas)', !/DROP TABLE/i.test(mig))
   ok('migration é idempotente', mig.includes('IF NOT EXISTS') && mig.includes('ON CONFLICT'))
   ok('migration migra os vínculos existentes', mig.includes('INSERT INTO "ServicoProdutoPais"'))

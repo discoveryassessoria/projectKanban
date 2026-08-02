@@ -191,7 +191,7 @@ sec('5 — backend, compatibilidade e migration aditiva')
   const motor = readFileSync(join(RAIZ, 'lib/financeiro/condicao-pagamento.ts'), 'utf8')
   ok('motor de cálculo intacto (lê os arrays)', motor.includes('c.moedasPermitidas') && motor.includes('c.modalidades'))
 
-  const dir = join(RAIZ, 'prisma/migrations/20260802000000_condicao_aplicabilidade_relacional/migration.sql')
+  const dir = join(RAIZ, 'prisma/migrations-arquivo/20260802000000_condicao_aplicabilidade_relacional/migration.sql')
   ok('migration aditiva existe', existsSync(dir))
   const sql = readFileSync(dir, 'utf8')
   ok('migration não é destrutiva', !/DROP\s+(TABLE|COLUMN)/i.test(sql) && !/DELETE\s+FROM/i.test(sql) && !/TRUNCATE/i.test(sql))

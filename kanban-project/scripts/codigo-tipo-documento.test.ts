@@ -98,7 +98,7 @@ ok(/formatoDe\(cfg\.entidade\)/.test(backfill), 'backfill usa o formato da entid
 
 // ═══════════════ 7) MIGRATION DE ALINHAMENTO ═══════════════════════════════════
 console.log('\n7) Migration que alinha o que já existe')
-const mig = ler('prisma/migrations/20260902100000_codigo_tipo_documento_doc/migration.sql')
+const mig = ler('prisma/migrations-arquivo/20260902100000_codigo_tipo_documento_doc/migration.sql')
 ok(/TDOC-\[0-9\]\+\$/.test(mig), 'converte os TDOC-n antigos')
 ok(/WHERE "publicCode" IS NULL/.test(mig), 'preenche os tipos que estavam sem código')
 ok(/GREATEST\("CodeSequence"\."ultimo"/.test(mig), 'semeia a sequência sem retroceder')

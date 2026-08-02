@@ -43,7 +43,7 @@ sec('3 — schema: entidades + vínculos aditivos')
 
 sec('4 — migration idempotente')
 {
-  const m = ler('prisma/migrations/20260805000000_adquirente_bandeira/migration.sql')
+  const m = ler('prisma/migrations-arquivo/20260805000000_adquirente_bandeira/migration.sql')
   ok('CREATE TABLE IF NOT EXISTS Adquirente/Bandeira', m.includes('CREATE TABLE IF NOT EXISTS "Adquirente"') && m.includes('CREATE TABLE IF NOT EXISTS "Bandeira"'))
   ok('ADD COLUMN IF NOT EXISTS (aditivo, sem drop)', m.includes('ADD COLUMN IF NOT EXISTS "adquirenteId"') && !m.includes('DROP'))
   ok('índices únicos idempotentes', m.includes('CREATE UNIQUE INDEX IF NOT EXISTS "Adquirente_slug_key"'))

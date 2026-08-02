@@ -20,7 +20,7 @@ ok('idempotência: LedgerEntry.idempotencyKey @unique', /model LedgerEntry[\s\S]
 ok('Obrigacao 1:1 origem (backfill idempotente)', /@@unique\(\[origemTipo, origemId\]\)/.test(schema))
 ok('Cobranca.obrigacaoId aditivo (legado)', /obrigacaoId\s+Int\?\s+\/\/ → ObrigacaoEconomica/.test(schema))
 
-const migRaw = rd('prisma/migrations/20260808000000_motor_financeiro_v3_fase1/migration.sql')
+const migRaw = rd('prisma/migrations-arquivo/20260808000000_motor_financeiro_v3_fase1/migration.sql')
 const mig = migRaw.split('\n').filter((l) => !l.trim().startsWith('--')).join('\n') // ignora comentários
 ok('migration idempotente (CREATE TABLE IF NOT EXISTS)', (mig.match(/CREATE TABLE IF NOT EXISTS/g) || []).length >= 16)
 ok('migration só aditiva (nenhum DROP/ALTER destrutivo em statements)', !/\bDROP TABLE\b/.test(mig) && !/\bDROP COLUMN\b/.test(mig) && mig.includes('ADD COLUMN IF NOT EXISTS "obrigacaoId"'))

@@ -238,7 +238,7 @@ secao('Integração com o FinanceRuleEngine')
   ok('parcela marca entrada', /model ParcelaFinanceira[\s\S]*?entrada\s+Boolean/.test(schema))
   ok('taxa tem quemAbsorve', /model TaxaPagamento[\s\S]*?quemAbsorve/.test(schema))
 
-  const mig = readFileSync(join(RAIZ, 'prisma/migrations/20260726000000_pagamentos_taxas_encargos/migration.sql'), 'utf8')
+  const mig = readFileSync(join(RAIZ, 'prisma/migrations-arquivo/20260726000000_pagamentos_taxas_encargos/migration.sql'), 'utf8')
   ok('migration é aditiva', !/DROP\s+(TABLE|COLUMN)|TRUNCATE|DELETE FROM/i.test(mig))
   ok('migration adiciona condição na Receita', mig.includes('"Receita" ADD COLUMN "condicaoPagamentoId"'))
   ok('migration adiciona condição no Custo', mig.includes('"Custo" ADD COLUMN "condicaoPagamentoId"'))

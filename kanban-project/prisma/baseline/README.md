@@ -17,8 +17,8 @@ essa tabela**. Não é caso isolado: 81 das 165 tabelas de produção não têm
 `CREATE TABLE` versionado. O histórico é um log incremental escrito sobre um
 banco que já existia — nunca foi um build a partir do zero.
 
-Enquanto isso não for resolvido de vez (consolidar as migrations num
-`0000_baseline`), este arquivo é o único caminho de reconstrução.
+**Resolvido em 02/08/2026:** as migrations foram consolidadas em
+`0000_baseline` e as 112 antigas foram arquivadas. Ver *Consolidação* abaixo.
 
 ## Quando usar
 
@@ -28,6 +28,81 @@ Enquanto isso não for resolvido de vez (consolidar as migrations num
 
 **Não use** para o dia a dia. Migrations continuam sendo o mecanismo normal:
 `prisma migrate deploy`. Este arquivo não é aplicado por nada automático.
+
+---
+
+## Consolidação de 02/08/2026
+
+**O que era.** `prisma/migrations` tinha 112 migrations e o ledger de produção
+(`_prisma_migrations`) havia sido reduzido a uma única linha, `0000_baseline`,
+registrada em 02/08/2026 23:13:05 UTC. Repositório e ledger discordavam: um
+`prisma migrate deploy` tentaria reaplicar as 112 sobre um banco que já tinha o
+schema completo — e quebraria na sétima.
+
+**O que é agora.**
+
+| | |
+|---|---|
+| migration oficial | `prisma/migrations/0000_baseline/migration.sql` |
+| checksum (sha256) | `379c12b2858a949928c9738d032a4864fbc37c9a87014d2429497710da9a4bea` |
+| ledger de produção | 1 linha: `0000_baseline`, mesmo checksum, `finished_at` preenchido |
+| migrations antigas | `prisma/migrations-arquivo/` (112, preservadas, nunca executadas) |
+| commit de origem | consolidação feita sobre `955866c4` |
+
+**Produção já estava no schema final.** Nada foi criado, alterado ou apagado no
+banco para chegar aqui: o `migration.sql` é uma cópia byte a byte do
+`baseline.sql`, cujo sha256 já era exatamente o checksum que a linha do ledger
+carregava. Por isso **não houve escrita nenhuma em `_prisma_migrations`** — o
+arquivo foi feito para casar com o registro, não o contrário.
+
+`prisma migrate status` responde **"Database schema is up to date!"**, com uma
+migration encontrada e nenhuma pendente.
+
+**Divergências conhecidas entre o baseline e produção** — todas cosméticas,
+levantadas por `prisma migrate diff` e deliberadamente NÃO corrigidas:
+
+- 18 colunas `atualizadoEm` têm `DEFAULT` no banco; o schema usa `@updatedAt`
+  (aplicado pela aplicação). Comportamento idêntico na prática.
+- `uq_cotacao_confidence` (produção) × nome gerado pelo Prisma (baseline) —
+  mesmas colunas, mesma semântica.
+- Três `DEFAULT` de texto com acento corrompido **no `schema.prisma`**
+  (`"PortuguÃªs"`, `"MÃ©dia"`, `"averbaÃ§Ã£o"`); produção tem o texto correto.
+  É sujeira antiga do schema, não do banco. Corrigir exige migration própria e
+  avaliação de impacto — não entrou nesta consolidação.
+
+### Como criar migrations a partir daqui
+
+Fluxo normal do Prisma, sem nenhuma cerimônia extra:
+
+```bash
+# 1. altere o prisma/schema.prisma
+# 2. gere a migration contra um banco de desenvolvimento/teste (NUNCA produção)
+npx prisma migrate dev --name descricao_curta
+
+# 3. regenere o baseline — ele passa a incluir a mudança
+npm run baseline:gerar
+
+# 4. commite os três juntos: schema, migration nova e baseline
+```
+
+A migration nova nasce em `prisma/migrations/<timestamp>_<nome>/` e convive com
+`0000_baseline`. Em produção ela é aplicada pelo guard oficial
+(`MIGRATE_ON_BUILD=1` + `EU_CONFIRMO_ESCRITA_EM_PRODUCAO`, ver
+`scripts/prod-migrate-guard.mjs`), que roda `prisma migrate deploy`: o Prisma vê
+`0000_baseline` já aplicada e executa **somente** o que veio depois.
+
+⚠️ **Regenerar o baseline muda o checksum quando o conteúdo muda.** O guard
+`npm run test:baseline` (que roda no build) reprova nesse caso e explica o
+procedimento: fazer backup do ledger, atualizar o checksum da linha
+`0000_baseline` de forma explícita e auditada — sem tocar em schema nem em
+dados — e só então atualizar a constante no teste, no mesmo commit. Nunca mude
+só a constante.
+
+O cabeçalho do arquivo carrega a data de geração, mas ela **só anda quando o
+conteúdo anda**: regerar sem mexer no schema preserva a data e, portanto, o
+checksum.
+
+---
 
 ## Como aplicar
 
@@ -51,6 +126,10 @@ npm run baseline:gerar
 
 Sempre que o `prisma/schema.prisma` mudar. Se esquecer, o build falha com
 instruções — ver `scripts/baseline-verificar.test.ts`.
+
+O comando escreve **dois** arquivos idênticos: `prisma/baseline/baseline.sql` e
+`prisma/migrations/0000_baseline/migration.sql`. Eles são a mesma verdade em
+dois lugares — o guard reprova se divergirem.
 
 ## Estrutura
 

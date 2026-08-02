@@ -47,7 +47,7 @@ function run() {
   // 2) Migration aditiva
   console.log("\n2) Migration CP-1 (aditiva/não-destrutiva):")
   const mig = readFileSync(
-    join(ROOT, "prisma/migrations/20260711120000_cp1_familia_identidade/migration.sql"),
+    join(ROOT, "prisma/migrations-arquivo/20260711120000_cp1_familia_identidade/migration.sql"),
     "utf8"
   )
   ok(!/DROP\s+TABLE/i.test(mig), "não contém DROP TABLE")

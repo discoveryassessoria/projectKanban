@@ -165,7 +165,7 @@ sec('5 — persistência e migration aditiva')
   ok('unicidade por faixa', schema.includes('@@unique([taxaId, parcelasDe, parcelasAte])'))
   ok('colunas legadas preservadas no schema', schema.includes('aplicaParcela String?') && schema.includes('installmentsFrom    Int?'))
 
-  const dir = join(RAIZ, 'prisma/migrations/20260804000000_taxa_tabela_parcelamento/migration.sql')
+  const dir = join(RAIZ, 'prisma/migrations-arquivo/20260804000000_taxa_tabela_parcelamento/migration.sql')
   ok('migration existe', existsSync(dir))
   const sql = readFileSync(dir, 'utf8')
   ok('migration não é destrutiva', !/DROP\s+(TABLE|COLUMN)/i.test(sql) && !/DELETE\s+FROM/i.test(sql) && !/TRUNCATE/i.test(sql))

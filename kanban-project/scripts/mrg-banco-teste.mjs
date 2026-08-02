@@ -110,7 +110,7 @@ function runE2e() {
  */
 function migration() {
   const psql = bin('psql')
-  const arquivo = 'prisma/migrations/20260830100000_mrg_motor_registral_genealogico/migration.sql'
+  const arquivo = 'prisma/migrations-arquivo/20260830100000_mrg_motor_registral_genealogico/migration.sql'
   for (const passada of [1, 2]) {
     console.log(`· aplicando a migration (passada ${passada}/2)`)
     execFileSync(psql, ['-h', '127.0.0.1', '-p', PORTA, '-U', 'postgres', '-d', BANCO, '-v', 'ON_ERROR_STOP=1', '-q', '-f', arquivo], {

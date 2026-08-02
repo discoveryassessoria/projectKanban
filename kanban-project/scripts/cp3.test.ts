@@ -58,7 +58,7 @@ function run() {
 
   // 4) Migration aditiva + CHECK XOR
   console.log("\n4) Migration CP-3 (aditiva/não-destrutiva):")
-  const mig = readFileSync(join(ROOT, "prisma/migrations/20260711140000_cp3_necessidade_documental/migration.sql"), "utf8")
+  const mig = readFileSync(join(ROOT, "prisma/migrations-arquivo/20260711140000_cp3_necessidade_documental/migration.sql"), "utf8")
   ok(!/DROP\s+TABLE/i.test(mig), "não contém DROP TABLE")
   ok(!/DROP\s+COLUMN/i.test(mig), "não contém DROP COLUMN")
   ok(/CREATE TABLE "NecessidadeDocumental"/.test(mig), "cria NecessidadeDocumental")

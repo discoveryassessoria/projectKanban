@@ -10,12 +10,101 @@
  * NAO abre conexao com banco. Compara texto: regenera o corpo a partir do
  * schema.prisma (offline) + o bloco manual, e confere contra o commitado.
  */
-import { readFileSync, existsSync } from 'node:fs'
+import { createHash } from 'node:crypto'
+import { readFileSync, existsSync, readdirSync, statSync } from 'node:fs'
 import { join, dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 const RAIZ = join(dirname(fileURLToPath(import.meta.url)), '..')
 const BASELINE = join(RAIZ, 'prisma', 'baseline', 'baseline.sql')
+const DIR_MIGRATIONS = join(RAIZ, 'prisma', 'migrations')
+const MIGRATION = join(DIR_MIGRATIONS, '0000_baseline', 'migration.sql')
+
+/**
+ * Checksum registrado em `_prisma_migrations` de PRODUCAO para 0000_baseline,
+ * consolidado em 02/08/2026. O Prisma guarda o sha256 do migration.sql; se o
+ * arquivo mudar, ele passa a acusar "migration modificada depois de aplicada"
+ * e o `migrate deploy` para.
+ *
+ * Mudar esta constante NAO conserta nada por si so: o ledger de producao
+ * precisa ser reconciliado no mesmo movimento, de forma explicita e auditada.
+ */
+const CHECKSUM_LEDGER = '379c12b2858a949928c9738d032a4864fbc37c9a87014d2429497710da9a4bea'
+
+const sha256 = (t: string) => createHash('sha256').update(t).digest('hex')
+
+/**
+ * A migration oficial e o baseline sao o MESMO arquivo, byte a byte, e sao a
+ * unica migration do repositorio. As 112 antigas vivem em
+ * prisma/migrations-arquivo/ e nunca mais sao aplicadas.
+ */
+function verificarMigrationOficial() {
+  if (!existsSync(MIGRATION)) {
+    falhar([
+      '  A MIGRATION OFICIAL 0000_baseline NAO EXISTE',
+      '',
+      '  prisma/migrations/0000_baseline/migration.sql sumiu. Producao tem esse',
+      '  nome registrado em _prisma_migrations; sem o arquivo, o Prisma trata a',
+      '  migration como removida e o deploy fica inconsistente.',
+      '',
+      '  Rode: npm run baseline:gerar',
+    ])
+  }
+
+  const migration = readFileSync(MIGRATION, 'utf8')
+  const baseline = readFileSync(BASELINE, 'utf8')
+
+  if (migration !== baseline) {
+    falhar([
+      '  BASELINE E MIGRATION DIVERGIRAM',
+      '',
+      '  prisma/baseline/baseline.sql e prisma/migrations/0000_baseline/migration.sql',
+      '  precisam ser identicos byte a byte — sao a mesma verdade em dois lugares.',
+      '',
+      '  Rode: npm run baseline:gerar (escreve os dois)',
+    ])
+  }
+
+  const checksum = sha256(migration)
+  if (checksum !== CHECKSUM_LEDGER) {
+    falhar([
+      '  O CHECKSUM DO BASELINE MUDOU',
+      '',
+      `  esperado (ledger de producao) : ${CHECKSUM_LEDGER}`,
+      `  atual    (arquivo commitado)  : ${checksum}`,
+      '',
+      '  Producao registra 0000_baseline por ESTE checksum. Com o arquivo',
+      '  diferente, `prisma migrate deploy` acusa migration modificada depois de',
+      '  aplicada e para — em producao, no meio do deploy.',
+      '',
+      'COMO RESOLVER — e um procedimento, nao um ajuste de constante:',
+      '  1. entenda POR QUE o conteudo mudou (schema novo? bloco manual?);',
+      '  2. faca backup do ledger antes de qualquer escrita;',
+      '  3. atualize o checksum da linha 0000_baseline em _prisma_migrations',
+      '     de forma explicita e auditada, sem tocar em schema nem em dados;',
+      '  4. so entao atualize CHECKSUM_LEDGER aqui, no mesmo commit.',
+      '',
+      '  Nunca mude so a constante: isso mente para o proximo que ler.',
+    ])
+  }
+
+  const entradas = readdirSync(DIR_MIGRATIONS)
+    .filter((n) => statSync(join(DIR_MIGRATIONS, n)).isDirectory())
+  if (entradas.length !== 1 || entradas[0] !== '0000_baseline') {
+    falhar([
+      '  HA MIGRATION ALEM DO BASELINE EM prisma/migrations',
+      '',
+      `  encontradas: ${entradas.join(', ')}`,
+      '',
+      '  As 112 migrations historicas foram arquivadas em prisma/migrations-arquivo/',
+      '  em 02/08/2026 porque nao reconstroem o banco e nao podem ser reaplicadas.',
+      '  Migration NOVA e bem-vinda — mas a partir do baseline, e registrada aqui',
+      '  com data propria. Se uma antiga voltou, foi engano: mova de volta.',
+    ])
+  }
+
+  console.log(`  ✅ 0000_baseline integro (sha256 ${checksum.slice(0, 12)}…) e unica migration do repositorio`)
+}
 
 /** Inicio deterministico do corpo gerado pelo Prisma — separa o cabecalho. */
 const MARCO_CORPO = '-- CreateSchema'
@@ -60,6 +149,7 @@ if (atual.trim() === esperado.trim()) {
   const tabelas = (commitado.match(/^CREATE TABLE/gm) ?? []).length
   const fks = (commitado.match(/FOREIGN KEY/g) ?? []).length
   console.log(`  ✅ baseline em dia com o schema.prisma (${tabelas} tabelas · ${fks} foreign keys)`)
+  verificarMigrationOficial()
   process.exit(0)
 }
 

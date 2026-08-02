@@ -169,7 +169,7 @@ secao('6) Ausência de escrita/leitura textual de categoria')
   ok('ItemCatalogo sem categoria textual', itemCatalogo !== '' && !/\n\s+categoria\s+String/.test(itemCatalogo))
   ok('ItemCatalogo aponta para o cadastro oficial', /categoriaId\s+Int\?/.test(itemCatalogo))
 
-  const mig = src('prisma/migrations/20260830200000_catalogo_referencias_estruturais/migration.sql')
+  const mig = src('prisma/migrations-arquivo/20260830200000_catalogo_referencias_estruturais/migration.sql')
   ok('migration remove as três colunas textuais', /DROP COLUMN IF EXISTS "category"/.test(mig) && /DROP COLUMN IF EXISTS "nationality"/.test(mig) && /DROP COLUMN IF EXISTS "categoria"/.test(mig))
   ok('remoção acontece DEPOIS da verificação', mig.indexOf('RAISE EXCEPTION') < mig.indexOf('DROP COLUMN'))
   ok('migration cria as categorias oficiais', mig.includes("'CIDNAC'") && mig.includes("'REGCIV'") && mig.includes("'RETREG'"))

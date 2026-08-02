@@ -150,7 +150,7 @@ console.log("\n5) Arquitetura")
   }
   ok(!/publicCode/.test(modelo), "sem publicCode")
 
-  const sql = readFileSync(join(RAIZ, "prisma/migrations/20260828000001_mdm3_decisao_dedup/migration.sql"), "utf8")
+  const sql = readFileSync(join(RAIZ, "prisma/migrations-arquivo/20260828000001_mdm3_decisao_dedup/migration.sql"), "utf8")
   ok(/CREATE TABLE IF NOT EXISTS "DecisaoDeduplicacao"/.test(sql), "cria tabela idempotente")
   ok(!/DROP\s+(TABLE|COLUMN)/i.test(sql), "sem DROP — aditiva")
   ok(!/ALTER TABLE "Pessoa"/i.test(sql), "não altera Pessoa")

@@ -80,7 +80,7 @@ const schema = src("prisma/schema.prisma")
 ok(/sistema\s+Boolean\s+@default\(false\)/.test(schema), "14. schema tem flag `sistema`")
 ok(/code:\s*'CODE_IMMUTABLE'/.test(catId) && /imutável após a criação/.test(catId), "15. PUT bloqueia mudança de code (409 CODE_IMMUTABLE)")
 ok(/exists\.sistema/.test(catId) && /code:\s*'SYSTEM'/.test(catId), "16. DELETE bloqueia categoria de sistema (409 SYSTEM)")
-const mig = src("prisma/migrations/20260713120000_categoria_documental/migration.sql")
+const mig = src("prisma/migrations-arquivo/20260713120000_categoria_documental/migration.sql")
 ok(/"sistema" BOOLEAN NOT NULL DEFAULT false/.test(mig) && CODES.every((c) => new RegExp(`'${c}'[^\\n]*true`).test(mig)), "17. migration semeia 7 categorias com sistema=true")
 
 // ── A4: categoria inativa na edição ────────────────────────────────────────

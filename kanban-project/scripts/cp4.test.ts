@@ -65,7 +65,7 @@ async function run() {
 
   // 3) Migration aditiva
   console.log("\n3) Migration CP-4A:")
-  const mig = readFileSync(join(ROOT, "prisma/migrations/20260712120000_cp4a_workflow_runtime/migration.sql"), "utf8")
+  const mig = readFileSync(join(ROOT, "prisma/migrations-arquivo/20260712120000_cp4a_workflow_runtime/migration.sql"), "utf8")
   ok(!/DROP\s+TABLE/i.test(mig), "não contém DROP TABLE")
   ok(!/DROP\s+COLUMN/i.test(mig), "não contém DROP COLUMN")
   ok(/CREATE TABLE "PhaseWorkflowInstance"/.test(mig), "cria PhaseWorkflowInstance")
@@ -165,7 +165,7 @@ async function run() {
 
   // 13) Migration CP-4B aditiva
   console.log("\n13) Migration CP-4B:")
-  const mig4b = readFileSync(join(ROOT, "prisma/migrations/20260712130000_cp4b_instance_identity_snapshot/migration.sql"), "utf8")
+  const mig4b = readFileSync(join(ROOT, "prisma/migrations-arquivo/20260712130000_cp4b_instance_identity_snapshot/migration.sql"), "utf8")
   ok(!/DROP\s+(TABLE|COLUMN)/i.test(mig4b), "sem DROP")
   ok(/ADD COLUMN\s+"faseMacroId" INTEGER/.test(mig4b), "adiciona faseMacroId")
   ok(/"snapshotSchemaVersion" INTEGER NOT NULL DEFAULT 1/.test(mig4b), "snapshotSchemaVersion default 1")
@@ -284,7 +284,7 @@ async function run() {
 
   // 25) Migration CP-4D aditiva
   console.log("\n25) Migration CP-4D:")
-  const mig4d = readFileSync(join(ROOT, "prisma/migrations/20260712140000_cp4d_sync_lock_events/migration.sql"), "utf8")
+  const mig4d = readFileSync(join(ROOT, "prisma/migrations-arquivo/20260712140000_cp4d_sync_lock_events/migration.sql"), "utf8")
   ok(!/DROP\s+(TABLE|COLUMN)/i.test(mig4d), "sem DROP")
   ok(/ALTER TYPE "StatusTarefa" ADD VALUE 'CANCELADA'/.test(mig4d), "StatusTarefa +CANCELADA")
   ok(/ADD VALUE 'PASSO_AGUARDANDO_APROVACAO'/.test(mig4d) && /ADD VALUE 'TAREFA_INICIADA'/.test(mig4d), "novos eventos aditivos")
@@ -436,7 +436,7 @@ async function run() {
 
   // 38) Migration CP-4F aditiva (sem DROP, sem NOT NULL prematuro sobre FK)
   console.log("\n38) Migration CP-4F (aditiva, sem DROP):")
-  const migDir = join(ROOT, "prisma/migrations/20260712150000_cp4f_phase_advance_log/migration.sql")
+  const migDir = join(ROOT, "prisma/migrations-arquivo/20260712150000_cp4f_phase_advance_log/migration.sql")
   ok(existsSync(migDir), "migration CP-4F existe")
   const migF = existsSync(migDir) ? readFileSync(migDir, "utf8") : ""
   ok(!/DROP\s+(TABLE|COLUMN|TYPE|CONSTRAINT)/i.test(migF), "migration sem DROP")

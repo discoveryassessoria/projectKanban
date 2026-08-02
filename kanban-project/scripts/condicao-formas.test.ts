@@ -184,7 +184,7 @@ sec('5 — backend, compatibilidade e migração do dado legado')
   const runtime = readFileSync(join(RAIZ, 'lib/financeiro/charge-runtime.ts'), 'utf8')
   ok('runtime carrega permitidas e padrão', runtime.includes('formasPermitidasIds') && runtime.includes('formaPadraoId'))
 
-  const sql = readFileSync(join(RAIZ, 'prisma/migrations/20260803000000_taxa_aplicabilidade_relacional/migration.sql'), 'utf8')
+  const sql = readFileSync(join(RAIZ, 'prisma/migrations-arquivo/20260803000000_taxa_aplicabilidade_relacional/migration.sql'), 'utf8')
   ok('migração da forma legada existe', sql.includes('INSERT INTO "CondicaoPagamentoForma"') && sql.includes('formaSugeridaId'))
   ok('migração é idempotente', sql.includes('ON CONFLICT ("condicaoId", "formaId") DO NOTHING'))
   ok('dado legado NÃO é apagado', !/UPDATE "CondicaoPagamento"[\s\S]*formaSugeridaId/.test(sql) && !/DROP COLUMN/i.test(sql))
@@ -193,7 +193,7 @@ sec('5 — backend, compatibilidade e migração do dado legado')
   const schema = readFileSync(join(RAIZ, 'prisma/schema.prisma'), 'utf8')
   ok('N:N das formas permitidas preservado', schema.includes('model CondicaoPagamentoForma {') && schema.includes('@@unique([condicaoId, formaId])'))
   ok('coluna da forma padrão preservada', schema.includes('formaSugeridaId Int?'))
-  ok('migration existe no disco', existsSync(join(RAIZ, 'prisma/migrations/20260803000000_taxa_aplicabilidade_relacional/migration.sql')))
+  ok('migration existe no disco', existsSync(join(RAIZ, 'prisma/migrations-arquivo/20260803000000_taxa_aplicabilidade_relacional/migration.sql')))
 }
 
 console.log(`\n${'='.repeat(60)}`)

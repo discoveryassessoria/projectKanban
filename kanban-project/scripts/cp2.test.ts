@@ -41,7 +41,7 @@ function run() {
   // 3) Migration CP-2 aditiva
   console.log("\n3) Migration CP-2 (aditiva/não-destrutiva):")
   const mig = readFileSync(
-    join(ROOT, "prisma/migrations/20260711130000_cp2_tiposervico_catalogo/migration.sql"),
+    join(ROOT, "prisma/migrations-arquivo/20260711130000_cp2_tiposervico_catalogo/migration.sql"),
     "utf8"
   )
   ok(!/DROP\s+TABLE/i.test(mig), "não contém DROP TABLE")

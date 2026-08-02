@@ -1,0 +1,16 @@
+{
+  "capturadoEm": "2026-08-02T23:22:42.223Z",
+  "banco": "produção (db.prisma.io)",
+  "linhas": [
+    {
+      "id": "324928c2-5761-40c2-bb4a-7356e21718d2",
+      "checksum": "379c12b2858a949928c9738d032a4864fbc37c9a87014d2429497710da9a4bea",
+      "migration_name": "0000_baseline",
+      "logs": "",
+      "rolled_back_at": null,
+      "started_at": "2026-08-02T23:13:05.728Z",
+      "finished_at": "2026-08-02T23:13:05.728Z",
+      "applied_steps_count": 0
+    }
+  ]
+}

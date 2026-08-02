@@ -18,13 +18,21 @@
 // garantir que, se algum dia o comando tentar conectar, ele falhe alto.
 // ============================================================================
 import { execFileSync } from 'node:child_process'
-import { existsSync, readFileSync, writeFileSync } from 'node:fs'
-import { join } from 'node:path'
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
+import { dirname, join } from 'node:path'
 
 const RAIZ = join(import.meta.dirname, '..')
 const SCHEMA = join(RAIZ, 'prisma', 'schema.prisma')
 const BLOCO = join(RAIZ, 'prisma', 'baseline', 'bloco-manual.sql')
 const SAIDA = join(RAIZ, 'prisma', 'baseline', 'baseline.sql')
+// A migration OFICIAL é o mesmo arquivo, byte a byte. Ela está registrada em
+// _prisma_migrations de produção pelo checksum do conteúdo: se as duas cópias
+// divergirem, o Prisma passa a acusar "migration modificada depois de aplicada".
+// Por isso o gerador escreve as DUAS — nunca uma só.
+const SAIDA_MIGRATION = join(RAIZ, 'prisma', 'migrations', '0000_baseline', 'migration.sql')
+
+/** Início determinístico do corpo — separa cabeçalho (data/versão) do conteúdo. */
+const MARCO_CORPO = '-- CreateSchema'
 
 // Binário LOCAL, nunca `npx prisma`. Rodando de outro diretório, o npx pode
 // resolver para um Prisma global de outra versão — e as versões divergem na
@@ -104,16 +112,39 @@ export function conteudoSemCabecalho() {
   return corpoGerado() + '\n' + blocoManual()
 }
 
+/**
+ * Data do cabeçalho já gravada, quando existe.
+ *
+ * O checksum do baseline É o registro de `_prisma_migrations` em produção. Se
+ * a data do cabeçalho mudasse a cada regeração, o checksum mudaria sem que uma
+ * linha do schema tivesse mudado — e o Prisma passaria a acusar "migration
+ * modificada depois de aplicada" por puro ruído de calendário. Então a data só
+ * anda quando o CONTEÚDO anda.
+ */
+function dataPreservada(corpoNovo) {
+  if (!existsSync(SAIDA)) return null
+  const atual = readFileSync(SAIDA, 'utf8')
+  const i = atual.indexOf(MARCO_CORPO)
+  if (i === -1) return null
+  if (atual.slice(i) !== corpoNovo.slice(corpoNovo.indexOf(MARCO_CORPO))) return null
+  return atual.match(/^-- Gerado em\s+:\s*(.+)$/m)?.[1]?.trim() ?? null
+}
+
 if (import.meta.filename === process.argv[1]) {
   const versao = versaoPrisma()
-  const data = new Date().toISOString().slice(0, 10)
-  const conteudo = cabecalho({ versao, data }) + conteudoSemCabecalho()
+  const corpo = conteudoSemCabecalho()
+  const data = dataPreservada(corpo) ?? new Date().toISOString().slice(0, 10)
+  const conteudo = cabecalho({ versao, data }) + corpo
   writeFileSync(SAIDA, conteudo)
+  mkdirSync(dirname(SAIDA_MIGRATION), { recursive: true })
+  writeFileSync(SAIDA_MIGRATION, conteudo)
   const linhas = conteudo.split('\n').length
   const tabelas = (conteudo.match(/^CREATE TABLE/gm) ?? []).length
   const fks = (conteudo.match(/FOREIGN KEY/g) ?? []).length
   console.log(`[baseline] prisma/baseline/baseline.sql regenerado`)
   console.log(`[baseline]   ${linhas} linhas · ${tabelas} tabelas · ${fks} foreign keys · Prisma ${versao}`)
   console.log(`[baseline]   bloco manual reanexado de prisma/baseline/bloco-manual.sql`)
-  console.log(`[baseline] Confira o diff antes de commitar: git diff prisma/baseline/baseline.sql`)
+  console.log(`[baseline] prisma/migrations/0000_baseline/migration.sql regravado (mesmo conteúdo)`)
+  console.log(`[baseline] Confira o diff antes de commitar: git diff prisma/baseline prisma/migrations`)
+  console.log(`[baseline] Se o checksum mudar, o ledger de produção precisa ser reconciliado EXPLICITAMENTE.`)
 }

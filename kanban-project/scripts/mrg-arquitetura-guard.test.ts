@@ -205,7 +205,7 @@ ok(
 
 // ============================================================================
 console.log("\n5) MIGRAÇÃO ADITIVA E IDEMPOTENTE")
-const DIR_MIG = "prisma/migrations/20260830100000_mrg_motor_registral_genealogico"
+const DIR_MIG = "prisma/migrations-arquivo/20260830100000_mrg_motor_registral_genealogico"
 ok(existsSync(join(RAIZ, DIR_MIG, "migration.sql")), "migração do MRG existe")
 const sqlBruto = ler(`${DIR_MIG}/migration.sql`)
 // Comentários citam as palavras proibidas (é o cabeçalho que documenta a garantia);

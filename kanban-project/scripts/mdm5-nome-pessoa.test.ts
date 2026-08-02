@@ -288,7 +288,7 @@ console.log("\n9) Complemento 1 — nenhum domínio copia o Cadastro Mestre")
 
 console.log("\n10) Migration aditiva e reversível")
 {
-  const dir = join(RAIZ, "prisma/migrations/20260828000000_mdm5_nome_pessoa")
+  const dir = join(RAIZ, "prisma/migrations-arquivo/20260828000000_mdm5_nome_pessoa")
   ok(existsSync(join(dir, "migration.sql")), "migration existe")
   const sql = readFileSync(join(dir, "migration.sql"), "utf8")
 

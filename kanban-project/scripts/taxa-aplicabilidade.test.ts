@@ -159,7 +159,7 @@ sec('4 — backend, projeção legada e migration aditiva')
   const motor = readFileSync(join(RAIZ, 'lib/financeiro/charge-calculation-service.ts'), 'utf8')
   ok('motor de cálculo intacto (lê o array projetado)', motor.includes('t.moedasAplicaveis'))
 
-  const dir = join(RAIZ, 'prisma/migrations/20260803000000_taxa_aplicabilidade_relacional/migration.sql')
+  const dir = join(RAIZ, 'prisma/migrations-arquivo/20260803000000_taxa_aplicabilidade_relacional/migration.sql')
   ok('migration aditiva existe', existsSync(dir))
   const sql = readFileSync(dir, 'utf8')
   ok('migration não é destrutiva', !/DROP\s+(TABLE|COLUMN)/i.test(sql) && !/DELETE\s+FROM/i.test(sql) && !/TRUNCATE/i.test(sql))
