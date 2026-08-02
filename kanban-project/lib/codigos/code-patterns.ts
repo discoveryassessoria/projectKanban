@@ -52,6 +52,8 @@ export type EntidadeCodigo = keyof typeof CODE_PREFIX | 'PROCESS'
 // sequência. Como a unicidade de `publicCode` é por TABELA, não há colisão.
 const CODE_FORMATO: Partial<Record<EntidadeCodigo, { prefixo: string; separador: string }>> = {
   DOCUMENT_TYPE: { prefixo: 'DOC', separador: '' },
+  // Órgãos e Organizações: ORG1, ORG2, ORG3…
+  ORGANIZATION: { prefixo: 'ORG', separador: '' },
 }
 
 // PROCESSO: prefixo = ISO do país; sequência INDEPENDENTE por nacionalidade (IT-1, ES-1...).

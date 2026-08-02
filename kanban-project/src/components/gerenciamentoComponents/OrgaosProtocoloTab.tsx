@@ -1,8 +1,38 @@
 "use client"
 
-import { useEffect, useState, useCallback } from "react"
+// Órgãos e Organizações — cadastro MESTRE. Ficha completa da entidade (nome
+// oficial, nome fantasia, categorias N:N, localização, contato, idioma, moeda,
+// horário, responsável, tags). O código público (ORG1, ORG2…) é do backend:
+// aparece em leitura e nunca é digitado.
 
-interface Orgao { id: number; name: string; type: string | null; country: string | null; state: string | null; city: string | null; queueRule: string | null; ativo: boolean }
+import { useEffect, useState, useCallback, useMemo } from "react"
+import { CodigoPublicoField } from "./CodigoPublicoField"
+
+interface CategoriaRef { id: number; code: string; nome: string; ativo: boolean }
+interface Orgao {
+  id: number
+  publicCode: string | null
+  name: string
+  nomeFantasia: string | null
+  type: string | null
+  country: string | null
+  state: string | null
+  city: string | null
+  endereco: string | null
+  cep: string | null
+  site: string | null
+  email: string | null
+  telefone: string | null
+  idioma: string | null
+  moeda: string | null
+  horario: string | null
+  responsavel: string | null
+  observacoes: string | null
+  tags: string[]
+  queueRule: string | null
+  ativo: boolean
+  categorias?: { categoriaId: number; categoria: CategoriaRef }[]
+}
 
 const TYPES: [string, string][] = [
   ["consulado", "Consulado"], ["comune", "Comune"], ["tribunal", "Tribunal"], ["conservatoria", "Conservatória"],
@@ -10,6 +40,8 @@ const TYPES: [string, string][] = [
   ["apostilamento", "Apostilamento"], ["outro", "Outro"],
 ]
 const typeLabel = (t: string | null) => (t ? TYPES.find(x => x[0] === t)?.[1] || t : "—")
+const IDIOMAS: [string, string][] = [["pt", "Português"], ["es", "Espanhol"], ["it", "Italiano"], ["en", "Inglês"], ["fr", "Francês"], ["de", "Alemão"]]
+const MOEDAS: [string, string][] = [["BRL", "Real (BRL)"], ["EUR", "Euro (EUR)"], ["USD", "Dólar (USD)"], ["ARS", "Peso argentino (ARS)"], ["PYG", "Guarani (PYG)"]]
 
 function authHeaders(): HeadersInit {
   const t = typeof window !== "undefined" ? localStorage.getItem("authToken") : null
@@ -21,45 +53,98 @@ const opt = "bg-zinc-900"
 const IEdit = () => (<svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 20h9" /><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z" /></svg>)
 const ITrash = () => (<svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 6h18" /><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" /></svg>)
 
-type Form = { id?: number; name: string; type: string; country: string; state: string; city: string; queueRule: string; ativo: boolean }
-const blank = (): Form => ({ name: "", type: "", country: "", state: "", city: "", queueRule: "", ativo: true })
+type Form = {
+  id?: number; publicCode?: string | null
+  name: string; nomeFantasia: string; type: string
+  country: string; state: string; city: string; endereco: string; cep: string
+  site: string; email: string; telefone: string
+  idioma: string; moeda: string; horario: string; responsavel: string
+  observacoes: string; tags: string; queueRule: string
+  categoriaIds: number[]
+  ativo: boolean
+}
+const blank = (): Form => ({
+  name: "", nomeFantasia: "", type: "", country: "", state: "", city: "", endereco: "", cep: "",
+  site: "", email: "", telefone: "", idioma: "", moeda: "", horario: "", responsavel: "",
+  observacoes: "", tags: "", queueRule: "", categoriaIds: [], ativo: true,
+})
+const daLinha = (d: Orgao): Form => ({
+  id: d.id, publicCode: d.publicCode, name: d.name, nomeFantasia: d.nomeFantasia || "", type: d.type || "",
+  country: d.country || "", state: d.state || "", city: d.city || "", endereco: d.endereco || "", cep: d.cep || "",
+  site: d.site || "", email: d.email || "", telefone: d.telefone || "", idioma: d.idioma || "", moeda: d.moeda || "",
+  horario: d.horario || "", responsavel: d.responsavel || "", observacoes: d.observacoes || "",
+  tags: (d.tags ?? []).join(", "), queueRule: d.queueRule || "",
+  categoriaIds: (d.categorias ?? []).map(c => c.categoriaId), ativo: d.ativo,
+})
 
 export default function OrgaosProtocoloTab() {
   const [rows, setRows] = useState<Orgao[]>([])
+  const [categorias, setCategorias] = useState<CategoriaRef[]>([])
   const [loading, setLoading] = useState(true)
   const [busy, setBusy] = useState(false)
   const [flash, setFlash] = useState("")
   const [form, setForm] = useState<Form | null>(null)
+  const [busca, setBusca] = useState("")
+  const [filtroPais, setFiltroPais] = useState("")
 
   const load = useCallback(async () => {
     try {
-      const res = await fetch("/api/gerenciamento/orgaos-protocolo", { headers: authHeaders() })
-      if (res.ok) setRows((await res.json()).orgaos || [])
+      const [resOrg, resCat] = await Promise.all([
+        fetch("/api/gerenciamento/orgaos-protocolo", { headers: authHeaders() }),
+        fetch("/api/gerenciamento/cadastros/categorias-organizacao", { headers: authHeaders() }).catch(() => null),
+      ])
+      if (resOrg.ok) setRows((await resOrg.json()).orgaos || [])
+      if (resCat?.ok) {
+        const j = await resCat.json()
+        setCategorias((j.registros ?? j.categorias ?? []).filter((c: CategoriaRef) => c.ativo !== false))
+      }
     } finally { setLoading(false) }
   }, [])
   useEffect(() => { load() }, [load])
 
   const showFlash = (m: string) => { setFlash(m); setTimeout(() => setFlash(""), 2600) }
-  const upsert = (d: Orgao) => setRows(rs => { const i = rs.findIndex(x => x.id === d.id); if (i < 0) return [...rs, d]; const c = rs.slice(); c[i] = d; return c })
+
+  const paises = useMemo(
+    () => Array.from(new Set(rows.map(r => r.country).filter((v): v is string => !!v))).sort(),
+    [rows],
+  )
+  const visiveis = useMemo(() => {
+    const q = busca.trim().toLowerCase()
+    return rows.filter(r => {
+      if (filtroPais && r.country !== filtroPais) return false
+      if (!q) return true
+      const alvo = [r.publicCode, r.name, r.nomeFantasia, r.city, r.country, ...(r.tags ?? []),
+        ...(r.categorias ?? []).map(c => c.categoria?.nome)].filter(Boolean).join(" ").toLowerCase()
+      return alvo.includes(q)
+    })
+  }, [rows, busca, filtroPais])
 
   async function save() {
     if (!form) return
-    if (!form.name.trim()) { showFlash("Informe o nome."); return }
+    if (!form.name.trim()) { showFlash("Informe o nome oficial."); return }
     setBusy(true)
     try {
       const url = form.id ? `/api/gerenciamento/orgaos-protocolo/${form.id}` : "/api/gerenciamento/orgaos-protocolo"
-      const res = await fetch(url, { method: form.id ? "PUT" : "POST", headers: authHeaders(), body: JSON.stringify(form) })
+      const { tags, publicCode: _pc, ...resto } = form
+      void _pc
+      const body = JSON.stringify({ ...resto, tags: tags.split(",").map(t => t.trim()).filter(Boolean) })
+      const res = await fetch(url, { method: form.id ? "PUT" : "POST", headers: authHeaders(), body })
       const j = await res.json().catch(() => ({}))
-      if (res.ok && j.orgao) { upsert(j.orgao); setForm(null); showFlash("Salvo.") }
+      if (res.ok && j.orgao) { setForm(null); showFlash("Salvo."); load() }
       else showFlash(j.error || "Erro ao salvar.")
     } finally { setBusy(false) }
   }
+
   async function del(d: Orgao) {
-    if (!confirm(`Excluir o órgão "${d.name}"?`)) return
-    setRows(rs => rs.filter(x => x.id !== d.id))
+    if (!confirm(`Excluir "${d.name}"?\n\nSe a organização já recebeu protocolo, ela é INATIVADA para preservar o histórico.`)) return
     const res = await fetch(`/api/gerenciamento/orgaos-protocolo/${d.id}`, { method: "DELETE", headers: authHeaders() })
-    if (res.ok) showFlash("Excluído."); else { showFlash("Erro ao excluir."); load() }
+    const j = await res.json().catch(() => ({}))
+    if (res.ok) { showFlash(j.inativado ? `Inativada (${j.protocolos} protocolo(s) no histórico).` : "Excluída."); load() }
+    else { showFlash(j.error || "Erro ao excluir."); load() }
   }
+
+  const alternarCategoria = (id: number) =>
+    setForm(f => f && ({ ...f, categoriaIds: f.categoriaIds.includes(id) ? f.categoriaIds.filter(x => x !== id) : [...f.categoriaIds, id] }))
 
   if (loading) return <div className="py-24 text-center text-white/50">Carregando…</div>
 
@@ -70,31 +155,59 @@ export default function OrgaosProtocoloTab() {
       <div className="rounded-2xl border border-white/10 bg-white/5 p-5 backdrop-blur-sm">
         <div className="flex items-start justify-between gap-3">
           <div>
-            <h2 className="text-lg font-semibold text-white">Órgãos de Protocolo</h2>
-            <p className="mt-1 text-sm text-white/60">Consulados, comunes, tribunais, conservatórias, cartórios.</p>
+            <h2 className="text-lg font-semibold text-white">Órgãos e Organizações</h2>
+            <p className="mt-1 text-sm text-white/60">Cadastro <strong className="text-white/80">mestre</strong> das entidades com que a operação fala: consulados, embaixadas, registros civis, comuni, tribunais, arquivos, cartórios, transportadoras e parceiros. Uma organização pode ter várias categorias.</p>
           </div>
-          <button onClick={() => setForm(blank())} className="flex-none rounded-lg bg-blue-600 px-3 py-2 text-xs font-medium text-white hover:bg-blue-500">+ Novo órgão</button>
+          <button onClick={() => setForm(blank())} className="flex-none rounded-lg bg-blue-600 px-3 py-2 text-xs font-medium text-white hover:bg-blue-500">+ Nova organização</button>
+        </div>
+        <div className="mt-4 flex flex-wrap items-center gap-2">
+          <input value={busca} onChange={e => setBusca(e.target.value)} placeholder="Buscar por nome, código, cidade, categoria ou tag…" className={inputCls + " max-w-md"} />
+          <select value={filtroPais} onChange={e => setFiltroPais(e.target.value)} className={inputCls + " max-w-[14rem]"}>
+            <option value="" className={opt}>Todos os países ({rows.length})</option>
+            {paises.map(p => <option key={p} value={p} className={opt}>{p}</option>)}
+          </select>
+          <span className="text-xs text-white/40">{visiveis.length} exibida(s)</span>
         </div>
       </div>
 
       <div className="overflow-hidden rounded-2xl border border-white/10 bg-white/5 backdrop-blur-sm">
         <table className="w-full text-sm">
           <thead className="border-b border-white/10 text-left text-xs text-white/50">
-            <tr><th className="px-4 py-3 font-medium">Nome</th><th className="px-4 py-3 font-medium">Tipo</th><th className="px-4 py-3 font-medium">País</th><th className="px-4 py-3 font-medium">Cidade</th><th className="px-4 py-3 font-medium">Status</th><th className="px-4 py-3 text-right font-medium">Ações</th></tr>
+            <tr>
+              <th className="px-4 py-3 font-medium">Código</th>
+              <th className="px-4 py-3 font-medium">Nome oficial</th>
+              <th className="px-4 py-3 font-medium">Categorias</th>
+              <th className="px-4 py-3 font-medium">País</th>
+              <th className="px-4 py-3 font-medium">Cidade</th>
+              <th className="px-4 py-3 font-medium">Status</th>
+              <th className="px-4 py-3 text-right font-medium">Ações</th>
+            </tr>
           </thead>
           <tbody>
-            {rows.length === 0 ? (
-              <tr><td colSpan={6} className="px-4 py-8 text-center text-xs text-white/40">Nenhum órgão cadastrado.</td></tr>
-            ) : rows.map(d => (
+            {visiveis.length === 0 ? (
+              <tr><td colSpan={7} className="px-4 py-8 text-center text-xs text-white/40">Nenhuma organização encontrada.</td></tr>
+            ) : visiveis.map(d => (
               <tr key={d.id} className="border-b border-white/5 last:border-0">
-                <td className="px-4 py-2.5 text-white">{d.name}</td>
-                <td className="px-4 py-2.5"><span className="rounded bg-white/10 px-1.5 py-0.5 text-[10px] text-white/70">{typeLabel(d.type)}</span></td>
+                <td className="px-4 py-2.5 font-mono text-[12px] font-bold text-white/80">{d.publicCode ?? "—"}</td>
+                <td className="px-4 py-2.5 text-white">
+                  {d.name}
+                  {d.nomeFantasia && <span className="ml-2 text-[11px] text-white/40">{d.nomeFantasia}</span>}
+                </td>
+                <td className="px-4 py-2.5">
+                  <div className="flex flex-wrap gap-1">
+                    {(d.categorias ?? []).length === 0
+                      ? <span className="rounded bg-white/10 px-1.5 py-0.5 text-[10px] text-white/50">{typeLabel(d.type)}</span>
+                      : (d.categorias ?? []).map(c => (
+                        <span key={c.categoriaId} className="rounded bg-white/10 px-1.5 py-0.5 text-[10px] text-white/70">{c.categoria?.nome}</span>
+                      ))}
+                  </div>
+                </td>
                 <td className="px-4 py-2.5 text-white/70">{d.country || "—"}</td>
                 <td className="px-4 py-2.5 text-white/70">{d.city || "—"}</td>
                 <td className="px-4 py-2.5"><span className={`rounded-full px-2 py-0.5 text-[10px] ${d.ativo ? "bg-green-500/15 text-green-300" : "bg-white/10 text-white/50"}`}>{d.ativo ? "Ativo" : "Inativo"}</span></td>
                 <td className="px-4 py-2.5">
                   <div className="flex items-center justify-end gap-0.5 text-white/50">
-                    <button title="Editar" aria-label="Editar" onClick={() => setForm({ id: d.id, name: d.name, type: d.type || "", country: d.country || "", state: d.state || "", city: d.city || "", queueRule: d.queueRule || "", ativo: d.ativo })} className="rounded p-1 hover:bg-white/10 hover:text-white"><IEdit /></button>
+                    <button title="Editar" aria-label="Editar" onClick={() => setForm(daLinha(d))} className="rounded p-1 hover:bg-white/10 hover:text-white"><IEdit /></button>
                     <button title="Excluir" aria-label="Excluir" onClick={() => del(d)} className="rounded p-1 text-red-300/70 hover:bg-red-500/10 hover:text-red-300"><ITrash /></button>
                   </div>
                 </td>
@@ -106,10 +219,12 @@ export default function OrgaosProtocoloTab() {
 
       {form && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm" onClick={() => setForm(null)}>
-          <div className="w-full max-w-2xl rounded-2xl border border-white/10 bg-zinc-900/95 shadow-2xl" onClick={e => e.stopPropagation()}>
-            <div className="border-b border-white/10 px-6 py-4"><h3 className="font-semibold text-white">{form.id ? "Editar" : "Novo"} órgão</h3></div>
+          <div className="max-h-[90vh] w-full max-w-3xl overflow-y-auto rounded-2xl border border-white/10 bg-zinc-900/95 shadow-2xl" onClick={e => e.stopPropagation()}>
+            <div className="border-b border-white/10 px-6 py-4"><h3 className="font-semibold text-white">{form.id ? "Editar" : "Nova"} organização</h3></div>
             <div className="grid grid-cols-2 gap-3 px-6 py-4">
-              <div className="col-span-2"><label className={labelCls}>Nome *</label><input value={form.name} onChange={e => setForm(f => f && { ...f, name: e.target.value })} className={inputCls} /></div>
+              <div className="col-span-2"><CodigoPublicoField codigo={form.publicCode} /></div>
+              <div className="col-span-2"><label className={labelCls}>Nome oficial *</label><input value={form.name} onChange={e => setForm(f => f && { ...f, name: e.target.value })} className={inputCls} placeholder="Na língua e grafia oficiais da entidade" /></div>
+              <div><label className={labelCls}>Nome fantasia</label><input value={form.nomeFantasia} onChange={e => setForm(f => f && { ...f, nomeFantasia: e.target.value })} className={inputCls} placeholder="Sigla ou nome usual" /></div>
               <div>
                 <label className={labelCls}>Tipo</label>
                 <select value={form.type} onChange={e => setForm(f => f && { ...f, type: e.target.value })} className={inputCls}>
@@ -117,10 +232,53 @@ export default function OrgaosProtocoloTab() {
                   {TYPES.map(([v, l]) => <option key={v} value={v} className={opt}>{l}</option>)}
                 </select>
               </div>
+
+              <div className="col-span-2">
+                <label className={labelCls}>Categorias</label>
+                {categorias.length === 0 ? (
+                  <p className="rounded-md border border-dashed border-white/10 p-3 text-xs text-white/40">Nenhuma categoria cadastrada.</p>
+                ) : (
+                  <div className="max-h-40 overflow-y-auto rounded-md border border-white/10">
+                    {categorias.map(c => (
+                      <label key={c.id} className="flex items-center gap-2 px-3 py-1.5 text-sm text-white/80 hover:bg-white/5">
+                        <input type="checkbox" checked={form.categoriaIds.includes(c.id)} onChange={() => alternarCategoria(c.id)} />
+                        {c.nome}
+                      </label>
+                    ))}
+                  </div>
+                )}
+              </div>
+
               <div><label className={labelCls}>País</label><input value={form.country} onChange={e => setForm(f => f && { ...f, country: e.target.value })} className={inputCls} /></div>
-              <div><label className={labelCls}>Estado</label><input value={form.state} onChange={e => setForm(f => f && { ...f, state: e.target.value })} className={inputCls} /></div>
+              <div><label className={labelCls}>Estado / Província</label><input value={form.state} onChange={e => setForm(f => f && { ...f, state: e.target.value })} className={inputCls} /></div>
               <div><label className={labelCls}>Cidade</label><input value={form.city} onChange={e => setForm(f => f && { ...f, city: e.target.value })} className={inputCls} /></div>
+              <div><label className={labelCls}>CEP / Código postal</label><input value={form.cep} onChange={e => setForm(f => f && { ...f, cep: e.target.value })} className={inputCls} /></div>
+              <div className="col-span-2"><label className={labelCls}>Endereço</label><input value={form.endereco} onChange={e => setForm(f => f && { ...f, endereco: e.target.value })} className={inputCls} /></div>
+
+              <div><label className={labelCls}>Site</label><input value={form.site} onChange={e => setForm(f => f && { ...f, site: e.target.value })} className={inputCls} placeholder="https://" /></div>
+              <div><label className={labelCls}>E-mail</label><input value={form.email} onChange={e => setForm(f => f && { ...f, email: e.target.value })} className={inputCls} /></div>
+              <div><label className={labelCls}>Telefone</label><input value={form.telefone} onChange={e => setForm(f => f && { ...f, telefone: e.target.value })} className={inputCls} /></div>
+              <div><label className={labelCls}>Horário de funcionamento</label><input value={form.horario} onChange={e => setForm(f => f && { ...f, horario: e.target.value })} className={inputCls} /></div>
+
+              <div>
+                <label className={labelCls}>Idioma</label>
+                <select value={form.idioma} onChange={e => setForm(f => f && { ...f, idioma: e.target.value })} className={inputCls}>
+                  <option value="" className={opt}>—</option>
+                  {IDIOMAS.map(([v, l]) => <option key={v} value={v} className={opt}>{l}</option>)}
+                </select>
+              </div>
+              <div>
+                <label className={labelCls}>Moeda</label>
+                <select value={form.moeda} onChange={e => setForm(f => f && { ...f, moeda: e.target.value })} className={inputCls}>
+                  <option value="" className={opt}>—</option>
+                  {MOEDAS.map(([v, l]) => <option key={v} value={v} className={opt}>{l}</option>)}
+                </select>
+              </div>
+
+              <div className="col-span-2"><label className={labelCls}>Responsável / contato</label><input value={form.responsavel} onChange={e => setForm(f => f && { ...f, responsavel: e.target.value })} className={inputCls} /></div>
+              <div className="col-span-2"><label className={labelCls}>Tags</label><input value={form.tags} onChange={e => setForm(f => f && { ...f, tags: e.target.value })} className={inputCls} placeholder="separadas por vírgula" /></div>
               <div className="col-span-2"><label className={labelCls}>Regra de fila</label><input value={form.queueRule} onChange={e => setForm(f => f && { ...f, queueRule: e.target.value })} className={inputCls} /></div>
+              <div className="col-span-2"><label className={labelCls}>Observações</label><textarea value={form.observacoes} onChange={e => setForm(f => f && { ...f, observacoes: e.target.value })} rows={3} className={inputCls} /></div>
               <label className="col-span-2 flex items-center gap-2 text-sm text-white/70"><input type="checkbox" checked={form.ativo} onChange={e => setForm(f => f && { ...f, ativo: e.target.checked })} />Ativo</label>
             </div>
             <div className="flex justify-end gap-2 border-t border-white/10 px-6 py-4">

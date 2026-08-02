@@ -2961,12 +2961,32 @@ model Departamento {
 
 // ÃrgÃ£os de Protocolo (op_organs) â consulados, comunes, tribunais, cartÃ³rios...
 model OrgaoProtocolo {
+  /// ORG1, ORG2… — código público gerado pelo CodeGeneratorService (imutável).
+  publicCode   String?  @unique @db.VarChar(20)
   id           Int      @id @default(autoincrement())
+  /// NOME OFICIAL — na língua e na grafia oficiais da entidade.
   name         String   @db.VarChar(200)
+  /// Nome fantasia/usual (sigla ou como o operador chama no dia a dia).
+  nomeFantasia String?  @db.VarChar(200)
   type         String?  @db.VarChar(30) // consulado|comune|tribunal|conservatoria|cartorio|ministerio|prefeitura|tradutor|apostilamento|outro
   country      String?  @db.VarChar(60)
   state        String?  @db.VarChar(60)
   city         String?  @db.VarChar(100)
+  endereco     String?  @db.VarChar(300)
+  cep          String?  @db.VarChar(20)
+  site         String?  @db.VarChar(300)
+  email        String?  @db.VarChar(200)
+  telefone     String?  @db.VarChar(60)
+  /// Idioma de atendimento (ISO 639-1: pt, es, it, en, fr, de…).
+  idioma       String?  @db.VarChar(10)
+  /// Moeda praticada pela entidade (ISO 4217: BRL, EUR, USD…).
+  moeda        String?  @db.VarChar(10)
+  horario      String?  @db.VarChar(200)
+  /// Responsável/contato na entidade (texto — não é usuário do sistema).
+  responsavel  String?  @db.VarChar(200)
+  observacoes  String?  @db.Text
+  /// Etiquetas livres de operação (ex.: "apostila", "cidadania", "urgente").
+  tags         String[] @default([])
   queueRule    String?  @db.VarChar(200) // regra de fila
   ativo        Boolean  @default(true)
   criadoEm     DateTime @default(now())
@@ -2978,7 +2998,11 @@ model OrgaoProtocolo {
   // protocolizações recebidas por este órgão (ocorrências dentro dos processos)
   protocolos Protocolo[]
 
+  /// Anti-duplicidade do cadastro mestre: mesma entidade não entra duas vezes.
+  @@unique([name, country])
   @@index([type])
+  @@index([country])
+  @@index([ativo])
 }
 
 // Tipos de Documento (op_doctypes) â tipos documentais usados nos processos
