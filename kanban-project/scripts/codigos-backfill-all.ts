@@ -5,7 +5,7 @@
 //   PRISMA_DATABASE_URL=... npx tsx scripts/codigos-backfill-all.ts
 import { prisma } from "@/lib/prisma"
 import { gerarCodigoPublico, semearSequencia } from "@/lib/codigos/code-generator"
-import { escopoDe } from "@/lib/codigos/code-patterns"
+import { escopoDe, formatoDe } from "@/lib/codigos/code-patterns"
 import { CODE_REGISTRY } from "@/lib/codigos/entity-registry"
 
 const LOTE = 300
@@ -22,9 +22,13 @@ async function main() {
     }>)[camel(modelName)]
     const preservados = await m.count({ where: { [cfg.campo]: { not: null } } })
 
-    // IMPORTAÇÃO: avança a sequência ao maior número já existente com este prefixo (idempotente).
+    // IMPORTAÇÃO: avança a sequência ao maior número já existente com este formato
+    // (idempotente). O separador vem do formato da entidade — nem todo código usa
+    // hífen (Tipo de Documento é DOC7), por isso o número é o sufixo numérico final.
+    const { prefixo, separador } = formatoDe(cfg.entidade)
     const maxRow = await prisma.$queryRawUnsafe<{ maxn: number }[]>(
-      `SELECT COALESCE(MAX(CAST(split_part("${cfg.campo}", '-', 2) AS INT)), 0) AS maxn FROM "${modelName}" WHERE "${cfg.campo}" ~ '^${scope}-[0-9]+$'`)
+      `SELECT COALESCE(MAX(CAST(substring("${cfg.campo}" from '([0-9]+)$') AS INT)), 0) AS maxn
+         FROM "${modelName}" WHERE "${cfg.campo}" LIKE $1`, `${prefixo}${separador}%`)
     const maxn = maxRow[0]?.maxn ?? 0
     if (maxn > 0) await semearSequencia(prisma, scope, maxn)
 

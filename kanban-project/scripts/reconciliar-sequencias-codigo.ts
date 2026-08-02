@@ -18,7 +18,7 @@
 // ============================================================================
 import { prisma } from '@/lib/prisma'
 import { CODE_REGISTRY } from '@/lib/codigos/entity-registry'
-import { escopoDe } from '@/lib/codigos/code-patterns'
+import { escopoDe, padraoLikeDe } from '@/lib/codigos/code-patterns'
 import { sincronizarSequenciaComTabela } from '@/lib/codigos/code-generator'
 
 const dry = process.argv.includes('--dry-run')
@@ -34,16 +34,17 @@ async function main() {
         `SELECT "ultimo" FROM "CodeSequence" WHERE "scope" = $1`, scope,
       ).then((r) => Number(r?.[0]?.ultimo ?? 0)).catch(() => 0)
 
+      // sufixo numérico FINAL: serve para "CLI-48" e para "DOC7" (ver code-patterns).
       const maxTabela = await prisma.$queryRawUnsafe<{ max: number | null }[]>(
-        `SELECT COALESCE(MAX(NULLIF(regexp_replace("${cfg.campo}", '^.*-', ''), '')::bigint), 0)::int AS max
-           FROM "${modelo}" WHERE "${cfg.campo}" LIKE $1`, `${scope}-%`,
+        `SELECT COALESCE(MAX(NULLIF(substring("${cfg.campo}" from '([0-9]+)$'), '')::bigint), 0)::int AS max
+           FROM "${modelo}" WHERE "${cfg.campo}" LIKE $1`, padraoLikeDe(cfg.entidade),
       ).then((r) => Number(r?.[0]?.max ?? 0)).catch(() => 0)
 
       const atrasada = maxTabela > atual
       console.log(`  ${atrasada ? '⚠' : '·'} ${scope.padEnd(5)} ${modelo.padEnd(22)} sequência=${atual} · maior código=${maxTabela}${atrasada ? '  → ATRASADA' : ''}`)
 
       if (atrasada && !dry) {
-        await sincronizarSequenciaComTabela(prisma, modelo, cfg.campo, scope)
+        await sincronizarSequenciaComTabela(prisma, modelo, cfg.campo, cfg.entidade)
         console.log(`      ✓ sequência de ${scope} semeada em ${maxTabela}`)
         corrigidos++
       }

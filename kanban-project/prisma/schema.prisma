@@ -3074,7 +3074,7 @@ model OrgaoProtocolo {
 
 // Tipos de Documento (op_doctypes) â tipos documentais usados nos processos
 model TipoDocumentoCadastro {
-  publicCode            String?               @unique @db.VarChar(20) // TDOC â cÃ³digo pÃºblico do tipo (NÃO Ã© o DOC-n do documento concreto)
+  publicCode            String?               @unique @db.VarChar(20) // DOC1, DOC2… — código público do TIPO (não é o DOC-n do documento concreto)
   id                    Int                   @id @default(autoincrement())
   code                  String?               @db.VarChar(40)
   name                  String                @db.VarChar(200)

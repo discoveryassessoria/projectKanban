@@ -1,7 +1,6 @@
 import { PrismaClient } from "@prisma/client"
 import { CODE_REGISTRY } from "./codigos/entity-registry"
 import { gerarCodigoPublico, sincronizarSequenciaComTabela } from "./codigos/code-generator"
-import { escopoDe } from "./codigos/code-patterns"
 
 const globalForPrisma = globalThis as unknown as { prisma?: ReturnType<typeof buildPrisma>; prismaBase?: PrismaClient }
 
@@ -100,7 +99,7 @@ function buildPrisma() {
             // código existente na tabela e tenta UMA vez. Não é esconder erro: é a sequência
             // convergindo para a realidade — qualquer outra falha sobe intacta.
             if (!ehColisaoDeCodigo(e, cfg.campo)) throw e
-            await sincronizarSequenciaComTabela(base, model as string, cfg.campo, escopoDe(cfg.entidade))
+            await sincronizarSequenciaComTabela(base, model as string, cfg.campo, cfg.entidade)
             delete data[cfg.campo]
             data[cfg.campo] = await gerarCodigoPublico(base, cfg.entidade)
             return await query(args)

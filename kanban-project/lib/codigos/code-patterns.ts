@@ -9,7 +9,7 @@ export const CODE_PREFIX = {
   CLIENT: 'CLI',
   SERVICE: 'SRV',
   DOCUMENT: 'DOC',
-  DOCUMENT_TYPE: 'TDOC', // Tipo de Documento (cadastro mestre) — distinto do DOC-n do documento concreto
+  DOCUMENT_TYPE: 'TDOC', // escopo da SEQUÊNCIA do Tipo de Documento — o código escrito é DOC1, DOC2… (ver CODE_FORMATO)
 
   PERSON: 'PES',
   SUPPLIER: 'FOR',
@@ -40,6 +40,20 @@ export const CODE_PREFIX = {
 
 export type EntidadeCodigo = keyof typeof CODE_PREFIX | 'PROCESS'
 
+// ── FORMATO ESCRITO × ESCOPO DA SEQUÊNCIA ───────────────────────────────────
+// São coisas diferentes e quase sempre coincidem:
+//   • ESCOPO  = chave da linha em `CodeSequence` (quem conta).
+//   • FORMATO = como o código é ESCRITO para o operador (prefixo + separador).
+// Declarar aqui só a exceção; o resto segue `PREFIXO-numero`.
+//
+// TIPO DE DOCUMENTO: o código lido pelo operador é DOC1, DOC2, DOC3… (sem
+// separador). O escopo continua sendo TDOC para NÃO compartilhar contador com o
+// DOC-n do documento concreto — são entidades distintas, cada uma com a sua
+// sequência. Como a unicidade de `publicCode` é por TABELA, não há colisão.
+const CODE_FORMATO: Partial<Record<EntidadeCodigo, { prefixo: string; separador: string }>> = {
+  DOCUMENT_TYPE: { prefixo: 'DOC', separador: '' },
+}
+
 // PROCESSO: prefixo = ISO do país; sequência INDEPENDENTE por nacionalidade (IT-1, ES-1...).
 const PAIS_ISO: Record<string, string> = {
   italia: 'IT', 'itália': 'IT', italy: 'IT', it: 'IT',
@@ -59,7 +73,24 @@ export function isoDoPais(pais: string | null | undefined): string {
   return PAIS_ISO[k] ?? PAIS_ISO[k.slice(0, 2)] ?? (k.length >= 2 ? k.slice(0, 2).toUpperCase() : 'XX')
 }
 
-/** Escopo da sequência (prefixo). PROCESS usa o ISO do país; demais, o prefixo fixo. */
+/** Escopo da sequência (chave em CodeSequence). PROCESS usa o ISO do país; demais, o prefixo fixo. */
 export function escopoDe(entidade: EntidadeCodigo, pais?: string | null): string {
   return entidade === 'PROCESS' ? isoDoPais(pais) : CODE_PREFIX[entidade]
+}
+
+/** Como o código é escrito: prefixo visível + separador. Default: `ESCOPO-`. */
+export function formatoDe(entidade: EntidadeCodigo, pais?: string | null): { prefixo: string; separador: string } {
+  return CODE_FORMATO[entidade] ?? { prefixo: escopoDe(entidade, pais), separador: '-' }
+}
+
+/** Monta o código público a partir do número da sequência (ex.: "CLI-48", "DOC7"). */
+export function formatarCodigo(entidade: EntidadeCodigo, numero: number, pais?: string | null): string {
+  const { prefixo, separador } = formatoDe(entidade, pais)
+  return `${prefixo}${separador}${numero}`
+}
+
+/** Padrão SQL LIKE que casa com os códigos da entidade (usado na reconciliação). */
+export function padraoLikeDe(entidade: EntidadeCodigo, pais?: string | null): string {
+  const { prefixo, separador } = formatoDe(entidade, pais)
+  return `${prefixo}${separador}%`
 }

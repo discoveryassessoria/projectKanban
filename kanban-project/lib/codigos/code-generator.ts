@@ -10,7 +10,7 @@
 //   const codigo = await gerarCodigoPublico(prisma, 'REVENUE')                   // "REC-42"
 
 import { Prisma, PrismaClient } from '@prisma/client'
-import { escopoDe, type EntidadeCodigo } from './code-patterns'
+import { escopoDe, formatarCodigo, padraoLikeDe, type EntidadeCodigo } from './code-patterns'
 
 // Aceita o client normal OU um tx client (para rodar dentro de transação). NÃO importa o singleton
 // (evita ciclo: lib/prisma → code-generator → lib/prisma) — o client é sempre passado pelo chamador.
@@ -32,15 +32,17 @@ async function proximoNumero(db: DB, scope: string): Promise<number> {
   return Number(rows[0].ultimo)
 }
 
-/** Gera o código público definitivo da entidade (ex.: "DE-7", "CLI-48", "REC-42"). */
+/**
+ * Gera o código público definitivo da entidade (ex.: "DE-7", "CLI-48", "DOC7").
+ * O ESCOPO conta; o FORMATO escreve — ver `code-patterns.ts`.
+ */
 export async function gerarCodigoPublico(
   db: DB,
   entidade: EntidadeCodigo,
   opts?: { pais?: string | null },
 ): Promise<string> {
-  const scope = escopoDe(entidade, opts?.pais)
-  const numero = await proximoNumero(db, scope)
-  return `${scope}-${numero}`
+  const numero = await proximoNumero(db, escopoDe(entidade, opts?.pais))
+  return formatarCodigo(entidade, numero, opts?.pais)
 }
 
 /** Semeia/avança a sequência de um escopo para >= `ate` (usado pelo backfill; idempotente). */
@@ -71,16 +73,19 @@ export async function semearSequencia(db: DB, scope: string, ate: number): Promi
  * entrar no SQL.
  */
 export async function sincronizarSequenciaComTabela(
-  db: DB, tabela: string, campo: string, scope: string,
+  db: DB, tabela: string, campo: string, entidade: EntidadeCodigo, pais?: string | null,
 ): Promise<number> {
   if (!/^[A-Za-z][A-Za-z0-9_]*$/.test(tabela) || !/^[A-Za-z][A-Za-z0-9_]*$/.test(campo)) {
     throw new Error(`Identificador inválido em sincronizarSequenciaComTabela: ${tabela}.${campo}`)
   }
+  const scope = escopoDe(entidade, pais)
+  // O sufixo numérico FINAL é o número da sequência nos dois formatos em uso
+  // ("CLI-48" e "DOC7") — não se pode assumir o hífen como separador.
   const rows = await db.$queryRawUnsafe<{ max: number | null }[]>(
-    `SELECT COALESCE(MAX(NULLIF(regexp_replace("${campo}", '^.*-', ''), '')::bigint), 0)::int AS max
+    `SELECT COALESCE(MAX(NULLIF(substring("${campo}" from '([0-9]+)$'), '')::bigint), 0)::int AS max
        FROM "${tabela}"
       WHERE "${campo}" LIKE $1`,
-    `${scope}-%`,
+    padraoLikeDe(entidade, pais),
   )
   const max = Number(rows?.[0]?.max ?? 0)
   if (max > 0) await semearSequencia(db, scope, max)

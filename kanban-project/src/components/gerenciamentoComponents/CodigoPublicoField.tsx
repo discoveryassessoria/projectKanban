@@ -3,7 +3,7 @@
 // PADRÃO OFICIAL do Discovery: no topo de todo formulário de cadastro mestre que
 // possua publicCode, mostrar o CÓDIGO PÚBLICO em modo SOMENTE LEITURA.
 //   - registro novo (sem código ainda) → "Será gerado automaticamente ao salvar."
-//   - registro salvo → o código definitivo (CLI-1, SRV-1, TDOC-1, FOR-1, USR-4...).
+//   - registro salvo → o código definitivo (CLI-1, SRV-1, DOC1, FOR-1, USR-4...).
 // A chave técnica interna NUNCA aparece. O usuário nunca digita identificadores.
 
 export function CodigoPublicoField({
