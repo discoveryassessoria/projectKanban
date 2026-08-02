@@ -12,7 +12,7 @@
  *  6. fila com evento antigo NÃO é saudável (a regra que faltava);
  *  7. a tela não pode declarar "Saudável" por conta própria.
  */
-import { readFileSync } from 'node:fs'
+import { existsSync, readFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { catalogo, cobertura, dominiosSemCobertura, elegiveis, VERSAO_CATALOGO } from '../lib/saude/catalogo'
@@ -289,6 +289,9 @@ async function assincronos() {
 
   const smokeSrc = ler('lib/saude/smoke.ts')
   ok(ROTAS_SMOKE.every((r) => r.rota.startsWith('/api/')), 'o smoke só visita rotas de API')
+  for (const r of ROTAS_SMOKE) {
+    ok(existsSync(join(ROOT, 'src/app', r.rota, 'route.ts')), `a rota do smoke existe de verdade: ${r.rota}`)
+  }
   ok(!/method: '(POST|PUT|PATCH|DELETE)'/.test(smokeSrc), 'o smoke NUNCA escreve — somente GET')
   ok(/signAuthToken/.test(smokeSrc), 'o smoke usa identidade técnica autenticada (401 não é rota testada)')
   ok(!/console\.log\(.*token/i.test(smokeSrc), 'o token técnico nunca é registrado em log')

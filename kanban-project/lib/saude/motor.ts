@@ -16,7 +16,11 @@ import {
   type ModoExecucao, type ResultadoDiagnostico,
 } from './tipos'
 
-const CONCORRENCIA_PADRAO = 4
+// O pool de conexões por instância é pequeno de propósito (ver lib/prisma.ts) e
+// há verificação que dispara várias consultas em paralelo. Concorrência alta
+// esgota o pool e transforma verificação boa em FALHA_TECNICA — diagnóstico
+// incompleto por limite de infraestrutura, não por problema real do sistema.
+const CONCORRENCIA_PADRAO = 2
 
 /** Corre a verificação com relógio próprio. Timeout é resultado, não exceção solta. */
 async function comTimeout(v: Verificacao, ctx: { agora: Date; modo: ModoExecucao }): Promise<ExecucaoVerificacao> {

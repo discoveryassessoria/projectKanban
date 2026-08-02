@@ -41,14 +41,18 @@ export interface ResultadoSmoke {
 const LIMITE_LENTO = 3000
 const TIMEOUT = 12_000
 
-/** Rotas essenciais — só leitura. */
+/**
+ * Rotas essenciais — só leitura.
+ *
+ * A lista é fiscalizada por teste: rota que deixa de existir sai daqui, senão
+ * o smoke passa a acusar 404 de algo que foi removido de propósito.
+ */
 export const ROTAS_SMOKE = [
   { rota: '/api/gerenciamento/overview', esperaJson: true },
   { rota: '/api/gerenciamento/saude', esperaJson: true },
   { rota: '/api/gerenciamento/orgaos-protocolo', esperaJson: true },
   { rota: '/api/gerenciamento/tipos-documento', esperaJson: true },
   { rota: '/api/gerenciamento/produtos', esperaJson: true },
-  { rota: '/api/gerenciamento/plano-contas-financeiras', esperaJson: false },
   { rota: '/api/gerenciamento/diagnostico', esperaJson: true },
   { rota: '/api/processos', esperaJson: true },
   { rota: '/api/usuarios', esperaJson: true },
