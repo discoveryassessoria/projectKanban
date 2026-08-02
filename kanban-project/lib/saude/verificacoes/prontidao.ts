@@ -235,6 +235,24 @@ registrar({
       })
     }
 
+    // Rota que não pôde sequer ser alcançada NÃO pode passar em silêncio:
+    // "não testada" nunca é sinônimo de "saudável".
+    const naoAlcancadas = r.rotas.filter((x) => x.status === 0)
+    if (naoAlcancadas.length) {
+      achados.push({
+        chave: 'smoke-rotas-nao-alcancadas',
+        severidade: 'ERRO',
+        titulo: `${naoAlcancadas.length} rota(s) essenciais não puderam ser visitadas`,
+        descricao: `Nenhuma resposta de ${r.base}: ${naoAlcancadas.slice(0, 5).map((x) => x.rota).join(', ')}${naoAlcancadas.length > 5 ? '…' : ''}.`,
+        explicacao: 'O smoke não obteve resposta do host — servidor fora do ar, rede bloqueada ou base apontando para um endereço que não existe naquele contexto de execução. Sem resposta não há prova de nada.',
+        impacto: 'As rotas essenciais seguem sem verificação; uma quebra nelas não seria detectada.',
+        entidade: 'Smoke',
+        quantidade: naoAlcancadas.length,
+        recomendacao: 'Ajuste SAUDE_SMOKE_BASE_URL para um host alcançável a partir do ambiente que executa o diagnóstico.',
+        evidencia: { base: r.base, problemas: naoAlcancadas.slice(0, 5).map((x) => x.problema) },
+      })
+    }
+
     for (const rota of r.rotas.filter((x) => !x.ok && x.status !== 0)) {
       achados.push({
         chave: `smoke:${rota.rota}`,
