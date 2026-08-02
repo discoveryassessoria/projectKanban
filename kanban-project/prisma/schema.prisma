@@ -3347,6 +3347,7 @@ model ItemCatalogo {
 
   @@index([natureza])
   @@index([ativo])
+  @@index([categoriaId]) // criado em 20260830200000_catalogo_referencias_estruturais; faltava aqui
 }
 
 // ============================================================
@@ -4164,6 +4165,8 @@ model ObrigacaoEconomica {
   atualizadoEm      DateTime  @updatedAt
 
   ledger           LedgerFinanceiro?
+  ledgerEntries    LedgerEntry[] // LedgerEntry.obrigacaoId é denormalizado (o caminho canônico é ledger→obrigacao); a relação existe para a FK proteger o valor
+  saldoProjecao    SaldoProjecao? // 1-1: SaldoProjecao.obrigacaoId é @unique
   ocorrencias      OcorrenciaFinanceira[]
   distribuicoes    DistribuicaoEconomica[]
   parcelasPagaveis ParcelaPagavel[] // F5 — cronograma de vencimentos de PAGÁVEIS (Contas a Pagar). Saldo continua no Ledger.
@@ -4175,6 +4178,7 @@ model ObrigacaoEconomica {
   @@index([status])
   @@index([natureza])
   @@index([codigoOperacional])
+  @@index([itemCatalogoId]) // criado em 20260814000000_obrigacao_item_catalogo; faltava aqui
 }
 
 // F5 — CRONOGRAMA de vencimentos de PAGÁVEIS (Contas a Pagar). Componente OFICIAL e
@@ -4256,6 +4260,8 @@ model LedgerEntry {
   correlacaoId      String?          @db.VarChar(60)
   criadoPorId       Int?
   criadoEm          DateTime         @default(now())
+
+  obrigacao ObrigacaoEconomica @relation(fields: [obrigacaoId], references: [id], onDelete: Cascade)
 
   @@index([ledgerId, sequencia])
   @@index([transacaoId])
@@ -4510,6 +4516,8 @@ model SaldoProjecao {
   aVencer                 Decimal  @default(0) @db.Decimal(14, 2)
   ultimaSequenciaAplicada Int      @default(0)
   atualizadoEm            DateTime @updatedAt
+
+  obrigacao ObrigacaoEconomica @relation(fields: [obrigacaoId], references: [id], onDelete: Cascade)
 }
 
 /// Snapshot de saldo (cache de desempenho para replay). DescartÃ¡vel.
@@ -4619,6 +4627,7 @@ model OrganizacaoCategoria {
   categoria   CategoriaOrganizacao @relation(fields: [categoriaId], references: [id], onDelete: Cascade)
 
   @@unique([orgaoId, categoriaId])
+  @@index([categoriaId]) // criado em 20260821000000_cadastros_gerenciamento; faltava aqui
 }
 
 /// Equipes / grupos que organizam usuários (não concedem permissão por si).
