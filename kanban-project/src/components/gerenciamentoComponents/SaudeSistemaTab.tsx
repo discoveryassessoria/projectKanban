@@ -37,12 +37,44 @@ interface VerificacaoMeta {
   obrigatoria: boolean; modos: string[]; orientacao: string; rotaCorrecao: string | null
   correcaoAutomatica: string | null; responsavel: string; ativo: boolean
 }
+type EstadoProntidao = "PRONTO" | "PARCIALMENTE_PRONTO" | "NAO_CONFIGURADO" | "CONFIGURACAO_INVALIDA" | "BLOQUEADO" | "DIAGNOSTICO_INCOMPLETO"
+interface DependenciaAvaliada {
+  codigo: string; nome: string; tipo: string; obrigatoria: boolean; acao: string
+  rota?: string; correcaoAutomatica?: string; ok: boolean; detalhe: string
+  quantidade?: number; indeterminada?: boolean; erro?: string
+}
+interface CapacidadeAvaliada {
+  codigo: string; nome: string; descricao: string; modulo: string; operacao: string
+  dominio: string; prioridade: number; estado: EstadoProntidao; motivo: string
+  dependencias: DependenciaAvaliada[]; faltantes: DependenciaAvaliada[]
+}
+interface Recomendacao {
+  codigo: string; ordem: number; titulo: string; problema: string; causa: string
+  impacto: string; acao: string; tipo: string; severidade: Severidade; modulo: string
+  destrava: string[]; rota?: string; correcaoAutomatica?: string
+  registrosAfetados: number; esforco: string
+}
+interface CausaRaiz {
+  causa: string; tipo: string; severidade: Severidade; ocorrencias: number
+  registrosAfetados: number; capacidadesAfetadas: string[]; acao: string; rota?: string
+}
+interface Contrato {
+  cadastro: string; rotulo: string; rota: string; totalAtivos: number
+  incompletos: { id: number; rotulo: string; faltando: string[] }[]; requisitos: string[]
+}
 interface Historico {
   execucoes: { id: number; modo: string; estado: Estado; criadoEm: string; duracaoMs: number; coberturaPercentual: number; criticos: number; erros: number; alertas: number; falhasTecnicas: number }[]
   tendencia: { totalAchados: number; abertos: number; resolvidos: number; recorrentes: number; reincidentes: number; tempoMedioResolucaoHoras: number | null }
   porDominio: { dominio: string; total: number; abertos: number; criticos: number }[]
 }
 interface Resposta {
+  capacidades: CapacidadeAvaliada[]
+  contratos: Contrato[]
+  plano: Recomendacao[]
+  causasRaiz: CausaRaiz[]
+  superficie: Record<string, string[]>
+  matriz: { modulo: string; capacidades: number; capacidadesProntas: number; verificacoes: number; temTesteFuncional: boolean }[]
+  totalCapacidades: number
   execucao: Execucao | null
   estadoAtual: Estado
   motivoEstado: string
@@ -51,7 +83,19 @@ interface Resposta {
   cobertura: CoberturaDominio[]
   dominiosSemCobertura: string[]
   versaoCatalogo: string
-  rotulos: { dominios: Record<string, string>; estados: Record<Estado, string>; severidades: Record<Severidade, string> }
+  rotulos: {
+    dominios: Record<string, string>; estados: Record<Estado, string>; severidades: Record<Severidade, string>
+    prontidao: Record<EstadoProntidao, string>; dependencias: Record<string, string>
+  }
+}
+
+const CORES_PRONTIDAO: Record<EstadoProntidao, string> = {
+  PRONTO: "bg-green-500/15 text-green-300 border-green-400/30",
+  PARCIALMENTE_PRONTO: "bg-amber-500/15 text-amber-300 border-amber-400/30",
+  NAO_CONFIGURADO: "bg-orange-500/15 text-orange-300 border-orange-400/30",
+  CONFIGURACAO_INVALIDA: "bg-orange-500/15 text-orange-300 border-orange-400/30",
+  BLOQUEADO: "bg-red-500/15 text-red-300 border-red-400/30",
+  DIAGNOSTICO_INCOMPLETO: "bg-violet-500/15 text-violet-300 border-violet-400/30",
 }
 
 const CARD = "rounded-2xl border border-white/10 bg-white/5 backdrop-blur-sm"
@@ -87,7 +131,7 @@ function Kpi({ valor, label, cor, destaque }: { valor: React.ReactNode; label: s
   )
 }
 
-type Aba = "visao" | "problemas" | "dominios" | "cobertura" | "execucao" | "historico"
+type Aba = "visao" | "prontidao" | "falta" | "plano" | "problemas" | "capacidades" | "dominios" | "cobertura" | "execucao" | "historico"
 
 export function SaudeSistemaTab() {
   const { dados, carregando, erro: erroApi, recarregar } = useApi<Resposta>("/api/gerenciamento/saude")
@@ -216,7 +260,18 @@ export function SaudeSistemaTab() {
 
       {/* ── ABAS ─────────────────────────────────────────────────────────── */}
       <div className="flex flex-wrap gap-1 border-b border-white/10 text-sm">
-        {([["visao", "Visão geral"], ["problemas", `Problemas (${dados.achados.length})`], ["dominios", "Domínios"], ["cobertura", "Cobertura"], ["execucao", "Execução"], ["historico", "Histórico e tendências"]] as [Aba, string][]).map(([k, l]) => (
+        {([
+          ["visao", "Visão geral"],
+          ["prontidao", `Prontidão (${dados.capacidades.filter(c => c.estado === "PRONTO").length}/${dados.capacidades.length})`],
+          ["falta", `O que falta (${dados.plano.length})`],
+          ["plano", "Plano de correção"],
+          ["problemas", `Problemas (${dados.achados.length})`],
+          ["capacidades", "Capacidades"],
+          ["dominios", "Domínios"],
+          ["cobertura", "Cobertura"],
+          ["execucao", "Execução"],
+          ["historico", "Histórico"],
+        ] as [Aba, string][]).map(([k, l]) => (
           <button key={k} onClick={() => setAba(k)}
             className={`px-3 py-2 ${aba === k ? "border-b-2 border-blue-400 font-medium text-white" : "text-white/55 hover:text-white/80"}`}>
             {l}
@@ -235,12 +290,174 @@ export function SaudeSistemaTab() {
               </div>
             </div>
           )}
+          <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+            {([
+              ["Capacidades prontas", `${dados.capacidades.filter((c) => c.estado === "PRONTO").length}/${dados.capacidades.length}`],
+              ["Capacidades bloqueadas", String(dados.capacidades.filter((c) => c.estado === "BLOQUEADO").length)],
+              ["Ações no plano", String(dados.plano.length)],
+              ["Causas raiz", String(dados.causasRaiz.length)],
+            ] as [string, string][]).map(([rotulo, valor]) => (
+              <div key={rotulo} className={`${CARD} px-4 py-3`}>
+                <div className="text-xs text-white/45">{rotulo}</div>
+                <div className="mt-0.5 text-xl font-semibold text-white">{valor}</div>
+              </div>
+            ))}
+          </div>
+          {dados.capacidades.some((c) => c.estado === "BLOQUEADO") && (
+            <div className="rounded-xl border border-red-400/30 bg-red-500/10 px-4 py-3 text-sm text-red-100">
+              <b>Há capacidade operacional bloqueada.</b> Enquanto uma operação essencial não puder ser executada de ponta a ponta,
+              o sistema não é declarado saudável, mesmo sem erro técnico aparente.
+              <div className="mt-1 text-xs text-red-200/80">
+                {dados.capacidades.filter((c) => c.estado === "BLOQUEADO").map((c) => c.nome).join(" · ")}
+              </div>
+            </div>
+          )}
           {dados.achados.slice(0, 8).map((a) => <LinhaAchado key={a.id} a={a} rot={rot} onCorrigir={corrigir} corrigindo={corrigindo === a.chave} />)}
           {dados.achados.length === 0 && e && (
             <div className={`${CARD} px-4 py-6 text-center text-sm text-white/60`}>
               Nenhum problema aberto nas verificações executadas.
             </div>
           )}
+        </div>
+      )}
+
+      {aba === "prontidao" && (
+        <div className="space-y-3">
+          <p className="text-xs text-white/45">
+            Prontidão operacional responde a uma pergunta diferente de “há erro?”: pergunta se cada operação essencial
+            <b className="text-white/70"> pode ser executada hoje, de ponta a ponta</b>, com os cadastros, configurações e vínculos que existem.
+          </p>
+          {dados.capacidades.map((c) => (
+            <div key={c.codigo} className={`${CARD} px-4 py-3`}>
+              <div className="flex flex-wrap items-center gap-2">
+                <span className={`rounded border px-1.5 py-0.5 text-[10px] ${CORES_PRONTIDAO[c.estado]}`}>{rot.prontidao[c.estado] ?? c.estado}</span>
+                <span className="font-medium text-white">{c.nome}</span>
+                <span className="text-xs text-white/35">{c.codigo} · {c.modulo}</span>
+              </div>
+              <div className="mt-1 text-sm text-white/70">{c.motivo}</div>
+              <div className="mt-2 grid gap-1">
+                {c.dependencias.map((d) => (
+                  <div key={d.codigo} className="flex items-start gap-2 text-xs">
+                    <span className={d.indeterminada ? "text-violet-300" : d.ok ? "text-green-400" : d.obrigatoria ? "text-red-400" : "text-amber-300"}>
+                      {d.indeterminada ? "?" : d.ok ? "✓" : "✕"}
+                    </span>
+                    <span className="text-white/45">{rot.dependencias[d.tipo] ?? d.tipo}</span>
+                    <span className="text-white/70">{d.nome}</span>
+                    <span className="text-white/40">— {d.detalhe}</span>
+                    {!d.obrigatoria && <span className="text-white/30">(recomendada)</span>}
+                  </div>
+                ))}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {aba === "falta" && (
+        <div className="space-y-3">
+          <p className="text-xs text-white/45">
+            O que está faltando para o sistema operar — cadastros, configurações, vínculos e automações ausentes. Nada aqui é excluído
+            ou corrigido sozinho: o motor aponta, quem decide é você.
+          </p>
+          {dados.causasRaiz.length > 0 && (
+            <div className={`${CARD} px-4 py-3`}>
+              <div className="text-xs uppercase tracking-wide text-white/40">Causas raiz</div>
+              <div className="mt-2 space-y-1.5">
+                {dados.causasRaiz.map((c) => (
+                  <div key={c.causa} className="flex flex-wrap items-center gap-2 text-sm">
+                    <span className={`rounded border px-1.5 py-0.5 text-[10px] ${CORES_SEV[c.severidade]}`}>{rot.severidades[c.severidade]}</span>
+                    <span className="text-white">{c.causa}</span>
+                    <span className="text-xs text-white/45">{c.ocorrencias} ocorrência(s) · {c.registrosAfetados} registro(s)</span>
+                    {c.capacidadesAfetadas.length > 0 && (
+                      <span className="text-xs text-white/35">afeta: {c.capacidadesAfetadas.join(", ")}</span>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+          {dados.contratos.map((c) => (
+            <div key={c.cadastro} className={`${CARD} px-4 py-3`}>
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="font-medium text-white">{c.rotulo}</span>
+                <span className="text-xs text-white/40">{c.totalAtivos} ativo(s)</span>
+                {c.incompletos.length === 0
+                  ? <span className="rounded bg-green-500/15 px-1.5 py-0.5 text-[10px] text-green-300">contrato mínimo cumprido</span>
+                  : <span className="rounded bg-amber-500/15 px-1.5 py-0.5 text-[10px] text-amber-300">{c.incompletos.length} incompleto(s)</span>}
+              </div>
+              <div className="mt-1 text-xs text-white/40">Exige: {c.requisitos.join(" · ")}</div>
+              {c.incompletos.slice(0, 8).map((i) => (
+                <div key={i.id} className="mt-1 text-xs text-white/60">
+                  <span className="text-white/80">{i.rotulo}</span> — falta {i.faltando.join(", ")}
+                </div>
+              ))}
+              {c.incompletos.length > 8 && <div className="mt-1 text-xs text-white/35">e mais {c.incompletos.length - 8}…</div>}
+            </div>
+          ))}
+          {dados.plano.length === 0 && dados.contratos.every((c) => !c.incompletos.length) && (
+            <div className={`${CARD} px-4 py-6 text-center text-sm text-white/60`}>
+              Nenhuma lacuna de configuração detectada nas capacidades declaradas.
+            </div>
+          )}
+        </div>
+      )}
+
+      {aba === "plano" && (
+        <div className="space-y-3">
+          <p className="text-xs text-white/45">
+            Plano ordenado: cada ação aparece depois daquilo de que ela depende. Resolver na ordem evita trabalho perdido.
+          </p>
+          {dados.plano.map((r) => (
+            <div key={r.codigo} className={`${CARD} px-4 py-3`}>
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="rounded bg-white/10 px-1.5 py-0.5 text-[10px] text-white/70">{r.ordem}º</span>
+                <span className={`rounded border px-1.5 py-0.5 text-[10px] ${CORES_SEV[r.severidade]}`}>{rot.severidades[r.severidade]}</span>
+                <span className="font-medium text-white">{r.titulo}</span>
+                <span className="text-xs text-white/35">{rot.dependencias[r.tipo] ?? r.tipo} · esforço {r.esforco.toLowerCase()}</span>
+              </div>
+              <div className="mt-1 grid gap-0.5 text-xs">
+                <div className="text-white/70"><span className="text-white/40">Problema: </span>{r.problema}</div>
+                <div className="text-white/70"><span className="text-white/40">Causa: </span>{r.causa}</div>
+                <div className="text-white/70"><span className="text-white/40">Impacto: </span>{r.impacto}</div>
+                <div className="text-white/85"><span className="text-white/40">Ação: </span>{r.acao}</div>
+                {r.destrava.length > 0 && <div className="text-white/50">Destrava: {r.destrava.join(", ")}</div>}
+              </div>
+              {r.rota && (
+                <a href={r.rota} className="mt-2 inline-block rounded-lg border border-white/15 px-2.5 py-1 text-xs text-white/80 hover:bg-white/10">
+                  Abrir cadastro
+                </a>
+              )}
+            </div>
+          ))}
+          {dados.plano.length === 0 && (
+            <div className={`${CARD} px-4 py-6 text-center text-sm text-white/60`}>Nada pendente no plano de correção.</div>
+          )}
+        </div>
+      )}
+
+      {aba === "capacidades" && (
+        <div className={`${CARD} overflow-hidden`}>
+          <table className="w-full text-sm">
+            <thead className="border-b border-white/10 text-left text-xs text-white/50">
+              <tr>
+                <th className="px-4 py-3">Capacidade</th><th className="px-4 py-3">Módulo</th>
+                <th className="px-4 py-3">Dependências</th><th className="px-4 py-3">Faltando</th><th className="px-4 py-3">Estado</th>
+              </tr>
+            </thead>
+            <tbody>
+              {dados.capacidades.map((c) => (
+                <tr key={c.codigo} className="border-b border-white/5 last:border-0">
+                  <td className="px-4 py-2.5 text-white">{c.nome}<div className="text-[10px] text-white/35">{c.codigo}</div></td>
+                  <td className="px-4 py-2.5 text-white/70">{c.modulo}</td>
+                  <td className="px-4 py-2.5 text-white/70">{c.dependencias.length}</td>
+                  <td className="px-4 py-2.5 text-white/70">{c.faltantes.length}</td>
+                  <td className="px-4 py-2.5">
+                    <span className={`rounded border px-1.5 py-0.5 text-[10px] ${CORES_PRONTIDAO[c.estado]}`}>{rot.prontidao[c.estado] ?? c.estado}</span>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         </div>
       )}
 
@@ -295,6 +512,31 @@ export function SaudeSistemaTab() {
       )}
 
       {aba === "cobertura" && (
+        <div className="space-y-3">
+        <div className={`${CARD} overflow-hidden`}>
+          <div className="border-b border-white/10 px-4 py-2.5 text-xs uppercase tracking-wide text-white/40">Matriz por módulo</div>
+          <table className="w-full text-sm">
+            <thead className="border-b border-white/10 text-left text-xs text-white/50">
+              <tr><th className="px-4 py-3">Módulo</th><th className="px-4 py-3">Capacidades prontas</th><th className="px-4 py-3">Verificações</th><th className="px-4 py-3">Situação</th></tr>
+            </thead>
+            <tbody>
+              {dados.matriz.map((m) => (
+                <tr key={m.modulo} className="border-b border-white/5 last:border-0">
+                  <td className="px-4 py-2.5 text-white">{m.modulo}</td>
+                  <td className="px-4 py-2.5 text-white/70">{m.capacidades ? `${m.capacidadesProntas}/${m.capacidades}` : "—"}</td>
+                  <td className="px-4 py-2.5 text-white/70">{m.verificacoes}</td>
+                  <td className="px-4 py-2.5">
+                    {m.capacidades === 0
+                      ? <span className="rounded bg-violet-500/15 px-1.5 py-0.5 text-[10px] text-violet-300">sem capacidade declarada</span>
+                      : m.capacidadesProntas === m.capacidades
+                        ? <span className="rounded bg-green-500/15 px-1.5 py-0.5 text-[10px] text-green-300">operacional</span>
+                        : <span className="rounded bg-amber-500/15 px-1.5 py-0.5 text-[10px] text-amber-300">parcial</span>}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
         <div className={`${CARD} overflow-hidden`}>
           <table className="w-full text-sm">
             <thead className="border-b border-white/10 text-left text-xs text-white/50">
@@ -315,6 +557,7 @@ export function SaudeSistemaTab() {
               ))}
             </tbody>
           </table>
+        </div>
         </div>
       )}
 

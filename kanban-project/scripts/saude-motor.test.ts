@@ -18,6 +18,10 @@ import { fileURLToPath } from 'node:url'
 import { catalogo, cobertura, dominiosSemCobertura, elegiveis, VERSAO_CATALOGO } from '../lib/saude/catalogo'
 import { consolidar } from '../lib/saude/motor'
 import { LIMITES_FILA } from '../lib/saude/verificacoes/filas'
+import { avaliarCapacidade, capacidades, piorProntidao, type Capacidade } from '../lib/saude/capacidades'
+import { montarPlano, agruparPorCausaRaiz } from '../lib/saude/plano'
+import { mapearSuperficie, lacunasDeCobertura, matrizCobertura } from '../lib/saude/superficie'
+import { ROTAS_SMOKE } from '../lib/saude/smoke'
 import { DOMINIOS, ESTADOS, SEVERIDADES, piorEstado, piorSeveridade, type ExecucaoVerificacao } from '../lib/saude/tipos'
 import '../lib/saude' // registra o catálogo
 
@@ -195,6 +199,111 @@ ok(/export const TIPOS_DRENADOS/.test(disp), 'os tipos drenados são declarados 
 ok(/phase-workflow\.instanced/.test(disp), 'o tipo que represou a fila por 12 dias agora é drenado')
 ok(/TIPOS_DRENADOS/.test(filaSrc), 'a verificação compara a fila com os tipos realmente drenados')
 
-console.log(`\n${passed} passaram, ${failed} falharam`)
-if (failed > 0) { console.log('FALHAS: ' + falhas.join('; ')); process.exit(1) }
-console.log('Motor da Saúde do Sistema: validado ✅')
+async function assincronos() {
+  // ═══════════ 14) PRONTIDÃO OPERACIONAL ═══════════
+  console.log('\n14) Capacidades e dependências')
+
+  const dep = (over: Partial<{ ok: boolean; indeterminada: boolean; erro: string }>, tipo = 'CADASTRO', obrigatoria = true) => ({
+    codigo: `d-${tipo}-${obrigatoria}-${over.ok}-${over.indeterminada ?? false}`,
+    nome: `dependência ${tipo}`,
+    tipo: tipo as 'CADASTRO',
+    obrigatoria,
+    acao: 'faça algo',
+    avaliar: async () => ({ ok: over.ok ?? false, detalhe: 'x', indeterminada: over.indeterminada, erro: over.erro }),
+  })
+  const cap = (deps: ReturnType<typeof dep>[]): Capacidade => ({
+    codigo: 'CAP-TESTE', nome: 'Capacidade de teste', descricao: 'd', modulo: 'Teste',
+    operacao: 'operar', dominio: 'PONTA_A_PONTA', prioridade: 1, severidadeFalha: 'CRITICO',
+    dependencias: deps, introduzidaEm: '2.0.0', ativo: true,
+  })
+
+  const pronta = await avaliarCapacidade(cap([dep({ ok: true })]))
+  ok(pronta.estado === 'PRONTO', 'todas as dependências atendidas ⇒ PRONTO')
+  ok(pronta.faltantes.length === 0, 'capacidade pronta não gera faltantes')
+
+  const semCadastro = await avaliarCapacidade(cap([dep({ ok: false })]))
+  ok(semCadastro.estado === 'NAO_CONFIGURADO', 'só falta cadastro/configuração ⇒ NÃO CONFIGURADO')
+  ok(semCadastro.faltantes.length === 1, 'a dependência não atendida aparece como faltante')
+
+  const bloqueada = await avaliarCapacidade(cap([dep({ ok: false }, 'TECNICA')]))
+  ok(bloqueada.estado === 'BLOQUEADO', 'dependência TÉCNICA obrigatória falhando ⇒ BLOQUEADO')
+
+  const invalida = await avaliarCapacidade(cap([dep({ ok: false }, 'VINCULO')]))
+  ok(invalida.estado === 'CONFIGURACAO_INVALIDA', 'vínculo obrigatório ausente ⇒ CONFIGURAÇÃO INVÁLIDA')
+
+  const parcial = await avaliarCapacidade(cap([dep({ ok: true }), dep({ ok: false }, 'CADASTRO', false)]))
+  ok(parcial.estado === 'PARCIALMENTE_PRONTO', 'só dependência recomendada falhando ⇒ PARCIALMENTE PRONTO')
+
+  const indet = await avaliarCapacidade(cap([dep({ ok: false, indeterminada: true, erro: 'timeout' })]))
+  ok(indet.estado === 'DIAGNOSTICO_INCOMPLETO', 'dependência indeterminada ⇒ DIAGNÓSTICO INCOMPLETO, nunca "pronto"')
+
+  const explode = await avaliarCapacidade(cap([{
+    codigo: 'boom', nome: 'que explode', tipo: 'CADASTRO' as const, obrigatoria: true, acao: 'x',
+    avaliar: async () => { throw new Error('falha de banco') },
+  }]))
+  ok(explode.estado === 'DIAGNOSTICO_INCOMPLETO', 'erro ao avaliar dependência NÃO vira aprovação — vira incompleto')
+  ok(explode.faltantes[0]?.indeterminada === true, 'a dependência que explodiu é marcada como indeterminada')
+
+  ok(piorProntidao('PRONTO', 'BLOQUEADO') === 'BLOQUEADO', 'a pior prontidão vence na agregação')
+  ok(capacidades().length >= 9, `catálogo de capacidades operacionais populado (${capacidades().length})`)
+  ok(new Set(capacidades().map((c) => c.codigo)).size === capacidades().length, 'não há capacidade com código duplicado')
+  ok(capacidades().every((c) => c.dependencias.length > 0), 'toda capacidade declara ao menos uma dependência')
+
+  // ═══════════ 15) PLANO DE CORREÇÃO ═══════════
+  console.log('\n15) Plano ordenado e causa raiz')
+  const compartilhada = dep({ ok: false })
+  const c1 = await avaliarCapacidade({ ...cap([compartilhada]), codigo: 'CAP-A', nome: 'A', prioridade: 1 })
+  const c2 = await avaliarCapacidade({ ...cap([compartilhada]), codigo: 'CAP-B', nome: 'B', prioridade: 2 })
+  const c3 = await avaliarCapacidade({ ...cap([dep({ ok: false }, 'PERMISSAO')]), codigo: 'CAP-C', nome: 'C', prioridade: 3, severidadeFalha: 'ALERTA' })
+  const plano = montarPlano([c1, c2, c3], [])
+  ok(plano.length === 2, 'a mesma dependência em duas capacidades vira UMA recomendação, não duas')
+  ok(plano[0].destrava.length === 2, 'a recomendação acumula as capacidades que destrava')
+  ok(plano[0].severidade === 'CRITICO', 'o que bloqueia mais e é mais grave vem primeiro')
+  ok(plano.every((r, i) => r.ordem === i + 1), 'a ordem é sequencial e explícita')
+  ok(plano.every((r) => r.problema && r.causa && r.impacto && r.acao), 'toda recomendação diz problema, causa, impacto e ação')
+
+  const contratoFake = [{ cadastro: 'servico', rotulo: 'Serviços', rota: '/x', totalAtivos: 10,
+    incompletos: [{ id: 1, rotulo: 'S', faltando: ['preço'] }], requisitos: ['preço'] }]
+  ok(montarPlano([], contratoFake).length === 1, 'contrato descumprido também entra no plano')
+
+  const raiz = agruparPorCausaRaiz(plano)
+  ok(raiz.length <= plano.length, 'causa raiz agrupa — não multiplica alertas')
+  ok(raiz[0].capacidadesAfetadas.length > 0, 'a causa raiz diz quais capacidades ela afeta')
+
+  // ═══════════ 16) SUPERFÍCIE E SMOKE ═══════════
+  console.log('\n16) Descoberta de superfície e smoke autenticado')
+  const sup = mapearSuperficie()
+  ok(sup.apis.length > 50, `as rotas de API são descobertas por varredura (${sup.apis.length})`)
+  ok(sup.paginas.length > 5, `as páginas são descobertas (${sup.paginas.length})`)
+  ok(sup.entidades.length > 50, `as entidades do schema são descobertas (${sup.entidades.length})`)
+  ok(sup.itensDeMenu.length > 0, 'os itens de menu são descobertos do código de navegação')
+  ok(Array.isArray(lacunasDeCobertura(sup)), 'as lacunas de cobertura são calculáveis')
+  ok(lacunasDeCobertura(sup).every((l) => l.detalhe.length > 0), 'toda lacuna explica por que é lacuna')
+  const matriz = matrizCobertura(new Set(capacidades().map((c) => c.codigo)))
+  ok(matriz.length > 0 && matriz.every((m) => typeof m.verificacoes === 'number'), 'a matriz módulo × cobertura é montada')
+
+  const smokeSrc = ler('lib/saude/smoke.ts')
+  ok(ROTAS_SMOKE.every((r) => r.rota.startsWith('/api/')), 'o smoke só visita rotas de API')
+  ok(!/method: '(POST|PUT|PATCH|DELETE)'/.test(smokeSrc), 'o smoke NUNCA escreve — somente GET')
+  ok(/signAuthToken/.test(smokeSrc), 'o smoke usa identidade técnica autenticada (401 não é rota testada)')
+  ok(!/console\.log\(.*token/i.test(smokeSrc), 'o token técnico nunca é registrado em log')
+  ok(/autorização negada/.test(smokeSrc), '401 com identidade técnica é reportado como falha, não como sucesso')
+
+  // ═══════════ 17) NADA DESTRUTIVO ═══════════
+  console.log('\n17) O motor não destrói nada')
+  for (const arq of ['lib/saude/capacidades.ts', 'lib/saude/contratos.ts', 'lib/saude/plano.ts', 'lib/saude/superficie.ts', 'lib/saude/smoke.ts', 'lib/saude/verificacoes/prontidao.ts']) {
+    const src = ler(arq)
+    ok(!/\.delete\(|\.deleteMany\(|DROP |TRUNCATE/i.test(src), `${arq} não apaga nada`)
+    ok(!/\.catch\(\(\) => \[\]\)|\.catch\(\(\) => 0\)/.test(src), `${arq} não engole erro fingindo resultado vazio`)
+  }
+  const corr = ler('lib/saude/correcoes.ts')
+  for (const proibido of ['exclus', 'fus', 'permiss']) {
+    ok(new RegExp(proibido, 'i').test(corr), `a lista do que NUNCA é automático menciona "${proibido}"`)
+  }
+
+  console.log(`\n${passed} passaram, ${failed} falharam`)
+  if (failed > 0) { console.log('FALHAS: ' + falhas.join('; ')); process.exit(1) }
+  console.log('Motor da Saúde do Sistema: validado ✅')
+}
+
+assincronos().catch((e) => { console.error(e); process.exit(1) })

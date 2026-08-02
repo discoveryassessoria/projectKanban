@@ -12,6 +12,8 @@ import {
   achadosAbertos, catalogo, cobertura, dominiosSemCobertura, executarDiagnostico,
   metadados, persistirDiagnostico, ultimaExecucao, VERSAO_CATALOGO,
   DOMINIO_LABEL, ESTADO_LABEL, SEVERIDADE_LABEL, type ModoExecucao,
+  avaliarCapacidades, avaliarContratos, montarPlano, agruparPorCausaRaiz,
+  mapearSuperficie, matrizCobertura, PRONTIDAO_LABEL, DEPENDENCIA_LABEL, capacidades,
 } from '@/lib/saude'
 
 const MODOS: ModoExecucao[] = ['RAPIDO', 'COMPLETO', 'PROFUNDO']
@@ -20,8 +22,23 @@ export async function GET(request: NextRequest) {
   const erro = await verificarPermissao(request, 'usuarios.gerenciar')
   if (erro) return erro
   try {
-    const [ultima, achados] = await Promise.all([ultimaExecucao(), achadosAbertos()])
+    const [ultima, achados, avaliadas, contratos] = await Promise.all([
+      ultimaExecucao(), achadosAbertos(), avaliarCapacidades(), avaliarContratos(),
+    ])
+    // O plano nasce das dependências declaradas e dos contratos — determinístico.
+    const plano = montarPlano(avaliadas, contratos)
+    const causasRaiz = agruparPorCausaRaiz(plano)
+    const superficie = mapearSuperficie()
+    const prontas = new Set(avaliadas.filter((c) => c.estado === 'PRONTO').map((c) => c.codigo))
+
     return NextResponse.json({
+      capacidades: avaliadas,
+      contratos,
+      plano,
+      causasRaiz,
+      superficie,
+      matriz: matrizCobertura(prontas),
+      totalCapacidades: capacidades().length,
       // "nunca executado" NÃO é "saudável" — é desconhecido.
       execucao: ultima,
       estadoAtual: ultima?.estado ?? 'INDISPONIVEL',
@@ -31,7 +48,10 @@ export async function GET(request: NextRequest) {
       cobertura: cobertura(),
       dominiosSemCobertura: dominiosSemCobertura(),
       versaoCatalogo: VERSAO_CATALOGO,
-      rotulos: { dominios: DOMINIO_LABEL, estados: ESTADO_LABEL, severidades: SEVERIDADE_LABEL },
+      rotulos: {
+        dominios: DOMINIO_LABEL, estados: ESTADO_LABEL, severidades: SEVERIDADE_LABEL,
+        prontidao: PRONTIDAO_LABEL, dependencias: DEPENDENCIA_LABEL,
+      },
     })
   } catch (e) {
     console.error('GET saude', e)
