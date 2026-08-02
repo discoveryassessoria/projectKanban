@@ -1,12 +1,12 @@
 // CRIAR EM: src/app/api/financas/pagar/route.ts
 //
 // GET /api/financas/pagar — aba "A Pagar", dados REAIS do banco.
-// Fonte: ContaPagar → Fornecedor, CategoriaFinanceira, ContaBancaria.
+// Fonte: ContaPagar → Fornecedor, ContaBancaria.
 // Campos do schema:
 //   ContaPagar: descricao, valor, valorPago, dataVencimento, dataPagamento,
 //     status (StatusContaPagar: PENDENTE/PAGO/VENCIDO/CANCELADO/AGENDADO),
 //     numeroParcela, totalParcelas, processoId
-//   Fornecedor: nome | CategoriaFinanceira: nome, cor | ContaBancaria: nome
+//   Fornecedor: nome | ContaBancaria: nome
 //
 // Mapeamento do mockup → schema:
 //   mockup "a_pagar" (pendente aprovação) ≈ PENDENTE
@@ -34,7 +34,6 @@ export async function GET(_req: NextRequest) {
         dataVencimento: true, dataPagamento: true, status: true,
         numeroParcela: true, totalParcelas: true,
         fornecedor: { select: { nome: true } },
-        categoria: { select: { nome: true, cor: true } },
         contaBancaria: { select: { nome: true } },
       },
     })
@@ -63,8 +62,6 @@ export async function GET(_req: NextRequest) {
         id: String(c.id),
         fornecedor: c.fornecedor?.nome ?? "—",
         descricao: c.descricao,
-        categoria: c.categoria?.nome ?? "Outros",
-        categoriaCor: c.categoria?.cor ?? null,
         conta: c.contaBancaria?.nome ?? null,
         valor,
         vencimento: c.dataVencimento,
@@ -94,8 +91,6 @@ export async function GET(_req: NextRequest) {
         id: `custo-${o.obrigacaoId}`,
         fornecedor: o.fornecedor ?? "—",
         descricao: o.descricao ?? "—",
-        categoria: "Processo",
-        categoriaCor: null as string | null,
         conta: null as string | null,
         valor,
         vencimento: venc ?? agora,
@@ -125,8 +120,6 @@ export async function GET(_req: NextRequest) {
         id: `custo-leg-${c.id}`,
         fornecedor: c.fornecedor ?? "—",
         descricao: c.descricao,
-        categoria: "Processo",
-        categoriaCor: null as string | null,
         conta: null as string | null,
         valor,
         vencimento: c.vencimento,
@@ -168,14 +161,15 @@ export async function GET(_req: NextRequest) {
       cancelado: { qtd: itens.filter((i) => i.cancelado).length, total: itens.filter((i) => i.cancelado).reduce((a, i) => a + i.valor, 0) },
     }
 
-    // por categoria (abertos)
-    const byCat = new Map<string, { total: number; cor: string | null; qtd: number }>()
+    // Agrupamento por FORNECEDOR (dimensão real). A classificação intermediária
+    // (categorias financeiras) foi eliminada — ver /api/financas/dre.
+    const byForn = new Map<string, { total: number; qtd: number }>()
     for (const i of abertos) {
-      const cur = byCat.get(i.categoria) ?? { total: 0, cor: i.categoriaCor, qtd: 0 }
+      const cur = byForn.get(i.fornecedor) ?? { total: 0, qtd: 0 }
       cur.total += i.valor; cur.qtd += 1
-      byCat.set(i.categoria, cur)
+      byForn.set(i.fornecedor, cur)
     }
-    const topCategorias = [...byCat.entries()]
+    const topFornecedores = [...byForn.entries()]
       .map(([nome, v]) => ({ nome, ...v }))
       .sort((a, b) => b.total - a.total)
 
@@ -210,7 +204,7 @@ export async function GET(_req: NextRequest) {
         qtdPendentes: pendentes.length,
       },
       pipeline,
-      topCategorias,
+      topFornecedores,
       proximos7,
       resumo,
       contas: lista,

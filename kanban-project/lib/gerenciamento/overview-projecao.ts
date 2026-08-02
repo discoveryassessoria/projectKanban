@@ -21,9 +21,8 @@ export interface ContagensOverview {
   usuarios: number
   perfis: number
   contas: number
-  categorias: number
   fornecedores: number
-  centros: number
+  configsFinanceiras: number
   statusCols: number
 }
 
@@ -42,29 +41,28 @@ export interface ItemStrip {
 
 /**
  * Rótulo canônico de cada contagem. Os nomes carregam o recorte real da query:
- * `fornecedores` conta apenas ativos e `categorias` conta CategoriaFinanceira —
- * omitir isso no rótulo promete mais do que o número entrega.
+ * `fornecedores` e `configsFinanceiras` contam apenas ATIVOS — omitir isso no
+ * rótulo promete mais do que o número entrega.
  */
 export const ROTULOS_CONTAGEM: Record<keyof ContagensOverview, string> = {
   usuarios: "Usuários",
   perfis: "Perfis",
   contas: "Contas bancárias",
-  categorias: "Categorias financeiras",
   fornecedores: "Fornecedores ativos",
-  centros: "Centros de custo",
+  configsFinanceiras: "Configurações financeiras ativas",
   statusCols: "Colunas de status",
 }
 
 /** ordem de exibição — a mesma em cards e strip. */
 export const ORDEM_CONTAGEM: (keyof ContagensOverview)[] = [
-  "usuarios", "perfis", "contas", "categorias", "fornecedores", "centros", "statusCols",
+  "usuarios", "perfis", "contas", "fornecedores", "configsFinanceiras", "statusCols",
 ]
 
 export const formatarDataCurta = (em: Date | string | null | undefined): string =>
   em ? new Date(em).toLocaleDateString("pt-BR") : "—"
 
 /**
- * Monta o KPI strip. As 7 contagens vão marcadas como `duplicadoEmCards`
+ * Monta o KPI strip. As contagens vão marcadas como `duplicadoEmCards`
  * porque aparecem como cards logo abaixo; "Última alteração" é exclusiva do
  * strip e por isso não é marcada.
  */

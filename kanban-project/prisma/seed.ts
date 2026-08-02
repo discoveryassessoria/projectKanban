@@ -124,79 +124,16 @@ async function main() {
     }
   }
 
-  // ===== CRIAR CATEGORIAS FINANCEIRAS PADRÃO =====
-  console.log('\n💰 Criando categorias financeiras...')
-
-  const categoriasEntrada = [
-    { nome: 'Honorários', cor: '#22c55e', icone: 'banknotes' },
-    { nome: 'Reembolsos', cor: '#3b82f6', icone: 'arrow-uturn-left' },
-    { nome: 'Outros Recebimentos', cor: '#8b5cf6', icone: 'plus-circle' },
-  ]
-
-  const categoriasSaida = [
-    { nome: 'Certidões', cor: '#ef4444', icone: 'document-text' },
-    { nome: 'Traduções', cor: '#f97316', icone: 'language' },
-    { nome: 'Apostilamentos', cor: '#eab308', icone: 'stamp' },
-    { nome: 'Taxas Consulares', cor: '#14b8a6', icone: 'building-library' },
-    { nome: 'Despesas Operacionais', cor: '#6366f1', icone: 'cog' },
-    { nome: 'Impostos', cor: '#ec4899', icone: 'receipt-percent' },
-    { nome: 'Outras Despesas', cor: '#78716c', icone: 'minus-circle' },
-  ]
-
-  for (const cat of categoriasEntrada) {
-    await prisma.categoriaFinanceira.upsert({
-      where: { id: -1 }, // Força criar se não existir por nome
-      update: {},
-      create: {
-        nome: cat.nome,
-        tipo: 'ENTRADA',
-        cor: cat.cor,
-        icone: cat.icone,
-      },
-    }).catch(async () => {
-      // Se já existe, ignora
-      const existe = await prisma.categoriaFinanceira.findFirst({
-        where: { nome: cat.nome, tipo: 'ENTRADA' }
-      })
-      if (!existe) {
-        await prisma.categoriaFinanceira.create({
-          data: {
-            nome: cat.nome,
-            tipo: 'ENTRADA',
-            cor: cat.cor,
-            icone: cat.icone,
-          }
-        })
-      }
-    })
-  }
-
-  for (const cat of categoriasSaida) {
-    const existe = await prisma.categoriaFinanceira.findFirst({
-      where: { nome: cat.nome, tipo: 'SAIDA' }
-    })
-    if (!existe) {
-      await prisma.categoriaFinanceira.create({
-        data: {
-          nome: cat.nome,
-          tipo: 'SAIDA',
-          cor: cat.cor,
-          icone: cat.icone,
-        }
-      })
-    }
-  }
-
-  console.log('   ✅ Categorias financeiras criadas')
+  // As Categorias Financeiras foram ELIMINADAS (02/08/2026): não existe mais
+  // classificação intermediária — o comportamento financeiro pertence à
+  // Configuração Financeira de cada cadastro mestre.
 
   // ===== RESUMO FINAL =====
   console.log('\n\n📊 RESUMO:')
   
   const totalStatus = await prisma.status.count()
-  const totalCategorias = await prisma.categoriaFinanceira.count()
   
   console.log(`   - ${totalStatus} etapas criadas`)
-  console.log(`   - ${totalCategorias} categorias financeiras`)
   console.log(`   - 1 usuário admin`)
 
   console.log('\n✅ Seed concluído com sucesso!')

@@ -7,7 +7,7 @@
  * de preço, item/config inativos e a GUARDA arquitetural (nenhuma tela ou rota
  * volta a expor cadastro eliminado).
  */
-import { readFileSync } from 'node:fs'
+import { existsSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import {
   NATUREZAS_ITEM_ELIMINADAS, NATUREZAS_ITEM_OFICIAIS,
@@ -111,8 +111,11 @@ ok(!/NaturezaItem\.PRODUTO/.test(sync), 'espelho de configuração não nasce ma
 const produtosRoute = ler('src/app/api/gerenciamento/produtos/route.ts')
 ok(!/prisma\.honorario\.find/.test(produtosRoute), 'Configurações Financeiras não consultam mais a tabela legada Honorario')
 ok(/Honorário não é mais um cadastro mestre/.test(produtosRoute), 'novo vínculo a Honorário é recusado pelo servidor')
-const categoriasRoute = ler('src/app/api/gerenciamento/categorias/route.ts')
-ok(!/prisma\.honorario\.find/.test(categoriasRoute), 'Categorias Financeiras não consultam mais a tabela legada Honorario')
+// Categorias Financeiras foi ELIMINADO (02/08/2026) junto com Plano de Contas e
+// Centros de Custo: não existe classificação intermediária. O comportamento
+// financeiro é da Configuração Financeira do cadastro mestre.
+ok(!existsSync(join(raiz, 'src/app/api/gerenciamento/categorias/route.ts')), 'API do cadastro Categorias Financeiras não existe mais')
+ok(!existsSync(join(raiz, 'src/components/gerenciamentoComponents/CategoriasTab.tsx')), 'tela de Categorias Financeiras não existe mais')
 
 const catMestre = ler('src/app/api/gerenciamento/catalogo-mestre/route.ts')
 ok(/NATUREZAS_ITEM_OFICIAIS/.test(catMestre) && !/Object\.values\(NaturezaItem\)/.test(catMestre), 'Catálogo Mestre só oferece/aceita naturezas oficiais')

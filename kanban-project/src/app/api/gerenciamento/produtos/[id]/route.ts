@@ -67,18 +67,6 @@ export async function PUT(
     const possuiCustoFinal = natFinReq ? natFinReq !== 'SOMENTE_RECEITA' : (b.possuiCusto !== undefined ? !!b.possuiCusto : atual.possuiCusto)
     const possuiReceitaFinal = natFinReq ? natFinReq !== 'SOMENTE_CUSTO' : (b.possuiReceita !== undefined ? !!b.possuiReceita : atual.possuiReceita)
 
-    // CONTA CONTÁBIL POR NATUREZA — valor EFETIVO (enviado ?? atual ?? conta legada única).
-    const contaLegadoFinal = b.planoContaId !== undefined ? (b.planoContaId ? Number(b.planoContaId) : null) : atual.planoContaId
-    const contaReceitaFinal =
-      (b.planoContaReceitaId !== undefined ? (b.planoContaReceitaId ? Number(b.planoContaReceitaId) : null) : atual.planoContaReceitaId) ?? contaLegadoFinal
-    const contaCustoFinal =
-      (b.planoContaCustoId !== undefined ? (b.planoContaCustoId ? Number(b.planoContaCustoId) : null) : atual.planoContaCustoId) ?? contaLegadoFinal
-    if (possuiReceitaFinal && !contaReceitaFinal) {
-      return NextResponse.json({ error: 'Conta Contábil de Receita é obrigatória para esta Natureza Financeira.' }, { status: 400 })
-    }
-    if (possuiCustoFinal && !contaCustoFinal) {
-      return NextResponse.json({ error: 'Conta Contábil de Custo é obrigatória para esta Natureza Financeira.' }, { status: 400 })
-    }
     // REEMBOLSÁVEL — valor efetivo; só se aplica a itens que geram custo.
     const reembolsavelFinal = b.reembolsavel !== undefined ? !!b.reembolsavel : atual.reembolsavel
     if (reembolsavelFinal && !possuiCustoFinal) {
@@ -94,10 +82,7 @@ export async function PUT(
           nome,
           especie: b.especie !== undefined ? s(b.especie) : atual.especie,
           tipoFinanceiro: b.tipoFinanceiro !== undefined ? s(b.tipoFinanceiro) : atual.tipoFinanceiro,
-          categoriaId: b.categoriaId !== undefined ? (b.categoriaId ? Number(b.categoriaId) : null) : atual.categoriaId,
-          planoContaId: contaLegadoFinal, // LEGADO preservado
-          planoContaReceitaId: contaReceitaFinal,
-          planoContaCustoId: contaCustoFinal,
+          regraComissaoId: b.regraComissaoId !== undefined ? (b.regraComissaoId ? Number(b.regraComissaoId) : null) : atual.regraComissaoId,
           moedaPadrao: b.moedaPadrao !== undefined ? (b.moedaPadrao || 'BRL') : atual.moedaPadrao,
           valorPadrao: b.valorPadrao !== undefined ? parseDecimal(b.valorPadrao) : atual.valorPadrao,
           aplicaA: b.aplicaA !== undefined ? s(b.aplicaA) : atual.aplicaA,

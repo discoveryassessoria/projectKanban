@@ -34,9 +34,6 @@ Guardas: `npm run test:nav` (73 asserções), `npm run test:accordion` (11 asser
 | Regras Documentais | `?screen=docrules` | Documentos e Protocolos › Regras | igual | `RegrasDocumentaisTab` | idêntica | — |
 | Catálogo de Serviços | `?screen=products` | Serviços | igual | `ProdutosServicosTab` | idêntica | — |
 | Configurações Financeiras | `?screen=catalog` | Financeiro | igual | `ProdutosTab` | idêntica | — |
-| Categorias Financeiras | `?screen=categories` | Financeiro › Classificação | igual | `CategoriasTab` | idêntica | — |
-| Plano de Contas | `?screen=coa` | Financeiro › Classificação | igual | `PlanoContasTab` | idêntica | — |
-| Centros de Custo | `?screen=costcenters` | Financeiro › Classificação | igual | `CentrosCustoTab` | idêntica | — |
 | Tabelas de Preços | `?screen=pricingtable` | Financeiro › Tabela de Valores | igual | `TabelaValoresTab` | idêntica | — |
 | Regras de Precificação | `?screen=discrules` | Financeiro › Tabela de Valores | igual | `RegrasDescontoTab` | idêntica | — |
 | Aplicabilidade Econômica | `?screen=pricing` | Financeiro › Tabela de Valores | igual | `AplicabilidadeEconomicaTab` | idêntica | — |
@@ -131,6 +128,27 @@ aplicada em produção pelo `prod-apply-cadastros-aditivas.mjs`):
 | Usuários › Auditoria de Acessos | `?screen=accaudit` | **o login passou a gravar trilha** (`entidade=ACESSO`, LOGIN/LOGIN_NEGADO, IP e agente; nunca a senha) |
 | Sistema › Identidade Visual | `?screen=identidade` | marca, logo e cores persistidos em `ConfiguracaoSistema`, com pré-visualização |
 | Relatórios › Dashboards | `?screen=dashboards` | índice dos painéis reais com números vivos e link que abre cada um |
+
+> **Classificação financeira — eliminada em 02/08/2026.** A seção
+> `Financeiro › Classificação` e os três cadastros que viviam nela — **Categorias
+> Financeiras** (`?screen=categories`, `CategoriaFinanceira`), **Plano de Contas**
+> (`?screen=coa`, `PlanoConta`) e **Centros de Custo** (`?screen=costcenters`,
+> `CentroCusto`) — foram removidos por inteiro: menu, telas, APIs
+> (`/api/gerenciamento/{categorias,plano-contas,centros-custo}`,
+> `/api/categorias-financeiras`, `/api/financeiro/v3/centros-custo`,
+> `/api/financas/cc`), exportações, seeds e tabelas
+> (migration `20260902200000_remove_classificacao_financeira`).
+> Sem substituto: **o comportamento financeiro pertence ao CADASTRO MESTRE**, na sua
+> própria Configuração Financeira (`ProdutoFinanceiro`) — natureza financeira,
+> cobrável, repasse, reembolsável, comissão (novo `regraComissaoId`, quando
+> aplicável), fornecedor padrão, condição de pagamento e ativo/inativo. Preço
+> continua exclusivo da Tabela de Valores. As URLs antigas caem em Configurações
+> Financeiras (alias → `catalog`). O Ledger do motor V3 não é afetado: ele grava a
+> conta contábil como texto, do plano fixo em `lib/financeiro/ledger/plano-contas.ts`
+> (`PlanoContaFinanceira`, tabela interna do motor, permanece).
+> Onde havia quebra por categoria (DRE, Contas a Pagar), a dimensão passou a ser o
+> **fornecedor** — real, já existente, sem inventar rótulo.
+> Guardas: `npm run test:nav`, `test:overview-projecao`, `ssot-financeiro`.
 
 > **Protocolos — eliminado em 02/08/2026.** O item
 > `Documentos e Protocolos › Protocolos › Tipos de Protocolo` (`?screen=prottypes`,

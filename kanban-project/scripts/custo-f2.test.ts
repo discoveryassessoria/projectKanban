@@ -33,12 +33,12 @@ async function main() {
   const { obrigacaoId } = await criarObrigacaoEconomicaComLedger({ natureza: 'CUSTO', valorContratado: 400, moedaContratual: 'BRL', processoId: PROC, criadoPorId: 1, fornecedorId: fA!.id, observacoes: 'Custo base' })
   const ref = String(obrigacaoId)
 
-  // (1) EDITAR fornecedor + fase + centro + descrição
-  const r = await editarReceita(ref, { fornecedorId: fB!.id, faseId: 7, centroCustoId: 3, titulo: 'Custo — editado' } as any, { criadoPorId: 1 })
+  // (1) EDITAR fornecedor + fase + descrição
+  const r = await editarReceita(ref, { fornecedorId: fB!.id, faseId: 7, titulo: 'Custo — editado' } as any, { criadoPorId: 1 })
   chk((r as any).ok === true, `editar campos do custo ok (${JSON.stringify((r as any).erros)})`)
-  const obr1 = await prisma.obrigacaoEconomica.findUnique({ where: { id: obrigacaoId }, select: { fornecedorId: true, faseId: true, centroCustoId: true, observacoes: true } })
+  const obr1 = await prisma.obrigacaoEconomica.findUnique({ where: { id: obrigacaoId }, select: { fornecedorId: true, faseId: true, observacoes: true } })
   chk(obr1?.fornecedorId === fB!.id, `fornecedor alterado (${obr1?.fornecedorId})`)
-  chk(obr1?.faseId === 7 && obr1?.centroCustoId === 3, `fase/centro alterados (${obr1?.faseId}/${obr1?.centroCustoId})`)
+  chk(obr1?.faseId === 7, `fase alterada (${obr1?.faseId})`)
   chk(obr1?.observacoes === 'Custo — editado', 'descrição alterada')
   const edit = await carregarReceitaEditavel(ref)
   chk((edit as any)?.fornecedorId === fB!.id && (edit as any)?.fornecedorNome === 'Tradutor B', `editor semeia fornecedor atual (${(edit as any)?.fornecedorNome})`)

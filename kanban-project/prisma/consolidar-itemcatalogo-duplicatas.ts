@@ -49,7 +49,6 @@ async function main() {
     await repontar(() => prisma.tabelaValor.updateMany({ where: { itemCatalogoId: desativar }, data: { itemCatalogoId: manter } }))
     await repontar(() => prisma.servicoProduto.updateMany({ where: { itemCatalogoId: desativar }, data: { itemCatalogoId: manter } }))
     await repontar(() => prisma.tipoDocumentoCadastro.updateMany({ where: { itemCatalogoId: desativar }, data: { itemCatalogoId: manter } }))
-    await repontar(() => prisma.categoriaFinanceira.updateMany({ where: { itemCatalogoId: desativar }, data: { itemCatalogoId: manter } }))
     await repontar(() => prisma.necessidadeDocumental.updateMany({ where: { itemCatalogoId: desativar }, data: { itemCatalogoId: manter } }))
 
     // 2) desativa o duplicado (preserva o registro — sem DELETE)

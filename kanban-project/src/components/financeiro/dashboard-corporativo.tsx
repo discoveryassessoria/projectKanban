@@ -61,7 +61,7 @@ export interface DashboardData {
   }
   contas: { id: number; nome: string; banco: string | null; saldoBRL: number; cor: string | null }[]
   proximosRecebimentos: { id: number; cliente: string; pais: string | null; processoId: number | null; descricao: string; valorBRL: number; vencimento: string; atrasado: boolean }[]
-  proximosPagamentos: { id: number; fornecedor: string; categoria: string; categoriaCor: string | null; valorBRL: number; vencimento: string; atrasado: boolean }[]
+  proximosPagamentos: { id: number; fornecedor: string; valorBRL: number; vencimento: string; atrasado: boolean }[]
   atividade: { id: number; acao: string; entidade: string; descricao: string; usuario: string; data: string }[]
   fx: { EUR: number; USD: number; BRL: number }
   mock: {
@@ -227,9 +227,9 @@ export function DashboardCorporativo({ dash, onGoTab, onClickProcesso }: {
           }))} />
         <ListCard icon={<CreditCard className="h-4 w-4" style={{ color: OURO }} />} title="Próximos Pagamentos"
           onVerTodos={() => onGoTab("pagar")} empty="Nenhum pagamento em aberto."
-          colLeft="Fornecedor" colMid="Categoria"
+          colLeft="Fornecedor" colMid="Vencimento"
           rows={dash.proximosPagamentos.map(p => ({
-            id: p.id, left: p.fornecedor, mid: p.categoria, val: fmtBRL(p.valorBRL),
+            id: p.id, left: p.fornecedor, mid: fmtDate(p.vencimento), val: fmtBRL(p.valorBRL),
             due: fmtDate(p.vencimento), dueHint: dueText(p.vencimento), critical: p.atrasado,
           }))} />
         <div className={`${CARD} p-4`}>

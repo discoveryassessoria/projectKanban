@@ -57,7 +57,6 @@ export async function POST(
           valor: valorPago,
           data: dataPagamento,
           contaBancariaId,
-          categoriaId: conta.categoriaId,
           contaPagarId: id,
           processoId: conta.processoId,
         }

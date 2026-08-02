@@ -316,7 +316,6 @@ export interface EditarReceitaPatch {
   // Custo (nível obrigação): beneficiário/fase/centro de custo — não movem saldo.
   fornecedorId?: number | null
   faseId?: number | null
-  centroCustoId?: number | null
 }
 
 // Distribui o novo total entre os irmãos na MESMA proporção atual (a divisão é
@@ -522,7 +521,7 @@ export async function editarReceita(ref: string, patch: EditarReceitaPatch, opts
   await prisma.$transaction(async (tx) => {
     for (const m of g.membros) {
       // Custo (sem Receita) também é afetado quando muda descrição/fornecedor/fase/centro.
-      const mudaCampoObrigacao = patch.titulo !== undefined || patch.fornecedorId !== undefined || patch.faseId !== undefined || patch.centroCustoId !== undefined
+      const mudaCampoObrigacao = patch.titulo !== undefined || patch.fornecedorId !== undefined || patch.faseId !== undefined
       if (m.receitaId == null && !mudaValor && !mudaCambio && !mudaResponsavel && !mudaVencimento && !mudaCampoObrigacao) continue
       const alvoBase = porObrigacao.get(m.obrigacaoId) ?? m.valorBase
       const delta = cent(alvoBase - m.valorBase)
@@ -573,7 +572,6 @@ export async function editarReceita(ref: string, patch: EditarReceitaPatch, opts
       if (m.receitaId == null) {
         if (patch.fornecedorId !== undefined) obrData.fornecedor = patch.fornecedorId == null ? { disconnect: true } : { connect: { id: patch.fornecedorId } }
         if (patch.faseId !== undefined) obrData.faseId = patch.faseId
-        if (patch.centroCustoId !== undefined) obrData.centroCustoId = patch.centroCustoId
       }
       // Custo (sem Receita): a descrição vive em ObrigacaoEconomica.observacoes — editável aqui
       // (o caminho textual acima só grava em prisma.receita e era no-op para custo).

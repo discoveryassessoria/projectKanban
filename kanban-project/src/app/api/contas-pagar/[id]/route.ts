@@ -16,7 +16,6 @@ export async function GET(
       where: { id },
       include: {
         fornecedor: true,
-        categoria: true,
         contaBancaria: true,
         transacoes: true
       }
@@ -62,7 +61,6 @@ export async function PUT(
         descricao: body.descricao,
         observacoes: body.observacoes,
         fornecedorId: body.fornecedorId ? parseInt(body.fornecedorId) : null,
-        categoriaId: body.categoriaId ? parseInt(body.categoriaId) : null,
         valor: body.valor ? parseFloat(body.valor) : undefined,
         dataVencimento: body.dataVencimento ? new Date(body.dataVencimento) : undefined,
         dataCompetencia: body.dataCompetencia ? new Date(body.dataCompetencia) : undefined,

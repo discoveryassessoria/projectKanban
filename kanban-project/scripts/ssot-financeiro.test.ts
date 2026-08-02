@@ -72,9 +72,12 @@ ok(!/\* 0\.136|receitaBruta \* 0\.13/.test(dre), "alíquota agregada de 13,6% el
 ok(!/0\.45\)|0\.18\)|0\.12\)|0\.10\)|0\.08\)|0\.05\)|0\.02\)/.test(dre), "quebra de despesas por percentual fixo eliminada")
 ok(/prisma\.imposto\.findMany/.test(dre), "impostos do DRE vêm do cadastro oficial")
 ok(/aplicaA: "revenue"/.test(dre), "DRE filtra tributos que incidem sobre receita")
-ok(/categoriaFinanceira\.findMany/.test(dre), "despesas agrupadas por categoria real")
-ok(/planoContaVinculado: false/.test(dre), "DRE declara honestamente a falta de vínculo com PlanoConta")
-ok(/prisma\.planoConta\.findMany/.test(dre), "DRE expõe o plano de contas oficial")
+// A classificação intermediária (Categorias Financeiras / Plano de Contas / Centros de
+// Custo) foi ELIMINADA em 02/08/2026. A única dimensão REAL de uma conta a pagar é o
+// fornecedor — é por ele que a despesa é quebrada. Nada de rótulo inventado.
+ok(/porFornecedor/.test(dre), "despesas agrupadas por fornecedor real")
+ok(!/categoriaFinanceira|planoConta/i.test(dre), "DRE não referencia cadastro de classificação eliminado")
+ok(/classificacaoIntermediaria: false/.test(dre), "DRE declara que não existe classificação intermediária")
 
 // ═══════════ 4) FALLBACK SILENCIOSO ═══════════
 console.log("\n4) Sem fallback silencioso para dado fabricado")
@@ -84,7 +87,8 @@ for (const [tela, marcador] of [
 ] as const) {
   const src = ler(tela)
   ok(!src.includes(marcador), `${tela.split("/").slice(-2)[0]} não injeta dado fabricado`)
-  ok(/setErro\(/.test(src), `${tela.split("/").slice(-2)[0]} sinaliza erro ao usuário`)
+  // A camada oficial (useApi) já entrega `erro`; a tela só precisa exibi-lo.
+  ok(/setErro\(|erroApi|erro &&/.test(src), `${tela.split("/").slice(-2)[0]} sinaliza erro ao usuário`)
   ok(/role="alert"/.test(src), `${tela.split("/").slice(-2)[0]} renderiza o alerta`)
 }
 

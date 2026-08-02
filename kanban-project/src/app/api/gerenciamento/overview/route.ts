@@ -2,7 +2,7 @@
 //
 // GET /api/gerenciamento/overview — Painel Geral do Gerenciamento.
 // TODOS os números são REAIS, lidos das tabelas que existem (Usuario, Perfil,
-// CategoriaFinanceira, ContaBancaria, Fornecedor, CentroCusto, Status,
+// ContaBancaria, Fornecedor, ProdutoFinanceiro (Configuração Financeira), Status,
 // LogAuditoria). NÃO existe valor mock/prévia neste endpoint.
 //
 // A projeção (rótulos, ordem, marcação de duplicidade) vive em
@@ -19,14 +19,15 @@ import { ENTIDADE_ACESSO, montarStrip } from "@/lib/gerenciamento/overview-proje
 
 export async function GET(_req: NextRequest) {
   try {
-    const [usuarios, perfis, categorias, contas, fornecedores, centros, statusCols, ultimoLog, ultimaAlteracaoLog] =
+    const [usuarios, perfis, contas, fornecedores, configsFinanceiras, statusCols, ultimoLog, ultimaAlteracaoLog] =
       await Promise.all([
         prisma.usuario.count(),
         prisma.perfil.count(),
-        prisma.categoriaFinanceira.count(),
         prisma.contaBancaria.count(),
         prisma.fornecedor.count({ where: { ativo: true } }),
-        prisma.centroCusto.count({ where: { ativo: true } }),
+        // Comportamento financeiro vive na Configuração Financeira do cadastro mestre
+        // (a classificação intermediária foi eliminada em 02/08/2026).
+        prisma.produtoFinanceiro.count({ where: { ativo: true } }),
         prisma.status.count(),
         // último log SEM filtro — mantido só para `ultimaAcao` (retrocompat).
         prisma.logAuditoria.findFirst({ orderBy: { criadoEm: "desc" }, select: { acao: true, entidade: true, criadoEm: true } }),
@@ -45,7 +46,7 @@ export async function GET(_req: NextRequest) {
     if (contas === 0) alertas.push("Nenhuma conta bancária cadastrada")
     if (fornecedores === 0) alertas.push("Nenhum fornecedor ativo cadastrado")
 
-    const contagens = { usuarios, perfis, contas, categorias, fornecedores, centros, statusCols }
+    const contagens = { usuarios, perfis, contas, fornecedores, configsFinanceiras, statusCols }
 
     return NextResponse.json({
       // cards reais

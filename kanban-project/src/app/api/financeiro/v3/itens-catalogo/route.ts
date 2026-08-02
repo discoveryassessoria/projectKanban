@@ -72,7 +72,6 @@ export async function GET(req: NextRequest) {
           id: true, ativo: true, naturezaFin: true, possuiCusto: true, possuiReceita: true,
           valorCustoPadrao: true, valorReceitaPadrao: true, moedaPadrao: true,
           fornecedorPadrao: { select: { nome: true } },
-          categoria: { select: { nome: true } },
         },
       },
       // Vigência entra junto: é ela que decide a elegibilidade a Receita e também
@@ -122,8 +121,9 @@ export async function GET(req: NextRequest) {
         name: i.name,
         descricao: i.descricao,
         natureza: i.natureza,
-        // Categoria oficial: a da Configuração Financeira quando existe; senão a do próprio item.
-        categoria: c?.categoria?.nome ?? i.categoria?.nome ?? null,
+        // Categoria do próprio item do Catálogo (CategoriaServico). A Configuração
+        // Financeira não classifica mais nada — ela define comportamento.
+        categoria: i.categoria?.nome ?? null,
         unidade: i.unidade,
         temConfig: !!c,
         temPreco: i.precos.some((p) => naturezasPreco.includes(String(p.natureza))),

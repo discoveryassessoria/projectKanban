@@ -83,14 +83,11 @@ const CatalogTab = dynamic(() => import("@/src/components/gerenciamentoComponent
   ssr: false, loading: () => <CarregandoTela />,
 })
 
-const CentrosCustoTab = dynamic(() => import("@/src/components/gerenciamentoComponents/CentrosCustoTab"), { ssr: false, loading: () => <CarregandoTela /> })
-const CategoriasTab = dynamic(() => import("@/src/components/gerenciamentoComponents/CategoriasTab"), { ssr: false, loading: () => <CarregandoTela /> })
 const ContasTab = dynamic(() => import("@/src/components/gerenciamentoComponents/ContasTab"), { ssr: false, loading: () => <CarregandoTela /> })
 const BancosTab = dynamic(() => import("@/src/components/gerenciamentoComponents/BancosTab"), { ssr: false, loading: () => <CarregandoTela /> })
 const FornecedoresTab = dynamic(() => import("@/src/components/gerenciamentoComponents/FornecedoresTab"), { ssr: false, loading: () => <CarregandoTela /> })
 const CambioTab = dynamic(() => import("@/src/components/gerenciamentoComponents/CambioTab"), { ssr: false, loading: () => <CarregandoTela /> })
 const ImpostosTab = dynamic(() => import("@/src/components/gerenciamentoComponents/ImpostosTab"), { ssr: false, loading: () => <CarregandoTela /> })
-const PlanoContasTab = dynamic(() => import("@/src/components/gerenciamentoComponents/PlanoContasTab"), { ssr: false, loading: () => <CarregandoTela /> })
 const CarteirasTab = dynamic(() => import("@/src/components/gerenciamentoComponents/CarteirasTab"), { ssr: false, loading: () => <CarregandoTela /> })
 const ProdutosTab = dynamic(() => import("@/src/components/gerenciamentoComponents/ProdutosTab"), { ssr: false, loading: () => <CarregandoTela /> })
 const TabelaValoresTab = dynamic(() => import("@/src/components/gerenciamentoComponents/TabelaValoresTab"), { ssr: false, loading: () => <CarregandoTela /> })
@@ -183,12 +180,9 @@ const TELAS: Record<string, React.ComponentType> = {
   banks: BancosTab,
   accounts: ContasTab,
   wallets: CarteirasTab,
-  coa: PlanoContasTab,
   // As concentradoras legadas (estruturafin, precificacao, fornecedoresconc, comercial,
   // pagamentos, integracaofin) foram removidas: eram invólucros de abas que só reusavam
   // as telas reais. Os deep-links continuam vivos por ALIAS_TELAS → tela dona da função.
-  categories: CategoriasTab,
-  costcenters: CentrosCustoTab,
   taxes: ImpostosTab,
   fees: TaxasPagamentoTab,
   organs: OrgaosProtocoloTab,
@@ -346,6 +340,11 @@ export default function GerenciamentoPage() {
     // Protocolo NÃO é cadastro: virou ocorrência operacional dentro do Processo
     // (aba Protocolos → Timeline/Histórico). As URLs antigas não podem abrir tela
     // morta nem "em breve" — caem no painel do Gerenciamento.
+    // Classificação financeira ELIMINADA (02/08/2026): o comportamento financeiro
+    // pertence ao cadastro mestre, na Configuração Financeira. URLs antigas caem lá.
+    categories: "catalog",
+    coa: "catalog",
+    costcenters: "catalog",
     prottypes: "overview",
     "prottypes-rascunho": "overview",
     protocols: "overview",

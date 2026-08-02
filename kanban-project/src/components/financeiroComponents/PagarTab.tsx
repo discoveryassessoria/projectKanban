@@ -3,7 +3,7 @@
 // Fiel ao Golden Master aprovado (imagem oficial): 5 KPIs (Total a Pagar /
 // Vencidos / A Vencer 7d / Pago (Mês) / Previsto (Mês)), filtros em chips,
 // toolbar (Mês atual + busca), DataTable com Vencimento/Título/Fornecedor/
-// Categoria/Processo/Valor/Status/Forma de Pagamento/Ações e paginação.
+// Processo/Valor/Status/Forma de Pagamento/Ações e paginação.
 // Linguagem visual 100% do kit compartilhado.
 //
 // Somente frontend: consome o endpoint EXISTENTE /api/financas/pagar (GET).
@@ -34,7 +34,7 @@ function dueText(d: string | Date | null): string {
 }
 
 interface Conta {
-  id: string; fornecedor: string; descricao: string; categoria: string; categoriaCor: string | null
+  id: string; fornecedor: string; descricao: string
   conta: string | null; valor: number; vencimento: string; dataPagamento: string | null; status: string
   numeroParcela: number | null; totalParcelas: number | null
   pago: boolean; cancelado: boolean; aberto: boolean; vencido: boolean; diasParaVencer: number
@@ -100,7 +100,7 @@ export default function PagarTab() {
     if (chip === "avencer" && !(!c.vencido && !c.pago && !c.cancelado)) return false
     if (chip === "pagos" && !c.pago) return false
     if (chip === "cancelados" && !c.cancelado) return false
-    if (busca && !(`${c.fornecedor} ${c.descricao} ${c.categoria} ${c.processoCodigo ?? ""} ${c.familia ?? ""}`.toLowerCase().includes(busca))) return false
+    if (busca && !(`${c.fornecedor} ${c.descricao} ${c.processoCodigo ?? ""} ${c.familia ?? ""}`.toLowerCase().includes(busca))) return false
     return true
   })
   const total = filtradas.length
@@ -164,7 +164,7 @@ export default function PagarTab() {
             <Thead>
               <Th><span className="inline-flex items-center gap-1">Vencimento <ArrowUpDown className="h-3 w-3 opacity-50" /></span></Th>
               <Th><span className="inline-flex items-center gap-1">Título <ArrowUpDown className="h-3 w-3 opacity-50" /></span></Th>
-              <Th>Fornecedor</Th><Th>Categoria</Th><Th>Processo</Th>
+              <Th>Fornecedor</Th><Th>Processo</Th>
               <Th align="right">Valor</Th><Th align="center">Status</Th><Th>Forma de Pagamento</Th><Th align="right">Ações</Th>
             </Thead>
             <tbody>
@@ -187,7 +187,6 @@ export default function PagarTab() {
                       {(c.nf || (c.totalParcelas && c.totalParcelas > 1)) && <div className="text-[11px]" style={{ color: "var(--text-muted)" }}>{c.nf ? c.nf : `Parcela ${c.numeroParcela} de ${c.totalParcelas}`}</div>}
                     </td>
                     <td className="py-2.5 px-2" style={{ color: "var(--text-secondary)" }}>{c.fornecedor}</td>
-                    <td className="py-2.5 px-2" style={{ color: "var(--text-secondary)" }}>{c.categoria}</td>
                     <td className="py-2.5 px-2">
                       <div style={{ color: "var(--text-secondary)" }}>{c.processoCodigo ?? "—"}</div>
                       {c.familia && <div className="text-[11px]" style={{ color: "var(--text-muted)" }}>{c.familia}</div>}

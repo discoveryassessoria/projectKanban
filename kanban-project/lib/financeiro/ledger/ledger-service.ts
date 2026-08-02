@@ -80,7 +80,6 @@ export interface CriarObrigacaoInput {
   faseId?: number | null
   clienteId?: number | null
   fornecedorId?: number | null
-  centroCustoId?: number | null
   itemCatalogoId?: number | null
   regraFinanceiraId?: number | null
   vencimento?: Date | null
@@ -116,7 +115,7 @@ export async function criarObrigacaoEconomicaComLedgerTx(tx: Tx, input: CriarObr
       codigoOperacional: input.codigoOperacional ?? null,
       natureza: input.natureza, direcao: dir,
       processoId: input.processoId ?? null, faseId: input.faseId ?? null, clienteId: input.clienteId ?? null,
-      fornecedorId: input.fornecedorId ?? null, centroCustoId: input.centroCustoId ?? null, itemCatalogoId: input.itemCatalogoId ?? null,
+      fornecedorId: input.fornecedorId ?? null, itemCatalogoId: input.itemCatalogoId ?? null,
       regraFinanceiraId: input.regraFinanceiraId ?? null,
       moedaContratual: moeda, moedaContabil: moeda,
       valorContratado: input.valorContratado,

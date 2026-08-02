@@ -95,7 +95,7 @@ const ARVORE_OFICIAL: Record<string, string[]> = {
   grp_documentos: ["Documentos", "Regras"],
   grp_servicos: ["Catálogo de Serviços", "Categorias"],
   grp_financeiro: [
-    "Configurações Financeiras", "Classificação", "Tabela de Valores", "Tesouraria",
+    "Configurações Financeiras", "Tabela de Valores", "Tesouraria",
     "Moedas", "Cobrança", "Crédito", "Fiscal", "Comissões", "Documentos Financeiros", "Governança",
   ],
   grp_orgaos: ["Organizações", "Categorias"],
@@ -119,7 +119,11 @@ ok(JSON.stringify(itensDaSecao("grp_processos", "Cadastros")) === JSON.stringify
 ok(JSON.stringify(itensDaSecao("grp_processos", "Estrutura")) === JSON.stringify(["fases", "phasemodes"]), "Processos › Estrutura = Fases, Variações da Fase")
 ok(JSON.stringify(itensDaSecao("grp_processos", "Configurações")) === JSON.stringify(["sla", "cfgversions", "proccfg"]), "Processos › Configurações = SLA, Versões, Configurações Gerais")
 ok(JSON.stringify(itensDaSecao("grp_workflow", "Fluxos")) === JSON.stringify(["macrokanban", "phaseiwf"]), "Workflow › Fluxos = Workflow Macro + Workflow Interno")
-ok(JSON.stringify(itensDaSecao("grp_financeiro", "Classificação")) === JSON.stringify(["categories", "coa", "costcenters"]), "Financeiro › Classificação = Categorias, Plano de Contas, Centros de Custo")
+// Classificação financeira ELIMINADA (02/08/2026): o comportamento financeiro vive na
+// Configuração Financeira do cadastro mestre; preço, na Tabela de Valores. Sem cadastro
+// intermediário — nem categoria, nem plano de contas, nem centro de custo.
+ok(itensDaSecao("grp_financeiro", "Classificação").length === 0, 'Financeiro não tem mais a seção "Classificação"')
+
 ok(JSON.stringify(itensDaSecao("grp_financeiro", "Tesouraria")) === JSON.stringify(["accounts", "banks", "wallets"]), "Financeiro › Tesouraria = Contas, Bancos, Carteiras")
 ok(JSON.stringify(itensDaSecao("grp_financeiro", "Cobrança")) === JSON.stringify(["methods", "paycond", "fees"]), "Financeiro › Cobrança = Formas, Condições, Taxas")
 ok(JSON.stringify(itensDaSecao("grp_financeiro", "Tabela de Valores")) === JSON.stringify(["pricingtable", "discrules", "pricing"]), "Financeiro › Tabela de Valores = Tabelas de Preços, Regras de Precificação, Aplicabilidade")
@@ -219,6 +223,13 @@ ok(
 ok(!TELAS_KEYS.has("prottypes") && !TELAS_KEYS.has("protocols"), "nenhuma tela de cadastro de protocolo registrada")
 ok(ALIAS_MAP_PROTO["prottypes"] === "overview" && ALIAS_MAP_PROTO["protocols"] === "overview", "URLs antigas de protocolo caem no painel do Gerenciamento (sem tela morta)")
 ok(!/tipos-protocolo|tipoProtocoloCadastro/i.test(registrySrc), 'motor genérico de cadastros não conhece "tipos-protocolo"')
+// Classificação financeira ELIMINADA: nem menu, nem tela, nem cadastro intermediário.
+ok(!itemDe("categories") && !itemDe("coa") && !itemDe("costcenters"), "Categorias Financeiras, Plano de Contas e Centros de Custo não existem na navegação")
+ok(!TELAS_KEYS.has("categories") && !TELAS_KEYS.has("coa") && !TELAS_KEYS.has("costcenters"), "nenhuma tela de classificação financeira registrada")
+ok(
+  ALIAS_MAP_PROTO["categories"] === "catalog" && ALIAS_MAP_PROTO["coa"] === "catalog" && ALIAS_MAP_PROTO["costcenters"] === "catalog",
+  "URLs antigas de classificação caem em Configurações Financeiras",
+)
 ok((gDe("grp_documentos")?.children ?? []).every((c) => c.section !== "Protocolos"), 'módulo Documentos e Protocolos não tem mais a seção "Protocolos"')
 ok(moduloDe("audit") === "grp_sistema" && itemDe("audit")?.status === "active", "Auditoria e Logs tem casa oficial (Sistema)")
 

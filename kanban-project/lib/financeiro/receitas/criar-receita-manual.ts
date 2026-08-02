@@ -62,7 +62,7 @@ export async function criarReceitaManualCanonica(input: CriarReceitaManualInput)
       precos: { where: { arquivado: false, legadoPendente: false }, select: { natureza: true, arquivado: true, legadoPendente: true, vigenciaInicio: true, vigenciaFim: true } },
     },
   })
-  const cfg = item ? await prisma.produtoFinanceiro.findUnique({ where: { itemCatalogoId: item.id }, select: { id: true, ativo: true, moedaPadrao: true, naturezaFin: true, possuiCusto: true, possuiReceita: true, condicaoPagamentoId: true, categoriaId: true } }) : null
+  const cfg = item ? await prisma.produtoFinanceiro.findUnique({ where: { itemCatalogoId: item.id }, select: { id: true, ativo: true, moedaPadrao: true, naturezaFin: true, possuiCusto: true, possuiReceita: true, condicaoPagamentoId: true } }) : null
   const eleg = elegibilidadeParaLancamento({
     item, config: cfg, precos: item?.precos, natureza: 'RECEITA', hoje: hojeISO(new Date()),
   })

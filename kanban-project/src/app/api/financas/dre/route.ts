@@ -7,13 +7,13 @@
 //   • Impostos sobre receita: cadastro oficial `Imposto` (aplicaA = revenue).
 //     A alíquota agregada é a SOMA das alíquotas cadastradas e ativas — não
 //     mais o 13,6% inventado.
-//   • Quebra de despesas: agrupada por `CategoriaFinanceira` real de ContaPagar.
+//   • Quebra de despesas: agrupada por FORNECEDOR real de ContaPagar.
 //
-// LIMITE CONHECIDO — vínculo com PlanoConta: `ContaPagar` não possui FK para
-// `PlanoConta`, então a quebra do DRE por conta contábil oficial é impossível
-// hoje sem inventar o mapeamento. O plano de contas oficial é devolvido em
-// `planoContas` (real) e `planoContaVinculado: false` declara a lacuna. A
-// quebra usa a única dimensão real existente: categoria financeira.
+// A classificação financeira intermediária (Categorias, Plano de Contas e
+// Centros de Custo) foi ELIMINADA em 02/08/2026: o comportamento financeiro
+// pertence à Configuração Financeira do cadastro mestre. Sem cadastro de
+// classificação, a única dimensão REAL de uma conta a pagar é o fornecedor —
+// é por ele que a despesa é quebrada. Nada é inventado nem estimado.
 
 import { NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
@@ -34,7 +34,7 @@ export async function GET(_req: NextRequest) {
 
     const fx = await carregarFx()
 
-    const [parcMesAtual, parcMesAnterior, custosMesAtual, contasPagarMes, impostosReceitaCad, planoContas] =
+    const [parcMesAtual, parcMesAnterior, custosMesAtual, contasPagarMes, impostosReceitaCad] =
       await Promise.all([
         prisma.parcelaFinanceira.findMany({
           where: { receitaId: { not: null }, vencimento: { gte: mesAtual.ini, lte: mesAtual.fim }, receita: { is: { cancelada: false } } },
@@ -50,18 +50,13 @@ export async function GET(_req: NextRequest) {
         }),
         prisma.contaPagar.findMany({
           where: { status: { not: "CANCELADO" }, dataVencimento: { gte: mesAtual.ini, lte: mesAtual.fim } },
-          select: { valor: true, categoriaId: true },
+          select: { valor: true, fornecedor: { select: { nome: true } } },
         }),
         // cadastro oficial de tributos que incidem sobre RECEITA
         prisma.imposto.findMany({
           where: { ativo: true, aplicaA: "revenue", modoCalculo: { not: "fixed" } },
           select: { id: true, codigo: true, nome: true, percentual: true },
           orderBy: { nome: "asc" },
-        }),
-        prisma.planoConta.findMany({
-          where: { ativo: true },
-          select: { id: true, codigo: true, nome: true, tipo: true, natureza: true },
-          orderBy: { codigo: "asc" },
         }),
       ])
 
@@ -93,18 +88,13 @@ export async function GET(_req: NextRequest) {
     const ajustesFinanceiros = 0
     const lucroLiquido = cent(lucroOperacional + ajustesFinanceiros)
 
-    // ── quebra de despesas: por CategoriaFinanceira REAL ─────────────────────
-    const catIds = [...new Set(contasPagarMes.map((c) => c.categoriaId).filter((v): v is number => v != null))]
-    const categorias = catIds.length
-      ? await prisma.categoriaFinanceira.findMany({ where: { id: { in: catIds } }, select: { id: true, nome: true } })
-      : []
-    const nomeCat = new Map(categorias.map((c) => [c.id, c.nome]))
-    const porCategoria = new Map<string, number>()
+    // ── quebra de despesas: por FORNECEDOR real ──────────────────────────────
+    const porFornecedor = new Map<string, number>()
     for (const c of contasPagarMes) {
-      const label = c.categoriaId != null ? (nomeCat.get(c.categoriaId) ?? `Categoria #${c.categoriaId}`) : "Sem categoria"
-      porCategoria.set(label, cent((porCategoria.get(label) ?? 0) + Number(c.valor)))
+      const label = c.fornecedor?.nome ?? "Sem fornecedor"
+      porFornecedor.set(label, cent((porFornecedor.get(label) ?? 0) + Number(c.valor)))
     }
-    const despesasDetalhe = [...porCategoria.entries()]
+    const despesasDetalhe = [...porFornecedor.entries()]
       .map(([label, valor]) => ({ label, valor: -valor, real: true }))
       .sort((a, b) => a.valor - b.valor)
 
@@ -144,11 +134,10 @@ export async function GET(_req: NextRequest) {
         naoConvertido,
         impostos: "cadastro:Imposto",
         aliquotaReceitaTotal: aliquotaTotal,
-        despesas: "ContaPagar › CategoriaFinanceira",
-        planoContaVinculado: false,
-        planoContaObs: "ContaPagar não possui vínculo com PlanoConta; quebra por conta contábil exige esse relacionamento.",
+        despesas: "ContaPagar › Fornecedor",
+        classificacaoIntermediaria: false,
+        classificacaoObs: "Categorias Financeiras, Plano de Contas e Centros de Custo foram eliminados: o comportamento financeiro vive na Configuração Financeira do cadastro mestre.",
       },
-      planoContas,
     })
   } catch (e) {
     console.error("[financas/dre] erro:", e)

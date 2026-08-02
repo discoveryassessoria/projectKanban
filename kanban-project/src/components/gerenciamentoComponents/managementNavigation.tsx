@@ -253,11 +253,12 @@ export const MANAGEMENT_NAVIGATION: ManagementNavigationItem[] = [
     key: "grp_financeiro", label: "Financeiro", icon: DollarSign, order: 70, status: "active",
     description: "Comportamento financeiro dos cadastros mestres, valores e cobrança.",
     children: [
-      a(10, "catalog", "Configurações Financeiras", ["configuracao", "config", "financeiro", "catalogo", "papel", "custo", "receita", "natureza", "repasse", "reembolsavel"]),
+      // REGRA: o comportamento financeiro pertence ao CADASTRO MESTRE, na sua própria
+      // Configuração Financeira. Não existe seção "Classificação" nem cadastro
+      // intermediário (Categorias Financeiras, Plano de Contas, Centros de Custo
+      // foram eliminados em 02/08/2026). Preço é assunto da Tabela de Valores.
+      a(10, "catalog", "Configurações Financeiras", ["configuracao", "config", "financeiro", "catalogo", "papel", "custo", "receita", "natureza", "cobravel", "reembolsavel", "comissao"]),
 
-      a(20, "categories", "Categorias Financeiras", ["categoria", "financeiro", "classificacao", "classificação"], "Classificação"),
-      a(30, "coa", "Plano de Contas", ["plano", "conta", "contabil", "contábil"], "Classificação"),
-      a(40, "costcenters", "Centros de Custo", ["centro", "custo"], "Classificação"),
 
       a(50, "pricingtable", "Tabelas de Preços", ["preco", "preço", "tabela", "valor", "vigencia", "vigência"], "Tabela de Valores"),
       a(60, "discrules", "Regras de Precificação", ["preco", "preço", "regra", "desconto", "economica"], "Tabela de Valores"),

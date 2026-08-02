@@ -55,7 +55,6 @@ export const ENTIDADES_MESTRES: EntidadeMestre[] = [
   { conceito: 'cargo', model: 'Cargo', fk: 'cargoId', camposSuspeitos: ['cargo', 'role'] },
   { conceito: 'perfil', model: 'Perfil', fk: 'perfilId', camposSuspeitos: ['perfil', 'profile'] },
   { conceito: 'moeda', model: 'MoedaCadastro', fk: 'moedaId', camposSuspeitos: ['currency', 'moeda'] },
-  { conceito: 'classificação financeira', model: 'CategoriaFinanceira', fk: 'categoriaId', camposSuspeitos: ['classificacaoFinanceira'] },
   { conceito: 'conta contábil', model: 'ContaContabil', fk: 'contaContabilId', camposSuspeitos: ['contaContabil'] },
 ]
 

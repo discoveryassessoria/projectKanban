@@ -76,7 +76,7 @@ export async function espelharReceitaComoObrigacao(receita: {
 // ============================================================================
 export async function espelharCustoComoObrigacao(custo: {
   id: number; codigo?: string | null; valor: number | string; moeda?: string | null; processoId?: number | null
-  fornecedorId?: number | null; centroCustoId?: number | null; faseId?: number | null; vencimento?: Date | null; criadoPorId?: number | null
+  fornecedorId?: number | null; faseId?: number | null; vencimento?: Date | null; criadoPorId?: number | null
 }): Promise<number | null> {
   try {
     const { obrigacaoId } = await criarObrigacaoEconomicaComLedger({
@@ -87,7 +87,6 @@ export async function espelharCustoComoObrigacao(custo: {
       processoId: custo.processoId ?? null,
       faseId: custo.faseId ?? null,
       fornecedorId: custo.fornecedorId ?? null,
-      centroCustoId: custo.centroCustoId ?? null,
       vencimento: custo.vencimento ?? null,
       origemTipo: 'Custo', origemId: custo.id,
       criadoPorId: custo.criadoPorId ?? null,

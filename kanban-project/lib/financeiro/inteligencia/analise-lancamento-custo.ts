@@ -36,7 +36,6 @@ export interface AvisoLancamento {
 
 export interface SugestoesLancamento {
   fornecedor: { id: number; nome: string; ocorrencias: number } | null
-  centroCusto: { id: number; nome: string; ocorrencias: number } | null
   valorTipico: { valor: number; moeda: string; amostras: number; minimo: number; maximo: number } | null
 }
 
@@ -51,7 +50,6 @@ export interface EntradaAnaliseCusto {
   processoId?: number | null
   itemCatalogoId?: number | null
   fornecedorId?: number | null
-  centroCustoId?: number | null
   valor?: number | null
   moeda?: string | null
   vencimento?: string | null
@@ -111,7 +109,7 @@ export async function analisarLancamentoCusto(e: EntradaAnaliseCusto): Promise<A
           status: { not: 'CANCELADO' },
           ...(e.ignorarObrigacaoId ? { id: { not: e.ignorarObrigacaoId } } : {}),
         },
-        select: { id: true, fornecedorId: true, centroCustoId: true, valorContratado: true, moedaContratual: true },
+        select: { id: true, fornecedorId: true, valorContratado: true, moedaContratual: true },
         orderBy: { id: 'desc' },
         take: 200,
       }).catch(() => [])
@@ -119,17 +117,14 @@ export async function analisarLancamentoCusto(e: EntradaAnaliseCusto): Promise<A
 
   // ── sugestões ──────────────────────────────────────────────────────────────
   const fornMais = maisFrequente(historico.map((h) => h.fornecedorId))
-  const centroMais = maisFrequente(historico.map((h) => h.centroCustoId))
   const valoresMesmaMoeda = historico.filter((h) => String(h.moedaContratual) === moeda).map((h) => cent(Number(h.valorContratado)))
 
-  const [fornNome, centroNome] = await Promise.all([
-    fornMais ? prisma.fornecedor.findUnique({ where: { id: fornMais.id }, select: { nome: true } }).catch(() => null) : Promise.resolve(null),
-    centroMais ? prisma.centroCusto.findUnique({ where: { id: centroMais.id }, select: { nome: true } }).catch(() => null) : Promise.resolve(null),
-  ])
+  const fornNome = fornMais
+    ? await prisma.fornecedor.findUnique({ where: { id: fornMais.id }, select: { nome: true } }).catch(() => null)
+    : null
 
   const sugestoes: SugestoesLancamento = {
     fornecedor: fornMais && fornNome ? { id: fornMais.id, nome: fornNome.nome, ocorrencias: fornMais.ocorrencias } : null,
-    centroCusto: centroMais && centroNome ? { id: centroMais.id, nome: centroNome.nome, ocorrencias: centroMais.ocorrencias } : null,
     valorTipico: valoresMesmaMoeda.length >= AMOSTRA_MINIMA_FAIXA
       ? { valor: mediana(valoresMesmaMoeda), moeda, amostras: valoresMesmaMoeda.length, minimo: Math.min(...valoresMesmaMoeda), maximo: Math.max(...valoresMesmaMoeda) }
       : null,
@@ -191,9 +186,6 @@ export async function analisarLancamentoCusto(e: EntradaAnaliseCusto): Promise<A
   }
   if (!e.fornecedorId) {
     avisos.push({ codigo: 'SEM_FORNECEDOR', severidade: 'info', mensagem: 'Custo sem fornecedor: sem ele não há conciliação por beneficiário nem histórico de preço por parceiro.' })
-  }
-  if (!e.centroCustoId) {
-    avisos.push({ codigo: 'SEM_CENTRO_CUSTO', severidade: 'info', mensagem: 'Custo sem centro de custo: ele não aparecerá nos rateios e relatórios por centro.' })
   }
 
   // Ordem de leitura: o mais grave primeiro.

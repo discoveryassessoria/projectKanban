@@ -26,7 +26,7 @@ export async function duplicarReceita(ref: string, opts: DuplicarOpts = {}): Pro
     where: { id: origemObrId },
     select: {
       id: true, natureza: true, moedaContratual: true, valorContratado: true, processoId: true, faseId: true,
-      clienteId: true, fornecedorId: true, centroCustoId: true, itemCatalogoId: true, regraFinanceiraId: true,
+      clienteId: true, fornecedorId: true, itemCatalogoId: true, regraFinanceiraId: true,
       origemTipo: true, origemId: true, observacoes: true,
       distribuicoes: { orderBy: { versao: 'desc' }, take: 1, include: { participacoes: true } },
     },
@@ -75,7 +75,7 @@ export async function duplicarReceita(ref: string, opts: DuplicarOpts = {}): Pro
     natureza: (origem.natureza as Natureza) ?? 'RECEITA',
     valorContratado: valor, moedaContratual: moeda, codigoOperacional: codigo,
     processoId: origem.processoId ?? null, faseId: origem.faseId ?? null, clienteId: origem.clienteId ?? null,
-    fornecedorId: origem.fornecedorId ?? null, centroCustoId: origem.centroCustoId ?? null, itemCatalogoId: origem.itemCatalogoId ?? null,
+    fornecedorId: origem.fornecedorId ?? null, itemCatalogoId: origem.itemCatalogoId ?? null,
     regraFinanceiraId: origem.regraFinanceiraId ?? null, vencimento,
     observacoes: novaReceitaId == null ? `${origem.observacoes ?? (isCusto ? 'Custo' : 'Receita')} (cópia)`.slice(0, 300) : null,
     origemTipo: novaReceitaId != null ? 'Receita' : 'nativo', origemId: novaReceitaId,

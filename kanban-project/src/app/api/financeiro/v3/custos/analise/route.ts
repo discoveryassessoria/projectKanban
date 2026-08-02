@@ -1,5 +1,5 @@
 // /api/financeiro/v3/custos/analise — F8.1: inteligência do lançamento de custo.
-//   POST { processoId?, itemCatalogoId?, fornecedorId?, centroCustoId?, valor?, moeda?,
+//   POST { processoId?, itemCatalogoId?, fornecedorId?, valor?, moeda?,
 //          vencimento?, ignorarObrigacaoId? } → { avisos, sugestoes, baseHistorica }
 // SOMENTE LEITURA: não grava, não bloqueia, não auto-preenche. É conselho com evidência —
 // quem decide é o operador. Gated por financeiro.ver (não expõe nada além do que a lista
@@ -21,7 +21,6 @@ export async function POST(req: NextRequest) {
       processoId: numOuNulo(b?.processoId),
       itemCatalogoId: numOuNulo(b?.itemCatalogoId),
       fornecedorId: numOuNulo(b?.fornecedorId),
-      centroCustoId: numOuNulo(b?.centroCustoId),
       valor: b?.valor != null ? Number(b.valor) : null,
       moeda: typeof b?.moeda === 'string' ? b.moeda : null,
       vencimento: typeof b?.vencimento === 'string' ? b.vencimento : null,

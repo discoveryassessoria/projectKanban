@@ -65,7 +65,6 @@ export async function GET(_req: NextRequest) {
         select: {
           id: true, descricao: true, valor: true, dataVencimento: true, status: true,
           fornecedor: { select: { nome: true } },
-          categoria: { select: { nome: true, cor: true } },
         },
         orderBy: { dataVencimento: "asc" },
       }),
@@ -163,8 +162,6 @@ export async function GET(_req: NextRequest) {
     const proximosPagamentos = contasPagarAbertas.slice(0, 5).map((c) => ({
       id: c.id,
       fornecedor: c.fornecedor?.nome ?? "—",
-      categoria: c.categoria?.nome ?? "Outros",
-      categoriaCor: c.categoria?.cor ?? null,
       valorBRL: Number(c.valor),
       vencimento: c.dataVencimento,
       atrasado: c.dataVencimento < agora,

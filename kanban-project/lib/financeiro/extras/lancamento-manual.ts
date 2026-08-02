@@ -28,7 +28,6 @@ export interface EntradaLancamentoManual {
   vencimento?: Date | null
   formaCobranca?: string | null
   fornecedorId?: number | null // custo
-  centroCustoId?: number | null // custo
   faseLabel?: string | null
   rateio?: { modo: ModoDistribuicao; participantes: ParticipanteRateio[] } | null
   pagamento?: { observacao?: string | null; comprovanteUrl?: string | null } | null
@@ -121,7 +120,6 @@ export async function criarLancamentoManual(e: EntradaLancamentoManual): Promise
     processoId: e.processoId,
     itemCatalogoId: e.itemCatalogoId, // FONTE do lançamento (Cadastro Mestre) — estrutural
     fornecedorId: e.natureza === 'CUSTO' ? (e.fornecedorId ?? null) : null,
-    centroCustoId: e.natureza === 'CUSTO' ? (e.centroCustoId ?? null) : null,
     vencimento: e.vencimento ?? null,
     distribuicao,
     pagamento: e.pagamento ? { observacao: e.pagamento.observacao ?? 'Pagamento no lançamento manual', comprovanteUrl: e.pagamento.comprovanteUrl ?? null } : null,

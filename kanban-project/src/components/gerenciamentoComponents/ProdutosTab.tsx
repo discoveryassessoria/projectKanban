@@ -12,8 +12,7 @@ import { useApi } from '@/src/lib/dados'
 import { usePermissoes } from '@/src/hooks/use-permissoes'
 import { ExclusaoDefinitivaModal } from './ExclusaoDefinitivaModal'
 
-type CategoriaRef = { id: number; nome: string }
-type ContaRef = { id: number; codigo: string; nome: string }
+type ComissaoRef = { id: number; name: string; ativo: boolean }
 type Produto = {
   id: number
   publicCode: string | null   // CFG-n — código PÚBLICO da configuração (backend, automático)
@@ -21,10 +20,6 @@ type Produto = {
   nome: string
   especie: string | null
   naturezaFinanceira: string | null
-  categoriaId: number | null
-  planoContaId: number | null // LEGADO (conta única) — preservado para leitura/fallback
-  planoContaReceitaId: number | null
-  planoContaCustoId: number | null
   moedaPadrao: string
   // M-UNIFICA — custo e receita como valores da MESMA config
   possuiCusto: boolean
@@ -35,10 +30,8 @@ type Produto = {
   repasse: boolean
   reembolsavel: boolean
   ativo: boolean
-  categoria?: CategoriaRef | null
-  planoConta?: ContaRef | null
-  planoContaReceita?: ContaRef | null
-  planoContaCusto?: ContaRef | null
+  regraComissaoId: number | null
+  regraComissao?: ComissaoRef | null
   tipoDocumentoId: number | null
   honorarioId: number | null
   tipoProcessoId: number | null
@@ -80,8 +73,7 @@ type RespostaProdutos = {
 // Listas vazias como constantes: literal novo por render trocaria a identidade da
 // dependência e faria os memos desta tela recalcularem sempre.
 const SEM_PRODUTOS: Produto[] = []
-const SEM_CATEGORIAS: CategoriaRef[] = []
-const SEM_CONTAS: ContaRef[] = []
+const SEM_COMISSOES: ComissaoRef[] = []
 // Rótulo da ORIGEM estrutural do mestre (Documento/Serviço/...). Usado na coluna e busca.
 const ORIGEM_LABEL: Record<string, string> = { documento: 'Documento', servico: 'Serviço', honorario: 'Honorário', processo: 'Processo', item: 'Item' }
 const origemLabel = (o?: string | null) => (o ? (ORIGEM_LABEL[o] ?? o) : '—')
@@ -110,7 +102,7 @@ const EMPTY = {
   naturezaFin: 'SOMENTE_RECEITA',
   valorCustoPadrao: '', valorReceitaPadrao: '',
   codigo: '', nome: '', naturezaFinanceira: 'revenue',
-  categoriaId: '', planoContaReceitaId: '', planoContaCustoId: '', moedaPadrao: 'BRL', fornecedorPadraoId: '',
+  moedaPadrao: 'BRL', fornecedorPadraoId: '', regraComissaoId: '',
   cobravelDoCliente: false, repasse: false, reembolsavel: false, ativo: true,
 }
 type FormState = typeof EMPTY
@@ -143,15 +135,13 @@ const Check = ({ ok }: { ok: boolean }) =>
   ok ? <span className="text-green-300">✓</span> : <span className="text-white/25">—</span>
 
 export default function ProdutosTab() {
-  // Três leituras pela camada oficial. Categorias e plano de contas seguem
-  // TOLERANTES (os `.catch(() => …)` originais): são listas de apoio do formulário,
-  // e falha nelas não pode impedir a tela de mostrar os produtos.
+  // Duas leituras pela camada oficial. A lista de regras de comissão é de APOIO ao
+  // formulário e segue TOLERANTE: falha nela não pode impedir a tela de mostrar as
+  // configurações.
   const produtosReq = useApi<RespostaProdutos>('/api/gerenciamento/produtos')
-  const categoriasReq = useApi<{ categorias?: CategoriaRef[] }>('/api/gerenciamento/categorias')
-  const contasReq = useApi<{ contas?: ContaRef[] }>('/api/gerenciamento/plano-contas')
+  const comissoesReq = useApi<{ regras?: ComissaoRef[] }>('/api/gerenciamento/regras-comissao')
   const produtos = produtosReq.dados?.produtos ?? SEM_PRODUTOS
-  const categorias = categoriasReq.dados?.categorias ?? SEM_CATEGORIAS
-  const contas = contasReq.dados?.contas ?? SEM_CONTAS
+  const comissoes = (comissoesReq.dados?.regras ?? SEM_COMISSOES).filter((r) => r.ativo)
   // A resposta dos mestres é normalizada para o formato dos selects. Como isso é
   // derivação pura, vive num useMemo e não em estado copiado por efeito.
   const mestres = useMemo<Mestres>(() => {
@@ -239,11 +229,9 @@ export default function ProdutosTab() {
       valorReceitaPadrao: p.valorReceitaPadrao != null ? String(p.valorReceitaPadrao) : '',
       codigo: '', nome: p.mestre?.nome || p.nome,
       naturezaFinanceira: p.naturezaFinanceira || 'revenue',
-      categoriaId: p.categoriaId ? String(p.categoriaId) : '',
-      planoContaReceitaId: String(p.planoContaReceitaId ?? p.planoContaId ?? ''),
-      planoContaCustoId: String(p.planoContaCustoId ?? p.planoContaId ?? ''),
       moedaPadrao: p.moedaPadrao || 'BRL',
       fornecedorPadraoId: p.fornecedorPadraoId ? String(p.fornecedorPadraoId) : '',
+      regraComissaoId: p.regraComissaoId ? String(p.regraComissaoId) : '',
       cobravelDoCliente: p.cobravelDoCliente,
       repasse: p.repasse, reembolsavel: p.reembolsavel, ativo: p.ativo,
     })
@@ -253,10 +241,7 @@ export default function ProdutosTab() {
   async function salvar() {
     if (!form.masterId) { setErroModal('Selecione a entidade mestre (origem). O nome/código vêm dela.'); return }
     if (!form.naturezaFin) { setErroModal('Selecione a Natureza Financeira.'); return }
-    const geraReceita = form.naturezaFin !== 'SOMENTE_CUSTO'
     const geraCusto = form.naturezaFin !== 'SOMENTE_RECEITA'
-    if (geraReceita && !form.planoContaReceitaId) { setErroModal('Informe a Conta Contábil de Receita.'); return }
-    if (geraCusto && !form.planoContaCustoId) { setErroModal('Informe a Conta Contábil de Custo.'); return }
     if (form.reembolsavel && !geraCusto) { setErroModal('Reembolsável só se aplica a itens que geram custo.'); return }
     setSalvando(true); setErroModal(null)
     try {
@@ -272,11 +257,8 @@ export default function ProdutosTab() {
         naturezaFin: form.naturezaFin,
         possuiCusto: form.naturezaFin !== 'SOMENTE_RECEITA',
         possuiReceita: form.naturezaFin !== 'SOMENTE_CUSTO',
-        categoriaId: form.categoriaId || null,
-        // Conta contábil por natureza (só envia a que a natureza usa).
-        planoContaReceitaId: geraReceita ? (form.planoContaReceitaId || null) : null,
-        planoContaCustoId: geraCusto ? (form.planoContaCustoId || null) : null,
         fornecedorPadraoId: form.fornecedorPadraoId || null,
+        regraComissaoId: form.regraComissaoId || null,
       })
       if (editando) {
         await jsonFetch(`/api/gerenciamento/produtos/${editando.id}`, { method: 'PUT', body })
@@ -460,35 +442,15 @@ export default function ProdutosTab() {
                 <p className="text-[11px] text-white/40">A Configuração Financeira define <b>o que</b> é o item. Os <b>preços</b> (custo/venda) vivem na Tabela de Preços — cadastre-os lá conforme a natureza escolhida.</p>
               </Secao>
 
-              {/* Classificação */}
-              <Secao titulo="Classificação">
+              {/* Vínculos — o comportamento financeiro vive AQUI, no cadastro mestre.
+                  Não há classificação intermediária (categoria/conta/centro de custo). */}
+              <Secao titulo="Vínculos">
                 <div>
-                  <label className="mb-1 block text-xs text-white/60">Categoria</label>
-                  <select value={form.categoriaId} onChange={(e) => set('categoriaId', e.target.value)} className={inputCls}>
-                    <option value="" className="bg-zinc-900">— Nenhuma —</option>
-                    {categorias.map((c) => <option key={c.id} value={c.id} className="bg-zinc-900">{c.nome}</option>)}
+                  <label className="mb-1 block text-xs text-white/60">Regra de comissão (quando aplicável)</label>
+                  <select value={form.regraComissaoId} onChange={(e) => set('regraComissaoId', e.target.value)} className={inputCls}>
+                    <option value="" className="bg-zinc-900">— Sem comissão —</option>
+                    {comissoes.map((r) => <option key={r.id} value={r.id} className="bg-zinc-900">{r.name}</option>)}
                   </select>
-                </div>
-                {/* Conta contábil por natureza: Receita ao gerar RECEITA, Custo ao gerar CUSTO. */}
-                <div className="grid grid-cols-2 gap-3">
-                  {form.naturezaFin !== 'SOMENTE_CUSTO' && (
-                    <div>
-                      <label className="mb-1 block text-xs text-white/60">Conta contábil de Receita</label>
-                      <select value={form.planoContaReceitaId} onChange={(e) => set('planoContaReceitaId', e.target.value)} className={inputCls}>
-                        <option value="" className="bg-zinc-900">— Selecione —</option>
-                        {contas.map((c) => <option key={c.id} value={c.id} className="bg-zinc-900">{c.codigo} — {c.nome}</option>)}
-                      </select>
-                    </div>
-                  )}
-                  {form.naturezaFin !== 'SOMENTE_RECEITA' && (
-                    <div>
-                      <label className="mb-1 block text-xs text-white/60">Conta contábil de Custo</label>
-                      <select value={form.planoContaCustoId} onChange={(e) => set('planoContaCustoId', e.target.value)} className={inputCls}>
-                        <option value="" className="bg-zinc-900">— Selecione —</option>
-                        {contas.map((c) => <option key={c.id} value={c.id} className="bg-zinc-900">{c.codigo} — {c.nome}</option>)}
-                      </select>
-                    </div>
-                  )}
                 </div>
                 <div>
                   <label className="mb-1 block text-xs text-white/60">Fornecedor padrão (opcional)</label>

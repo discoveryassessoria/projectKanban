@@ -1,7 +1,7 @@
 // src/components/gerenciamentoComponents/OverviewTab.tsx
 //
 // Painel Geral do Gerenciamento — cards de contagem REAIS do banco
-// (usuários, perfis, contas, categorias, fornecedores, centros, status),
+// (usuários, perfis, contas, fornecedores, configurações financeiras, status),
 // KPI strip, alertas de configuração e última alteração. Busca /api/gerenciamento/overview.
 //
 // Um número, um lugar: o strip só renderiza o que NÃO é card (a API marca as
@@ -18,7 +18,7 @@ import { ROTULOS_CONTAGEM, type ItemStrip } from "@/lib/gerenciamento/overview-p
 interface RegistroAuditoria { acao: string; entidade: string; em: string }
 
 interface OverviewData {
-  cards: { usuarios: number; perfis: number; categorias: number; contas: number; fornecedores: number; centros: number; statusCols: number }
+  cards: { usuarios: number; perfis: number; contas: number; fornecedores: number; configsFinanceiras: number; statusCols: number }
   strip: ItemStrip[]
   alertas: string[]
   /** alteração de configuração, sem eventos de acesso. Ausente em backend antigo. */
@@ -44,9 +44,8 @@ export default function OverviewTab() {
     { icon: <Users className="h-4 w-4" />, label: ROTULOS_CONTAGEM.usuarios, value: d.cards.usuarios },
     { icon: <Shield className="h-4 w-4" />, label: ROTULOS_CONTAGEM.perfis, value: d.cards.perfis },
     { icon: <Landmark className="h-4 w-4" />, label: ROTULOS_CONTAGEM.contas, value: d.cards.contas },
-    { icon: <Tag className="h-4 w-4" />, label: ROTULOS_CONTAGEM.categorias, value: d.cards.categorias },
     { icon: <Truck className="h-4 w-4" />, label: ROTULOS_CONTAGEM.fornecedores, value: d.cards.fornecedores },
-    { icon: <Target className="h-4 w-4" />, label: ROTULOS_CONTAGEM.centros, value: d.cards.centros },
+    { icon: <Tag className="h-4 w-4" />, label: ROTULOS_CONTAGEM.configsFinanceiras, value: d.cards.configsFinanceiras },
     { icon: <Columns3 className="h-4 w-4" />, label: ROTULOS_CONTAGEM.statusCols, value: d.cards.statusCols },
   ]
 

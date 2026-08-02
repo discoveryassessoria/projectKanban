@@ -42,9 +42,6 @@ export async function GET(request: NextRequest) {
         fornecedor: {
           select: { id: true, nome: true, nomeFantasia: true }
         },
-        categoria: {
-          select: { id: true, nome: true }
-        },
         contaBancaria: {
           select: { id: true, nome: true }
         }
@@ -84,7 +81,6 @@ export async function POST(request: NextRequest) {
         descricao: body.descricao,
         observacoes: body.observacoes || null,
         fornecedorId: body.fornecedorId ? parseInt(body.fornecedorId) : null,
-        categoriaId: body.categoriaId ? parseInt(body.categoriaId) : null,
         valor: parseFloat(body.valor),
         dataEmissao: body.dataEmissao ? new Date(body.dataEmissao) : new Date(),
         dataVencimento: new Date(body.dataVencimento),
@@ -99,7 +95,7 @@ export async function POST(request: NextRequest) {
         fornecedor: {
           select: { id: true, nome: true }
         },
-        categoria: {
+        contaBancaria: {
           select: { id: true, nome: true }
         }
       }

@@ -5,7 +5,7 @@
  * O que este teste garante:
  *  1. um número tem UM nome só — cards e strip usam ROTULOS_CONTAGEM;
  *  2. rótulos carregam o recorte real da query (ativos / financeiras);
- *  3. as 7 contagens vêm marcadas como duplicadoEmCards e "Última alteração" não;
+ *  3. as contagens vêm marcadas como duplicadoEmCards e "Última alteração" não;
  *  4. acesso (entidade ACESSO) NÃO é alteração de configuração;
  *  5. a rota filtra por entidade e mantém `ultimaAcao` (retrocompat);
  *  6. o OverviewTab filtra o strip e tem fallback para backend antigo;
@@ -31,26 +31,27 @@ function ok(cond: boolean, nome: string) {
 }
 
 const CONTAGENS: ContagensOverview = {
-  usuarios: 3, perfis: 5, contas: 1, categorias: 0, fornecedores: 0, centros: 0, statusCols: 0,
+  usuarios: 3, perfis: 5, contas: 1, fornecedores: 0, configsFinanceiras: 0, statusCols: 0,
 }
 
 // ═══════════ 1) ACHADO 2 — um número, um nome ═══════════
 console.log("\n1) Rótulos (achado 2)")
-ok(ORDEM_CONTAGEM.length === 7, "as 7 contagens estão na ordem canônica")
+ok(ORDEM_CONTAGEM.length === 6, "as 6 contagens estão na ordem canônica")
 ok(
   ORDEM_CONTAGEM.every((k) => typeof ROTULOS_CONTAGEM[k] === "string" && ROTULOS_CONTAGEM[k].length > 0),
   "toda contagem tem rótulo canônico",
 )
 ok(ROTULOS_CONTAGEM.fornecedores === "Fornecedores ativos", 'fornecedores diz "ativos" (a query filtra ativo:true)')
-ok(ROTULOS_CONTAGEM.categorias === "Categorias financeiras", 'categorias diz "financeiras" (conta CategoriaFinanceira)')
+ok(ROTULOS_CONTAGEM.configsFinanceiras === "Configurações financeiras ativas", 'configsFinanceiras diz "ativas" (a query filtra ativo:true)')
+ok(!("categorias" in ROTULOS_CONTAGEM) && !("centros" in ROTULOS_CONTAGEM), 'classificação financeira (categorias/centros) não é mais contada — cadastros eliminados')
 ok(!/label: "Categorias"/.test(tabSrc) && !/label: "Fornecedores"/.test(tabSrc), "OverviewTab não hardcoda os rótulos ambíguos antigos")
 ok(/ROTULOS_CONTAGEM/.test(tabSrc), "cards consomem a fonte única de rótulos")
 
 // ═══════════ 2) ACHADO 1 — sem número duplicado ═══════════
 console.log("\n2) Duplicidade cards × strip (achado 1)")
 const strip = montarStrip(CONTAGENS, new Date("2026-07-20T10:00:00Z"))
-ok(strip.length === 8, "strip tem 8 entradas (7 contagens + última alteração)")
-ok(strip.filter((k) => k.duplicadoEmCards).length === 7, "as 7 contagens vêm marcadas como duplicadas")
+ok(strip.length === 7, "strip tem 7 entradas (6 contagens + última alteração)")
+ok(strip.filter((k) => k.duplicadoEmCards).length === 6, "as 6 contagens vêm marcadas como duplicadas")
 const naoDuplicados = strip.filter((k) => !k.duplicadoEmCards)
 ok(naoDuplicados.length === 1 && naoDuplicados[0].label === "Última alteração", "só 'Última alteração' sobrevive ao filtro")
 ok(

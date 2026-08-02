@@ -35,7 +35,6 @@ function extrairPatch(b: Record<string, unknown>): EditarReceitaPatch {
     vencimento: p.vencimento === undefined ? undefined : (p.vencimento as string | null),
     fornecedorId: p.fornecedorId === undefined ? undefined : (p.fornecedorId == null ? null : Number(p.fornecedorId)),
     faseId: p.faseId === undefined ? undefined : (p.faseId == null ? null : Number(p.faseId)),
-    centroCustoId: p.centroCustoId === undefined ? undefined : (p.centroCustoId == null ? null : Number(p.centroCustoId)),
   }
 }
 

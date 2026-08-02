@@ -1,5 +1,5 @@
 // F8.1 — Inteligência do lançamento de custo: núcleo puro + comportamento no banco real.
-// Prova: mediana/classificação de valor; sugestão de fornecedor/centro/valor pelo histórico
+// Prova: mediana/classificação de valor; sugestão de fornecedor/valor pelo histórico
 // do MESMO item; duplicidade provável (mesmo processo/fornecedor/valor na janela) com
 // evidências; vencimento no passado; avisos de completude; e — o mais importante — que a
 // análise NUNCA grava nada e NUNCA bloqueia.
@@ -38,13 +38,12 @@ async function main() {
   const item = await prisma.itemCatalogo.create({ data: { code: `F81-${TS}`, name: `Certidão F81 ${TS}`, natureza: 'DOCUMENTO' } as any, select: { id: true } })
   const fornA = await criarFornecedor({ nome: `Cartório A ${TS}`, tipo: 'PJ', cpfCnpj: `1${String(TS).slice(-13)}`.slice(0, 14) })
   const fornB = await criarFornecedor({ nome: `Cartório B ${TS}`, tipo: 'PJ', cpfCnpj: `2${String(TS).slice(-13)}`.slice(0, 14) })
-  const centro = await prisma.centroCusto.create({ data: { nome: `Centro F81 ${TS}` }, select: { id: true } })
 
-  // histórico: 3 lançamentos do MESMO item, fornecedor A e centro, ~200
+  // histórico: 3 lançamentos do MESMO item, fornecedor A, ~200
   for (const v of [190, 200, 210]) {
     await criarObrigacaoEconomicaComLedger({
       natureza: 'CUSTO', valorContratado: v, moedaContratual: 'BRL', processoId: PROC, criadoPorId: 1,
-      fornecedorId: fornA!.id, centroCustoId: centro.id, itemCatalogoId: item.id, observacoes: 'histórico F81',
+      fornecedorId: fornA!.id, itemCatalogoId: item.id, observacoes: 'histórico F81',
     })
   }
 
@@ -52,7 +51,6 @@ async function main() {
   const a1 = await analisarLancamentoCusto({ processoId: PROC, itemCatalogoId: item.id, moeda: 'BRL' })
   chk(a1.baseHistorica === 3, `base histórica reconhecida (${a1.baseHistorica})`)
   chk(a1.sugestoes.fornecedor?.id === fornA!.id, `sugere o fornecedor mais usado (${a1.sugestoes.fornecedor?.nome ?? '—'})`)
-  chk(a1.sugestoes.centroCusto?.id === centro.id, 'sugere o centro de custo mais usado')
   chk(a1.sugestoes.valorTipico?.valor === 200, `sugere o valor típico = mediana (${a1.sugestoes.valorTipico?.valor})`)
   chk(a1.sugestoes.valorTipico?.minimo === 190 && a1.sugestoes.valorTipico?.maximo === 210, 'sugestão informa a faixa observada')
 
@@ -61,15 +59,15 @@ async function main() {
   chk(aEur.sugestoes.valorTipico === null, 'valor típico não mistura moedas')
 
   // ───────── valor fora da faixa ─────────
-  const aAlto = await analisarLancamentoCusto({ processoId: PROC, itemCatalogoId: item.id, moeda: 'BRL', valor: 2000, fornecedorId: fornB!.id, centroCustoId: centro.id })
+  const aAlto = await analisarLancamentoCusto({ processoId: PROC, itemCatalogoId: item.id, moeda: 'BRL', valor: 2000, fornecedorId: fornB!.id })
   chk(temAviso(aAlto, 'VALOR_ACIMA_DO_HISTORICO'), 'avisa valor bem acima do praticado')
-  const aBaixo = await analisarLancamentoCusto({ processoId: PROC, itemCatalogoId: item.id, moeda: 'BRL', valor: 20, fornecedorId: fornB!.id, centroCustoId: centro.id })
+  const aBaixo = await analisarLancamentoCusto({ processoId: PROC, itemCatalogoId: item.id, moeda: 'BRL', valor: 20, fornecedorId: fornB!.id })
   chk(temAviso(aBaixo, 'VALOR_ABAIXO_DO_HISTORICO'), 'avisa valor bem abaixo do praticado')
-  const aOk = await analisarLancamentoCusto({ processoId: PROC, itemCatalogoId: item.id, moeda: 'BRL', valor: 205, fornecedorId: fornB!.id, centroCustoId: centro.id })
+  const aOk = await analisarLancamentoCusto({ processoId: PROC, itemCatalogoId: item.id, moeda: 'BRL', valor: 205, fornecedorId: fornB!.id })
   chk(!temAviso(aOk, 'VALOR_ACIMA_DO_HISTORICO') && !temAviso(aOk, 'VALOR_ABAIXO_DO_HISTORICO'), 'valor normal não gera ruído')
 
   // ───────── duplicidade provável ─────────
-  const aDup = await analisarLancamentoCusto({ processoId: PROC, itemCatalogoId: item.id, moeda: 'BRL', valor: 200, fornecedorId: fornA!.id, centroCustoId: centro.id })
+  const aDup = await analisarLancamentoCusto({ processoId: PROC, itemCatalogoId: item.id, moeda: 'BRL', valor: 200, fornecedorId: fornA!.id })
   chk(temAviso(aDup, 'DUPLICIDADE_PROVAVEL'), `duplicidade detectada na janela de ${JANELA_DUPLICIDADE_DIAS} dias`)
   const dup = aDup.avisos.find((x) => x.codigo === 'DUPLICIDADE_PROVAVEL')!
   chk((dup.evidencias?.length ?? 0) >= 1, `aviso traz EVIDÊNCIA verificável (${dup.evidencias?.length ?? 0} registro(s))`)
@@ -97,8 +95,8 @@ async function main() {
   // ───────── completude e datas ─────────
   const aVenc = await analisarLancamentoCusto({ processoId: PROC, itemCatalogoId: item.id, moeda: 'BRL', valor: 205, vencimento: '2020-01-01' })
   chk(temAviso(aVenc, 'VENCIMENTO_NO_PASSADO'), 'avisa vencimento no passado')
-  chk(temAviso(aVenc, 'SEM_FORNECEDOR') && temAviso(aVenc, 'SEM_CENTRO_CUSTO'), 'avisa ausência de fornecedor e centro de custo')
-  const aCompleto = await analisarLancamentoCusto({ processoId: PROC, itemCatalogoId: item.id, moeda: 'BRL', valor: 205, fornecedorId: fornB!.id, centroCustoId: centro.id })
+  chk(temAviso(aVenc, 'SEM_FORNECEDOR'), 'avisa ausência de fornecedor')
+  const aCompleto = await analisarLancamentoCusto({ processoId: PROC, itemCatalogoId: item.id, moeda: 'BRL', valor: 205, fornecedorId: fornB!.id })
   chk(!temAviso(aCompleto, 'SEM_FORNECEDOR') && !temAviso(aCompleto, 'SEM_CENTRO_CUSTO'), 'lançamento completo não recebe aviso de completude')
 
   // ordem: o mais grave primeiro

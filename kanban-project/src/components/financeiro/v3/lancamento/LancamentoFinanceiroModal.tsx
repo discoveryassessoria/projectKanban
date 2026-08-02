@@ -13,7 +13,7 @@
 //  • erro nunca é genérico: aponta o campo e a correção. O botão principal fica
 //    travado enquanto houver erro impeditivo;
 //  • fonte única: Catálogo Mestre, Configuração Financeira, Tabela de Valores,
-//    Fornecedores, Centros de Custo, Formas e Condições de Pagamento.
+//    Fornecedores, Formas e Condições de Pagamento.
 //
 // O núcleo de cálculo/validação é puro e vive em lib/financeiro/lancamento/calculo.ts.
 // ============================================================================
@@ -52,7 +52,6 @@ interface Analise {
   avisos: AvisoLancamento[]
   sugestoes: {
     fornecedor: { id: number; nome: string; ocorrencias: number } | null
-    centroCusto: { id: number; nome: string; ocorrencias: number } | null
     valorTipico: { valor: number; moeda: string; amostras: number; minimo: number; maximo: number } | null
   }
   baseHistorica: number
@@ -92,7 +91,6 @@ export function LancamentoFinanceiroModal({
   const [requerentes, setRequerentes] = useState<Requerente[]>([])
   const [fases, setFases] = useState<Fase[]>([])
   const [fornecedores, setFornecedores] = useState<Nomeado[]>([])
-  const [centros, setCentros] = useState<Nomeado[]>([])
   const [formasPagamento, setFormasPagamento] = useState<Nomeado[]>([])
   const [condicoes, setCondicoes] = useState<{ id: number; nome: string; parcelas: number }[]>([])
 
@@ -110,7 +108,6 @@ export function LancamentoFinanceiroModal({
   const [desconto, setDesconto] = useState("")
   const [acrescimo, setAcrescimo] = useState("")
   const [fornecedorId, setFornecedorId] = useState("")
-  const [centroCustoId, setCentroCustoId] = useState("")
   const [condicaoId, setCondicaoId] = useState("")
   const [formaPagamento, setFormaPagamento] = useState("")
   const [nParcelas, setNParcelas] = useState("1")
@@ -151,8 +148,6 @@ export function LancamentoFinanceiroModal({
     if (custo) {
       fetch(`/api/fornecedores?ativo=true`, { headers: authHeaders() }).then((r) => r.json())
         .then((j) => setFornecedores((Array.isArray(j) ? j : j?.fornecedores ?? []).map((f: any) => ({ id: f.id, nome: f.nome })))).catch(() => setFornecedores([]))
-      fetch(`/api/financeiro/v3/centros-custo`, { headers: authHeaders() }).then((r) => r.json())
-        .then((j) => setCentros(j?.centros ?? [])).catch(() => setCentros([]))
     }
   }, [processoId, custo])
 
@@ -296,7 +291,7 @@ export function LancamentoFinanceiroModal({
         registrarPagamento: comPagamento || undefined,
       }
       const body = custo
-        ? { ...comum, acrescimo: acr || undefined, fornecedorId: fornecedorId ? Number(fornecedorId) : undefined, centroCustoId: centroCustoId ? Number(centroCustoId) : undefined, parcelas: parcelas.length > 1 ? parcelas : undefined }
+        ? { ...comum, acrescimo: acr || undefined, fornecedorId: fornecedorId ? Number(fornecedorId) : undefined, parcelas: parcelas.length > 1 ? parcelas : undefined }
         : comum
 
       const res = await fetch(`/api/financeiro/v3/${custo ? "custos" : "receitas"}`, {
@@ -460,13 +455,6 @@ export function LancamentoFinanceiroModal({
                 </Campo>
               )}
 
-              {custo && (
-                <Campo label="Centro de custo" opcional>
-                  {({ id, descrevePor }) => (
-                    <Selecao id={id} descrevePor={descrevePor} valor={centroCustoId} onChange={alterar(setCentroCustoId)} opcoes={opcoesDe(centros)} />
-                  )}
-                </Campo>
-              )}
             </div>
 
             {/* Preview das parcelas — em tempo real, somando exatamente o total. */}
@@ -612,18 +600,13 @@ export function LancamentoFinanceiroModal({
             )}
 
             {/* Sugestões com evidência histórica — conselho, nunca preenchimento silencioso. */}
-            {custo && analise && (analise.sugestoes.fornecedor || analise.sugestoes.centroCusto || analise.sugestoes.valorTipico) && (
+            {custo && analise && (analise.sugestoes.fornecedor || analise.sugestoes.valorTipico) && (
               <div className="mt-3 rounded-[var(--radius-sm)] border border-[var(--border-default)] bg-[var(--surface-overlay)] px-3 py-2 text-xs">
                 <div className="mb-1.5 text-[var(--text-muted)]">Com base em {analise.baseHistorica} lançamento(s) deste mesmo item:</div>
                 <div className="flex flex-wrap items-center gap-2">
                   {analise.sugestoes.fornecedor && String(analise.sugestoes.fornecedor.id) !== fornecedorId && (
                     <Sugestao onClick={() => alterar(setFornecedorId)(String(analise.sugestoes.fornecedor!.id))}>
                       Usar fornecedor <b className="text-[var(--text-primary)]">{analise.sugestoes.fornecedor.nome}</b> ({analise.sugestoes.fornecedor.ocorrencias}×)
-                    </Sugestao>
-                  )}
-                  {analise.sugestoes.centroCusto && String(analise.sugestoes.centroCusto.id) !== centroCustoId && (
-                    <Sugestao onClick={() => alterar(setCentroCustoId)(String(analise.sugestoes.centroCusto!.id))}>
-                      Usar centro de custo <b className="text-[var(--text-primary)]">{analise.sugestoes.centroCusto.nome}</b> ({analise.sugestoes.centroCusto.ocorrencias}×)
                     </Sugestao>
                   )}
                   {analise.sugestoes.valorTipico && analise.sugestoes.valorTipico.moeda === moeda && (

@@ -36,7 +36,7 @@ const MARCA = 'SMOKE Catálogo de Serviços'
 
 /** Censo do cadastro mestre e de tudo que o referencia. */
 async function censo() {
-  const [itens, servicos, configs, precos, tiposDoc, tiposServico, necessidades, catsFin] = await Promise.all([
+  const [itens, servicos, configs, precos, tiposDoc, tiposServico, necessidades] = await Promise.all([
     prisma.itemCatalogo.count(),
     prisma.servicoProduto.count(),
     prisma.produtoFinanceiro.count(),
@@ -44,9 +44,8 @@ async function censo() {
     prisma.tipoDocumentoCadastro.count({ where: { itemCatalogoId: { not: null } } }),
     prisma.tipoServico.count({ where: { itemCatalogoId: { not: null } } }),
     prisma.necessidadeDocumental.count(), // itemCatalogoId é obrigatório nesta tabela
-    prisma.categoriaFinanceira.count({ where: { itemCatalogoId: { not: null } } }),
   ])
-  return { itens, servicos, configs, precos, tiposDoc, tiposServico, necessidades, catsFin }
+  return { itens, servicos, configs, precos, tiposDoc, tiposServico, necessidades }
 }
 
 /** Toda FK que aponta para o mestre resolve num ItemCatalogo existente? */
@@ -63,7 +62,6 @@ async function fksOrfas(): Promise<string[]> {
   await conferir('TipoDocumentoCadastro', await prisma.tipoDocumentoCadastro.findMany({ select: { itemCatalogoId: true } }))
   await conferir('TipoServico', await prisma.tipoServico.findMany({ select: { itemCatalogoId: true } }))
   await conferir('NecessidadeDocumental', await prisma.necessidadeDocumental.findMany({ select: { itemCatalogoId: true } }))
-  await conferir('CategoriaFinanceira', await prisma.categoriaFinanceira.findMany({ select: { itemCatalogoId: true } }))
   return orfas
 }
 
@@ -249,7 +247,7 @@ async function main() {
   chk(orfasDepois.length === 0, `nenhuma FK órfã DEPOIS (${orfasDepois.join('; ') || 'ok'})`)
   const meio = await censo()
   chk(meio.tiposDoc === antes.tiposDoc && meio.tiposServico === antes.tiposServico &&
-      meio.necessidades === antes.necessidades && meio.catsFin === antes.catsFin,
+      meio.necessidades === antes.necessidades,
     'vínculos preexistentes (documentos, tipos de serviço, necessidades, categorias) inalterados')
 
   // ── limpeza: o smoke não deixa resíduo ───────────────────────────────────

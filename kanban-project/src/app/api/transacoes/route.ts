@@ -39,9 +39,6 @@ export async function GET(request: NextRequest) {
       where,
       orderBy: { data: "desc" },
       include: {
-        categoria: {
-          select: { id: true, nome: true }
-        },
         contaBancaria: {
           select: { id: true, nome: true }
         }
@@ -84,13 +81,9 @@ export async function POST(request: NextRequest) {
         data: body.data ? new Date(body.data) : new Date(),
         dataCompetencia: body.dataCompetencia ? new Date(body.dataCompetencia) : null,
         contaBancariaId,
-        categoriaId: body.categoriaId ? parseInt(body.categoriaId) : null,
         processoId: body.processoId ? parseInt(body.processoId) : null,
       },
       include: {
-        categoria: {
-          select: { id: true, nome: true }
-        },
         contaBancaria: {
           select: { id: true, nome: true }
         }
