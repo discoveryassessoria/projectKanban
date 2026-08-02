@@ -48,10 +48,6 @@ const MODULOS_PERMISSOES = [
     { chave: "financeiro.coluna_criar", label: "Adicionar coluna na planilha" }, { chave: "financeiro.coluna_editar", label: "Editar nome de coluna" },
     { chave: "financeiro.coluna_excluir", label: "Excluir coluna da planilha" }, { chave: "financeiro.custos_editar", label: "Editar valores e reordenar planilha" },
   ]},
-  { modulo: "Mensagens", icone: "💬", permissoes: [
-    { chave: "mensagens.ver", label: "Ver mensagens" }, { chave: "mensagens.responder", label: "Responder mensagens" },
-    { chave: "mensagens.apagar", label: "Apagar mensagens de outros" },
-  ]},
   { modulo: "Eventos", icone: "📅", permissoes: [
     { chave: "eventos.ver", label: "Ver eventos" }, { chave: "eventos.criar", label: "Criar eventos" },
     { chave: "eventos.editar", label: "Editar eventos" }, { chave: "eventos.excluir", label: "Excluir eventos" },

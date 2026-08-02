@@ -27,6 +27,7 @@ model Usuario {
 
   documentosResponsavel Documento[]           @relation("DocumentoResponsavel")
   eventosResponsavel    Evento[]              @relation("EventoResponsavel")
+  protocolosResponsavel Protocolo[]           @relation("ProtocoloResponsavel")
   gruposUsuario         GrupoUsuarioMembro[]
   nomesPessoaAfirmados  NomePessoa[]          @relation("NomePessoaResponsavel")
   decisoesDedupTomadas  DecisaoDeduplicacao[] @relation("DecisaoDedupResponsavel")
@@ -290,6 +291,7 @@ model Documento {
   // CP-4A â vÃ­nculos operacionais do runtime v2 (back-relations)
   tarefasVinculadas Tarefa[]                    @relation("TarefaDocumento")
   stepInstances     PhaseWorkflowStepInstance[]
+  protocolos        ProtocoloDocumento[]
 
   // ============================================================
   // MRG - TRANSCRICAO REGISTRAL (pertence ao Sistema Documental, nao a arvore).
@@ -628,27 +630,79 @@ model Requerente {
   @@index([personId])
 }
 
+/// PROTOCOLIZAÇÃO — ocorrência operacional realizada DENTRO do processo.
+/// NÃO é cadastro: cada registro é um ato concreto (entregar/enviar algo a um
+/// órgão), que gera Evento na Timeline e entra no Histórico do Processo.
 model Protocolo {
-  publicCode      String?          @unique @db.VarChar(20) // CodeGeneratorService central â aditivo, Ãºnico, nÃ£o editÃ¡vel
-  id              Int              @id @default(autoincrement())
+  publicCode      String?              @unique @db.VarChar(20)
+  id              Int                  @id @default(autoincrement())
   processoId      Int
   contratanteId   Int?
   requerenteId    Int?
-  consulado       Consulado
-  consuladoOutro  String?          @db.VarChar(200)
+  /// LEGADO (Espanha): substituído por `orgaoId` — Órgãos e Organizações.
+  consulado       Consulado?
+  consuladoOutro  String?              @db.VarChar(200)
+  /// Órgão que RECEBEU o protocolo (fonte única: Órgãos e Organizações).
+  orgaoId         Int?
+  /// Setor/guichê dentro do órgão (opcional).
+  setor           String?              @db.VarChar(120)
+  /// Data e hora da protocolização.
   dataProtocolo   DateTime?
-  numeroProtocolo String?          @db.VarChar(100)
+  numeroProtocolo String?              @db.VarChar(100)
+  tipoProtocolo   TipoProtocolo?
+  formaEnvio      FormaEnvioProtocolo?
+  /// Quem da equipe protocolou.
+  responsavelId   Int?
   observacoes     String?
-  createdAt       DateTime         @default(now())
-  updatedAt       DateTime         @updatedAt
+  createdAt       DateTime             @default(now())
+  updatedAt       DateTime             @updatedAt
   anexos          AnexoProtocolo[]
-  contratante     Contratante?     @relation(fields: [contratanteId], references: [id], onDelete: Cascade)
-  processo        Processo         @relation(fields: [processoId], references: [id], onDelete: Cascade)
-  requerente      Requerente?      @relation(fields: [requerenteId], references: [id], onDelete: Cascade)
+  documentos      ProtocoloDocumento[]
+  contratante     Contratante?         @relation(fields: [contratanteId], references: [id], onDelete: Cascade)
+  processo        Processo             @relation(fields: [processoId], references: [id], onDelete: Cascade)
+  requerente      Requerente?          @relation(fields: [requerenteId], references: [id], onDelete: Cascade)
+  orgao           OrgaoProtocolo?      @relation(fields: [orgaoId], references: [id], onDelete: SetNull)
+  responsavel     Usuario?             @relation("ProtocoloResponsavel", fields: [responsavelId], references: [id], onDelete: SetNull)
 
   @@index([processoId])
   @@index([contratanteId])
   @@index([requerenteId])
+  @@index([orgaoId])
+  @@index([responsavelId])
+}
+
+/// Documentos ENVIADOS numa protocolização (o que foi entregue ao órgão).
+model ProtocoloDocumento {
+  id          Int       @id @default(autoincrement())
+  protocoloId Int
+  documentoId Int
+  criadoEm    DateTime  @default(now())
+  protocolo   Protocolo @relation(fields: [protocoloId], references: [id], onDelete: Cascade)
+  documento   Documento @relation(fields: [documentoId], references: [id], onDelete: Cascade)
+
+  @@unique([protocoloId, documentoId])
+  @@index([documentoId])
+}
+
+/// Natureza do ato de protocolo. Dimensão FECHADA de domínio — não é cadastro
+/// mestre (o cadastro "Tipos de Protocolo" foi eliminado em 02/08/2026).
+enum TipoProtocolo {
+  CONSULAR
+  JUDICIAL
+  ADMINISTRATIVO
+  COMUNE
+  CARTORIO
+  TRIBUNAL
+  OUTRO
+}
+
+/// Como o protocolo chegou ao órgão.
+enum FormaEnvioProtocolo {
+  PRESENCIAL
+  CORREIO
+  EMAIL
+  PORTAL_ONLINE
+  TERCEIRO
 }
 
 model InformacaoItalia {
@@ -3012,6 +3066,9 @@ model OrgaoProtocolo {
   // categorias (N:N) — uma organização pode ser cartório E tradutor, por exemplo
   categorias OrganizacaoCategoria[]
 
+  // protocolizações recebidas por este órgão (ocorrências dentro dos processos)
+  protocolos Protocolo[]
+
   @@index([type])
 }
 
@@ -3907,6 +3964,7 @@ enum TipoEvento {
   PRAZO
   AUDIENCIA
   ENTREGA_DOCUMENTO
+  PROTOCOLO
   OUTRO
 }
 
@@ -4513,22 +4571,10 @@ model SaldoSnapshot {
 // oficiais do Gerenciamento que antes não tinham backend.
 // ============================================================================
 
-/// Marcos do processo — pontos de controle nomeados (cadastro; sem efeito de runtime).
-model MarcoProcesso {
-  id             Int      @id @default(autoincrement())
-  code           String   @unique @db.VarChar(60)
-  nome           String   @db.VarChar(200)
-  descricao      String?  @db.Text
-  tipoProcessoId Int? // null = vale para todos os tipos
-  phaseKey       String?  @db.VarChar(60) // fase de referência (opcional)
-  ordem          Int      @default(0)
-  ativo          Boolean  @default(true)
-  criadoEm       DateTime @default(now())
-  atualizadoEm   DateTime @updatedAt
-
-  @@index([tipoProcessoId])
-  @@index([phaseKey])
-}
+// NOTA: o cadastro "Marcos do processo" (MarcoProcesso) foi ELIMINADO em 02/08/2026.
+// Eventos importantes do processo têm UMA ÚNICA fonte de registro cronológico: a
+// Timeline/Histórico do Processo (Diário Operacional), que agrega `WorkflowEvento`,
+// `Evento` e `LogAuditoria`. Não existe cadastro paralelo de pontos de controle.
 
 /// MODALIDADE LEGAL — a base jurídica sob a qual a nacionalidade é requerida
 /// (ex.: Lei da Memória Democrática). NÃO se confunde com a VIA DE TRAMITAÇÃO
@@ -4651,19 +4697,11 @@ model CargoCadastro {
   atualizadoEm DateTime @updatedAt
 }
 
-/// Tipos de Protocolo (consular, judicial, comune, administrativo…).
-model TipoProtocoloCadastro {
-  id            Int      @id @default(autoincrement())
-  code          String   @unique @db.VarChar(60)
-  nome          String   @db.VarChar(200)
-  escopo        String?  @db.VarChar(40) // person | process | consular_case | comune_case | judicial_case
-  nacionalidade String?  @db.VarChar(60)
-  observacoes   String?  @db.Text
-  ordem         Int      @default(0)
-  ativo         Boolean  @default(true)
-  criadoEm      DateTime @default(now())
-  atualizadoEm  DateTime @updatedAt
-}
+// NOTA: o cadastro "Tipos de Protocolo" (TipoProtocoloCadastro) foi ELIMINADO em
+// 02/08/2026. Protocolo NÃO é cadastro mestre: é uma OCORRÊNCIA operacional
+// registrada dentro do Processo (model `Protocolo`), com órgão, setor, data/hora,
+// número, tipo, forma de envio, responsável, comprovante, observações e documentos
+// enviados — e que gera evento na Timeline/Histórico do Processo.
 
 /// Configuração global chave/valor (Sistema › Configurações Gerais e Identidade Visual).
 model ConfiguracaoSistema {

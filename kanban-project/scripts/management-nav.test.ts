@@ -92,7 +92,7 @@ const ARVORE_OFICIAL: Record<string, string[]> = {
   grp_processos: ["Cadastros", "Estrutura", "Configurações"],
   grp_workflow: ["Fluxos", "Transições", "Configurações"],
   grp_automacoes: ["Financeiras", "Eventos", "Configurações"],
-  grp_documentos: ["Documentos", "Protocolos", "Regras"],
+  grp_documentos: ["Documentos", "Regras"],
   grp_servicos: ["Catálogo de Serviços", "Categorias"],
   grp_financeiro: [
     "Configurações Financeiras", "Classificação", "Tabela de Valores", "Tesouraria",
@@ -116,7 +116,7 @@ for (const [k, esperado] of Object.entries(ARVORE_OFICIAL)) {
 const itensDaSecao = (gk: string, secao: string) =>
   (gDe(gk)?.children ?? []).filter((c) => c.section === secao && c.status !== "hidden").map((c) => c.key)
 ok(JSON.stringify(itensDaSecao("grp_processos", "Cadastros")) === JSON.stringify(["proctypes", "modalidades", "countrycatalog"]), "Processos › Cadastros = Tipos de Processo, Modalidades, Países e Regiões")
-ok(JSON.stringify(itensDaSecao("grp_processos", "Estrutura")) === JSON.stringify(["fases", "phasemodes", "marcos"]), "Processos › Estrutura = Fases, Variações da Fase, Marcos")
+ok(JSON.stringify(itensDaSecao("grp_processos", "Estrutura")) === JSON.stringify(["fases", "phasemodes"]), "Processos › Estrutura = Fases, Variações da Fase")
 ok(JSON.stringify(itensDaSecao("grp_processos", "Configurações")) === JSON.stringify(["sla", "cfgversions", "proccfg"]), "Processos › Configurações = SLA, Versões, Configurações Gerais")
 ok(JSON.stringify(itensDaSecao("grp_workflow", "Fluxos")) === JSON.stringify(["macrokanban", "phaseiwf"]), "Workflow › Fluxos = Workflow Macro + Workflow Interno")
 ok(JSON.stringify(itensDaSecao("grp_financeiro", "Classificação")) === JSON.stringify(["categories", "coa", "costcenters"]), "Financeiro › Classificação = Categorias, Plano de Contas, Centros de Custo")
@@ -198,6 +198,28 @@ ok(!itemDe("catalogmestre"), "Catálogo Mestre não é mais item de menu (cadast
 ok(ALIAS_KEYS.has("catalogmestre") && ALIAS_MAP["catalogmestre"] === "products", "?screen=catalogmestre → Catálogo de Serviços (URL antiga preservada)")
 ok(ALIAS_MAP["honorariums"] === "products", "?screen=honorariums → Catálogo de Serviços (não aponta mais para a tela técnica)")
 ok(!/Cat[aá]logo Mestre/.test(rotulosMenu()), 'nomenclatura "Catálogo Mestre" ausente do menu')
+// Marcos: cadastro ELIMINADO (02/08/2026). Eventos importantes do processo têm uma
+// única fonte de registro cronológico — a Timeline/Histórico do Processo. Nada de
+// cadastro paralelo de pontos de controle, nem no menu, nem no motor de cadastros.
+ok(!itemDe("marcos") && !/Marcos/.test(rotulosMenu()), 'cadastro "Marcos" não existe mais na navegação')
+ok(!TELAS_KEYS.has("marcos") && !ALIAS_KEYS.has("marcos"), '?screen=marcos não resolve para nenhuma tela')
+const registrySrc = readFileSync(join(ROOT, "src/lib/gerenciamento/cadastros-registry.ts"), "utf8")
+const ALIAS_MAP_PROTO = Object.fromEntries(
+  Array.from(blocoAlias.matchAll(/"?([\w-]+)"?:\s*"(\w+)"/g)).map((m) => [m[1], m[2]]),
+)
+ok(!/\bmarcos\b/i.test(registrySrc), 'motor genérico de cadastros não conhece "marcos"')
+// Protocolos: cadastro ELIMINADO (02/08/2026). Protocolo é OCORRÊNCIA operacional
+// registrada dentro do Processo (aba Protocolos → Timeline/Histórico), nunca um
+// cadastro mestre do Gerenciamento.
+ok(!itemDe("prottypes") && !itemDe("protocols"), 'cadastro "Tipos de Protocolo" não existe mais na navegação')
+ok(
+  !todosItens.filter((i) => i.status !== "hidden").some((i) => /protocolo/i.test(i.label)),
+  'nenhum ITEM de menu de protocolo (só o nome do módulo "Documentos e Protocolos" permanece)',
+)
+ok(!TELAS_KEYS.has("prottypes") && !TELAS_KEYS.has("protocols"), "nenhuma tela de cadastro de protocolo registrada")
+ok(ALIAS_MAP_PROTO["prottypes"] === "overview" && ALIAS_MAP_PROTO["protocols"] === "overview", "URLs antigas de protocolo caem no painel do Gerenciamento (sem tela morta)")
+ok(!/tipos-protocolo|tipoProtocoloCadastro/i.test(registrySrc), 'motor genérico de cadastros não conhece "tipos-protocolo"')
+ok((gDe("grp_documentos")?.children ?? []).every((c) => c.section !== "Protocolos"), 'módulo Documentos e Protocolos não tem mais a seção "Protocolos"')
 ok(moduloDe("audit") === "grp_sistema" && itemDe("audit")?.status === "active", "Auditoria e Logs tem casa oficial (Sistema)")
 
 // ═══════════════ 5) SEM DUPLICAÇÃO E SEM NOMENCLATURA ANTIGA ═══════════════════

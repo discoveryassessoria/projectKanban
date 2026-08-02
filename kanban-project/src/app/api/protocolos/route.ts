@@ -1,162 +1,156 @@
 // src/app/api/protocolos/route.ts
+//
+// Protocolizações DO PROCESSO. Protocolo não é cadastro: é um ato operacional
+// registrado dentro do processo e que alimenta a Timeline/Histórico (fonte
+// cronológica única).
 
 import { NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
-import { Consulado } from "@prisma/client"
-import { verificarPermissao } from '@/src/lib/verificar-permissao'
+import { TipoProtocolo, FormaEnvioProtocolo } from "@prisma/client"
+import { verificarPermissao, extrairUsuarioComPermissoes } from "@/src/lib/verificar-permissao"
+import {
+  INCLUDE_PROTOCOLO,
+  descreverProtocolizacao,
+  registrarNaTimelineTx,
+} from "@/src/services/protocolizacao"
 
-// GET - Buscar protocolos (filtrar por processoId)
+// GET - protocolizações de um processo
 export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url)
     const processoId = searchParams.get("processoId")
 
     if (!processoId) {
-      return NextResponse.json(
-        { error: "processoId é obrigatório" },
-        { status: 400 }
-      )
+      return NextResponse.json({ error: "processoId é obrigatório" }, { status: 400 })
     }
 
     const protocolos = await prisma.protocolo.findMany({
-      where: {
-        processoId: parseInt(processoId)
-      },
-      include: {
-        contratante: {
-          select: {
-            id: true,
-            publicCode: true,
-            nome: true,
-            email: true,
-            telefone: true
-          }
-        },
-        requerente: {
-          select: {
-            id: true,
-            publicCode: true,
-            nome: true,
-            email: true,
-            telefone: true
-          }
-        }
-      },
-      orderBy: { createdAt: "desc" }
+      where: { processoId: parseInt(processoId) },
+      include: INCLUDE_PROTOCOLO,
+      orderBy: [{ dataProtocolo: "desc" }, { createdAt: "desc" }],
     })
 
     return NextResponse.json({ protocolos })
   } catch (error) {
     console.error("Erro ao buscar protocolos:", error)
-    return NextResponse.json(
-      { error: "Erro ao buscar protocolos" },
-      { status: 500 }
-    )
+    return NextResponse.json({ error: "Erro ao buscar protocolos" }, { status: 500 })
   }
 }
 
-// POST - Criar novo protocolo
+// POST - registrar protocolização
 export async function POST(request: Request) {
   try {
-    const erro = await verificarPermissao(request, 'processos.editar_paginas')
+    const erro = await verificarPermissao(request, "processos.editar_paginas")
     if (erro) return erro
+    const usuario = await extrairUsuarioComPermissoes(request)
 
     const body = await request.json()
     const {
       processoId,
       contratanteId,
       requerenteId,
-      consulado,
-      consuladoOutro,
+      orgaoId,
+      setor,
       dataProtocolo,
       numeroProtocolo,
-      observacoes
+      tipoProtocolo,
+      formaEnvio,
+      responsavelId,
+      observacoes,
+      documentoIds,
     } = body
 
-    // Validações
+    // ── campos mínimos do ato ────────────────────────────────────────────────
     if (!processoId) {
-      return NextResponse.json(
-        { error: "processoId é obrigatório" },
-        { status: 400 }
-      )
+      return NextResponse.json({ error: "processoId é obrigatório" }, { status: 400 })
+    }
+    if (!orgaoId) {
+      return NextResponse.json({ error: "Órgão é obrigatório" }, { status: 400 })
+    }
+    if (!dataProtocolo) {
+      return NextResponse.json({ error: "Data e hora do protocolo são obrigatórias" }, { status: 400 })
+    }
+    if (!numeroProtocolo) {
+      return NextResponse.json({ error: "Número do protocolo é obrigatório" }, { status: 400 })
+    }
+    if (!tipoProtocolo || !Object.values(TipoProtocolo).includes(tipoProtocolo)) {
+      return NextResponse.json({ error: "Tipo de protocolo inválido" }, { status: 400 })
+    }
+    if (!formaEnvio || !Object.values(FormaEnvioProtocolo).includes(formaEnvio)) {
+      return NextResponse.json({ error: "Forma de envio inválida" }, { status: 400 })
+    }
+    if (!responsavelId) {
+      return NextResponse.json({ error: "Responsável é obrigatório" }, { status: 400 })
     }
 
-    if (!contratanteId && !requerenteId) {
-      return NextResponse.json(
-        { error: "É necessário vincular a um contratante ou requerente" },
-        { status: 400 }
-      )
-    }
-
-    if (!consulado || !Object.values(Consulado).includes(consulado)) {
-      return NextResponse.json(
-        { error: "Consulado inválido" },
-        { status: 400 }
-      )
-    }
-
-    if (consulado === "OUTROS" && !consuladoOutro) {
-      return NextResponse.json(
-        { error: "Nome do consulado é obrigatório quando 'Outros' é selecionado" },
-        { status: 400 }
-      )
-    }
-
-    // Verificar se processo existe e é da Espanha
-    const processo = await prisma.processo.findUnique({
-      where: { id: processoId }
-    })
-
+    const processo = await prisma.processo.findUnique({ where: { id: processoId }, select: { id: true } })
     if (!processo) {
-      return NextResponse.json(
-        { error: "Processo não encontrado" },
-        { status: 404 }
-      )
+      return NextResponse.json({ error: "Processo não encontrado" }, { status: 404 })
     }
 
-    if (processo.pais !== "ESPANHA") {
-      return NextResponse.json(
-        { error: "Protocolos só podem ser criados para processos da Espanha" },
-        { status: 400 }
-      )
+    const orgao = await prisma.orgaoProtocolo.findUnique({ where: { id: Number(orgaoId) }, select: { id: true, name: true } })
+    if (!orgao) {
+      return NextResponse.json({ error: "Órgão não encontrado" }, { status: 404 })
     }
 
-    // Criar protocolo
-    const protocolo = await prisma.protocolo.create({
-      data: {
-        processoId,
-        contratanteId: contratanteId || null,
-        requerenteId: requerenteId || null,
-        consulado,
-        consuladoOutro: consulado === "OUTROS" ? consuladoOutro : null,
-        dataProtocolo: dataProtocolo ? new Date(dataProtocolo) : null,
-        numeroProtocolo: numeroProtocolo || null,
-        observacoes: observacoes || null
-      },
-      include: {
-        contratante: {
-          select: {
-            id: true,
-            publicCode: true,
-            nome: true
-          }
+    const quando = new Date(dataProtocolo)
+    const ids: number[] = Array.isArray(documentoIds)
+      ? Array.from(new Set(documentoIds.map(Number).filter((n: number) => Number.isFinite(n))))
+      : []
+
+    const protocolo = await prisma.$transaction(async (tx) => {
+      const criado = await tx.protocolo.create({
+        data: {
+          processoId,
+          contratanteId: contratanteId || null,
+          requerenteId: requerenteId || null,
+          orgaoId: Number(orgaoId),
+          setor: setor || null,
+          dataProtocolo: quando,
+          numeroProtocolo,
+          tipoProtocolo,
+          formaEnvio,
+          responsavelId: Number(responsavelId),
+          observacoes: observacoes || null,
+          ...(ids.length
+            ? { documentos: { create: ids.map((documentoId) => ({ documentoId })) } }
+            : {}),
         },
-        requerente: {
-          select: {
-            id: true,
-            publicCode: true,
-            nome: true
-          }
-        }
-      }
+        include: INCLUDE_PROTOCOLO,
+      })
+
+      const titulo = descreverProtocolizacao({
+        numeroProtocolo: criado.numeroProtocolo,
+        tipoProtocolo: criado.tipoProtocolo,
+        orgaoNome: orgao.name,
+      })
+
+      await registrarNaTimelineTx(tx, {
+        acao: "PROTOCOLO_REGISTRADO",
+        processoId,
+        protocoloId: criado.id,
+        titulo,
+        quando,
+        usuarioId: usuario?.userId ?? null,
+        responsavelId: criado.responsavelId,
+        criarEvento: true,
+        detalhes: {
+          protocoloId: criado.id,
+          orgao: orgao.name,
+          setor: criado.setor,
+          numero: criado.numeroProtocolo,
+          tipo: criado.tipoProtocolo,
+          formaEnvio: criado.formaEnvio,
+          documentosEnviados: ids.length,
+        },
+      })
+
+      return criado
     })
 
     return NextResponse.json({ protocolo }, { status: 201 })
   } catch (error) {
     console.error("Erro ao criar protocolo:", error)
-    return NextResponse.json(
-      { error: "Erro ao criar protocolo" },
-      { status: 500 }
-    )
+    return NextResponse.json({ error: "Erro ao criar protocolo" }, { status: 500 })
   }
 }

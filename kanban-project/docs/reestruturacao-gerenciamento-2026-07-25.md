@@ -31,7 +31,6 @@ Guardas: `npm run test:nav` (73 asserções), `npm run test:accordion` (11 asser
 | Histórico de Execuções | `?screen=execmatrix` | Automações › Configurações | igual | `ExecMatrixTab` | idêntica | — |
 | Tipos de Documento | `?screen=doctypes` | Documentos e Protocolos › Documentos | igual | `TiposDocumentoTab` | idêntica | — |
 | Categorias Documentais | `?screen=doccats` | Documentos e Protocolos › Documentos | igual | `CategoriasDocumentaisTab` | idêntica | — |
-| Tipos de Protocolo | `?screen=prottypes` | Documentos e Protocolos › Protocolos | igual | `CatalogTab('op_prottypes')` | idêntica | — |
 | Regras Documentais | `?screen=docrules` | Documentos e Protocolos › Regras | igual | `RegrasDocumentaisTab` | idêntica | — |
 | Catálogo de Serviços | `?screen=products` | Serviços | igual | `ProdutosServicosTab` | idêntica | — |
 | Configurações Financeiras | `?screen=catalog` | Financeiro | igual | `ProdutosTab` | idêntica | — |
@@ -118,14 +117,13 @@ Os rascunhos substituídos continuam acessíveis: `?screen=sla-rascunho`,
 Os itens que restavam desabilitados passaram a ter tela real. **Zero itens desabilitados no menu.**
 
 Tabelas novas (migration `20260821000000_cadastros_gerenciamento`, 100% aditiva e idempotente,
-aplicada em produção pelo `prod-apply-cadastros-aditivas.mjs`): `MarcoProcesso`,
+aplicada em produção pelo `prod-apply-cadastros-aditivas.mjs`):
 `CategoriaServico`, `CategoriaOrganizacao` + `OrganizacaoCategoria`, `GrupoUsuario` +
-`GrupoUsuarioMembro`, `CargoCadastro`, `TipoProtocoloCadastro`, `ConfiguracaoSistema`,
+`GrupoUsuarioMembro`, `CargoCadastro`, `ConfiguracaoSistema`,
 `ModeloDocumento`, `RegraNotificacao`.
 
 | Item oficial | Rota | Implementação |
 |---|---|---|
-| Processos › Estrutura › Marcos | `?screen=marcos` | cadastro real (motor genérico) |
 | Serviços › Categorias | `?screen=servcats` | cadastro real `CategoriaServico` |
 | Órgãos › Categorias | `?screen=orgcats` | cadastro real `CategoriaOrganizacao` (N:N com organização) |
 | Financeiro › Crédito | `?screen=credito` | consulta real: gerado/disponível/utilizado/revogado por crédito |
@@ -134,9 +132,28 @@ aplicada em produção pelo `prod-apply-cadastros-aditivas.mjs`): `MarcoProcesso
 | Sistema › Identidade Visual | `?screen=identidade` | marca, logo e cores persistidos em `ConfiguracaoSistema`, com pré-visualização |
 | Relatórios › Dashboards | `?screen=dashboards` | índice dos painéis reais com números vivos e link que abre cada um |
 
+> **Protocolos — eliminado em 02/08/2026.** O item
+> `Documentos e Protocolos › Protocolos › Tipos de Protocolo` (`?screen=prottypes`,
+> tabela `TipoProtocoloCadastro`), o rascunho `?screen=protocols` e o catálogo
+> `op_prottypes` foram removidos por inteiro. Não houve cadastro substituto: um
+> protocolo é uma OCORRÊNCIA operacional registrada dentro do Processo (aba
+> Protocolos), que gera Evento na Timeline e entra no Histórico — a única fonte
+> cronológica oficial. O módulo passa a ter apenas **Documentos** e **Regras**.
+> As URLs antigas caem no painel do Gerenciamento (alias → `overview`).
+> Migration `20260902000001_protocolo_ocorrencia_do_processo`. Guarda: `npm run test:nav`.
+
+> **Marcos — eliminado em 02/08/2026.** O item `Processos › Estrutura › Marcos`
+> (`?screen=marcos`, tabela `MarcoProcesso`) foi removido por inteiro: menu, rota,
+> spec do motor de cadastros, exportação e tabela (migration
+> `20260902000000_remove_marcos_processo`). Ele não foi substituído por outro
+> cadastro — eventos importantes do processo passam a ser registrados
+> EXCLUSIVAMENTE na Timeline/Histórico do Processo (Diário Operacional, sobre
+> `WorkflowEvento` + `Evento` + `LogAuditoria`), que é a única fonte cronológica.
+> Guarda: `npm run test:nav`.
+
 ### Rascunhos do mockup substituídos por telas reais
 
-`teams` (Equipes), `rolecat` (Cargos), `prottypes` (Tipos de Protocolo), `templates` (Modelos),
+`teams` (Equipes), `rolecat` (Cargos), `templates` (Modelos),
 `notifications` (Notificações), `settings` (Configurações Gerais), `impexp` (Exportações — download
 real em CSV/JSON das rotas canônicas), `diagnostics`, `mgmthealth`, `syshealth` e `execmatrix`
 (quatro lentes sobre `/api/gerenciamento/diagnostico`).

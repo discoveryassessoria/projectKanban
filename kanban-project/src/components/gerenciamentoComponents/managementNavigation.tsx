@@ -166,7 +166,6 @@ export const MANAGEMENT_NAVIGATION: ManagementNavigationItem[] = [
       // ESTRUTURA — o catálogo de fases é a fonte única das fases do sistema.
       a(40, "fases", "Fases", ["fase", "fases", "catalogo", "catálogo", "etapa", "phase"], "Estrutura"),
       a(50, "phasemodes", "Variações da Fase", ["variacao", "variação", "modo", "interno", "fase"], "Estrutura"),
-      a(60, "marcos", "Marcos", ["marco", "milestone", "checkpoint", "controle"], "Estrutura"),
 
       // CONFIGURAÇÕES
       a(70, "sla", "SLA", ["sla", "prazo", "vencimento", "alerta"], "Configurações"),
@@ -216,23 +215,21 @@ export const MANAGEMENT_NAVIGATION: ManagementNavigationItem[] = [
   },
 
   // ══════════════════ 5. DOCUMENTOS E PROTOCOLOS ══════════════════════════════
-  // REGRA: sem submenu "Configurações" aqui — Documentos, Protocolos e Regras.
+  // REGRA: só Documentos e Regras. PROTOCOLO NÃO É CADASTRO — é uma OCORRÊNCIA
+  // operacional registrada dentro do Processo (aba Protocolos), que alimenta a
+  // Timeline/Histórico. Não existe cadastro mestre de protocolo no Gerenciamento.
   {
     key: "grp_documentos", label: "Documentos", fullLabel: "Documentos e Protocolos", icon: FileText, order: 50, status: "active",
-    description: "Cadastros documentais, protocolos e políticas documentais.",
+    description: "Cadastros documentais e políticas documentais.",
     children: [
       a(10, "doctypes", "Tipos de Documento", ["documento", "certidao", "certidão", "tipo", "nascimento", "casamento", "obito"], "Documentos"),
       a(20, "doccats", "Categorias Documentais", ["categoria", "categorias", "documental", "classificacao", "classificação"], "Documentos"),
-
-      a(30, "prottypes", "Tipos de Protocolo", ["protocolo", "orgao", "órgão", "tipo", "modalidade"], "Protocolos"),
 
       a(40, "docrules", "Regras Documentais", ["aplicabilidade", "regra", "documento", "documental", "matriz", "obrigatorio", "obrigatório"], "Regras"),
 
       // OCULTOS (telas existentes, acessíveis por ?screen=) — sem cadastro paralelo no menu.
       h(900, "certtypes", "Tipos de Certidão (consolidado em Tipos de Documento)"),
       h(910, "docmatrix", "Matriz Documental (visão técnica)"),
-      h(920, "protocols", "Regras de Protocolo por Nacionalidade (rascunho)"),
-      h(930, "prottypes-rascunho", "Tipos de Protocolo (rascunho do mockup)"),
     ],
   },
 

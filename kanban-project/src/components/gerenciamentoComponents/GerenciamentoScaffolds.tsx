@@ -129,32 +129,12 @@ export function ProductsTab() {
   )
 }
 
-/* --------------------- 5. Regras de Protocolo / Órgãos ------------------- */
-const NACIONALIDADES = ['Espanhola', 'Portuguesa', 'Italiana', 'Alemã', 'Judicial', 'Indefinida']
-export function ProtocolsTab() {
-  return (
-    <div>
-      <AvisoRascunho />
-      <Section
-        title="Regras por Nacionalidade"
-        desc="Configuração global de órgãos e regras de protocolo por nacionalidade. A Central de Protocolos consome estas configurações."
-      />
-      <div className="mb-5 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
-        {NACIONALIDADES.map((n) => (
-          <button key={n} disabled title={TITULO_RASCUNHO} className={`${CARD} cursor-not-allowed p-3 text-left opacity-60`}>
-            <div className="text-sm font-semibold text-white">{n}</div>
-            <div className="mt-1 text-[11px] text-white/50">
-              Escopo padrão: —<br />
-              Bloqueia avanço: —
-            </div>
-          </button>
-        ))}
-      </div>
-      <Section title="Órgãos" action={<button disabled title={TITULO_RASCUNHO} className={BTN_RASCUNHO}>+ Novo Órgão</button>} />
-      <Table headers={['Órgão', 'Tipo', 'Nacionalidade', 'Cidade', 'Regra de fila', 'Ações']} />
-    </div>
-  )
-}
+/* --------------------- 5. (vago) --------------------------------------------
+   O rascunho "Regras de Protocolo por Nacionalidade" foi ELIMINADO em 02/08/2026:
+   protocolo não é cadastro nem regra global — é uma OCORRÊNCIA operacional
+   registrada dentro do Processo (aba Protocolos), que alimenta a Timeline e o
+   Histórico. Os órgãos que recebem protocolo vivem em Órgãos e Organizações.
+   -------------------------------------------------------------------------- */
 
 /* ----------------------------- 6. SLA e Prazos --------------------------- */
 export function SLATab() {

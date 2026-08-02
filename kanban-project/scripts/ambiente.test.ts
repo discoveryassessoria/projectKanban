@@ -59,7 +59,7 @@ ok(montar("espanha", 154, "ES-1", null, "emissao_documental").chave !== cenaA.ch
 // 6) Financeiro Geral neutro; Kanban/processo dirigidos pela tela
 console.log("\n6) Rotas neutras")
 ok(rotaEhNeutra("/financas") && rotaEhNeutra("/financeiro"), "Financeiro Geral é neutro")
-ok(rotaEhNeutra("/settings") && rotaEhNeutra("/dashboard"), "Configurações/Dashboard neutros")
+ok(rotaEhNeutra("/administrator") && rotaEhNeutra("/dashboard"), "Gerenciamento/Dashboard neutros")
 ok(!rotaEhNeutra("/kanban"), "Kanban NÃO é forçado a neutro")
 ok(!rotaEhNeutra("/genealogy"), "Árvore (dentro do processo) NÃO é forçada a neutro")
 

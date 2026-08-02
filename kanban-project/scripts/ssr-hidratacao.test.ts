@@ -87,7 +87,6 @@ const MIGRADAS = [
   'src/app/activities/page.tsx',
   'src/app/financeiro/page.tsx',
   'src/app/login/page.tsx',
-  'src/app/settings/page.tsx',
   'src/components/contratantes-tabela.tsx',
   'src/components/financeiro/modals/ModalBase.tsx',
   'src/components/pdf-thumbnail.tsx',

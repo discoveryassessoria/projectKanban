@@ -1,12 +1,17 @@
 // src/components/kanban/ProcessoProtocolos.tsx
+//
+// PROTOCOLIZAÇÕES DO PROCESSO — o único lugar onde um protocolo é registrado.
+// Protocolo não é cadastro: é um ato operacional (órgão, setor, data/hora,
+// número, tipo, forma de envio, responsável, comprovante, observações e
+// documentos enviados). Cada registro gera Evento na Timeline e entra no
+// Histórico do Processo — a única fonte cronológica oficial.
 
 "use client"
 
-import { useState, useEffect } from "react"
-import { buscar, useConsulta } from "@/src/lib/dados"
+import { useState } from "react"
+import { buscar, useApi, useConsulta } from "@/src/lib/dados"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { DatePickerField } from "@/components/ui/date-picker-field"
 import { uploadFiles } from "@/src/lib/storage"
 import {
   Plus,
@@ -20,7 +25,9 @@ import {
   X,
   Building2,
   Paperclip,
-  Eye
+  Eye,
+  Send,
+  Layers,
 } from "lucide-react"
 import { usePermissoes } from "@/src/hooks/use-permissoes"
 
@@ -44,6 +51,19 @@ interface Anexo {
   createdAt: string
 }
 
+interface DocumentoEnviado {
+  id: number
+  documentoId: number
+  documento?: {
+    id: number
+    publicCode?: string | null
+    tipo?: string | null
+    descricao?: string | null
+    status?: string | null
+    pessoa?: { id: number; nome: string } | null
+  } | null
+}
+
 interface Protocolo {
   id: number
   processoId: number
@@ -51,13 +71,30 @@ interface Protocolo {
   requerenteId?: number | null
   contratante?: PessoaBase | null
   requerente?: PessoaBase | null
-  consulado: string
-  consuladoOutro?: string | null
+  orgaoId?: number | null
+  orgao?: { id: number; name: string; type?: string | null; city?: string | null } | null
+  setor?: string | null
   dataProtocolo?: string | null
   numeroProtocolo?: string | null
+  tipoProtocolo?: string | null
+  formaEnvio?: string | null
+  responsavelId?: number | null
+  responsavel?: { id: number; nome: string } | null
   observacoes?: string | null
   anexos?: Anexo[]
+  documentos?: DocumentoEnviado[]
   createdAt: string
+  // legado (Espanha) — exibido quando o registro antigo não tem órgão
+  consulado?: string | null
+  consuladoOutro?: string | null
+}
+
+interface OpcoesProtocolo {
+  orgaos: { id: number; name: string; type?: string | null; city?: string | null }[]
+  responsaveis: { id: number; nome: string }[]
+  documentos: { id: number; publicCode: string | null; tipo: string | null; descricao: string | null; pessoa: string }[]
+  tipos: { valor: string; label: string }[]
+  formasEnvio: { valor: string; label: string }[]
 }
 
 interface ProcessoProtocolosProps {
@@ -65,21 +102,6 @@ interface ProcessoProtocolosProps {
   contratantes: PessoaBase[]
   requerentes: PessoaBase[]
   onUpdate?: () => void
-}
-
-// Mapa de consulados
-const CONSULADOS = [
-  { value: "SAO_PAULO", label: "São Paulo" },
-  { value: "PORTO_ALEGRE", label: "Porto Alegre" },
-  { value: "RIO_DE_JANEIRO", label: "Rio de Janeiro" },
-  { value: "SALVADOR", label: "Salvador" },
-  { value: "BRASILIA", label: "Brasília" },
-  { value: "OUTROS", label: "Outros" },
-]
-
-const getConsuladoLabel = (value: string, outro?: string | null) => {
-  if (value === "OUTROS" && outro) return outro
-  return CONSULADOS.find(c => c.value === value)?.label || value
 }
 
 // Helper para formatar tamanho de arquivo
@@ -90,38 +112,73 @@ const formatFileSize = (bytes?: number | null) => {
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
 }
 
-const SEM_PROTOCOLOS: Protocolo[] = []
+// ISO → valor de <input type="datetime-local"> (hora local, sem segundos)
+const paraDatetimeLocal = (iso?: string | null) => {
+  if (!iso) return ""
+  const d = new Date(iso)
+  if (isNaN(d.getTime())) return ""
+  const p = (n: number) => String(n).padStart(2, "0")
+  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}T${p(d.getHours())}:${p(d.getMinutes())}`
+}
 
-export function ProcessoProtocolos({ 
-  processoId, 
-  contratantes, 
+const formatarDataHora = (iso?: string | null) => {
+  if (!iso) return "—"
+  const d = new Date(iso)
+  if (isNaN(d.getTime())) return "—"
+  return d.toLocaleString("pt-BR", { dateStyle: "short", timeStyle: "short" })
+}
+
+const rotuloDocumento = (d: { publicCode?: string | null; tipo?: string | null; descricao?: string | null; pessoa?: string }) => {
+  const nome = d.descricao || (d.tipo ? d.tipo.replace(/_/g, " ").toLowerCase() : "Documento")
+  const codigo = d.publicCode ? `${d.publicCode} — ` : ""
+  return `${codigo}${nome}${d.pessoa ? ` (${d.pessoa})` : ""}`
+}
+
+const SEM_PROTOCOLOS: Protocolo[] = []
+const INPUT = "w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-orange-500"
+
+const FORM_VAZIO = {
+  tipoPessoa: "contratante" as "contratante" | "requerente",
+  pessoaId: "",
+  orgaoId: "",
+  setor: "",
+  dataProtocolo: "",
+  numeroProtocolo: "",
+  tipoProtocolo: "",
+  formaEnvio: "",
+  responsavelId: "",
+  observacoes: "",
+  documentoIds: [] as number[],
+}
+
+export function ProcessoProtocolos({
+  processoId,
+  contratantes,
   requerentes,
-  onUpdate 
+  onUpdate
 }: ProcessoProtocolosProps) {
 
   const [showForm, setShowForm] = useState(false)
   const [editando, setEditando] = useState<Protocolo | null>(null)
   const [salvando, setSalvando] = useState(false)
-  
+  const [erroForm, setErroForm] = useState<string | null>(null)
+
   // Estados para upload
   const [arquivosPendentes, setArquivosPendentes] = useState<{[protocoloId: number]: File[]}>({})
   const [uploadingProtocoloId, setUploadingProtocoloId] = useState<number | null>(null)
   const [uploadProgress, setUploadProgress] = useState(0)
-  
+
   // Verificar permissão do usuário
   const { pode } = usePermissoes()
   const podeEditar = pode('processos.editar_paginas')
 
   // Form state
-  const [form, setForm] = useState({
-    tipoPessoa: "contratante" as "contratante" | "requerente",
-    pessoaId: "",
-    consulado: "",
-    consuladoOutro: "",
-    dataProtocolo: "",
-    numeroProtocolo: "",
-    observacoes: ""
-  })
+  const [form, setForm] = useState(FORM_VAZIO)
+
+  // Opções do ato: órgãos, responsáveis, documentos do processo e as dimensões
+  // fechadas (tipo/forma de envio). Fonte única, resolvida no servidor.
+  const opcoesReq = useApi<OpcoesProtocolo>(processoId ? `/api/protocolos/opcoes?processoId=${processoId}` : null)
+  const opcoes = opcoesReq.dados
 
   // Buscar protocolos
   // Leitura COMPOSTA: a lista de protocolos e, para cada um, os seus anexos. Em tela
@@ -151,15 +208,8 @@ export function ProcessoProtocolos({
 
   // Resetar form
   const resetForm = () => {
-    setForm({
-      tipoPessoa: "contratante",
-      pessoaId: "",
-      consulado: "",
-      consuladoOutro: "",
-      dataProtocolo: "",
-      numeroProtocolo: "",
-      observacoes: ""
-    })
+    setForm(FORM_VAZIO)
+    setErroForm(null)
     setEditando(null)
     setShowForm(false)
   }
@@ -167,52 +217,69 @@ export function ProcessoProtocolos({
   // Abrir edição
   const abrirEdicao = (protocolo: Protocolo) => {
     setEditando(protocolo)
+    setErroForm(null)
     setForm({
       tipoPessoa: protocolo.contratanteId ? "contratante" : "requerente",
       pessoaId: (protocolo.contratanteId || protocolo.requerenteId || "").toString(),
-      consulado: protocolo.consulado,
-      consuladoOutro: protocolo.consuladoOutro || "",
-      dataProtocolo: protocolo.dataProtocolo ? protocolo.dataProtocolo.split("T")[0] : "",
+      orgaoId: protocolo.orgaoId ? String(protocolo.orgaoId) : "",
+      setor: protocolo.setor || "",
+      dataProtocolo: paraDatetimeLocal(protocolo.dataProtocolo),
       numeroProtocolo: protocolo.numeroProtocolo || "",
-      observacoes: protocolo.observacoes || ""
+      tipoProtocolo: protocolo.tipoProtocolo || "",
+      formaEnvio: protocolo.formaEnvio || "",
+      responsavelId: protocolo.responsavelId ? String(protocolo.responsavelId) : "",
+      observacoes: protocolo.observacoes || "",
+      documentoIds: (protocolo.documentos ?? []).map((d) => d.documentoId),
     })
     setShowForm(true)
   }
 
+  const alternarDocumento = (documentoId: number) => {
+    setForm((f) => ({
+      ...f,
+      documentoIds: f.documentoIds.includes(documentoId)
+        ? f.documentoIds.filter((id) => id !== documentoId)
+        : [...f.documentoIds, documentoId],
+    }))
+  }
+
   // Salvar (criar ou atualizar)
   const handleSalvar = async () => {
-    if (!form.pessoaId || !form.consulado) {
-      alert("Preencha a pessoa e o consulado")
-      return
-    }
+    // campos mínimos do ato — sem eles a protocolização não é rastreável
+    if (!form.orgaoId) return setErroForm("Selecione o órgão que recebeu o protocolo.")
+    if (!form.dataProtocolo) return setErroForm("Informe a data e a hora da protocolização.")
+    if (!form.numeroProtocolo.trim()) return setErroForm("Informe o número do protocolo.")
+    if (!form.tipoProtocolo) return setErroForm("Selecione o tipo de protocolo.")
+    if (!form.formaEnvio) return setErroForm("Selecione a forma de envio.")
+    if (!form.responsavelId) return setErroForm("Selecione o responsável pela protocolização.")
 
-    if (form.consulado === "OUTROS" && !form.consuladoOutro) {
-      alert("Informe o nome do consulado")
-      return
-    }
-
+    setErroForm(null)
     setSalvando(true)
     try {
       const payload = {
         processoId,
-        contratanteId: form.tipoPessoa === "contratante" ? parseInt(form.pessoaId) : null,
-        requerenteId: form.tipoPessoa === "requerente" ? parseInt(form.pessoaId) : null,
-        consulado: form.consulado,
-        consuladoOutro: form.consulado === "OUTROS" ? form.consuladoOutro : null,
-        dataProtocolo: form.dataProtocolo || null,
-        numeroProtocolo: form.numeroProtocolo || null,
-        observacoes: form.observacoes || null
+        contratanteId: form.pessoaId && form.tipoPessoa === "contratante" ? parseInt(form.pessoaId) : null,
+        requerenteId: form.pessoaId && form.tipoPessoa === "requerente" ? parseInt(form.pessoaId) : null,
+        orgaoId: parseInt(form.orgaoId),
+        setor: form.setor.trim() || null,
+        dataProtocolo: new Date(form.dataProtocolo).toISOString(),
+        numeroProtocolo: form.numeroProtocolo.trim(),
+        tipoProtocolo: form.tipoProtocolo,
+        formaEnvio: form.formaEnvio,
+        responsavelId: parseInt(form.responsavelId),
+        observacoes: form.observacoes.trim() || null,
+        documentoIds: form.documentoIds,
       }
 
-      const url = editando 
+      const url = editando
         ? `/api/protocolos/${editando.id}`
         : "/api/protocolos"
-      
+
       const method = editando ? "PUT" : "POST"
 
       const response = await fetch(url, {
         method,
-        headers: { 
+        headers: {
           "Content-Type": "application/json",
           "Authorization": `Bearer ${localStorage.getItem("authToken")}`
         },
@@ -225,11 +292,11 @@ export function ProcessoProtocolos({
         onUpdate?.()
       } else {
         const data = await response.json()
-        alert(data.error || "Erro ao salvar protocolo")
+        setErroForm(data.error || "Erro ao salvar protocolo")
       }
     } catch (error) {
       console.error("Erro ao salvar:", error)
-      alert("Erro ao salvar protocolo")
+      setErroForm("Erro ao salvar protocolo")
     } finally {
       setSalvando(false)
     }
@@ -346,19 +413,26 @@ export function ProcessoProtocolos({
     }
   }
 
-  // Obter nome da pessoa do protocolo
+  // Pessoa vinculada (opcional) — o vínculo obrigatório é com o PROCESSO
   const getNomePessoa = (protocolo: Protocolo) => {
     const c = protocolo.contratante ?? protocolo.requerente
-    if (c) return c.publicCode ? `${c.publicCode} — ${c.nome}` : c.nome
-    return "Pessoa não encontrada"
+    if (!c) return null
+    const rotulo = c.publicCode ? `${c.publicCode} — ${c.nome}` : c.nome
+    return `${rotulo}${protocolo.contratanteId ? " (Contratante)" : " (Requerente)"}`
   }
 
-  // Obter tipo da pessoa
-  const getTipoPessoa = (protocolo: Protocolo) => {
-    if (protocolo.contratanteId) return "Contratante"
-    if (protocolo.requerenteId) return "Requerente"
-    return ""
+  const rotuloOrgao = (protocolo: Protocolo) => {
+    if (protocolo.orgao) return protocolo.orgao.city ? `${protocolo.orgao.name} — ${protocolo.orgao.city}` : protocolo.orgao.name
+    // registro legado (Espanha), anterior ao órgão como fonte única
+    if (protocolo.consulado === "OUTROS" && protocolo.consuladoOutro) return protocolo.consuladoOutro
+    if (protocolo.consulado) return `Consulado ${protocolo.consulado.replace(/_/g, " ").toLowerCase()}`
+    return "Órgão não informado"
   }
+
+  const rotuloTipo = (valor?: string | null) =>
+    opcoes?.tipos.find((t) => t.valor === valor)?.label ?? null
+  const rotuloForma = (valor?: string | null) =>
+    opcoes?.formasEnvio.find((f) => f.valor === valor)?.label ?? null
 
   return (
     <div className="h-full flex flex-col">
@@ -382,7 +456,7 @@ export function ProcessoProtocolos({
           className={`bg-orange-600 hover:bg-orange-700 ${!podeEditar || protocolos.length === 0 ? 'hidden' : ''}`}
         >
           <Plus className="h-4 w-4 mr-1" />
-          Novo Protocolo
+          Registrar protocolo
         </Button>
       </div>
 
@@ -394,10 +468,10 @@ export function ProcessoProtocolos({
           </div>
         ) : showForm ? (
           /* ===== FORMULÁRIO ===== */
-          <div className="max-w-lg mx-auto bg-white border border-gray-200 rounded-lg p-6">
-            <div className="flex items-center justify-between mb-6">
+          <div className="max-w-2xl mx-auto bg-white border border-gray-200 rounded-lg p-6">
+            <div className="flex items-center justify-between mb-1">
               <h4 className="font-semibold text-gray-900">
-                {editando ? "Editar Protocolo" : "Novo Protocolo"}
+                {editando ? "Editar protocolização" : "Registrar protocolização"}
               </h4>
               <button
                 onClick={resetForm}
@@ -406,103 +480,181 @@ export function ProcessoProtocolos({
                 <X className="h-5 w-5" />
               </button>
             </div>
+            <p className="text-xs text-gray-500 mb-6">
+              O registro entra na Timeline e no Histórico do processo — a fonte cronológica oficial dos protocolos realizados.
+            </p>
 
             <div className="space-y-4">
-              {/* Pessoa */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  <User className="h-4 w-4 inline mr-1" />
-                  Pessoa
-                </label>
-                <select
-                  value={`${form.tipoPessoa}-${form.pessoaId}`}
-                  onChange={(e) => {
-                    const [tipo, id] = e.target.value.split("-")
-                    setForm({
-                      ...form,
-                      tipoPessoa: tipo as "contratante" | "requerente",
-                      pessoaId: id
-                    })
-                  }}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-orange-500"
-                >
-                  <option value="">Selecione uma pessoa</option>
-                  {contratantes.length > 0 && (
-                    <optgroup label="Contratantes">
-                      {contratantes.map(c => (
-                        <option key={`c-${c.id}`} value={`contratante-${c.id}`}>
-                          {c.publicCode ? c.publicCode + ' — ' : ''}{c.nome}
-                        </option>
-                      ))}
-                    </optgroup>
-                  )}
-                  {requerentes.length > 0 && (
-                    <optgroup label="Requerentes">
-                      {requerentes.map(r => (
-                        <option key={`r-${r.id}`} value={`requerente-${r.id}`}>
-                          {r.publicCode ? r.publicCode + ' — ' : ''}{r.nome}
-                        </option>
-                      ))}
-                    </optgroup>
-                  )}
-                </select>
-              </div>
-
-              {/* Consulado */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  <Building2 className="h-4 w-4 inline mr-1" />
-                  Consulado
-                </label>
-                <select
-                  value={form.consulado}
-                  onChange={(e) => setForm({ ...form, consulado: e.target.value })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-orange-500"
-                >
-                  <option value="">Selecione o consulado</option>
-                  {CONSULADOS.map(c => (
-                    <option key={c.value} value={c.value}>{c.label}</option>
-                  ))}
-                </select>
-              </div>
-
-              {/* Consulado Outro */}
-              {form.consulado === "OUTROS" && (
+              {/* Órgão + Setor */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Nome do Consulado
+                    <Building2 className="h-4 w-4 inline mr-1" />
+                    Órgão *
                   </label>
+                  <select
+                    value={form.orgaoId}
+                    onChange={(e) => setForm({ ...form, orgaoId: e.target.value })}
+                    className={INPUT}
+                  >
+                    <option value="">Selecione o órgão</option>
+                    {(opcoes?.orgaos ?? []).map((o) => (
+                      <option key={o.id} value={o.id}>
+                        {o.city ? `${o.name} — ${o.city}` : o.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Setor</label>
                   <Input
-                    value={form.consuladoOutro}
-                    onChange={(e) => setForm({ ...form, consuladoOutro: e.target.value })}
-                    placeholder="Digite o nome do consulado"
+                    value={form.setor}
+                    onChange={(e) => setForm({ ...form, setor: e.target.value })}
+                    placeholder="Opcional — guichê, seção, mesa…"
                   />
                 </div>
-              )}
-
-              {/* Data */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  <Calendar className="h-4 w-4 inline mr-1" />
-                  Data do Protocolo
-                </label>
-                <DatePickerField
-                  value={form.dataProtocolo}
-                  onChange={(value) => setForm({ ...form, dataProtocolo: value })}
-                />
               </div>
 
-              {/* Número */}
+              {/* Data/hora + Número */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    <Calendar className="h-4 w-4 inline mr-1" />
+                    Data e hora *
+                  </label>
+                  <input
+                    type="datetime-local"
+                    value={form.dataProtocolo}
+                    onChange={(e) => setForm({ ...form, dataProtocolo: e.target.value })}
+                    className={INPUT}
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    <Hash className="h-4 w-4 inline mr-1" />
+                    Número do protocolo *
+                  </label>
+                  <Input
+                    value={form.numeroProtocolo}
+                    onChange={(e) => setForm({ ...form, numeroProtocolo: e.target.value })}
+                    placeholder="Ex: M8371/2"
+                  />
+                </div>
+              </div>
+
+              {/* Tipo + Forma de envio */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Tipo de protocolo *</label>
+                  <select
+                    value={form.tipoProtocolo}
+                    onChange={(e) => setForm({ ...form, tipoProtocolo: e.target.value })}
+                    className={INPUT}
+                  >
+                    <option value="">Selecione o tipo</option>
+                    {(opcoes?.tipos ?? []).map((t) => (
+                      <option key={t.valor} value={t.valor}>{t.label}</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    <Send className="h-4 w-4 inline mr-1" />
+                    Forma de envio *
+                  </label>
+                  <select
+                    value={form.formaEnvio}
+                    onChange={(e) => setForm({ ...form, formaEnvio: e.target.value })}
+                    className={INPUT}
+                  >
+                    <option value="">Selecione a forma</option>
+                    {(opcoes?.formasEnvio ?? []).map((f) => (
+                      <option key={f.valor} value={f.valor}>{f.label}</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              {/* Responsável + Pessoa vinculada */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    <User className="h-4 w-4 inline mr-1" />
+                    Responsável *
+                  </label>
+                  <select
+                    value={form.responsavelId}
+                    onChange={(e) => setForm({ ...form, responsavelId: e.target.value })}
+                    className={INPUT}
+                  >
+                    <option value="">Quem protocolou</option>
+                    {(opcoes?.responsaveis ?? []).map((u) => (
+                      <option key={u.id} value={u.id}>{u.nome}</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Pessoa vinculada</label>
+                  <select
+                    value={form.pessoaId ? `${form.tipoPessoa}-${form.pessoaId}` : ""}
+                    onChange={(e) => {
+                      const [tipo, id] = e.target.value.split("-")
+                      setForm({
+                        ...form,
+                        tipoPessoa: (tipo as "contratante" | "requerente") || "contratante",
+                        pessoaId: id || "",
+                      })
+                    }}
+                    className={INPUT}
+                  >
+                    <option value="">Opcional — todo o processo</option>
+                    {contratantes.length > 0 && (
+                      <optgroup label="Contratantes">
+                        {contratantes.map(c => (
+                          <option key={`c-${c.id}`} value={`contratante-${c.id}`}>
+                            {c.publicCode ? c.publicCode + ' — ' : ''}{c.nome}
+                          </option>
+                        ))}
+                      </optgroup>
+                    )}
+                    {requerentes.length > 0 && (
+                      <optgroup label="Requerentes">
+                        {requerentes.map(r => (
+                          <option key={`r-${r.id}`} value={`requerente-${r.id}`}>
+                            {r.publicCode ? r.publicCode + ' — ' : ''}{r.nome}
+                          </option>
+                        ))}
+                      </optgroup>
+                    )}
+                  </select>
+                </div>
+              </div>
+
+              {/* Documentos enviados */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
-                  <Hash className="h-4 w-4 inline mr-1" />
-                  Número do Protocolo
+                  <Layers className="h-4 w-4 inline mr-1" />
+                  Documentos enviados
                 </label>
-                <Input
-                  value={form.numeroProtocolo}
-                  onChange={(e) => setForm({ ...form, numeroProtocolo: e.target.value })}
-                  placeholder="Ex: M8371/2"
-                />
+                {(opcoes?.documentos ?? []).length === 0 ? (
+                  <p className="text-xs text-gray-400 border border-dashed border-gray-200 rounded-md p-3">
+                    Nenhum documento disponível neste processo.
+                  </p>
+                ) : (
+                  <div className="max-h-44 overflow-y-auto border border-gray-200 rounded-md divide-y divide-gray-100">
+                    {(opcoes?.documentos ?? []).map((d) => (
+                      <label key={d.id} className="flex items-start gap-2 px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={form.documentoIds.includes(d.id)}
+                          onChange={() => alternarDocumento(d.id)}
+                          className="mt-0.5"
+                        />
+                        <span>{rotuloDocumento(d)}</span>
+                      </label>
+                    ))}
+                  </div>
+                )}
               </div>
 
               {/* Observações */}
@@ -514,20 +666,28 @@ export function ProcessoProtocolos({
                   value={form.observacoes}
                   onChange={(e) => setForm({ ...form, observacoes: e.target.value })}
                   placeholder="Anotações sobre o protocolo..."
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-orange-500"
+                  className={INPUT}
                   rows={3}
                 />
               </div>
 
+              <p className="text-xs text-gray-500">
+                O comprovante/anexo é enviado no cartão do protocolo, logo após o registro.
+              </p>
+
+              {erroForm && (
+                <p className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-md px-3 py-2">{erroForm}</p>
+              )}
+
               {/* Botões */}
-              <div className="flex gap-3 pt-4">
+              <div className="flex gap-3 pt-2">
                 <Button
                   onClick={handleSalvar}
                   disabled={salvando}
                   className="flex-1 bg-orange-600 hover:bg-orange-700"
                 >
                   {salvando && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
-                  {editando ? "Salvar Alterações" : "Criar Protocolo"}
+                  {editando ? "Salvar alterações" : "Registrar protocolo"}
                 </Button>
                 <Button
                   variant="outline"
@@ -543,11 +703,11 @@ export function ProcessoProtocolos({
           /* ===== EMPTY STATE ===== */
           <div className="text-center py-12">
             <FileText className="h-12 w-12 mx-auto mb-4 text-gray-300" />
-            <h3 className="text-lg font-medium text-gray-700">Nenhum protocolo cadastrado</h3>
+            <h3 className="text-lg font-medium text-gray-700">Nenhuma protocolização registrada</h3>
             <p className="text-sm text-gray-500 mt-1 mb-4">
-              {podeEditar 
-                ? "Cadastre os protocolos de solicitação de nacionalidade"
-                : "Ainda não há protocolos cadastrados para este processo"
+              {podeEditar
+                ? "Registre aqui cada protocolo realizado — ele entra na Timeline e no Histórico do processo"
+                : "Ainda não há protocolos registrados para este processo"
               }
             </p>
             {podeEditar && (
@@ -556,7 +716,7 @@ export function ProcessoProtocolos({
                 className="bg-orange-600 hover:bg-orange-700"
               >
                 <Plus className="h-4 w-4 mr-2" />
-                Adicionar Primeiro Protocolo
+                Registrar primeiro protocolo
               </Button>
             )}
           </div>
@@ -565,9 +725,11 @@ export function ProcessoProtocolos({
           <div className="space-y-4">
             {protocolos.map((protocolo) => {
               const anexos = protocolo.anexos || []
+              const documentos = protocolo.documentos || []
               const arquivosPendentesProtocolo = arquivosPendentes[protocolo.id] || []
               const isUploadingThis = uploadingProtocoloId === protocolo.id
-              
+              const pessoa = getNomePessoa(protocolo)
+
               return (
                 <div
                   key={protocolo.id}
@@ -577,43 +739,79 @@ export function ProcessoProtocolos({
                   <div className="p-4">
                     <div className="flex items-start justify-between">
                       <div className="flex-1">
-                        {/* Nome da pessoa */}
+                        {/* Órgão + setor */}
                         <div className="flex items-center gap-2 mb-2">
-                          <User className="h-4 w-4 text-gray-500" />
+                          <Building2 className="h-4 w-4 text-gray-500" />
                           <span className="font-semibold text-gray-900">
-                            {getNomePessoa(protocolo)}
+                            {rotuloOrgao(protocolo)}
                           </span>
-                          <span className="text-xs px-2 py-0.5 bg-gray-100 text-gray-600 rounded">
-                            {getTipoPessoa(protocolo)}
-                          </span>
+                          {protocolo.setor && (
+                            <span className="text-xs px-2 py-0.5 bg-gray-100 text-gray-600 rounded">
+                              {protocolo.setor}
+                            </span>
+                          )}
+                          {rotuloTipo(protocolo.tipoProtocolo) && (
+                            <span className="text-xs px-2 py-0.5 bg-orange-50 text-orange-700 rounded">
+                              {rotuloTipo(protocolo.tipoProtocolo)}
+                            </span>
+                          )}
                         </div>
 
                         {/* Info do protocolo */}
-                        <div className="grid grid-cols-2 gap-3 text-sm ml-5">
-                          {/* Consulado */}
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm ml-5">
                           <div className="flex items-center gap-2 text-gray-600">
-                            <Building2 className="h-4 w-4 text-gray-400" />
-                            <span>{getConsuladoLabel(protocolo.consulado, protocolo.consuladoOutro)}</span>
+                            <Calendar className="h-4 w-4 text-gray-400" />
+                            <span>{formatarDataHora(protocolo.dataProtocolo)}</span>
                           </div>
 
-                          {/* Data */}
-                          {protocolo.dataProtocolo && (
-                            <div className="flex items-center gap-2 text-gray-600">
-                              <Calendar className="h-4 w-4 text-gray-400" />
-                              <span>
-                                {new Date(protocolo.dataProtocolo).toLocaleDateString("pt-BR")}
-                              </span>
-                            </div>
-                          )}
-
-                          {/* Número */}
                           {protocolo.numeroProtocolo && (
                             <div className="flex items-center gap-2 text-gray-600">
                               <Hash className="h-4 w-4 text-gray-400" />
                               <span className="font-mono">{protocolo.numeroProtocolo}</span>
                             </div>
                           )}
+
+                          {rotuloForma(protocolo.formaEnvio) && (
+                            <div className="flex items-center gap-2 text-gray-600">
+                              <Send className="h-4 w-4 text-gray-400" />
+                              <span>{rotuloForma(protocolo.formaEnvio)}</span>
+                            </div>
+                          )}
+
+                          {protocolo.responsavel && (
+                            <div className="flex items-center gap-2 text-gray-600">
+                              <User className="h-4 w-4 text-gray-400" />
+                              <span>{protocolo.responsavel.nome}</span>
+                            </div>
+                          )}
                         </div>
+
+                        {pessoa && (
+                          <p className="text-xs text-gray-500 mt-2 ml-5">{pessoa}</p>
+                        )}
+
+                        {/* Documentos enviados */}
+                        {documentos.length > 0 && (
+                          <div className="mt-2 ml-5">
+                            <p className="text-xs font-medium text-gray-600 flex items-center gap-1">
+                              <Layers className="h-3.5 w-3.5" />
+                              Documentos enviados ({documentos.length})
+                            </p>
+                            <ul className="mt-1 space-y-0.5">
+                              {documentos.map((d) => (
+                                <li key={d.id} className="text-xs text-gray-500">
+                                  •{" "}
+                                  {rotuloDocumento({
+                                    publicCode: d.documento?.publicCode,
+                                    tipo: d.documento?.tipo,
+                                    descricao: d.documento?.descricao,
+                                    pessoa: d.documento?.pessoa?.nome,
+                                  })}
+                                </li>
+                              ))}
+                            </ul>
+                          </div>
+                        )}
 
                         {/* Observações */}
                         {protocolo.observacoes && (
@@ -648,7 +846,7 @@ export function ProcessoProtocolos({
                     <div className="mt-4 pt-4 border-t border-gray-100">
                       <h4 className="text-sm font-medium text-gray-700 flex items-center gap-2 mb-3">
                         <Paperclip className="h-4 w-4" />
-                        Anexos
+                        Comprovantes e anexos
                         {anexos.length > 0 && (
                           <span className="text-xs px-1.5 py-0.5 bg-blue-100 text-blue-600 rounded">
                             {anexos.length}
@@ -662,7 +860,7 @@ export function ProcessoProtocolos({
                           {anexos.map((anexo) => {
                             const isImage = anexo.mimeType?.startsWith("image/")
                             const isPDF = anexo.mimeType === "application/pdf"
-                            
+
                             return (
                               <div
                                 key={anexo.id}
@@ -692,13 +890,13 @@ export function ProcessoProtocolos({
                                       )}
                                     </div>
                                   )}
-                                  
+
                                   {/* Overlay */}
                                   <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors flex items-center justify-center">
                                     <Eye className="h-6 w-6 text-white opacity-0 group-hover:opacity-100 transition-opacity" />
                                   </div>
                                 </a>
-                                
+
                                 {/* Info */}
                                 <div className="p-2 border-t border-gray-200">
                                   <p className="text-xs text-gray-700 truncate" title={anexo.nome}>
@@ -708,7 +906,7 @@ export function ProcessoProtocolos({
                                     <p className="text-xs text-gray-400">{formatFileSize(anexo.tamanho)}</p>
                                   )}
                                 </div>
-                                
+
                                 {/* Botão remover - apenas para quem pode editar */}
                                 {podeEditar && (
                                   <button
@@ -749,7 +947,7 @@ export function ProcessoProtocolos({
                               </button>
                             </div>
                           ))}
-                          
+
                           {/* Botão de Upload */}
                           <button
                             type="button"
@@ -784,7 +982,7 @@ export function ProcessoProtocolos({
                           <p className="text-xs text-gray-400 mt-1">Imagens, PDF, Word, Excel (máx. 64MB cada)</p>
                         </label>
                       )}
-                      
+
                       {/* Mensagem quando não pode editar e não tem anexos */}
                       {!podeEditar && anexos.length === 0 && (
                         <p className="text-sm text-gray-400 text-center py-4">Nenhum anexo</p>

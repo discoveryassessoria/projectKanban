@@ -98,33 +98,6 @@ const CAMPOS_BASE: CampoSpec[] = [
 ]
 
 export const CADASTROS: Record<string, CadastroSpec> = {
-  // ── Processos › Estrutura › Marcos ─────────────────────────────────────────
-  marcos: {
-    entidade: "marcos",
-    model: "marcoProcesso",
-    titulo: "Marcos",
-    descricao:
-      "Pontos de controle nomeados do processo. É um cadastro de referência para acompanhamento — não altera o fluxo nem cria tarefa (isso é do Workflow Interno).",
-    novoLabel: "+ Novo marco",
-    codeDe: "nome",
-    ordenarPor: [{ campo: "ordem", direcao: "asc" }, { campo: "nome", direcao: "asc" }],
-    colunas: [
-      { key: "ordem", label: "Ordem" },
-      { key: "nome", label: "Marco" },
-      { key: "code", label: "Código" },
-      { key: "tipoProcessoId", label: "Processo" },
-      { key: "phaseKey", label: "Fase" },
-    ],
-    campos: [
-      { key: "nome", label: "Nome do marco", tipo: "text", obrigatorio: true, largura: "cheia" },
-      { key: "descricao", label: "Descrição", tipo: "textarea", largura: "cheia" },
-      { key: "tipoProcessoId", label: "Processo", tipo: "select", fonte: "tiposProcesso", ajuda: "Vazio = vale para todos os processos.", largura: "meia" },
-      { key: "phaseKey", label: "Fase de referência", tipo: "select", fonte: "fases", largura: "meia" },
-      { key: "ordem", label: "Ordem", tipo: "number", largura: "meia" },
-      ...CAMPOS_BASE,
-    ],
-  },
-
   // ── Serviços › Categorias ──────────────────────────────────────────────────
   "categorias-servico": {
     entidade: "categorias-servico",
@@ -237,42 +210,6 @@ export const CADASTROS: Record<string, CadastroSpec> = {
       { key: "nome", label: "Nome do cargo", tipo: "text", obrigatorio: true, largura: "cheia" },
       { key: "area", label: "Área", tipo: "text", largura: "meia" },
       { key: "descricao", label: "Descrição", tipo: "textarea", largura: "cheia" },
-      ...CAMPOS_BASE,
-    ],
-  },
-
-  // ── Documentos e Protocolos › Protocolos ───────────────────────────────────
-  "tipos-protocolo": {
-    entidade: "tipos-protocolo",
-    model: "tipoProtocoloCadastro",
-    titulo: "Tipos de Protocolo",
-    descricao:
-      "Tipos e modalidades de protocolo usados nos processos (consular, judicial, comune, administrativo…). Os órgãos que recebem o protocolo são cadastrados em Órgãos e Organizações.",
-    novoLabel: "+ Novo tipo de protocolo",
-    codeDe: "nome",
-    ordenarPor: [{ campo: "ordem", direcao: "asc" }, { campo: "nome", direcao: "asc" }],
-    colunas: [
-      { key: "ordem", label: "Ordem" },
-      { key: "nome", label: "Tipo" },
-      { key: "code", label: "Código" },
-      { key: "escopo", label: "Escopo" },
-      { key: "nacionalidade", label: "Nacionalidade" },
-    ],
-    campos: [
-      { key: "nome", label: "Nome do tipo", tipo: "text", obrigatorio: true, largura: "cheia" },
-      {
-        key: "escopo", label: "Escopo padrão", tipo: "select", largura: "meia",
-        opcoes: [
-          { valor: "person", label: "Pessoa" },
-          { valor: "process", label: "Processo" },
-          { valor: "consular_case", label: "Caso consular" },
-          { valor: "comune_case", label: "Caso comune" },
-          { valor: "judicial_case", label: "Caso judicial" },
-        ],
-      },
-      { key: "nacionalidade", label: "Nacionalidade aplicável", tipo: "text", largura: "meia" },
-      { key: "observacoes", label: "Observações", tipo: "textarea", largura: "cheia" },
-      { key: "ordem", label: "Ordem", tipo: "number", largura: "meia" },
       ...CAMPOS_BASE,
     ],
   },

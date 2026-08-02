@@ -58,23 +58,11 @@ export const MG_CATALOG: Record<string, CatalogConfig> = {
     ],
   },
 
-  // OPERACIONAL — Tipos de Protocolo
   // LOTE A — 'op_certtypes' (scaffold de "Tipos de Certidão" com salvar no-op, origem
   // do bug de duplicidade) foi APOSENTADO e é inalcançável: certidões são Tipos de
   // Documento (natureza CERTIDAO_*) geridos em doctypes. Não reintroduzir.
-  'op_prottypes': {
-    path: 'operational.protocolTypes',
-    title: 'Tipos de Protocolo',
-    desc: 'Tipos de protocolo (consular, judicial, comune, administrativo, etc.).',
-    cols: [['code', 'Código'], ['name', 'Nome'], ['scope', 'Escopo']],
-    fields: [
-      { key: 'code', label: 'Código', type: 'text' },
-      { key: 'name', label: 'Nome', type: 'text', required: true },
-      { key: 'scope', label: 'Escopo padrão', type: 'select', options: ['person', 'process', 'consular_case', 'comune_case', 'judicial_case'] },
-      { key: 'nationality', label: 'Nacionalidade aplicável', type: 'text' },
-      { key: 'notes', label: 'Observações', type: 'text' },
-    ],
-  },
+  // 'op_prottypes' (Tipos de Protocolo) foi ELIMINADO em 02/08/2026: protocolo não é
+  // cadastro — é ocorrência registrada dentro do Processo. Não reintroduzir.
 
   // ---------- FORNECEDORES ----------
   fin_suppliers: {

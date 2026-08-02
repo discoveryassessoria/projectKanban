@@ -43,8 +43,6 @@ const FONTES: Fonte[] = [
   { chave: "departamentos", nome: "Departamentos", modulo: "Usuários", url: "/api/gerenciamento/departamentos", raiz: "departamentos" },
   { chave: "grupos", nome: "Equipes", modulo: "Usuários", url: "/api/gerenciamento/cadastros/grupos", raiz: "registros" },
   { chave: "cargos", nome: "Cargos", modulo: "Usuários", url: "/api/gerenciamento/cadastros/cargos", raiz: "registros" },
-  { chave: "marcos", nome: "Marcos", modulo: "Processos", url: "/api/gerenciamento/cadastros/marcos", raiz: "registros" },
-  { chave: "tipos-protocolo", nome: "Tipos de Protocolo", modulo: "Documentos", url: "/api/gerenciamento/cadastros/tipos-protocolo", raiz: "registros" },
   { chave: "auditoria", nome: "Trilha de Auditoria", modulo: "Sistema", url: "/api/gerenciamento/auditoria?take=1000", raiz: "logs" },
 ]
 

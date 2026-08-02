@@ -57,11 +57,6 @@ export const PERMISSOES = {
   'financeiro.custo_excluir': 'Excluir custo (exclusão lógica)',
   'financeiro.custo_arquivar': 'Arquivar/desarquivar custo',
 
-  // Mensagens
-  'mensagens.ver': 'Ver mensagens de clientes',
-  'mensagens.responder': 'Responder mensagens',
-  'mensagens.apagar': 'Apagar mensagens de outros',
-
   // Eventos
   'eventos.ver': 'Ver eventos',
   'eventos.criar': 'Criar eventos',
@@ -205,15 +200,6 @@ export const MODULOS_PERMISSOES = [
       'financeiro.custo_conciliar',
       'financeiro.custo_excluir',
       'financeiro.custo_arquivar',
-    ],
-  },
-  {
-    modulo: 'Mensagens',
-    icone: '💬',
-    permissoes: [
-      'mensagens.ver',
-      'mensagens.responder',
-      'mensagens.apagar',
     ],
   },
   {
@@ -379,7 +365,6 @@ export const PERFIS_PADRAO = [
       'processos.ver': true,
       'processos.ver_paginas': true,
       'clientes.ver': true,
-      'mensagens.ver': true,
       'eventos.ver': true,
       'arvore.ver': true,
       // Vê a evidência que sustenta um dado; não revisa, não aprova, não altera.

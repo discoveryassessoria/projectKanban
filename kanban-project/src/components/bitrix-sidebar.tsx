@@ -3,18 +3,14 @@
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { useState, useRef, useEffect, useCallback } from "react"
-import { useApi } from '@/src/lib/dados'
 import {
   Menu,
-  MessageCircle,
-  Settings2,
 } from "lucide-react"
 
 import { HouseIcon } from "@/src/components/icons/house-icon"
 import { GridIcon } from "@/src/components/icons/grid-icon"
 import { CheckIcon } from "@/src/components/icons/check-icon"
 import { TreeIcon } from "@/src/components/icons/tree-icon"
-import { SettingsIcon } from "@/src/components/icons/settings-icon"
 import { ShieldIcon } from "@/src/components/icons/shield-icon"
 import { useSidebarContext } from "@/src/contexts/sidebar-context"
 import { CalendarIcon } from "@/src/components/icons/calendar-icon"
@@ -55,15 +51,6 @@ const menuItems = [
     permissao: "eventos.ver",
   },
   {
-    title: "Mensagens",
-    url: "/mensagens",
-    icon: ({ className, filled }: any) => <MessageCircle className={className} fill={filled ? "currentColor" : "none"} />,
-    textOffset: "",
-    iconOffset: "",
-    badge: "mensagens",
-    permissao: "mensagens.ver",
-  },
-  {
     title: "Árvore Genealógica",
     url: "/genealogy",
     icon: TreeIcon,
@@ -81,13 +68,6 @@ const menuItems = [
     textOffset: "",
     iconOffset: "",
     permissao: "registral.ver_evidencias",
-  },
-  {
-    title: "Configurações",
-    url: "/settings",
-    icon: SettingsIcon,
-    textOffset: "",
-    iconOffset: "",
   },
 ]
 
@@ -118,18 +98,6 @@ export function BitrixSidebar() {
   const hoverTimeoutRef = useRef<NodeJS.Timeout | null>(null)
   const pathname = usePathname()
 
-  // =====================================================
-  // 🔴 Badge de mensagens não lidas
-  // =====================================================
-  // Contador de não lidas: a camada oficial faz o polling (`refreshInterval`), em
-  // lugar de um `setInterval` mais um `useState` mais um efeito de montagem. A falha
-  // continua SILENCIOSA de propósito — o badge da sidebar não pode virar um erro na
-  // cara do usuário.
-  const naoLidas = useApi<{ totalNaoLidas?: number }>('/api/admin/mensagens/nao-lidas', { refreshInterval: 30_000 })
-  const mensagensNaoLidas = naoLidas.dados?.totalNaoLidas ?? 0
-
-  // =====================================================
-
   const isExpanded = !isCollapsed || isHovered
 
   const handleMouseEnter = () => {
@@ -156,15 +124,9 @@ export function BitrixSidebar() {
   }
 
   // Função para renderizar o ícone corretamente
-  const renderIcon = (Icon: typeof HouseIcon | typeof GridIcon | typeof CheckIcon | typeof TreeIcon | typeof SettingsIcon | typeof ShieldIcon | typeof CalendarIcon | typeof DollarIcon, isActive: boolean, iconOffset: string = "") => {
+  const renderIcon = (Icon: typeof HouseIcon | typeof GridIcon | typeof CheckIcon | typeof TreeIcon | typeof ShieldIcon | typeof CalendarIcon | typeof DollarIcon, isActive: boolean, iconOffset: string = "") => {
   // Todos os ícones são customizados agora, passa a prop filled
     return <Icon className={`h-5 w-5 flex-shrink-0 text-white ${iconOffset}`} filled={isActive} />
-  }
-
-  // Função para obter o valor do badge de um item
-  const getBadgeCount = (badgeKey?: string): number => {
-    if (badgeKey === 'mensagens') return mensagensNaoLidas
-    return 0
   }
 
   return (
@@ -221,7 +183,6 @@ export function BitrixSidebar() {
           <nav className="space-y-1">
             {menuItems.filter((item) => !item.permissao || pode(item.permissao)).map((item) => {
               const isActive = pathname === item.url
-              const badgeCount = getBadgeCount((item as any).badge)
 
               return (
                 <Link
@@ -235,26 +196,12 @@ export function BitrixSidebar() {
                   `}
                   title={!isExpanded ? item.title : undefined}
                 >
-                  {/* Ícone com badge quando sidebar colapsada */}
                   <span className="relative flex-shrink-0">
                     {renderIcon(item.icon, isActive, item.iconOffset)}
-                    {badgeCount > 0 && !isExpanded && (
-                      <span className="absolute -top-2 -right-2 h-4 w-4 rounded-full bg-red-500 text-[9px] font-bold flex items-center justify-center leading-none">
-                        {badgeCount > 9 ? '9+' : badgeCount}
-                      </span>
-                    )}
                   </span>
 
                   {isExpanded && (
-                    <>
-                      <span className={`whitespace-nowrap leading-none ${item.textOffset}`}>{item.title}</span>
-                      {/* Badge quando sidebar expandida - à direita */}
-                      {badgeCount > 0 && (
-                        <span className="ml-auto h-5 min-w-[20px] px-1 rounded-full bg-red-500 text-[10px] font-bold flex items-center justify-center leading-none">
-                          {badgeCount > 99 ? '99+' : badgeCount}
-                        </span>
-                      )}
-                    </>
+                    <span className={`whitespace-nowrap leading-none ${item.textOffset}`}>{item.title}</span>
                   )}
                 </Link>
               )

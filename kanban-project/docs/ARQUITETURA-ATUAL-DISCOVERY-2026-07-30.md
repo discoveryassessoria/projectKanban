@@ -560,9 +560,10 @@ só `analyzePessoa`/`DOCUMENT_RULES` puros seguem em uso),
   `TabOperationCockpit.tsx` + `OpManageModal.tsx`.
 - Gerenciamento → Documentos e Protocolos: **Tipos de Documento**
   (`TiposDocumentoTab`), **Categorias Documentais** (`CategoriasDocumentaisTab`),
-  **Tipos de Protocolo**, **Regras Documentais** (`RegrasDocumentaisTab`), e
-  ocultos: `certtypes`, **`docmatrix`** (Matriz Documental — visão técnica),
-  `protocols`, `prottypes-rascunho`.
+  **Regras Documentais** (`RegrasDocumentaisTab`), e ocultos: `certtypes`,
+  **`docmatrix`** (Matriz Documental — visão técnica).
+  (O cadastro **Tipos de Protocolo** foi eliminado em 02/08/2026 — protocolo é
+  OCORRÊNCIA operacional do processo, ver §5.7.)
 - `DocumentCategorySelector.tsx`.
 
 ### 5.6 Rotas
@@ -576,6 +577,18 @@ só `analyzePessoa`/`DOCUMENT_RULES` puros seguem em uso),
 
 ### 5.7 Regras de negócio
 
+- **Protocolo é OCORRÊNCIA, não cadastro** (02/08/2026). Não existe cadastro
+  mestre de protocolos no Gerenciamento: toda protocolização é registrada DENTRO
+  do processo (aba **Protocolos**, `ProcessoProtocolos.tsx` sobre `Protocolo` +
+  `ProtocoloDocumento` + `AnexoProtocolo`), com órgão (`OrgaoProtocolo`), setor,
+  data/hora, número, tipo (`TipoProtocolo`), forma de envio
+  (`FormaEnvioProtocolo`), responsável, comprovante, observações e documentos
+  enviados. Cada registro grava, na MESMA transação, um `Evento`
+  (`TipoEvento.PROTOCOLO`) e um `LogAuditoria` — a Timeline/Histórico do Processo
+  é a única fonte cronológica oficial dos protocolos realizados.
+  Rotas: `/api/protocolos` (GET/POST), `/api/protocolos/[protocoloId]`
+  (GET/PUT/DELETE), `/api/protocolos/[protocoloId]/anexos`,
+  `/api/protocolos/opcoes`. Serviço: `services/protocolizacao.ts`.
 - 1 necessidade → N documentos (múltiplas vias). O vínculo é `Documento.necessidadeId`.
 - Necessidade **DISPENSADA** não bloqueia e seu passo é ignorado pelo motor.
 - Necessidade tem **ciclo** e **supersessão**: nova necessidade supersede a
@@ -1116,7 +1129,7 @@ foi removido). Guarda `test:status-legacy-guard`.
 `PhaseEconomicRule`, `PhaseWorkflowInstance`, `PhaseWorkflowStepInstance`,
 `WorkflowEvento`, `PhaseAdvanceLog`, `DomainOutbox`, `Tarefa`, `TarefaHistorico`,
 `MotorArtefato`, `MotorConfig`, `PerfilPermissaoMotor`, `OperacaoAntecipada`,
-`RegraTarefaTransversal` (dormant), `MarcoProcesso`.
+`RegraTarefaTransversal` (dormant).
 
 **Enums:** `PassoTipo` (HUMANO/AUTOMATICO/ESPERA/VALIDACAO/DECISAO/APROVACAO/
 MANUAL_SEM_TAREFA), `WorkflowInstanceStatus`, `StepInstanceStatus`,
@@ -1142,8 +1155,10 @@ MANUAL_SEM_TAREFA), `WorkflowInstanceStatus`, `StepInstanceStatus`,
 ### 10.12 Telas de configuração
 
 Gerenciamento → **Processos**: Tipos de Processo, Modalidades, Países e Regiões,
-**Fases** (`CatalogoFasesTab`, sobre `CatalogoFase`), Variações da Fase, Marcos,
+**Fases** (`CatalogoFasesTab`, sobre `CatalogoFase`), Variações da Fase,
 SLA, Versões, Configurações Gerais.
+(O cadastro "Marcos" foi eliminado em 02/08/2026: eventos importantes do processo
+são registrados EXCLUSIVAMENTE na Timeline/Histórico do Processo.)
 Gerenciamento → **Workflow**: Workflow Macro (`MacroKanbanTab`), Workflow Interno
 (`PhaseWorkflowsFasesTab`), Transições, Executor do Motor (`ExecutorMotorTab`),
 Diagnóstico de Runtime (`RuntimeWorkflowDiagnostics`), Migração do Motor.

@@ -43,7 +43,7 @@ import {
 
 // Lote 1 — telas bespoke (só as REGISTRADAS no mapa TELAS abaixo)
 import {
-  TeamsTab, ProtocolsTab,
+  TeamsTab,
   SLATab, TemplatesTab, NotificationsTab, ImportExportTab,
   BackupTab, SettingsTab,
 } from "@/src/components/gerenciamentoComponents/GerenciamentoScaffolds"
@@ -192,8 +192,6 @@ const TELAS: Record<string, React.ComponentType> = {
   taxes: ImpostosTab,
   fees: TaxasPagamentoTab,
   organs: OrgaosProtocoloTab,
-  prottypes: cad("tipos-protocolo"),
-  "prottypes-rascunho": cat("op_prottypes"),
   suppliers: FornecedoresTab,
   departments: DepartamentosTab,
   // Países e Regiões: era um scaffold de catálogo sem persistência; agora é a tela
@@ -208,7 +206,6 @@ const TELAS: Record<string, React.ComponentType> = {
   // por ?screen=<key>-rascunho.
   teams: cad("grupos"),
   "teams-rascunho": TeamsTab,
-  marcos: cad("marcos"),
   servcats: cad("categorias-servico"),
   orgcats: cad("categorias-organizacao"),
   // Automações por fase — MESMA tela para os itens oficiais "Financeiras" e
@@ -216,7 +213,6 @@ const TELAS: Record<string, React.ComponentType> = {
   // próprio: vira alias para `autofin` (deep-link preservado).
   autofin: function AutomacoesFinanceiras() { return <PhaseAutomationsFasesTab kindInicial="financial" /> },
   autoevt: function AutomacoesEventos() { return <PhaseAutomationsFasesTab kindInicial="event" /> },
-  protocols: ProtocolsTab,
   // SLA consolidado (real, sobre a configuração de cada processo). O rascunho antigo
   // continua acessível por ?screen=sla-rascunho.
   sla: SLAConfiguracaoTab,
@@ -347,6 +343,12 @@ export default function GerenciamentoPage() {
     // baixo. Toda URL antiga cai na tela oficial (Serviços › Catálogo de Serviços).
     catalogmestre: "products",       // Catálogo Mestre (tela técnica) → Catálogo de Serviços
     honorariums: "products",         // Honorários (legado) → Catálogo de Serviços
+    // Protocolo NÃO é cadastro: virou ocorrência operacional dentro do Processo
+    // (aba Protocolos → Timeline/Histórico). As URLs antigas não podem abrir tela
+    // morta nem "em breve" — caem no painel do Gerenciamento.
+    prottypes: "overview",
+    "prottypes-rascunho": "overview",
+    protocols: "overview",
   }
   const resolverTela = useCallback((k: string | null): string => {
     if (!k) return "overview"
