@@ -314,6 +314,26 @@ async function assincronos() {
     ok(new RegExp(proibido, 'i').test(corr), `a lista do que NUNCA é automático menciona "${proibido}"`)
   }
 
+  // ═══════════ 18) SUÍTE DE INTERFACE ═══════════
+  console.log('\n18) Testes de navegador')
+  ok(existsSync(join(ROOT, 'playwright.config.ts')), 'a configuração da suíte de interface existe')
+  ok(existsSync(join(ROOT, 'tests/ui/gerenciamento.spec.ts')), 'existe spec varrendo as telas do Gerenciamento')
+  ok(existsSync(join(ROOT, 'tests/ui/saude.spec.ts')), 'existe spec do painel de Saúde do Sistema')
+  const telasSrc = ler('tests/ui/telas.ts')
+  ok(/MANAGEMENT_NAVIGATION/.test(telasSrc), 'a suíte deriva as telas da navegação oficial — sem lista paralela que envelhece')
+  const gerSpec = ler('tests/ui/gerenciamento.spec.ts')
+  ok(/pageerror/.test(gerSpec) && /toEqual\(\[\]\)/.test(gerSpec), 'erro de console reprova o teste de tela')
+  ok(/toBeHidden/.test(gerSpec), '"Carregando" eterno é defeito; a suíte espera a tela sair do carregamento')
+  const saudeSpec = ler('tests/ui/saude.spec.ts')
+  ok(/pode dizer "Saudável"/.test(saudeSpec), 'a suíte cobra da TELA a mesma honestidade que se cobra do motor')
+  ok(!/click\(\)[\s\S]{0,80}Executar diagnóstico/.test(saudeSpec), 'a suíte não dispara execução — somente leitura')
+  const uiCheck = catalogo().find((v) => v.codigo === 'UI-001')
+  ok(!!uiCheck, 'a própria suíte de interface é vigiada por uma verificação (UI-001)')
+  ok(uiCheck?.dominio === 'INTERFACE', 'UI-001 pertence ao domínio Interface')
+  const setup = ler('tests/ui/global-setup.ts')
+  ok(/ui-token/.test(setup) && !/fill\(/.test(setup), 'a suíte não digita senha: assina token para um administrador que já existe')
+  ok(/\.auth/.test(setup) && ler('.gitignore').includes('tests/ui/.auth'), 'o estado autenticado fica fora do git')
+
   console.log(`\n${passed} passaram, ${failed} falharam`)
   if (failed > 0) { console.log('FALHAS: ' + falhas.join('; ')); process.exit(1) }
   console.log('Motor da Saúde do Sistema: validado ✅')

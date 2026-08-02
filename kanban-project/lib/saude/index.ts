@@ -15,6 +15,7 @@ import './verificacoes/tesouraria'
 import './verificacoes/plataforma'
 import './verificacoes/ponta-a-ponta'
 import './verificacoes/agendados'
+import './verificacoes/interface'
 // capacidades precisam estar registradas ANTES das verificações que as avaliam
 import './capacidades/operacionais'
 import './verificacoes/prontidao'

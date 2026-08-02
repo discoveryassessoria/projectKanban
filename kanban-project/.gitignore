@@ -50,3 +50,8 @@ backup_*.sql
 reset-password.mjs
 .claude/worktrees/
 .env*.local
+
+# testes de interface
+/tests/ui/.auth/
+/test-results/
+/playwright-report/
