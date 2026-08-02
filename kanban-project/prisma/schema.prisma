@@ -5521,3 +5521,88 @@ model MetricaRegistral {
   @@unique([chave, escopo, janelaInicio])
   @@index([chave, janelaInicio])
 }
+
+// ════════════════════════ SAÚDE DO SISTEMA ═════════════════════════════════
+// Auditoria contínua. O histórico NUNCA é apagado: é ele que mostra problema
+// novo × recorrente × resolvido e o tempo de resolução.
+
+/// Uma rodada do motor de diagnóstico.
+model SaudeExecucao {
+  id                   Int      @id @default(autoincrement())
+  modo                 String   @db.VarChar(20) // RAPIDO | COMPLETO | PROFUNDO
+  estado               String   @db.VarChar(30) // SAUDAVEL | ATENCAO | DEGRADADO | CRITICO | DIAGNOSTICO_INCOMPLETO | INDISPONIVEL
+  motivoEstado         String   @db.Text
+  versaoCatalogo       String   @db.VarChar(20)
+  iniciadoEm           DateTime
+  concluidoEm          DateTime
+  duracaoMs            Int
+  totalCatalogo        Int
+  totalElegiveis       Int
+  executadas           Int
+  aprovadas            Int
+  comAchados           Int
+  falhasTecnicas       Int
+  naoExecutadas        Int
+  coberturaPercentual  Int
+  criticos             Int
+  erros                Int
+  alertas              Int
+  informativos         Int
+  /// resultado por verificação (código, status, duração, métricas, erro)
+  execucoes            Json
+  dominiosSemCobertura String[] @default([])
+  /// quem disparou (null = automático)
+  disparadoPorId       Int?
+  criadoEm             DateTime @default(now())
+
+  achados SaudeAchado[]
+
+  @@index([criadoEm])
+  @@index([estado])
+  @@index([modo])
+}
+
+/// Um problema concreto, com vida própria entre execuções: primeira detecção,
+/// última detecção, recorrências e resolução.
+model SaudeAchado {
+  id                 Int            @id @default(autoincrement())
+  /// identidade estável do problema (código da verificação + chave do achado)
+  chave              String         @unique @db.VarChar(300)
+  codigo             String         @db.VarChar(60)
+  dominio            String         @db.VarChar(40)
+  modulo             String         @db.VarChar(60)
+  severidade         String         @db.VarChar(20)
+  titulo             String         @db.VarChar(300)
+  descricao          String         @db.Text
+  explicacao         String?        @db.Text
+  impacto            String?        @db.Text
+  entidade           String?        @db.VarChar(80)
+  registroId         String?        @db.VarChar(60)
+  registroNome       String?        @db.VarChar(300)
+  quantidade         Int            @default(1)
+  link               String?        @db.VarChar(300)
+  recomendacao       String?        @db.Text
+  correcaoAutomatica String?        @db.VarChar(60)
+  evidencia          Json?
+  /// ABERTO | RECONHECIDO | EM_CORRECAO | RESOLVIDO | REINCIDENTE | IGNORADO
+  status             String         @default("ABERTO") @db.VarChar(20)
+  primeiraDeteccao   DateTime       @default(now())
+  ultimaDeteccao     DateTime       @default(now())
+  resolvidoEm        DateTime?
+  recorrencias       Int            @default(1)
+  responsavelId      Int?
+  /// justificativa obrigatória para IGNORADO — problema ignorado continua visível
+  justificativa      String?        @db.Text
+  ignoradoPorId      Int?
+  ignoradoAte        DateTime?
+  versaoCatalogo     String         @db.VarChar(20)
+  execucaoId         Int?
+  execucao           SaudeExecucao? @relation(fields: [execucaoId], references: [id], onDelete: SetNull)
+  atualizadoEm       DateTime       @updatedAt
+
+  @@index([status])
+  @@index([severidade])
+  @@index([dominio])
+  @@index([codigo])
+  @@index([ultimaDeteccao])
+}

@@ -378,6 +378,9 @@ export const MANAGEMENT_NAVIGATION: ManagementNavigationItem[] = [
       h(910, "diagnostics-rascunho", "Diagnóstico do Sistema (rascunho do mockup)"),
       h(920, "mgmthealth-rascunho", "Diagnóstico Executivo (rascunho do mockup)"),
       h(930, "syshealth-rascunho", "Saúde do Sistema (rascunho do mockup)"),
+      // Visão de integridade ANTERIOR ao motor de auditoria — preservada e acessível
+      // por ?screen= até a validação completa do motor novo em produção.
+      h(940, "syshealth-legado", "Saúde do Sistema (visão anterior)"),
       h(940, "impexp-rascunho", "Importação / Exportação (rascunho do mockup)"),
     ],
   },

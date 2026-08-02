@@ -147,7 +147,11 @@ const IdentidadeVisualTab = dynamic(() => import("@/src/components/gerenciamento
 // DIAGNÓSTICOS — quatro lentes sobre o mesmo read-model.
 const DiagnosticoSistemaTab = dynamic(() => import("@/src/components/gerenciamentoComponents/DiagnosticoViews").then(m => m.DiagnosticoSistemaTab), { ssr: false, loading: () => <CarregandoTela /> })
 const DiagnosticoExecutivoTab = dynamic(() => import("@/src/components/gerenciamentoComponents/DiagnosticoViews").then(m => m.DiagnosticoExecutivoTab), { ssr: false, loading: () => <CarregandoTela /> })
-const SaudeSistemaTab = dynamic(() => import("@/src/components/gerenciamentoComponents/DiagnosticoViews").then(m => m.SaudeSistemaTab), { ssr: false, loading: () => <CarregandoTela /> })
+// Saúde do Sistema — motor de auditoria contínua (catálogo versionado + estados
+// reais). A visão antiga de integridade continua acessível em ?screen=syshealth-legado
+// até o motor novo estar validado em produção.
+const SaudeSistemaTab = dynamic(() => import("@/src/components/gerenciamentoComponents/SaudeSistemaTab").then(m => m.SaudeSistemaTab), { ssr: false, loading: () => <CarregandoTela /> })
+const SaudeSistemaLegadoTab = dynamic(() => import("@/src/components/gerenciamentoComponents/DiagnosticoViews").then(m => m.SaudeSistemaTab), { ssr: false, loading: () => <CarregandoTela /> })
 const HistoricoExecucoesTab = dynamic(() => import("@/src/components/gerenciamentoComponents/DiagnosticoViews").then(m => m.HistoricoExecucoesTab), { ssr: false, loading: () => <CarregandoTela /> })
 // GESTÃO FINANCEIRA (consulta) + exportações + índice de dashboards.
 const CreditoTab = dynamic(() => import("@/src/components/gerenciamentoComponents/FinanceiroGestaoViews").then(m => m.CreditoTab), { ssr: false, loading: () => <CarregandoTela /> })
@@ -280,6 +284,7 @@ const TELAS: Record<string, React.ComponentType> = {
   execmatrix: HistoricoExecucoesTab,
   "execmatrix-rascunho": ExecMatrixTab,
   syshealth: SaudeSistemaTab,
+  "syshealth-legado": SaudeSistemaLegadoTab,
   "syshealth-rascunho": SystemHealthTab,
 }
 
