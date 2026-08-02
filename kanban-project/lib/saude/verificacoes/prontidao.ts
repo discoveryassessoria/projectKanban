@@ -196,6 +196,30 @@ registrar({
     const r = await executarSmoke()
     const achados: Achado[] = []
 
+    // Se TODAS as rotas recusaram a identidade, o problema é a identidade
+    // (segredo de outro ambiente), não nove rotas quebradas. Reportar nove
+    // alertas aqui seria alarme falso — e alarme falso mata a confiança no
+    // painel mais rápido do que a ausência de alarme.
+    const todasRecusaram = r.rotas.length > 0 && r.rotas.every((x) => x.status === 401 || x.status === 403)
+    if (todasRecusaram) {
+      return {
+        achados: [{
+          chave: 'smoke-identidade-recusada',
+          severidade: 'ERRO',
+          titulo: `Nenhuma rota pôde ser visitada em ${r.base}`,
+          descricao: `As ${r.rotas.length} rotas recusaram a identidade técnica (401/403).`,
+          explicacao: 'O token é assinado com o segredo do ambiente em execução. Recusa em todas as rotas significa que o smoke está apontando para um host que usa outro segredo — as rotas não foram testadas, e isso não é o mesmo que estarem quebradas.',
+          impacto: 'As rotas essenciais permanecem sem verificação de resposta real.',
+          entidade: 'Smoke',
+          quantidade: r.rotas.length,
+          recomendacao: 'Execute o diagnóstico profundo a partir do próprio ambiente, ou aponte SAUDE_SMOKE_BASE_URL para o host cujo segredo é o mesmo.',
+          evidencia: { base: r.base, rotas: r.rotas.length },
+        }],
+        metricas: { rotas: r.rotas.length, ok: 0, falhas: 0, lentas: 0, naoTestadas: r.rotas.length },
+        resumo: `Nenhuma rota testada em ${r.base}.`,
+      }
+    }
+
     if (!r.autenticado) {
       achados.push({
         chave: 'smoke-sem-identidade',

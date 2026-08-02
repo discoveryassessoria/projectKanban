@@ -293,6 +293,9 @@ async function assincronos() {
   ok(/signAuthToken/.test(smokeSrc), 'o smoke usa identidade técnica autenticada (401 não é rota testada)')
   ok(!/console\.log\(.*token/i.test(smokeSrc), 'o token técnico nunca é registrado em log')
   ok(/autorização negada/.test(smokeSrc), '401 com identidade técnica é reportado como falha, não como sucesso')
+  const pron = ler('lib/saude/verificacoes/prontidao.ts')
+  ok(/todasRecusaram/.test(pron), 'identidade recusada em TODAS as rotas vira um achado só — nove rotas "quebradas" seria alarme falso')
+  ok(/VERCEL_PROJECT_PRODUCTION_URL/.test(smokeSrc), 'o smoke prefere o domínio de produção à URL protegida do deployment')
 
   // ═══════════ 17) NADA DESTRUTIVO ═══════════
   console.log('\n17) O motor não destrói nada')
