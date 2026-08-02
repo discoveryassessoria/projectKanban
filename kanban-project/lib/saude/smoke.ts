@@ -73,8 +73,12 @@ async function tokenTecnico(): Promise<{ token: string | null; motivo?: string }
 }
 
 export async function executarSmoke(base?: string): Promise<ResultadoSmoke> {
+  // O domínio de produção vem antes da URL do deployment: a URL do deployment
+  // pode estar sob proteção de acesso da Vercel e devolveria 401 na borda,
+  // antes de chegar na aplicação — alarme falso disfarçado de falha real.
   const origem = base
     ?? process.env.SAUDE_SMOKE_BASE_URL
+    ?? (process.env.VERCEL_PROJECT_PRODUCTION_URL ? `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}` : null)
     ?? (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : null)
     ?? 'http://localhost:3000'
 
