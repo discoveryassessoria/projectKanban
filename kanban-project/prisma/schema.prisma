@@ -2970,7 +2970,10 @@ model OrgaoProtocolo {
   nomeFantasia String?  @db.VarChar(200)
   type         String?  @db.VarChar(30) // consulado|comune|tribunal|conservatoria|cartorio|ministerio|prefeitura|tradutor|apostilamento|outro
   country      String?  @db.VarChar(60)
+  /// Região / estado / província de 1º nível (ex.: Veneto, SP, Cataluña).
   state        String?  @db.VarChar(60)
+  /// Província / distrito de 2º nível (ex.: Vicenza, Barletta-Andria-Trani).
+  provincia    String?  @db.VarChar(80)
   city         String?  @db.VarChar(100)
   endereco     String?  @db.VarChar(300)
   cep          String?  @db.VarChar(20)
@@ -2988,6 +2991,35 @@ model OrgaoProtocolo {
   /// Etiquetas livres de operação (ex.: "apostila", "cidadania", "urgente").
   tags         String[] @default([])
   queueRule    String?  @db.VarChar(200) // regra de fila
+
+  // ── FUNÇÕES ────────────────────────────────────────────────────────────────
+  // A MESMA organização exerce várias funções ao mesmo tempo — e continua sendo
+  // UM ÚNICO registro. Cartório que cobra emolumento é ORGAO + FORNECEDOR; a DHL
+  // é FORNECEDOR; um escritório parceiro é PARCEIRO + FORNECEDOR. Classificar
+  // NUNCA é criar cadastro novo.
+  funcoes FuncaoOrganizacao[] @default([])
+
+  // ── IDENTIDADE FISCAL (chave forte de deduplicação) ────────────────────────
+  /// CNPJ, CPF, VAT, NIF, CIF, Partita IVA… Só o número, sem máscara.
+  identificacaoFiscal     String? @unique @db.VarChar(40)
+  /// Que documento é o acima (CNPJ|CPF|VAT|NIF|CIF|PIVA|EIN|OUTRO).
+  tipoIdentificacaoFiscal String? @db.VarChar(20)
+
+  // ── DADOS FINANCEIROS (só fazem sentido quando a organização é FORNECEDOR) ──
+  formaPagamento         String? @db.VarChar(60)
+  chavePix               String? @db.VarChar(140)
+  tipoChavePix           String? @db.VarChar(20)
+  banco                  String? @db.VarChar(120)
+  agencia                String? @db.VarChar(20)
+  conta                  String? @db.VarChar(30)
+  tipoConta              String? @db.VarChar(20)
+  /// Prazo de pagamento acordado, em dias.
+  prazoPagamentoDias     Int?
+  contatoFinanceiro      String? @db.VarChar(200)
+  observacoesFinanceiras String? @db.Text
+  /// REGULAR | PENDENTE | BLOQUEADO — situação do fornecedor no financeiro.
+  statusFinanceiro       String? @db.VarChar(20)
+
   ativo        Boolean  @default(true)
   criadoEm     DateTime @default(now())
   atualizadoEm DateTime @updatedAt
@@ -3003,6 +3035,17 @@ model OrgaoProtocolo {
   @@index([type])
   @@index([country])
   @@index([ativo])
+  @@index([provincia])
+  @@index([funcoes])
+}
+
+/// Funções que uma organização exerce. Uma organização = UM registro, N funções.
+enum FuncaoOrganizacao {
+  ORGAO
+  FORNECEDOR
+  PARCEIRO
+  CORRESPONDENTE
+  CLIENTE_CORPORATIVO
 }
 
 // Tipos de Documento (op_doctypes) â tipos documentais usados nos processos

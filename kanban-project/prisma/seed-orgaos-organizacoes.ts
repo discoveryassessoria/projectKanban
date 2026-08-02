@@ -18,7 +18,8 @@
 
 import { prisma } from '@/lib/prisma'
 import { gerarCodigoPublico } from '@/lib/codigos/code-generator'
-import { CATEGORIAS, ORGANIZACOES, validarBase, type OrganizacaoSeed } from './dados-orgaos-organizacoes'
+import { resolverOrganizacao, unirFuncoes } from '@/src/services/organizacao-identidade'
+import { CATEGORIAS, BASE_COMPLETA, funcoesDe, validarBase, type OrganizacaoSeed } from './dados-orgaos-organizacoes'
 
 const DRY = process.argv.includes('--dry-run')
 const log = (m: string) => console.log(`[seed-orgaos]${DRY ? ' (dry)' : ''} ${m}`)
@@ -30,6 +31,7 @@ function fichaDe(o: OrganizacaoSeed) {
     type: o.type ?? null,
     country: o.country,
     state: o.state ?? null,
+    provincia: o.provincia ?? null,
     city: o.city ?? null,
     site: o.site ?? null,
     idioma: o.idioma ?? null,
@@ -46,7 +48,7 @@ async function main() {
     for (const p of problemas) console.error(`  · ${p}`)
     process.exit(1)
   }
-  log(`base válida: ${CATEGORIAS.length} categorias · ${ORGANIZACOES.length} organizações`)
+  log(`base válida: ${CATEGORIAS.length} categorias · ${BASE_COMPLETA.length} organizações`)
 
   // ── 1) categorias ──────────────────────────────────────────────────────────
   const existentesCat = new Map(
@@ -71,23 +73,40 @@ async function main() {
   let orgCompletadas = 0
   let vinculosNovos = 0
 
-  for (const o of ORGANIZACOES) {
+  let funcoesAcrescentadas = 0
+  for (const o of BASE_COMPLETA) {
     const ficha = fichaDe(o)
-    const atual = await prisma.orgaoProtocolo.findFirst({
-      where: { name: o.name, country: o.country },
-      include: { categorias: { select: { categoriaId: true } } },
+    const funcoes = funcoesDe(o)
+
+    // ORGANIZAÇÃO ÚNICA: a entidade é procurada na ordem obrigatória
+    // (id → identificação fiscal → nome oficial + país → nome fantasia + país).
+    // Só é criada quando NADA casou.
+    const resolucao = await resolverOrganizacao(prisma, {
+      name: o.name, nomeFantasia: o.nomeFantasia, country: o.country,
     })
+    const atual = resolucao.id
+      ? await prisma.orgaoProtocolo.findUnique({
+          where: { id: resolucao.id },
+          include: { categorias: { select: { categoriaId: true } } },
+        })
+      : null
 
     let orgaoId: number
     if (!atual) {
       if (DRY) { orgNovas++; continue }
       const criado = await prisma.orgaoProtocolo.create({
-        data: { name: o.name, ...ficha, ativo: true },
+        data: { name: o.name, ...ficha, funcoes, ativo: true },
         select: { id: true },
       })
       orgaoId = criado.id
       orgNovas++
     } else {
+      // Já existe: NUNCA duplica — acrescenta função e completa o que falta.
+      const funcoesFinais = unirFuncoes(atual.funcoes, funcoes)
+      if (funcoesFinais.length !== atual.funcoes.length) {
+        if (!DRY) await prisma.orgaoProtocolo.update({ where: { id: atual.id }, data: { funcoes: funcoesFinais } })
+        funcoesAcrescentadas++
+      }
       orgaoId = atual.id
       // Só COMPLETA o que está vazio — edição manual do operador é preservada.
       const patch: Record<string, unknown> = {}
@@ -120,7 +139,7 @@ async function main() {
       vinculosNovos += faltando.length
     }
   }
-  log(`organizações: +${orgNovas} novas · ${orgCompletadas} completadas · +${vinculosNovos} vínculos de categoria`)
+  log(`organizações: +${orgNovas} novas · ${orgCompletadas} completadas · +${vinculosNovos} vínculos de categoria · ${funcoesAcrescentadas} ganharam função`)
 
   // ── 4) código público para registros antigos ───────────────────────────────
   const semCodigo = await prisma.orgaoProtocolo.findMany({ where: { publicCode: null }, select: { id: true }, orderBy: { id: 'asc' } })
@@ -142,9 +161,13 @@ async function main() {
     ),
   ])
   const nDup = duplicados?.[0]?.n ?? 0
+  const semFuncao = await prisma.orgaoProtocolo.count({ where: { funcoes: { isEmpty: true } } })
+  const fornecedores = await prisma.orgaoProtocolo.count({ where: { funcoes: { has: 'FORNECEDOR' } } })
+  const orgaos = await prisma.orgaoProtocolo.count({ where: { funcoes: { has: 'ORGAO' } } })
   log(`TOTAL: ${totalOrg} organizações · ${ativos} ativas · ${semPublicCode} sem código · ${nDup} duplicadas`)
-  if (!DRY && (nDup > 0 || semPublicCode > 0)) {
-    console.error('[seed-orgaos] INCONSISTÊNCIA: há duplicidade ou registro sem código público.')
+  log(`FUNÇÕES: ${orgaos} órgãos · ${fornecedores} fornecedores · ${semFuncao} sem função`)
+  if (!DRY && (nDup > 0 || semPublicCode > 0 || semFuncao > 0)) {
+    console.error('[seed-orgaos] INCONSISTÊNCIA: há duplicidade, registro sem código público ou sem função.')
     process.exit(1)
   }
   log('OK.')

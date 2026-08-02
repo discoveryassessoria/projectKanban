@@ -5,6 +5,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { verificarPermissao } from '@/src/lib/verificar-permissao'
+import { FUNCOES, detectarDuplicidade, normalizarIdentificacaoFiscal } from '@/src/services/organizacao-identidade'
+import type { FuncaoOrganizacao } from '@prisma/client'
 
 const INCLUDE_CATEGORIAS = {
   categorias: { select: { categoriaId: true, categoria: { select: { id: true, code: true, nome: true, ativo: true } } } },
@@ -42,6 +44,20 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
       }
     }
 
+    // Editar também não pode gerar duplicidade: renomear para algo muito parecido
+    // com outra organização é avisado antes de gravar.
+    if (b.name !== undefined && b.confirmarNova !== true) {
+      const suspeitas = await detectarDuplicidade(prisma, { name: nomeFinal, country: paisFinal }, { ignorarId: id })
+      if (suspeitas.length) {
+        return NextResponse.json({
+          error: 'O novo nome ficou muito parecido com outra organização já cadastrada.',
+          duplicidade: { suspeitas },
+          acao: 'CONFIRMAR_ENTIDADE_DIFERENTE',
+          dica: 'Reenvie com confirmarNova:true se forem entidades diferentes.',
+        }, { status: 409 })
+      }
+    }
+
     const campo = <T,>(chave: string, atualValor: T, transformar: (v: unknown) => T): T =>
       b[chave] !== undefined ? transformar(b[chave]) : atualValor
 
@@ -54,6 +70,26 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
           type: campo('type', atual.type, (v) => txt(v, 30)),
           country: paisFinal,
           state: campo('state', atual.state, (v) => txt(v, 60)),
+          provincia: campo('provincia', atual.provincia, (v) => txt(v, 80)),
+          // FUNÇÕES: a organização é uma só e acumula papéis. A edição substitui
+          // a lista quando enviada — mas nunca cria outro cadastro.
+          funcoes: b.funcoes !== undefined
+            ? (Array.isArray(b.funcoes) ? FUNCOES.filter((f) => (b.funcoes as unknown[]).includes(f)) : atual.funcoes) as FuncaoOrganizacao[]
+            : atual.funcoes,
+          identificacaoFiscal: campo('identificacaoFiscal', atual.identificacaoFiscal, (v) => normalizarIdentificacaoFiscal(txt(v, 40))),
+          tipoIdentificacaoFiscal: campo('tipoIdentificacaoFiscal', atual.tipoIdentificacaoFiscal, (v) => txt(v, 20)),
+          formaPagamento: campo('formaPagamento', atual.formaPagamento, (v) => txt(v, 60)),
+          chavePix: campo('chavePix', atual.chavePix, (v) => txt(v, 140)),
+          tipoChavePix: campo('tipoChavePix', atual.tipoChavePix, (v) => txt(v, 20)),
+          banco: campo('banco', atual.banco, (v) => txt(v, 120)),
+          agencia: campo('agencia', atual.agencia, (v) => txt(v, 20)),
+          conta: campo('conta', atual.conta, (v) => txt(v, 30)),
+          tipoConta: campo('tipoConta', atual.tipoConta, (v) => txt(v, 20)),
+          prazoPagamentoDias: campo('prazoPagamentoDias', atual.prazoPagamentoDias, (v) =>
+            v === null || v === '' || v === undefined ? null : (Number.isFinite(Number(v)) ? Math.trunc(Number(v)) : null)),
+          contatoFinanceiro: campo('contatoFinanceiro', atual.contatoFinanceiro, (v) => txt(v, 200)),
+          observacoesFinanceiras: campo('observacoesFinanceiras', atual.observacoesFinanceiras, (v) => txt(v)),
+          statusFinanceiro: campo('statusFinanceiro', atual.statusFinanceiro, (v) => txt(v, 20)),
           city: campo('city', atual.city, (v) => txt(v, 100)),
           endereco: campo('endereco', atual.endereco, (v) => txt(v, 300)),
           cep: campo('cep', atual.cep, (v) => txt(v, 20)),

@@ -19,6 +19,9 @@ export interface CategoriaSeed {
   ordem: number
 }
 
+/** Funções que a organização exerce — a MESMA organização pode ter várias. */
+export type Funcao = 'ORGAO' | 'FORNECEDOR' | 'PARCEIRO' | 'CORRESPONDENTE' | 'CLIENTE_CORPORATIVO'
+
 export interface OrganizacaoSeed {
   /** Nome OFICIAL — na língua e grafia da entidade. */
   name: string
@@ -27,7 +30,10 @@ export interface OrganizacaoSeed {
   /** type legado (consulado|comune|tribunal|conservatoria|cartorio|ministerio|prefeitura|tradutor|apostilamento|outro) */
   type?: string
   country: string
+  /** região / estado / província de 1º nível */
   state?: string
+  /** província / distrito de 2º nível */
+  provincia?: string
   city?: string
   site?: string
   idioma?: string
@@ -36,6 +42,39 @@ export interface OrganizacaoSeed {
   tags?: string[]
   /** codes de CategoriaOrganizacao */
   categorias: string[]
+  /** funções explícitas; quando ausente, derivam das categorias (`funcoesDe`). */
+  funcoes?: Funcao[]
+}
+
+// ── FUNÇÕES DERIVADAS DA CLASSIFICAÇÃO ──────────────────────────────────────
+// Categorias que caracterizam ENTIDADE EMISSORA/PÚBLICA → função ORGAO.
+const CATEGORIAS_ORGAO = new Set([
+  'consulados', 'embaixadas', 'cartorios', 'registros-civis', 'comuni', 'tribunais', 'ministerios',
+  'prefeituras', 'governos-estaduais', 'governos-nacionais', 'arquivos-historicos', 'arquivos-distritais',
+  'arquivos-provinciais', 'arquivos-nacionais', 'igrejas', 'paroquias', 'dioceses', 'curias', 'notarios',
+  'apostilamento', 'policia', 'receita-federal', 'justica', 'imigracao', 'universidades',
+])
+// Categorias cujo trabalho GERA custo, taxa, custa ou emolumento → função FORNECEDOR.
+// Um órgão que cobra emolumento é Órgão E Fornecedor: um único cadastro, duas funções.
+const CATEGORIAS_FORNECEDOR = new Set([
+  'cartorios', 'registros-civis', 'comuni', 'tribunais', 'ministerios', 'prefeituras', 'consulados',
+  'embaixadas', 'notarios', 'apostilamento', 'traducao-juramentada', 'tradutores', 'arquivos-historicos',
+  'arquivos-distritais', 'arquivos-provinciais', 'arquivos-nacionais', 'igrejas', 'paroquias', 'dioceses',
+  'curias', 'transportadoras', 'correios', 'bancos', 'certificacao-digital', 'digitalizacao', 'peritos',
+  'advogados', 'correspondentes', 'despachantes', 'genealogistas', 'pesquisadores', 'escritorios-juridicos',
+  'escritorios-advocacia', 'escritorios-contabeis', 'consultores', 'contadores', 'fornecedores',
+])
+
+/** Funções efetivas: as declaradas OU as derivadas da classificação. */
+export function funcoesDe(o: OrganizacaoSeed): Funcao[] {
+  if (o.funcoes?.length) return o.funcoes
+  const f = new Set<Funcao>()
+  for (const c of o.categorias) {
+    if (CATEGORIAS_ORGAO.has(c)) f.add('ORGAO')
+    if (CATEGORIAS_FORNECEDOR.has(c)) f.add('FORNECEDOR')
+  }
+  if (!f.size) f.add('ORGAO')
+  return [...f]
 }
 
 // ══════════════════════════════ CATEGORIAS ══════════════════════════════════
@@ -46,7 +85,8 @@ export const CATEGORIAS: CategoriaSeed[] = [
   { code: 'registros-civis', nome: 'Registros Civis', descricao: 'Órgãos de registro civil de nascimento, casamento e óbito.', ordem: 40 },
   { code: 'tribunais', nome: 'Tribunais', descricao: 'Órgãos do Poder Judiciário.', ordem: 50 },
   { code: 'ministerios', nome: 'Ministérios', descricao: 'Pastas do governo central.', ordem: 60 },
-  { code: 'prefeituras', nome: 'Prefeituras', descricao: 'Administrações municipais (inclui Comuni italianos e Ayuntamientos).', ordem: 70 },
+  { code: 'prefeituras', nome: 'Prefeituras', descricao: 'Administrações municipais (Câmaras, Ayuntamientos, Mairies).', ordem: 70 },
+  { code: 'comuni', nome: 'Comuni', descricao: 'Comuni italianos — Ufficio dello Stato Civile e Anagrafe; emitem os atti que sustentam a cidadania.', ordem: 75 },
   { code: 'governos-estaduais', nome: 'Governos Estaduais', descricao: 'Administrações estaduais, provinciais e regionais.', ordem: 80 },
   { code: 'governos-nacionais', nome: 'Governos Nacionais', descricao: 'Órgãos de âmbito nacional que não são ministérios.', ordem: 90 },
   { code: 'arquivos-historicos', nome: 'Arquivos Históricos', descricao: 'Acervos históricos de pesquisa documental.', ordem: 100 },
@@ -137,20 +177,6 @@ export const ORGANIZACOES: OrganizacaoSeed[] = [
   { name: 'Tribunale Ordinario di Milano', type: 'tribunal', country: 'Itália', state: 'Lombardia', city: 'Milano', idioma: 'it', moeda: 'EUR', categorias: ['tribunais', 'justica'], tags: ['italia', 'judicial'] },
   { name: 'Tribunale Ordinario di Napoli', type: 'tribunal', country: 'Itália', state: 'Campania', city: 'Napoli', idioma: 'it', moeda: 'EUR', categorias: ['tribunais', 'justica'], tags: ['italia', 'judicial'] },
   { name: 'Tribunale Ordinario di Torino', type: 'tribunal', country: 'Itália', state: 'Piemonte', city: 'Torino', idioma: 'it', moeda: 'EUR', categorias: ['tribunais', 'justica'], tags: ['italia', 'judicial'] },
-  { name: 'Comune di Roma', type: 'comune', country: 'Itália', state: 'Lazio', city: 'Roma', site: 'https://www.comune.roma.it', idioma: 'it', moeda: 'EUR', categorias: ['prefeituras', 'registros-civis'], tags: ['italia', 'comune'] },
-  { name: 'Comune di Milano', type: 'comune', country: 'Itália', state: 'Lombardia', city: 'Milano', site: 'https://www.comune.milano.it', idioma: 'it', moeda: 'EUR', categorias: ['prefeituras', 'registros-civis'], tags: ['italia', 'comune'] },
-  { name: 'Comune di Napoli', type: 'comune', country: 'Itália', state: 'Campania', city: 'Napoli', idioma: 'it', moeda: 'EUR', categorias: ['prefeituras', 'registros-civis'], tags: ['italia', 'comune'] },
-  { name: 'Comune di Torino', type: 'comune', country: 'Itália', state: 'Piemonte', city: 'Torino', idioma: 'it', moeda: 'EUR', categorias: ['prefeituras', 'registros-civis'], tags: ['italia', 'comune'] },
-  { name: 'Comune di Venezia', type: 'comune', country: 'Itália', state: 'Veneto', city: 'Venezia', idioma: 'it', moeda: 'EUR', categorias: ['prefeituras', 'registros-civis'], tags: ['italia', 'comune'] },
-  { name: 'Comune di Firenze', type: 'comune', country: 'Itália', state: 'Toscana', city: 'Firenze', idioma: 'it', moeda: 'EUR', categorias: ['prefeituras', 'registros-civis'], tags: ['italia', 'comune'] },
-  { name: 'Comune di Bologna', type: 'comune', country: 'Itália', state: 'Emilia-Romagna', city: 'Bologna', idioma: 'it', moeda: 'EUR', categorias: ['prefeituras', 'registros-civis'], tags: ['italia', 'comune'] },
-  { name: 'Comune di Genova', type: 'comune', country: 'Itália', state: 'Liguria', city: 'Genova', idioma: 'it', moeda: 'EUR', categorias: ['prefeituras', 'registros-civis'], tags: ['italia', 'comune'] },
-  { name: 'Comune di Palermo', type: 'comune', country: 'Itália', state: 'Sicilia', city: 'Palermo', idioma: 'it', moeda: 'EUR', categorias: ['prefeituras', 'registros-civis'], tags: ['italia', 'comune'] },
-  { name: 'Comune di Bari', type: 'comune', country: 'Itália', state: 'Puglia', city: 'Bari', idioma: 'it', moeda: 'EUR', categorias: ['prefeituras', 'registros-civis'], tags: ['italia', 'comune'] },
-  { name: 'Comune di Trento', type: 'comune', country: 'Itália', state: 'Trentino-Alto Adige', city: 'Trento', idioma: 'it', moeda: 'EUR', categorias: ['prefeituras', 'registros-civis'], tags: ['italia', 'comune'] },
-  { name: 'Comune di Vicenza', type: 'comune', country: 'Itália', state: 'Veneto', city: 'Vicenza', idioma: 'it', moeda: 'EUR', categorias: ['prefeituras', 'registros-civis'], tags: ['italia', 'comune'] },
-  { name: 'Comune di Treviso', type: 'comune', country: 'Itália', state: 'Veneto', city: 'Treviso', idioma: 'it', moeda: 'EUR', categorias: ['prefeituras', 'registros-civis'], tags: ['italia', 'comune'] },
-  { name: 'Comune di Belluno', type: 'comune', country: 'Itália', state: 'Veneto', city: 'Belluno', idioma: 'it', moeda: 'EUR', categorias: ['prefeituras', 'registros-civis'], tags: ['italia', 'comune'] },
   { name: 'Archivio Centrale dello Stato', type: 'outro', country: 'Itália', city: 'Roma', site: 'https://acs.cultura.gov.it', idioma: 'it', moeda: 'EUR', categorias: ['arquivos-nacionais', 'arquivos-historicos'], tags: ['italia', 'pesquisa'] },
   { name: 'Archivio di Stato di Venezia', type: 'outro', country: 'Itália', state: 'Veneto', city: 'Venezia', idioma: 'it', moeda: 'EUR', categorias: ['arquivos-provinciais', 'arquivos-historicos'], tags: ['italia', 'pesquisa'] },
   { name: 'Archivio di Stato di Napoli', type: 'outro', country: 'Itália', state: 'Campania', city: 'Napoli', idioma: 'it', moeda: 'EUR', categorias: ['arquivos-provinciais', 'arquivos-historicos'], tags: ['italia', 'pesquisa'] },
@@ -207,17 +233,265 @@ export const ORGANIZACOES: OrganizacaoSeed[] = [
   { name: 'U.S. Citizenship and Immigration Services', nomeFantasia: 'USCIS', type: 'outro', country: 'Estados Unidos', state: 'DC', city: 'Washington', site: 'https://www.uscis.gov', idioma: 'en', moeda: 'USD', categorias: ['imigracao', 'governos-nacionais'], tags: ['eua', 'imigracao'] },
   { name: 'U.S. Department of State', type: 'ministerio', country: 'Estados Unidos', state: 'DC', city: 'Washington', site: 'https://www.state.gov', idioma: 'en', moeda: 'USD', observacoes: 'Autoridade competente para apostila de documentos federais.', categorias: ['ministerios', 'apostilamento'], tags: ['eua', 'apostila'] },
 
-  // ───────────────── LOGÍSTICA E SERVIÇOS (empresas reais) ──────────────────
-  { name: 'DHL Express', type: 'outro', country: 'Brasil', site: 'https://www.dhl.com', idioma: 'pt', moeda: 'BRL', categorias: ['transportadoras', 'fornecedores'], tags: ['logistica', 'internacional'] },
-  { name: 'FedEx Express', type: 'outro', country: 'Brasil', site: 'https://www.fedex.com', idioma: 'pt', moeda: 'BRL', categorias: ['transportadoras', 'fornecedores'], tags: ['logistica', 'internacional'] },
-  { name: 'UPS — United Parcel Service', type: 'outro', country: 'Brasil', site: 'https://www.ups.com', idioma: 'pt', moeda: 'BRL', categorias: ['transportadoras', 'fornecedores'], tags: ['logistica', 'internacional'] },
-  { name: 'Jadlog Logística', type: 'outro', country: 'Brasil', state: 'SP', city: 'São Paulo', site: 'https://www.jadlog.com.br', idioma: 'pt', moeda: 'BRL', categorias: ['transportadoras', 'fornecedores'], tags: ['logistica', 'nacional'] },
-  { name: 'Azul Cargo Express', type: 'outro', country: 'Brasil', state: 'SP', city: 'Barueri', site: 'https://www.azulcargo.com.br', idioma: 'pt', moeda: 'BRL', categorias: ['transportadoras', 'fornecedores'], tags: ['logistica', 'nacional'] },
-  { name: 'LATAM Cargo Brasil', type: 'outro', country: 'Brasil', state: 'SP', city: 'São Paulo', site: 'https://www.latamcargo.com', idioma: 'pt', moeda: 'BRL', categorias: ['transportadoras', 'fornecedores'], tags: ['logistica', 'nacional'] },
+  // ───────────────── INFRAESTRUTURA PÚBLICA (empresas reais) ────────────────
   { name: 'Instituto Nacional de Tecnologia da Informação', nomeFantasia: 'ITI', type: 'outro', country: 'Brasil', state: 'DF', city: 'Brasília', site: 'https://www.gov.br/iti', idioma: 'pt', moeda: 'BRL', observacoes: 'Autoridade Certificadora Raiz da ICP-Brasil.', categorias: ['certificacao-digital', 'governos-nacionais'], tags: ['brasil', 'assinatura-digital'] },
 ]
 
-/** Sanidade do próprio arquivo: sem duplicidade e sem categoria inexistente. */
+
+
+// ══════════════════════════ COMUNI ITALIANI ═════════════════════════════════
+//
+// Todos os 107 capoluoghi di provincia (que incluem, por definição, os 20
+// capoluoghi di regione) + comuni de alta demanda em processos de cidadania —
+// as áreas da grande emigração italiana para o Brasil (Veneto, Trentino, Friuli,
+// Lombardia alpina). Nome oficial em italiano: "Comune di X".
+//
+// Cada comune é ÓRGÃO (Ufficio dello Stato Civile) e FORNECEDOR: emite atti
+// mediante diritti di segreteria / marca da bollo, custo que o processo paga.
+// Um cadastro, duas funções — nunca dois registros.
+
+export interface ComuneSeed {
+  /** nome do comune, sem o prefixo "Comune di" */
+  nome: string
+  regiao: string
+  provincia: string
+  /** sigla oficial da província (RM, VI, TN…) */
+  sigla: string
+  /** capoluogo di regione */
+  capitalRegional?: boolean
+  /** capoluogo di provincia */
+  capitalProvincial?: boolean
+  observacoes?: string
+}
+
+export const COMUNI: ComuneSeed[] = [
+  // ── Abruzzo ──
+  { nome: "L'Aquila", regiao: 'Abruzzo', provincia: "L'Aquila", sigla: 'AQ', capitalRegional: true, capitalProvincial: true },
+  { nome: 'Chieti', regiao: 'Abruzzo', provincia: 'Chieti', sigla: 'CH', capitalProvincial: true },
+  { nome: 'Pescara', regiao: 'Abruzzo', provincia: 'Pescara', sigla: 'PE', capitalProvincial: true },
+  { nome: 'Teramo', regiao: 'Abruzzo', provincia: 'Teramo', sigla: 'TE', capitalProvincial: true },
+  // ── Basilicata ──
+  { nome: 'Potenza', regiao: 'Basilicata', provincia: 'Potenza', sigla: 'PZ', capitalRegional: true, capitalProvincial: true },
+  { nome: 'Matera', regiao: 'Basilicata', provincia: 'Matera', sigla: 'MT', capitalProvincial: true },
+  // ── Calabria ──
+  { nome: 'Catanzaro', regiao: 'Calabria', provincia: 'Catanzaro', sigla: 'CZ', capitalRegional: true, capitalProvincial: true },
+  { nome: 'Cosenza', regiao: 'Calabria', provincia: 'Cosenza', sigla: 'CS', capitalProvincial: true },
+  { nome: 'Crotone', regiao: 'Calabria', provincia: 'Crotone', sigla: 'KR', capitalProvincial: true },
+  { nome: 'Reggio di Calabria', regiao: 'Calabria', provincia: 'Reggio Calabria', sigla: 'RC', capitalProvincial: true },
+  { nome: 'Vibo Valentia', regiao: 'Calabria', provincia: 'Vibo Valentia', sigla: 'VV', capitalProvincial: true },
+  // ── Campania ──
+  { nome: 'Napoli', regiao: 'Campania', provincia: 'Napoli', sigla: 'NA', capitalRegional: true, capitalProvincial: true },
+  { nome: 'Avellino', regiao: 'Campania', provincia: 'Avellino', sigla: 'AV', capitalProvincial: true },
+  { nome: 'Benevento', regiao: 'Campania', provincia: 'Benevento', sigla: 'BN', capitalProvincial: true },
+  { nome: 'Caserta', regiao: 'Campania', provincia: 'Caserta', sigla: 'CE', capitalProvincial: true },
+  { nome: 'Salerno', regiao: 'Campania', provincia: 'Salerno', sigla: 'SA', capitalProvincial: true },
+  // ── Emilia-Romagna ──
+  { nome: 'Bologna', regiao: 'Emilia-Romagna', provincia: 'Bologna', sigla: 'BO', capitalRegional: true, capitalProvincial: true },
+  { nome: 'Ferrara', regiao: 'Emilia-Romagna', provincia: 'Ferrara', sigla: 'FE', capitalProvincial: true },
+  { nome: 'Forlì', regiao: 'Emilia-Romagna', provincia: 'Forlì-Cesena', sigla: 'FC', capitalProvincial: true },
+  { nome: 'Cesena', regiao: 'Emilia-Romagna', provincia: 'Forlì-Cesena', sigla: 'FC', capitalProvincial: true },
+  { nome: 'Modena', regiao: 'Emilia-Romagna', provincia: 'Modena', sigla: 'MO', capitalProvincial: true },
+  { nome: 'Parma', regiao: 'Emilia-Romagna', provincia: 'Parma', sigla: 'PR', capitalProvincial: true },
+  { nome: 'Piacenza', regiao: 'Emilia-Romagna', provincia: 'Piacenza', sigla: 'PC', capitalProvincial: true },
+  { nome: 'Ravenna', regiao: 'Emilia-Romagna', provincia: 'Ravenna', sigla: 'RA', capitalProvincial: true },
+  { nome: "Reggio nell'Emilia", regiao: 'Emilia-Romagna', provincia: "Reggio nell'Emilia", sigla: 'RE', capitalProvincial: true },
+  { nome: 'Rimini', regiao: 'Emilia-Romagna', provincia: 'Rimini', sigla: 'RN', capitalProvincial: true },
+  // ── Friuli-Venezia Giulia ──
+  { nome: 'Trieste', regiao: 'Friuli-Venezia Giulia', provincia: 'Trieste', sigla: 'TS', capitalRegional: true, capitalProvincial: true },
+  { nome: 'Gorizia', regiao: 'Friuli-Venezia Giulia', provincia: 'Gorizia', sigla: 'GO', capitalProvincial: true },
+  { nome: 'Pordenone', regiao: 'Friuli-Venezia Giulia', provincia: 'Pordenone', sigla: 'PN', capitalProvincial: true },
+  { nome: 'Udine', regiao: 'Friuli-Venezia Giulia', provincia: 'Udine', sigla: 'UD', capitalProvincial: true },
+  { nome: 'Spilimbergo', regiao: 'Friuli-Venezia Giulia', provincia: 'Pordenone', sigla: 'PN', observacoes: 'Alta demanda — região de forte emigração para o Brasil.' },
+  { nome: 'Codroipo', regiao: 'Friuli-Venezia Giulia', provincia: 'Udine', sigla: 'UD', observacoes: 'Alta demanda — região de forte emigração para o Brasil.' },
+  // ── Lazio ──
+  { nome: 'Roma', regiao: 'Lazio', provincia: 'Roma', sigla: 'RM', capitalRegional: true, capitalProvincial: true },
+  { nome: 'Frosinone', regiao: 'Lazio', provincia: 'Frosinone', sigla: 'FR', capitalProvincial: true },
+  { nome: 'Latina', regiao: 'Lazio', provincia: 'Latina', sigla: 'LT', capitalProvincial: true },
+  { nome: 'Rieti', regiao: 'Lazio', provincia: 'Rieti', sigla: 'RI', capitalProvincial: true },
+  { nome: 'Viterbo', regiao: 'Lazio', provincia: 'Viterbo', sigla: 'VT', capitalProvincial: true },
+  // ── Liguria ──
+  { nome: 'Genova', regiao: 'Liguria', provincia: 'Genova', sigla: 'GE', capitalRegional: true, capitalProvincial: true },
+  { nome: 'Imperia', regiao: 'Liguria', provincia: 'Imperia', sigla: 'IM', capitalProvincial: true },
+  { nome: 'La Spezia', regiao: 'Liguria', provincia: 'La Spezia', sigla: 'SP', capitalProvincial: true },
+  { nome: 'Savona', regiao: 'Liguria', provincia: 'Savona', sigla: 'SV', capitalProvincial: true },
+  // ── Lombardia ──
+  { nome: 'Milano', regiao: 'Lombardia', provincia: 'Milano', sigla: 'MI', capitalRegional: true, capitalProvincial: true },
+  { nome: 'Bergamo', regiao: 'Lombardia', provincia: 'Bergamo', sigla: 'BG', capitalProvincial: true },
+  { nome: 'Brescia', regiao: 'Lombardia', provincia: 'Brescia', sigla: 'BS', capitalProvincial: true },
+  { nome: 'Como', regiao: 'Lombardia', provincia: 'Como', sigla: 'CO', capitalProvincial: true },
+  { nome: 'Cremona', regiao: 'Lombardia', provincia: 'Cremona', sigla: 'CR', capitalProvincial: true },
+  { nome: 'Lecco', regiao: 'Lombardia', provincia: 'Lecco', sigla: 'LC', capitalProvincial: true },
+  { nome: 'Lodi', regiao: 'Lombardia', provincia: 'Lodi', sigla: 'LO', capitalProvincial: true },
+  { nome: 'Mantova', regiao: 'Lombardia', provincia: 'Mantova', sigla: 'MN', capitalProvincial: true },
+  { nome: 'Monza', regiao: 'Lombardia', provincia: 'Monza e della Brianza', sigla: 'MB', capitalProvincial: true },
+  { nome: 'Pavia', regiao: 'Lombardia', provincia: 'Pavia', sigla: 'PV', capitalProvincial: true },
+  { nome: 'Sondrio', regiao: 'Lombardia', provincia: 'Sondrio', sigla: 'SO', capitalProvincial: true },
+  { nome: 'Varese', regiao: 'Lombardia', provincia: 'Varese', sigla: 'VA', capitalProvincial: true },
+  { nome: 'Chiavenna', regiao: 'Lombardia', provincia: 'Sondrio', sigla: 'SO', observacoes: 'Alta demanda — região de forte emigração para o Brasil.' },
+  // ── Marche ──
+  { nome: 'Ancona', regiao: 'Marche', provincia: 'Ancona', sigla: 'AN', capitalRegional: true, capitalProvincial: true },
+  { nome: 'Ascoli Piceno', regiao: 'Marche', provincia: 'Ascoli Piceno', sigla: 'AP', capitalProvincial: true },
+  { nome: 'Fermo', regiao: 'Marche', provincia: 'Fermo', sigla: 'FM', capitalProvincial: true },
+  { nome: 'Macerata', regiao: 'Marche', provincia: 'Macerata', sigla: 'MC', capitalProvincial: true },
+  { nome: 'Pesaro', regiao: 'Marche', provincia: 'Pesaro e Urbino', sigla: 'PU', capitalProvincial: true },
+  { nome: 'Urbino', regiao: 'Marche', provincia: 'Pesaro e Urbino', sigla: 'PU', capitalProvincial: true },
+  // ── Molise ──
+  { nome: 'Campobasso', regiao: 'Molise', provincia: 'Campobasso', sigla: 'CB', capitalRegional: true, capitalProvincial: true },
+  { nome: 'Isernia', regiao: 'Molise', provincia: 'Isernia', sigla: 'IS', capitalProvincial: true },
+  // ── Piemonte ──
+  { nome: 'Torino', regiao: 'Piemonte', provincia: 'Torino', sigla: 'TO', capitalRegional: true, capitalProvincial: true },
+  { nome: 'Alessandria', regiao: 'Piemonte', provincia: 'Alessandria', sigla: 'AL', capitalProvincial: true },
+  { nome: 'Asti', regiao: 'Piemonte', provincia: 'Asti', sigla: 'AT', capitalProvincial: true },
+  { nome: 'Biella', regiao: 'Piemonte', provincia: 'Biella', sigla: 'BI', capitalProvincial: true },
+  { nome: 'Cuneo', regiao: 'Piemonte', provincia: 'Cuneo', sigla: 'CN', capitalProvincial: true },
+  { nome: 'Novara', regiao: 'Piemonte', provincia: 'Novara', sigla: 'NO', capitalProvincial: true },
+  { nome: 'Verbania', regiao: 'Piemonte', provincia: 'Verbano-Cusio-Ossola', sigla: 'VB', capitalProvincial: true },
+  { nome: 'Vercelli', regiao: 'Piemonte', provincia: 'Vercelli', sigla: 'VC', capitalProvincial: true },
+  // ── Puglia ──
+  { nome: 'Bari', regiao: 'Puglia', provincia: 'Bari', sigla: 'BA', capitalRegional: true, capitalProvincial: true },
+  { nome: 'Barletta', regiao: 'Puglia', provincia: 'Barletta-Andria-Trani', sigla: 'BT', capitalProvincial: true },
+  { nome: 'Andria', regiao: 'Puglia', provincia: 'Barletta-Andria-Trani', sigla: 'BT', capitalProvincial: true },
+  { nome: 'Trani', regiao: 'Puglia', provincia: 'Barletta-Andria-Trani', sigla: 'BT', capitalProvincial: true },
+  { nome: 'Brindisi', regiao: 'Puglia', provincia: 'Brindisi', sigla: 'BR', capitalProvincial: true },
+  { nome: 'Foggia', regiao: 'Puglia', provincia: 'Foggia', sigla: 'FG', capitalProvincial: true },
+  { nome: 'Lecce', regiao: 'Puglia', provincia: 'Lecce', sigla: 'LE', capitalProvincial: true },
+  { nome: 'Taranto', regiao: 'Puglia', provincia: 'Taranto', sigla: 'TA', capitalProvincial: true },
+  // ── Sardegna ──
+  { nome: 'Cagliari', regiao: 'Sardegna', provincia: 'Cagliari', sigla: 'CA', capitalRegional: true, capitalProvincial: true },
+  { nome: 'Nuoro', regiao: 'Sardegna', provincia: 'Nuoro', sigla: 'NU', capitalProvincial: true },
+  { nome: 'Oristano', regiao: 'Sardegna', provincia: 'Oristano', sigla: 'OR', capitalProvincial: true },
+  { nome: 'Sassari', regiao: 'Sardegna', provincia: 'Sassari', sigla: 'SS', capitalProvincial: true },
+  { nome: 'Carbonia', regiao: 'Sardegna', provincia: 'Sud Sardegna', sigla: 'SU', capitalProvincial: true },
+  // ── Sicilia ──
+  { nome: 'Palermo', regiao: 'Sicilia', provincia: 'Palermo', sigla: 'PA', capitalRegional: true, capitalProvincial: true },
+  { nome: 'Agrigento', regiao: 'Sicilia', provincia: 'Agrigento', sigla: 'AG', capitalProvincial: true },
+  { nome: 'Caltanissetta', regiao: 'Sicilia', provincia: 'Caltanissetta', sigla: 'CL', capitalProvincial: true },
+  { nome: 'Catania', regiao: 'Sicilia', provincia: 'Catania', sigla: 'CT', capitalProvincial: true },
+  { nome: 'Enna', regiao: 'Sicilia', provincia: 'Enna', sigla: 'EN', capitalProvincial: true },
+  { nome: 'Messina', regiao: 'Sicilia', provincia: 'Messina', sigla: 'ME', capitalProvincial: true },
+  { nome: 'Ragusa', regiao: 'Sicilia', provincia: 'Ragusa', sigla: 'RG', capitalProvincial: true },
+  { nome: 'Siracusa', regiao: 'Sicilia', provincia: 'Siracusa', sigla: 'SR', capitalProvincial: true },
+  { nome: 'Trapani', regiao: 'Sicilia', provincia: 'Trapani', sigla: 'TP', capitalProvincial: true },
+  // ── Toscana ──
+  { nome: 'Firenze', regiao: 'Toscana', provincia: 'Firenze', sigla: 'FI', capitalRegional: true, capitalProvincial: true },
+  { nome: 'Arezzo', regiao: 'Toscana', provincia: 'Arezzo', sigla: 'AR', capitalProvincial: true },
+  { nome: 'Grosseto', regiao: 'Toscana', provincia: 'Grosseto', sigla: 'GR', capitalProvincial: true },
+  { nome: 'Livorno', regiao: 'Toscana', provincia: 'Livorno', sigla: 'LI', capitalProvincial: true },
+  { nome: 'Lucca', regiao: 'Toscana', provincia: 'Lucca', sigla: 'LU', capitalProvincial: true },
+  { nome: 'Massa', regiao: 'Toscana', provincia: 'Massa-Carrara', sigla: 'MS', capitalProvincial: true },
+  { nome: 'Pisa', regiao: 'Toscana', provincia: 'Pisa', sigla: 'PI', capitalProvincial: true },
+  { nome: 'Pistoia', regiao: 'Toscana', provincia: 'Pistoia', sigla: 'PT', capitalProvincial: true },
+  { nome: 'Prato', regiao: 'Toscana', provincia: 'Prato', sigla: 'PO', capitalProvincial: true },
+  { nome: 'Siena', regiao: 'Toscana', provincia: 'Siena', sigla: 'SI', capitalProvincial: true },
+  // ── Trentino-Alto Adige ──
+  { nome: 'Trento', regiao: 'Trentino-Alto Adige', provincia: 'Trento', sigla: 'TN', capitalRegional: true, capitalProvincial: true },
+  { nome: 'Bolzano', regiao: 'Trentino-Alto Adige', provincia: 'Bolzano', sigla: 'BZ', capitalRegional: true, capitalProvincial: true, observacoes: 'Comune bilíngue (Stadtgemeinde Bozen).' },
+  { nome: 'Rovereto', regiao: 'Trentino-Alto Adige', provincia: 'Trento', sigla: 'TN', observacoes: 'Alta demanda — região de forte emigração para o Brasil.' },
+  { nome: 'Pergine Valsugana', regiao: 'Trentino-Alto Adige', provincia: 'Trento', sigla: 'TN', observacoes: 'Alta demanda — região de forte emigração para o Brasil.' },
+  { nome: 'Borgo Valsugana', regiao: 'Trentino-Alto Adige', provincia: 'Trento', sigla: 'TN', observacoes: 'Alta demanda — região de forte emigração para o Brasil.' },
+  // ── Umbria ──
+  { nome: 'Perugia', regiao: 'Umbria', provincia: 'Perugia', sigla: 'PG', capitalRegional: true, capitalProvincial: true },
+  { nome: 'Terni', regiao: 'Umbria', provincia: 'Terni', sigla: 'TR', capitalProvincial: true },
+  // ── Valle d'Aosta ──
+  { nome: 'Aosta', regiao: "Valle d'Aosta", provincia: 'Aosta', sigla: 'AO', capitalRegional: true, capitalProvincial: true, observacoes: "Comune bilíngue (Commune d'Aoste)." },
+  // ── Veneto ──
+  { nome: 'Venezia', regiao: 'Veneto', provincia: 'Venezia', sigla: 'VE', capitalRegional: true, capitalProvincial: true },
+  { nome: 'Belluno', regiao: 'Veneto', provincia: 'Belluno', sigla: 'BL', capitalProvincial: true },
+  { nome: 'Padova', regiao: 'Veneto', provincia: 'Padova', sigla: 'PD', capitalProvincial: true },
+  { nome: 'Rovigo', regiao: 'Veneto', provincia: 'Rovigo', sigla: 'RO', capitalProvincial: true },
+  { nome: 'Treviso', regiao: 'Veneto', provincia: 'Treviso', sigla: 'TV', capitalProvincial: true },
+  { nome: 'Verona', regiao: 'Veneto', provincia: 'Verona', sigla: 'VR', capitalProvincial: true },
+  { nome: 'Vicenza', regiao: 'Veneto', provincia: 'Vicenza', sigla: 'VI', capitalProvincial: true },
+  { nome: 'Bassano del Grappa', regiao: 'Veneto', provincia: 'Vicenza', sigla: 'VI', observacoes: 'Alta demanda — região de forte emigração para o Brasil.' },
+  { nome: 'Schio', regiao: 'Veneto', provincia: 'Vicenza', sigla: 'VI', observacoes: 'Alta demanda — região de forte emigração para o Brasil.' },
+  { nome: 'Thiene', regiao: 'Veneto', provincia: 'Vicenza', sigla: 'VI', observacoes: 'Alta demanda — região de forte emigração para o Brasil.' },
+  { nome: 'Valdagno', regiao: 'Veneto', provincia: 'Vicenza', sigla: 'VI', observacoes: 'Alta demanda — região de forte emigração para o Brasil.' },
+  { nome: 'Asiago', regiao: 'Veneto', provincia: 'Vicenza', sigla: 'VI', observacoes: 'Alta demanda — região de forte emigração para o Brasil.' },
+  { nome: 'Conegliano', regiao: 'Veneto', provincia: 'Treviso', sigla: 'TV', observacoes: 'Alta demanda — região de forte emigração para o Brasil.' },
+  { nome: 'Castelfranco Veneto', regiao: 'Veneto', provincia: 'Treviso', sigla: 'TV', observacoes: 'Alta demanda — região de forte emigração para o Brasil.' },
+  { nome: 'Montebelluna', regiao: 'Veneto', provincia: 'Treviso', sigla: 'TV', observacoes: 'Alta demanda — região de forte emigração para o Brasil.' },
+  { nome: 'Vittorio Veneto', regiao: 'Veneto', provincia: 'Treviso', sigla: 'TV', observacoes: 'Alta demanda — região de forte emigração para o Brasil.' },
+  { nome: 'Feltre', regiao: 'Veneto', provincia: 'Belluno', sigla: 'BL', observacoes: 'Alta demanda — região de forte emigração para o Brasil.' },
+  { nome: 'Legnago', regiao: 'Veneto', provincia: 'Verona', sigla: 'VR', observacoes: 'Alta demanda — região de forte emigração para o Brasil.' },
+]
+
+/** Comune → registro do cadastro mestre (um só, com as duas funções). */
+export function comuneParaOrganizacao(c: ComuneSeed): OrganizacaoSeed {
+  const papel = c.capitalRegional ? 'capoluogo di regione' : c.capitalProvincial ? 'capoluogo di provincia' : 'comune'
+  return {
+    name: `Comune di ${c.nome}`,
+    nomeFantasia: `${c.nome} (${c.sigla})`,
+    type: 'comune',
+    country: 'Itália',
+    state: c.regiao,
+    provincia: `${c.provincia} (${c.sigla})`,
+    city: c.nome,
+    idioma: 'it',
+    moeda: 'EUR',
+    observacoes: [`Ufficio dello Stato Civile e Anagrafe — ${papel}.`, c.observacoes].filter(Boolean).join(' '),
+    tags: ['italia', 'comune', c.sigla.toLowerCase(), ...(c.capitalRegional ? ['capoluogo-regione'] : []), ...(c.capitalProvincial ? ['capoluogo-provincia'] : [])],
+    categorias: ['comuni', 'registros-civis'],
+    funcoes: ['ORGAO', 'FORNECEDOR'],
+  }
+}
+
+// ═══════════════════════ FORNECEDORES REAIS ═════════════════════════════════
+//
+// Empresas REAIS com que a operação gasta. Entram no MESMO cadastro, com a
+// função FORNECEDOR — não existe cadastro de fornecedor separado.
+//
+// CNPJ, dados bancários, chave PIX e contato financeiro NÃO são semeados: são
+// dados que só o escritório conhece com segurança. Campo vazio > dado inventado.
+
+export const FORNECEDORES: OrganizacaoSeed[] = [
+  // ── transporte e logística ──
+  { name: 'DHL Express', type: 'outro', country: 'Brasil', site: 'https://www.dhl.com', idioma: 'pt', moeda: 'BRL', categorias: ['transportadoras', 'fornecedores'], funcoes: ['FORNECEDOR'], tags: ['logistica', 'internacional'] },
+  { name: 'FedEx Express', nomeFantasia: 'FedEx', type: 'outro', country: 'Brasil', site: 'https://www.fedex.com', idioma: 'pt', moeda: 'BRL', categorias: ['transportadoras', 'fornecedores'], funcoes: ['FORNECEDOR'], tags: ['logistica', 'internacional'] },
+  { name: 'UPS — United Parcel Service', nomeFantasia: 'UPS', type: 'outro', country: 'Brasil', site: 'https://www.ups.com', idioma: 'pt', moeda: 'BRL', categorias: ['transportadoras', 'fornecedores'], funcoes: ['FORNECEDOR'], tags: ['logistica', 'internacional'] },
+  { name: 'Jadlog Logística', nomeFantasia: 'Jadlog', type: 'outro', country: 'Brasil', state: 'SP', city: 'São Paulo', site: 'https://www.jadlog.com.br', idioma: 'pt', moeda: 'BRL', categorias: ['transportadoras', 'fornecedores'], funcoes: ['FORNECEDOR'], tags: ['logistica', 'nacional'] },
+  { name: 'Azul Cargo Express', type: 'outro', country: 'Brasil', state: 'SP', city: 'Barueri', site: 'https://www.azulcargo.com.br', idioma: 'pt', moeda: 'BRL', categorias: ['transportadoras', 'fornecedores'], funcoes: ['FORNECEDOR'], tags: ['logistica', 'nacional'] },
+  { name: 'LATAM Cargo Brasil', type: 'outro', country: 'Brasil', state: 'SP', city: 'São Paulo', site: 'https://www.latamcargo.com', idioma: 'pt', moeda: 'BRL', categorias: ['transportadoras', 'fornecedores'], funcoes: ['FORNECEDOR'], tags: ['logistica', 'nacional'] },
+
+  // ── bancos e pagamentos ──
+  { name: 'Banco do Brasil S.A.', nomeFantasia: 'Banco do Brasil', type: 'outro', country: 'Brasil', state: 'DF', city: 'Brasília', site: 'https://www.bb.com.br', idioma: 'pt', moeda: 'BRL', categorias: ['bancos', 'fornecedores'], funcoes: ['FORNECEDOR'], tags: ['financeiro'] },
+  { name: 'Caixa Econômica Federal', nomeFantasia: 'Caixa', type: 'outro', country: 'Brasil', state: 'DF', city: 'Brasília', site: 'https://www.caixa.gov.br', idioma: 'pt', moeda: 'BRL', categorias: ['bancos', 'fornecedores'], funcoes: ['FORNECEDOR'], tags: ['financeiro'] },
+  { name: 'Itaú Unibanco S.A.', nomeFantasia: 'Itaú', type: 'outro', country: 'Brasil', state: 'SP', city: 'São Paulo', site: 'https://www.itau.com.br', idioma: 'pt', moeda: 'BRL', categorias: ['bancos', 'fornecedores'], funcoes: ['FORNECEDOR'], tags: ['financeiro'] },
+  { name: 'Banco Bradesco S.A.', nomeFantasia: 'Bradesco', type: 'outro', country: 'Brasil', state: 'SP', city: 'Osasco', site: 'https://www.bradesco.com.br', idioma: 'pt', moeda: 'BRL', categorias: ['bancos', 'fornecedores'], funcoes: ['FORNECEDOR'], tags: ['financeiro'] },
+  { name: 'Banco Santander (Brasil) S.A.', nomeFantasia: 'Santander', type: 'outro', country: 'Brasil', state: 'SP', city: 'São Paulo', site: 'https://www.santander.com.br', idioma: 'pt', moeda: 'BRL', categorias: ['bancos', 'fornecedores'], funcoes: ['FORNECEDOR'], tags: ['financeiro'] },
+  { name: 'Nu Pagamentos S.A.', nomeFantasia: 'Nubank', type: 'outro', country: 'Brasil', state: 'SP', city: 'São Paulo', site: 'https://nubank.com.br', idioma: 'pt', moeda: 'BRL', categorias: ['bancos', 'fornecedores'], funcoes: ['FORNECEDOR'], tags: ['financeiro'] },
+  { name: 'Sicredi — Sistema de Crédito Cooperativo', nomeFantasia: 'Sicredi', type: 'outro', country: 'Brasil', state: 'RS', city: 'Porto Alegre', site: 'https://www.sicredi.com.br', idioma: 'pt', moeda: 'BRL', categorias: ['bancos', 'fornecedores'], funcoes: ['FORNECEDOR'], tags: ['financeiro'] },
+  { name: 'Sicoob — Sistema de Cooperativas de Crédito do Brasil', nomeFantasia: 'Sicoob', type: 'outro', country: 'Brasil', state: 'DF', city: 'Brasília', site: 'https://www.sicoob.com.br', idioma: 'pt', moeda: 'BRL', categorias: ['bancos', 'fornecedores'], funcoes: ['FORNECEDOR'], tags: ['financeiro'] },
+  { name: 'Wise Payments Limited', nomeFantasia: 'Wise', type: 'outro', country: 'Reino Unido', city: 'London', site: 'https://wise.com', idioma: 'en', moeda: 'EUR', observacoes: 'Câmbio e pagamentos internacionais — remessas para órgãos no exterior.', categorias: ['bancos', 'fornecedores'], funcoes: ['FORNECEDOR'], tags: ['financeiro', 'cambio', 'internacional'] },
+  { name: 'PayPal Holdings, Inc.', nomeFantasia: 'PayPal', type: 'outro', country: 'Estados Unidos', state: 'CA', city: 'San Jose', site: 'https://www.paypal.com', idioma: 'en', moeda: 'USD', categorias: ['bancos', 'fornecedores'], funcoes: ['FORNECEDOR'], tags: ['financeiro', 'internacional'] },
+  { name: 'Stripe, Inc.', nomeFantasia: 'Stripe', type: 'outro', country: 'Estados Unidos', state: 'CA', city: 'South San Francisco', site: 'https://stripe.com', idioma: 'en', moeda: 'USD', categorias: ['bancos', 'fornecedores'], funcoes: ['FORNECEDOR'], tags: ['financeiro', 'internacional'] },
+  { name: 'Mercado Pago', type: 'outro', country: 'Brasil', state: 'SP', city: 'São Paulo', site: 'https://www.mercadopago.com.br', idioma: 'pt', moeda: 'BRL', categorias: ['bancos', 'fornecedores'], funcoes: ['FORNECEDOR'], tags: ['financeiro'] },
+  { name: 'PagSeguro Internet S.A.', nomeFantasia: 'PagBank', type: 'outro', country: 'Brasil', state: 'SP', city: 'São Paulo', site: 'https://pagseguro.uol.com.br', idioma: 'pt', moeda: 'BRL', categorias: ['bancos', 'fornecedores'], funcoes: ['FORNECEDOR'], tags: ['financeiro'] },
+
+  // ── tecnologia e operação ──
+  { name: 'Microsoft Corporation', nomeFantasia: 'Microsoft', type: 'outro', country: 'Estados Unidos', state: 'WA', city: 'Redmond', site: 'https://www.microsoft.com', idioma: 'en', moeda: 'USD', categorias: ['fornecedores'], funcoes: ['FORNECEDOR'], tags: ['tecnologia'] },
+  { name: 'Google LLC', nomeFantasia: 'Google', type: 'outro', country: 'Estados Unidos', state: 'CA', city: 'Mountain View', site: 'https://www.google.com', idioma: 'en', moeda: 'USD', categorias: ['fornecedores'], funcoes: ['FORNECEDOR'], tags: ['tecnologia'] },
+  { name: 'Amazon Web Services, Inc.', nomeFantasia: 'AWS', type: 'outro', country: 'Estados Unidos', state: 'WA', city: 'Seattle', site: 'https://aws.amazon.com', idioma: 'en', moeda: 'USD', categorias: ['fornecedores'], funcoes: ['FORNECEDOR'], tags: ['tecnologia', 'nuvem'] },
+  { name: 'Cloudflare, Inc.', nomeFantasia: 'Cloudflare', type: 'outro', country: 'Estados Unidos', state: 'CA', city: 'San Francisco', site: 'https://www.cloudflare.com', idioma: 'en', moeda: 'USD', categorias: ['fornecedores'], funcoes: ['FORNECEDOR'], tags: ['tecnologia', 'nuvem'] },
+  { name: 'Vercel, Inc.', nomeFantasia: 'Vercel', type: 'outro', country: 'Estados Unidos', state: 'CA', city: 'San Francisco', site: 'https://vercel.com', idioma: 'en', moeda: 'USD', categorias: ['fornecedores'], funcoes: ['FORNECEDOR'], tags: ['tecnologia', 'nuvem'] },
+  { name: 'Adobe Inc.', nomeFantasia: 'Adobe', type: 'outro', country: 'Estados Unidos', state: 'CA', city: 'San Jose', site: 'https://www.adobe.com', idioma: 'en', moeda: 'USD', categorias: ['fornecedores'], funcoes: ['FORNECEDOR'], tags: ['tecnologia'] },
+  { name: 'DocuSign, Inc.', nomeFantasia: 'DocuSign', type: 'outro', country: 'Estados Unidos', state: 'CA', city: 'San Francisco', site: 'https://www.docusign.com', idioma: 'en', moeda: 'USD', categorias: ['certificacao-digital', 'fornecedores'], funcoes: ['FORNECEDOR'], tags: ['assinatura-digital'] },
+  { name: 'Clicksign Gestão de Documentos S.A.', nomeFantasia: 'Clicksign', type: 'outro', country: 'Brasil', state: 'SP', city: 'São Paulo', site: 'https://www.clicksign.com', idioma: 'pt', moeda: 'BRL', categorias: ['certificacao-digital', 'fornecedores'], funcoes: ['FORNECEDOR'], tags: ['assinatura-digital'] },
+  { name: 'Certisign Certificadora Digital S.A.', nomeFantasia: 'Certisign', type: 'outro', country: 'Brasil', state: 'SP', city: 'São Paulo', site: 'https://www.certisign.com.br', idioma: 'pt', moeda: 'BRL', categorias: ['certificacao-digital', 'fornecedores'], funcoes: ['FORNECEDOR'], tags: ['assinatura-digital', 'icp-brasil'] },
+  { name: 'Serasa Experian', type: 'outro', country: 'Brasil', state: 'SP', city: 'São Paulo', site: 'https://www.serasaexperian.com.br', idioma: 'pt', moeda: 'BRL', categorias: ['fornecedores'], funcoes: ['FORNECEDOR'], tags: ['dados', 'consulta'] },
+]
+
+/** Base completa: entidades oficiais + comuni italianos + fornecedores reais. */
+export const BASE_COMPLETA: OrganizacaoSeed[] = [
+  ...ORGANIZACOES,
+  ...COMUNI.map(comuneParaOrganizacao),
+  ...FORNECEDORES,
+]
+
+/**
+ * Sanidade do próprio arquivo, sobre a BASE COMPLETA: nenhuma entidade declarada
+ * duas vezes (nem entre blocos), nenhuma categoria órfã, nenhuma organização sem
+ * classificação e nenhuma sem função.
+ */
 export function validarBase(): string[] {
   const problemas: string[] = []
   const codes = new Set<string>()
@@ -226,12 +500,20 @@ export function validarBase(): string[] {
     codes.add(c.code)
   }
   const chaves = new Set<string>()
-  for (const o of ORGANIZACOES) {
+  for (const o of BASE_COMPLETA) {
     const chave = `${o.name}::${o.country}`
     if (chaves.has(chave)) problemas.push(`organização duplicada: ${chave}`)
     chaves.add(chave)
     if (!o.categorias.length) problemas.push(`organização sem categoria: ${o.name}`)
+    if (!funcoesDe(o).length) problemas.push(`organização sem função: ${o.name}`)
     for (const c of o.categorias) if (!codes.has(c)) problemas.push(`categoria inexistente "${c}" em ${o.name}`)
+  }
+  // comuni: região e província obrigatórias — é o vínculo territorial do ato
+  const siglas = /^[A-Z]{2}$/
+  for (const c of COMUNI) {
+    if (!c.regiao) problemas.push(`comune sem região: ${c.nome}`)
+    if (!c.provincia) problemas.push(`comune sem província: ${c.nome}`)
+    if (!siglas.test(c.sigla)) problemas.push(`sigla de província inválida em ${c.nome}: ${c.sigla}`)
   }
   return problemas
 }
