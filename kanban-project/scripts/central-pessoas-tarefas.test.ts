@@ -140,8 +140,18 @@ const CONDICOES_PROIBIDAS: Array<[string, RegExp]> = [
 for (const [nome, re] of CONDICOES_PROIBIDAS) {
   check(`sem condição incorreta: ${nome}`, !re.test(central) && !re.test(painel) && !re.test(rota))
 }
-check("linha da pessoa é CONTEXTO, sem tarefas duplicadas", !painel.includes("p.docs.map") && !painel.includes("Abrir operação"))
-check("Operação Antecipada preservada, agora na instância do passo", painel.includes("+ antecipada") && painel.includes("onNovaOperacao(t.necessidadeId"))
+// A linha da pessoa não pode mais listar documentos/tarefas — isso vive no workflow.
+// ("Abrir operação" segue existindo, mas dentro da Operação Antecipada, que é outra coisa.)
+check("linha da pessoa é CONTEXTO, sem tarefas duplicadas",
+  !painel.includes("p.docs.map") && !painel.includes("docsResumo.map") && !painel.includes("docExpRow"))
+// OPERAÇÃO ANTECIPADA — a capacidade tem de continuar INTEIRA: criar, listar,
+// avaliar e abrir. Só mudou de lugar (do documento na tabela para o alvo do passo).
+check("antecipada: criar", painel.includes("+ antecipada") && painel.includes("onNovaOperacao(t.necessidadeId"))
+check("antecipada: listar inline no alvo", painel.includes("function OperacoesAntecipadasInline") && painel.includes("<OperacoesAntecipadasInline"))
+check("antecipada: avaliar (SIM/PARCIAL/NAO/CANCELAR)", painel.includes("function OperacaoAntecipadaItem") && painel.includes("onAvaliar?.(o.id"))
+check("antecipada: abrir a operação oficial", painel.includes("onAbrirOperacaoAntecipada") && central.includes("abrirOperacaoAntecipada"))
+check("antecipada: rótulos de status preservados", painel.includes("ST_OP_LABEL") && painel.includes("AGUARDANDO_RESULTADO"))
+check("antecipada: ligada ponta a ponta pela Central", central.includes("operacoesPorNec={operacoesPorNec}") && central.includes("onAvaliarOperacao={readOnly ? undefined : avaliarOperacao}"))
 
 // Timeline: executar a tarefa pela Central tem de deixar rastro no Diário Operacional.
 const opDoc = read("src/services/documento-operacao.ts")

@@ -950,6 +950,9 @@ export function ProcessoCentralOperacional({
             readOnly={readOnly}
             usuarios={usuarios}
             onNovaOperacao={readOnly ? undefined : (necessidadeId, pessoaIdNec, label) => setNovaOperacaoCtx({ necessidadeId, pessoaId: pessoaIdNec, label })}
+            operacoesPorNec={operacoesPorNec}
+            onAvaliarOperacao={readOnly ? undefined : avaliarOperacao}
+            onAbrirOperacaoAntecipada={readOnly ? undefined : abrirOperacaoAntecipada}
             modoReestruturacao={!!bodyData.genealogiaReestruturacao}
             avisoReestruturacao={bodyData.mensagemReestruturacao ?? undefined}
           />
