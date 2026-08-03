@@ -75,6 +75,7 @@ export interface FaseTarefaRow {
   responsavelNome: string | null
   prazo: string | null
   diasParaPrazo: number | null
+  slaDays: number | null
   motivo: string | null
   escopo: "GLOBAL" | "PESSOA" | "DOCUMENTO"
   executor: "OPERACAO_DOCUMENTO" | null
@@ -587,6 +588,10 @@ function TarefaRow({
           <span className={t.diasParaPrazo < 0 ? "text-[#f87171] font-semibold" : "text-white/68"}>
             {t.diasParaPrazo < 0 ? `${Math.abs(t.diasParaPrazo)}d atrasada` : `${t.diasParaPrazo}d`}
           </span>
+        ) : t.slaDays ? (
+          // Sem prazo iniciado ainda: mostra o SLA CONFIGURADO, para o operador não
+          // ler "—" num passo que tem prazo definido no cadastro.
+          <span className="text-white/40">SLA {t.slaDays}d</span>
         ) : (
           <span className="text-white/25">—</span>
         )}

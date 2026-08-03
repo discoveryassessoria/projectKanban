@@ -150,6 +150,8 @@ interface TarefaFaseRow {
   responsavelNome: string | null
   prazo: string | null
   diasParaPrazo: number | null
+  /** SLA em dias CONFIGURADO no passo publicado (visível mesmo sem prazo iniciado). */
+  slaDays: number | null
   motivo: string | null
   /** Escopo persistido do passo, derivado da entidade vinculada à instância. */
   escopo: "GLOBAL" | "PESSOA" | "DOCUMENTO"
@@ -884,7 +886,7 @@ export async function GET(
           select: {
             id: true, stepKey: true, ordem: true, status: true, obrigatorio: true,
             pessoaId: true, necessidadeId: true, documentoId: true, responsavelId: true,
-            prazo: true, motivo: true, snapshot: true, ciclo: true,
+            prazo: true, slaDays: true, motivo: true, snapshot: true, ciclo: true,
           },
         })
       : []
@@ -973,6 +975,7 @@ export async function GET(
         responsavelNome: s.responsavelId != null ? respNomesTarefa.get(s.responsavelId) ?? null : null,
         prazo: s.prazo?.toISOString() ?? null,
         diasParaPrazo: s.prazo ? diffDays(s.prazo, now) : null,
+        slaDays: s.slaDays ?? null,
         motivo: s.motivo ?? null,
         escopo,
         executor,
