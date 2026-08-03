@@ -99,8 +99,15 @@ export function KanbanContent() {
 
   // Processos do país selecionado: o país está na CHAVE, então trocar de país já
   // dispara a busca — era um efeito em `[paisSelecionado]`.
+  // Override LOCAL da política padrão (POLITICA_PADRAO em src/lib/dados/index.ts):
+  // várias pessoas mexem no mesmo Kanban ao mesmo tempo, então o quadro precisa
+  // acompanhar sozinho. Só esta chamada muda — nenhuma outra tela é afetada.
   const processosReq = useApi<{ processos?: Processo[] }>(
     paisSelecionado ? `/api/processos?pais=${paisSelecionado}` : null,
+    // dedupingInterval também entra: o padrão (30s) é MAIOR que o refresh de 20s,
+    // e o polling do SWR passa pelo dedupe — o disparo dos 20s seria engolido e o
+    // intervalo real viraria ~40s. Com 10s aqui, os 20s valem de verdade.
+    { refreshInterval: 20_000, revalidateOnFocus: true, dedupingInterval: 10_000 },
   )
   const processos = processosReq.dados?.processos ?? SEM_PROCESSOS
   const contratantesReq = useApi<{ contratantes?: Contratante[] }>(autenticado ? "/api/contratantes" : null)
