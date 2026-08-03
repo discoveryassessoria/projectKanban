@@ -103,28 +103,31 @@ console.log("\n(B) A regressão não pode voltar")
 const rota = read("src/app/api/processos/[processoId]/central-operacional/route.ts")
 const central = read("src/components/kanban/ProcessoCentralOperacional.tsx")
 const painel = read("src/components/kanban/PainelDaFase.tsx")
+const consulta = read("src/lib/process-stage/estrutura-operacional.ts")
+const nucleo = read("src/lib/process-stage/estrutura-operacional-core.ts")
 
 check("rota devolve o roster oficial de pessoas", /pessoas:\s*pessoasDoProcesso/.test(rota))
-check("rota devolve a lista de tarefas da fase", /\btarefas,\s*$/m.test(rota) || rota.includes("tarefas,\n"))
+check("rota devolve a ESTRUTURA da fase (pessoa → documento → workflow → passos)", /^\s*estrutura,\s*$/m.test(rota))
 check("pessoas vêm do vínculo com a árvore (Pessoa.arvoreId)", /prisma\.pessoa\.findMany\(\{\s*\n?\s*where:\s*\{\s*arvoreId:\s*processo\.arvoreId\s*\}/.test(rota))
 check("roster é montado pelo núcleo puro (fonte única)", rota.includes("montarPessoasDoProcesso(pessoas, unioes)"))
-check("tarefas vêm de PhaseWorkflowStepInstance da fase", rota.includes("passosDaFase") && rota.includes("phaseWorkflowStepInstance.findMany"))
-check("tarefas usam a régua única de balde", rota.includes("baldeDoPasso(s.status)"))
+check("o trabalho vem de PhaseWorkflowStepInstance da fase", consulta.includes("phaseWorkflowStepInstance.findMany") && consulta.includes("faseMacroKey: ctx.faseMacroKey"))
+check("a régua única de balde continua sendo a mesma", nucleo.includes("baldeDoPasso"))
 check("etapa sem item aplicável NÃO se declara 'em andamento'", rota.includes('totalObrig === 0 ? "pendente"'))
 
-check("Central semeia as linhas pelo roster, não pela fila", central.includes("const roster = data.pessoas ?? []") && central.includes("for (const r of roster) porPessoa.set(r.pessoaId, linhaDoRoster(r))"))
-check("Central expõe o grupo 'pendente de classificação'", central.includes("pendenteClassificacao"))
-check("tabela de pessoas não repete o trabalho do workflow", painel.includes("PESSOAS DO PROCESSO (contexto"))
-check("Central repassa as tarefas ao painel", central.includes("tarefas={bodyData.tarefas ?? []}"))
-check("Central tem handler único de abertura de tarefa", central.includes("const abrirTarefa = useCallback"))
-check("abrir tarefa usa a operação oficial (sem rota legada)", /abrirOperacao\(t\.documentoId \?\? 0, t\.necessidadeId\)/.test(central))
-check("passo sem executor vira erro administrativo explícito (tarefa não some)", central.includes("if (!t.executor)") && painel.includes("erroAdministrativo") && painel.includes("Sem executor"))
-check("progresso da fase por alvo sai da MESMA lista de tarefas", central.includes("const porAlvo = tarefasFase.length > 0") && central.includes('label: "Registros a localizar"'))
+check("Central recebe o roster e a estrutura prontos do backend", central.includes("pessoas?: PessoaDoProcessoUI[]") && central.includes("estrutura?: EstruturaOperacional"))
+check("Central expõe o grupo 'pendente de classificação'", painel.includes("pendenteClassificacao"))
+check("pessoa aparece com ou sem documento aplicável", painel.includes("Nenhum documento aplicável nesta fase"))
+check("Central repassa a estrutura ao painel", central.includes("estrutura={bodyData.estrutura"))
+check("Central tem handler único de abertura de passo", central.includes("const abrirPasso = useCallback"))
+check("abrir passo usa a operação oficial (sem rota legada)", /abrirOperacao\(p\.documentoId \?\? 0, p\.necessidadeId\)/.test(central))
+check("passo sem executor vira erro administrativo explícito (passo não some)", central.includes("if (!p.executor)") && painel.includes("erroAdministrativo") && painel.includes("Sem executor"))
+check("contador e lista têm a MESMA fonte (resumo da estrutura)", central.includes("data.estrutura?.resumo"))
 
-check("painel renderiza o WORKFLOW da fase (não uma segunda lista)", painel.includes("<WorkflowDaFase") && painel.includes("function WorkflowDaFase"))
-check("cada passo do workflow é expansível", painel.includes("function PassoDoWorkflow") && painel.includes("setExp(!exp)"))
-check("expandir mostra as INSTÂNCIAS operacionais do passo", painel.includes("function InstanciaDoPasso") && painel.includes("passo.instancias.map"))
+check("painel renderiza a hierarquia da execução, não uma segunda lista", painel.includes("function PessoaAccordion") && painel.includes("function DocumentoAccordion") && painel.includes("function PassoRow"))
+check("pessoa e documento são expansíveis", painel.includes("alternar(chave)") && painel.includes("abertos.has(chave)"))
+check("expandir o documento mostra o workflow DELE", painel.includes("doc.passos.map"))
 check("sem lista de tarefas paralela ao workflow", !painel.includes("ListaDeTarefas") && !painel.includes("GRUPOS_TAREFA"))
+check("sem agregado por passo misturando as pessoas", !painel.includes("function WorkflowDaFase") && !painel.includes("function PassoDoWorkflow"))
 check("sem esteira de etapas duplicando o workflow", !painel.includes("5 ETAPAS EM LINHA") && !central.includes("let steps: FaseStep[]"))
 check("painel tem o grupo de pendência de classificação", painel.includes("Pendente de classificação"))
 
@@ -140,13 +143,13 @@ const CONDICOES_PROIBIDAS: Array<[string, RegExp]> = [
 for (const [nome, re] of CONDICOES_PROIBIDAS) {
   check(`sem condição incorreta: ${nome}`, !re.test(central) && !re.test(painel) && !re.test(rota))
 }
-// A linha da pessoa não pode mais listar documentos/tarefas — isso vive no workflow.
-// ("Abrir operação" segue existindo, mas dentro da Operação Antecipada, que é outra coisa.)
-check("linha da pessoa é CONTEXTO, sem tarefas duplicadas",
-  !painel.includes("p.docs.map") && !painel.includes("docsResumo.map") && !painel.includes("docExpRow"))
+// O trabalho aparece UMA vez: dentro do documento a que pertence. Nem a linha da
+// pessoa nem um agregado por passo podem repetir a mesma instância.
+check("a mesma instância não é desenhada em dois lugares",
+  !painel.includes("p.docs.map") && !painel.includes("docsResumo.map") && !painel.includes("passo.instancias.map"))
 // OPERAÇÃO ANTECIPADA — a capacidade tem de continuar INTEIRA: criar, listar,
-// avaliar e abrir. Só mudou de lugar (do documento na tabela para o alvo do passo).
-check("antecipada: criar", painel.includes("+ antecipada") && painel.includes("onNovaOperacao(t.necessidadeId"))
+// avaliar e abrir. Ela pertence ao ALVO, e é no documento que o alvo aparece.
+check("antecipada: criar", painel.includes("+ operação antecipada") && painel.includes("acoes.onNovaOperacao!(doc.necessidadeId"))
 check("antecipada: listar inline no alvo", painel.includes("function OperacoesAntecipadasInline") && painel.includes("<OperacoesAntecipadasInline"))
 check("antecipada: avaliar (SIM/PARCIAL/NAO/CANCELAR)", painel.includes("function OperacaoAntecipadaItem") && painel.includes("onAvaliar?.(o.id"))
 check("antecipada: abrir a operação oficial", painel.includes("onAbrirOperacaoAntecipada") && central.includes("abrirOperacaoAntecipada"))
@@ -159,8 +162,8 @@ check("operação por-documento emite evento do motor (timeline)", opDoc.include
 check("evento cobre início, mudança de status e conclusão", /EM_ANDAMENTO:\s*"PASSO_INICIADO"/.test(opDoc) && /CONCLUIDO:\s*"PASSO_CONCLUIDO"/.test(opDoc) && /BLOQUEADO:\s*"PASSO_BLOQUEADO"/.test(opDoc))
 check("evento é idempotente (não derruba a transação ao repetir)", opDoc.includes("skipDuplicates: true") && opDoc.includes("chaveEvento("))
 check("sem evento quando não houve transição de estado", opDoc.includes("novo === p.status ? null"))
-check("lista de tarefas aparece com UMA tarefa (sem piso de quantidade)", !/tarefas\.length\s*>\s*1/.test(painel))
-check("instâncias concluídas continuam visíveis (sem filtro)", painel.includes('t.balde === "CONCLUIDA"') && !painel.includes("filter((t) => t.balde !== "))
+check("um documento com UM passo aparece igual (sem piso de quantidade)", !/passos\.length\s*>\s*1/.test(painel))
+check("passos concluídos continuam visíveis (sem filtro)", painel.includes('p.balde === "CONCLUIDA"') && !painel.includes("filter((p) => p.balde !== "))
 
 // ============================================================
 console.log(`\n${falhas.length === 0 ? "✅" : "❌"} ${ok}/${ok + falhas.length} verificações`)

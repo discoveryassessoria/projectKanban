@@ -3,16 +3,21 @@
 // Painel da fase operacional. Ordem do que aparece, e por quê:
 //
 //   1. Cabeçalho da fase (título, subtítulo, abas)
-//   2. Contadores da fase
-//   3. Barra de progresso
-//   4. WORKFLOW DA FASE — a única lista de trabalho. Um passo publicado por linha,
-//      expansível, mostrando as instâncias operacionais reais (pessoa, registro,
-//      certidão ou documento). É aqui que se abre a execução, e é aqui que vive a
-//      Operação Antecipada de cada alvo.
-//   5. PESSOAS DO PROCESSO — contexto, não fila: quem são, onde estão na linha de
-//      transmissão, o que falta no cadastro delas. Nenhuma tarefa se repete aqui.
+//   2. Resumo AGREGADO da fase (contadores + progresso) — só resumo, sem lista
+//   3. ESTRUTURA OPERACIONAL — a única lista de trabalho:
 //
-// A Central EXECUTA o workflow publicado; não mantém uma lista própria em paralelo.
+//         PESSOA → DOCUMENTO/CERTIDÃO → WORKFLOW DAQUELE DOCUMENTO → PASSOS
+//
+// Antes, o workflow era agrupado POR PASSO: "Solicitar certidão" aparecia uma vez e,
+// dentro dele, as certidões de todas as pessoas misturadas. Isso descreve o cadastro,
+// não o trabalho. Ninguém executa "Solicitar certidão"; executa-se "a certidão de
+// nascimento da Tereza" — e essa certidão tem a sequência inteira do workflow só
+// dela, com progresso, prazo e bloqueio próprios. Concluir o passo do João não pode
+// mexer no da Tereza, e a tela precisa mostrar isso.
+//
+// A Central APRESENTA as instâncias oficiais já materializadas pelo domínio. Não cria
+// passo, não copia tarefa, não infere sequência, não monta status. O agrupamento vem
+// pronto do backend (getPhaseOperationalStructure), por IDs relacionais oficiais.
 
 "use client"
 
@@ -21,7 +26,6 @@ import {
   ExternalLink,
   Search,
   Clock,
-  Download,
   CheckCircle2,
   ChevronDown,
   ChevronRight,
@@ -29,14 +33,18 @@ import {
   Star,
   Users,
   ArrowLeftRight,
-  UserRound,
   Ban,
-  CalendarDays,
   AlertTriangle,
-  PlayCircle,
+  Layers,
 } from "lucide-react"
 import { FASES } from "@/src/lib/process-stage/fases-catalog"
 import type { FaseCode } from "@prisma/client"
+import type {
+  AlvoDaEstrutura,
+  EstruturaOperacional,
+  PassoDaEstrutura,
+  PessoaDaEstrutura,
+} from "@/src/lib/process-stage/estrutura-operacional-core"
 
 // Rótulo amigável da fase a partir do código técnico (origem da operação antecipada).
 function faseLabel(code: string | null): string {
@@ -48,84 +56,12 @@ function faseLabel(code: string | null): string {
 // TIPOS
 // ============================================================
 
-export interface FaseStep {
-  title: string
-  status: "concluida" | "em_andamento" | "bloqueada" | "pendente"
-}
-
-/** Balde operacional da tarefa — espelho de central-operacional-core. */
-export type BaldeTarefa = "PENDENTE" | "EM_ANDAMENTO" | "CONCLUIDA"
-
-/** Tarefa da fase (PhaseWorkflowStepInstance) exibida na lista operacional. */
-export interface FaseTarefaRow {
-  stepInstanceId: number
-  stepKey: string
-  titulo: string
-  balde: BaldeTarefa
-  statusRaw: string
-  statusLabel: string
-  obrigatorio: boolean
-  pessoaId: number | null
-  pessoaNome: string | null
-  assunto: string | null
-  necessidadeId: number | null
-  documentoId: number | null
-  responsavelId: number | null
-  responsavelNome: string | null
-  prazo: string | null
-  diasParaPrazo: number | null
-  slaDays: number | null
-  motivo: string | null
-  escopo: "GLOBAL" | "PESSOA" | "DOCUMENTO"
-  executor: "OPERACAO_DOCUMENTO" | null
-  /** Falta de configuração — exibida na linha; a tarefa nunca é escondida. */
-  erroAdministrativo: string | null
-}
+export type { AlvoDaEstrutura, EstruturaOperacional, PassoDaEstrutura, PessoaDaEstrutura }
 
 export interface FaseKpi {
   label: string
   value: number
   tone?: "" | "ok" | "busca" | "late"
-}
-
-export interface FaseDocRow {
-  id: number
-  // Genealogia V2: necessidade da certidão (usada p/ garantir o registro
-  // operacional ao abrir a operação quando ainda não há Documento, id=0).
-  necessidadeId?: number | null
-  responsavelId?: number | null   // responsável atual do passo (seletor "Delegar")
-  tipoLabel: string        // "Certidão de Nascimento"
-  subtitulo?: string       // "Inteiro teor"
-  statusLabel: string      // "A SOLICITAR"
-  statusCls: string        // "pendente" | "em_busca" | "localizado" | "bloqueado" | ...
-  responsavel?: string | null
-  sla?: string | null
-  proximaAcao?: string | null
-  emissaoConcluida?: boolean
-}
-
-export interface FasePersonRow {
-  pessoaId: number
-  /** Código oficial da pessoa (CodeGeneratorService). null = ainda não gerado. */
-  publicCode?: string | null
-  nome: string
-  iniciais: string
-  papel: string
-  geracao: string          // "G1", "Atual", "—"
-  isLinha: boolean
-  /** Pendência ADMINISTRATIVA de cadastro. Exibida na linha; nunca esconde a pessoa. */
-  pendencia?: string | null
-  transmissao: {
-    state: "OK" | "BLOQUEADA" | "FORA"
-    label: string
-    sub?: string
-  }
-  docsResumo: Array<{ abbr: string; statusLabel: string; statusCls: string }>
-  validados: number
-  total: number
-  responsavel?: string | null
-  proximaAcao?: { txt: string; cls?: "crit" | "" ; semResp?: boolean; sub?: string | null } | null
-  docs: FaseDocRow[]
 }
 
 // Operação Antecipada vinculada a uma necessidade — VÍNCULO com a operação oficial (sem etapas
@@ -158,40 +94,34 @@ export interface PainelDaFaseProps {
   faseNome: string                 // "Emissão documental"
   faseSub: string                  // subtítulo da fase
   faseTabs: string[]               // abas do mockup pra essa fase
-  kpis: FaseKpi[]                  // os 7 contadores
-  progressoPct: number             // % da fase
-  progressoConcluidos: number      // ex: 0
-  progressoTotal: number           // ex: 1
-  progressoTexto: string           // "Solicite, receba... Falta 1 documento..."
-  linhaPrincipal: FasePersonRow[]
-  foraDaLinha: FasePersonRow[]
-  /** Pessoas com inconsistência real de cadastro — visíveis, nunca descartadas. */
-  pendenteClassificacao?: FasePersonRow[]
-  /** Lista operacional REAL das tarefas da fase (não o agregado das etapas). */
-  tarefas?: FaseTarefaRow[]
-  /** Abre a tarefa na tela oficial da operação. undefined ⇒ só leitura. */
-  onAbrirTarefa?: (t: FaseTarefaRow) => void
-  // OPERAÇÃO ANTECIPADA — capacidade nativa preservada INTEGRALMENTE. Ela sempre
-  // pertenceu ao ALVO (a necessidade), não à tabela por pessoa: criar, listar,
-  // avaliar e abrir agora acontecem na instância do passo, onde o alvo está.
+  kpis: FaseKpi[]                  // contadores agregados da fase
+  progressoPct: number             // % da fase (projeção operacional canônica)
+  progressoConcluidos: number
+  progressoTotal: number
+  progressoTexto: string
+  /** ESTRUTURA OFICIAL da fase — a única fonte da lista de trabalho. */
+  estrutura: EstruturaOperacional
+  /**
+   * Identidade da fase exibida (processo + fase + ciclo). Trocar de fase RESETA o
+   * estado de expansão: manter o accordion de outra fase aberto mostraria posição de
+   * um trabalho que não é este.
+   */
+  chaveExpansao: string
+  /** Abre o passo na tela oficial da operação. undefined ⇒ só leitura. */
+  onAbrirPasso?: (p: PassoDaEstrutura) => void
+  // OPERAÇÃO ANTECIPADA — capacidade nativa preservada INTEGRALMENTE. Ela pertence ao
+  // ALVO (a necessidade), então aparece UMA vez, no cabeçalho do documento a que se
+  // refere — e não repetida em cada passo daquele mesmo documento.
   operacoesPorNec?: Map<number, OpAntecipadaInline[]>
   onAvaliarOperacao?: AvaliarFn
   onAbrirOperacaoAntecipada?: (op: OpAntecipadaInline) => void
-  onAbrirPainelCompleto?: () => void
-  // Delegação direto na fila (Genealogia): lista de funcionários + callback.
-  usuarios?: Array<{ id: number; nome: string; publicCode?: string | null }>
-  // Operação Antecipada: capacidade nativa — usa a operação oficial de outra fase p/ atender esta necessidade.
   onNovaOperacao?: (necessidadeId: number, pessoaId: number | null, label: string) => void
-  // Operações antecipadas existentes por necessidade — exibidas INLINE dentro do documento.
+  onAbrirPainelCompleto?: () => void
   // CONSULTA de fase passada (PAST_READ_ONLY): mesmo layout/dados, mas SEM ações de
-  // mutação (abrir operação/delegar). Só leitura. onAbrirOperacao/onDelegar chegam
-  // undefined; readOnly deixa a intenção explícita para a UI.
+  // mutação. Só leitura.
   readOnly?: boolean
   // LEGADO_INATIVO (desativação Genealogia): em modo reestruturação, o painel NÃO
-  // exibe as etapas/KPIs/progresso/"validados" antigos (derivados de
-  // Documento.status + linhaReta). Mostra apenas um aviso neutro + a lista de
-  // pessoas. Os documentos existentes aparecem como "registros operacionais
-  // existentes", sem rótulo de obrigatório/validado.
+  // exibe KPIs/progresso antigos (derivados de Documento.status + linhaReta).
   modoReestruturacao?: boolean
   avisoReestruturacao?: string
 }
@@ -209,17 +139,14 @@ export function PainelDaFase({
   progressoConcluidos,
   progressoTotal,
   progressoTexto,
-  linhaPrincipal,
-  foraDaLinha,
-  pendenteClassificacao = [],
-  tarefas = [],
-  onAbrirTarefa,
+  estrutura,
+  chaveExpansao,
+  onAbrirPasso,
   operacoesPorNec,
   onAvaliarOperacao,
   onAbrirOperacaoAntecipada,
-  onAbrirPainelCompleto,
-  usuarios,
   onNovaOperacao,
+  onAbrirPainelCompleto,
   readOnly = false,
   modoReestruturacao = false,
   avisoReestruturacao,
@@ -282,17 +209,16 @@ export function PainelDaFase({
           </div>
         ) : (
         <>
-        {/* A esteira de etapas em linha saiu daqui: ela repetia, em forma de resumo,
-            o mesmo workflow que agora é renderizado abaixo com os passos expansíveis
-            e as instâncias reais de cada um. Duas representações do mesmo workflow
-            divergem no primeiro dia em que uma delas deixa de ser atualizada. */}
-
-        {/* --- 7 CONTADORES --- */}
-        <div className="grid gap-2.5 mb-4" style={{ gridTemplateColumns: `repeat(${kpis.length}, 1fr)` }}>
+        {/* --- RESUMO AGREGADO DA FASE ---
+            Só resumo. A lista de trabalho vive abaixo, dentro de cada documento de
+            cada pessoa. Um agregado por passo aqui em cima seria o mesmo workflow
+            desenhado duas vezes — e duas representações divergem. */}
+        {/* auto-fit em vez de uma coluna por KPI: com 7 contadores numa largura
+            pequena, colunas fixas espremem o número até ele deixar de ser legível. */}
+        <div className="grid gap-2.5 mb-4" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(116px, 1fr))" }}>
           {kpis.map((k, i) => {
             const valColor =
-              k.label === "Solicitados" ? "text-[#7dd3fc]"
-              : k.tone === "ok" ? "text-[#4ade80]"
+              k.tone === "ok" ? "text-[#4ade80]"
               : k.tone === "busca" ? "text-[#d2a948]"
               : k.tone === "late" ? "text-[#f87171]"
               : "text-white/95"
@@ -322,441 +248,564 @@ export function PainelDaFase({
         </>
         )}
 
-        {/* --- TAREFAS DA FASE (lista operacional real) --- */}
-        <WorkflowDaFase tarefas={tarefas} onAbrir={onAbrirTarefa} onNovaOperacao={onNovaOperacao} operacoesPorNec={operacoesPorNec} onAvaliarOperacao={onAvaliarOperacao} onAbrirOperacaoAntecipada={onAbrirOperacaoAntecipada} readOnly={readOnly} faseNome={faseNome} />
-
-        {/* --- PESSOAS DO PROCESSO (contexto, não fila de trabalho) ---
-            O trabalho por pessoa/certidão vive DENTRO do passo do workflow, acima.
-            Repetir aqui as mesmas tarefas criava duas listas para a mesma coisa —
-            e duas listas divergem. Aqui ficam só quem são as pessoas, onde estão na
-            linha de transmissão e o que falta no cadastro delas. */}
-        <div className="border border-white/10 rounded-xl overflow-hidden">
-          {/* Cabeçalho de colunas */}
-          <div
-            className="grid items-center gap-2.5 px-5 py-2.5 text-[10px] font-bold text-white/40 uppercase tracking-wider bg-[#20262e] border-b border-white/10"
-            style={{ gridTemplateColumns: "52px minmax(200px,2fr) 1.2fr 1.6fr" }}
-          >
-            <div />
-            <div>
-              PESSOA
-              <div className="text-[9px] font-semibold text-white/25 normal-case tracking-normal mt-0.5">Posição / Código</div>
-            </div>
-            <div>
-              TRANSMISSÃO
-              <div className="text-[9px] font-semibold text-white/25 normal-case tracking-normal mt-0.5">Status</div>
-            </div>
-            <div>PENDÊNCIA DE CADASTRO</div>
-          </div>
-
-          {/* Grupo Linha Principal */}
-          <GroupBar
-            icon={<Star className="w-3 h-3" />}
-            title="Linha principal · transmissão de cidadania"
-            count={linhaPrincipal.length}
-            tone="linha"
-          />
-          {linhaPrincipal.map((p) => (
-            <PersonRow key={p.pessoaId} p={p} />
-          ))}
-
-          {/* Grupo Fora da linhagem */}
-          <GroupBar
-            icon={<Users className="w-3 h-3" />}
-            title="Fora da linhagem · cônjuges / apoio"
-            count={foraDaLinha.length}
-            tone="fora"
-          />
-          {foraDaLinha.map((p) => (
-            <PersonRow key={p.pessoaId} p={p} />
-          ))}
-
-          {/* Grupo Pendente de classificação — só aparece quando há inconsistência
-              REAL de cadastro. Nenhuma pessoa é descartada em silêncio. */}
-          {pendenteClassificacao.length > 0 && (
-            <>
-              <GroupBar
-                icon={<AlertTriangle className="w-3 h-3" />}
-                title="Pendente de classificação · revisar cadastro"
-                count={pendenteClassificacao.length}
-                tone="pendente"
-              />
-              {pendenteClassificacao.map((p) => (
-                <PersonRow key={p.pessoaId} p={p} />
-              ))}
-            </>
-          )}
-        </div>
+        {/* --- ESTRUTURA OPERACIONAL — pessoa → documento → workflow → passos --- */}
+        <EstruturaOperacionalView
+          estrutura={estrutura}
+          chaveExpansao={chaveExpansao}
+          onAbrirPasso={onAbrirPasso}
+          operacoesPorNec={operacoesPorNec}
+          onAvaliarOperacao={onAvaliarOperacao}
+          onAbrirOperacaoAntecipada={onAbrirOperacaoAntecipada}
+          onNovaOperacao={onNovaOperacao}
+          readOnly={readOnly}
+          faseNome={faseNome}
+        />
       </div>
     </div>
   )
 }
 
 // ============================================================
-// SUBCOMPONENTES
+// ESTRUTURA OPERACIONAL
 // ============================================================
 
-// ------------------------------------------------------------
-// WORKFLOW DA FASE
-// ------------------------------------------------------------
-// A Central não mantém uma lista própria de tarefas: ela RENDERIZA o workflow
-// publicado da fase. Cada passo aparece uma vez, com o estado agregado das suas
-// instâncias; expandir o passo mostra as instâncias operacionais reais (a pessoa,
-// o registro, a certidão ou o documento de cada uma) e é ali que se abre a execução.
-//
-// O workflow é a fonte única. Se um passo tem 1 alvo, aparece 1 instância; se tem
-// 40, aparecem 40 — sem piso de quantidade e sem esconder as concluídas.
-
-/** Estado agregado de um passo a partir das suas instâncias. */
-function resumirPasso(instancias: FaseTarefaRow[]) {
-  const total = instancias.length
-  const concluidas = instancias.filter((t) => t.balde === "CONCLUIDA").length
-  const emAndamento = instancias.filter((t) => t.balde === "EM_ANDAMENTO").length
-  const divergentes = instancias.filter((t) => t.statusRaw === "BLOQUEADO" || t.statusRaw === "FALHOU").length
-  const estado: "concluida" | "em_andamento" | "pendente" =
-    total > 0 && concluidas >= total ? "concluida"
-    : emAndamento > 0 || concluidas > 0 ? "em_andamento"
-    : "pendente"
-  return { total, concluidas, emAndamento, divergentes, pendentes: total - concluidas - divergentes, estado }
-}
-
-function WorkflowDaFase({
-  tarefas,
-  onAbrir,
-  onNovaOperacao,
-  operacoesPorNec,
-  onAvaliarOperacao,
-  onAbrirOperacaoAntecipada,
-  readOnly,
-  faseNome,
-}: {
-  tarefas: FaseTarefaRow[]
-  onAbrir?: (t: FaseTarefaRow) => void
-  onNovaOperacao?: (necessidadeId: number, pessoaId: number | null, label: string) => void
+interface AcoesEstrutura {
+  onAbrirPasso?: (p: PassoDaEstrutura) => void
   operacoesPorNec?: Map<number, OpAntecipadaInline[]>
   onAvaliarOperacao?: AvaliarFn
   onAbrirOperacaoAntecipada?: (op: OpAntecipadaInline) => void
+  onNovaOperacao?: (necessidadeId: number, pessoaId: number | null, label: string) => void
   readOnly: boolean
+}
+
+/**
+ * Quantos documentos ainda cabem abertos de saída. Acima disto a tela abriria como um
+ * muro de passos; abaixo, deixar tudo fechado esconderia o trabalho. É uma decisão de
+ * APRESENTAÇÃO — não filtra, não altera contagem e não muda nada nos dados.
+ */
+const LIMITE_AUTO_EXPANSAO = 12
+
+interface Expansao {
+  /** Fase a que este estado pertence. */
+  chave: string
+  /** Já foi semeado com uma estrutura que tinha trabalho. */
+  semeado: boolean
+  abertos: Set<string>
+}
+
+/** Estado inicial: abre quem tem trabalho, quando couber na tela. */
+function semear(chave: string, estrutura: EstruturaOperacional): Expansao {
+  const abertos = new Set<string>()
+  if (estrutura.resumo.documentos > 0 && estrutura.resumo.documentos <= LIMITE_AUTO_EXPANSAO) {
+    const pessoas = [...estrutura.linhaPrincipal, ...estrutura.foraDaLinha, ...estrutura.pendenteClassificacao]
+    for (const l of pessoas) {
+      if (l.semTrabalhoAplicavel) continue
+      abertos.add(`pessoa:${l.pessoa.pessoaId}`)
+      for (const d of l.documentos) if (!d.concluido) abertos.add(`alvo:${d.chave}`)
+    }
+  }
+  return { chave, semeado: estrutura.resumo.documentos > 0, abertos }
+}
+
+function EstruturaOperacionalView({
+  estrutura,
+  chaveExpansao,
+  faseNome,
+  ...acoes
+}: AcoesEstrutura & {
+  estrutura: EstruturaOperacional
+  chaveExpansao: string
   faseNome: string
 }) {
-  // Agrupa por passo publicado, preservando a ordem em que a fase os entrega.
-  const passos: Array<{ stepKey: string; titulo: string; instancias: FaseTarefaRow[] }> = []
-  const indice = new Map<string, number>()
-  for (const t of tarefas) {
-    let i = indice.get(t.stepKey)
-    if (i == null) {
-      i = passos.length
-      indice.set(t.stepKey, i)
-      passos.push({ stepKey: t.stepKey, titulo: t.titulo, instancias: [] })
-    }
-    passos[i].instancias.push(t)
+  // ESTADO DE EXPANSÃO — local, por processo/fase. Preferência visual não vai ao banco.
+  //
+  // O ajuste acontece DURANTE a renderização (padrão oficial do React para "estado
+  // derivado de prop que mudou"), não num efeito: um efeito que dependesse da
+  // `estrutura` fecharia os accordions a cada revalidação em segundo plano — o
+  // operador perderia a posição no meio do trabalho a cada refresh.
+  const [expansao, setExpansao] = useState<Expansao>(() => semear(chaveExpansao, estrutura))
+  let atual = expansao
+  if (atual.chave !== chaveExpansao || (!atual.semeado && estrutura.resumo.documentos > 0)) {
+    atual = semear(chaveExpansao, estrutura)
+    setExpansao(atual)
   }
+  const abertos = atual.abertos
+
+  const alternar = (chave: string) =>
+    setExpansao((prev) => {
+      const proximo = new Set(prev.abertos)
+      if (proximo.has(chave)) proximo.delete(chave)
+      else proximo.add(chave)
+      return { ...prev, abertos: proximo }
+    })
+
+  const totalPessoas =
+    estrutura.linhaPrincipal.length + estrutura.foraDaLinha.length + estrutura.pendenteClassificacao.length
+  const semNada = totalPessoas === 0 && estrutura.globais.length === 0 && estrutura.semDono.length === 0
 
   return (
-    <div className="border border-white/10 rounded-xl overflow-hidden mb-5">
+    // A hierarquia tem colunas com largura mínima real (pessoa, estado, responsável,
+    // prazo, ação). Numa largura pequena elas ESCOAM dentro deste container em vez de
+    // espremer o conteúdo até ficar ilegível — e a página nunca ganha scroll lateral.
+    <div className="border border-white/10 rounded-xl overflow-x-auto">
+      <div className="min-w-[860px]">
       <div className="flex items-center gap-2.5 px-5 py-2.5 border-b border-white/10 bg-[#20262e]/70">
         <span className="w-[22px] h-[22px] rounded-lg grid place-items-center flex-none bg-[#252c35] text-white/55">
-          <PlayCircle className="w-3 h-3" />
+          <Layers className="w-3 h-3" />
         </span>
         <b className="text-[11.5px] font-extrabold tracking-wide uppercase text-white/55">
-          Workflow · {faseNome}
+          Execução · {faseNome}
         </b>
-        <span className="ml-auto text-[11px] font-bold text-white/40 bg-[#1b2027] border border-white/10 rounded-full px-2.5 py-0.5">
-          {passos.length} passo(s)
+        <span className="ml-auto flex items-center gap-1.5">
+          <Contador texto={`${totalPessoas} pessoa(s)`} />
+          <Contador texto={`${estrutura.resumo.documentos} documento(s)`} />
         </span>
       </div>
 
-      {passos.length === 0 ? (
+      {semNada ? (
         <div className="px-5 py-6 text-center">
-          <div className="text-[13px] text-white/68">O workflow desta fase não tem passos materializados.</div>
+          <div className="text-[13px] text-white/68">Esta fase não tem trabalho materializado.</div>
           <div className="text-[11.5px] text-white/40 mt-1 leading-relaxed">
             Publique os passos da fase em Gerenciamento › Workflows das Fases. Enquanto
             não houver passo publicado, não há o que executar aqui.
           </div>
         </div>
       ) : (
-        passos.map((p) => (
-          <PassoDoWorkflow
-            key={p.stepKey} passo={p} onAbrir={onAbrir} onNovaOperacao={onNovaOperacao}
-            operacoesPorNec={operacoesPorNec} onAvaliarOperacao={onAvaliarOperacao}
-            onAbrirOperacaoAntecipada={onAbrirOperacaoAntecipada} readOnly={readOnly}
+        <>
+          {/* PASSOS DA FASE INTEIRA (escopo PROCESSO) — uma instância por fase/ciclo.
+              Não pertencem a nenhuma pessoa; por isso ficam aqui, e não repetidos
+              dentro de cada uma. */}
+          {estrutura.globais.length > 0 && (
+            <>
+              <GroupBar icon={<Layers className="w-3 h-3" />} title="Passos da fase · escopo do processo" contagem={`${estrutura.globais.length} passo(s)`} tone="linha" />
+              <div className="bg-[#15191f]">
+                {estrutura.globais.map((p) => (
+                  <PassoRow key={p.stepInstanceId} p={p} {...acoes} recuo={40} />
+                ))}
+              </div>
+            </>
+          )}
+
+          <GroupBar
+            icon={<Star className="w-3 h-3" />}
+            title="Linha principal · transmissão de cidadania"
+            contagem={`${estrutura.linhaPrincipal.length} pessoa(s)`}
+            tone="linha"
           />
-        ))
-      )}
-    </div>
-  )
-}
-
-function PassoDoWorkflow({
-  passo,
-  onAbrir,
-  onNovaOperacao,
-  operacoesPorNec,
-  onAvaliarOperacao,
-  onAbrirOperacaoAntecipada,
-  readOnly,
-}: {
-  passo: { stepKey: string; titulo: string; instancias: FaseTarefaRow[] }
-  onAbrir?: (t: FaseTarefaRow) => void
-  onNovaOperacao?: (necessidadeId: number, pessoaId: number | null, label: string) => void
-  operacoesPorNec?: Map<number, OpAntecipadaInline[]>
-  onAvaliarOperacao?: AvaliarFn
-  onAbrirOperacaoAntecipada?: (op: OpAntecipadaInline) => void
-  readOnly: boolean
-}) {
-  const r = resumirPasso(passo.instancias)
-  // Abre já expandido o passo em que há trabalho; concluído entra recolhido.
-  const [exp, setExp] = useState(r.estado !== "concluida")
-
-  const icBorder =
-    r.estado === "concluida" ? "border-[#4ade80]/40 text-[#4ade80]"
-    : r.estado === "em_andamento" ? "border-[#2563eb] text-[#7dd3fc]"
-    : "border-white/10 text-white/40"
-
-  return (
-    <div className="border-b border-white/10 last:border-b-0">
-      <button
-        type="button"
-        onClick={() => setExp(!exp)}
-        className="w-full text-left flex items-center gap-3 px-5 py-3 hover:bg-[#20262e] transition-colors"
-      >
-        <span className={`w-7 h-7 rounded-full grid place-items-center border-[1.5px] flex-none bg-[#1b2027] ${icBorder}`}>
-          {r.estado === "concluida" ? <CheckCircle2 className="w-3.5 h-3.5" />
-            : r.estado === "em_andamento" ? <Search className="w-3.5 h-3.5" />
-            : <Clock className="w-3.5 h-3.5" />}
-        </span>
-        <span className="min-w-0 flex-1">
-          <b className="text-[13.5px] font-bold block leading-tight text-white/95">{passo.titulo}</b>
-          <span className="text-[11.5px] text-white/40">
-            {r.concluidas} de {r.total} concluída(s)
-            {r.divergentes > 0 && <span className="text-[#f87171]"> · {r.divergentes} divergente(s)</span>}
-          </span>
-        </span>
-        <span className="w-28 h-1.5 rounded bg-[#252c35] overflow-hidden flex-none">
-          <span className="block h-full bg-[#7dd3fc]" style={{ width: `${r.total > 0 ? Math.round((r.concluidas / r.total) * 100) : 0}%` }} />
-        </span>
-        <span className="text-white/40 flex-none">
-          {exp ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
-        </span>
-      </button>
-
-      {exp && (
-        <div className="bg-[#15191f] border-t border-white/10">
-          {passo.instancias.map((t) => (
-            <InstanciaDoPasso
-              key={t.stepInstanceId} t={t} onAbrir={onAbrir} onNovaOperacao={onNovaOperacao}
-              ops={t.necessidadeId != null ? operacoesPorNec?.get(t.necessidadeId) ?? [] : []}
-              onAvaliarOperacao={onAvaliarOperacao} onAbrirOperacaoAntecipada={onAbrirOperacaoAntecipada}
-              readOnly={readOnly}
-            />
+          {estrutura.linhaPrincipal.map((l) => (
+            <PessoaAccordion key={l.pessoa.pessoaId} linha={l} abertos={abertos} alternar={alternar} {...acoes} />
           ))}
-        </div>
+
+          <GroupBar
+            icon={<Users className="w-3 h-3" />}
+            title="Fora da linhagem · cônjuges / apoio"
+            contagem={`${estrutura.foraDaLinha.length} pessoa(s)`}
+            tone="fora"
+          />
+          {estrutura.foraDaLinha.map((l) => (
+            <PessoaAccordion key={l.pessoa.pessoaId} linha={l} abertos={abertos} alternar={alternar} {...acoes} />
+          ))}
+
+          {/* Só aparece quando há inconsistência REAL de cadastro. Nenhuma pessoa é
+              descartada em silêncio. */}
+          {estrutura.pendenteClassificacao.length > 0 && (
+            <>
+              <GroupBar
+                icon={<AlertTriangle className="w-3 h-3" />}
+                title="Pendente de classificação · revisar cadastro"
+                contagem={`${estrutura.pendenteClassificacao.length} pessoa(s)`}
+                tone="pendente"
+              />
+              {estrutura.pendenteClassificacao.map((l) => (
+                <PessoaAccordion key={l.pessoa.pessoaId} linha={l} abertos={abertos} alternar={alternar} {...acoes} />
+              ))}
+            </>
+          )}
+
+          {/* ALVO SEM DONO NO ROSTER — cadastro inconsistente (pessoa fora da árvore
+              do processo, união sem titular). Fica VISÍVEL: sumir seria esconder
+              trabalho real que ninguém veria de novo. */}
+          {estrutura.semDono.length > 0 && (
+            <>
+              <GroupBar
+                icon={<AlertTriangle className="w-3 h-3" />}
+                title="Sem pessoa vinculada · revisar cadastro do registro"
+                contagem={`${estrutura.semDono.length} documento(s)`}
+                tone="pendente"
+              />
+              <div className="bg-[#15191f]">
+                {estrutura.semDono.map((d) => (
+                  <DocumentoAccordion key={d.chave} doc={d} pessoaId={null} abertos={abertos} alternar={alternar} {...acoes} />
+                ))}
+              </div>
+            </>
+          )}
+        </>
       )}
+      </div>
     </div>
   )
 }
 
-/** Uma instância operacional do passo: o alvo concreto (pessoa/registro/documento). */
-function InstanciaDoPasso({
-  t,
-  onAbrir,
-  onNovaOperacao,
-  ops = [],
-  onAvaliarOperacao,
-  onAbrirOperacaoAntecipada,
-  readOnly,
-}: {
-  t: FaseTarefaRow
-  onAbrir?: (t: FaseTarefaRow) => void
-  onNovaOperacao?: (necessidadeId: number, pessoaId: number | null, label: string) => void
-  ops?: OpAntecipadaInline[]
-  onAvaliarOperacao?: AvaliarFn
-  onAbrirOperacaoAntecipada?: (op: OpAntecipadaInline) => void
-  readOnly: boolean
-}) {
-  const podeAbrir = !readOnly && !!onAbrir && !!t.executor
-  const concluida = t.balde === "CONCLUIDA"
-
+function Contador({ texto }: { texto: string }) {
   return (
-    <>
-    <button
-      type="button"
-      onClick={() => podeAbrir && onAbrir!(t)}
-      disabled={!podeAbrir}
-      title={t.erroAdministrativo ?? (readOnly ? "Somente leitura" : `Abrir: ${t.pessoaNome ?? t.assunto ?? t.titulo}`)}
-      className={`w-full text-left grid items-center gap-2.5 pl-14 pr-5 py-2.5 border-b border-white/10 last:border-b-0 transition-colors ${
-        podeAbrir ? "hover:bg-[#20262e] cursor-pointer" : "cursor-default"
-      }`}
-      style={{ gridTemplateColumns: "minmax(160px,2fr) 1.2fr 1fr 0.7fr 108px" }}
-    >
-      <span className="min-w-0 block">
-        <b className={`text-[13px] font-bold block leading-tight truncate ${concluida ? "text-white/68" : "text-white/95"}`}>
-          {t.pessoaNome ?? t.assunto ?? "Etapa da fase"}
-        </b>
-        {t.pessoaNome && t.assunto && (
-          <span className="text-[11.5px] text-white/40 block truncate">{t.assunto}</span>
-        )}
-      </span>
-
-      <span className="block">
-        <span className={`text-[12px] font-semibold ${concluida ? "text-[#4ade80]" : t.balde === "EM_ANDAMENTO" ? "text-[#7dd3fc]" : "text-white/68"}`}>
-          {t.statusLabel}
-        </span>
-        {t.motivo && <span className="text-[11px] text-white/40 block truncate">{t.motivo}</span>}
-        {t.erroAdministrativo && (
-          <span className="text-[11px] text-[#d2a948] block leading-snug mt-0.5">⚠ {t.erroAdministrativo}</span>
-        )}
-      </span>
-
-      <span className="text-[12px] block truncate">
-        {t.responsavelNome
-          ? <span className="text-white/80 font-semibold">{t.responsavelNome}</span>
-          : <span className="text-white/40">Sem responsável</span>}
-      </span>
-
-      <span className="text-[12px] block">
-        {t.diasParaPrazo != null ? (
-          <span className={t.diasParaPrazo < 0 ? "text-[#f87171] font-semibold" : "text-white/68"}>
-            {t.diasParaPrazo < 0 ? `${Math.abs(t.diasParaPrazo)}d atrasada` : `${t.diasParaPrazo}d`}
-          </span>
-        ) : t.slaDays ? (
-          <span className="text-white/40">SLA {t.slaDays}d</span>
-        ) : (
-          <span className="text-white/25">—</span>
-        )}
-      </span>
-
-      <span className="flex justify-end items-center gap-2">
-        {/* OPERAÇÃO ANTECIPADA — vive AQUI, junto do alvo a que se refere. Antes ficava
-            na linha do documento dentro da tabela por pessoa; com o trabalho todo no
-            workflow, este é o lugar dela. */}
-        {!readOnly && onNovaOperacao && t.necessidadeId != null && !concluida && (
-          <span
-            role="button"
-            tabIndex={0}
-            title="Nova operação antecipada"
-            onClick={(e) => { e.stopPropagation(); onNovaOperacao(t.necessidadeId as number, t.pessoaId, `${t.assunto ?? t.titulo} — ${t.pessoaNome ?? ""}`.trim()) }}
-            onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.stopPropagation(); e.preventDefault(); onNovaOperacao(t.necessidadeId as number, t.pessoaId, `${t.assunto ?? t.titulo} — ${t.pessoaNome ?? ""}`.trim()) } }}
-            className="text-[11px] font-semibold text-white/40 hover:text-[#7dd3fc] underline decoration-dotted underline-offset-2 cursor-pointer"
-          >
-            + antecipada
-          </span>
-        )}
-        {podeAbrir ? (
-          <span className="inline-flex items-center gap-1.5 bg-[#252c35] text-white/95 border border-white/10 text-[12px] font-bold px-3 py-1.5 rounded-lg">
-            {concluida ? "Ver" : "Abrir"} <ChevronRight className="w-3 h-3" />
-          </span>
-        ) : (
-          <span className="text-[11px] font-semibold text-[#d2a948]">
-            {readOnly ? "Somente leitura" : "Sem executor"}
-          </span>
-        )}
-      </span>
-    </button>
-    {/* Operações antecipadas DESTE alvo — mesma lista, mesma avaliação e mesma
-        abertura de antes; agora ancoradas na instância do passo a que pertencem. */}
-    {ops.length > 0 && (
-      <OperacoesAntecipadasInline
-        ops={ops} readOnly={readOnly}
-        onAvaliar={onAvaliarOperacao} onAbrir={onAbrirOperacaoAntecipada}
-      />
-    )}
-    </>
+    <span className="text-[11px] font-bold text-white/40 bg-[#1b2027] border border-white/10 rounded-full px-2.5 py-0.5">
+      {texto}
+    </span>
   )
 }
 
 function GroupBar({
   icon,
   title,
-  count,
+  contagem,
   tone,
 }: {
   icon: React.ReactNode
   title: string
-  count: number
+  contagem: string
   tone: "linha" | "fora" | "pendente"
 }) {
   return (
-    <div className={`flex items-center gap-2.5 px-5 py-2.5 border-b border-white/10 ${tone === "pendente" ? "bg-[#d2a948]/12" : tone === "fora" ? "bg-[#252c35]" : "bg-[#20262e]/70"}`}>
+    <div className={`flex items-center gap-2.5 px-5 py-2.5 border-y border-white/10 ${tone === "pendente" ? "bg-[#d2a948]/12" : tone === "fora" ? "bg-[#252c35]" : "bg-[#20262e]/70"}`}>
       <span className={`w-[22px] h-[22px] rounded-lg grid place-items-center flex-none ${tone === "pendente" ? "bg-[#d2a948]/20 text-[#d2a948]" : tone === "fora" ? "bg-[#252c35] text-white/40" : "bg-[#252c35] text-white/55"}`}>
         {icon}
       </span>
       <b className="text-[11.5px] font-extrabold tracking-wide uppercase text-white/55">{title}</b>
-      <span className="ml-auto text-[11px] font-bold text-white/40 bg-[#1b2027] border border-white/10 rounded-full px-2.5 py-0.5">
-        {count} pessoa(s)
-      </span>
+      <span className="ml-auto"><Contador texto={contagem} /></span>
     </div>
   )
 }
 
 // ------------------------------------------------------------
-// PESSOA — CONTEXTO, não fila de trabalho
+// PESSOA — nível 1 da execução
 // ------------------------------------------------------------
-// O que esta linha responde: quem é a pessoa, onde ela está na linha de transmissão
-// e se o cadastro dela tem pendência. O TRABALHO dela (buscar o registro, solicitar
-// a certidão) aparece dentro do passo do workflow, junto com todos os outros alvos
-// daquele passo. Duas listas para o mesmo trabalho divergem; esta deixou de ser uma.
-function PersonRow({ p }: { p: FasePersonRow }) {
-  const borderCls = !p.isLinha
-    ? "border-l-[3px] border-white/10 bg-[#15191f]"
-    : "border-l-[3px] border-white/10"
+// A pessoa existe na Central pelo vínculo com a árvore. Ela aparece com ou sem
+// documento aplicável: quem não tem trabalho nesta fase diz isso, em texto, e não
+// conta como pendência nem bloqueia a conclusão.
+function PessoaAccordion({
+  linha,
+  abertos,
+  alternar,
+  ...acoes
+}: AcoesEstrutura & {
+  linha: PessoaDaEstrutura
+  abertos: Set<string>
+  alternar: (chave: string) => void
+}) {
+  const p = linha.pessoa
+  const chave = `pessoa:${p.pessoaId}`
+  const aberto = abertos.has(chave)
+  const podeAbrir = !linha.semTrabalhoAplicavel
+  const prog = linha.progresso
 
-  const transDot =
-    p.transmissao.state === "OK" ? "bg-[#4ade80]"
-    : p.transmissao.state === "BLOQUEADA" ? "bg-[#f87171]"
-    : "bg-white/25"
-  const transColor =
-    p.transmissao.state === "OK" ? "text-[#4ade80]"
-    : p.transmissao.state === "BLOQUEADA" ? "text-[#f87171]"
-    : "text-white/40"
+  const transmissao =
+    p.classificacao === "LINHA_PRINCIPAL"
+      ? { cor: "text-[#4ade80]", dot: "bg-[#4ade80]", label: "Na linha de transmissão", sub: p.posicao }
+      : p.classificacao === "FORA_DA_LINHAGEM"
+        ? { cor: "text-white/40", dot: "bg-white/25", label: "Fora da linha", sub: "Sem impacto na transmissão" }
+        : { cor: "text-[#f87171]", dot: "bg-[#f87171]", label: "Classificação pendente", sub: p.pendencia ?? undefined }
 
   return (
-    <div
-      className={`grid items-center gap-2.5 px-5 py-3 border-b border-white/10 last:border-b-0 ${borderCls}`}
-      style={{ gridTemplateColumns: "52px minmax(200px,2fr) 1.2fr 1.6fr" }}
-    >
-      {/* Geração */}
-      <div className="text-center text-[11px] font-extrabold text-white/55 bg-[#1b2027] border border-white/10 rounded-lg py-1.5 leading-tight">
-        {p.geracao}
-      </div>
+    <div className="border-b border-white/10 last:border-b-0">
+      <button
+        type="button"
+        onClick={() => podeAbrir && alternar(chave)}
+        disabled={!podeAbrir}
+        className={`w-full text-left grid items-center gap-2.5 px-5 py-3 transition-colors ${podeAbrir ? "hover:bg-[#20262e]" : "cursor-default"}`}
+        style={{ gridTemplateColumns: "52px minmax(180px,2fr) 1.2fr 1.4fr 140px 20px" }}
+      >
+        {/* Geração */}
+        <span className="text-center text-[11px] font-extrabold text-white/55 bg-[#1b2027] border border-white/10 rounded-lg py-1.5 leading-tight block">
+          {p.geracao != null ? `G${p.geracao + 1}` : "—"}
+        </span>
 
-      {/* Pessoa */}
-      <div className="flex items-center gap-2.5 min-w-0">
-        <div className="w-[34px] h-[34px] rounded-full grid place-items-center text-white font-extrabold text-[12.5px] flex-none bg-[#252c35]">
-          {p.iniciais}
-        </div>
-        <div className="min-w-0">
-          <b className="text-[14px] font-extrabold block leading-tight truncate text-white/95">{p.nome}</b>
-          <span className="text-[11.5px] text-white/40 font-semibold block truncate">
-            {[p.publicCode, p.papel].filter(Boolean).join(" · ")}
+        {/* Pessoa */}
+        <span className="flex items-center gap-2.5 min-w-0">
+          <span className="w-[34px] h-[34px] rounded-full grid place-items-center text-white font-extrabold text-[12.5px] flex-none bg-[#252c35]">
+            {p.iniciais}
           </span>
-        </div>
-      </div>
-
-      {/* Transmissão */}
-      <div>
-        <div className={`flex items-center gap-1.5 text-[13px] font-bold ${transColor}`}>
-          <span className={`w-2 h-2 rounded-full flex-none ${transDot}`} />
-          {p.transmissao.label}
-        </div>
-        {p.transmissao.sub && (
-          <div className="text-[11.5px] text-white/40 font-medium mt-0.5">{p.transmissao.sub}</div>
-        )}
-      </div>
-
-      {/* Pendência de cadastro — o que falta para a pessoa estar íntegra */}
-      <div>
-        {p.pendencia ? (
-          <span className="text-[11.5px] text-[#d2a948] font-semibold flex items-start gap-1.5 leading-snug">
-            <AlertTriangle className="w-3.5 h-3.5 flex-none mt-px" />
-            {p.pendencia}
+          <span className="min-w-0 block">
+            <b className="text-[14px] font-extrabold block leading-tight truncate text-white/95">{p.nome}</b>
+            <span className="text-[11.5px] text-white/40 font-semibold block truncate">
+              {[p.publicCode, p.requerente ? "Requerente" : p.posicao].filter(Boolean).join(" · ")}
+            </span>
           </span>
-        ) : (
-          <span className="text-[11.5px] text-white/25">—</span>
-        )}
-      </div>
+        </span>
+
+        {/* Transmissão */}
+        <span className="block min-w-0">
+          <span className={`flex items-center gap-1.5 text-[13px] font-bold ${transmissao.cor}`}>
+            <span className={`w-2 h-2 rounded-full flex-none ${transmissao.dot}`} />
+            {transmissao.label}
+          </span>
+          {transmissao.sub && <span className="text-[11.5px] text-white/40 font-medium block mt-0.5 truncate">{transmissao.sub}</span>}
+        </span>
+
+        {/* Documentos / pendência de cadastro */}
+        <span className="block min-w-0">
+          {linha.semTrabalhoAplicavel ? (
+            <span className="text-[11.5px] text-white/40">Nenhum documento aplicável nesta fase</span>
+          ) : (
+            <span className="text-[12px] text-white/68">
+              {linha.documentos.length} documento(s)
+              {linha.passosDaPessoa.length > 0 && ` · ${linha.passosDaPessoa.length} passo(s) da pessoa`}
+              {linha.divergentes > 0 && <span className="text-[#f87171]"> · {linha.divergentes} divergente(s)</span>}
+            </span>
+          )}
+          {p.pendencia && (
+            <span className="text-[11.5px] text-[#d2a948] font-semibold flex items-start gap-1.5 leading-snug mt-0.5">
+              <AlertTriangle className="w-3.5 h-3.5 flex-none mt-px" />
+              {p.pendencia}
+            </span>
+          )}
+        </span>
+
+        {/* Progresso da pessoa — soma dos obrigatórios dos alvos dela */}
+        <span className="block">
+          {linha.semTrabalhoAplicavel ? (
+            <span className="text-[11.5px] text-white/25">—</span>
+          ) : (
+            <>
+              <span className="text-[11.5px] text-white/55 font-semibold block mb-1">
+                {prog.concluidos}/{prog.total} passo(s)
+              </span>
+              <span className="block h-1.5 rounded bg-[#252c35] overflow-hidden">
+                <span className="block h-full bg-[#7dd3fc]" style={{ width: `${prog.pct}%` }} />
+              </span>
+            </>
+          )}
+        </span>
+
+        <span className="text-white/40 flex-none">
+          {!podeAbrir ? null : aberto ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
+        </span>
+      </button>
+
+      {aberto && podeAbrir && (
+        <div className="bg-[#15191f] border-t border-white/10">
+          {linha.documentos.map((d) => (
+            <DocumentoAccordion
+              key={d.chave} doc={d} pessoaId={linha.pessoa.pessoaId}
+              abertos={abertos} alternar={alternar} {...acoes}
+            />
+          ))}
+          {/* PASSOS DE ESCOPO PESSOA — trabalho da pessoa que não pertence a um
+              documento. Não são "documento vazio": têm lugar próprio. */}
+          {linha.passosDaPessoa.length > 0 && (
+            <div className="border-t border-white/10">
+              <div className="px-5 py-2 text-[10.5px] font-bold uppercase tracking-wide text-white/40" style={{ paddingLeft: 40 }}>
+                Passos da pessoa
+              </div>
+              {linha.passosDaPessoa.map((s) => (
+                <PassoRow key={s.stepInstanceId} p={s} {...acoes} recuo={56} />
+              ))}
+            </div>
+          )}
+        </div>
+      )}
     </div>
   )
 }
+
+// ------------------------------------------------------------
+// DOCUMENTO / CERTIDÃO — nível 2 da execução
+// ------------------------------------------------------------
+// Cada documento carrega o workflow COMPLETO da fase aplicado só a ele: sequência,
+// progresso, prazo e bloqueio próprios. Concluir "Solicitar certidão" aqui libera o
+// próximo passo DESTE documento — nenhum outro.
+function DocumentoAccordion({
+  doc,
+  pessoaId,
+  abertos,
+  alternar,
+  ...acoes
+}: AcoesEstrutura & {
+  doc: AlvoDaEstrutura
+  pessoaId: number | null
+  abertos: Set<string>
+  alternar: (chave: string) => void
+}) {
+  const chave = `alvo:${doc.chave}`
+  const aberto = abertos.has(chave)
+  const ops = doc.necessidadeId != null ? acoes.operacoesPorNec?.get(doc.necessidadeId) ?? [] : []
+
+  const icBorder =
+    doc.divergente ? "border-[#f87171]/40 text-[#f87171]"
+    : doc.concluido ? "border-[#4ade80]/40 text-[#4ade80]"
+    : doc.progresso.concluidos > 0 ? "border-[#2563eb] text-[#7dd3fc]"
+    : "border-white/10 text-white/40"
+
+  return (
+    <div className="border-b border-white/10 last:border-b-0">
+      <button
+        type="button"
+        onClick={() => alternar(chave)}
+        className="w-full text-left flex items-center gap-3 py-2.5 pr-5 hover:bg-[#20262e] transition-colors"
+        style={{ paddingLeft: 40 }}
+      >
+        <span className={`w-7 h-7 rounded-lg grid place-items-center border-[1.5px] flex-none bg-[#1b2027] ${icBorder}`}>
+          {doc.divergente ? <Ban className="w-3.5 h-3.5" />
+            : doc.concluido ? <CheckCircle2 className="w-3.5 h-3.5" />
+            : <FileText className="w-3.5 h-3.5" />}
+        </span>
+        <span className="min-w-0 flex-1">
+          <b className={`text-[13.5px] font-bold block leading-tight truncate ${doc.concluido ? "text-white/68" : "text-white/95"}`}>
+            {doc.titulo}
+          </b>
+          <span className="text-[11.5px] text-white/40 block truncate">
+            {[doc.subtitulo, doc.pais, doc.statusLabel].filter(Boolean).join(" · ") || "—"}
+          </span>
+        </span>
+
+        {ops.length > 0 && (
+          <span className="text-[10.5px] font-bold px-2 py-0.5 rounded-full bg-[#a78bfa]/15 text-[#a78bfa] flex-none">
+            {ops.length} antecipada(s)
+          </span>
+        )}
+        {doc.vencido && (
+          <span className="text-[10.5px] font-bold px-2 py-0.5 rounded-full bg-[#f87171]/15 text-[#f87171] flex-none">vencido</span>
+        )}
+
+        <span className="text-[11.5px] text-white/40 font-semibold flex-none w-24 text-right">
+          {doc.progresso.concluidos}/{doc.progresso.total} passo(s)
+        </span>
+        <span className="w-24 h-1.5 rounded bg-[#252c35] overflow-hidden flex-none">
+          <span className="block h-full bg-[#7dd3fc]" style={{ width: `${doc.progresso.pct}%` }} />
+        </span>
+        <span className="text-white/40 flex-none">
+          {aberto ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
+        </span>
+      </button>
+
+      {aberto && (
+        <div className="border-t border-white/10 bg-[#12161b]">
+          {doc.passos.length === 0 ? (
+            <div className="px-5 py-3 text-[12px] text-white/40" style={{ paddingLeft: 56 }}>
+              Nenhum passo materializado para este registro.
+            </div>
+          ) : (
+            doc.passos.map((s) => <PassoRow key={s.stepInstanceId} p={s} {...acoes} recuo={56} />)
+          )}
+
+          {/* OPERAÇÃO ANTECIPADA — pertence ao ALVO (a necessidade), então vive AQUI,
+              no documento a que se refere, e aparece UMA vez. Antes era repetida em
+              cada passo do mesmo documento: a mesma operação em cinco lugares. */}
+          {!acoes.readOnly && acoes.onNovaOperacao && doc.necessidadeId != null && !doc.concluido && (
+            <div className="pb-2 pr-5" style={{ paddingLeft: 56 }}>
+              <button
+                type="button"
+                onClick={() => acoes.onNovaOperacao!(doc.necessidadeId as number, pessoaId, doc.titulo)}
+                className="text-[11px] font-semibold text-white/40 hover:text-[#7dd3fc] underline decoration-dotted underline-offset-2"
+              >
+                + operação antecipada
+              </button>
+            </div>
+          )}
+          {ops.length > 0 && (
+            <OperacoesAntecipadasInline
+              ops={ops} readOnly={acoes.readOnly}
+              onAvaliar={acoes.onAvaliarOperacao} onAbrir={acoes.onAbrirOperacaoAntecipada}
+            />
+          )}
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ------------------------------------------------------------
+// PASSO — nível 3 da execução
+// ------------------------------------------------------------
+// Estado, responsável, prazo e disponibilidade vêm PERSISTIDOS do domínio. A tela não
+// decide se o passo pode ser executado; ela mostra o que o motor gravou, incluindo o
+// motivo de estar parado.
+function PassoRow({
+  p,
+  recuo,
+  onAbrirPasso,
+  readOnly,
+}: AcoesEstrutura & { p: PassoDaEstrutura; recuo: number }) {
+  const concluida = p.balde === "CONCLUIDA"
+  const podeAbrir = !readOnly && !!onAbrirPasso && !!p.executor && (p.disponivel || concluida)
+
+  const icone = concluida ? <CheckCircle2 className="w-3.5 h-3.5" />
+    : p.bloqueado ? <Ban className="w-3.5 h-3.5" />
+    : p.balde === "EM_ANDAMENTO" ? <Search className="w-3.5 h-3.5" />
+    : <Clock className="w-3.5 h-3.5" />
+  const icBorder = concluida ? "border-[#4ade80]/40 text-[#4ade80]"
+    : p.bloqueado ? "border-white/10 text-white/25"
+    : p.balde === "EM_ANDAMENTO" ? "border-[#2563eb] text-[#7dd3fc]"
+    : "border-white/10 text-white/40"
+
+  return (
+    <button
+      type="button"
+      onClick={() => podeAbrir && onAbrirPasso!(p)}
+      disabled={!podeAbrir}
+      title={p.erroAdministrativo ?? p.motivoBloqueio ?? (readOnly ? "Somente leitura" : `Abrir: ${p.titulo}`)}
+      className={`w-full text-left grid items-center gap-2.5 pr-5 py-2.5 border-b border-white/10 last:border-b-0 transition-colors ${
+        podeAbrir ? "hover:bg-[#20262e] cursor-pointer" : "cursor-default"
+      }`}
+      style={{ paddingLeft: recuo, gridTemplateColumns: "24px minmax(140px,2fr) 1.2fr 1fr 0.7fr 100px" }}
+    >
+      <span className={`w-6 h-6 rounded-full grid place-items-center border-[1.5px] flex-none bg-[#1b2027] ${icBorder}`}>
+        {icone}
+      </span>
+
+      <span className="min-w-0 block">
+        <b className={`text-[12.5px] font-bold block leading-tight truncate ${concluida ? "text-white/55" : p.bloqueado ? "text-white/55" : "text-white/95"}`}>
+          {p.ordem}. {p.titulo}
+        </b>
+        {!p.obrigatorio && <span className="text-[10.5px] text-white/40">opcional</span>}
+      </span>
+
+      <span className="block min-w-0">
+        <span className={`text-[12px] font-semibold ${concluida ? "text-[#4ade80]" : p.balde === "EM_ANDAMENTO" ? "text-[#7dd3fc]" : "text-white/68"}`}>
+          {p.statusLabel}
+        </span>
+        {p.motivoBloqueio && <span className="text-[11px] text-white/40 block truncate">{p.motivoBloqueio}</span>}
+        {p.erroAdministrativo && (
+          <span className="text-[11px] text-[#d2a948] block leading-snug mt-0.5">⚠ {p.erroAdministrativo}</span>
+        )}
+      </span>
+
+      <span className="text-[12px] block truncate">
+        {p.responsavelNome
+          ? <span className="text-white/80 font-semibold">{p.responsavelNome}</span>
+          : <span className="text-white/40">Sem responsável</span>}
+      </span>
+
+      <span className="text-[12px] block">
+        {p.diasParaPrazo != null ? (
+          <span className={p.diasParaPrazo < 0 ? "text-[#f87171] font-semibold" : "text-white/68"}>
+            {p.diasParaPrazo < 0 ? `${Math.abs(p.diasParaPrazo)}d atrasada` : `${p.diasParaPrazo}d`}
+          </span>
+        ) : p.slaDays ? (
+          <span className="text-white/40">SLA {p.slaDays}d</span>
+        ) : (
+          <span className="text-white/25">—</span>
+        )}
+      </span>
+
+      <span className="flex justify-end items-center">
+        {podeAbrir ? (
+          <span className="inline-flex items-center gap-1.5 bg-[#252c35] text-white/95 border border-white/10 text-[12px] font-bold px-3 py-1.5 rounded-lg">
+            {concluida ? "Ver" : "Abrir"} <ChevronRight className="w-3 h-3" />
+          </span>
+        ) : (
+          <span className="text-[11px] font-semibold text-[#d2a948] text-right">
+            {readOnly ? "Somente leitura" : !p.executor ? "Sem executor" : "Bloqueado"}
+          </span>
+        )}
+      </span>
+    </button>
+  )
+}
+
+// ============================================================
+// OPERAÇÃO ANTECIPADA (preservada integralmente)
+// ============================================================
 
 const ST_OP_LABEL: Record<string, { t: string; c: string }> = {
   CRIADA: { t: "Criada", c: "bg-[#252c35] text-white/68" },
@@ -776,7 +825,7 @@ function OperacoesAntecipadasInline({ ops, readOnly, onAvaliar, onAbrir }: {
 }) {
   const abertas = ops.filter((o) => !o.encerrada).length
   return (
-    <div className="pr-5 pb-2" style={{ paddingLeft: 76 }}>
+    <div className="pr-5 pb-2" style={{ paddingLeft: 56 }}>
       <div className="rounded-lg border border-[#a78bfa]/25 bg-[#a78bfa]/12 overflow-hidden">
         <div className="flex items-center gap-1.5 px-3 py-1.5 border-b border-[#a78bfa]/20 text-[10.5px] font-bold uppercase tracking-wide text-[#a78bfa]">
           <ArrowLeftRight className="w-3 h-3" /> Operações antecipadas
@@ -859,33 +908,3 @@ function OperacaoAntecipadaItem({ o, readOnly, onAvaliar, onAbrir }: {
     </div>
   )
 }
-
-// ============================================================
-// HELPERS DE COR (status do documento)
-// ============================================================
-
-function docCls(cls: string): string {
-  switch (cls) {
-    case "localizado":
-    case "validado":
-    case "recebido": return "text-[#4ade80]"
-    case "em_busca":
-    case "solicitado": return "text-[#d2a948]"
-    case "bloqueado": return "text-[#f87171]"
-    case "desnecessario": return "text-white/40"
-    default: return "text-white/40"
-  }
-}
-
-function docDot(cls: string): string {
-  switch (cls) {
-    case "localizado":
-    case "validado":
-    case "recebido": return "bg-[#4ade80]"
-    case "em_busca":
-    case "solicitado": return "bg-[#d2a948]"
-    case "bloqueado": return "bg-[#f87171]"
-    default: return "bg-white/25"
-  }
-}
-

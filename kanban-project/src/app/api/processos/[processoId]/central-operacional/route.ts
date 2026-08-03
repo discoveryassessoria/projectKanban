@@ -10,12 +10,14 @@ import { resolveProgressoFaseDocumento } from "@/src/lib/process-stage/resolve-f
 import { resolveOperationalProjection, type OperationalProjection } from "@/src/lib/process-stage/operational-projection"
 import {
   montarPessoasDoProcesso,
-  baldeDoPasso,
-  rotuloStatusPasso,
   nomeCompletoPessoa,
   type PessoaDoProcesso,
-  type BaldeTarefa,
 } from "@/src/lib/process-stage/central-operacional-core"
+// CONSULTA OFICIAL da Central: devolve a fase já na hierarquia de execução
+// (pessoa → documento → workflow do documento → passos). O agrupamento é feito no
+// domínio, por IDs relacionais — a tela não recombina nada por nome.
+import { getPhaseOperationalStructure, TIPO_DOCUMENTO_LABELS } from "@/src/lib/process-stage/estrutura-operacional"
+import type { EstruturaOperacional } from "@/src/lib/process-stage/estrutura-operacional-core"
 import type { FaseCode } from "@prisma/client"
 
 // ============================================================
@@ -128,41 +130,13 @@ interface FaseProgress {
   }
 }
 
-// ============================================================
-// TAREFA DA FASE — um PhaseWorkflowStepInstance da fase consultada, com o sujeito
-// (pessoa/requisito) resolvido e a referência que a UI usa para ABRIR a operação.
-// É a lista operacional real da fase; o "strip" de etapas é só o agregado dela.
-// ============================================================
-interface TarefaFaseRow {
-  stepInstanceId: number
-  stepKey: string
-  titulo: string
-  balde: BaldeTarefa
-  statusRaw: string
-  statusLabel: string
-  obrigatorio: boolean
-  pessoaId: number | null
-  pessoaNome: string | null
-  assunto: string | null
-  necessidadeId: number | null
-  documentoId: number | null
-  responsavelId: number | null
-  responsavelNome: string | null
-  prazo: string | null
-  diasParaPrazo: number | null
-  /** SLA em dias CONFIGURADO no passo publicado (visível mesmo sem prazo iniciado). */
-  slaDays: number | null
-  motivo: string | null
-  /** Escopo persistido do passo, derivado da entidade vinculada à instância. */
-  escopo: "GLOBAL" | "PESSOA" | "DOCUMENTO"
-  /** Executor oficial que a UI deve renderizar ao abrir. null ⇒ não há executor. */
-  executor: "OPERACAO_DOCUMENTO" | null
-  /**
-   * Erro ADMINISTRATIVO explícito quando não há executor para o tipo/escopo do passo.
-   * A tarefa continua visível — o que falta é configuração, e isso precisa ser dito.
-   */
-  erroAdministrativo: string | null
-}
+// A lista PLANA de tarefas da fase saiu daqui. Ela era um segundo desenho do mesmo
+// workflow — agrupado por PASSO, misturando as certidões de todas as pessoas dentro
+// de cada passo. Numa fase documental isso descreve o cadastro, não o trabalho: quem
+// executa não faz "Solicitar certidão", faz "a certidão de nascimento da Tereza", e
+// essa certidão tem a sequência inteira do workflow só dela. O que a rota devolve
+// agora é a ESTRUTURA (getPhaseOperationalStructure): as MESMAS instâncias oficiais,
+// organizadas na hierarquia em que são executadas. Uma fonte, uma forma.
 
 // Modo operacional da Central (UMA única tela; muda só o modo, nunca o layout):
 //  • ACTIVE          — fase operada atual, editável.
@@ -185,8 +159,9 @@ interface CentralOperacionalResponse {
   // ROSTER OFICIAL das pessoas do processo (vínculo Pessoa.arvoreId = Processo.arvoreId).
   // NÃO derivado da fila: processo sem documento/tarefa continua exibindo as pessoas.
   pessoas: PessoaDoProcesso[]
-  // Lista operacional REAL de tarefas da fase consultada.
-  tarefas: TarefaFaseRow[]
+  // ESTRUTURA OPERACIONAL da fase consultada: pessoa → documento/certidão → workflow
+  // daquele documento → passos. Pronta para apresentação; o frontend não reagrupa.
+  estrutura: EstruturaOperacional
   faseProgress: FaseProgress
   // LEGADO_INATIVO (desativação Genealogia): quando a fase atual é GENEALOGIA, as
   // métricas documentais antigas (Obrigatórios/validados/percentual, derivadas de
@@ -211,32 +186,8 @@ const STATUS_WAITING_EXTERNAL = ["EM_BUSCA", "SOLICITADO", "SOLICITAR"]
 const STATUS_FINALIZADOS = ["RECEBIDO", "ENTREGUE", "INVALIDO", "NAO_ENCONTRADO"]
 const STATUS_VALIDADOS = ["RECEBIDO", "ENTREGUE", "APOSTILADO", "TRADUZIDO"]
 
-const TIPO_LABELS: Record<string, string> = {
-  CERTIDAO_NASCIMENTO: "Certidão de Nascimento",
-  CERTIDAO_NASCIMENTO_INTEIRO_TEOR: "Certidão de Nascimento (IT)",
-  CERTIDAO_CASAMENTO: "Certidão de Casamento",
-  CERTIDAO_CASAMENTO_INTEIRO_TEOR: "Certidão de Casamento (IT)",
-  CERTIDAO_OBITO: "Certidão de Óbito",
-  CERTIDAO_OBITO_INTEIRO_TEOR: "Certidão de Óbito (IT)",
-  CERTIDAO_BATISMO: "Certidão de Batismo",
-  CNN: "CNN",
-  CARTA_NATURALIZACAO: "Carta de Naturalização",
-  RG: "RG",
-  CPF: "CPF",
-  CNH: "CNH",
-  PASSAPORTE_BRASILEIRO: "Passaporte BR",
-  TITULO_ELEITOR: "Título de Eleitor",
-  RESERVISTA: "Reservista",
-  PASSAPORTE_ESTRANGEIRO: "Passaporte Estrangeiro",
-  CERTIDAO_CIDADANIA_ESTRANGEIRA: "Certidão de Cidadania",
-  COMPROVANTE_RESIDENCIA: "Comprovante de Residência",
-  TRADUCAO_JURAMENTADA: "Tradução Juramentada",
-  APOSTILA_HAIA: "Apostila de Haia",
-  FOTO_3X4: "Foto 3x4",
-  PROCURACAO: "Procuração",
-  ARVORE_GENEALOGICA_DOC: "Árvore Genealógica",
-  OUTRO: "Outro",
-}
+// Rótulos de tipo documental: fonte única na camada de leitura da Central.
+const TIPO_LABELS = TIPO_DOCUMENTO_LABELS
 
 const STATUS_LABELS: Record<string, string> = {
   PENDENTE: "Pendente",
@@ -864,141 +815,22 @@ export async function GET(
     }
 
     // ============================================================
-    // 10) TAREFAS DA FASE — a lista operacional REAL, não o agregado.
+    // 10) ESTRUTURA OPERACIONAL DA FASE — a consulta oficial da Central.
     // ------------------------------------------------------------
-    // Fonte única: PhaseWorkflowStepInstance da fase consultada (mesmo escopo do
-    // progresso: processo + faseMacroKey + instância quando é consulta de fase
-    // passada). Exclui SUPERSEDIDO/CANCELADO. Cada linha carrega o sujeito (pessoa +
-    // requisito) e a referência que a UI usa para ABRIR a operação oficial — nunca
-    // rota legada. A lista aparece com 1 tarefa ou com 50; agrupar não é filtrar.
+    // Uma chamada devolve a fase inteira já na hierarquia em que ela é executada:
+    // PESSOA → DOCUMENTO/CERTIDÃO → WORKFLOW DAQUELE DOCUMENTO → PASSOS. As
+    // instâncias são as MESMAS de sempre (PhaseWorkflowStepInstance da fase
+    // consultada, escopadas por instância quando é consulta de fase passada,
+    // excluindo SUPERSEDIDO/CANCELADO): o que mudou é que o agrupamento acontece no
+    // domínio, por IDs relacionais oficiais, e não na tela por concatenação de nome.
+    //
+    // O roster já lido acima é REAPROVEITADO — a árvore não é relida na mesma
+    // requisição só para montar a estrutura.
     // ============================================================
-    const passosDaFase = faseConsultadaKey
-      ? await prisma.phaseWorkflowStepInstance.findMany({
-          where: {
-            processoId: id,
-            faseMacroKey: faseConsultadaKey,
-            status: { notIn: ["SUPERSEDIDO", "CANCELADO"] },
-            ...(faseContexto?.workflowInstanceId != null
-              ? { workflowInstanceId: faseContexto.workflowInstanceId }
-              : {}),
-          },
-          orderBy: [{ ciclo: "desc" }, { ordem: "asc" }, { id: "asc" }],
-          select: {
-            id: true, stepKey: true, ordem: true, status: true, obrigatorio: true,
-            pessoaId: true, necessidadeId: true, documentoId: true, responsavelId: true,
-            prazo: true, slaDays: true, motivo: true, snapshot: true, ciclo: true,
-          },
-        })
-      : []
-
-    // Sujeito das tarefas: necessidade → pessoa + requisito; documento → pessoa + tipo.
-    const necIdsTarefa = [...new Set(passosDaFase.map((s) => s.necessidadeId).filter((x): x is number => x != null))]
-    const docIdsTarefa = [...new Set(passosDaFase.map((s) => s.documentoId).filter((x): x is number => x != null))]
-    const respIdsTarefa = [...new Set(passosDaFase.map((s) => s.responsavelId).filter((x): x is number => x != null))]
-
-    const [necsTarefa, respNomesTarefa] = await Promise.all([
-      necIdsTarefa.length
-        ? prisma.necessidadeDocumental.findMany({
-            where: { id: { in: necIdsTarefa } },
-            select: {
-              id: true, pessoaId: true, matrizSnapshot: true,
-              itemCatalogo: { select: { name: true } },
-              // Certidão de casamento tem a UNIÃO como sujeito, não uma pessoa. Sem
-              // isto a linha ficava sem nome — e "de quem é este casamento?" é
-              // exatamente o que o operador precisa ler.
-              uniao: { select: { pessoa1: { select: { nome: true, sobrenome: true } }, pessoa2: { select: { nome: true, sobrenome: true } } } },
-            },
-          })
-        : Promise.resolve([]),
-      respIdsTarefa.length
-        ? prisma.usuario
-            .findMany({ where: { id: { in: respIdsTarefa } }, select: { id: true, nome: true } })
-            .then((us) => new Map(us.map((u) => [u.id, u.nome])))
-        : Promise.resolve(new Map<number, string>()),
-    ])
-    const necTarefaMap = new Map(necsTarefa.map((n) => [n.id, n]))
-    const docTarefaMap = new Map(docsRaw.filter((d) => docIdsTarefa.includes(d.id)).map((d) => [d.id, d]))
-
-    // Título da tarefa: rótulo do snapshot do passo (imutável) → catálogo da fase →
-    // stepKey. Nunca inventa texto.
-    const catalogoDaFase = faseAtualCode ? getStepsForFase(faseAtualCode) : []
-    const tituloDoPasso = (stepKey: string, snapshot: unknown): string => {
-      // O rótulo VEM DO SNAPSHOT do passo publicado (imutável, versionado): é o texto
-      // que o operador cadastrou. `titulo` é a chave que construirSnapshotPasso grava;
-      // `label` cobre snapshots de outra origem. Só depois cai no catálogo, e por
-      // último no stepKey — que é identificador, não rótulo.
-      if (snapshot && typeof snapshot === "object") {
-        for (const chave of ["titulo", "label"] as const) {
-          const v = (snapshot as Record<string, unknown>)[chave]
-          if (typeof v === "string" && v.trim()) return v
-        }
-      }
-      return catalogoDaFase.find((c) => c.stepKey === stepKey)?.title ?? stepKey
-    }
-    const requisitoDaNecessidade = (n: { matrizSnapshot: unknown; itemCatalogo: { name: string } | null } | undefined): string | null => {
-      if (!n) return null
-      const snap = n.matrizSnapshot
-      if (snap && typeof snap === "object" && "requisito" in snap) {
-        const r = (snap as { requisito: unknown }).requisito
-        if (typeof r === "string" && r.trim()) return r
-      }
-      return n.itemCatalogo?.name ?? null
-    }
-
-    const tarefas: TarefaFaseRow[] = passosDaFase.map((s) => {
-      const nec = s.necessidadeId != null ? necTarefaMap.get(s.necessidadeId) : undefined
-      const doc = s.documentoId != null ? docTarefaMap.get(s.documentoId) : undefined
-      const pessoaId = s.pessoaId ?? nec?.pessoaId ?? doc?.pessoaId ?? null
-      const pessoa = pessoaId != null ? pessoasMap.get(pessoaId) : undefined
-      const assunto =
-        requisitoDaNecessidade(nec) ??
-        (doc?.tipo ? TIPO_LABELS[doc.tipo] ?? doc.tipo : null)
-
-      // ESCOPO da instância — lido da entidade que ela carrega, que por sua vez veio do
-      // escopo PERSISTIDO no cadastro do passo. Nunca inferido por nome ou posição.
-      const escopo: TarefaFaseRow["escopo"] =
-        s.necessidadeId != null || s.documentoId != null ? "DOCUMENTO"
-        : s.pessoaId != null ? "PESSOA"
-        : "GLOBAL"
-
-      // EXECUTOR: qual tela oficial abre esta tarefa. Hoje existe UM executor — a
-      // operação por documento/necessidade (busca documental e dados registrais).
-      // Um passo sem entidade não tem executor: a tarefa CONTINUA VISÍVEL e diz, em
-      // texto, que falta configuração. Esconder a tarefa seria mentir sobre o trabalho.
-      const executor: TarefaFaseRow["executor"] =
-        s.necessidadeId != null || s.documentoId != null ? "OPERACAO_DOCUMENTO" : null
-      const erroAdministrativo = executor
-        ? null
-        : `Sem executor para este passo. "${tituloDoPasso(s.stepKey, s.snapshot)}" está publicado com escopo ${escopo} na fase "${faseConsultadaKey}", e o único executor disponível opera sobre documento/necessidade. Ajuste o escopo do passo em Gerenciamento › Workflows das Fases, ou publique o requisito documental que gera a entidade.`
-
-      return {
-        stepInstanceId: s.id,
-        stepKey: s.stepKey,
-        titulo: tituloDoPasso(s.stepKey, s.snapshot),
-        balde: baldeDoPasso(s.status),
-        statusRaw: s.status,
-        statusLabel: rotuloStatusPasso(s.status),
-        obrigatorio: s.obrigatorio,
-        pessoaId,
-        pessoaNome: pessoa
-          ? nomeCompleto(pessoa)
-          : nec?.uniao
-            ? [nec.uniao.pessoa1, nec.uniao.pessoa2].filter(Boolean).map((x) => nomeCompleto(x!)).join(" e ")
-            : null,
-        assunto,
-        necessidadeId: s.necessidadeId,
-        documentoId: s.documentoId,
-        responsavelId: s.responsavelId,
-        responsavelNome: s.responsavelId != null ? respNomesTarefa.get(s.responsavelId) ?? null : null,
-        prazo: s.prazo?.toISOString() ?? null,
-        diasParaPrazo: s.prazo ? diffDays(s.prazo, now) : null,
-        slaDays: s.slaDays ?? null,
-        motivo: s.motivo ?? null,
-        escopo,
-        executor,
-        erroAdministrativo,
-      }
-    })
+    const { estrutura } = await getPhaseOperationalStructure(
+      { processoId: id, faseMacroKey: faseConsultadaKey, workflowInstanceId: faseContexto?.workflowInstanceId ?? null },
+      { pessoas: pessoasDoProcesso, agora: now },
+    )
 
     // Headline de progresso vem da PROJEÇÃO OFICIAL (mesmo % do Kanban/Header). O
     // detalhamento por pessoa (byPerson) e a lista de faltantes seguem como dado
@@ -1026,7 +858,7 @@ export async function GET(
       queue: genealogiaV2 ? genealogiaV2.queue : queue,
       queueTitle,
       pessoas: pessoasDoProcesso,
-      tarefas,
+      estrutura,
       faseProgress: genealogiaV2 ? genealogiaV2.faseProgress : faseProgress,
       // Genealogia agora tem visualização V2 real — sai o estado neutro de reestruturação.
       genealogiaReestruturacao: genealogiaV2 ? false : genealogiaReestruturacao,
