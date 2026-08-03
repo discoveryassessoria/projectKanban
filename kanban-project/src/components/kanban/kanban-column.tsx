@@ -20,6 +20,8 @@ interface KanbanColumnProps {
   headerColor?: string
   isLast?: boolean
   onProcessoClick?: (processo: Processo) => void
+  /** Repassado a cada card: o usuário pode arrastar processos? */
+  podeArrastar?: boolean
 }
 
 export function KanbanColumn({
@@ -28,6 +30,7 @@ export function KanbanColumn({
   processos,
   headerColor = "#3f3f46",
   isLast,
+  podeArrastar = true,
   onProcessoClick,
 }: KanbanColumnProps) {
   const { setNodeRef, isOver } = useDroppable({
@@ -68,6 +71,7 @@ export function KanbanColumn({
         <SortableContext items={processosIds} strategy={verticalListSortingStrategy}>
           {processos.map((processo) => (
             <KanbanCard
+              podeArrastar={podeArrastar}
               key={processo.id}
               processo={processo}
               onClick={() => onProcessoClick?.(processo)}

@@ -25,10 +25,14 @@ import { PrismaClient } from "@prisma/client"
 import { calcularPermissoes, PERMISSOES_EXCLUSIVAS, temPermissao } from "../src/lib/permissoes"
 import { resultadoDaOperacao, exigeJustificativa } from "../src/lib/motor/phase-advance-helpers"
 import { movePhaseManual } from "../src/lib/motor/phase-advance"
+import { MOTIVOS_MOVIMENTACAO, motivoValido, normalizarJustificativa, JUSTIFICATIVA_MIN, JUSTIFICATIVA_MAX } from "../src/lib/motor/motivos-movimentacao"
 import { reconciliarFaseAtiva } from "../src/services/reconciliar-fase"
 
 const ROOT = join(__dirname, "..")
 const read = (rel: string) => (existsSync(join(ROOT, rel)) ? readFileSync(join(ROOT, rel), "utf8") : "")
+/** Só o CÓDIGO: comentários citam a regra de propósito e não podem virar violação. */
+const semComentarios = (t: string) =>
+  t.replace(/\/\*[\s\S]*?\*\//g, "").split("\n").filter((l) => !l.trim().startsWith("//")).join("\n")
 
 let ok = 0
 const falhas: string[] = []
@@ -77,13 +81,18 @@ console.log("\n(C) Blindagem estática")
 const rota = read("src/app/api/processos/[processoId]/phase/move/route.ts")
 const motor = read("src/lib/motor/phase-advance.ts")
 const schema = read("prisma/schema.prisma")
+const modal = read("src/components/kanban/MovimentarFaseModal.tsx")
+const board = read("src/components/kanban-board-novo.tsx")
+const card = read("src/components/kanban/kanban-card.tsx")
+const coluna = read("src/components/kanban/kanban-column.tsx")
+const modalProcesso = read("src/components/kanban/atividade-details-modal.tsx")
 
 check("a rota existe", rota.length > 0)
-check("a rota exige a permissão exclusiva", rota.includes(`temPermissao(usuario.permissoes, "${PERM}")`))
-check("sem permissão devolve 403 (não 401 nem silêncio)", /status: 403/.test(rota))
+check("a rota exige a permissão exclusiva", rota.includes("temPermissao(usuario.permissoes, PERMISSAO)") && rota.includes(`const PERMISSAO = "${PERM}"`))
+check("sem permissão devolve 403 (não 401 nem silêncio)", /PERMISSION_REQUIRED: 403/.test(rota))
 check("o usuário da movimentação vem do TOKEN, nunca do corpo", rota.includes("solicitadoPorId: usuario.userId") && !/solicitadoPorId:\s*body/.test(rota))
 check("a rota não decide regra de negócio: delega ao motor", rota.includes("movePhaseManual(processoId,"))
-check("justificativa e motivo ausentes viram 422", rota.includes("JUSTIFICATIVA_OBRIGATORIA") && rota.includes("MOTIVO_OBRIGATORIO") && /\?\s*422/.test(rota))
+check("justificativa e motivo ausentes viram 422", /MISSING_JUSTIFICATION: 422/.test(rota) && /MISSING_REASON: 422/.test(rota))
 
 check("o motor expõe movePhaseManual", motor.includes("export async function movePhaseManual"))
 check("a fase de origem é SUPERSEDIDA, nunca concluída", /operacao: "MOVER"[\s\S]{0,600}encerramento: "SUPERSEDER"/.test(motor))
@@ -99,6 +108,57 @@ const mig = read("prisma/migrations/20260803d_mover_fase_manual/migration.sql")
 check("a migration é aditiva e idempotente", mig.includes("ADD VALUE IF NOT EXISTS 'MOVIDO'") && mig.includes("ADD VALUE IF NOT EXISTS 'FASE_MOVIDA'"))
 check("a migration não altera nem remove nada", !/DROP |DELETE |UPDATE |ALTER TABLE/i.test(mig))
 check("a migration está declarada no guard do baseline", read("scripts/baseline-verificar.test.ts").includes("20260803d_mover_fase_manual"))
+
+console.log("\n(C2) Catálogo de motivos — do SERVIDOR, nunca do frontend")
+check("o catálogo vive no servidor", read("src/lib/motor/motivos-movimentacao.ts").includes("MOTIVOS_MOVIMENTACAO"))
+check("tem os motivos oficiais", ["PROCESSO_JA_EM_ANDAMENTO", "CORRECAO_DE_FASE", "OPERACAO_ADMINISTRATIVA", "RETORNO_PARA_REGULARIZACAO", "OUTRO_AUTORIZADO"].every((c) => MOTIVOS_MOVIMENTACAO.some((m) => m.codigo === c)))
+check("código fora do catálogo é rejeitado", motivoValido("INVENTADO_NO_FRONT") === false)
+check("código do catálogo é aceito", motivoValido("CORRECAO_DE_FASE") === true)
+check("justificativa só de espaços vira vazio", normalizarJustificativa("      ") === "")
+check("limites de justificativa declarados", JUSTIFICATIVA_MIN === 10 && JUSTIFICATIVA_MAX === 500)
+check("o modal NÃO cadastra motivo no frontend", !modal.includes("PROCESSO_JA_EM_ANDAMENTO") && !modal.includes("CORRECAO_DE_FASE"))
+check("o modal lê o catálogo da API", modal.includes("/phase/move`") && modal.includes("ctx?.motivos"))
+check("a rota serve o catálogo por GET", rota.includes("export async function GET") && rota.includes("motivos: MOTIVOS_MOVIMENTACAO"))
+check("as fases do modal vêm do MACRO do processo", rota.includes("macroWorkflow.findUnique") && modal.includes("ctx?.fases"))
+
+console.log("\n(C3) Erros ESTRUTURADOS — a tela mostra o motivo real")
+for (const code of ["UNAUTHORIZED", "PERMISSION_REQUIRED", "INVALID_TARGET_PHASE", "SAME_PHASE", "PROCESS_NOT_FOUND", "PHASE_NOT_IN_WORKFLOW", "MISSING_REASON", "MISSING_JUSTIFICATION", "CONCURRENT_MODIFICATION", "MIGRATION_NOT_READY", "INTERNAL_ERROR"]) {
+  check(`a rota conhece ${code}`, rota.includes(code))
+}
+check("todo erro sai com { code, message }", /\{ success: false, code, message/.test(rota))
+check("o modal exibe a MESSAGE do servidor", modal.includes("d?.message ||"))
+check("o board deixou de tratar tudo como erro genérico", !board.includes('"Erro ao mover processo"'))
+check("o board prefere a mensagem do servidor", board.includes("d.message || d.error"))
+
+console.log("\n(C4) Kanban — permissão, modal e sem otimismo indevido")
+check("o board usa a permissão OFICIAL", board.includes("pode('processos.moverFaseManual')"))
+check("não autoriza por tipo/nome/e-mail/flag do cliente", (() => { const c = semComentarios(board); return !/tipo\s*===\s*['\"]admin['\"]/.test(c) && !c.includes("usuario.email ===") })())
+check("o card só é arrastável com permissão", card.includes("disabled: !podeArrastar") && coluna.includes("podeArrastar={podeArrastar}"))
+check("sem permissão o cursor não promete movimento", card.includes('cursor: podeArrastar ? undefined : "default"'))
+check("o drop ABRE o modal em vez de mover", board.includes("setMovimentacao({ processoId: activeId, faseAlvo: targetFaseKey })"))
+check("o card NÃO muda de coluna antes da resposta do servidor", (() => {
+  const c = semComentarios(board)
+  const i = c.indexOf("if (podeMoverManual) {")
+  if (i < 0) return false
+  // fecha no `\n    }` do if — não no `}` do objeto passado a setMovimentacao.
+  const ramo = c.slice(i, c.indexOf("\n    }", i))
+  // O ramo do Master abre o modal e RETORNA: nada de setLocalProcessos ali.
+  return ramo.includes("setMovimentacao(") && ramo.includes("return") && !ramo.includes("setLocalProcessos")
+})())
+check("só move depois do onMovido (confirmação do servidor)", board.includes("onMovido={(r) =>") && board.includes("faseAtualKey: r.faseAtual"))
+check("cancelar não chama API", modal.includes("onCancelar") && !/onCancelar[\s\S]{0,120}fetch\(/.test(modal))
+check("duplo envio é bloqueado por ref", modal.includes("enviandoRef.current") && modal.includes("if (enviandoRef.current) return"))
+check("há estado de carregamento no confirmar", modal.includes("Movendo…"))
+check("o payload NÃO leva userId", !/userId/.test(semComentarios(modal)))
+check("o payload leva a origem da chamada", modal.includes("origem }"))
+check("origem KANBAN_DRAG_DROP é reconhecida pela rota", rota.includes('"KANBAN_DRAG_DROP"'))
+
+console.log("\n(C5) UI alternativa e auditoria da tentativa negada")
+check("existe ação 'Movimentar fase' no menu do processo", modalProcesso.includes("Movimentar fase") && modalProcesso.includes("<MovimentarFaseModal"))
+check("a ação do menu é gated pela mesma permissão", modalProcesso.includes("pode('processos.moverFaseManual')"))
+check("a ação do menu usa o MESMO modal e endpoint", modalProcesso.includes('origem="MENU_PROCESSO"'))
+check("tentativa negada é auditada", rota.includes("auditarTentativaNegada") && rota.includes("negado: true"))
+check("auditar a negativa não pode derrubar o 403", rota.includes("// Auditar a negativa não pode derrubar a negativa"))
 
 // ============================================================
 // (B) COMPORTAMENTO — banco real

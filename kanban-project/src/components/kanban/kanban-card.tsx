@@ -16,9 +16,16 @@ interface KanbanCardProps {
   processo: Processo
   onClick?: () => void
   isDragging?: boolean // Prop para quando está no DragOverlay
+  /**
+   * O card pode ser ARRASTADO por este usuário. Falso ⇒ `useSortable` nasce
+   * desabilitado: sem listeners, sem cursor de arraste, sem drop registrado. A
+   * autorização definitiva continua sendo do servidor; isto evita oferecer ao
+   * operador uma ação que ele não pode concluir.
+   */
+  podeArrastar?: boolean
 }
 
-export function KanbanCard({ processo, onClick, isDragging: isDraggingProp }: KanbanCardProps) {
+export function KanbanCard({ processo, onClick, isDragging: isDraggingProp, podeArrastar = true }: KanbanCardProps) {
   const {
     id,
     nome,
@@ -39,6 +46,7 @@ export function KanbanCard({ processo, onClick, isDragging: isDraggingProp }: Ka
     isDragging: isDraggingSortable
   } = useSortable({
     id: `card-${id}`,
+    disabled: !podeArrastar,
     data: {
       type: "Card",
       processo: processo,
@@ -53,6 +61,8 @@ export function KanbanCard({ processo, onClick, isDragging: isDraggingProp }: Ka
     transform: CSS.Transform.toString(transform),
     transition,
     opacity: isDragging ? 0.5 : 1,
+    // Sem permissão o cursor não promete movimento nenhum.
+    cursor: podeArrastar ? undefined : "default",
   }
 
   // Dados do contratante para contato

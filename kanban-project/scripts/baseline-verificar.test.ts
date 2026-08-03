@@ -29,20 +29,18 @@ const MIGRATION = join(DIR_MIGRATIONS, '0000_baseline', 'migration.sql')
  * Mudar esta constante NAO conserta nada por si so: o ledger de producao
  * precisa ser reconciliado no mesmo movimento, de forma explicita e auditada.
  */
-// RECONCILIACAO PENDENTE EM PRODUCAO — leia antes de fazer deploy desta mudanca.
+// RECONCILIACAO DO LEDGER — feita em 03/08/2026, junto com a migration ADITIVA
+// 20260803d_mover_fase_manual (dois valores de enum: AdvanceResultado.MOVIDO e
+// WorkflowEventoTipo.FASE_MOVIDA).
 //
-// O baseline mudou por causa da migration ADITIVA 20260803d_mover_fase_manual (dois
-// valores de enum: AdvanceResultado.MOVIDO e WorkflowEventoTipo.FASE_MOVIDA). O
-// arquivo commitado ja descreve o banco novo; o ledger de PRODUCAO ainda registra
-// 0000_baseline pelo checksum ANTERIOR:
+//   anterior : b0021b6e4e9b6ba07a137c271f8229bc122b6f6aaa4838402be09beb7e3ce4a3
+//   atual    : 6aa5afa53bd7e4b089b05cf957235163f77cf931b61cdad817c650a1c802ae01
 //
-//   anterior (ainda em producao) : b0021b6e4e9b6ba07a137c271f8229bc122b6f6aaa4838402be09beb7e3ce4a3
-//   atual    (este arquivo)      : 6aa5afa53bd7e4b089b05cf957235163f77cf931b61cdad817c650a1c802ae01
-//
-// ANTES do deploy que levar esta mudanca: faca backup do ledger e atualize o checksum
-// da linha 0000_baseline em _prisma_migrations para o valor ATUAL, de forma explicita
-// e auditada, sem tocar em schema nem em dados. Sem isso, `prisma migrate deploy`
-// acusa migration modificada depois de aplicada e para no meio do deploy.
+// Procedimento executado: backup do ledger -> conferencia de que o diff do baseline
+// eram SO as duas linhas de CREATE TYPE (zero DDL destrutivo) -> UPDATE de UMA
+// coluna na linha 0000_baseline -> `prisma migrate status` consistente -> `prisma
+// migrate deploy`. Nenhuma outra migration foi tocada; contagens de processos,
+// instancias, passos, tarefas, eventos e logs identicas antes e depois.
 const CHECKSUM_LEDGER = '6aa5afa53bd7e4b089b05cf957235163f77cf931b61cdad817c650a1c802ae01'
 
 /**

@@ -28,6 +28,7 @@ import { Plus } from "lucide-react"
 import { KanbanColumn } from "./kanban/kanban-column"
 import { KanbanCard } from "./kanban/kanban-card"
 import { ProcessoDetailsModal } from "./kanban/atividade-details-modal"
+import { MovimentarFaseModal } from "./kanban/MovimentarFaseModal"
 import {
   corDoPais,
   type PaisKanban,
@@ -253,6 +254,19 @@ export function KanbanBoard({
     setActiveProcesso(processo || null)
   }
 
+  // MOVIMENTAÇÃO MANUAL pendente de confirmação. O card NÃO se move aqui: ele só
+  // muda de coluna depois que o SERVIDOR confirmar. Enquanto isso, o board continua
+  // exibindo a fase real.
+  const [movimentacao, setMovimentacao] = useState<{ processoId: number; faseAlvo: string } | null>(null)
+  const [aviso, setAviso] = useState<string | null>(null)
+
+  // Quem pode reposicionar o processo em QUALQUER fase (Administrador Master).
+  // Permissão OFICIAL — nunca `tipo === 'admin'`, nome, e-mail ou flag do cliente.
+  const podeMoverManual = pode('processos.moverFaseManual')
+  // Quem pode apenas solicitar o AVANÇO normal (fase seguinte, com o gate).
+  const podeAvancar = pode('workflow.avancar')
+  const podeArrastar = podeMoverManual || podeAvancar
+
   const handleDragEnd = async (event: DragEndEvent) => {
     const { active, over } = event
 
@@ -278,13 +292,23 @@ export function KanbanBoard({
     // Mesma fase ou indefinida: não faz nada
     if (!targetFaseKey || processo.faseAtualKey === targetFaseKey) return
 
-    // 🔒 Mover de fase na mão exige permissão. Sem ela: avisa e o card volta.
-    if (!pode('workflow.avancar')) {
-      alert("As fases avançam automaticamente conforme os documentos são validados. Você não tem permissão para mover o processo de fase manualmente.")
+    // ADMINISTRADOR MASTER: qualquer fase — anterior, posterior ou intermediária.
+    // O drop NÃO move o card: abre o modal, que exige motivo e justificativa e só
+    // então chama o endpoint oficial. Cancelar deixa tudo como estava.
+    if (podeMoverManual) {
+      setMovimentacao({ processoId: activeId, faseAlvo: targetFaseKey })
       return
     }
 
-    // Com permissão: move de verdade (atualização otimista + PUT de fase)
+    // 🔒 Sem nenhuma das permissões o card nem arrasta (useSortable desabilitado);
+    // esta guarda cobre o caminho residual.
+    if (!podeAvancar) {
+      setAviso("As fases avançam automaticamente conforme os documentos são validados. Você não tem permissão para mover o processo de fase manualmente.")
+      return
+    }
+
+    // FLUXO NORMAL (inalterado): arrastar é uma SOLICITAÇÃO de avanço para a próxima
+    // fase, validada pelo gate no servidor.
     const previousProcessos = [...localProcessos]
     setLocalProcessos(prev =>
       prev.map(p => p.id === activeId ? { ...p, faseAtualKey: targetFaseKey! } : p)
@@ -301,13 +325,14 @@ export function KanbanBoard({
       })
       if (!response.ok) {
         const d = await response.json().catch(() => ({}))
-        throw new Error(d.error || "Erro ao mover processo")
+        // A mensagem REAL do servidor. O genérico é fallback, não o padrão.
+        throw new Error(d.message || d.error || "Não foi possível mover o processo.")
       }
       onRefresh()
-    } catch (error: any) {
-      console.error("Erro ao mover processo de fase:", error)
+    } catch (error) {
+      console.error("[kanban] avanço de fase recusado:", error)
       setLocalProcessos(previousProcessos)
-      alert(error.message || "Erro ao mover o processo. Tente novamente.")
+      setAviso((error as Error)?.message || "Não foi possível mover o processo. Tente novamente.")
     }
   }
 
@@ -368,6 +393,7 @@ export function KanbanBoard({
                       headerColor={corPais}
                       isLast={index === fases.length - 1}
                       onProcessoClick={handleProcessoClick}
+                      podeArrastar={podeArrastar}
                     />
                   </div>
                 ))}
@@ -449,6 +475,43 @@ export function KanbanBoard({
         initialTarefaPaiId={tarefaPaiInicialDoModal}
         initialAtividadeId={atividadeInicialDoModal}
       />
+
+      {/* MOVIMENTAÇÃO MANUAL — o card só troca de coluna DEPOIS que o servidor
+          confirma. Cancelar não chama API e não altera nada. */}
+      {movimentacao && (
+        <MovimentarFaseModal
+          processoId={movimentacao.processoId}
+          faseAlvoInicial={movimentacao.faseAlvo}
+          origem="KANBAN_DRAG_DROP"
+          onCancelar={() => setMovimentacao(null)}
+          onMovido={(r) => {
+            setMovimentacao(null)
+            // Atualização local imediata + revalidação oficial: o servidor é a
+            // fonte da verdade, mas o operador não fica olhando o card parado.
+            setLocalProcessos((prev) =>
+              prev.map((p) => (p.id === movimentacao.processoId ? { ...p, faseAtualKey: r.faseAtual } : p)),
+            )
+            onRefresh()
+            setAviso(r.message)
+          }}
+        />
+      )}
+
+      {aviso && (
+        <div className="fixed inset-0 z-[10060] flex items-center justify-center bg-black/40 px-4" onClick={() => setAviso(null)}>
+          <div className="max-w-sm rounded-xl border border-white/10 bg-[#1b2027] p-5 shadow-2xl" onClick={(e) => e.stopPropagation()}>
+            <div className="text-[13px] text-white/90 leading-relaxed">{aviso}</div>
+            <div className="flex justify-end mt-4">
+              <button
+                onClick={() => setAviso(null)}
+                className="text-[12.5px] font-bold px-3.5 py-1.5 rounded-lg bg-[#252c35] text-white/95 hover:bg-[#2d353f]"
+              >
+                Fechar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </>
   )
 }
