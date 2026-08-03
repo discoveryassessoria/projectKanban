@@ -3602,6 +3602,7 @@ enum WorkflowEventoTipo {
   FASE_AVANCADA_FORCADO
   FASE_REABERTA
   FASE_RETORNADA
+  FASE_MOVIDA
 }
 
 model PhaseWorkflowInstance {
@@ -3769,6 +3770,10 @@ enum AdvanceResultado {
   FORCADO
   REABERTO
   RETORNADO
+  // Movimentacao MANUAL do Administrador Master: reposiciona a fase atual sem
+  // consultar o gate. NAO e FORCADO (forcar = o gate disse nao e foi sobreposto)
+  // nem RETORNADO (retorno so vai para tras). Fato diferente, registro diferente.
+  MOVIDO
   IDEMPOTENTE
   CONFLITO
 }

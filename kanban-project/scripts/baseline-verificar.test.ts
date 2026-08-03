@@ -29,7 +29,21 @@ const MIGRATION = join(DIR_MIGRATIONS, '0000_baseline', 'migration.sql')
  * Mudar esta constante NAO conserta nada por si so: o ledger de producao
  * precisa ser reconciliado no mesmo movimento, de forma explicita e auditada.
  */
-const CHECKSUM_LEDGER = 'b0021b6e4e9b6ba07a137c271f8229bc122b6f6aaa4838402be09beb7e3ce4a3'
+// RECONCILIACAO PENDENTE EM PRODUCAO — leia antes de fazer deploy desta mudanca.
+//
+// O baseline mudou por causa da migration ADITIVA 20260803d_mover_fase_manual (dois
+// valores de enum: AdvanceResultado.MOVIDO e WorkflowEventoTipo.FASE_MOVIDA). O
+// arquivo commitado ja descreve o banco novo; o ledger de PRODUCAO ainda registra
+// 0000_baseline pelo checksum ANTERIOR:
+//
+//   anterior (ainda em producao) : b0021b6e4e9b6ba07a137c271f8229bc122b6f6aaa4838402be09beb7e3ce4a3
+//   atual    (este arquivo)      : 6aa5afa53bd7e4b089b05cf957235163f77cf931b61cdad817c650a1c802ae01
+//
+// ANTES do deploy que levar esta mudanca: faca backup do ledger e atualize o checksum
+// da linha 0000_baseline em _prisma_migrations para o valor ATUAL, de forma explicita
+// e auditada, sem tocar em schema nem em dados. Sem isso, `prisma migrate deploy`
+// acusa migration modificada depois de aplicada e para no meio do deploy.
+const CHECKSUM_LEDGER = '6aa5afa53bd7e4b089b05cf957235163f77cf931b61cdad817c650a1c802ae01'
 
 /**
  * Migrations criadas DEPOIS da consolidacao de 02/08/2026. Toda migration nova
@@ -40,6 +54,7 @@ const MIGRATIONS_POS_BASELINE: string[] = [
   '20260803_workflow_escopo_execucao',
   '20260803b_cardinalidade_passo',
   '20260803c_regularizacao_historica',
+  '20260803d_mover_fase_manual',
 ]
 
 const sha256 = (t: string) => createHash('sha256').update(t).digest('hex')

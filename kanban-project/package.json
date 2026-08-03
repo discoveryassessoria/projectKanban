@@ -105,6 +105,7 @@
     "test:central-loading": "tsx scripts/central-operacional-loading.test.ts",
     "test:central-pessoas": "tsx scripts/central-pessoas-tarefas.test.ts",
     "test:motor-fases": "tsx scripts/motor-fases-passos.test.ts",
+    "test:mover-fase": "tsx scripts/mover-fase-manual.test.ts",
     "test:estrutura-operacional": "tsx scripts/estrutura-operacional.test.ts",
     "test:estrutura-operacional-integracao": "tsx scripts/estrutura-operacional-integracao.test.ts",
     "test:central-unificada": "tsx scripts/central-unificada-guard.test.ts",

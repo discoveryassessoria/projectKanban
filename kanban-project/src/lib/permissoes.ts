@@ -29,6 +29,11 @@ export const PERMISSOES = {
   // depois as fases anteriores. Mexe em histórico: é EXCLUSIVA (ver PERMISSOES_EXCLUSIVAS),
   // não vem por perfil padrão nem por ser tipo=admin. Só por concessão nominal.
   'processos.regularizarHistorico': 'Regularização histórica: cadastrar processo em fase avançada e completar fases anteriores',
+  // MOVIMENTAÇÃO MANUAL DE FASE — reposiciona o processo em QUALQUER fase do workflow
+  // (anterior, posterior ou intermediária) SEM as validações do fluxo automático. É a
+  // permissão do "Administrador Master": EXCLUSIVA (ver PERMISSOES_EXCLUSIVAS), nunca
+  // concedida por perfil padrão nem por `tipo = 'admin'`. Funcionário não a recebe.
+  'processos.moverFaseManual': 'Administrador Master: mover o processo manualmente para qualquer fase, sem as validações do fluxo',
 
   // Clientes/Cadastros
   'clientes.ver': 'Ver contratantes e requerentes',
@@ -279,6 +284,7 @@ export const MODULOS_PERMISSOES = [
  */
 export const PERMISSOES_EXCLUSIVAS = new Set<string>([
   'processos.regularizarHistorico',
+  'processos.moverFaseManual',
 ])
 
 export const PERMISSOES_OPT_IN = new Set<string>([

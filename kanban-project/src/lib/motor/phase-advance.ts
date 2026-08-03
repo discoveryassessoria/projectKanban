@@ -67,6 +67,13 @@ export interface ReturnInput extends AdvanceCtx {
   motivoCodigo: string
 }
 
+/** Movimentação MANUAL (Administrador Master) para qualquer fase do macro. */
+export interface MoveInput extends AdvanceCtx {
+  faseAlvo: string
+  justificativa: string
+  motivoCodigo: string
+}
+
 export interface AdvanceOk {
   success: true
   resultado: Exclude<AdvanceResultadoStr, "BLOQUEADO" | "CONFLITO">
@@ -165,7 +172,7 @@ interface Plano {
   cicloAlvo: number
   origemInstancia: OrigemInstanciaStr
   encerramento: "CONCLUIR" | "SUPERSEDER" | "NENHUM"
-  eventoFaseTipo: "FASE_AVANCADA" | "FASE_AVANCADA_FORCADO" | "FASE_REABERTA" | "FASE_RETORNADA"
+  eventoFaseTipo: "FASE_AVANCADA" | "FASE_AVANCADA_FORCADO" | "FASE_REABERTA" | "FASE_RETORNADA" | "FASE_MOVIDA"
   correlationId: string
   causationId: string | null
   solicitadoPorId?: number
@@ -603,6 +610,80 @@ export async function returnPhase(processoId: number, input: ReturnInput): Promi
     correlationId, causationId: input.causationId ?? null, solicitadoPorId: input.solicitadoPorId,
     forcado: false, justificativa: input.justificativa, motivoCodigo: input.motivoCodigo,
     origemLog: input.origem ?? "return", regrasAvaliadas: snap.regrasAvaliadas,
+    pendencias: snap.pendencias, warnings: snap.warnings,
+  })
+}
+
+
+// --------------------------------------------------------------------------
+// MOVIMENTAÇÃO MANUAL — Administrador Master
+// --------------------------------------------------------------------------
+
+/**
+ * Reposiciona a fase atual do processo para QUALQUER fase do macro workflow —
+ * anterior, posterior ou intermediária — SEM executar as validações do fluxo
+ * automático.
+ *
+ * O QUE ELA FAZ: só reposiciona. A instância da fase de origem é SUPERSEDIDA (nunca
+ * concluída: nada foi concluído), e a fase de destino ganha um NOVO CICLO. Tudo o que
+ * existe continua existindo — passos, tarefas, eventos, instâncias e logs das demais
+ * fases não são tocados, e o histórico da fase de origem fica preservado no ciclo
+ * dela. Nada é apagado, recalculado ou reescrito.
+ *
+ * O QUE ELA NÃO FAZ: não consulta o gate, não avalia pendências para DECIDIR. As
+ * pendências da fase de origem ainda são fotografadas para o log — o registro precisa
+ * dizer em que estado o processo estava quando foi movido, mesmo que esse estado não
+ * tenha impedido nada.
+ *
+ * AUTORIZAÇÃO é da rota, por permissão EXCLUSIVA (`processos.moverFaseManual`), nunca
+ * por `tipo = 'admin'`. Funcionário não move processo.
+ */
+export async function movePhaseManual(processoId: number, input: MoveInput): Promise<AdvanceResult> {
+  const ctxOuErr = await carregarContexto(processoId)
+  if ("success" in ctxOuErr) return ctxOuErr
+  const c = ctxOuErr
+  const correlationId = input.correlationId ?? randomUUID()
+
+  const faseAlvo = (input.faseAlvo ?? "").trim()
+  if (!faseAlvo) {
+    return { success: false, resultado: "REJEITADO", code: "FASE_ALVO_INVALIDA", message: "Informe a fase-alvo da movimentação", correlationId }
+  }
+  // A fase-alvo tem de existir NO MACRO DESTE PROCESSO. Aceitar uma chave qualquer
+  // deixaria o processo numa fase que o workflow dele não conhece.
+  if (!c.fases.some((f) => f.phaseKey === faseAlvo)) {
+    return { success: false, resultado: "REJEITADO", code: "FASE_ALVO_INVALIDA", message: "Fase-alvo inexistente no macro do processo", correlationId }
+  }
+  if (faseAlvo === c.processo.faseAtual) {
+    return {
+      success: false, resultado: "REJEITADO", code: "FASE_ALVO_INVALIDA",
+      message: "O processo já está nesta fase. Para reiniciar o ciclo da fase atual, use a reabertura.",
+      faseAtual: c.processo.faseAtual, correlationId,
+    }
+  }
+  if (!input.justificativa || !input.justificativa.trim()) {
+    return { success: false, resultado: "REJEITADO", code: "JUSTIFICATIVA_OBRIGATORIA", message: "Movimentação manual exige justificativa", correlationId }
+  }
+  if (!input.motivoCodigo || !input.motivoCodigo.trim()) {
+    return { success: false, resultado: "REJEITADO", code: "MOTIVO_OBRIGATORIO", message: "Movimentação manual exige código de motivo", correlationId }
+  }
+
+  const cicloAlvo = await proximoCiclo(processoId, faseAlvo)
+  // As pendências entram no log como FOTOGRAFIA do estado, não como decisão: a
+  // movimentação manual não é gateada por elas. Sem isso, o registro não diria de
+  // onde o processo saiu.
+  const snap = await snapshotPendencias(processoId, c.processo.faseAtual, correlationId)
+
+  return executarPlano({
+    operacao: "MOVER", processoId, faseAtual: c.processo.faseAtual, lockVersion: c.processo.lockVersion,
+    faseDestino: faseAlvo, novaFaseAtualKey: faseAlvo, cicloAlvo,
+    // SUPERSEDER, nunca CONCLUIR: mover não conclui a fase de origem. Marcá-la como
+    // concluída faria o histórico afirmar um trabalho que não aconteceu.
+    origemInstancia: "MANUAL", encerramento: "SUPERSEDER", eventoFaseTipo: "FASE_MOVIDA",
+    correlationId, causationId: input.causationId ?? null, solicitadoPorId: input.solicitadoPorId,
+    // `forcado` continua sendo especificamente "o gate barrou e foi sobreposto".
+    // Aqui o gate nem foi consultado — o fato é outro, e quem o nomeia é `resultado`.
+    forcado: false, justificativa: input.justificativa, motivoCodigo: input.motivoCodigo,
+    origemLog: input.origem ?? "mover-manual", regrasAvaliadas: snap.regrasAvaliadas,
     pendencias: snap.pendencias, warnings: snap.warnings,
   })
 }

@@ -4,7 +4,18 @@
 // exigência de justificativa e resolução da próxima/anterior fase pela ORDEM do
 // Workflow Macro (nunca por label). Importável por scripts de teste (tsx).
 
-export type AdvanceOperacao = "AVANCAR" | "FORCAR" | "REABRIR" | "RETORNAR"
+/**
+ * Operações que reposicionam a fase do processo.
+ *  AVANCAR  — fluxo normal, só com o gate liberado.
+ *  FORCAR   — o gate barrou e foi sobreposto, com justificativa.
+ *  REABRIR  — volta a fase atual para um novo ciclo.
+ *  RETORNAR — volta para uma fase ANTERIOR, novo ciclo.
+ *  MOVER    — Administrador Master reposiciona para QUALQUER fase (anterior,
+ *             posterior ou intermediária) SEM consultar o gate. Não é FORCAR
+ *             (ali o gate foi consultado e sobreposto) nem RETORNAR (que só
+ *             anda para trás): é decisão administrativa, e o registro diz isso.
+ */
+export type AdvanceOperacao = "AVANCAR" | "FORCAR" | "REABRIR" | "RETORNAR" | "MOVER"
 
 // Espelha o enum Prisma AdvanceResultado (mantido em string para o helper ser puro).
 export type AdvanceResultadoStr =
@@ -13,6 +24,7 @@ export type AdvanceResultadoStr =
   | "FORCADO"
   | "REABERTO"
   | "RETORNADO"
+  | "MOVIDO"
   | "IDEMPOTENTE"
   | "CONFLITO"
 
@@ -37,12 +49,17 @@ export function resultadoDaOperacao(op: AdvanceOperacao): Exclude<AdvanceResulta
     case "FORCAR": return "FORCADO"
     case "REABRIR": return "REABERTO"
     case "RETORNAR": return "RETORNADO"
+    case "MOVER": return "MOVIDO"
   }
 }
 
-/** Força e reabertura/retorno exigem justificativa + código de motivo (spec §14/§19). */
+/**
+ * Força, reabertura, retorno e movimentação manual exigem justificativa + código de
+ * motivo (spec §14/§19). Toda saída do fluxo automático precisa dizer POR QUÊ — é o
+ * que separa uma decisão administrativa de um estado que ninguém sabe explicar.
+ */
 export function exigeJustificativa(op: AdvanceOperacao): boolean {
-  return op === "FORCAR" || op === "REABRIR" || op === "RETORNAR"
+  return op === "FORCAR" || op === "REABRIR" || op === "RETORNAR" || op === "MOVER"
 }
 
 /**
