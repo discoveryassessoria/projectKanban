@@ -12,9 +12,12 @@
 // retrocede nem reaproveita número. Somente leitura nas tabelas de negócio —
 // escreve apenas em CodeSequence.
 //
-// Rodar: npx tsx scripts/reconciliar-sequencias-codigo.ts [--dry-run]
-// No build da Vercel roda sozinho em produção (o gerador também se autocura
-// em runtime; isto evita que o primeiro create de cada escopo pague o pato).
+// Rodar: npm run reconciliar:sequencias:dry (só leitura) ou
+//        npm run reconciliar:sequencias (escreve; protegido por guard:escrita,
+//        exige ambiente NÃO-produção)
+// NÃO roda sozinho no build da Vercel — é manual. O gerador central também
+// se autocura em runtime a cada create (evita boa parte dos casos), mas se a
+// sequência ficar atrasada mesmo assim, rode isto manualmente.
 // ============================================================================
 import { prisma } from '@/lib/prisma'
 import { CODE_REGISTRY } from '@/lib/codigos/entity-registry'
