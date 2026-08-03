@@ -13,10 +13,24 @@
 /** Tabelas que só existem no Discovery. Ausência = não é banco deste sistema. */
 export const TABELAS_SENTINELA = ['Requerente', 'Contratante', 'Processo', 'Usuario', '_prisma_migrations']
 
-/** Assinatura mínima de PRODUÇÃO. Abaixo disso, não se escreve. */
+/**
+ * Assinatura mínima de PRODUÇÃO. Abaixo disso, não se escreve.
+ *
+ * `minMigrations` era 60 e caiu para 1 em 02/08/2026. Motivo: a consolidação do
+ * histórico em `0000_baseline` reduziu o `_prisma_migrations` de produção a UMA
+ * linha. O critério de 60 virou permanentemente inalcançável e `classificar()`
+ * passou a devolver DESENVOLVIMENTO para o banco real — desligando em silêncio o
+ * `guard:escrita` e as travas de produção dos scripts de backfill.
+ *
+ * Depois da consolidação a contagem de migrations não discrimina mais nada: um
+ * banco de teste recém-criado por `migrate deploy` também começa em 1. Quem
+ * discrimina de fato agora é `minTabelas` (schema completo) somado a
+ * `minRequerentes` (dado real de negócio) — e é o segundo que separa PRODUÇÃO de
+ * um staging com o mesmo schema e sem dado.
+ */
 export const ASSINATURA_PRODUCAO = {
   minTabelas: 100,
-  minMigrations: 60,
+  minMigrations: 1,
   minRequerentes: 700,
 }
 
@@ -75,7 +89,7 @@ export function classificar(retrato) {
   if (tabelas >= a.minTabelas && migrations >= a.minMigrations && requerentes >= a.minRequerentes) {
     return CLASSE.PRODUCAO
   }
-  if (tabelas >= a.minTabelas && migrations >= 20) return CLASSE.STAGING
+  if (tabelas >= a.minTabelas && migrations >= 1) return CLASSE.STAGING
   return CLASSE.DESENVOLVIMENTO
 }
 
