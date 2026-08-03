@@ -198,6 +198,87 @@ export interface EstruturaOperacional {
 }
 
 // ============================================================
+// DTO DE ÍNDICE — o que a TELA PRINCIPAL recebe
+// ------------------------------------------------------------
+// A Central Operacional é um ÍNDICE: pessoa → documento → "Abrir detalhes". Quem
+// EXECUTA é o modal do documento, na aba Workflow. Por isso a tela principal não
+// recebe passo, status de passo, responsável de passo, SLA, prazo, bloqueio nem
+// operação antecipada: o que ela não pode mostrar, ela não precisa carregar.
+//
+// Os contadores e o status final são calculados AQUI, no domínio, a partir das
+// instâncias oficiais — nunca contando elementos renderizados na tela.
+// ============================================================
+
+/** Estado canônico e resumido de um artefato ou do documento inteiro. */
+export type StatusResumo =
+  | "PENDENTE"
+  | "EM_ANDAMENTO"
+  | "PRONTO"
+  | "DIVERGENTE"
+  | "INVALIDADO"
+  | "NAO_APLICAVEL"
+
+export const ROTULO_STATUS_RESUMO: Record<StatusResumo, string> = {
+  PENDENTE: "Pendente",
+  EM_ANDAMENTO: "Em andamento",
+  PRONTO: "Pronto",
+  DIVERGENTE: "Divergente",
+  INVALIDADO: "Invalidado",
+  NAO_APLICAVEL: "Não aplicável",
+}
+
+/** Estado dos artefatos do documento — uma coluna cada na tabela do índice. */
+export interface ArtefatosDoDocumento {
+  certidao: StatusResumo
+  retificada: StatusResumo
+  traducao: StatusResumo
+  apostila: StatusResumo
+}
+
+/** Uma LINHA da tabela de documentos da pessoa. Sem nada de execução. */
+export interface DocumentoDoIndice {
+  chave: string
+  documentoId: number | null
+  necessidadeId: number | null
+  /** Titular do documento — o modal precisa dele para a Operação Antecipada. */
+  pessoaId: number | null
+  titulo: string
+  tipoLabel: string | null
+  pais: string | null
+  artefatos: ArtefatosDoDocumento
+  statusFinal: StatusResumo
+  statusFinalLabel: string
+  /** Há executor oficial para abrir o detalhe deste documento. */
+  podeAbrirDetalhes: boolean
+  /** Falta de configuração, dita em texto. O documento nunca é escondido. */
+  impedimento: string | null
+}
+
+export interface PessoaDoIndice {
+  pessoa: PessoaDoProcesso
+  documentos: DocumentoDoIndice[]
+  totais: { documentos: number; prontos: number; pendentes: number; divergentes: number }
+  semDocumentoAplicavel: boolean
+}
+
+export interface ResumoDoIndice {
+  documentos: number
+  prontos: number
+  pendentes: number
+  divergentes: number
+  pessoasComTrabalho: number
+}
+
+export interface IndiceOperacional {
+  resumo: ResumoDoIndice
+  linhaPrincipal: PessoaDoIndice[]
+  foraDaLinha: PessoaDoIndice[]
+  pendenteClassificacao: PessoaDoIndice[]
+  /** Documentos sem pessoa no roster — visíveis, nunca descartados em silêncio. */
+  semDono: DocumentoDoIndice[]
+}
+
+// ============================================================
 // REGRAS DE ESTADO — únicas, derivadas do status PERSISTIDO
 // ============================================================
 
@@ -447,4 +528,119 @@ export function montarEstruturaOperacional(input: EstruturaInput): EstruturaOper
 /** Ordem de execução: a do workflow publicado (ordem), desempate estável por id. */
 function ordenar(passos: PassoBruto[]): PassoBruto[] {
   return [...passos].sort((a, b) => a.ordem - b.ordem || a.stepInstanceId - b.stepInstanceId)
+}
+
+// ============================================================
+// PROJEÇÃO PARA O ÍNDICE
+// ============================================================
+
+/**
+ * Estado do documento derivado do workflow DELE — a fonte é a mesma da execução,
+ * então índice e modal nunca discordam. Divergência (BLOQUEADO/FALHOU) tem
+ * precedência sobre progresso: um documento travado não é "em andamento".
+ */
+export function statusFinalDoAlvo(alvo: AlvoDaEstrutura): StatusResumo {
+  if (alvo.divergente) return "DIVERGENTE"
+  if (alvo.progresso.total === 0) return "NAO_APLICAVEL"
+  if (alvo.concluido) return "PRONTO"
+  if (alvo.progresso.concluidos > 0) return "EM_ANDAMENTO"
+  // Algum passo já saiu do estado inicial? Então o trabalho começou.
+  return alvo.passos.some((p) => p.balde === "EM_ANDAMENTO") ? "EM_ANDAMENTO" : "PENDENTE"
+}
+
+/**
+ * Artefatos do documento (certidão / retificada / tradução / apostila). O que o
+ * domínio não registra vem como NAO_APLICAVEL — nunca um estado inventado para
+ * preencher coluna.
+ */
+export type ArtefatosPorChave = Map<string, Partial<ArtefatosDoDocumento>>
+
+function montarDocumentoDoIndice(
+  alvo: AlvoDaEstrutura,
+  artefatos: ArtefatosPorChave | undefined,
+): DocumentoDoIndice {
+  const statusFinal = statusFinalDoAlvo(alvo)
+  const extra = artefatos?.get(alvo.chave) ?? {}
+  // Sem executor em NENHUM passo do documento não há o que abrir — e isso é falta de
+  // configuração, que precisa ser dita, não escondida.
+  const comExecutor = alvo.passos.some((p) => p.executor != null)
+  const impedimento = comExecutor
+    ? null
+    : alvo.passos.find((p) => p.erroAdministrativo)?.erroAdministrativo ??
+      "Sem executor configurado para os passos deste documento."
+  return {
+    chave: alvo.chave,
+    documentoId: alvo.documentoId,
+    necessidadeId: alvo.necessidadeId,
+    pessoaId: alvo.pessoaId,
+    titulo: alvo.titulo,
+    tipoLabel: alvo.subtitulo,
+    pais: alvo.pais,
+    artefatos: {
+      certidao: extra.certidao ?? statusFinal,
+      retificada: extra.retificada ?? "NAO_APLICAVEL",
+      traducao: extra.traducao ?? "NAO_APLICAVEL",
+      apostila: extra.apostila ?? "NAO_APLICAVEL",
+    },
+    statusFinal,
+    statusFinalLabel: ROTULO_STATUS_RESUMO[statusFinal],
+    podeAbrirDetalhes: comExecutor,
+    impedimento,
+  }
+}
+
+function montarPessoaDoIndice(linha: PessoaDaEstrutura, artefatos: ArtefatosPorChave | undefined): PessoaDoIndice {
+  const documentos = linha.documentos.map((d) => montarDocumentoDoIndice(d, artefatos))
+  return {
+    pessoa: linha.pessoa,
+    documentos,
+    totais: {
+      documentos: documentos.length,
+      prontos: documentos.filter((d) => d.statusFinal === "PRONTO").length,
+      pendentes: documentos.filter((d) => d.statusFinal === "PENDENTE" || d.statusFinal === "EM_ANDAMENTO").length,
+      divergentes: documentos.filter((d) => d.statusFinal === "DIVERGENTE" || d.statusFinal === "INVALIDADO").length,
+    },
+    // Passos de escopo PESSOA continuam existindo no domínio e são executados pelo
+    // modal do alvo deles; no ÍNDICE eles não viram linha, porque não são documento.
+    semDocumentoAplicavel: documentos.length === 0,
+  }
+}
+
+/**
+ * Projeta a estrutura completa no ÍNDICE que a tela principal consome.
+ *
+ * Nada de execução atravessa: passo, status de passo, responsável, SLA, prazo,
+ * bloqueio e operação antecipada ficam de fora por construção — não é filtro de
+ * renderização, é o contrato do DTO.
+ */
+export function montarIndiceOperacional(
+  estrutura: EstruturaOperacional,
+  artefatos?: ArtefatosPorChave,
+): IndiceOperacional {
+  const linhaPrincipal = estrutura.linhaPrincipal.map((l) => montarPessoaDoIndice(l, artefatos))
+  const foraDaLinha = estrutura.foraDaLinha.map((l) => montarPessoaDoIndice(l, artefatos))
+  const pendenteClassificacao = estrutura.pendenteClassificacao.map((l) => montarPessoaDoIndice(l, artefatos))
+  const semDono = estrutura.semDono.map((d) => montarDocumentoDoIndice(d, artefatos))
+
+  const todos = [
+    ...linhaPrincipal.flatMap((p) => p.documentos),
+    ...foraDaLinha.flatMap((p) => p.documentos),
+    ...pendenteClassificacao.flatMap((p) => p.documentos),
+    ...semDono,
+  ]
+
+  return {
+    resumo: {
+      documentos: todos.length,
+      prontos: todos.filter((d) => d.statusFinal === "PRONTO").length,
+      pendentes: todos.filter((d) => d.statusFinal === "PENDENTE" || d.statusFinal === "EM_ANDAMENTO").length,
+      divergentes: todos.filter((d) => d.statusFinal === "DIVERGENTE" || d.statusFinal === "INVALIDADO").length,
+      pessoasComTrabalho: [...linhaPrincipal, ...foraDaLinha, ...pendenteClassificacao]
+        .filter((p) => !p.semDocumentoAplicavel).length,
+    },
+    linhaPrincipal,
+    foraDaLinha,
+    pendenteClassificacao,
+    semDono,
+  }
 }

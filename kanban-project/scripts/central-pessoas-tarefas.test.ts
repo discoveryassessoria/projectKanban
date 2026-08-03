@@ -105,27 +105,29 @@ const central = read("src/components/kanban/ProcessoCentralOperacional.tsx")
 const painel = read("src/components/kanban/PainelDaFase.tsx")
 const consulta = read("src/lib/process-stage/estrutura-operacional.ts")
 const nucleo = read("src/lib/process-stage/estrutura-operacional-core.ts")
+const wtab = read("src/components/kanban/workflow/WorkflowTab.tsx")
+const opa = read("src/components/kanban/workflow/OperacaoAntecipadaPainel.tsx")
 
 check("rota devolve o roster oficial de pessoas", /pessoas:\s*pessoasDoProcesso/.test(rota))
-check("rota devolve a ESTRUTURA da fase (pessoa → documento → workflow → passos)", /^\s*estrutura,\s*$/m.test(rota))
+check("rota devolve o ÍNDICE da fase (pessoa → documento)", /^\s*indice,\s*$/m.test(rota))
 check("pessoas vêm do vínculo com a árvore (Pessoa.arvoreId)", /prisma\.pessoa\.findMany\(\{\s*\n?\s*where:\s*\{\s*arvoreId:\s*processo\.arvoreId\s*\}/.test(rota))
 check("roster é montado pelo núcleo puro (fonte única)", rota.includes("montarPessoasDoProcesso(pessoas, unioes)"))
 check("o trabalho vem de PhaseWorkflowStepInstance da fase", consulta.includes("phaseWorkflowStepInstance.findMany") && consulta.includes("faseMacroKey: ctx.faseMacroKey"))
 check("a régua única de balde continua sendo a mesma", nucleo.includes("baldeDoPasso"))
 check("etapa sem item aplicável NÃO se declara 'em andamento'", rota.includes('totalObrig === 0 ? "pendente"'))
 
-check("Central recebe o roster e a estrutura prontos do backend", central.includes("pessoas?: PessoaDoProcessoUI[]") && central.includes("estrutura?: EstruturaOperacional"))
+check("Central recebe o roster e o índice prontos do backend", central.includes("pessoas?: PessoaDoProcessoUI[]") && central.includes("indice?: IndiceOperacional"))
 check("Central expõe o grupo 'pendente de classificação'", painel.includes("pendenteClassificacao"))
 check("pessoa aparece com ou sem documento aplicável", painel.includes("Nenhum documento aplicável nesta fase"))
-check("Central repassa a estrutura ao painel", central.includes("estrutura={bodyData.estrutura"))
-check("Central tem handler único de abertura de passo", central.includes("const abrirPasso = useCallback"))
-check("abrir passo usa a operação oficial (sem rota legada)", /abrirOperacao\(p\.documentoId \?\? 0, p\.necessidadeId\)/.test(central))
-check("passo sem executor vira erro administrativo explícito (passo não some)", central.includes("if (!p.executor)") && painel.includes("erroAdministrativo") && painel.includes("Sem executor"))
-check("contador e lista têm a MESMA fonte (resumo da estrutura)", central.includes("data.estrutura?.resumo"))
+check("Central repassa o índice ao painel", central.includes("indice={bodyData.indice"))
+check("Central tem handler único de abertura de detalhes", central.includes("const abrirDetalhes = useCallback"))
+check("abrir detalhes usa a operação oficial (sem rota legada)", /abrirOperacao\(doc\.documentoId \?\? 0, doc\.necessidadeId\)/.test(central))
+check("documento sem executor vira erro administrativo explícito (linha não some)", central.includes("if (!doc.podeAbrirDetalhes)") && painel.includes("doc.impedimento") && painel.includes("Sem executor"))
+check("contador e lista têm a MESMA fonte (resumo do índice)", central.includes("data.indice?.resumo"))
 
-check("painel renderiza a hierarquia da execução, não uma segunda lista", painel.includes("function PessoaAccordion") && painel.includes("function DocumentoAccordion") && painel.includes("function PassoRow"))
-check("pessoa e documento são expansíveis", painel.includes("alternar(chave)") && painel.includes("abertos.has(chave)"))
-check("expandir o documento mostra o workflow DELE", painel.includes("doc.passos.map"))
+check("painel é ÍNDICE: pessoa em card, documento em linha", painel.includes("function PessoaCard") && painel.includes("function LinhaDocumento") && !painel.includes("function PassoRow"))
+check("pessoa é expansível e revela os documentos dela", painel.includes("alternar()") && painel.includes("abertos.has(`pessoa:"))
+check("o workflow do documento vive no MODAL, não no painel", !painel.includes("doc.passos") && read("src/components/kanban/workflow/WorkflowTab.tsx").includes("workflow.steps.map"))
 check("sem lista de tarefas paralela ao workflow", !painel.includes("ListaDeTarefas") && !painel.includes("GRUPOS_TAREFA"))
 check("sem agregado por passo misturando as pessoas", !painel.includes("function WorkflowDaFase") && !painel.includes("function PassoDoWorkflow"))
 check("sem esteira de etapas duplicando o workflow", !painel.includes("5 ETAPAS EM LINHA") && !central.includes("let steps: FaseStep[]"))
@@ -145,16 +147,16 @@ for (const [nome, re] of CONDICOES_PROIBIDAS) {
 }
 // O trabalho aparece UMA vez: dentro do documento a que pertence. Nem a linha da
 // pessoa nem um agregado por passo podem repetir a mesma instância.
-check("a mesma instância não é desenhada em dois lugares",
-  !painel.includes("p.docs.map") && !painel.includes("docsResumo.map") && !painel.includes("passo.instancias.map"))
+check("a execução é desenhada em UM lugar só (o modal)",
+  !painel.includes("p.docs.map") && !painel.includes("docsResumo.map") && !/\.passos\.map/.test(painel))
 // OPERAÇÃO ANTECIPADA — a capacidade tem de continuar INTEIRA: criar, listar,
 // avaliar e abrir. Ela pertence ao ALVO, e é no documento que o alvo aparece.
-check("antecipada: criar", painel.includes("+ operação antecipada") && painel.includes("acoes.onNovaOperacao!(doc.necessidadeId"))
-check("antecipada: listar inline no alvo", painel.includes("function OperacoesAntecipadasInline") && painel.includes("<OperacoesAntecipadasInline"))
-check("antecipada: avaliar (SIM/PARCIAL/NAO/CANCELAR)", painel.includes("function OperacaoAntecipadaItem") && painel.includes("onAvaliar?.(o.id"))
-check("antecipada: abrir a operação oficial", painel.includes("onAbrirOperacaoAntecipada") && central.includes("abrirOperacaoAntecipada"))
-check("antecipada: rótulos de status preservados", painel.includes("ST_OP_LABEL") && painel.includes("AGUARDANDO_RESULTADO"))
-check("antecipada: ligada ponta a ponta pela Central", central.includes("operacoesPorNec={operacoesPorNec}") && central.includes("onAvaliarOperacao={readOnly ? undefined : avaliarOperacao}"))
+check("antecipada: criar (no modal)", wtab.includes("nova operação antecipada") && wtab.includes("OperacaoAntecipadaModal"))
+check("antecipada: listar inline no alvo (no modal)", opa.includes("export function OperacoesAntecipadasInline") && wtab.includes("<OperacoesAntecipadasInline"))
+check("antecipada: avaliar (SIM/PARCIAL/NAO/CANCELAR)", opa.includes("function OperacaoAntecipadaItem") && opa.includes("onAvaliar?.(o.id"))
+check("antecipada: abrir a operação oficial", wtab.includes("onAbrirOperacaoAlvo") && central.includes("const abrirOperacaoAlvo = useCallback"))
+check("antecipada: rótulos de status preservados", opa.includes("ST_OP_LABEL") && opa.includes("AGUARDANDO_RESULTADO"))
+check("antecipada: a Central passa o ALVO ao modal, e só", central.includes("contextoAntecipada={") && !central.includes("operacoesPorNec"))
 
 // Timeline: executar a tarefa pela Central tem de deixar rastro no Diário Operacional.
 const opDoc = read("src/services/documento-operacao.ts")
@@ -162,8 +164,8 @@ check("operação por-documento emite evento do motor (timeline)", opDoc.include
 check("evento cobre início, mudança de status e conclusão", /EM_ANDAMENTO:\s*"PASSO_INICIADO"/.test(opDoc) && /CONCLUIDO:\s*"PASSO_CONCLUIDO"/.test(opDoc) && /BLOQUEADO:\s*"PASSO_BLOQUEADO"/.test(opDoc))
 check("evento é idempotente (não derruba a transação ao repetir)", opDoc.includes("skipDuplicates: true") && opDoc.includes("chaveEvento("))
 check("sem evento quando não houve transição de estado", opDoc.includes("novo === p.status ? null"))
-check("um documento com UM passo aparece igual (sem piso de quantidade)", !/passos\.length\s*>\s*1/.test(painel))
-check("passos concluídos continuam visíveis (sem filtro)", painel.includes('p.balde === "CONCLUIDA"') && !painel.includes("filter((p) => p.balde !== "))
+check("um documento aparece igual com 1 ou com 5 passos (sem piso de quantidade)", !/passos\.length\s*>\s*1/.test(painel) && !/steps\.length\s*>\s*1/.test(wtab))
+check("a aba Workflow mostra TODOS os passos (sem filtro que esconde futuros)", wtab.includes("workflow.steps.map") && !/steps\s*\.filter\(\(step\)/.test(wtab))
 
 // ============================================================
 console.log(`\n${falhas.length === 0 ? "✅" : "❌"} ${ok}/${ok + falhas.length} verificações`)

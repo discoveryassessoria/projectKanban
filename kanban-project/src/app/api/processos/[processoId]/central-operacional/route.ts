@@ -16,8 +16,8 @@ import {
 // CONSULTA OFICIAL da Central: devolve a fase já na hierarquia de execução
 // (pessoa → documento → workflow do documento → passos). O agrupamento é feito no
 // domínio, por IDs relacionais — a tela não recombina nada por nome.
-import { getPhaseOperationalStructure, TIPO_DOCUMENTO_LABELS } from "@/src/lib/process-stage/estrutura-operacional"
-import type { EstruturaOperacional } from "@/src/lib/process-stage/estrutura-operacional-core"
+import { getPhaseOperationalSummary, TIPO_DOCUMENTO_LABELS } from "@/src/lib/process-stage/estrutura-operacional"
+import type { IndiceOperacional } from "@/src/lib/process-stage/estrutura-operacional-core"
 import type { FaseCode } from "@prisma/client"
 
 // ============================================================
@@ -159,9 +159,10 @@ interface CentralOperacionalResponse {
   // ROSTER OFICIAL das pessoas do processo (vínculo Pessoa.arvoreId = Processo.arvoreId).
   // NÃO derivado da fila: processo sem documento/tarefa continua exibindo as pessoas.
   pessoas: PessoaDoProcesso[]
-  // ESTRUTURA OPERACIONAL da fase consultada: pessoa → documento/certidão → workflow
-  // daquele documento → passos. Pronta para apresentação; o frontend não reagrupa.
-  estrutura: EstruturaOperacional
+  // ÍNDICE OPERACIONAL da fase consultada: pessoa → documento, com contadores e
+  // status final. A tela principal INDEXA; quem EXECUTA é o modal do documento, e é
+  // por isso que passo, SLA, responsável de passo e bloqueio NÃO vêm aqui.
+  indice: IndiceOperacional
   faseProgress: FaseProgress
   // LEGADO_INATIVO (desativação Genealogia): quando a fase atual é GENEALOGIA, as
   // métricas documentais antigas (Obrigatórios/validados/percentual, derivadas de
@@ -815,19 +816,20 @@ export async function GET(
     }
 
     // ============================================================
-    // 10) ESTRUTURA OPERACIONAL DA FASE — a consulta oficial da Central.
+    // 10) ÍNDICE OPERACIONAL DA FASE — a consulta oficial da tela principal.
     // ------------------------------------------------------------
-    // Uma chamada devolve a fase inteira já na hierarquia em que ela é executada:
-    // PESSOA → DOCUMENTO/CERTIDÃO → WORKFLOW DAQUELE DOCUMENTO → PASSOS. As
-    // instâncias são as MESMAS de sempre (PhaseWorkflowStepInstance da fase
-    // consultada, escopadas por instância quando é consulta de fase passada,
-    // excluindo SUPERSEDIDO/CANCELADO): o que mudou é que o agrupamento acontece no
-    // domínio, por IDs relacionais oficiais, e não na tela por concatenação de nome.
+    // A Central Operacional é um ÍNDICE: pessoa → documento → "Abrir detalhes". Quem
+    // EXECUTA é o modal do documento, na aba Workflow, que tem a própria consulta.
+    // Por isso esta resposta NÃO carrega passo, status de passo, responsável de
+    // passo, SLA, prazo, bloqueio nem operação antecipada: um processo com 20
+    // instâncias não manda 20 instâncias para uma tela que não pode mostrá-las.
     //
-    // O roster já lido acima é REAPROVEITADO — a árvore não é relida na mesma
-    // requisição só para montar a estrutura.
+    // O agrupamento continua sendo do domínio, por IDs relacionais oficiais, sobre
+    // as MESMAS instâncias de sempre (escopadas por instância na consulta de fase
+    // passada, excluindo SUPERSEDIDO/CANCELADO). O roster já lido acima é
+    // REAPROVEITADO — a árvore não é relida na mesma requisição.
     // ============================================================
-    const { estrutura } = await getPhaseOperationalStructure(
+    const { indice } = await getPhaseOperationalSummary(
       { processoId: id, faseMacroKey: faseConsultadaKey, workflowInstanceId: faseContexto?.workflowInstanceId ?? null },
       { pessoas: pessoasDoProcesso, agora: now },
     )
@@ -858,7 +860,7 @@ export async function GET(
       queue: genealogiaV2 ? genealogiaV2.queue : queue,
       queueTitle,
       pessoas: pessoasDoProcesso,
-      estrutura,
+      indice,
       faseProgress: genealogiaV2 ? genealogiaV2.faseProgress : faseProgress,
       // Genealogia agora tem visualização V2 real — sai o estado neutro de reestruturação.
       genealogiaReestruturacao: genealogiaV2 ? false : genealogiaReestruturacao,

@@ -26,11 +26,15 @@ import {
 } from "./central-operacional-core"
 import {
   montarEstruturaOperacional,
+  montarIndiceOperacional,
   chaveDoAlvo,
   escopoDoAlvo,
   type AlvoBruto,
+  type ArtefatosPorChave,
   type EstruturaOperacional,
+  type IndiceOperacional,
   type PassoBruto,
+  type StatusResumo,
 } from "./estrutura-operacional-core"
 import { getStepsForFase, phaseKeyToFaseCode } from "./fases-catalog"
 
@@ -451,4 +455,86 @@ export async function getPhaseOperationalStructure(
   }
 
   return { estrutura, diagnosticos }
+}
+
+// ============================================================
+// ÍNDICE OPERACIONAL — o que a TELA PRINCIPAL consome
+// ------------------------------------------------------------
+// A Central Operacional é um ÍNDICE (pessoa → documento → "Abrir detalhes"); quem
+// EXECUTA é o modal do documento, na aba Workflow. Esta consulta devolve SÓ o que o
+// índice pode mostrar: pessoa, documentos, artefatos, status final e contadores.
+//
+// Passo, status de passo, responsável, SLA, prazo, bloqueio e operação antecipada
+// NÃO atravessam — não por filtro de renderização, mas porque não estão no DTO. Um
+// processo com 20 instâncias de passo não manda 20 instâncias para uma tela que não
+// as usa.
+// ============================================================
+
+/** Estado do artefato a partir do registro do Documento. */
+function statusArtefato(feito: boolean, emAndamento: boolean): StatusResumo {
+  if (feito) return "PRONTO"
+  return emAndamento ? "EM_ANDAMENTO" : "NAO_APLICAVEL"
+}
+
+export interface IndiceFaseResultado {
+  indice: IndiceOperacional
+  diagnosticos: DiagnosticoEstrutura[]
+}
+
+export async function getPhaseOperationalSummary(
+  ctx: EstruturaFaseContexto,
+  opcoes: EstruturaFaseOpcoes = {},
+): Promise<IndiceFaseResultado> {
+  const db = opcoes.db ?? prisma
+  const { estrutura, diagnosticos } = await getPhaseOperationalStructure(ctx, opcoes)
+
+  // ARTEFATOS — colunas "Certidão retificada", "Tradução" e "Apostila" da tabela.
+  // Vêm dos registros OFICIAIS do documento; o que o domínio não registra fica
+  // "Não aplicável", nunca um estado inventado só para preencher coluna.
+  const alvos = [
+    ...estrutura.linhaPrincipal.flatMap((p) => p.documentos),
+    ...estrutura.foraDaLinha.flatMap((p) => p.documentos),
+    ...estrutura.pendenteClassificacao.flatMap((p) => p.documentos),
+    ...estrutura.semDono,
+  ]
+  const docIds = alvos.map((a) => a.documentoId).filter((x): x is number => x != null)
+  const artefatos: ArtefatosPorChave = new Map()
+
+  if (docIds.length > 0) {
+    const [documentos, retificadas] = await Promise.all([
+      db.documento.findMany({
+        where: { id: { in: docIds } },
+        select: { id: true, status: true, traduzido: true, apostilado: true },
+      }),
+      db.emissaoRetificada.findMany({
+        where: { processoId: ctx.processoId, documentoId: { in: docIds } },
+        select: { documentoId: true, status: true, retifiedValidated: true },
+      }),
+    ])
+    const docMap = new Map(documentos.map((d) => [d.id, d]))
+    const retMap = new Map(retificadas.map((r) => [r.documentoId, r]))
+
+    for (const a of alvos) {
+      if (a.documentoId == null) continue
+      const d = docMap.get(a.documentoId)
+      const r = retMap.get(a.documentoId)
+      if (!d && !r) continue
+      artefatos.set(a.chave, {
+        // A CERTIDÃO em si segue o workflow da fase (statusFinalDoAlvo); só o
+        // INVALIDADO vem do registro, porque é estado do documento, não do passo.
+        certidao: d?.status === "INVALIDO" ? "INVALIDADO" : undefined,
+        retificada: r ? (r.retifiedValidated ? "PRONTO" : "EM_ANDAMENTO") : "NAO_APLICAVEL",
+        traducao: statusArtefato(
+          d?.traduzido === true || d?.status === "TRADUZIDO",
+          d?.status === "EM_TRADUCAO",
+        ),
+        apostila: statusArtefato(
+          d?.apostilado === true || d?.status === "APOSTILADO",
+          d?.status === "EM_APOSTILAMENTO",
+        ),
+      })
+    }
+  }
+
+  return { indice: montarIndiceOperacional(estrutura, artefatos), diagnosticos }
 }

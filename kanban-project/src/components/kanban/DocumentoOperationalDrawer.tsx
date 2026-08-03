@@ -8,7 +8,7 @@ import type { WorkflowShape } from "./TabOperationCockpit"
 import { createPortal } from "react-dom"
 import { X, Loader2, AlertTriangle, UserRound, Clock, CalendarDays, FileText } from "lucide-react"
 import { usePermissoes } from "@/src/hooks/use-permissoes"
-import { WorkflowTab } from "./workflow/WorkflowTab"
+import { WorkflowTab, type ContextoAntecipada } from "./workflow/WorkflowTab"
 import { InitOperationModal } from "./InitOperationModal"
 import { WorkflowControls } from "./WorkflowControls"
 import { TabOperationCockpit } from "./TabOperationCockpit"
@@ -148,6 +148,12 @@ interface DocumentoOperationalDrawerProps {
   backLabel?: string
   /** Banner de contexto quando a MESMA tela oficial é aberta por uma Operação Antecipada. */
   bannerAntecipada?: string | null
+  /**
+   * Contexto da OPERAÇÃO ANTECIPADA deste documento (alvo + permissões), repassado
+   * à aba Workflow. Quem abriu o documento sabe qual é a necessidade dele; o drawer
+   * só encaminha, sem resolver nada por texto.
+   */
+  contextoAntecipada?: ContextoAntecipada
 }
 
 type TabId =
@@ -259,6 +265,7 @@ function ConteudoDrawer({
   onBack,
   backLabel,
   bannerAntecipada,
+  contextoAntecipada,
 }: DocumentoOperationalDrawerProps) {
   const { pode } = usePermissoes()
   const [delegandoResp, setDelegandoResp] = useState(false)
@@ -627,6 +634,7 @@ function ConteudoDrawer({
               {activeTab === "workflow" && (
                 <WorkflowTab
                   documentoId={doc.id}
+                  contextoAntecipada={contextoAntecipada}
                   onChange={() => {
                     onSave?.()
                     carregar()

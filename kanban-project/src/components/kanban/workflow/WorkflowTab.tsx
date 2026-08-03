@@ -12,6 +12,8 @@ import {
   Lock,
 } from "lucide-react"
 import { CentralDaEtapaDrawer } from "./CentralDaEtapaDrawer"
+import { OperacoesAntecipadasInline, type OpAntecipadaInline, type ResultadoAvaliacaoUI } from "./OperacaoAntecipadaPainel"
+import { OperacaoAntecipadaModal } from "../OperacaoAntecipadaModal"
 
 // ============================================================
 // TIPOS
@@ -67,9 +69,28 @@ interface Workflow {
   steps: WorkflowStep[]
 }
 
+/**
+ * Contexto para a OPERAÇÃO ANTECIPADA deste documento. Ela pertence ao ALVO (a
+ * necessidade documental), e o alvo só é conhecido por quem abriu o documento —
+ * por isso chega de fora, por ID, nunca resolvido por texto aqui dentro.
+ *
+ * Ausente ⇒ a aba não exibe operação antecipada (ex.: documento sem necessidade).
+ */
+export interface ContextoAntecipada {
+  processoId: number
+  necessidadeId: number | null
+  pessoaId: number | null
+  faseAtivaCode: string | null
+  usuarios: Array<{ id: number; nome: string; publicCode?: string | null }>
+  /** Abre a operação-ALVO da antecipada na tela oficial (o mesmo drawer). */
+  onAbrirOperacaoAlvo?: (documentoId: number, necessidadeId: number | null, objetivo: string | null) => void
+  readOnly?: boolean
+}
+
 interface WorkflowTabProps {
   documentoId: number
   onChange?: () => void
+  contextoAntecipada?: ContextoAntecipada
 }
 
 // ============================================================
@@ -132,11 +153,35 @@ const STATUS_LABEL: Record<StatusStep, string> = {
 // COMPONENTE PRINCIPAL
 // ============================================================
 
-export function WorkflowTab({ documentoId, onChange }: WorkflowTabProps) {
+export function WorkflowTab({ documentoId, onChange, contextoAntecipada }: WorkflowTabProps) {
   // fase atual não tem Workflow Interno configurado (nunca cai no de outra fase)
 
   // ✅ NOVO: stepId aberto na Central da Etapa (drawer empilhado)
   const [centralStepId, setCentralStepId] = useState<number | null>(null)
+
+  // OPERAÇÃO ANTECIPADA deste ALVO. Vive AQUI, no modal do documento — nunca na
+  // listagem principal da Central, que é índice e não executor.
+  const necId = contextoAntecipada?.necessidadeId ?? null
+  const opsReq = useApi<{ operacoes?: OpAntecipadaInline[] }>(
+    contextoAntecipada ? `/api/processos/${contextoAntecipada.processoId}/operacoes-antecipadas` : null,
+  )
+  // Filtra pela NECESSIDADE deste documento: a operação antecipada de outro alvo não
+  // é assunto desta tela.
+  const opsDoAlvo = (opsReq.dados?.operacoes ?? []).filter((o) => necId != null && o.necessidadeId === necId)
+  const [criandoAntecipada, setCriandoAntecipada] = useState(false)
+
+  const avaliarAntecipada = useCallback(
+    async (id: number, resultado: ResultadoAvaliacaoUI, resultadoObtido: string, resultadoDados?: Record<string, unknown>) => {
+      await fetch(`/api/operacoes-antecipadas/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${localStorage.getItem("authToken")}` },
+        body: JSON.stringify({ resultado, resultadoObtido: resultadoObtido || null, resultadoDados: resultadoDados ?? null }),
+      })
+      await opsReq.recarregar()
+      onChange?.()
+    },
+    [opsReq, onChange],
+  )
 
   // -- Carrega o workflow
   // Leitura pela camada oficial: o token e o tratamento de erro deixam de ser
@@ -239,30 +284,71 @@ export function WorkflowTab({ documentoId, onChange }: WorkflowTabProps) {
         </div>
       </div>
 
-      {/* ============== LISTA DE STEPS ============== */}
+      {/* ============== LISTA DE STEPS ==============
+          TODOS os passos do workflow deste documento, na ordem publicada. O filtro
+          que escondia "bloqueada sem motivo" e "não iniciada" saiu: com a execução
+          concentrada aqui, esconder os passos futuros deixava o operador sem ver o
+          caminho do documento — e a Central, que era onde ele via, virou índice. */}
       <div className="space-y-2">
-        {workflow.steps
-          .filter((step) => {
-            // ✅ Mostra: concluídas + em execução + bloqueadas COM motivo
-            //    (cobre lock-step "aguardando irmãos" e bloqueio manual)
-            // ❌ Esconde: bloqueadas sem motivo (= ainda não chegou a vez)
-            //    e não_iniciada
-            const isDone = step.status === "concluida"
-            const isActive =
-              step.status === "em_andamento" ||
-              step.status === "aguardando_terceiro" ||
-              step.status === "atrasada" ||
-              (step.status === "bloqueada" && step.motivoBloqueio !== null)
-            return isDone || isActive
-          })
-          .map((step) => (
-            <StepCard
-              key={step.id}
-              step={step}
-              onOpenCentral={() => setCentralStepId(step.id)}
-            />
-          ))}
+        {workflow.steps.map((step) => (
+          <StepCard
+            key={step.id}
+            step={step}
+            onOpenCentral={() => setCentralStepId(step.id)}
+          />
+        ))}
       </div>
+
+      {/* ============== OPERAÇÃO ANTECIPADA ==============
+          Capacidade nativa preservada INTEIRA (criar, listar, avaliar, abrir). Ela
+          pertence ao ALVO deste documento e só existe aqui dentro. */}
+      {contextoAntecipada && necId != null && (
+        <div className="border border-[#a78bfa]/20 rounded-lg bg-[#a78bfa]/[0.05] px-3 py-3">
+          <div className="flex items-center justify-between gap-3 mb-2 flex-wrap">
+            <b className="text-[11px] font-extrabold uppercase tracking-wide text-[#a78bfa]">
+              Operação antecipada
+            </b>
+            {!contextoAntecipada.readOnly && (
+              <button
+                type="button"
+                onClick={() => setCriandoAntecipada(true)}
+                className="text-[11px] font-semibold text-white/55 hover:text-[#a78bfa] underline decoration-dotted underline-offset-2"
+              >
+                + nova operação antecipada
+              </button>
+            )}
+          </div>
+          {opsDoAlvo.length === 0 ? (
+            <div className="text-[11.5px] text-white/40">
+              Nenhuma operação antecipada para este documento.
+            </div>
+          ) : (
+            <OperacoesAntecipadasInline
+              ops={opsDoAlvo}
+              readOnly={contextoAntecipada.readOnly}
+              onAvaliar={contextoAntecipada.readOnly ? undefined : avaliarAntecipada}
+              onAbrir={
+                contextoAntecipada.onAbrirOperacaoAlvo
+                  ? (op) => contextoAntecipada.onAbrirOperacaoAlvo!(op.operacao.uiRef.id ?? 0, op.necessidadeId, op.objetivo)
+                  : undefined
+              }
+            />
+          )}
+        </div>
+      )}
+
+      {criandoAntecipada && contextoAntecipada && necId != null && (
+        <OperacaoAntecipadaModal
+          processoId={contextoAntecipada.processoId}
+          necessidadeId={necId}
+          necessidadeLabel={workflow.templateName}
+          pessoaId={contextoAntecipada.pessoaId}
+          faseAtivaCode={contextoAntecipada.faseAtivaCode}
+          usuarios={contextoAntecipada.usuarios}
+          onClose={() => setCriandoAntecipada(false)}
+          onCreated={() => { setCriandoAntecipada(false); void opsReq.recarregar(); onChange?.() }}
+        />
+      )}
 
       {/* ============== CENTRAL DA ETAPA (drawer empilhado) ============== */}
       <CentralDaEtapaDrawer

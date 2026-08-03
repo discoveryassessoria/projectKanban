@@ -15,7 +15,7 @@ import { WorkflowMacroTrilha, ResumoDoProcesso, PROCESS_PHASES } from "./Workflo
 import { PainelDaFase, type FaseKpi } from "./PainelDaFase"
 // ESTRUTURA OPERACIONAL — contrato oficial da Central (pessoa → documento →
 // workflow do documento → passos). Vem pronta do backend; a tela não reagrupa.
-import type { EstruturaOperacional, PassoDaEstrutura } from "@/src/lib/process-stage/estrutura-operacional-core"
+import type { DocumentoDoIndice, IndiceOperacional } from "@/src/lib/process-stage/estrutura-operacional-core"
 import { ProcessoAnalise } from "./ProcessoAnalise"
 import { ProcessoTraducao } from "./ProcessoTraducao"
 import { ProcessoFaseGenerica } from "./ProcessoFaseGenerica"
@@ -24,7 +24,6 @@ import { ProcessoFaseFinal } from "./ProcessoFaseFinal"
 import { ProcessoRetificacao } from "./ProcessoRetificacao"
 import { ProcessoEmissaoRetificada } from "./ProcessoEmissaoRetificada"
 import { RetornarFaseButton } from "./RetornarFaseButton"
-import { OperacaoAntecipadaModal } from "./OperacaoAntecipadaModal"
 import { TarefaTransversalModal } from "./TarefaTransversalModal"
 import type { FaseCode } from "@prisma/client"
 
@@ -180,7 +179,7 @@ interface CentralOpData {
   // Pessoas do processo (fonte oficial) e ESTRUTURA da fase — as instâncias oficiais
   // já organizadas na hierarquia em que são executadas.
   pessoas?: PessoaDoProcessoUI[]
-  estrutura?: EstruturaOperacional
+  indice?: IndiceOperacional
   faseProgress?: FaseProgress // ✅ NOVO (opcional: fallback cobre ausência)
   // LEGADO_INATIVO (desativação Genealogia): flag+mensagem de reestruturação.
   genealogiaReestruturacao?: boolean
@@ -225,7 +224,7 @@ function abreviar(tipo: string): string {
 
 function mapearPainel(data: CentralOpData, faseNome: string) {
   const matrix = data.matrix
-  const resumo = data.estrutura?.resumo ?? null
+  const resumo = data.indice?.resumo ?? null
 
   const total = matrix.total
   const validados = matrix.completed
@@ -233,10 +232,9 @@ function mapearPainel(data: CentralOpData, faseNome: string) {
   // ============================================================
   // RESUMO AGREGADO DA FASE
   // ------------------------------------------------------------
-  // Os contadores saem do MESMO resumo que a estrutura abaixo — contador e lista
-  // têm uma fonte só, então não podem divergir. A tabela por pessoa que existia
-  // aqui saiu: ela recombinava fila + roster por nome para redesenhar, em outro
-  // formato, o trabalho que agora vem pronto e agrupado por IDs oficiais.
+  // Os contadores saem do MESMO resumo que o índice abaixo — contador e lista têm
+  // uma fonte só, então não podem divergir. Nenhum deles conta elementos
+  // renderizados, e nenhum expõe detalhe interno do workflow.
   //
   // O PERCENTUAL da fase continua sendo o da PROJEÇÃO OPERACIONAL CANÔNICA
   // (matrix.percentage) — a mesma do Kanban, do Header e do gate de avanço. Um
@@ -244,13 +242,11 @@ function mapearPainel(data: CentralOpData, faseNome: string) {
   // ============================================================
   const kpis: FaseKpi[] = resumo
     ? [
+        { label: "Pessoas", value: resumo.pessoasComTrabalho },
         { label: "Documentos", value: resumo.documentos },
-        { label: "Concluídos", value: resumo.documentosConcluidos, tone: "ok" },
-        { label: "Pendentes", value: resumo.documentosPendentes, tone: "busca" },
-        { label: "Divergentes", value: resumo.documentosDivergentes, tone: "late" },
-        { label: "Vencidos", value: resumo.documentosVencidos, tone: "late" },
-        { label: "Passos obrigatórios", value: resumo.passosObrigatorios },
-        { label: "Passos concluídos", value: resumo.passosObrigatoriosConcluidos, tone: "ok" },
+        { label: "Prontos", value: resumo.prontos, tone: "ok" },
+        { label: "Pendentes", value: resumo.pendentes, tone: "busca" },
+        { label: "Divergentes", value: resumo.divergentes, tone: "late" },
       ]
     : // Janela de deploy (back sem `estrutura`): números da matriz oficial, sem
       // inventar um agregado paralelo.
@@ -274,15 +270,11 @@ function mapearPainel(data: CentralOpData, faseNome: string) {
   return { kpis, pct, validados, total, progressoTexto }
 }
 
-// Back sem `estrutura` (janela de deploy): a tela renderiza a estrutura VAZIA, que
-// diz que não há trabalho materializado — nunca uma lista montada de outra fonte.
-const ESTRUTURA_VAZIA: EstruturaOperacional = {
-  resumo: {
-    documentos: 0, documentosConcluidos: 0, documentosPendentes: 0,
-    documentosDivergentes: 0, documentosVencidos: 0,
-    passosObrigatorios: 0, passosObrigatoriosConcluidos: 0, pessoasComTrabalho: 0,
-  },
-  linhaPrincipal: [], foraDaLinha: [], pendenteClassificacao: [], globais: [], semDono: [],
+// Back sem `indice` (janela de deploy): a tela renderiza o índice VAZIO, que diz que
+// não há trabalho materializado — nunca uma lista montada de outra fonte.
+const INDICE_VAZIO: IndiceOperacional = {
+  resumo: { documentos: 0, prontos: 0, pendentes: 0, divergentes: 0, pessoasComTrabalho: 0 },
+  linhaPrincipal: [], foraDaLinha: [], pendenteClassificacao: [], semDono: [],
 }
 
 const FASE_META: Record<string, { sub: string; tabs: string[] }> = {
@@ -303,7 +295,6 @@ const FASE_META: Record<string, { sub: string; tabs: string[] }> = {
 // ============================================================
 
 const SEM_PHASES: PhaseMeta[] = []
-const SEM_OPERACOES: OpAntecipada[] = []
 
 export function ProcessoCentralOperacional({
   processo,
@@ -371,12 +362,8 @@ export function ProcessoCentralOperacional({
   // segue intacto para a trilha/resumo. Nunca snapshot; sempre dados reais da instância.
 
   // Operação Antecipada: contexto (necessidade) para o modal de criação + lista por necessidade.
-  const [novaOperacaoCtx, setNovaOperacaoCtx] = useState<{ necessidadeId?: number | null; pessoaId?: number | null; label?: string } | null>(null)
   // Tarefa Transversal (funcionalidade oficial e SEPARADA da Operação Antecipada).
   const [novaTransversalCtx, setNovaTransversalCtx] = useState<{ necessidadeId?: number | null; pessoaId?: number | null; label?: string } | null>(null)
-  const operacoesReq = useApi<{ operacoes?: OpAntecipada[] }>(`/api/processos/${processo.id}/operacoes-antecipadas`)
-  const operacoes = operacoesReq.dados?.operacoes ?? SEM_OPERACOES
-  const carregarOperacoes = useCallback(async () => { await operacoesReq.recarregar() }, [operacoesReq])
   // Banner "executada antecipadamente para atender…" exibido na tela oficial (drawer) reusada.
   const [bannerAntecipada, setBannerAntecipada] = useState<string | null>(null)
 
@@ -443,20 +430,27 @@ export function ProcessoCentralOperacional({
     [processo.id]
   )
 
-  // ABRIR PASSO — ponto único de entrada da execução.
-  // Um passo é um PhaseWorkflowStepInstance. Abrir significa abrir a tela OFICIAL da
-  // operação DAQUELE ALVO, dentro da própria Central:
-  //   • documentoId presente  → drawer da operação do documento;
-  //   • só necessidadeId      → materializa o registro operacional e abre o drawer
-  //                             (é o caminho de "Localizar registro da certidão").
-  // Nenhuma condição de documento obrigatório, de progresso da fase ou de quantidade
-  // de passos participa desta decisão. Sem redirecionamento para rota legada.
-  const abrirPasso = useCallback((p: PassoDaEstrutura) => {
-    // Sem executor configurado para o tipo/escopo do passo: erro ADMINISTRATIVO
-    // explícito. O passo segue visível na lista — o que falta é cadastro.
-    if (!p.executor) { setErroOperacao(p.erroAdministrativo ?? "Sem executor configurado para este passo."); return }
+  // A Operação Antecipada saiu da listagem principal: ela pertence ao ALVO e vive no
+  // MODAL do documento, na aba Workflow. A Central só guarda o ALVO do documento que
+  // está sendo aberto e repassa como contexto — sem lista, sem avaliação, sem botão.
+  const [alvoAntecipada, setAlvoAntecipada] = useState<{ necessidadeId: number | null; pessoaId: number | null } | null>(null)
+
+  // ABRIR DETALHES — a ÚNICA porta da Central para a execução.
+  // A listagem é índice; quem executa é o modal do documento (aba Workflow). Aqui só
+  // se resolve QUAL documento abrir, por ID:
+  //   • documentoId presente  → drawer da operação daquele documento;
+  //   • só necessidadeId      → materializa o registro operacional e abre o drawer.
+  // Nenhuma condição de progresso, quantidade ou obrigatoriedade participa disto.
+  const abrirDetalhes = useCallback((doc: DocumentoDoIndice) => {
+    // Sem executor configurado: erro ADMINISTRATIVO explícito. A linha do documento
+    // continua visível na listagem — o que falta é cadastro.
+    if (!doc.podeAbrirDetalhes) {
+      setErroOperacao(doc.impedimento ?? "Sem executor configurado para este documento.")
+      return
+    }
     setBannerAntecipada(null)
-    void abrirOperacao(p.documentoId ?? 0, p.necessidadeId)
+    setAlvoAntecipada({ necessidadeId: doc.necessidadeId, pessoaId: doc.pessoaId ?? null })
+    void abrirOperacao(doc.documentoId ?? 0, doc.necessidadeId)
   }, [abrirOperacao])
 
   // Lista de funcionários para os seletores "Delegar" (carrega uma vez).
@@ -509,22 +503,10 @@ export function ProcessoCentralOperacional({
 
 
 
-  const operacoesPorNec = new Map<number, OpAntecipada[]>()
-  for (const o of operacoes) {
-    if (o.necessidadeId == null) continue
-    const arr = operacoesPorNec.get(o.necessidadeId) ?? []
-    arr.push(o); operacoesPorNec.set(o.necessidadeId, arr)
-  }
-
-  const avaliarOperacao = useCallback(async (id: number, resultado: "SIM" | "PARCIAL" | "NAO" | "CANCELAR", resultadoObtido: string, resultadoDados?: Record<string, unknown>) => {
-    await fetch(`/api/operacoes-antecipadas/${id}`, { method: "PATCH", headers: { "Content-Type": "application/json", Authorization: `Bearer ${localStorage.getItem("authToken")}` }, body: JSON.stringify({ resultado, resultadoObtido: resultadoObtido || null, resultadoDados: resultadoDados ?? null }) })
-    await carregarOperacoes(); carregar(true)
-  }, [carregarOperacoes, carregar])
-
-  // "Abrir operação" da antecipada: reusa a MESMA tela oficial (drawer) + banner de contexto.
-  const abrirOperacaoAntecipada = useCallback((op: OpAntecipada) => {
-    setBannerAntecipada(op.objetivo ? `Executada antecipadamente para atender: ${op.objetivo}` : "Operação executada antecipadamente")
-    void abrirOperacao(op.operacao.uiRef.id ?? 0, op.necessidadeId)
+  // "Abrir operação" de uma antecipada: reusa a MESMA tela oficial (drawer) + banner.
+  const abrirOperacaoAlvo = useCallback((documentoId: number, necessidadeId: number | null, objetivo: string | null) => {
+    setBannerAntecipada(objetivo ? `Executada antecipadamente para atender: ${objetivo}` : "Operação executada antecipadamente")
+    void abrirOperacao(documentoId, necessidadeId)
   }, [abrirOperacao])
 
   // Fase PASSADA consultada: dados VIVOS daquela fase (instância/ciclo), na MESMA rota
@@ -828,16 +810,12 @@ export function ProcessoCentralOperacional({
             progressoConcluidos={painel.validados}
             progressoTotal={painel.total}
             progressoTexto={painel.progressoTexto}
-            estrutura={bodyData.estrutura ?? ESTRUTURA_VAZIA}
+            indice={bodyData.indice ?? INDICE_VAZIO}
             // A identidade da fase EXIBIDA (não a ativa): trocar de fase reseta a
-            // expansão, para o accordion nunca mostrar a posição de outro trabalho.
+            // expansão, para o card nunca mostrar a posição de outro trabalho.
             chaveExpansao={`${processo.id}|${bodyData.phaseContext?.faseMacroKey ?? faseAtualNome}|${bodyData.phaseContext?.ciclo ?? ""}`}
-            onAbrirPasso={readOnly ? undefined : abrirPasso}
+            onAbrirDetalhes={abrirDetalhes}
             readOnly={readOnly}
-            onNovaOperacao={readOnly ? undefined : (necessidadeId, pessoaIdNec, label) => setNovaOperacaoCtx({ necessidadeId, pessoaId: pessoaIdNec, label })}
-            operacoesPorNec={operacoesPorNec}
-            onAvaliarOperacao={readOnly ? undefined : avaliarOperacao}
-            onAbrirOperacaoAntecipada={readOnly ? undefined : abrirOperacaoAntecipada}
             modoReestruturacao={!!bodyData.genealogiaReestruturacao}
             avisoReestruturacao={bodyData.mensagemReestruturacao ?? undefined}
           />
@@ -868,10 +846,24 @@ export function ProcessoCentralOperacional({
             documentoId={drawerDocId}
             isOpen={drawerDocId !== null}
             bannerAntecipada={bannerAntecipada}
-            onClose={() => { setDrawerDocId(null); setBannerAntecipada(null) }}
+            // CONTEXTO DA OPERAÇÃO ANTECIPADA — o ALVO do documento aberto. Ela vive
+            // na aba Workflow do modal; a Central só diz sobre QUE alvo se trata.
+            contextoAntecipada={
+              alvoAntecipada
+                ? {
+                    processoId: processo.id,
+                    necessidadeId: alvoAntecipada.necessidadeId,
+                    pessoaId: alvoAntecipada.pessoaId,
+                    faseAtivaCode: faseKeyAtiva ? String(faseKeyAtiva) : null,
+                    usuarios,
+                    onAbrirOperacaoAlvo: readOnly ? undefined : abrirOperacaoAlvo,
+                    readOnly,
+                  }
+                : undefined
+            }
+            onClose={() => { setDrawerDocId(null); setBannerAntecipada(null); setAlvoAntecipada(null) }}
             onSave={() => {
               marcarAtualizando(drawerDocId)
-              carregarOperacoes()
               carregar(true)
             }}
           />
@@ -889,18 +881,6 @@ export function ProcessoCentralOperacional({
         </>
         )}
 
-        {novaOperacaoCtx && (
-          <OperacaoAntecipadaModal
-            processoId={processo.id}
-            necessidadeId={novaOperacaoCtx.necessidadeId}
-            necessidadeLabel={novaOperacaoCtx.label}
-            pessoaId={novaOperacaoCtx.pessoaId}
-            faseAtivaCode={faseKeyAtiva ? String(faseKeyAtiva) : null}
-            usuarios={usuarios}
-            onClose={() => setNovaOperacaoCtx(null)}
-            onCreated={() => { setNovaOperacaoCtx(null); carregarOperacoes(); carregar(true) }}
-          />
-        )}
 
         {novaTransversalCtx && (
           <TarefaTransversalModal

@@ -19,6 +19,7 @@ import { readFileSync } from "fs"
 import { join } from "path"
 import {
   montarEstruturaOperacional,
+  montarIndiceOperacional,
   chaveDoAlvo,
   escopoDoAlvo,
   type AlvoBruto,
@@ -242,6 +243,59 @@ check("alvo cujo dono não está no roster fica VISÍVEL em 'sem dono'", eGlobal
 check("alvo órfão NÃO é atribuído a uma pessoa qualquer", eGlobal.linhaPrincipal.every((l) => l.documentos.every((d) => d.necessidadeId !== 99)))
 
 // ============================================================
+console.log("\n(A9) ÍNDICE — o DTO que a tela principal recebe")
+// ============================================================
+
+const idx = montarIndiceOperacional(e3)
+const linhasIdx = [...idx.linhaPrincipal, ...idx.foraDaLinha, ...idx.pendenteClassificacao]
+const idxDe = (id: number) => linhasIdx.find((l) => l.pessoa.pessoaId === id)!
+
+// A prova mais dura: o payload do índice não contém NADA de execução.
+const payload = JSON.stringify(idx)
+for (const proibido of ["passos", "stepInstanceId", "stepKey", "slaDays", "prazo", "diasParaPrazo", "responsavelNome", "motivoBloqueio", "disponivel", "bloqueado", "executor"]) {
+  check(`o índice NÃO carrega "${proibido}"`, !payload.includes(proibido))
+}
+check("uma linha por documento, com identidade por ID", idxDe(3).documentos.length === 2 && idxDe(3).documentos.every((d) => d.necessidadeId != null))
+check("todas as pessoas continuam no índice", linhasIdx.length === 4)
+check("pessoa sem documento aplicável é marcada, não removida", idxDe(4).semDocumentoAplicavel === true && idxDe(4).documentos.length === 0)
+check("contadores por pessoa vêm do domínio", JSON.stringify(idxDe(3).totais) === JSON.stringify({ documentos: 2, prontos: 0, pendentes: 2, divergentes: 0 }))
+check("documento concluído vira status final PRONTO", idxDe(1).documentos[0].statusFinal === "PRONTO")
+check("documento parcialmente executado vira EM_ANDAMENTO", (() => {
+  const d = idxDe(3).documentos.find((x) => x.chave === "necessidade:13")!
+  return d.statusFinal === "EM_ANDAMENTO"
+})())
+check("documento sem passo concluído vira PENDENTE", idxDe(2).documentos[0].statusFinal === "PENDENTE")
+check("status final tem rótulo humano pronto", idxDe(1).documentos[0].statusFinalLabel === "Pronto")
+check("resumo do índice = soma dos documentos, não de elementos na tela", (() => {
+  const r = idx.resumo
+  return r.documentos === 4 && r.prontos === 1 && r.pendentes === 3 && r.pessoasComTrabalho === 3
+})())
+check("artefatos ausentes viram 'Não aplicável', nunca um estado inventado",
+  idxDe(2).documentos[0].artefatos.retificada === "NAO_APLICAVEL" &&
+  idxDe(2).documentos[0].artefatos.traducao === "NAO_APLICAVEL")
+check("o índice leva o pessoaId do titular (a antecipada do modal precisa dele)", idxDe(1).documentos[0].pessoaId === 1)
+
+// Divergência tem precedência: documento travado não é "em andamento".
+const eDiv = (() => {
+  seqId = 7000
+  const passos = materializar(11).map((p, i) => (i === 0 ? { ...p, status: "BLOQUEADO" } : p))
+  return montarIndiceOperacional(montarEstruturaOperacional({ pessoas: PESSOAS, passos, alvos: ALVOS }))
+})()
+check("documento com passo BLOQUEADO vira DIVERGENTE no índice",
+  eDiv.linhaPrincipal.find((l) => l.pessoa.pessoaId === 1)!.documentos[0].statusFinal === "DIVERGENTE")
+
+// Documento sem executor em nenhum passo: NÃO abre, mas continua visível e dizendo o porquê.
+const eSemExec = (() => {
+  seqId = 8000
+  const passos = materializar(11).map((p) => ({ ...p, executor: null, erroAdministrativo: "Sem executor" }))
+  return montarIndiceOperacional(montarEstruturaOperacional({ pessoas: PESSOAS, passos, alvos: ALVOS }))
+})()
+const semExec = eSemExec.linhaPrincipal.find((l) => l.pessoa.pessoaId === 1)!.documentos[0]
+check("documento sem executor NÃO é escondido do índice", semExec != null)
+check("documento sem executor não oferece 'Abrir detalhes'", semExec.podeAbrirDetalhes === false)
+check("e diz em texto o que falta", semExec.impedimento === "Sem executor")
+
+// ============================================================
 console.log("\n(B) A regressão não pode voltar")
 // ============================================================
 
@@ -251,70 +305,100 @@ const painel = read("src/components/kanban/PainelDaFase.tsx")
 const consulta = read("src/lib/process-stage/estrutura-operacional.ts")
 const nucleo = read("src/lib/process-stage/estrutura-operacional-core.ts")
 const docop = read("src/services/documento-operacao.ts")
+const wtab = read("src/components/kanban/workflow/WorkflowTab.tsx")
+const drawer = read("src/components/kanban/DocumentoOperationalDrawer.tsx")
+const opa = read("src/components/kanban/workflow/OperacaoAntecipadaPainel.tsx")
 const escopo = read("src/services/phase-workflow-escopo.ts")
 const schema = read("prisma/schema.prisma")
 
-console.log("\n(B1) A consulta oficial é uma só, e é do domínio")
-check("existe getPhaseOperationalStructure", consulta.includes("export async function getPhaseOperationalStructure"))
-check("a rota consome a consulta oficial", rota.includes("getPhaseOperationalStructure(") && /estrutura,/.test(rota))
-check("a rota NÃO devolve mais a lista plana de tarefas", !/^\s*tarefas,\s*$/m.test(rota) && !rota.includes("TarefaFaseRow"))
+console.log("\n(B1) Duas consultas, dois DTOs — o índice não carrega execução")
+check("existe getPhaseOperationalStructure (detalhe, para o domínio/modal)", consulta.includes("export async function getPhaseOperationalStructure"))
+check("existe getPhaseOperationalSummary (índice, para a tela principal)", consulta.includes("export async function getPhaseOperationalSummary"))
+check("a rota da Central consome o ÍNDICE", rota.includes("getPhaseOperationalSummary(") && /^\s*indice,\s*$/m.test(rota))
+check("a rota NÃO devolve mais a estrutura completa nem a lista plana", !/^\s*estrutura,\s*$/m.test(rota) && !rota.includes("TarefaFaseRow"))
+check("o DTO de índice existe e é explícito", nucleo.includes("export interface IndiceOperacional") && nucleo.includes("export interface DocumentoDoIndice"))
+check("o índice é PROJETADO da estrutura (uma fonte, dois recortes)", nucleo.includes("export function montarIndiceOperacional"))
 check("a consulta lê PhaseWorkflowStepInstance da fase (fonte única)", consulta.includes("phaseWorkflowStepInstance.findMany") && consulta.includes("faseMacroKey: ctx.faseMacroKey"))
 check("a consulta exclui SUPERSEDIDO/CANCELADO (saíram do fluxo)", consulta.includes('notIn: ["SUPERSEDIDO", "CANCELADO"]'))
 check("a consulta escopa por instância quando a fase não é a ativa", consulta.includes("ctx.workflowInstanceId != null"))
+// O contrato do DTO é a trava: nenhum campo de execução existe em DocumentoDoIndice.
+const dto = nucleo.slice(nucleo.indexOf("export interface DocumentoDoIndice"), nucleo.indexOf("export interface PessoaDoIndice"))
+for (const proibido of ["passos", "stepInstanceId", "slaDays", "prazo", "responsavel", "motivoBloqueio", "executor:"]) {
+  check(`DocumentoDoIndice não tem campo "${proibido}"`, !dto.includes(proibido))
+}
 
-console.log("\n(B2) O frontend apresenta; não reconstrói regra de negócio")
-check("a Central recebe a estrutura pronta", central.includes("estrutura?: EstruturaOperacional") && central.includes("estrutura={bodyData.estrutura"))
-check("a Central NÃO reagrupa pessoas/documentos/tarefas por nome", !central.includes("porPessoa.set") && !central.includes("q.pessoaNome"))
-check("o painel renderiza pessoa → documento → passo", painel.includes("function PessoaAccordion") && painel.includes("function DocumentoAccordion") && painel.includes("function PassoRow"))
-check("não existe mais lista global de tarefas agrupada por passo", !painel.includes("function WorkflowDaFase") && !painel.includes("function PassoDoWorkflow") && !painel.includes("function InstanciaDoPasso"))
-check("não existe tabela linear de pessoas repetindo o trabalho", !painel.includes("PESSOAS DO PROCESSO (contexto"))
-check("pessoa e documento são expansíveis", painel.includes("abertos.has(chave)") && painel.includes("alternar(chave)"))
-check("o estado de expansão é local, por processo/fase (não vai ao banco)", painel.includes("chaveExpansao") && !painel.includes("fetch(\"/api/preferencias"))
+console.log("\n(B2) TELA PRINCIPAL — índice, nunca executor")
+check("o painel recebe o ÍNDICE, não a estrutura", painel.includes("indice: IndiceOperacional") && !painel.includes("estrutura: EstruturaOperacional"))
+check("a Central repassa o índice ao painel", central.includes("indice={bodyData.indice") && central.includes("indice?: IndiceOperacional"))
+check("o painel renderiza pessoa (card) → documento (linha)", painel.includes("function PessoaCard") && painel.includes("function LinhaDocumento"))
+check("a única ação por documento é 'Abrir detalhes'", painel.includes("Abrir detalhes") && painel.includes("onAbrirDetalhes"))
+// Os componentes de execução NÃO existem mais na tela principal.
+for (const proibido of ["function PassoRow", "function PassoDoWorkflow", "function InstanciaDoPasso", "function WorkflowDaFase", "function DocumentoAccordion", "function PessoaAccordion"]) {
+  check(`tela principal não tem "${proibido}"`, !painel.includes(proibido))
+}
+// Nem o vocabulário de execução.
+for (const proibido of ["statusLabel", "slaDays", "diasParaPrazo", "motivoBloqueio", "responsavelNome", "stepInstanceId", "disponivel", "OperacoesAntecipadasInline", "onNovaOperacao", "onAvaliarOperacao", "passo(s)"]) {
+  check(`tela principal não usa "${proibido}"`, !painel.includes(proibido))
+}
+check("a tela principal não mapeia passos de lugar nenhum", !/\.passos\.map/.test(painel) && !/workflow\.steps/.test(painel))
+check("contadores da tela vêm do backend (totais/resumo), não de contar elementos", painel.includes("linha.totais") && painel.includes("indice.resumo"))
 check("pessoa sem documento aplicável diz isso em texto", painel.includes("Nenhum documento aplicável nesta fase"))
-check("status/disponibilidade vêm do backend, não montados na tela", painel.includes("p.statusLabel") && painel.includes("p.disponivel") && !painel.includes("function statusDoPasso"))
+check("colunas do índice são as aprovadas", ["Documento", "Certidão", "Retificada", "Tradução", "Apostila", "Status final", "Ações"].every((c) => painel.includes(`>${c}<`)))
 
-console.log("\n(B3) Alvo por ID oficial — nunca por texto")
+console.log("\n(B3) MODAL DO DOCUMENTO — o único executor")
+check("a aba Workflow existe e é do documento", wtab.includes("export function WorkflowTab") && wtab.includes("documentoId"))
+check("a aba mostra TODOS os passos (sem filtro que esconde futuros)", wtab.includes("workflow.steps.map") && !/steps\s*\.filter\(\(step\)/.test(wtab))
+check("a aba tem uma consulta oficial única do backend", wtab.includes("`/api/documentos/${documentoId}/workflow`"))
+check("a aba abre a Central da Etapa (execução por passo)", wtab.includes("CentralDaEtapaDrawer") && wtab.includes("setCentralStepId"))
+check("o drawer do documento repassa o contexto à aba", drawer.includes("contextoAntecipada={contextoAntecipada}") && drawer.includes("type ContextoAntecipada"))
+check("a Central abre o modal por ID do documento", central.includes("const abrirDetalhes = useCallback") && /abrirOperacao\(doc\.documentoId \?\? 0, doc\.necessidadeId\)/.test(central))
+
+console.log("\n(B4) OPERAÇÃO ANTECIPADA — inteira, e só dentro do modal")
+check("componente existe no escopo do modal", opa.includes("export function OperacoesAntecipadasInline") && opa.includes("OperacaoAntecipadaItem"))
+check("criar continua disponível (no modal)", wtab.includes("OperacaoAntecipadaModal") && wtab.includes("nova operação antecipada"))
+check("listar continua disponível (no modal)", wtab.includes("<OperacoesAntecipadasInline"))
+check("avaliar o objetivo continua disponível", opa.includes("onAvaliar?.(o.id") && opa.includes("Objetivo atingido"))
+check("abrir a operação oficial continua disponível", wtab.includes("onAbrirOperacaoAlvo") && central.includes("const abrirOperacaoAlvo = useCallback"))
+check("rótulos de status preservados", opa.includes("ST_OP_LABEL") && opa.includes("AGUARDANDO_RESULTADO"))
+check("ancorada no ALVO (necessidade do documento aberto)", wtab.includes("o.necessidadeId === necId"))
+// Só o CÓDIGO conta: o cabeçalho do arquivo cita a regra de propósito.
+const painelCodigo = painel.slice(painel.indexOf('"use client"'))
+check("NÃO aparece na tela principal", !/antecipada/i.test(painelCodigo))
+check("NÃO foi movida para a pessoa nem para a fase", !painel.includes("operacoesPorNec") && !central.includes("operacoesPorNec"))
+
+console.log("\n(B5) Alvo por ID oficial — nunca por texto")
 check("o núcleo agrupa por id (necessidade/documento/pessoa)", nucleo.includes("`necessidade:${p.necessidadeId}`") && nucleo.includes("`documento:${p.documentoId}`"))
 check("o escopo é lido da entidade vinculada", nucleo.includes("export function escopoDoAlvo"))
 check("a instância PERSISTE o alvo no schema", /pessoaId\s+Int\?/.test(schema) && /necessidadeId Int\?/.test(schema) && /documentoId\s+Int\?/.test(schema))
 check("a materialização grava o alvo (não deduz depois)", escopo.includes("pessoaId: number | null") && escopo.includes("necessidadeId: number | null"))
 check("a cardinalidade publicada decide quantas instâncias existem", escopo.includes("cardinalidadeEfetiva") && escopo.includes('cardinalidade === "NECESSIDADE"'))
 
-console.log("\n(B4) Idempotência com trava REAL no banco")
+console.log("\n(B6) Idempotência com trava REAL no banco")
 check("chaveIdempotencia é UNIQUE em PhaseWorkflowStepInstance", /chaveIdempotencia String\s+@unique/.test(schema))
 check("a consulta ALARMA duplicidade em vez de exibi-la", consulta.includes("INSTANCIA_DUPLICADA"))
 check("não há createMany+skipDuplicates fazendo o papel da constraint", !/phaseWorkflowStepInstance\.createMany\([\s\S]{0,200}skipDuplicates/.test(read("src/services/phase-workflow.ts")))
 
-console.log("\n(B5) Sequência por documento — no domínio, não na tela")
+console.log("\n(B7) Sequência por documento — no domínio, não na tela")
 check("liberar o próximo passo é escopado pelo DOCUMENTO", /findFirst\(\{\s*where: \{ documentoId, faseMacroKey: p\.faseMacroKey, ordem: \{ gt: p\.ordem \}/.test(docop))
 check("reabrir bloqueia só os posteriores DO MESMO documento", /updateMany\(\{\s*where: \{ documentoId, faseMacroKey: p\.faseMacroKey, ordem: \{ gt: p\.ordem \}/.test(docop))
-check("a tela não tem regra fixa de sequência", !painel.includes("ordem === 1") && !painel.includes("primeiroPasso"))
 check("o modo de execução é PERSISTIDO (SEQUENCIAL/PARALELO), não fixo no código", escopo.includes('execucao === "SEQUENCIAL"'))
 
-console.log("\n(B6) Operação Antecipada — preservada e ancorada no alvo")
-check("(14) a Operação Antecipada continua na Central", painel.includes("OperacoesAntecipadasInline") && painel.includes("Operações antecipadas"))
-check("(14) criação continua disponível", painel.includes("onNovaOperacao") && painel.includes("+ operação antecipada"))
-check("(14) avaliação do objetivo continua disponível", painel.includes("onAvaliarOperacao") && painel.includes("Objetivo atingido"))
-check("(14) abertura da operação oficial continua disponível", painel.includes("onAbrirOperacaoAntecipada") && painel.includes("Abrir operação"))
-check("(14) ancorada no ALVO (necessidade do documento), uma vez só", painel.includes("doc.necessidadeId != null ? acoes.operacoesPorNec?.get(doc.necessidadeId)"))
-check("(14) NÃO foi movida para a pessoa nem para um passo genérico", !painel.includes("linha.pessoa.necessidadeId") && !/PassoRow[\s\S]{0,600}operacoesPorNec/.test(painel))
-
-console.log("\n(B7) Segurança — validação no servidor")
-check("(17) a leitura da Central exige permissão", rota.includes('verificarPermissao(request, "processos.ver")'))
-check("(17) abrir a operação exige permissão de edição", read("src/app/api/processos/[processoId]/genealogia/operacao/route.ts").includes('verificarPermissao(request, "processos.editar")'))
-check("(17/18) o PERTENCIMENTO é validado no servidor, não confiado no cliente", read("src/services/genealogia/operacao-necessidade.ts").includes("nec.processoId !== processoId"))
+console.log("\n(B8) Segurança — validação no servidor")
+check("a leitura da Central exige permissão", rota.includes('verificarPermissao(request, "processos.ver")'))
+check("abrir a operação exige permissão de edição", read("src/app/api/processos/[processoId]/genealogia/operacao/route.ts").includes('verificarPermissao(request, "processos.editar")'))
+check("o PERTENCIMENTO é validado no servidor, não confiado no cliente", read("src/services/genealogia/operacao-necessidade.ts").includes("nec.processoId !== processoId"))
 check("a consulta é escopada pelo processo (nunca lista global)", consulta.includes("processoId: ctx.processoId"))
 
-console.log("\n(B8) Observabilidade")
+console.log("\n(B9) Observabilidade")
 for (const evento of ["ALVO_AUSENTE", "ALVO_SEM_DONO", "INSTANCIA_DUPLICADA", "PASSO_SEM_EXECUTOR"]) {
   check(`log estruturado para ${evento}`, consulta.includes(evento))
 }
 check("log estruturado (prefixo estável + JSON), não console.log solto", consulta.includes('console.warn(`[estrutura-operacional]') && consulta.includes("JSON.stringify(d)"))
 
-console.log("\n(B9) Fonte única de progresso da fase")
+console.log("\n(B10) Fonte única de progresso da fase")
 check("o núcleo NÃO calcula um percentual rival para a fase", !nucleo.includes("percentualDaFase") && nucleo.includes("resolveOperationalProjection"))
 check("a barra da fase segue na projeção canônica", central.includes("const pct = matrix.percentage"))
-check("os KPIs saem do MESMO resumo da estrutura (contador e lista não divergem)", central.includes("data.estrutura?.resumo"))
+check("os KPIs saem do MESMO resumo do índice", central.includes("data.indice?.resumo"))
 
 // ============================================================
 console.log(`\n${falhas.length === 0 ? "✅ PASSOU" : "❌ FALHOU"}: ${ok} ok, ${falhas.length} falhas`)
