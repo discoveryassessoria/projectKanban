@@ -29,7 +29,16 @@ const MIGRATION = join(DIR_MIGRATIONS, '0000_baseline', 'migration.sql')
  * Mudar esta constante NAO conserta nada por si so: o ledger de producao
  * precisa ser reconciliado no mesmo movimento, de forma explicita e auditada.
  */
-const CHECKSUM_LEDGER = '379c12b2858a949928c9738d032a4864fbc37c9a87014d2429497710da9a4bea'
+const CHECKSUM_LEDGER = 'a76297512de9484bcf1b4fbe01e2b77510217f8fad465b1969d0175c89dd58b5'
+
+/**
+ * Migrations criadas DEPOIS da consolidacao de 02/08/2026. Toda migration nova
+ * entra aqui no MESMO commit que a cria — assim o guard continua reprovando uma
+ * migration historica que volte por engano, sem travar o fluxo normal do Prisma.
+ */
+const MIGRATIONS_POS_BASELINE: string[] = [
+  '20260803_workflow_escopo_execucao',
+]
 
 const sha256 = (t: string) => createHash('sha256').update(t).digest('hex')
 
@@ -90,20 +99,35 @@ function verificarMigrationOficial() {
 
   const entradas = readdirSync(DIR_MIGRATIONS)
     .filter((n) => statSync(join(DIR_MIGRATIONS, n)).isDirectory())
-  if (entradas.length !== 1 || entradas[0] !== '0000_baseline') {
+  const inesperadas = entradas.filter((n) => n !== '0000_baseline' && !MIGRATIONS_POS_BASELINE.includes(n))
+  if (inesperadas.length > 0) {
     falhar([
-      '  HA MIGRATION ALEM DO BASELINE EM prisma/migrations',
+      '  HA MIGRATION NAO REGISTRADA EM prisma/migrations',
       '',
       `  encontradas: ${entradas.join(', ')}`,
+      `  nao registradas: ${inesperadas.join(', ')}`,
       '',
       '  As 112 migrations historicas foram arquivadas em prisma/migrations-arquivo/',
       '  em 02/08/2026 porque nao reconstroem o banco e nao podem ser reaplicadas.',
-      '  Migration NOVA e bem-vinda — mas a partir do baseline, e registrada aqui',
-      '  com data propria. Se uma antiga voltou, foi engano: mova de volta.',
+      '  Migration NOVA e bem-vinda — mas precisa ser declarada em',
+      '  MIGRATIONS_POS_BASELINE, no topo deste arquivo, no mesmo commit que a cria.',
+      '  Se uma antiga voltou, foi engano: mova de volta.',
+    ])
+  }
+  const faltando = MIGRATIONS_POS_BASELINE.filter((n) => !entradas.includes(n))
+  if (faltando.length > 0) {
+    falhar([
+      '  MIGRATION DECLARADA NAO EXISTE NO REPOSITORIO',
+      '',
+      `  declaradas em MIGRATIONS_POS_BASELINE e ausentes: ${faltando.join(', ')}`,
+      '',
+      '  Producao pode ja te-las aplicado. Apagar o diretorio nao as desfaz —',
+      '  restaure o diretorio ou remova a declaracao com justificativa.',
     ])
   }
 
-  console.log(`  ✅ 0000_baseline integro (sha256 ${checksum.slice(0, 12)}…) e unica migration do repositorio`)
+  const extra = MIGRATIONS_POS_BASELINE.length
+  console.log(`  ✅ 0000_baseline integro (sha256 ${checksum.slice(0, 12)}…)${extra ? ` + ${extra} migration(s) pos-baseline declarada(s)` : ' e unica migration do repositorio'}`)
 }
 
 /** Inicio deterministico do corpo gerado pelo Prisma — separa o cabecalho. */

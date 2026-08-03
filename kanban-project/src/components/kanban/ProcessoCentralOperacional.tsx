@@ -565,7 +565,9 @@ export function ProcessoCentralOperacional({
   // Nenhuma condição de documento obrigatório, de progresso da fase ou de quantidade
   // de tarefas participa desta decisão. Sem redirecionamento para rota legada.
   const abrirTarefa = useCallback((t: FaseTarefaRow) => {
-    if (t.bloqueioAbertura) { setErroOperacao(t.bloqueioAbertura); return }
+    // Sem executor configurado para o tipo/escopo do passo: erro ADMINISTRATIVO
+    // explícito. A tarefa segue visível na lista — o que falta é cadastro.
+    if (!t.executor) { setErroOperacao(t.erroAdministrativo ?? "Sem executor configurado para este passo."); return }
     setBannerAntecipada(null)
     void abrirOperacao(t.documentoId ?? 0, t.necessidadeId)
   }, [abrirOperacao])

@@ -151,8 +151,15 @@ interface TarefaFaseRow {
   prazo: string | null
   diasParaPrazo: number | null
   motivo: string | null
-  /** Por que a tarefa não pode ser aberta agora. null ⇒ abre. */
-  bloqueioAbertura: string | null
+  /** Escopo persistido do passo, derivado da entidade vinculada à instância. */
+  escopo: "GLOBAL" | "PESSOA" | "DOCUMENTO"
+  /** Executor oficial que a UI deve renderizar ao abrir. null ⇒ não há executor. */
+  executor: "OPERACAO_DOCUMENTO" | null
+  /**
+   * Erro ADMINISTRATIVO explícito quando não há executor para o tipo/escopo do passo.
+   * A tarefa continua visível — o que falta é configuração, e isso precisa ser dito.
+   */
+  erroAdministrativo: string | null
 }
 
 // Modo operacional da Central (UMA única tela; muda só o modo, nunca o layout):
@@ -876,7 +883,7 @@ export async function GET(
           orderBy: [{ ciclo: "desc" }, { ordem: "asc" }, { id: "asc" }],
           select: {
             id: true, stepKey: true, ordem: true, status: true, obrigatorio: true,
-            necessidadeId: true, documentoId: true, responsavelId: true,
+            pessoaId: true, necessidadeId: true, documentoId: true, responsavelId: true,
             prazo: true, motivo: true, snapshot: true, ciclo: true,
           },
         })
@@ -926,19 +933,29 @@ export async function GET(
     const tarefas: TarefaFaseRow[] = passosDaFase.map((s) => {
       const nec = s.necessidadeId != null ? necTarefaMap.get(s.necessidadeId) : undefined
       const doc = s.documentoId != null ? docTarefaMap.get(s.documentoId) : undefined
-      const pessoaId = nec?.pessoaId ?? doc?.pessoaId ?? null
+      const pessoaId = s.pessoaId ?? nec?.pessoaId ?? doc?.pessoaId ?? null
       const pessoa = pessoaId != null ? pessoasMap.get(pessoaId) : undefined
       const assunto =
         requisitoDaNecessidade(nec) ??
         (doc?.tipo ? TIPO_LABELS[doc.tipo] ?? doc.tipo : null)
-      // ABERTURA: um passo por-entidade abre a operação oficial (documento existente
-      // ou necessidade que materializa o documento ao abrir). Passo genérico da fase
-      // (sem entidade) não tem tela de operação por item — é executado no painel da
-      // fase. A ausência de documento obrigatório NÃO bloqueia nada aqui.
-      const bloqueioAbertura =
-        s.necessidadeId == null && s.documentoId == null
-          ? "Etapa da fase, sem item próprio — execute pelo painel da fase."
-          : null
+
+      // ESCOPO da instância — lido da entidade que ela carrega, que por sua vez veio do
+      // escopo PERSISTIDO no cadastro do passo. Nunca inferido por nome ou posição.
+      const escopo: TarefaFaseRow["escopo"] =
+        s.necessidadeId != null || s.documentoId != null ? "DOCUMENTO"
+        : s.pessoaId != null ? "PESSOA"
+        : "GLOBAL"
+
+      // EXECUTOR: qual tela oficial abre esta tarefa. Hoje existe UM executor — a
+      // operação por documento/necessidade (busca documental e dados registrais).
+      // Um passo sem entidade não tem executor: a tarefa CONTINUA VISÍVEL e diz, em
+      // texto, que falta configuração. Esconder a tarefa seria mentir sobre o trabalho.
+      const executor: TarefaFaseRow["executor"] =
+        s.necessidadeId != null || s.documentoId != null ? "OPERACAO_DOCUMENTO" : null
+      const erroAdministrativo = executor
+        ? null
+        : `Sem executor para este passo. "${tituloDoPasso(s.stepKey, s.snapshot)}" está publicado com escopo ${escopo} na fase "${faseConsultadaKey}", e o único executor disponível opera sobre documento/necessidade. Ajuste o escopo do passo em Gerenciamento › Workflows das Fases, ou publique o requisito documental que gera a entidade.`
+
       return {
         stepInstanceId: s.id,
         stepKey: s.stepKey,
@@ -957,7 +974,9 @@ export async function GET(
         prazo: s.prazo?.toISOString() ?? null,
         diasParaPrazo: s.prazo ? diffDays(s.prazo, now) : null,
         motivo: s.motivo ?? null,
-        bloqueioAbertura,
+        escopo,
+        executor,
+        erroAdministrativo,
       }
     })
 

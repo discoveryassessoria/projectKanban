@@ -111,11 +111,12 @@ model Pessoa {
   decisoesDedup DecisaoDeduplicacao[]   @relation("PessoaDecisaoDedup")
 
   // MRG — back-relations (referencia, nunca duplicacao de dominio)
-  ocorrenciasResolvidas OcorrenciaDocumental[]      @relation("OcorrenciaPessoaResolvida")
-  correspondencias      CorrespondenciaIdentidade[] @relation("CorrespondenciaPessoa")
-  fatosRegistrais       FatoRegistral[]
-  evidenciasRegistrais  EvidenciaRegistral[]        @relation("EvidenciaPessoa")
-  conflitosRegistrais   ConflitoRegistral[]         @relation("ConflitoPessoa")
+  ocorrenciasResolvidas      OcorrenciaDocumental[]      @relation("OcorrenciaPessoaResolvida")
+  correspondencias           CorrespondenciaIdentidade[] @relation("CorrespondenciaPessoa")
+  fatosRegistrais            FatoRegistral[]
+  evidenciasRegistrais       EvidenciaRegistral[]        @relation("EvidenciaPessoa")
+  conflitosRegistrais        ConflitoRegistral[]         @relation("ConflitoPessoa")
+  phaseWorkflowStepInstances PhaseWorkflowStepInstance[]
 
   @@index([arvoreId])
   @@index([pais_nasc])
@@ -2876,6 +2877,10 @@ model PhaseInternalWorkflow {
   tipoProcessoId Int? // â TipoProcessoNacionalidade (solto; null = TODOS os processos)
   phaseKey       String   @db.VarChar(60)
   name           String   @db.VarChar(200)
+  // MODO DE EXECUCAO dos passos publicados (persistido; nunca inferido no codigo):
+  //   SEQUENCIAL = so o primeiro passo nasce DISPONIVEL; concluir um libera o seguinte.
+  //   PARALELO   = todos os passos nascem DISPONIVEL.
+  execucao       String   @default("SEQUENCIAL") @db.VarChar(20)
   active         Boolean  @default(true)
   arquivado      Boolean  @default(false)
   versao         Int      @default(1) // CP-4A â versionamento (definiÃ§Ã£o/template)
@@ -2901,6 +2906,10 @@ model PhaseInternalWorkflowStep {
   owner          String?               @db.VarChar(120) // "ResponsÃ¡vel padrÃ£o"
   priority       String                @default("medium") @db.VarChar(20) // low | medium | high
   slaDays        Int                   @default(0)
+  // ESCOPO DE EXECUCAO do passo (persistido no cadastro oficial; nunca inferido por
+  // nome/posicao/texto): GLOBAL = 1 instancia compartilhada por fase/ciclo;
+  // PESSOA = 1 instancia por pessoa aplicavel; DOCUMENTO = 1 por necessidade/documento.
+  escopo         String                @default("GLOBAL") @db.VarChar(20)
   completionRule String?               @db.Text // "CondiÃ§Ã£o de conclusÃ£o"
   checklist      Json?
   versao         Int                   @default(1) // CP-4A â versionamento (definiÃ§Ã£o/template)
@@ -3620,6 +3629,10 @@ model PhaseWorkflowStepInstance {
   obrigatorio  Boolean   @default(true)
   geraTarefa   Boolean   @default(true)
 
+  // Entidade do ESCOPO do passo. No maximo UMA fica preenchida: pessoaId (escopo
+  // PESSOA), necessidadeId/documentoId (escopo DOCUMENTO). Nenhuma = escopo GLOBAL.
+  pessoaId      Int?
+  pessoa        Pessoa?                @relation(fields: [pessoaId], references: [id], onDelete: SetNull)
   necessidadeId Int?
   necessidade   NecessidadeDocumental? @relation(fields: [necessidadeId], references: [id], onDelete: SetNull)
   documentoId   Int?

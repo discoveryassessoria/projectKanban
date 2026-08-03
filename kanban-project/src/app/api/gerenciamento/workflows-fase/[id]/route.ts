@@ -30,6 +30,9 @@ function buildSteps(raw: any[], workflowId: number) {
       owner: s?.owner ? String(s.owner) : null,
       priority: s?.priority || 'medium',
       slaDays: Number(s?.slaDays) || 0,
+      // ESCOPO persistido do passo (GLOBAL | PESSOA | DOCUMENTO). Valor desconhecido
+      // cai no default do schema — nunca se infere escopo por nome ou posição.
+      escopo: ['GLOBAL', 'PESSOA', 'DOCUMENTO'].includes(String(s?.escopo)) ? String(s.escopo) : 'GLOBAL',
       completionRule: s?.completionRule ? String(s.completionRule) : null,
       checklist: (s?.checklist == null ? undefined : s.checklist) as Prisma.InputJsonValue | undefined,
     }
@@ -51,6 +54,11 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
 
     const dataBase: Prisma.PhaseInternalWorkflowUpdateInput = {}
     if (body.name !== undefined) dataBase.name = String(body.name)
+    // MODO DE EXECUÇÃO persistido (SEQUENCIAL | PARALELO) — é ele que decide se a fase
+    // libera um passo por vez ou todos; nunca uma regra fixa no código.
+    if (body.execucao !== undefined) {
+      dataBase.execucao = body.execucao === 'PARALELO' ? 'PARALELO' : 'SEQUENCIAL'
+    }
     if (body.active !== undefined) dataBase.active = !!body.active
     if (body.arquivado !== undefined) dataBase.arquivado = !!body.arquivado
 

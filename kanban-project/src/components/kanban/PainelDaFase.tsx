@@ -76,7 +76,10 @@ export interface FaseTarefaRow {
   prazo: string | null
   diasParaPrazo: number | null
   motivo: string | null
-  bloqueioAbertura: string | null
+  escopo: "GLOBAL" | "PESSOA" | "DOCUMENTO"
+  executor: "OPERACAO_DOCUMENTO" | null
+  /** Falta de configuração — exibida na linha; a tarefa nunca é escondida. */
+  erroAdministrativo: string | null
 }
 
 export interface FaseKpi {
@@ -527,7 +530,7 @@ function TarefaRow({
 }) {
   // ABRIR é o caminho normal. Só não abre quando o próprio passo não tem item
   // operacional (etapa genérica da fase) — e nesse caso o motivo fica escrito.
-  const podeAbrir = !readOnly && !!onAbrir && !t.bloqueioAbertura
+  const podeAbrir = !readOnly && !!onAbrir && !!t.executor
   const concluida = t.balde === "CONCLUIDA"
 
   return (
@@ -535,7 +538,7 @@ function TarefaRow({
       type="button"
       onClick={() => podeAbrir && onAbrir!(t)}
       disabled={!podeAbrir}
-      title={t.bloqueioAbertura ?? (readOnly ? "Somente leitura" : `Abrir: ${t.titulo}`)}
+      title={t.erroAdministrativo ?? (readOnly ? "Somente leitura" : `Abrir: ${t.titulo}`)}
       className={`w-full text-left grid items-center gap-2.5 px-5 py-3 border-b border-white/10 transition-colors ${
         podeAbrir ? "hover:bg-[#20262e] cursor-pointer" : "cursor-default"
       }`}
@@ -564,7 +567,11 @@ function TarefaRow({
           {t.statusLabel}
         </span>
         {t.motivo && <span className="text-[11px] text-white/40 block truncate">{t.motivo}</span>}
-        {t.bloqueioAbertura && <span className="text-[11px] text-white/40 block">{t.bloqueioAbertura}</span>}
+        {t.erroAdministrativo && (
+          <span className="text-[11px] text-[#d2a948] block leading-snug mt-0.5">
+            ⚠ {t.erroAdministrativo}
+          </span>
+        )}
       </span>
 
       <span className="text-[12px] block truncate">
@@ -591,8 +598,8 @@ function TarefaRow({
             {concluida ? "Ver" : "Abrir"} <ChevronRight className="w-3 h-3" />
           </span>
         ) : (
-          <span className="text-[11px] font-semibold text-white/40">
-            {readOnly ? "Somente leitura" : "—"}
+          <span className="text-[11px] font-semibold text-[#d2a948]">
+            {readOnly ? "Somente leitura" : "Sem executor"}
           </span>
         )}
       </span>

@@ -117,6 +117,7 @@ check("Central expõe o grupo 'pendente de classificação'", central.includes("
 check("Central repassa as tarefas ao painel", central.includes("tarefas={bodyData.tarefas ?? []}"))
 check("Central tem handler único de abertura de tarefa", central.includes("const abrirTarefa = useCallback"))
 check("abrir tarefa usa a operação oficial (sem rota legada)", /abrirOperacao\(t\.documentoId \?\? 0, t\.necessidadeId\)/.test(central))
+check("passo sem executor vira erro administrativo explícito (tarefa não some)", central.includes("if (!t.executor)") && painel.includes("erroAdministrativo") && painel.includes("Sem executor"))
 
 check("painel renderiza a lista de tarefas", painel.includes("<ListaDeTarefas") && painel.includes("function ListaDeTarefas"))
 check("painel agrupa em Pendentes / Em andamento / Concluídas", painel.includes('titulo: "Pendentes"') && painel.includes('titulo: "Em andamento"') && painel.includes('titulo: "Concluídas"'))

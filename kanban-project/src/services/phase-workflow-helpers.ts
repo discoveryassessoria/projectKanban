@@ -31,6 +31,33 @@ export interface WorkflowValidationResult {
 }
 
 // Definições recebidas (subset do que importa; sem acoplar ao Prisma).
+/**
+ * Modo de execução dos passos publicados da fase — CONFIGURAÇÃO, não regra de código.
+ *  • SEQUENCIAL: só o primeiro passo nasce disponível; concluir um libera o seguinte.
+ *  • PARALELO:   todos os passos nascem disponíveis.
+ */
+export type ModoExecucaoPassos = "SEQUENCIAL" | "PARALELO"
+
+/**
+ * Escopo de execução de um passo publicado — CONFIGURAÇÃO, nunca inferida por nome,
+ * posição ou texto.
+ *  • GLOBAL:    1 instância compartilhada por fase/ciclo do processo.
+ *  • PESSOA:    1 instância por pessoa aplicável do processo.
+ *  • DOCUMENTO: 1 instância por necessidade/documento aplicável.
+ */
+export type EscopoPasso = "GLOBAL" | "PESSOA" | "DOCUMENTO"
+
+export const MODOS_EXECUCAO: readonly ModoExecucaoPassos[] = ["SEQUENCIAL", "PARALELO"]
+export const ESCOPOS_PASSO: readonly EscopoPasso[] = ["GLOBAL", "PESSOA", "DOCUMENTO"]
+
+/** Normaliza o valor persistido; desconhecido cai no default declarado no schema. */
+export function normalizarModoExecucao(v: string | null | undefined): ModoExecucaoPassos {
+  return v === "PARALELO" ? "PARALELO" : "SEQUENCIAL"
+}
+export function normalizarEscopoPasso(v: string | null | undefined): EscopoPasso {
+  return v === "PESSOA" || v === "DOCUMENTO" ? v : "GLOBAL"
+}
+
 export interface DefWorkflow {
   id: number
   wfUid: string
@@ -40,6 +67,8 @@ export interface DefWorkflow {
   versao: number
   active: boolean
   arquivado: boolean
+  /** Modo de execução PERSISTIDO dos passos: SEQUENCIAL | PARALELO. */
+  execucao: ModoExecucaoPassos
 }
 export interface DefStep {
   id: number
@@ -55,8 +84,10 @@ export interface DefStep {
   completionRule: string | null
   checklist: unknown
   versao: number
+  /** Escopo de execução PERSISTIDO: GLOBAL | PESSOA | DOCUMENTO. */
+  escopo: EscopoPasso
   tipo?: string | null // a definição atual NÃO tem; reservado p/ futuro
-  dependeDeStepKeys?: string[] | null // reservado; hoje ausente na definição
+  dependeDeStepKeys?: string[] | null // derivado do modo de execução do workflow
 }
 
 // ---------- Chaves de idempotência (determinísticas) ----------
@@ -89,6 +120,11 @@ export function montarChavePasso(i: {
   // Passo operacional POR-DOCUMENTO: distingue a mesma stepKey entre documentos
   // sob a mesma instância. Ausente (passo-template da fase) mantém a chave legada.
   documentoId?: number | null
+  // Passo POR-PESSOA (escopo PESSOA do cadastro): distingue a mesma stepKey entre
+  // pessoas da árvore sob a mesma instância.
+  pessoaId?: number | null
+  // Passo POR-NECESSIDADE (escopo DOCUMENTO sem Documento materializado ainda).
+  necessidadeId?: number | null
 }): string {
   const base = [
     `wfi${i.workflowInstanceId}`,
@@ -97,8 +133,12 @@ export function montarChavePasso(i: {
     `stepv${i.stepDefinitionVersion}`,
     `c${i.ciclo}`,
   ]
-  // Retrocompat: só anexa o segmento quando há documento (passo-template inalterado).
+  // Retrocompat: só anexa o segmento quando há entidade (passo-template inalterado).
+  // A chave lógica é processo+ciclo+passo publicado+entidade do escopo (item 26 da
+  // especificação): reexecutar a materialização converge, nunca duplica.
   if (i.documentoId != null) base.push(`doc${i.documentoId}`)
+  if (i.pessoaId != null) base.push(`pes${i.pessoaId}`)
+  if (i.necessidadeId != null) base.push(`nec${i.necessidadeId}`)
   return base.join("|")
 }
 

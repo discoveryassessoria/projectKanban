@@ -5,7 +5,7 @@
 --   corpo        → gerado do prisma/schema.prisma
 --   bloco manual → prisma/baseline/bloco-manual.sql (edite LÁ)
 --
--- Gerado em : 2026-08-02
+-- Gerado em : 2026-08-03
 -- Prisma    : 6.19.3
 --
 -- PARA QUE SERVE: reconstruir o banco DO ZERO. O histórico de migrations NÃO
@@ -2304,6 +2304,7 @@ CREATE TABLE "PhaseInternalWorkflow" (
     "tipoProcessoId" INTEGER,
     "phaseKey" VARCHAR(60) NOT NULL,
     "name" VARCHAR(200) NOT NULL,
+    "execucao" VARCHAR(20) NOT NULL DEFAULT 'SEQUENCIAL',
     "active" BOOLEAN NOT NULL DEFAULT true,
     "arquivado" BOOLEAN NOT NULL DEFAULT false,
     "versao" INTEGER NOT NULL DEFAULT 1,
@@ -2326,6 +2327,7 @@ CREATE TABLE "PhaseInternalWorkflowStep" (
     "owner" VARCHAR(120),
     "priority" VARCHAR(20) NOT NULL DEFAULT 'medium',
     "slaDays" INTEGER NOT NULL DEFAULT 0,
+    "escopo" VARCHAR(20) NOT NULL DEFAULT 'GLOBAL',
     "completionRule" TEXT,
     "checklist" JSONB,
     "versao" INTEGER NOT NULL DEFAULT 1,
@@ -2713,6 +2715,7 @@ CREATE TABLE "PhaseWorkflowStepInstance" (
     "tipo" "PassoTipo" NOT NULL DEFAULT 'HUMANO',
     "obrigatorio" BOOLEAN NOT NULL DEFAULT true,
     "geraTarefa" BOOLEAN NOT NULL DEFAULT true,
+    "pessoaId" INTEGER,
     "necessidadeId" INTEGER,
     "documentoId" INTEGER,
     "ciclo" INTEGER NOT NULL DEFAULT 1,
@@ -5787,6 +5790,9 @@ ALTER TABLE "PhaseWorkflowInstance" ADD CONSTRAINT "PhaseWorkflowInstance_previo
 
 -- AddForeignKey
 ALTER TABLE "PhaseWorkflowStepInstance" ADD CONSTRAINT "PhaseWorkflowStepInstance_workflowInstanceId_fkey" FOREIGN KEY ("workflowInstanceId") REFERENCES "PhaseWorkflowInstance"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "PhaseWorkflowStepInstance" ADD CONSTRAINT "PhaseWorkflowStepInstance_pessoaId_fkey" FOREIGN KEY ("pessoaId") REFERENCES "Pessoa"("id") ON DELETE SET NULL ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "PhaseWorkflowStepInstance" ADD CONSTRAINT "PhaseWorkflowStepInstance_necessidadeId_fkey" FOREIGN KEY ("necessidadeId") REFERENCES "NecessidadeDocumental"("id") ON DELETE SET NULL ON UPDATE CASCADE;

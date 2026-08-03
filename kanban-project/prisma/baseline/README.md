@@ -44,7 +44,7 @@ schema completo — e quebraria na sétima.
 | | |
 |---|---|
 | migration oficial | `prisma/migrations/0000_baseline/migration.sql` |
-| checksum (sha256) | `379c12b2858a949928c9738d032a4864fbc37c9a87014d2429497710da9a4bea` |
+| checksum (sha256) | `a76297512de9484bcf1b4fbe01e2b77510217f8fad465b1969d0175c89dd58b5` |
 | ledger de produção | 1 linha: `0000_baseline`, mesmo checksum, `finished_at` preenchido |
 | migrations antigas | `prisma/migrations-arquivo/` (112, preservadas, nunca executadas) |
 | commit de origem | consolidação feita sobre `955866c4` |
@@ -192,3 +192,23 @@ pode aparecer em `DROP INDEX IF EXISTS` de migrations idempotentes ou em
 As extensões `pg_stat_statements`, `pgcrypto` e `uuid-ossp` existem em produção
 mas ficam fora. Nenhuma coluna usa `gen_random_uuid()`, `uuid_generate_v4()` ou
 `crypt()` — são observabilidade e legado do provedor, não dependência do schema.
+
+---
+
+## Reconciliação de 03/08/2026 — escopo e execução do motor de fases
+
+**Motivo.** O schema ganhou três colunas aditivas
+(`PhaseInternalWorkflow.execucao`, `PhaseInternalWorkflowStep.escopo`,
+`PhaseWorkflowStepInstance.pessoaId` + FK), então o baseline mudou e, com ele,
+o checksum.
+
+| | |
+|---|---|
+| checksum anterior | `379c12b2858a949928c9738d032a4864fbc37c9a87014d2429497710da9a4bea` |
+| checksum atual | `a76297512de9484bcf1b4fbe01e2b77510217f8fad465b1969d0175c89dd58b5` |
+| linha do ledger | `0000_baseline` — apenas a coluna `checksum` foi atualizada |
+| backup do ledger | tirado antes da escrita (1 linha, conteúdo integral) |
+| migration nova | `20260803_workflow_escopo_execucao` (aditiva e idempotente) |
+
+Nada de schema ou de dado foi alterado nessa reconciliação: `started_at`,
+`finished_at` e `applied_steps_count` seguem os originais de 02/08/2026.
