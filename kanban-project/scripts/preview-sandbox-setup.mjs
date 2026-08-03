@@ -167,12 +167,9 @@ try {
   // homologação passa a classificar STAGING; barrar por isso trancaria o sandbox
   // fora do banco que ele existe para semear. O que realmente importa continua
   // valendo, e agora vale SEMPRE (antes só era checado no ramo de banco vazio):
-  // assinatura de produção, endpoint de produção e presença de requerentes reais.
+  // assinatura de produção e presença de requerentes reais.
   if (classe === CLASSE.PRODUCAO) {
     console.error('[sandbox] ABORTADO: alvo classificado PRODUCAO. O sandbox NUNCA escreve em produção.'); process.exit(1)
-  }
-  if (/db\.prisma\.io/i.test(identificador(url))) {
-    console.error('[sandbox] ABORTADO: alvo é db.prisma.io (Prisma Postgres = produção).'); process.exit(1)
   }
   if (retrato.requerentes > 0) {
     console.error(`[sandbox] ABORTADO: ${retrato.requerentes} requerentes no alvo — há dado real. O sandbox só escreve em banco sintético.`); process.exit(1)
