@@ -32,6 +32,7 @@ function check(nome: string, cond: boolean, extra?: string) {
 // Passos publicados por fase, exatamente como no cadastro de produção.
 const CADASTRO: Array<{ phaseKey: string; nome: string; passos: string[] }> = [
   { phaseKey: "genealogia", nome: "Workflow Interno · Genealogia", passos: ["Localizar registro da certidão"] },
+  { phaseKey: "emissao_documental", nome: "Workflow Interno · Emissão Documental", passos: ["Solicitar certidão", "Aguardar retorno do cartório", "Receber certidão", "Conferir certidão", "Validar certidão"] },
   { phaseKey: "analise_documental", nome: "Workflow Interno · Análise Documental", passos: ["Preparar pacote de análise", "Comparar nomes, datas, locais e filiação", "Registrar divergências", "Classificar criticidade", "Concluir necessidade de retificação"] },
   { phaseKey: "retificacao_registros", nome: "Workflow Interno · Retificação de Registros", passos: ["Definir modo de retificação", "Preparar requerimento/petição", "Protocolar retificação", "Acompanhar decisão", "Registrar averbação", "Validar retificação"] },
   { phaseKey: "emissao_documental_retificada", nome: "Workflow Interno · Emissão Documental Retificada", passos: ["Solicitar averbação", "Solicitar certidão retificada", "Aguardar retorno", "Receber certidão", "Conferir certidão", "Validar certidão retificada"] },
@@ -43,7 +44,7 @@ const slug = (s: string) =>
 
 async function limpar() {
   await prisma.$executeRawUnsafe(
-    'TRUNCATE "Processo","Arvore","Pessoa","Uniao","Documento","NecessidadeDocumental","NecessidadeDocumentalEvento","PhaseWorkflowInstance","PhaseWorkflowStepInstance","PhaseInternalWorkflow","PhaseInternalWorkflowStep","WorkflowEvento","DomainOutbox","Tarefa","MacroWorkflow","FaseMacro" RESTART IDENTITY CASCADE',
+    'TRUNCATE "Processo","Arvore","Pessoa","Uniao","Documento","NecessidadeDocumental","NecessidadeDocumentalEvento","PhaseWorkflowInstance","PhaseWorkflowStepInstance","PhaseInternalWorkflow","PhaseInternalWorkflowStep","WorkflowEvento","DomainOutbox","Tarefa","MacroWorkflow","FaseMacro","MatrizDocumental","TipoDocumentoCadastro","ItemCatalogo" RESTART IDENTITY CASCADE',
   )
 }
 
@@ -57,6 +58,20 @@ async function semear() {
       modalityLabel: "Administrativa", processFamily: "CIDADANIA", serviceNature: "PROCESSO",
     },
   })
+
+  // CATÁLOGO DE CERTIDÕES — espelha produção: TipoDocumentoCadastro com
+  // legacyEnumKey (é por ele que a regra da árvore resolve o item mestre) e natureza
+  // "certidao" (é o que torna a necessidade um alvo de localização registral).
+  for (const c of [
+    { code: "IT - NAS", name: "Certidão de nascimento - Inteiro Teor", enumKey: "CERTIDAO_NASCIMENTO_INTEIRO_TEOR" },
+    { code: "IT - CAS", name: "Certidão de casamento - Inteiro Teor", enumKey: "CERTIDAO_CASAMENTO_INTEIRO_TEOR" },
+    { code: "IT - OBI", name: "Certidão de óbito - Inteiro Teor", enumKey: "CERTIDAO_OBITO_INTEIRO_TEOR" },
+  ]) {
+    const item = await prisma.itemCatalogo.create({ data: { code: c.code, name: c.name, natureza: "DOCUMENTO" } })
+    await prisma.tipoDocumentoCadastro.create({
+      data: { code: c.code, name: c.name, nature: "certidao", legacyEnumKey: c.enumKey, itemCatalogoId: item.id },
+    })
+  }
 
   // Macro do processo: uma FaseMacro por fase do cadastro.
   const macro = await prisma.macroWorkflow.create({
@@ -107,23 +122,51 @@ async function main() {
   console.log("\n(1) Cada fase materializa somente os SEUS passos publicados")
   const processos: Record<string, number> = {}
   for (const f of CADASTRO) {
-    const p = await criarProcesso(tipoId, f.phaseKey, `T-${f.phaseKey.slice(0, 6)}`)
+    // Emissão opera por DOCUMENTO: num processo recém-criado ainda não há documento
+    // materializado, então ela é exercitada no bloco (8), depois do avanço real.
+    if (f.phaseKey === "emissao_documental") continue
+    const p = await criarProcesso(tipoId, f.phaseKey, `T-${f.phaseKey.slice(0, 8)}`)
     processos[f.phaseKey] = p.id
     const r = await reconciliarFaseAtiva(p.id)
     check(`${f.phaseKey}: reconciliação sem erro`, r.erro === null, r.erro ?? undefined)
 
     const passos = await passosDa(p.id)
-    check(`${f.phaseKey}: ${f.passos.length} passo(s) instanciado(s)`, passos.length === f.passos.length, `veio ${passos.length}`)
+    // Genealogia opera por NECESSIDADE (escopo canônico da fase): 1 instância do passo
+    // publicado por certidão a localizar. As demais fases operam por PROCESSO.
+    const alvos = f.phaseKey === "genealogia"
+      ? await prisma.necessidadeDocumental.count({ where: { processoId: p.id, supersedePorId: null } })
+      : 1
+    const esperado = f.passos.length * alvos
+    check(`${f.phaseKey}: ${esperado} instância(s) = ${f.passos.length} passo(s) × ${alvos} alvo(s)`, passos.length === esperado, `veio ${passos.length}`)
     check(`${f.phaseKey}: nenhum passo de outra fase`, passos.every((s) => s.faseMacroKey === f.phaseKey))
     const esperados = f.passos.map(slug)
-    check(`${f.phaseKey}: ordem oficial preservada`, passos.map((s) => s.stepKey).join(",") === esperados.join(","), passos.map((s) => s.stepKey).join(","))
-    check(`${f.phaseKey}: SEM necessidade documental e SEM documento no processo`,
-      (await prisma.necessidadeDocumental.count({ where: { processoId: p.id } })) === 0 &&
+    const ordemVista = [...new Set(passos.map((s) => s.stepKey))]
+    check(`${f.phaseKey}: ordem oficial preservada`, ordemVista.join(",") === esperados.join(","), ordemVista.join(","))
+    check(`${f.phaseKey}: SEM Regra Documental publicada e SEM documento materializado`,
+      (await prisma.matrizDocumental.count()) === 0 &&
       (await prisma.documento.count({ where: { pessoa: { arvoreId: (await prisma.processo.findUnique({ where: { id: p.id }, select: { arvoreId: true } }))!.arvoreId! } } })) === 0)
     check(`${f.phaseKey}: config preservada (obrigatório + gera tarefa + SLA + equipe)`,
       passos.every((s) => s.obrigatorio && s.geraTarefa && s.slaDays === 5 && s.papel === "equipe_documental"))
-    check(`${f.phaseKey}: escopo GLOBAL ⇒ 1 instância por passo, sem entidade`,
-      passos.every((s) => s.pessoaId === null && s.necessidadeId === null && s.documentoId === null))
+    check(`${f.phaseKey}: cardinalidade da fase respeitada`,
+      f.phaseKey === "genealogia"
+        ? passos.every((s) => s.necessidadeId !== null)
+        : passos.every((s) => s.pessoaId === null && s.necessidadeId === null && s.documentoId === null))
+  }
+
+  console.log("\n(1b) Genealogia: um alvo por pessoa/registro, sem Regra Documental publicada")
+  {
+    const pg = processos["genealogia"]
+    const necs = await prisma.necessidadeDocumental.findMany({
+      where: { processoId: pg }, select: { id: true, pessoaId: true, origem: true, ruleCode: true, itemCatalogoId: true },
+    })
+    check("necessidades vieram da REGRA DA ÁRVORE (origem ARVORE)", necs.length > 0 && necs.every((n) => n.origem === "ARVORE"), JSON.stringify(necs.map((n) => n.origem)))
+    check("uma certidão de nascimento por pessoa da árvore", necs.filter((n) => n.ruleCode === "NASC_IT").length === 2, String(necs.length))
+    const passos = await passosDa(pg)
+    check("cada passo preserva o vínculo com o registro", passos.every((s) => s.necessidadeId != null))
+    check("cada passo aponta para uma necessidade distinta", new Set(passos.map((s) => s.necessidadeId)).size === passos.length)
+    const pessoaDaNec = new Map(necs.map((n) => [n.id, n.pessoaId]))
+    check("o vínculo com a PESSOA é recuperável a partir do passo",
+      passos.every((s) => pessoaDaNec.get(s.necessidadeId!) != null))
   }
 
   // ── 2) sequência configurada (SEQUENCIAL é o default) ──────────────────────
@@ -156,35 +199,35 @@ async function main() {
     (await prisma.phaseWorkflowInstance.count({ where: { processoId: pGen, status: "ATIVO" } })) === 1 &&
     (await prisma.phaseWorkflowStepInstance.count({ where: { processoId: pGen } })) === 0)
   const rec = await reconciliarFaseAtiva(pGen)
-  check("reconciliação criou o passo publicado", rec.passosCriados === 1, JSON.stringify(rec))
-  check("passo é o da Genealogia", (await passosDa(pGen))[0]?.stepKey === slug("Localizar registro da certidão"))
-  check("tarefa correspondente criada", rec.tarefasCriadas === 1)
+  check("reconciliação recriou os passos publicados", rec.passosCriados === 2, JSON.stringify(rec))
+  check("passos são os da Genealogia", (await passosDa(pGen)).every((s) => s.stepKey === slug("Localizar registro da certidão")))
+  check("tarefa correspondente criada por alvo", rec.tarefasCriadas === 2, String(rec.tarefasCriadas))
   await reconciliarFaseAtiva(pGen)
-  check("reconciliar de novo não duplica", (await passosDa(pGen)).length === 1)
+  check("reconciliar de novo não duplica", (await passosDa(pGen)).length === 2)
 
   // ── 5) escopo PESSOA e DOCUMENTO vêm do cadastro (plano puro) ──────────────
-  console.log("\n(5) Escopo persistido governa o fan-out")
+  console.log("\n(5) Cardinalidade persistida governa o fan-out")
   const base: DefStep = {
     id: 1, key: "p1", label: "P1", description: null, ordem: 1, createsTask: true, required: true,
-    owner: null, priority: "medium", slaDays: 0, completionRule: null, checklist: null, versao: 1, escopo: "GLOBAL",
+    owner: null, priority: "medium", slaDays: 0, completionRule: null, checklist: null, versao: 1, cardinalidade: null,
   }
-  const ctx = { pessoaIds: [10, 11, 12], necessidadeIds: [70, 71], documentoIdPorNecessidade: new Map([[70, 900]]) }
-  check("GLOBAL ⇒ 1 alvo, sem entidade",
-    planejarMaterializacao([base], "SEQUENCIAL", ctx).alvos.length === 1)
-  const porPessoa = planejarMaterializacao([{ ...base, escopo: "PESSOA" }], "SEQUENCIAL", ctx).alvos
+  const ctx = { pessoaIds: [10, 11, 12], necessidadeIds: [70, 71], documentoIds: [900], documentoIdPorNecessidade: new Map([[70, 900]]) }
+  check("PROCESSO ⇒ 1 alvo, sem entidade",
+    planejarMaterializacao([base], "SEQUENCIAL", "PROCESSO", ctx).alvos.length === 1)
+  const porPessoa = planejarMaterializacao([{ ...base, cardinalidade: "PESSOA" }], "SEQUENCIAL", "PROCESSO", ctx).alvos
   check("PESSOA ⇒ 1 alvo por pessoa", porPessoa.length === 3 && porPessoa.every((a) => a.pessoaId != null))
-  const porDoc = planejarMaterializacao([{ ...base, escopo: "DOCUMENTO" }], "SEQUENCIAL", ctx).alvos
-  check("DOCUMENTO ⇒ 1 alvo por necessidade", porDoc.length === 2 && porDoc.every((a) => a.necessidadeId != null))
-  check("DOCUMENTO vincula o Documento quando já existe", porDoc.find((a) => a.necessidadeId === 70)?.documentoId === 900)
-  const semEntidade = planejarMaterializacao([{ ...base, escopo: "PESSOA" }], "SEQUENCIAL", { pessoaIds: [], necessidadeIds: [], documentoIdPorNecessidade: new Map() })
-  check("escopo sem entidade avisa explicitamente (nunca silencioso)",
-    semEntidade.alvos.length === 0 && semEntidade.avisos.some((a) => a.code === "ESCOPO_SEM_ENTIDADE"))
+  const porDoc = planejarMaterializacao([{ ...base, cardinalidade: "NECESSIDADE" }], "SEQUENCIAL", "PROCESSO", ctx).alvos
+  check("NECESSIDADE ⇒ 1 alvo por certidão", porDoc.length === 2 && porDoc.every((a) => a.necessidadeId != null))
+  check("NECESSIDADE vincula o Documento quando já existe", porDoc.find((a) => a.necessidadeId === 70)?.documentoId === 900)
+  const semEntidade = planejarMaterializacao([{ ...base, cardinalidade: "PESSOA" }], "SEQUENCIAL", "PROCESSO", { pessoaIds: [], necessidadeIds: [], documentoIds: [], documentoIdPorNecessidade: new Map() })
+  check("cardinalidade sem alvo avisa explicitamente (nunca silencioso)",
+    semEntidade.alvos.length === 0 && semEntidade.avisos.some((a) => a.code === "CARDINALIDADE_SEM_ALVO"))
   const paralelo = planejarMaterializacao(
-    [base, { ...base, id: 2, key: "p2", ordem: 2 }], "PARALELO", ctx)
+    [base, { ...base, id: 2, key: "p2", ordem: 2 }], "PARALELO", "PROCESSO", ctx)
   check("PARALELO ⇒ todos DISPONIVEL, sem dependência",
     paralelo.alvos.every((a) => a.status === "DISPONIVEL" && a.dependeDeStepKeys.length === 0))
   const sequencial = planejarMaterializacao(
-    [base, { ...base, id: 2, key: "p2", ordem: 2 }], "SEQUENCIAL", ctx)
+    [base, { ...base, id: 2, key: "p2", ordem: 2 }], "SEQUENCIAL", "PROCESSO", ctx)
   check("SEQUENCIAL ⇒ segundo PENDENTE e dependente do primeiro",
     sequencial.alvos[1].status === "PENDENTE" && sequencial.alvos[1].dependeDeStepKeys[0] === "p1")
 
@@ -219,6 +262,49 @@ async function main() {
   const ciclo2 = apos.filter((s) => s.faseMacroKey === "emissao_documental_retificada" && s.ciclo === 2)
   check("ciclo 1 intacto (mesmos ids)", ciclo1.map((s) => s.id).sort().join(",") === idsCicloUm.join(","))
   check("ciclo 2 tem instâncias próprias", ciclo2.length === 6 && ciclo2.every((s) => !idsCicloUm.includes(s.id)))
+
+  // ── 8) fluxo oficial: executar as buscas conclui a fase e avança sozinho ──
+  console.log("\n(8) Buscas concluídas ⇒ Genealogia conclui e avança para Emissão Documental")
+  {
+    const pg = processos["genealogia"]
+    const { atualizarPassoV2 } = await import("../src/services/documento-operacao")
+    const { garantirDocumentoDaNecessidade } = await import("../src/services/genealogia/operacao-necessidade")
+
+    const passos = await passosDa(pg)
+    check("2 buscas a executar", passos.length === 2)
+
+    for (const s of passos) {
+      // Abrir a busca materializa o Documento do registro (mesmo caminho do botão "Abrir").
+      const docId = await garantirDocumentoDaNecessidade(pg, s.necessidadeId!)
+      check(`busca do registro ${s.necessidadeId} abriu com documento próprio`, docId > 0)
+      const r = await atualizarPassoV2(docId, s.id, { status: "concluida" })
+      check(`busca do registro ${s.necessidadeId} concluída`, r.ok, r.ok ? "" : r.error)
+    }
+
+    const proc = await prisma.processo.findUnique({ where: { id: pg }, select: { faseAtualKey: true } })
+    check("Genealogia avançou automaticamente para Emissão Documental",
+      proc?.faseAtualKey === "emissao_documental", String(proc?.faseAtualKey))
+
+    const instGen = await prisma.phaseWorkflowInstance.findFirst({ where: { processoId: pg, faseMacroKey: "genealogia" }, select: { status: true } })
+    check("instância da Genealogia concluída", instGen?.status === "CONCLUIDO", String(instGen?.status))
+
+    const todosPassos = await passosDa(pg)
+    const daGen = todosPassos.filter((s) => s.faseMacroKey === "genealogia")
+    check("histórico da Genealogia preservado (2 passos, concluídos)",
+      daGen.length === 2 && daGen.every((s) => s.status === "CONCLUIDO"), JSON.stringify(daGen.map((s) => s.status)))
+
+    const daEmissao = todosPassos.filter((s) => s.faseMacroKey === "emissao_documental")
+    const keysEmissao = [...new Set(daEmissao.map((s) => s.stepKey))]
+    check("Emissão Documental materializou exatamente os seus 5 passos publicados",
+      keysEmissao.length === 5, keysEmissao.join(","))
+    check("nenhum passo da Genealogia vazou para a Emissão",
+      !keysEmissao.includes(slug("Localizar registro da certidão")))
+
+    const evs = await prisma.workflowEvento.findMany({ where: { processoId: pg }, select: { tipo: true } })
+    check("timeline registra conclusão de passo e avanço de fase",
+      evs.some((e) => e.tipo === "PASSO_CONCLUIDO") && evs.some((e) => String(e.tipo).startsWith("FASE_AVANCADA")),
+      [...new Set(evs.map((e) => e.tipo))].join(","))
+  }
 
   console.log(`\n${falhas.length === 0 ? "✅" : "❌"} ${ok}/${ok + falhas.length} verificações`)
   if (falhas.length) {

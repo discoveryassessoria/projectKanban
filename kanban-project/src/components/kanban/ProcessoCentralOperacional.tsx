@@ -239,6 +239,21 @@ function mapearPainel(data: CentralOpData, faseNome: string) {
     // (fp), não mais do status do documento. Aqui é que "0 Recebidos com doc
     // recebido" e o "passo ativo errado" são corrigidos.
     const c = fp.counts
+    // O progresso da fase sai da PRÓPRIA lista de tarefas quando a fase opera por
+    // alvo (Genealogia = registros a localizar): contador e lista têm a mesma fonte,
+    // então não podem divergir. Sem tarefas, cai nos contadores por passo.
+    const tarefasFase = data.tarefas ?? []
+    const porAlvo = tarefasFase.length > 0 && tarefasFase.every((t) => t.necessidadeId != null || t.documentoId != null)
+    if (porAlvo) {
+      const localizados = tarefasFase.filter((t) => t.balde === "CONCLUIDA").length
+      const divergentesAlvo = tarefasFase.filter((t) => t.statusRaw === "BLOQUEADO" || t.statusRaw === "FALHOU").length
+      kpis = [
+        { label: "Registros a localizar", value: tarefasFase.length },
+        { label: "Localizados", value: localizados, tone: "ok" },
+        { label: "Pendentes", value: tarefasFase.length - localizados - divergentesAlvo, tone: "busca" },
+        { label: "Divergentes", value: divergentesAlvo, tone: "late" },
+      ]
+    } else {
     kpis = [
       { label: "Obrigatórios", value: total },
       { label: "Validados", value: c.validados, tone: "ok" },
@@ -248,6 +263,7 @@ function mapearPainel(data: CentralOpData, faseNome: string) {
       { label: "Conferidos", value: c.conferidos },
       { label: "Divergentes", value: divergentes, tone: "late" },
     ]
+    }
     steps = fp.steps.map((s) => ({ title: s.title, status: s.status }))
   } else {
     // FALLBACK — só entra se a rota ainda não devolveu faseProgress (ex.: janela

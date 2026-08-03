@@ -2,10 +2,13 @@
 
 import { useEffect, useState, useCallback } from "react"
 
-// Rótulo do escopo persistido do passo. A UI só EXIBE o que está no cadastro.
-const ESCOPO_LABEL: Record<string, string> = {
-  GLOBAL: "global",
+// Rótulo da CARDINALIDADE do passo (quantas instâncias, presas a qual entidade).
+// Nada a ver com "global (compartilhado)", que é o compartilhamento do WORKFLOW.
+const CARDINALIDADE_LABEL: Record<string, string> = {
+  "": "conforme a fase",
+  PROCESSO: "1 por fase",
   PESSOA: "por pessoa",
+  NECESSIDADE: "por certidão",
   DOCUMENTO: "por documento",
 }
 
@@ -20,8 +23,8 @@ interface Step {
   ordem: number
   createsTask: boolean
   required: boolean
-  /** Escopo persistido do passo: GLOBAL | PESSOA | DOCUMENTO. */
-  escopo?: string
+  /** Cardinalidade persistida. Vazio = herda o escopo operacional da fase. */
+  cardinalidade?: string | null
   owner?: string | null
   priority?: string
   slaDays?: number
@@ -97,7 +100,7 @@ export default function PhaseWorkflowsFasesTab() {
   const [replaceAsk, setReplaceAsk] = useState<{ templateId: number; phaseKey: string; label: string } | null>(null)
 
   const [stepModal, setStepModal] = useState<{ wf: Workflow; editKey?: string } | null>(null)
-  const [stepForm, setStepForm] = useState({ label: "", createsTask: true, required: true, escopo: "GLOBAL", owner: "", slaDays: 0, completionRule: "" })
+  const [stepForm, setStepForm] = useState({ label: "", createsTask: true, required: true, cardinalidade: "", owner: "", slaDays: 0, completionRule: "" })
 
   const load = useCallback(async () => {
     try {
@@ -196,11 +199,11 @@ export default function PhaseWorkflowsFasesTab() {
   }
 
   function openAddStep(wf: Workflow) {
-    setStepForm({ label: "", createsTask: true, required: true, escopo: "GLOBAL", owner: "", slaDays: 0, completionRule: "" })
+    setStepForm({ label: "", createsTask: true, required: true, cardinalidade: "", owner: "", slaDays: 0, completionRule: "" })
     setStepModal({ wf })
   }
   function openEditStep(wf: Workflow, st: Step) {
-    setStepForm({ label: st.label, createsTask: st.createsTask, required: st.required, escopo: st.escopo || "GLOBAL", owner: st.owner || "", slaDays: st.slaDays || 0, completionRule: st.completionRule || "" })
+    setStepForm({ label: st.label, createsTask: st.createsTask, required: st.required, cardinalidade: st.cardinalidade || "", owner: st.owner || "", slaDays: st.slaDays || 0, completionRule: st.completionRule || "" })
     setStepModal({ wf, editKey: st.key })
   }
   async function saveStep() {
@@ -209,11 +212,11 @@ export default function PhaseWorkflowsFasesTab() {
     if (!stepForm.label.trim()) { showFlash("Informe o nome do passo."); return }
     let steps: Step[]
     if (editKey) {
-      steps = wf.passos.map(s => s.key === editKey ? { ...s, label: stepForm.label, createsTask: stepForm.createsTask, required: stepForm.required, escopo: stepForm.escopo, owner: stepForm.owner, slaDays: stepForm.slaDays, completionRule: stepForm.completionRule } : s)
+      steps = wf.passos.map(s => s.key === editKey ? { ...s, label: stepForm.label, createsTask: stepForm.createsTask, required: stepForm.required, cardinalidade: stepForm.cardinalidade || null, owner: stepForm.owner, slaDays: stepForm.slaDays, completionRule: stepForm.completionRule } : s)
     } else {
       let k = slug(stepForm.label) || "passo"; let n = 2
       while (wf.passos.some(s => s.key === k)) { k = slug(stepForm.label) + "_" + n; n++ }
-      steps = [...wf.passos, { key: k, label: stepForm.label, ordem: wf.passos.length + 1, createsTask: stepForm.createsTask, required: stepForm.required, escopo: stepForm.escopo, owner: stepForm.owner, slaDays: stepForm.slaDays, completionRule: stepForm.completionRule, priority: "medium" }]
+      steps = [...wf.passos, { key: k, label: stepForm.label, ordem: wf.passos.length + 1, createsTask: stepForm.createsTask, required: stepForm.required, cardinalidade: stepForm.cardinalidade || null, owner: stepForm.owner, slaDays: stepForm.slaDays, completionRule: stepForm.completionRule, priority: "medium" }]
     }
     setStepModal(null)
     await putSteps(wf, steps)
@@ -360,7 +363,7 @@ export default function PhaseWorkflowsFasesTab() {
                       <div className="mt-0.5 flex flex-wrap items-center gap-1.5 text-[10px]">
                         {st.createsTask && <span className="rounded bg-green-500/15 px-1.5 py-0.5 text-green-300">gera tarefa</span>}
                         {st.required && <span className="rounded bg-amber-500/15 px-1.5 py-0.5 text-amber-300">obrigatório</span>}
-                        <span className="rounded bg-sky-500/15 px-1.5 py-0.5 text-sky-300">{ESCOPO_LABEL[st.escopo || "GLOBAL"] ?? st.escopo}</span>
+                        <span className="rounded bg-sky-500/15 px-1.5 py-0.5 text-sky-300">{CARDINALIDADE_LABEL[st.cardinalidade || ""] ?? st.cardinalidade}</span>
                         {st.owner && <span className="rounded bg-white/10 px-1.5 py-0.5 text-white/60">{st.owner}</span>}
                         {!!st.slaDays && st.slaDays > 0 && <span className="rounded bg-white/10 px-1.5 py-0.5 text-white/60">SLA {st.slaDays}d</span>}
                       </div>
@@ -455,11 +458,13 @@ export default function PhaseWorkflowsFasesTab() {
                 </select>
               </div>
               <div>
-                <label className={labelCls}>Escopo</label>
-                <select value={stepForm.escopo} onChange={e => setStepForm(f => ({ ...f, escopo: e.target.value }))} className={inputCls}>
-                  <option value="GLOBAL" className="bg-zinc-900">Global — 1 tarefa por fase</option>
-                  <option value="PESSOA" className="bg-zinc-900">Por pessoa</option>
-                  <option value="DOCUMENTO" className="bg-zinc-900">Por documento/necessidade</option>
+                <label className={labelCls}>Cardinalidade</label>
+                <select value={stepForm.cardinalidade} onChange={e => setStepForm(f => ({ ...f, cardinalidade: e.target.value }))} className={inputCls}>
+                  <option value="" className="bg-zinc-900">Conforme a fase (padrão)</option>
+                  <option value="PROCESSO" className="bg-zinc-900">1 tarefa por fase</option>
+                  <option value="PESSOA" className="bg-zinc-900">Uma por pessoa</option>
+                  <option value="NECESSIDADE" className="bg-zinc-900">Uma por certidão a localizar</option>
+                  <option value="DOCUMENTO" className="bg-zinc-900">Uma por documento</option>
                 </select>
               </div>
               <div>

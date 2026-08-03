@@ -39,23 +39,26 @@ export interface WorkflowValidationResult {
 export type ModoExecucaoPassos = "SEQUENCIAL" | "PARALELO"
 
 /**
- * Escopo de execução de um passo publicado — CONFIGURAÇÃO, nunca inferida por nome,
- * posição ou texto.
- *  • GLOBAL:    1 instância compartilhada por fase/ciclo do processo.
- *  • PESSOA:    1 instância por pessoa aplicável do processo.
- *  • DOCUMENTO: 1 instância por necessidade/documento aplicável.
+ * CARDINALIDADE OPERACIONAL de um passo: quantas instâncias ele gera e presa a QUAL
+ * entidade. NÃO confundir com "global (compartilhado)", que é o compartilhamento do
+ * WORKFLOW entre tipos de processo (PhaseInternalWorkflow.tipoProcessoId = null).
+ *  • PROCESSO:    1 instância por fase/ciclo.
+ *  • PESSOA:      1 por pessoa aplicável da árvore.
+ *  • NECESSIDADE: 1 por registro/certidão a localizar (preserva pessoa + registro).
+ *  • DOCUMENTO:   1 por documento materializado.
  */
-export type EscopoPasso = "GLOBAL" | "PESSOA" | "DOCUMENTO"
+export type Cardinalidade = "PROCESSO" | "PESSOA" | "NECESSIDADE" | "DOCUMENTO"
 
 export const MODOS_EXECUCAO: readonly ModoExecucaoPassos[] = ["SEQUENCIAL", "PARALELO"]
-export const ESCOPOS_PASSO: readonly EscopoPasso[] = ["GLOBAL", "PESSOA", "DOCUMENTO"]
+export const CARDINALIDADES: readonly Cardinalidade[] = ["PROCESSO", "PESSOA", "NECESSIDADE", "DOCUMENTO"]
 
 /** Normaliza o valor persistido; desconhecido cai no default declarado no schema. */
 export function normalizarModoExecucao(v: string | null | undefined): ModoExecucaoPassos {
   return v === "PARALELO" ? "PARALELO" : "SEQUENCIAL"
 }
-export function normalizarEscopoPasso(v: string | null | undefined): EscopoPasso {
-  return v === "PESSOA" || v === "DOCUMENTO" ? v : "GLOBAL"
+/** null/desconhecido ⇒ null (= herda o escopo operacional da fase). */
+export function normalizarCardinalidade(v: string | null | undefined): Cardinalidade | null {
+  return (CARDINALIDADES as readonly string[]).includes(String(v)) ? (v as Cardinalidade) : null
 }
 
 export interface DefWorkflow {
@@ -84,8 +87,8 @@ export interface DefStep {
   completionRule: string | null
   checklist: unknown
   versao: number
-  /** Escopo de execução PERSISTIDO: GLOBAL | PESSOA | DOCUMENTO. */
-  escopo: EscopoPasso
+  /** Cardinalidade PERSISTIDA. null ⇒ herda o escopo operacional da fase. */
+  cardinalidade: Cardinalidade | null
   tipo?: string | null // a definição atual NÃO tem; reservado p/ futuro
   dependeDeStepKeys?: string[] | null // derivado do modo de execução do workflow
 }

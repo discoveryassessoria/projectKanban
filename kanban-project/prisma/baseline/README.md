@@ -44,7 +44,7 @@ schema completo — e quebraria na sétima.
 | | |
 |---|---|
 | migration oficial | `prisma/migrations/0000_baseline/migration.sql` |
-| checksum (sha256) | `a76297512de9484bcf1b4fbe01e2b77510217f8fad465b1969d0175c89dd58b5` |
+| checksum (sha256) | `8e30b94b9fa9100f2c993f93dfdae320a06ddc836246a217345ae48c45a72a47` |
 | ledger de produção | 1 linha: `0000_baseline`, mesmo checksum, `finished_at` preenchido |
 | migrations antigas | `prisma/migrations-arquivo/` (112, preservadas, nunca executadas) |
 | commit de origem | consolidação feita sobre `955866c4` |
@@ -209,6 +209,13 @@ o checksum.
 | linha do ledger | `0000_baseline` — apenas a coluna `checksum` foi atualizada |
 | backup do ledger | tirado antes da escrita (1 linha, conteúdo integral) |
 | migration nova | `20260803_workflow_escopo_execucao` (aditiva e idempotente) |
+
+Na mesma data, `20260803b_cardinalidade_passo` renomeou
+`PhaseInternalWorkflowStep.escopo` para `cardinalidade` (nullable, sem default) —
+o nome anterior colava a cardinalidade operacional do passo ao rótulo
+"global (compartilhado)", que é o compartilhamento do WORKFLOW. Checksum do
+baseline passou a `8e30b94b9fa9100f2c993f93dfdae320a06ddc836246a217345ae48c45a72a47`,
+reconciliado no ledger com backup e sem tocar schema ou dados.
 
 Nada de schema ou de dado foi alterado nessa reconciliação: `started_at`,
 `finished_at` e `applied_steps_count` seguem os originais de 02/08/2026.

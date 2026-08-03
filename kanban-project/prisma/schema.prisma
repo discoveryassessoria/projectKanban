@@ -2906,10 +2906,15 @@ model PhaseInternalWorkflowStep {
   owner          String?               @db.VarChar(120) // "ResponsÃ¡vel padrÃ£o"
   priority       String                @default("medium") @db.VarChar(20) // low | medium | high
   slaDays        Int                   @default(0)
-  // ESCOPO DE EXECUCAO do passo (persistido no cadastro oficial; nunca inferido por
-  // nome/posicao/texto): GLOBAL = 1 instancia compartilhada por fase/ciclo;
-  // PESSOA = 1 instancia por pessoa aplicavel; DOCUMENTO = 1 por necessidade/documento.
-  escopo         String                @default("GLOBAL") @db.VarChar(20)
+  // CARDINALIDADE OPERACIONAL do passo: quantas instancias ele gera e presa a QUAL
+  // entidade. NAO confundir com "global (compartilhado)", que e o compartilhamento do
+  // WORKFLOW entre tipos de processo (PhaseInternalWorkflow.tipoProcessoId = null).
+  //   PROCESSO    = 1 instancia por fase/ciclo
+  //   PESSOA      = 1 por pessoa aplicavel da arvore
+  //   NECESSIDADE = 1 por registro/certidao a localizar
+  //   DOCUMENTO   = 1 por documento materializado
+  // NULL = herda o escopo operacional canonico da FASE (fases-catalog).
+  cardinalidade  String?               @db.VarChar(20)
   completionRule String?               @db.Text // "CondiÃ§Ã£o de conclusÃ£o"
   checklist      Json?
   versao         Int                   @default(1) // CP-4A â versionamento (definiÃ§Ã£o/template)

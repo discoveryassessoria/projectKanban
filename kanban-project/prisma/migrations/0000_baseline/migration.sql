@@ -2327,7 +2327,7 @@ CREATE TABLE "PhaseInternalWorkflowStep" (
     "owner" VARCHAR(120),
     "priority" VARCHAR(20) NOT NULL DEFAULT 'medium',
     "slaDays" INTEGER NOT NULL DEFAULT 0,
-    "escopo" VARCHAR(20) NOT NULL DEFAULT 'GLOBAL',
+    "cardinalidade" VARCHAR(20),
     "completionRule" TEXT,
     "checklist" JSONB,
     "versao" INTEGER NOT NULL DEFAULT 1,

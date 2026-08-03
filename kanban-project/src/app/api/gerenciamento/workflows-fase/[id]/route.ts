@@ -30,9 +30,11 @@ function buildSteps(raw: any[], workflowId: number) {
       owner: s?.owner ? String(s.owner) : null,
       priority: s?.priority || 'medium',
       slaDays: Number(s?.slaDays) || 0,
-      // ESCOPO persistido do passo (GLOBAL | PESSOA | DOCUMENTO). Valor desconhecido
-      // cai no default do schema — nunca se infere escopo por nome ou posição.
-      escopo: ['GLOBAL', 'PESSOA', 'DOCUMENTO'].includes(String(s?.escopo)) ? String(s.escopo) : 'GLOBAL',
+      // CARDINALIDADE OPERACIONAL persistida do passo. null = herda o escopo da fase.
+      // Não confundir com "global (compartilhado)", que é o compartilhamento do WORKFLOW.
+      cardinalidade: ['PROCESSO', 'PESSOA', 'NECESSIDADE', 'DOCUMENTO'].includes(String(s?.cardinalidade))
+        ? String(s.cardinalidade)
+        : null,
       completionRule: s?.completionRule ? String(s.completionRule) : null,
       checklist: (s?.checklist == null ? undefined : s.checklist) as Prisma.InputJsonValue | undefined,
     }

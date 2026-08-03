@@ -118,6 +118,7 @@ check("Central repassa as tarefas ao painel", central.includes("tarefas={bodyDat
 check("Central tem handler único de abertura de tarefa", central.includes("const abrirTarefa = useCallback"))
 check("abrir tarefa usa a operação oficial (sem rota legada)", /abrirOperacao\(t\.documentoId \?\? 0, t\.necessidadeId\)/.test(central))
 check("passo sem executor vira erro administrativo explícito (tarefa não some)", central.includes("if (!t.executor)") && painel.includes("erroAdministrativo") && painel.includes("Sem executor"))
+check("progresso da fase por alvo sai da MESMA lista de tarefas", central.includes("const porAlvo = tarefasFase.length > 0") && central.includes('label: "Registros a localizar"'))
 
 check("painel renderiza a lista de tarefas", painel.includes("<ListaDeTarefas") && painel.includes("function ListaDeTarefas"))
 check("painel agrupa em Pendentes / Em andamento / Concluídas", painel.includes('titulo: "Pendentes"') && painel.includes('titulo: "Em andamento"') && painel.includes('titulo: "Concluídas"'))

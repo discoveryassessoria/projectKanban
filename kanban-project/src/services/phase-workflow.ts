@@ -23,9 +23,12 @@ import {
   construirSnapshotWorkflow,
   construirSnapshotPasso,
   normalizarModoExecucao,
-  normalizarEscopoPasso,
+  normalizarCardinalidade,
+  type Cardinalidade,
 } from "@/src/services/phase-workflow-helpers"
-import { planejarMaterializacao, type ContextoEscopo, type AlvoDePasso } from "@/src/services/phase-workflow-escopo"
+import { planejarMaterializacao, cardinalidadeEfetiva, type ContextoEscopo, type AlvoDePasso } from "@/src/services/phase-workflow-escopo"
+import { garantirNecessidadesArvoreDoProcesso } from "@/src/services/necessidade-documental"
+import { itemCatalogosDeCertidao } from "@/src/lib/documentos/natureza-certidao"
 
 export type OrigemInstanciaStr = "MOTOR" | "MANUAL" | "MIGRACAO" | "REABERTURA"
 
@@ -134,7 +137,7 @@ export async function resolverWorkflowAplicavel(
     id: p.id, key: p.key, label: p.label, description: p.description, ordem: p.ordem,
     createsTask: p.createsTask, required: p.required, owner: p.owner, priority: p.priority,
     slaDays: p.slaDays, completionRule: p.completionRule, checklist: p.checklist, versao: p.versao,
-    escopo: normalizarEscopoPasso(p.escopo),
+    cardinalidade: normalizarCardinalidade(p.cardinalidade),
     tipo: null,
     // A sequência é derivada do MODO DE EXECUÇÃO configurado no workflow, no
     // planejamento (phase-workflow-escopo). Aqui não se decide nada.
@@ -153,31 +156,54 @@ export async function resolverWorkflowAplicavel(
 async function carregarContextoEscopo(
   processoId: number,
   steps: DefStep[],
+  escopoDaFase: Cardinalidade,
   db: Prisma.TransactionClient | typeof prisma,
 ): Promise<ContextoEscopo> {
-  const precisaPessoa = steps.some((s) => s.escopo === "PESSOA")
-  const precisaDocumento = steps.some((s) => s.escopo === "DOCUMENTO")
-  const vazio: ContextoEscopo = { pessoaIds: [], necessidadeIds: [], documentoIdPorNecessidade: new Map() }
-  if (!precisaPessoa && !precisaDocumento) return vazio
+  const cards = new Set(steps.map((st) => cardinalidadeEfetiva(st.cardinalidade, escopoDaFase)))
+  const ctx: ContextoEscopo = { pessoaIds: [], necessidadeIds: [], documentoIds: [], documentoIdPorNecessidade: new Map() }
+  if (cards.size === 1 && cards.has("PROCESSO")) return ctx
 
   const proc = await db.processo.findUnique({ where: { id: processoId }, select: { arvoreId: true } })
 
-  if (precisaPessoa && proc?.arvoreId) {
+  if (cards.has("PESSOA") && proc?.arvoreId) {
     const pessoas = await db.pessoa.findMany({ where: { arvoreId: proc.arvoreId }, select: { id: true }, orderBy: { id: "asc" } })
-    vazio.pessoaIds = pessoas.map((p) => p.id)
+    ctx.pessoaIds = pessoas.map((p) => p.id)
   }
-  if (precisaDocumento) {
-    // Necessidades vivas do processo (superseded não conta). O Documento entra
-    // vinculado quando já existir — sua ausência não impede a instância.
+
+  if (cards.has("NECESSIDADE")) {
+    // ALVOS DA FASE = os registros/certidões a localizar. Eles nascem da REGRA
+    // OFICIAL DA ÁRVORE que já existe (analyzePessoa/DOCUMENT_RULES via
+    // garantirNecessidadesArvoreDoProcesso): toda pessoa precisa de nascimento,
+    // casado precisa de casamento, falecido precisa de óbito. É idempotente e não
+    // cria Documento. Exigir uma Regra Documental publicada só para a fase ter alvo
+    // seria trocar a regra de negócio por uma dependência de cadastro que ela nunca
+    // teve. A Matriz Documental, quando publicada, ACRESCENTA exigências por cima —
+    // as duas origens convivem na mesma NecessidadeDocumental.
+    try {
+      await garantirNecessidadesArvoreDoProcesso(processoId, db)
+    } catch (e) {
+      console.error(`[phase-workflow] geração de necessidades da árvore falhou (proc ${processoId}):`, e)
+    }
+    const certItens = await itemCatalogosDeCertidao(db)
     const necs = await db.necessidadeDocumental.findMany({
       where: { processoId, supersedePorId: null, status: { not: "DISPENSADA" } },
-      select: { id: true, documentos: { select: { id: true }, take: 1, orderBy: { id: "asc" } } },
+      select: { id: true, itemCatalogoId: true, documentos: { select: { id: true }, take: 1, orderBy: { id: "asc" } } },
       orderBy: { id: "asc" },
     })
-    vazio.necessidadeIds = necs.map((n) => n.id)
-    for (const n of necs) if (n.documentos[0]) vazio.documentoIdPorNecessidade.set(n.id, n.documentos[0].id)
+    // Só CERTIDÕES entram como alvo de localização registral (natureza estruturada).
+    const certidoes = necs.filter((n) => certItens.has(n.itemCatalogoId))
+    ctx.necessidadeIds = certidoes.map((n) => n.id)
+    for (const n of certidoes) if (n.documentos[0]) ctx.documentoIdPorNecessidade.set(n.id, n.documentos[0].id)
   }
-  return vazio
+
+  if (cards.has("DOCUMENTO") && proc?.arvoreId) {
+    const docs = await db.documento.findMany({
+      where: { pessoa: { arvoreId: proc.arvoreId }, status: { not: "CANCELADO" } },
+      select: { id: true }, orderBy: { id: "asc" },
+    })
+    ctx.documentoIds = docs.map((d) => d.id)
+  }
+  return ctx
 }
 
 /**
@@ -205,10 +231,30 @@ async function materializarAlvos(
       documentoId: a.documentoId, pessoaId: a.pessoaId, necessidadeId: a.necessidadeId,
     }),
   )
-  const jaExistem = chaves.length
-    ? await tx.phaseWorkflowStepInstance.findMany({ where: { chaveIdempotencia: { in: chaves } } })
+  // CONVERGÊNCIA POR IDENTIDADE LÓGICA, não só pela string da chave. O passo de uma
+  // necessidade pode ter sido criado por outro caminho oficial (a materialização
+  // documental usa a chave `matdoc|...`). Reconhecer o que já existe pelo par
+  // (stepKey, entidade, ciclo) é o que impede DUAS tarefas para o mesmo alvo.
+  const jaExistem = alvos.length
+    ? await tx.phaseWorkflowStepInstance.findMany({
+        where: {
+          workflowInstanceId: ctx.instanciaId,
+          ciclo: ctx.ciclo,
+          stepKey: { in: [...new Set(alvos.map((a) => a.def.key))] },
+          status: { notIn: ["SUPERSEDIDO", "CANCELADO"] },
+        },
+      })
     : []
-  const porChave = new Map(jaExistem.map((s) => [s.chaveIdempotencia, s]))
+  const idLogica = (x: { stepKey: string; pessoaId: number | null; necessidadeId: number | null; documentoId: number | null }) =>
+    `${x.stepKey}|p${x.pessoaId ?? "-"}|n${x.necessidadeId ?? "-"}|d${x.documentoId ?? "-"}`
+  const porChave = new Map<string, (typeof jaExistem)[number]>()
+  for (const e of jaExistem) {
+    porChave.set(e.chaveIdempotencia, e)
+    porChave.set(idLogica(e), e)
+    // Passo criado por outro caminho ANTES de o Documento existir fica com
+    // documentoId=null; o alvo atual já traz o Documento. É o mesmo trabalho.
+    if (e.necessidadeId != null) porChave.set(`${e.stepKey}|p-|n${e.necessidadeId}|d-`, e)
+  }
 
   const criados: PhaseWorkflowStepInstance[] = []
   const existentes: PhaseWorkflowStepInstance[] = []
@@ -216,7 +262,10 @@ async function materializarAlvos(
   for (let i = 0; i < alvos.length; i++) {
     const a = alvos[i]
     const chavePasso = chaves[i]
-    const existente = porChave.get(chavePasso)
+    const existente =
+      porChave.get(chavePasso) ??
+      porChave.get(idLogica({ stepKey: a.def.key, pessoaId: a.pessoaId, necessidadeId: a.necessidadeId, documentoId: a.documentoId })) ??
+      (a.necessidadeId != null ? porChave.get(`${a.def.key}|p-|n${a.necessidadeId}|d-`) : undefined)
     if (existente) { existentes.push(existente); continue }
 
     const tipoRes = mapearTipoPasso(a.def)
@@ -265,7 +314,7 @@ async function materializarAlvos(
         }),
         dados: {
           stepKey: a.def.key, ordem: a.def.ordem, tipo: tipoRes.tipo, ciclo: ctx.ciclo,
-          escopo: a.escopo, pessoaId: a.pessoaId, necessidadeId: a.necessidadeId, documentoId: a.documentoId,
+          cardinalidade: a.cardinalidade, pessoaId: a.pessoaId, necessidadeId: a.necessidadeId, documentoId: a.documentoId,
         },
       },
     })
@@ -338,8 +387,13 @@ export async function instanciarWorkflowDaFase(
   // PLANO DE MATERIALIZAÇÃO — o que a CONFIGURAÇÃO publicada manda existir.
   // Calculado antes da transação de escrita e reusado pelos dois caminhos (instância
   // nova e instância já existente), para que os dois convirjam para o mesmo estado.
-  const ctxEscopo = await carregarContextoEscopo(processo.id, steps, db)
-  const plano = planejarMaterializacao(steps, workflow.execucao, ctxEscopo)
+  // ESCOPO OPERACIONAL CANÔNICO da fase (fases-catalog): é a declaração oficial de
+  // por qual entidade a fase opera. O passo pode sobrepor no cadastro; sem sobreposição,
+  // herda daqui. Fase fora do catálogo cai em PROCESSO (1 instância por fase/ciclo).
+  const faseCodeMat = phaseKeyToFaseCode(input.faseMacroKey)
+  const escopoDaFase: Cardinalidade = faseCodeMat ? (FASES[faseCodeMat].scope as Cardinalidade) : "PROCESSO"
+  const ctxEscopo = await carregarContextoEscopo(processo.id, steps, escopoDaFase, db)
+  const plano = planejarMaterializacao(steps, workflow.execucao, escopoDaFase, ctxEscopo)
   const avisos = [...val.warnings, ...plano.avisos]
 
   const corpo = async (tx: Prisma.TransactionClient): Promise<InstanciarResultado> => {
