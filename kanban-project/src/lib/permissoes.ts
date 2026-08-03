@@ -25,6 +25,10 @@ export const PERMISSOES = {
   'processos.excluir_coluna': 'Excluir colunas no kanban',
   'processos.ver_paginas': 'Ver páginas específicas (Protocolos/Informações)',
   'processos.editar_paginas': 'Editar páginas específicas',
+  // REGULARIZAÇÃO HISTÓRICA — cadastrar processo já em fase avançada e completar
+  // depois as fases anteriores. Mexe em histórico: é EXCLUSIVA (ver PERMISSOES_EXCLUSIVAS),
+  // não vem por perfil padrão nem por ser tipo=admin. Só por concessão nominal.
+  'processos.regularizarHistorico': 'Regularização histórica: cadastrar processo em fase avançada e completar fases anteriores',
 
   // Clientes/Cadastros
   'clientes.ver': 'Ver contratantes e requerentes',
@@ -262,6 +266,21 @@ export const MODULOS_PERMISSOES = [
 // "admin tem tudo", nem pelos perfis padrão (TODAS_PERMISSOES). Só valem se atribuídas
 // EXPLICITAMENTE no perfil ou nas permissões custom do usuário. Autorização por PERMISSÃO,
 // nunca por tipo de usuário.
+/**
+ * Permissões EXCLUSIVAS: nem o `tipo === 'admin'` as recebe por ser admin.
+ *
+ * As OPT-IN abaixo já ficam fora dos perfis padrão, mas `calcularPermissoes` liga
+ * TUDO para quem é `tipo='admin'` — ou seja, "admin" (um texto no cadastro) ainda
+ * seria a autorização de fato. Para uma operação que reescreve histórico isso não
+ * serve: a autorização tem de ser uma concessão NOMINAL, verificável e auditável.
+ *
+ * Uma permissão exclusiva só vale quando o perfil ou as permissões custom do usuário
+ * a concedem com `true` de forma explícita.
+ */
+export const PERMISSOES_EXCLUSIVAS = new Set<string>([
+  'processos.regularizarHistorico',
+])
+
 export const PERMISSOES_OPT_IN = new Set<string>([
   'sistema.exclusaoDefinitiva',
   'financeiro.dataCorte',
@@ -272,7 +291,7 @@ export const PERMISSOES_OPT_IN = new Set<string>([
 
 // Todas as permissões ligadas — EXCETO as opt-in (que exigem concessão explícita).
 const TODAS_PERMISSOES = Object.keys(PERMISSOES).reduce((acc, key) => {
-  acc[key] = !PERMISSOES_OPT_IN.has(key)
+  acc[key] = !PERMISSOES_OPT_IN.has(key) && !PERMISSOES_EXCLUSIVAS.has(key)
   return acc
 }, {} as Record<string, boolean>)
 
@@ -394,8 +413,10 @@ export function calcularPermissoes(
   // como exclusão definitiva). Usuário comum começa com tudo false e só recebe o que perfil/custom
   // conceder; PERMISSOES_OPT_IN mantém essas permissões FORA dos perfis padrão (TODAS_PERMISSOES),
   // então um não-admin só as obtém por concessão EXPLÍCITA.
+  // EXCLUSIVAS ficam FALSE na base mesmo para admin: quem as concede é o cadastro
+  // (perfil/custom), nominalmente. "ser admin" não é autorização para reescrever histórico.
   const resultado: MapaPermissoes = Object.keys(PERMISSOES).reduce((acc, key) => {
-    acc[key] = tipo === 'admin' ? true : false
+    acc[key] = tipo === 'admin' && !PERMISSOES_EXCLUSIVAS.has(key)
     return acc
   }, {} as MapaPermissoes)
 

@@ -114,6 +114,7 @@ check("etapa sem item aplicável NÃO se declara 'em andamento'", rota.includes(
 
 check("Central semeia as linhas pelo roster, não pela fila", central.includes("const roster = data.pessoas ?? []") && central.includes("for (const r of roster) porPessoa.set(r.pessoaId, linhaDoRoster(r))"))
 check("Central expõe o grupo 'pendente de classificação'", central.includes("pendenteClassificacao"))
+check("tabela de pessoas não repete o trabalho do workflow", painel.includes("PESSOAS DO PROCESSO (contexto"))
 check("Central repassa as tarefas ao painel", central.includes("tarefas={bodyData.tarefas ?? []}"))
 check("Central tem handler único de abertura de tarefa", central.includes("const abrirTarefa = useCallback"))
 check("abrir tarefa usa a operação oficial (sem rota legada)", /abrirOperacao\(t\.documentoId \?\? 0, t\.necessidadeId\)/.test(central))
@@ -139,7 +140,8 @@ const CONDICOES_PROIBIDAS: Array<[string, RegExp]> = [
 for (const [nome, re] of CONDICOES_PROIBIDAS) {
   check(`sem condição incorreta: ${nome}`, !re.test(central) && !re.test(painel) && !re.test(rota))
 }
-check("botão 'Abrir' da pessoa não é morto (não depende de docs.length)", !painel.includes("p.docs.length && (setExp(true))"))
+check("linha da pessoa é CONTEXTO, sem tarefas duplicadas", !painel.includes("p.docs.map") && !painel.includes("Abrir operação"))
+check("Operação Antecipada preservada, agora na instância do passo", painel.includes("+ antecipada") && painel.includes("onNovaOperacao(t.necessidadeId"))
 
 // Timeline: executar a tarefa pela Central tem de deixar rastro no Diário Operacional.
 const opDoc = read("src/services/documento-operacao.ts")

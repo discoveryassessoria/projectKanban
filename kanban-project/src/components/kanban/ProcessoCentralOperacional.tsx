@@ -948,13 +948,8 @@ export function ProcessoCentralOperacional({
             tarefas={bodyData.tarefas ?? []}
             onAbrirTarefa={readOnly ? undefined : abrirTarefa}
             readOnly={readOnly}
-            onAbrirOperacao={readOnly ? undefined : (docId, necessidadeId) => { setBannerAntecipada(null); void abrirOperacao(docId, necessidadeId) }}
             usuarios={usuarios}
-            onDelegar={readOnly ? undefined : (necessidadeId, responsavelId) => { void delegar(necessidadeId, responsavelId) }}
             onNovaOperacao={readOnly ? undefined : (necessidadeId, pessoaIdNec, label) => setNovaOperacaoCtx({ necessidadeId, pessoaId: pessoaIdNec, label })}
-            operacoesPorNec={operacoesPorNec}
-            onAvaliarOperacao={readOnly ? undefined : avaliarOperacao}
-            onAbrirOperacaoAntecipada={readOnly ? undefined : abrirOperacaoAntecipada}
             modoReestruturacao={!!bodyData.genealogiaReestruturacao}
             avisoReestruturacao={bodyData.mensagemReestruturacao ?? undefined}
           />

@@ -29,7 +29,7 @@ const MIGRATION = join(DIR_MIGRATIONS, '0000_baseline', 'migration.sql')
  * Mudar esta constante NAO conserta nada por si so: o ledger de producao
  * precisa ser reconciliado no mesmo movimento, de forma explicita e auditada.
  */
-const CHECKSUM_LEDGER = '8e30b94b9fa9100f2c993f93dfdae320a06ddc836246a217345ae48c45a72a47'
+const CHECKSUM_LEDGER = 'b0021b6e4e9b6ba07a137c271f8229bc122b6f6aaa4838402be09beb7e3ce4a3'
 
 /**
  * Migrations criadas DEPOIS da consolidacao de 02/08/2026. Toda migration nova
@@ -39,6 +39,7 @@ const CHECKSUM_LEDGER = '8e30b94b9fa9100f2c993f93dfdae320a06ddc836246a217345ae48
 const MIGRATIONS_POS_BASELINE: string[] = [
   '20260803_workflow_escopo_execucao',
   '20260803b_cardinalidade_passo',
+  '20260803c_regularizacao_historica',
 ]
 
 const sha256 = (t: string) => createHash('sha256').update(t).digest('hex')

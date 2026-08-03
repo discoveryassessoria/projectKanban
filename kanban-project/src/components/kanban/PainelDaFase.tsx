@@ -172,17 +172,12 @@ export interface PainelDaFaseProps {
   tarefas?: FaseTarefaRow[]
   /** Abre a tarefa na tela oficial da operação. undefined ⇒ só leitura. */
   onAbrirTarefa?: (t: FaseTarefaRow) => void
-  onAbrirOperacao?: (docId: number, necessidadeId?: number | null) => void
   onAbrirPainelCompleto?: () => void
   // Delegação direto na fila (Genealogia): lista de funcionários + callback.
   usuarios?: Array<{ id: number; nome: string; publicCode?: string | null }>
-  onDelegar?: (necessidadeId: number, responsavelId: number | null) => void
   // Operação Antecipada: capacidade nativa — usa a operação oficial de outra fase p/ atender esta necessidade.
   onNovaOperacao?: (necessidadeId: number, pessoaId: number | null, label: string) => void
   // Operações antecipadas existentes por necessidade — exibidas INLINE dentro do documento.
-  operacoesPorNec?: Map<number, OpAntecipadaInline[]>
-  onAvaliarOperacao?: AvaliarFn
-  onAbrirOperacaoAntecipada?: (op: OpAntecipadaInline) => void
   // CONSULTA de fase passada (PAST_READ_ONLY): mesmo layout/dados, mas SEM ações de
   // mutação (abrir operação/delegar). Só leitura. onAbrirOperacao/onDelegar chegam
   // undefined; readOnly deixa a intenção explícita para a UI.
@@ -214,14 +209,9 @@ export function PainelDaFase({
   pendenteClassificacao = [],
   tarefas = [],
   onAbrirTarefa,
-  onAbrirOperacao,
   onAbrirPainelCompleto,
   usuarios,
-  onDelegar,
   onNovaOperacao,
-  operacoesPorNec,
-  onAvaliarOperacao,
-  onAbrirOperacaoAntecipada,
   readOnly = false,
   modoReestruturacao = false,
   avisoReestruturacao,
@@ -325,32 +315,29 @@ export function PainelDaFase({
         )}
 
         {/* --- TAREFAS DA FASE (lista operacional real) --- */}
-        <WorkflowDaFase tarefas={tarefas} onAbrir={onAbrirTarefa} readOnly={readOnly} faseNome={faseNome} />
+        <WorkflowDaFase tarefas={tarefas} onAbrir={onAbrirTarefa} onNovaOperacao={onNovaOperacao} readOnly={readOnly} faseNome={faseNome} />
 
-        {/* --- TABELA POR PESSOA --- */}
+        {/* --- PESSOAS DO PROCESSO (contexto, não fila de trabalho) ---
+            O trabalho por pessoa/certidão vive DENTRO do passo do workflow, acima.
+            Repetir aqui as mesmas tarefas criava duas listas para a mesma coisa —
+            e duas listas divergem. Aqui ficam só quem são as pessoas, onde estão na
+            linha de transmissão e o que falta no cadastro delas. */}
         <div className="border border-white/10 rounded-xl overflow-hidden">
           {/* Cabeçalho de colunas */}
           <div
             className="grid items-center gap-2.5 px-5 py-2.5 text-[10px] font-bold text-white/40 uppercase tracking-wider bg-[#20262e] border-b border-white/10"
-            style={{ gridTemplateColumns: "52px minmax(160px,1.6fr) 1fr 1.2fr 1fr 0.7fr 1.2fr 124px" }}
+            style={{ gridTemplateColumns: "52px minmax(200px,2fr) 1.2fr 1.6fr" }}
           >
             <div />
             <div>
               PESSOA
-              <div className="text-[9px] font-semibold text-white/25 normal-case tracking-normal mt-0.5">Linha / Código</div>
+              <div className="text-[9px] font-semibold text-white/25 normal-case tracking-normal mt-0.5">Posição / Código</div>
             </div>
             <div>
               TRANSMISSÃO
               <div className="text-[9px] font-semibold text-white/25 normal-case tracking-normal mt-0.5">Status</div>
             </div>
-            <div>
-              DOCUMENTOS
-              <div className="text-[9px] font-semibold text-white/25 normal-case tracking-normal mt-0.5">Solicitados / Recebidos</div>
-            </div>
-            <div>RESPONSÁVEL</div>
-            <div>PRAZO</div>
-            <div>PRÓXIMA AÇÃO</div>
-            <div className="text-right">AÇÃO</div>
+            <div>PENDÊNCIA DE CADASTRO</div>
           </div>
 
           {/* Grupo Linha Principal */}
@@ -361,7 +348,7 @@ export function PainelDaFase({
             tone="linha"
           />
           {linhaPrincipal.map((p) => (
-            <PersonRow key={p.pessoaId} p={p} onAbrirOperacao={onAbrirOperacao} usuarios={usuarios} onDelegar={onDelegar} onNovaOperacao={onNovaOperacao} operacoesPorNec={operacoesPorNec} onAvaliarOperacao={onAvaliarOperacao} onAbrirOperacaoAntecipada={onAbrirOperacaoAntecipada} ocultarValidacao={modoReestruturacao} readOnly={readOnly} />
+            <PersonRow key={p.pessoaId} p={p} />
           ))}
 
           {/* Grupo Fora da linhagem */}
@@ -372,7 +359,7 @@ export function PainelDaFase({
             tone="fora"
           />
           {foraDaLinha.map((p) => (
-            <PersonRow key={p.pessoaId} p={p} onAbrirOperacao={onAbrirOperacao} usuarios={usuarios} onDelegar={onDelegar} onNovaOperacao={onNovaOperacao} operacoesPorNec={operacoesPorNec} onAvaliarOperacao={onAvaliarOperacao} onAbrirOperacaoAntecipada={onAbrirOperacaoAntecipada} ocultarValidacao={modoReestruturacao} readOnly={readOnly} />
+            <PersonRow key={p.pessoaId} p={p} />
           ))}
 
           {/* Grupo Pendente de classificação — só aparece quando há inconsistência
@@ -386,7 +373,7 @@ export function PainelDaFase({
                 tone="pendente"
               />
               {pendenteClassificacao.map((p) => (
-                <PersonRow key={p.pessoaId} p={p} onAbrirOperacao={onAbrirOperacao} usuarios={usuarios} onDelegar={onDelegar} onNovaOperacao={onNovaOperacao} operacoesPorNec={operacoesPorNec} onAvaliarOperacao={onAvaliarOperacao} onAbrirOperacaoAntecipada={onAbrirOperacaoAntecipada} ocultarValidacao={modoReestruturacao} readOnly={readOnly} />
+                <PersonRow key={p.pessoaId} p={p} />
               ))}
             </>
           )}
@@ -427,11 +414,13 @@ function resumirPasso(instancias: FaseTarefaRow[]) {
 function WorkflowDaFase({
   tarefas,
   onAbrir,
+  onNovaOperacao,
   readOnly,
   faseNome,
 }: {
   tarefas: FaseTarefaRow[]
   onAbrir?: (t: FaseTarefaRow) => void
+  onNovaOperacao?: (necessidadeId: number, pessoaId: number | null, label: string) => void
   readOnly: boolean
   faseNome: string
 }) {
@@ -471,7 +460,7 @@ function WorkflowDaFase({
           </div>
         </div>
       ) : (
-        passos.map((p) => <PassoDoWorkflow key={p.stepKey} passo={p} onAbrir={onAbrir} readOnly={readOnly} />)
+        passos.map((p) => <PassoDoWorkflow key={p.stepKey} passo={p} onAbrir={onAbrir} onNovaOperacao={onNovaOperacao} readOnly={readOnly} />)
       )}
     </div>
   )
@@ -480,10 +469,12 @@ function WorkflowDaFase({
 function PassoDoWorkflow({
   passo,
   onAbrir,
+  onNovaOperacao,
   readOnly,
 }: {
   passo: { stepKey: string; titulo: string; instancias: FaseTarefaRow[] }
   onAbrir?: (t: FaseTarefaRow) => void
+  onNovaOperacao?: (necessidadeId: number, pessoaId: number | null, label: string) => void
   readOnly: boolean
 }) {
   const r = resumirPasso(passo.instancias)
@@ -525,7 +516,7 @@ function PassoDoWorkflow({
       {exp && (
         <div className="bg-[#15191f] border-t border-white/10">
           {passo.instancias.map((t) => (
-            <InstanciaDoPasso key={t.stepInstanceId} t={t} onAbrir={onAbrir} readOnly={readOnly} />
+            <InstanciaDoPasso key={t.stepInstanceId} t={t} onAbrir={onAbrir} onNovaOperacao={onNovaOperacao} readOnly={readOnly} />
           ))}
         </div>
       )}
@@ -537,10 +528,12 @@ function PassoDoWorkflow({
 function InstanciaDoPasso({
   t,
   onAbrir,
+  onNovaOperacao,
   readOnly,
 }: {
   t: FaseTarefaRow
   onAbrir?: (t: FaseTarefaRow) => void
+  onNovaOperacao?: (necessidadeId: number, pessoaId: number | null, label: string) => void
   readOnly: boolean
 }) {
   const podeAbrir = !readOnly && !!onAbrir && !!t.executor
@@ -594,7 +587,22 @@ function InstanciaDoPasso({
         )}
       </span>
 
-      <span className="flex justify-end">
+      <span className="flex justify-end items-center gap-2">
+        {/* OPERAÇÃO ANTECIPADA — vive AQUI, junto do alvo a que se refere. Antes ficava
+            na linha do documento dentro da tabela por pessoa; com o trabalho todo no
+            workflow, este é o lugar dela. */}
+        {!readOnly && onNovaOperacao && t.necessidadeId != null && !concluida && (
+          <span
+            role="button"
+            tabIndex={0}
+            title="Nova operação antecipada"
+            onClick={(e) => { e.stopPropagation(); onNovaOperacao(t.necessidadeId as number, t.pessoaId, `${t.assunto ?? t.titulo} — ${t.pessoaNome ?? ""}`.trim()) }}
+            onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.stopPropagation(); e.preventDefault(); onNovaOperacao(t.necessidadeId as number, t.pessoaId, `${t.assunto ?? t.titulo} — ${t.pessoaNome ?? ""}`.trim()) } }}
+            className="text-[11px] font-semibold text-white/40 hover:text-[#7dd3fc] underline decoration-dotted underline-offset-2 cursor-pointer"
+          >
+            + antecipada
+          </span>
+        )}
         {podeAbrir ? (
           <span className="inline-flex items-center gap-1.5 bg-[#252c35] text-white/95 border border-white/10 text-[12px] font-bold px-3 py-1.5 rounded-lg">
             {concluida ? "Ver" : "Abrir"} <ChevronRight className="w-3 h-3" />
@@ -633,38 +641,17 @@ function GroupBar({
   )
 }
 
-function PersonRow({
-  p,
-  onAbrirOperacao,
-  usuarios,
-  onDelegar,
-  onNovaOperacao,
-  operacoesPorNec,
-  onAvaliarOperacao,
-  onAbrirOperacaoAntecipada,
-  ocultarValidacao = false,
-  readOnly = false,
-}: {
-  p: FasePersonRow
-  onAbrirOperacao?: (docId: number, necessidadeId?: number | null) => void
-  usuarios?: Array<{ id: number; nome: string; publicCode?: string | null }>
-  onDelegar?: (necessidadeId: number, responsavelId: number | null) => void
-  onNovaOperacao?: (necessidadeId: number, pessoaId: number | null, label: string) => void
-  operacoesPorNec?: Map<number, OpAntecipadaInline[]>
-  onAvaliarOperacao?: AvaliarFn
-  onAbrirOperacaoAntecipada?: (op: OpAntecipadaInline) => void
-  ocultarValidacao?: boolean
-  readOnly?: boolean
-}) {
-  const [exp, setExp] = useState(false)
-
+// ------------------------------------------------------------
+// PESSOA — CONTEXTO, não fila de trabalho
+// ------------------------------------------------------------
+// O que esta linha responde: quem é a pessoa, onde ela está na linha de transmissão
+// e se o cadastro dela tem pendência. O TRABALHO dela (buscar o registro, solicitar
+// a certidão) aparece dentro do passo do workflow, junto com todos os outros alvos
+// daquele passo. Duas listas para o mesmo trabalho divergem; esta deixou de ser uma.
+function PersonRow({ p }: { p: FasePersonRow }) {
   const borderCls = !p.isLinha
     ? "border-l-[3px] border-white/10 bg-[#15191f]"
-    : p.transmissao.state === "BLOQUEADA"
-    ? "border-l-[3px] border-white/10"
-    : p.transmissao.state === "OK"
-    ? "border-l-[3px] border-white/10"
-    : "border-l-[3px] border-transparent"
+    : "border-l-[3px] border-white/10"
 
   const transDot =
     p.transmissao.state === "OK" ? "bg-[#4ade80]"
@@ -675,385 +662,54 @@ function PersonRow({
     : p.transmissao.state === "BLOQUEADA" ? "text-[#f87171]"
     : "text-white/40"
 
-  const pctVal = p.total > 0 ? Math.round((p.validados / p.total) * 100) : 0
-
-  // Delegação em nível de pessoa: aplica a TODAS as necessidades dos documentos.
-  const necIds = p.docs.map((d) => d.necessidadeId).filter((v): v is number => v != null)
-  const respIds = new Set(p.docs.map((d) => d.responsavelId ?? null))
-  const commonResp = respIds.size === 1 ? [...respIds][0] : null
-
   return (
-    <>
-      <div
-        className={`grid items-center gap-2.5 px-5 py-3 border-b border-white/10 hover:bg-[#20262e] transition-colors ${borderCls}`}
-        style={{ gridTemplateColumns: "52px minmax(160px,1.6fr) 1fr 1.2fr 1fr 0.7fr 1.2fr 124px" }}
-      >
-        {/* G */}
-        <div className="text-center text-[11px] font-extrabold text-white/55 bg-[#1b2027] border border-white/10 rounded-lg py-1.5 leading-tight">
-          {p.geracao === "Atual" ? (
-            <>
-              <span className="text-[13px]">{p.iniciais}</span>
-              <small className="block text-[8.5px] font-bold text-white/40">Atual</small>
-            </>
-          ) : (
-            p.geracao
-          )}
-        </div>
-
-        {/* Pessoa */}
-        <div className="flex items-center gap-2.5 min-w-0">
-          <div className="w-[34px] h-[34px] rounded-full grid place-items-center text-white font-extrabold text-[12.5px] flex-none bg-[#252c35]">
-            {p.iniciais}
-          </div>
-          <div className="min-w-0">
-            <b className="text-[14px] font-extrabold block leading-tight truncate text-white/95">{p.nome}</b>
-            <span className="text-[11.5px] text-white/40 font-semibold block truncate">
-              {[p.publicCode, p.papel].filter(Boolean).join(" · ")}
-            </span>
-            {p.pendencia && (
-              <span className="text-[11px] text-[#d2a948] font-semibold flex items-center gap-1 mt-0.5">
-                <AlertTriangle className="w-3 h-3 flex-none" />
-                {p.pendencia}
-              </span>
-            )}
-          </div>
-        </div>
-
-        {/* Transmissão */}
-        <div>
-          <div className={`flex items-center gap-1.5 text-[13px] font-bold ${transColor}`}>
-            <span className={`w-2 h-2 rounded-full flex-none ${transDot}`} />
-            {p.transmissao.label}
-          </div>
-          {p.transmissao.sub && (
-            <div className="text-[11.5px] text-white/40 font-medium mt-0.5">{p.transmissao.sub}</div>
-          )}
-        </div>
-
-        {/* Documentos (resumo + barra) */}
-        <div>
-          {p.docsResumo.length === 0 ? (
-            <span className="text-[11.5px] text-white/40">—</span>
-          ) : (
-            p.docsResumo.map((d, i) => (
-              <div key={i} className="grid gap-2 text-[11.5px] leading-relaxed" style={{ gridTemplateColumns: "34px auto" }}>
-                <span className="text-white/55 font-bold">{d.abbr}</span>
-                <span className={`flex items-center gap-1.5 font-semibold ${docCls(d.statusCls)}`}>
-                  <span className={`w-1.5 h-1.5 rounded-full flex-none ${docDot(d.statusCls)}`} />
-                  {d.statusLabel.toLowerCase()}
-                </span>
-              </div>
-            ))
-          )}
-          {!ocultarValidacao && (
-            <div className="flex items-center gap-2 mt-1.5">
-              <span className="text-[11px] font-bold text-white/55">{p.validados} / {p.total}</span>
-              <div className="w-24 h-1 rounded bg-[#252c35] overflow-hidden">
-                <div className="h-full bg-[#7dd3fc]" style={{ width: `${pctVal}%` }} />
-              </div>
-            </div>
-          )}
-        </div>
-
-        {/* Responsável */}
-        <div className="text-[12px]">
-          {p.responsavel ? (
-            <div className="flex items-center gap-1.5 font-bold text-white/85">
-              <span className="w-1.5 h-1.5 rounded-full bg-white/25 flex-none" />
-              {p.responsavel}
-            </div>
-          ) : (
-            <div className="flex items-center gap-1.5 text-white/60 font-semibold">
-              <UserRound className="w-3.5 h-3.5 flex-none" />
-              Sem responsável
-            </div>
-          )}
-          {!readOnly && onDelegar && usuarios && usuarios.length > 0 && necIds.length > 0 && (
-            <select
-              value={commonResp ?? ""}
-              onChange={(e) => {
-                const v = e.target.value ? Number(e.target.value) : null
-                necIds.forEach((nid) => onDelegar(nid, v))
-              }}
-              onClick={(e) => e.stopPropagation()}
-              className={`mt-1 text-[12px] rounded-md border px-1.5 py-1 bg-[#1b2027] max-w-[150px] focus:outline-none focus:border-[#7dd3fc]/50 focus:ring-1 focus:ring-[#7dd3fc]/25 ${commonResp ? "text-white/80 border-white/10" : "text-white/40 border-dashed border-white/15"}`}
-              title="Delegar responsável"
-            >
-              <option value="">Delegar…</option>
-              {usuarios.map((u) => (
-                <option key={u.id} value={u.id}>{u.publicCode ? u.publicCode + ' — ' : ''}{u.nome}</option>
-              ))}
-            </select>
-          )}
-        </div>
-
-        {/* Prazo — vazio para a linha da pessoa */}
-        <div />
-
-        {/* Próxima ação — ação + subtítulo */}
-        <div>
-          {p.proximaAcao?.txt ? (
-            <>
-              <div className="flex items-center gap-1.5">
-                {p.proximaAcao.cls === "crit" && <Ban className="text-[#f87171] w-3.5 h-3.5 flex-none" />}
-                <span className="text-white/90 font-semibold text-[13px]">{p.proximaAcao.txt}</span>
-              </div>
-              <div className="text-[11px] text-white/40 mt-0.5">{p.proximaAcao.sub || "Aguardando solicitação"}</div>
-            </>
-          ) : (
-            <span className="text-white/40">—</span>
-          )}
-        </div>
-
-        {/* Ação */}
-        {/* "Abrir" NUNCA é botão morto: abre o painel operacional da pessoa mesmo sem
-            documento/necessidade — lá dentro o estado vazio explica o porquê. Antes
-            `p.docs.length && setExp(true)` deixava o botão inerte justamente no caso
-            em que o operador mais precisa de resposta. */}
-        <div className="flex items-center justify-end gap-1.5">
-          <button
-            onClick={() => setExp(!exp)}
-            className="inline-flex items-center gap-1.5 bg-[#12161c] text-white text-[12.5px] font-bold px-3.5 py-2 rounded-lg hover:bg-[#20262e] transition-colors"
-          >
-            {exp ? "Fechar" : "Abrir"}
-            {exp ? <ChevronDown className="w-3 h-3" /> : <ChevronRight className="w-3 h-3" />}
-          </button>
-        </div>
+    <div
+      className={`grid items-center gap-2.5 px-5 py-3 border-b border-white/10 last:border-b-0 ${borderCls}`}
+      style={{ gridTemplateColumns: "52px minmax(200px,2fr) 1.2fr 1.6fr" }}
+    >
+      {/* Geração */}
+      <div className="text-center text-[11px] font-extrabold text-white/55 bg-[#1b2027] border border-white/10 rounded-lg py-1.5 leading-tight">
+        {p.geracao}
       </div>
 
-      {/* Painel operacional da pessoa — necessidades/documentos dela. Vazio explicado. */}
-      {exp && p.docs.length === 0 && (
-        <div className="border-t border-white/10 px-5 py-4 bg-[#15191f]">
-          <div className="text-[12.5px] text-white/68">Nenhuma necessidade documental para {p.nome} nesta fase.</div>
-          <div className="text-[11.5px] text-white/40 mt-1 leading-relaxed">
-            As necessidades desta pessoa são materializadas a partir das Regras Documentais
-            publicadas que se aplicam a ela. Enquanto nenhuma se aplicar, não há documento
-            a localizar — e isso não impede o cadastro nem a classificação dela.
-          </div>
+      {/* Pessoa */}
+      <div className="flex items-center gap-2.5 min-w-0">
+        <div className="w-[34px] h-[34px] rounded-full grid place-items-center text-white font-extrabold text-[12.5px] flex-none bg-[#252c35]">
+          {p.iniciais}
         </div>
-      )}
-
-      {/* Linhas expandidas (documentos) */}
-      {exp &&
-        p.docs.map((d) => {
-        const ops = d.necessidadeId != null ? (operacoesPorNec?.get(d.necessidadeId) ?? []) : []
-        return (
-          <div key={d.id}>
-          <div
-            className="grid items-center gap-2.5 border-t border-white/10 py-3 px-5"
-            style={{ gridTemplateColumns: "52px minmax(160px,1.6fr) 1fr 1.2fr 1fr 0.7fr 1.2fr 124px" }}
-          >
-            {/* (1) G — vazio */}
-            <div />
-
-            {/* (2) Pessoa — nome do doc (indenta sob Pessoa) */}
-            <div className="flex items-center gap-2.5">
-              <div className="w-7 h-7 rounded-lg bg-[#1b2027] border border-white/10 grid place-items-center text-white/55 flex-none">
-                <FileText className="w-3.5 h-3.5" />
-              </div>
-              <div className="min-w-0">
-                <b className="text-[13px] font-bold block leading-tight">{d.tipoLabel}</b>
-                <span className="text-[11px] text-white/40">{d.subtitulo || "Inteiro teor"}</span>
-              </div>
-            </div>
-
-            {/* (3) Transmissão — vazio */}
-            <div />
-
-            {/* (4) Documentos — vazio */}
-            <div />
-
-            {/* (5) Responsável — "Sem responsável" + seletor de delegação */}
-            <div className="text-[12px]">
-              {d.responsavel ? (
-                <div className="flex items-center gap-1.5 font-semibold text-white/80">
-                  <span className="w-1.5 h-1.5 rounded-full bg-white/25 flex-none" />
-                  {d.responsavel}
-                </div>
-              ) : (
-                <div className="flex items-center gap-1.5 text-white/60 font-semibold">
-                  <UserRound className="w-3.5 h-3.5 flex-none" />
-                  Sem responsável
-                </div>
-              )}
-              {onDelegar && usuarios && usuarios.length > 0 && d.necessidadeId != null ? (
-                <select
-                  value={d.responsavelId ?? ""}
-                  onChange={(e) => onDelegar(d.necessidadeId as number, e.target.value ? Number(e.target.value) : null)}
-                  onClick={(e) => e.stopPropagation()}
-                  className={`mt-1 text-[12px] rounded-md border px-1.5 py-1 bg-[#1b2027] max-w-[150px] focus:outline-none focus:border-[#7dd3fc]/50 focus:ring-1 focus:ring-[#7dd3fc]/25 ${d.responsavelId ? "text-white/80 border-white/10" : "text-white/40 border-dashed border-white/15"}`}
-                  title="Delegar responsável"
-                >
-                  <option value="">Delegar…</option>
-                  {usuarios.map((u) => (
-                    <option key={u.id} value={u.id}>{u.publicCode ? u.publicCode + ' — ' : ''}{u.nome}</option>
-                  ))}
-                </select>
-              ) : null}
-            </div>
-
-            {/* (6) Prazo — SLA + rótulo */}
-            <div>
-              {d.sla ? (
-                <>
-                  <div className="flex items-center gap-1.5 text-[12px] text-white/80">
-                    <CalendarDays className="w-3.5 h-3.5 text-white/40 flex-none" />
-                    {d.sla}
-                  </div>
-                  <div className="text-[11px] text-white/40 mt-0.5">Prazo</div>
-                </>
-              ) : (
-                <span className="text-[12px] text-white/40">—</span>
-              )}
-            </div>
-
-            {/* (7) Próxima ação — botão "+ Operação antecipada" */}
-            <div>
-              {!readOnly && onNovaOperacao && d.necessidadeId != null && !d.emissaoConcluida && (
-                <button
-                  onClick={() => onNovaOperacao(d.necessidadeId as number, p.pessoaId ?? null, `${d.tipoLabel}${d.subtitulo ? " · " + d.subtitulo : ""} — ${p.nome}`)}
-                  title="Nova operação antecipada"
-                  className="text-[11px] font-semibold text-white/55 hover:text-[#7dd3fc] underline decoration-dotted underline-offset-2"
-                >
-                  + Operação antecipada
-                </button>
-              )}
-            </div>
-
-            {/* (8) Ação — botão abrir/ver/somente leitura */}
-            <div className="flex justify-end items-center gap-2">
-              {readOnly || !onAbrirOperacao ? (
-                <span className="text-[11px] font-semibold text-white/40 px-3 py-2">Somente leitura</span>
-              ) : (
-                <button
-                  onClick={() => onAbrirOperacao(d.id, d.necessidadeId)}
-                  className={`text-[12px] font-bold px-3 py-2 rounded-lg transition-colors ${
-                    d.emissaoConcluida
-                      ? "border border-white/10 text-white/80 bg-[#1b2027] hover:bg-[#20262e]"
-                      : "bg-[#252c35] text-white/95 border border-white/10 hover:bg-[#2d353f]"
-                  }`}
-                >
-                  {d.emissaoConcluida ? "Ver workflow" : "Abrir operação"}
-                </button>
-              )}
-            </div>
-          </div>
-          {ops.length > 0 && (
-            <OperacoesAntecipadasInline ops={ops} readOnly={readOnly} onAvaliar={onAvaliarOperacao} onAbrir={onAbrirOperacaoAntecipada} />
-          )}
-          </div>
-        )})}
-    </>
-  )
-}
-
-const ST_OP_LABEL: Record<string, { t: string; c: string }> = {
-  CRIADA: { t: "Criada", c: "bg-[#252c35] text-white/68" },
-  EM_EXECUCAO: { t: "Em execução", c: "bg-[#7dd3fc]/15 text-[#7dd3fc]" },
-  AGUARDANDO_RESULTADO: { t: "Aguardando avaliação", c: "bg-[#d2a948]/15 text-[#d2a948]" },
-  CONCLUIDA: { t: "Concluída", c: "bg-[#4ade80]/15 text-[#4ade80]" },
-  CONCLUIDA_PARCIAL: { t: "Concluída parcial", c: "bg-teal-500/15 text-teal-300" },
-  NAO_ATINGIDA: { t: "Não atingida", c: "bg-[#f87171]/15 text-[#f87171]" },
-  CANCELADA: { t: "Cancelada", c: "bg-[#252c35] text-white/40" },
-}
-
-// OPERAÇÕES ANTECIPADAS de UMA necessidade — linha COMPACTA (objetivo · operação vinculada ·
-// status da operação oficial · Abrir operação). NUNCA mostra o workflow inteiro aqui.
-function OperacoesAntecipadasInline({ ops, readOnly, onAvaliar, onAbrir }: {
-  ops: OpAntecipadaInline[]
-  readOnly?: boolean
-  onAvaliar?: AvaliarFn
-  onAbrir?: (op: OpAntecipadaInline) => void
-}) {
-  const abertas = ops.filter((o) => !o.encerrada).length
-  return (
-    <div className="pr-5 pb-2" style={{ paddingLeft: 76 }}>
-      <div className="rounded-lg border border-[#a78bfa]/25 bg-[#a78bfa]/12 overflow-hidden">
-        <div className="flex items-center gap-1.5 px-3 py-1.5 border-b border-[#a78bfa]/20 text-[10.5px] font-bold uppercase tracking-wide text-[#a78bfa]">
-          <ArrowLeftRight className="w-3 h-3" /> Operações antecipadas
-          <span className="font-semibold text-[#a78bfa]/70 normal-case tracking-normal">· {ops.length}{abertas > 0 ? ` (${abertas} aberta${abertas > 1 ? "s" : ""})` : ""}</span>
-        </div>
-        <div className="divide-y divide-[#a78bfa]/15">
-          {ops.map((o) => (
-            <OperacaoAntecipadaItem key={o.id} o={o} readOnly={readOnly} onAvaliar={onAvaliar} onAbrir={onAbrir} />
-          ))}
-        </div>
-      </div>
-    </div>
-  )
-}
-
-function OperacaoAntecipadaItem({ o, readOnly, onAvaliar, onAbrir }: {
-  o: OpAntecipadaInline
-  readOnly?: boolean
-  onAvaliar?: AvaliarFn
-  onAbrir?: (op: OpAntecipadaInline) => void
-}) {
-  const [avaliando, setAvaliando] = useState(false)
-  const [resultado, setResultado] = useState("")
-  const [dados, setDados] = useState<Record<string, string>>({})
-  const st = ST_OP_LABEL[o.status] ?? { t: o.status, c: "bg-[#252c35] text-white/68" }
-  const objetivo = o.objetivo || "Operação antecipada"
-  const apoio = !o.vinculavel // documento-alvo diferente do exigido → captura resultado estruturado
-  const setD = (k: string, v: string) => setDados((d) => ({ ...d, [k]: v }))
-  const enviar = (r: ResultadoAvaliacaoUI) => {
-    onAvaliar?.(o.id, r, resultado, r === "SIM" && apoio ? { ...dados } : undefined)
-    setAvaliando(false)
-  }
-
-  return (
-    <div className={`px-3 py-2.5 ${o.encerrada ? "opacity-60" : ""}`}>
-      <div className="flex items-center justify-between gap-3 flex-wrap">
-        <div className="min-w-0 flex items-baseline gap-1.5 flex-wrap">
-          {/* Operação Antecipada é orquestração interna: identificada pelo objetivo/documento/serviço vinculado, sem código público próprio (OPA-n removido). */}
-          <span className="text-[12.5px] font-semibold text-white/95">{objetivo}</span>
-          <span className="text-[11px] text-white/40">
-            {o.operacao.statusLabel}
-            {o.originPhaseCode ? ` · origem ${faseLabel(o.originPhaseCode)}` : ""}
-            {apoio && o.targetTipoDocumentoId ? " · documento de apoio" : ""}
-            {o.responsavel?.nome ? ` · ${o.responsavel.nome}` : ""}
+        <div className="min-w-0">
+          <b className="text-[14px] font-extrabold block leading-tight truncate text-white/95">{p.nome}</b>
+          <span className="text-[11.5px] text-white/40 font-semibold block truncate">
+            {[p.publicCode, p.papel].filter(Boolean).join(" · ")}
           </span>
         </div>
-        <div className="flex items-center gap-2 flex-none">
-          <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full uppercase ${st.c}`}>{st.t}</span>
-          {onAbrir && (
-            <button onClick={() => onAbrir(o)} className="text-[11.5px] font-bold px-2.5 py-1 rounded-md bg-[#252c35] text-white/95 border border-white/10 hover:bg-[#2d353f]">Abrir operação</button>
-          )}
-        </div>
       </div>
 
-      {/* AVALIAÇÃO FINAL — só após o workflow oficial concluir. Documento de APOIO captura o
-          resultado ESTRUTURADO (é ele que resolve a necessidade de origem, não o doc em si). */}
-      {!readOnly && o.aguardandoAvaliacao && onAvaliar && (
-        avaliando ? (
-          <div className="mt-2 rounded-md border border-white/10 bg-[#1b2027] p-2 space-y-2">
-            {apoio && (
-              <div className="grid grid-cols-2 gap-2">
-                {[["cartorio", "Cartório"], ["municipio", "Município"], ["livro", "Livro"], ["folha", "Folha"], ["termo", "Termo"], ["data", "Data"], ["fonte", "Fonte da informação"]].map(([k, label]) => (
-                  <input key={k} value={dados[k] ?? ""} onChange={(e) => setD(k, e.target.value)} placeholder={label} className="text-[12px] rounded-md border border-white/10 px-2 py-1.5 focus:outline-none focus:border-[#7dd3fc]/50 focus:ring-1 focus:ring-[#7dd3fc]/25" />
-                ))}
-              </div>
-            )}
-            <input value={resultado} onChange={(e) => setResultado(e.target.value)} placeholder={apoio ? "Observações" : "Resultado obtido"} className="w-full text-[12px] rounded-md border border-white/10 px-2 py-1.5 focus:outline-none focus:border-[#7dd3fc]/50 focus:ring-1 focus:ring-[#7dd3fc]/25" autoFocus />
-            <div className="flex items-center gap-2 flex-wrap">
-              <button onClick={() => enviar("SIM")} className="inline-flex items-center gap-1 text-[11.5px] font-bold px-2.5 py-1.5 rounded-md bg-[#4ade80]/15 text-[#4ade80] border border-[#4ade80]/40 hover:bg-[#4ade80]/25"><CheckCircle2 className="w-3.5 h-3.5" /> Objetivo atingido</button>
-              <button onClick={() => enviar("PARCIAL")} className="text-[11.5px] font-semibold px-2.5 py-1.5 rounded-md border border-teal-500/25 text-teal-300 hover:bg-teal-500/10">Parcialmente</button>
-              <button onClick={() => enviar("NAO")} className="text-[11.5px] font-semibold px-2.5 py-1.5 rounded-md border border-white/10 text-white/80 hover:bg-[#20262e]">Não atingido</button>
-              <button onClick={() => enviar("CANCELAR")} className="text-[11.5px] text-white/40 hover:text-[#f87171] ml-auto">Cancelar operação</button>
-            </div>
-          </div>
+      {/* Transmissão */}
+      <div>
+        <div className={`flex items-center gap-1.5 text-[13px] font-bold ${transColor}`}>
+          <span className={`w-2 h-2 rounded-full flex-none ${transDot}`} />
+          {p.transmissao.label}
+        </div>
+        {p.transmissao.sub && (
+          <div className="text-[11.5px] text-white/40 font-medium mt-0.5">{p.transmissao.sub}</div>
+        )}
+      </div>
+
+      {/* Pendência de cadastro — o que falta para a pessoa estar íntegra */}
+      <div>
+        {p.pendencia ? (
+          <span className="text-[11.5px] text-[#d2a948] font-semibold flex items-start gap-1.5 leading-snug">
+            <AlertTriangle className="w-3.5 h-3.5 flex-none mt-px" />
+            {p.pendencia}
+          </span>
         ) : (
-          <button onClick={() => { setAvaliando(true); setResultado("") }} className="mt-2 inline-flex items-center gap-1 text-[11.5px] font-bold px-2.5 py-1.5 rounded-md bg-[#4ade80]/15 text-[#4ade80] border border-[#4ade80]/40 hover:bg-[#4ade80]/25"><CheckCircle2 className="w-3.5 h-3.5" /> Operação concluída — avaliar objetivo</button>
-        )
-      )}
-      {o.resultadoObtido && <div className="text-[11px] text-white/55 mt-1">Resultado: {o.resultadoObtido}</div>}
+          <span className="text-[11.5px] text-white/25">—</span>
+        )}
+      </div>
     </div>
   )
 }
-
-// ============================================================
-// HELPERS DE COR (status do documento)
-// ============================================================
 
 function docCls(cls: string): string {
   switch (cls) {
