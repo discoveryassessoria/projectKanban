@@ -36,7 +36,7 @@ if [ -n "$BASH_VERSION" ]; then
   }
 elif [ -n "$ZSH_VERSION" ]; then
   case "$ZSH_EVAL_CONTEXT" in
-    *:file:*) ;;
+    *:file|*:file:*) ;;
     *)
       echo "[ativar-db] ERRO: este script precisa ser SOURCEADO, não executado." >&2
       echo "[ativar-db]   errado : ./scripts/ativar-db.sh" >&2
