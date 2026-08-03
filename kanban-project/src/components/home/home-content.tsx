@@ -129,12 +129,6 @@ function CentralOperacional({ data }: { data: HomeData }) {
   const total = data.status.totalAcoes
   return (
     <section className={`${CARD_FOCAL} flex h-full flex-col`}>
-      {/* Fio dourado no topo — a marca de que ESTE é o bloco principal da tela. */}
-      <span
-        aria-hidden
-        className="pointer-events-none absolute inset-x-0 top-0 h-px"
-        style={{ background: `linear-gradient(90deg, transparent, ${OURO}8C, transparent)` }}
-      />
       <div className="px-5 pb-3 pt-5">
         <BlocoHeader
           titulo="Central Operacional"

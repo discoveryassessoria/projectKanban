@@ -24,7 +24,7 @@ export const CARD = "rounded-xl border border-white/10 bg-white/[0.05] backdrop-
  * uma camada translúcida sobre a foto.
  */
 export const CARD_FOCAL =
-  "relative overflow-hidden rounded-2xl border border-white/[0.14] bg-[var(--surface-overlay)] shadow-[0_24px_60px_-20px_rgba(0,0,0,0.75)]"
+  "relative overflow-hidden rounded-2xl border border-white/10 bg-white/[0.05] backdrop-blur-md shadow-[0_24px_60px_-20px_rgba(0,0,0,0.75)]"
 
 // ---- Estilos por nível -----------------------------------------------------
 export interface NivelStyle {

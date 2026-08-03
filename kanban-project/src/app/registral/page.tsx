@@ -67,7 +67,15 @@ export default function RegistralPage() {
     return (
       <div className="relative min-h-screen text-white overflow-x-hidden">
         <div className="pointer-events-none fixed inset-0 -z-10 bg-[url('/espanha.jpg')] bg-cover bg-center bg-no-repeat" />
-        <div className="min-h-screen bg-black/40 backdrop-blur-sm flex items-center justify-center">
+        <div
+          className="pointer-events-none fixed inset-0 -z-10"
+          style={{
+            background:
+              "linear-gradient(180deg, rgba(8,9,11,.985) 0%, rgba(8,9,11,.975) 46%, rgba(8,9,11,.95) 60%," +
+              " rgba(8,9,11,.86) 72%, rgba(8,9,11,.76) 86%, rgba(8,9,11,.88) 100%)",
+          }}
+        />
+        <div className="min-h-screen flex items-center justify-center">
           <div className="text-center">
             <div className="animate-spin h-12 w-12 border-4 border-white border-t-transparent rounded-full mx-auto mb-4" />
             <p className="text-white/70">Carregando revisão registral…</p>
@@ -85,8 +93,15 @@ export default function RegistralPage() {
 
   return (
     <div className="relative min-h-screen text-white overflow-x-hidden overscroll-none">
-      <div className="pointer-events-none fixed inset-0 -z-10 scale-105 blur-[6px] bg-[url('/espanha.jpg')] bg-cover bg-center bg-no-repeat" />
-      <div className="pointer-events-none fixed inset-0 -z-10 bg-black/60" />
+      <div className="pointer-events-none fixed inset-0 -z-10 bg-[url('/espanha.jpg')] bg-cover bg-center bg-no-repeat" />
+      <div
+        className="pointer-events-none fixed inset-0 -z-10"
+        style={{
+          background:
+            "linear-gradient(180deg, rgba(8,9,11,.985) 0%, rgba(8,9,11,.975) 46%, rgba(8,9,11,.95) 60%," +
+            " rgba(8,9,11,.86) 72%, rgba(8,9,11,.76) 86%, rgba(8,9,11,.88) 100%)",
+        }}
+      />
 
       <HeaderBar
         title="Revisão Registral"
@@ -101,7 +116,6 @@ export default function RegistralPage() {
       />
 
       <div className="min-h-screen relative">
-        <div className="absolute inset-0 bg-black/10 pointer-events-none" />
         <main className="relative px-4 py-4 max-w-full">
           <CentralRegistral
             processos={opcoes}

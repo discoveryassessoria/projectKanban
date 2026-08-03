@@ -35,17 +35,10 @@ export function HomeShell({
 
   return (
     <div className="relative min-h-screen overflow-x-hidden text-white">
-      {/* ----------------------------------------------------------------------
-          AMBIENTE — a foto não é textura sob o texto, é HORIZONTE.
-          O borrão uniforme + preto 60% deixava a imagem passando por baixo do
-          conteúdo (contraste baixo em tudo, sem ganhar profundidade em nada).
-          Aqui o véu é quase opaco na faixa onde o conteúdo vive e só abre na
-          base: a cidade aparece nítida embaixo, como decisão de composição.
-          ---------------------------------------------------------------------- */}
-      <div
-        className="pointer-events-none fixed inset-0 -z-10 bg-[url('/espanha.jpg')] bg-cover bg-center bg-no-repeat"
-        style={{ filter: "saturate(.55) contrast(1.02) brightness(.92)" }}
-      />
+      {/* AMBIENTE — receita única do sistema: imagem fixa nítida + degradê escuro.
+          O degradê é quase opaco onde o conteúdo vive e abre na base, então a
+          cidade aparece nítida embaixo — decisão de composição, não sobra. */}
+      <div className="pointer-events-none fixed inset-0 -z-10 bg-[url('/espanha.jpg')] bg-cover bg-center bg-no-repeat" />
       <div
         className="pointer-events-none fixed inset-0 -z-10"
         style={{
@@ -65,9 +58,7 @@ export function HomeShell({
         onLogout={sair}
       />
 
-      {/* Sem véu extra aqui: quem controla a luz da tela é a camada de ambiente
-          acima. Um `bg-black/10` a mais só apagaria o horizonte. */}
-      <div className="relative min-h-screen">
+      <div className="min-h-screen relative">
         <main className="relative">{children}</main>
       </div>
     </div>

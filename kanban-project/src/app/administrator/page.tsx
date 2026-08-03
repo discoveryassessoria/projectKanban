@@ -295,7 +295,7 @@ function CarregandoTela() {
 // fallback de segurança (não deve aparecer — todas as telas estão registradas)
 function EmBreve({ titulo }: { titulo: string }) {
   return (
-    <div className="rounded-2xl border border-white/10 bg-slate-900/70 p-10 text-center">
+    <div className="rounded-2xl border border-white/10 bg-white/[0.05] backdrop-blur-md p-10 text-center">
       <Settings2 className="mx-auto mb-3 h-10 w-10 text-white/40" />
       <div className="font-semibold text-white/90">{titulo}</div>
       <div className="mt-1 text-sm text-white/50">Esta área será portada em breve.</div>
@@ -499,8 +499,16 @@ export default function GerenciamentoPage() {
   if (permLoading) {
     return (
       <div className="relative min-h-screen text-white">
-        <div className="pointer-events-none fixed inset-0 -z-10 bg-[url('/espanha.jpg')] bg-cover bg-center" />
-        <div className="flex min-h-screen items-center justify-center bg-slate-950/70">
+        <div className="pointer-events-none fixed inset-0 -z-10 bg-[url('/espanha.jpg')] bg-cover bg-center bg-no-repeat" />
+        <div
+          className="pointer-events-none fixed inset-0 -z-10"
+          style={{
+            background:
+              "linear-gradient(180deg, rgba(8,9,11,.985) 0%, rgba(8,9,11,.975) 46%, rgba(8,9,11,.95) 60%," +
+              " rgba(8,9,11,.86) 72%, rgba(8,9,11,.76) 86%, rgba(8,9,11,.88) 100%)",
+          }}
+        />
+        <div className="flex min-h-screen items-center justify-center">
           <div className="text-center">
             <div className="mx-auto mb-4 h-16 w-16 animate-spin rounded-full border-b-2 border-white" />
             <p className="text-lg">Verificando permissões…</p>
@@ -560,13 +568,19 @@ export default function GerenciamentoPage() {
   const secaoTela = itemAtivo?.section
 
   // classes de superfície — contraste real (fundo semissólido, blur discreto)
-  const PANEL = "rounded-2xl border border-white/10 bg-slate-900/75 backdrop-blur-sm"
+  const PANEL = "rounded-2xl border border-white/10 bg-white/[0.05] backdrop-blur-md"
 
   return (
     <div className="relative min-h-screen overflow-x-hidden text-white">
       <div className="pointer-events-none fixed inset-0 -z-10 bg-[url('/espanha.jpg')] bg-cover bg-center bg-no-repeat" />
-      {/* Scrim sólido: garante leitura sobre o fundo (menos transparência/blur excessivo) */}
-      <div className="pointer-events-none fixed inset-0 -z-10 bg-slate-950/72" />
+      <div
+        className="pointer-events-none fixed inset-0 -z-10"
+        style={{
+          background:
+            "linear-gradient(180deg, rgba(8,9,11,.985) 0%, rgba(8,9,11,.975) 46%, rgba(8,9,11,.95) 60%," +
+            " rgba(8,9,11,.86) 72%, rgba(8,9,11,.76) 86%, rgba(8,9,11,.88) 100%)",
+        }}
+      />
 
       <HeaderBar
         title="Gerenciamento Geral"
@@ -592,7 +606,7 @@ export default function GerenciamentoPage() {
                   onChange={(e) => setBusca(e.target.value)}
                   placeholder="Buscar configuração, módulo ou tela…"
                   aria-label="Buscar configuração, módulo ou tela"
-                  className="w-full rounded-xl border border-white/12 bg-slate-900/70 py-3.5 pl-12 pr-11 text-[15px] text-white placeholder:text-white/45 focus:border-white/35 focus:outline-none focus-visible:ring-2 focus-visible:ring-white/40"
+                  className="w-full rounded-xl border border-white/12 bg-white/[0.05] backdrop-blur-md py-3.5 pl-12 pr-11 text-[15px] text-white placeholder:text-white/45 focus:border-white/35 focus:outline-none focus-visible:ring-2 focus-visible:ring-white/40"
                 />
                 {busca ? (
                   <button
@@ -641,7 +655,7 @@ export default function GerenciamentoPage() {
                     <button
                       key={g.key}
                       onClick={() => irParaModulo(g.key)}
-                      className="group flex min-h-[188px] flex-col rounded-2xl border border-white/10 bg-slate-900/75 p-5 text-left backdrop-blur-sm transition-all duration-150 hover:-translate-y-0.5 hover:border-white/25 hover:bg-slate-900/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/50"
+                      className="group flex min-h-[188px] flex-col rounded-2xl border border-white/10 bg-white/[0.05] p-5 text-left backdrop-blur-sm transition-all duration-150 hover:-translate-y-0.5 hover:border-white/25 hover:bg-white/[0.08] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/50"
                     >
                       <div className="mb-3.5 flex h-12 w-12 flex-none items-center justify-center rounded-xl border border-white/10 bg-white/[0.07] text-white/85 transition-colors group-hover:bg-white/[0.12]">
                         {Icon ? <Icon className="h-6 w-6" /> : <Settings2 className="h-6 w-6" />}
@@ -683,7 +697,7 @@ export default function GerenciamentoPage() {
               {/* ÁRVORE LATERAL — TODOS os módulos; accordion (1 módulo aberto por vez) */}
               <aside
                 aria-label="Navegação do Gerenciamento"
-                className={`mgmt-scroll fixed left-0 top-0 z-40 h-full flex-none overflow-y-auto overflow-x-hidden border-r border-white/10 bg-slate-900/95 p-3 transition-transform duration-200 motion-reduce:transition-none md:sticky md:top-4 md:z-auto md:h-auto md:max-h-[calc(100vh-96px)] md:rounded-2xl md:border md:bg-slate-900/80 md:backdrop-blur-sm ${mobileNav ? "translate-x-0" : "-translate-x-full"} md:translate-x-0 ${navCollapsed ? "md:w-[60px]" : "w-[280px] md:w-[272px]"}`}
+                className={`mgmt-scroll fixed left-0 top-0 z-40 h-full flex-none overflow-y-auto overflow-x-hidden border-r border-white/10 bg-white/[0.05] backdrop-blur-md p-3 transition-transform duration-200 motion-reduce:transition-none md:sticky md:top-4 md:z-auto md:h-auto md:max-h-[calc(100vh-96px)] md:rounded-2xl md:border md:bg-white/[0.05] md:backdrop-blur-sm ${mobileNav ? "translate-x-0" : "-translate-x-full"} md:translate-x-0 ${navCollapsed ? "md:w-[60px]" : "w-[280px] md:w-[272px]"}`}
               >
                 {navCollapsed ? (
                   // modo recolhido (rail com ícones de TODOS os módulos)
