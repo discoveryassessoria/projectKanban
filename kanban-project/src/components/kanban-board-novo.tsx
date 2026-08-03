@@ -279,7 +279,7 @@ export function KanbanBoard({
     if (!targetFaseKey || processo.faseAtualKey === targetFaseKey) return
 
     // 🔒 Mover de fase na mão exige permissão. Sem ela: avisa e o card volta.
-    if (!pode('processos.editar_status')) {
+    if (!pode('workflow.avancar')) {
       alert("As fases avançam automaticamente conforme os documentos são validados. Você não tem permissão para mover o processo de fase manualmente.")
       return
     }
