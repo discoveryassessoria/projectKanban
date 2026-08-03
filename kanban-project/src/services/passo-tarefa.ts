@@ -22,6 +22,32 @@ import {
   passoGeraTarefa,
 } from "@/src/services/passo-tarefa-helpers"
 
+/**
+ * Pré-condições do processo, iguais para TODOS os passos de uma mesma rodada.
+ * Quem gera tarefas em lote (avanço de fase, reconciliação) lê UMA vez e repassa —
+ * senão cada passo repete duas consultas dentro da transação, e uma fase com muitos
+ * alvos estoura o tempo da transação antes de terminar.
+ */
+export interface PreCondicoesProcesso {
+  runtimeV2Habilitado: boolean
+  workflowRuntime: string | null
+}
+
+/** Lê as pré-condições uma única vez (use no laço de geração em lote). */
+export async function carregarPreCondicoes(
+  processoId: number,
+  db: Prisma.TransactionClient | typeof prisma = prisma,
+): Promise<PreCondicoesProcesso> {
+  const [processo, cfg] = await Promise.all([
+    db.processo.findUnique({ where: { id: processoId }, select: { workflowRuntime: true } }),
+    db.motorConfig.findUnique({ where: { id: 1 }, select: { runtimeV2Habilitado: true } }),
+  ])
+  return {
+    runtimeV2Habilitado: cfg?.runtimeV2Habilitado ?? false,
+    workflowRuntime: processo?.workflowRuntime ?? null,
+  }
+}
+
 export interface GarantirTarefaInput {
   stepInstanceId: number
   taskRole?: string
@@ -29,6 +55,8 @@ export interface GarantirTarefaInput {
   causationId?: string
   origem?: string
   solicitadoPorId?: number
+  /** Pré-condições já lidas pelo chamador (geração em lote). Omitido ⇒ lê aqui. */
+  preCondicoes?: PreCondicoesProcesso
 }
 
 export type GarantirTarefaResultado =
@@ -71,15 +99,11 @@ export async function garantirTarefaDePasso(
   })
   if (!step) return fail("STEP_NAO_ENCONTRADO")
 
-  // runtime v2 + feature flag
-  const processo = await db.processo.findUnique({
-    where: { id: step.processoId },
-    select: { workflowRuntime: true },
-  })
-  const cfg = await db.motorConfig.findUnique({ where: { id: 1 }, select: { runtimeV2Habilitado: true } })
-  const v2Global = cfg?.runtimeV2Habilitado ?? false
+  // runtime v2 + feature flag (reusa a leitura do chamador quando houver)
+  const pre = input.preCondicoes ?? (await carregarPreCondicoes(step.processoId, db))
+  const v2Global = pre.runtimeV2Habilitado
   if (!v2Global) return fail("RUNTIME_V2_DESABILITADO")
-  if (resolveWorkflowRuntime(processo?.workflowRuntime, v2Global) !== "v2") return fail("PROCESSO_LEGACY")
+  if (resolveWorkflowRuntime(pre.workflowRuntime, v2Global) !== "v2") return fail("PROCESSO_LEGACY")
 
   // instância ativa
   if (!["ATIVO", "AGUARDANDO", "BLOQUEADO"].includes(step.workflowInstance.status)) {

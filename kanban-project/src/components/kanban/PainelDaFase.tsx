@@ -159,7 +159,6 @@ export interface PainelDaFaseProps {
   faseNome: string                 // "Emissão documental"
   faseSub: string                  // subtítulo da fase
   faseTabs: string[]               // abas do mockup pra essa fase
-  steps: FaseStep[]                // as 5 etapas
   kpis: FaseKpi[]                  // os 7 contadores
   progressoPct: number             // % da fase
   progressoConcluidos: number      // ex: 0
@@ -205,7 +204,6 @@ export function PainelDaFase({
   faseNome,
   faseSub,
   faseTabs,
-  steps,
   kpis,
   progressoPct,
   progressoConcluidos,
@@ -286,53 +284,10 @@ export function PainelDaFase({
           </div>
         ) : (
         <>
-        {/* --- 5 ETAPAS EM LINHA --- */}
-        <div className="flex items-center mb-5 overflow-x-auto pb-1">
-          {steps.map((s, i) => {
-            const cls =
-              s.status === "concluida" ? "done"
-              : s.status === "em_andamento" ? "active"
-              : "pend"
-            const icBorder =
-              cls === "done" ? "border-[#4ade80]/40 text-[#4ade80]"
-              : cls === "active" ? "border-[#2563eb] text-[#7dd3fc]"
-              : "border-white/10 text-white/40"
-            const titColor = cls === "pend" ? "text-white/40" : "text-white/95"
-            const subColor =
-              cls === "done" ? "text-[#4ade80]"
-              : cls === "active" ? "text-[#7dd3fc]"
-              : "text-white/40"
-            const subTxt =
-              s.status === "concluida" ? "Concluído"
-              : s.status === "em_andamento" ? "Em andamento"
-              // "pendente" = etapa SEM item aplicável. Anunciar "Em andamento" aqui era
-              // a mentira que fazia o operador clicar numa etapa que não abre nada.
-              : s.status === "pendente" ? "Sem itens aplicáveis"
-              : "Bloqueada"
-            return (
-              <div key={i} className="flex items-center flex-none">
-                <div className="flex items-center gap-2.5">
-                  <div className={`w-7 h-7 rounded-full grid place-items-center border-[1.5px] bg-[#1b2027] ${icBorder}`}>
-                    {s.status === "concluida" ? (
-                      <CheckCircle2 className="w-3.5 h-3.5" />
-                    ) : s.status === "em_andamento" ? (
-                      <Search className="w-3.5 h-3.5" />
-                    ) : (
-                      <Clock className="w-3.5 h-3.5" />
-                    )}
-                  </div>
-                  <div>
-                    <div className={`text-[12.5px] font-bold leading-tight ${titColor}`}>{s.title}</div>
-                    <div className={`text-[11px] font-semibold mt-px ${subColor}`}>{subTxt}</div>
-                  </div>
-                </div>
-                {i < steps.length - 1 && (
-                  <div className={`h-px min-w-[28px] flex-1 mx-2.5 ${s.status === "concluida" ? "bg-[#4ade80]" : "bg-[#252c35]"}`} style={{ width: 60 }} />
-                )}
-              </div>
-            )
-          })}
-        </div>
+        {/* A esteira de etapas em linha saiu daqui: ela repetia, em forma de resumo,
+            o mesmo workflow que agora é renderizado abaixo com os passos expansíveis
+            e as instâncias reais de cada um. Duas representações do mesmo workflow
+            divergem no primeiro dia em que uma delas deixa de ser atualizada. */}
 
         {/* --- 7 CONTADORES --- */}
         <div className="grid gap-2.5 mb-4" style={{ gridTemplateColumns: `repeat(${kpis.length}, 1fr)` }}>
@@ -370,7 +325,7 @@ export function PainelDaFase({
         )}
 
         {/* --- TAREFAS DA FASE (lista operacional real) --- */}
-        <ListaDeTarefas tarefas={tarefas} onAbrir={onAbrirTarefa} readOnly={readOnly} faseNome={faseNome} />
+        <WorkflowDaFase tarefas={tarefas} onAbrir={onAbrirTarefa} readOnly={readOnly} faseNome={faseNome} />
 
         {/* --- TABELA POR PESSOA --- */}
         <div className="border border-white/10 rounded-xl overflow-hidden">
@@ -446,23 +401,30 @@ export function PainelDaFase({
 // ============================================================
 
 // ------------------------------------------------------------
-// LISTA DE TAREFAS DA FASE
+// WORKFLOW DA FASE
 // ------------------------------------------------------------
-// A lista operacional REAL: uma linha por passo materializado da fase, agrupada em
-// Pendentes / Em andamento / Concluídas. Clicar abre a tela oficial da operação.
+// A Central não mantém uma lista própria de tarefas: ela RENDERIZA o workflow
+// publicado da fase. Cada passo aparece uma vez, com o estado agregado das suas
+// instâncias; expandir o passo mostra as instâncias operacionais reais (a pessoa,
+// o registro, a certidão ou o documento de cada uma) e é ali que se abre a execução.
 //
-// REGRAS que esta lista respeita, porque a ausência delas foi o defeito:
-//  • Aparece com UMA tarefa tanto quanto com cinquenta — agrupar não é filtrar.
-//  • Concluídas continuam visíveis (histórico da fase), nunca somem.
-//  • Documento obrigatório configurado NÃO é condição de exibição nem de abertura.
-//  • Quando não há nenhuma tarefa, diz POR QUE — não devolve uma área em branco.
-const GRUPOS_TAREFA: Array<{ balde: BaldeTarefa; titulo: string; cor: string }> = [
-  { balde: "PENDENTE", titulo: "Pendentes", cor: "text-white/55" },
-  { balde: "EM_ANDAMENTO", titulo: "Em andamento", cor: "text-[#7dd3fc]" },
-  { balde: "CONCLUIDA", titulo: "Concluídas", cor: "text-[#4ade80]" },
-]
+// O workflow é a fonte única. Se um passo tem 1 alvo, aparece 1 instância; se tem
+// 40, aparecem 40 — sem piso de quantidade e sem esconder as concluídas.
 
-function ListaDeTarefas({
+/** Estado agregado de um passo a partir das suas instâncias. */
+function resumirPasso(instancias: FaseTarefaRow[]) {
+  const total = instancias.length
+  const concluidas = instancias.filter((t) => t.balde === "CONCLUIDA").length
+  const emAndamento = instancias.filter((t) => t.balde === "EM_ANDAMENTO").length
+  const divergentes = instancias.filter((t) => t.statusRaw === "BLOQUEADO" || t.statusRaw === "FALHOU").length
+  const estado: "concluida" | "em_andamento" | "pendente" =
+    total > 0 && concluidas >= total ? "concluida"
+    : emAndamento > 0 || concluidas > 0 ? "em_andamento"
+    : "pendente"
+  return { total, concluidas, emAndamento, divergentes, pendentes: total - concluidas - divergentes, estado }
+}
+
+function WorkflowDaFase({
   tarefas,
   onAbrir,
   readOnly,
@@ -473,6 +435,19 @@ function ListaDeTarefas({
   readOnly: boolean
   faseNome: string
 }) {
+  // Agrupa por passo publicado, preservando a ordem em que a fase os entrega.
+  const passos: Array<{ stepKey: string; titulo: string; instancias: FaseTarefaRow[] }> = []
+  const indice = new Map<string, number>()
+  for (const t of tarefas) {
+    let i = indice.get(t.stepKey)
+    if (i == null) {
+      i = passos.length
+      indice.set(t.stepKey, i)
+      passos.push({ stepKey: t.stepKey, titulo: t.titulo, instancias: [] })
+    }
+    passos[i].instancias.push(t)
+  }
+
   return (
     <div className="border border-white/10 rounded-xl overflow-hidden mb-5">
       <div className="flex items-center gap-2.5 px-5 py-2.5 border-b border-white/10 bg-[#20262e]/70">
@@ -480,47 +455,86 @@ function ListaDeTarefas({
           <PlayCircle className="w-3 h-3" />
         </span>
         <b className="text-[11.5px] font-extrabold tracking-wide uppercase text-white/55">
-          Tarefas da fase {faseNome}
+          Workflow · {faseNome}
         </b>
         <span className="ml-auto text-[11px] font-bold text-white/40 bg-[#1b2027] border border-white/10 rounded-full px-2.5 py-0.5">
-          {tarefas.length} tarefa(s)
+          {passos.length} passo(s)
         </span>
       </div>
 
-      {tarefas.length === 0 ? (
+      {passos.length === 0 ? (
         <div className="px-5 py-6 text-center">
-          <div className="text-[13px] text-white/68">Nenhuma tarefa materializada nesta fase.</div>
+          <div className="text-[13px] text-white/68">O workflow desta fase não tem passos materializados.</div>
           <div className="text-[11.5px] text-white/40 mt-1 leading-relaxed">
-            As tarefas da fase nascem dos requisitos documentais publicados que se aplicam
-            às pessoas da árvore. Enquanto nenhuma Regra Documental publicada exigir algo
-            nesta fase, não há o que executar — as pessoas abaixo continuam disponíveis.
+            Publique os passos da fase em Gerenciamento › Workflows das Fases. Enquanto
+            não houver passo publicado, não há o que executar aqui.
           </div>
         </div>
       ) : (
-        GRUPOS_TAREFA.map((g) => {
-          const doGrupo = tarefas.filter((t) => t.balde === g.balde)
-          return (
-            <div key={g.balde}>
-              <div className="flex items-center gap-2 px-5 py-2 bg-[#1b2027] border-b border-white/10">
-                <b className={`text-[11px] font-extrabold uppercase tracking-wider ${g.cor}`}>{g.titulo}</b>
-                <span className="text-[11px] font-bold text-white/40">{doGrupo.length}</span>
-              </div>
-              {doGrupo.length === 0 ? (
-                <div className="px-5 py-2.5 text-[11.5px] text-white/25 border-b border-white/10">Nenhuma</div>
-              ) : (
-                doGrupo.map((t) => (
-                  <TarefaRow key={t.stepInstanceId} t={t} onAbrir={onAbrir} readOnly={readOnly} />
-                ))
-              )}
-            </div>
-          )
-        })
+        passos.map((p) => <PassoDoWorkflow key={p.stepKey} passo={p} onAbrir={onAbrir} readOnly={readOnly} />)
       )}
     </div>
   )
 }
 
-function TarefaRow({
+function PassoDoWorkflow({
+  passo,
+  onAbrir,
+  readOnly,
+}: {
+  passo: { stepKey: string; titulo: string; instancias: FaseTarefaRow[] }
+  onAbrir?: (t: FaseTarefaRow) => void
+  readOnly: boolean
+}) {
+  const r = resumirPasso(passo.instancias)
+  // Abre já expandido o passo em que há trabalho; concluído entra recolhido.
+  const [exp, setExp] = useState(r.estado !== "concluida")
+
+  const icBorder =
+    r.estado === "concluida" ? "border-[#4ade80]/40 text-[#4ade80]"
+    : r.estado === "em_andamento" ? "border-[#2563eb] text-[#7dd3fc]"
+    : "border-white/10 text-white/40"
+
+  return (
+    <div className="border-b border-white/10 last:border-b-0">
+      <button
+        type="button"
+        onClick={() => setExp(!exp)}
+        className="w-full text-left flex items-center gap-3 px-5 py-3 hover:bg-[#20262e] transition-colors"
+      >
+        <span className={`w-7 h-7 rounded-full grid place-items-center border-[1.5px] flex-none bg-[#1b2027] ${icBorder}`}>
+          {r.estado === "concluida" ? <CheckCircle2 className="w-3.5 h-3.5" />
+            : r.estado === "em_andamento" ? <Search className="w-3.5 h-3.5" />
+            : <Clock className="w-3.5 h-3.5" />}
+        </span>
+        <span className="min-w-0 flex-1">
+          <b className="text-[13.5px] font-bold block leading-tight text-white/95">{passo.titulo}</b>
+          <span className="text-[11.5px] text-white/40">
+            {r.concluidas} de {r.total} concluída(s)
+            {r.divergentes > 0 && <span className="text-[#f87171]"> · {r.divergentes} divergente(s)</span>}
+          </span>
+        </span>
+        <span className="w-28 h-1.5 rounded bg-[#252c35] overflow-hidden flex-none">
+          <span className="block h-full bg-[#7dd3fc]" style={{ width: `${r.total > 0 ? Math.round((r.concluidas / r.total) * 100) : 0}%` }} />
+        </span>
+        <span className="text-white/40 flex-none">
+          {exp ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
+        </span>
+      </button>
+
+      {exp && (
+        <div className="bg-[#15191f] border-t border-white/10">
+          {passo.instancias.map((t) => (
+            <InstanciaDoPasso key={t.stepInstanceId} t={t} onAbrir={onAbrir} readOnly={readOnly} />
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
+/** Uma instância operacional do passo: o alvo concreto (pessoa/registro/documento). */
+function InstanciaDoPasso({
   t,
   onAbrir,
   readOnly,
@@ -529,8 +543,6 @@ function TarefaRow({
   onAbrir?: (t: FaseTarefaRow) => void
   readOnly: boolean
 }) {
-  // ABRIR é o caminho normal. Só não abre quando o próprio passo não tem item
-  // operacional (etapa genérica da fase) — e nesse caso o motivo fica escrito.
   const podeAbrir = !readOnly && !!onAbrir && !!t.executor
   const concluida = t.balde === "CONCLUIDA"
 
@@ -539,28 +551,19 @@ function TarefaRow({
       type="button"
       onClick={() => podeAbrir && onAbrir!(t)}
       disabled={!podeAbrir}
-      title={t.erroAdministrativo ?? (readOnly ? "Somente leitura" : `Abrir: ${t.titulo}`)}
-      className={`w-full text-left grid items-center gap-2.5 px-5 py-3 border-b border-white/10 transition-colors ${
+      title={t.erroAdministrativo ?? (readOnly ? "Somente leitura" : `Abrir: ${t.pessoaNome ?? t.assunto ?? t.titulo}`)}
+      className={`w-full text-left grid items-center gap-2.5 pl-14 pr-5 py-2.5 border-b border-white/10 last:border-b-0 transition-colors ${
         podeAbrir ? "hover:bg-[#20262e] cursor-pointer" : "cursor-default"
       }`}
-      style={{ gridTemplateColumns: "28px minmax(180px,2fr) 1.4fr 1fr 0.8fr 118px" }}
+      style={{ gridTemplateColumns: "minmax(160px,2fr) 1.2fr 1fr 0.7fr 108px" }}
     >
-      <span className={`w-6 h-6 rounded-full grid place-items-center border-[1.5px] flex-none ${
-        concluida ? "border-[#4ade80]/40 text-[#4ade80]"
-        : t.balde === "EM_ANDAMENTO" ? "border-[#2563eb] text-[#7dd3fc]"
-        : "border-white/10 text-white/40"
-      }`}>
-        {concluida ? <CheckCircle2 className="w-3 h-3" /> : t.balde === "EM_ANDAMENTO" ? <Search className="w-3 h-3" /> : <Clock className="w-3 h-3" />}
-      </span>
-
       <span className="min-w-0 block">
-        <b className={`text-[13.5px] font-bold block leading-tight truncate ${concluida ? "text-white/68" : "text-white/95"}`}>
-          {t.titulo}
+        <b className={`text-[13px] font-bold block leading-tight truncate ${concluida ? "text-white/68" : "text-white/95"}`}>
+          {t.pessoaNome ?? t.assunto ?? "Etapa da fase"}
         </b>
-        <span className="text-[11.5px] text-white/40 block truncate">
-          {[t.pessoaNome, t.assunto].filter(Boolean).join(" · ") || "Etapa da fase"}
-          {!t.obrigatorio && " · opcional"}
-        </span>
+        {t.pessoaNome && t.assunto && (
+          <span className="text-[11.5px] text-white/40 block truncate">{t.assunto}</span>
+        )}
       </span>
 
       <span className="block">
@@ -569,18 +572,14 @@ function TarefaRow({
         </span>
         {t.motivo && <span className="text-[11px] text-white/40 block truncate">{t.motivo}</span>}
         {t.erroAdministrativo && (
-          <span className="text-[11px] text-[#d2a948] block leading-snug mt-0.5">
-            ⚠ {t.erroAdministrativo}
-          </span>
+          <span className="text-[11px] text-[#d2a948] block leading-snug mt-0.5">⚠ {t.erroAdministrativo}</span>
         )}
       </span>
 
       <span className="text-[12px] block truncate">
-        {t.responsavelNome ? (
-          <span className="text-white/80 font-semibold">{t.responsavelNome}</span>
-        ) : (
-          <span className="text-white/40">Sem responsável</span>
-        )}
+        {t.responsavelNome
+          ? <span className="text-white/80 font-semibold">{t.responsavelNome}</span>
+          : <span className="text-white/40">Sem responsável</span>}
       </span>
 
       <span className="text-[12px] block">
@@ -589,8 +588,6 @@ function TarefaRow({
             {t.diasParaPrazo < 0 ? `${Math.abs(t.diasParaPrazo)}d atrasada` : `${t.diasParaPrazo}d`}
           </span>
         ) : t.slaDays ? (
-          // Sem prazo iniciado ainda: mostra o SLA CONFIGURADO, para o operador não
-          // ler "—" num passo que tem prazo definido no cadastro.
           <span className="text-white/40">SLA {t.slaDays}d</span>
         ) : (
           <span className="text-white/25">—</span>

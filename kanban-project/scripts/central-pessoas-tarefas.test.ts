@@ -120,10 +120,12 @@ check("abrir tarefa usa a operação oficial (sem rota legada)", /abrirOperacao\
 check("passo sem executor vira erro administrativo explícito (tarefa não some)", central.includes("if (!t.executor)") && painel.includes("erroAdministrativo") && painel.includes("Sem executor"))
 check("progresso da fase por alvo sai da MESMA lista de tarefas", central.includes("const porAlvo = tarefasFase.length > 0") && central.includes('label: "Registros a localizar"'))
 
-check("painel renderiza a lista de tarefas", painel.includes("<ListaDeTarefas") && painel.includes("function ListaDeTarefas"))
-check("painel agrupa em Pendentes / Em andamento / Concluídas", painel.includes('titulo: "Pendentes"') && painel.includes('titulo: "Em andamento"') && painel.includes('titulo: "Concluídas"'))
+check("painel renderiza o WORKFLOW da fase (não uma segunda lista)", painel.includes("<WorkflowDaFase") && painel.includes("function WorkflowDaFase"))
+check("cada passo do workflow é expansível", painel.includes("function PassoDoWorkflow") && painel.includes("setExp(!exp)"))
+check("expandir mostra as INSTÂNCIAS operacionais do passo", painel.includes("function InstanciaDoPasso") && painel.includes("passo.instancias.map"))
+check("sem lista de tarefas paralela ao workflow", !painel.includes("ListaDeTarefas") && !painel.includes("GRUPOS_TAREFA"))
+check("sem esteira de etapas duplicando o workflow", !painel.includes("5 ETAPAS EM LINHA") && !central.includes("let steps: FaseStep[]"))
 check("painel tem o grupo de pendência de classificação", painel.includes("Pendente de classificação"))
-check("etapa 'pendente' é rotulada com honestidade", painel.includes("Sem itens aplicáveis"))
 
 // A regressão exata: condições de quantidade/obrigatoriedade governando renderização.
 const CONDICOES_PROIBIDAS: Array<[string, RegExp]> = [
@@ -146,7 +148,7 @@ check("evento cobre início, mudança de status e conclusão", /EM_ANDAMENTO:\s*
 check("evento é idempotente (não derruba a transação ao repetir)", opDoc.includes("skipDuplicates: true") && opDoc.includes("chaveEvento("))
 check("sem evento quando não houve transição de estado", opDoc.includes("novo === p.status ? null"))
 check("lista de tarefas aparece com UMA tarefa (sem piso de quantidade)", !/tarefas\.length\s*>\s*1/.test(painel))
-check("tarefas concluídas continuam visíveis (grupo próprio, sem filtro)", painel.includes('balde: "CONCLUIDA"'))
+check("instâncias concluídas continuam visíveis (sem filtro)", painel.includes('t.balde === "CONCLUIDA"') && !painel.includes("filter((t) => t.balde !== "))
 
 // ============================================================
 console.log(`\n${falhas.length === 0 ? "✅" : "❌"} ${ok}/${ok + falhas.length} verificações`)

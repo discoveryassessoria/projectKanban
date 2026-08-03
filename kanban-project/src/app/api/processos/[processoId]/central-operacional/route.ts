@@ -900,7 +900,14 @@ export async function GET(
       necIdsTarefa.length
         ? prisma.necessidadeDocumental.findMany({
             where: { id: { in: necIdsTarefa } },
-            select: { id: true, pessoaId: true, matrizSnapshot: true, itemCatalogo: { select: { name: true } } },
+            select: {
+              id: true, pessoaId: true, matrizSnapshot: true,
+              itemCatalogo: { select: { name: true } },
+              // Certidão de casamento tem a UNIÃO como sujeito, não uma pessoa. Sem
+              // isto a linha ficava sem nome — e "de quem é este casamento?" é
+              // exatamente o que o operador precisa ler.
+              uniao: { select: { pessoa1: { select: { nome: true, sobrenome: true } }, pessoa2: { select: { nome: true, sobrenome: true } } } },
+            },
           })
         : Promise.resolve([]),
       respIdsTarefa.length
@@ -916,9 +923,15 @@ export async function GET(
     // stepKey. Nunca inventa texto.
     const catalogoDaFase = faseAtualCode ? getStepsForFase(faseAtualCode) : []
     const tituloDoPasso = (stepKey: string, snapshot: unknown): string => {
-      if (snapshot && typeof snapshot === "object" && "label" in snapshot) {
-        const l = (snapshot as { label: unknown }).label
-        if (typeof l === "string" && l.trim()) return l
+      // O rótulo VEM DO SNAPSHOT do passo publicado (imutável, versionado): é o texto
+      // que o operador cadastrou. `titulo` é a chave que construirSnapshotPasso grava;
+      // `label` cobre snapshots de outra origem. Só depois cai no catálogo, e por
+      // último no stepKey — que é identificador, não rótulo.
+      if (snapshot && typeof snapshot === "object") {
+        for (const chave of ["titulo", "label"] as const) {
+          const v = (snapshot as Record<string, unknown>)[chave]
+          if (typeof v === "string" && v.trim()) return v
+        }
       }
       return catalogoDaFase.find((c) => c.stepKey === stepKey)?.title ?? stepKey
     }
@@ -967,7 +980,11 @@ export async function GET(
         statusLabel: rotuloStatusPasso(s.status),
         obrigatorio: s.obrigatorio,
         pessoaId,
-        pessoaNome: pessoa ? nomeCompleto(pessoa) : null,
+        pessoaNome: pessoa
+          ? nomeCompleto(pessoa)
+          : nec?.uniao
+            ? [nec.uniao.pessoa1, nec.uniao.pessoa2].filter(Boolean).map((x) => nomeCompleto(x!)).join(" e ")
+            : null,
         assunto,
         necessidadeId: s.necessidadeId,
         documentoId: s.documentoId,

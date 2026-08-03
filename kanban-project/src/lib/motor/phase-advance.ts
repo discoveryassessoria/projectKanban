@@ -23,7 +23,7 @@ import { resolveWorkflowRuntime } from "@/src/lib/workflow-runtime"
 import { calcularPendencias } from "@/src/lib/motor/blocking-engine"
 import type { BlockingIssue } from "@/src/lib/motor/blocking-helpers"
 import { instanciarWorkflowDaFase, type OrigemInstanciaStr } from "@/src/services/phase-workflow"
-import { garantirTarefaDePasso } from "@/src/services/passo-tarefa"
+import { garantirTarefaDePasso, carregarPreCondicoes } from "@/src/services/passo-tarefa"
 import { processarOutbox } from "@/src/services/outbox-dispatcher"
 import {
   type AdvanceOperacao,
@@ -80,6 +80,8 @@ export interface AdvanceOk {
   tarefasCriadas: number
   correlationId: string
   logId: number | null
+  /** Passos instanciados na nova fase — as tarefas deles são geradas após o commit. */
+  stepInstanceIds?: number[]
 }
 
 export interface AdvanceErr {
@@ -248,15 +250,13 @@ async function executarPlano(p: Plano): Promise<AdvanceResult> {
         })
       }
 
-      // 4) gerar Tarefas humanas dos passos elegíveis (idempotente; o serviço se auto-filtra)
-      let tarefasCriadas = 0
-      for (const step of inst.stepInstances) {
-        const g = await garantirTarefaDePasso(
-          { stepInstanceId: step.id, correlationId: p.correlationId, causationId: chave, origem: "workflow" },
-          tx,
-        )
-        if (g.success && g.created) tarefasCriadas++
-      }
+      // 4) As Tarefas dos passos NÃO são geradas aqui dentro.
+      // Uma fase operada por entidade instancia um passo por alvo: com N alvos, gerar
+      // as tarefas na mesma transação do avanço multiplica escritas sem teto e estoura
+      // o tempo da transação (P2028) — a fase não avançava justamente quando tinha
+      // muito trabalho. A geração é idempotente e chaveada por passo, então roda logo
+      // após o commit; se falhar, a reconciliação da fase a completa.
+      const tarefasCriadas = 0
 
       // 5) evento de fase (append-only)
       await tx.workflowEvento.create({
@@ -339,16 +339,32 @@ async function executarPlano(p: Plano): Promise<AdvanceResult> {
         faseAnterior: p.faseAtual, faseAtual: p.novaFaseAtualKey, faseDestino: p.faseDestino,
         ciclo: p.cicloAlvo, workflowInstanceId: inst.workflowInstance.id,
         tarefasCriadas, correlationId: p.correlationId, logId: log.id,
+        stepInstanceIds: inst.stepInstances.map((si) => si.id),
       }
       return ok
     }, {
-      // A transação do avanço cria a instância da próxima fase + passos + tarefas +
-      // eventos + logs + outbox (muitas escritas sequenciais). O default de 5000ms
-      // estourava (P2028) na transição genealogia→emissao_documental sob latência de
-      // pool. Só amplia a janela; nenhuma mudança de lógica.
+      // A transação do avanço cria a instância da próxima fase + passos + eventos +
+      // logs + outbox. As tarefas saíram daqui (ver 4b) justamente porque escalam com
+      // o número de alvos da fase. O default de 5000ms não cobre a latência do pool.
       timeout: 20000,
       maxWait: 15000,
     })
+    // 4b) Tarefas dos passos da nova fase — fora da transação, idempotente e em lote.
+    // As pré-condições do processo são lidas UMA vez para todos os passos.
+    if (out.success && out.changed && out.stepInstanceIds?.length) {
+      try {
+        const preCondicoes = await carregarPreCondicoes(p.processoId)
+        for (const stepId of out.stepInstanceIds) {
+          const g = await garantirTarefaDePasso(
+            { stepInstanceId: stepId, correlationId: p.correlationId, causationId: chave, origem: "workflow", preCondicoes },
+          )
+          if (g.success && g.created) out.tarefasCriadas++
+        }
+      } catch (e) {
+        console.error(`[avanço de fase] geração de tarefas falhou (proc ${p.processoId}); reconciliação completará:`, e)
+      }
+    }
+
     // Drena o phase.entered recém-emitido: os EFEITOS ADICIONAIS da nova fase (automações
     // FINANCEIRAS → lançamentos) rodam ao AVANÇAR, não só na criação do processo. Best-effort:
     // uma falha aqui não desfaz o avanço (o evento fica PENDENTE e é reprocessável).

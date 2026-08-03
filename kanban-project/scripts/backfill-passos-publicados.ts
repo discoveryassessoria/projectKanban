@@ -79,6 +79,42 @@ async function main() {
     }
   }
 
+  // ── A2) instâncias sem vínculo criadas pela leitura errada de escopo ──────
+  // Em 03/08/2026 uma leitura equivocada tratou "global (compartilhado)" (que é o
+  // compartilhamento do WORKFLOW) como cardinalidade do passo, e criou uma instância
+  // única sem pessoa e sem registro em fases que operam por alvo. Ela não é histórico
+  // de trabalho: nasceu DISPONIVEL, nunca foi executada e não tem entidade. Só é
+  // removida nessas condições — qualquer passo iniciado, concluído ou com vínculo fica.
+  console.log("\nA2) Instâncias sem vínculo em fases que operam por alvo")
+  const semVinculo = await prisma.phaseWorkflowStepInstance.findMany({
+    where: {
+      pessoaId: null, necessidadeId: null, documentoId: null,
+      status: "DISPONIVEL", startedAt: null, completedAt: null,
+      faseMacroKey: { in: ["genealogia", "emissao_documental"] },
+    },
+    select: { id: true, processoId: true, faseMacroKey: true, stepKey: true, ciclo: true },
+  })
+  if (semVinculo.length === 0) console.log("   nenhuma.")
+  for (const s of semVinculo) {
+    console.log(`   ${EXECUTAR ? "✔ removendo" : "→ removeria"} passo#${s.id} · proc${s.processoId} · ${s.faseMacroKey} · ${s.stepKey} c${s.ciclo} (sem pessoa/registro, nunca executado)`)
+    if (!EXECUTAR) continue
+    const tarefas = await prisma.tarefa.findMany({ where: { workflowStepInstanceId: s.id }, select: { id: true, statusTarefa: true } })
+    const emAndamento = tarefas.filter((t) => t.statusTarefa !== "NAO_INICIADA")
+    if (emAndamento.length > 0) {
+      console.log(`     ⚠ tarefa já iniciada (${emAndamento.map((t) => t.id).join(",")}) — passo PRESERVADO.`)
+      continue
+    }
+    await prisma.logAuditoria.create({
+      data: {
+        acao: "BACKFILL_REMOVE_PASSO_SEM_VINCULO", entidade: "PROCESSO", entidadeId: s.processoId,
+        descricao: `Passo ${s.stepKey} (id ${s.id}) da fase ${s.faseMacroKey} removido: instância sem pessoa/registro criada por leitura errada de escopo, nunca executada`,
+        detalhes: { stepInstanceId: s.id, ciclo: s.ciclo, tarefasRemovidas: tarefas.map((t) => t.id) },
+      },
+    }).catch(() => {})
+    await prisma.tarefa.deleteMany({ where: { workflowStepInstanceId: s.id } })
+    await prisma.phaseWorkflowStepInstance.delete({ where: { id: s.id } })
+  }
+
   // ── B) processos: fase ativa sem os passos publicados ─────────────────────
   console.log("\nB) Processos com fase ativa")
   const processos = await prisma.processo.findMany({

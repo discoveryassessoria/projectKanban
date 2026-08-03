@@ -12,7 +12,7 @@ import type { ProcessoWithStatus, Processo, OperationalProjection } from "@/src/
 import { DocumentoOperationalDrawer } from "./DocumentoOperationalDrawer"
 import { InitOperationModal } from "./InitOperationModal"
 import { WorkflowMacroTrilha, ResumoDoProcesso, PROCESS_PHASES } from "./WorkflowMacroTrilha"
-import { PainelDaFase, type FasePersonRow, type FaseStep, type FaseKpi, type FaseTarefaRow } from "./PainelDaFase"
+import { PainelDaFase, type FasePersonRow, type FaseKpi, type FaseTarefaRow } from "./PainelDaFase"
 import { ProcessoAnalise } from "./ProcessoAnalise"
 import { ProcessoTraducao } from "./ProcessoTraducao"
 import { ProcessoFaseGenerica } from "./ProcessoFaseGenerica"
@@ -229,10 +229,9 @@ function mapearPainel(data: CentralOpData, faseNome: string) {
   const divergentes = queue.filter((q) => ["INVALIDO", "NAO_ENCONTRADO"].includes(q.statusRaw)).length
 
   // ============================================================
-  // KPIs + 5 passos
+  // KPIs da fase (o workflow em si é renderizado pelo PainelDaFase)
   // ============================================================
   let kpis: FaseKpi[]
-  let steps: FaseStep[]
 
   if (fp && fp.steps.length > 0) {
     // ✅ CAMINHO REAL: números e passos vêm do estado gravado nos WorkflowSteps
@@ -264,7 +263,6 @@ function mapearPainel(data: CentralOpData, faseNome: string) {
       { label: "Divergentes", value: divergentes, tone: "late" },
     ]
     }
-    steps = fp.steps.map((s) => ({ title: s.title, status: s.status }))
   } else {
     // FALLBACK — só entra se a rota ainda não devolveu faseProgress (ex.: janela
     // de deploy). Mantém o comportamento antigo (inferido do status do doc) pra
@@ -281,21 +279,8 @@ function mapearPainel(data: CentralOpData, faseNome: string) {
       { label: "Conferidos", value: 0 },
       { label: "Divergentes", value: divergentes, tone: "late" },
     ]
-    const algumSolicitado = solicitados > 0 || validados > 0
-    const algumRecebido = validados > 0
-    const stepDefs = [
-      { title: "Solicitar certidão", done: algumSolicitado },
-      { title: "Aguardar retorno", done: algumRecebido },
-      { title: "Receber certidão", done: algumRecebido },
-      { title: "Conferir certidão", done: false },
-      { title: "Validar certidão", done: validados >= total && total > 0 },
-    ]
-    let achouAtiva = false
-    steps = stepDefs.map((s) => {
-      if (s.done) return { title: s.title, status: "concluida" as const }
-      if (!achouAtiva) { achouAtiva = true; return { title: s.title, status: "em_andamento" as const } }
-      return { title: s.title, status: "bloqueada" as const }
-    })
+    // A esteira de passos inferida do status do documento saiu junto com o resumo em
+    // linha: quem desenha o workflow agora é o próprio workflow materializado.
   }
 
   // ============================================================
@@ -411,7 +396,7 @@ function mapearPainel(data: CentralOpData, faseNome: string) {
         ? `${faseNome} concluída — todos os documentos validados.`
         : `Solicite, receba, confira e valide cada certidão. Falta${total - validados === 1 ? "" : "m"} ${total - validados} documento${total - validados === 1 ? "" : "s"} para concluir a ${faseNome}.`
 
-  return { kpis, steps, linhaPrincipal, foraDaLinha, pendenteClassificacao, pct, validados, total, progressoTexto }
+  return { kpis, linhaPrincipal, foraDaLinha, pendenteClassificacao, pct, validados, total, progressoTexto }
 }
 
 const FASE_META: Record<string, { sub: string; tabs: string[] }> = {
@@ -952,7 +937,6 @@ export function ProcessoCentralOperacional({
             faseNome={faseAtualNome}
             faseSub={bodyData.genealogiaReestruturacao ? "" : meta.sub}
             faseTabs={meta.tabs}
-            steps={painel.steps}
             kpis={painel.kpis}
             progressoPct={painel.pct}
             progressoConcluidos={painel.validados}

@@ -40,13 +40,25 @@ export async function garantirDocumentoDaNecessidade(
 ): Promise<number> {
   const nec = await prisma.necessidadeDocumental.findUnique({
     where: { id: necessidadeId },
-    select: { id: true, processoId: true, pessoaId: true, itemCatalogoId: true },
+    select: {
+      id: true, processoId: true, pessoaId: true, itemCatalogoId: true,
+      uniao: { select: { pessoa1Id: true, pessoa2Id: true } },
+    },
   })
   if (!nec || nec.processoId !== processoId) {
     throw new OperacaoNecessidadeErro("Necessidade não encontrada neste processo.", 404)
   }
-  if (!nec.pessoaId) {
-    throw new OperacaoNecessidadeErro("Necessidade sem pessoa (sujeito) — não é possível abrir a operação.", 400)
+
+  // SUJEITO DO REGISTRO. Nascimento e óbito têm PESSOA; casamento tem UNIÃO — e uma
+  // certidão de casamento é sempre lavrada em nome de um dos cônjuges. O Documento
+  // exige um titular, então a união usa o primeiro cônjuge, de forma determinística.
+  // O vínculo real do trabalho continua sendo `necessidadeId`, que aponta para a união.
+  const titularId = nec.pessoaId ?? nec.uniao?.pessoa1Id ?? null
+  if (!titularId) {
+    throw new OperacaoNecessidadeErro(
+      "Registro sem sujeito (nem pessoa, nem união) — não é possível abrir a busca.",
+      400,
+    )
   }
 
   // Tipo do documento a partir do itemCatalogo da necessidade (ponte legacyEnumKey).
@@ -70,7 +82,7 @@ export async function garantirDocumentoDaNecessidade(
     if (!d) {
       d = await tx.documento.create({
         data: {
-          pessoaId: nec.pessoaId!,
+          pessoaId: titularId,
           necessidadeId: nec.id,
           documentTypeId: tipoDoc?.id ?? null,
           tipo: tipoEnum,
