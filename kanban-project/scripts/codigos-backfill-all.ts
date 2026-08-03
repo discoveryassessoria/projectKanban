@@ -7,6 +7,7 @@ import { prisma } from "@/lib/prisma"
 import { gerarCodigoPublico, semearSequencia } from "@/lib/codigos/code-generator"
 import { escopoDe, formatoDe } from "@/lib/codigos/code-patterns"
 import { CODE_REGISTRY } from "@/lib/codigos/entity-registry"
+import { CLASSE, classificar, retratar } from "../lib/db/identidade-banco.mjs"
 
 const LOTE = 300
 const camel = (s: string) => s[0].toLowerCase() + s.slice(1)
@@ -14,6 +15,12 @@ const camel = (s: string) => s[0].toLowerCase() + s.slice(1)
 interface Linha { entidade: string; prefixo: string; migrados: number; preservados: number; erros: number }
 
 async function main() {
+  const classe = classificar(await retratar(prisma))
+  if (classe === CLASSE.PRODUCAO) {
+    console.error('[guard] ABORTADO: este script não pode rodar contra produção. Rode só em ambiente não-produtivo.')
+    process.exit(1)
+  }
+
   const tabela: Linha[] = []
   for (const [modelName, cfg] of Object.entries(CODE_REGISTRY)) {
     const scope = escopoDe(cfg.entidade)

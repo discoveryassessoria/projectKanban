@@ -25,6 +25,7 @@
 // Conexão: usa INSPECT_DB_URL se setado; senão o datasource padrão.
 // ============================================================================
 import { PrismaClient, Moeda } from '@prisma/client'
+import { CLASSE, classificar, retratar } from '../lib/db/identidade-banco.mjs'
 
 const url = process.env.INSPECT_DB_URL
 const prisma = url ? new PrismaClient({ datasources: { db: { url } } }) : new PrismaClient()
@@ -33,6 +34,12 @@ const EXECUTE = process.argv.includes('--execute')
 type Plano = { codigo: string; nome: string; itemCatalogoId: number; tipoDocumentoId: number | null; origem: string }
 
 async function main() {
+  const classe = classificar(await retratar(prisma))
+  if (EXECUTE && classe === CLASSE.PRODUCAO) {
+    console.error('[guard] ABORTADO: este script não pode rodar contra produção. Rode só em ambiente não-produtivo.')
+    process.exit(1)
+  }
+
   const [docs, servicos, existentes] = await Promise.all([
     prisma.tipoDocumentoCadastro.findMany({ where: { ativo: true }, select: { id: true, code: true, name: true, itemCatalogoId: true } }),
     prisma.itemCatalogo.findMany({ where: { ativo: true, natureza: 'SERVICO' }, select: { id: true, code: true, name: true } }),

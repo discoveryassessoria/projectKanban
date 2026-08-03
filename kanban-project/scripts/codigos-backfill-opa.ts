@@ -5,10 +5,17 @@
 //   PRISMA_DATABASE_URL=... npx tsx scripts/codigos-backfill-opa.ts
 import { prisma } from "@/lib/prisma"
 import { gerarCodigoPublico } from "@/lib/codigos/code-generator"
+import { CLASSE, classificar, retratar } from "../lib/db/identidade-banco.mjs"
 
 const LOTE = 200
 
 async function main() {
+  const classe = classificar(await retratar(prisma))
+  if (classe === CLASSE.PRODUCAO) {
+    console.error('[guard] ABORTADO: este script não pode rodar contra produção. Rode só em ambiente não-produtivo.')
+    process.exit(1)
+  }
+
   let feitos = 0, erros = 0
   for (;;) {
     const pendentes = await prisma.operacaoAntecipada.findMany({

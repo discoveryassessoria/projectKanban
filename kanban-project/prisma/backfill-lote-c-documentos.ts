@@ -5,8 +5,15 @@
 // NÃO inventa mapping: o que não casar entra em NEEDS_REVIEW.
 // Rodar DEPOIS do seed dos tipos: npx tsx prisma/backfill-lote-c-documentos.ts
 import { prisma } from '@/lib/prisma'
+import { CLASSE, classificar, retratar } from '../lib/db/identidade-banco.mjs'
 
 async function main() {
+  const classe = classificar(await retratar(prisma))
+  if (classe === CLASSE.PRODUCAO) {
+    console.error('[guard] ABORTADO: este script não pode rodar contra produção. Rode só em ambiente não-produtivo.')
+    process.exit(1)
+  }
+
   console.log('🔗 LOTE C · Fase 6 — backfill Documento.tipo → documentTypeId\n')
 
   // mapa legacyEnumKey → id (uma query)
