@@ -31,6 +31,36 @@ export interface WorkflowValidationResult {
 }
 
 // Definições recebidas (subset do que importa; sem acoplar ao Prisma).
+/**
+ * Modo de execução dos passos publicados da fase — CONFIGURAÇÃO, não regra de código.
+ *  • SEQUENCIAL: só o primeiro passo nasce disponível; concluir um libera o seguinte.
+ *  • PARALELO:   todos os passos nascem disponíveis.
+ */
+export type ModoExecucaoPassos = "SEQUENCIAL" | "PARALELO"
+
+/**
+ * CARDINALIDADE OPERACIONAL de um passo: quantas instâncias ele gera e presa a QUAL
+ * entidade. NÃO confundir com "global (compartilhado)", que é o compartilhamento do
+ * WORKFLOW entre tipos de processo (PhaseInternalWorkflow.tipoProcessoId = null).
+ *  • PROCESSO:    1 instância por fase/ciclo.
+ *  • PESSOA:      1 por pessoa aplicável da árvore.
+ *  • NECESSIDADE: 1 por registro/certidão a localizar (preserva pessoa + registro).
+ *  • DOCUMENTO:   1 por documento materializado.
+ */
+export type Cardinalidade = "PROCESSO" | "PESSOA" | "NECESSIDADE" | "DOCUMENTO"
+
+export const MODOS_EXECUCAO: readonly ModoExecucaoPassos[] = ["SEQUENCIAL", "PARALELO"]
+export const CARDINALIDADES: readonly Cardinalidade[] = ["PROCESSO", "PESSOA", "NECESSIDADE", "DOCUMENTO"]
+
+/** Normaliza o valor persistido; desconhecido cai no default declarado no schema. */
+export function normalizarModoExecucao(v: string | null | undefined): ModoExecucaoPassos {
+  return v === "PARALELO" ? "PARALELO" : "SEQUENCIAL"
+}
+/** null/desconhecido ⇒ null (= herda o escopo operacional da fase). */
+export function normalizarCardinalidade(v: string | null | undefined): Cardinalidade | null {
+  return (CARDINALIDADES as readonly string[]).includes(String(v)) ? (v as Cardinalidade) : null
+}
+
 export interface DefWorkflow {
   id: number
   wfUid: string
@@ -40,6 +70,8 @@ export interface DefWorkflow {
   versao: number
   active: boolean
   arquivado: boolean
+  /** Modo de execução PERSISTIDO dos passos: SEQUENCIAL | PARALELO. */
+  execucao: ModoExecucaoPassos
 }
 export interface DefStep {
   id: number
@@ -55,8 +87,10 @@ export interface DefStep {
   completionRule: string | null
   checklist: unknown
   versao: number
+  /** Cardinalidade PERSISTIDA. null ⇒ herda o escopo operacional da fase. */
+  cardinalidade: Cardinalidade | null
   tipo?: string | null // a definição atual NÃO tem; reservado p/ futuro
-  dependeDeStepKeys?: string[] | null // reservado; hoje ausente na definição
+  dependeDeStepKeys?: string[] | null // derivado do modo de execução do workflow
 }
 
 // ---------- Chaves de idempotência (determinísticas) ----------
@@ -89,6 +123,11 @@ export function montarChavePasso(i: {
   // Passo operacional POR-DOCUMENTO: distingue a mesma stepKey entre documentos
   // sob a mesma instância. Ausente (passo-template da fase) mantém a chave legada.
   documentoId?: number | null
+  // Passo POR-PESSOA (escopo PESSOA do cadastro): distingue a mesma stepKey entre
+  // pessoas da árvore sob a mesma instância.
+  pessoaId?: number | null
+  // Passo POR-NECESSIDADE (escopo DOCUMENTO sem Documento materializado ainda).
+  necessidadeId?: number | null
 }): string {
   const base = [
     `wfi${i.workflowInstanceId}`,
@@ -97,8 +136,12 @@ export function montarChavePasso(i: {
     `stepv${i.stepDefinitionVersion}`,
     `c${i.ciclo}`,
   ]
-  // Retrocompat: só anexa o segmento quando há documento (passo-template inalterado).
+  // Retrocompat: só anexa o segmento quando há entidade (passo-template inalterado).
+  // A chave lógica é processo+ciclo+passo publicado+entidade do escopo (item 26 da
+  // especificação): reexecutar a materialização converge, nunca duplica.
   if (i.documentoId != null) base.push(`doc${i.documentoId}`)
+  if (i.pessoaId != null) base.push(`pes${i.pessoaId}`)
+  if (i.necessidadeId != null) base.push(`nec${i.necessidadeId}`)
   return base.join("|")
 }
 

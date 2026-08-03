@@ -114,14 +114,19 @@ check("etapa sem item aplicável NÃO se declara 'em andamento'", rota.includes(
 
 check("Central semeia as linhas pelo roster, não pela fila", central.includes("const roster = data.pessoas ?? []") && central.includes("for (const r of roster) porPessoa.set(r.pessoaId, linhaDoRoster(r))"))
 check("Central expõe o grupo 'pendente de classificação'", central.includes("pendenteClassificacao"))
+check("tabela de pessoas não repete o trabalho do workflow", painel.includes("PESSOAS DO PROCESSO (contexto"))
 check("Central repassa as tarefas ao painel", central.includes("tarefas={bodyData.tarefas ?? []}"))
 check("Central tem handler único de abertura de tarefa", central.includes("const abrirTarefa = useCallback"))
 check("abrir tarefa usa a operação oficial (sem rota legada)", /abrirOperacao\(t\.documentoId \?\? 0, t\.necessidadeId\)/.test(central))
+check("passo sem executor vira erro administrativo explícito (tarefa não some)", central.includes("if (!t.executor)") && painel.includes("erroAdministrativo") && painel.includes("Sem executor"))
+check("progresso da fase por alvo sai da MESMA lista de tarefas", central.includes("const porAlvo = tarefasFase.length > 0") && central.includes('label: "Registros a localizar"'))
 
-check("painel renderiza a lista de tarefas", painel.includes("<ListaDeTarefas") && painel.includes("function ListaDeTarefas"))
-check("painel agrupa em Pendentes / Em andamento / Concluídas", painel.includes('titulo: "Pendentes"') && painel.includes('titulo: "Em andamento"') && painel.includes('titulo: "Concluídas"'))
+check("painel renderiza o WORKFLOW da fase (não uma segunda lista)", painel.includes("<WorkflowDaFase") && painel.includes("function WorkflowDaFase"))
+check("cada passo do workflow é expansível", painel.includes("function PassoDoWorkflow") && painel.includes("setExp(!exp)"))
+check("expandir mostra as INSTÂNCIAS operacionais do passo", painel.includes("function InstanciaDoPasso") && painel.includes("passo.instancias.map"))
+check("sem lista de tarefas paralela ao workflow", !painel.includes("ListaDeTarefas") && !painel.includes("GRUPOS_TAREFA"))
+check("sem esteira de etapas duplicando o workflow", !painel.includes("5 ETAPAS EM LINHA") && !central.includes("let steps: FaseStep[]"))
 check("painel tem o grupo de pendência de classificação", painel.includes("Pendente de classificação"))
-check("etapa 'pendente' é rotulada com honestidade", painel.includes("Sem itens aplicáveis"))
 
 // A regressão exata: condições de quantidade/obrigatoriedade governando renderização.
 const CONDICOES_PROIBIDAS: Array<[string, RegExp]> = [
@@ -135,7 +140,18 @@ const CONDICOES_PROIBIDAS: Array<[string, RegExp]> = [
 for (const [nome, re] of CONDICOES_PROIBIDAS) {
   check(`sem condição incorreta: ${nome}`, !re.test(central) && !re.test(painel) && !re.test(rota))
 }
-check("botão 'Abrir' da pessoa não é morto (não depende de docs.length)", !painel.includes("p.docs.length && (setExp(true))"))
+// A linha da pessoa não pode mais listar documentos/tarefas — isso vive no workflow.
+// ("Abrir operação" segue existindo, mas dentro da Operação Antecipada, que é outra coisa.)
+check("linha da pessoa é CONTEXTO, sem tarefas duplicadas",
+  !painel.includes("p.docs.map") && !painel.includes("docsResumo.map") && !painel.includes("docExpRow"))
+// OPERAÇÃO ANTECIPADA — a capacidade tem de continuar INTEIRA: criar, listar,
+// avaliar e abrir. Só mudou de lugar (do documento na tabela para o alvo do passo).
+check("antecipada: criar", painel.includes("+ antecipada") && painel.includes("onNovaOperacao(t.necessidadeId"))
+check("antecipada: listar inline no alvo", painel.includes("function OperacoesAntecipadasInline") && painel.includes("<OperacoesAntecipadasInline"))
+check("antecipada: avaliar (SIM/PARCIAL/NAO/CANCELAR)", painel.includes("function OperacaoAntecipadaItem") && painel.includes("onAvaliar?.(o.id"))
+check("antecipada: abrir a operação oficial", painel.includes("onAbrirOperacaoAntecipada") && central.includes("abrirOperacaoAntecipada"))
+check("antecipada: rótulos de status preservados", painel.includes("ST_OP_LABEL") && painel.includes("AGUARDANDO_RESULTADO"))
+check("antecipada: ligada ponta a ponta pela Central", central.includes("operacoesPorNec={operacoesPorNec}") && central.includes("onAvaliarOperacao={readOnly ? undefined : avaliarOperacao}"))
 
 // Timeline: executar a tarefa pela Central tem de deixar rastro no Diário Operacional.
 const opDoc = read("src/services/documento-operacao.ts")
@@ -144,7 +160,7 @@ check("evento cobre início, mudança de status e conclusão", /EM_ANDAMENTO:\s*
 check("evento é idempotente (não derruba a transação ao repetir)", opDoc.includes("skipDuplicates: true") && opDoc.includes("chaveEvento("))
 check("sem evento quando não houve transição de estado", opDoc.includes("novo === p.status ? null"))
 check("lista de tarefas aparece com UMA tarefa (sem piso de quantidade)", !/tarefas\.length\s*>\s*1/.test(painel))
-check("tarefas concluídas continuam visíveis (grupo próprio, sem filtro)", painel.includes('balde: "CONCLUIDA"'))
+check("instâncias concluídas continuam visíveis (sem filtro)", painel.includes('t.balde === "CONCLUIDA"') && !painel.includes("filter((t) => t.balde !== "))
 
 // ============================================================
 console.log(`\n${falhas.length === 0 ? "✅" : "❌"} ${ok}/${ok + falhas.length} verificações`)

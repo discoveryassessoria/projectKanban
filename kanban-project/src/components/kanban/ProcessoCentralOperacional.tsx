@@ -12,7 +12,7 @@ import type { ProcessoWithStatus, Processo, OperationalProjection } from "@/src/
 import { DocumentoOperationalDrawer } from "./DocumentoOperationalDrawer"
 import { InitOperationModal } from "./InitOperationModal"
 import { WorkflowMacroTrilha, ResumoDoProcesso, PROCESS_PHASES } from "./WorkflowMacroTrilha"
-import { PainelDaFase, type FasePersonRow, type FaseStep, type FaseKpi, type FaseTarefaRow } from "./PainelDaFase"
+import { PainelDaFase, type FasePersonRow, type FaseKpi, type FaseTarefaRow } from "./PainelDaFase"
 import { ProcessoAnalise } from "./ProcessoAnalise"
 import { ProcessoTraducao } from "./ProcessoTraducao"
 import { ProcessoFaseGenerica } from "./ProcessoFaseGenerica"
@@ -229,16 +229,30 @@ function mapearPainel(data: CentralOpData, faseNome: string) {
   const divergentes = queue.filter((q) => ["INVALIDO", "NAO_ENCONTRADO"].includes(q.statusRaw)).length
 
   // ============================================================
-  // KPIs + 5 passos
+  // KPIs da fase (o workflow em si é renderizado pelo PainelDaFase)
   // ============================================================
   let kpis: FaseKpi[]
-  let steps: FaseStep[]
 
   if (fp && fp.steps.length > 0) {
     // ✅ CAMINHO REAL: números e passos vêm do estado gravado nos WorkflowSteps
     // (fp), não mais do status do documento. Aqui é que "0 Recebidos com doc
     // recebido" e o "passo ativo errado" são corrigidos.
     const c = fp.counts
+    // O progresso da fase sai da PRÓPRIA lista de tarefas quando a fase opera por
+    // alvo (Genealogia = registros a localizar): contador e lista têm a mesma fonte,
+    // então não podem divergir. Sem tarefas, cai nos contadores por passo.
+    const tarefasFase = data.tarefas ?? []
+    const porAlvo = tarefasFase.length > 0 && tarefasFase.every((t) => t.necessidadeId != null || t.documentoId != null)
+    if (porAlvo) {
+      const localizados = tarefasFase.filter((t) => t.balde === "CONCLUIDA").length
+      const divergentesAlvo = tarefasFase.filter((t) => t.statusRaw === "BLOQUEADO" || t.statusRaw === "FALHOU").length
+      kpis = [
+        { label: "Registros a localizar", value: tarefasFase.length },
+        { label: "Localizados", value: localizados, tone: "ok" },
+        { label: "Pendentes", value: tarefasFase.length - localizados - divergentesAlvo, tone: "busca" },
+        { label: "Divergentes", value: divergentesAlvo, tone: "late" },
+      ]
+    } else {
     kpis = [
       { label: "Obrigatórios", value: total },
       { label: "Validados", value: c.validados, tone: "ok" },
@@ -248,7 +262,7 @@ function mapearPainel(data: CentralOpData, faseNome: string) {
       { label: "Conferidos", value: c.conferidos },
       { label: "Divergentes", value: divergentes, tone: "late" },
     ]
-    steps = fp.steps.map((s) => ({ title: s.title, status: s.status }))
+    }
   } else {
     // FALLBACK — só entra se a rota ainda não devolveu faseProgress (ex.: janela
     // de deploy). Mantém o comportamento antigo (inferido do status do doc) pra
@@ -265,21 +279,8 @@ function mapearPainel(data: CentralOpData, faseNome: string) {
       { label: "Conferidos", value: 0 },
       { label: "Divergentes", value: divergentes, tone: "late" },
     ]
-    const algumSolicitado = solicitados > 0 || validados > 0
-    const algumRecebido = validados > 0
-    const stepDefs = [
-      { title: "Solicitar certidão", done: algumSolicitado },
-      { title: "Aguardar retorno", done: algumRecebido },
-      { title: "Receber certidão", done: algumRecebido },
-      { title: "Conferir certidão", done: false },
-      { title: "Validar certidão", done: validados >= total && total > 0 },
-    ]
-    let achouAtiva = false
-    steps = stepDefs.map((s) => {
-      if (s.done) return { title: s.title, status: "concluida" as const }
-      if (!achouAtiva) { achouAtiva = true; return { title: s.title, status: "em_andamento" as const } }
-      return { title: s.title, status: "bloqueada" as const }
-    })
+    // A esteira de passos inferida do status do documento saiu junto com o resumo em
+    // linha: quem desenha o workflow agora é o próprio workflow materializado.
   }
 
   // ============================================================
@@ -395,7 +396,7 @@ function mapearPainel(data: CentralOpData, faseNome: string) {
         ? `${faseNome} concluída — todos os documentos validados.`
         : `Solicite, receba, confira e valide cada certidão. Falta${total - validados === 1 ? "" : "m"} ${total - validados} documento${total - validados === 1 ? "" : "s"} para concluir a ${faseNome}.`
 
-  return { kpis, steps, linhaPrincipal, foraDaLinha, pendenteClassificacao, pct, validados, total, progressoTexto }
+  return { kpis, linhaPrincipal, foraDaLinha, pendenteClassificacao, pct, validados, total, progressoTexto }
 }
 
 const FASE_META: Record<string, { sub: string; tabs: string[] }> = {
@@ -565,7 +566,9 @@ export function ProcessoCentralOperacional({
   // Nenhuma condição de documento obrigatório, de progresso da fase ou de quantidade
   // de tarefas participa desta decisão. Sem redirecionamento para rota legada.
   const abrirTarefa = useCallback((t: FaseTarefaRow) => {
-    if (t.bloqueioAbertura) { setErroOperacao(t.bloqueioAbertura); return }
+    // Sem executor configurado para o tipo/escopo do passo: erro ADMINISTRATIVO
+    // explícito. A tarefa segue visível na lista — o que falta é cadastro.
+    if (!t.executor) { setErroOperacao(t.erroAdministrativo ?? "Sem executor configurado para este passo."); return }
     setBannerAntecipada(null)
     void abrirOperacao(t.documentoId ?? 0, t.necessidadeId)
   }, [abrirOperacao])
@@ -934,7 +937,6 @@ export function ProcessoCentralOperacional({
             faseNome={faseAtualNome}
             faseSub={bodyData.genealogiaReestruturacao ? "" : meta.sub}
             faseTabs={meta.tabs}
-            steps={painel.steps}
             kpis={painel.kpis}
             progressoPct={painel.pct}
             progressoConcluidos={painel.validados}
@@ -946,9 +948,7 @@ export function ProcessoCentralOperacional({
             tarefas={bodyData.tarefas ?? []}
             onAbrirTarefa={readOnly ? undefined : abrirTarefa}
             readOnly={readOnly}
-            onAbrirOperacao={readOnly ? undefined : (docId, necessidadeId) => { setBannerAntecipada(null); void abrirOperacao(docId, necessidadeId) }}
             usuarios={usuarios}
-            onDelegar={readOnly ? undefined : (necessidadeId, responsavelId) => { void delegar(necessidadeId, responsavelId) }}
             onNovaOperacao={readOnly ? undefined : (necessidadeId, pessoaIdNec, label) => setNovaOperacaoCtx({ necessidadeId, pessoaId: pessoaIdNec, label })}
             operacoesPorNec={operacoesPorNec}
             onAvaliarOperacao={readOnly ? undefined : avaliarOperacao}

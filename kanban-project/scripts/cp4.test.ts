@@ -129,8 +129,8 @@ async function run() {
 
   // 10) Validator
   console.log("\n10) Validator:")
-  const wf = { id: 5, wfUid: "u", name: "W", phaseKey: "GENEALOGIA", tipoProcessoId: 1, versao: 1, active: true, arquivado: false }
-  const stepOk: DefStep = { id: 1, key: "solicitar", label: "L", description: null, ordem: 0, createsTask: true, required: true, owner: null, priority: "medium", slaDays: 3, completionRule: null, checklist: null, versao: 1 }
+  const wf = { id: 5, wfUid: "u", name: "W", phaseKey: "GENEALOGIA", tipoProcessoId: 1, versao: 1, active: true, arquivado: false, execucao: "SEQUENCIAL" as const }
+  const stepOk: DefStep = { id: 1, key: "solicitar", label: "L", description: null, ordem: 0, createsTask: true, required: true, owner: null, priority: "medium", slaDays: 3, completionRule: null, checklist: null, versao: 1, cardinalidade: null }
   ok(validarDefinicao(wf, []).errors.some((e) => e.code === "WORKFLOW_SEM_PASSOS"), "workflow sem passos => WORKFLOW_SEM_PASSOS")
   ok(validarDefinicao(wf, [{ ...stepOk, key: "" }]).errors.some((e) => e.code === "STEP_SEM_KEY"), "step sem key => STEP_SEM_KEY")
   ok(validarDefinicao(wf, [stepOk, { ...stepOk, id: 2 }]).errors.some((e) => e.code === "STEP_KEY_DUPLICADA"), "stepKey duplicada => STEP_KEY_DUPLICADA")

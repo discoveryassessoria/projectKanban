@@ -150,9 +150,18 @@ interface TarefaFaseRow {
   responsavelNome: string | null
   prazo: string | null
   diasParaPrazo: number | null
+  /** SLA em dias CONFIGURADO no passo publicado (visível mesmo sem prazo iniciado). */
+  slaDays: number | null
   motivo: string | null
-  /** Por que a tarefa não pode ser aberta agora. null ⇒ abre. */
-  bloqueioAbertura: string | null
+  /** Escopo persistido do passo, derivado da entidade vinculada à instância. */
+  escopo: "GLOBAL" | "PESSOA" | "DOCUMENTO"
+  /** Executor oficial que a UI deve renderizar ao abrir. null ⇒ não há executor. */
+  executor: "OPERACAO_DOCUMENTO" | null
+  /**
+   * Erro ADMINISTRATIVO explícito quando não há executor para o tipo/escopo do passo.
+   * A tarefa continua visível — o que falta é configuração, e isso precisa ser dito.
+   */
+  erroAdministrativo: string | null
 }
 
 // Modo operacional da Central (UMA única tela; muda só o modo, nunca o layout):
@@ -876,8 +885,8 @@ export async function GET(
           orderBy: [{ ciclo: "desc" }, { ordem: "asc" }, { id: "asc" }],
           select: {
             id: true, stepKey: true, ordem: true, status: true, obrigatorio: true,
-            necessidadeId: true, documentoId: true, responsavelId: true,
-            prazo: true, motivo: true, snapshot: true, ciclo: true,
+            pessoaId: true, necessidadeId: true, documentoId: true, responsavelId: true,
+            prazo: true, slaDays: true, motivo: true, snapshot: true, ciclo: true,
           },
         })
       : []
@@ -891,7 +900,14 @@ export async function GET(
       necIdsTarefa.length
         ? prisma.necessidadeDocumental.findMany({
             where: { id: { in: necIdsTarefa } },
-            select: { id: true, pessoaId: true, matrizSnapshot: true, itemCatalogo: { select: { name: true } } },
+            select: {
+              id: true, pessoaId: true, matrizSnapshot: true,
+              itemCatalogo: { select: { name: true } },
+              // Certidão de casamento tem a UNIÃO como sujeito, não uma pessoa. Sem
+              // isto a linha ficava sem nome — e "de quem é este casamento?" é
+              // exatamente o que o operador precisa ler.
+              uniao: { select: { pessoa1: { select: { nome: true, sobrenome: true } }, pessoa2: { select: { nome: true, sobrenome: true } } } },
+            },
           })
         : Promise.resolve([]),
       respIdsTarefa.length
@@ -907,9 +923,15 @@ export async function GET(
     // stepKey. Nunca inventa texto.
     const catalogoDaFase = faseAtualCode ? getStepsForFase(faseAtualCode) : []
     const tituloDoPasso = (stepKey: string, snapshot: unknown): string => {
-      if (snapshot && typeof snapshot === "object" && "label" in snapshot) {
-        const l = (snapshot as { label: unknown }).label
-        if (typeof l === "string" && l.trim()) return l
+      // O rótulo VEM DO SNAPSHOT do passo publicado (imutável, versionado): é o texto
+      // que o operador cadastrou. `titulo` é a chave que construirSnapshotPasso grava;
+      // `label` cobre snapshots de outra origem. Só depois cai no catálogo, e por
+      // último no stepKey — que é identificador, não rótulo.
+      if (snapshot && typeof snapshot === "object") {
+        for (const chave of ["titulo", "label"] as const) {
+          const v = (snapshot as Record<string, unknown>)[chave]
+          if (typeof v === "string" && v.trim()) return v
+        }
       }
       return catalogoDaFase.find((c) => c.stepKey === stepKey)?.title ?? stepKey
     }
@@ -926,19 +948,29 @@ export async function GET(
     const tarefas: TarefaFaseRow[] = passosDaFase.map((s) => {
       const nec = s.necessidadeId != null ? necTarefaMap.get(s.necessidadeId) : undefined
       const doc = s.documentoId != null ? docTarefaMap.get(s.documentoId) : undefined
-      const pessoaId = nec?.pessoaId ?? doc?.pessoaId ?? null
+      const pessoaId = s.pessoaId ?? nec?.pessoaId ?? doc?.pessoaId ?? null
       const pessoa = pessoaId != null ? pessoasMap.get(pessoaId) : undefined
       const assunto =
         requisitoDaNecessidade(nec) ??
         (doc?.tipo ? TIPO_LABELS[doc.tipo] ?? doc.tipo : null)
-      // ABERTURA: um passo por-entidade abre a operação oficial (documento existente
-      // ou necessidade que materializa o documento ao abrir). Passo genérico da fase
-      // (sem entidade) não tem tela de operação por item — é executado no painel da
-      // fase. A ausência de documento obrigatório NÃO bloqueia nada aqui.
-      const bloqueioAbertura =
-        s.necessidadeId == null && s.documentoId == null
-          ? "Etapa da fase, sem item próprio — execute pelo painel da fase."
-          : null
+
+      // ESCOPO da instância — lido da entidade que ela carrega, que por sua vez veio do
+      // escopo PERSISTIDO no cadastro do passo. Nunca inferido por nome ou posição.
+      const escopo: TarefaFaseRow["escopo"] =
+        s.necessidadeId != null || s.documentoId != null ? "DOCUMENTO"
+        : s.pessoaId != null ? "PESSOA"
+        : "GLOBAL"
+
+      // EXECUTOR: qual tela oficial abre esta tarefa. Hoje existe UM executor — a
+      // operação por documento/necessidade (busca documental e dados registrais).
+      // Um passo sem entidade não tem executor: a tarefa CONTINUA VISÍVEL e diz, em
+      // texto, que falta configuração. Esconder a tarefa seria mentir sobre o trabalho.
+      const executor: TarefaFaseRow["executor"] =
+        s.necessidadeId != null || s.documentoId != null ? "OPERACAO_DOCUMENTO" : null
+      const erroAdministrativo = executor
+        ? null
+        : `Sem executor para este passo. "${tituloDoPasso(s.stepKey, s.snapshot)}" está publicado com escopo ${escopo} na fase "${faseConsultadaKey}", e o único executor disponível opera sobre documento/necessidade. Ajuste o escopo do passo em Gerenciamento › Workflows das Fases, ou publique o requisito documental que gera a entidade.`
+
       return {
         stepInstanceId: s.id,
         stepKey: s.stepKey,
@@ -948,7 +980,11 @@ export async function GET(
         statusLabel: rotuloStatusPasso(s.status),
         obrigatorio: s.obrigatorio,
         pessoaId,
-        pessoaNome: pessoa ? nomeCompleto(pessoa) : null,
+        pessoaNome: pessoa
+          ? nomeCompleto(pessoa)
+          : nec?.uniao
+            ? [nec.uniao.pessoa1, nec.uniao.pessoa2].filter(Boolean).map((x) => nomeCompleto(x!)).join(" e ")
+            : null,
         assunto,
         necessidadeId: s.necessidadeId,
         documentoId: s.documentoId,
@@ -956,8 +992,11 @@ export async function GET(
         responsavelNome: s.responsavelId != null ? respNomesTarefa.get(s.responsavelId) ?? null : null,
         prazo: s.prazo?.toISOString() ?? null,
         diasParaPrazo: s.prazo ? diffDays(s.prazo, now) : null,
+        slaDays: s.slaDays ?? null,
         motivo: s.motivo ?? null,
-        bloqueioAbertura,
+        escopo,
+        executor,
+        erroAdministrativo,
       }
     })
 

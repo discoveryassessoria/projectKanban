@@ -33,6 +33,11 @@ model Usuario {
   decisoesDedupTomadas  DecisaoDeduplicacao[] @relation("DecisaoDedupResponsavel")
 
   // MRG - back-relations (autoria e assinatura das decisoes registrais)
+  // Regularizacao historica: autoria das instancias de fase e das conclusoes.
+  fasesCriadas           PhaseWorkflowInstance[] @relation("FaseCriadaPor")
+  fasesRegularizadas     PhaseWorkflowInstance[] @relation("FaseRegularizadaPor")
+  processosRegularizados Processo[]              @relation("ProcessoRegularizadoPor")
+
   lotesRegistrais           LoteRegistral[]             @relation("LoteRegistralAutor")
   fatosRegistraisAfirmados  FatoRegistral[]             @relation("FatoRegistralResponsavel")
   correspondenciasDecididas CorrespondenciaIdentidade[] @relation("CorrespondenciaDecisor")
@@ -111,11 +116,12 @@ model Pessoa {
   decisoesDedup DecisaoDeduplicacao[]   @relation("PessoaDecisaoDedup")
 
   // MRG — back-relations (referencia, nunca duplicacao de dominio)
-  ocorrenciasResolvidas OcorrenciaDocumental[]      @relation("OcorrenciaPessoaResolvida")
-  correspondencias      CorrespondenciaIdentidade[] @relation("CorrespondenciaPessoa")
-  fatosRegistrais       FatoRegistral[]
-  evidenciasRegistrais  EvidenciaRegistral[]        @relation("EvidenciaPessoa")
-  conflitosRegistrais   ConflitoRegistral[]         @relation("ConflitoPessoa")
+  ocorrenciasResolvidas      OcorrenciaDocumental[]      @relation("OcorrenciaPessoaResolvida")
+  correspondencias           CorrespondenciaIdentidade[] @relation("CorrespondenciaPessoa")
+  fatosRegistrais            FatoRegistral[]
+  evidenciasRegistrais       EvidenciaRegistral[]        @relation("EvidenciaPessoa")
+  conflitosRegistrais        ConflitoRegistral[]         @relation("ConflitoPessoa")
+  phaseWorkflowStepInstances PhaseWorkflowStepInstance[]
 
   @@index([arvoreId])
   @@index([pais_nasc])
@@ -350,47 +356,59 @@ model CodeSequence {
 }
 
 model Processo {
-  id                  Int                   @id @default(autoincrement())
+  id                          Int                    @id @default(autoincrement())
   // CÃDIGO PÃBLICO (humano) gerado pelo CodeGeneratorService: IT-1, ES-1, DE-1...
   // (sequÃªncia por paÃ­s). UNIQUE, imutÃ¡vel, nunca reusado. O identificador tÃ©cnico segue id.
-  codigo              String?               @unique @db.VarChar(20)
-  nome                String                @db.VarChar(100)
-  descricao           String?               @db.VarChar(500)
-  observacoes         String?
-  pais                String
-  arvoreId            Int?
-  familiaId           Int?
-  dataInicio          DateTime              @default(now())
-  previsaoTermino     DateTime?
-  dataConclusao       DateTime?
-  createdAt           DateTime              @default(now())
-  updatedAt           DateTime              @updatedAt
-  percentualImposto   Decimal               @default(12.00) @db.Decimal(5, 2)
-  anexos              AnexoProcesso[]
-  counterRecibo       CounterRecibo?
-  custos              Custo[]
-  custosPessoa        CustoPessoa[]
-  eventos             Evento[]
-  faturas             Fatura[]
-  informacaoItalia    InformacaoItalia?
-  mensagens           Mensagem[]
-  outrosCustos        OutroCusto[]
-  arvore              Arvore?               @relation(fields: [arvoreId], references: [id])
-  familia             Familia?              @relation(fields: [familiaId], references: [id], onDelete: SetNull)
-  analise             AnaliseDocumental?
-  faseAtualKey        String?
-  contratantes        ProcessoContratante[]
-  requerentes         ProcessoRequerente[]
-  protocolos          Protocolo[]
-  receitas            Receita[]
-  recibos             Recibo[]
-  tarefas             Tarefa[]
-  tiposServico        TipoServico[]
-  pastaTraducao       PastaTraducao?
-  pastaApostilamento  PastaApostilamento?
-  fasesFinais         FaseFinal[]
-  retificacaoPacotes  RetificacaoPacote[]
-  emissoesRetificadas EmissaoRetificada[]
+  codigo                      String?                @unique @db.VarChar(20)
+  nome                        String                 @db.VarChar(100)
+  descricao                   String?                @db.VarChar(500)
+  observacoes                 String?
+  pais                        String
+  arvoreId                    Int?
+  familiaId                   Int?
+  dataInicio                  DateTime               @default(now())
+  previsaoTermino             DateTime?
+  dataConclusao               DateTime?
+  createdAt                   DateTime               @default(now())
+  updatedAt                   DateTime               @updatedAt
+  percentualImposto           Decimal                @default(12.00) @db.Decimal(5, 2)
+  anexos                      AnexoProcesso[]
+  counterRecibo               CounterRecibo?
+  custos                      Custo[]
+  custosPessoa                CustoPessoa[]
+  eventos                     Evento[]
+  faturas                     Fatura[]
+  informacaoItalia            InformacaoItalia?
+  mensagens                   Mensagem[]
+  outrosCustos                OutroCusto[]
+  arvore                      Arvore?                @relation(fields: [arvoreId], references: [id])
+  familia                     Familia?               @relation(fields: [familiaId], references: [id], onDelete: SetNull)
+  analise                     AnaliseDocumental?
+  faseAtualKey                String?
+  // ---- REGULARIZACAO HISTORICA ----
+  // faseAtualKey continua sendo a FASE OPERACIONAL DE REFERENCIA: a mais avancada
+  // liberada para operar. Ela NAO representa sozinha a situacao do processo - cada
+  // instancia de fase carrega o seu proprio estado, workflow, tarefas e datas.
+  regularizacaoHistorica      RegularizacaoHistorica @default(NAO_NECESSARIA)
+  regularizacaoConcluidaEm    DateTime?
+  regularizacaoConcluidaPorId Int?
+  regularizacaoConcluidaPor   Usuario?               @relation("ProcessoRegularizadoPor", fields: [regularizacaoConcluidaPorId], references: [id], onDelete: SetNull)
+  /**
+   * Por que o processo foi cadastrado ja em fase avancada.
+   */
+  motivoCadastroEmAndamento   String?                @db.Text
+  contratantes                ProcessoContratante[]
+  requerentes                 ProcessoRequerente[]
+  protocolos                  Protocolo[]
+  receitas                    Receita[]
+  recibos                     Recibo[]
+  tarefas                     Tarefa[]
+  tiposServico                TipoServico[]
+  pastaTraducao               PastaTraducao?
+  pastaApostilamento          PastaApostilamento?
+  fasesFinais                 FaseFinal[]
+  retificacaoPacotes          RetificacaoPacote[]
+  emissoesRetificadas         EmissaoRetificada[]
 
   // CP-3 â necessidades documentais do processo
   necessidades NecessidadeDocumental[]
@@ -2876,6 +2894,10 @@ model PhaseInternalWorkflow {
   tipoProcessoId Int? // â TipoProcessoNacionalidade (solto; null = TODOS os processos)
   phaseKey       String   @db.VarChar(60)
   name           String   @db.VarChar(200)
+  // MODO DE EXECUCAO dos passos publicados (persistido; nunca inferido no codigo):
+  //   SEQUENCIAL = so o primeiro passo nasce DISPONIVEL; concluir um libera o seguinte.
+  //   PARALELO   = todos os passos nascem DISPONIVEL.
+  execucao       String   @default("SEQUENCIAL") @db.VarChar(20)
   active         Boolean  @default(true)
   arquivado      Boolean  @default(false)
   versao         Int      @default(1) // CP-4A â versionamento (definiÃ§Ã£o/template)
@@ -2901,6 +2923,15 @@ model PhaseInternalWorkflowStep {
   owner          String?               @db.VarChar(120) // "ResponsÃ¡vel padrÃ£o"
   priority       String                @default("medium") @db.VarChar(20) // low | medium | high
   slaDays        Int                   @default(0)
+  // CARDINALIDADE OPERACIONAL do passo: quantas instancias ele gera e presa a QUAL
+  // entidade. NAO confundir com "global (compartilhado)", que e o compartilhamento do
+  // WORKFLOW entre tipos de processo (PhaseInternalWorkflow.tipoProcessoId = null).
+  //   PROCESSO    = 1 instancia por fase/ciclo
+  //   PESSOA      = 1 por pessoa aplicavel da arvore
+  //   NECESSIDADE = 1 por registro/certidao a localizar
+  //   DOCUMENTO   = 1 por documento materializado
+  // NULL = herda o escopo operacional canonico da FASE (fases-catalog).
+  cardinalidade  String?               @db.VarChar(20)
   completionRule String?               @db.Text // "CondiÃ§Ã£o de conclusÃ£o"
   checklist      Json?
   versao         Int                   @default(1) // CP-4A â versionamento (definiÃ§Ã£o/template)
@@ -3481,6 +3512,23 @@ enum WorkflowInstanceStatus {
   CANCELADO
   SUPERSEDIDO
   FALHOU
+  // A fase pertence ao fluxo oficial, o processo ja avancou operacionalmente alem
+  // dela, e o trabalho historico dela ainda precisa ser registrado. NAO bloqueia a
+  // fase operacional atual; continua obrigatoria para a integridade do historico.
+  PENDENTE_DE_REGULARIZACAO
+  // Regra real de negocio torna a fase inaplicavel a este processo. Exige
+  // justificativa e auditoria. Nunca e atalho para evitar trabalho.
+  NAO_APLICAVEL
+}
+
+/**
+ * Integridade HISTORICA do processo (nao encerra nem bloqueia a operacao).
+ */
+enum RegularizacaoHistorica {
+  NAO_NECESSARIA
+  PENDENTE
+  PARCIAL
+  REGULARIZADA
 }
 
 enum StepInstanceStatus {
@@ -3593,12 +3641,29 @@ model PhaseWorkflowInstance {
   createdAt    DateTime  @default(now())
   updatedAt    DateTime  @updatedAt
 
+  // ---- REGULARIZACAO HISTORICA (cadastro de processo ja em andamento) ----
+  // DATA REAL informada retroativamente x data de registro no sistema: sao coisas
+  // diferentes e ficam em campos diferentes. createdAt/startedAt/completedAt NUNCA
+  // sao reescritos para simular antiguidade.
+  inicioReal           DateTime?
+  conclusaoReal        DateTime?
+  fonteDataHistorica   String?   @db.VarChar(200)
+  requerRegularizacao  Boolean   @default(false)
+  regularizadoEm       DateTime?
+  regularizadoPorId    Int?
+  regularizadoPor      Usuario?  @relation("FaseRegularizadaPor", fields: [regularizadoPorId], references: [id], onDelete: SetNull)
+  motivoAdministrativo String?   @db.Text
+  motivoNaoAplicavel   String?   @db.Text
+  criadoPorId          Int?
+  criadoPor            Usuario?  @relation("FaseCriadaPor", fields: [criadoPorId], references: [id], onDelete: SetNull)
+
   steps   PhaseWorkflowStepInstance[]
   tarefas Tarefa[]
 
   @@index([processoId, faseMacroKey, status])
   @@index([chaveIdempotencia])
   @@index([previousInstanceId])
+  @@index([processoId, requerRegularizacao])
 }
 
 model PhaseWorkflowStepInstance {
@@ -3620,6 +3685,10 @@ model PhaseWorkflowStepInstance {
   obrigatorio  Boolean   @default(true)
   geraTarefa   Boolean   @default(true)
 
+  // Entidade do ESCOPO do passo. No maximo UMA fica preenchida: pessoaId (escopo
+  // PESSOA), necessidadeId/documentoId (escopo DOCUMENTO). Nenhuma = escopo GLOBAL.
+  pessoaId      Int?
+  pessoa        Pessoa?                @relation(fields: [pessoaId], references: [id], onDelete: SetNull)
   necessidadeId Int?
   necessidade   NecessidadeDocumental? @relation(fields: [necessidadeId], references: [id], onDelete: SetNull)
   documentoId   Int?

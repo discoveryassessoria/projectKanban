@@ -20,6 +20,7 @@ import { mapLegacyStepStatus, stepInstanceStatusToLegacy } from "@/src/lib/proce
 import { montarChavePasso } from "@/src/services/phase-workflow-helpers"
 import { evoluirNecessidadePorPasso, reabrirAtendimentoNecessidade } from "@/src/services/necessidade-documental"
 import { chaveEvento } from "@/src/services/task-step-sync-helpers"
+import { recalcularFaseDoProcesso } from "@/src/lib/process-stage/recalcular-fase"
 
 // Transição de estado do passo → evento operacional do motor. Fonte única desta
 // tradução para a operação por-documento; espelha o vocabulário de WorkflowEventoTipo.
@@ -384,6 +385,21 @@ export async function atualizarPassoV2(
       })
     }
   })
+  // CONCLUSÃO DA FASE E AVANÇO — automáticos, e no serviço, não na rota. Concluir a
+  // última obrigação da fase é o que a conclui; quem concluiu por outro caminho (job,
+  // sincronização de tarefa, script) tem de disparar o mesmo avanço. Deixar isso na
+  // rota HTTP fazia o comportamento depender de por onde a conclusão entrou.
+  // Idempotente e gated pelo BlockingEngine: sem todas as obrigatórias feitas, não anda.
+  // Fora da transação de propósito: o avanço abre a sua própria.
+  if (liberarProximo) {
+    try {
+      const adv = await recalcularFaseDoProcesso(documentoId)
+      if (adv.mudou) console.log(`[avanço de fase] doc ${documentoId}: ${adv.faseAnterior} → ${adv.faseNova}`)
+    } catch (e) {
+      console.error("[avanço de fase] erro ao recalcular:", e)
+    }
+  }
+
   return { ok: true, workflow: await montarWorkflowV2(documentoId) }
 }
 

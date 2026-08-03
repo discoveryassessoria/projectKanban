@@ -6,7 +6,6 @@
 
 import { NextResponse } from "next/server"
 import { atualizarPassoV2 } from "@/src/services/documento-operacao"
-import { recalcularFaseDoProcesso } from "@/src/lib/process-stage/recalcular-fase"
 
 interface PatchBody {
   status?: string
@@ -43,15 +42,8 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     const r = await atualizarPassoV2(documentoId, stepInstanceId, body as Record<string, unknown>)
     if (!r.ok) return NextResponse.json({ error: r.error }, { status: r.status })
 
-    // Avanço de fase derivado do V2 (idempotente). Só ao concluir um passo.
-    if (body.status === "concluida") {
-      try {
-        const adv = await recalcularFaseDoProcesso(documentoId)
-        if (adv.mudou) console.log(`[avanço de fase] doc ${documentoId}: ${adv.faseAnterior} → ${adv.faseNova}`)
-      } catch (e) {
-        console.error("[avanço de fase] erro ao recalcular:", e)
-      }
-    }
+    // O avanço de fase é disparado por atualizarPassoV2 (serviço), não aqui: assim
+    // ele vale para qualquer caminho que conclua um passo, não só para esta rota.
 
     return NextResponse.json({ workflow: r.workflow })
   } catch (error) {

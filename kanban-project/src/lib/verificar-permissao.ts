@@ -30,13 +30,10 @@ export async function extrairUsuarioComPermissoes(
   const usuario = await extrairUsuarioKanban(request)
   if (!usuario) return null
 
-  // Admin tem TUDO — inclusive as permissões OPT-IN (ações destrutivas, ex.: exclusão definitiva).
-  // Não-admin só as obtém por concessão explícita (perfil/custom); elas ficam fora dos perfis padrão.
-  if (usuario.tipo === 'admin') {
-    return { userId: usuario.userId, nome: '', email: usuario.email, tipo: 'admin', permissoes: calcularPermissoes('admin') }
-  }
-
-  // Buscar perfil e permissões custom do usuário
+  // O usuário é SEMPRE lido do banco — inclusive o admin. Antes o admin recebia um
+  // mapa sintético sem consultar o cadastro, o que deixava as permissões EXCLUSIVAS
+  // (concedidas nominalmente em perfil/custom) inalcançáveis para ele, e tornava o
+  // texto "admin" no token a única autorização de fato.
   const usuarioDB = await prisma.usuario.findUnique({
     where: { id: usuario.userId },
     select: {

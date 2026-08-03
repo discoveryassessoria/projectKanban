@@ -5,7 +5,7 @@
 --   corpo        → gerado do prisma/schema.prisma
 --   bloco manual → prisma/baseline/bloco-manual.sql (edite LÁ)
 --
--- Gerado em : 2026-08-02
+-- Gerado em : 2026-08-03
 -- Prisma    : 6.19.3
 --
 -- PARA QUE SERVE: reconstruir o banco DO ZERO. O histórico de migrations NÃO
@@ -70,7 +70,10 @@ CREATE TYPE "TipoEventoNecessidade" AS ENUM ('CRIADA', 'EM_ATENDIMENTO', 'ATENDI
 CREATE TYPE "PassoTipo" AS ENUM ('HUMANO', 'AUTOMATICO', 'ESPERA', 'VALIDACAO', 'DECISAO', 'APROVACAO', 'MANUAL_SEM_TAREFA');
 
 -- CreateEnum
-CREATE TYPE "WorkflowInstanceStatus" AS ENUM ('PENDENTE', 'INSTANCIANDO', 'ATIVO', 'BLOQUEADO', 'AGUARDANDO', 'CONCLUIDO', 'CANCELADO', 'SUPERSEDIDO', 'FALHOU');
+CREATE TYPE "WorkflowInstanceStatus" AS ENUM ('PENDENTE', 'INSTANCIANDO', 'ATIVO', 'BLOQUEADO', 'AGUARDANDO', 'CONCLUIDO', 'CANCELADO', 'SUPERSEDIDO', 'FALHOU', 'PENDENTE_DE_REGULARIZACAO', 'NAO_APLICAVEL');
+
+-- CreateEnum
+CREATE TYPE "RegularizacaoHistorica" AS ENUM ('NAO_NECESSARIA', 'PENDENTE', 'PARCIAL', 'REGULARIZADA');
 
 -- CreateEnum
 CREATE TYPE "StepInstanceStatus" AS ENUM ('PENDENTE', 'DISPONIVEL', 'EM_ANDAMENTO', 'AGUARDANDO', 'BLOQUEADO', 'EXECUTADO', 'AGUARDANDO_APROVACAO', 'CONCLUIDO', 'FALHOU', 'CANCELADO', 'DISPENSADO', 'SUPERSEDIDO');
@@ -441,6 +444,10 @@ CREATE TABLE "Processo" (
     "updatedAt" TIMESTAMP(3) NOT NULL,
     "percentualImposto" DECIMAL(5,2) NOT NULL DEFAULT 12.00,
     "faseAtualKey" TEXT,
+    "regularizacaoHistorica" "RegularizacaoHistorica" NOT NULL DEFAULT 'NAO_NECESSARIA',
+    "regularizacaoConcluidaEm" TIMESTAMP(3),
+    "regularizacaoConcluidaPorId" INTEGER,
+    "motivoCadastroEmAndamento" TEXT,
     "workflowRuntime" VARCHAR(20) NOT NULL DEFAULT 'v2',
     "lockVersion" INTEGER NOT NULL DEFAULT 0,
     "chaveIdempotenciaCriacao" VARCHAR(200),
@@ -2304,6 +2311,7 @@ CREATE TABLE "PhaseInternalWorkflow" (
     "tipoProcessoId" INTEGER,
     "phaseKey" VARCHAR(60) NOT NULL,
     "name" VARCHAR(200) NOT NULL,
+    "execucao" VARCHAR(20) NOT NULL DEFAULT 'SEQUENCIAL',
     "active" BOOLEAN NOT NULL DEFAULT true,
     "arquivado" BOOLEAN NOT NULL DEFAULT false,
     "versao" INTEGER NOT NULL DEFAULT 1,
@@ -2326,6 +2334,7 @@ CREATE TABLE "PhaseInternalWorkflowStep" (
     "owner" VARCHAR(120),
     "priority" VARCHAR(20) NOT NULL DEFAULT 'medium',
     "slaDays" INTEGER NOT NULL DEFAULT 0,
+    "cardinalidade" VARCHAR(20),
     "completionRule" TEXT,
     "checklist" JSONB,
     "versao" INTEGER NOT NULL DEFAULT 1,
@@ -2694,6 +2703,15 @@ CREATE TABLE "PhaseWorkflowInstance" (
     "supersededAt" TIMESTAMP(3),
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" TIMESTAMP(3) NOT NULL,
+    "inicioReal" TIMESTAMP(3),
+    "conclusaoReal" TIMESTAMP(3),
+    "fonteDataHistorica" VARCHAR(200),
+    "requerRegularizacao" BOOLEAN NOT NULL DEFAULT false,
+    "regularizadoEm" TIMESTAMP(3),
+    "regularizadoPorId" INTEGER,
+    "motivoAdministrativo" TEXT,
+    "motivoNaoAplicavel" TEXT,
+    "criadoPorId" INTEGER,
 
     CONSTRAINT "PhaseWorkflowInstance_pkey" PRIMARY KEY ("id")
 );
@@ -2713,6 +2731,7 @@ CREATE TABLE "PhaseWorkflowStepInstance" (
     "tipo" "PassoTipo" NOT NULL DEFAULT 'HUMANO',
     "obrigatorio" BOOLEAN NOT NULL DEFAULT true,
     "geraTarefa" BOOLEAN NOT NULL DEFAULT true,
+    "pessoaId" INTEGER,
     "necessidadeId" INTEGER,
     "documentoId" INTEGER,
     "ciclo" INTEGER NOT NULL DEFAULT 1,
@@ -4823,6 +4842,9 @@ CREATE INDEX "PhaseWorkflowInstance_chaveIdempotencia_idx" ON "PhaseWorkflowInst
 CREATE INDEX "PhaseWorkflowInstance_previousInstanceId_idx" ON "PhaseWorkflowInstance"("previousInstanceId");
 
 -- CreateIndex
+CREATE INDEX "PhaseWorkflowInstance_processoId_requerRegularizacao_idx" ON "PhaseWorkflowInstance"("processoId", "requerRegularizacao");
+
+-- CreateIndex
 CREATE UNIQUE INDEX "PhaseWorkflowStepInstance_chaveIdempotencia_key" ON "PhaseWorkflowStepInstance"("chaveIdempotencia");
 
 -- CreateIndex
@@ -5333,6 +5355,9 @@ ALTER TABLE "Processo" ADD CONSTRAINT "Processo_arvoreId_fkey" FOREIGN KEY ("arv
 ALTER TABLE "Processo" ADD CONSTRAINT "Processo_familiaId_fkey" FOREIGN KEY ("familiaId") REFERENCES "Familia"("id") ON DELETE SET NULL ON UPDATE CASCADE;
 
 -- AddForeignKey
+ALTER TABLE "Processo" ADD CONSTRAINT "Processo_regularizacaoConcluidaPorId_fkey" FOREIGN KEY ("regularizacaoConcluidaPorId") REFERENCES "Usuario"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
 ALTER TABLE "Processo" ADD CONSTRAINT "Processo_tipoProcessoMotorId_fkey" FOREIGN KEY ("tipoProcessoMotorId") REFERENCES "TipoProcessoNacionalidade"("id") ON DELETE SET NULL ON UPDATE CASCADE;
 
 -- AddForeignKey
@@ -5786,7 +5811,16 @@ ALTER TABLE "PhaseWorkflowInstance" ADD CONSTRAINT "PhaseWorkflowInstance_proces
 ALTER TABLE "PhaseWorkflowInstance" ADD CONSTRAINT "PhaseWorkflowInstance_previousInstanceId_fkey" FOREIGN KEY ("previousInstanceId") REFERENCES "PhaseWorkflowInstance"("id") ON DELETE SET NULL ON UPDATE CASCADE;
 
 -- AddForeignKey
+ALTER TABLE "PhaseWorkflowInstance" ADD CONSTRAINT "PhaseWorkflowInstance_regularizadoPorId_fkey" FOREIGN KEY ("regularizadoPorId") REFERENCES "Usuario"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "PhaseWorkflowInstance" ADD CONSTRAINT "PhaseWorkflowInstance_criadoPorId_fkey" FOREIGN KEY ("criadoPorId") REFERENCES "Usuario"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
 ALTER TABLE "PhaseWorkflowStepInstance" ADD CONSTRAINT "PhaseWorkflowStepInstance_workflowInstanceId_fkey" FOREIGN KEY ("workflowInstanceId") REFERENCES "PhaseWorkflowInstance"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "PhaseWorkflowStepInstance" ADD CONSTRAINT "PhaseWorkflowStepInstance_pessoaId_fkey" FOREIGN KEY ("pessoaId") REFERENCES "Pessoa"("id") ON DELETE SET NULL ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "PhaseWorkflowStepInstance" ADD CONSTRAINT "PhaseWorkflowStepInstance_necessidadeId_fkey" FOREIGN KEY ("necessidadeId") REFERENCES "NecessidadeDocumental"("id") ON DELETE SET NULL ON UPDATE CASCADE;
