@@ -8,6 +8,14 @@ import { getOrdemFase, getStepsForFase, getFase, phaseKeyToFaseCode, faseCodeToP
 import { itemCatalogosDeCertidao } from "@/src/lib/documentos/natureza-certidao"
 import { resolveProgressoFaseDocumento } from "@/src/lib/process-stage/resolve-fase-progresso"
 import { resolveOperationalProjection, type OperationalProjection } from "@/src/lib/process-stage/operational-projection"
+import {
+  montarPessoasDoProcesso,
+  baldeDoPasso,
+  rotuloStatusPasso,
+  nomeCompletoPessoa,
+  type PessoaDoProcesso,
+  type BaldeTarefa,
+} from "@/src/lib/process-stage/central-operacional-core"
 import type { FaseCode } from "@prisma/client"
 
 // ============================================================
@@ -99,7 +107,9 @@ interface FaseStepReal {
   ordem: number
   stepKey: string
   title: string
-  status: "concluida" | "em_andamento" | "bloqueada"
+  // "pendente" = etapa sem NENHUM item aplicável (denominador zero). Distinta de
+  // "bloqueada" (tem itens, mas depende de etapa anterior).
+  status: "concluida" | "em_andamento" | "bloqueada" | "pendente"
   concluidos: number // docs que concluíram este passo
   total: number       // docs (linha reta) que possuem este passo nesta fase
 }
@@ -116,6 +126,33 @@ interface FaseProgress {
     conferidos: number
     validados: number
   }
+}
+
+// ============================================================
+// TAREFA DA FASE — um PhaseWorkflowStepInstance da fase consultada, com o sujeito
+// (pessoa/requisito) resolvido e a referência que a UI usa para ABRIR a operação.
+// É a lista operacional real da fase; o "strip" de etapas é só o agregado dela.
+// ============================================================
+interface TarefaFaseRow {
+  stepInstanceId: number
+  stepKey: string
+  titulo: string
+  balde: BaldeTarefa
+  statusRaw: string
+  statusLabel: string
+  obrigatorio: boolean
+  pessoaId: number | null
+  pessoaNome: string | null
+  assunto: string | null
+  necessidadeId: number | null
+  documentoId: number | null
+  responsavelId: number | null
+  responsavelNome: string | null
+  prazo: string | null
+  diasParaPrazo: number | null
+  motivo: string | null
+  /** Por que a tarefa não pode ser aberta agora. null ⇒ abre. */
+  bloqueioAbertura: string | null
 }
 
 // Modo operacional da Central (UMA única tela; muda só o modo, nunca o layout):
@@ -136,6 +173,11 @@ interface CentralOperacionalResponse {
   cards: CardCounts
   queue: QueueRow[]
   queueTitle: string
+  // ROSTER OFICIAL das pessoas do processo (vínculo Pessoa.arvoreId = Processo.arvoreId).
+  // NÃO derivado da fila: processo sem documento/tarefa continua exibindo as pessoas.
+  pessoas: PessoaDoProcesso[]
+  // Lista operacional REAL de tarefas da fase consultada.
+  tarefas: TarefaFaseRow[]
   faseProgress: FaseProgress
   // LEGADO_INATIVO (desativação Genealogia): quando a fase atual é GENEALOGIA, as
   // métricas documentais antigas (Obrigatórios/validados/percentual, derivadas de
@@ -280,9 +322,12 @@ export async function GET(
     const faseAtualCode =
       (phaseKeyToFaseCode(faseConsultadaKey) ?? null)
 
-    // pessoas e documentos não dependem um do outro (ambos só precisam do
-    // arvoreId) → busca os dois EM PARALELO, economizando um round-trip ao banco.
-    const [pessoas, docsRaw] = await Promise.all([
+    // pessoas, uniões e documentos não dependem um do outro (todos só precisam do
+    // arvoreId) → busca EM PARALELO, economizando round-trips ao banco.
+    // PESSOAS: vínculo OFICIAL Pessoa.arvoreId = Processo.arvoreId. Sem filtro por
+    // documento, tarefa, necessidade, status ou transmissão — é o cadastro da árvore
+    // que define quem existe no processo, e nada mais.
+    const [pessoas, unioes, docsRaw] = await Promise.all([
       processo.arvoreId
         ? prisma.pessoa.findMany({
             where: { arvoreId: processo.arvoreId },
@@ -290,10 +335,25 @@ export async function GET(
               id: true,
               nome: true,
               sobrenome: true,
+              sexo: true,
+              publicCode: true,
               numeroLinhagem: true,
               requerente: true,
               linhaReta: true,
+              paiId: true,
+              maeId: true,
             },
+          })
+        : [],
+      processo.arvoreId
+        ? prisma.uniao.findMany({
+            where: {
+              OR: [
+                { pessoa1: { arvoreId: processo.arvoreId } },
+                { pessoa2: { arvoreId: processo.arvoreId } },
+              ],
+            },
+            select: { id: true, pessoa1Id: true, pessoa2Id: true },
           })
         : [],
       processo.arvoreId
@@ -318,11 +378,20 @@ export async function GET(
         : [],
     ])
 
-    const nomeCompleto = (p: { nome: string; sobrenome: string | null }) =>
-      `${p.nome}${p.sobrenome ? " " + p.sobrenome : ""}`
+    // Nome completo: fonte única no núcleo puro (mesma régua usada pelo roster).
+    const nomeCompleto = nomeCompletoPessoa
 
     const pessoasMap = new Map(pessoas.map((p) => [p.id, p]))
     const pessoasNaLinha = pessoas.filter((p) => p.linhaReta)
+
+    // ============================================================
+    // ROSTER OFICIAL DAS PESSOAS DO PROCESSO
+    // ------------------------------------------------------------
+    // Classificação (linha principal / fora da linhagem / pendente) e posição na
+    // linhagem calculadas pelo motor genealógico oficial a partir das relações de
+    // filiação reais. Independe de documento, necessidade, tarefa e workflow.
+    // ============================================================
+    const pessoasDoProcesso = montarPessoasDoProcesso(pessoas, unioes)
 
     // FONTE OFICIAL ÚNICA de progresso/estado do workflow — a MESMA usada pelo cabeçalho
     // (/api/processos/[id]/phase) e demais consumidores. Nada de cálculo paralelo aqui.
@@ -335,9 +404,14 @@ export async function GET(
     // como dado operacional, mas o headline de progresso é a projeção.
     const projection = await resolveOperationalProjection(id, faseContexto)
 
+    // Geração exibida (1 = requerente, 2 = pais, …) derivada do MESMO roster — não de
+    // um campo denormalizado que pode estar vazio (numeroLinhagem é null em toda a
+    // base atual, o que fazia toda pessoa cair em "99").
+    const geracaoPorPessoa = new Map(pessoasDoProcesso.map((p) => [p.pessoaId, p.geracao]))
     const generationOf = (pessoaId: number): number => {
-      const p = pessoasMap.get(pessoaId)
-      return p?.numeroLinhagem ?? 99
+      const g = geracaoPorPessoa.get(pessoaId)
+      if (g != null) return g + 1
+      return pessoasMap.get(pessoaId)?.numeroLinhagem ?? 99
     }
 
     // docId -> responsável da ETAPA ativa (fallback quando o doc não tem
@@ -763,11 +837,129 @@ export async function GET(
         queue: queueV2,
         faseProgress: {
           faseCode: faseAtualCode ?? null, kind: "documento", docsNaFase: necs.length,
-          steps: [{ ordem: 1, stepKey: "localizar_registro", title: "Localizar registro da certidão", status: totalObrig > 0 && obrigDone >= totalObrig ? "concluida" : "em_andamento", concluidos: obrigDone, total: totalObrig }],
+          // ESTADO HONESTO DO PASSO: com ZERO requisito aplicável a etapa NÃO está "em
+          // andamento" — não há o que andar. Declarar "Em andamento" com denominador
+          // zero produzia exatamente o sintoma relatado: uma etapa que se anuncia ativa
+          // e não abre nada, porque não existe nenhuma tarefa por trás dela.
+          steps: [{
+            ordem: 1,
+            stepKey: "localizar_registro",
+            title: "Localizar registro da certidão",
+            status: totalObrig === 0 ? "pendente" : obrigDone >= totalObrig ? "concluida" : "em_andamento",
+            concluidos: obrigDone,
+            total: totalObrig,
+          }],
           counts: { solicitados: 0, aguardando: Math.max(0, totalObrig - obrigDone), recebidos: obrigDone, conferidos: 0, validados: obrigDone },
         },
       }
     }
+
+    // ============================================================
+    // 10) TAREFAS DA FASE — a lista operacional REAL, não o agregado.
+    // ------------------------------------------------------------
+    // Fonte única: PhaseWorkflowStepInstance da fase consultada (mesmo escopo do
+    // progresso: processo + faseMacroKey + instância quando é consulta de fase
+    // passada). Exclui SUPERSEDIDO/CANCELADO. Cada linha carrega o sujeito (pessoa +
+    // requisito) e a referência que a UI usa para ABRIR a operação oficial — nunca
+    // rota legada. A lista aparece com 1 tarefa ou com 50; agrupar não é filtrar.
+    // ============================================================
+    const passosDaFase = faseConsultadaKey
+      ? await prisma.phaseWorkflowStepInstance.findMany({
+          where: {
+            processoId: id,
+            faseMacroKey: faseConsultadaKey,
+            status: { notIn: ["SUPERSEDIDO", "CANCELADO"] },
+            ...(faseContexto?.workflowInstanceId != null
+              ? { workflowInstanceId: faseContexto.workflowInstanceId }
+              : {}),
+          },
+          orderBy: [{ ciclo: "desc" }, { ordem: "asc" }, { id: "asc" }],
+          select: {
+            id: true, stepKey: true, ordem: true, status: true, obrigatorio: true,
+            necessidadeId: true, documentoId: true, responsavelId: true,
+            prazo: true, motivo: true, snapshot: true, ciclo: true,
+          },
+        })
+      : []
+
+    // Sujeito das tarefas: necessidade → pessoa + requisito; documento → pessoa + tipo.
+    const necIdsTarefa = [...new Set(passosDaFase.map((s) => s.necessidadeId).filter((x): x is number => x != null))]
+    const docIdsTarefa = [...new Set(passosDaFase.map((s) => s.documentoId).filter((x): x is number => x != null))]
+    const respIdsTarefa = [...new Set(passosDaFase.map((s) => s.responsavelId).filter((x): x is number => x != null))]
+
+    const [necsTarefa, respNomesTarefa] = await Promise.all([
+      necIdsTarefa.length
+        ? prisma.necessidadeDocumental.findMany({
+            where: { id: { in: necIdsTarefa } },
+            select: { id: true, pessoaId: true, matrizSnapshot: true, itemCatalogo: { select: { name: true } } },
+          })
+        : Promise.resolve([]),
+      respIdsTarefa.length
+        ? prisma.usuario
+            .findMany({ where: { id: { in: respIdsTarefa } }, select: { id: true, nome: true } })
+            .then((us) => new Map(us.map((u) => [u.id, u.nome])))
+        : Promise.resolve(new Map<number, string>()),
+    ])
+    const necTarefaMap = new Map(necsTarefa.map((n) => [n.id, n]))
+    const docTarefaMap = new Map(docsRaw.filter((d) => docIdsTarefa.includes(d.id)).map((d) => [d.id, d]))
+
+    // Título da tarefa: rótulo do snapshot do passo (imutável) → catálogo da fase →
+    // stepKey. Nunca inventa texto.
+    const catalogoDaFase = faseAtualCode ? getStepsForFase(faseAtualCode) : []
+    const tituloDoPasso = (stepKey: string, snapshot: unknown): string => {
+      if (snapshot && typeof snapshot === "object" && "label" in snapshot) {
+        const l = (snapshot as { label: unknown }).label
+        if (typeof l === "string" && l.trim()) return l
+      }
+      return catalogoDaFase.find((c) => c.stepKey === stepKey)?.title ?? stepKey
+    }
+    const requisitoDaNecessidade = (n: { matrizSnapshot: unknown; itemCatalogo: { name: string } | null } | undefined): string | null => {
+      if (!n) return null
+      const snap = n.matrizSnapshot
+      if (snap && typeof snap === "object" && "requisito" in snap) {
+        const r = (snap as { requisito: unknown }).requisito
+        if (typeof r === "string" && r.trim()) return r
+      }
+      return n.itemCatalogo?.name ?? null
+    }
+
+    const tarefas: TarefaFaseRow[] = passosDaFase.map((s) => {
+      const nec = s.necessidadeId != null ? necTarefaMap.get(s.necessidadeId) : undefined
+      const doc = s.documentoId != null ? docTarefaMap.get(s.documentoId) : undefined
+      const pessoaId = nec?.pessoaId ?? doc?.pessoaId ?? null
+      const pessoa = pessoaId != null ? pessoasMap.get(pessoaId) : undefined
+      const assunto =
+        requisitoDaNecessidade(nec) ??
+        (doc?.tipo ? TIPO_LABELS[doc.tipo] ?? doc.tipo : null)
+      // ABERTURA: um passo por-entidade abre a operação oficial (documento existente
+      // ou necessidade que materializa o documento ao abrir). Passo genérico da fase
+      // (sem entidade) não tem tela de operação por item — é executado no painel da
+      // fase. A ausência de documento obrigatório NÃO bloqueia nada aqui.
+      const bloqueioAbertura =
+        s.necessidadeId == null && s.documentoId == null
+          ? "Etapa da fase, sem item próprio — execute pelo painel da fase."
+          : null
+      return {
+        stepInstanceId: s.id,
+        stepKey: s.stepKey,
+        titulo: tituloDoPasso(s.stepKey, s.snapshot),
+        balde: baldeDoPasso(s.status),
+        statusRaw: s.status,
+        statusLabel: rotuloStatusPasso(s.status),
+        obrigatorio: s.obrigatorio,
+        pessoaId,
+        pessoaNome: pessoa ? nomeCompleto(pessoa) : null,
+        assunto,
+        necessidadeId: s.necessidadeId,
+        documentoId: s.documentoId,
+        responsavelId: s.responsavelId,
+        responsavelNome: s.responsavelId != null ? respNomesTarefa.get(s.responsavelId) ?? null : null,
+        prazo: s.prazo?.toISOString() ?? null,
+        diasParaPrazo: s.prazo ? diffDays(s.prazo, now) : null,
+        motivo: s.motivo ?? null,
+        bloqueioAbertura,
+      }
+    })
 
     // Headline de progresso vem da PROJEÇÃO OFICIAL (mesmo % do Kanban/Header). O
     // detalhamento por pessoa (byPerson) e a lista de faltantes seguem como dado
@@ -794,6 +986,8 @@ export async function GET(
       cards,
       queue: genealogiaV2 ? genealogiaV2.queue : queue,
       queueTitle,
+      pessoas: pessoasDoProcesso,
+      tarefas,
       faseProgress: genealogiaV2 ? genealogiaV2.faseProgress : faseProgress,
       // Genealogia agora tem visualização V2 real — sai o estado neutro de reestruturação.
       genealogiaReestruturacao: genealogiaV2 ? false : genealogiaReestruturacao,

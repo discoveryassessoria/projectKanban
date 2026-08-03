@@ -7,7 +7,7 @@
 // (não recalcula regra — regras 9/10).
 
 import { prisma } from "@/lib/prisma"
-import type { StepInstanceStatus, FaseCode, Prisma } from "@prisma/client"
+import type { StepInstanceStatus, FaseCode, Prisma, WorkflowEventoTipo } from "@prisma/client"
 import {
   resolveStepCompletionState,
   politicaPadraoParaStep,
@@ -19,6 +19,21 @@ import {
 import { mapLegacyStepStatus, stepInstanceStatusToLegacy } from "@/src/lib/process-stage/legacy-status-map"
 import { montarChavePasso } from "@/src/services/phase-workflow-helpers"
 import { evoluirNecessidadePorPasso, reabrirAtendimentoNecessidade } from "@/src/services/necessidade-documental"
+import { chaveEvento } from "@/src/services/task-step-sync-helpers"
+
+// Transição de estado do passo → evento operacional do motor. Fonte única desta
+// tradução para a operação por-documento; espelha o vocabulário de WorkflowEventoTipo.
+const EVENTO_POR_STATUS: Partial<Record<StepInstanceStatus, WorkflowEventoTipo>> = {
+  DISPONIVEL: "PASSO_DISPONIBILIZADO",
+  EM_ANDAMENTO: "PASSO_INICIADO",
+  BLOQUEADO: "PASSO_BLOQUEADO",
+  EXECUTADO: "PASSO_EXECUTADO",
+  CONCLUIDO: "PASSO_CONCLUIDO",
+  DISPENSADO: "PASSO_DISPENSADO",
+  CANCELADO: "PASSO_CANCELADO",
+  FALHOU: "PASSO_FALHOU",
+  PENDENTE: "PASSO_REABERTO",
+}
 
 // Passos que NÃO contam como operação ativa do documento.
 const INATIVOS: StepInstanceStatus[] = ["SUPERSEDIDO", "CANCELADO"]
@@ -271,7 +286,7 @@ export async function atualizarPassoV2(
 ): Promise<OpResult> {
   const p = await prisma.phaseWorkflowStepInstance.findUnique({
     where: { id: stepInstanceId },
-    select: { id: true, documentoId: true, necessidadeId: true, processoId: true, faseMacroKey: true, ordem: true, status: true, ciclo: true, metadata: true, stepKey: true },
+    select: { id: true, documentoId: true, necessidadeId: true, processoId: true, workflowInstanceId: true, faseMacroKey: true, ordem: true, status: true, ciclo: true, metadata: true, stepKey: true },
   })
   if (!p || p.documentoId !== documentoId) return { ok: false, error: "Passo não encontrado", status: 404 }
   const now = new Date()
@@ -283,6 +298,10 @@ export async function atualizarPassoV2(
 
   const novo: StepInstanceStatus = typeof patch.status === "string" ? mapLegacyStepStatus(patch.status) : p.status
   const eraConcluida = p.status === "CONCLUIDO"
+  // Evento operacional correspondente à transição (vocabulário canônico do motor,
+  // o mesmo de task-step-sync/phase-workflow). null = mudança sem transição de
+  // estado (ex.: só trocou o responsável) — não inventa evento onde não houve.
+  const eventoDaTransicao = novo === p.status ? null : EVENTO_POR_STATUS[novo] ?? null
   const liberarProximo = novo === "CONCLUIDO" && !eraConcluida
   const vaiReabrir = eraConcluida && novo !== "CONCLUIDO"
 
@@ -337,6 +356,33 @@ export async function atualizarPassoV2(
       })
     }
     await tx.documento.update({ where: { id: documentoId }, data: { ultimaMovimentacao: now } })
+
+    // DIÁRIO OPERACIONAL: a operação feita pela Central/drawer precisa aparecer na
+    // linha do tempo do processo como qualquer outra do motor. Antes, executar um
+    // passo por aqui não deixava rastro em WorkflowEvento — o histórico só existia
+    // na necessidade, e a timeline do processo ficava muda sobre início e conclusão
+    // de tarefa. Mesma tabela, mesmo vocabulário e mesma chave de idempotência dos
+    // demais emissores; dentro da MESMA transação, então rastro e estado não podem
+    // divergir.
+    if (eventoDaTransicao) {
+      // createMany + skipDuplicates: a chave de idempotência é única, e repetir a MESMA
+      // transição no mesmo ciclo (reabrir → concluir de novo) não pode derrubar a
+      // transação inteira com violação de unicidade. O rastro da reabertura fica
+      // registrado pelo próprio evento PASSO_REABERTO, entre as duas conclusões.
+      await tx.workflowEvento.createMany({
+        skipDuplicates: true,
+        data: {
+          tipo: eventoDaTransicao,
+          entityType: "step_instance",
+          entityId: p.id,
+          processoId: p.processoId,
+          workflowInstanceId: p.workflowInstanceId,
+          stepInstanceId: p.id,
+          chaveIdempotencia: chaveEvento(eventoDaTransicao, "step_instance", p.id, novo, p.ciclo),
+          dados: { documentoId, necessidadeId: p.necessidadeId, stepKey: p.stepKey, de: p.status, para: novo },
+        },
+      })
+    }
   })
   return { ok: true, workflow: await montarWorkflowV2(documentoId) }
 }

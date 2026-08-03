@@ -101,6 +101,7 @@
     "test:catalogo-servicos-homolog": "tsx scripts/catalogo-servicos-homolog.test.ts",
     "test:categorias-servico": "tsx scripts/cadastro-categorias.test.ts",
     "test:central-loading": "tsx scripts/central-operacional-loading.test.ts",
+    "test:central-pessoas": "tsx scripts/central-pessoas-tarefas.test.ts",
     "test:central-unificada": "tsx scripts/central-unificada-guard.test.ts",
     "test:codigo-tipo-documento": "tsx scripts/codigo-tipo-documento.test.ts",
     "test:completion": "tsx scripts/completion-engine.test.ts",

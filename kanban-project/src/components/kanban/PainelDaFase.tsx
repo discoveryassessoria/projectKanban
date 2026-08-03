@@ -33,6 +33,8 @@ import {
   UserRound,
   Ban,
   CalendarDays,
+  AlertTriangle,
+  PlayCircle,
 } from "lucide-react"
 import { FASES } from "@/src/lib/process-stage/fases-catalog"
 import type { FaseCode } from "@prisma/client"
@@ -50,6 +52,31 @@ function faseLabel(code: string | null): string {
 export interface FaseStep {
   title: string
   status: "concluida" | "em_andamento" | "bloqueada" | "pendente"
+}
+
+/** Balde operacional da tarefa — espelho de central-operacional-core. */
+export type BaldeTarefa = "PENDENTE" | "EM_ANDAMENTO" | "CONCLUIDA"
+
+/** Tarefa da fase (PhaseWorkflowStepInstance) exibida na lista operacional. */
+export interface FaseTarefaRow {
+  stepInstanceId: number
+  stepKey: string
+  titulo: string
+  balde: BaldeTarefa
+  statusRaw: string
+  statusLabel: string
+  obrigatorio: boolean
+  pessoaId: number | null
+  pessoaNome: string | null
+  assunto: string | null
+  necessidadeId: number | null
+  documentoId: number | null
+  responsavelId: number | null
+  responsavelNome: string | null
+  prazo: string | null
+  diasParaPrazo: number | null
+  motivo: string | null
+  bloqueioAbertura: string | null
 }
 
 export interface FaseKpi {
@@ -76,11 +103,15 @@ export interface FaseDocRow {
 
 export interface FasePersonRow {
   pessoaId: number
+  /** Código oficial da pessoa (CodeGeneratorService). null = ainda não gerado. */
+  publicCode?: string | null
   nome: string
   iniciais: string
   papel: string
   geracao: string          // "G1", "Atual", "—"
   isLinha: boolean
+  /** Pendência ADMINISTRATIVA de cadastro. Exibida na linha; nunca esconde a pessoa. */
+  pendencia?: string | null
   transmissao: {
     state: "OK" | "BLOQUEADA" | "FORA"
     label: string
@@ -132,6 +163,12 @@ export interface PainelDaFaseProps {
   progressoTexto: string           // "Solicite, receba... Falta 1 documento..."
   linhaPrincipal: FasePersonRow[]
   foraDaLinha: FasePersonRow[]
+  /** Pessoas com inconsistência real de cadastro — visíveis, nunca descartadas. */
+  pendenteClassificacao?: FasePersonRow[]
+  /** Lista operacional REAL das tarefas da fase (não o agregado das etapas). */
+  tarefas?: FaseTarefaRow[]
+  /** Abre a tarefa na tela oficial da operação. undefined ⇒ só leitura. */
+  onAbrirTarefa?: (t: FaseTarefaRow) => void
   onAbrirOperacao?: (docId: number, necessidadeId?: number | null) => void
   onAbrirPainelCompleto?: () => void
   // Delegação direto na fila (Genealogia): lista de funcionários + callback.
@@ -172,6 +209,9 @@ export function PainelDaFase({
   progressoTexto,
   linhaPrincipal,
   foraDaLinha,
+  pendenteClassificacao = [],
+  tarefas = [],
+  onAbrirTarefa,
   onAbrirOperacao,
   onAbrirPainelCompleto,
   usuarios,
@@ -261,6 +301,9 @@ export function PainelDaFase({
             const subTxt =
               s.status === "concluida" ? "Concluído"
               : s.status === "em_andamento" ? "Em andamento"
+              // "pendente" = etapa SEM item aplicável. Anunciar "Em andamento" aqui era
+              // a mentira que fazia o operador clicar numa etapa que não abre nada.
+              : s.status === "pendente" ? "Sem itens aplicáveis"
               : "Bloqueada"
             return (
               <div key={i} className="flex items-center flex-none">
@@ -322,6 +365,9 @@ export function PainelDaFase({
         </>
         )}
 
+        {/* --- TAREFAS DA FASE (lista operacional real) --- */}
+        <ListaDeTarefas tarefas={tarefas} onAbrir={onAbrirTarefa} readOnly={readOnly} faseNome={faseNome} />
+
         {/* --- TABELA POR PESSOA --- */}
         <div className="border border-white/10 rounded-xl overflow-hidden">
           {/* Cabeçalho de colunas */}
@@ -369,6 +415,22 @@ export function PainelDaFase({
           {foraDaLinha.map((p) => (
             <PersonRow key={p.pessoaId} p={p} onAbrirOperacao={onAbrirOperacao} usuarios={usuarios} onDelegar={onDelegar} onNovaOperacao={onNovaOperacao} operacoesPorNec={operacoesPorNec} onAvaliarOperacao={onAvaliarOperacao} onAbrirOperacaoAntecipada={onAbrirOperacaoAntecipada} ocultarValidacao={modoReestruturacao} readOnly={readOnly} />
           ))}
+
+          {/* Grupo Pendente de classificação — só aparece quando há inconsistência
+              REAL de cadastro. Nenhuma pessoa é descartada em silêncio. */}
+          {pendenteClassificacao.length > 0 && (
+            <>
+              <GroupBar
+                icon={<AlertTriangle className="w-3 h-3" />}
+                title="Pendente de classificação · revisar cadastro"
+                count={pendenteClassificacao.length}
+                tone="pendente"
+              />
+              {pendenteClassificacao.map((p) => (
+                <PersonRow key={p.pessoaId} p={p} onAbrirOperacao={onAbrirOperacao} usuarios={usuarios} onDelegar={onDelegar} onNovaOperacao={onNovaOperacao} operacoesPorNec={operacoesPorNec} onAvaliarOperacao={onAvaliarOperacao} onAbrirOperacaoAntecipada={onAbrirOperacaoAntecipada} ocultarValidacao={modoReestruturacao} readOnly={readOnly} />
+              ))}
+            </>
+          )}
         </div>
       </div>
     </div>
@@ -379,6 +441,165 @@ export function PainelDaFase({
 // SUBCOMPONENTES
 // ============================================================
 
+// ------------------------------------------------------------
+// LISTA DE TAREFAS DA FASE
+// ------------------------------------------------------------
+// A lista operacional REAL: uma linha por passo materializado da fase, agrupada em
+// Pendentes / Em andamento / Concluídas. Clicar abre a tela oficial da operação.
+//
+// REGRAS que esta lista respeita, porque a ausência delas foi o defeito:
+//  • Aparece com UMA tarefa tanto quanto com cinquenta — agrupar não é filtrar.
+//  • Concluídas continuam visíveis (histórico da fase), nunca somem.
+//  • Documento obrigatório configurado NÃO é condição de exibição nem de abertura.
+//  • Quando não há nenhuma tarefa, diz POR QUE — não devolve uma área em branco.
+const GRUPOS_TAREFA: Array<{ balde: BaldeTarefa; titulo: string; cor: string }> = [
+  { balde: "PENDENTE", titulo: "Pendentes", cor: "text-white/55" },
+  { balde: "EM_ANDAMENTO", titulo: "Em andamento", cor: "text-[#7dd3fc]" },
+  { balde: "CONCLUIDA", titulo: "Concluídas", cor: "text-[#4ade80]" },
+]
+
+function ListaDeTarefas({
+  tarefas,
+  onAbrir,
+  readOnly,
+  faseNome,
+}: {
+  tarefas: FaseTarefaRow[]
+  onAbrir?: (t: FaseTarefaRow) => void
+  readOnly: boolean
+  faseNome: string
+}) {
+  return (
+    <div className="border border-white/10 rounded-xl overflow-hidden mb-5">
+      <div className="flex items-center gap-2.5 px-5 py-2.5 border-b border-white/10 bg-[#20262e]/70">
+        <span className="w-[22px] h-[22px] rounded-lg grid place-items-center flex-none bg-[#252c35] text-white/55">
+          <PlayCircle className="w-3 h-3" />
+        </span>
+        <b className="text-[11.5px] font-extrabold tracking-wide uppercase text-white/55">
+          Tarefas da fase {faseNome}
+        </b>
+        <span className="ml-auto text-[11px] font-bold text-white/40 bg-[#1b2027] border border-white/10 rounded-full px-2.5 py-0.5">
+          {tarefas.length} tarefa(s)
+        </span>
+      </div>
+
+      {tarefas.length === 0 ? (
+        <div className="px-5 py-6 text-center">
+          <div className="text-[13px] text-white/68">Nenhuma tarefa materializada nesta fase.</div>
+          <div className="text-[11.5px] text-white/40 mt-1 leading-relaxed">
+            As tarefas da fase nascem dos requisitos documentais publicados que se aplicam
+            às pessoas da árvore. Enquanto nenhuma Regra Documental publicada exigir algo
+            nesta fase, não há o que executar — as pessoas abaixo continuam disponíveis.
+          </div>
+        </div>
+      ) : (
+        GRUPOS_TAREFA.map((g) => {
+          const doGrupo = tarefas.filter((t) => t.balde === g.balde)
+          return (
+            <div key={g.balde}>
+              <div className="flex items-center gap-2 px-5 py-2 bg-[#1b2027] border-b border-white/10">
+                <b className={`text-[11px] font-extrabold uppercase tracking-wider ${g.cor}`}>{g.titulo}</b>
+                <span className="text-[11px] font-bold text-white/40">{doGrupo.length}</span>
+              </div>
+              {doGrupo.length === 0 ? (
+                <div className="px-5 py-2.5 text-[11.5px] text-white/25 border-b border-white/10">Nenhuma</div>
+              ) : (
+                doGrupo.map((t) => (
+                  <TarefaRow key={t.stepInstanceId} t={t} onAbrir={onAbrir} readOnly={readOnly} />
+                ))
+              )}
+            </div>
+          )
+        })
+      )}
+    </div>
+  )
+}
+
+function TarefaRow({
+  t,
+  onAbrir,
+  readOnly,
+}: {
+  t: FaseTarefaRow
+  onAbrir?: (t: FaseTarefaRow) => void
+  readOnly: boolean
+}) {
+  // ABRIR é o caminho normal. Só não abre quando o próprio passo não tem item
+  // operacional (etapa genérica da fase) — e nesse caso o motivo fica escrito.
+  const podeAbrir = !readOnly && !!onAbrir && !t.bloqueioAbertura
+  const concluida = t.balde === "CONCLUIDA"
+
+  return (
+    <button
+      type="button"
+      onClick={() => podeAbrir && onAbrir!(t)}
+      disabled={!podeAbrir}
+      title={t.bloqueioAbertura ?? (readOnly ? "Somente leitura" : `Abrir: ${t.titulo}`)}
+      className={`w-full text-left grid items-center gap-2.5 px-5 py-3 border-b border-white/10 transition-colors ${
+        podeAbrir ? "hover:bg-[#20262e] cursor-pointer" : "cursor-default"
+      }`}
+      style={{ gridTemplateColumns: "28px minmax(180px,2fr) 1.4fr 1fr 0.8fr 118px" }}
+    >
+      <span className={`w-6 h-6 rounded-full grid place-items-center border-[1.5px] flex-none ${
+        concluida ? "border-[#4ade80]/40 text-[#4ade80]"
+        : t.balde === "EM_ANDAMENTO" ? "border-[#2563eb] text-[#7dd3fc]"
+        : "border-white/10 text-white/40"
+      }`}>
+        {concluida ? <CheckCircle2 className="w-3 h-3" /> : t.balde === "EM_ANDAMENTO" ? <Search className="w-3 h-3" /> : <Clock className="w-3 h-3" />}
+      </span>
+
+      <span className="min-w-0 block">
+        <b className={`text-[13.5px] font-bold block leading-tight truncate ${concluida ? "text-white/68" : "text-white/95"}`}>
+          {t.titulo}
+        </b>
+        <span className="text-[11.5px] text-white/40 block truncate">
+          {[t.pessoaNome, t.assunto].filter(Boolean).join(" · ") || "Etapa da fase"}
+          {!t.obrigatorio && " · opcional"}
+        </span>
+      </span>
+
+      <span className="block">
+        <span className={`text-[12px] font-semibold ${concluida ? "text-[#4ade80]" : t.balde === "EM_ANDAMENTO" ? "text-[#7dd3fc]" : "text-white/68"}`}>
+          {t.statusLabel}
+        </span>
+        {t.motivo && <span className="text-[11px] text-white/40 block truncate">{t.motivo}</span>}
+        {t.bloqueioAbertura && <span className="text-[11px] text-white/40 block">{t.bloqueioAbertura}</span>}
+      </span>
+
+      <span className="text-[12px] block truncate">
+        {t.responsavelNome ? (
+          <span className="text-white/80 font-semibold">{t.responsavelNome}</span>
+        ) : (
+          <span className="text-white/40">Sem responsável</span>
+        )}
+      </span>
+
+      <span className="text-[12px] block">
+        {t.diasParaPrazo != null ? (
+          <span className={t.diasParaPrazo < 0 ? "text-[#f87171] font-semibold" : "text-white/68"}>
+            {t.diasParaPrazo < 0 ? `${Math.abs(t.diasParaPrazo)}d atrasada` : `${t.diasParaPrazo}d`}
+          </span>
+        ) : (
+          <span className="text-white/25">—</span>
+        )}
+      </span>
+
+      <span className="flex justify-end">
+        {podeAbrir ? (
+          <span className="inline-flex items-center gap-1.5 bg-[#252c35] text-white/95 border border-white/10 text-[12px] font-bold px-3 py-1.5 rounded-lg">
+            {concluida ? "Ver" : "Abrir"} <ChevronRight className="w-3 h-3" />
+          </span>
+        ) : (
+          <span className="text-[11px] font-semibold text-white/40">
+            {readOnly ? "Somente leitura" : "—"}
+          </span>
+        )}
+      </span>
+    </button>
+  )
+}
+
 function GroupBar({
   icon,
   title,
@@ -388,11 +609,11 @@ function GroupBar({
   icon: React.ReactNode
   title: string
   count: number
-  tone: "linha" | "fora"
+  tone: "linha" | "fora" | "pendente"
 }) {
   return (
-    <div className={`flex items-center gap-2.5 px-5 py-2.5 border-b border-white/10 ${tone === "fora" ? "bg-[#252c35]" : "bg-[#20262e]/70"}`}>
-      <span className={`w-[22px] h-[22px] rounded-lg grid place-items-center flex-none ${tone === "fora" ? "bg-[#252c35] text-white/40" : "bg-[#252c35] text-white/55"}`}>
+    <div className={`flex items-center gap-2.5 px-5 py-2.5 border-b border-white/10 ${tone === "pendente" ? "bg-[#d2a948]/12" : tone === "fora" ? "bg-[#252c35]" : "bg-[#20262e]/70"}`}>
+      <span className={`w-[22px] h-[22px] rounded-lg grid place-items-center flex-none ${tone === "pendente" ? "bg-[#d2a948]/20 text-[#d2a948]" : tone === "fora" ? "bg-[#252c35] text-white/40" : "bg-[#252c35] text-white/55"}`}>
         {icon}
       </span>
       <b className="text-[11.5px] font-extrabold tracking-wide uppercase text-white/55">{title}</b>
@@ -477,9 +698,15 @@ function PersonRow({
           </div>
           <div className="min-w-0">
             <b className="text-[14px] font-extrabold block leading-tight truncate text-white/95">{p.nome}</b>
-            <span className="text-[11.5px] text-white/40 font-semibold">
-              {p.papel} · {p.isLinha ? "Linha reta" : "Fora da linha"}
+            <span className="text-[11.5px] text-white/40 font-semibold block truncate">
+              {[p.publicCode, p.papel].filter(Boolean).join(" · ")}
             </span>
+            {p.pendencia && (
+              <span className="text-[11px] text-[#d2a948] font-semibold flex items-center gap-1 mt-0.5">
+                <AlertTriangle className="w-3 h-3 flex-none" />
+                {p.pendencia}
+              </span>
+            )}
           </div>
         </div>
 
@@ -570,23 +797,32 @@ function PersonRow({
         </div>
 
         {/* Ação */}
+        {/* "Abrir" NUNCA é botão morto: abre o painel operacional da pessoa mesmo sem
+            documento/necessidade — lá dentro o estado vazio explica o porquê. Antes
+            `p.docs.length && setExp(true)` deixava o botão inerte justamente no caso
+            em que o operador mais precisa de resposta. */}
         <div className="flex items-center justify-end gap-1.5">
           <button
-            onClick={() => p.docs.length && (setExp(true))}
+            onClick={() => setExp(!exp)}
             className="inline-flex items-center gap-1.5 bg-[#12161c] text-white text-[12.5px] font-bold px-3.5 py-2 rounded-lg hover:bg-[#20262e] transition-colors"
           >
-            Abrir <ChevronRight className="w-3 h-3" />
+            {exp ? "Fechar" : "Abrir"}
+            {exp ? <ChevronDown className="w-3 h-3" /> : <ChevronRight className="w-3 h-3" />}
           </button>
-          {p.docs.length > 0 && (
-            <button
-              onClick={() => setExp(!exp)}
-              className="w-7 h-7 grid place-items-center text-white/40 hover:text-white/68"
-            >
-              {exp ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
-            </button>
-          )}
         </div>
       </div>
+
+      {/* Painel operacional da pessoa — necessidades/documentos dela. Vazio explicado. */}
+      {exp && p.docs.length === 0 && (
+        <div className="border-t border-white/10 px-5 py-4 bg-[#15191f]">
+          <div className="text-[12.5px] text-white/68">Nenhuma necessidade documental para {p.nome} nesta fase.</div>
+          <div className="text-[11.5px] text-white/40 mt-1 leading-relaxed">
+            As necessidades desta pessoa são materializadas a partir das Regras Documentais
+            publicadas que se aplicam a ela. Enquanto nenhuma se aplicar, não há documento
+            a localizar — e isso não impede o cadastro nem a classificação dela.
+          </div>
+        </div>
+      )}
 
       {/* Linhas expandidas (documentos) */}
       {exp &&

@@ -12,7 +12,7 @@ import type { ProcessoWithStatus, Processo, OperationalProjection } from "@/src/
 import { DocumentoOperationalDrawer } from "./DocumentoOperationalDrawer"
 import { InitOperationModal } from "./InitOperationModal"
 import { WorkflowMacroTrilha, ResumoDoProcesso, PROCESS_PHASES } from "./WorkflowMacroTrilha"
-import { PainelDaFase, type FasePersonRow, type FaseStep, type FaseKpi } from "./PainelDaFase"
+import { PainelDaFase, type FasePersonRow, type FaseStep, type FaseKpi, type FaseTarefaRow } from "./PainelDaFase"
 import { ProcessoAnalise } from "./ProcessoAnalise"
 import { ProcessoTraducao } from "./ProcessoTraducao"
 import { ProcessoFaseGenerica } from "./ProcessoFaseGenerica"
@@ -86,6 +86,21 @@ interface MatrixMissing {
   generation: number
 }
 
+// ROSTER OFICIAL de pessoas do processo — espelho de central-operacional-core.
+// Vem do vínculo Pessoa.arvoreId = Processo.arvoreId; NÃO é derivado da fila.
+interface PessoaDoProcessoUI {
+  pessoaId: number
+  publicCode: string | null
+  nome: string
+  iniciais: string
+  requerente: boolean
+  linhaReta: boolean
+  classificacao: "LINHA_PRINCIPAL" | "FORA_DA_LINHAGEM" | "PENDENTE_CLASSIFICACAO"
+  geracao: number | null
+  posicao: string
+  pendencia: string | null
+}
+
 // ✅ NOVO: espelho do bloco faseProgress da rota (estado REAL dos passos).
 interface FaseProgress {
   faseCode: string | null
@@ -94,7 +109,7 @@ interface FaseProgress {
     ordem: number
     stepKey: string
     title: string
-    status: "concluida" | "em_andamento" | "bloqueada"
+    status: "concluida" | "em_andamento" | "bloqueada" | "pendente"
     concluidos: number
     total: number
   }>
@@ -159,6 +174,9 @@ interface CentralOpData {
     responsavelId?: number | null
   }>
   queueTitle: string
+  // Pessoas do processo (fonte oficial) e tarefas da fase (passos materializados).
+  pessoas?: PessoaDoProcessoUI[]
+  tarefas?: FaseTarefaRow[]
   faseProgress?: FaseProgress // ✅ NOVO (opcional: fallback cobre ausência)
   // LEGADO_INATIVO (desativação Genealogia): flag+mensagem de reestruturação.
   genealogiaReestruturacao?: boolean
@@ -265,35 +283,68 @@ function mapearPainel(data: CentralOpData, faseNome: string) {
   }
 
   // ============================================================
-  // tabela por pessoa (inalterada: mostra o status de cada documento)
-  // ============================================================
-  // P6 — chave por pessoaId REAL (não por nome; homônimos não colapsam). Fallback ao nome
-  // só quando o back não enviou pessoaId (compat).
+  // TABELA POR PESSOA
+  // ------------------------------------------------------------
+  // A lista de pessoas é SEMEADA pelo roster oficial do processo (data.pessoas), não
+  // pela fila. Era exatamente o contrário que produzia "0 pessoa(s)": sem documento
+  // obrigatório configurado a fila vem vazia, e com ela sumiam TODAS as pessoas da
+  // árvore. Agora a fila só ENRIQUECE linhas que já existem — documento e tarefa são
+  // conteúdo da linha, nunca condição para ela existir.
+  //
+  // Fallback (roster ausente, ex.: janela de deploy com back antigo): deriva da fila
+  // como antes, para não ficar pior do que estava.
   const porPessoa = new Map<string | number, FasePersonRow>()
-  const ord = (g: number) => (g === 99 ? 100 : g)
+  const roster = data.pessoas ?? []
+
+  const linhaDoRoster = (r: PessoaDoProcessoUI): FasePersonRow => ({
+    pessoaId: r.pessoaId,
+    publicCode: r.publicCode,
+    nome: r.nome,
+    iniciais: r.iniciais,
+    papel: r.requerente ? "Requerente" : r.posicao,
+    geracao: r.geracao != null ? `G${r.geracao + 1}` : "—",
+    isLinha: r.classificacao === "LINHA_PRINCIPAL",
+    pendencia: r.pendencia,
+    transmissao:
+      r.classificacao === "LINHA_PRINCIPAL"
+        ? { state: "OK", label: "Na linha de transmissão", sub: r.posicao }
+        : r.classificacao === "FORA_DA_LINHAGEM"
+          ? { state: "FORA", label: "Fora da linha", sub: "Sem impacto na transmissão" }
+          : { state: "BLOQUEADA", label: "Classificação pendente", sub: r.pendencia ?? undefined },
+    docsResumo: [],
+    validados: 0,
+    total: 0,
+    responsavel: null,
+    proximaAcao: null,
+    docs: [],
+  })
+
+  for (const r of roster) porPessoa.set(r.pessoaId, linhaDoRoster(r))
 
   for (const q of queue) {
     const key: string | number = q.pessoaId != null && q.pessoaId > 0 ? q.pessoaId : q.pessoaNome
     if (!porPessoa.has(key)) {
+      // Item sem pessoa no roster (ou roster ausente): a linha é criada a partir da
+      // fila. Nenhum item operacional fica invisível por falta de cadastro.
       const iniciais = q.pessoaNome.split(/\s+/).map((x) => x[0]).slice(0, 2).join("").toUpperCase()
       const isLinha = q.isLinhaReta
       porPessoa.set(key, {
         pessoaId: q.pessoaId ?? q.docId,
+        publicCode: null,
         nome: q.pessoaNome,
         iniciais,
         papel: isLinha ? "Linha reta" : "Apoio",
         geracao: isLinha ? `G${q.generation}` : "—",
         isLinha,
+        pendencia: null,
         transmissao: isLinha
-          ? { state: "OK", label: "OK", sub: "Transmissão comprovada" }
+          ? { state: "OK", label: "Na linha de transmissão", sub: undefined }
           : { state: "FORA", label: "Fora da linha", sub: "Sem impacto na transmissão" },
         docsResumo: [],
         validados: 0,
         total: 0,
-        responsavel: q.responsavelNome,
-        proximaAcao: q.noOwner
-          ? { txt: "Solicitar certidão", cls: "crit", semResp: true, sub: "Aguardando solicitação" }
-          : { txt: q.proximoPasso === "normal" ? "Solicitar certidão" : (q.proximoPasso || "—"), sub: "Aguardando solicitação" },
+        responsavel: null,
+        proximaAcao: null,
         docs: [],
       })
     }
@@ -302,6 +353,12 @@ function mapearPainel(data: CentralOpData, faseNome: string) {
     row.docsResumo.push({ abbr: abreviar(q.docType), statusLabel: q.status, statusCls: cls })
     row.total += 1
     if (cls === "recebido") row.validados += 1
+    row.responsavel = row.responsavel ?? q.responsavelNome
+    row.proximaAcao =
+      row.proximaAcao ??
+      (q.noOwner
+        ? { txt: "Solicitar certidão", cls: "crit", semResp: true, sub: "Aguardando solicitação" }
+        : { txt: q.proximoPasso === "normal" ? "Solicitar certidão" : (q.proximoPasso || "—"), sub: "Aguardando solicitação" })
     row.docs.push({
       id: q.docId,
       necessidadeId: q.necessidadeId ?? null,
@@ -317,11 +374,14 @@ function mapearPainel(data: CentralOpData, faseNome: string) {
     })
   }
 
+  // Classificação exibida = a do roster. Sem roster, cai no flag da fila (isLinha).
+  const classePorPessoa = new Map(roster.map((r) => [r.pessoaId, r.classificacao]))
   const todas = Array.from(porPessoa.values())
-  const linhaPrincipal = todas
-    .filter((p) => p.isLinha)
-    .sort((a, b) => ord(parseInt(a.geracao.replace("G", "")) || 99) - ord(parseInt(b.geracao.replace("G", "")) || 99))
-  const foraDaLinha = todas.filter((p) => !p.isLinha)
+  const classeDe = (p: FasePersonRow) =>
+    classePorPessoa.get(p.pessoaId) ?? (p.isLinha ? "LINHA_PRINCIPAL" : "FORA_DA_LINHAGEM")
+  const linhaPrincipal = todas.filter((p) => classeDe(p) === "LINHA_PRINCIPAL")
+  const foraDaLinha = todas.filter((p) => classeDe(p) === "FORA_DA_LINHAGEM")
+  const pendenteClassificacao = todas.filter((p) => classeDe(p) === "PENDENTE_CLASSIFICACAO")
 
   const pct = matrix.percentage
   // "Faltam 0 documentos" não é informação — é um contador falando sozinho. Com
@@ -335,7 +395,7 @@ function mapearPainel(data: CentralOpData, faseNome: string) {
         ? `${faseNome} concluída — todos os documentos validados.`
         : `Solicite, receba, confira e valide cada certidão. Falta${total - validados === 1 ? "" : "m"} ${total - validados} documento${total - validados === 1 ? "" : "s"} para concluir a ${faseNome}.`
 
-  return { kpis, steps, linhaPrincipal, foraDaLinha, pct, validados, total, progressoTexto }
+  return { kpis, steps, linhaPrincipal, foraDaLinha, pendenteClassificacao, pct, validados, total, progressoTexto }
 }
 
 const FASE_META: Record<string, { sub: string; tabs: string[] }> = {
@@ -495,6 +555,20 @@ export function ProcessoCentralOperacional({
     },
     [processo.id]
   )
+
+  // ABRIR TAREFA — ponto único de entrada da lista de tarefas da fase.
+  // Uma tarefa é um passo materializado (PhaseWorkflowStepInstance). Abrir significa
+  // abrir a tela OFICIAL da operação daquele item, dentro da própria Central:
+  //   • documentoId presente  → drawer da operação do documento;
+  //   • só necessidadeId      → materializa o registro operacional e abre o drawer
+  //                             (é o caminho de "Localizar registro da certidão").
+  // Nenhuma condição de documento obrigatório, de progresso da fase ou de quantidade
+  // de tarefas participa desta decisão. Sem redirecionamento para rota legada.
+  const abrirTarefa = useCallback((t: FaseTarefaRow) => {
+    if (t.bloqueioAbertura) { setErroOperacao(t.bloqueioAbertura); return }
+    setBannerAntecipada(null)
+    void abrirOperacao(t.documentoId ?? 0, t.necessidadeId)
+  }, [abrirOperacao])
 
   // Lista de funcionários para os seletores "Delegar" (carrega uma vez).
   const [usuarios, setUsuarios] = useState<Array<{ id: number; nome: string; publicCode?: string | null }>>([])
@@ -868,6 +942,9 @@ export function ProcessoCentralOperacional({
             progressoTexto={painel.progressoTexto}
             linhaPrincipal={painel.linhaPrincipal}
             foraDaLinha={painel.foraDaLinha}
+            pendenteClassificacao={painel.pendenteClassificacao}
+            tarefas={bodyData.tarefas ?? []}
+            onAbrirTarefa={readOnly ? undefined : abrirTarefa}
             readOnly={readOnly}
             onAbrirOperacao={readOnly ? undefined : (docId, necessidadeId) => { setBannerAntecipada(null); void abrirOperacao(docId, necessidadeId) }}
             usuarios={usuarios}
