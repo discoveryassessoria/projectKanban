@@ -4,6 +4,7 @@
   "private": true,
   "scripts": {
     "audit:referencias": "tsx scripts/prod-auditar-referencias-textuais.mjs",
+    "auditar:vinculo-documental": "tsx scripts/auditar-vinculo-documental.ts",
     "backfill:catfin": "npm run guard:escrita && tsx prisma/backfill-categoria-financeira-mestre.ts --execute",
     "backfill:catfin:dry": "tsx prisma/backfill-categoria-financeira-mestre.ts --dry-run",
     "backfill:codigos-all": "npm run guard:escrita && tsx scripts/codigos-backfill-all.ts",
@@ -159,6 +160,7 @@
     "test:home": "tsx scripts/home-logic.test.ts && tsx scripts/home-guard.test.ts",
     "test:home-guard": "tsx scripts/home-guard.test.ts",
     "test:home-logic": "tsx scripts/home-logic.test.ts",
+    "test:invariante-doc": "tsx scripts/invariante-documental.test.ts",
     "test:lancamento": "tsx scripts/lancamento-financeiro.test.ts",
     "test:legacy-guard": "tsx scripts/legacy-workflow-guard.test.ts",
     "test:lote-b": "tsx scripts/lote-b-catalogo.test.ts",

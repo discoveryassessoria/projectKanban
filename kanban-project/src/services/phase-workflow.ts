@@ -11,6 +11,7 @@ import { prisma } from "@/lib/prisma"
 import { Prisma, type PhaseWorkflowInstance, type PhaseWorkflowStepInstance } from "@prisma/client"
 import { resolveWorkflowRuntime } from "@/src/lib/workflow-runtime"
 import { validarDefinicao } from "@/src/services/workflow-definition-validator"
+import { exigirDocumentoNoPasso } from "@/src/services/invariante-documental"
 import { phaseKeyToFaseCode, FASES } from "@/src/lib/process-stage/fases-catalog"
 import {
   type DefWorkflow,
@@ -257,6 +258,8 @@ async function materializarAlvos(
     correlationId: string
     causationId: string
     instantiatedAt: string
+    /** CONTRATO (Fatia 1): o workflow declarou que executa sobre documento? */
+    exigeDocumento?: boolean
   },
   alvos: AlvoDePasso[],
 ): Promise<{ criados: PhaseWorkflowStepInstance[]; existentes: PhaseWorkflowStepInstance[] }> {
@@ -303,6 +306,17 @@ async function materializarAlvos(
       porChave.get(idLogica({ stepKey: a.def.key, pessoaId: a.pessoaId, necessidadeId: a.necessidadeId, documentoId: a.documentoId })) ??
       (a.necessidadeId != null ? porChave.get(`${a.def.key}|p-|n${a.necessidadeId}|d-`) : undefined)
     if (existente) { existentes.push(existente); continue }
+
+    // INVARIANTE DOCUMENTAL — workflow que declarou exigir documento não
+    // materializa passo sem documento. Aborta a transação inteira: passo órfão
+    // não é meio-certo, é um passo que a Central não agrupa e o operador não
+    // executa. Workflow que não assinou o contrato segue como antes.
+    exigirDocumentoNoPasso({
+      workflowExigeDocumento: ctx.exigeDocumento === true,
+      stepKey: a.def.key,
+      documentoId: a.documentoId,
+      processoId: ctx.processoId,
+    })
 
     const tipoRes = mapearTipoPasso(a.def)
     const si = await tx.phaseWorkflowStepInstance.create({
@@ -444,6 +458,7 @@ export async function instanciarWorkflowDaFase(
           {
             instanciaId: existente.id, processoId: processo.id, faseMacroKey: input.faseMacroKey,
             ciclo: existente.ciclo, correlationId, causationId: chaveWorkflow, instantiatedAt,
+            exigeDocumento: workflow.exigeDocumento === true,
           },
           plano.alvos,
         )
@@ -501,6 +516,7 @@ export async function instanciarWorkflowDaFase(
         {
           instanciaId: instancia.id, processoId: processo.id, faseMacroKey: input.faseMacroKey,
           ciclo, correlationId, causationId: chaveWorkflow, instantiatedAt,
+          exigeDocumento: workflow.exigeDocumento === true,
         },
         plano.alvos,
       )

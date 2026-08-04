@@ -72,6 +72,13 @@ export interface DefWorkflow {
   arquivado: boolean
   /** Modo de execução PERSISTIDO dos passos: SEQUENCIAL | PARALELO. */
   execucao: ModoExecucaoPassos
+  /**
+   * CONTRATO DE EXECUÇÃO (Fatia 1). Declarado no cadastro; `false`/ausente
+   * significa workflow que ainda não assinou contrato — segue como sempre.
+   */
+  escopoExecucao?: string | null
+  exigeDocumento?: boolean
+  exigePessoa?: boolean
 }
 export interface DefStep {
   id: number
