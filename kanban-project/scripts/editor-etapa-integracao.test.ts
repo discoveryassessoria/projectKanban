@@ -143,16 +143,15 @@ async function main() {
             observacao: `${marca} verificação automática`,
             chaveIdempotencia: marca,
           },
-          observacao: { texto: `${marca} observação de verificação`, chaveIdempotencia: `${marca}-obs` },
           campos: { proximoAcompanhamento: null },
         },
         CTX,
       )
-      ok(r1.ok, "14. registrar contato + observação retorna sucesso")
+      ok(r1.ok, "14. registrar contato retorna sucesso")
 
       const depois = await lerAndamentoDoBanco(alvo.id)
       ok(depois.contatos.length === antes.contatos.length + 1, "15. o contato foi PERSISTIDO (histórico cresceu em 1)")
-      ok(depois.observacoes.length === antes.observacoes.length + 1, "16. a observação foi PERSISTIDA")
+      ok(depois.contatos.every((c) => !!c.registradoEm && !!c.canal), "16. o contato persistido tem canal e carimbo")
       ok(antes.contatos.every((c) => depois.contatos.some((d) => d.chave === c.chave)),
         "17. contatos anteriores NÃO foram sobrescritos")
 
@@ -178,7 +177,7 @@ async function main() {
       const r3 = await registrarAndamentoPassoV2(
         documentoId,
         alvo.id,
-        { observacao: { texto: `${marca} concorrente` }, lockVersion: alvo.lockVersion },
+        { campos: { destinatario: `${marca} concorrente` }, lockVersion: alvo.lockVersion },
         CTX,
       )
       ok(!r3.ok && r3.error === "CONCURRENT_UPDATE",
@@ -187,10 +186,10 @@ async function main() {
       // permissão: sem permissão, 403 — e nada é escrito
       const semPermissao = { usuarioId: null, permissoes: {} as Record<string, boolean> }
       const r4 = await registrarAndamentoPassoV2(
-        documentoId, alvo.id, { observacao: { texto: `${marca} sem permissão` } }, semPermissao,
+        documentoId, alvo.id, { campos: { destinatario: `${marca} sem permissão` } }, semPermissao,
       )
       const depois3 = await lerAndamentoDoBanco(alvo.id)
-      ok(!r4.ok && r4.error === "PERMISSION_REQUIRED" && depois3.observacoes.length === depois2.observacoes.length,
+      ok(!r4.ok && r4.error === "PERMISSION_REQUIRED" && depois3.destinatario !== `${marca} sem permissão`,
         "20. usuário sem permissão recebe 403 e NADA é gravado")
 
       // auditoria
@@ -212,8 +211,7 @@ async function main() {
         data: { metadata: metadataOriginal ?? Prisma.JsonNull },
       })
       const restaurado = await lerAndamentoDoBanco(alvo.id)
-      ok(restaurado.contatos.length === antes.contatos.length &&
-         restaurado.observacoes.length === antes.observacoes.length,
+      ok(restaurado.contatos.length === antes.contatos.length,
         "23. payload original restaurado — o teste não deixa resíduo")
     }
   }

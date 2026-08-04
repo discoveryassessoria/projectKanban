@@ -47,8 +47,6 @@ import {
   useAndamento,
   mensagemDoErro,
   BlocoContatos,
-  BlocoObservacoes,
-  BlocoAnexos,
   LABEL_CANAL,
   fmtData,
   campoCls,
@@ -57,7 +55,31 @@ import {
   type AndamentoView,
   type UsuarioResumo,
 } from "./AndamentoEtapa"
+import {
+  AbaAnexosDocumentais,
+  AbaObservacoesDocumentais,
+  type SolicitacaoView,
+} from "../documento/AbasDocumentais"
 import { CANAIS_CONTATO, type CanalContato } from "@/src/lib/process-stage/andamento-etapa"
+import {
+  canalDoTexto,
+  faltamCamposDoCanal,
+  LABEL_CAMPO_FALTANDO,
+} from "@/src/lib/process-stage/canais-solicitacao"
+
+/**
+ * Erro do domínio → frase operacional. Códigos de campo faltando viram a lista
+ * de campos, com o rótulo que o operador conhece — nunca o código cru.
+ */
+function mensagemDaSolicitacao(codigo: string | null | undefined): string {
+  if (!codigo) return mensagemDoErro("INTERNAL_ERROR")
+  const [base, detalhe] = codigo.split(":")
+  if (base === "VALIDATION_ERROR" && detalhe) {
+    const campos = detalhe.split(",").map((c) => LABEL_CAMPO_FALTANDO[c] ?? c)
+    return `Falta preencher: ${campos.join(", ")}.`
+  }
+  return mensagemDoErro(base)
+}
 
 // ============================================================
 // TIPOS COMPARTILHADOS
@@ -584,17 +606,25 @@ interface DocSnapshot {
 interface SolicitarFormState {
   canal: CanalId | null
   attachmentUrl: string
+  /** Metadados REAIS do arquivo enviado — viram registro, não só nome na tela. */
+  attachmentMeta: { name: string; size: number; type: string } | null
   protocolo: string
   trackingCode: string
   observacao: string
   externalEntityName: string
   costPaid: string
   paymentMethod: string
+  /** Cartório/destinatário e prazo esperado passam a ser campos do ato. */
+  destinatario: string
+  prazoEsperadoDias: string
 }
 
 const emptySolicitarForm = (): SolicitarFormState => ({
   canal: null,
   attachmentUrl: "",
+  attachmentMeta: null,
+  destinatario: "",
+  prazoEsperadoDias: "",
   protocolo: "",
   trackingCode: "",
   observacao: "",
@@ -687,7 +717,13 @@ function FormSolicitarCertidao({
     const canalValido = CANAIS.find((c) => c.id === canalSalvo)?.id || null
     return {
       canal: canalValido || getRecomendacao(doc).canal,
-      attachmentUrl: doc.link_acompanhamento || "",
+      // O requerimento NÃO nasce mais de `link_acompanhamento`: aquele campo
+      // significa link de acompanhamento, e usá-lo como esconderijo do arquivo
+      // era exatamente o que fazia o anexo sumir de todas as abas.
+      attachmentUrl: "",
+      attachmentMeta: null,
+      destinatario: doc.cartorio || "",
+      prazoEsperadoDias: "",
       protocolo: doc.protocolo || texto(etapa?.externalProtocol),
       trackingCode: texto(etapa?.trackingCode),
       observacao: doc.observacoes || "",
@@ -703,74 +739,86 @@ function FormSolicitarCertidao({
   const canalConfig = form.canal ? CANAIS.find((c) => c.id === form.canal)! : null
   const recomendacao = doc ? getRecomendacao(doc) : null
 
-  // Validação completa
-  const errosValidacao: string[] = []
-  if (!canalConfig) {
-    errosValidacao.push("Selecione um canal de solicitação")
-  } else {
-    const r = canalConfig.requires
-    if (r.attachment && !form.attachmentUrl.trim()) {
-      errosValidacao.push(`${r.attachmentLabel} (anexo)`)
-    }
-    if (r.protocol && !form.protocolo.trim()) {
-      errosValidacao.push("Número do protocolo")
-    }
-    if (r.trackingCode && !form.trackingCode.trim()) {
-      errosValidacao.push("Código de rastreio")
-    }
-    if (r.observation && !form.observacao.trim()) {
-      errosValidacao.push("Observação")
-    }
-  }
+  // VALIDAÇÃO pela configuração OFICIAL do canal — a mesma que o servidor aplica.
+  // Antes a regra vivia só aqui dentro; a rota aceitava qualquer coisa.
+  const canalDominio = canalDoTexto(form.canal)
+  const faltando = canalDominio
+    ? faltamCamposDoCanal({
+        canal: canalDominio,
+        numeroProtocolo: form.protocolo,
+        anexoUrl: form.attachmentUrl,
+        codigoRastreio: form.trackingCode,
+        observacao: form.observacao,
+        destinatarioNome: form.destinatario,
+      })
+    : ["CANAL_INVALIDO"]
+  const errosValidacao = faltando.map((f) => LABEL_CAMPO_FALTANDO[f] ?? f)
   const podeConcluir = errosValidacao.length === 0
+  const [erroServidor, setErroServidor] = useState<string | null>(null)
 
   const handleSalvar = async () => {
-    if (readOnly) return
+    if (readOnly || saving) return
     if (!podeConcluir) {
-      alert("Falta preencher:\n• " + errosValidacao.join("\n• "))
+      setErroServidor("Falta preencher: " + errosValidacao.join(", ") + ".")
       return
     }
 
-    // ⚡ fecha o modal e comemora NA HORA; o salvamento roda em 2º plano
-    onClose()
-    void celebrar()
-
     setSaving(true)
+    setErroServidor(null)
     try {
-      // PUT no doc
-      const okDoc = await putDocumento(documentoId, {
-        canal_solicitacao: form.canal,
-        protocolo: form.protocolo.trim() || null,
-        link_acompanhamento: form.attachmentUrl.trim() || null,
-        observacoes: form.observacao.trim() || null,
-        status: "SOLICITADO",
-      })
-      if (!okDoc) throw new Error("PUT doc falhou")
-
-      // PATCH no step com todos os detalhes
       const cost = parseFloat(form.costPaid.replace(",", "."))
-      const okStep = await patchStep(documentoId, stepId, {
-        status: "concluida",
-        completedById: getUserId(),
-        requestChannel: form.canal,
-        externalProtocol: form.protocolo.trim() || null,
-        trackingCode: form.trackingCode.trim() || null,
-        externalEntityName: form.externalEntityName.trim() || null,
-        costPaid: !isNaN(cost) ? cost : null,
-        paymentMethod: form.paymentMethod || null,
-        notes: form.observacao.trim() || null,
+      // UMA requisição, UMA transação: solicitação + protocolo + requerimento +
+      // observação + conclusão da etapa. O par PUT-documento/PATCH-passo que existia
+      // aqui eram duas transações sem garantia de acontecerem juntas — e nenhuma
+      // delas criava registro de solicitação, de protocolo ou de anexo.
+      const res = await fetch(`/api/documentos/${documentoId}/solicitacoes`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", ...authHeader() },
+        body: JSON.stringify({
+          stepInstanceId: stepId,
+          canal: form.canal,
+          destinatarioNome: form.destinatario.trim() || null,
+          atendente: form.externalEntityName.trim() || null,
+          numeroProtocolo: form.protocolo.trim() || null,
+          observacao: form.observacao.trim() || null,
+          prazoEsperadoDias: form.prazoEsperadoDias.trim() || null,
+          codigoRastreio: form.trackingCode.trim() || null,
+          custoPago: !isNaN(cost) ? cost : null,
+          formaPagamento: form.paymentMethod || null,
+          requerimento: form.attachmentUrl.trim()
+            ? {
+                url: form.attachmentUrl.trim(),
+                nome: form.attachmentMeta?.name ?? null,
+                mimeType: form.attachmentMeta?.type ?? null,
+                tamanho: form.attachmentMeta?.size ?? null,
+              }
+            : null,
+          concluirEtapa: true,
+        }),
       })
-      if (!okStep) console.warn("[EditorSolicitarCertidao] step não concluiu")
-
+      const json = (await res.json().catch(() => ({}))) as { error?: string }
+      if (!res.ok) {
+        setErroServidor(mensagemDaSolicitacao(json.error))
+        return
+      }
+      // Só fecha e comemora DEPOIS que o servidor confirmou. Fechar antes era o que
+      // fazia a etapa "parecer concluída" mesmo quando a gravação falhava.
+      onClose()
+      void celebrar()
       onSaved?.()
     } catch (e) {
       console.error("[EditorSolicitarCertidao] salvar:", e)
-      alert("A etapa foi marcada, mas houve erro ao salvar no servidor. Atualize a página e confira. (console)")
-      onSaved?.()
+      setErroServidor(mensagemDaSolicitacao("INTERNAL_ERROR"))
     } finally {
       setSaving(false)
     }
   }
+
+  const bannerErro = erroServidor ? (
+    <div className="mb-4 rounded-md border border-[#f87171]/30 bg-[#f87171]/10 px-3 py-2 text-[12px] text-[#f87171]">
+      {erroServidor}
+    </div>
+  ) : null
 
   const tipoLabel = doc ? TIPO_LABEL[doc.tipo] || doc.tipo : ""
   const pessoaNome = doc?.pessoa
@@ -822,6 +870,7 @@ function FormSolicitarCertidao({
       }
     >
       <ReadOnlyBanner stepStatus={stepStatus} />
+      {bannerErro}
 
       {loading ? (
         <div className="py-12 flex justify-center">
@@ -989,7 +1038,13 @@ function FormSolicitarCertidao({
                     required
                     invalid={!form.attachmentUrl.trim()}
                     value={form.attachmentUrl}
-                    onChange={(url) => setForm({ ...form, attachmentUrl: url })}
+                    onChange={(url, meta) =>
+                      setForm({
+                        ...form,
+                        attachmentUrl: url,
+                        attachmentMeta: meta ? { name: meta.name, size: meta.size, type: meta.type } : null,
+                      })
+                    }
                     disabled={readOnly}
                     prefix={`documentos/${documentoId}/solicitacao`}
                   />
@@ -1081,26 +1136,43 @@ function FormSolicitarCertidao({
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <Label>Nome do cartório / atendente</Label>
+                  <Label required>Cartório / destinatário</Label>
+                  <input
+                    type="text"
+                    value={form.destinatario}
+                    onChange={(e) => setForm({ ...form, destinatario: e.target.value })}
+                    placeholder="ex: 2º Registro Civil de São Paulo"
+                    disabled={readOnly}
+                    className={form.destinatario.trim() ? inputCls : inputClsInvalid}
+                  />
+                </div>
+
+                <div>
+                  <Label>Atendente</Label>
                   <input
                     type="text"
                     value={form.externalEntityName}
                     onChange={(e) =>
                       setForm({ ...form, externalEntityName: e.target.value })
                     }
-                    placeholder="ex: 2º Cartório / João Silva"
+                    placeholder="ex: João Silva"
                     disabled={readOnly}
                     className={inputCls}
                   />
                 </div>
 
                 <div>
-                  <Label>Prazo esperado (SLA do cartório)</Label>
+                  {/* Prazo REAL informado pelo cartório — era um campo desabilitado
+                      com "~30 dias úteis" fixo, que não ia para lugar nenhum. */}
+                  <Label>Prazo esperado (dias)</Label>
                   <input
-                    type="text"
-                    value="~30 dias úteis"
-                    disabled
-                    className="w-full px-3 py-2 bg-[#12161c] border border-white/10 rounded-md text-sm text-white/50 cursor-not-allowed"
+                    type="number"
+                    min={0}
+                    value={form.prazoEsperadoDias}
+                    onChange={(e) => setForm({ ...form, prazoEsperadoDias: e.target.value })}
+                    placeholder="ex: 30"
+                    disabled={readOnly}
+                    className={inputCls}
                   />
                 </div>
 
@@ -1224,23 +1296,27 @@ const PAGAMENTO_LABEL: Record<string, string> = {
 
 /** Casca: carrega, e monta o formulário com a semente já em mãos. */
 export function EditorAguardarRetorno(props: StepEditorBaseProps) {
-  const { doc, etapa, etapas, carregando, recarregar } = useDocumentoEEtapa(
+  const { doc, etapa, carregando, recarregar } = useDocumentoEEtapa(
     props.isOpen ? props.documentoId : null,
     props.stepId,
   )
-  // A solicitação (etapa anterior) é o contexto exibido no topo deste editor.
-  const solicitacaoEtapa = etapas.find((s) => s.stepKey === "solicitar_certidao") ?? null
+  // A SOLICITAÇÃO vem do registro canônico, não da remontagem do payload da etapa
+  // anterior: é o mesmo dado que a aba Protocolo do documento mostra, lido uma vez.
+  const solicitacaoReq = useApi<{ resumo?: { solicitacoes: SolicitacaoView[] } }>(
+    props.isOpen && props.documentoId ? `/api/documentos/${props.documentoId}/solicitacoes` : null,
+  )
+  const solicitacao = solicitacaoReq.dados?.resumo?.solicitacoes?.[0] ?? null
   const usuarios = useUsuarios(props.isOpen)
   if (!props.isOpen) return null
   return (
     <FormAguardarRetorno
-      key={versaoDe(doc, [etapa, solicitacaoEtapa])}
+      key={versaoDe(doc, [etapa, solicitacao])}
       {...props}
       doc={doc}
       etapa={etapa}
-      solicitacaoEtapa={solicitacaoEtapa}
+      solicitacao={solicitacao}
       usuarios={usuarios}
-      loading={carregando}
+      loading={carregando || solicitacaoReq.carregando}
       recarregar={recarregar}
     />
   )
@@ -1255,14 +1331,14 @@ function FormAguardarRetorno({
   onSaved,
   doc,
   etapa,
-  solicitacaoEtapa,
+  solicitacao,
   usuarios,
   loading,
   recarregar,
 }: StepEditorBaseProps & {
   doc: Record<string, unknown> | null
   etapa: EtapaCarregada | null
-  solicitacaoEtapa: EtapaCarregada | null
+  solicitacao: SolicitacaoView | null
   usuarios: UsuarioResumo[]
   loading: boolean
   recarregar: () => void
@@ -1292,23 +1368,24 @@ function FormAguardarRetorno({
   const [concluindo, setConcluindo] = useState(false)
   const [falha, setFalha] = useState<string | null>(null)
 
-  // Retrato da solicitação: o documento manda, e a etapa anterior completa o que ele
-  // não tem. Somente leitura — esta etapa acompanha o protocolo, não o recria.
+  // Retrato da solicitação — LEITURA do registro canônico. Antes era remontado a
+  // partir de campos soltos do documento e do payload do passo anterior: a mesma
+  // informação em dois lugares, e nenhum deles autoritativo.
   const solicit = useMemo<SolicitacaoSummary>(() => ({
-    atendente: textoOuNulo(solicitacaoEtapa?.externalEntityName),
-    cartorio: textoOuNulo(doc?.cartorio),
-    canal: textoOuNulo(doc?.canal_solicitacao) || textoOuNulo(solicitacaoEtapa?.requestChannel),
-    protocolo: textoOuNulo(doc?.protocolo) || textoOuNulo(solicitacaoEtapa?.externalProtocol),
-    link: textoOuNulo(doc?.link_acompanhamento),
-    observacao: textoOuNulo(doc?.observacoes),
-    sentAt: textoOuNulo(solicitacaoEtapa?.completedAt) || textoOuNulo(solicitacaoEtapa?.startedAt),
-    custoPago: numeroOuNulo(solicitacaoEtapa?.costPaid),
-    formaPagamento: textoOuNulo(solicitacaoEtapa?.paymentMethod),
-    requerimentoUrl: textoOuNulo(doc?.link_acompanhamento),
-    trackingCode: textoOuNulo(solicitacaoEtapa?.trackingCode),
-  }), [doc, solicitacaoEtapa])
+    atendente: solicitacao?.atendente ?? null,
+    cartorio: solicitacao?.destinatarioNome ?? textoOuNulo(doc?.cartorio),
+    canal: solicitacao?.canalLabel ?? solicitacao?.canal ?? null,
+    protocolo: solicitacao?.protocolos.find((p) => p.vigente)?.numero ?? null,
+    link: solicitacao?.linkAcompanhamento ?? null,
+    observacao: solicitacao?.observacao ?? null,
+    sentAt: solicitacao?.dataEnvio ?? null,
+    custoPago: solicitacao?.custoPago ?? null,
+    formaPagamento: solicitacao?.formaPagamento ?? null,
+    requerimentoUrl: solicitacao?.arquivos.find((a) => a.tipo === "REQUERIMENTO_ENVIADO")?.url ?? null,
+    trackingCode: solicitacao?.codigoRastreio ?? null,
+  }), [doc, solicitacao])
 
-  const semProtocolo = !solicit.canal && !solicit.protocolo && !solicit.atendente
+  const semProtocolo = !solicitacao
 
   const inicioEspera = textoOuNulo(etapa?.startedAt)
   const previsaoMostrada = previsao || andamento.previsaoEfetiva || ""
@@ -1617,24 +1694,26 @@ function FormAguardarRetorno({
             salvando={salvando}
             onRegistrar={async (contato) => apos(await registrar({ contato }))}
           />
+          {/* OBSERVAÇÕES e ANEXOS — os MESMOS registros das abas do documento,
+              escopados a esta etapa. Não existe cópia local do dado. */}
+          <div>
+            <div className="text-[11px] font-bold uppercase tracking-wider text-white/55 mb-2">Observações</div>
+            <AbaObservacoesDocumentais
+              documentoId={documentoId}
+              stepInstanceId={stepId}
+              podeRegistrar={acoes.includes("registrar_observacao") && !readOnly}
+            />
+          </div>
 
-          {/* 5. OBSERVAÇÕES */}
-          <BlocoObservacoes
-            observacoes={andamento.observacoes}
-            usuarios={usuarios}
-            podeRegistrar={acoes.includes("registrar_observacao") && !readOnly}
-            salvando={salvando}
-            onRegistrar={async (t) => apos(await registrar({ observacao: { texto: t } }))}
-          />
-
-          {/* 6. ANEXOS / COMPROVANTES */}
-          <BlocoAnexos
-            anexos={andamento.anexos}
-            usuarios={usuarios}
-            podeAnexar={acoes.includes("anexar") && !readOnly}
-            salvando={salvando}
-            onAnexar={async (arquivos) => apos(await registrar({ anexos: arquivos }))}
-          />
+          <div>
+            <div className="text-[11px] font-bold uppercase tracking-wider text-white/55 mb-2">Anexos e comprovantes</div>
+            <AbaAnexosDocumentais
+              documentoId={documentoId}
+              stepInstanceId={stepId}
+              podeAnexar={acoes.includes("anexar") && !readOnly}
+              tipoPadrao="COMPROVANTE_CONTATO"
+            />
+          </div>
         </div>
       )}
     </EditorShell>
@@ -3338,22 +3417,26 @@ function FormPadrao({
             salvando={salvando}
             onRegistrar={async (contato) => apos(await registrar({ contato }))}
           />
+          {/* OBSERVAÇÕES e ANEXOS — os MESMOS registros das abas do documento,
+              escopados a esta etapa. Não existe cópia local do dado. */}
+          <div>
+            <div className="text-[11px] font-bold uppercase tracking-wider text-white/55 mb-2">Observações</div>
+            <AbaObservacoesDocumentais
+              documentoId={documentoId}
+              stepInstanceId={stepId}
+              podeRegistrar={acoes.includes("registrar_observacao") && !readOnly}
+            />
+          </div>
 
-          <BlocoObservacoes
-            observacoes={andamento.observacoes}
-            usuarios={usuarios}
-            podeRegistrar={acoes.includes("registrar_observacao") && !readOnly}
-            salvando={salvando}
-            onRegistrar={async (t) => apos(await registrar({ observacao: { texto: t } }))}
-          />
-
-          <BlocoAnexos
-            anexos={andamento.anexos}
-            usuarios={usuarios}
-            podeAnexar={acoes.includes("anexar") && !readOnly}
-            salvando={salvando}
-            onAnexar={async (arquivos) => apos(await registrar({ anexos: arquivos }))}
-          />
+          <div>
+            <div className="text-[11px] font-bold uppercase tracking-wider text-white/55 mb-2">Anexos e comprovantes</div>
+            <AbaAnexosDocumentais
+              documentoId={documentoId}
+              stepInstanceId={stepId}
+              podeAnexar={acoes.includes("anexar") && !readOnly}
+              tipoPadrao="COMPROVANTE_CONTATO"
+            />
+          </div>
         </div>
       )}
     </EditorShell>

@@ -47,7 +47,7 @@ interface PassoResposta {
   lockVersion?: number
   editor?: { kind: string; especifico: boolean; stepKeyCanonico: string }
   acoesPermitidas?: string[]
-  andamento?: { contatos: unknown[]; observacoes: unknown[]; anexos: unknown[] }
+  andamento?: { contatos: unknown[] }
   externalProtocol?: string | null
   requestChannel?: string | null
 }
@@ -177,7 +177,7 @@ async function main() {
         data: { metadata: (metadataOriginal ?? Prisma.JsonNull) as never },
       })
       const restaurado = await lerDoBanco(alvo.id)
-      chk(restaurado.contatos.length === antes.contatos.length && restaurado.observacoes.length === antes.observacoes.length,
+      chk(restaurado.contatos.length === antes.contatos.length,
         "21. payload original restaurado — produção sem resíduo")
     }
   }

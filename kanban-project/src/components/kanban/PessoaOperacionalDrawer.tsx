@@ -422,35 +422,30 @@ function ConteudoDrawer({
                 <Placeholder
                   titulo="Transmissão"
                   descricao="Visão da transmissão de cidadania por esta pessoa (estado da linhagem, bloqueios, dependências externas)."
-                  pendencia="Requer cálculo agregado no backend."
                 />
               )}
               {activeTab === "divergencias" && (
                 <Placeholder
                   titulo="Divergências"
                   descricao="Inconsistências detectadas entre documentos da pessoa (nomes divergentes, datas conflitantes)."
-                  pendencia="Requer modelo Divergencia no schema."
                 />
               )}
               {activeTab === "estrategia" && (
                 <Placeholder
                   titulo="Estratégia"
                   descricao="Plano de ataque para esta pessoa: ordem de busca, cartórios prioritários, vias judiciais."
-                  pendencia="Modelo futuro."
                 />
               )}
               {activeTab === "dependencias" && (
                 <Placeholder
                   titulo="Dependências"
                   descricao="Outras pessoas/documentos que dependem deste para serem processados."
-                  pendencia="Requer cálculo de grafo de dependências no backend."
                 />
               )}
               {activeTab === "historico" && (
                 <Placeholder
                   titulo="Histórico"
                   descricao="Timeline de eventos da pessoa (criação, edições, documentos gerados, atribuições)."
-                  pendencia="Filtrar LogAuditoria por entidade='Pessoa'."
                 />
               )}
             </div>
@@ -625,24 +620,14 @@ function DocCard({ doc, onClick }: { doc: Documento; onClick: () => void }) {
 // PLACEHOLDER (igual ao do DocumentoOperationalDrawer)
 // ============================================================
 
-function Placeholder({
-  titulo,
-  descricao,
-  pendencia,
-}: {
-  titulo: string
-  descricao: string
-  pendencia: string
-}) {
+/** Aba sem conteúdo próprio — em vocabulário de operação, nunca de schema. */
+function Placeholder({ titulo, descricao }: { titulo: string; descricao: string }) {
   return (
     <div className="flex flex-col items-center justify-center py-16 text-center max-w-md mx-auto">
-      <div className="w-12 h-12 rounded-full bg-[#1b2027]/5 border border-white/10 flex items-center justify-center mb-4">
-        <AlertTriangle className="w-5 h-5 text-amber-400/70" />
-      </div>
-      <div className="text-base font-semibold text-white mb-2">{titulo}</div>
-      <div className="text-sm text-white/60 leading-relaxed mb-4">{descricao}</div>
-      <div className="text-[11px] text-amber-300/80 bg-[#d2a948]/10 border border-amber-500/20 rounded-md px-3 py-2 leading-relaxed">
-        ⚠ {pendencia}
+      <div className="text-base font-semibold text-white/80 mb-2">{titulo}</div>
+      <div className="text-sm text-white/55 leading-relaxed">{descricao}</div>
+      <div className="mt-3 text-[11px] uppercase tracking-wider text-white/35">
+        Ainda não há registros aqui
       </div>
     </div>
   )

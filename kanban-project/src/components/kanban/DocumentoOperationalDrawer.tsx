@@ -156,6 +156,12 @@ interface DocumentoOperationalDrawerProps {
   contextoAntecipada?: ContextoAntecipada
 }
 
+import {
+  AbaProtocoloDocumento,
+  AbaAnexosDocumentais,
+  AbaObservacoesDocumentais,
+} from "./documento/AbasDocumentais"
+
 type TabId =
   | "operation"
   | "workflow"
@@ -645,49 +651,31 @@ function ConteudoDrawer({
                 <Placeholder
                   titulo="Divergências"
                   descricao="Inconsistências detectadas entre os dados do documento e a árvore (nome divergente, data conflitante, vínculo inválido)."
-                  pendencia="Requer modelo Divergencia no schema."
                 />
               )}
               {activeTab === "attach" && (
-                <Placeholder
-                  titulo="Anexos"
-                  descricao="Arquivos anexados ao longo da operação (rascunho, comprovante de pedido, certidão recebida, tradução, apostila)."
-                  pendencia="O Documento já tem arquivo_url / arquivo_traducao_url / arquivo_apostila_url, mas o histórico de anexos por etapa requer modelo WorkflowStepAttachment."
-                />
+                <AbaAnexosDocumentais documentoId={documentoId} podeAnexar />
               )}
               {activeTab === "observ" && (
-                <Placeholder
-                  titulo="Observações"
-                  descricao="Comentários da equipe sobre cada etapa da operação."
-                  pendencia="Requer modelo WorkflowStepComment no schema."
-                />
+                <AbaObservacoesDocumentais documentoId={documentoId} podeRegistrar />
               )}
-              {activeTab === "protocol" && (
-                <Placeholder
-                  titulo="Protocolo"
-                  descricao="Protocolos consulares vinculados a este documento."
-                  pendencia="O modelo Protocolo existe, mas está vinculado a Processo. Para vincular por documento, seria preciso uma tabela de junção."
-                />
-              )}
+              {activeTab === "protocol" && <AbaProtocoloDocumento documentoId={documentoId} />}
               {activeTab === "returns" && (
                 <Placeholder
                   titulo="Devoluções"
                   descricao="Devoluções do cartório com motivo, gravidade e número de tentativas."
-                  pendencia="Requer modelo RegistryReturn no schema."
                 />
               )}
               {activeTab === "attempts" && (
                 <Placeholder
                   titulo="Tentativas"
                   descricao="Tentativas de localização/emissão do documento em diferentes cartórios e canais."
-                  pendencia="Requer modelo DocumentAttempt no schema."
                 />
               )}
               {activeTab === "audit" && (
                 <Placeholder
                   titulo="Auditoria"
                   descricao="Log completo de quem fez o quê e quando neste documento."
-                  pendencia="O modelo LogAuditoria é genérico — para auditoria específica por documento, será necessário filtrar por entidade='Documento' e entidadeId."
                 />
               )}
             </div>
@@ -828,8 +816,8 @@ function TabHistory({ doc }: { doc: Documento }) {
         </div>
       </Section>
       <div className="text-[11px] text-white/40 px-2 pt-2">
-        Histórico básico baseado nos timestamps do documento. Para um log completo de eventos
-        (mudanças de status, atribuições, cobranças), será necessário um modelo DocumentoHistorico no schema.
+        Marcos do documento. O diário completo da operação (contatos, observações e
+        anexos, com autor e data) fica nas abas Observações e Anexos.
       </div>
     </div>
   )
@@ -873,16 +861,18 @@ function GridFields({ fields }: { fields: Array<[string, string | null | undefin
   )
 }
 
-function Placeholder({ titulo, descricao, pendencia }: { titulo: string; descricao: string; pendencia: string }) {
+/**
+ * Aba ainda sem conteúdo próprio. Diz ao OPERADOR o que a aba vai mostrar — e só
+ * isso. Antes exibia a pendência técnica de implementação — ou seja, nome de
+ * model e de coluna na tela de quem está operando um processo.
+ */
+function Placeholder({ titulo, descricao }: { titulo: string; descricao: string }) {
   return (
     <div className="flex flex-col items-center justify-center py-16 text-center max-w-md mx-auto">
-      <div className="w-12 h-12 rounded-full bg-[#161b21] border border-white/10 flex items-center justify-center mb-4">
-        <AlertTriangle className="w-5 h-5 text-amber-400/70" />
-      </div>
-      <div className="text-base font-semibold text-white mb-2">{titulo}</div>
-      <div className="text-sm text-white/60 leading-relaxed mb-4">{descricao}</div>
-      <div className="text-[11px] text-amber-300/80 bg-[#d2a948]/10 border border-amber-500/20 rounded-md px-3 py-2 leading-relaxed">
-        ⚠ {pendencia}
+      <div className="text-base font-semibold text-white/80 mb-2">{titulo}</div>
+      <div className="text-sm text-white/55 leading-relaxed">{descricao}</div>
+      <div className="mt-3 text-[11px] uppercase tracking-wider text-white/35">
+        Ainda não há registros aqui
       </div>
     </div>
   )

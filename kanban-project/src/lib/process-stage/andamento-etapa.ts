@@ -13,12 +13,16 @@
 //
 // O QUE ESTE ARQUIVO ACRESCENTA
 // -----------------------------
-// Três COLEÇÕES APPEND-ONLY dentro desse payload — contatos, observações e
-// anexos — com FORMATO VALIDADO. O histórico de contatos vivia como texto
-// corrido dentro de `notes`, com parsing por regex: um contato podia ser
-// sobrescrito por qualquer edição da nota, não tinha autor, e "quem registrou"
-// simplesmente não existia. Aqui cada registro é uma entrada imutável, com autor
-// e carimbo de tempo, e nada apaga o que já foi registrado.
+// Os campos de acompanhamento e o HISTÓRICO DE CONTATOS, com formato validado.
+// O histórico vivia como texto corrido dentro de `notes`, com parsing por regex:
+// um contato podia ser sobrescrito por qualquer edição da nota, não tinha autor,
+// e "quem registrou" simplesmente não existia. Aqui cada contato é uma entrada
+// imutável, com autor e carimbo, e nada apaga o que já foi registrado.
+//
+// O QUE NÃO MORA AQUI: anexo e observação. Esses são registro do DOCUMENTO
+// (DocumentoArquivo / DocumentoObservacao), porque aparecem nas abas Anexos e
+// Observações do documento inteiro — não só da etapa. Guardá-los no payload do
+// passo criaria uma segunda fonte para o mesmo fato.
 //
 // IDEMPOTÊNCIA
 // ------------
@@ -64,23 +68,6 @@ export interface ContatoEtapa {
   anexoNome: string | null
 }
 
-export interface ObservacaoEtapa {
-  chave: string
-  registradoEm: string
-  autorId: number | null
-  texto: string
-}
-
-export interface AnexoEtapa {
-  chave: string
-  registradoEm: string
-  autorId: number | null
-  url: string
-  nome: string
-  tipo: string | null
-  tamanho: number | null
-}
-
 /** Campos de acompanhamento da espera. Todos OPCIONAIS: salvar andamento nunca exige formulário completo. */
 export interface CamposAcompanhamento {
   prazoEstimadoDias: number | null
@@ -93,8 +80,6 @@ export interface CamposAcompanhamento {
 
 export interface AndamentoEtapa extends CamposAcompanhamento {
   contatos: ContatoEtapa[]
-  observacoes: ObservacaoEtapa[]
-  anexos: AnexoEtapa[]
 }
 
 export const ANDAMENTO_VAZIO: AndamentoEtapa = {
@@ -105,8 +90,6 @@ export const ANDAMENTO_VAZIO: AndamentoEtapa = {
   canalPreferencial: null,
   semRetornoDesde: null,
   contatos: [],
-  observacoes: [],
-  anexos: [],
 }
 
 // ── Leitores tolerantes ──────────────────────────────────────────────────────
@@ -203,39 +186,6 @@ function lerContato(v: unknown): ContatoEtapa | null {
   }
 }
 
-function lerObservacao(v: unknown): ObservacaoEtapa | null {
-  if (!v || typeof v !== "object") return null
-  const o = v as Record<string, unknown>
-  const texto = str(o.texto)
-  if (!texto) return null
-  const registradoEm = instanteIso(o.registradoEm, new Date(0).toISOString())
-  const autorId = num(o.autorId)
-  return {
-    chave: str(o.chave) ?? chaveDeConteudo(["obs", texto, autorId, registradoEm.slice(0, 16)]),
-    registradoEm,
-    autorId,
-    texto,
-  }
-}
-
-function lerAnexo(v: unknown): AnexoEtapa | null {
-  if (!v || typeof v !== "object") return null
-  const o = v as Record<string, unknown>
-  const url = str(o.url)
-  if (!url) return null
-  const registradoEm = instanteIso(o.registradoEm, new Date(0).toISOString())
-  return {
-    // A chave de um anexo é a URL: reenviar o MESMO arquivo (retry) não duplica a linha.
-    chave: str(o.chave) ?? chaveDeConteudo(["anexo", url]),
-    registradoEm,
-    autorId: num(o.autorId),
-    url,
-    nome: str(o.nome) ?? url.split("/").pop() ?? "arquivo",
-    tipo: str(o.tipo),
-    tamanho: num(o.tamanho),
-  }
-}
-
 function lista<T>(v: unknown, ler: (x: unknown) => T | null): T[] {
   if (!Array.isArray(v)) return []
   const out: T[] = []
@@ -258,10 +208,6 @@ export function lerAndamento(operacao: unknown): AndamentoEtapa {
     canalPreferencial: ehCanal(o.canalPreferencial) ? o.canalPreferencial : null,
     semRetornoDesde: dataIso(o.semRetornoDesde),
     contatos: ordenarPorTempo(lista(o.contatos, lerContato)),
-    observacoes: lista(o.observacoes, lerObservacao).sort((a, b) =>
-      a.registradoEm.localeCompare(b.registradoEm),
-    ),
-    anexos: lista(o.anexos, lerAnexo).sort((a, b) => a.registradoEm.localeCompare(b.registradoEm)),
   }
 }
 
@@ -274,8 +220,6 @@ function ordenarPorTempo(cs: ContatoEtapa[]): ContatoEtapa[] {
 export interface EntradaAndamento {
   campos?: Partial<Record<keyof CamposAcompanhamento, unknown>>
   contato?: unknown
-  observacao?: unknown
-  anexos?: unknown
 }
 
 export interface ContextoAndamento {
@@ -286,7 +230,7 @@ export interface ContextoAndamento {
 export interface ResultadoAplicacao {
   andamento: AndamentoEtapa
   /** O que de fato mudou — vai para a auditoria e permite detectar no-op. */
-  mudou: { campos: boolean; contato: boolean; observacao: boolean; anexos: number }
+  mudou: { campos: boolean; contato: boolean }
   erros: string[]
 }
 
@@ -302,13 +246,8 @@ export function aplicarAndamento(
 ): ResultadoAplicacao {
   const erros: string[] = []
   const agoraIso = ctx.agora.toISOString()
-  const proximo: AndamentoEtapa = {
-    ...atual,
-    contatos: [...atual.contatos],
-    observacoes: [...atual.observacoes],
-    anexos: [...atual.anexos],
-  }
-  const mudou = { campos: false, contato: false, observacao: false, anexos: 0 }
+  const proximo: AndamentoEtapa = { ...atual, contatos: [...atual.contatos] }
+  const mudou = { campos: false, contato: false }
 
   // 1) CAMPOS — só o que veio na requisição é tocado. `null` explícito LIMPA;
   //    ausência PRESERVA. Salvar andamento nunca exige preencher tudo.
@@ -383,43 +322,6 @@ export function aplicarAndamento(
     }
   }
 
-  // 3) OBSERVAÇÃO — append. Não sobrescreve as anteriores.
-  if (entrada.observacao != null) {
-    const bruto = entrada.observacao as Record<string, unknown> | string
-    const texto = typeof bruto === "string" ? str(bruto) : str(bruto?.texto)
-    const chaveCliente = typeof bruto === "string" ? null : str(bruto?.chaveIdempotencia)
-    if (!texto) erros.push("OBSERVACAO_VAZIA")
-    else {
-      const chave = chaveCliente ?? chaveDeConteudo(["obs", texto, ctx.autorId, agoraIso.slice(0, 16)])
-      if (!proximo.observacoes.some((x) => x.chave === chave)) {
-        proximo.observacoes.push({ chave, registradoEm: agoraIso, autorId: ctx.autorId, texto })
-        mudou.observacao = true
-      }
-    }
-  }
-
-  // 4) ANEXOS — append, deduplicado por URL (retry de upload não duplica linha).
-  if (entrada.anexos != null) {
-    const brutos = Array.isArray(entrada.anexos) ? entrada.anexos : [entrada.anexos]
-    for (const a of brutos) {
-      const o = (a ?? {}) as Record<string, unknown>
-      const url = str(o.url)
-      if (!url) { erros.push("ANEXO_SEM_URL"); continue }
-      const chave = chaveDeConteudo(["anexo", url])
-      if (proximo.anexos.some((x) => x.chave === chave)) continue
-      proximo.anexos.push({
-        chave,
-        registradoEm: agoraIso,
-        autorId: ctx.autorId,
-        url,
-        nome: str(o.nome) ?? url.split("/").pop() ?? "arquivo",
-        tipo: str(o.tipo),
-        tamanho: num(o.tamanho),
-      })
-      mudou.anexos++
-    }
-  }
-
   return { andamento: erros.length ? atual : proximo, mudou, erros }
 }
 
@@ -441,8 +343,6 @@ export function gravarAndamento(
     canalPreferencial: andamento.canalPreferencial,
     semRetornoDesde: andamento.semRetornoDesde,
     contatos: andamento.contatos,
-    observacoes: andamento.observacoes,
-    anexos: andamento.anexos,
   }
 }
 

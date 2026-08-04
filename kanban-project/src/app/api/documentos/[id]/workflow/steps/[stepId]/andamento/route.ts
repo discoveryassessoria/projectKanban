@@ -37,8 +37,6 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     const body = (await request.json()) as {
       campos?: Record<string, unknown>
       contato?: unknown
-      observacao?: unknown
-      anexos?: unknown
       lockVersion?: number
     }
 
@@ -48,8 +46,6 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
       {
         campos: body.campos,
         contato: body.contato,
-        observacao: body.observacao,
-        anexos: body.anexos,
         lockVersion: typeof body.lockVersion === "number" ? body.lockVersion : undefined,
       },
       { usuarioId: usuario.userId, permissoes: usuario.permissoes },

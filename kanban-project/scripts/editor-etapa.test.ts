@@ -184,24 +184,9 @@ const r3 = aplicarAndamento(r2.andamento, {
 ok(r3.andamento.contatos.length === 2 && r3.mudou.contato === false,
   "23. duplo clique não duplica contato (idempotência por conteúdo)")
 
-// observações
-const o1 = aplicarAndamento(r2.andamento, { observacao: { texto: "primeira" } }, ctx)
-const o2 = aplicarAndamento(o1.andamento, { observacao: { texto: "segunda" } }, ctx)
-ok(o2.andamento.observacoes.length === 2 && o2.andamento.observacoes[0].texto === "primeira" &&
-   o2.andamento.observacoes.every((o) => o.autorId === 7 && !!o.registradoEm),
-  "24. observações são append-only, com autor e data")
-
-ok(aplicarAndamento(ANDAMENTO_VAZIO, { observacao: { texto: "   " } }, ctx).erros.includes("OBSERVACAO_VAZIA"),
-  "25. observação vazia é recusada com código de validação")
-
-// anexos — dedup por URL (retry de upload)
-const a1 = aplicarAndamento(o2.andamento, { anexos: [{ url: "https://x/a.pdf", nome: "a.pdf" }] }, ctx)
-const a2 = aplicarAndamento(a1.andamento, { anexos: [{ url: "https://x/a.pdf", nome: "a.pdf" }] }, ctx)
-ok(a1.andamento.anexos.length === 1 && a2.andamento.anexos.length === 1 && a2.mudou.anexos === 0,
-  "26. anexo fica vinculado à etapa e o retry não duplica")
-
-ok(a1.andamento.anexos[0].autorId === 7 && !!a1.andamento.anexos[0].registradoEm,
-  "27. anexo registra autor e data")
+// NOTA: observações e anexos deixaram de morar no payload da etapa — viraram
+// registro do DOCUMENTO (DocumentoArquivo/DocumentoObservacao). A cobertura deles
+// está em `solicitacao-documento.test.ts`.
 
 // campos: salvar andamento NÃO exige formulário completo
 const c1 = aplicarAndamento(ANDAMENTO_VAZIO, { campos: { proximoAcompanhamento: "2026-08-20" } }, ctx)
@@ -215,22 +200,23 @@ ok(aplicarAndamento(ANDAMENTO_VAZIO, { contato: { canal: "POMBO_CORREIO", result
   "30. canal fora do domínio é recusado")
 
 // entrada inválida NÃO altera o estado (rollback lógico)
-const invalido = aplicarAndamento(r2.andamento, { campos: { previsaoRetorno: "xx" }, observacao: { texto: "vai junto?" } }, ctx)
-ok(invalido.andamento === r2.andamento && invalido.andamento.observacoes.length === r2.andamento.observacoes.length,
+const invalido = aplicarAndamento(r2.andamento, {
+  campos: { previsaoRetorno: "xx" },
+  contato: { canal: "EMAIL", resultado: "OUTRO", observacao: "vai junto?" },
+}, ctx)
+ok(invalido.andamento === r2.andamento && invalido.andamento.contatos.length === r2.andamento.contatos.length,
   "31. falha de validação não aplica NADA da entrada (tudo ou nada)")
 
 // round-trip pelo payload persistido, preservando o resto da operação
 const operacaoExistente = { trackingCode: "BR123", externalProtocol: "999", reviewChecklist: { a: true } }
-const gravado = gravarAndamento(operacaoExistente, a1.andamento)
+const gravado = gravarAndamento(operacaoExistente, r2.andamento)
 const relido = lerAndamento(gravado)
 ok(gravado.trackingCode === "BR123" && gravado.externalProtocol === "999" && !!gravado.reviewChecklist,
   "32. gravar andamento PRESERVA o resto do payload operacional do passo")
-ok(relido.contatos.length === a1.andamento.contatos.length &&
-   relido.observacoes.length === a1.andamento.observacoes.length &&
-   relido.anexos.length === a1.andamento.anexos.length,
+ok(relido.contatos.length === r2.andamento.contatos.length,
   "33. reload mantém os dados (round-trip do payload)")
 
-ok(lerAndamento(null).contatos.length === 0 && lerAndamento("lixo").observacoes.length === 0,
+ok(lerAndamento(null).contatos.length === 0 && lerAndamento("lixo").contatos.length === 0,
   "34. payload ausente ou corrompido lê como vazio, sem quebrar a tela")
 
 // previsão derivada

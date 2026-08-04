@@ -47,6 +47,11 @@ model Usuario {
   decisoesRegistrais        DecisaoRevisaoRegistral[]   @relation("DecisaoRegistralResponsavel")
   versoesGenealogicas       VersaoGenealogica[]         @relation("VersaoGenealogicaAutor")
 
+  // Emissao documental: autoria da solicitacao, do arquivo e da observacao.
+  solicitacoesDocumento SolicitacaoDocumento[] @relation("SolicitacaoDocumentoAutor")
+  arquivosDocumento     DocumentoArquivo[]     @relation("DocumentoArquivoAutor")
+  observacoesDocumento  DocumentoObservacao[]  @relation("DocumentoObservacaoAutor")
+
   @@index([perfilId])
 }
 
@@ -298,6 +303,11 @@ model Documento {
   tarefasVinculadas Tarefa[]                    @relation("TarefaDocumento")
   stepInstances     PhaseWorkflowStepInstance[]
   protocolos        ProtocoloDocumento[]
+
+  // EMISSAO DOCUMENTAL - fonte canonica da solicitacao, dos arquivos e das observacoes.
+  solicitacoes            SolicitacaoDocumento[]
+  arquivos                DocumentoArquivo[]
+  observacoesOperacionais DocumentoObservacao[]
 
   // ============================================================
   // MRG - TRANSCRICAO REGISTRAL (pertence ao Sistema Documental, nao a arvore).
@@ -652,41 +662,49 @@ model Requerente {
 /// NÃO é cadastro: cada registro é um ato concreto (entregar/enviar algo a um
 /// órgão), que gera Evento na Timeline e entra no Histórico do Processo.
 model Protocolo {
-  publicCode      String?              @unique @db.VarChar(20)
-  id              Int                  @id @default(autoincrement())
+  publicCode      String?               @unique @db.VarChar(20)
+  id              Int                   @id @default(autoincrement())
   processoId      Int
   contratanteId   Int?
   requerenteId    Int?
   /// LEGADO (Espanha): substituído por `orgaoId` — Órgãos e Organizações.
   consulado       Consulado?
-  consuladoOutro  String?              @db.VarChar(200)
+  consuladoOutro  String?               @db.VarChar(200)
   /// Órgão que RECEBEU o protocolo (fonte única: Órgãos e Organizações).
   orgaoId         Int?
   /// Setor/guichê dentro do órgão (opcional).
-  setor           String?              @db.VarChar(120)
+  setor           String?               @db.VarChar(120)
   /// Data e hora da protocolização.
   dataProtocolo   DateTime?
-  numeroProtocolo String?              @db.VarChar(100)
+  numeroProtocolo String?               @db.VarChar(100)
   tipoProtocolo   TipoProtocolo?
   formaEnvio      FormaEnvioProtocolo?
   /// Quem da equipe protocolou.
   responsavelId   Int?
   observacoes     String?
-  createdAt       DateTime             @default(now())
-  updatedAt       DateTime             @updatedAt
+  /// ORIGEM do ato. "PROCESSO" = protocolizacao do dossie no orgao (telas do processo).
+  /// "SOLICITACAO_DOCUMENTO" = numero devolvido ao solicitar uma certidao. E o MESMO
+  /// cadastro de protocolo (nao existe um segundo); a origem so diz de onde ele nasceu.
+  origem          String                @default("PROCESSO") @db.VarChar(30)
+  /// Solicitacao de certidao que originou este protocolo (null = protocolo do processo).
+  solicitacaoId   Int?
+  createdAt       DateTime              @default(now())
+  updatedAt       DateTime              @updatedAt
   anexos          AnexoProtocolo[]
   documentos      ProtocoloDocumento[]
-  contratante     Contratante?         @relation(fields: [contratanteId], references: [id], onDelete: Cascade)
-  processo        Processo             @relation(fields: [processoId], references: [id], onDelete: Cascade)
-  requerente      Requerente?          @relation(fields: [requerenteId], references: [id], onDelete: Cascade)
-  orgao           OrgaoProtocolo?      @relation(fields: [orgaoId], references: [id], onDelete: SetNull)
-  responsavel     Usuario?             @relation("ProtocoloResponsavel", fields: [responsavelId], references: [id], onDelete: SetNull)
+  contratante     Contratante?          @relation(fields: [contratanteId], references: [id], onDelete: Cascade)
+  processo        Processo              @relation(fields: [processoId], references: [id], onDelete: Cascade)
+  requerente      Requerente?           @relation(fields: [requerenteId], references: [id], onDelete: Cascade)
+  orgao           OrgaoProtocolo?       @relation(fields: [orgaoId], references: [id], onDelete: SetNull)
+  responsavel     Usuario?              @relation("ProtocoloResponsavel", fields: [responsavelId], references: [id], onDelete: SetNull)
+  solicitacao     SolicitacaoDocumento? @relation(fields: [solicitacaoId], references: [id], onDelete: Cascade)
 
   @@index([processoId])
   @@index([contratanteId])
   @@index([requerenteId])
   @@index([orgaoId])
   @@index([responsavelId])
+  @@index([solicitacaoId])
 }
 
 /// Documentos ENVIADOS numa protocolização (o que foi entregue ao órgão).
@@ -3059,7 +3077,8 @@ model OrgaoProtocolo {
   categorias OrganizacaoCategoria[]
 
   // protocolizações recebidas por este órgão (ocorrências dentro dos processos)
-  protocolos Protocolo[]
+  protocolos            Protocolo[]
+  solicitacaoDocumentos SolicitacaoDocumento[]
 
   /// Anti-duplicidade do cadastro mestre: mesma entidade não entra duas vezes.
   @@unique([name, country])
@@ -5688,4 +5707,169 @@ model SaudeAchado {
   @@index([dominio])
   @@index([codigo])
   @@index([ultimaDeteccao])
+}
+
+// ============================================================================
+// EMISSAO DOCUMENTAL - SOLICITACAO, ARQUIVOS E OBSERVACOES DO DOCUMENTO
+// ============================================================================
+//
+// FONTE UNICA da solicitacao de certidao. Ate aqui, o que o operador preenchia em
+// "Solicitar certidao" ficava em tres lugares e nenhum era canonico: campos soltos
+// do Documento (protocolo, canal_solicitacao, cartorio, link_acompanhamento) e
+// metadata.operacao do passo. Consequencia: o arquivo do requerimento existia no R2
+// mas nao tinha registro, o numero de protocolo nao virava Protocolo, e a aba
+// Protocolo do documento nao tinha o que ler.
+//
+// A solicitacao e o ATO; o protocolo e o que o orgao devolve (pode nao existir no
+// envio, pode chegar depois, pode haver mais de um). Por isso protocolo NAO e coluna
+// da solicitacao: e o cadastro Protocolo ja existente, apontando para ela.
+
+/// Canal pelo qual a solicitacao foi enviada. Dimensao FECHADA de dominio (mesma
+/// natureza de TipoProtocolo/FormaEnvioProtocolo) - nao e cadastro mestre: o canal
+/// nao tem atributos proprios administraveis, so identidade.
+enum CanalSolicitacaoDocumento {
+  CRC
+  ECARTORIO
+  EMAIL
+  WHATSAPP
+  BALCAO
+  COMUNE
+  CORREIOS
+  CONSULADO
+}
+
+enum StatusSolicitacaoDocumento {
+  /// Enviada; o canal nao exige protocolo imediato ou ele ainda nao chegou.
+  AGUARDANDO_PROTOCOLO
+  /// Enviada e com numero de protocolo registrado.
+  PROTOCOLADA
+  /// O orgao respondeu (documento recebido / recusado).
+  RESPONDIDA
+  /// Solicitacao cancelada; preservada para historico.
+  CANCELADA
+}
+
+/// Natureza do arquivo dentro da operacao do documento. Fechada de proposito: a aba
+/// Anexos agrupa por ela, e um tipo novo e decisao de dominio, nao texto livre.
+enum TipoArquivoDocumento {
+  REQUERIMENTO_ENVIADO
+  COMPROVANTE_PROTOCOLO
+  COMPROVANTE_CONTATO
+  DOCUMENTO_RECEBIDO
+  OUTRO
+}
+
+/// SOLICITACAO OFICIAL de um documento a um cartorio/orgao. Uma por envio formal;
+/// reenvio gera OUTRA solicitacao (historico preservado, nada sobrescrito).
+model SolicitacaoDocumento {
+  id          Int       @id @default(autoincrement())
+  documentoId Int
+  documento   Documento @relation(fields: [documentoId], references: [id], onDelete: Cascade)
+  /// Denormalizados por ESCOPO (nao por conveniencia): a consulta da aba Protocolo
+  /// e por documento, e o isolamento entre processos precisa ser verificavel na linha.
+  processoId  Int
+  pessoaId    Int
+
+  // Vinculos com a execucao que originou a solicitacao (nunca por nome/titulo).
+  faseMacroKey       String @db.VarChar(60)
+  workflowInstanceId Int?
+  stepInstanceId     Int?
+  tarefaId           Int?
+
+  canal            CanalSolicitacaoDocumento
+  /// Orgao/cartorio quando ha cadastro (Orgaos e Organizacoes).
+  orgaoId          Int?
+  orgao            OrgaoProtocolo?           @relation(fields: [orgaoId], references: [id], onDelete: SetNull)
+  /// Nome do destinatario quando nao ha cadastro correspondente. Nunca substitui orgaoId.
+  destinatarioNome String?                   @db.VarChar(200)
+  /// Pessoa que atendeu (balcao, telefone, e-mail).
+  atendente        String?                   @db.VarChar(200)
+
+  dataEnvio          DateTime
+  prazoEsperadoDias  Int?
+  previsaoRetorno    DateTime?
+  observacao         String?   @db.Text
+  custoPago          Decimal?  @db.Decimal(12, 2)
+  formaPagamento     String?   @db.VarChar(40)
+  linkAcompanhamento String?   @db.VarChar(500)
+  codigoRastreio     String?   @db.VarChar(100)
+
+  status StatusSolicitacaoDocumento @default(AGUARDANDO_PROTOCOLO)
+
+  criadoPorId Int?
+  criadoPor   Usuario? @relation("SolicitacaoDocumentoAutor", fields: [criadoPorId], references: [id], onDelete: SetNull)
+
+  /// Idempotencia do ato: duplo clique e retry caem na MESMA solicitacao.
+  chaveIdempotencia String @unique @db.VarChar(200)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  protocolos Protocolo[]
+  arquivos   DocumentoArquivo[]
+
+  @@index([documentoId, createdAt])
+  @@index([processoId])
+  @@index([stepInstanceId])
+  @@index([tarefaId])
+  @@index([status])
+}
+
+/// ARQUIVO vinculado a operacao de um documento - registro unico por arquivo.
+/// A aba Anexos da ETAPA filtra por stepInstanceId; a do DOCUMENTO lista tudo e
+/// agrupa por origem. O binario e um so (R2); aqui mora a REFERENCIA.
+model DocumentoArquivo {
+  id          Int       @id @default(autoincrement())
+  documentoId Int
+  documento   Documento @relation(fields: [documentoId], references: [id], onDelete: Cascade)
+
+  /// Origem estrutural do arquivo. Ambos podem estar preenchidos (requerimento de
+  /// uma solicitacao feita numa etapa); nenhum preenchido = arquivo do documento.
+  solicitacaoId  Int?
+  solicitacao    SolicitacaoDocumento? @relation(fields: [solicitacaoId], references: [id], onDelete: SetNull)
+  stepInstanceId Int?
+
+  tipo TipoArquivoDocumento @default(OUTRO)
+
+  url      String
+  nome     String  @db.VarChar(300)
+  mimeType String? @db.VarChar(120)
+  tamanho  Int?
+
+  criadoPorId Int?
+  criadoPor   Usuario? @relation("DocumentoArquivoAutor", fields: [criadoPorId], references: [id], onDelete: SetNull)
+
+  createdAt DateTime @default(now())
+
+  /// DEDUP: o mesmo arquivo (mesma URL) nao entra duas vezes no mesmo documento.
+  /// E o que faz o retry de upload nao duplicar linha.
+  @@unique([documentoId, url])
+  @@index([documentoId, createdAt])
+  @@index([stepInstanceId])
+  @@index([solicitacaoId])
+  @@index([tipo])
+}
+
+/// OBSERVACAO operacional do documento - append-only, com autor e carimbo.
+/// Substitui o texto mutavel que vivia em metadata: observacao anterior nunca some.
+model DocumentoObservacao {
+  id          Int       @id @default(autoincrement())
+  documentoId Int
+  documento   Documento @relation(fields: [documentoId], references: [id], onDelete: Cascade)
+
+  solicitacaoId  Int?
+  stepInstanceId Int?
+
+  texto String @db.Text
+
+  criadoPorId Int?
+  criadoPor   Usuario? @relation("DocumentoObservacaoAutor", fields: [criadoPorId], references: [id], onDelete: SetNull)
+
+  createdAt DateTime @default(now())
+
+  /// Idempotencia: o mesmo texto reenviado (duplo clique/retry) nao vira duas linhas.
+  chaveIdempotencia String @unique @db.VarChar(200)
+
+  @@index([documentoId, createdAt])
+  @@index([stepInstanceId])
 }

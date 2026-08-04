@@ -323,6 +323,9 @@ const CAMPOS_OPERACAO = [
   "trackingCode", "externalProtocol", "requestChannel", "reviewResult", "validationResult",
   "externalEntityName", "costPaid", "paymentMethod", "documentMedium", "physicalLocation",
   "reviewChecklist", "stepObservation", "legalOpinion", "notes", "completedById",
+  // REFERÊNCIA ao registro canônico. O payload do passo deixa de ser fonte da
+  // solicitação e passa a apontar para ela.
+  "solicitacaoId",
 ] as const
 
 /**
@@ -345,16 +348,40 @@ function acaoDoPatch(patch: Record<string, unknown>, statusAtual: StepInstanceSt
   return "salvar_andamento"
 }
 
-/** PATCH de um passo no V2 (status/responsável/campos de domínio) + lock-step entre irmãos. */
-export async function atualizarPassoV2(
+/** Passo carregado, do jeito que o motor de transição precisa dele. */
+export type PassoParaTransicao = {
+  id: number
+  documentoId: number | null
+  necessidadeId: number | null
+  processoId: number
+  workflowInstanceId: number
+  faseMacroKey: string
+  ordem: number
+  status: StepInstanceStatus
+  ciclo: number
+  metadata: unknown
+  stepKey: string
+}
+
+const SELECT_PASSO_TRANSICAO = {
+  id: true, documentoId: true, necessidadeId: true, processoId: true, workflowInstanceId: true,
+  faseMacroKey: true, ordem: true, status: true, ciclo: true, metadata: true, stepKey: true,
+} as const
+
+/**
+ * Carrega o passo e AUTORIZA a ação pretendida. Separado da aplicação para que
+ * quem precisa concluir o passo DENTRO da própria transação (a solicitação de
+ * certidão) use o MESMO gate — sem um segundo motor de transição por perto.
+ */
+export async function carregarPassoAutorizado(
   documentoId: number,
   stepInstanceId: number,
   patch: Record<string, unknown>,
   ctx?: ContextoLeituraWorkflow,
-): Promise<OpResult> {
+): Promise<{ ok: true; passo: PassoParaTransicao } | { ok: false; error: string; status: number }> {
   const p = await prisma.phaseWorkflowStepInstance.findUnique({
     where: { id: stepInstanceId },
-    select: { id: true, documentoId: true, necessidadeId: true, processoId: true, workflowInstanceId: true, faseMacroKey: true, ordem: true, status: true, ciclo: true, metadata: true, stepKey: true },
+    select: SELECT_PASSO_TRANSICAO,
   })
   if (!p || p.documentoId !== documentoId) return { ok: false, error: "STEP_NOT_FOUND", status: 404 }
 
@@ -375,8 +402,63 @@ export async function atualizarPassoV2(
       }
     }
   }
+  return { ok: true, passo: p as PassoParaTransicao }
+}
+
+/** PATCH de um passo no V2 (status/responsável/campos de domínio) + lock-step entre irmãos. */
+export async function atualizarPassoV2(
+  documentoId: number,
+  stepInstanceId: number,
+  patch: Record<string, unknown>,
+  ctx?: ContextoLeituraWorkflow,
+): Promise<OpResult> {
+  const carregado = await carregarPassoAutorizado(documentoId, stepInstanceId, patch, ctx)
+  if (!carregado.ok) return carregado
+  const p = carregado.passo
 
   const now = new Date()
+  const liberarProximo = await prisma.$transaction((tx) => aplicarTransicaoDoPassoTx(tx, p, patch, ctx, now))
+
+  // CONCLUSÃO DA FASE E AVANÇO — automáticos, e no serviço, não na rota. Concluir a
+  // última obrigação da fase é o que a conclui; quem concluiu por outro caminho (job,
+  // sincronização de tarefa, script) tem de disparar o mesmo avanço. Deixar isso na
+  // rota HTTP fazia o comportamento depender de por onde a conclusão entrou.
+  // Idempotente e gated pelo BlockingEngine: sem todas as obrigatórias feitas, não anda.
+  // Fora da transação de propósito: o avanço abre a sua própria.
+  if (liberarProximo) await avancarFaseSeCouber(documentoId)
+
+  return { ok: true, workflow: await montarWorkflowV2(documentoId, ctx) }
+}
+
+/** Dispara o recálculo/avanço de fase. Fora de transação, e tolerante a falha. */
+export async function avancarFaseSeCouber(documentoId: number): Promise<void> {
+  try {
+    const adv = await recalcularFaseDoProcesso(documentoId)
+    if (adv.mudou) console.log(`[avanço de fase] doc ${documentoId}: ${adv.faseAnterior} → ${adv.faseNova}`)
+  } catch (e) {
+    console.error("[avanço de fase] erro ao recalcular:", e)
+  }
+}
+
+/**
+ * MOTOR DE TRANSIÇÃO DO PASSO — o corpo transacional, aberto para composição.
+ *
+ * Recebe a transação de fora justamente para que quem precisa concluir o passo
+ * JUNTO com outras escritas (a solicitação de certidão grava solicitação,
+ * protocolo e arquivo e conclui a etapa num COMMIT só) reuse este motor em vez
+ * de reimplementar a transição. Continua sendo UM motor.
+ *
+ * Devolve `liberarProximo` — o chamador decide quando disparar o avanço de fase
+ * (que abre a própria transação e não pode rodar dentro desta).
+ */
+export async function aplicarTransicaoDoPassoTx(
+  tx: Prisma.TransactionClient,
+  p: PassoParaTransicao,
+  patch: Record<string, unknown>,
+  ctx: ContextoLeituraWorkflow | undefined,
+  now: Date,
+): Promise<boolean> {
+  const documentoId = p.documentoId as number
   const catStep = getStepDef(phaseKeyToFaseCode(p.faseMacroKey), p.stepKey)
 
   const novo: StepInstanceStatus = typeof patch.status === "string" ? mapLegacyStepStatus(patch.status) : p.status
@@ -419,9 +501,9 @@ export async function atualizarPassoV2(
     ...(liberarProximo ? { completedAt: now } : {}),
     ...(vaiReabrir ? { completedAt: null } : {}),
   }
-  // TRANSACIONAL (P3): passo + necessidade + passos-irmãos + documento numa única transação —
+  // TRANSACIONAL (P3): passo + necessidade + passos-irmãos + documento na MESMA transação —
   // a reabertura NÃO deixa estados intermediários inconsistentes (progresso/bloqueio caem juntos).
-  await prisma.$transaction(async (tx) => {
+  {
     await tx.phaseWorkflowStepInstance.update({ where: { id: p.id }, data })
 
     // A TAREFA É PROJEÇÃO DO PASSO. Esta transação escrevia só o passo e deixava a
@@ -530,23 +612,9 @@ export async function atualizarPassoV2(
     // TRAVA antes do commit: nenhum par passo/tarefa desta transação pode terminar
     // em estados contraditórios. Divergência ⇒ rollback integral.
     await assegurarCoerenciaPassoTarefa(tx, passosTocados)
-  })
-  // CONCLUSÃO DA FASE E AVANÇO — automáticos, e no serviço, não na rota. Concluir a
-  // última obrigação da fase é o que a conclui; quem concluiu por outro caminho (job,
-  // sincronização de tarefa, script) tem de disparar o mesmo avanço. Deixar isso na
-  // rota HTTP fazia o comportamento depender de por onde a conclusão entrou.
-  // Idempotente e gated pelo BlockingEngine: sem todas as obrigatórias feitas, não anda.
-  // Fora da transação de propósito: o avanço abre a sua própria.
-  if (liberarProximo) {
-    try {
-      const adv = await recalcularFaseDoProcesso(documentoId)
-      if (adv.mudou) console.log(`[avanço de fase] doc ${documentoId}: ${adv.faseAnterior} → ${adv.faseNova}`)
-    } catch (e) {
-      console.error("[avanço de fase] erro ao recalcular:", e)
-    }
   }
 
-  return { ok: true, workflow: await montarWorkflowV2(documentoId, ctx) }
+  return liberarProximo
 }
 
 /**
@@ -584,8 +652,6 @@ export async function registrarAndamentoPassoV2(
   // Qual permissão exigir depende do que a entrada CONTÉM — o servidor classifica.
   const exigidas: AcaoEtapa[] = []
   if (entrada.contato != null) exigidas.push("registrar_contato")
-  if (entrada.observacao != null) exigidas.push("registrar_observacao")
-  if (entrada.anexos != null) exigidas.push("anexar")
   if (entrada.campos != null) exigidas.push("salvar_andamento")
   if (exigidas.length === 0) return { ok: false, error: "VALIDATION_ERROR", status: 422 }
 
@@ -606,10 +672,12 @@ export async function registrarAndamentoPassoV2(
   const r = aplicarAndamento(lerAndamento(operacaoAtual), entrada, { autorId: ctx.usuarioId, agora: now })
   if (r.erros.length > 0) return { ok: false, error: `VALIDATION_ERROR:${r.erros.join(",")}`, status: 422 }
 
-  const nada = !r.mudou.campos && !r.mudou.contato && !r.mudou.observacao && r.mudou.anexos === 0
+  const nada = !r.mudou.campos && !r.mudou.contato
   // Nada mudou = reenvio idempotente. Sucesso, sem escrita e sem linha de auditoria.
   if (nada) return { ok: true, workflow: await montarWorkflowV2(documentoId, ctx) }
 
+  // O payload guarda só o que é DO PASSO: campos de acompanhamento e contatos.
+  // Anexo e observação são registro do DOCUMENTO e entram pelas rotas próprias.
   const novaOperacao = gravarAndamento(operacaoAtual, r.andamento)
 
   try {
@@ -636,11 +704,7 @@ export async function registrarAndamentoPassoV2(
           detalhes: {
             documentoId, processoId: p.processoId, stepKey: p.stepKey, faseMacroKey: p.faseMacroKey,
             ciclo: p.ciclo, mudou: r.mudou,
-            totais: {
-              contatos: r.andamento.contatos.length,
-              observacoes: r.andamento.observacoes.length,
-              anexos: r.andamento.anexos.length,
-            },
+            totais: { contatos: r.andamento.contatos.length },
           } as Prisma.InputJsonValue,
           usuarioId: ctx.usuarioId,
         },

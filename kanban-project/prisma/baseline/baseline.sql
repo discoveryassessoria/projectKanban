@@ -5,7 +5,7 @@
 --   corpo        → gerado do prisma/schema.prisma
 --   bloco manual → prisma/baseline/bloco-manual.sql (edite LÁ)
 --
--- Gerado em : 2026-08-03
+-- Gerado em : 2026-08-04
 -- Prisma    : 6.19.3
 --
 -- PARA QUE SERVE: reconstruir o banco DO ZERO. O histórico de migrations NÃO
@@ -221,6 +221,15 @@ CREATE TYPE "StatusConflitoRegistral" AS ENUM ('ABERTO', 'EM_REVISAO', 'RESOLVID
 
 -- CreateEnum
 CREATE TYPE "ResultadoLinhagemRegistral" AS ENUM ('LINHA_COMPLETA_COMPROVADA', 'LINHA_COMPLETA_COM_PENDENCIAS', 'LINHA_ESTRUTURAL_INCOMPLETA', 'LINHA_CONFLITANTE', 'ASCENDENTE_ELEGIVEL_NAO_IDENTIFICADO', 'REVISAO_OBRIGATORIA');
+
+-- CreateEnum
+CREATE TYPE "CanalSolicitacaoDocumento" AS ENUM ('CRC', 'ECARTORIO', 'EMAIL', 'WHATSAPP', 'BALCAO', 'COMUNE', 'CORREIOS', 'CONSULADO');
+
+-- CreateEnum
+CREATE TYPE "StatusSolicitacaoDocumento" AS ENUM ('AGUARDANDO_PROTOCOLO', 'PROTOCOLADA', 'RESPONDIDA', 'CANCELADA');
+
+-- CreateEnum
+CREATE TYPE "TipoArquivoDocumento" AS ENUM ('REQUERIMENTO_ENVIADO', 'COMPROVANTE_PROTOCOLO', 'COMPROVANTE_CONTATO', 'DOCUMENTO_RECEBIDO', 'OUTRO');
 
 -- CreateTable
 CREATE TABLE "Usuario" (
@@ -623,6 +632,8 @@ CREATE TABLE "Protocolo" (
     "formaEnvio" "FormaEnvioProtocolo",
     "responsavelId" INTEGER,
     "observacoes" TEXT,
+    "origem" VARCHAR(30) NOT NULL DEFAULT 'PROCESSO',
+    "solicitacaoId" INTEGER,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" TIMESTAMP(3) NOT NULL,
 
@@ -3803,6 +3814,68 @@ CREATE TABLE "SaudeAchado" (
 );
 
 -- CreateTable
+CREATE TABLE "SolicitacaoDocumento" (
+    "id" SERIAL NOT NULL,
+    "documentoId" INTEGER NOT NULL,
+    "processoId" INTEGER NOT NULL,
+    "pessoaId" INTEGER NOT NULL,
+    "faseMacroKey" VARCHAR(60) NOT NULL,
+    "workflowInstanceId" INTEGER,
+    "stepInstanceId" INTEGER,
+    "tarefaId" INTEGER,
+    "canal" "CanalSolicitacaoDocumento" NOT NULL,
+    "orgaoId" INTEGER,
+    "destinatarioNome" VARCHAR(200),
+    "atendente" VARCHAR(200),
+    "dataEnvio" TIMESTAMP(3) NOT NULL,
+    "prazoEsperadoDias" INTEGER,
+    "previsaoRetorno" TIMESTAMP(3),
+    "observacao" TEXT,
+    "custoPago" DECIMAL(12,2),
+    "formaPagamento" VARCHAR(40),
+    "linkAcompanhamento" VARCHAR(500),
+    "codigoRastreio" VARCHAR(100),
+    "status" "StatusSolicitacaoDocumento" NOT NULL DEFAULT 'AGUARDANDO_PROTOCOLO',
+    "criadoPorId" INTEGER,
+    "chaveIdempotencia" VARCHAR(200) NOT NULL,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
+
+    CONSTRAINT "SolicitacaoDocumento_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "DocumentoArquivo" (
+    "id" SERIAL NOT NULL,
+    "documentoId" INTEGER NOT NULL,
+    "solicitacaoId" INTEGER,
+    "stepInstanceId" INTEGER,
+    "tipo" "TipoArquivoDocumento" NOT NULL DEFAULT 'OUTRO',
+    "url" TEXT NOT NULL,
+    "nome" VARCHAR(300) NOT NULL,
+    "mimeType" VARCHAR(120),
+    "tamanho" INTEGER,
+    "criadoPorId" INTEGER,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT "DocumentoArquivo_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "DocumentoObservacao" (
+    "id" SERIAL NOT NULL,
+    "documentoId" INTEGER NOT NULL,
+    "solicitacaoId" INTEGER,
+    "stepInstanceId" INTEGER,
+    "texto" TEXT NOT NULL,
+    "criadoPorId" INTEGER,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "chaveIdempotencia" VARCHAR(200) NOT NULL,
+
+    CONSTRAINT "DocumentoObservacao_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
 CREATE TABLE "_ReciboPagamento" (
     "A" INTEGER NOT NULL,
     "B" INTEGER NOT NULL,
@@ -4000,6 +4073,9 @@ CREATE INDEX "Protocolo_orgaoId_idx" ON "Protocolo"("orgaoId");
 
 -- CreateIndex
 CREATE INDEX "Protocolo_responsavelId_idx" ON "Protocolo"("responsavelId");
+
+-- CreateIndex
+CREATE INDEX "Protocolo_solicitacaoId_idx" ON "Protocolo"("solicitacaoId");
 
 -- CreateIndex
 CREATE INDEX "ProtocoloDocumento_documentoId_idx" ON "ProtocoloDocumento"("documentoId");
@@ -5307,6 +5383,48 @@ CREATE INDEX "SaudeAchado_codigo_idx" ON "SaudeAchado"("codigo");
 CREATE INDEX "SaudeAchado_ultimaDeteccao_idx" ON "SaudeAchado"("ultimaDeteccao");
 
 -- CreateIndex
+CREATE UNIQUE INDEX "SolicitacaoDocumento_chaveIdempotencia_key" ON "SolicitacaoDocumento"("chaveIdempotencia");
+
+-- CreateIndex
+CREATE INDEX "SolicitacaoDocumento_documentoId_createdAt_idx" ON "SolicitacaoDocumento"("documentoId", "createdAt");
+
+-- CreateIndex
+CREATE INDEX "SolicitacaoDocumento_processoId_idx" ON "SolicitacaoDocumento"("processoId");
+
+-- CreateIndex
+CREATE INDEX "SolicitacaoDocumento_stepInstanceId_idx" ON "SolicitacaoDocumento"("stepInstanceId");
+
+-- CreateIndex
+CREATE INDEX "SolicitacaoDocumento_tarefaId_idx" ON "SolicitacaoDocumento"("tarefaId");
+
+-- CreateIndex
+CREATE INDEX "SolicitacaoDocumento_status_idx" ON "SolicitacaoDocumento"("status");
+
+-- CreateIndex
+CREATE INDEX "DocumentoArquivo_documentoId_createdAt_idx" ON "DocumentoArquivo"("documentoId", "createdAt");
+
+-- CreateIndex
+CREATE INDEX "DocumentoArquivo_stepInstanceId_idx" ON "DocumentoArquivo"("stepInstanceId");
+
+-- CreateIndex
+CREATE INDEX "DocumentoArquivo_solicitacaoId_idx" ON "DocumentoArquivo"("solicitacaoId");
+
+-- CreateIndex
+CREATE INDEX "DocumentoArquivo_tipo_idx" ON "DocumentoArquivo"("tipo");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "DocumentoArquivo_documentoId_url_key" ON "DocumentoArquivo"("documentoId", "url");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "DocumentoObservacao_chaveIdempotencia_key" ON "DocumentoObservacao"("chaveIdempotencia");
+
+-- CreateIndex
+CREATE INDEX "DocumentoObservacao_documentoId_createdAt_idx" ON "DocumentoObservacao"("documentoId", "createdAt");
+
+-- CreateIndex
+CREATE INDEX "DocumentoObservacao_stepInstanceId_idx" ON "DocumentoObservacao"("stepInstanceId");
+
+-- CreateIndex
 CREATE INDEX "_ReciboPagamento_B_index" ON "_ReciboPagamento"("B");
 
 -- CreateIndex
@@ -5428,6 +5546,9 @@ ALTER TABLE "Protocolo" ADD CONSTRAINT "Protocolo_orgaoId_fkey" FOREIGN KEY ("or
 
 -- AddForeignKey
 ALTER TABLE "Protocolo" ADD CONSTRAINT "Protocolo_responsavelId_fkey" FOREIGN KEY ("responsavelId") REFERENCES "Usuario"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "Protocolo" ADD CONSTRAINT "Protocolo_solicitacaoId_fkey" FOREIGN KEY ("solicitacaoId") REFERENCES "SolicitacaoDocumento"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "ProtocoloDocumento" ADD CONSTRAINT "ProtocoloDocumento_protocoloId_fkey" FOREIGN KEY ("protocoloId") REFERENCES "Protocolo"("id") ON DELETE CASCADE ON UPDATE CASCADE;
@@ -6043,6 +6164,30 @@ ALTER TABLE "VersaoGenealogica" ADD CONSTRAINT "VersaoGenealogica_criadoPorId_fk
 
 -- AddForeignKey
 ALTER TABLE "SaudeAchado" ADD CONSTRAINT "SaudeAchado_execucaoId_fkey" FOREIGN KEY ("execucaoId") REFERENCES "SaudeExecucao"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "SolicitacaoDocumento" ADD CONSTRAINT "SolicitacaoDocumento_documentoId_fkey" FOREIGN KEY ("documentoId") REFERENCES "Documento"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "SolicitacaoDocumento" ADD CONSTRAINT "SolicitacaoDocumento_orgaoId_fkey" FOREIGN KEY ("orgaoId") REFERENCES "OrgaoProtocolo"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "SolicitacaoDocumento" ADD CONSTRAINT "SolicitacaoDocumento_criadoPorId_fkey" FOREIGN KEY ("criadoPorId") REFERENCES "Usuario"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "DocumentoArquivo" ADD CONSTRAINT "DocumentoArquivo_documentoId_fkey" FOREIGN KEY ("documentoId") REFERENCES "Documento"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "DocumentoArquivo" ADD CONSTRAINT "DocumentoArquivo_solicitacaoId_fkey" FOREIGN KEY ("solicitacaoId") REFERENCES "SolicitacaoDocumento"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "DocumentoArquivo" ADD CONSTRAINT "DocumentoArquivo_criadoPorId_fkey" FOREIGN KEY ("criadoPorId") REFERENCES "Usuario"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "DocumentoObservacao" ADD CONSTRAINT "DocumentoObservacao_documentoId_fkey" FOREIGN KEY ("documentoId") REFERENCES "Documento"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "DocumentoObservacao" ADD CONSTRAINT "DocumentoObservacao_criadoPorId_fkey" FOREIGN KEY ("criadoPorId") REFERENCES "Usuario"("id") ON DELETE SET NULL ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "_ReciboPagamento" ADD CONSTRAINT "_ReciboPagamento_A_fkey" FOREIGN KEY ("A") REFERENCES "PagamentoFatura"("id") ON DELETE CASCADE ON UPDATE CASCADE;

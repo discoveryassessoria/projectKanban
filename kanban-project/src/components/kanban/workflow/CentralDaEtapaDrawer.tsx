@@ -34,6 +34,10 @@ import {
 } from "@/src/lib/process-stage/step-editor-registry"
 import type { AcaoEtapa } from "@/src/lib/process-stage/acoes-etapa"
 import { mensagemDoErro } from "./AndamentoEtapa"
+import {
+  AbaAnexosDocumentais,
+  AbaObservacoesDocumentais,
+} from "../documento/AbasDocumentais"
 
 // ============================================================
 // HELPER — pega userId logado do localStorage (mesmo padrão do
@@ -786,8 +790,8 @@ function ConteudoDrawer({
               {(
                 [
                   { id: "campos" as TabId, label: "Campos" },
-                  { id: "anexos" as TabId, label: "Anexos", count: 0 },
-                  { id: "comentarios" as TabId, label: "Comentários", count: 0 },
+                  { id: "anexos" as TabId, label: "Anexos" },
+                  { id: "comentarios" as TabId, label: "Observações" },
                   { id: "dependencias" as TabId, label: "Dependências" },
                   { id: "sla" as TabId, label: "SLA" },
                   { id: "automacao" as TabId, label: "Automação" },
@@ -804,7 +808,7 @@ function ConteudoDrawer({
                   }`}
                 >
                   {t.label}
-                  {"count" in t && t.count !== undefined && (
+                  {"count" in t && typeof t.count === "number" && (
                     <span
                       className={`text-[9.5px] px-1.5 rounded-full font-bold ${
                         activeTab === t.id
@@ -835,31 +839,33 @@ function ConteudoDrawer({
               )}
               {activeTab === "timeline" && <TabTimeline step={step} />}
               {activeTab === "anexos" && (
-                <Placeholder
-                  titulo="Anexos"
-                  descricao="Arquivos da equipe relacionados a esta etapa (rascunhos, comprovantes, capturas de tela)."
-                  pendencia="Requer modelo WorkflowStepAttachment no schema."
+                // Escopo por ETAPA: mostra o requerimento anexado ao solicitar a
+                // certidão e o que mais foi anexado aqui. Mesmo registro que a aba
+                // do documento consolida — um arquivo, um binário, duas visões.
+                <AbaAnexosDocumentais
+                  documentoId={documentoId}
+                  stepInstanceId={step.id}
+                  podeAnexar={permite(step, "anexar")}
+                  tipoPadrao="COMPROVANTE_CONTATO"
                 />
               )}
               {activeTab === "comentarios" && (
-                <Placeholder
-                  titulo="Comentários"
-                  descricao="Conversa interna da equipe sobre esta etapa específica. Separado das observações livres."
-                  pendencia="Requer modelo WorkflowStepComment no schema."
+                <AbaObservacoesDocumentais
+                  documentoId={documentoId}
+                  stepInstanceId={step.id}
+                  podeRegistrar={permite(step, "registrar_observacao")}
                 />
               )}
               {activeTab === "dependencias" && (
                 <Placeholder
                   titulo="Dependências"
                   descricao="Outras etapas (deste ou de outros documentos) que dependem da conclusão desta para serem desbloqueadas."
-                  pendencia="Requer modelo WorkflowStepDependency no schema."
                 />
               )}
               {activeTab === "automacao" && (
                 <Placeholder
                   titulo="Automação"
                   descricao="Regras automáticas que disparam follow-ups, mudam status do documento ou abrem subtarefas quando algo acontece com esta etapa."
-                  pendencia="Requer engine de regras + modelo WorkflowStepAutomation."
                 />
               )}
             </div>
@@ -1124,24 +1130,17 @@ function Field({ label, value }: { label: string; value: string | null }) {
   )
 }
 
-function Placeholder({
-  titulo,
-  descricao,
-  pendencia,
-}: {
-  titulo: string
-  descricao: string
-  pendencia: string
-}) {
+/**
+ * Aba ainda sem conteúdo próprio. Diz o que a aba vai mostrar, em vocabulário de
+ * operação. Nome de model e de coluna não são assunto de quem opera um processo.
+ */
+function Placeholder({ titulo, descricao }: { titulo: string; descricao: string }) {
   return (
     <div className="flex flex-col items-center justify-center py-16 text-center max-w-md mx-auto">
-      <div className="w-12 h-12 rounded-full bg-[#1b2027]/5 border border-white/10 flex items-center justify-center mb-4">
-        <AlertTriangle className="w-5 h-5 text-[#d2a948]/70" />
-      </div>
-      <div className="text-base font-semibold text-white mb-2">{titulo}</div>
-      <div className="text-sm text-white/60 leading-relaxed mb-4">{descricao}</div>
-      <div className="text-[11px] text-[#d2a948]/80 bg-[#d2a948]/10 border border-[#d2a948]/20 rounded-md px-3 py-2 leading-relaxed">
-        ⚠ {pendencia}
+      <div className="text-base font-semibold text-white/80 mb-2">{titulo}</div>
+      <div className="text-sm text-white/55 leading-relaxed">{descricao}</div>
+      <div className="mt-3 text-[11px] uppercase tracking-wider text-white/35">
+        Ainda não há registros aqui
       </div>
     </div>
   )

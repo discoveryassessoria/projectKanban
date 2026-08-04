@@ -41,7 +41,26 @@ const MIGRATION = join(DIR_MIGRATIONS, '0000_baseline', 'migration.sql')
 // coluna na linha 0000_baseline -> `prisma migrate status` consistente -> `prisma
 // migrate deploy`. Nenhuma outra migration foi tocada; contagens de processos,
 // instancias, passos, tarefas, eventos e logs identicas antes e depois.
-const CHECKSUM_LEDGER = '6aa5afa53bd7e4b089b05cf957235163f77cf931b61cdad817c650a1c802ae01'
+// ATUALIZACAO 04/08/2026 — migration ADITIVA 20260804_solicitacao_documental
+// (SolicitacaoDocumento, DocumentoArquivo, DocumentoObservacao e duas colunas em
+// Protocolo). O baseline foi regenerado e o checksum mudou:
+//
+//   anterior : 6aa5afa53bd7e4b089b05cf957235163f77cf931b61cdad817c650a1c802ae01
+//   atual    : 81743bfef8cb44adfce7b4953d67026d95e65749e71ca8721a5df06bfe925491
+//
+// RECONCILIACAO DO LEDGER: NAO FOI POSSIVEL — e a razao importa. Em 04/08/2026 a
+// tabela `_prisma_migrations` NAO EXISTE em nenhum dos bancos alcancaveis por
+// PRISMA_DATABASE_URL nem por DIRECT_DATABASE_URL (verificado por
+// information_schema). Nao ha linha 0000_baseline para atualizar, e
+// `prisma migrate deploy` nesse estado tentaria aplicar o baseline inteiro sobre
+// um schema que ja existe. Por isso a migration foi aplicada pelo caminho
+// controlado de `scripts/aplicar-migration-aditiva.ts` (SQL aditivo, idempotente,
+// numa transacao, com prova de identidade antes da escrita).
+//
+// PENDENCIA DECLARADA: quando o banco de producao com os dados voltar a estar
+// acessivel, CONFERIR se ele tem `_prisma_migrations` e, se tiver, reconciliar o
+// checksum da linha 0000_baseline antes de qualquer `migrate deploy`.
+const CHECKSUM_LEDGER = '81743bfef8cb44adfce7b4953d67026d95e65749e71ca8721a5df06bfe925491'
 
 /**
  * Migrations criadas DEPOIS da consolidacao de 02/08/2026. Toda migration nova
@@ -53,6 +72,7 @@ const MIGRATIONS_POS_BASELINE: string[] = [
   '20260803b_cardinalidade_passo',
   '20260803c_regularizacao_historica',
   '20260803d_mover_fase_manual',
+  '20260804_solicitacao_documental',
 ]
 
 const sha256 = (t: string) => createHash('sha256').update(t).digest('hex')

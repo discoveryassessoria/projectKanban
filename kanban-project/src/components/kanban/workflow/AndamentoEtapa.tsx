@@ -1,11 +1,14 @@
 // src/components/kanban/workflow/AndamentoEtapa.tsx
 //
-// PAINEL DE ANDAMENTO DA ETAPA — os blocos operacionais que TODA etapa tem:
-// histórico de contatos, observações e anexos/comprovantes.
+// HISTÓRICO DE CONTATOS DA ETAPA — o bloco operacional que toda etapa tem.
 //
 // Compartilhado pelo EDITOR PADRÃO e pelos editores específicos que precisam do
 // mesmo acompanhamento (hoje, "Aguardar retorno do cartório"). Um bloco só, num
 // arquivo só — não existe uma segunda implementação de "registrar contato".
+//
+// Anexos e observações NÃO estão aqui: são registro do DOCUMENTO e têm os
+// componentes canônicos em `documento/AbasDocumentais` — os mesmos que as abas
+// Anexos e Observações usam, para que a etapa e o documento leiam o mesmo dado.
 //
 // PERSISTÊNCIA: tudo passa pela rota de ANDAMENTO
 // (POST .../workflow/steps/{stepId}/andamento), que é transacional, append-only e
@@ -15,8 +18,7 @@
 "use client"
 
 import { useCallback, useMemo, useRef, useState } from "react"
-import { Loader2, Upload, Paperclip, MessageCircle, StickyNote, ExternalLink } from "lucide-react"
-import { uploadFiles } from "@/src/lib/storage"
+import { Loader2, MessageCircle, ExternalLink } from "lucide-react"
 import {
   CANAIS_CONTATO,
   RESULTADOS_CONTATO,
@@ -107,23 +109,6 @@ export interface ContatoView {
   anexoNome: string | null
 }
 
-export interface ObservacaoView {
-  chave: string
-  registradoEm: string
-  autorId: number | null
-  texto: string
-}
-
-export interface AnexoView {
-  chave: string
-  registradoEm: string
-  autorId: number | null
-  url: string
-  nome: string
-  tipo: string | null
-  tamanho: number | null
-}
-
 export interface AndamentoView {
   prazoEstimadoDias: number | null
   previsaoRetorno: string | null
@@ -133,8 +118,6 @@ export interface AndamentoView {
   semRetornoDesde: string | null
   previsaoEfetiva: string | null
   contatos: ContatoView[]
-  observacoes: ObservacaoView[]
-  anexos: AnexoView[]
 }
 
 export const ANDAMENTO_VIEW_VAZIO: AndamentoView = {
@@ -146,8 +129,6 @@ export const ANDAMENTO_VIEW_VAZIO: AndamentoView = {
   semRetornoDesde: null,
   previsaoEfetiva: null,
   contatos: [],
-  observacoes: [],
-  anexos: [],
 }
 
 export interface UsuarioResumo {
@@ -182,8 +163,6 @@ export function mensagemDoErro(codigo: string | null | undefined): string {
 export interface EntradaAndamentoRequisicao {
   campos?: Record<string, unknown>
   contato?: Record<string, unknown>
-  observacao?: { texto: string; chaveIdempotencia?: string }
-  anexos?: Array<Record<string, unknown>>
 }
 
 /**
@@ -462,186 +441,6 @@ export function BlocoContatos({
               Registrar contato
             </button>
           </div>
-        </div>
-      )}
-    </div>
-  )
-}
-
-// ── BLOCO: observações ───────────────────────────────────────────────────────
-
-export function BlocoObservacoes({
-  observacoes,
-  usuarios,
-  podeRegistrar,
-  onRegistrar,
-  salvando,
-}: {
-  observacoes: ObservacaoView[]
-  usuarios: UsuarioResumo[]
-  podeRegistrar: boolean
-  onRegistrar: (texto: string) => Promise<boolean>
-  salvando: boolean
-}) {
-  const [texto, setTexto] = useState("")
-  const emOrdem = useMemo(() => [...observacoes].reverse(), [observacoes])
-
-  const enviar = async () => {
-    const t = texto.trim()
-    if (!t) return
-    const ok = await onRegistrar(t)
-    if (ok) setTexto("")
-  }
-
-  return (
-    <div>
-      <TituloBloco icone={StickyNote} contagem={observacoes.length}>
-        Observações
-      </TituloBloco>
-
-      {emOrdem.length === 0 ? (
-        <div className="px-3 py-3 rounded-md bg-[#161b21] border border-dashed border-white/15 text-center text-[11.5px] text-white/55 italic">
-          Nenhuma observação registrada.
-        </div>
-      ) : (
-        <div className="space-y-1.5">
-          {emOrdem.map((o) => (
-            <div key={o.chave} className="rounded-md border border-white/10 bg-[#161b21] p-2.5">
-              <div className="text-[10px] text-white/45 mb-0.5">
-                {nomeAutor(o.autorId, usuarios)} · {fmtDataHora(o.registradoEm)}
-              </div>
-              <div className="text-[12.5px] text-white/85 leading-snug whitespace-pre-wrap">{o.texto}</div>
-            </div>
-          ))}
-        </div>
-      )}
-
-      {podeRegistrar && (
-        <div className="mt-2.5">
-          <textarea
-            rows={2}
-            value={texto}
-            onChange={(e) => setTexto(e.target.value)}
-            placeholder="Anote algo relevante sobre esta etapa…"
-            className={`${campoCls} resize-none`}
-          />
-          <div className="flex justify-end mt-1.5">
-            <button
-              type="button"
-              onClick={enviar}
-              disabled={salvando || !texto.trim()}
-              className="px-3 py-1.5 text-[11.5px] font-semibold bg-[#20262e] hover:bg-[#252c35] disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-md inline-flex items-center gap-1.5"
-            >
-              {salvando && <Loader2 className="w-3 h-3 animate-spin" />}
-              Adicionar observação
-            </button>
-          </div>
-        </div>
-      )}
-    </div>
-  )
-}
-
-// ── BLOCO: anexos / comprovantes ─────────────────────────────────────────────
-
-export function BlocoAnexos({
-  anexos,
-  usuarios,
-  podeAnexar,
-  onAnexar,
-  salvando,
-}: {
-  anexos: AnexoView[]
-  usuarios: UsuarioResumo[]
-  podeAnexar: boolean
-  onAnexar: (arquivos: Array<Record<string, unknown>>) => Promise<boolean>
-  salvando: boolean
-}) {
-  const inputRef = useRef<HTMLInputElement>(null)
-  const [enviando, setEnviando] = useState(false)
-  const [falha, setFalha] = useState<string | null>(null)
-
-  const escolher = async (files: FileList | null) => {
-    if (!files || files.length === 0) return
-    setEnviando(true)
-    setFalha(null)
-    try {
-      const enviados = await uploadFiles(Array.from(files), { prefix: "etapas" })
-      // O vínculo com a etapa é gravado pelo servidor. Reenviar o MESMO arquivo cai
-      // na mesma chave (a URL) e não duplica a linha.
-      await onAnexar(
-        enviados.map((f) => ({ url: f.url, nome: f.name, tipo: f.type, tamanho: f.size })),
-      )
-    } catch (e) {
-      setFalha(e instanceof Error ? e.message : "Falha ao enviar o arquivo.")
-    } finally {
-      setEnviando(false)
-      if (inputRef.current) inputRef.current.value = ""
-    }
-  }
-
-  return (
-    <div>
-      <TituloBloco icone={Paperclip} contagem={anexos.length}>
-        Anexos e comprovantes
-      </TituloBloco>
-
-      {anexos.length > 0 && (
-        <div className="space-y-1.5 mb-2.5">
-          {anexos.map((a) => (
-            <a
-              key={a.chave}
-              href={a.url}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="flex items-center gap-2 rounded-md border border-white/10 bg-[#161b21] px-2.5 py-2 hover:bg-[#1b2027]"
-            >
-              <Paperclip className="w-3.5 h-3.5 text-white/50 flex-shrink-0" />
-              <div className="min-w-0 flex-1">
-                <div className="text-[12px] text-white/85 truncate">{a.nome}</div>
-                <div className="text-[10px] text-white/40">
-                  {nomeAutor(a.autorId, usuarios)} · {fmtDataHora(a.registradoEm)}
-                </div>
-              </div>
-              <ExternalLink className="w-3 h-3 text-white/40 flex-shrink-0" />
-            </a>
-          ))}
-        </div>
-      )}
-
-      {podeAnexar && (
-        <>
-          <input
-            ref={inputRef}
-            type="file"
-            multiple
-            className="hidden"
-            onChange={(e) => void escolher(e.target.files)}
-          />
-          <button
-            type="button"
-            onClick={() => inputRef.current?.click()}
-            disabled={enviando || salvando}
-            className="w-full px-3 py-2.5 bg-[#161b21] border border-dashed border-white/15 rounded-md text-left hover:bg-[#20262e] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            <div className="flex items-center gap-2.5">
-              {enviando ? (
-                <Loader2 className="w-4 h-4 animate-spin text-white/60" />
-              ) : (
-                <Upload className="w-4 h-4 text-white/60" />
-              )}
-              <div className="text-[12px] text-white/85 font-medium">
-                {enviando ? "Enviando…" : "Anexar comprovante"}
-              </div>
-            </div>
-          </button>
-          {falha && <div className="mt-1.5 text-[11px] text-[#f87171]">{falha}</div>}
-        </>
-      )}
-
-      {!podeAnexar && anexos.length === 0 && (
-        <div className="px-3 py-3 rounded-md bg-[#161b21] border border-dashed border-white/15 text-center text-[11.5px] text-white/55 italic">
-          Nenhum anexo nesta etapa.
         </div>
       )}
     </div>
