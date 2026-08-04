@@ -89,6 +89,7 @@
     "seed:permissoes-registral": "npm run guard:escrita && tsx scripts/seed-permissoes-registral.ts",
     "seed:permissoes-registral:dry": "tsx scripts/seed-permissoes-registral.ts --dry-run",
     "smoke:prod-custos": "tsx scripts/prod-smoke-custos.ts",
+    "smoke:prod-doc21": "tsx scripts/prod-smoke-doc21.ts",
     "smoke:prod-editor-etapa": "tsx scripts/prod-smoke-editor-etapa.ts",
     "smoke:prod-registral": "tsx scripts/prod-smoke-registral.ts",
     "start": "next start",
