@@ -99,14 +99,15 @@ const servico = ler("src/services/solicitacao-documento.ts")
 ok(!/Requer modelo \w+ no schema/.test(drawerDoc + drawerEtapa),
   "14. nenhuma aba diz \"Requer modelo X no schema\"")
 ok(!/tabela de junção|vinculado a Processo/i.test(drawerDoc),
-  "15. a aba Protocolo não fala mais em vínculo só com Processo")
+  "15. nenhuma aba fala em vínculo só com Processo")
 ok(!/pendencia=/.test(drawerDoc + drawerEtapa),
   "16. nenhum componente recebe mais texto de pendência técnica")
 
-// as três abas consomem o registro canônico
-ok(drawerDoc.includes("AbaProtocoloDocumento") && drawerDoc.includes("AbaAnexosDocumentais") &&
-   drawerDoc.includes("AbaObservacoesDocumentais"),
-  "17. as abas Protocolo, Anexos e Observações do documento são reais")
+// As abas que sobraram no documento consomem o registro canônico. A antiga aba
+// Protocolo saiu da interface (os dados vivem nas etapas), mas continua sendo o
+// MESMO registro — o que o editor de "Aguardar retorno" lê.
+ok(drawerDoc.includes("AbaAnexosDocumentais") && drawerDoc.includes("AbaObservacoesDocumentais"),
+  "17. as abas Anexos e Observações do documento são reais")
 ok(drawerEtapa.includes("AbaAnexosDocumentais") && drawerEtapa.includes("stepInstanceId={step.id}"),
   "18. a aba Anexos da ETAPA lê o mesmo registro, escopado ao passo")
 

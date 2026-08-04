@@ -60,7 +60,27 @@ const MIGRATION = join(DIR_MIGRATIONS, '0000_baseline', 'migration.sql')
 // PENDENCIA DECLARADA: quando o banco de producao com os dados voltar a estar
 // acessivel, CONFERIR se ele tem `_prisma_migrations` e, se tiver, reconciliar o
 // checksum da linha 0000_baseline antes de qualquer `migrate deploy`.
-const CHECKSUM_LEDGER = '81743bfef8cb44adfce7b4953d67026d95e65749e71ca8721a5df06bfe925491'
+//
+// PENDENCIA RESOLVIDA — 04/08/2026, junto com a migration ADITIVA
+// 20260804b_requerimento_doc21_vinculo (DocumentoArquivo ganha protocoloId,
+// documentTypeId, hashConteudo e as colunas de versao; nasce
+// ExigenciaEvidenciaEtapa).
+//
+// O banco de producao voltou, e com ele a `_prisma_migrations`. A linha
+// 0000_baseline estava com `6aa5afa5...` — o checksum ANTERIOR a regeneracao de
+// 04/08 —, ou seja, a reconciliacao de entao realmente nao aconteceu. Os dois
+// saltos foram fechados de uma vez:
+//
+//   ledger antes : 6aa5afa53bd7e4b089b05cf957235163f77cf931b61cdad817c650a1c802ae01
+//   arquivo antes: 81743bfef8cb44adfce7b4953d67026d95e65749e71ca8721a5df06bfe925491
+//   atual (ambos): c3b59b340c8b529cc31cc98c770622897a093bac3c4cc6bc154e1580682b4c43
+//
+// Procedimento executado: pg_dump completo de producao -> copia da tabela
+// `_prisma_migrations` para CSV -> conferencia de que o diff do baseline eram 64
+// linhas SO de INSERT (zero DDL destrutivo, zero linha removida) -> UPDATE de UMA
+// coluna na linha 0000_baseline -> `prisma migrate status` consistente. Nenhuma
+// outra migration foi tocada; nenhum dado de negocio foi lido ou alterado.
+const CHECKSUM_LEDGER = 'c3b59b340c8b529cc31cc98c770622897a093bac3c4cc6bc154e1580682b4c43'
 
 /**
  * Migrations criadas DEPOIS da consolidacao de 02/08/2026. Toda migration nova
@@ -73,6 +93,7 @@ const MIGRATIONS_POS_BASELINE: string[] = [
   '20260803c_regularizacao_historica',
   '20260803d_mover_fase_manual',
   '20260804_solicitacao_documental',
+  '20260804b_requerimento_doc21_vinculo',
 ]
 
 const sha256 = (t: string) => createHash('sha256').update(t).digest('hex')

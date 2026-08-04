@@ -40,12 +40,30 @@ import { canalDoTexto, faltamCamposDoCanal, configDoCanal } from "@/src/lib/proc
 import {
   vincularArquivoDocumentoTx,
   registrarObservacaoDocumentoTx,
+  ligarArquivosAoProtocoloTx,
 } from "@/src/services/documento-arquivos"
+import {
+  resolverExigenciasDaEtapa,
+  exigenciaPrincipal,
+  exigenciasNaoAtendidas,
+  type ExigenciaEvidenciaDTO,
+} from "@/src/services/exigencia-evidencia"
 
-export { vincularArquivoDocumentoTx, registrarObservacaoDocumentoTx }
+export { vincularArquivoDocumentoTx, registrarObservacaoDocumentoTx, ligarArquivosAoProtocoloTx }
 
 export type ResultadoSolicitacao =
-  | { ok: true; solicitacaoId: number; protocoloId: number | null; arquivoId: number | null; workflow: WorkflowV2Shape | null }
+  | {
+      ok: true
+      solicitacaoId: number
+      protocoloId: number | null
+      /** Registro do requerimento — o MESMO id que as três abas exibem. */
+      arquivoId: number | null
+      /** Documento mestre com que o requerimento foi classificado (null = etapa sem exigência configurada). */
+      evidenciaTipoId: number | null
+      /** Versão anterior que saiu de vigência nesta gravação (null = não houve troca). */
+      substituiuArquivoId: number | null
+      workflow: WorkflowV2Shape | null
+    }
   | { ok: false; error: string; status: number }
 
 export interface EntradaSolicitacao {
@@ -59,10 +77,22 @@ export interface EntradaSolicitacao {
   linkAcompanhamento?: string | null
   custoPago?: number | null
   formaPagamento?: string | null
-  /** Requerimento enviado ao cartório — já subiu para o R2; aqui vira registro. */
-  requerimento?: { url: string; nome?: string | null; mimeType?: string | null; tamanho?: number | null } | null
+  /**
+   * Requerimento enviado ao cartório — já subiu para o R2; aqui vira registro.
+   * `hash` é a impressão digital calculada na origem do upload (opcional: o
+   * registro não depende dela, mas com ela o reenvio idêntico fica provado).
+   */
+  requerimento?: {
+    url: string
+    nome?: string | null
+    mimeType?: string | null
+    tamanho?: number | null
+    hash?: string | null
+  } | null
+  /** Motivo da troca, quando o requerimento substitui uma versão anterior. */
+  motivoSubstituicao?: string | null
   /** Comprovantes adicionais do envio. */
-  anexos?: Array<{ url: string; nome?: string | null; mimeType?: string | null; tamanho?: number | null; tipo?: TipoArquivoDocumento }> | null
+  anexos?: Array<{ url: string; nome?: string | null; mimeType?: string | null; tamanho?: number | null; hash?: string | null; tipo?: TipoArquivoDocumento }> | null
   /** Concluir a etapa junto (o botão "Confirmar envio · concluir etapa"). */
   concluirEtapa?: boolean
 }
@@ -119,9 +149,20 @@ export async function registrarSolicitacaoDocumento(
   // 3) documento + processo + pessoa (e o vínculo entre eles — sem IDOR)
   const doc = await prisma.documento.findUnique({
     where: { id: documentoId },
-    select: { id: true, pessoaId: true, cartorio: true },
+    select: { id: true, pessoaId: true, cartorio: true, documentTypeId: true },
   })
   if (!doc) return { ok: false, error: "STEP_NOT_FOUND", status: 404 }
+
+  // 3.1) EXIGÊNCIA DE EVIDÊNCIA — que documento MESTRE esta etapa exige anexar.
+  // Vem da configuração oficial (ExigenciaEvidenciaEtapa), por ID. É ela que diz
+  // que o arquivo do requerimento é o "Requerimento inteiro teor" do cadastro —
+  // não o rótulo do campo, não o nome do arquivo, não a extensão.
+  const exigencias = await resolverExigenciasDaEtapa({
+    stepKey: passo.stepKey,
+    documentoTipoId: doc.documentTypeId,
+    canal,
+  })
+  const exigidoNoAnexo = exigenciaPrincipal(exigencias)
 
   const destinatarioNome = texto(entrada.destinatarioNome) ?? texto(doc.cartorio)
   const numeroProtocolo = texto(entrada.numeroProtocolo)
@@ -129,17 +170,53 @@ export async function registrarSolicitacaoDocumento(
   const codigoRastreio = texto(entrada.codigoRastreio)
   const observacao = texto(entrada.observacao)
 
+  // 3.2) O requerimento JÁ REGISTRADO nesta etapa (reabertura, retry, segunda
+  // gravação). Sem isto, concluir de novo exigiria reenviar um arquivo que já
+  // está no registro — foi exatamente esse pedido de reenvio que a correção veio
+  // eliminar. Só conta o VIGENTE: versão substituída não satisfaz exigência.
+  const requerimentoJaRegistrado = await prisma.documentoArquivo.findFirst({
+    where: {
+      documentoId,
+      stepInstanceId: passo.id,
+      vigente: true,
+      ...(exigidoNoAnexo
+        ? { OR: [{ documentTypeId: exigidoNoAnexo.documentoMestre.id }, { tipo: "REQUERIMENTO_ENVIADO" }] }
+        : { tipo: "REQUERIMENTO_ENVIADO" }),
+    },
+    select: { id: true, url: true, documentTypeId: true },
+    orderBy: { id: "desc" },
+  })
+
   // 4) campos obrigatórios POR CANAL — a mesma configuração que a tela recebeu
   const faltando = faltamCamposDoCanal({
     canal,
     numeroProtocolo,
-    anexoUrl: requerimentoUrl,
+    anexoUrl: requerimentoUrl ?? requerimentoJaRegistrado?.url ?? null,
     codigoRastreio,
     observacao,
     destinatarioNome,
   })
   if (faltando.length > 0) {
     return { ok: false, error: `VALIDATION_ERROR:${faltando.join(",")}`, status: 422 }
+  }
+
+  // 4.1) EVIDÊNCIA OBRIGATÓRIA — a etapa não conclui sem o documento mestre que a
+  // configuração exige. O arquivo que chega no campo de requerimento É essa
+  // evidência (a etapa tem um campo só); sem arquivo, a exigência não é atendida.
+  if (entrada.concluirEtapa) {
+    const anexadosAgora: Array<{ documentTypeId: number | null }> = []
+    if (requerimentoUrl && exigidoNoAnexo) anexadosAgora.push({ documentTypeId: exigidoNoAnexo.documentoMestre.id })
+    // O que já está no registro conta: a evidência não some porque a etapa foi
+    // reaberta. Se a linha antiga ainda não tem classificação (registro anterior
+    // à configuração), a exigência do arquivo que ocupa aquele lugar é a que vale.
+    if (!requerimentoUrl && requerimentoJaRegistrado && exigidoNoAnexo) {
+      anexadosAgora.push({ documentTypeId: exigidoNoAnexo.documentoMestre.id })
+    }
+    const naoAtendidas = exigenciasNaoAtendidas(exigencias, anexadosAgora)
+    if (naoAtendidas.length > 0) {
+      const codigos = naoAtendidas.map((e) => e.documentoMestre.publicCode ?? e.documentoMestre.code ?? String(e.documentoMestre.id))
+      return { ok: false, error: `VALIDATION_ERROR:EVIDENCIA_OBRIGATORIA:${codigos.join(",")}`, status: 422 }
+    }
   }
 
   const agora = new Date()
@@ -150,6 +227,7 @@ export async function registrarSolicitacaoDocumento(
   let solicitacaoId = 0
   let protocoloId: number | null = null
   let arquivoId: number | null = null
+  let substituiuArquivoId: number | null = null
   let liberouProximo = false
 
   await prisma.$transaction(async (tx) => {
@@ -223,15 +301,29 @@ export async function registrarSolicitacaoDocumento(
       })
     }
 
-    // ── 4.3 ARQUIVOS — o requerimento vira registro, com origem e autor ──────
-    const arquivos: Array<{ url: string; nome: string; mimeType: string | null; tamanho: number | null; tipo: TipoArquivoDocumento }> = []
+    // ── 4.3 ARQUIVOS — o requerimento vira registro, com origem, autor, tipo
+    //        mestre e protocolo. UM upload, UMA linha, TODOS os vínculos. ──────
+    const arquivos: Array<{
+      url: string
+      nome: string
+      mimeType: string | null
+      tamanho: number | null
+      hashConteudo: string | null
+      tipo: TipoArquivoDocumento
+      documentTypeId: number | null
+    }> = []
     if (requerimentoUrl) {
       arquivos.push({
         url: requerimentoUrl,
         nome: texto(entrada.requerimento?.nome) ?? nomeDaUrl(requerimentoUrl),
         mimeType: texto(entrada.requerimento?.mimeType),
         tamanho: inteiro(entrada.requerimento?.tamanho),
-        tipo: "REQUERIMENTO_ENVIADO",
+        hashConteudo: texto(entrada.requerimento?.hash),
+        // A finalidade vem da exigência configurada; sem exigência, o arquivo
+        // continua sendo o requerimento do envio, apenas sem classificação
+        // mestre — nenhum tipo é inventado para preencher a coluna.
+        tipo: exigidoNoAnexo?.finalidade ?? "REQUERIMENTO_ENVIADO",
+        documentTypeId: exigidoNoAnexo?.documentoMestre.id ?? null,
       })
     }
     for (const a of entrada.anexos ?? []) {
@@ -242,18 +334,50 @@ export async function registrarSolicitacaoDocumento(
         nome: texto(a?.nome) ?? nomeDaUrl(url),
         mimeType: texto(a?.mimeType),
         tamanho: inteiro(a?.tamanho),
+        hashConteudo: texto(a?.hash),
         tipo: a?.tipo ?? "COMPROVANTE_PROTOCOLO",
+        documentTypeId: null,
       })
     }
     for (const a of arquivos) {
-      const criado = await vincularArquivoDocumentoTx(tx, {
+      const r = await vincularArquivoDocumentoTx(tx, {
         documentoId,
         solicitacaoId,
         stepInstanceId: passo.id,
+        // O protocolo pode não existir neste envio (canal que devolve depois):
+        // o arquivo NÃO espera por ele — nasce vinculado ao que já existe e é
+        // ligado ao protocolo assim que houver um.
+        protocoloId,
         criadoPorId: ctx.usuarioId,
+        motivoSubstituicao: texto(entrada.motivoSubstituicao),
         ...a,
       })
-      if (a.tipo === "REQUERIMENTO_ENVIADO") arquivoId = criado
+      if (a.documentTypeId != null || a.tipo === "REQUERIMENTO_ENVIADO") {
+        arquivoId = r.id
+        substituiuArquivoId = r.substituiuId
+      }
+    }
+
+    // ── 4.3.1 O requerimento que JÁ existia entra na solicitação ─────────────
+    // Etapa reaberta sem novo upload: o arquivo continua sendo o mesmo registro,
+    // e é aqui que ele ganha os vínculos que ainda faltavam. Nenhuma cópia, nenhum
+    // reenvio, nenhum id novo.
+    if (!requerimentoUrl && requerimentoJaRegistrado) {
+      await tx.documentoArquivo.update({
+        where: { id: requerimentoJaRegistrado.id },
+        data: {
+          solicitacaoId,
+          ...(requerimentoJaRegistrado.documentTypeId == null && exigidoNoAnexo
+            ? { documentTypeId: exigidoNoAnexo.documentoMestre.id }
+            : {}),
+        },
+      })
+      arquivoId = requerimentoJaRegistrado.id
+    }
+
+    // ── 4.3.2 PROTOCOLO ↔ ARQUIVOS — o elo direto que a aba Protocolo lê ─────
+    if (protocoloId) {
+      await ligarArquivosAoProtocoloTx(tx, { solicitacaoId, protocoloId })
     }
 
     // ── 4.4 OBSERVAÇÃO — append-only, com autor e carimbo ────────────────────
@@ -315,6 +439,12 @@ export async function registrarSolicitacaoDocumento(
         detalhes: {
           documentoId, processoId: passo.processoId, stepInstanceId: passo.id,
           canal, destinatarioNome, numeroProtocolo, protocoloId, arquivoId,
+          // Rastro da CLASSIFICAÇÃO: qual documento mestre a etapa exigiu e qual
+          // versão anterior saiu de vigência. Sem isto a auditoria não distingue
+          // "anexou" de "trocou".
+          evidenciaExigidaId: exigidoNoAnexo?.documentoMestre.id ?? null,
+          evidenciaExigidaCodigo: exigidoNoAnexo?.documentoMestre.publicCode ?? null,
+          substituiuArquivoId,
           concluiuEtapa: entrada.concluirEtapa === true,
         } as Prisma.InputJsonValue,
         usuarioId: ctx.usuarioId,
@@ -330,6 +460,8 @@ export async function registrarSolicitacaoDocumento(
     solicitacaoId,
     protocoloId,
     arquivoId,
+    evidenciaTipoId: exigidoNoAnexo?.documentoMestre.id ?? null,
+    substituiuArquivoId,
     workflow: await montarWorkflowV2(documentoId, ctx),
   }
 }
@@ -429,10 +561,25 @@ export interface ArquivoDTO {
   nome: string
   mimeType: string | null
   tamanho: number | null
+  hashConteudo: string | null
+  /** Finalidade na operação (dimensão fechada). */
   tipo: TipoArquivoDocumento
+  /**
+   * CLASSIFICAÇÃO MESTRE — o que este arquivo É no Cadastro de Documentos.
+   * null = arquivo sem exigência configurada; a tela mostra só a finalidade,
+   * nunca um código inventado.
+   */
+  documentoMestre: { id: number; publicCode: string | null; code: string | null; name: string } | null
   origem: "SOLICITACAO" | "ETAPA" | "DOCUMENTO"
   stepInstanceId: number | null
   solicitacaoId: number | null
+  protocoloId: number | null
+  /** Versão vigente do vínculo. false = substituída; permanece para auditoria. */
+  vigente: boolean
+  /** Versão que ESTE arquivo substituiu. */
+  substituiId: number | null
+  substituidoEm: string | null
+  motivoSubstituicao: string | null
   criadoPor: { id: number; nome: string } | null
   createdAt: string
 }
@@ -491,7 +638,7 @@ export async function carregarResumoProtocoloDocumento(
       },
       arquivos: {
         orderBy: { createdAt: "asc" },
-        include: { criadoPor: USUARIO_RESUMO },
+        include: INCLUDE_ARQUIVO,
       },
     },
   })
@@ -538,7 +685,12 @@ export async function carregarResumoProtocoloDocumento(
   }
 }
 
-type ArquivoComAutor = Prisma.DocumentoArquivoGetPayload<{ include: { criadoPor: { select: { id: true; nome: true } } } }>
+const INCLUDE_ARQUIVO = {
+  criadoPor: USUARIO_RESUMO,
+  documentType: { select: { id: true, publicCode: true, code: true, name: true } },
+} as const
+
+type ArquivoComAutor = Prisma.DocumentoArquivoGetPayload<{ include: typeof INCLUDE_ARQUIVO }>
 
 function mapArquivo(a: ArquivoComAutor): ArquivoDTO {
   return {
@@ -547,10 +699,17 @@ function mapArquivo(a: ArquivoComAutor): ArquivoDTO {
     nome: a.nome,
     mimeType: a.mimeType,
     tamanho: a.tamanho,
+    hashConteudo: a.hashConteudo,
     tipo: a.tipo,
+    documentoMestre: a.documentType ?? null,
     origem: a.solicitacaoId ? "SOLICITACAO" : a.stepInstanceId ? "ETAPA" : "DOCUMENTO",
     stepInstanceId: a.stepInstanceId,
     solicitacaoId: a.solicitacaoId,
+    protocoloId: a.protocoloId,
+    vigente: a.vigente,
+    substituiId: a.substituiId,
+    substituidoEm: a.substituidoEm ? a.substituidoEm.toISOString() : null,
+    motivoSubstituicao: a.motivoSubstituicao,
     criadoPor: a.criadoPor,
     createdAt: a.createdAt.toISOString(),
   }
@@ -558,17 +717,26 @@ function mapArquivo(a: ArquivoComAutor): ArquivoDTO {
 
 /**
  * Arquivos do documento — consulta consolidada. `stepInstanceId` filtra para a aba
- * Anexos da ETAPA; sem filtro, é a aba do DOCUMENTO. Um arquivo aparece UMA vez:
- * a unicidade (documentoId, url) garante isso na origem, não na tela.
+ * Anexos da ETAPA; `protocoloId` para a aba Protocolo; sem filtro, é a aba do
+ * DOCUMENTO. Um arquivo aparece UMA vez: a unicidade (documentoId, url) garante
+ * isso na origem, não na tela.
+ *
+ * Por padrão devolve só o VIGENTE — a versão trocada continua no banco e é lida
+ * com `incluirHistorico`, nunca some. O que a operação vê é o que vale hoje.
  */
 export async function listarArquivosDocumento(
   documentoId: number,
-  filtro?: { stepInstanceId?: number },
+  filtro?: { stepInstanceId?: number; protocoloId?: number; incluirHistorico?: boolean },
 ): Promise<ArquivoDTO[]> {
   const arquivos = await prisma.documentoArquivo.findMany({
-    where: { documentoId, ...(filtro?.stepInstanceId ? { stepInstanceId: filtro.stepInstanceId } : {}) },
+    where: {
+      documentoId,
+      ...(filtro?.stepInstanceId ? { stepInstanceId: filtro.stepInstanceId } : {}),
+      ...(filtro?.protocoloId ? { protocoloId: filtro.protocoloId } : {}),
+      ...(filtro?.incluirHistorico ? {} : { vigente: true }),
+    },
     orderBy: { createdAt: "asc" },
-    include: { criadoPor: USUARIO_RESUMO },
+    include: INCLUDE_ARQUIVO,
   })
   return arquivos.map(mapArquivo)
 }
@@ -645,6 +813,7 @@ export async function informarProtocoloPosterior(
         documentoId,
         solicitacaoId: s.id,
         stepInstanceId: s.stepInstanceId,
+        protocoloId,
         url: extras.comprovante.url,
         nome: texto(extras.comprovante.nome) ?? nomeDaUrl(extras.comprovante.url),
         mimeType: extras.comprovante.mimeType ?? null,
@@ -653,6 +822,10 @@ export async function informarProtocoloPosterior(
         criadoPorId: ctx.usuarioId,
       })
     }
+    // O REQUERIMENTO já enviado passa a apontar para o protocolo que acabou de
+    // chegar. Nada é reenviado nem duplicado: é o mesmo registro, agora completo.
+    // Sem isto, protocolo informado depois nasceria sem o requerimento que o gerou.
+    await ligarArquivosAoProtocoloTx(tx, { solicitacaoId: s.id, protocoloId })
     await tx.solicitacaoDocumento.update({ where: { id: s.id }, data: { status: "PROTOCOLADA" } })
     await tx.documento.update({ where: { id: documentoId }, data: { protocolo: numero, ultimaMovimentacao: agora } })
     await tx.logAuditoria.create({
@@ -677,4 +850,69 @@ export async function informarProtocoloPosterior(
 export async function carregarSolicitacaoVigente(documentoId: number): Promise<SolicitacaoDTO | null> {
   const resumo = await carregarResumoProtocoloDocumento(documentoId)
   return resumo.solicitacoes[0] ?? null
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+// EXIGÊNCIA DE EVIDÊNCIA — o que a etapa exige anexar, servido para a tela
+// ════════════════════════════════════════════════════════════════════════════
+
+export interface ExigenciasDaEtapaDTO {
+  stepInstanceId: number
+  stepKey: string
+  documentoTipoId: number | null
+  canal: CanalSolicitacaoDocumento | null
+  exigencias: ExigenciaEvidenciaDTO[]
+  /** A exigência que o campo de anexo do editor atende (null = etapa sem exigência). */
+  principal: ExigenciaEvidenciaDTO | null
+  /** O requerimento VIGENTE já anexado nesta etapa, se houver. */
+  anexoAtual: ArquivoDTO | null
+}
+
+/**
+ * O contrato que o editor de "Solicitar certidão" consome para saber QUAL
+ * documento mestre precisa anexar. A tela não decide isso por canal nem por
+ * rótulo: ela pergunta ao servidor, que responde com o ID do cadastro.
+ *
+ * Escopo verificado na linha: o passo TEM de ser do documento pedido — sem isso a
+ * rota seria um IDOR entre documentos do mesmo processo.
+ */
+export async function carregarExigenciasDaEtapa(
+  documentoId: number,
+  stepInstanceId: number,
+  canal?: CanalSolicitacaoDocumento | null,
+): Promise<ExigenciasDaEtapaDTO | null> {
+  const passo = await prisma.phaseWorkflowStepInstance.findUnique({
+    where: { id: stepInstanceId },
+    select: { id: true, stepKey: true, documentoId: true },
+  })
+  if (!passo || passo.documentoId !== documentoId) return null
+
+  const doc = await prisma.documento.findUnique({
+    where: { id: documentoId },
+    select: { documentTypeId: true },
+  })
+  if (!doc) return null
+
+  const exigencias = await resolverExigenciasDaEtapa({
+    stepKey: passo.stepKey,
+    documentoTipoId: doc.documentTypeId,
+    canal: canal ?? null,
+  })
+  const principal = exigenciaPrincipal(exigencias)
+
+  const anexos = await listarArquivosDocumento(documentoId, { stepInstanceId })
+  const anexoAtual =
+    (principal ? anexos.find((a) => a.documentoMestre?.id === principal.documentoMestre.id) : undefined) ??
+    anexos.find((a) => a.tipo === "REQUERIMENTO_ENVIADO") ??
+    null
+
+  return {
+    stepInstanceId: passo.id,
+    stepKey: passo.stepKey,
+    documentoTipoId: doc.documentTypeId,
+    canal: canal ?? null,
+    exigencias,
+    principal,
+    anexoAtual,
+  }
 }

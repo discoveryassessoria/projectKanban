@@ -157,23 +157,27 @@ interface DocumentoOperationalDrawerProps {
 }
 
 import {
-  AbaProtocoloDocumento,
   AbaAnexosDocumentais,
   AbaObservacoesDocumentais,
 } from "./documento/AbasDocumentais"
 
+// ABAS DO DOCUMENTO — as seis que o operador realmente usa, nesta ordem.
+//
+// Saíram: Divergências, Devoluções, Tentativas e Auditoria (eram placeholders — a
+// aba existia, o conteúdo não) e Protocolo. A de Protocolo saiu por outro motivo:
+// os dados dela existem e são canônicos, mas já aparecem onde o trabalho acontece
+// — na etapa "Solicitar certidão", nos Anexos da etapa e do documento e na etapa
+// "Aguardar retorno". Uma aba a mais era uma segunda vitrine do mesmo registro.
+//
+// NADA foi apagado do domínio: SolicitacaoDocumento, Protocolo, o requerimento e
+// o LogAuditoria continuam intactos e consultáveis. O que saiu foi a exposição.
 type TabId =
   | "operation"
   | "workflow"
   | "registry"
-  | "divergences"
   | "history"
   | "attach"
   | "observ"
-  | "protocol"
-  | "returns"
-  | "attempts"
-  | "audit"
 
 // Projeção operacional oficial do documento (espelho do contrato do backend
 // resolveDocumentOperationalProjection). Fonte ÚNICA de estado/próxima ação do Drawer.
@@ -386,21 +390,15 @@ function ConteudoDrawer({
     { id: "operation", label: "Operação" },
     { id: "workflow", label: "Workflow" },
     { id: "registry", label: "Dados Registrais" },
-    { id: "divergences", label: "Divergências" },
     { id: "history", label: "Histórico" },
     { id: "attach", label: "Anexos" },
     { id: "observ", label: "Observações" },
-    { id: "protocol", label: "Protocolo" },
-    { id: "returns", label: "Devoluções" },
-    { id: "attempts", label: "Tentativas" },
-    { id: "audit", label: "Auditoria" },
   ]
   // A Central não depende de lista fixa por fase: recebe a fase (workflow.faseCode)
-  // e ajusta as abas. Na Genealogia, abas de outra natureza (Divergências, Anexos,
-  // Tentativas, Auditoria) ficam fora — preservando Operação, Workflow, Dados
-  // Registrais, Histórico, Observações, Protocolo e Devoluções.
+  // e ajusta as abas. Na Genealogia, Anexos fica fora — ali o documento ainda não
+  // tem arquivo operacional próprio. As demais permanecem.
   const ehGenealogia = String((workflow as { faseCode?: string } | null)?.faseCode ?? "").toUpperCase() === "GENEALOGIA"
-  const OCULTAS_GENEALOGIA = new Set<TabId>(["divergences", "attach", "attempts", "audit"])
+  const OCULTAS_GENEALOGIA = new Set<TabId>(["attach"])
   const tabs = ehGenealogia ? tabsAll.filter((t) => !OCULTAS_GENEALOGIA.has(t.id)) : tabsAll
 
   const drawerContent = (
@@ -588,14 +586,14 @@ function ConteudoDrawer({
 
             {/* TABS */}
             <div
-              className="flex-shrink-0 flex overflow-x-auto px-6 border-b border-white/10"
+              className="flex-shrink-0 flex flex-wrap px-6 border-b border-white/10"
               style={{ background: "#11151b" }}
             >
               {tabs.map((t) => (
                 <button
                   key={t.id}
                   onClick={() => setActiveTab(t.id)}
-                  className={`flex-shrink-0 inline-flex items-center gap-1.5 px-4 py-2.5 text-[11.5px] font-semibold border-b-2 transition-colors -mb-px ${
+                  className={`inline-flex items-center gap-1.5 px-3.5 py-2.5 text-[11.5px] font-semibold whitespace-nowrap border-b-2 transition-colors -mb-px ${
                     activeTab === t.id
                       ? "text-[#7dd3fc] border-[#7dd3fc]"
                       : "text-white/55 hover:text-white/80 border-transparent"
@@ -647,36 +645,11 @@ function ConteudoDrawer({
                   }}
                 />
               )}
-              {activeTab === "divergences" && (
-                <Placeholder
-                  titulo="Divergências"
-                  descricao="Inconsistências detectadas entre os dados do documento e a árvore (nome divergente, data conflitante, vínculo inválido)."
-                />
-              )}
               {activeTab === "attach" && (
                 <AbaAnexosDocumentais documentoId={documentoId} podeAnexar />
               )}
               {activeTab === "observ" && (
                 <AbaObservacoesDocumentais documentoId={documentoId} podeRegistrar />
-              )}
-              {activeTab === "protocol" && <AbaProtocoloDocumento documentoId={documentoId} />}
-              {activeTab === "returns" && (
-                <Placeholder
-                  titulo="Devoluções"
-                  descricao="Devoluções do cartório com motivo, gravidade e número de tentativas."
-                />
-              )}
-              {activeTab === "attempts" && (
-                <Placeholder
-                  titulo="Tentativas"
-                  descricao="Tentativas de localização/emissão do documento em diferentes cartórios e canais."
-                />
-              )}
-              {activeTab === "audit" && (
-                <Placeholder
-                  titulo="Auditoria"
-                  descricao="Log completo de quem fez o quê e quando neste documento."
-                />
               )}
             </div>
             <InitOperationModal
@@ -857,23 +830,6 @@ function GridFields({ fields }: { fields: Array<[string, string | null | undefin
       {fields.map(([label, value], i) => (
         <Field key={i} label={label} value={value} />
       ))}
-    </div>
-  )
-}
-
-/**
- * Aba ainda sem conteúdo próprio. Diz ao OPERADOR o que a aba vai mostrar — e só
- * isso. Antes exibia a pendência técnica de implementação — ou seja, nome de
- * model e de coluna na tela de quem está operando um processo.
- */
-function Placeholder({ titulo, descricao }: { titulo: string; descricao: string }) {
-  return (
-    <div className="flex flex-col items-center justify-center py-16 text-center max-w-md mx-auto">
-      <div className="text-base font-semibold text-white/80 mb-2">{titulo}</div>
-      <div className="text-sm text-white/55 leading-relaxed">{descricao}</div>
-      <div className="mt-3 text-[11px] uppercase tracking-wider text-white/35">
-        Ainda não há registros aqui
-      </div>
     </div>
   )
 }

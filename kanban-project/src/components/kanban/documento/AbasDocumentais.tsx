@@ -1,23 +1,26 @@
 // src/components/kanban/documento/AbasDocumentais.tsx
 //
-// ABAS DOCUMENTAIS — Protocolo, Anexos e Observações do documento.
+// ABAS DOCUMENTAIS — Anexos e Observações do documento e da etapa.
 //
-// Substituem os três textos de pendência que estavam em produção ("Requer modelo
-// WorkflowStepAttachment no schema.", "Requer modelo WorkflowStepComment...", "O
-// modelo Protocolo existe, mas está vinculado a Processo..."). Nenhuma delas
-// pede que o operador digite de novo o que já preencheu em "Solicitar certidão":
-// todas LEEM o registro canônico (SolicitacaoDocumento / Protocolo /
-// DocumentoArquivo / DocumentoObservacao).
+// Substituem os textos de pendência que estavam em produção ("Requer modelo
+// WorkflowStepAttachment no schema.", "Requer modelo WorkflowStepComment..."):
+// nenhuma delas pede que o operador digite de novo o que já preencheu em
+// "Solicitar certidão" — todas LEEM o registro canônico (DocumentoArquivo /
+// DocumentoObservacao).
 //
 // A aba de ETAPA e a aba de DOCUMENTO são a MESMA consulta com escopo diferente —
 // o arquivo aparece nas duas por referência, com um único binário no R2.
+//
+// A antiga aba PROTOCOLO saiu da interface (os dados dela vivem na etapa
+// "Solicitar certidão" e em "Aguardar retorno"), mas os tipos de leitura da
+// solicitação continuam aqui: são o contrato que os editores de etapa consomem.
 
 "use client"
 
 import { useMemo, useRef, useState } from "react"
 import { useApi } from "@/src/lib/dados"
 import {
-  Paperclip, ExternalLink, Loader2, Upload, StickyNote, FileText, Hash, AlertTriangle,
+  Paperclip, ExternalLink, Loader2, Upload, StickyNote, AlertTriangle,
 } from "lucide-react"
 import { uploadFiles } from "@/src/lib/storage"
 
@@ -29,10 +32,19 @@ export interface ArquivoDocumentoView {
   nome: string
   mimeType: string | null
   tamanho: number | null
+  hashConteudo: string | null
+  /** Finalidade na operação. */
   tipo: string
+  /** O que o arquivo É no Cadastro Mestre de Documentos. null = sem exigência configurada. */
+  documentoMestre: { id: number; publicCode: string | null; code: string | null; name: string } | null
   origem: "SOLICITACAO" | "ETAPA" | "DOCUMENTO"
   stepInstanceId: number | null
   solicitacaoId: number | null
+  protocoloId: number | null
+  vigente: boolean
+  substituiId: number | null
+  substituidoEm: string | null
+  motivoSubstituicao: string | null
   criadoPor: { id: number; nome: string } | null
   createdAt: string
 }
@@ -95,20 +107,6 @@ const LABEL_ORIGEM: Record<string, string> = {
   DOCUMENTO: "Documento",
 }
 
-const LABEL_STATUS_SOLICITACAO: Record<string, string> = {
-  AGUARDANDO_PROTOCOLO: "Aguardando protocolo",
-  PROTOCOLADA: "Protocolada",
-  RESPONDIDA: "Respondida",
-  CANCELADA: "Cancelada",
-}
-
-const PILL_STATUS: Record<string, string> = {
-  AGUARDANDO_PROTOCOLO: "bg-[#d2a948]/20 text-[#d2a948] border-[#d2a948]/40",
-  PROTOCOLADA: "bg-[#4ade80]/20 text-[#4ade80] border-[#4ade80]/40",
-  RESPONDIDA: "bg-[#7dd3fc]/20 text-[#7dd3fc] border-[#7dd3fc]/40",
-  CANCELADA: "bg-[#20262e] text-white/50 border-white/15",
-}
-
 function fmtDataHora(iso: string | null): string {
   if (!iso) return "—"
   const d = new Date(iso)
@@ -129,17 +127,6 @@ const authHeader = () => ({
   Authorization: `Bearer ${typeof window !== "undefined" ? localStorage.getItem("authToken") ?? "" : ""}`,
 })
 
-function Campo({ label, valor, mono }: { label: string; valor: string | null; mono?: boolean }) {
-  return (
-    <div>
-      <div className="text-[10px] uppercase font-semibold tracking-wider text-white/45 mb-0.5">{label}</div>
-      <div className={`text-[12px] ${mono ? "font-mono" : ""} ${valor ? "text-white/90" : "text-white/30 italic"}`}>
-        {valor || "—"}
-      </div>
-    </div>
-  )
-}
-
 function Vazio({ titulo, descricao }: { titulo: string; descricao: string }) {
   return (
     <div className="py-10 text-center">
@@ -150,262 +137,54 @@ function Vazio({ titulo, descricao }: { titulo: string; descricao: string }) {
 }
 
 // ════════════════════════════════════════════════════════════════════════════
-// ABA PROTOCOLO DO DOCUMENTO
-// ════════════════════════════════════════════════════════════════════════════
-
-export function AbaProtocoloDocumento({ documentoId }: { documentoId: number | null }) {
-  const req = useApi<{ resumo?: { solicitacoes: SolicitacaoView[]; vigenteId: number | null } }>(
-    documentoId ? `/api/documentos/${documentoId}/solicitacoes` : null,
-  )
-  const solicitacoes = req.dados?.resumo?.solicitacoes ?? []
-  const vigenteId = req.dados?.resumo?.vigenteId ?? null
-
-  if (req.carregando) {
-    return (
-      <div className="py-12 flex justify-center">
-        <Loader2 className="w-5 h-5 animate-spin text-white/50" />
-      </div>
-    )
-  }
-
-  if (req.erro) {
-    return (
-      <div className="py-10 text-center text-[12px] text-[#f87171]">
-        Não foi possível carregar o protocolo agora.
-        <button onClick={() => void req.recarregar()} className="ml-2 underline hover:text-white">
-          Tentar novamente
-        </button>
-      </div>
-    )
-  }
-
-  if (solicitacoes.length === 0 || documentoId == null) {
-    return (
-      <Vazio
-        titulo="Nenhuma solicitação registrada"
-        descricao="Quando a etapa “Solicitar certidão” for concluída, o canal, o destinatário, o protocolo e o requerimento enviado aparecem aqui automaticamente — sem precisar digitar de novo."
-      />
-    )
-  }
-
-  return (
-    <div className="space-y-4">
-      {solicitacoes.map((s) => (
-        <CartaoSolicitacao
-          key={s.id}
-          solicitacao={s}
-          documentoId={documentoId}
-          vigente={s.id === vigenteId}
-          onMudou={() => void req.recarregar()}
-        />
-      ))}
-    </div>
-  )
-}
-
-function CartaoSolicitacao({
-  solicitacao: s,
-  documentoId,
-  vigente,
-  onMudou,
-}: {
-  solicitacao: SolicitacaoView
-  documentoId: number
-  vigente: boolean
-  onMudou: () => void
-}) {
-  const [informando, setInformando] = useState(false)
-  const [numero, setNumero] = useState("")
-  const [salvando, setSalvando] = useState(false)
-  const [erro, setErro] = useState<string | null>(null)
-
-  const semProtocolo = s.protocolos.length === 0
-
-  const informar = async () => {
-    if (!numero.trim() || salvando) return
-    setSalvando(true)
-    setErro(null)
-    try {
-      const res = await fetch(`/api/documentos/${documentoId}/solicitacoes/${s.id}/protocolos`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json", ...authHeader() },
-        body: JSON.stringify({ numeroProtocolo: numero.trim() }),
-      })
-      if (!res.ok) {
-        setErro(res.status === 403 ? "Você não tem permissão para registrar protocolo." : "Não foi possível registrar agora.")
-        return
-      }
-      setNumero("")
-      setInformando(false)
-      onMudou()
-    } catch {
-      setErro("Não foi possível registrar agora.")
-    } finally {
-      setSalvando(false)
-    }
-  }
-
-  return (
-    <div className={`rounded-lg border bg-[#161b21] overflow-hidden ${vigente ? "border-[#7dd3fc]/30" : "border-white/10"}`}>
-      <div className="px-3.5 py-2 bg-[#1b2027] border-b border-white/10 flex items-center gap-2 flex-wrap">
-        <FileText className="w-3.5 h-3.5 text-[#7dd3fc]" />
-        <span className="text-[11px] font-bold uppercase tracking-wider text-white/60">
-          Solicitação · {s.canalLabel ?? s.canal}
-        </span>
-        <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full border ${PILL_STATUS[s.status] ?? PILL_STATUS.CANCELADA}`}>
-          {LABEL_STATUS_SOLICITACAO[s.status] ?? s.status}
-        </span>
-        {vigente && (
-          <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full border bg-[#7dd3fc]/15 text-[#7dd3fc] border-[#7dd3fc]/30">
-            vigente
-          </span>
-        )}
-        <span className="ml-auto text-[10.5px] text-white/45 font-mono">{fmtDataHora(s.dataEnvio)}</span>
-      </div>
-
-      <div className="p-3.5 grid grid-cols-3 gap-x-4 gap-y-2.5">
-        <Campo label="Cartório / destinatário" valor={s.destinatarioNome} />
-        <Campo label="Canal" valor={s.canalLabel ?? s.canal} />
-        <Campo label="Atendente" valor={s.atendente} />
-        <Campo label="Data de envio" valor={fmtDataHora(s.dataEnvio)} />
-        <Campo
-          label="Prazo esperado"
-          valor={s.prazoEsperadoDias != null ? `${s.prazoEsperadoDias} dia(s)` : null}
-        />
-        <Campo label="Registrado por" valor={s.criadoPor?.nome ?? null} />
-        {s.codigoRastreio && <Campo label="Código de rastreio" valor={s.codigoRastreio} mono />}
-        {s.custoPago != null && (
-          <Campo
-            label="Custo pago"
-            valor={`R$ ${s.custoPago.toFixed(2).replace(".", ",")}${s.formaPagamento ? ` · ${s.formaPagamento}` : ""}`}
-          />
-        )}
-        {s.observacao && (
-          <div className="col-span-3">
-            <div className="text-[10px] uppercase font-semibold tracking-wider text-white/45 mb-0.5">Observação do envio</div>
-            <div className="text-[12px] text-white/80 italic">&ldquo;{s.observacao}&rdquo;</div>
-          </div>
-        )}
-      </div>
-
-      {/* ── PROTOCOLOS — histórico; o mais recente é o vigente ─────────── */}
-      <div className="px-3.5 pb-3.5">
-        <div className="text-[10px] uppercase font-bold tracking-wider text-white/45 mb-1.5 flex items-center gap-1.5">
-          <Hash className="w-3 h-3" />
-          Protocolo
-        </div>
-
-        {semProtocolo ? (
-          <div className="rounded-md border border-dashed border-white/15 bg-[#12161c] px-3 py-2.5">
-            <div className="text-[11.5px] text-white/60">
-              {s.protocoloObrigatorio
-                ? "Este canal devolve protocolo no envio, mas nenhum número foi registrado."
-                : "Este canal pode não devolver protocolo no envio. Registre o número quando o cartório informar."}
-            </div>
-          </div>
-        ) : (
-          <div className="space-y-1.5">
-            {s.protocolos.map((p) => (
-              <div
-                key={p.id}
-                className={`rounded-md border px-3 py-2 ${p.vigente ? "border-[#4ade80]/30 bg-[#4ade80]/5" : "border-white/10 bg-[#12161c]"}`}
-              >
-                <div className="flex items-center gap-2 flex-wrap">
-                  <span className="text-[12.5px] font-mono text-white/90">{p.numero ?? "—"}</span>
-                  {p.vigente && (
-                    <span className="text-[9.5px] font-semibold px-1.5 py-0.5 rounded bg-[#4ade80]/20 text-[#4ade80]">
-                      vigente
-                    </span>
-                  )}
-                  <span className="text-[10.5px] text-white/45">
-                    informado em {fmtDataHora(p.informadoEm)}
-                    {p.informadoPor ? ` por ${p.informadoPor.nome}` : ""}
-                  </span>
-                </div>
-                {p.observacoes && <div className="text-[11px] text-white/60 mt-0.5">{p.observacoes}</div>}
-              </div>
-            ))}
-          </div>
-        )}
-
-        {/* Complementar o protocolo depois — atualiza a solicitação existente,
-            acrescenta ao histórico e nunca cria uma segunda solicitação. */}
-        {!informando ? (
-          <button
-            onClick={() => setInformando(true)}
-            className="mt-2 px-2.5 py-1 text-[11px] font-semibold bg-[#20262e] hover:bg-[#252c35] text-white/85 rounded"
-          >
-            {semProtocolo ? "+ Informar protocolo" : "+ Informar novo protocolo"}
-          </button>
-        ) : (
-          <div className="mt-2 flex items-center gap-2">
-            <input
-              type="text"
-              value={numero}
-              onChange={(e) => setNumero(e.target.value)}
-              placeholder="Número do protocolo"
-              autoFocus
-              className="flex-1 px-2.5 py-1.5 bg-[#12161c] border border-white/10 rounded text-[12px] text-white placeholder-white/30 focus:outline-none focus:border-[#7dd3fc]/50 font-mono"
-            />
-            <button
-              onClick={informar}
-              disabled={salvando || !numero.trim()}
-              className="px-3 py-1.5 text-[11px] font-semibold bg-[#2563eb] hover:bg-[#1d4ed8] disabled:opacity-50 text-white rounded inline-flex items-center gap-1.5"
-            >
-              {salvando && <Loader2 className="w-3 h-3 animate-spin" />}
-              Registrar
-            </button>
-            <button
-              onClick={() => { setInformando(false); setNumero(""); setErro(null) }}
-              className="px-2 py-1.5 text-[11px] text-white/60 hover:text-white"
-            >
-              Cancelar
-            </button>
-          </div>
-        )}
-        {erro && <div className="mt-1.5 text-[11px] text-[#f87171]">{erro}</div>}
-      </div>
-
-      {/* ── ARQUIVOS DA SOLICITAÇÃO ─────────────────────────────────────── */}
-      {s.arquivos.length > 0 && (
-        <div className="px-3.5 pb-3.5">
-          <div className="text-[10px] uppercase font-bold tracking-wider text-white/45 mb-1.5 flex items-center gap-1.5">
-            <Paperclip className="w-3 h-3" />
-            Requerimento e comprovantes
-          </div>
-          <div className="space-y-1.5">
-            {s.arquivos.map((a) => (
-              <LinhaArquivo key={a.id} arquivo={a} />
-            ))}
-          </div>
-        </div>
-      )}
-    </div>
-  )
-}
-
-// ════════════════════════════════════════════════════════════════════════════
 // ANEXOS (documento e etapa — mesma consulta, escopo diferente)
 // ════════════════════════════════════════════════════════════════════════════
 
+/**
+ * Uma linha por ARQUIVO. O tipo mestre (o que o documento É no cadastro) vem
+ * antes da finalidade: "Requerimento inteiro teor · DOC21" é a identidade; a
+ * finalidade só diz o papel dele naquele envio. Sem classificação, mostra a
+ * finalidade sozinha — nunca um código inventado.
+ */
 function LinhaArquivo({ arquivo: a }: { arquivo: ArquivoDocumentoView }) {
+  const mestre = a.documentoMestre
   return (
     <a
       href={a.url}
       target="_blank"
       rel="noopener noreferrer"
-      className="flex items-center gap-2.5 rounded-md border border-white/10 bg-[#12161c] px-2.5 py-2 hover:bg-[#1b2027] transition-colors"
+      className={`flex items-center gap-2.5 rounded-md border px-2.5 py-2 transition-colors ${
+        a.vigente
+          ? "border-white/10 bg-[#12161c] hover:bg-[#1b2027]"
+          : "border-white/5 bg-[#0f1216] hover:bg-[#161b21] opacity-60"
+      }`}
     >
       <Paperclip className="w-3.5 h-3.5 text-white/50 flex-shrink-0" />
       <div className="min-w-0 flex-1">
-        <div className="text-[12px] text-white/90 truncate">{a.nome}</div>
+        <div className="flex items-center gap-1.5 min-w-0">
+          <span className="text-[12px] text-white/90 truncate">{a.nome}</span>
+          {!a.vigente && (
+            <span className="text-[9px] font-semibold uppercase tracking-wider px-1.5 py-0.5 rounded bg-white/10 text-white/55 flex-shrink-0">
+              substituído
+            </span>
+          )}
+        </div>
+        {mestre && (
+          <div className="text-[10.5px] text-[#7dd3fc]/85 truncate">
+            {mestre.name}
+            {mestre.publicCode ? ` · ${mestre.publicCode}` : ""}
+          </div>
+        )}
         <div className="text-[10px] text-white/45">
           {LABEL_TIPO_ARQUIVO[a.tipo] ?? a.tipo}
           {" · "}
           {LABEL_ORIGEM[a.origem] ?? a.origem}
           {a.tamanho != null ? ` · ${fmtTamanho(a.tamanho)}` : ""}
+          {a.solicitacaoId ? ` · solicitação #${a.solicitacaoId}` : ""}
+          {a.protocoloId ? ` · protocolo #${a.protocoloId}` : ""}
           {" · "}
           {a.criadoPor?.nome ?? "—"} em {fmtDataHora(a.createdAt)}
+          {!a.vigente && a.substituidoEm ? ` · substituído em ${fmtDataHora(a.substituidoEm)}` : ""}
         </div>
       </div>
       <ExternalLink className="w-3 h-3 text-white/40 flex-shrink-0" />

@@ -3850,15 +3850,40 @@ CREATE TABLE "DocumentoArquivo" (
     "documentoId" INTEGER NOT NULL,
     "solicitacaoId" INTEGER,
     "stepInstanceId" INTEGER,
+    "protocoloId" INTEGER,
+    "documentTypeId" INTEGER,
     "tipo" "TipoArquivoDocumento" NOT NULL DEFAULT 'OUTRO',
     "url" TEXT NOT NULL,
     "nome" VARCHAR(300) NOT NULL,
     "mimeType" VARCHAR(120),
     "tamanho" INTEGER,
+    "hashConteudo" VARCHAR(80),
+    "vigente" BOOLEAN NOT NULL DEFAULT true,
+    "substituiId" INTEGER,
+    "substituidoEm" TIMESTAMP(3),
+    "motivoSubstituicao" VARCHAR(300),
     "criadoPorId" INTEGER,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
     CONSTRAINT "DocumentoArquivo_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "ExigenciaEvidenciaEtapa" (
+    "id" SERIAL NOT NULL,
+    "stepKey" VARCHAR(80) NOT NULL,
+    "documentoTipoId" INTEGER,
+    "canal" "CanalSolicitacaoDocumento",
+    "evidenciaTipoId" INTEGER NOT NULL,
+    "finalidade" "TipoArquivoDocumento" NOT NULL DEFAULT 'REQUERIMENTO_ENVIADO',
+    "obrigatoria" BOOLEAN NOT NULL DEFAULT true,
+    "cardinalidadeMax" INTEGER NOT NULL DEFAULT 1,
+    "ativo" BOOLEAN NOT NULL DEFAULT true,
+    "chaveExigencia" VARCHAR(140) NOT NULL,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
+
+    CONSTRAINT "ExigenciaEvidenciaEtapa_pkey" PRIMARY KEY ("id")
 );
 
 -- CreateTable
@@ -5401,6 +5426,9 @@ CREATE INDEX "SolicitacaoDocumento_tarefaId_idx" ON "SolicitacaoDocumento"("tare
 CREATE INDEX "SolicitacaoDocumento_status_idx" ON "SolicitacaoDocumento"("status");
 
 -- CreateIndex
+CREATE UNIQUE INDEX "DocumentoArquivo_substituiId_key" ON "DocumentoArquivo"("substituiId");
+
+-- CreateIndex
 CREATE INDEX "DocumentoArquivo_documentoId_createdAt_idx" ON "DocumentoArquivo"("documentoId", "createdAt");
 
 -- CreateIndex
@@ -5410,10 +5438,31 @@ CREATE INDEX "DocumentoArquivo_stepInstanceId_idx" ON "DocumentoArquivo"("stepIn
 CREATE INDEX "DocumentoArquivo_solicitacaoId_idx" ON "DocumentoArquivo"("solicitacaoId");
 
 -- CreateIndex
+CREATE INDEX "DocumentoArquivo_protocoloId_idx" ON "DocumentoArquivo"("protocoloId");
+
+-- CreateIndex
+CREATE INDEX "DocumentoArquivo_documentTypeId_idx" ON "DocumentoArquivo"("documentTypeId");
+
+-- CreateIndex
 CREATE INDEX "DocumentoArquivo_tipo_idx" ON "DocumentoArquivo"("tipo");
 
 -- CreateIndex
+CREATE INDEX "DocumentoArquivo_vigente_idx" ON "DocumentoArquivo"("vigente");
+
+-- CreateIndex
 CREATE UNIQUE INDEX "DocumentoArquivo_documentoId_url_key" ON "DocumentoArquivo"("documentoId", "url");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "ExigenciaEvidenciaEtapa_chaveExigencia_key" ON "ExigenciaEvidenciaEtapa"("chaveExigencia");
+
+-- CreateIndex
+CREATE INDEX "ExigenciaEvidenciaEtapa_stepKey_idx" ON "ExigenciaEvidenciaEtapa"("stepKey");
+
+-- CreateIndex
+CREATE INDEX "ExigenciaEvidenciaEtapa_evidenciaTipoId_idx" ON "ExigenciaEvidenciaEtapa"("evidenciaTipoId");
+
+-- CreateIndex
+CREATE INDEX "ExigenciaEvidenciaEtapa_documentoTipoId_idx" ON "ExigenciaEvidenciaEtapa"("documentoTipoId");
 
 -- CreateIndex
 CREATE UNIQUE INDEX "DocumentoObservacao_chaveIdempotencia_key" ON "DocumentoObservacao"("chaveIdempotencia");
@@ -6181,7 +6230,22 @@ ALTER TABLE "DocumentoArquivo" ADD CONSTRAINT "DocumentoArquivo_documentoId_fkey
 ALTER TABLE "DocumentoArquivo" ADD CONSTRAINT "DocumentoArquivo_solicitacaoId_fkey" FOREIGN KEY ("solicitacaoId") REFERENCES "SolicitacaoDocumento"("id") ON DELETE SET NULL ON UPDATE CASCADE;
 
 -- AddForeignKey
+ALTER TABLE "DocumentoArquivo" ADD CONSTRAINT "DocumentoArquivo_protocoloId_fkey" FOREIGN KEY ("protocoloId") REFERENCES "Protocolo"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "DocumentoArquivo" ADD CONSTRAINT "DocumentoArquivo_documentTypeId_fkey" FOREIGN KEY ("documentTypeId") REFERENCES "TipoDocumentoCadastro"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "DocumentoArquivo" ADD CONSTRAINT "DocumentoArquivo_substituiId_fkey" FOREIGN KEY ("substituiId") REFERENCES "DocumentoArquivo"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
 ALTER TABLE "DocumentoArquivo" ADD CONSTRAINT "DocumentoArquivo_criadoPorId_fkey" FOREIGN KEY ("criadoPorId") REFERENCES "Usuario"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "ExigenciaEvidenciaEtapa" ADD CONSTRAINT "ExigenciaEvidenciaEtapa_documentoTipoId_fkey" FOREIGN KEY ("documentoTipoId") REFERENCES "TipoDocumentoCadastro"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "ExigenciaEvidenciaEtapa" ADD CONSTRAINT "ExigenciaEvidenciaEtapa_evidenciaTipoId_fkey" FOREIGN KEY ("evidenciaTipoId") REFERENCES "TipoDocumentoCadastro"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "DocumentoObservacao" ADD CONSTRAINT "DocumentoObservacao_documentoId_fkey" FOREIGN KEY ("documentoId") REFERENCES "Documento"("id") ON DELETE CASCADE ON UPDATE CASCADE;

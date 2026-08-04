@@ -26,14 +26,22 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
     const usuario = await extrairUsuarioComPermissoes(request)
     if (!usuario) return NextResponse.json({ error: "PERMISSION_REQUIRED" }, { status: 401 })
 
-    const stepParam = new URL(request.url).searchParams.get("stepInstanceId")
-    const stepInstanceId = stepParam ? parseInt(stepParam) : undefined
+    const q = new URL(request.url).searchParams
+    const numero = (nome: string) => {
+      const v = q.get(nome)
+      if (!v) return undefined
+      const n = parseInt(v)
+      return isNaN(n) ? undefined : n
+    }
 
     return NextResponse.json({
-      arquivos: await listarArquivosDocumento(
-        documentoId,
-        stepInstanceId && !isNaN(stepInstanceId) ? { stepInstanceId } : undefined,
-      ),
+      arquivos: await listarArquivosDocumento(documentoId, {
+        stepInstanceId: numero("stepInstanceId"),
+        protocoloId: numero("protocoloId"),
+        // O histórico de substituições é pedido explicitamente: a operação vê o
+        // vigente por padrão, e a versão trocada continua acessível quando se quer.
+        incluirHistorico: q.get("historico") === "1",
+      }),
     })
   } catch (error) {
     console.error("[GET /api/documentos/[id]/arquivos]", error)
@@ -59,9 +67,13 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
       nome?: string
       mimeType?: string | null
       tamanho?: number | null
+      hash?: string | null
       tipo?: TipoArquivoDocumento
+      documentTypeId?: number | null
       stepInstanceId?: number | null
       solicitacaoId?: number | null
+      protocoloId?: number | null
+      motivoSubstituicao?: string | null
     }
     const url = String(body.url ?? "").trim()
     if (!url) return NextResponse.json({ error: "VALIDATION_ERROR:URL" }, { status: 422 })
@@ -75,26 +87,60 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
         return NextResponse.json({ error: "STEP_NOT_FOUND" }, { status: 404 })
       }
     }
+    // IDOR: a solicitação informada TEM de ser deste documento.
+    if (body.solicitacaoId) {
+      const s = await prisma.solicitacaoDocumento.findUnique({
+        where: { id: body.solicitacaoId }, select: { documentoId: true },
+      })
+      if (!s || s.documentoId !== documentoId) {
+        return NextResponse.json({ error: "STEP_NOT_FOUND" }, { status: 404 })
+      }
+    }
+    // IDOR: o protocolo informado TEM de estar vinculado a este documento.
+    if (body.protocoloId) {
+      const vinculo = await prisma.protocoloDocumento.findFirst({
+        where: { protocoloId: body.protocoloId, documentoId }, select: { id: true },
+      })
+      if (!vinculo) return NextResponse.json({ error: "PROTOCOL_NOT_FOUND" }, { status: 404 })
+    }
+    // A classificação mestre tem de EXISTIR e estar ativa no cadastro. Sem esta
+    // verificação, um id inventado no payload viraria classificação de arquivo.
+    if (body.documentTypeId != null) {
+      const mestre = await prisma.tipoDocumentoCadastro.findUnique({
+        where: { id: body.documentTypeId }, select: { id: true, ativo: true },
+      })
+      if (!mestre || !mestre.ativo) {
+        return NextResponse.json({ error: "VALIDATION_ERROR:DOCUMENT_TYPE" }, { status: 422 })
+      }
+    }
 
     const tipo = TIPOS_VALIDOS.includes(body.tipo as TipoArquivoDocumento)
       ? (body.tipo as TipoArquivoDocumento)
       : "OUTRO"
 
-    const arquivoId = await prisma.$transaction((tx) =>
+    const vinculo = await prisma.$transaction((tx) =>
       vincularArquivoDocumentoTx(tx, {
         documentoId,
         url,
         nome: String(body.nome ?? "").trim() || url.split("/").pop() || "arquivo",
         mimeType: body.mimeType ?? null,
         tamanho: body.tamanho ?? null,
+        hashConteudo: body.hash ?? null,
         tipo,
+        documentTypeId: body.documentTypeId ?? null,
         stepInstanceId: body.stepInstanceId ?? null,
         solicitacaoId: body.solicitacaoId ?? null,
+        protocoloId: body.protocoloId ?? null,
+        motivoSubstituicao: body.motivoSubstituicao ?? null,
         criadoPorId: usuario.userId,
       }),
     )
 
-    return NextResponse.json({ arquivoId, arquivos: await listarArquivosDocumento(documentoId) })
+    return NextResponse.json({
+      arquivoId: vinculo.id,
+      substituiuArquivoId: vinculo.substituiuId,
+      arquivos: await listarArquivosDocumento(documentoId),
+    })
   } catch (error) {
     console.error("[POST /api/documentos/[id]/arquivos]", error)
     return NextResponse.json({ error: "INTERNAL_ERROR" }, { status: 500 })

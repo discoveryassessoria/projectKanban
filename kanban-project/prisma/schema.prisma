@@ -692,6 +692,10 @@ model Protocolo {
   updatedAt       DateTime              @updatedAt
   anexos          AnexoProtocolo[]
   documentos      ProtocoloDocumento[]
+  /// Arquivos da operacao documental ligados a ESTE protocolo (o requerimento
+  /// enviado, os comprovantes). E REFERENCIA ao mesmo DocumentoArquivo que a etapa
+  /// e o documento leem - nao existe copia do binario nem segunda linha.
+  arquivos        DocumentoArquivo[]   @relation("ArquivoProtocolo")
   contratante     Contratante?          @relation(fields: [contratanteId], references: [id], onDelete: Cascade)
   processo        Processo              @relation(fields: [processoId], references: [id], onDelete: Cascade)
   requerente      Requerente?           @relation(fields: [requerenteId], references: [id], onDelete: Cascade)
@@ -3115,6 +3119,12 @@ model TipoDocumentoCadastro {
   countryCode           String?              @db.VarChar(8) // opcional (paÃ­s)
   description           String?              @db.Text
   documentos            Documento[] // back-relation (docs que apontam pra este tipo)
+  // EMISSAO DOCUMENTAL - o tipo mestre CLASSIFICA arquivos operacionais (ex.: DOC21
+  // "Requerimento inteiro teor" e o tipo do arquivo enviado ao cartorio) e aparece
+  // nas exigencias de evidencia das etapas. Sempre por ID; nunca por nome/rotulo.
+  arquivosClassificados DocumentoArquivo[]   @relation("ArquivoTipoMestre")
+  exigenciasComoAlvo    ExigenciaEvidenciaEtapa[] @relation("ExigenciaDocumentoOperacional")
+  exigenciasComoEvidencia ExigenciaEvidenciaEtapa[] @relation("ExigenciaEvidenciaMestre")
   configFinanceiras     ProdutoFinanceiro[]  @relation("ConfigFinTipoDocumento")
   econRules             PhaseEconomicRule[]  @relation("EconTipoDocumento")
   participaPlanilha     Boolean              @default(false)
@@ -5817,7 +5827,13 @@ model SolicitacaoDocumento {
 
 /// ARQUIVO vinculado a operacao de um documento - registro unico por arquivo.
 /// A aba Anexos da ETAPA filtra por stepInstanceId; a do DOCUMENTO lista tudo e
-/// agrupa por origem. O binario e um so (R2); aqui mora a REFERENCIA.
+/// agrupa por origem; a aba Protocolo le pelo protocolo. O binario e um so (R2);
+/// aqui mora a REFERENCIA, e e ela que carrega TODOS os vinculos oficiais.
+///
+/// UMA LINHA, QUATRO VINCULOS. Nao existem quatro tabelas de juncao (StepAttachment,
+/// RequestAttachment, ProtocolAttachment, DocumentAttachment): as quatro relacoes
+/// vivem na MESMA linha, porque o arquivo e um so e cada vinculo e no maximo um.
+/// Quatro tabelas seriam quatro chances de divergir sobre o mesmo fileId.
 model DocumentoArquivo {
   id          Int       @id @default(autoincrement())
   documentoId Int
@@ -5829,12 +5845,41 @@ model DocumentoArquivo {
   solicitacao    SolicitacaoDocumento? @relation(fields: [solicitacaoId], references: [id], onDelete: SetNull)
   stepInstanceId Int?
 
+  /// PROTOCOLO ao qual este arquivo pertence (o requerimento que gerou o numero,
+  /// o comprovante do protocolo). Mesmo cadastro Protocolo; nunca uma copia.
+  protocoloId Int?
+  protocolo   Protocolo? @relation("ArquivoProtocolo", fields: [protocoloId], references: [id], onDelete: SetNull)
+
+  /// CLASSIFICACAO MESTRE do arquivo (Cadastro Mestre de Documentos). Para o
+  /// requerimento enviado ao cartorio e o ID oficial do DOC21 - resolvido no
+  /// servidor pelo cadastro, nunca por nome de arquivo, rotulo de campo ou string
+  /// "DOC21" espalhada no frontend.
+  documentTypeId Int?
+  documentType   TipoDocumentoCadastro? @relation("ArquivoTipoMestre", fields: [documentTypeId], references: [id], onDelete: Restrict)
+
+  /// Finalidade do arquivo dentro da operacao (dimensao fechada).
   tipo TipoArquivoDocumento @default(OUTRO)
 
   url      String
   nome     String  @db.VarChar(300)
   mimeType String? @db.VarChar(120)
   tamanho  Int?
+  /// Impressao digital do conteudo (sha256:<hex>), calculada na origem do upload.
+  /// Serve para provar que o binario e o mesmo e para reconhecer reenvio identico.
+  hashConteudo String? @db.VarChar(80)
+
+  // ── VERSIONAMENTO (a etapa reaberta e o botao "Trocar") ────────────────────
+  /// Versao vigente do vinculo. Substituir NAO apaga: marca a anterior como nao
+  /// vigente e preserva storageKey, autoria, data e historico.
+  vigente Boolean @default(true)
+  /// Arquivo que ESTE registro substituiu (a versao anterior).
+  substituiId Int?              @unique
+  substitui   DocumentoArquivo? @relation("VersaoArquivo", fields: [substituiId], references: [id], onDelete: SetNull)
+  /// Back-relation: a versao que substituiu este registro.
+  substituidoPor DocumentoArquivo? @relation("VersaoArquivo")
+  /// Quando este registro deixou de ser vigente (null = vigente).
+  substituidoEm      DateTime?
+  motivoSubstituicao String?   @db.VarChar(300)
 
   criadoPorId Int?
   criadoPor   Usuario? @relation("DocumentoArquivoAutor", fields: [criadoPorId], references: [id], onDelete: SetNull)
@@ -5847,7 +5892,60 @@ model DocumentoArquivo {
   @@index([documentoId, createdAt])
   @@index([stepInstanceId])
   @@index([solicitacaoId])
+  @@index([protocoloId])
+  @@index([documentTypeId])
   @@index([tipo])
+  @@index([vigente])
+}
+
+/// EXIGENCIA DE EVIDENCIA DE UMA ETAPA - configuracao OFICIAL de qual documento
+/// MESTRE precisa ser anexado ao executar um passo publicado.
+///
+/// POR QUE E TABELA, e nao constante no codigo: a exigencia aponta para uma LINHA
+/// do Cadastro Mestre de Documentos (documentTypeId). Uma constante so poderia
+/// referenciar o cadastro por texto ("DOC21", "Requerimento inteiro teor") - que e
+/// exatamente a referencia estrutural por texto que a arquitetura proibe.
+///
+/// A etapa NAO decide por switch de canal no frontend: ela LE esta configuracao.
+model ExigenciaEvidenciaEtapa {
+  id Int @id @default(autoincrement())
+
+  /// Chave canonica do passo publicado (PhaseInternalWorkflowStep.key).
+  stepKey String @db.VarChar(80)
+
+  /// Tipo do DOCUMENTO OPERACIONAL que dispara a exigencia (ex.: certidao em
+  /// inteiro teor). NULL = qualquer tipo.
+  documentoTipoId Int?
+  documentoTipo   TipoDocumentoCadastro? @relation("ExigenciaDocumentoOperacional", fields: [documentoTipoId], references: [id], onDelete: Cascade)
+
+  /// Canal da solicitacao. NULL = qualquer canal.
+  canal CanalSolicitacaoDocumento?
+
+  /// Documento MESTRE exigido como evidencia - o ID oficial (DOC21, para o
+  /// requerimento). Restrict: nao se apaga do cadastro um tipo que e exigido.
+  evidenciaTipoId Int
+  evidenciaTipo   TipoDocumentoCadastro @relation("ExigenciaEvidenciaMestre", fields: [evidenciaTipoId], references: [id], onDelete: Restrict)
+
+  /// Finalidade do arquivo dentro da operacao (dimensao fechada ja existente).
+  finalidade TipoArquivoDocumento @default(REQUERIMENTO_ENVIADO)
+
+  obrigatoria Boolean @default(true)
+  /// Quantos arquivos VIGENTES desta evidencia a etapa admite.
+  cardinalidadeMax Int @default(1)
+  ativo            Boolean @default(true)
+
+  /// Chave de identidade DERIVADA DOS IDS (step + tipo + canal + evidencia).
+  /// Existe porque UNIQUE com coluna nula nao deduplica em Postgres: e a trava que
+  /// impede duas linhas para a mesma exigencia. Nao e referencia estrutural por
+  /// texto - e o mesmo padrao de `chaveIdempotencia` ja usado no motor.
+  chaveExigencia String @unique @db.VarChar(140)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([stepKey])
+  @@index([evidenciaTipoId])
+  @@index([documentoTipoId])
 }
 
 /// OBSERVACAO operacional do documento - append-only, com autor e carimbo.

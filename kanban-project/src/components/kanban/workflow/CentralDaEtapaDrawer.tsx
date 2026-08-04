@@ -3,9 +3,14 @@
 // Drawer empilhado sobre o DocumentoOperationalDrawer. Abre quando o usuário
 // clica em "Central da Etapa →" na lista de steps do WorkflowTab.
 //
-// Espelha a "Central da Etapa" do HTML do Marco (Image 4 da rodada anterior):
-// header com "ETAPA X DE Y", botões grandes Concluir/Bloquear/Transferir/Forçar/Fechar,
-// e tabs Campos / Anexos / Comentários / Dependências / SLA / Automação / Timeline.
+// Header com "ETAPA X DE Y", barra de ações (Concluir / Abrir editor / Bloquear /
+// Transferir / Forçar / Reabrir / Fechar) e as abas OPERACIONAIS da etapa:
+// Anexos, Observações e Timeline.
+//
+// As abas de CONFIGURAÇÃO (Campos, Dependências, SLA, Automação) saíram da
+// interface diária — ver o comentário de `TabId`. Nada do motor foi tocado:
+// dependências, SLA e automações continuam valendo, calculados onde sempre
+// estiveram; o que deixou de existir é a vitrine técnica delas dentro da etapa.
 
 "use client"
 
@@ -20,7 +25,6 @@ import {
   Lock,
   ArrowLeftRight,
   Zap,
-  ChevronRight,
   Clock,
   User as UserIcon,
   FileText,
@@ -29,7 +33,6 @@ import { EditorRegistralModal } from "./EditorRegistralModal"
 import { StepEditorRouter } from "./StepEditors"
 import {
   resolveWorkflowStepEditor,
-  APRESENTACAO_EDITOR,
   type StepEditorKind,
 } from "@/src/lib/process-stage/step-editor-registry"
 import type { AcaoEtapa } from "@/src/lib/process-stage/acoes-etapa"
@@ -113,14 +116,17 @@ interface Workflow {
   steps: WorkflowStep[]
 }
 
-type TabId =
-  | "campos"
-  | "anexos"
-  | "comentarios"
-  | "dependencias"
-  | "sla"
-  | "automacao"
-  | "timeline"
+// ABAS DA ETAPA — só o que o operador USA no dia a dia.
+//
+// "Campos", "Dependências", "SLA" e "Automação" saíram: são CONFIGURAÇÃO do
+// workflow, não trabalho de etapa. As duas primeiras eram placeholders; a de SLA
+// duplicava um prazo que o motor já deriva; e o editor — a única coisa útil que a
+// aba "Campos" fazia — continua nos botões oficiais "Abrir editor" e "Ver campos
+// preenchidos" da barra de ações, que nunca dependeram dela.
+//
+// O que ficou é o registro operacional: os arquivos, as observações e a linha do
+// tempo da etapa.
+type TabId = "anexos" | "comentarios" | "timeline"
 
 export interface CentralDaEtapaDrawerProps {
   documentoId: number
@@ -200,18 +206,6 @@ const kindDoEditor = (step: WorkflowStep): StepEditorKind =>
 const permite = (step: WorkflowStep | null, acao: AcaoEtapa): boolean =>
   !!step?.acoesPermitidas?.includes(acao)
 
-const fmtSla = (
-  dueAt: string | null,
-): { label: string; cls: string } => {
-  if (!dueAt) return { label: "sem prazo", cls: "text-white/40" }
-  const diff = (new Date(dueAt).getTime() - Date.now()) / 86400000
-  if (diff < -5)
-    return { label: `${Math.abs(Math.floor(diff))}d crítico`, cls: "text-[#f87171]" }
-  if (diff < 0)
-    return { label: `${Math.abs(Math.floor(diff))}d atrasado`, cls: "text-[#fbbf24]" }
-  if (diff < 1) return { label: "vence hoje", cls: "text-[#d2a948]" }
-  return { label: `${Math.ceil(diff)} dia(s) restantes`, cls: "text-[#4ade80]" }
-}
 
 // ============================================================
 // COMPONENTE PRINCIPAL
@@ -234,7 +228,7 @@ function ConteudoDrawer({
   onClose,
   onUpdate,
 }: CentralDaEtapaDrawerProps) {
-  const [activeTab, setActiveTab] = useState<TabId>("campos")
+  const [activeTab, setActiveTab] = useState<TabId>("anexos")
   const [saving, setSaving] = useState<string | null>(null)
 
   // -- Estados dos formulários inline (bloquear, transferir)
@@ -784,17 +778,13 @@ function ConteudoDrawer({
 
             {/* ============== TABS ============== */}
             <div
-              className="flex-shrink-0 flex overflow-x-auto px-6 border-b border-white/10"
+              className="flex-shrink-0 flex flex-wrap px-6 border-b border-white/10"
               style={{ background: "#11151b" }}
             >
               {(
                 [
-                  { id: "campos" as TabId, label: "Campos" },
                   { id: "anexos" as TabId, label: "Anexos" },
                   { id: "comentarios" as TabId, label: "Observações" },
-                  { id: "dependencias" as TabId, label: "Dependências" },
-                  { id: "sla" as TabId, label: "SLA" },
-                  { id: "automacao" as TabId, label: "Automação" },
                   { id: "timeline" as TabId, label: "Timeline" },
                 ] as const
               ).map((t) => (
@@ -825,18 +815,6 @@ function ConteudoDrawer({
 
             {/* ============== BODY ============== */}
             <div className="flex-1 overflow-y-auto px-6 py-5" style={{ background: "#0f1419" }}>
-              {activeTab === "campos" && (
-                <TabCampos
-                  step={step}
-                  onOpenEditor={() => setEditorAberto(true)}
-                />
-              )}
-              {activeTab === "sla" && (
-                // A `key` inclui prazo e notas de propósito: o formulário abaixo
-                // reinicia exatamente quando o efeito antigo reiniciava — ao trocar de
-                // passo OU quando o servidor devolve valores novos para o mesmo passo.
-                <TabSla key={`${step.id}-${step.dueAt ?? ''}-${step.notes ?? ''}`} step={step} onPatch={patchStep} saving={saving} />
-              )}
               {activeTab === "timeline" && <TabTimeline step={step} />}
               {activeTab === "anexos" && (
                 // Escopo por ETAPA: mostra o requerimento anexado ao solicitar a
@@ -854,18 +832,6 @@ function ConteudoDrawer({
                   documentoId={documentoId}
                   stepInstanceId={step.id}
                   podeRegistrar={permite(step, "registrar_observacao")}
-                />
-              )}
-              {activeTab === "dependencias" && (
-                <Placeholder
-                  titulo="Dependências"
-                  descricao="Outras etapas (deste ou de outros documentos) que dependem da conclusão desta para serem desbloqueadas."
-                />
-              )}
-              {activeTab === "automacao" && (
-                <Placeholder
-                  titulo="Automação"
-                  descricao="Regras automáticas que disparam follow-ups, mudam status do documento ou abrem subtarefas quando algo acontece com esta etapa."
                 />
               )}
             </div>
@@ -911,143 +877,6 @@ function ConteudoDrawer({
 
   if (typeof window === "undefined") return null
   return createPortal(drawerContent, document.body)
-}
-
-// ============================================================
-// TAB: CAMPOS — gatilho do editor (que vive no drawer principal)
-// ============================================================
-
-function TabCampos({
-  step,
-  onOpenEditor,
-}: {
-  step: WorkflowStep
-  onOpenEditor: () => void
-}) {
-  // A APRESENTAÇÃO vem do registry, indexada pelo KIND do editor — nunca por um
-  // mapa de nomes de passo mantido à parte. Antes, uma etapa fora deste mapa caía
-  // em "Editor a ser definido para esta etapa", que era a mesma mentira do modal
-  // de editor ausente dita com outras palavras.
-  const config = APRESENTACAO_EDITOR[kindDoEditor(step)]
-
-  // Se etapa concluída, mostra texto explicando precisa reabrir
-  const isConcluida = step.status === "concluida"
-
-  return (
-    <div className="flex flex-col items-center justify-center py-12 text-center max-w-lg mx-auto">
-      <div className="w-14 h-14 rounded-full bg-[#7dd3fc]/10 border border-[#7dd3fc]/30 flex items-center justify-center mb-4">
-        <FileText className="w-6 h-6 text-[#7dd3fc]" />
-      </div>
-      <div className="text-base font-semibold text-white mb-2">{config.titulo}</div>
-      <div className="text-sm text-white/65 leading-relaxed mb-5">{config.descricao}</div>
-
-      <button
-        onClick={onOpenEditor}
-        className="inline-flex items-center gap-1.5 px-4 py-2 text-[12.5px] font-semibold bg-[#7dd3fc] hover:bg-[#252c35] text-white/95 border border-white/10 rounded-md transition-colors"
-      >
-        {isConcluida ? "Ver campos preenchidos" : "Abrir editor"}
-        <ChevronRight className="w-3.5 h-3.5" />
-      </button>
-
-      {isConcluida && (
-        <div className="mt-3 text-[10px] uppercase tracking-wider text-white/40">
-          Etapa concluída — modo leitura. Use ↻ Reabrir etapa para editar.
-        </div>
-      )}
-    </div>
-  )
-}
-
-// ============================================================
-// TAB: SLA — funcional
-// ============================================================
-
-function TabSla({
-  step,
-  onPatch,
-  saving,
-}: {
-  step: WorkflowStep
-  onPatch: (body: Record<string, unknown>) => Promise<boolean>
-  saving: string | null
-}) {
-  // O rascunho nasce do passo. Quem garante que ele é REINICIADO quando o passo muda
-  // é a `key` no ponto de uso — não um efeito que sobrescreve o que o usuário digitou
-  // um render depois de a tela já ter aparecido com o valor velho.
-  const [dueAt, setDueAt] = useState(step.dueAt ? step.dueAt.slice(0, 10) : "")
-  const [notes, setNotes] = useState(step.notes || "")
-  const sla = fmtSla(step.dueAt)
-
-  const salvar = async () => {
-    await onPatch({
-      dueAt: dueAt || null,
-      notes: notes || null,
-    })
-  }
-
-  const inputCls =
-    "w-full px-3 py-2 bg-[#1b2027]/5 border border-white/10 rounded-md text-sm text-white placeholder-white/30 focus:outline-none focus:border-[#7dd3fc]/50 focus:ring-1 focus:ring-[#7dd3fc]/30"
-
-  return (
-    <div className="space-y-5 max-w-2xl">
-      <div>
-        <div className="text-[10px] uppercase font-bold tracking-wider text-white/45 mb-2.5">
-          Prazo da etapa
-        </div>
-        <div className="grid grid-cols-2 gap-3">
-          <div>
-            <label className="block text-[10px] uppercase font-semibold tracking-wider text-white/50 mb-1.5">
-              Data prazo
-            </label>
-            <input
-              type="date"
-              value={dueAt}
-              onChange={(e) => setDueAt(e.target.value)}
-              className={inputCls}
-            />
-          </div>
-          <div>
-            <label className="block text-[10px] uppercase font-semibold tracking-wider text-white/50 mb-1.5">
-              Status do SLA
-            </label>
-            <div className={`px-3 py-2 bg-[#1b2027]/5 border border-white/10 rounded-md text-sm font-semibold ${sla.cls}`}>
-              {sla.label}
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <div>
-        <div className="text-[10px] uppercase font-bold tracking-wider text-white/45 mb-2.5">
-          Observações desta etapa
-        </div>
-        <textarea
-          rows={3}
-          value={notes}
-          onChange={(e) => setNotes(e.target.value)}
-          placeholder="Notas livres da equipe sobre esta etapa…"
-          className={inputCls + " resize-none"}
-        />
-      </div>
-
-      <div className="grid grid-cols-3 gap-3">
-        <Field label="SLA configurado" value={`${step.slaDays} dia(s)`} />
-        <Field label="Iniciada em" value={fmtDateTime(step.startedAt)} />
-        <Field label="Última atualização" value={fmtDateTime(step.updatedAt)} />
-      </div>
-
-      <div className="flex justify-end pt-3 border-t border-white/10">
-        <button
-          onClick={salvar}
-          disabled={!!saving}
-          className="px-4 py-2 bg-[#7dd3fc] hover:bg-[#7dd3fc] disabled:opacity-50 text-white text-sm font-semibold rounded-md inline-flex items-center gap-2"
-        >
-          {saving ? <Loader2 className="w-3 h-3 animate-spin" /> : null}
-          Salvar
-        </button>
-      </div>
-    </div>
-  )
 }
 
 // ============================================================
@@ -1104,44 +933,7 @@ function TabTimeline({ step }: { step: WorkflowStep }) {
           </div>
         ))}
       </div>
-      <div className="text-[11px] text-white/40 italic pt-2">
-        Timeline básica baseada nos timestamps do step. Histórico completo de eventos
-        (transferências, bloqueios, comentários) requer modelo WorkflowStepHistory no
-        schema.
-      </div>
     </div>
   )
 }
 
-// ============================================================
-// HELPERS DE UI
-// ============================================================
-
-function Field({ label, value }: { label: string; value: string | null }) {
-  return (
-    <div>
-      <div className="text-[10px] uppercase font-semibold tracking-wider text-white/45 mb-0.5">
-        {label}
-      </div>
-      <div className={`text-sm ${value && value !== "—" ? "text-white" : "text-white/30 italic"}`}>
-        {value || "—"}
-      </div>
-    </div>
-  )
-}
-
-/**
- * Aba ainda sem conteúdo próprio. Diz o que a aba vai mostrar, em vocabulário de
- * operação. Nome de model e de coluna não são assunto de quem opera um processo.
- */
-function Placeholder({ titulo, descricao }: { titulo: string; descricao: string }) {
-  return (
-    <div className="flex flex-col items-center justify-center py-16 text-center max-w-md mx-auto">
-      <div className="text-base font-semibold text-white/80 mb-2">{titulo}</div>
-      <div className="text-sm text-white/55 leading-relaxed">{descricao}</div>
-      <div className="mt-3 text-[11px] uppercase tracking-wider text-white/35">
-        Ainda não há registros aqui
-      </div>
-    </div>
-  )
-}

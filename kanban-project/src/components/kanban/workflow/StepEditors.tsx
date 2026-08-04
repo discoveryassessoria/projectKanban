@@ -35,8 +35,9 @@ import {
   AlertCircle,
   Trash2,
   ExternalLink,
+  Paperclip,
 } from "lucide-react"
-import { uploadFiles } from "@/src/lib/storage"
+import { uploadFiles, hashDoArquivo } from "@/src/lib/storage"
 import { celebrar } from "@/src/lib/confetti"
 import {
   resolveWorkflowStepEditor,
@@ -65,7 +66,9 @@ import {
   canalDoTexto,
   faltamCamposDoCanal,
   LABEL_CAMPO_FALTANDO,
+  CANAIS_SOLICITACAO,
 } from "@/src/lib/process-stage/canais-solicitacao"
+import type { CanalSolicitacaoDocumento } from "@prisma/client"
 
 /**
  * Erro do domínio → frase operacional. Códigos de campo faltando viram a lista
@@ -453,108 +456,69 @@ export function StepEditorRouter(props: StepEditorRouterProps) {
 // registrais + histórico + recomendação), 8 canais, evidências
 // condicionais e Detalhes do Envio (atendente, custo, pagamento).
 
-type CanalId =
-  | "crc"
-  | "e-cartorio"
-  | "email"
-  | "whatsapp"
-  | "balcao"
-  | "comune"
-  | "correios"
-  | "consulado"
+// CANAIS — DERIVADOS da configuração oficial compartilhada.
+//
+// Aqui existia uma segunda lista de canais, com as exigências escritas de novo — e
+// ELA DISCORDAVA da oficial: marcava "protocolo obrigatório" em e-mail, WhatsApp,
+// balcão, comune e Correios, canais que legitimamente podem não devolver número no
+// envio. O servidor validava por uma regra e a tela cobrava outra; o operador via
+// campo obrigatório que o backend não exigia.
+//
+// Agora a lista NASCE de `CANAIS_SOLICITACAO`. O que fica local é só o que é de
+// tela: o ícone e a dica do campo de observação.
 
-interface CanalRequirements {
-  attachment: boolean
-  attachmentLabel: string
-  protocol: boolean
-  trackingCode?: boolean
-  observation?: boolean
-  observationHint?: string
+type CanalId = string
+
+const ICONE_DO_CANAL: Record<CanalSolicitacaoDocumento, React.ComponentType<{ className?: string }>> = {
+  CRC: Globe,
+  ECARTORIO: Send,
+  EMAIL: Mail,
+  WHATSAPP: MessageCircle,
+  BALCAO: MapPin,
+  COMUNE: Globe,
+  CORREIOS: Send,
+  CONSULADO: MapPin,
+}
+
+/** Dica do campo de observação — texto de tela, sem efeito em regra nenhuma. */
+const DICA_OBSERVACAO: Partial<Record<CanalSolicitacaoDocumento, string>> = {
+  BALCAO: "Atendente, número do guichê, horário",
+  CONSULADO: "Setor consular, atendente",
 }
 
 interface CanalConfig {
+  /** Valor do domínio — a identidade estrutural do canal. */
+  canal: CanalSolicitacaoDocumento
+  /** Mesma chave em minúsculas que o form e o documento já gravam. */
   id: CanalId
   label: string
   desc: string
   icon: React.ComponentType<{ className?: string }>
-  requires: CanalRequirements
+  requires: {
+    attachment: boolean
+    attachmentLabel: string
+    protocol: boolean
+    trackingCode: boolean
+    observation: boolean
+    observationHint?: string
+  }
 }
 
-const CANAIS: CanalConfig[] = [
-  {
-    id: "crc",
-    label: "CRC Nacional",
-    desc: "Central Nacional de Registro Civil — integração eletrônica",
-    icon: Globe,
-    requires: { attachment: true, attachmentLabel: "Print do protocolo CRC", protocol: true },
+const CANAIS: CanalConfig[] = CANAIS_SOLICITACAO.map((c) => ({
+  canal: c.canal,
+  id: c.canal.toLowerCase(),
+  label: c.label,
+  desc: c.descricao,
+  icon: ICONE_DO_CANAL[c.canal],
+  requires: {
+    attachment: c.anexoObrigatorioLabel !== null,
+    attachmentLabel: c.anexoObrigatorioLabel ?? "Comprovante do envio",
+    protocol: c.protocoloObrigatorio,
+    trackingCode: c.rastreioObrigatorio,
+    observation: c.observacaoObrigatoria,
+    observationHint: DICA_OBSERVACAO[c.canal],
   },
-  {
-    id: "e-cartorio",
-    label: "E-cartório",
-    desc: "Portal eletrônico do cartório",
-    icon: Send,
-    requires: { attachment: true, attachmentLabel: "PDF do pedido eletrônico", protocol: true },
-  },
-  {
-    id: "email",
-    label: "E-mail",
-    desc: "Pedido por e-mail direto ao cartório",
-    icon: Mail,
-    requires: { attachment: true, attachmentLabel: "Requerimento PDF enviado", protocol: true },
-  },
-  {
-    id: "whatsapp",
-    label: "WhatsApp",
-    desc: "WhatsApp Business do cartório",
-    icon: MessageCircle,
-    requires: { attachment: true, attachmentLabel: "Screenshot da conversa", protocol: true },
-  },
-  {
-    id: "balcao",
-    label: "Balcão",
-    desc: "Atendimento presencial",
-    icon: MapPin,
-    requires: {
-      attachment: true,
-      attachmentLabel: "Comprovante de protocolo (papel digitalizado)",
-      protocol: true,
-      observation: true,
-      observationHint: "Atendente, número do guichê, horário",
-    },
-  },
-  {
-    id: "comune",
-    label: "Comune italiana",
-    desc: "Pedido direto à comune (Italia)",
-    icon: Globe,
-    requires: { attachment: true, attachmentLabel: "PEC enviada ou modulo richiesta", protocol: true },
-  },
-  {
-    id: "correios",
-    label: "Correios",
-    desc: "Pedido via correios com AR",
-    icon: Send,
-    requires: {
-      attachment: true,
-      attachmentLabel: "Comprovante AR",
-      protocol: true,
-      trackingCode: true,
-    },
-  },
-  {
-    id: "consulado",
-    label: "Consulado",
-    desc: "Via consulado italiano no Brasil",
-    icon: MapPin,
-    requires: {
-      attachment: true,
-      attachmentLabel: "Comprovante consular",
-      protocol: true,
-      observation: true,
-      observationHint: "Setor consular, atendente",
-    },
-  },
-]
+}))
 
 // Custo estimado por tipo de documento (referência média de mercado)
 const CUSTO_ESTIMADO: Record<string, number> = {
@@ -603,11 +567,24 @@ interface DocSnapshot {
   observacoes: string | null
 }
 
+/**
+ * Contrato de leitura da exigência de evidência (espelho do DTO do serviço).
+ * O que a tela usa daqui é o NOME e o CÓDIGO do cadastro mestre — para rotular o
+ * campo com o documento oficial em vez de um texto solto.
+ */
+interface ExigenciasEtapaView {
+  principal: {
+    obrigatoria: boolean
+    documentoMestre: { id: number; publicCode: string | null; code: string | null; name: string }
+  } | null
+  anexoAtual: { id: number; nome: string; url: string; documentoMestre: { publicCode: string | null; name: string } | null } | null
+}
+
 interface SolicitarFormState {
   canal: CanalId | null
   attachmentUrl: string
   /** Metadados REAIS do arquivo enviado — viram registro, não só nome na tela. */
-  attachmentMeta: { name: string; size: number; type: string } | null
+  attachmentMeta: { name: string; size: number; type: string; hash: string | null } | null
   protocolo: string
   trackingCode: string
   observacao: string
@@ -713,8 +690,10 @@ function FormSolicitarCertidao({
   // "Detalhes do envio" já aparecerem ao abrir.
   const [form, setForm] = useState<SolicitarFormState>(() => {
     if (!doc) return emptySolicitarForm()
-    const canalSalvo = (doc.canal_solicitacao || "").toLowerCase()
-    const canalValido = CANAIS.find((c) => c.id === canalSalvo)?.id || null
+    // A chave gravada passa pela ponte OFICIAL do domínio, não por comparação de
+    // string: registro antigo com "e-cartorio" continua reconhecido.
+    const canalSalvo = canalDoTexto(doc.canal_solicitacao)
+    const canalValido = canalSalvo ? canalSalvo.toLowerCase() : null
     return {
       canal: canalValido || getRecomendacao(doc).canal,
       // O requerimento NÃO nasce mais de `link_acompanhamento`: aquele campo
@@ -739,6 +718,18 @@ function FormSolicitarCertidao({
   const canalConfig = form.canal ? CANAIS.find((c) => c.id === form.canal)! : null
   const recomendacao = doc ? getRecomendacao(doc) : null
 
+  // EXIGÊNCIA DE EVIDÊNCIA — QUAL documento mestre esta etapa pede. Vem do
+  // servidor, que a lê da configuração oficial. A tela não decide isso por canal
+  // nem por rótulo: ela pergunta, e usa o nome/código do cadastro na etiqueta do
+  // campo. É o que faz o operador saber que está anexando o requerimento oficial.
+  const exig = useApi<{ exigencias?: ExigenciasEtapaView }>(
+    isOpen && documentoId && stepId
+      ? `/api/documentos/${documentoId}/solicitacoes/exigencias?stepInstanceId=${stepId}${form.canal ? `&canal=${form.canal}` : ""}`
+      : null,
+  )
+  const evidencia = exig.dados?.exigencias?.principal ?? null
+  const anexoJaRegistrado = exig.dados?.exigencias?.anexoAtual ?? null
+
   // VALIDAÇÃO pela configuração OFICIAL do canal — a mesma que o servidor aplica.
   // Antes a regra vivia só aqui dentro; a rota aceitava qualquer coisa.
   const canalDominio = canalDoTexto(form.canal)
@@ -746,7 +737,9 @@ function FormSolicitarCertidao({
     ? faltamCamposDoCanal({
         canal: canalDominio,
         numeroProtocolo: form.protocolo,
-        anexoUrl: form.attachmentUrl,
+        // O que já está REGISTRADO satisfaz a exigência: etapa reaberta não pede
+        // de novo o arquivo que o sistema já tem.
+        anexoUrl: form.attachmentUrl || anexoJaRegistrado?.url || "",
         codigoRastreio: form.trackingCode,
         observacao: form.observacao,
         destinatarioNome: form.destinatario,
@@ -785,12 +778,16 @@ function FormSolicitarCertidao({
           codigoRastreio: form.trackingCode.trim() || null,
           custoPago: !isNaN(cost) ? cost : null,
           formaPagamento: form.paymentMethod || null,
+          // A CLASSIFICAÇÃO não vem daqui: o servidor resolve o documento mestre
+          // pela configuração da etapa. A tela manda o arquivo e seus metadados
+          // reais — inclusive o hash, calculado antes do upload.
           requerimento: form.attachmentUrl.trim()
             ? {
                 url: form.attachmentUrl.trim(),
                 nome: form.attachmentMeta?.name ?? null,
                 mimeType: form.attachmentMeta?.type ?? null,
                 tamanho: form.attachmentMeta?.size ?? null,
+                hash: form.attachmentMeta?.hash ?? null,
               }
             : null,
           concluirEtapa: true,
@@ -1031,23 +1028,57 @@ function FormSolicitarCertidao({
               </div>
 
               <div className="space-y-3 mb-5">
-                {/* Anexo */}
+                {/* Anexo — rotulado pelo DOCUMENTO MESTRE que a configuração
+                    exige. Sem exigência configurada, cai no rótulo do canal:
+                    nenhum código é inventado para preencher a etiqueta. */}
                 {canalConfig.requires.attachment && (
-                  <FileUploadField
-                    label={`📎 ${canalConfig.requires.attachmentLabel}`}
-                    required
-                    invalid={!form.attachmentUrl.trim()}
-                    value={form.attachmentUrl}
-                    onChange={(url, meta) =>
-                      setForm({
-                        ...form,
-                        attachmentUrl: url,
-                        attachmentMeta: meta ? { name: meta.name, size: meta.size, type: meta.type } : null,
-                      })
-                    }
-                    disabled={readOnly}
-                    prefix={`documentos/${documentoId}/solicitacao`}
-                  />
+                  <>
+                    <FileUploadField
+                      label={
+                        evidencia
+                          ? `📎 ${evidencia.documentoMestre.name}${evidencia.documentoMestre.publicCode ? ` · ${evidencia.documentoMestre.publicCode}` : ""}`
+                          : `📎 ${canalConfig.requires.attachmentLabel}`
+                      }
+                      required
+                      invalid={!form.attachmentUrl.trim() && !anexoJaRegistrado}
+                      value={form.attachmentUrl}
+                      onChange={(url, meta) =>
+                        setForm({
+                          ...form,
+                          attachmentUrl: url,
+                          attachmentMeta: meta
+                            ? { name: meta.name, size: meta.size, type: meta.type, hash: meta.hash ?? null }
+                            : null,
+                        })
+                      }
+                      disabled={readOnly}
+                      prefix={`documentos/${documentoId}/solicitacao`}
+                    />
+                    {/* Já anexado numa execução anterior desta MESMA etapa: o
+                        operador vê o que existe em vez de reenviar às cegas. */}
+                    {anexoJaRegistrado && (
+                      <div className="rounded-md border border-white/10 bg-[#12161c] px-2.5 py-2 flex items-center gap-2">
+                        <Paperclip className="w-3.5 h-3.5 text-white/50 flex-shrink-0" />
+                        <div className="min-w-0 flex-1">
+                          <a
+                            href={anexoJaRegistrado.url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-[12px] text-white/90 hover:text-white truncate block"
+                          >
+                            {anexoJaRegistrado.nome}
+                          </a>
+                          <div className="text-[10px] text-white/45">
+                            já registrado nesta etapa
+                            {anexoJaRegistrado.documentoMestre
+                              ? ` · ${anexoJaRegistrado.documentoMestre.name}${anexoJaRegistrado.documentoMestre.publicCode ? ` (${anexoJaRegistrado.documentoMestre.publicCode})` : ""}`
+                              : ""}
+                            {form.attachmentUrl.trim() ? " · enviar substitui esta versão (a anterior fica no histórico)" : ""}
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </>
                 )}
 
                 {/* Protocolo */}
@@ -1206,6 +1237,20 @@ function FormSolicitarCertidao({
                     ))}
                   </select>
                 </div>
+              </div>
+
+              {/* ========================================================== */}
+              {/* ANEXOS DESTA ETAPA                                          */}
+              {/* ========================================================== */}
+              {/* A MESMA consulta da aba Anexos da etapa e da aba do documento,
+                  escopada por stepInstanceId. O requerimento aparece aqui por
+                  REFERÊNCIA ao mesmo registro — nenhuma cópia, nenhum upload
+                  paralelo. Só leitura: quem anexa nesta etapa é o campo acima. */}
+              <div className="mt-5 pt-4 border-t border-white/10">
+                <div className="text-[10px] uppercase font-bold tracking-wider text-white/45 mb-2">
+                  4. Anexos desta etapa
+                </div>
+                <AbaAnexosDocumentais documentoId={documentoId} stepInstanceId={stepId} />
               </div>
             </>
           )}
@@ -1571,10 +1616,30 @@ function FormAguardarRetorno({
                     : null
                 }
               />
+              {/* O REQUERIMENTO e o LINK DE ACOMPANHAMENTO são coisas diferentes
+                  e voltam a ser exibidos como tais — juntar os dois num campo só
+                  foi o que fez o arquivo enviado sumir de vista. */}
+              {solicit.requerimentoUrl && (
+                <div className="col-span-2">
+                  <div className="text-[10px] uppercase font-semibold tracking-wider text-white/45 mb-0.5">
+                    Requerimento enviado ao cartório
+                  </div>
+                  <a
+                    href={solicit.requerimentoUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-[12px] text-[#7dd3fc] hover:underline inline-flex items-center gap-1 break-all"
+                  >
+                    <Paperclip className="w-3 h-3 flex-shrink-0" />
+                    {solicitacao?.arquivos.find((a) => a.tipo === "REQUERIMENTO_ENVIADO")?.nome ?? solicit.requerimentoUrl}
+                    <ExternalLink className="w-3 h-3 flex-shrink-0" />
+                  </a>
+                </div>
+              )}
               {solicit.link && (
                 <div className="col-span-2">
                   <div className="text-[10px] uppercase font-semibold tracking-wider text-white/45 mb-0.5">
-                    Requerimento enviado / acompanhamento
+                    Link de acompanhamento
                   </div>
                   <a
                     href={solicit.link}
@@ -1601,6 +1666,18 @@ function FormAguardarRetorno({
                 <AlertTriangle className="w-3 h-3 flex-shrink-0" />
                 A solicitação ainda não foi preenchida. Reabra a etapa anterior para registrar o protocolo.
               </div>
+            )}
+            {/* INFORMAR O NÚMERO QUE CHEGOU DEPOIS — é AQUI que o cartório
+                responde, e por isso é aqui que o número se registra. Acrescenta
+                ao histórico da MESMA solicitação: não cria uma segunda, não
+                reenvia o requerimento, não sobrescreve o protocolo anterior. */}
+            {solicitacao && (
+              <InformarProtocoloInline
+                documentoId={documentoId}
+                solicitacaoId={solicitacao.id}
+                jaTemProtocolo={solicitacao.protocolos.length > 0}
+                onRegistrado={() => { recarregar(); onSaved?.() }}
+              />
             )}
           </div>
 
@@ -1717,6 +1794,95 @@ function FormAguardarRetorno({
         </div>
       )}
     </EditorShell>
+  )
+}
+
+/**
+ * INFORMAR PROTOCOLO DEPOIS — a ação que vivia na aba Protocolo do documento e
+ * mudou para o lugar onde o fato acontece: a espera pelo cartório.
+ *
+ * Chama a MESMA rota canônica de antes (`.../solicitacoes/{id}/protocolos`), que
+ * acrescenta o número ao histórico da solicitação e liga o requerimento já
+ * registrado ao protocolo novo. Nada é duplicado e nada é sobrescrito.
+ */
+function InformarProtocoloInline({
+  documentoId,
+  solicitacaoId,
+  jaTemProtocolo,
+  onRegistrado,
+}: {
+  documentoId: number
+  solicitacaoId: number
+  jaTemProtocolo: boolean
+  onRegistrado: () => void
+}) {
+  const [aberto, setAberto] = useState(false)
+  const [numero, setNumero] = useState("")
+  const [salvando, setSalvando] = useState(false)
+  const [erro, setErro] = useState<string | null>(null)
+
+  const registrar = async () => {
+    const n = numero.trim()
+    if (!n || salvando) return
+    setSalvando(true)
+    setErro(null)
+    try {
+      const res = await fetch(`/api/documentos/${documentoId}/solicitacoes/${solicitacaoId}/protocolos`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", ...authHeader() },
+        body: JSON.stringify({ numeroProtocolo: n }),
+      })
+      if (!res.ok) {
+        setErro(res.status === 403 ? "Você não tem permissão para registrar protocolo." : "Não foi possível registrar agora.")
+        return
+      }
+      setNumero("")
+      setAberto(false)
+      onRegistrado()
+    } catch {
+      setErro("Não foi possível registrar agora.")
+    } finally {
+      setSalvando(false)
+    }
+  }
+
+  return (
+    <div className="px-3.5 py-2.5 border-t border-white/10">
+      {!aberto ? (
+        <button
+          onClick={() => setAberto(true)}
+          className="px-2.5 py-1 text-[11px] font-semibold bg-[#20262e] hover:bg-[#252c35] text-white/85 rounded"
+        >
+          {jaTemProtocolo ? "+ Informar novo protocolo" : "+ Informar protocolo"}
+        </button>
+      ) : (
+        <div className="flex items-center gap-2">
+          <input
+            type="text"
+            value={numero}
+            onChange={(e) => setNumero(e.target.value)}
+            placeholder="Número devolvido pelo cartório"
+            autoFocus
+            className="flex-1 px-2.5 py-1.5 bg-[#12161c] border border-white/10 rounded text-[12px] text-white placeholder-white/30 focus:outline-none focus:border-[#7dd3fc]/50 font-mono"
+          />
+          <button
+            onClick={registrar}
+            disabled={salvando || !numero.trim()}
+            className="px-3 py-1.5 text-[11px] font-semibold bg-[#2563eb] hover:bg-[#1d4ed8] disabled:opacity-50 text-white rounded inline-flex items-center gap-1.5"
+          >
+            {salvando && <Loader2 className="w-3 h-3 animate-spin" />}
+            Registrar
+          </button>
+          <button
+            onClick={() => { setAberto(false); setNumero(""); setErro(null) }}
+            className="px-2 py-1.5 text-[11px] text-white/60 hover:text-white"
+          >
+            Cancelar
+          </button>
+        </div>
+      )}
+      {erro && <div className="mt-1.5 text-[11px] text-[#f87171]">{erro}</div>}
+    </div>
   )
 }
 
@@ -3067,7 +3233,7 @@ interface FileUploadFieldProps {
   value: string
   onChange: (
     url: string,
-    meta?: { name: string; size: number; type: string; key: string } | null,
+    meta?: { name: string; size: number; type: string; key: string; hash: string | null } | null,
   ) => void
   disabled?: boolean
   /** Pasta lógica no bucket. Ex: "documentos/123/solicitacao" */
@@ -3133,6 +3299,9 @@ function FileUploadField({
     setFileSize(file.size)
 
     try {
+      // Hash ANTES do upload: a impressão digital é do arquivo que o operador
+      // escolheu, não do que voltou do storage.
+      const hash = await hashDoArquivo(file)
       const result = await uploadFiles([file], {
         prefix,
         onProgress: (_, p) => setProgress(p),
@@ -3144,6 +3313,7 @@ function FileUploadField({
           size: uploaded.size,
           type: uploaded.type,
           key: uploaded.key,
+          hash,
         })
       }
     } catch (err) {

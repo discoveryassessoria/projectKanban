@@ -16,6 +16,29 @@ export interface UploadOptions {
 }
 
 /**
+ * IMPRESSÃO DIGITAL do conteúdo, calculada na origem — antes do upload.
+ *
+ * Serve para PROVAR que o binário registrado é o mesmo que o operador escolheu, e
+ * para reconhecer reenvio idêntico. É complemento, não substituto: o registro do
+ * arquivo não depende dela (navegador em contexto inseguro não expõe SubtleCrypto,
+ * e nesse caso o hash simplesmente não existe — nada é inventado no lugar).
+ */
+export async function hashDoArquivo(file: File): Promise<string | null> {
+  try {
+    const subtle = globalThis.crypto?.subtle;
+    if (!subtle) return null;
+    const buffer = await file.arrayBuffer();
+    const digest = await subtle.digest("SHA-256", buffer);
+    const hex = Array.from(new Uint8Array(digest))
+      .map((b) => b.toString(16).padStart(2, "0"))
+      .join("");
+    return `sha256:${hex}`;
+  } catch {
+    return null;
+  }
+}
+
+/**
  * Faz upload de um array de arquivos pro R2 via presigned URL.
  * Substitui o `uploadFiles` do UploadThing.
  */
