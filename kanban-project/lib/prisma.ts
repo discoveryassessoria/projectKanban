@@ -27,10 +27,15 @@ function urlDoRuntime(): string | undefined {
   const bruta = process.env.PRISMA_DATABASE_URL
   if (!bruta) return undefined
 
+  // `pool(ed|er).` cobre os DOIS hosts: `pooler.` (Supabase/Neon) e `pooled.`
+  // (Prisma Postgres, que é o desta instalação). A checagem antiga procurava só
+  // "pooler." e por isso NUNCA reconhecia `pooled.db.prisma.io` — o endpoint
+  // pooled de produção recebia `connection_limit`/`pool_timeout` do lado do
+  // cliente, exatamente o que o bloco acima diz que não deve acontecer.
   const pooled =
     bruta.startsWith("prisma+postgres://") ||
     bruta.includes("accelerate.prisma-data.net") ||
-    bruta.includes("pooler.") ||
+    /pool(ed|er)\./.test(bruta) ||
     bruta.includes("pgbouncer=true")
   if (pooled) return bruta
 

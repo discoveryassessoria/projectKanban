@@ -13,6 +13,7 @@ import { ReactFlowTree, ReactFlowTreeRef } from "./react-flow-tree"
 import { useAnaliseArvore, paisAlvoDe } from "./inteligencia/use-analise-arvore"
 import { PainelInteligencia } from "./inteligencia/painel-inteligencia"
 import { PaletaComandos } from "./inteligencia/paleta-comandos"
+import { ImportarArvoreModal } from "./importar-arvore-modal"
 import { TreeOnboarding } from "./tree-onboarding"
 import { RequerenteSelector } from "./requerente-selector"
 import { DatePickerField } from "@/components/ui/date-picker-field"
@@ -25,6 +26,7 @@ import {
   FileDown,
   Search,
   Sparkles,
+  ImagePlus,
 } from "lucide-react"
 import { usePermissoes } from "@/src/hooks/use-permissoes"
 
@@ -111,6 +113,7 @@ export function ArvoreGenealogicaView({
     raizId: pessoaPrincipal?.id ?? null,
   })
   const [painelAberto, setPainelAberto] = useState(false)
+  const [importarAberto, setImportarAberto] = useState(false)
   const [paletaAberta, setPaletaAberta] = useState(false)
 
   // ⌘K / Ctrl+K abre a busca. Atalho global é assinatura de teclado — efeito é a
@@ -581,6 +584,41 @@ export function ArvoreGenealogicaView({
     await fetchArvore()
   }
 
+  // "Importar Árvore" precisa existir nos DOIS caminhos de render — a árvore
+  // montada e o onboarding. Definir o botão só dentro do return principal foi
+  // o bug: numa árvore VAZIA o onboarding retorna antes (linha ~636) e o botão
+  // nunca chegava à tela, justamente no estado em que importar é o caminho
+  // mais provável. Declarado aqui, antes dos returns, ele é o mesmo elemento
+  // nos dois lugares — não há como um sair de sincronia com o outro.
+  const podeImportar = Boolean(pode('arvore.criar') && arvoreId)
+
+  const botaoImportar = podeImportar ? (
+    <button
+      onClick={() => setImportarAberto(true)}
+      title="Importar árvore a partir de um print"
+      className="flex items-center gap-2 rounded-lg border border-gray-200 bg-white px-3 py-2 text-[13px] text-gray-600 shadow-sm transition hover:border-gray-300 hover:text-gray-900"
+    >
+      <ImagePlus className="h-4 w-4" />
+      <span className="hidden sm:inline">Importar Árvore</span>
+    </button>
+  ) : null
+
+  const modalImportar = arvoreId ? (
+    <ImportarArvoreModal
+      arvoreId={arvoreId}
+      aberto={importarAberto}
+      onFechar={() => setImportarAberto(false)}
+      onImportado={() => {
+        // Volta ao comportamento DERIVADO (null), não apenas `false`: se o
+        // onboarding tivesse sido aberto à mão, ele continuaria na frente da
+        // árvore recém-importada. Com null, `showOnboarding` passa a seguir
+        // `pessoas.length` de novo e a árvore aparece sozinha.
+        setShowOnboarding(null)
+        void fetchArvore()
+      }}
+    />
+  ) : null
+
   // Estado vazio - sem árvore
   if (!arvoreId && !loading) {
     return (
@@ -632,13 +670,19 @@ export function ArvoreGenealogicaView({
   // Onboarding
   if (showOnboarding && arvoreId) {
     return (
-      <div ref={containerRef} className="h-full">
+      // `relative` é o que ancora o botão sobreposto. O <TreeOnboarding> abaixo
+      // não sabe que ele existe — segue recebendo as mesmas props e não muda de
+      // layout; o botão apenas flutua no mesmo canto em que aparece na árvore
+      // montada, para o operador achá-lo no mesmo lugar nos dois estados.
+      <div ref={containerRef} className="relative h-full">
         <TreeOnboarding
           arvoreId={arvoreId}
           processoId={processoId}
           paisProcesso={paisProcesso}
           onComplete={handleOnboardingComplete}
         />
+        {botaoImportar && <div className="absolute right-4 top-4 z-20">{botaoImportar}</div>}
+        {modalImportar}
       </div>
     )
   }
@@ -770,8 +814,15 @@ export function ArvoreGenealogicaView({
             `absolute` no canto superior direito, longe dos controles que já
             existiam no canto inferior esquerdo. O <ReactFlowTree> acima não sabe
             que elas existem: abrir ou fechar não move um card sequer. */}
-        {pessoas.length > 0 && (
+        {/* Uma barra só. "Importar Árvore" NÃO depende de `pessoas.length`:
+            árvore vazia é justamente quando importar faz mais sentido. Buscar e
+            Análise seguem condicionais — não há o que buscar nem analisar sem
+            pessoas. */}
+        {(pessoas.length > 0 || podeImportar) && (
           <div className="absolute right-4 top-4 z-20 flex items-center gap-2">
+            {botaoImportar}
+            {pessoas.length > 0 && (
+            <>
             <button
               onClick={() => setPaletaAberta(true)}
               title="Buscar pessoa (⌘K)"
@@ -796,8 +847,12 @@ export function ArvoreGenealogicaView({
                 </span>
               )}
             </button>
+            </>
+            )}
           </div>
         )}
+
+        {modalImportar}
 
         <PainelInteligencia
           analise={analise}
