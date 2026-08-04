@@ -11,7 +11,7 @@
  * o arquivo continua sendo uma linha só, que o runtime continua sem citar nome de
  * documento, que não nasceu alias nem fallback nem segunda fonte.
  *
- * O documento correspondente é docs/BASELINE-ARQUITETURAL.md. Os dois mudam juntos.
+ * O documento correspondente é docs/architecture/01-baseline-arquitetural.md. Os dois mudam juntos.
  */
 import { readFileSync, existsSync } from "node:fs"
 import { execSync } from "node:child_process"
@@ -202,8 +202,8 @@ ok(guardEnv.includes("VERCEL_ENV") && guardEnv.includes("process.exit(1)"),
 // ════════════════════════════════════════════════════════════════
 console.log("\n(9) Documento da baseline:")
 
-ok(existe("docs/BASELINE-ARQUITETURAL.md"), "9.1 a baseline está versionada")
-const doc = ler("docs/BASELINE-ARQUITETURAL.md")
+ok(existe("docs/architecture/01-baseline-arquitetural.md"), "9.1 a baseline está versionada em docs/architecture/")
+const doc = ler("docs/architecture/01-baseline-arquitetural.md")
 for (const secao of ["Modelo de domínio", "Fluxo operacional", "Relações entre entidades",
                      "Regras invariantes", "Decisões arquiteturais", "Diagramas",
                      "Checklist de regressão", "Testes obrigatórios"]) {

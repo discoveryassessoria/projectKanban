@@ -9,6 +9,23 @@ nada descrito aqui.
 Validação automática: `npm run test:arquitetura-baseline`. **Nenhuma implementação
 está concluída se essa suíte falhar.**
 
+## Índice oficial
+
+Este documento é o resumo executivo. O detalhe vive nos seguintes, e os nove são a
+mesma verdade em profundidades diferentes — mudam juntos.
+
+| doc | responde |
+|---|---|
+| **01** (este) | a arquitetura inteira, em uma passada |
+| [02 — Modelo de domínio](02-modelo-de-dominio.md) | quais entidades existem e quem é o centro |
+| [03 — Runtime documental](03-runtime-documental.md) | como a execução acontece |
+| [04 — Invariantes](04-invariantes.md) | o que nunca pode ser verdade |
+| [05 — Materialização](05-materializacao.md) | como documento e execução nascem |
+| [06 — Fonte da verdade](06-fonte-da-verdade.md) | por que existe só uma de cada coisa |
+| [07 — Regras de evolução](07-regras-de-evolucao.md) | o que pode e o que não pode mudar |
+| [08 — Checklist de regressão](08-checklist-de-regressao.md) | o que rodar antes de qualquer deploy |
+| [09 — Decisões (ADR)](09-decisoes-arquiteturais.md) | o que foi decidido, e por quê |
+
 ---
 
 ## 1. Modelo de domínio aprovado
