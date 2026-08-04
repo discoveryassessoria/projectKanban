@@ -5,12 +5,17 @@ import { registrarAuditoria } from '@/lib/gerenciamento/auditoria'
 import { parseConsulta, filtroBusca, filtroAtivo, ordenacao, meta } from '@/lib/gerenciamento/consulta'
 import { legacyFromCode } from '@/src/lib/document-category-map'
 import { slugTecnico, gerarChaveUnica } from '@/src/lib/catalogo/chave-tecnica-interna'
+import { conferirContratoDoTipo, dadosDoContrato, INCLUDE_CONTRATO } from '@/src/lib/documentos/contrato-tipo-documento'
 
 // Classificação CANÔNICA = categoriaDocumental (por ID). A relação é sempre
 // carregada para a UI exibir o nome do mestre (sem mapa local). A coluna legada
 // `category` só existe como fallback transitório e NÃO é editável pela UI nova.
 const INCLUDE_CATEGORIA = {
   categoriaDocumental: { select: { id: true, code: true, name: true, ativo: true } },
+  // CONTRATO OPERACIONAL — a tela precisa MOSTRAR o contrato, e mostrar exige
+  // trazer o workflow por trás do perfil. Só leitura: a edição do workflow
+  // continua na área de Workflow Interno.
+  ...INCLUDE_CONTRATO,
 } as const
 
 export async function GET(request: NextRequest) {
@@ -36,6 +41,10 @@ export async function POST(request: NextRequest) {
   try {
     const b = await request.json()
     if (!b.name || !String(b.name).trim()) return NextResponse.json({ error: 'Informe o nome.' }, { status: 400 })
+
+    // GUARD DO CONTRATO — recusa, nunca corrige.
+    const recusa = await conferirContratoDoTipo(b, null)
+    if (recusa) return NextResponse.json(recusa, { status: 422 })
 
     // LOTE A — FONTE CANÔNICA = categoriaDocumentalId (por ID). Valida existência.
     // DUAL-WRITE: deriva a coluna legada `category` a partir do code SÓ como
@@ -70,6 +79,7 @@ export async function POST(request: NextRequest) {
         category: categoryLegado,
         categoriaDocumentalId,
         ativo: b.ativo !== false,
+        ...dadosDoContrato(b),
       },
       include: INCLUDE_CATEGORIA,
     })

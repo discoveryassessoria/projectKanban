@@ -3,10 +3,12 @@ import { prisma } from '@/lib/prisma'
 import { verificarPermissao } from '@/src/lib/verificar-permissao'
 import { registrarAuditoria } from '@/lib/gerenciamento/auditoria'
 import { legacyFromCode } from '@/src/lib/document-category-map'
+import { conferirContratoDoTipo, dadosDoContrato, INCLUDE_CONTRATO } from '@/src/lib/documentos/contrato-tipo-documento'
 
 // Classificação canônica sempre carregada (UI exibe o nome do mestre, sem mapa local).
 const INCLUDE_CATEGORIA = {
   categoriaDocumental: { select: { id: true, code: true, name: true, ativo: true } },
+  ...INCLUDE_CONTRATO,
 } as const
 
 export async function PUT(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
@@ -18,6 +20,10 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
     const b = await request.json()
     const atual = await prisma.tipoDocumentoCadastro.findUnique({ where: { id } })
     if (!atual) return NextResponse.json({ error: 'Tipo não encontrado.' }, { status: 404 })
+
+    // GUARD DO CONTRATO — recusa, nunca corrige.
+    const recusa = await conferirContratoDoTipo(b, id)
+    if (recusa) return NextResponse.json(recusa, { status: 422 })
 
     // LOTE A — só reescreve a classificação quando o campo vem no body.
     // Enviado categoriaDocumentalId: valida (404) e faz dual-write da coluna
@@ -51,6 +57,7 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
         category: categoryLegado,
         categoriaDocumentalId,
         ativo: b.ativo !== undefined ? !!b.ativo : atual.ativo,
+        ...dadosDoContrato(b),
       },
       include: INCLUDE_CATEGORIA,
     })
@@ -70,6 +77,7 @@ export async function DELETE(request: NextRequest, { params }: { params: Promise
     const id = Number(idStr)
     const atual = await prisma.tipoDocumentoCadastro.findUnique({ where: { id } })
     if (!atual) return NextResponse.json({ error: 'Tipo não encontrado.' }, { status: 404 })
+
     await prisma.tipoDocumentoCadastro.delete({ where: { id } })
     await registrarAuditoria(request, { acao: 'EXCLUIR', entidade: 'TipoDocumentoCadastro', entidadeId: id, descricao: `Tipo documental excluído (#${id})` })
     return NextResponse.json({ ok: true })

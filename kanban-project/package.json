@@ -125,6 +125,7 @@
     "test:condicao-aplicabilidade": "tsx scripts/condicao-aplicabilidade.test.ts",
     "test:condicao-formas": "tsx scripts/condicao-formas.test.ts",
     "test:condicao-pagamento": "tsx scripts/condicao-pagamento.test.ts",
+    "test:contrato-doc": "tsx scripts/contrato-documental.test.ts",
     "test:cp-sec": "tsx scripts/cp-sec.test.ts",
     "test:cp1": "tsx scripts/cp1.test.ts",
     "test:cp2": "tsx scripts/cp2.test.ts",

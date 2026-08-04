@@ -39,7 +39,15 @@ interface Workflow {
   phaseKey: string
   name: string
   active: boolean
+  versao?: number
   passos: Step[]
+  // CONTRATO DE EXECUÇÃO — o que o workflow declara operar. Antes isso era
+  // conhecimento do motor (escopo canônico da fase); agora é do cadastro.
+  escopoExecucao?: string | null
+  exigeDocumento?: boolean
+  exigePessoa?: boolean
+  familiaDocumental?: { id: number; code: string; name: string } | null
+  perfis?: Array<{ id: number; code: string; name: string; escopoInstanciacao: string }>
 }
 interface Fase { phaseKey: string; label: string; order: number }
 interface TipoProcesso { id: number; name: string; fases: Fase[] }
@@ -338,6 +346,29 @@ export default function PhaseWorkflowsFasesTab() {
                 {wf
                   ? <div className="mt-0.5 text-xs text-green-300/80">{wf.passos.length} passo(s) · {wf.passos.filter(s => s.createsTask).length} gera(m) tarefa</div>
                   : <div className="mt-0.5 text-xs text-white/40">Sem workflow interno configurado.</div>}
+
+                {/* CONTRATO DE EXECUÇÃO — herdado pelo workflow inteiro, por isso
+                    fica no cabeçalho e não se repete em cada passo. Só leitura:
+                    quem declara é o cadastro, e o passo mostra só o que é dele. */}
+                {wf?.escopoExecucao && (
+                  <div className="mt-2 flex flex-wrap items-center gap-1.5 text-[10px]">
+                    <span className="rounded bg-indigo-500/15 px-1.5 py-0.5 text-indigo-300">
+                      {wf.escopoExecucao === "DOCUMENTO" ? "documental" : `execução por ${wf.escopoExecucao.toLowerCase()}`}
+                    </span>
+                    {wf.perfis?.[0] && (
+                      <span className="rounded bg-sky-500/15 px-1.5 py-0.5 text-sky-300">perfil: {wf.perfis[0].name}</span>
+                    )}
+                    {wf.familiaDocumental && (
+                      <span className="rounded bg-white/10 px-1.5 py-0.5 text-white/70">família: {wf.familiaDocumental.name}</span>
+                    )}
+                    <span className="rounded bg-white/10 px-1.5 py-0.5 text-white/70">
+                      {CARDINALIDADE_LABEL[wf.escopoExecucao] ?? wf.escopoExecucao}
+                    </span>
+                    {wf.exigeDocumento && <span className="rounded bg-emerald-500/15 px-1.5 py-0.5 text-emerald-300">exige documento</span>}
+                    {wf.exigePessoa && <span className="rounded bg-emerald-500/15 px-1.5 py-0.5 text-emerald-300">exige pessoa</span>}
+                    {wf.versao != null && <span className="rounded bg-white/10 px-1.5 py-0.5 text-white/50">v{wf.versao}</span>}
+                  </div>
+                )}
               </div>
               {wf && (
                 <div className="flex flex-none flex-wrap justify-end gap-1.5">
