@@ -4,6 +4,7 @@
 // (custo/receita). É aqui que o Marco liga Tradução/Apostila/Retificação SEM seed/código.
 import { useState, useEffect, useCallback } from 'react'
 import { useApi } from "@/src/lib/dados"
+import { fasesParaSelecao } from '@/src/lib/process-stage/fases-catalog'
 
 type Regra = {
   id: number; tipoProcessoId: number | null; phaseKey: string; documentTypeCode: string | null
@@ -17,11 +18,10 @@ type DocRef = { id?: number; code: string | null; name: string }
 type Data = { regras: Regra[]; produtos: Produto[]; tiposProcesso: ProcRef[]; docTypes: DocRef[] }
 type Form = Omit<Regra, 'id'> & { id?: number }
 
-const FASES: [string, string][] = [
-  ['emissao_documental', 'Emissão Documental'], ['analise_documental', 'Análise Documental'],
-  ['traducao', 'Tradução'], ['apostilamento', 'Apostilamento'],
-  ['retificacao', 'Retificação'], ['emissao_documental_retificada', 'Emissão Retificada'],
-]
+// Fases do CATÁLOGO OFICIAL. Antes esta lista era repetida aqui e continuou
+// oferecendo `traducao`/`retificacao` depois de o cadastro ter sido corrigido —
+// a tela gravava chave legada sem ninguém perceber.
+const FASES: [string, string][] = fasesParaSelecao().map((f) => [f.phaseKey, f.label])
 const APPLIES: [string, string][] = [['any', 'Qualquer'], ['certificate', 'Certidão'], ['translation', 'Tradução'], ['original', 'Original']]
 const faseLabel = (k: string) => FASES.find(([v]) => v === k)?.[1] || k
 

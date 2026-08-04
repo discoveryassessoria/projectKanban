@@ -3,19 +3,10 @@
 
 import { useEffect, useState, useCallback, type ReactNode } from "react"
 import { useApi } from "@/src/lib/dados"
+import { fasesParaSelecao } from "@/src/lib/process-stage/fases-catalog"
 
-const FASES: [string, string][] = [
-  ["genealogia", "Genealogia"],
-  ["emissao_documental", "Emissão Documental"],
-  ["analise_documental", "Análise Documental"],
-  ["retificacao", "Retificação de Registros"],
-  ["emissao_documental_retificada", "Emissão Documental Retificada"],
-  ["traducao", "Tradução Juramentada"],
-  ["apostilamento", "Apostilamento"],
-  ["aguardando_protocolo", "Aguardando Protocolo"],
-  ["protocolado", "Protocolado"],
-  ["finalizado", "Finalizado"],
-]
+// Fases do CATÁLOGO OFICIAL — nunca uma cópia textual (ver AplicabilidadeEconomicaTab).
+const FASES: [string, string][] = fasesParaSelecao().map((f) => [f.phaseKey, f.label])
 const faseLabel = (k: string | null) => (k ? FASES.find(f => f[0] === k)?.[1] || k : "—")
 
 const TRIGGERS: Record<string, string> = {

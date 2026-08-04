@@ -11,6 +11,7 @@
     "backfill:passos-publicados": "tsx scripts/backfill-passos-publicados.ts --execute",
     "reparar:materializacao": "tsx scripts/reparar-materializacao-fase.ts --execute",
     "reparar:passo-tarefa": "tsx scripts/reparar-passo-tarefa.ts --execute",
+    "remover:fase-nao-canonica": "tsx scripts/remover-fase-nao-canonica.ts",
     "reparar:passo-tarefa:dry": "tsx scripts/reparar-passo-tarefa.ts",
     "reparar:materializacao:dry": "tsx scripts/reparar-materializacao-fase.ts",
     "backfill:passos-publicados:dry": "tsx scripts/backfill-passos-publicados.ts",

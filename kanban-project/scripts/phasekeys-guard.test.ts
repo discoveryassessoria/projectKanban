@@ -7,14 +7,14 @@
 //     e só sugere canônica quando a equivalência é determinística.
 // (B) BLINDAGEM ESTÁTICA — o motor não ganhou alias/fallback, e o seed não semeia
 //     chave legada nova.
-// (C) DADOS REAIS (quando há banco) — nenhuma pendência ALÉM das DECLARADAS.
-//     Pendência conhecida vive no inventário abaixo, com motivo e SQL de correção;
-//     qualquer registro fora dele quebra o build. É o mesmo padrão do guard de
-//     referências: exceção existe, mas é NOMEADA — nunca silenciosa.
+// (C) DADOS REAIS (quando há banco) — ZERO achados. Sem inventário, sem exceção,
+//     sem "pendência declarada". Um guard que aceita exceção vira um lugar onde o
+//     erro mora com autorização: a lista de tolerância existiu enquanto havia
+//     correção pendente, e morreu junto com a última delas.
 //
 // Falha ⇒ quebra o build/CI.
 
-import { readFileSync, existsSync } from "fs"
+import { readFileSync, existsSync, readdirSync, statSync } from "fs"
 import { join } from "path"
 import {
   verificarPhaseKeys,
@@ -25,6 +25,14 @@ import {
 
 const ROOT = join(__dirname, "..")
 const read = (rel: string) => (existsSync(join(ROOT, rel)) ? readFileSync(join(ROOT, rel), "utf8") : "")
+function varrer(dir: string, acc: string[] = []): string[] {
+  for (const nome of readdirSync(join(ROOT, dir))) {
+    const rel = `${dir}/${nome}`
+    if (statSync(join(ROOT, rel)).isDirectory()) varrer(rel, acc)
+    else if (rel.endsWith(".ts") || rel.endsWith(".tsx")) acc.push(rel)
+  }
+  return acc
+}
 
 let ok = 0
 const falhas: string[] = []
@@ -32,39 +40,6 @@ function check(nome: string, cond: boolean, extra?: string) {
   if (cond) { ok++; console.log(`  ✅ ${nome}`) }
   else { falhas.push(nome); console.log(`  ❌ ${nome}${extra ? ` — ${extra}` : ""}`) }
 }
-
-// ============================================================
-// INVENTÁRIO DE PENDÊNCIAS DECLARADAS
-// ------------------------------------------------------------
-// Cadastro em produção que ainda não foi corrigido, com o motivo de não ter sido.
-//
-// Aqui só entra o que NÃO tem correção determinística. Erro com equivalência
-// confirmada se corrige — não se inventaria. ALE-ADM, ESP-ADM, ITA-JUD e o
-// CatalogoFase foram corrigidos em 04/08/2026 e saíram desta lista; a checagem
-// abaixo (`sem exceção determinística`) impede que voltem a se esconder aqui.
-//
-// Cada linha é uma dívida VISÍVEL: enquanto estiver aqui, o guard passa; um
-// registro novo fora daqui, não.
-// ============================================================
-interface PendenciaDeclarada {
-  macroWorkflowId: number
-  phaseKey: string
-  faseMacroId: number
-  motivo: string
-  correcao: string
-}
-const PENDENCIAS_DECLARADAS: PendenciaDeclarada[] = [
-  {
-    macroWorkflowId: -1, phaseKey: "transcricoes", faseMacroId: 11,
-    motivo:
-      "CatalogoFase #11 'Transcrições' (ordem 20). Não tem correspondente no catálogo canônico e " +
-      "não há equivalência determinística — corrigir seria inventar arquitetura. Nenhum MacroWorkflow " +
-      "a utiliza hoje. Aguarda decisão: a fase é oficial (entra no catálogo) ou sai do cadastro.",
-    correcao: "(sem correção automática — decisão arquitetural)",
-  },
-]
-const declarada = (macroWorkflowId: number, phaseKey: string) =>
-  PENDENCIAS_DECLARADAS.some((p) => p.macroWorkflowId === macroWorkflowId && p.phaseKey === phaseKey)
 
 // ============================================================
 console.log("\n(A) Verificador — núcleo puro")
@@ -189,6 +164,26 @@ for (const arq of ["prisma/seed-motor-3a.ts", "prisma/seed-lote-b-fases.ts"]) {
   check(`${arq} usa só chaves canônicas`, chaves.every((k) => phaseKeysCanonicas().includes(k)), JSON.stringify(chaves.filter((k) => !phaseKeysCanonicas().includes(k))))
 }
 
+// NENHUMA TELA pode repetir a lista de fases. Cada cópia textual é um lugar onde
+// uma chave legada sobrevive à correção do cadastro — foi exatamente o que
+// aconteceu com AplicabilidadeEconomicaTab e RegrasTarefaTransversalTab.
+check("as telas de gerenciamento derivam as fases do catálogo",
+  ["src/components/gerenciamentoComponents/AplicabilidadeEconomicaTab.tsx",
+   "src/components/gerenciamentoComponents/RegrasTarefaTransversalTab.tsx"]
+    .every((arq) => read(arq).includes("fasesParaSelecao()")))
+check("o catálogo expõe a lista oficial para a UI",
+  read("src/lib/process-stage/fases-catalog.ts").includes("export function fasesParaSelecao"))
+check("nenhum componente monta uma lista própria de phaseKeys", (() => {
+  const suspeitos: string[] = []
+  for (const arq of varrer("src/components")) {
+    const txt = read(arq)
+    // duas ou mais phaseKeys canônicas literais em pares [chave, rótulo] = lista repetida
+    const pares = txt.match(/\[\s*["'](genealogia|emissao_documental|analise_documental|retificacao_registros|traducao_juramentada|apostilamento|aguardando_protocolo|protocolado|finalizado)["']\s*,/g) ?? []
+    if (pares.length >= 3) suspeitos.push(arq)
+  }
+  return suspeitos.length === 0 || (suspeitos.length === 1 && suspeitos[0].includes("WorkflowMacroTrilha"))
+})())
+
 // ENDPOINT de criação de macro: recusa cadastro legado, nunca converte.
 const rotaMacro = read("src/app/api/gerenciamento/workflow-macro/route.ts")
 check("o endpoint de criação valida o catálogo antes de persistir",
@@ -205,7 +200,7 @@ async function contraOBanco() {
   const { PrismaClient } = await import("@prisma/client")
   const prisma = new PrismaClient()
   try {
-    console.log("\n(C) Cadastro real — nenhuma pendência além das DECLARADAS")
+    console.log("\n(C) Cadastro real — ZERO legado, sem exceção")
 
     const fasesDb = await prisma.faseMacro.findMany({
       select: {
@@ -231,40 +226,40 @@ async function contraOBanco() {
       modosDeFase: modosDb,
     })
 
-    console.log(`   FaseMacro na base: ${fasesDb.length} · achados: ${achados.length}`)
-    const naoDeclarados = achados.filter((a) => !declarada(a.macroWorkflowId, a.phaseKey))
+    console.log(`   FaseMacro na base: ${fasesDb.length} · CatalogoFase: ${catalogoDb.length} · modos: ${modosDb.length}`)
     for (const a of achados) {
-      const marca = declarada(a.macroWorkflowId, a.phaseKey) ? "declarado" : "NÃO DECLARADO"
-      console.log(`   [${a.severidade}] macro ${a.macroWorkflowId} (${a.tipoProcessoCode}) "${a.phaseKey}" — ${a.tipo} · ${a.processosAfetados} processo(s) · ${marca}`)
+      console.log(`   [${a.severidade}] ${a.tipo} · macro ${a.macroWorkflowId} (${a.tipoProcessoCode ?? "—"}) · #${a.faseMacroId} "${a.phaseKey}"`)
+      console.log(`        ${a.detalhe}`)
       if (a.canonicaSugerida) console.log(`        → canônica: ${a.canonicaSugerida}`)
     }
+    // TRAVA ABSOLUTA. Não há exceção a declarar: qualquer achado quebra o build,
+    // com a origem no relatório acima.
+    check("ZERO achados no cadastro inteiro (sem exceção, sem inventário)", achados.length === 0,
+      JSON.stringify(achados.map((a) => ({ tipo: a.tipo, macro: a.macroWorkflowId, id: a.faseMacroId, phaseKey: a.phaseKey }))))
 
-    check("o ALE-ADM não tem NENHUM achado", !achados.some((a) => a.tipoProcessoCode === "ALE-ADM"),
-      JSON.stringify(achados.filter((a) => a.tipoProcessoCode === "ALE-ADM")))
-    check("nenhuma pendência fora do inventário declarado", naoDeclarados.length === 0,
-      JSON.stringify(naoDeclarados.map((a) => ({ macro: a.macroWorkflowId, phaseKey: a.phaseKey, tipo: a.tipo }))))
+    // As mesmas verificações, nomeadas — quando quebram, dizem QUAL invariante caiu.
+    check("nenhuma FaseMacro fora do catálogo canônico", !achados.some((a) => a.tipo === "PHASEKEY_FORA_DO_CATALOGO"))
+    check("nenhum CatalogoFase inválido (nem ativo, nem inativo)", !achados.some((a) => a.tipo === "CATALOGO_FASE_COM_CHAVE_LEGADA"))
+    check("nenhum modo de fase inválido", !achados.some((a) => a.tipo === "MODO_DE_FASE_COM_CHAVE_LEGADA"))
     check("nenhuma phaseKey duplicada em macro nenhum", !achados.some((a) => a.tipo === "PHASEKEY_DUPLICADA_NO_MACRO"))
-    // O inventário não é esconderijo: erro com equivalência CONFIRMADA tem correção
-    // determinística e precisa ser corrigido, não declarado.
-    const determinísticosEscondidos = achados.filter((a) => a.canonicaSugerida != null && declarada(a.macroWorkflowId, a.phaseKey))
-    check("o inventário não abriga erro determinístico (corrigir ≠ declarar)",
-      determinísticosEscondidos.length === 0,
-      JSON.stringify(determinísticosEscondidos.map((a) => ({ macro: a.macroWorkflowId, phaseKey: a.phaseKey, canonica: a.canonicaSugerida }))))
-    check("as chaves legadas sumiram do cadastro inteiro",
-      !achados.some((a) => Object.keys(EQUIVALENCIA_LEGADA).includes(a.phaseKey)),
-      JSON.stringify(achados.filter((a) => Object.keys(EQUIVALENCIA_LEGADA).includes(a.phaseKey))))
-    // O inventário lista registros de PRODUÇÃO, por id. Contra um banco de teste esses
-    // ids não existem, e cobrar "entrada morta" ali acusaria uma dívida que aquele
-    // banco nunca teve. A verificação de higiene do inventário — impedir que ele
-    // guarde exceção já resolvida — só faz sentido no dataset a que ele se refere.
-    const ehDatasetDeProducao = await prisma.macroWorkflow.count({ where: { id: { in: [11, 14, 15] } } }) === 3
-    if (ehDatasetDeProducao) {
-      check("toda pendência declarada ainda existe (inventário sem entrada morta)",
-        PENDENCIAS_DECLARADAS.every((p) => achados.some((a) => a.macroWorkflowId === p.macroWorkflowId && a.phaseKey === p.phaseKey)),
-        JSON.stringify(PENDENCIAS_DECLARADAS.filter((p) => !achados.some((a) => a.macroWorkflowId === p.macroWorkflowId && a.phaseKey === p.phaseKey))))
-    } else {
-      console.log("   (inventário de pendências não conferido — este não é o dataset de produção)")
-    }
+    check("nenhuma fase obrigatória sem workflow publicado", !achados.some((a) => a.tipo === "FASE_OBRIGATORIA_SEM_WORKFLOW"))
+
+    // Nenhuma chave legada em lugar nenhum do cadastro — nem inativa.
+    const legadasNoCadastro = [
+      ...fasesDb.filter((f) => EQUIVALENCIA_LEGADA[f.phaseKey] != null).map((f) => `FaseMacro#${f.id}`),
+      ...catalogoDb.filter((c) => EQUIVALENCIA_LEGADA[c.phaseKey] != null).map((c) => `CatalogoFase#${c.id}`),
+      ...modosDb.filter((m) => EQUIVALENCIA_LEGADA[m.phaseKey] != null).map((m) => `PhaseInternalMode#${m.id}`),
+    ]
+    check("nenhuma chave legada persistida (nem em registro inativo)", legadasNoCadastro.length === 0, JSON.stringify(legadasNoCadastro))
+
+    // Workflows publicados também falam o catálogo.
+    const wfsFora = wfs.filter((w) => phaseKeysCanonicas().indexOf(w.phaseKey) < 0)
+    check("nenhum workflow publicado com chave fora do catálogo", wfsFora.length === 0, JSON.stringify(wfsFora))
+
+    // O CatalogoFase é o molde: se ele estiver íntegro, macro novo nasce canônico.
+    const catInvalido = catalogoDb.filter((c) => phaseKeysCanonicas().indexOf(c.phaseKey) < 0)
+    check("criação de MacroWorkflow DESBLOQUEADA (catálogo 100% canônico)", catInvalido.length === 0,
+      JSON.stringify(catInvalido.map((c) => ({ id: c.id, phaseKey: c.phaseKey, ativo: c.ativo }))))
   } finally {
     await prisma.$disconnect()
   }

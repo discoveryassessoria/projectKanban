@@ -199,6 +199,21 @@ export function getFaseByOrdem(ordem: number): FaseCode | null {
   return found ? found.code : null
 }
 
+/**
+ * Fases oficiais na ordem do fluxo, prontas para um <select>.
+ *
+ * Existe para que NENHUMA tela precise repetir a lista de fases. Cada cópia
+ * textual dessa lista é um lugar onde uma chave legada sobrevive — foi assim que
+ * `traducao`/`retificacao` continuaram sendo oferecidas ao operador depois de o
+ * cadastro já ter sido corrigido.
+ */
+export function fasesParaSelecao(): Array<{ phaseKey: string; label: string; code: FaseCode }> {
+  return Object.values(FASES)
+    .slice()
+    .sort((a, b) => a.ordem - b.ordem)
+    .map((f) => ({ phaseKey: f.phaseKey, label: f.label, code: f.code }))
+}
+
 // ── Conversão canônica faseCode ⇄ phaseKey ─────────────────────────────────
 // ÚNICA fonte da ponte entre o enum FaseCode (Prisma) e a chave estável phaseKey
 // usada no banco. NENHUM outro ponto do código deve fazer toUpperCase/toLowerCase
