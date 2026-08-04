@@ -2928,8 +2928,24 @@ model PhaseInternalWorkflow {
 
   passos PhaseInternalWorkflowStep[]
 
+  // ── CONTRATO DE EXECUÇÃO ───────────────────────────────────────────────────
+  // O workflow declara SOBRE O QUE executa. Antes só se sabia a fase, e o escopo
+  // vinha do catálogo em código — o cadastro não tinha como recusar um workflow
+  // documental materializado sem documento.
+  /// Natureza da execução: sobre processo, pessoa, necessidade ou documento.
+  escopoExecucao EscopoExecucao?
+  /// Perfis que apontam para este workflow (back-relation).
+  perfis         PerfilOperacionalDocumento[] @relation("PerfilWorkflow")
+  /// Família documental aceita (null = não é workflow documental, ou aceita qualquer).
+  familiaDocumentalId Int?
+  familiaDocumental   FamiliaDocumental? @relation(fields: [familiaDocumentalId], references: [id], onDelete: SetNull)
+  /// Contrato de materialização: sem estes, a instância documental não nasce.
+  exigeDocumento Boolean @default(false)
+  exigePessoa    Boolean @default(false)
+
   @@index([phaseKey])
   @@index([tipoProcessoId])
+  @@index([familiaDocumentalId])
 }
 
 model PhaseInternalWorkflowStep {
@@ -3136,8 +3152,132 @@ model TipoDocumentoCadastro {
   categoriaDocumentalId Int?
   categoriaDocumental   CategoriaDocumental? @relation(fields: [categoriaDocumentalId], references: [id], onDelete: Restrict)
 
+  // ── CONTRATO OPERACIONAL ───────────────────────────────────────────────────
+  // Categoria diz ONDE o documento se arquiva. Estes três dizem COMO ele opera:
+  // o que ele é (familia), como entra (natureza) e qual workflow o processa
+  // (perfil). Nullable porque a classificação é gradual — documento sem perfil
+  // continua sendo anexável; o que ele não faz é materializar workflow.
+  familiaDocumentalId  Int?
+  familiaDocumental    FamiliaDocumental? @relation(fields: [familiaDocumentalId], references: [id], onDelete: SetNull)
+  naturezaOperacionalId Int?
+  naturezaOperacional   NaturezaOperacionalDocumento? @relation(fields: [naturezaOperacionalId], references: [id], onDelete: SetNull)
+  perfilOperacionalId  Int?
+  perfilOperacional    PerfilOperacionalDocumento? @relation(fields: [perfilOperacionalId], references: [id], onDelete: SetNull)
+
   @@index([itemCatalogoId])
   @@index([categoriaDocumentalId])
+  @@index([familiaDocumentalId])
+  @@index([naturezaOperacionalId])
+  @@index([perfilOperacionalId])
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+// CONTRATO DOCUMENTAL — o Cadastro Mestre passa a declarar COMO o documento é
+// processado, e o Workflow Interno passa a declarar SOBRE O QUE ele executa.
+//
+// O QUE ESTAVA IMPLÍCITO
+// ----------------------
+// O Workflow Interno sabia apenas a que FASE pertencia. Que "Emissão Documental"
+// executa uma vez por DOCUMENTO era conhecimento do código (o escopo canônico da
+// fase, em fases-catalog), não do cadastro. Consequência: nada impedia passo
+// documental sem documento, tarefa documental sem documento, ou workflow
+// aplicado a tipo documental incompatível — os estados inválidos eram possíveis
+// porque o contrato não existia para ser violado.
+//
+// A DIMENSÃO DE ESCOPO NÃO VIRA CADASTRO
+// --------------------------------------
+// PROCESSO/PESSOA/NECESSIDADE/DOCUMENTO é dimensão FECHADA de domínio — mesma
+// natureza de TipoArquivoDocumento e CanalSolicitacaoDocumento: não tem atributo
+// próprio administrável, só identidade. E já existe como tipo canônico único no
+// motor (`Cardinalidade`, em phase-workflow-helpers). Virar cadastro mestre
+// criaria uma SEGUNDA fonte para o que o motor já resolve. Família, Natureza
+// Operacional e Perfil, ao contrário, têm atributos administráveis — esses são
+// cadastro.
+
+/// Escopo sobre o qual uma execução acontece. Espelha `Cardinalidade` do motor.
+enum EscopoExecucao {
+  PROCESSO
+  PESSOA
+  NECESSIDADE
+  DOCUMENTO
+}
+
+/// FAMILIA DOCUMENTAL — o que o documento E, em grupo operacional (Certidao de
+/// Registro Civil, Documento de Identidade, Procuracao, Requerimento...).
+/// Eixo DISTINTO de CategoriaDocumental (classificacao administrativa): a familia
+/// diz como o documento se comporta na operacao, nao onde ele e arquivado.
+model FamiliaDocumental {
+  id        Int      @id @default(autoincrement())
+  code      String   @unique @db.VarChar(40)
+  name      String   @db.VarChar(120)
+  descricao String?  @db.Text
+  ordem     Int      @default(0)
+  ativo     Boolean  @default(true)
+  /// Familia de bootstrap: code imutavel, nao excluivel.
+  sistema   Boolean  @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  tipos     TipoDocumentoCadastro[]
+  perfis    PerfilOperacionalDocumento[]
+  workflows PhaseInternalWorkflow[]
+}
+
+/// NATUREZA OPERACIONAL — COMO o documento entra na operacao (obtido de terceiro,
+/// gerado pelo sistema, recebido do cliente, evidencia de etapa...).
+/// `exigeWorkflow` separa documento que se PROCESSA de documento que so se anexa:
+/// e a regra que o guard administrativo cobra.
+model NaturezaOperacionalDocumento {
+  id            Int      @id @default(autoincrement())
+  code          String   @unique @db.VarChar(40)
+  name          String   @db.VarChar(120)
+  descricao     String?  @db.Text
+  /// true = documento desta natureza precisa de perfil operacional.
+  exigeWorkflow Boolean  @default(false)
+  ordem         Int      @default(0)
+  ativo         Boolean  @default(true)
+  sistema       Boolean  @default(false)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  tipos TipoDocumentoCadastro[]
+}
+
+/// PERFIL OPERACIONAL — a ponte entre o Cadastro Mestre e o Workflow publicado.
+/// Responde "qual workflow processa este documento, e com que escopo".
+/// Um perfil serve N tipos documentais: "Emissao de Certidao" atende nascimento,
+/// casamento e obito sem duplicar workflow, porque o processo operacional e o
+/// mesmo — o que muda e QUAL certidao, e isso e a INSTANCIA, nao o modelo.
+model PerfilOperacionalDocumento {
+  id        Int     @id @default(autoincrement())
+  code      String  @unique @db.VarChar(40)
+  name      String  @db.VarChar(120)
+  descricao String? @db.Text
+
+  /// Workflow Interno PUBLICADO que executa este perfil.
+  workflowId Int?
+  workflow   PhaseInternalWorkflow? @relation("PerfilWorkflow", fields: [workflowId], references: [id], onDelete: Restrict)
+
+  /// Familia aceita (null = qualquer).
+  familiaDocumentalId Int?
+  familiaDocumental   FamiliaDocumental? @relation(fields: [familiaDocumentalId], references: [id], onDelete: SetNull)
+
+  /// Uma execucao por QUE. Para emissao de certidao: DOCUMENTO.
+  escopoInstanciacao EscopoExecucao @default(DOCUMENTO)
+
+  exigeProcesso  Boolean @default(true)
+  exigePessoa    Boolean @default(true)
+  exigeDocumento Boolean @default(true)
+
+  ativo     Boolean  @default(true)
+  sistema   Boolean  @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  tipos TipoDocumentoCadastro[]
+
+  @@index([workflowId])
+  @@index([familiaDocumentalId])
 }
 
 // LOTE A â Cadastro mestre de Categorias Documentais. FONTE CANÃNICA da

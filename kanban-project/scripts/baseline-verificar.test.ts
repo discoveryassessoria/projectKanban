@@ -80,7 +80,13 @@ const MIGRATION = join(DIR_MIGRATIONS, '0000_baseline', 'migration.sql')
 // linhas SO de INSERT (zero DDL destrutivo, zero linha removida) -> UPDATE de UMA
 // coluna na linha 0000_baseline -> `prisma migrate status` consistente. Nenhuma
 // outra migration foi tocada; nenhum dado de negocio foi lido ou alterado.
-const CHECKSUM_LEDGER = 'c3b59b340c8b529cc31cc98c770622897a093bac3c4cc6bc154e1580682b4c43'
+// ATUALIZACAO 04/08/2026 (contrato documental) — migration ADITIVA
+// 20260804c_contrato_documental: FamiliaDocumental, NaturezaOperacionalDocumento,
+// PerfilOperacionalDocumento, enum EscopoExecucao e colunas novas em
+// TipoDocumentoCadastro e PhaseInternalWorkflow. Diff do baseline: SO insercoes.
+//   anterior : c3b59b340c8b529cc31cc98c770622897a093bac3c4cc6bc154e1580682b4c43
+//   atual    : 503a30b46aa6ea92de7bba1441603b2bec79351deee4c8ec6f70f756ba4ba02a
+const CHECKSUM_LEDGER = '503a30b46aa6ea92de7bba1441603b2bec79351deee4c8ec6f70f756ba4ba02a'
 
 /**
  * Migrations criadas DEPOIS da consolidacao de 02/08/2026. Toda migration nova
@@ -94,6 +100,7 @@ const MIGRATIONS_POS_BASELINE: string[] = [
   '20260803d_mover_fase_manual',
   '20260804_solicitacao_documental',
   '20260804b_requerimento_doc21_vinculo',
+  '20260804c_contrato_documental',
 ]
 
 const sha256 = (t: string) => createHash('sha256').update(t).digest('hex')

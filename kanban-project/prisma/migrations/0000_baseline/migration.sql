@@ -43,6 +43,9 @@ CREATE TYPE "FormaEnvioProtocolo" AS ENUM ('PRESENCIAL', 'CORREIO', 'EMAIL', 'PO
 CREATE TYPE "FuncaoOrganizacao" AS ENUM ('ORGAO', 'FORNECEDOR', 'PARCEIRO', 'CORRESPONDENTE', 'CLIENTE_CORPORATIVO');
 
 -- CreateEnum
+CREATE TYPE "EscopoExecucao" AS ENUM ('PROCESSO', 'PESSOA', 'NECESSIDADE', 'DOCUMENTO');
+
+-- CreateEnum
 CREATE TYPE "RegraDocumentalStatus" AS ENUM ('RASCUNHO', 'PUBLICADA', 'INATIVA', 'ARQUIVADA');
 
 -- CreateEnum
@@ -2328,6 +2331,10 @@ CREATE TABLE "PhaseInternalWorkflow" (
     "versao" INTEGER NOT NULL DEFAULT 1,
     "criadoEm" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "atualizadoEm" TIMESTAMP(3) NOT NULL,
+    "escopoExecucao" "EscopoExecucao",
+    "familiaDocumentalId" INTEGER,
+    "exigeDocumento" BOOLEAN NOT NULL DEFAULT false,
+    "exigePessoa" BOOLEAN NOT NULL DEFAULT false,
 
     CONSTRAINT "PhaseInternalWorkflow_pkey" PRIMARY KEY ("id")
 );
@@ -2457,8 +2464,62 @@ CREATE TABLE "TipoDocumentoCadastro" (
     "description" TEXT,
     "participaPlanilha" BOOLEAN NOT NULL DEFAULT false,
     "categoriaDocumentalId" INTEGER,
+    "familiaDocumentalId" INTEGER,
+    "naturezaOperacionalId" INTEGER,
+    "perfilOperacionalId" INTEGER,
 
     CONSTRAINT "TipoDocumentoCadastro_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "FamiliaDocumental" (
+    "id" SERIAL NOT NULL,
+    "code" VARCHAR(40) NOT NULL,
+    "name" VARCHAR(120) NOT NULL,
+    "descricao" TEXT,
+    "ordem" INTEGER NOT NULL DEFAULT 0,
+    "ativo" BOOLEAN NOT NULL DEFAULT true,
+    "sistema" BOOLEAN NOT NULL DEFAULT false,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
+
+    CONSTRAINT "FamiliaDocumental_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "NaturezaOperacionalDocumento" (
+    "id" SERIAL NOT NULL,
+    "code" VARCHAR(40) NOT NULL,
+    "name" VARCHAR(120) NOT NULL,
+    "descricao" TEXT,
+    "exigeWorkflow" BOOLEAN NOT NULL DEFAULT false,
+    "ordem" INTEGER NOT NULL DEFAULT 0,
+    "ativo" BOOLEAN NOT NULL DEFAULT true,
+    "sistema" BOOLEAN NOT NULL DEFAULT false,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
+
+    CONSTRAINT "NaturezaOperacionalDocumento_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "PerfilOperacionalDocumento" (
+    "id" SERIAL NOT NULL,
+    "code" VARCHAR(40) NOT NULL,
+    "name" VARCHAR(120) NOT NULL,
+    "descricao" TEXT,
+    "workflowId" INTEGER,
+    "familiaDocumentalId" INTEGER,
+    "escopoInstanciacao" "EscopoExecucao" NOT NULL DEFAULT 'DOCUMENTO',
+    "exigeProcesso" BOOLEAN NOT NULL DEFAULT true,
+    "exigePessoa" BOOLEAN NOT NULL DEFAULT true,
+    "exigeDocumento" BOOLEAN NOT NULL DEFAULT true,
+    "ativo" BOOLEAN NOT NULL DEFAULT true,
+    "sistema" BOOLEAN NOT NULL DEFAULT false,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
+
+    CONSTRAINT "PerfilOperacionalDocumento_pkey" PRIMARY KEY ("id")
 );
 
 -- CreateTable
@@ -4781,6 +4842,9 @@ CREATE INDEX "PhaseInternalWorkflow_phaseKey_idx" ON "PhaseInternalWorkflow"("ph
 CREATE INDEX "PhaseInternalWorkflow_tipoProcessoId_idx" ON "PhaseInternalWorkflow"("tipoProcessoId");
 
 -- CreateIndex
+CREATE INDEX "PhaseInternalWorkflow_familiaDocumentalId_idx" ON "PhaseInternalWorkflow"("familiaDocumentalId");
+
+-- CreateIndex
 CREATE UNIQUE INDEX "PhaseInternalWorkflowStep_workflowId_key_key" ON "PhaseInternalWorkflowStep"("workflowId", "key");
 
 -- CreateIndex
@@ -4833,6 +4897,30 @@ CREATE INDEX "TipoDocumentoCadastro_itemCatalogoId_idx" ON "TipoDocumentoCadastr
 
 -- CreateIndex
 CREATE INDEX "TipoDocumentoCadastro_categoriaDocumentalId_idx" ON "TipoDocumentoCadastro"("categoriaDocumentalId");
+
+-- CreateIndex
+CREATE INDEX "TipoDocumentoCadastro_familiaDocumentalId_idx" ON "TipoDocumentoCadastro"("familiaDocumentalId");
+
+-- CreateIndex
+CREATE INDEX "TipoDocumentoCadastro_naturezaOperacionalId_idx" ON "TipoDocumentoCadastro"("naturezaOperacionalId");
+
+-- CreateIndex
+CREATE INDEX "TipoDocumentoCadastro_perfilOperacionalId_idx" ON "TipoDocumentoCadastro"("perfilOperacionalId");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "FamiliaDocumental_code_key" ON "FamiliaDocumental"("code");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "NaturezaOperacionalDocumento_code_key" ON "NaturezaOperacionalDocumento"("code");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "PerfilOperacionalDocumento_code_key" ON "PerfilOperacionalDocumento"("code");
+
+-- CreateIndex
+CREATE INDEX "PerfilOperacionalDocumento_workflowId_idx" ON "PerfilOperacionalDocumento"("workflowId");
+
+-- CreateIndex
+CREATE INDEX "PerfilOperacionalDocumento_familiaDocumentalId_idx" ON "PerfilOperacionalDocumento"("familiaDocumentalId");
 
 -- CreateIndex
 CREATE UNIQUE INDEX "CategoriaDocumental_code_key" ON "CategoriaDocumental"("code");
@@ -5933,6 +6021,9 @@ ALTER TABLE "MacroWorkflow" ADD CONSTRAINT "MacroWorkflow_tipoProcessoId_fkey" F
 ALTER TABLE "FaseMacro" ADD CONSTRAINT "FaseMacro_macroWorkflowId_fkey" FOREIGN KEY ("macroWorkflowId") REFERENCES "MacroWorkflow"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
+ALTER TABLE "PhaseInternalWorkflow" ADD CONSTRAINT "PhaseInternalWorkflow_familiaDocumentalId_fkey" FOREIGN KEY ("familiaDocumentalId") REFERENCES "FamiliaDocumental"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
 ALTER TABLE "PhaseInternalWorkflowStep" ADD CONSTRAINT "PhaseInternalWorkflowStep_workflowId_fkey" FOREIGN KEY ("workflowId") REFERENCES "PhaseInternalWorkflow"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
@@ -5940,6 +6031,21 @@ ALTER TABLE "TipoDocumentoCadastro" ADD CONSTRAINT "TipoDocumentoCadastro_itemCa
 
 -- AddForeignKey
 ALTER TABLE "TipoDocumentoCadastro" ADD CONSTRAINT "TipoDocumentoCadastro_categoriaDocumentalId_fkey" FOREIGN KEY ("categoriaDocumentalId") REFERENCES "CategoriaDocumental"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "TipoDocumentoCadastro" ADD CONSTRAINT "TipoDocumentoCadastro_familiaDocumentalId_fkey" FOREIGN KEY ("familiaDocumentalId") REFERENCES "FamiliaDocumental"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "TipoDocumentoCadastro" ADD CONSTRAINT "TipoDocumentoCadastro_naturezaOperacionalId_fkey" FOREIGN KEY ("naturezaOperacionalId") REFERENCES "NaturezaOperacionalDocumento"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "TipoDocumentoCadastro" ADD CONSTRAINT "TipoDocumentoCadastro_perfilOperacionalId_fkey" FOREIGN KEY ("perfilOperacionalId") REFERENCES "PerfilOperacionalDocumento"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "PerfilOperacionalDocumento" ADD CONSTRAINT "PerfilOperacionalDocumento_workflowId_fkey" FOREIGN KEY ("workflowId") REFERENCES "PhaseInternalWorkflow"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "PerfilOperacionalDocumento" ADD CONSTRAINT "PerfilOperacionalDocumento_familiaDocumentalId_fkey" FOREIGN KEY ("familiaDocumentalId") REFERENCES "FamiliaDocumental"("id") ON DELETE SET NULL ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "MotorArtefato" ADD CONSTRAINT "MotorArtefato_processoId_fkey" FOREIGN KEY ("processoId") REFERENCES "Processo"("id") ON DELETE CASCADE ON UPDATE CASCADE;
