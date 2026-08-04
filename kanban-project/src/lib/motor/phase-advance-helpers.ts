@@ -41,6 +41,8 @@ export type AdvanceFailureCode =
   | "BLOQUEADO"
   | "CONFLITO"
   | "INSTANCIACAO_FALHOU"
+  // A transição alteraria obrigação de outra fase — trava de domínio, rollback integral.
+  | "INVARIANTE_OBRIGACOES"
 
 /** Resultado de sucesso esperado para cada operação (quando há mutação de fato). */
 export function resultadoDaOperacao(op: AdvanceOperacao): Exclude<AdvanceResultadoStr, "BLOQUEADO" | "IDEMPOTENTE" | "CONFLITO"> {

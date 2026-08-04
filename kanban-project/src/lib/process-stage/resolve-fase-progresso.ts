@@ -11,6 +11,7 @@ import { prisma } from "@/lib/prisma"
 import { phaseKeyToFaseCode, getStepsForFase } from "./fases-catalog"
 import { escopoDaFase } from "@/src/lib/motor/resolve-passos-bloqueantes"
 import { itemCatalogosDeCertidao } from "@/src/lib/documentos/natureza-certidao"
+import { resolverInstanciaVigente } from "./instancia-vigente-da-fase"
 import type { FaseCode } from "@prisma/client"
 
 const stepConcluidoRe = (status: string) => /conclu|finaliz/i.test(String(status))
@@ -55,18 +56,21 @@ export async function resolveProgressoFaseDocumento(processoId: number, contexto
   // Fase consultada = contexto (fase passada) ou a ATIVA do processo (default).
   const faseMacroKey = contexto?.faseMacroKey ?? processo?.faseAtualKey ?? null
   const faseCode = phaseKeyToFaseCode(faseMacroKey)
-  const instanceId = contexto?.workflowInstanceId ?? null
+  // Escopo por INSTÂNCIA, sempre: sem instância explícita, a VIGENTE. Uma fase com
+  // mais de um ciclo (retorno / movimentação manual) não pode ter os ciclos somados.
+  const instanceId =
+    contexto?.workflowInstanceId ??
+    (processo && faseMacroKey ? (await resolverInstanciaVigente(processoId, faseMacroKey))?.id ?? null : null)
 
-  // Passos V2 da fase consultada. Escopo por faseMacroKey (e por instância, quando a
-  // consulta é de uma fase passada específica) → nunca mistura fases nem ciclos. Exclui
-  // SUPERSEDIDO/CANCELADO — para a fase ATIVA remove históricos; para uma fase CONCLUÍDA
-  // os passos são CONCLUIDO/DISPENSADO (preservados).
-  const stepInstancesRaw = (processo && faseMacroKey)
+  // Passos V2 da fase consultada. Escopo por faseMacroKey + instância → nunca mistura
+  // fases nem ciclos. Exclui SUPERSEDIDO/CANCELADO — para a fase ATIVA remove
+  // históricos; para uma fase CONCLUÍDA os passos são CONCLUIDO/DISPENSADO (preservados).
+  const stepInstancesRaw = (processo && faseMacroKey && instanceId != null)
     ? await prisma.phaseWorkflowStepInstance.findMany({
         where: {
           processoId,
           faseMacroKey,
-          ...(instanceId != null ? { workflowInstanceId: instanceId } : {}),
+          workflowInstanceId: instanceId,
           // passos vinculados a ENTIDADE (documento OU necessidade) — genéricos ficam de fora.
           OR: [{ documentoId: { not: null } }, { necessidadeId: { not: null } }],
           status: { notIn: ["SUPERSEDIDO", "CANCELADO"] },

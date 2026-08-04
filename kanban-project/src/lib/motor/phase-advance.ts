@@ -23,8 +23,13 @@ import { resolveWorkflowRuntime } from "@/src/lib/workflow-runtime"
 import { calcularPendencias } from "@/src/lib/motor/blocking-engine"
 import type { BlockingIssue } from "@/src/lib/motor/blocking-helpers"
 import { instanciarWorkflowDaFase, type OrigemInstanciaStr } from "@/src/services/phase-workflow"
-import { garantirTarefaDePasso, carregarPreCondicoes } from "@/src/services/passo-tarefa"
 import { processarOutbox } from "@/src/services/outbox-dispatcher"
+import { materializarExecucaoDaFase, type FonteMaterializacao } from "@/src/services/materializar-fase"
+import {
+  fotografarObrigacoes,
+  compararObrigacoes,
+  type ResultadoInvariantes,
+} from "@/src/lib/motor/invariantes-obrigacoes"
 import {
   type AdvanceOperacao,
   type AdvanceFailureCode,
@@ -89,6 +94,19 @@ export interface AdvanceOk {
   logId: number | null
   /** Passos instanciados na nova fase — as tarefas deles são geradas após o commit. */
   stepInstanceIds?: number[]
+  /**
+   * Estado da materialização da fase de destino. `null` só quando a operação
+   * convergiu por idempotência (nada foi materializado nesta chamada).
+   */
+  materializacao?: {
+    estado: string
+    mensagemAdministrativa: string | null
+    motivos: Array<{ code: string; message: string }>
+    passos: number
+    tarefasCriadas: number
+  } | null
+  /** Prova de que nenhuma obrigação de outra fase foi tocada. */
+  obrigacoesPreservadas?: ResultadoInvariantes["resumo"] | null
 }
 
 export interface AdvanceErr {
@@ -171,6 +189,8 @@ interface Plano {
   novaFaseAtualKey: string
   cicloAlvo: number
   origemInstancia: OrigemInstanciaStr
+  /** Fonte declarada para o materializador oficial — a MESMA para todas as origens. */
+  fonteMaterializacao: FonteMaterializacao
   encerramento: "CONCLUIR" | "SUPERSEDER" | "NENHUM"
   eventoFaseTipo: "FASE_AVANCADA" | "FASE_AVANCADA_FORCADO" | "FASE_REABERTA" | "FASE_RETORNADA" | "FASE_MOVIDA"
   correlationId: string
@@ -194,7 +214,14 @@ async function executarPlano(p: Plano): Promise<AdvanceResult> {
   })
 
   try {
+    let invariantes: ResultadoInvariantes | null = null
     const out = await prisma.$transaction(async (tx) => {
+      // 0) FOTOGRAFIA DAS OBRIGAÇÕES — antes de qualquer escrita.
+      //    Mudar a fase do processo não pode concluir, cancelar, invalidar nem apagar
+      //    obrigação de fase nenhuma. A conferência é feita ANTES do commit (passo 8):
+      //    se alguma obrigação alheia mudou, a transição inteira volta atrás.
+      const obrigacoesAntes = await fotografarObrigacoes(tx, p.processoId)
+
       // 1) encerrar/superseder a instância atual da fase de origem (histórico preservado)
       let previousInstanceId: number | null = null
       if (p.encerramento !== "NENHUM") {
@@ -265,6 +292,25 @@ async function executarPlano(p: Plano): Promise<AdvanceResult> {
       // após o commit; se falhar, a reconciliação da fase a completa.
       const tarefasCriadas = 0
 
+      // 4c) INVARIANTE DE DOMÍNIO — obrigações alheias intactas.
+      //
+      // A transição só pode ter: criado a instância de destino (e os passos dela) e
+      // mudado o STATUS DO CICLO de origem. Nenhuma obrigação — passo ou tarefa — de
+      // qualquer fase pode ter mudado de status, ganhado data de conclusão ou sumido.
+      // Um ciclo SUPERSEDIDO continua contendo tarefas pendentes obrigatórias; a
+      // supersessão diz que aquele ciclo deixou de ser a referência operacional, não
+      // que o trabalho dele deixou de ser devido.
+      const obrigacoesDepois = await fotografarObrigacoes(tx, p.processoId)
+      invariantes = compararObrigacoes(obrigacoesAntes, obrigacoesDepois, {
+        instanciaDestinoId: inst.workflowInstance.id,
+        passosDoDestino: new Set(inst.stepInstances.map((s) => s.id)),
+      })
+      if (!invariantes.ok) {
+        const err = new Error("INVARIANTE_OBRIGACOES") as Error & { __invariante?: ResultadoInvariantes }
+        err.__invariante = invariantes
+        throw err
+      }
+
       // 5) evento de fase (append-only)
       await tx.workflowEvento.create({
         data: {
@@ -288,7 +334,17 @@ async function executarPlano(p: Plano): Promise<AdvanceResult> {
           macroVersion: inst.workflowInstance.macroVersion ?? null,
           internalWorkflowVersion: inst.workflowInstance.workflowVersion ?? null,
           policy: "ALL_REQUIRED_COMPLETED",
-          regrasAvaliadas: p.regrasAvaliadas, pendencias: p.pendencias, warnings: p.warnings,
+          // `regrasAvaliadas` ganha o bloco `invariantes`: a auditoria passa a dizer,
+          // com números, que nenhuma obrigação alheia mudou — e quantas pendências
+          // cada fase tinha antes e depois.
+          regrasAvaliadas: {
+            regras: p.regrasAvaliadas,
+            invariantes: {
+              obrigacoesPreservadas: true,
+              ...(invariantes as ResultadoInvariantes | null)?.resumo,
+            },
+          } as unknown as Prisma.InputJsonValue,
+          pendencias: p.pendencias, warnings: p.warnings,
           resultado: resultadoEnum, origem: p.origemLog, solicitadoPorId: p.solicitadoPorId ?? null,
           justificativa: p.justificativa ?? null, motivoCodigo: p.motivoCodigo ?? null,
           forcado: p.forcado, correlationId: p.correlationId, causationId: p.causationId,
@@ -356,21 +412,43 @@ async function executarPlano(p: Plano): Promise<AdvanceResult> {
       timeout: 20000,
       maxWait: 15000,
     })
-    // 4b) Tarefas dos passos da nova fase — fora da transação, idempotente e em lote.
-    // As pré-condições do processo são lidas UMA vez para todos os passos.
-    if (out.success && out.changed && out.stepInstanceIds?.length) {
+    // 4b) MATERIALIZAÇÃO DA FASE DE DESTINO — serviço OFICIAL ÚNICO.
+    //
+    // Antes, cada origem gerava as tarefas do seu jeito aqui dentro. É por isso que
+    // avanço automático e movimentação manual podiam terminar em estados diferentes.
+    // Agora toda origem chama `materializarExecucaoDaFase`, que converge o que faltar
+    // (passos e tarefas), é idempotente e devolve o MOTIVO quando não materializa nada.
+    // Roda fora da transação porque escala com o número de alvos da fase (ver 4).
+    if (out.success && out.changed && out.workflowInstanceId != null) {
       try {
-        const preCondicoes = await carregarPreCondicoes(p.processoId)
-        for (const stepId of out.stepInstanceIds) {
-          const g = await garantirTarefaDePasso(
-            { stepInstanceId: stepId, correlationId: p.correlationId, causationId: chave, origem: "workflow", preCondicoes },
-          )
-          if (g.success && g.created) out.tarefasCriadas++
+        const mat = await materializarExecucaoDaFase({
+          processoId: p.processoId,
+          phaseInstanceId: out.workflowInstanceId,
+          fonte: p.fonteMaterializacao,
+          solicitadoPorId: p.solicitadoPorId,
+          correlationId: p.correlationId,
+          causationId: chave,
+        })
+        out.tarefasCriadas += mat.tarefasCriadas
+        out.materializacao = {
+          estado: mat.estado,
+          mensagemAdministrativa: mat.mensagemAdministrativa,
+          motivos: mat.motivos.map((m) => ({ code: m.code, message: m.message })),
+          passos: mat.passosTotais,
+          tarefasCriadas: mat.tarefasCriadas,
         }
       } catch (e) {
-        console.error(`[avanço de fase] geração de tarefas falhou (proc ${p.processoId}); reconciliação completará:`, e)
+        console.error(`[avanço de fase] materialização da fase de destino falhou (proc ${p.processoId}); reconciliação completará:`, e)
+        out.materializacao = {
+          estado: "ERRO",
+          mensagemAdministrativa: "A fase mudou, mas a materialização da fase de destino falhou. Use o reparo da fase para completá-la.",
+          motivos: [{ code: "MATERIALIZACAO_POS_COMMIT_FALHOU", message: e instanceof Error ? e.message : String(e) }],
+          passos: out.stepInstanceIds?.length ?? 0,
+          tarefasCriadas: 0,
+        }
       }
     }
+    if (out.success) out.obrigacoesPreservadas = (invariantes as ResultadoInvariantes | null)?.resumo ?? null
 
     // Drena o phase.entered recém-emitido: os EFEITOS ADICIONAIS da nova fase (automações
     // FINANCEIRAS → lançamentos) rodam ao AVANÇAR, não só na criação do processo. Best-effort:
@@ -381,7 +459,26 @@ async function executarPlano(p: Plano): Promise<AdvanceResult> {
     }
     return out
   } catch (e) {
-    const err = e as { __conflito?: boolean; __instFail?: string; code?: string }
+    const err = e as { __conflito?: boolean; __instFail?: string; code?: string; __invariante?: ResultadoInvariantes }
+    // INVARIANTE quebrado: a transição mexeu em obrigação que não era dela. A
+    // transação já sofreu rollback (nada foi commitado); aqui só se explica o motivo.
+    // Este caminho é uma trava de segurança: se ele disparar, há um efeito colateral
+    // no domínio que precisa ser removido — não um erro de operação do usuário.
+    if (err.__invariante) {
+      const v = err.__invariante.violacoes.slice(0, 5)
+      console.error(
+        `[mudança de fase] INVARIANTE DE OBRIGAÇÕES violado (proc ${p.processoId}, ${p.correlationId}) — rollback integral:`,
+        JSON.stringify(err.__invariante.violacoes),
+      )
+      return {
+        success: false, resultado: "REJEITADO", code: "INVARIANTE_OBRIGACOES",
+        message:
+          "A mudança de fase foi desfeita: ela alteraria obrigações de outras fases " +
+          `(${err.__invariante.violacoes.length} ocorrência(s), ex.: ${v.map((x) => `${x.chave} ${x.de ?? "—"}→${x.para ?? "removida"}`).join("; ")}). ` +
+          "Mover o processo altera apenas a fase operacional de referência.",
+        correlationId: p.correlationId,
+      }
+    }
     // Concorrência: CAS falhou ou colisão da chave @unique (clique duplo real).
     if (err.__conflito || err.code === "P2002") {
       const atual = await prisma.processo.findUnique({
@@ -505,6 +602,7 @@ export async function advance(processoId: number, ctx: AdvanceCtx = {}): Promise
   return executarPlano({
     operacao: "AVANCAR", processoId, faseAtual: c.processo.faseAtual, lockVersion: c.processo.lockVersion,
     faseDestino: proxima, novaFaseAtualKey: proxima, cicloAlvo, origemInstancia: "MOTOR",
+    fonteMaterializacao: "AVANCO_AUTOMATICO",
     encerramento: "CONCLUIR", eventoFaseTipo: "FASE_AVANCADA", correlationId,
     causationId: ctx.causationId ?? null, solicitadoPorId: ctx.solicitadoPorId, forcado: false,
     origemLog: ctx.origem ?? "advance", regrasAvaliadas: snap.regrasAvaliadas,
@@ -540,6 +638,7 @@ export async function forceAdvance(processoId: number, input: ForceInput): Promi
   return executarPlano({
     operacao: "FORCAR", processoId, faseAtual: c.processo.faseAtual, lockVersion: c.processo.lockVersion,
     faseDestino: proxima, novaFaseAtualKey: proxima, cicloAlvo, origemInstancia: "MOTOR",
+    fonteMaterializacao: "AVANCO_FORCADO",
     encerramento: "CONCLUIR", eventoFaseTipo: "FASE_AVANCADA_FORCADO", correlationId,
     causationId: input.causationId ?? null, solicitadoPorId: input.solicitadoPorId, forcado: true,
     justificativa: input.justificativa, motivoCodigo: input.motivoCodigo,
@@ -568,7 +667,8 @@ export async function reopenPhase(processoId: number, input: ReopenInput): Promi
   return executarPlano({
     operacao: "REABRIR", processoId, faseAtual: c.processo.faseAtual, lockVersion: c.processo.lockVersion,
     faseDestino: c.processo.faseAtual, novaFaseAtualKey: c.processo.faseAtual, cicloAlvo,
-    origemInstancia: "REABERTURA", encerramento: "SUPERSEDER", eventoFaseTipo: "FASE_REABERTA",
+    origemInstancia: "REABERTURA", fonteMaterializacao: "REABERTURA",
+    encerramento: "SUPERSEDER", eventoFaseTipo: "FASE_REABERTA",
     correlationId, causationId: input.causationId ?? null, solicitadoPorId: input.solicitadoPorId,
     forcado: false, justificativa: input.justificativa, motivoCodigo: input.motivoCodigo,
     origemLog: input.origem ?? "reopen", regrasAvaliadas: snap.regrasAvaliadas,
@@ -606,7 +706,8 @@ export async function returnPhase(processoId: number, input: ReturnInput): Promi
   return executarPlano({
     operacao: "RETORNAR", processoId, faseAtual: c.processo.faseAtual, lockVersion: c.processo.lockVersion,
     faseDestino: input.faseAlvo, novaFaseAtualKey: input.faseAlvo, cicloAlvo,
-    origemInstancia: "REABERTURA", encerramento: "SUPERSEDER", eventoFaseTipo: "FASE_RETORNADA",
+    origemInstancia: "REABERTURA", fonteMaterializacao: "RETORNO_CONTROLADO",
+    encerramento: "SUPERSEDER", eventoFaseTipo: "FASE_RETORNADA",
     correlationId, causationId: input.causationId ?? null, solicitadoPorId: input.solicitadoPorId,
     forcado: false, justificativa: input.justificativa, motivoCodigo: input.motivoCodigo,
     origemLog: input.origem ?? "return", regrasAvaliadas: snap.regrasAvaliadas,
@@ -678,7 +779,8 @@ export async function movePhaseManual(processoId: number, input: MoveInput): Pro
     faseDestino: faseAlvo, novaFaseAtualKey: faseAlvo, cicloAlvo,
     // SUPERSEDER, nunca CONCLUIR: mover não conclui a fase de origem. Marcá-la como
     // concluída faria o histórico afirmar um trabalho que não aconteceu.
-    origemInstancia: "MANUAL", encerramento: "SUPERSEDER", eventoFaseTipo: "FASE_MOVIDA",
+    origemInstancia: "MANUAL", fonteMaterializacao: "MOVIMENTACAO_MANUAL",
+    encerramento: "SUPERSEDER", eventoFaseTipo: "FASE_MOVIDA",
     correlationId, causationId: input.causationId ?? null, solicitadoPorId: input.solicitadoPorId,
     // `forcado` continua sendo especificamente "o gate barrou e foi sobreposto".
     // Aqui o gate nem foi consultado — o fato é outro, e quem o nomeia é `resultado`.

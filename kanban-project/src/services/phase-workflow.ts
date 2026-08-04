@@ -158,12 +158,24 @@ async function carregarContextoEscopo(
   steps: DefStep[],
   escopoDaFase: Cardinalidade,
   db: Prisma.TransactionClient | typeof prisma,
-): Promise<ContextoEscopo> {
+): Promise<{ ctx: ContextoEscopo; diagnosticos: WorkflowValidationIssue[] }> {
   const cards = new Set(steps.map((st) => cardinalidadeEfetiva(st.cardinalidade, escopoDaFase)))
   const ctx: ContextoEscopo = { pessoaIds: [], necessidadeIds: [], documentoIds: [], documentoIdPorNecessidade: new Map() }
-  if (cards.size === 1 && cards.has("PROCESSO")) return ctx
+  // DIAGNÓSTICO, não log: quando a fase não materializa nada, o motivo tem de chegar
+  // até quem pediu a materialização — e daí até a tela. Um console.error aqui foi o
+  // que deixou "0 documentos" sem explicação em produção.
+  const diagnosticos: WorkflowValidationIssue[] = []
+  if (cards.size === 1 && cards.has("PROCESSO")) return { ctx, diagnosticos }
 
   const proc = await db.processo.findUnique({ where: { id: processoId }, select: { arvoreId: true } })
+
+  if (!proc?.arvoreId && (cards.has("PESSOA") || cards.has("NECESSIDADE") || cards.has("DOCUMENTO"))) {
+    diagnosticos.push({
+      code: "PROCESSO_SEM_ARVORE",
+      message: "O processo ainda não tem árvore genealógica vinculada, e os passos publicados desta fase operam por entidade da árvore. Crie a árvore e cadastre as pessoas: a fase converge sozinha quando elas existirem.",
+      entityType: "processo", entityId: processoId,
+    })
+  }
 
   if (cards.has("PESSOA") && proc?.arvoreId) {
     const pessoas = await db.pessoa.findMany({ where: { arvoreId: proc.arvoreId }, select: { id: true }, orderBy: { id: "asc" } })
@@ -180,9 +192,25 @@ async function carregarContextoEscopo(
     // teve. A Matriz Documental, quando publicada, ACRESCENTA exigências por cima —
     // as duas origens convivem na mesma NecessidadeDocumental.
     try {
-      await garantirNecessidadesArvoreDoProcesso(processoId, db)
+      const g = await garantirNecessidadesArvoreDoProcesso(processoId, db)
+      // `puladas` é a regra da árvore que se aplicava mas não achou o item no
+      // Documento Mestre. Descartar esse número é o que transformava um cadastro
+      // documental incompleto em "a fase não tem nada a fazer".
+      if (g.puladas > 0) {
+        diagnosticos.push({
+          code: "REGRA_ARVORE_SEM_ITEM_MESTRE",
+          message: `${g.puladas} exigência(s) da árvore não puderam ser criadas porque o tipo documental correspondente não está vinculado ao Documento Mestre (ou a pessoa não tem união única, no caso do casamento). Confira Gerenciamento › Documentos e Protocolos › Documentos.`,
+          entityType: "processo", entityId: processoId,
+        })
+      }
     } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e)
       console.error(`[phase-workflow] geração de necessidades da árvore falhou (proc ${processoId}):`, e)
+      diagnosticos.push({
+        code: "NECESSIDADES_ARVORE_FALHOU",
+        message: `A geração das exigências documentais a partir da árvore falhou: ${msg}`,
+        entityType: "processo", entityId: processoId,
+      })
     }
     const certItens = await itemCatalogosDeCertidao(db)
     const necs = await db.necessidadeDocumental.findMany({
@@ -194,6 +222,14 @@ async function carregarContextoEscopo(
     const certidoes = necs.filter((n) => certItens.has(n.itemCatalogoId))
     ctx.necessidadeIds = certidoes.map((n) => n.id)
     for (const n of certidoes) if (n.documentos[0]) ctx.documentoIdPorNecessidade.set(n.id, n.documentos[0].id)
+
+    if (certidoes.length === 0 && necs.length > 0) {
+      diagnosticos.push({
+        code: "NENHUMA_NECESSIDADE_DE_CERTIDAO",
+        message: `O processo tem ${necs.length} exigência(s) documental(is), mas nenhuma delas é de natureza CERTIDÃO — e esta fase opera sobre registros/certidões. Confira a natureza dos tipos documentais.`,
+        entityType: "processo", entityId: processoId,
+      })
+    }
   }
 
   if (cards.has("DOCUMENTO") && proc?.arvoreId) {
@@ -203,7 +239,7 @@ async function carregarContextoEscopo(
     })
     ctx.documentoIds = docs.map((d) => d.id)
   }
-  return ctx
+  return { ctx, diagnosticos }
 }
 
 /**
@@ -392,9 +428,9 @@ export async function instanciarWorkflowDaFase(
   // herda daqui. Fase fora do catálogo cai em PROCESSO (1 instância por fase/ciclo).
   const faseCodeMat = phaseKeyToFaseCode(input.faseMacroKey)
   const escopoDaFase: Cardinalidade = faseCodeMat ? (FASES[faseCodeMat].scope as Cardinalidade) : "PROCESSO"
-  const ctxEscopo = await carregarContextoEscopo(processo.id, steps, escopoDaFase, db)
+  const { ctx: ctxEscopo, diagnosticos: diagEscopo } = await carregarContextoEscopo(processo.id, steps, escopoDaFase, db)
   const plano = planejarMaterializacao(steps, workflow.execucao, escopoDaFase, ctxEscopo)
-  const avisos = [...val.warnings, ...plano.avisos]
+  const avisos = [...val.warnings, ...diagEscopo, ...plano.avisos]
 
   const corpo = async (tx: Prisma.TransactionClient): Promise<InstanciarResultado> => {
       const existente = await tx.phaseWorkflowInstance.findUnique({ where: { chaveIdempotencia: chaveWorkflow } })
@@ -493,7 +529,10 @@ export async function instanciarWorkflowDaFase(
         },
       })
 
-      return { success: true, created: true, workflowInstance: instancia, stepInstances, warnings: val.warnings, correlationId }
+      // `avisos`, não `val.warnings`: o ramo que CRIA a instância é justamente onde os
+      // motivos de "nenhum alvo" nascem. Devolver só os avisos de validação da
+      // definição fazia a informação decisiva morrer aqui dentro.
+      return { success: true, created: true, workflowInstance: instancia, stepInstances, warnings: avisos, correlationId }
   }
   try {
     return txExterno ? await corpo(txExterno) : await prisma.$transaction(corpo)
@@ -506,7 +545,7 @@ export async function instanciarWorkflowDaFase(
         const stepInstances = await prisma.phaseWorkflowStepInstance.findMany({
           where: { workflowInstanceId: existente.id }, orderBy: { ordem: "asc" },
         })
-        return { success: true, created: false, workflowInstance: existente, stepInstances, warnings: val.warnings, correlationId }
+        return { success: true, created: false, workflowInstance: existente, stepInstances, warnings: avisos, correlationId }
       }
     }
     throw e

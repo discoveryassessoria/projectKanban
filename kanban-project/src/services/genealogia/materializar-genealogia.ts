@@ -18,6 +18,7 @@ import { avaliarRegrasDocumentais } from "@/src/lib/documentos/regras-documentai
 import type { RegraDocumental, SujeitoContexto } from "@/src/lib/documentos/regras-documentais/tipos"
 import { ehNaturezaCertidao } from "@/src/lib/documentos/natureza-certidao"
 import { aplicarHonorariosCidadaniaItaliana } from "@/src/lib/motor/executor"
+import { materializarExecucaoDaFase } from "@/src/services/materializar-fase"
 
 type DB = typeof prisma | Prisma.TransactionClient
 
@@ -209,6 +210,19 @@ export async function dispararMaterializacaoPorArvore(arvoreId: number | null | 
   try {
     const procs = await prisma.processo.findMany({ where: { arvoreId }, select: { id: true } })
     for (const p of procs) {
+      // CONVERGÊNCIA OFICIAL primeiro. Este é o elo causal que faltava: no fluxo
+      // real o processo nasce ANTES da árvore, e a fase inicial foi materializada
+      // com zero pessoa. Quando a pessoa aparece, a fase precisa convergir — pelo
+      // materializador ÚNICO, não por um caminho paralelo.
+      //
+      // `materializarGenealogia` (abaixo) continua sendo a origem MATRIZ das
+      // exigências e depende de Regra Documental publicada; sem nenhuma publicada
+      // ela retorna cedo, e era por isso que este gatilho não fazia nada.
+      try {
+        await materializarExecucaoDaFase({ processoId: p.id, fonte: "RECONCILIACAO" })
+      } catch (e) {
+        console.error(`[genealogia] convergência oficial do processo ${p.id} falhou (fluxo seguiu):`, e)
+      }
       try { await materializarGenealogia(p.id) } catch (e) { console.error(`[genealogia] materializar processo ${p.id} falhou (fluxo seguiu):`, e) }
       // EVENTO OPERACIONAL "REQUERENTES_DO_PROCESSO_DEFINIDOS/ATUALIZADOS": mudou a árvore
       // (inclui a marcação de requerente) → o FinanceRuleEngine recalcula os honorários da

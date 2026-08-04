@@ -199,8 +199,13 @@ export function MovimentarFaseModal({
                 <div className="flex items-center gap-2 text-[12px] font-bold text-[#d2a948]">
                   <AlertTriangle className="w-3.5 h-3.5 flex-none" /> Esta ação não passa pelo fluxo automático
                 </div>
+                <p className="text-[11.5px] text-[#d2a948]/90 leading-relaxed">
+                  Esta movimentação altera apenas a fase operacional do processo. Tarefas e
+                  obrigações das demais fases permanecerão pendentes até serem concluídas.
+                </p>
                 <ul className="text-[11.5px] text-[#d2a948]/90 leading-relaxed list-disc pl-5">
                   <li>Não conclui as tarefas da fase atual, nem marca a fase como concluída.</li>
+                  <li>Não conclui, cancela nem dispensa tarefas de nenhuma outra fase — inclusive das fases atravessadas.</li>
                   <li>Todo o histórico é preservado: tarefas, passos e ciclos anteriores continuam existindo.</li>
                   <li>A fase de destino recebe um novo ciclo, e a movimentação fica registrada com o seu usuário.</li>
                   {destino?.conditional && (

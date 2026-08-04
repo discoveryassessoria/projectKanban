@@ -7,6 +7,7 @@ import { type NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import { garantirFamiliaParaArvore } from "@/src/services/familia"
 import { verificarPermissao } from "@/src/lib/verificar-permissao"
+import { materializarExecucaoDaFase } from "@/src/services/materializar-fase"
 
 // GET - Listar todas as árvores
 export async function GET(request: NextRequest) {
@@ -63,6 +64,15 @@ export async function POST(request: NextRequest) {
         where: { id: processoId },
         data: { arvoreId: novaArvore.id, familiaId }
       })
+      // O processo nasce ANTES da árvore: quando a fase inicial foi materializada,
+      // não havia árvore nenhuma e o plano de alvos saiu vazio. Agora que ela existe,
+      // a fase converge pelo materializador OFICIAL. Best-effort — criar a árvore não
+      // pode falhar por causa disto, e a Central converge de novo na leitura.
+      try {
+        await materializarExecucaoDaFase({ processoId, fonte: "RECONCILIACAO" })
+      } catch (e) {
+        console.error(`[arvore] convergência da fase do processo ${processoId} falhou (fluxo seguiu):`, e)
+      }
     }
 
     return NextResponse.json({ ...novaArvore, familiaId }, { status: 201 })

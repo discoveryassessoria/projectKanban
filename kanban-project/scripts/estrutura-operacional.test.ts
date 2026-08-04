@@ -320,7 +320,11 @@ check("o DTO de índice existe e é explícito", nucleo.includes("export interfa
 check("o índice é PROJETADO da estrutura (uma fonte, dois recortes)", nucleo.includes("export function montarIndiceOperacional"))
 check("a consulta lê PhaseWorkflowStepInstance da fase (fonte única)", consulta.includes("phaseWorkflowStepInstance.findMany") && consulta.includes("faseMacroKey: ctx.faseMacroKey"))
 check("a consulta exclui SUPERSEDIDO/CANCELADO (saíram do fluxo)", consulta.includes('notIn: ["SUPERSEDIDO", "CANCELADO"]'))
-check("a consulta escopa por instância quando a fase não é a ativa", consulta.includes("ctx.workflowInstanceId != null"))
+// REGRA ENDURECIDA: o escopo por instância deixou de ser condicional. Sem instância
+// explícita, a consulta resolve a VIGENTE — uma fase com mais de um ciclo (retorno,
+// movimentação manual) não pode ter os ciclos somados na leitura.
+check("a consulta escopa por instância SEMPRE (vigente quando não informada)",
+  consulta.includes("resolverInstanciaVigente") && consulta.includes("workflowInstanceId: instanciaAlvo"))
 // O contrato do DTO é a trava: nenhum campo de execução existe em DocumentoDoIndice.
 const dto = nucleo.slice(nucleo.indexOf("export interface DocumentoDoIndice"), nucleo.indexOf("export interface PessoaDoIndice"))
 for (const proibido of ["passos", "stepInstanceId", "slaDays", "prazo", "responsavel", "motivoBloqueio", "executor:"]) {

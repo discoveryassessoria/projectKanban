@@ -17,6 +17,8 @@ import {
 // (pessoa → documento → workflow do documento → passos). O agrupamento é feito no
 // domínio, por IDs relacionais — a tela não recombina nada por nome.
 import { getPhaseOperationalSummary, TIPO_DOCUMENTO_LABELS } from "@/src/lib/process-stage/estrutura-operacional"
+import { resolverInstanciaVigente } from "@/src/lib/process-stage/instancia-vigente-da-fase"
+import { materializarExecucaoDaFase } from "@/src/services/materializar-fase"
 import type { IndiceOperacional } from "@/src/lib/process-stage/estrutura-operacional-core"
 import type { FaseCode } from "@prisma/client"
 
@@ -163,6 +165,18 @@ interface CentralOperacionalResponse {
   // status final. A tela principal INDEXA; quem EXECUTA é o modal do documento, e é
   // por isso que passo, SLA, responsável de passo e bloqueio NÃO vêm aqui.
   indice: IndiceOperacional
+  // ESTADO DA MATERIALIZAÇÃO da fase ativa. Presente só quando a fase estava sem
+  // materialização e a convergência oficial rodou nesta leitura. Quando vem com
+  // `estado != "MATERIALIZADO"`, a tela mostra `mensagemAdministrativa` — o motivo
+  // REAL de não haver documento/tarefa — em vez de um texto genérico de configuração.
+  materializacao: {
+    estado: string
+    mensagemAdministrativa: string | null
+    motivos: Array<{ code: string; message: string }>
+    workflowInstanceId: number | null
+    ciclo: number | null
+    passos: number
+  } | null
   faseProgress: FaseProgress
   // LEGADO_INATIVO (desativação Genealogia): quando a fase atual é GENEALOGIA, as
   // métricas documentais antigas (Obrigatórios/validados/percentual, derivadas de
@@ -282,6 +296,56 @@ export async function GET(
     // A fase "corrente" desta resposta é a CONSULTADA (ativa ou passada).
     const faseAtualCode =
       (phaseKeyToFaseCode(faseConsultadaKey) ?? null)
+
+    // ============================================================
+    // CONVERGÊNCIA DA FASE ATIVA — "0 documentos" nunca é resposta muda.
+    // ------------------------------------------------------------
+    // A materialização de uma fase acontece no instante em que a fase é ativada, e
+    // planeja os alvos com as entidades que existiam NAQUELE instante. No fluxo real
+    // o processo nasce antes da árvore: quando a Genealogia foi ativada, não havia
+    // pessoa nenhuma, o plano saiu vazio e a fase ficava ATIVA com zero passos para
+    // sempre — sem tarefa, sem documento e sem ninguém dizendo por quê.
+    //
+    // Aqui a fase ATIVA converge pelo materializador OFICIAL antes da leitura. É
+    // idempotente e só roda quando a fase está de fato sem materialização, então não
+    // escreve a cada F5. Se ainda assim nada for materializado, o motivo REAL vai na
+    // resposta e a tela mostra ele — em vez de inventar "nenhum documento configurado".
+    let instanciaVigente = faseConsultadaKey
+      ? await resolverInstanciaVigente(id, faseConsultadaKey)
+      : null
+    let materializacao: {
+      estado: string
+      mensagemAdministrativa: string | null
+      motivos: Array<{ code: string; message: string }>
+      workflowInstanceId: number | null
+      ciclo: number | null
+      passos: number
+    } | null = null
+
+    if (!isView && faseConsultadaKey) {
+      const passosDaVigente = instanciaVigente
+        ? await prisma.phaseWorkflowStepInstance.count({ where: { workflowInstanceId: instanciaVigente.id } })
+        : 0
+      if (!instanciaVigente || passosDaVigente === 0) {
+        const rel = await materializarExecucaoDaFase({
+          processoId: id,
+          faseMacroKey: faseConsultadaKey,
+          fonte: "RECONCILIACAO",
+          correlationId,
+        })
+        materializacao = {
+          estado: rel.estado,
+          mensagemAdministrativa: rel.mensagemAdministrativa,
+          motivos: rel.motivos.map((m) => ({ code: m.code, message: m.message })),
+          workflowInstanceId: rel.workflowInstanceId,
+          ciclo: rel.ciclo,
+          passos: rel.passosTotais,
+        }
+        if (rel.workflowInstanceId != null) {
+          instanciaVigente = await resolverInstanciaVigente(id, faseConsultadaKey)
+        }
+      }
+    }
 
     // pessoas, uniões e documentos não dependem um do outro (todos só precisam do
     // arvoreId) → busca EM PARALELO, economizando round-trips ao banco.
@@ -830,7 +894,14 @@ export async function GET(
     // REAPROVEITADO — a árvore não é relida na mesma requisição.
     // ============================================================
     const { indice } = await getPhaseOperationalSummary(
-      { processoId: id, faseMacroKey: faseConsultadaKey, workflowInstanceId: faseContexto?.workflowInstanceId ?? null },
+      {
+        processoId: id,
+        faseMacroKey: faseConsultadaKey,
+        // Escopo por INSTÂNCIA sempre: da fase passada quando informada, senão a
+        // VIGENTE da fase ativa. Sem isso, uma fase com dois ciclos (retorno ou
+        // movimentação manual) devolvia os dois somados.
+        workflowInstanceId: faseContexto?.workflowInstanceId ?? instanciaVigente?.id ?? null,
+      },
       { pessoas: pessoasDoProcesso, agora: now },
     )
 
@@ -851,9 +922,10 @@ export async function GET(
       phaseContext: {
         faseCode: faseAtualCode,
         faseMacroKey: faseConsultadaKey,
-        workflowInstanceId,
-        ciclo: cicloConsultado,
+        workflowInstanceId: workflowInstanceId ?? instanciaVigente?.id ?? null,
+        ciclo: cicloConsultado ?? instanciaVigente?.ciclo ?? null,
       },
+      materializacao,
       projection,
       matrix: matrixOficial,
       cards,

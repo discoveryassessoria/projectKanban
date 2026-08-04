@@ -37,6 +37,7 @@ import {
   type StatusResumo,
 } from "./estrutura-operacional-core"
 import { getStepsForFase, phaseKeyToFaseCode } from "./fases-catalog"
+import { resolverInstanciaVigente } from "./instancia-vigente-da-fase"
 
 // ============================================================
 // RÓTULOS DE TIPO DOCUMENTAL — fonte única desta camada de leitura.
@@ -202,13 +203,23 @@ export async function getPhaseOperationalStructure(
 
   // ------------------------------------------------------------
   // 2) INSTÂNCIAS DA FASE — a fonte única do trabalho.
+  //
+  // ESCOPO POR CICLO, sempre. Quando o chamador não diz qual instância quer, a
+  // leitura resolve a VIGENTE em vez de aceitar todos os ciclos da fase: depois de
+  // um retorno ou de uma movimentação manual, a fase tem mais de um ciclo, e somar
+  // os dois mostra um estado que não existe em nenhum deles.
   // ------------------------------------------------------------
-  const instancias = await db.phaseWorkflowStepInstance.findMany({
+  const instanciaAlvo =
+    ctx.workflowInstanceId ??
+    (await resolverInstanciaVigente(ctx.processoId, ctx.faseMacroKey, db))?.id ??
+    null
+
+  const instancias = instanciaAlvo == null ? [] : await db.phaseWorkflowStepInstance.findMany({
     where: {
       processoId: ctx.processoId,
       faseMacroKey: ctx.faseMacroKey,
       status: { notIn: ["SUPERSEDIDO", "CANCELADO"] },
-      ...(ctx.workflowInstanceId != null ? { workflowInstanceId: ctx.workflowInstanceId } : {}),
+      workflowInstanceId: instanciaAlvo,
     },
     orderBy: [{ ciclo: "desc" }, { ordem: "asc" }, { id: "asc" }],
     select: {

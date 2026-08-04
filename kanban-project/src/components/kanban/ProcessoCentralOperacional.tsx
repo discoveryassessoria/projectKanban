@@ -131,6 +131,17 @@ interface CentralOpData {
   phaseContext?: { faseCode: string | null; faseMacroKey: string | null; workflowInstanceId: number | null; ciclo: number | null }
   // Projeção operacional oficial (fonte única do percentual/estado da fase).
   projection?: OperationalProjection | null
+  // ESTADO REAL da materialização da fase, quando o servidor precisou convergi-la
+  // nesta leitura. É o que impede a tela de traduzir "não materializou" como
+  // "não há regra documental configurada" — duas coisas diferentes.
+  materializacao?: {
+    estado: string
+    mensagemAdministrativa: string | null
+    motivos: Array<{ code: string; message: string }>
+    workflowInstanceId: number | null
+    ciclo: number | null
+    passos: number
+  } | null
   matrix: {
     percentage: number
     completed: number
@@ -260,9 +271,20 @@ function mapearPainel(data: CentralOpData, faseNome: string) {
   // denominador zero a fase não tem documento configurado, e é ISSO que o operador
   // precisa ler: o trabalho não começou porque não há o que exigir, e o caminho
   // para resolver é a Matriz Documental, não esta tela.
+  // Quando o servidor reporta o ESTADO da materialização, ele é a explicação — e
+  // ganha da frase genérica. "Nenhum documento configurado" só é verdade quando a
+  // configuração é mesmo o que falta; falta de árvore, workflow não publicado ou
+  // tipo documental sem vínculo no Documento Mestre são outras coisas, e o operador
+  // não consegue agir enquanto a tela chamar todas elas pelo mesmo nome.
+  const explicacaoMaterializacao =
+    data.materializacao && data.materializacao.estado !== "MATERIALIZADO"
+      ? data.materializacao.mensagemAdministrativa
+      : null
+
   const progressoTexto =
     total === 0
-      ? `Nenhum documento obrigatório configurado para a ${faseNome}. Defina as regras em Gerenciamento › Documentos e Protocolos › Matriz Documental.`
+      ? (explicacaoMaterializacao
+        ?? `Nenhum documento obrigatório configurado para a ${faseNome}. Defina as regras em Gerenciamento › Documentos e Protocolos › Matriz Documental.`)
       : validados >= total
         ? `${faseNome} concluída — todos os documentos validados.`
         : `Solicite, receba, confira e valide cada certidão. Falta${total - validados === 1 ? "" : "m"} ${total - validados} documento${total - validados === 1 ? "" : "s"} para concluir a ${faseNome}.`
