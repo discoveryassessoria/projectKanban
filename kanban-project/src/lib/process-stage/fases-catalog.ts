@@ -73,7 +73,13 @@ export const FASES: Record<FaseCode, FaseDef> = {
       { ordem: 1, stepKey: "solicitar_certidao", title: "Solicitar certidão",
         description: "Enviar requerimento ao cartório e registrar protocolo retornado.",
         weight: 25, ownerKey: "daniela_brait", slaDays: 3 },
-      { ordem: 2, stepKey: "aguardar_retorno", title: "Aguardar retorno do cartório",
+      // stepKey CANÔNICO = a chave do passo PUBLICADO no Workflow Interno
+      // (PhaseInternalWorkflowStep.key). Enquanto o catálogo dizia "aguardar_retorno" e o
+      // publicado dizia "aguardar_retorno_do_cartorio", TODO lookup por catálogo falhava
+      // silenciosamente para esta etapa: título virava a chave crua, peso caía para o
+      // default 1 (distorcendo o progresso) e o SLA de 15 dias nunca era aplicado.
+      // A chave legada continua resolvendo por STEP_KEY_ALIASES.
+      { ordem: 2, stepKey: "aguardar_retorno_do_cartorio", title: "Aguardar retorno do cartório",
         description: "Aguardar resposta do cartório · follow-ups manuais e automáticos disponíveis.",
         weight: 10, ownerKey: "daniela_brait", slaDays: 15 },
       { ordem: 3, stepKey: "receber_certidao", title: "Receber certidão",
@@ -233,4 +239,23 @@ const STEP_KEY_ALIASES: Record<string, Record<string, string>> = {
 export function resolveStepKeyCompat(phaseKey: string | null | undefined, stepKey: string): string {
   if (!phaseKey) return stepKey
   return STEP_KEY_ALIASES[String(phaseKey).toLowerCase()]?.[stepKey] ?? stepKey
+}
+
+/**
+ * Definição de catálogo de UM passo, TOLERANTE A ALIAS — ponto único de lookup.
+ *
+ * Sem isto, cada consumidor fazia `steps.find(c => c.stepKey === k)` com a chave
+ * crua: uma instância antiga gravada com a chave legada não encontrava o passo
+ * publicado (e vice-versa), e o miss era silencioso — virava `title = stepKey`,
+ * `weight = 1`, `slaDays = 1`. A resolução do alias mora aqui, uma vez.
+ */
+export function getStepDef(
+  faseCode: FaseCode | null | undefined,
+  stepKey: string,
+): FaseStep | undefined {
+  if (!faseCode) return undefined
+  const fase = FASES[faseCode]
+  if (!fase) return undefined
+  const canonico = resolveStepKeyCompat(fase.phaseKey, stepKey)
+  return fase.steps.find((c) => c.stepKey === canonico || c.stepKey === stepKey)
 }

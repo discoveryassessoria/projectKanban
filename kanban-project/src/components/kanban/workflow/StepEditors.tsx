@@ -38,6 +38,26 @@ import {
 } from "lucide-react"
 import { uploadFiles } from "@/src/lib/storage"
 import { celebrar } from "@/src/lib/confetti"
+import {
+  resolveWorkflowStepEditor,
+  type StepEditorKind,
+} from "@/src/lib/process-stage/step-editor-registry"
+import type { AcaoEtapa } from "@/src/lib/process-stage/acoes-etapa"
+import {
+  useAndamento,
+  mensagemDoErro,
+  BlocoContatos,
+  BlocoObservacoes,
+  BlocoAnexos,
+  LABEL_CANAL,
+  fmtData,
+  campoCls,
+  Rotulo,
+  ANDAMENTO_VIEW_VAZIO,
+  type AndamentoView,
+  type UsuarioResumo,
+} from "./AndamentoEtapa"
+import { CANAIS_CONTATO, type CanalContato } from "@/src/lib/process-stage/andamento-etapa"
 
 // ============================================================
 // TIPOS COMPARTILHADOS
@@ -98,6 +118,39 @@ function useDocumentoEEtapa(documentoId: number | null, stepId: number | null) {
 
 const SEM_ETAPAS: EtapaCarregada[] = []
 
+// ── Leitura do que o SERVIDOR decidiu sobre a etapa ──────────────────────────
+//
+// Andamento, ações permitidas e versão vêm prontos no payload do workflow. A tela
+// não infere permissão nem transição: se a ação não veio, o botão não existe.
+
+const SEM_ACOES: AcaoEtapa[] = []
+
+function andamentoDaEtapa(etapa: EtapaCarregada | null): AndamentoView {
+  const a = etapa?.andamento
+  if (!a || typeof a !== "object") return ANDAMENTO_VIEW_VAZIO
+  return a as unknown as AndamentoView
+}
+
+function acoesDaEtapa(etapa: EtapaCarregada | null): AcaoEtapa[] {
+  const a = etapa?.acoesPermitidas
+  return Array.isArray(a) ? (a as AcaoEtapa[]) : SEM_ACOES
+}
+
+function versaoDaEtapa(etapa: EtapaCarregada | null): number | null {
+  const v = etapa?.lockVersion
+  return typeof v === "number" ? v : null
+}
+
+/** Equipe, para nomear autor de contato/observação/anexo. */
+function useUsuarios(ativo: boolean): UsuarioResumo[] {
+  const req = useApi<{ usuarios?: UsuarioResumo[] } | UsuarioResumo[]>(ativo ? "/api/usuarios" : null)
+  return useMemo<UsuarioResumo[]>(() => {
+    const d = req.dados
+    if (!d) return []
+    return Array.isArray(d) ? d : (d.usuarios ?? [])
+  }, [req.dados])
+}
+
 // Leitores tolerantes do payload. Os editores liam `d.campo || ""` sobre um `any`; com
 // a resposta tipada como `Record<string, unknown>`, a conversão fica explícita e num
 // lugar só — sem `any` e sem repetir o mesmo `|| ""` em trinta pontos.
@@ -151,20 +204,39 @@ async function putDocumento(
   return res.ok
 }
 
+/**
+ * PATCH do passo devolvendo o CÓDIGO do erro do domínio (STEP_NOT_AVAILABLE,
+ * PERMISSION_REQUIRED, CONCURRENT_UPDATE, …) para a tela traduzir. Sem isto, todo
+ * problema virava um `alert("erro, veja o console")` genérico.
+ */
+async function patchStepComErro(
+  documentoId: number,
+  stepId: number,
+  body: Record<string, unknown>,
+): Promise<{ ok: true } | { ok: false; codigo: string }> {
+  try {
+    const res = await fetch(
+      `/api/documentos/${documentoId}/workflow/steps/${stepId}`,
+      {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json", ...authHeader() },
+        body: JSON.stringify(body),
+      },
+    )
+    if (res.ok) return { ok: true }
+    const json = (await res.json().catch(() => ({}))) as { error?: string }
+    return { ok: false, codigo: json.error ?? "INTERNAL_ERROR" }
+  } catch {
+    return { ok: false, codigo: "INTERNAL_ERROR" }
+  }
+}
+
 async function patchStep(
   documentoId: number,
   stepId: number,
   body: Record<string, unknown>,
 ): Promise<boolean> {
-  const res = await fetch(
-    `/api/documentos/${documentoId}/workflow/steps/${stepId}`,
-    {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json", ...authHeader() },
-      body: JSON.stringify(body),
-    },
-  )
-  return res.ok
+  return (await patchStepComErro(documentoId, stepId, body)).ok
 }
 
 // ============================================================
@@ -298,11 +370,23 @@ function ReadOnlyBanner({ stepStatus }: { stepStatus: string }) {
 }
 
 // ============================================================
-// ROUTER — escolhe o editor certo baseado no stepKey
+// ROUTER — monta o editor resolvido pelo REGISTRY OFICIAL
 // ============================================================
+//
+// Antes isto era um `switch (stepKey)` com `default` caindo num modal de erro.
+// Dois problemas de uma vez: os `case` usavam chaves LEGADAS (o passo publicado
+// "aguardar_retorno_do_cartorio" nunca casava com a chave legada do switch), e
+// "sem editor específico" era tratado como falha em vez de caso de uso do editor
+// padrão. Agora a decisão é do registry — o servidor inclusive já a devolve
+// resolvida em `step.editor.kind`, e este componente só confere o mesmo mapa.
 
 export interface StepEditorRouterProps {
   stepKey: string
+  /** Fase do passo — necessária para converter chave legada em publicada. */
+  phaseKey?: string | null
+  /** Resolução do editor vinda do servidor. Ausente = resolve localmente pelo mesmo registry. */
+  editorKind?: StepEditorKind | null
+  stepTitle?: string
   documentoId: number
   stepId: number
   stepStatus: string
@@ -312,22 +396,30 @@ export interface StepEditorRouterProps {
 }
 
 export function StepEditorRouter(props: StepEditorRouterProps) {
-  const { stepKey, ...rest } = props
+  const { stepKey, phaseKey, editorKind, stepTitle, ...rest } = props
+  const kind: StepEditorKind =
+    editorKind ?? resolveWorkflowStepEditor({ stepKey, phaseKey }).kind
 
-  switch (stepKey) {
-    case "solicitar_certidao":
+  switch (kind) {
+    case "solicitacao_cartorio":
       return <EditorSolicitarCertidao {...rest} />
-    case "aguardar_retorno":
+    case "acompanhamento_retorno":
       return <EditorAguardarRetorno {...rest} />
-    case "receber_certidao":
+    case "recebimento_documento":
       return <EditorReceberCertidao {...rest} />
-    case "conferir_certidao":
+    case "conferencia_documento":
       return <EditorConferirCertidao {...rest} />
-    case "validar_certidao":
+    case "validacao_juridica":
       return <EditorValidarCertidao {...rest} />
+    case "registral":
+      // O editor registral é montado pela Central da Etapa (ele tem contrato próprio).
+      // Chegar aqui significaria montagem duplicada; nada a renderizar.
+      return null
+    case "padrao":
     default:
-      // Etapas sem editor implementado: modal placeholder
-      return <EditorPlaceholder stepKey={stepKey} {...rest} />
+      // NÃO É ERRO. Toda etapa publicada tem interface executável — quando não há
+      // editor específico, vale o painel operacional padrão.
+      return <DefaultWorkflowStepEditor stepTitle={stepTitle ?? null} {...rest} />
   }
 }
 
@@ -1076,85 +1168,24 @@ function ResumoCard({
 // ============================================================
 // ETAPA 3: AGUARDAR RETORNO DO CARTÓRIO
 // ============================================================
-
-// ============================================================
-// ETAPA 3: AGUARDAR RETORNO DO CARTÓRIO
-// ============================================================
 //
-// Estrutura inspirada no HTML de referência do Marco:
-//   - Resumo da solicitação (read-only, dados recuperados da Etapa 2)
-//   - Histórico de contatos (follow-ups) com cartório
-//   - Formulário inline pra adicionar novo contato
-//   - Código de rastreio (correios/sedex/motoboy)
+// PAINEL OPERACIONAL DA ESPERA. Esta etapa é a que ficava sem editor: o passo
+// publicado se chama "aguardar_retorno_do_cartorio" e o router antigo só conhecia
+// a chave legada, então caía num modal de erro que instruía o operador a usar
+// Forçar. Agora a resolução é do registry oficial e este editor é o específico
+// da etapa.
 //
-// Os follow-ups são salvos em step.notes em formato linha-por-linha:
-//   [2026-05-26 14:30] LIGACAO: Maria atendeu, pediu 7 dias úteis
-//   [2026-06-02 09:15] WHATSAPP: Confirmaram que documento foi assinado
+// O QUE MUDA NA PERSISTÊNCIA
+// --------------------------
+// O histórico de contatos era texto corrido dentro de `notes`, remontado por
+// regex: sem autor, sem estrutura, e sobrescrevível por qualquer edição da nota.
+// Agora contatos, observações e anexos são coleções APPEND-ONLY validadas dentro
+// do payload operacional do passo, gravadas pela rota transacional de andamento.
 //
-// Isso evita migração de schema agora. Quando criarmos WorkflowStepComment
-// numa rodada futura, dá pra migrar os existentes via parsing simples.
-
-type FollowupKind = "LIGACAO" | "EMAIL" | "WHATSAPP" | "CARTORIO" | "CORREIOS" | "OUTRO"
-
-interface Followup {
-  iso: string
-  date: string
-  time: string
-  kind: FollowupKind
-  description: string
-}
-
-const FOLLOWUP_KINDS: {
-  value: FollowupKind
-  label: string
-  icon: string
-  pillClass: string
-}[] = [
-  { value: "LIGACAO", label: "Ligação", icon: "📞", pillClass: "bg-[#7dd3fc]/20 text-[#7dd3fc] border-[#7dd3fc]/30" },
-  { value: "EMAIL", label: "E-mail", icon: "📧", pillClass: "bg-[#7dd3fc]/20 text-[#7dd3fc] border-[#7dd3fc]/30" },
-  { value: "WHATSAPP", label: "WhatsApp", icon: "💬", pillClass: "bg-[#4ade80]/20 text-[#4ade80] border-[#4ade80]/30" },
-  { value: "CARTORIO", label: "Cartório presencial", icon: "🏛", pillClass: "bg-[#d2a948]/20 text-[#d2a948] border-[#d2a948]/30" },
-  { value: "CORREIOS", label: "Correios", icon: "📬", pillClass: "bg-rose-500/20 text-rose-200 border-rose-500/30" },
-  { value: "OUTRO", label: "Outro", icon: "🔔", pillClass: "bg-[#20262e] text-white/80 border-white/20" },
-]
-
-function getFollowupMeta(kind: FollowupKind) {
-  return FOLLOWUP_KINDS.find((k) => k.value === kind) || FOLLOWUP_KINDS[5]
-}
-
-function parseFollowups(notes: string): Followup[] {
-  if (!notes) return []
-  const lines = notes.split("\n").map((l) => l.trim()).filter(Boolean)
-  const out: Followup[] = []
-  const re = /^\[(\d{4}-\d{2}-\d{2})(?:\s+(\d{2}:\d{2}))?\]\s+([A-Z_]+):\s*(.*)$/
-  const validKinds: FollowupKind[] = ["LIGACAO", "EMAIL", "WHATSAPP", "CARTORIO", "CORREIOS", "OUTRO"]
-  for (const line of lines) {
-    const m = line.match(re)
-    if (m) {
-      const [, date, time = "00:00", kindStr, desc] = m
-      const kind = validKinds.includes(kindStr as FollowupKind) ? (kindStr as FollowupKind) : "OUTRO"
-      out.push({
-        iso: `${date}T${time}:00`,
-        date,
-        time,
-        kind,
-        description: desc.trim(),
-      })
-    }
-  }
-  // Mais recente primeiro
-  out.sort((a, b) => b.iso.localeCompare(a.iso))
-  return out
-}
-
-function formatFollowupLine(date: string, kind: FollowupKind, desc: string): string {
-  const time = new Date().toTimeString().slice(0, 5) // HH:mm local
-  return `[${date} ${time}] ${kind}: ${desc.trim()}`
-}
-
-function todayIso(): string {
-  return new Date().toISOString().slice(0, 10)
-}
+// PROTOCOLO
+// ---------
+// A etapa ACOMPANHA o protocolo aberto em "Solicitar certidão" — lê e exibe, e
+// não cria nem duplica registro nenhum.
 
 interface SolicitacaoSummary {
   atendente: string | null
@@ -1166,14 +1197,18 @@ interface SolicitacaoSummary {
   custoPago: number | null
   formaPagamento: string | null
   cartorio: string | null
+  requerimentoUrl: string | null
+  trackingCode: string | null
 }
 
 const CANAL_LABEL: Record<string, string> = {
   crc: "🌐 CRC Nacional",
+  "e-cartorio": "💻 E-cartório",
   ecartorio: "💻 E-cartório",
   email: "📧 E-mail",
   whatsapp: "💬 WhatsApp",
   balcao: "🏛 Balcão",
+  comune: "🇮🇹 Comune italiana",
   comune_italiana: "🇮🇹 Comune italiana",
   correios: "📬 Correios",
   consulado: "🏛 Consulado",
@@ -1189,9 +1224,13 @@ const PAGAMENTO_LABEL: Record<string, string> = {
 
 /** Casca: carrega, e monta o formulário com a semente já em mãos. */
 export function EditorAguardarRetorno(props: StepEditorBaseProps) {
-  const { doc, etapa, etapas, carregando } = useDocumentoEEtapa(props.isOpen ? props.documentoId : null, props.stepId)
+  const { doc, etapa, etapas, carregando, recarregar } = useDocumentoEEtapa(
+    props.isOpen ? props.documentoId : null,
+    props.stepId,
+  )
   // A solicitação (etapa anterior) é o contexto exibido no topo deste editor.
   const solicitacaoEtapa = etapas.find((s) => s.stepKey === "solicitar_certidao") ?? null
+  const usuarios = useUsuarios(props.isOpen)
   if (!props.isOpen) return null
   return (
     <FormAguardarRetorno
@@ -1200,7 +1239,9 @@ export function EditorAguardarRetorno(props: StepEditorBaseProps) {
       doc={doc}
       etapa={etapa}
       solicitacaoEtapa={solicitacaoEtapa}
+      usuarios={usuarios}
       loading={carregando}
+      recarregar={recarregar}
     />
   )
 }
@@ -1215,22 +1256,45 @@ function FormAguardarRetorno({
   doc,
   etapa,
   solicitacaoEtapa,
+  usuarios,
   loading,
+  recarregar,
 }: StepEditorBaseProps & {
   doc: Record<string, unknown> | null
   etapa: EtapaCarregada | null
   solicitacaoEtapa: EtapaCarregada | null
+  usuarios: UsuarioResumo[]
   loading: boolean
+  recarregar: () => void
 }) {
-  // Instante de referência do editor, fixado na montagem (ver fmtRelative).
-  const [agoraRef] = useState(() => Date.now())
+  const andamento = andamentoDaEtapa(etapa)
+  const acoes = acoesDaEtapa(etapa)
+  const lockVersion = versaoDaEtapa(etapa)
+  const { registrar, salvando, erro } = useAndamento(documentoId, stepId, lockVersion)
+
+  const readOnly = stepStatus === "concluida"
+  const podeSalvar = acoes.includes("salvar_andamento") && !readOnly
+  const podeConcluir = acoes.includes("concluir") && !readOnly
+
+  // Rascunho dos campos de acompanhamento. Nasce do gravado (a `key` do
+  // componente reinicia quando o servidor devolve conteúdo novo).
+  const [prazoDias, setPrazoDias] = useState(
+    andamento.prazoEstimadoDias != null ? String(andamento.prazoEstimadoDias) : "",
+  )
+  const [previsao, setPrevisao] = useState(andamento.previsaoRetorno ?? "")
+  const [proximo, setProximo] = useState(andamento.proximoAcompanhamento ?? "")
+  const [destinatario, setDestinatario] = useState(
+    andamento.destinatario ?? textoOuNulo(doc?.cartorio) ?? "",
+  )
+  const [canalPref, setCanalPref] = useState<CanalContato | "">(andamento.canalPreferencial ?? "")
+  const [semRetorno, setSemRetorno] = useState<boolean>(andamento.semRetornoDesde != null)
   const [trackingCode, setTrackingCode] = useState(() => texto(etapa?.trackingCode))
-  const [notes, setNotes] = useState(() => texto(etapa?.notes))
-  const [saving, setSaving] = useState(false)
+  const [concluindo, setConcluindo] = useState(false)
+  const [falha, setFalha] = useState<string | null>(null)
 
   // Retrato da solicitação: o documento manda, e a etapa anterior completa o que ele
-  // não tem. Mesma precedência de antes, agora como derivação.
-  const solicit = useMemo<SolicitacaoSummary | null>(() => ({
+  // não tem. Somente leitura — esta etapa acompanha o protocolo, não o recria.
+  const solicit = useMemo<SolicitacaoSummary>(() => ({
     atendente: textoOuNulo(solicitacaoEtapa?.externalEntityName),
     cartorio: textoOuNulo(doc?.cartorio),
     canal: textoOuNulo(doc?.canal_solicitacao) || textoOuNulo(solicitacaoEtapa?.requestChannel),
@@ -1240,104 +1304,67 @@ function FormAguardarRetorno({
     sentAt: textoOuNulo(solicitacaoEtapa?.completedAt) || textoOuNulo(solicitacaoEtapa?.startedAt),
     custoPago: numeroOuNulo(solicitacaoEtapa?.costPaid),
     formaPagamento: textoOuNulo(solicitacaoEtapa?.paymentMethod),
+    requerimentoUrl: textoOuNulo(doc?.link_acompanhamento),
+    trackingCode: textoOuNulo(solicitacaoEtapa?.trackingCode),
   }), [doc, solicitacaoEtapa])
 
-  // Form pra adicionar follow-up
-  const [newDate, setNewDate] = useState<string>(todayIso())
-  const [newKind, setNewKind] = useState<FollowupKind>("LIGACAO")
-  const [newDesc, setNewDesc] = useState("")
-  const [addingFollowup, setAddingFollowup] = useState(false)
+  const semProtocolo = !solicit.canal && !solicit.protocolo && !solicit.atendente
 
-  const readOnly = stepStatus === "concluida"
+  const inicioEspera = textoOuNulo(etapa?.startedAt)
+  const previsaoMostrada = previsao || andamento.previsaoEfetiva || ""
+  // Instante de referência fixado na montagem: o relógio não é lido durante o
+  // render (impuro) e o texto não muda sozinho entre renders.
+  const [agoraRef] = useState(() => Date.now())
+  const diasEsperando = useMemo(() => {
+    if (!inicioEspera) return null
+    const d = new Date(inicioEspera)
+    if (Number.isNaN(d.getTime())) return null
+    return Math.max(0, Math.floor((agoraRef - d.getTime()) / 86400000))
+  }, [inicioEspera, agoraRef])
 
-  const followups = parseFollowups(notes)
-
-  const handleAddFollowup = async () => {
-    if (readOnly) return
-    if (!newDesc.trim()) {
-      alert("Descreva o contato antes de adicionar.")
-      return
-    }
-    setAddingFollowup(true)
-    try {
-      const line = formatFollowupLine(newDate, newKind, newDesc)
-      const newNotes = notes ? `${notes}\n${line}` : line
-      const ok = await patchStep(documentoId, stepId, { notes: newNotes })
-      if (!ok) throw new Error("PATCH falhou")
-      setNotes(newNotes)
-      setNewDesc("")
-      setNewKind("LIGACAO")
-      setNewDate(todayIso())
-      onSaved?.()
-    } catch (e) {
-      console.error("[EditorAguardarRetorno] addFollowup:", e)
-      alert("Erro ao adicionar contato. Veja o console.")
-    } finally {
-      setAddingFollowup(false)
-    }
+  const apos = async (ok: boolean) => {
+    if (ok) { recarregar(); onSaved?.() }
+    return ok
   }
 
-  const handleSalvar = async (concluir: boolean) => {
-    if (readOnly) return
+  const salvarAndamento = async () => {
+    if (!podeSalvar) return
+    setFalha(null)
+    // Só CAMPOS. Nada aqui conclui a etapa nem exige formulário completo.
+    const ok = await registrar({
+      campos: {
+        prazoEstimadoDias: prazoDias.trim() === "" ? null : Number(prazoDias),
+        previsaoRetorno: previsao || null,
+        proximoAcompanhamento: proximo || null,
+        destinatario: destinatario.trim() || null,
+        canalPreferencial: canalPref || null,
+        semRetornoDesde: semRetorno
+          ? andamento.semRetornoDesde ?? new Date().toISOString().slice(0, 10)
+          : null,
+      },
+    })
+    if (!ok) return
+    // O código de rastreio é campo do PASSO (não do andamento) e continua indo pelo PATCH.
+    if (trackingCode.trim() !== texto(etapa?.trackingCode)) {
+      const r = await patchStepComErro(documentoId, stepId, { trackingCode: trackingCode.trim() || null })
+      if (!r.ok) { setFalha(mensagemDoErro(r.codigo)); return }
+    }
+    void apos(true)
+  }
 
-    // ⚡ fecha na hora; comemora só quando CONCLUI a etapa
+  const concluir = async () => {
+    if (!podeConcluir || concluindo) return
+    setConcluindo(true)
+    setFalha(null)
+    const r = await patchStepComErro(documentoId, stepId, {
+      status: "concluida",
+      trackingCode: trackingCode.trim() || null,
+    })
+    setConcluindo(false)
+    if (!r.ok) { setFalha(mensagemDoErro(r.codigo)); return }
+    void celebrar()
     onClose()
-    if (concluir) void celebrar()
-
-    setSaving(true)
-    try {
-      const body: Record<string, unknown> = {
-        trackingCode: trackingCode.trim() || null,
-        notes: notes.trim() || null,
-      }
-      if (concluir) {
-        body.status = "concluida"
-        body.completedById = getUserId()
-      }
-      const ok = await patchStep(documentoId, stepId, body)
-      if (!ok) throw new Error("PATCH falhou")
-      onSaved?.()
-    } catch (e) {
-      console.error("[EditorAguardarRetorno] salvar:", e)
-      alert("Houve erro ao salvar no servidor. Atualize a página e confira. (console)")
-      onSaved?.()
-    } finally {
-      setSaving(false)
-    }
-  }
-
-  const fmtDateTime = (iso: string | null) => {
-    if (!iso) return "—"
-    try {
-      const d = new Date(iso)
-      return d.toLocaleString("pt-BR", {
-        day: "2-digit",
-        month: "2-digit",
-        year: "numeric",
-        hour: "2-digit",
-        minute: "2-digit",
-      })
-    } catch {
-      return iso
-    }
-  }
-
-  // "há quanto tempo" a partir de um instante fixado na montagem: o relógio não
-  // é lido durante o render (impuro), e o texto não muda sozinho entre renders.
-  const fmtRelative = (iso: string) => {
-    try {
-      const d = new Date(iso)
-      const diffMs = agoraRef - d.getTime()
-      const diffH = Math.floor(diffMs / (1000 * 60 * 60))
-      const diffD = Math.floor(diffH / 24)
-      if (diffD === 0 && diffH === 0) return "agora há pouco"
-      if (diffD === 0) return `há ${diffH}h`
-      if (diffD === 1) return "ontem"
-      if (diffD < 7) return `há ${diffD} dias`
-      return d.toLocaleDateString("pt-BR")
-    } catch {
-      return iso
-    }
+    onSaved?.()
   }
 
   return (
@@ -1345,31 +1372,36 @@ function FormAguardarRetorno({
       isOpen={isOpen}
       onClose={onClose}
       title="Aguardar retorno do cartório"
-      subtitle="Acompanhe a solicitação e registre os contatos feitos com o cartório enquanto espera o retorno."
+      subtitle="Acompanhe o protocolo já aberto, registre os contatos e conclua quando o retorno chegar."
       footer={
         <div className="flex items-center justify-end gap-3">
           <button
             onClick={onClose}
-            disabled={saving}
+            disabled={salvando || concluindo}
             className="px-4 py-2 text-[12.5px] font-semibold text-white/70 hover:text-white hover:bg-[#161b21] rounded-md disabled:opacity-50"
           >
-            Cancelar
+            Fechar
           </button>
-          <button
-            onClick={() => handleSalvar(false)}
-            disabled={saving || readOnly}
-            className="px-4 py-2 text-[12.5px] font-semibold bg-[#20262e] hover:bg-[#252c35] disabled:opacity-50 text-white rounded-md"
-          >
-            Salvar (sem concluir)
-          </button>
-          <button
-            onClick={() => handleSalvar(true)}
-            disabled={saving || readOnly}
-            className="px-5 py-2 text-[12.5px] font-semibold bg-[#2563eb] hover:bg-[#1d4ed8] disabled:bg-[#2563eb]/40 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-md inline-flex items-center gap-2"
-          >
-            {saving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Check className="w-3.5 h-3.5" />}
-            Confirmar retorno · concluir etapa
-          </button>
+          {podeSalvar && (
+            <button
+              onClick={salvarAndamento}
+              disabled={salvando || concluindo}
+              className="px-4 py-2 text-[12.5px] font-semibold bg-[#20262e] hover:bg-[#252c35] disabled:opacity-50 text-white rounded-md inline-flex items-center gap-2"
+            >
+              {salvando && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+              Salvar andamento
+            </button>
+          )}
+          {podeConcluir && (
+            <button
+              onClick={concluir}
+              disabled={salvando || concluindo}
+              className="px-5 py-2 text-[12.5px] font-semibold bg-[#2563eb] hover:bg-[#1d4ed8] disabled:bg-[#2563eb]/40 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-md inline-flex items-center gap-2"
+            >
+              {concluindo ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Check className="w-3.5 h-3.5" />}
+              Confirmar retorno · concluir etapa
+            </button>
+          )}
         </div>
       }
     >
@@ -1381,222 +1413,264 @@ function FormAguardarRetorno({
         </div>
       ) : (
         <div className="space-y-5">
-          {/* ═══════════════════════════════════════════════════════
-              1. RESUMO DA SOLICITAÇÃO (read-only, vem da Etapa 2)
-             ═══════════════════════════════════════════════════════ */}
-          {solicit && (
-            <div className="rounded-lg border border-white/10 bg-[#161b21] overflow-hidden">
-              <div className="px-3.5 py-2 bg-[#1b2027] border-b border-white/10 flex items-center gap-2">
-                <Send className="w-3.5 h-3.5 text-[#7dd3fc]" />
-                <span className="text-[11px] font-bold uppercase tracking-wider text-white/60">
-                  Resumo da solicitação
-                </span>
-              </div>
-              <div className="p-3.5 grid grid-cols-2 gap-x-4 gap-y-2.5 text-[12px]">
-                <SummaryField label="Cartório" value={solicit.cartorio} />
-                <SummaryField
-                  label="Canal"
-                  value={
-                    solicit.canal
-                      ? CANAL_LABEL[solicit.canal] || solicit.canal
-                      : null
-                  }
-                />
-                <SummaryField label="Atendente" value={solicit.atendente} />
-                <SummaryField label="Protocolo" value={solicit.protocolo} mono />
-                <SummaryField label="Enviado em" value={fmtDateTime(solicit.sentAt)} />
-                <SummaryField
-                  label="Custo pago"
-                  value={
-                    solicit.custoPago != null
-                      ? `R$ ${solicit.custoPago.toFixed(2).replace(".", ",")}${
-                          solicit.formaPagamento
-                            ? ` · ${PAGAMENTO_LABEL[solicit.formaPagamento] || solicit.formaPagamento}`
-                            : ""
-                        }`
-                      : null
-                  }
-                />
-                {solicit.link && (
-                  <div className="col-span-2">
-                    <div className="text-[10px] uppercase font-semibold tracking-wider text-white/45 mb-0.5">
-                      Link de acompanhamento
-                    </div>
-                    <a
-                      href={solicit.link}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="text-[12px] text-[#7dd3fc] hover:text-[#7dd3fc] hover:underline inline-flex items-center gap-1 break-all"
-                    >
-                      {solicit.link}
-                      <ExternalLink className="w-3 h-3 flex-shrink-0" />
-                    </a>
-                  </div>
-                )}
-                {solicit.observacao && (
-                  <div className="col-span-2">
-                    <div className="text-[10px] uppercase font-semibold tracking-wider text-white/45 mb-0.5">
-                      Observação da solicitação
-                    </div>
-                    <div className="text-[12px] text-white/80 italic">
-                      &ldquo;{solicit.observacao}&rdquo;
-                    </div>
-                  </div>
-                )}
-              </div>
-              {!solicit.canal && !solicit.protocolo && !solicit.atendente && (
-                <div className="px-3.5 py-2 border-t border-[#7dd3fc]/20 text-[11px] text-[#d2a948] bg-[#d2a948]/5 flex items-center gap-1.5">
-                  <AlertTriangle className="w-3 h-3 flex-shrink-0" />
-                  Solicitação ainda não preenchida na Etapa 2. Reabra a etapa anterior para preencher.
-                </div>
-              )}
+          {(erro || falha) && (
+            <div className="rounded-md border border-[#f87171]/30 bg-[#f87171]/10 px-3 py-2 text-[12px] text-[#f87171]">
+              {falha || erro}
             </div>
           )}
 
-          {/* ═══════════════════════════════════════════════════════
-              2. HISTÓRICO DE CONTATOS (timeline de follow-ups)
-             ═══════════════════════════════════════════════════════ */}
-          <div>
-            <div className="flex items-center justify-between mb-2">
-              <div className="text-[11px] font-bold uppercase tracking-wider text-white/55 flex items-center gap-1.5">
-                <MessageCircle className="w-3.5 h-3.5" />
-                Histórico de contatos
-                {followups.length > 0 && (
-                  <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-[#20262e] text-white/70">
-                    {followups.length}
-                  </span>
-                )}
-              </div>
+          {/* 1. SITUAÇÃO DA ESPERA */}
+          <div className="rounded-lg border border-white/10 bg-[#161b21] overflow-hidden">
+            <div className="px-3.5 py-2 bg-[#1b2027] border-b border-white/10 flex items-center gap-2">
+              <Clock className="w-3.5 h-3.5 text-[#7dd3fc]" />
+              <span className="text-[11px] font-bold uppercase tracking-wider text-white/60">
+                Situação da espera
+              </span>
             </div>
-
-            {followups.length === 0 ? (
-              <div className="px-3 py-4 rounded-md bg-[#161b21] border border-dashed border-white/15 text-center">
-                <div className="text-[11.5px] text-white/55 italic">
-                  Nenhum contato registrado ainda.
-                </div>
-                <div className="text-[10.5px] text-white/40 mt-0.5">
-                  Use o formulário abaixo para registrar ligações, e-mails ou visitas.
-                </div>
-              </div>
-            ) : (
-              <div className="space-y-2">
-                {followups.map((f, i) => {
-                  const meta = getFollowupMeta(f.kind)
-                  return (
-                    <div
-                      key={`${f.iso}-${i}`}
-                      className="rounded-md border border-white/10 bg-[#161b21] p-2.5"
-                    >
-                      <div className="flex items-center gap-2 mb-1 flex-wrap">
-                        <span
-                          className={`text-[10.5px] font-semibold px-2 py-0.5 rounded border ${meta.pillClass} inline-flex items-center gap-1`}
-                        >
-                          <span>{meta.icon}</span>
-                          <span>{meta.label}</span>
-                        </span>
-                        <span className="text-[10.5px] text-white/60 font-mono">
-                          {f.date.split("-").reverse().join("/")} · {f.time}
-                        </span>
-                        <span className="text-[10px] text-white/40">
-                          ({fmtRelative(f.iso)})
-                        </span>
-                      </div>
-                      <div className="text-[12.5px] text-white/85 leading-snug whitespace-pre-wrap">
-                        {f.description}
-                      </div>
-                    </div>
-                  )
-                })}
+            <div className="p-3.5 grid grid-cols-3 gap-x-4 gap-y-2.5 text-[12px]">
+              <SummaryField
+                label="Esperando desde"
+                value={
+                  inicioEspera
+                    ? `${new Date(inicioEspera).toLocaleDateString("pt-BR")}${
+                        diasEsperando != null ? ` · há ${diasEsperando} dia(s)` : ""
+                      }`
+                    : null
+                }
+              />
+              <SummaryField label="Previsão de retorno" value={previsaoMostrada ? fmtData(previsaoMostrada) : null} />
+              <SummaryField
+                label="Próximo acompanhamento"
+                value={andamento.proximoAcompanhamento ? fmtData(andamento.proximoAcompanhamento) : null}
+              />
+              <SummaryField
+                label="Último contato"
+                value={
+                  andamento.contatos.length > 0
+                    ? new Date(andamento.contatos[andamento.contatos.length - 1].ocorridoEm).toLocaleString("pt-BR", {
+                        day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit",
+                      })
+                    : null
+                }
+              />
+              <SummaryField label="Responsável" value={(etapa?.assignee as { nome?: string } | null)?.nome ?? null} />
+              <SummaryField label="Prazo da etapa (SLA)" value={fmtPrazoSla(textoOuNulo(etapa?.dueAt), agoraRef)} />
+            </div>
+            {andamento.semRetornoDesde && (
+              <div className="px-3.5 py-2 border-t border-[#d2a948]/20 text-[11px] text-[#d2a948] bg-[#d2a948]/5 flex items-center gap-1.5">
+                <AlertTriangle className="w-3 h-3 flex-shrink-0" />
+                Ausência de retorno registrada desde {fmtData(andamento.semRetornoDesde)}.
               </div>
             )}
           </div>
 
-          {/* ═══════════════════════════════════════════════════════
-              3. ADICIONAR NOVO CONTATO
-             ═══════════════════════════════════════════════════════ */}
-          {!readOnly && (
-            <div className="rounded-lg border border-white/10 bg-[#161b21] p-3.5">
-              <div className="text-[11px] font-bold uppercase tracking-wider text-[#4ade80] mb-2.5 flex items-center gap-1.5">
-                <span>+</span>
-                <span>Adicionar contato</span>
+          {/* 2. PROTOCOLO DA SOLICITAÇÃO (somente leitura — não duplica nada) */}
+          <div className="rounded-lg border border-white/10 bg-[#161b21] overflow-hidden">
+            <div className="px-3.5 py-2 bg-[#1b2027] border-b border-white/10 flex items-center gap-2">
+              <Send className="w-3.5 h-3.5 text-[#7dd3fc]" />
+              <span className="text-[11px] font-bold uppercase tracking-wider text-white/60">
+                Protocolo da solicitação
+              </span>
+              <span className="ml-auto text-[10px] uppercase tracking-wider text-white/35">somente leitura</span>
+            </div>
+            <div className="p-3.5 grid grid-cols-2 gap-x-4 gap-y-2.5 text-[12px]">
+              <SummaryField label="Cartório / destinatário" value={solicit.cartorio} />
+              <SummaryField
+                label="Canal da solicitação"
+                value={solicit.canal ? CANAL_LABEL[solicit.canal] || solicit.canal : null}
+              />
+              <SummaryField label="Número do protocolo" value={solicit.protocolo} mono />
+              <SummaryField label="Solicitado em" value={fmtDataHoraLonga(solicit.sentAt)} />
+              <SummaryField label="Atendente" value={solicit.atendente} />
+              <SummaryField
+                label="Custo pago"
+                value={
+                  solicit.custoPago != null
+                    ? `R$ ${solicit.custoPago.toFixed(2).replace(".", ",")}${
+                        solicit.formaPagamento
+                          ? ` · ${PAGAMENTO_LABEL[solicit.formaPagamento] || solicit.formaPagamento}`
+                          : ""
+                      }`
+                    : null
+                }
+              />
+              {solicit.link && (
+                <div className="col-span-2">
+                  <div className="text-[10px] uppercase font-semibold tracking-wider text-white/45 mb-0.5">
+                    Requerimento enviado / acompanhamento
+                  </div>
+                  <a
+                    href={solicit.link}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-[12px] text-[#7dd3fc] hover:underline inline-flex items-center gap-1 break-all"
+                  >
+                    {solicit.link}
+                    <ExternalLink className="w-3 h-3 flex-shrink-0" />
+                  </a>
+                </div>
+              )}
+              {solicit.observacao && (
+                <div className="col-span-2">
+                  <div className="text-[10px] uppercase font-semibold tracking-wider text-white/45 mb-0.5">
+                    Observação da solicitação
+                  </div>
+                  <div className="text-[12px] text-white/80 italic">&ldquo;{solicit.observacao}&rdquo;</div>
+                </div>
+              )}
+            </div>
+            {semProtocolo && (
+              <div className="px-3.5 py-2 border-t border-[#d2a948]/20 text-[11px] text-[#d2a948] bg-[#d2a948]/5 flex items-center gap-1.5">
+                <AlertTriangle className="w-3 h-3 flex-shrink-0" />
+                A solicitação ainda não foi preenchida. Reabra a etapa anterior para registrar o protocolo.
               </div>
+            )}
+          </div>
 
-              <div className="grid grid-cols-2 gap-3 mb-2.5">
+          {/* 3. ACOMPANHAMENTO — campos editáveis, todos opcionais */}
+          {podeSalvar && (
+            <div>
+              <TituloAcompanhamento />
+              <div className="grid grid-cols-3 gap-3">
                 <div>
-                  <Label>Data</Label>
+                  <Label>Prazo estimado (dias)</Label>
                   <input
-                    type="date"
-                    value={newDate}
-                    onChange={(e) => setNewDate(e.target.value)}
-                    max={todayIso()}
+                    type="number"
+                    min={0}
+                    value={prazoDias}
+                    onChange={(e) => setPrazoDias(e.target.value)}
+                    placeholder="15"
                     className={inputCls}
                   />
                 </div>
                 <div>
-                  <Label>Tipo de contato</Label>
+                  <Label>Previsão de retorno</Label>
+                  <input
+                    type="date"
+                    value={previsao}
+                    onChange={(e) => setPrevisao(e.target.value)}
+                    className={inputCls}
+                  />
+                </div>
+                <div>
+                  <Label>Próximo acompanhamento</Label>
+                  <input
+                    type="date"
+                    value={proximo}
+                    onChange={(e) => setProximo(e.target.value)}
+                    className={inputCls}
+                  />
+                </div>
+                <div className="col-span-2">
+                  <Label>Cartório / destinatário do acompanhamento</Label>
+                  <input
+                    type="text"
+                    value={destinatario}
+                    onChange={(e) => setDestinatario(e.target.value)}
+                    placeholder="Nome do cartório, setor ou e-mail"
+                    className={inputCls}
+                  />
+                </div>
+                <div>
+                  <Label>Canal preferencial</Label>
                   <select
-                    value={newKind}
-                    onChange={(e) => setNewKind(e.target.value as FollowupKind)}
+                    value={canalPref}
+                    onChange={(e) => setCanalPref(e.target.value as CanalContato | "")}
                     className={inputCls}
                   >
-                    {FOLLOWUP_KINDS.map((k) => (
-                      <option key={k.value} value={k.value}>
-                        {k.icon} {k.label}
+                    <option value="" className="bg-[#20262e]">—</option>
+                    {CANAIS_CONTATO.map((c) => (
+                      <option key={c} value={c} className="bg-[#20262e]">
+                        {LABEL_CANAL[c]}
                       </option>
                     ))}
                   </select>
                 </div>
-              </div>
-
-              <div className="mb-2.5">
-                <Label>Descrição do contato</Label>
-                <textarea
-                  rows={2}
-                  value={newDesc}
-                  onChange={(e) => setNewDesc(e.target.value)}
-                  placeholder="Ex: Maria atendeu, pediu 7 dias úteis. Vai retornar até sexta."
-                  className={`${inputCls} resize-none`}
-                />
-              </div>
-
-              <div className="flex justify-end">
-                <button
-                  onClick={handleAddFollowup}
-                  disabled={addingFollowup || !newDesc.trim()}
-                  className="px-3.5 py-1.5 text-[11.5px] font-semibold bg-[#2563eb] hover:bg-[#1d4ed8] disabled:bg-[#2563eb]/40 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-md inline-flex items-center gap-1.5"
-                >
-                  {addingFollowup ? (
-                    <Loader2 className="w-3 h-3 animate-spin" />
-                  ) : (
-                    <span>+</span>
-                  )}
-                  Adicionar contato
-                </button>
+                <div className="col-span-3">
+                  <Label>Código de rastreio (Correios, Sedex, motoboy)</Label>
+                  <input
+                    type="text"
+                    value={trackingCode}
+                    onChange={(e) => setTrackingCode(e.target.value)}
+                    placeholder="ex: BR123456789BR"
+                    className={`${inputCls} font-mono`}
+                  />
+                </div>
+                <label className="col-span-3 flex items-center gap-2 text-[12px] text-white/80 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={semRetorno}
+                    onChange={(e) => setSemRetorno(e.target.checked)}
+                    className="accent-[#d2a948]"
+                  />
+                  Registrar AUSÊNCIA de retorno (cartório não respondeu no prazo informado)
+                </label>
               </div>
             </div>
           )}
 
-          {/* ═══════════════════════════════════════════════════════
-              4. CÓDIGO DE RASTREIO (correios/sedex/motoboy)
-             ═══════════════════════════════════════════════════════ */}
-          <div>
-            <Label>Código de rastreio (Correios, Sedex, motoboy)</Label>
-            <input
-              type="text"
-              value={trackingCode}
-              onChange={(e) => setTrackingCode(e.target.value)}
-              placeholder="ex: BR123456789BR"
-              disabled={readOnly}
-              className={`${inputCls} font-mono`}
-            />
-            <div className="text-[10.5px] text-white/40 mt-1 italic">
-              Opcional. Use só quando a entrega é por transportadora física.
-            </div>
-          </div>
+          {/* 4. HISTÓRICO DE CONTATOS */}
+          <BlocoContatos
+            contatos={andamento.contatos}
+            usuarios={usuarios}
+            podeRegistrar={acoes.includes("registrar_contato") && !readOnly}
+            salvando={salvando}
+            onRegistrar={async (contato) => apos(await registrar({ contato }))}
+          />
+
+          {/* 5. OBSERVAÇÕES */}
+          <BlocoObservacoes
+            observacoes={andamento.observacoes}
+            usuarios={usuarios}
+            podeRegistrar={acoes.includes("registrar_observacao") && !readOnly}
+            salvando={salvando}
+            onRegistrar={async (t) => apos(await registrar({ observacao: { texto: t } }))}
+          />
+
+          {/* 6. ANEXOS / COMPROVANTES */}
+          <BlocoAnexos
+            anexos={andamento.anexos}
+            usuarios={usuarios}
+            podeAnexar={acoes.includes("anexar") && !readOnly}
+            salvando={salvando}
+            onAnexar={async (arquivos) => apos(await registrar({ anexos: arquivos }))}
+          />
         </div>
       )}
     </EditorShell>
   )
+}
+
+function TituloAcompanhamento() {
+  return (
+    <div className="text-[11px] font-bold uppercase tracking-wider text-white/55 flex items-center gap-1.5 mb-2">
+      <Clock className="w-3.5 h-3.5" />
+      Acompanhamento
+      <span className="ml-1 text-[9.5px] font-medium normal-case tracking-normal text-white/35">
+        nenhum campo é obrigatório para salvar
+      </span>
+    </div>
+  )
+}
+
+function fmtDataHoraLonga(iso: string | null): string | null {
+  if (!iso) return null
+  const d = new Date(iso)
+  if (Number.isNaN(d.getTime())) return null
+  return d.toLocaleString("pt-BR", {
+    day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit",
+  })
+}
+
+function fmtPrazoSla(dueAt: string | null, agora: number): string | null {
+  if (!dueAt) return null
+  const d = new Date(dueAt)
+  if (Number.isNaN(d.getTime())) return null
+  const dias = Math.ceil((d.getTime() - agora) / 86400000)
+  const data = d.toLocaleDateString("pt-BR")
+  if (dias < 0) return `${data} · ${Math.abs(dias)}d em atraso`
+  if (dias === 0) return `${data} · vence hoje`
+  return `${data} · ${dias} dia(s)`
 }
 
 function SummaryField({
@@ -3130,37 +3204,197 @@ function FileUploadField({
 }
 
 // ============================================================
-// PLACEHOLDER — fallback para stepKeys sem editor implementado
+// EDITOR PADRÃO DE ETAPA
 // ============================================================
+//
+// Interface executável de QUALQUER etapa publicada que não tenha editor próprio.
+// Substitui o antigo modal de editor ausente, que mandava o operador usar o
+// botão Forçar — ou seja, transformava uma lacuna de implementação em obrigação
+// de burlar o fluxo.
+//
+// Ele NÃO adivinha nada sobre a etapa: mostra o que o motor já sabe (situação,
+// responsável, prazo, prazo do catálogo), oferece os blocos operacionais comuns
+// (contatos, observações, anexos) e conclui — tudo condicionado às AÇÕES que o
+// servidor autorizou.
 
-function EditorPlaceholder({
-  stepKey,
+export function DefaultWorkflowStepEditor(
+  props: StepEditorBaseProps & { stepTitle?: string | null },
+) {
+  const { doc, etapa, carregando, recarregar } = useDocumentoEEtapa(
+    props.isOpen ? props.documentoId : null,
+    props.stepId,
+  )
+  const usuarios = useUsuarios(props.isOpen)
+  if (!props.isOpen) return null
+  return (
+    <FormPadrao
+      key={versaoDe(doc, etapa)}
+      {...props}
+      etapa={etapa}
+      usuarios={usuarios}
+      loading={carregando}
+      recarregar={recarregar}
+    />
+  )
+}
+
+function FormPadrao({
+  documentoId,
+  stepId,
+  stepStatus,
+  stepTitle,
   isOpen,
   onClose,
-}: { stepKey: string } & Omit<StepEditorBaseProps, "documentoId" | "stepId" | "stepStatus">) {
+  onSaved,
+  etapa,
+  usuarios,
+  loading,
+  recarregar,
+}: StepEditorBaseProps & {
+  stepTitle?: string | null
+  etapa: EtapaCarregada | null
+  usuarios: UsuarioResumo[]
+  loading: boolean
+  recarregar: () => void
+}) {
+  const andamento = andamentoDaEtapa(etapa)
+  const acoes = acoesDaEtapa(etapa)
+  const lockVersion = versaoDaEtapa(etapa)
+  const { registrar, salvando, erro } = useAndamento(documentoId, stepId, lockVersion)
+  const [concluindo, setConcluindo] = useState(false)
+  const [falha, setFalha] = useState<string | null>(null)
+
+  const titulo = stepTitle || texto(etapa?.title) || "Etapa do workflow"
+  const readOnly = stepStatus === "concluida"
+  const podeConcluir = acoes.includes("concluir")
+
+  const apos = async (ok: boolean) => {
+    if (ok) { recarregar(); onSaved?.() }
+    return ok
+  }
+
+  const concluir = async () => {
+    if (!podeConcluir || concluindo) return
+    setConcluindo(true)
+    setFalha(null)
+    const resultado = await patchStepComErro(documentoId, stepId, { status: "concluida" })
+    setConcluindo(false)
+    if (!resultado.ok) { setFalha(mensagemDoErro(resultado.codigo)); return }
+    void celebrar()
+    onClose()
+    onSaved?.()
+  }
+
   return (
     <EditorShell
       isOpen={isOpen}
       onClose={onClose}
-      title="Editor não disponível"
-      subtitle={`A etapa "${stepKey}" ainda não tem editor específico implementado.`}
+      title={titulo}
+      subtitle={
+        texto(etapa?.description) ||
+        "Registre o andamento desta etapa e conclua quando o trabalho estiver feito."
+      }
       footer={
-        <div className="flex items-center justify-end">
+        <div className="flex items-center justify-end gap-3">
           <button
             onClick={onClose}
-            className="px-4 py-2 text-[12.5px] font-semibold bg-[#20262e] hover:bg-[#252c35] text-white rounded-md"
+            className="px-4 py-2 text-[12.5px] font-semibold text-white/70 hover:text-white hover:bg-[#161b21] rounded-md"
           >
             Fechar
           </button>
+          {podeConcluir && (
+            <button
+              onClick={concluir}
+              disabled={concluindo}
+              className="px-5 py-2 text-[12.5px] font-semibold bg-[#2563eb] hover:bg-[#1d4ed8] disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-md inline-flex items-center gap-2"
+            >
+              {concluindo ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Check className="w-3.5 h-3.5" />}
+              Concluir etapa
+            </button>
+          )}
         </div>
       }
     >
-      <div className="py-8 text-center text-white/55">
-        <AlertCircle className="w-10 h-10 text-[#d2a948]/60 mx-auto mb-3" />
-        <p className="text-sm">
-          Use o botão <strong>⚡ Forçar</strong> no header se quiser concluir esta etapa sem editor.
-        </p>
-      </div>
+      <ReadOnlyBanner stepStatus={stepStatus} />
+
+      {loading ? (
+        <div className="py-12 flex justify-center">
+          <Loader2 className="w-5 h-5 animate-spin text-white/50" />
+        </div>
+      ) : (
+        <div className="space-y-5">
+          <SituacaoDaEtapa etapa={etapa} usuarios={usuarios} />
+
+          {(erro || falha) && (
+            <div className="rounded-md border border-[#f87171]/30 bg-[#f87171]/10 px-3 py-2 text-[12px] text-[#f87171]">
+              {falha || erro}
+            </div>
+          )}
+
+          <BlocoContatos
+            contatos={andamento.contatos}
+            usuarios={usuarios}
+            podeRegistrar={acoes.includes("registrar_contato") && !readOnly}
+            salvando={salvando}
+            onRegistrar={async (contato) => apos(await registrar({ contato }))}
+          />
+
+          <BlocoObservacoes
+            observacoes={andamento.observacoes}
+            usuarios={usuarios}
+            podeRegistrar={acoes.includes("registrar_observacao") && !readOnly}
+            salvando={salvando}
+            onRegistrar={async (t) => apos(await registrar({ observacao: { texto: t } }))}
+          />
+
+          <BlocoAnexos
+            anexos={andamento.anexos}
+            usuarios={usuarios}
+            podeAnexar={acoes.includes("anexar") && !readOnly}
+            salvando={salvando}
+            onAnexar={async (arquivos) => apos(await registrar({ anexos: arquivos }))}
+          />
+        </div>
+      )}
     </EditorShell>
   )
+}
+
+/** Situação atual da etapa — só leitura, direto do motor. */
+function SituacaoDaEtapa({
+  etapa,
+  usuarios,
+}: {
+  etapa: EtapaCarregada | null
+  usuarios: UsuarioResumo[]
+}) {
+  const responsavelId = numeroOuNulo(etapa?.assigneeId)
+  const responsavel =
+    (etapa?.assignee as { nome?: string } | null)?.nome ??
+    (responsavelId != null ? usuarios.find((u) => u.id === responsavelId)?.nome : null) ??
+    null
+  const prazoDias = numeroOuNulo(etapa?.slaDays)
+  return (
+    <div className="rounded-lg border border-white/10 bg-[#161b21] overflow-hidden">
+      <div className="px-3.5 py-2 bg-[#1b2027] border-b border-white/10 flex items-center gap-2">
+        <Clock className="w-3.5 h-3.5 text-[#7dd3fc]" />
+        <span className="text-[11px] font-bold uppercase tracking-wider text-white/60">Situação atual</span>
+      </div>
+      <div className="p-3.5 grid grid-cols-2 gap-x-4 gap-y-2.5 text-[12px]">
+        <SummaryField label="Responsável" value={responsavel} />
+        <SummaryField label="Iniciada em" value={fmtDataHoraCurta(textoOuNulo(etapa?.startedAt))} />
+        <SummaryField label="Prazo da etapa" value={fmtDataHoraCurta(textoOuNulo(etapa?.dueAt))} />
+        <SummaryField label="SLA previsto" value={prazoDias != null ? `${prazoDias} dia(s)` : null} />
+      </div>
+    </div>
+  )
+}
+
+function fmtDataHoraCurta(iso: string | null): string | null {
+  if (!iso) return null
+  const d = new Date(iso)
+  if (Number.isNaN(d.getTime())) return null
+  return d.toLocaleString("pt-BR", {
+    day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit",
+  })
 }

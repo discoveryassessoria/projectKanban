@@ -11,15 +11,22 @@ import {
   iniciarOperacaoDocumentoV2,
   controlarOperacaoV2,
 } from "@/src/services/documento-operacao"
+import { extrairUsuarioComPermissoes } from "@/src/lib/verificar-permissao"
 
 // GET — workflow (V2) do documento no formato antigo. MATERIALIZA automaticamente a
 // operação da fase atual (idempotente) — o fluxo normal não depende de "Iniciar operação".
-export async function GET(_request: Request, { params }: { params: Promise<{ id: string }> }) {
+// Cada etapa sai com o EDITOR já resolvido e as AÇÕES PERMITIDAS calculadas para o
+// usuário do token: a tela desenha o que recebe, não o que deduz do status.
+export async function GET(request: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
     const { id } = await params
     const documentoId = parseInt(id)
     if (isNaN(documentoId)) return NextResponse.json({ error: "ID inválido" }, { status: 400 })
-    const { workflow, semWorkflowInterno } = await garantirOperacaoDocumentoV2(documentoId)
+    const usuario = await extrairUsuarioComPermissoes(request)
+    const { workflow, semWorkflowInterno } = await garantirOperacaoDocumentoV2(documentoId, {
+      usuarioId: usuario?.userId ?? null,
+      permissoes: usuario?.permissoes ?? null,
+    })
     return NextResponse.json({ workflow, semWorkflowInterno: semWorkflowInterno ?? false })
   } catch (error) {
     console.error("[GET /api/documentos/[id]/workflow]", error)
@@ -59,11 +66,16 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
       return NextResponse.json({ workflow: null, status: "CANCELADO" }, { status: 200 })
     }
 
-    const r = await iniciarOperacaoDocumentoV2(documentoId, {
-      responsavelId: body.responsavelId ?? null,
-      dataPrazoInicial: body.dataPrazoInicial ? new Date(body.dataPrazoInicial) : null,
-      observacaoInicial: body.observacaoInicial ?? null,
-    })
+    const usuario = await extrairUsuarioComPermissoes(request)
+    const r = await iniciarOperacaoDocumentoV2(
+      documentoId,
+      {
+        responsavelId: body.responsavelId ?? null,
+        dataPrazoInicial: body.dataPrazoInicial ? new Date(body.dataPrazoInicial) : null,
+        observacaoInicial: body.observacaoInicial ?? null,
+      },
+      { usuarioId: usuario?.userId ?? null, permissoes: usuario?.permissoes ?? null },
+    )
     if (!r.ok) return NextResponse.json({ error: r.error }, { status: r.status })
     return NextResponse.json({ workflow: r.workflow }, { status: 201 })
   } catch (error) {
@@ -83,7 +95,11 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     if (!body.action || !["pausar", "retomar", "cancelar", "invalidar"].includes(body.action)) {
       return NextResponse.json({ error: "action inválido. Use: pausar | retomar | cancelar | invalidar" }, { status: 400 })
     }
-    const r = await controlarOperacaoV2(documentoId, body.action, body.observacao)
+    const usuario = await extrairUsuarioComPermissoes(request)
+    const r = await controlarOperacaoV2(documentoId, body.action, body.observacao, {
+      usuarioId: usuario?.userId ?? null,
+      permissoes: usuario?.permissoes ?? null,
+    })
     if (!r.ok) return NextResponse.json({ error: r.error }, { status: r.status })
     return NextResponse.json({ workflow: r.workflow })
   } catch (error) {

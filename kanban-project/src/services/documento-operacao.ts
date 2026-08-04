@@ -14,8 +14,16 @@ import {
 } from "@/src/services/processEngine/stepCompletionResolver"
 import { evaluateWorkflowProgress, type AggregateResult } from "@/src/services/completion-engine/policies"
 import {
-  getStepsForFase, getFase, isFaseReady, phaseKeyToFaseCode, faseCodeToPhaseKey, resolveStepKeyCompat,
+  getFase, getStepDef, isFaseReady, phaseKeyToFaseCode, faseCodeToPhaseKey, resolveStepKeyCompat,
 } from "@/src/lib/process-stage/fases-catalog"
+import { resolveWorkflowStepEditor } from "@/src/lib/process-stage/step-editor-registry"
+import {
+  acoesPermitidasDaEtapa, acaoCompativelComEstado, PERMISSAO_DA_ACAO, type AcaoEtapa,
+} from "@/src/lib/process-stage/acoes-etapa"
+import {
+  lerAndamento, aplicarAndamento, gravarAndamento, previsaoEfetiva,
+  type EntradaAndamento,
+} from "@/src/lib/process-stage/andamento-etapa"
 import { mapLegacyStepStatus, stepInstanceStatusToLegacy } from "@/src/lib/process-stage/legacy-status-map"
 import { montarChavePasso } from "@/src/services/phase-workflow-helpers"
 import { evoluirNecessidadePorPasso, reabrirAtendimentoNecessidade } from "@/src/services/necessidade-documental"
@@ -57,6 +65,8 @@ export interface PassoOperacaoV2 {
   startedAt: Date | null
   completedAt: Date | null
   motivo: string | null
+  /** Versionamento otimista do passo — o cliente devolve no salvar andamento. */
+  lockVersion: number
   operacao: Record<string, unknown> | null // metadata.operacao (domínio)
 }
 
@@ -86,6 +96,7 @@ export async function passosOperacaoV2(documentoId: number): Promise<PassoOperac
     select: {
       id: true, stepKey: true, status: true, faseMacroKey: true, ordem: true,
       responsavelId: true, prazo: true, startedAt: true, completedAt: true, motivo: true, metadata: true,
+      lockVersion: true,
     },
   })
   return rows.map((r) => {
@@ -93,7 +104,7 @@ export async function passosOperacaoV2(documentoId: number): Promise<PassoOperac
     return {
       id: r.id, stepKey: r.stepKey, status: r.status, faseMacroKey: r.faseMacroKey, ordem: r.ordem,
       responsavelId: r.responsavelId, prazo: r.prazo, startedAt: r.startedAt, completedAt: r.completedAt,
-      motivo: r.motivo, operacao: meta?.operacao ?? null,
+      motivo: r.motivo, lockVersion: r.lockVersion, operacao: meta?.operacao ?? null,
     }
   })
 }
@@ -119,8 +130,10 @@ export async function progressoOperacaoV2(documentoId: number): Promise<Aggregat
   if (passos.length === 0) return null
   const now = new Date()
   const faseCode = phaseKeyToFaseCode(passos[0].faseMacroKey)
-  const catalogo = faseCode ? getStepsForFase(faseCode) : []
-  const pesoDe = (k: string) => catalogo.find((c) => c.stepKey === k)?.weight ?? 1
+  // Lookup TOLERANTE A ALIAS (getStepDef): a instância pode ter sido gravada com a
+  // chave legada e o catálogo carrega a publicada — o peso não pode cair para 1 por
+  // causa disso, senão o progresso do documento fica errado sem ninguém perceber.
+  const pesoDe = (k: string) => getStepDef(faseCode, k)?.weight ?? 1
 
   const inputs = await Promise.all(
     passos.map(async (p) => {
@@ -151,14 +164,31 @@ export interface WorkflowV2Shape {
   steps: Array<Record<string, unknown>>
 }
 
+/**
+ * Quem está lendo o workflow. As AÇÕES PERMITIDAS de cada etapa são calculadas
+ * aqui, no servidor, a partir das permissões efetivas — o frontend desenha o que
+ * recebe e não infere transição nenhuma. Sem contexto (jobs, scripts, chamadas
+ * internas) o payload sai sem ações, e nenhuma tela ganha botão por acidente.
+ */
+export interface ContextoLeituraWorkflow {
+  usuarioId: number | null
+  permissoes: Record<string, boolean> | null
+}
+
 /** Monta o objeto "workflow" no formato antigo esperado pela UI, a partir do V2. */
-export async function montarWorkflowV2(documentoId: number): Promise<WorkflowV2Shape | null> {
+export async function montarWorkflowV2(
+  documentoId: number,
+  ctx?: ContextoLeituraWorkflow,
+): Promise<WorkflowV2Shape | null> {
   const passos = await passosOperacaoV2(documentoId)
   if (passos.length === 0) return null
   const faseMacroKey = passos[0].faseMacroKey
   const faseCode = phaseKeyToFaseCode(faseMacroKey)
-  const catalogo = faseCode ? getFase(faseCode as FaseCode).steps : []
-  const catOf = (k: string) => catalogo.find((c) => c.stepKey === k)
+  // Lookup de catálogo TOLERANTE A ALIAS. Enquanto era `find(c => c.stepKey === k)` com a
+  // chave crua, o passo publicado "aguardar_retorno_do_cartorio" não achava a definição
+  // "aguardar_retorno" do catálogo: a etapa aparecia na tela com a CHAVE como título,
+  // peso 1 e sem descrição. Um ponto de resolução só, no catálogo.
+  const catOf = (k: string) => getStepDef(faseCode, k)
   const ids = [...new Set(passos.map((p) => p.responsavelId).filter((x): x is number => x != null))]
   const usuarios = ids.length
     ? await prisma.usuario.findMany({ where: { id: { in: ids } }, select: { id: true, nome: true, email: true } })
@@ -172,14 +202,24 @@ export async function montarWorkflowV2(documentoId: number): Promise<WorkflowV2S
     totalW += w
     if (p.status === "CONCLUIDO" || p.status === "DISPENSADO") doneW += w
     const op = (p.operacao ?? {}) as Record<string, unknown>
+    const andamento = lerAndamento(op)
+    // EDITOR resolvido no SERVIDOR, pelo registry oficial. A tela não decide mais
+    // qual interface montar a partir da chave do passo — e "sem editor específico"
+    // resolve para o editor PADRÃO, nunca para uma tela de erro.
+    const editor = resolveWorkflowStepEditor({ stepKey: p.stepKey, phaseKey: p.faseMacroKey })
     return {
       ...op,
       id: p.id, ordem: p.ordem, stepKey: p.stepKey,
       title: c?.title ?? p.stepKey, description: c?.description ?? null,
       status: stepInstanceStatusToLegacy(p.status), weight: w, ownerKey: c?.ownerKey ?? null,
+      slaDays: c?.slaDays ?? null,
       assigneeId: p.responsavelId, assignee: p.responsavelId ? uMap.get(p.responsavelId) ?? null : null,
       startedAt: p.startedAt, dueAt: p.prazo, completedAt: p.completedAt,
       notes: (op.notes as string) ?? null, motivoBloqueio: p.motivo,
+      lockVersion: p.lockVersion,
+      editor: { kind: editor.kind, especifico: editor.especifico, stepKeyCanonico: editor.stepKeyCanonico },
+      acoesPermitidas: acoesPermitidasDaEtapa({ status: p.status, permissoes: ctx?.permissoes ?? null }),
+      andamento: { ...andamento, previsaoEfetiva: previsaoEfetiva(andamento, p.startedAt) },
     } as Record<string, unknown>
   })
   const progress = totalW > 0 ? Math.round((doneW / totalW) * 100) : 0
@@ -191,7 +231,11 @@ type IniciarOpts = { responsavelId?: number | null; dataPrazoInicial?: Date | nu
 type OpResult = { ok: true; workflow: WorkflowV2Shape | null } | { ok: false; error: string; status: number }
 
 /** "Iniciar operação" no V2: cria os passos por-documento sob a instância da fase. */
-export async function iniciarOperacaoDocumentoV2(documentoId: number, opts: IniciarOpts = {}): Promise<OpResult> {
+export async function iniciarOperacaoDocumentoV2(
+  documentoId: number,
+  opts: IniciarOpts = {},
+  ctx?: ContextoLeituraWorkflow,
+): Promise<OpResult> {
   if (await temOperacaoV2(documentoId)) return { ok: false, error: "Operação já existe para este documento", status: 409 }
   const doc = await prisma.documento.findUnique({
     where: { id: documentoId },
@@ -241,7 +285,7 @@ export async function iniciarOperacaoDocumentoV2(documentoId: number, opts: Inic
       },
     })
   })
-  return { ok: true, workflow: await montarWorkflowV2(documentoId) }
+  return { ok: true, workflow: await montarWorkflowV2(documentoId, ctx) }
 }
 
 /**
@@ -256,17 +300,18 @@ export async function iniciarOperacaoDocumentoV2(documentoId: number, opts: Inic
  */
 export async function garantirOperacaoDocumentoV2(
   documentoId: number,
+  ctx?: ContextoLeituraWorkflow,
 ): Promise<{ workflow: WorkflowV2Shape | null; semWorkflowInterno?: boolean }> {
   // 1) já existe operação na fase atual? (montarWorkflowV2 já é escopado à fase atual)
-  const existente = await montarWorkflowV2(documentoId)
+  const existente = await montarWorkflowV2(documentoId, ctx)
   if (existente) return { workflow: existente }
 
   // 2) materializa (idempotente). iniciarOperacaoDocumentoV2 valida fase/instância/catálogo.
-  const r = await iniciarOperacaoDocumentoV2(documentoId)
+  const r = await iniciarOperacaoDocumentoV2(documentoId, {}, ctx)
   if (r.ok) return { workflow: r.workflow }
 
   // 3) corrida: outra requisição materializou em paralelo → re-lê e reusa
-  if (r.status === 409) return { workflow: await montarWorkflowV2(documentoId) }
+  if (r.status === 409) return { workflow: await montarWorkflowV2(documentoId, ctx) }
 
   // 4) fase atual SEM workflow configurado (sem catálogo/instância) → mensagem controlada,
   //    NUNCA workflow de outra fase.
@@ -280,23 +325,59 @@ const CAMPOS_OPERACAO = [
   "reviewChecklist", "stepObservation", "legalOpinion", "notes", "completedById",
 ] as const
 
+/**
+ * Ação PRETENDIDA por um PATCH, para o enforcement server-side. O cliente pode
+ * mandar qualquer corpo; quem decide o que aquilo É em termos de domínio (e,
+ * portanto, qual permissão exige) é o servidor.
+ */
+function acaoDoPatch(patch: Record<string, unknown>, statusAtual: StepInstanceStatus): AcaoEtapa | null {
+  if (patch.forcar === true) return "forcar"
+  if (typeof patch.status === "string") {
+    const novo = mapLegacyStepStatus(patch.status)
+    if (novo === "CONCLUIDO") return "concluir"
+    if (novo === "BLOQUEADO") return "bloquear"
+    if (statusAtual === "CONCLUIDO") return "reabrir"
+    if (statusAtual === "BLOQUEADO") return "desbloquear"
+    return "salvar_andamento"
+  }
+  if (patch.assigneeId !== undefined) return "transferir"
+  if (patch.dueAt !== undefined) return "alterar_prazo"
+  return "salvar_andamento"
+}
+
 /** PATCH de um passo no V2 (status/responsável/campos de domínio) + lock-step entre irmãos. */
 export async function atualizarPassoV2(
   documentoId: number,
   stepInstanceId: number,
   patch: Record<string, unknown>,
+  ctx?: ContextoLeituraWorkflow,
 ): Promise<OpResult> {
   const p = await prisma.phaseWorkflowStepInstance.findUnique({
     where: { id: stepInstanceId },
     select: { id: true, documentoId: true, necessidadeId: true, processoId: true, workflowInstanceId: true, faseMacroKey: true, ordem: true, status: true, ciclo: true, metadata: true, stepKey: true },
   })
-  if (!p || p.documentoId !== documentoId) return { ok: false, error: "Passo não encontrado", status: 404 }
+  if (!p || p.documentoId !== documentoId) return { ok: false, error: "STEP_NOT_FOUND", status: 404 }
+
+  // AUTORIZAÇÃO NO SERVIDOR. `ctx` ausente = chamada interna confiável (job, script,
+  // sincronização); vindo de rota HTTP ele é SEMPRE preenchido, e aí a permissão da
+  // ação pretendida é exigida — não a lista que o frontend achou que podia mostrar.
+  if (ctx) {
+    const acao = acaoDoPatch(patch, p.status)
+    if (acao) {
+      if (!acaoCompativelComEstado(acao, p.status)) {
+        return { ok: false, error: "STEP_NOT_AVAILABLE", status: 409 }
+      }
+      if (ctx.permissoes?.[PERMISSAO_DA_ACAO[acao]] !== true) {
+        return { ok: false, error: "PERMISSION_REQUIRED", status: 403 }
+      }
+      if (acao === "forcar" && !String(patch.justificativa ?? "").trim()) {
+        return { ok: false, error: "VALIDATION_ERROR", status: 422 }
+      }
+    }
+  }
+
   const now = new Date()
-  const catStep = (() => {
-    const fc = phaseKeyToFaseCode(p.faseMacroKey)
-    return fc ? getFase(fc as FaseCode).steps.find((c) => c.stepKey === p.stepKey) : undefined
-  })()
-  const slaDays = catStep?.slaDays ?? 1
+  const catStep = getStepDef(phaseKeyToFaseCode(p.faseMacroKey), p.stepKey)
 
   const novo: StepInstanceStatus = typeof patch.status === "string" ? mapLegacyStepStatus(patch.status) : p.status
   const eraConcluida = p.status === "CONCLUIDO"
@@ -311,6 +392,22 @@ export async function atualizarPassoV2(
   const metaExist = ((p.metadata ?? {}) as { operacao?: Record<string, unknown> }).operacao ?? {}
   const opPatch: Record<string, unknown> = { ...metaExist }
   for (const k of CAMPOS_OPERACAO) if (patch[k] !== undefined) opPatch[k] = patch[k]
+  // AUTORIA DA CONCLUSÃO vem do token, nunca do corpo da requisição. O cliente
+  // mandava `completedById: getUserId()` lido do localStorage — quem concluiu era,
+  // na prática, o que o navegador dissesse. Fora da conclusão/reabertura, o valor
+  // JÁ GRAVADO é preservado (o patch do cliente é descartado, não aplicado).
+  if (ctx) {
+    if (liberarProximo) opPatch.completedById = ctx.usuarioId
+    else if (vaiReabrir) opPatch.completedById = null
+    else opPatch.completedById = metaExist.completedById ?? null
+  }
+  if (ctx && patch.forcar === true) {
+    // Rastro do ato administrativo dentro do próprio payload da etapa, além da auditoria.
+    opPatch.forcadoPor = ctx.usuarioId
+    opPatch.forcadoEm = now.toISOString()
+    opPatch.forcadoMotivo = String(patch.motivo ?? "").trim() || null
+    opPatch.forcadoJustificativa = String(patch.justificativa ?? "").trim() || null
+  }
 
   const data: Prisma.PhaseWorkflowStepInstanceUpdateInput = {
     status: novo,
@@ -347,10 +444,17 @@ export async function atualizarPassoV2(
       const proximo = await tx.phaseWorkflowStepInstance.findFirst({
         where: { documentoId, faseMacroKey: p.faseMacroKey, ordem: { gt: p.ordem }, status: { in: ["BLOQUEADO", "PENDENTE"] } },
         orderBy: { ordem: "asc" },
-        select: { id: true },
+        select: { id: true, stepKey: true },
       })
       if (proximo) {
-        const due = new Date(now.getTime() + slaDays * 86400000)
+        // SLA do PASSO QUE ESTÁ SENDO ABERTO — não o do passo que acabou de fechar.
+        // Com a chave do catálogo desalinhada da publicada, este lookup falhava e o
+        // prazo caía no default 1 dia; e mesmo alinhado, herdar o SLA do passo anterior
+        // dava 3 dias para uma espera de cartório de 15.
+        const slaProximo =
+          getStepDef(phaseKeyToFaseCode(p.faseMacroKey), proximo.stepKey)?.slaDays ??
+          catStep?.slaDays ?? 1
+        const due = new Date(now.getTime() + slaProximo * 86400000)
         await tx.phaseWorkflowStepInstance.update({
           where: { id: proximo.id },
           data: { status: "EM_ANDAMENTO", startedAt: now, prazo: due, motivo: null },
@@ -403,6 +507,26 @@ export async function atualizarPassoV2(
       })
     }
 
+    // AUDITORIA do ato administrativo, na MESMA transação do estado. "Forçar" só é
+    // aceitável se ficar registrado quem forçou, com que motivo e com que justificativa.
+    if (ctx && patch.forcar === true) {
+      await tx.logAuditoria.create({
+        data: {
+          acao: "PASSO_FORCADO",
+          entidade: "PhaseWorkflowStepInstance",
+          entidadeId: p.id,
+          descricao: `Conclusão FORÇADA da etapa "${p.stepKey}" do documento ${documentoId}.`,
+          detalhes: {
+            documentoId, processoId: p.processoId, stepKey: p.stepKey, faseMacroKey: p.faseMacroKey,
+            statusAnterior: p.status, ciclo: p.ciclo,
+            motivo: String(patch.motivo ?? "").trim() || null,
+            justificativa: String(patch.justificativa ?? "").trim() || null,
+          } as Prisma.InputJsonValue,
+          usuarioId: ctx.usuarioId,
+        },
+      })
+    }
+
     // TRAVA antes do commit: nenhum par passo/tarefa desta transação pode terminar
     // em estados contraditórios. Divergência ⇒ rollback integral.
     await assegurarCoerenciaPassoTarefa(tx, passosTocados)
@@ -422,11 +546,123 @@ export async function atualizarPassoV2(
     }
   }
 
-  return { ok: true, workflow: await montarWorkflowV2(documentoId) }
+  return { ok: true, workflow: await montarWorkflowV2(documentoId, ctx) }
 }
 
+/**
+ * REGISTRAR ANDAMENTO de uma etapa — salvar campos de acompanhamento, adicionar
+ * contato ao histórico, adicionar observação e vincular anexos, TUDO numa única
+ * transação e SEM concluir nada.
+ *
+ * Por que é um serviço separado de `atualizarPassoV2`: aquele existe para mudar o
+ * ESTADO do passo (e arrasta tarefa, necessidade, passos-irmãos e avanço de fase
+ * junto). Registrar andamento não muda estado nenhum — e, exatamente por isso,
+ * não pode passar pelo caminho que dispara avanço.
+ *
+ * Garantias:
+ *   • APPEND-ONLY   — contato/observação/anexo nunca sobrescrevem os anteriores;
+ *   • IDEMPOTENTE   — duplo clique e retry caem na mesma chave e não duplicam;
+ *   • CONCORRÊNCIA  — lockVersion otimista: quem gravou sobre versão velha recebe
+ *                     CONCURRENT_UPDATE em vez de sobrescrever o trabalho do outro;
+ *   • ATÔMICO       — payload + carimbo do documento + auditoria commitam juntos.
+ */
+export async function registrarAndamentoPassoV2(
+  documentoId: number,
+  stepInstanceId: number,
+  entrada: EntradaAndamento & { lockVersion?: number },
+  ctx: ContextoLeituraWorkflow,
+): Promise<OpResult> {
+  const p = await prisma.phaseWorkflowStepInstance.findUnique({
+    where: { id: stepInstanceId },
+    select: {
+      id: true, documentoId: true, processoId: true, faseMacroKey: true, stepKey: true,
+      status: true, metadata: true, lockVersion: true, ciclo: true,
+    },
+  })
+  if (!p || p.documentoId !== documentoId) return { ok: false, error: "STEP_NOT_FOUND", status: 404 }
+
+  // Qual permissão exigir depende do que a entrada CONTÉM — o servidor classifica.
+  const exigidas: AcaoEtapa[] = []
+  if (entrada.contato != null) exigidas.push("registrar_contato")
+  if (entrada.observacao != null) exigidas.push("registrar_observacao")
+  if (entrada.anexos != null) exigidas.push("anexar")
+  if (entrada.campos != null) exigidas.push("salvar_andamento")
+  if (exigidas.length === 0) return { ok: false, error: "VALIDATION_ERROR", status: 422 }
+
+  for (const acao of exigidas) {
+    if (!acaoCompativelComEstado(acao, p.status)) return { ok: false, error: "STEP_NOT_AVAILABLE", status: 409 }
+    if (ctx.permissoes?.[PERMISSAO_DA_ACAO[acao]] !== true) return { ok: false, error: "PERMISSION_REQUIRED", status: 403 }
+  }
+
+  // LOCK OTIMISTA contra a versão que o CLIENTE tinha em tela. Sem isto, duas
+  // pessoas com o mesmo editor aberto gravariam uma por cima da outra e a que
+  // perdesse não saberia. Ausente = cliente antigo; o lock do UPDATE ainda protege.
+  if (entrada.lockVersion !== undefined && entrada.lockVersion !== p.lockVersion) {
+    return { ok: false, error: "CONCURRENT_UPDATE", status: 409 }
+  }
+
+  const now = new Date()
+  const operacaoAtual = ((p.metadata ?? {}) as { operacao?: Record<string, unknown> }).operacao ?? {}
+  const r = aplicarAndamento(lerAndamento(operacaoAtual), entrada, { autorId: ctx.usuarioId, agora: now })
+  if (r.erros.length > 0) return { ok: false, error: `VALIDATION_ERROR:${r.erros.join(",")}`, status: 422 }
+
+  const nada = !r.mudou.campos && !r.mudou.contato && !r.mudou.observacao && r.mudou.anexos === 0
+  // Nada mudou = reenvio idempotente. Sucesso, sem escrita e sem linha de auditoria.
+  if (nada) return { ok: true, workflow: await montarWorkflowV2(documentoId, ctx) }
+
+  const novaOperacao = gravarAndamento(operacaoAtual, r.andamento)
+
+  try {
+    await prisma.$transaction(async (tx) => {
+      // TRAVA OTIMISTA: o update só casa se lockVersion ainda for o que lemos. Duas
+      // gravações concorrentes ⇒ a segunda não encontra linha e vira CONCURRENT_UPDATE.
+      const escrita = await tx.phaseWorkflowStepInstance.updateMany({
+        where: { id: p.id, lockVersion: p.lockVersion },
+        data: {
+          metadata: { operacao: novaOperacao } as Prisma.InputJsonValue,
+          lockVersion: { increment: 1 },
+        },
+      })
+      if (escrita.count !== 1) throw new ConflitoDeConcorrencia()
+
+      await tx.documento.update({ where: { id: documentoId }, data: { ultimaMovimentacao: now } })
+
+      await tx.logAuditoria.create({
+        data: {
+          acao: "PASSO_ANDAMENTO",
+          entidade: "PhaseWorkflowStepInstance",
+          entidadeId: p.id,
+          descricao: `Andamento registrado na etapa "${p.stepKey}" do documento ${documentoId}.`,
+          detalhes: {
+            documentoId, processoId: p.processoId, stepKey: p.stepKey, faseMacroKey: p.faseMacroKey,
+            ciclo: p.ciclo, mudou: r.mudou,
+            totais: {
+              contatos: r.andamento.contatos.length,
+              observacoes: r.andamento.observacoes.length,
+              anexos: r.andamento.anexos.length,
+            },
+          } as Prisma.InputJsonValue,
+          usuarioId: ctx.usuarioId,
+        },
+      })
+    })
+  } catch (e) {
+    if (e instanceof ConflitoDeConcorrencia) return { ok: false, error: "CONCURRENT_UPDATE", status: 409 }
+    throw e
+  }
+
+  return { ok: true, workflow: await montarWorkflowV2(documentoId, ctx) }
+}
+
+class ConflitoDeConcorrencia extends Error {}
+
 /** Controles da operação (pausar/retomar/cancelar/invalidar) no V2 + status do documento. */
-export async function controlarOperacaoV2(documentoId: number, action: string, observacao?: string): Promise<OpResult> {
+export async function controlarOperacaoV2(
+  documentoId: number,
+  action: string,
+  observacao?: string,
+  ctx?: ContextoLeituraWorkflow,
+): Promise<OpResult> {
   const passos = await passosOperacaoV2(documentoId)
   if (passos.length === 0) return { ok: false, error: "Operação não encontrada", status: 404 }
   const now = new Date()
@@ -474,7 +710,7 @@ export async function controlarOperacaoV2(documentoId: number, action: string, o
   } else {
     return { ok: false, error: "action inválido", status: 400 }
   }
-  return { ok: true, workflow: await montarWorkflowV2(documentoId) }
+  return { ok: true, workflow: await montarWorkflowV2(documentoId, ctx) }
 }
 
 /**
