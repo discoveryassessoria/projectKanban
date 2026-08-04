@@ -95,6 +95,53 @@ async function main() {
     check(`${rotulo}: tarefa criada`, inst!.steps.every((s) => s.tarefas.length === 1))
   }
 
+  // ── PARTE 15 — criação de macro a partir do CatalogoFase (seedDefaults) ────
+  console.log("\nCriação de macro com seedDefaults — nasce canônico ou não nasce")
+  for (const f of [
+    { phaseKey: "genealogia", label: "Genealogia", ordemPadrao: 1, requiredPadrao: true, conditionalPadrao: false, slaDiasPadrao: 30 },
+    { phaseKey: "analise_documental", label: "Análise Documental", ordemPadrao: 3, requiredPadrao: true, conditionalPadrao: false, slaDiasPadrao: 30 },
+    { phaseKey: "retificacao_registros", label: "Retificação de Registros", ordemPadrao: 4, requiredPadrao: false, conditionalPadrao: true, slaDiasPadrao: 30 },
+    { phaseKey: "traducao_juramentada", label: "Tradução Juramentada", ordemPadrao: 6, requiredPadrao: true, conditionalPadrao: false, slaDiasPadrao: 30 },
+  ]) {
+    await prisma.catalogoFase.upsert({ where: { phaseKey: f.phaseKey }, update: f, create: f })
+  }
+  // Roda o seed OFICIAL duas vezes: idempotente, não duplica.
+  const { execSync } = await import("child_process")
+  execSync("npx tsx prisma/seed-motor-1b.ts", { cwd: __dirname + "/..", env: process.env, stdio: "pipe" })
+  const catalogo1 = await prisma.catalogoFase.count()
+  execSync("npx tsx prisma/seed-motor-1b.ts", { cwd: __dirname + "/..", env: process.env, stdio: "pipe" })
+  const catalogo2 = await prisma.catalogoFase.count()
+  check("o seed oficial é idempotente (2 execuções, mesma contagem)", catalogo1 === catalogo2, `${catalogo1} → ${catalogo2}`)
+  const catFinal = await prisma.catalogoFase.findMany({ select: { phaseKey: true } })
+  check("o seed não deixou chave legada no CatalogoFase",
+    !catFinal.some((c) => c.phaseKey === "traducao" || c.phaseKey === "retificacao"), JSON.stringify(catFinal.map((c) => c.phaseKey)))
+  check("o CatalogoFase tem as canônicas", ["traducao_juramentada", "retificacao_registros"].every((k) => catFinal.some((c) => c.phaseKey === k)))
+
+  // Macro novo montado como o endpoint monta (a partir do catálogo ativo).
+  const tipoNovo = await prisma.tipoProcessoNacionalidade.upsert({
+    where: { code: "NOVO-SEED" }, update: {},
+    create: { code: "NOVO-SEED", name: "Macro novo (seedDefaults)", countryKey: "italia", countryLabel: "Itália", nationalityKey: "italiana", nationalityLabel: "Italiana", modalityKey: "administrativa", modalityLabel: "Administrativa", processFamily: "CIDADANIA", serviceNature: "PROCESSO" },
+  })
+  const catAtivo = await prisma.catalogoFase.findMany({ where: { ativo: true }, orderBy: { ordemPadrao: "asc" } })
+  const macroNovo = await prisma.macroWorkflow.create({
+    data: {
+      tipoProcessoId: tipoNovo.id, name: "Macro novo", ativo: true,
+      fases: { create: catAtivo.map((f, i) => ({ phaseKey: f.phaseKey, label: f.label, ordem: i + 1, required: f.requiredPadrao, conditional: f.conditionalPadrao, entryRule: i === 0 ? "process_created" : "previous_phase_completed", slaDays: f.slaDiasPadrao, showInKanban: true })) },
+    },
+    include: { fases: true },
+  })
+  const chavesNovas = macroNovo.fases.map((f) => f.phaseKey)
+  check("macro novo recebe traducao_juramentada", chavesNovas.includes("traducao_juramentada"))
+  check("macro novo recebe retificacao_registros", chavesNovas.includes("retificacao_registros"))
+  check("macro novo NÃO recebe traducao", !chavesNovas.includes("traducao"))
+  check("macro novo NÃO recebe retificacao", !chavesNovas.includes("retificacao"))
+  check("macro novo sem duplicação", new Set(chavesNovas).size === chavesNovas.length)
+  const { phaseKeyToFaseCode } = await import("../src/lib/process-stage/fases-catalog")
+  check("toda fase do macro novo é canônica", chavesNovas.every((k) => phaseKeyToFaseCode(k) != null), JSON.stringify(chavesNovas))
+  // remoção do macro temporário (mecanismo oficial de teste)
+  await prisma.macroWorkflow.delete({ where: { id: macroNovo.id } })
+  check("macro temporário removido", (await prisma.macroWorkflow.count({ where: { id: macroNovo.id } })) === 0)
+
   console.log("\nCAMINHO A — Análise → Retificação de Registros (requerRetificacao = true)")
   const pa = await processoNaAnalise("CAMA", true)
   const antesA = { passos: await prisma.phaseWorkflowStepInstance.count({ where: { processoId: pa.id } }), tarefas: await prisma.tarefa.count({ where: { processoId: pa.id } }) }

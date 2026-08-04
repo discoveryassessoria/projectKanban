@@ -1,9 +1,11 @@
 /**
  * FASE 3A — Seed dos Modos Internos das Fases (instâncias padrão).
  * 19 modos GLOBAIS por fase (tipoProcessoId = null → valem p/ qualquer processo):
- *   retificacao 5 · protocolado 7 · traducao 3 · apostilamento 4
+ *   retificacao_registros 5 · protocolado 7 · traducao_juramentada 3 · apostilamento 4
  * Re-rodável: upsert por modeUid (`all::{phaseKey}::{key}`). Não duplica.
  * phaseKey do mockup 'protocolo' → 'protocolado' (consistente com a 2A).
+ * As phaseKey são as CANÔNICAS do catálogo (fases-catalog): o modeUid embute a chave,
+ * e uma chave legada aqui deixaria os modos órfãos da fase que os usa.
  *
  * Rodar:  npx tsx prisma/seed-motor-3a.ts
  */
@@ -15,11 +17,11 @@ type Def = { phaseKey: string; key: string; label: string; description?: string 
 
 const DEFS: Def[] = [
   // ===== Retificação de Registros (5) =====
-  { phaseKey: 'retificacao', key: 'pending_definition', label: 'A definir', description: 'Modo ainda não definido.' },
-  { phaseKey: 'retificacao', key: 'administrative', label: 'Administrativa', description: 'Retificação por via administrativa (cartório).' },
-  { phaseKey: 'retificacao', key: 'judicial', label: 'Judicial', description: 'Retificação por via judicial.' },
-  { phaseKey: 'retificacao', key: 'mixed', label: 'Mista', description: 'Retificação por via judicial e administrativa.' },
-  { phaseKey: 'retificacao', key: 'not_required', label: 'Não necessária', description: 'Sem necessidade de retificação.' },
+  { phaseKey: 'retificacao_registros', key: 'pending_definition', label: 'A definir', description: 'Modo ainda não definido.' },
+  { phaseKey: 'retificacao_registros', key: 'administrative', label: 'Administrativa', description: 'Retificação por via administrativa (cartório).' },
+  { phaseKey: 'retificacao_registros', key: 'judicial', label: 'Judicial', description: 'Retificação por via judicial.' },
+  { phaseKey: 'retificacao_registros', key: 'mixed', label: 'Mista', description: 'Retificação por via judicial e administrativa.' },
+  { phaseKey: 'retificacao_registros', key: 'not_required', label: 'Não necessária', description: 'Sem necessidade de retificação.' },
   // ===== Protocolado (7) — mockup 'protocolo' =====
   { phaseKey: 'protocolado', key: 'per_applicant', label: 'Por requerente' },
   { phaseKey: 'protocolado', key: 'per_family', label: 'Por família/processo' },
@@ -29,9 +31,9 @@ const DEFS: Def[] = [
   { phaseKey: 'protocolado', key: 'conservatoria_case', label: 'Conservatória' },
   { phaseKey: 'protocolado', key: 'administrative_case', label: 'Administrativo' },
   // ===== Tradução (3) =====
-  { phaseKey: 'traducao', key: 'full_package_translation', label: 'Pacote completo' },
-  { phaseKey: 'traducao', key: 'partial_translation', label: 'Parcial' },
-  { phaseKey: 'traducao', key: 'not_required', label: 'Não necessária' },
+  { phaseKey: 'traducao_juramentada', key: 'full_package_translation', label: 'Pacote completo' },
+  { phaseKey: 'traducao_juramentada', key: 'partial_translation', label: 'Parcial' },
+  { phaseKey: 'traducao_juramentada', key: 'not_required', label: 'Não necessária' },
   // ===== Apostilamento (4) =====
   { phaseKey: 'apostilamento', key: 'full_package_apostille', label: 'Pacote completo' },
   { phaseKey: 'apostilamento', key: 'partial_apostille', label: 'Parcial' },

@@ -23,7 +23,7 @@ type ComponenteDef = {
   itemName: string
   natureza: NaturezaItem
   unidade: UnidadeItem
-  phaseKey: string          // fase real do workflow
+  phaseKey: string          // fase real do workflow — chave CANÔNICA do catálogo (fases-catalog)
   componentKey: string      // identidade do componente
   componentName: string     // = nome da coluna/TipoServico
   appliesTo: string         // any | certificate | translation | original
@@ -38,7 +38,7 @@ const COMPONENTES: ComponenteDef[] = [
   // ── TRADUÇÃO JURAMENTADA (preço por PÁGINA, ex.) ──────────────────────────
   {
     itemCode: 'TRAD_JURAMENTADA', itemName: 'Tradução Juramentada', natureza: NaturezaItem.SERVICO, unidade: UnidadeItem.PAGINA,
-    phaseKey: 'traducao', componentKey: 'TRADUCAO_JURAMENTADA', componentName: 'Tradução Juramentada', appliesTo: 'any',
+    phaseKey: 'traducao_juramentada', componentKey: 'TRADUCAO_JURAMENTADA', componentName: 'Tradução Juramentada', appliesTo: 'any',
     custoCode: 'TRAD_CUSTO', receitaCode: 'TRAD_RECEITA', custoMoeda: Moeda.BRL, receitaMoeda: Moeda.EUR, ordem: 10,
   },
   // ── APOSTILAMENTO CERTIDÃO (preço por DOCUMENTO) ──────────────────────────
@@ -56,7 +56,7 @@ const COMPONENTES: ComponenteDef[] = [
   // ── RETIFICAÇÃO (preço por DOCUMENTO; varia por modo via preço/condição) ──
   {
     itemCode: 'RETIFICACAO', itemName: 'Retificação de Registro', natureza: NaturezaItem.SERVICO, unidade: UnidadeItem.DOCUMENTO,
-    phaseKey: 'retificacao', componentKey: 'RETIFICACAO', componentName: 'Retificação', appliesTo: 'any',
+    phaseKey: 'retificacao_registros', componentKey: 'RETIFICACAO', componentName: 'Retificação', appliesTo: 'any',
     custoCode: 'RETIF_CUSTO', receitaCode: 'RETIF_RECEITA', custoMoeda: Moeda.BRL, receitaMoeda: Moeda.EUR, ordem: 40,
   },
 ]

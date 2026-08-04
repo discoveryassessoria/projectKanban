@@ -37,9 +37,14 @@ function check(nome: string, cond: boolean, extra?: string) {
 // INVENTÁRIO DE PENDÊNCIAS DECLARADAS
 // ------------------------------------------------------------
 // Cadastro em produção que ainda não foi corrigido, com o motivo de não ter sido.
-// A correção do ALE-ADM (04/08/2026) foi autorizada e executada; estes ficaram
-// FORA daquela autorização e aguardam decisão. Cada linha é uma dívida VISÍVEL:
-// enquanto estiver aqui, o guard passa; um registro novo fora daqui, não.
+//
+// Aqui só entra o que NÃO tem correção determinística. Erro com equivalência
+// confirmada se corrige — não se inventaria. ALE-ADM, ESP-ADM, ITA-JUD e o
+// CatalogoFase foram corrigidos em 04/08/2026 e saíram desta lista; a checagem
+// abaixo (`sem exceção determinística`) impede que voltem a se esconder aqui.
+//
+// Cada linha é uma dívida VISÍVEL: enquanto estiver aqui, o guard passa; um
+// registro novo fora daqui, não.
 // ============================================================
 interface PendenciaDeclarada {
   macroWorkflowId: number
@@ -50,36 +55,12 @@ interface PendenciaDeclarada {
 }
 const PENDENCIAS_DECLARADAS: PendenciaDeclarada[] = [
   {
-    macroWorkflowId: 14, phaseKey: "retificacao", faseMacroId: 287,
-    motivo: "ESP-ADM. Mesma equivalência do ALE-ADM, mas fora do escopo autorizado em 04/08/2026.",
-    correcao: "npx tsx scripts/corrigir-phasekeys-macro.ts --tipo ESP-ADM --execute",
-  },
-  {
-    macroWorkflowId: 15, phaseKey: "retificacao", faseMacroId: 306,
-    motivo: "ITA-JUD. Mesma equivalência do ALE-ADM, mas fora do escopo autorizado em 04/08/2026.",
-    correcao: "npx tsx scripts/corrigir-phasekeys-macro.ts --tipo ITA-JUD --execute",
-  },
-  {
-    macroWorkflowId: 15, phaseKey: "traducao", faseMacroId: 308,
-    motivo: "ITA-JUD. Mesma equivalência do ALE-ADM, mas fora do escopo autorizado em 04/08/2026.",
-    correcao: "npx tsx scripts/corrigir-phasekeys-macro.ts --tipo ITA-JUD --execute",
-  },
-  // ORIGEM da recorrência (macroWorkflowId -1 = CatalogoFase). Corrigir aqui exige
-  // corrigir o seed no MESMO ato, senão o próximo seed duplica a linha.
-  {
-    macroWorkflowId: -1, phaseKey: "retificacao", faseMacroId: 4,
-    motivo: "CatalogoFase — molde de macros novos. Corrigir junto com prisma/seed-motor-1b.ts.",
-    correcao: "UPDATE \"CatalogoFase\" SET \"phaseKey\"='retificacao_registros' WHERE id=4; + seed",
-  },
-  {
-    macroWorkflowId: -1, phaseKey: "traducao", faseMacroId: 6,
-    motivo: "CatalogoFase — molde de macros novos. Corrigir junto com prisma/seed-motor-1b.ts.",
-    correcao: "UPDATE \"CatalogoFase\" SET \"phaseKey\"='traducao_juramentada' WHERE id=6; + seed",
-  },
-  {
     macroWorkflowId: -1, phaseKey: "transcricoes", faseMacroId: 11,
-    motivo: "CatalogoFase — fase sem correspondente no catálogo canônico. AMBÍGUA: decisão de arquitetura.",
-    correcao: "(sem correção automática — definir se 'Transcrições' é fase oficial ou deve sair do cadastro)",
+    motivo:
+      "CatalogoFase #11 'Transcrições' (ordem 20). Não tem correspondente no catálogo canônico e " +
+      "não há equivalência determinística — corrigir seria inventar arquitetura. Nenhum MacroWorkflow " +
+      "a utiliza hoje. Aguarda decisão: a fase é oficial (entra no catálogo) ou sai do cadastro.",
+    correcao: "(sem correção automática — decisão arquitetural)",
   },
 ]
 const declarada = (macroWorkflowId: number, phaseKey: string) =>
@@ -129,6 +110,10 @@ check("fase OPCIONAL sem workflow não vira achado",
   verificarPhaseKeys({ ...ctxBase, phaseKeysComWorkflow: new Set(), fases: [fase({ id: 1, phaseKey: "apostilamento", required: false })] })
     .every((a) => a.tipo !== "FASE_OBRIGATORIA_SEM_WORKFLOW"))
 
+const modoLegado = verificarPhaseKeys({ ...ctxBase, fases: [], modosDeFase: [{ id: 1, phaseKey: "retificacao", key: "judicial", modeUid: "all::retificacao::judicial" }] })
+check("modo de fase com chave legada é detectado", modoLegado.length === 1 && modoLegado[0].tipo === "MODO_DE_FASE_COM_CHAVE_LEGADA")
+check("e sugere a canônica", modoLegado[0].canonicaSugerida === "retificacao_registros")
+
 check("o mais grave vem primeiro",
   verificarPhaseKeys({ ...ctxBase, fases: [fase({ id: 1, phaseKey: "retificacao", required: false }), fase({ id: 2, phaseKey: "traducao", required: true, ordem: 2 })] })[0].severidade === "CRITICA")
 
@@ -173,14 +158,44 @@ check("o corretor não toca em processo, ciclo ou tarefa",
 const seedFases = read("prisma/seed-motor-1b.ts")
 const seedChaves = [...seedFases.matchAll(/phaseKey: '([a-z_]+)'/g)].map((m) => m[1])
 check("o seed do catálogo de fases foi lido", seedChaves.length === 10, String(seedChaves.length))
-const seedLegadas = seedChaves.filter((k) => EQUIVALENCIA_LEGADA[k] != null)
-const catalogoLegadasDeclaradas = PENDENCIAS_DECLARADAS.filter((p) => p.macroWorkflowId === -1 && EQUIVALENCIA_LEGADA[p.phaseKey] != null).map((p) => p.phaseKey)
-check("seed e CatalogoFase declarado dizem a mesma coisa (corrigir um sem o outro quebra aqui)",
-  seedLegadas.slice().sort().join(",") === catalogoLegadasDeclaradas.slice().sort().join(","),
-  JSON.stringify({ seed: seedLegadas, catalogoDeclarado: catalogoLegadasDeclaradas }))
-check("o seed não inventa chave fora do catálogo além das legadas conhecidas",
-  seedChaves.every((k) => phaseKeysCanonicas().includes(k) || EQUIVALENCIA_LEGADA[k] != null),
-  JSON.stringify(seedChaves.filter((k) => !phaseKeysCanonicas().includes(k) && EQUIVALENCIA_LEGADA[k] == null)))
+check("o seed NÃO semeia nenhuma chave legada",
+  seedChaves.every((k) => EQUIVALENCIA_LEGADA[k] == null),
+  JSON.stringify(seedChaves.filter((k) => EQUIVALENCIA_LEGADA[k] != null)))
+check("toda chave do seed está no catálogo canônico",
+  seedChaves.every((k) => phaseKeysCanonicas().includes(k)),
+  JSON.stringify(seedChaves.filter((k) => !phaseKeysCanonicas().includes(k))))
+check("o seed semeia as canônicas que substituíram as legadas",
+  Object.values(EQUIVALENCIA_LEGADA).every((k) => seedChaves.includes(k)))
+check("o seed é idempotente (upsert por phaseKey, sem create solto)",
+  /catalogoFase\.upsert\(\{ where: \{ phaseKey: f\.phaseKey \}/.test(seedFases) && !/catalogoFase\.create\(/.test(seedFases))
+check("nenhum outro seed/fixture semeia chave legada em CatalogoFase ou FaseMacro", (() => {
+  const suspeitos = ["prisma/seed.ts", "prisma/seed-motor-1a.ts", "prisma/seed-motor-1b.ts", "prisma/seed-motor-3a.ts", "prisma/seed-lote-b-fases.ts", "prisma/seed-workflows-fase.ts", "prisma/reset-workflows-fase.ts"]
+  return suspeitos.every((arq) => {
+    const txt = read(arq)
+    if (!txt) return true
+    // só interessa quem escreve em CatalogoFase/FaseMacro — outras tabelas usam
+    // 'traducao'/'retificacao' como natureza ou modo, e isso não é phaseKey de fase.
+    if (!/catalogoFase|faseMacro/i.test(txt)) return true
+    const trechos = txt.match(/phaseKey: '([a-z_]+)'/g) ?? []
+    return trechos.every((t) => { const k = t.match(/'([a-z_]+)'/)![1]; return EQUIVALENCIA_LEGADA[k] == null })
+  })
+})())
+
+// Seeds que gravam phaseKey em OUTRAS tabelas keyed por fase (modos, regras econômicas).
+for (const arq of ["prisma/seed-motor-3a.ts", "prisma/seed-lote-b-fases.ts"]) {
+  const txt = read(arq)
+  const chaves = [...txt.matchAll(/phaseKey: '([a-z_]+)'/g)].map((m) => m[1])
+  check(`${arq} não semeia chave legada`, chaves.every((k) => EQUIVALENCIA_LEGADA[k] == null), JSON.stringify(chaves.filter((k) => EQUIVALENCIA_LEGADA[k] != null)))
+  check(`${arq} usa só chaves canônicas`, chaves.every((k) => phaseKeysCanonicas().includes(k)), JSON.stringify(chaves.filter((k) => !phaseKeysCanonicas().includes(k))))
+}
+
+// ENDPOINT de criação de macro: recusa cadastro legado, nunca converte.
+const rotaMacro = read("src/app/api/gerenciamento/workflow-macro/route.ts")
+check("o endpoint de criação valida o catálogo antes de persistir",
+  rotaMacro.includes("CATALOGO_FASE_COM_CHAVE_INVALIDA") && rotaMacro.includes("phaseKeyToFaseCode"))
+check("o endpoint RECUSA a chave legada, não a traduz",
+  !/traducao_juramentada['"]?\s*:|EQUIVALENCIA_LEGADA|MAPEAMENTO/.test(rotaMacro))
+check("o endpoint também barra catálogo com chave repetida", rotaMacro.includes("CATALOGO_FASE_DUPLICADA"))
 
 // ============================================================
 // (C) DADOS REAIS
@@ -202,6 +217,7 @@ async function contraOBanco() {
     const wfs = await prisma.phaseInternalWorkflow.findMany({ where: { active: true, arquivado: false }, select: { phaseKey: true } })
     const processos = await prisma.processo.groupBy({ by: ["tipoProcessoMotorId"], _count: { _all: true } })
     const catalogoDb = await prisma.catalogoFase.findMany({ select: { id: true, phaseKey: true, label: true, ativo: true }, orderBy: { ordemPadrao: "asc" } })
+    const modosDb = await prisma.phaseInternalMode.findMany({ select: { id: true, phaseKey: true, key: true, modeUid: true }, orderBy: { id: "asc" } })
 
     const achados = verificarPhaseKeys({
       fases: fasesDb.map((f) => ({
@@ -212,6 +228,7 @@ async function contraOBanco() {
       phaseKeysComWorkflow: new Set(wfs.map((w) => w.phaseKey)),
       processosPorTipo: new Map(processos.filter((p) => p.tipoProcessoMotorId != null).map((p) => [p.tipoProcessoMotorId as number, p._count._all])),
       catalogoFase: catalogoDb,
+      modosDeFase: modosDb,
     })
 
     console.log(`   FaseMacro na base: ${fasesDb.length} · achados: ${achados.length}`)
@@ -227,6 +244,15 @@ async function contraOBanco() {
     check("nenhuma pendência fora do inventário declarado", naoDeclarados.length === 0,
       JSON.stringify(naoDeclarados.map((a) => ({ macro: a.macroWorkflowId, phaseKey: a.phaseKey, tipo: a.tipo }))))
     check("nenhuma phaseKey duplicada em macro nenhum", !achados.some((a) => a.tipo === "PHASEKEY_DUPLICADA_NO_MACRO"))
+    // O inventário não é esconderijo: erro com equivalência CONFIRMADA tem correção
+    // determinística e precisa ser corrigido, não declarado.
+    const determinísticosEscondidos = achados.filter((a) => a.canonicaSugerida != null && declarada(a.macroWorkflowId, a.phaseKey))
+    check("o inventário não abriga erro determinístico (corrigir ≠ declarar)",
+      determinísticosEscondidos.length === 0,
+      JSON.stringify(determinísticosEscondidos.map((a) => ({ macro: a.macroWorkflowId, phaseKey: a.phaseKey, canonica: a.canonicaSugerida }))))
+    check("as chaves legadas sumiram do cadastro inteiro",
+      !achados.some((a) => Object.keys(EQUIVALENCIA_LEGADA).includes(a.phaseKey)),
+      JSON.stringify(achados.filter((a) => Object.keys(EQUIVALENCIA_LEGADA).includes(a.phaseKey))))
     // O inventário lista registros de PRODUÇÃO, por id. Contra um banco de teste esses
     // ids não existem, e cobrar "entrada morta" ali acusaria uma dívida que aquele
     // banco nunca teve. A verificação de higiene do inventário — impedir que ele

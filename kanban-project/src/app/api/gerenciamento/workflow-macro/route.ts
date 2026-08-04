@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { verificarPermissao } from '@/src/lib/verificar-permissao'
+import { phaseKeyToFaseCode } from '@/src/lib/process-stage/fases-catalog'
 
 // GET - Bootstrap: tipos de processo + catálogo de fases (+ flags dos países)
 export async function GET(request: NextRequest) {
@@ -50,6 +51,40 @@ export async function POST(request: NextRequest) {
     let fasesCreate: any = undefined
     if (b.seedDefaults) {
       const cat = await prisma.catalogoFase.findMany({ where: { ativo: true }, orderBy: { ordemPadrao: 'asc' } })
+
+      // O macro NASCE canônico ou não nasce. O catálogo de fases é um cadastro
+      // editável, e uma chave que não existe no catálogo oficial produz uma fase que
+      // o motor nunca vai resolver — o processo trava nela. Foi assim que três
+      // macrofluxos nasceram com `traducao`/`retificacao`.
+      //
+      // RECUSAR, nunca converter: traduzir a chave aqui seria um alias escondido no
+      // endpoint, e o operador continuaria cadastrando errado sem saber.
+      const invalidas = cat.filter((f) => phaseKeyToFaseCode(f.phaseKey) == null)
+      if (invalidas.length > 0) {
+        return NextResponse.json(
+          {
+            error:
+              `O catálogo de fases tem ${invalidas.length} fase(s) com chave fora do catálogo oficial: ` +
+              invalidas.map((f) => `"${f.phaseKey}" (${f.label})`).join(', ') +
+              '. Corrija o cadastro em Gerenciamento › Processos › Estrutura › Fases antes de criar o macrofluxo — ' +
+              'um macro criado assim nasce com fases que o motor não resolve.',
+            code: 'CATALOGO_FASE_COM_CHAVE_INVALIDA',
+            fases: invalidas.map((f) => ({ id: f.id, phaseKey: f.phaseKey, label: f.label })),
+          },
+          { status: 422 },
+        )
+      }
+      const duplicadas = cat.filter((f, i) => cat.findIndex((x) => x.phaseKey === f.phaseKey) !== i)
+      if (duplicadas.length > 0) {
+        return NextResponse.json(
+          {
+            error: `O catálogo de fases tem chave repetida: ${duplicadas.map((f) => f.phaseKey).join(', ')}.`,
+            code: 'CATALOGO_FASE_DUPLICADA',
+          },
+          { status: 422 },
+        )
+      }
+
       fasesCreate = {
         create: cat.map((f, i) => ({
           phaseKey: f.phaseKey,

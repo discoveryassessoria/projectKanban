@@ -4,15 +4,19 @@
 import { PrismaClient } from '@prisma/client'
 const prisma = new PrismaClient()
 
-// As 10 fases padrão (batem com o enum FaseCode do sistema vivo).
+// As 10 fases padrão. As phaseKey são as CANÔNICAS do catálogo oficial
+// (src/lib/process-stage/fases-catalog.ts) — o motor resolve a fase pela chave exata,
+// sem alias e sem fallback, e este seed é o molde de onde todo MacroWorkflow novo
+// copia as fases. Semear chave legada aqui foi o que espalhou `traducao`/`retificacao`
+// por três macrofluxos; o guard `npm run test:phasekeys` trava se voltar.
 // required=false + conditional=true nas duas fases condicionais (retificação).
 const FASES = [
   { phaseKey: 'genealogia',                    label: 'Genealogia',                     ordemPadrao: 1,  requiredPadrao: true,  conditionalPadrao: false, slaDiasPadrao: 30 },
   { phaseKey: 'emissao_documental',            label: 'Emissão Documental',             ordemPadrao: 2,  requiredPadrao: true,  conditionalPadrao: false, slaDiasPadrao: 30 },
   { phaseKey: 'analise_documental',            label: 'Análise Documental',             ordemPadrao: 3,  requiredPadrao: true,  conditionalPadrao: false, slaDiasPadrao: 30 },
-  { phaseKey: 'retificacao',                   label: 'Retificação de Registros',       ordemPadrao: 4,  requiredPadrao: false, conditionalPadrao: true,  slaDiasPadrao: 30 },
+  { phaseKey: 'retificacao_registros',         label: 'Retificação de Registros',       ordemPadrao: 4,  requiredPadrao: false, conditionalPadrao: true,  slaDiasPadrao: 30 },
   { phaseKey: 'emissao_documental_retificada', label: 'Emissão Documental Retificada',  ordemPadrao: 5,  requiredPadrao: false, conditionalPadrao: true,  slaDiasPadrao: 30 },
-  { phaseKey: 'traducao',                      label: 'Tradução Juramentada',           ordemPadrao: 6,  requiredPadrao: true,  conditionalPadrao: false, slaDiasPadrao: 30 },
+  { phaseKey: 'traducao_juramentada',          label: 'Tradução Juramentada',           ordemPadrao: 6,  requiredPadrao: true,  conditionalPadrao: false, slaDiasPadrao: 30 },
   { phaseKey: 'apostilamento',                 label: 'Apostilamento',                  ordemPadrao: 7,  requiredPadrao: true,  conditionalPadrao: false, slaDiasPadrao: 30 },
   { phaseKey: 'aguardando_protocolo',          label: 'Aguardando Protocolo',           ordemPadrao: 8,  requiredPadrao: true,  conditionalPadrao: false, slaDiasPadrao: 30 },
   { phaseKey: 'protocolado',                   label: 'Protocolado',                    ordemPadrao: 9,  requiredPadrao: true,  conditionalPadrao: false, slaDiasPadrao: 30 },

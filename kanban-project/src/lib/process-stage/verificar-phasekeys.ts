@@ -39,6 +39,8 @@ export interface AchadoPhaseKey {
      * ela ressemeia o defeito no próximo macro criado.
      */
     | "CATALOGO_FASE_COM_CHAVE_LEGADA"
+    /** Modo interno da fase apontando para uma fase que não existe no catálogo. */
+    | "MODO_DE_FASE_COM_CHAVE_LEGADA"
   severidade: SeveridadePhaseKey
   macroWorkflowId: number
   macroNome: string | null
@@ -81,6 +83,8 @@ export interface ContextoVerificacao {
   processosPorTipo: Map<number, number>
   /** Cadastro de fases padrão. Omitido ⇒ não verifica a origem. */
   catalogoFase?: CatalogoFaseParaVerificar[]
+  /** Modos internos por fase (`PhaseInternalMode`). Omitido ⇒ não verifica. */
+  modosDeFase?: Array<{ id: number; phaseKey: string; key: string; modeUid: string }>
 }
 
 /** NÚCLEO PURO — sem prisma. A mesma função serve ao guard e ao runtime. */
@@ -174,6 +178,26 @@ export function verificarPhaseKeys(ctx: ContextoVerificacao): AchadoPhaseKey[] {
       detalhe: sugerida
         ? `CatalogoFase #${c.id} "${c.phaseKey}" não está no catálogo canônico; todo MacroWorkflow criado com seedDefaults nasce com esta chave. Equivalência confirmada: "${sugerida}".`
         : `CatalogoFase #${c.id} "${c.phaseKey}" não está no catálogo canônico e não tem equivalência conhecida — decisão humana.`,
+    })
+  }
+
+  // Modos internos da fase: keyed por phaseKey. Com a chave desalinhada, a fase existe
+  // e os modos dela ficam órfãos — a tela não acha nenhum, sem dizer por quê.
+  for (const m of ctx.modosDeFase ?? []) {
+    if (phaseKeyToFaseCode(m.phaseKey) != null) continue
+    const sugerida = EQUIVALENCIA_LEGADA[m.phaseKey] ?? null
+    achados.push({
+      tipo: "MODO_DE_FASE_COM_CHAVE_LEGADA",
+      severidade: "ALTA",
+      macroWorkflowId: -2,
+      macroNome: "(PhaseInternalMode — modos da fase)",
+      tipoProcessoCode: null,
+      faseMacroId: m.id,
+      phaseKey: m.phaseKey,
+      ordem: null,
+      canonicaSugerida: sugerida,
+      processosAfetados: 0,
+      detalhe: `PhaseInternalMode #${m.id} ("${m.modeUid}") aponta para a fase "${m.phaseKey}", fora do catálogo — os modos ficam órfãos da fase que os usa.`,
     })
   }
 
