@@ -21,6 +21,7 @@ import { montarChavePasso } from "@/src/services/phase-workflow-helpers"
 import { evoluirNecessidadePorPasso, reabrirAtendimentoNecessidade } from "@/src/services/necessidade-documental"
 import { chaveEvento } from "@/src/services/task-step-sync-helpers"
 import { recalcularFaseDoProcesso } from "@/src/lib/process-stage/recalcular-fase"
+import { projetarTarefaDoPasso, assegurarCoerenciaPassoTarefa } from "@/src/services/passo-tarefa-projecao"
 
 // Transição de estado do passo → evento operacional do motor. Fonte única desta
 // tradução para a operação por-documento; espelha o vocabulário de WorkflowEventoTipo.
@@ -326,6 +327,13 @@ export async function atualizarPassoV2(
   await prisma.$transaction(async (tx) => {
     await tx.phaseWorkflowStepInstance.update({ where: { id: p.id }, data })
 
+    // A TAREFA É PROJEÇÃO DO PASSO. Esta transação escrevia só o passo e deixava a
+    // tarefa como estava: em produção o passo "Localizar registro da certidão" ficou
+    // CONCLUIDO com a tarefa NAO_INICIADA. Projeção pelo mapeamento OFICIAL, na mesma
+    // transação — os dois estados nascem e mudam juntos, ou nenhum muda.
+    const passosTocados = [p.id]
+    await projetarTarefaDoPasso(tx, { stepInstanceId: p.id, statusPasso: novo })
+
     // CICLO DE VIDA DA NECESSIDADE (fluxo operacional oficial). Conclusão → ATENDIDA; início →
     // EM_ATENDIMENTO. REABERTURA → regride ATENDIDA/NAO_LOCALIZADA para EM_ATENDIMENTO (a
     // necessidade deixa de contar como concluída, o gate volta a bloquear). Sem escrita direta.
@@ -347,14 +355,24 @@ export async function atualizarPassoV2(
           where: { id: proximo.id },
           data: { status: "EM_ANDAMENTO", startedAt: now, prazo: due, motivo: null },
         })
+        passosTocados.push(proximo.id)
+        await projetarTarefaDoPasso(tx, { stepInstanceId: proximo.id, statusPasso: "EM_ANDAMENTO", agora: now })
       }
     }
     // REABERTURA: bloqueia as etapas posteriores do mesmo documento (voltam a depender desta).
     if (vaiReabrir) {
-      await tx.phaseWorkflowStepInstance.updateMany({
+      const posteriores = await tx.phaseWorkflowStepInstance.findMany({
         where: { documentoId, faseMacroKey: p.faseMacroKey, ordem: { gt: p.ordem }, status: { in: ["EM_ANDAMENTO", "AGUARDANDO"] } },
+        select: { id: true },
+      })
+      await tx.phaseWorkflowStepInstance.updateMany({
+        where: { id: { in: posteriores.map((x) => x.id) } },
         data: { status: "BLOQUEADO", startedAt: null, prazo: null, motivo: null },
       })
+      for (const posterior of posteriores) {
+        passosTocados.push(posterior.id)
+        await projetarTarefaDoPasso(tx, { stepInstanceId: posterior.id, statusPasso: "BLOQUEADO", agora: now })
+      }
     }
     await tx.documento.update({ where: { id: documentoId }, data: { ultimaMovimentacao: now } })
 
@@ -384,6 +402,10 @@ export async function atualizarPassoV2(
         },
       })
     }
+
+    // TRAVA antes do commit: nenhum par passo/tarefa desta transação pode terminar
+    // em estados contraditórios. Divergência ⇒ rollback integral.
+    await assegurarCoerenciaPassoTarefa(tx, passosTocados)
   })
   // CONCLUSÃO DA FASE E AVANÇO — automáticos, e no serviço, não na rota. Concluir a
   // última obrigação da fase é o que a conclui; quem concluiu por outro caminho (job,
@@ -410,9 +432,17 @@ export async function controlarOperacaoV2(documentoId: number, action: string, o
   const now = new Date()
   const obs = (observacao ?? "").trim()
   if (action === "cancelar" || action === "invalidar") {
-    await prisma.phaseWorkflowStepInstance.updateMany({
-      where: { documentoId, status: { notIn: ["CONCLUIDO", "SUPERSEDIDO", "CANCELADO"] } },
-      data: { status: "CANCELADO", cancelledAt: now },
+    await prisma.$transaction(async (tx) => {
+      const alvos = await tx.phaseWorkflowStepInstance.findMany({
+        where: { documentoId, status: { notIn: ["CONCLUIDO", "SUPERSEDIDO", "CANCELADO"] } },
+        select: { id: true },
+      })
+      await tx.phaseWorkflowStepInstance.updateMany({
+        where: { id: { in: alvos.map((x) => x.id) } },
+        data: { status: "CANCELADO", cancelledAt: now },
+      })
+      for (const alvo of alvos) await projetarTarefaDoPasso(tx, { stepInstanceId: alvo.id, statusPasso: "CANCELADO", agora: now })
+      await assegurarCoerenciaPassoTarefa(tx, alvos.map((x) => x.id))
     })
     await prisma.documento.update({
       where: { id: documentoId },
@@ -421,11 +451,25 @@ export async function controlarOperacaoV2(documentoId: number, action: string, o
         : { status: "PENDENTE", ultimaMovimentacao: now, dataInicioOperacao: null, dataPrazoOperacao: null, motivoBloqueio: obs ? `Operação cancelada: ${obs}` : "Operação cancelada" },
     })
   } else if (action === "pausar") {
-    await prisma.phaseWorkflowStepInstance.updateMany({ where: { documentoId, status: "EM_ANDAMENTO" }, data: { status: "BLOQUEADO", motivo: obs ? `Operação pausada: ${obs}` : "Operação pausada" } })
+    await prisma.$transaction(async (tx) => {
+      const alvos = await tx.phaseWorkflowStepInstance.findMany({ where: { documentoId, status: "EM_ANDAMENTO" }, select: { id: true } })
+      await tx.phaseWorkflowStepInstance.updateMany({
+        where: { id: { in: alvos.map((x) => x.id) } },
+        data: { status: "BLOQUEADO", motivo: obs ? `Operação pausada: ${obs}` : "Operação pausada" },
+      })
+      for (const alvo of alvos) await projetarTarefaDoPasso(tx, { stepInstanceId: alvo.id, statusPasso: "BLOQUEADO", agora: now })
+      await assegurarCoerenciaPassoTarefa(tx, alvos.map((x) => x.id))
+    })
     await prisma.documento.update({ where: { id: documentoId }, data: { ultimaMovimentacao: now, motivoBloqueio: obs ? `Operação pausada: ${obs}` : "Operação pausada" } })
   } else if (action === "retomar") {
     const primeiro = passos.find((s) => s.status === "BLOQUEADO")
-    if (primeiro) await prisma.phaseWorkflowStepInstance.update({ where: { id: primeiro.id }, data: { status: "EM_ANDAMENTO", motivo: null } })
+    if (primeiro) {
+      await prisma.$transaction(async (tx) => {
+        await tx.phaseWorkflowStepInstance.update({ where: { id: primeiro.id }, data: { status: "EM_ANDAMENTO", motivo: null } })
+        await projetarTarefaDoPasso(tx, { stepInstanceId: primeiro.id, statusPasso: "EM_ANDAMENTO", agora: now })
+        await assegurarCoerenciaPassoTarefa(tx, [primeiro.id])
+      })
+    }
     await prisma.documento.update({ where: { id: documentoId }, data: { ultimaMovimentacao: now, motivoBloqueio: null } })
   } else {
     return { ok: false, error: "action inválido", status: 400 }
@@ -453,13 +497,17 @@ export async function sincronizarStatusPassoV2(
   )
   if (!alvo) return false
   const novo = mapLegacyStepStatus(legacyStatus)
-  await prisma.phaseWorkflowStepInstance.update({
-    where: { id: alvo.id },
-    data: {
-      status: novo,
-      ...(novo === "CONCLUIDO" ? { completedAt: new Date() } : {}),
-      ...(novo === "EM_ANDAMENTO" ? { startedAt: new Date() } : {}),
-    },
+  await prisma.$transaction(async (tx) => {
+    await tx.phaseWorkflowStepInstance.update({
+      where: { id: alvo.id },
+      data: {
+        status: novo,
+        ...(novo === "CONCLUIDO" ? { completedAt: new Date() } : {}),
+        ...(novo === "EM_ANDAMENTO" ? { startedAt: new Date() } : {}),
+      },
+    })
+    await projetarTarefaDoPasso(tx, { stepInstanceId: alvo.id, statusPasso: novo })
+    await assegurarCoerenciaPassoTarefa(tx, [alvo.id])
   })
   return true
 }

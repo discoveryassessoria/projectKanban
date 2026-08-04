@@ -397,7 +397,11 @@ async function run() {
   ok(/resultado: "IDEMPOTENTE"/.test(svcF), "clique duplo converge para IDEMPOTENTE")
   ok(/phaseAdvanceLog\.create/.test(svcF) && /workflowEvento\.create/.test(svcF) && /domainOutbox\.create/.test(svcF), "auditoria: log + evento + outbox")
   ok(/calcularPendencias/.test(svcF), "recalcula pendências antes do avanço normal")
-  ok(/instanciarWorkflowDaFase\(/.test(svcF) && /garantirTarefaDePasso\(/.test(svcF), "compõe instanciação de fase + geração de tarefas na mesma tx")
+  // A geração de tarefas saiu do corpo da transação (escala com o número de alvos e
+  // estourava P2028) e passou pelo materializador OFICIAL, que é quem chama
+  // garantirTarefaDePasso. A composição continua: instanciar na tx, materializar logo
+  // após o commit, de forma idempotente.
+  ok(/instanciarWorkflowDaFase\(/.test(svcF) && /materializarExecucaoDaFase\(/.test(svcF), "compõe instanciação de fase (na tx) + materialização oficial do destino")
   ok(/JUSTIFICATIVA_OBRIGATORIA/.test(svcF) && /MOTIVO_OBRIGATORIO/.test(svcF), "forçado/retorno exigem justificativa + motivo")
   ok(/FASE_ALVO_NAO_ANTERIOR/.test(svcF), "retorno só para fase anterior")
   ok(!/\.custo|contaPagar|fatura|pagamento/i.test(svcF), "avanço NÃO executa efeito financeiro")

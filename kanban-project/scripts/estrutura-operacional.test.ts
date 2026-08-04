@@ -384,7 +384,11 @@ check("não há createMany+skipDuplicates fazendo o papel da constraint", !/phas
 
 console.log("\n(B7) Sequência por documento — no domínio, não na tela")
 check("liberar o próximo passo é escopado pelo DOCUMENTO", /findFirst\(\{\s*where: \{ documentoId, faseMacroKey: p\.faseMacroKey, ordem: \{ gt: p\.ordem \}/.test(docop))
-check("reabrir bloqueia só os posteriores DO MESMO documento", /updateMany\(\{\s*where: \{ documentoId, faseMacroKey: p\.faseMacroKey, ordem: \{ gt: p\.ordem \}/.test(docop))
+// A reabertura passou a LER os posteriores antes de bloqueá-los, porque cada um
+// precisa ter a tarefa projetada junto (passo e tarefa mudam no mesmo ato). O
+// escopo continua sendo o MESMO documento — é isso que a guarda protege.
+check("reabrir bloqueia só os posteriores DO MESMO documento", /findMany\(\{\s*where: \{ documentoId, faseMacroKey: p\.faseMacroKey, ordem: \{ gt: p\.ordem \}/.test(docop))
+check("e projeta a tarefa de cada posterior bloqueado", /posteriores[\s\S]{0,300}projetarTarefaDoPasso/.test(docop))
 check("o modo de execução é PERSISTIDO (SEQUENCIAL/PARALELO), não fixo no código", escopo.includes('execucao === "SEQUENCIAL"'))
 
 console.log("\n(B8) Segurança — validação no servidor")

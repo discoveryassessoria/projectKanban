@@ -29,17 +29,27 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
     if (responsavelId != null) {
       const u = await prisma.usuario.findUnique({ where: { id: responsavelId }, select: { id: true, nome: true } })
       if (!u) return NextResponse.json({ error: "Usuário responsável inválido." }, { status: 400 })
-      await prisma.phaseWorkflowStepInstance.updateMany({
-        where: { necessidadeId: nec.id, stepKey: "localizar_registro" },
-        data: { responsavelId },
+      // Responsável é do PAR passo+tarefa: delegar só o passo deixaria a fila da
+      // pessoa mostrando um dono e o painel do passo mostrando outro.
+      await prisma.$transaction(async (tx) => {
+        const passos = await tx.phaseWorkflowStepInstance.findMany({
+          where: { necessidadeId: nec.id, stepKey: "localizar_registro" }, select: { id: true },
+        })
+        const ids = passos.map((x) => x.id)
+        await tx.phaseWorkflowStepInstance.updateMany({ where: { id: { in: ids } }, data: { responsavelId } })
+        await tx.tarefa.updateMany({ where: { workflowStepInstanceId: { in: ids } }, data: { responsavelId } })
       })
       return NextResponse.json({ ok: true, responsavelId: u.id, responsavelNome: u.nome })
     }
 
     // desatribuir
-    await prisma.phaseWorkflowStepInstance.updateMany({
-      where: { necessidadeId: nec.id, stepKey: "localizar_registro" },
-      data: { responsavelId: null },
+    await prisma.$transaction(async (tx) => {
+      const passos = await tx.phaseWorkflowStepInstance.findMany({
+        where: { necessidadeId: nec.id, stepKey: "localizar_registro" }, select: { id: true },
+      })
+      const ids = passos.map((x) => x.id)
+      await tx.phaseWorkflowStepInstance.updateMany({ where: { id: { in: ids } }, data: { responsavelId: null } })
+      await tx.tarefa.updateMany({ where: { workflowStepInstanceId: { in: ids } }, data: { responsavelId: null } })
     })
     return NextResponse.json({ ok: true, responsavelId: null, responsavelNome: null })
   } catch (e) {

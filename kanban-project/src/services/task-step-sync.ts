@@ -12,6 +12,7 @@ import { prisma } from "@/lib/prisma"
 import { Prisma, type Tarefa, type PhaseWorkflowStepInstance, type WorkflowEventoTipo } from "@prisma/client"
 import { resolveWorkflowRuntime } from "@/src/lib/workflow-runtime"
 import * as H from "@/src/services/task-step-sync-helpers"
+import { projetarTarefaDoPasso, assegurarCoerenciaPassoTarefa } from "@/src/services/passo-tarefa-projecao"
 
 const TAREFA_CONCLUIDA_STATUS = "CONCLUIDO_RECEBIDO"
 
@@ -180,6 +181,7 @@ export async function iniciarTarefa(tarefaId: number, ctx: SyncContexto): Promis
       if (rt.code) return ko(rt.code, correlationId)
       let rp: { changed: boolean; anterior?: string; atual?: string } = { changed: false }
       if (t.workflowStepInstanceId) rp = await aplicarPasso(tx, t.workflowStepInstanceId, "EM_ANDAMENTO", "PASSO_INICIADO", base)
+      if (t.workflowStepInstanceId) await assegurarCoerenciaPassoTarefa(tx, [t.workflowStepInstanceId])
       return ok(rt.changed || rp.changed, correlationId, { tarefa: rt.anterior, passo: rp.anterior }, { tarefa: rt.atual, passo: rp.atual }, ["TAREFA_INICIADA", ...(rp.changed ? ["PASSO_INICIADO"] : [])])
     })
   } catch (e) { return convergirOuThrow(e, correlationId) }
@@ -221,6 +223,7 @@ export async function concluirTarefa(tarefaId: number, ctx: SyncContexto): Promi
           if (rc.changed) eventos.push("PASSO_CONCLUIDO")
         }
       }
+      if (t.workflowStepInstanceId) await assegurarCoerenciaPassoTarefa(tx, [t.workflowStepInstanceId])
       return ok(rt.changed, correlationId, { tarefa: rt.anterior, passo: passoAnterior }, { tarefa: rt.atual, passo: passoAtual }, eventos)
     })
   } catch (e) { return convergirOuThrow(e, correlationId) }
@@ -335,6 +338,7 @@ async function opPassoSimples(stepInstanceId: number, ctx: SyncContexto, alvoPas
         tAnt = rt.anterior; tAt = rt.atual
         if (rt.changed) eventos.push(sincronizarTarefa.evt as string)
       }
+      await assegurarCoerenciaPassoTarefa(tx, [stepInstanceId])
       return ok(rp.changed, correlationId, { passo: rp.anterior, tarefa: tAnt }, { passo: rp.atual, tarefa: tAt }, eventos)
     })
   } catch (e) { return convergirOuThrow(e, correlationId) }
@@ -374,6 +378,10 @@ export async function concluirPasso(stepInstanceId: number, ctx: SyncContexto): 
         tAnt = rt.anterior; tAt = rt.atual
         if (rt.changed) eventos.push("TAREFA_CONCLUIDA")
       }
+      // TRAVA antes do commit: o par não pode terminar contraditório. Se o mapeamento
+      // desta operação divergir do mapeamento OFICIAL, a transação cai aqui — o
+      // desalinhamento aparece na hora, não meses depois num relatório.
+      await assegurarCoerenciaPassoTarefa(tx, [stepInstanceId])
       return ok(true, correlationId, { passo: pAnt, tarefa: tAnt }, { passo: pAt, tarefa: tAt }, eventos)
     })
   } catch (e) { return convergirOuThrow(e, correlationId) }
@@ -399,6 +407,10 @@ export async function aprovarPasso(stepInstanceId: number, ctx: SyncContexto): P
       const ra = await aplicarPasso(tx, stepInstanceId, "CONCLUIDO", "PASSO_APROVADO", { ...base, extra: { aprovadorId: ctx.aprovadorId, approvedAt: new Date() } })
       if (ra.code) return ko(ra.code, correlationId)
       if (ra.changed) eventos.push("PASSO_APROVADO", "PASSO_CONCLUIDO")
+      // Aprovar CONCLUI o passo: a tarefa (já concluída pelo executor) tem de estar
+      // coerente com isso antes do commit.
+      await projetarTarefaDoPasso(tx, { stepInstanceId, statusPasso: "CONCLUIDO", usuarioId: ctx.aprovadorId })
+      await assegurarCoerenciaPassoTarefa(tx, [stepInstanceId])
       return ok(ra.changed, correlationId, { passo: ra.anterior }, { passo: ra.atual }, eventos)
     })
   } catch (e) { return convergirOuThrow(e, correlationId) }
