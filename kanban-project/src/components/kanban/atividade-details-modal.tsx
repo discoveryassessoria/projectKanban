@@ -477,7 +477,7 @@ function ConteudoModal({
 
   // Abas com o Discovery Design System (dark glass/dourado). As demais permanecem
   // no tema claro. Skin only — layout idêntico.
-  const finDark = activeTab === "faturas" || activeTab === "geral" || activeTab === "central" || activeTab === "documentos" || activeTab === "historico"
+  const finDark = activeTab === "faturas" || activeTab === "geral" || activeTab === "central" || activeTab === "documentos" || activeTab === "historico" || activeTab === "protocolos" || activeTab === "eventos" || activeTab === "arvore"
 
   const modalContent = (
     <>

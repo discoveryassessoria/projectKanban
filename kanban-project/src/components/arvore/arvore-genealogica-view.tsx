@@ -650,11 +650,11 @@ export function ArvoreGenealogicaView({
       <div className={`absolute inset-0 bg-white z-[9999] pointer-events-none transition-opacity duration-300 ${isTransitioning ? 'opacity-60' : 'opacity-0'}`} />
 
       {/* Toolbar */}
-      <div className="flex items-center justify-between px-4 py-2 bg-white border-b">
+      <div className="flex items-center justify-between px-4 py-2 bg-[#15191f] border-b border-white/10 text-white/70">
         <div className="flex items-center gap-2">
           {/* Botão Paisagem */}
           <button
-            className={`flex items-center gap-2 px-3 py-2 rounded transition-colors ${viewMode === 'paisagem' ? 'bg-gray-100' : 'hover:bg-gray-50'}`}
+            className={`flex items-center gap-2 px-3 py-2 rounded transition-colors ${viewMode === 'paisagem' ? 'bg-[#252c35] text-white/95' : 'hover:bg-[#252c35]'}`}
             onClick={() => setViewMode('paisagem')}
           >
             <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -669,7 +669,7 @@ export function ArvoreGenealogicaView({
 
           {/* Botão Retrato */}
           <button
-            className={`flex items-center gap-2 px-3 py-2 rounded transition-colors ${viewMode === 'retrato' ? 'bg-gray-100' : 'hover:bg-gray-50'}`}
+            className={`flex items-center gap-2 px-3 py-2 rounded transition-colors ${viewMode === 'retrato' ? 'bg-[#252c35] text-white/95' : 'hover:bg-[#252c35]'}`}
             onClick={() => setViewMode('retrato')}
           >
             <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -686,7 +686,7 @@ export function ArvoreGenealogicaView({
         <div className="flex items-center gap-1">
           {/* Botão Exportar PDF */}
           <button
-            className="flex items-center gap-2 px-3 py-2 hover:bg-gray-100 rounded transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            className="flex items-center gap-2 px-3 py-2 hover:bg-[#252c35] rounded transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             onClick={handleExportPDF}
             disabled={isExporting || pessoas.length === 0}
             title="Exportar para PDF"
@@ -703,7 +703,7 @@ export function ArvoreGenealogicaView({
 
           {/* Botão Fullscreen */}
           <button
-            className="p-2 hover:bg-gray-100 rounded transition-colors"
+            className="p-2 hover:bg-[#252c35] rounded transition-colors"
             onClick={handleToggleFullscreen}
             title={isFullscreen ? "Sair da tela cheia" : "Tela cheia"}
           >

@@ -437,10 +437,10 @@ export function ProcessoProtocolos({
   return (
     <div className="h-full flex flex-col">
       {/* Header */}
-      <div className="flex items-center justify-between px-6 py-4 border-b bg-white flex-shrink-0">
+      <div className="flex items-center justify-between px-6 py-4 border-b border-white/10 flex-shrink-0">
         <div className="flex items-center gap-2">
           <FileText className="h-5 w-5 text-orange-600" />
-          <h3 className="font-semibold text-gray-900">Protocolos</h3>
+          <h3 className="font-semibold text-white/95">Protocolos</h3>
           {protocolos.length > 0 && (
             <span className="px-2 py-0.5 bg-orange-100 text-orange-600 text-xs font-medium rounded-full">
               {protocolos.length}
@@ -468,19 +468,19 @@ export function ProcessoProtocolos({
           </div>
         ) : showForm ? (
           /* ===== FORMULÁRIO ===== */
-          <div className="max-w-2xl mx-auto bg-white border border-gray-200 rounded-lg p-6">
+          <div className="max-w-2xl mx-auto bg-[#1b2027] border border-white/10 rounded-lg p-6">
             <div className="flex items-center justify-between mb-1">
-              <h4 className="font-semibold text-gray-900">
+              <h4 className="font-semibold text-white/95">
                 {editando ? "Editar protocolização" : "Registrar protocolização"}
               </h4>
               <button
                 onClick={resetForm}
-                className="text-gray-400 hover:text-gray-600"
+                className="text-gray-400 hover:text-white/70"
               >
                 <X className="h-5 w-5" />
               </button>
             </div>
-            <p className="text-xs text-gray-500 mb-6">
+            <p className="text-xs text-white/70 mb-6">
               O registro entra na Timeline e no Histórico do processo — a fonte cronológica oficial dos protocolos realizados.
             </p>
 
@@ -488,7 +488,7 @@ export function ProcessoProtocolos({
               {/* Órgão + Setor */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                  <label className="block text-sm font-medium text-white/95 mb-1">
                     <Building2 className="h-4 w-4 inline mr-1" />
                     Órgão *
                   </label>
@@ -506,7 +506,7 @@ export function ProcessoProtocolos({
                   </select>
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Setor</label>
+                  <label className="block text-sm font-medium text-white/95 mb-1">Setor</label>
                   <Input
                     value={form.setor}
                     onChange={(e) => setForm({ ...form, setor: e.target.value })}
@@ -518,7 +518,7 @@ export function ProcessoProtocolos({
               {/* Data/hora + Número */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                  <label className="block text-sm font-medium text-white/95 mb-1">
                     <Calendar className="h-4 w-4 inline mr-1" />
                     Data e hora *
                   </label>
@@ -530,7 +530,7 @@ export function ProcessoProtocolos({
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                  <label className="block text-sm font-medium text-white/95 mb-1">
                     <Hash className="h-4 w-4 inline mr-1" />
                     Número do protocolo *
                   </label>
@@ -545,7 +545,7 @@ export function ProcessoProtocolos({
               {/* Tipo + Forma de envio */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Tipo de protocolo *</label>
+                  <label className="block text-sm font-medium text-white/95 mb-1">Tipo de protocolo *</label>
                   <select
                     value={form.tipoProtocolo}
                     onChange={(e) => setForm({ ...form, tipoProtocolo: e.target.value })}
@@ -558,7 +558,7 @@ export function ProcessoProtocolos({
                   </select>
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                  <label className="block text-sm font-medium text-white/95 mb-1">
                     <Send className="h-4 w-4 inline mr-1" />
                     Forma de envio *
                   </label>
@@ -578,7 +578,7 @@ export function ProcessoProtocolos({
               {/* Responsável + Pessoa vinculada */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                  <label className="block text-sm font-medium text-white/95 mb-1">
                     <User className="h-4 w-4 inline mr-1" />
                     Responsável *
                   </label>
@@ -594,7 +594,7 @@ export function ProcessoProtocolos({
                   </select>
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Pessoa vinculada</label>
+                  <label className="block text-sm font-medium text-white/95 mb-1">Pessoa vinculada</label>
                   <select
                     value={form.pessoaId ? `${form.tipoPessoa}-${form.pessoaId}` : ""}
                     onChange={(e) => {
@@ -632,18 +632,18 @@ export function ProcessoProtocolos({
 
               {/* Documentos enviados */}
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
+                <label className="block text-sm font-medium text-white/95 mb-1">
                   <Layers className="h-4 w-4 inline mr-1" />
                   Documentos enviados
                 </label>
                 {(opcoes?.documentos ?? []).length === 0 ? (
-                  <p className="text-xs text-gray-400 border border-dashed border-gray-200 rounded-md p-3">
+                  <p className="text-xs text-gray-400 border border-dashed border-white/10 rounded-md p-3">
                     Nenhum documento disponível neste processo.
                   </p>
                 ) : (
-                  <div className="max-h-44 overflow-y-auto border border-gray-200 rounded-md divide-y divide-gray-100">
+                  <div className="max-h-44 overflow-y-auto border border-white/10 rounded-md divide-y divide-gray-100">
                     {(opcoes?.documentos ?? []).map((d) => (
-                      <label key={d.id} className="flex items-start gap-2 px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 cursor-pointer">
+                      <label key={d.id} className="flex items-start gap-2 px-3 py-2 text-sm text-white/95 hover:bg-[#252c35] cursor-pointer">
                         <input
                           type="checkbox"
                           checked={form.documentoIds.includes(d.id)}
@@ -659,7 +659,7 @@ export function ProcessoProtocolos({
 
               {/* Observações */}
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
+                <label className="block text-sm font-medium text-white/95 mb-1">
                   Observações
                 </label>
                 <textarea
@@ -671,7 +671,7 @@ export function ProcessoProtocolos({
                 />
               </div>
 
-              <p className="text-xs text-gray-500">
+              <p className="text-xs text-white/70">
                 O comprovante/anexo é enviado no cartão do protocolo, logo após o registro.
               </p>
 
@@ -703,8 +703,8 @@ export function ProcessoProtocolos({
           /* ===== EMPTY STATE ===== */
           <div className="text-center py-12">
             <FileText className="h-12 w-12 mx-auto mb-4 text-gray-300" />
-            <h3 className="text-lg font-medium text-gray-700">Nenhuma protocolização registrada</h3>
-            <p className="text-sm text-gray-500 mt-1 mb-4">
+            <h3 className="text-lg font-medium text-white/95">Nenhuma protocolização registrada</h3>
+            <p className="text-sm text-white/70 mt-1 mb-4">
               {podeEditar
                 ? "Registre aqui cada protocolo realizado — ele entra na Timeline e no Histórico do processo"
                 : "Ainda não há protocolos registrados para este processo"
@@ -733,7 +733,7 @@ export function ProcessoProtocolos({
               return (
                 <div
                   key={protocolo.id}
-                  className="bg-white border border-gray-200 rounded-lg overflow-hidden"
+                  className="bg-[#1b2027] border border-white/10 rounded-lg overflow-hidden"
                 >
                   {/* Card principal */}
                   <div className="p-4">
@@ -741,12 +741,12 @@ export function ProcessoProtocolos({
                       <div className="flex-1">
                         {/* Órgão + setor */}
                         <div className="flex items-center gap-2 mb-2">
-                          <Building2 className="h-4 w-4 text-gray-500" />
-                          <span className="font-semibold text-gray-900">
+                          <Building2 className="h-4 w-4 text-white/70" />
+                          <span className="font-semibold text-white/95">
                             {rotuloOrgao(protocolo)}
                           </span>
                           {protocolo.setor && (
-                            <span className="text-xs px-2 py-0.5 bg-gray-100 text-gray-600 rounded">
+                            <span className="text-xs px-2 py-0.5 bg-[#252c35] text-white/70 rounded">
                               {protocolo.setor}
                             </span>
                           )}
@@ -759,27 +759,27 @@ export function ProcessoProtocolos({
 
                         {/* Info do protocolo */}
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm ml-5">
-                          <div className="flex items-center gap-2 text-gray-600">
+                          <div className="flex items-center gap-2 text-white/70">
                             <Calendar className="h-4 w-4 text-gray-400" />
                             <span>{formatarDataHora(protocolo.dataProtocolo)}</span>
                           </div>
 
                           {protocolo.numeroProtocolo && (
-                            <div className="flex items-center gap-2 text-gray-600">
+                            <div className="flex items-center gap-2 text-white/70">
                               <Hash className="h-4 w-4 text-gray-400" />
                               <span className="font-mono">{protocolo.numeroProtocolo}</span>
                             </div>
                           )}
 
                           {rotuloForma(protocolo.formaEnvio) && (
-                            <div className="flex items-center gap-2 text-gray-600">
+                            <div className="flex items-center gap-2 text-white/70">
                               <Send className="h-4 w-4 text-gray-400" />
                               <span>{rotuloForma(protocolo.formaEnvio)}</span>
                             </div>
                           )}
 
                           {protocolo.responsavel && (
-                            <div className="flex items-center gap-2 text-gray-600">
+                            <div className="flex items-center gap-2 text-white/70">
                               <User className="h-4 w-4 text-gray-400" />
                               <span>{protocolo.responsavel.nome}</span>
                             </div>
@@ -787,19 +787,19 @@ export function ProcessoProtocolos({
                         </div>
 
                         {pessoa && (
-                          <p className="text-xs text-gray-500 mt-2 ml-5">{pessoa}</p>
+                          <p className="text-xs text-white/70 mt-2 ml-5">{pessoa}</p>
                         )}
 
                         {/* Documentos enviados */}
                         {documentos.length > 0 && (
                           <div className="mt-2 ml-5">
-                            <p className="text-xs font-medium text-gray-600 flex items-center gap-1">
+                            <p className="text-xs font-medium text-white/70 flex items-center gap-1">
                               <Layers className="h-3.5 w-3.5" />
                               Documentos enviados ({documentos.length})
                             </p>
                             <ul className="mt-1 space-y-0.5">
                               {documentos.map((d) => (
-                                <li key={d.id} className="text-xs text-gray-500">
+                                <li key={d.id} className="text-xs text-white/70">
                                   •{" "}
                                   {rotuloDocumento({
                                     publicCode: d.documento?.publicCode,
@@ -815,7 +815,7 @@ export function ProcessoProtocolos({
 
                         {/* Observações */}
                         {protocolo.observacoes && (
-                          <p className="text-sm text-gray-500 mt-2 ml-5 italic">
+                          <p className="text-sm text-white/70 mt-2 ml-5 italic">
                             {protocolo.observacoes}
                           </p>
                         )}
@@ -844,7 +844,7 @@ export function ProcessoProtocolos({
 
                     {/* Seção de Anexos */}
                     <div className="mt-4 pt-4 border-t border-gray-100">
-                      <h4 className="text-sm font-medium text-gray-700 flex items-center gap-2 mb-3">
+                      <h4 className="text-sm font-medium text-white/95 flex items-center gap-2 mb-3">
                         <Paperclip className="h-4 w-4" />
                         Comprovantes e anexos
                         {anexos.length > 0 && (
@@ -864,7 +864,7 @@ export function ProcessoProtocolos({
                             return (
                               <div
                                 key={anexo.id}
-                                className="group relative bg-gray-50 rounded-lg border border-gray-200 overflow-hidden hover:shadow-md transition-shadow"
+                                className="group relative bg-[#1b2027] rounded-lg border border-white/10 overflow-hidden hover:shadow-md transition-shadow"
                               >
                                 {/* Preview */}
                                 <a
@@ -880,7 +880,7 @@ export function ProcessoProtocolos({
                                       className="w-full h-full object-cover"
                                     />
                                   ) : (
-                                    <div className="w-full h-full flex items-center justify-center bg-gray-100">
+                                    <div className="w-full h-full flex items-center justify-center bg-[#252c35]">
                                       {isPDF ? (
                                         <div className="w-12 h-14 bg-red-600 rounded-sm flex items-center justify-center text-white text-xs font-bold">
                                           PDF
@@ -898,8 +898,8 @@ export function ProcessoProtocolos({
                                 </a>
 
                                 {/* Info */}
-                                <div className="p-2 border-t border-gray-200">
-                                  <p className="text-xs text-gray-700 truncate" title={anexo.nome}>
+                                <div className="p-2 border-t border-white/10">
+                                  <p className="text-xs text-white/95 truncate" title={anexo.nome}>
                                     {anexo.nome}
                                   </p>
                                   {anexo.tamanho && (
@@ -928,14 +928,14 @@ export function ProcessoProtocolos({
                       {/* Arquivos selecionados (pendentes de upload) - apenas para quem pode editar */}
                       {podeEditar && arquivosPendentesProtocolo.length > 0 && (
                         <div className="mb-4 space-y-2">
-                          <p className="text-sm text-gray-600 font-medium">Arquivos selecionados:</p>
+                          <p className="text-sm text-white/70 font-medium">Arquivos selecionados:</p>
                           {arquivosPendentesProtocolo.map((arquivo, index) => (
                             <div key={index} className="flex items-center justify-between p-3 bg-amber-50 rounded-lg border border-amber-200">
                               <div className="flex items-center gap-3">
                                 <FileText className="h-5 w-5 text-amber-600" />
                                 <div>
-                                  <p className="text-sm font-medium text-gray-700">{arquivo.name}</p>
-                                  <p className="text-xs text-gray-500">{formatFileSize(arquivo.size)}</p>
+                                  <p className="text-sm font-medium text-white/95">{arquivo.name}</p>
+                                  <p className="text-xs text-white/70">{formatFileSize(arquivo.size)}</p>
                                 </div>
                               </div>
                               <button
@@ -978,7 +978,7 @@ export function ProcessoProtocolos({
                             accept="image/*,.pdf,.doc,.docx,.xls,.xlsx"
                           />
                           <FileText className="h-8 w-8 mx-auto mb-2 text-gray-400" />
-                          <p className="text-sm text-gray-600 font-medium">Clique para selecionar arquivos</p>
+                          <p className="text-sm text-white/70 font-medium">Clique para selecionar arquivos</p>
                           <p className="text-xs text-gray-400 mt-1">Imagens, PDF, Word, Excel (máx. 64MB cada)</p>
                         </label>
                       )}

@@ -228,8 +228,8 @@ export function ProcessoEventos({ processoId, onUpdate }: ProcessoEventosProps) 
               <Calendar className="h-5 w-5 text-blue-600" />
             </div>
             <div>
-              <h2 className="text-lg font-semibold text-gray-900">Eventos</h2>
-              <p className="text-sm text-gray-500">
+              <h2 className="text-lg font-semibold text-white/95">Eventos</h2>
+              <p className="text-sm text-white/70">
                 {eventos.length} {eventos.length === 1 ? "evento" : "eventos"}
               </p>
             </div>
@@ -248,14 +248,14 @@ export function ProcessoEventos({ processoId, onUpdate }: ProcessoEventosProps) 
 
         {/* Formulário */}
         {showForm && (
-          <div className="mb-6 p-4 bg-gray-50 rounded-xl border border-gray-200">
+          <div className="mb-6 p-4 bg-[#1b2027] rounded-xl border border-white/10">
             <div className="flex items-center justify-between mb-4">
-              <h3 className="font-medium text-gray-900">
+              <h3 className="font-medium text-white/95">
                 {editingId ? "Editar Evento" : "Novo Evento"}
               </h3>
               <button
                 onClick={resetForm}
-                className="text-gray-400 hover:text-gray-600"
+                className="text-gray-400 hover:text-white/70"
               >
                 <X className="h-5 w-5" />
               </button>
@@ -264,7 +264,7 @@ export function ProcessoEventos({ processoId, onUpdate }: ProcessoEventosProps) 
             <div className="space-y-4">
               {/* Título */}
               <div>
-                <label className="text-sm text-gray-600 mb-1 block">Título *</label>
+                <label className="text-sm text-white/70 mb-1 block">Título *</label>
                 <Input
                   value={titulo}
                   onChange={(e) => setTitulo(e.target.value)}
@@ -274,7 +274,7 @@ export function ProcessoEventos({ processoId, onUpdate }: ProcessoEventosProps) 
 
               {/* Tipo */}
               <div>
-                <label className="text-sm text-gray-600 mb-1 block">Tipo</label>
+                <label className="text-sm text-white/70 mb-1 block">Tipo</label>
                 <div className="grid grid-cols-4 gap-2">
                   {TIPOS_EVENTO.map((t) => {
                     const Icon = t.icon
@@ -285,7 +285,7 @@ export function ProcessoEventos({ processoId, onUpdate }: ProcessoEventosProps) 
                         className={`p-2 rounded-lg border text-sm flex flex-col items-center gap-1 transition-colors ${
                           tipo === t.value
                             ? "border-blue-500 bg-blue-50 text-blue-700"
-                            : "border-gray-200 hover:border-gray-300 text-gray-600"
+                            : "border-white/10 hover:border-gray-300 text-white/70"
                         }`}
                       >
                         <Icon className="h-4 w-4" style={{ color: t.cor }} />
@@ -305,7 +305,7 @@ export function ProcessoEventos({ processoId, onUpdate }: ProcessoEventosProps) 
                   onChange={(e) => setDiaInteiro(e.target.checked)}
                   className="rounded border-gray-300"
                 />
-                <label htmlFor="diaInteiro" className="text-sm text-gray-600">
+                <label htmlFor="diaInteiro" className="text-sm text-white/70">
                   Dia inteiro
                 </label>
               </div>
@@ -313,7 +313,7 @@ export function ProcessoEventos({ processoId, onUpdate }: ProcessoEventosProps) 
               {/* Data/Hora */}
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="text-sm text-gray-600 mb-1 block">
+                  <label className="text-sm text-white/70 mb-1 block">
                     Data Início *
                   </label>
                   <DatePickerField
@@ -324,7 +324,7 @@ export function ProcessoEventos({ processoId, onUpdate }: ProcessoEventosProps) 
                 </div>
                 {!diaInteiro && (
                   <div>
-                    <label className="text-sm text-gray-600 mb-1 block">Hora</label>
+                    <label className="text-sm text-white/70 mb-1 block">Hora</label>
                     <Input
                       type="time"
                       value={horaInicio}
@@ -337,7 +337,7 @@ export function ProcessoEventos({ processoId, onUpdate }: ProcessoEventosProps) 
             {!diaInteiro && (
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="text-sm text-gray-600 mb-1 block">
+                  <label className="text-sm text-white/70 mb-1 block">
                     Data Fim (opcional)
                   </label>
                   <DatePickerField
@@ -348,7 +348,7 @@ export function ProcessoEventos({ processoId, onUpdate }: ProcessoEventosProps) 
                 </div>
                 {dataFim && (
                   <div>
-                    <label className="text-sm text-gray-600 mb-1 block">Hora</label>
+                    <label className="text-sm text-white/70 mb-1 block">Hora</label>
                     <Input
                       type="time"
                       value={horaFim}
@@ -361,7 +361,7 @@ export function ProcessoEventos({ processoId, onUpdate }: ProcessoEventosProps) 
 
               {/* Local */}
               <div>
-                <label className="text-sm text-gray-600 mb-1 block">Local</label>
+                <label className="text-sm text-white/70 mb-1 block">Local</label>
                 <Input
                   value={local}
                   onChange={(e) => setLocal(e.target.value)}
@@ -371,7 +371,7 @@ export function ProcessoEventos({ processoId, onUpdate }: ProcessoEventosProps) 
 
               {/* Lembrete */}
               <div>
-                <label className="text-sm text-gray-600 mb-1 block">
+                <label className="text-sm text-white/70 mb-1 block">
                   Lembrete (dias antes)
                 </label>
                 <Input
@@ -385,7 +385,7 @@ export function ProcessoEventos({ processoId, onUpdate }: ProcessoEventosProps) 
 
               {/* Descrição */}
               <div>
-                <label className="text-sm text-gray-600 mb-1 block">Descrição</label>
+                <label className="text-sm text-white/70 mb-1 block">Descrição</label>
                 <textarea
                   value={descricao}
                   onChange={(e) => setDescricao(e.target.value)}
@@ -413,7 +413,7 @@ export function ProcessoEventos({ processoId, onUpdate }: ProcessoEventosProps) 
         {eventos.length === 0 ? (
           <div className="text-center py-12">
             <Calendar className="h-12 w-12 mx-auto mb-4 text-gray-300" />
-            <p className="text-gray-500">Nenhum evento cadastrado</p>
+            <p className="text-white/70">Nenhum evento cadastrado</p>
             <p className="text-sm text-gray-400 mt-1">
               Clique em "Novo Evento" para adicionar
             </p>
@@ -427,7 +427,7 @@ export function ProcessoEventos({ processoId, onUpdate }: ProcessoEventosProps) 
               return (
                 <div
                   key={evento.id}
-                  className="p-4 bg-white rounded-xl border border-gray-200 hover:border-gray-300 transition-colors"
+                  className="p-4 bg-[#1b2027] rounded-xl border border-white/10 hover:border-gray-300 transition-colors"
                 >
                   <div className="flex items-start justify-between">
                     <div className="flex items-start gap-3">
@@ -441,8 +441,8 @@ export function ProcessoEventos({ processoId, onUpdate }: ProcessoEventosProps) 
                         />
                       </div>
                       <div>
-                        <h4 className="font-medium text-gray-900">{evento.titulo}</h4>
-                        <div className="flex items-center gap-3 mt-1 text-sm text-gray-500">
+                        <h4 className="font-medium text-white/95">{evento.titulo}</h4>
+                        <div className="flex items-center gap-3 mt-1 text-sm text-white/70">
                           <span className="flex items-center gap-1">
                             <Clock className="h-3.5 w-3.5" />
                             {formatarData(evento.dataInicio, evento.diaInteiro)}
@@ -455,7 +455,7 @@ export function ProcessoEventos({ processoId, onUpdate }: ProcessoEventosProps) 
                           )}
                         </div>
                         {evento.descricao && (
-                          <p className="text-sm text-gray-500 mt-2">
+                          <p className="text-sm text-white/70 mt-2">
                             {evento.descricao}
                           </p>
                         )}

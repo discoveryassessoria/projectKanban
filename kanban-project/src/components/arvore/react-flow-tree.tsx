@@ -1468,7 +1468,11 @@ const ReactFlowTreeInner = forwardRef<ReactFlowTreeRef, ReactFlowTreeProps>(({
       <Background color="#e0e0e0" gap={20} />
       
       <Panel position="bottom-left">
-        <div className="flex flex-col bg-white border border-gray-200 rounded shadow-sm">
+        {/* text-gray-700 EXPLÍCITO: os SVGs abaixo usam stroke="currentColor" e não
+            declaram cor própria. Sem isto, herdam a cor do ancestral — e quando a
+            árvore abre dentro do modal de processo (tema escuro, text-white), o
+            ícone fica branco sobre botão branco: invisível. */}
+        <div className="flex flex-col bg-white border border-gray-200 rounded shadow-sm text-gray-700">
           <button
             onClick={() => zoomIn()}
             className="p-2 hover:bg-gray-100 border-b border-gray-200"
