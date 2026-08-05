@@ -814,15 +814,15 @@ export function ArvoreGenealogicaView({
             `absolute` no canto superior direito, longe dos controles que já
             existiam no canto inferior esquerdo. O <ReactFlowTree> acima não sabe
             que elas existem: abrir ou fechar não move um card sequer. */}
-        {/* Uma barra só. "Importar Árvore" NÃO depende de `pessoas.length`:
-            árvore vazia é justamente quando importar faz mais sentido. Buscar e
-            Análise seguem condicionais — não há o que buscar nem analisar sem
-            pessoas. */}
+        {/* Uma barra só, nesta ordem: Buscar · Importar Árvore · Análise.
+            "Importar Árvore" NÃO depende de `pessoas.length`: árvore vazia é
+            justamente quando importar faz mais sentido. Buscar e Análise seguem
+            condicionais — não há o que buscar nem analisar sem pessoas. Por
+            ficarem em lados opostos do Importar, cada um carrega a sua própria
+            guarda em vez de dividirem um fragmento. */}
         {(pessoas.length > 0 || podeImportar) && (
           <div className="absolute right-4 top-4 z-20 flex items-center gap-2">
-            {botaoImportar}
             {pessoas.length > 0 && (
-            <>
             <button
               onClick={() => setPaletaAberta(true)}
               title="Buscar pessoa (⌘K)"
@@ -832,6 +832,9 @@ export function ArvoreGenealogicaView({
               <span className="hidden sm:inline">Buscar</span>
               <kbd className="hidden rounded border border-gray-200 px-1 text-[10px] text-gray-400 sm:inline">⌘K</kbd>
             </button>
+            )}
+            {botaoImportar}
+            {pessoas.length > 0 && (
             <button
               onClick={() => setPainelAberto(true)}
               title="Inteligência da árvore"
@@ -847,7 +850,6 @@ export function ArvoreGenealogicaView({
                 </span>
               )}
             </button>
-            </>
             )}
           </div>
         )}
@@ -1008,9 +1010,12 @@ function AddPersonModal({
   const [precisaDocumentacao, setPrecisaDocumentacao] = useState<boolean>(true)
 
   // Classes padrão
-  const inputClass = "w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500 bg-white text-sm h-[42px]"
+  // O Preflight do Tailwind aplica `color: inherit` em input/select/textarea.
+  // Declarar `bg-white` sem declarar a cor do texto deixa o campo à mercê do que
+  // o ancestral definir — foi assim que o valor digitado virou branco no branco.
+  const inputClass = "w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500 bg-white text-gray-900 placeholder:text-gray-400 text-sm h-[42px]"
   
-  const selectClass = "w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500 bg-white text-sm h-[42px] appearance-none cursor-pointer"
+  const selectClass = "w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500 bg-white text-gray-900 text-sm h-[42px] appearance-none cursor-pointer"
   
   const selectStyle = {
     backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%239ca3af' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E")`,
@@ -1176,7 +1181,13 @@ function AddPersonModal({
   return (
     <>
       <div className="fixed inset-0 bg-black/50 z-[10003]" onClick={onClose} />
-      <div className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-white rounded-xl shadow-2xl z-[10004] w-full max-w-3xl max-h-[90vh] overflow-y-auto">
+      {/* `text-gray-900` na RAIZ do modal não é redundância com as classes dos
+          campos: o modal é filho, na árvore DOM, do container de abas que ganha
+          `text-white/80` quando `finDark` está ligado (atividade-details-modal),
+          e `position: fixed` NÃO interrompe herança de cor. Sem uma cor própria
+          aqui, todo elemento sem `text-` explícito herda branco sobre `bg-white`
+          — inclusive qualquer campo que venha a ser adicionado depois. */}
+      <div className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-white text-gray-900 rounded-xl shadow-2xl z-[10004] w-full max-w-3xl max-h-[90vh] overflow-y-auto">
         <div className="px-6 py-4 border-b sticky top-0 bg-white">
           <h2 className="text-xl font-semibold text-gray-900">{titles[type || 'pessoa']}</h2>
         </div>
@@ -1356,7 +1367,7 @@ function AddPersonModal({
           {/* ===== Observações ===== */}
           <section className="border-t border-gray-100 pt-5">
             <h3 className="text-xs font-semibold uppercase tracking-wider text-gray-400 mb-3">Observações</h3>
-            <textarea value={comentario} onChange={(e) => setComentario(e.target.value)} rows={2} className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500 resize-none text-sm" />
+            <textarea value={comentario} onChange={(e) => setComentario(e.target.value)} rows={2} className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500 bg-white text-gray-900 placeholder:text-gray-400 resize-none text-sm" />
           </section>
 
           <div className="flex justify-end gap-3 pt-4 border-t border-gray-100">
@@ -1415,9 +1426,12 @@ function EditPersonModal({
   const [precisaDocumentacao, setPrecisaDocumentacao] = useState<boolean>((pessoa as any).documentacao ?? true)
 
   // Classes padrão
-  const inputClass = "w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500 bg-white text-sm h-[42px]"
+  // O Preflight do Tailwind aplica `color: inherit` em input/select/textarea.
+  // Declarar `bg-white` sem declarar a cor do texto deixa o campo à mercê do que
+  // o ancestral definir — foi assim que o valor digitado virou branco no branco.
+  const inputClass = "w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500 bg-white text-gray-900 placeholder:text-gray-400 text-sm h-[42px]"
   
-  const selectClass = "w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500 bg-white text-sm h-[42px] appearance-none cursor-pointer"
+  const selectClass = "w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500 bg-white text-gray-900 text-sm h-[42px] appearance-none cursor-pointer"
   
   const selectStyle = {
     backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%239ca3af' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E")`,
@@ -1520,7 +1534,13 @@ function EditPersonModal({
   return (
     <>
       <div className="fixed inset-0 bg-black/50 z-[10003]" onClick={onClose} />
-      <div className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-white rounded-xl shadow-2xl z-[10004] w-full max-w-3xl max-h-[90vh] overflow-y-auto">
+      {/* `text-gray-900` na RAIZ do modal não é redundância com as classes dos
+          campos: o modal é filho, na árvore DOM, do container de abas que ganha
+          `text-white/80` quando `finDark` está ligado (atividade-details-modal),
+          e `position: fixed` NÃO interrompe herança de cor. Sem uma cor própria
+          aqui, todo elemento sem `text-` explícito herda branco sobre `bg-white`
+          — inclusive qualquer campo que venha a ser adicionado depois. */}
+      <div className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-white text-gray-900 rounded-xl shadow-2xl z-[10004] w-full max-w-3xl max-h-[90vh] overflow-y-auto">
         <div className="px-6 py-4 border-b sticky top-0 bg-white">
           <h2 className="text-xl font-semibold text-gray-900">Editar Pessoa</h2>
         </div>
@@ -1673,7 +1693,7 @@ function EditPersonModal({
           {/* ===== Observações ===== */}
           <section className="border-t border-gray-100 pt-5">
             <h3 className="text-xs font-semibold uppercase tracking-wider text-gray-400 mb-3">Observações</h3>
-            <textarea value={comentario} onChange={(e) => setComentario(e.target.value)} rows={2} className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500 resize-none text-sm" />
+            <textarea value={comentario} onChange={(e) => setComentario(e.target.value)} rows={2} className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500 bg-white text-gray-900 placeholder:text-gray-400 resize-none text-sm" />
           </section>
 
           <div className="flex justify-end gap-3 pt-4 border-t border-gray-100">

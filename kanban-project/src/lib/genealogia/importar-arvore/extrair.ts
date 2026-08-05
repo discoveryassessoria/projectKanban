@@ -10,7 +10,10 @@
 // Lá a IA investigava certidões manuscritas e inferia vínculos — caro e frágil.
 // Aqui a entrada já vem organizada em cards, então a instrução é TRANSCREVER:
 //   • ler cada card e devolver os campos como estão escritos;
-//   • NÃO inferir dado ausente — campo ilegível ou cortado é OMITIDO;
+//   • TRANSCREVER o que está escrito e DERIVAR só o que está numa lista fechada
+//     (sexo pela cor do card, país pela cidade, nacionalidade pelo país, UF
+//     colada à cidade) — toda derivação vai para `avisos`, para o operador
+//     separar na prévia o que foi lido do que foi deduzido;
 //   • NÃO analisar robustez do caso (elo sem documento etc.) — fora de escopo;
 //   • o vínculo pai/mãe vem das LINHAS entre os cards, não de dedução por
 //     sobrenome ou idade;
@@ -140,15 +143,22 @@ export const ESQUEMA_EXTRACAO = {
           sexo: {
             type: "string",
             enum: ["masculino", "feminino", ""],
-            description: 'Só quando o card marca explicitamente (M/F, símbolo, rótulo). Nunca deduzir pelo nome; senão "".',
+            description:
+              'Regra B1: COR DO CARD primeiro (azul=masculino, rosa=feminino); sem cor utilizável, pelo nome próprio quando inequívoco; senão "".',
           },
           data_nasc: DATA,
-          local_nasc: { type: "string", description: 'Cidade de nascimento; "" se ilegível.' },
-          estado_nasc: TEXTO,
-          pais_nasc: TEXTO,
-          nacionalidade: TEXTO,
+          local_nasc: { type: "string", description: 'Cidade de nascimento, sem a UF (regra B4); "" se ilegível.' },
+          estado_nasc: { type: "string", description: 'UF/estado, inclusive quando vier colado à cidade ("Ribeirão Preto/SP" ⇒ "SP").' },
+          pais_nasc: { type: "string", description: 'Regra B2: derive da cidade/UF quando identificável ("Ribeirão Preto/SP" ⇒ "Brasil"); senão "".' },
+          nacionalidade: {
+            type: "string",
+            description: 'Regra B3: derive do país concordando com o sexo (Brasil ⇒ "Brasileiro"/"Brasileira"); "" se o país for indeterminado.',
+          },
           data_obito: DATA,
-          local_obito: TEXTO,
+          local_obito: {
+            type: "string",
+            description: 'Cidade/UF do falecimento (regra A4). Campo de primeira classe: se o card ou o texto complementar citam o local, ele TEM de vir aqui.',
+          },
           numeroLinhagem: { type: "string", description: 'Número de linhagem/geração se o card mostrar; senão "".' },
           paiRef: { type: "string", description: '`ref` do pai, quando houver LINHA ligando os cards; senão "".' },
           maeRef: { type: "string", description: '`ref` da mãe, quando houver LINHA ligando os cards; senão "".' },
@@ -174,7 +184,8 @@ export const ESQUEMA_EXTRACAO = {
     },
     avisos: {
       type: "array",
-      description: "Uma linha curta por leitura duvidosa, citando o `ref`. Sem dúvidas, devolva [].",
+      description:
+        "Uma linha por leitura duvidosa E uma por cada derivação da PARTE B (campo, valor e base), citando o `ref`. Sem nada a registrar, devolva [].",
       items: { type: "string" },
     },
   },
@@ -182,49 +193,102 @@ export const ESQUEMA_EXTRACAO = {
 
 // ---------------------------------------------------------------- prompt
 
-const SISTEMA = `Você transcreve uma ÁRVORE GENEALÓGICA JÁ MONTADA a partir da imagem enviada.
+const SISTEMA = `Você extrai uma ÁRVORE GENEALÓGICA JÁ MONTADA a partir da imagem
+enviada, mais o texto complementar quando houver.
 
-A imagem NÃO é uma certidão nem um documento manuscrito: é o print de uma árvore
-já organizada, com uma pessoa por card e linhas ligando os cards. Sua tarefa é
-LER e COPIAR o que está escrito. Não investigue, não deduza, não complete.
+A imagem NÃO é certidão nem documento manuscrito: é o print de uma árvore já
+organizada, com uma pessoa por card e linhas ligando os cards.
 
-REGRAS
+O trabalho tem duas partes, e a fronteira entre elas é o que separa leitura de
+invenção:
+  A. TRANSCREVER o que está escrito.
+  B. DERIVAR o que decorre necessariamente do que está escrito — e SÓ o que está
+     na lista fechada da PARTE B.
 
-1. TRANSCREVA LITERALMENTE. Nome, sobrenome, datas e locais saem exatamente como
-   estão escritos no card: sem corrigir grafia, sem traduzir, sem expandir
-   abreviação, sem padronizar acento.
+REGRA MESTRA: nenhum dado presente na imagem ou no texto complementar pode sair
+em branco. Se a informação está em qualquer uma das duas fontes — mesmo exigindo
+uma derivação da lista B — ela TEM de ser preenchida. String vazia ("") é
+reservada ao que não consta em nenhuma das duas.
 
-2. O QUE NÃO DÁ PARA LER SAI COMO STRING VAZIA (""). Todas as chaves são
-   obrigatórias: sempre inclua todas, e use "" no que estiver ausente, cortado
-   pela borda, borrado, coberto ou ambíguo. Nunca invente, estime, arredonde nem
-   complete a partir do contexto. "" é a resposta certa, não uma falha.
+FORMATO: todas as chaves são obrigatórias. Sempre inclua todas, usando "" no que
+ficar sem valor.
 
-3. DATA só sai preenchida se der para ler dia, mês e ano, no formato YYYY-MM-DD.
-   Data parcial ("1890", "c. 1902", "19??", "mar/1930") sai como "" e entra em
-   'avisos' dizendo o que estava escrito.
+═══ PARTE A — TRANSCRIÇÃO ═══
 
-4. FILIAÇÃO VEM DAS LINHAS entre os cards — nunca de dedução por sobrenome
-   igual, diferença de idade ou posição na página. Sem linha ligando o card do
-   filho ao do pai/mãe, 'paiRef' e 'maeRef' saem como "".
+A1. LITERAL. Nome, sobrenome, datas e locais saem como estão escritos: sem
+    corrigir grafia, sem traduzir, sem expandir abreviação, sem padronizar acento.
 
-5. CASAMENTO ('unioes') só quando a imagem marca o par explicitamente: linha de
-   casal, símbolo de união, rótulo "casado com", moldura de casal. Duas pessoas
-   no mesmo nível, ou lado a lado, NÃO são um casal.
+A2. O TEXTO COMPLEMENTAR TEM O MESMO PESO DA IMAGEM. Dado que só aparece nele
+    entra normalmente. Se os dois se contradisserem, vale a imagem e a
+    divergência entra em 'avisos'.
 
-6. NÃO ANALISE O CASO. Robustez do vínculo, documento faltante, viabilidade de
-   cidadania, qualidade da árvore e qualquer juízo de valor estão FORA de escopo.
-   Você transcreve; quem decide é o operador que vai revisar a prévia.
+A3. DATA só sai preenchida com dia, mês e ano, em YYYY-MM-DD. Data parcial
+    ("1890", "c. 1902", "19??", "mar/1930") sai "" e entra em 'avisos' com o que
+    estava escrito.
 
-7. 'ref' é um identificador local que você inventa ("p1", "p2", ...), único por
-   pessoa. Serve só para 'paiRef', 'maeRef', 'pessoa1Ref' e 'pessoa2Ref'
-   apontarem entre si. Toda ref citada tem que existir na lista 'pessoas'.
+A4. LOCAL DE FALECIMENTO é campo de primeira classe, não acessório da data.
+    "faleceu em 20 de novembro de 1992, São Caetano do Sul/SP" preenche
+    data_obito = "1992-11-20" E local_obito = "São Caetano do Sul/SP". Ler a data
+    e largar o local é erro.
 
-8. 'avisos': uma linha curta por leitura duvidosa (card cortado, data ambígua,
-   nome parcialmente legível, linha de filiação que não dá para seguir), citando
-   a 'ref'. Sem dúvidas, devolva lista vazia. Avisos não são análise do caso.
+A5. FILIAÇÃO vem das LINHAS entre os cards — nunca de sobrenome igual, diferença
+    de idade ou posição na página. Sem linha ligando, 'paiRef' e 'maeRef' saem "".
 
-Se a imagem não for uma árvore genealógica, devolva 'pessoas' e 'unioes' vazios
-e um aviso dizendo o que a imagem parece ser.`
+A6. CASAMENTO ('unioes') só com marcação explícita: linha de casal, símbolo de
+    união, rótulo "casado com", moldura de casal. Lado a lado não é casal.
+
+═══ PARTE B — DERIVAÇÕES PERMITIDAS (lista fechada) ═══
+
+Estas são OBRIGATÓRIAS quando a base existir. Qualquer outra inferência está
+proibida.
+
+B1. SEXO pela COR DO CARD. Convenção destas árvores: AZUL = masculino,
+    ROSA = feminino. Use-a sempre que a cor for distinguível.
+    Sem cor utilizável (árvore em preto e branco, cards cinza/brancos), infira
+    pelo NOME PRÓPRIO quando ele for inequívoco em português, espanhol ou
+    italiano (ex.: "Ginez", "Antonio", "José" = masculino; "Maria", "Ana",
+    "Josefa" = feminino). Nome ambíguo ou desconhecido e sem cor: "".
+
+B2. PAÍS DE NASCIMENTO a partir da cidade/UF. Cidade brasileira ou sigla de UF
+    brasileira ("Ribeirão Preto", "São Caetano do Sul/SP", "/MG") ⇒
+    pais_nasc = "Brasil". Vale igual para outros países quando a cidade for
+    identificável ("Múrcia" ⇒ "Espanha", "Vicenza" ⇒ "Itália"). Cidade ausente
+    ou ambígua: "".
+
+B3. NACIONALIDADE a partir do país (lido ou derivado em B2), CONCORDANDO COM O
+    SEXO:
+      Brasil ⇒ "Brasileiro" / "Brasileira"
+      Espanha ⇒ "Espanhol" / "Espanhola"
+      Itália ⇒ "Italiano" / "Italiana"
+      Portugal ⇒ "Português" / "Portuguesa"
+    Sexo indeterminado: use a forma masculina e registre em 'avisos'.
+    País indeterminado: "".
+
+B4. ESTADO/UF separado da cidade quando vierem colados. "Ribeirão Preto/SP" ⇒
+    local_nasc = "Ribeirão Preto" e estado_nasc = "SP".
+
+TODA derivação da PARTE B entra em 'avisos', dizendo campo, valor e base. Ex.:
+  "p3: sexo=masculino derivado da cor azul do card."
+  "p3: pais_nasc=Brasil derivado de 'Ribeirão Preto/SP'."
+O operador revisa a prévia antes de gravar; sem esse registro ele não tem como
+separar o que foi lido do que foi derivado.
+
+═══ PARTE C — FORA DE ESCOPO ═══
+
+C1. NÃO ANALISE O CASO. Robustez do vínculo, documento faltante, viabilidade de
+    cidadania e qualquer juízo de valor estão fora de escopo. Você extrai; quem
+    decide é o operador.
+
+C2. NÃO INVENTE FATO AUSENTE. Derivar "Brasil" de "Ribeirão Preto/SP" é ler o
+    que está lá; supor data de nascimento pela idade aparente, ou sobrenome pelo
+    do pai, é inventar. Nada fora da lista B.
+
+'ref' é um identificador local que você cria ("p1", "p2", ...), único por pessoa,
+usado por 'paiRef', 'maeRef', 'pessoa1Ref' e 'pessoa2Ref'. Toda ref citada tem de
+existir na lista 'pessoas'.
+
+Se a imagem não for uma árvore genealógica, devolva 'pessoas' e 'unioes' vazios e
+um aviso dizendo o que a imagem parece ser.`
 
 // ---------------------------------------------------------------- implementação
 

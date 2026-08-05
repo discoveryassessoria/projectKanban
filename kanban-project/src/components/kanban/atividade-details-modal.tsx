@@ -192,7 +192,11 @@ function ConteudoModal({
   
 
   // Classes padrão para formulários
-  const inputClass = "w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white text-sm h-[42px]"
+  // Sem uso hoje, mas mantido com a cor explícita de propósito: é justamente
+  // deste arquivo que sai o `text-white/80` das abas, e uma classe de campo com
+  // `bg-white` e sem cor de texto é a semente do bug — quem copiar daqui herda
+  // o campo branco no branco.
+  const inputClass = "w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white text-gray-900 placeholder:text-gray-400 text-sm h-[42px]"
 
   // ✅ Verificar se o processo é da Itália (aba Informações)
   const isItalia = ehItalia(processo)

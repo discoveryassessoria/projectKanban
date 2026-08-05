@@ -17,19 +17,33 @@ manualmente.
 | País de Nascimento | `pais_nasc` | `Pessoa.pais_nasc` | `VarChar(50)?` | não |
 | Nacionalidade | `nacionalidade` | `Pessoa.nacionalidade` | `VarChar(50)?` | não |
 | Data de Falecimento | `data_obito` | `Pessoa.data_obito` | `DateTime?` | não |
-| **Local de Falecimento** | `local_obito` | **não existe** | — | — |
+| Local de Falecimento | `local_obito` | `Pessoa.local_emigracao` ⚠️ | `VarChar(100)?` | não |
 | Nº Linhagem | `numeroLinhagem` | `Pessoa.numeroLinhagem` | `Int?` | não |
 | (derivado) | — | `Pessoa.vivo` | `Boolean` | preenchido: `false` se há `data_obito` |
 | (derivado) | — | `Pessoa.casado` | `Boolean` | preenchido: `true` se a pessoa entra em alguma união |
 | (fixo) | — | `Pessoa.requerente` | `VarChar` | sempre `"nao"` — ver abaixo |
 | (contexto) | — | `Pessoa.arvoreId` | `Int` | vem da rota, não da imagem |
 
-### Local de falecimento — o campo que não tem onde entrar
+### Local de falecimento — grava numa coluna com outro nome
 
-`Pessoa` tem `data_obito` mas **não tem coluna de local de falecimento**. O
-contrato extrai `local_obito` para não perder o dado da leitura, mas a rota
-**não grava**. Persistir exige migration (`local_obito VarChar(100)?`), que não
-foi feita porque está fora do escopo desta etapa.
+`Pessoa` **não tem** coluna `local_obito`. O sistema inteiro já resolve isso
+reaproveitando `local_emigracao`, e a importação segue a mesma convenção:
+
+| Onde | O que faz |
+|---|---|
+| `arvore-genealogica-view.tsx` | o campo "Local de Falecimento" grava e lê `local_emigracao` |
+| `motor/eventos.ts` | lê `local_emigracao` como local de óbito **quando não há `data_emigracao`** |
+| `pessoa-sidebar.tsx` | exibe `local_obito \|\| local_emigracao` |
+
+Inventar uma coluna nova só para a importação deixaria o dado invisível para as
+três telas que já sabem onde procurar. A importação **nunca grava
+`data_emigracao`**, então o motor não tem como confundir o valor com emigração
+de verdade.
+
+A dívida real continua registrada: a coluna deveria se chamar `local_obito`, e
+`local_emigracao` deveria guardar emigração. Renomear é migration + varredura
+nos cinco pontos acima — maior que esta etapa, e não urgente enquanto a
+convenção for consistente.
 
 ### Requerente nunca vem da importação
 

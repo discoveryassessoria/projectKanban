@@ -453,8 +453,14 @@ function ConteudoSidebar({
     }
   }
 
+  // `text-gray-900` na raiz: este painel é filho, na árvore DOM, do container de
+  // abas que recebe `text-white/80` quando `finDark` está ligado
+  // (atividade-details-modal), e `position: fixed` NÃO interrompe herança de cor.
+  // Sem cor própria aqui, todo texto sem `text-` explícito — e há vários, como os
+  // rótulos "Adicionar Pai/Mãe/cônjuge/filho(a)" — sai branco sobre `bg-white`,
+  // isto é, invisível.
   return (
-    <div className="fixed right-0 top-0 h-full w-[420px] bg-white shadow-2xl z-[10001] flex flex-col border-l border-slate-200">
+    <div className="fixed right-0 top-0 h-full w-[420px] bg-white text-gray-900 shadow-2xl z-[10001] flex flex-col border-l border-slate-200">
       {/* Header */}
       <div className="p-5 border-b border-slate-200 bg-gradient-to-r from-slate-50 to-white">
         <button 

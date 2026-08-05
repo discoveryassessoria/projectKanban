@@ -128,8 +128,16 @@ export async function POST(request: NextRequest) {
               pais_nasc: texto(p.pais_nasc),
               nacionalidade: texto(p.nacionalidade),
               data_obito: paraData(p.data_obito),
-              // `local_obito` NÃO é gravado: a coluna não existe em Pessoa.
-              // Ver MAPEAMENTO.md — gravar exige migration.
+              // GOTCHA do modelo: `Pessoa` não tem coluna `local_obito`. O campo
+              // "Local de Falecimento" da tela grava em `local_emigracao`
+              // (arvore-genealogica-view.tsx), o motor lê a mesma coluna como
+              // óbito quando não há `data_emigracao` (motor/eventos.ts) e a
+              // sidebar faz `local_obito || local_emigracao`. A importação segue
+              // a MESMA convenção — inventar uma coluna nova aqui deixaria o
+              // dado invisível para as três telas que já sabem onde procurar.
+              // A importação nunca grava `data_emigracao`, então não há como o
+              // motor confundir este valor com emigração de verdade.
+              local_emigracao: texto(p.local_obito),
               vivo: paraData(p.data_obito) ? false : true,
               numeroLinhagem: typeof p.numeroLinhagem === "number" ? p.numeroLinhagem : null,
               arvoreId,

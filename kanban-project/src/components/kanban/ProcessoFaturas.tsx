@@ -905,7 +905,10 @@ export function ProcessoFaturas({ processoId, nomeFamilia, onUpdate }: ProcessoF
                                 {fatura.destinatarios.map(dest => (
                                   <span 
                                     key={dest.id}
-                                    className="px-2 py-1 bg-white border rounded-lg text-sm"
+                                    // `text-gray-900` explícito: a aba "faturas" roda com
+                                    // `finDark`, e o container das abas aplica `text-white/80`.
+                                    // Sem cor própria, este nome sairia branco sobre `bg-white`.
+                                    className="px-2 py-1 bg-white text-gray-900 border rounded-lg text-sm"
                                   >
                                     {dest.publicCode ? dest.publicCode + ' — ' : ''}{dest.nome}
                                   </span>
