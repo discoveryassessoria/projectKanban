@@ -9,8 +9,10 @@
 //    throttle e ANUNCIADA às outras abas — usar uma aba mantém todas vivas;
 //  • um único timer, que alterna entre 5 s (repouso) e 1 s (contagem regressiva).
 //    Nada de um timer por listener, nada de timer por componente;
-//  • a renovação só sai quando resta pouco E houve atividade desde a emissão do
-//    token. Sem isso, "renovar durante o uso" viraria uma chamada por clique;
+//  • a renovação só sai quando resta pouco E a atividade é RECENTE (dentro da
+//    antecedência de renovação). "Resta pouco" evita uma chamada por clique;
+//    "recente" evita que um clique antigo estenda a sessão de uma máquina já
+//    abandonada — ver o comentário em `avaliar()`;
 //  • encerrar propaga por BroadcastChannel e por `storage` (fallback), então as
 //    outras abas saem no mesmo instante — sem esperar o próprio tick.
 //
@@ -20,7 +22,8 @@
 "use client"
 
 import {
-  avaliarSessao, devoRenovar, type EstadoSessao, type MotivoEncerramento,
+  avaliarSessao, devoRenovar, RENOVAR_QUANDO_RESTAR_MS,
+  type EstadoSessao, type MotivoEncerramento,
 } from "@/lib/sessao/politica"
 
 const CANAL = "discovery:sessao"
@@ -187,8 +190,21 @@ export function iniciarSessao({ aoEstado, agora = Date.now }: OpcoesSessao): Ses
       void encerrarSessao(estado.motivo ?? "inatividade")
       return
     }
-    // Renova quando a janela está acabando E houve uso desde a emissão do token.
-    if (devoRenovar(t, info.exp, info.sessaoInicio) && ultimaAtividade >= info.iat) void renovar()
+    // Renova quando a janela está acabando E a atividade é RECENTE — dentro da
+    // própria antecedência de renovação, não "em algum momento desde a emissão".
+    //
+    // A diferença decide quanto tempo uma máquina abandonada segue logada. Com
+    // `>= info.iat`, um único clique logo após o login autoriza a renovação
+    // ~80 min depois, e o token novo vale mais 90: dá 170 min de ocioso. Com a
+    // atividade tendo de estar dentro dos últimos RENOVAR_QUANDO_RESTAR_MS, esse
+    // clique já não vale nada na hora da renovação, e o ocioso volta a ~90 min
+    // (pior caso 100 = janela + antecedência).
+    //
+    // Quem está de fato usando não sente: a renovação acontece durante o uso, e
+    // aí a atividade é sempre recente.
+    if (devoRenovar(t, info.exp, info.sessaoInicio) && ultimaAtividade >= t - RENOVAR_QUANDO_RESTAR_MS) {
+      void renovar()
+    }
 
     agendar(estado.emAviso ? TICK_AVISO_MS : TICK_REPOUSO_MS)
   }
@@ -203,7 +219,16 @@ export function iniciarSessao({ aoEstado, agora = Date.now }: OpcoesSessao): Ses
   }
 
   // ── escutas ──
-  const eventos: (keyof WindowEventMap)[] = ["pointerdown", "keydown", "wheel", "touchstart", "focus"]
+  // `mousemove` e `scroll` entram para que LER uma tela conte como uso — antes,
+  // quem só acompanhava sem clicar era tratado como ausente e caía por
+  // inatividade. Os dois disparam em rajada, mas todos passam por
+  // `marcarAtividade`, que já ignora qualquer disparo dentro de
+  // THROTTLE_ATIVIDADE_MS (5 s): a rajada custa uma comparação por evento e no
+  // máximo uma escrita a cada 5 s, igual aos demais. Todos são `passive`, então
+  // nenhum atrasa rolagem ou ponteiro.
+  const eventos: (keyof WindowEventMap)[] = [
+    "pointerdown", "keydown", "wheel", "touchstart", "focus", "mousemove", "scroll",
+  ]
   const aoAgir = () => marcarAtividade()
   const aoVisibilidade = () => { if (document.visibilityState === "visible") { marcarAtividade(); avaliar() } }
   const aoStorage = (e: StorageEvent) => {

@@ -37,6 +37,43 @@ function limparAuth(): void {
     "authToken=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT"
 }
 
+// ÚLTIMO E-MAIL — conveniência de tela, não credencial.
+//
+// Guarda SÓ o e-mail, para a próxima visita ao login pedir apenas a senha.
+// Nunca senha, nunca token. Fica fora de `limparAuth`/`limparCredenciais` de
+// propósito: é justamente ao sair — por "Sair" ou por expiração — que ele
+// precisa sobreviver. Some só quando o usuário pede, em "Entrar com outra
+// conta". Como as duas rotinas de limpeza removem chaves uma a uma (não há
+// `localStorage.clear()` no projeto), sobreviver é o comportamento padrão e
+// não exigiu mexer em nenhuma delas.
+const K_ULTIMO_EMAIL = "sessao:ultimoEmail"
+
+function lerUltimoEmail(): string | null {
+  if (typeof window === "undefined") return null
+  try {
+    const v = localStorage.getItem(K_ULTIMO_EMAIL)
+    return v && v.trim() ? v : null
+  } catch {
+    return null
+  }
+}
+
+function guardarUltimoEmail(email: string): void {
+  try {
+    if (email.trim()) localStorage.setItem(K_ULTIMO_EMAIL, email.trim())
+  } catch {
+    /* storage cheio ou bloqueado: lembrar é conveniência, não pode impedir o login */
+  }
+}
+
+function esquecerUltimoEmail(): void {
+  try {
+    localStorage.removeItem(K_ULTIMO_EMAIL)
+  } catch {
+    /* idem */
+  }
+}
+
 // 🆕 12/05/2026 — Detecta tokens em formato antigo (base64 simples) vs JWT.
 // JWT tem formato "header.payload.signature" (3 partes separadas por ponto).
 // Tokens antigos eram uma string base64 única sem pontos. Distinguir
@@ -51,7 +88,20 @@ export default function AuthComponent({
 }: AuthProps) {
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState("")
+  // Inicializador preguiçoso: lê o storage UMA vez, na criação do estado. O
+  // componente só é renderizado depois de montar no cliente (login/page.tsx
+  // segura com `useIsClient`), então não há divergência de hidratação; o guard
+  // de `typeof window` em `lerUltimoEmail` cobre qualquer reuso fora dali.
+  const [ultimoEmail, setUltimoEmail] = useState<string | null>(() => lerUltimoEmail())
   const router = useRouter()
+
+  const modoLembrado = ultimoEmail !== null
+
+  function trocarDeConta() {
+    esquecerUltimoEmail()
+    setUltimoEmail(null)
+    setError("")
+  }
 
   // 🆕 12/05/2026 — Sequência de checagens no mount:
   //
@@ -121,6 +171,8 @@ export default function AuthComponent({
         console.log("Login bem-sucedido!")
         localStorage.setItem("authToken", data.token)
         localStorage.setItem("user", JSON.stringify(data.user))
+        // Só depois do 200: e-mail que não autenticou não vira sugestão.
+        guardarUltimoEmail(email)
 
         // Cookie pro middleware ler. 7 dias de validade.
         document.cookie = `authToken=${data.token}; path=/; max-age=${60 * 60 * 24 * 7}`
@@ -162,44 +214,76 @@ export default function AuthComponent({
       {/* Cabeçalho */}
       <div className="text-center mb-6">
         <h1 className="text-[28px] font-semibold text-slate-900">
-          Bem-vindo!
+          {modoLembrado ? "Bem-vindo de volta!" : "Bem-vindo!"}
         </h1>
         <p className="text-[14px] text-slate-500 mt-0.5">
-          Faça login para continuar.
+          {modoLembrado ? "Confirme sua senha para continuar." : "Faça login para continuar."}
         </p>
       </div>
 
       {/* Formulário */}
       <form onSubmit={handleLogin} className="space-y-4">
-        {/* EMAIL */}
-        <div className="space-y-1.5">
-          <Label
-            htmlFor="login-email"
-            className="text-sm font-medium text-slate-700"
-          >
-            Email
-          </Label>
-          <Input
-            id="login-email"
-            name="email"
-            type="email"
-            placeholder="seu@email.com"
-            required
-            disabled={isLoading}
-            className="
-              h-12 text-[15px]
-              bg-white
-              border border-slate-200
-              text-slate-900
-              placeholder:text-slate-400
-              rounded-lg
-              focus-visible:ring-2
-              focus-visible:ring-[#123C73]/30
-              focus-visible:border-[#123C73]
-              transition-all duration-150
-            "
-          />
-        </div>
+        {/* EMAIL — lembrado (leitura) ou campo normal */}
+        {modoLembrado ? (
+          <div className="space-y-1.5">
+            {/* O e-mail vai no POST por aqui: `handleLogin` continua lendo
+                `formData.get("email")` sem saber que existem dois modos. Sem
+                `required` — campo oculto não participa da validação do browser. */}
+            <input type="hidden" name="email" value={ultimoEmail} />
+            <div
+              className="
+                flex items-center gap-3
+                h-12 px-3
+                bg-slate-50
+                border border-slate-200
+                rounded-lg
+              "
+            >
+              <span
+                aria-hidden="true"
+                className="
+                  flex h-7 w-7 shrink-0 items-center justify-center
+                  rounded-full bg-[#123C73] text-[12px] font-semibold text-white
+                "
+              >
+                {ultimoEmail.slice(0, 1).toUpperCase()}
+              </span>
+              <span className="truncate text-[15px] text-slate-900" title={ultimoEmail}>
+                {ultimoEmail}
+              </span>
+            </div>
+          </div>
+        ) : (
+          <div className="space-y-1.5">
+            <Label
+              htmlFor="login-email"
+              className="text-sm font-medium text-slate-700"
+            >
+              Email
+            </Label>
+            <Input
+              id="login-email"
+              name="email"
+              type="email"
+              placeholder="seu@email.com"
+              required
+              autoFocus
+              disabled={isLoading}
+              className="
+                h-12 text-[15px]
+                bg-white
+                border border-slate-200
+                text-slate-900
+                placeholder:text-slate-400
+                rounded-lg
+                focus-visible:ring-2
+                focus-visible:ring-[#123C73]/30
+                focus-visible:border-[#123C73]
+                transition-all duration-150
+              "
+            />
+          </div>
+        )}
 
         {/* SENHA */}
         <div className="space-y-1.5">
@@ -215,6 +299,9 @@ export default function AuthComponent({
             type="password"
             placeholder="Sua senha"
             required
+            // No modo lembrado o e-mail já está resolvido: o cursor começa onde
+            // resta digitar. No modo normal quem recebe o foco é o e-mail.
+            autoFocus={modoLembrado}
             disabled={isLoading}
             className="
               h-12 text-[15px]
@@ -255,6 +342,24 @@ export default function AuthComponent({
         >
           {isLoading ? "Entrando..." : "Entrar"}
         </Button>
+
+        {/* TROCAR DE CONTA — o único caminho que apaga o e-mail lembrado. */}
+        {modoLembrado && (
+          <div className="text-center">
+            <button
+              type="button"
+              onClick={trocarDeConta}
+              disabled={isLoading}
+              className="
+                text-[13px] text-slate-500 underline underline-offset-2
+                transition-colors hover:text-[#123C73]
+                disabled:opacity-50 disabled:cursor-not-allowed
+              "
+            >
+              Não é você? Entrar com outra conta
+            </button>
+          </div>
+        )}
 
         {/* TEXTO FINAL */}
         <div className="pt-3 text-center text-[13px] text-slate-500">

@@ -17,8 +17,18 @@
 // Perto do teto, o último token nasce mais curto — nunca ultrapassa o limite.
 // ============================================================================
 
-/** Minutos de inatividade tolerados antes do logout automático. */
-export const INATIVIDADE_MS = 15 * 60 * 1000
+/**
+ * Minutos de inatividade tolerados antes do logout automático.
+ *
+ * Eram 15 desde a arquitetura de 29/07 (b2f5b771). Passaram a 45 por decisão do
+ * dono do produto: 15 min derrubava quem estava trabalhando — lendo uma tela,
+ * conferindo um documento — porque só clique/tecla contava como atividade. A
+ * proteção contra máquina desatendida continua, mas com folga de uso real.
+ *
+ * O teto ABSOLUTO de 8 h não mudou: é ele, não esta janela, a rede de segurança
+ * de fundo — nenhuma atividade o estende.
+ */
+export const INATIVIDADE_MS = 45 * 60 * 1000
 /** Antecedência do aviso com contagem regressiva. */
 export const AVISO_MS = 60 * 1000
 /** Duração máxima absoluta da sessão, independente de atividade. */

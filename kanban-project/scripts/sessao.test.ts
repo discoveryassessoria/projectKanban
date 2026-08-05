@@ -27,7 +27,7 @@ const H = 60 * MIN
 async function main() {
   // ── 1) configuração declarada ─────────────────────────────────────────────
   sec('1) configuração padrão')
-  chk(INATIVIDADE_MS === 15 * MIN, 'inatividade = 15 minutos')
+  chk(INATIVIDADE_MS === 45 * MIN, 'inatividade = 45 minutos')
   chk(AVISO_MS === 60_000, 'aviso = 60 segundos antes')
   chk(ABSOLUTA_MS === 8 * H, 'sessão máxima = 8 horas')
   chk(RENOVAR_QUANDO_RESTAR_MS < INATIVIDADE_MS, 'renovação acontece ANTES de a janela acabar')
@@ -89,7 +89,7 @@ async function main() {
   chk(v !== null, 'token de login é válido')
   chk(!!v && v.sessaoInicio > 0, 'token carrega o início da sessão')
   const duracao = (v!.exp - v!.sessaoInicio)
-  chk(Math.abs(duracao - INATIVIDADE_MS) < 2000, `token de login vale ~15 min (${Math.round(duracao / 1000)}s), não 7 dias`)
+  chk(Math.abs(duracao - INATIVIDADE_MS) < 2000, `token de login vale a janela de inatividade (${Math.round(duracao / 60000)} min), não 7 dias`)
 
   // renovação preserva o início — é isso que impede o teto de escorregar
   const inicioAntigo = Date.now() - 3 * H
