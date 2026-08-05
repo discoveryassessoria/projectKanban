@@ -475,7 +475,15 @@ export function PessoaDetailsPage({
                       )}
                       {pessoa.mae && (
                         <div 
-                          className="p-3 border-l-4 border-pink-500 cursor-pointer hover:bg-gray-50 border-t border-gray-100"
+                          // Cor POR LADO, não genérica: `border-pink-500` e
+                          // `border-gray-100` definem a mesma propriedade
+                          // (`border-color`, os quatro lados), então uma anulava a
+                          // outra e qual vencia dependia da ordem em que o Tailwind
+                          // emite as classes — não da ordem escrita aqui. Com
+                          // `border-l-pink-500` e `border-t-gray-100` cada lado tem
+                          // a sua longhand e não há disputa: esquerda rosa (a linha
+                          // da mãe), topo cinza (o separador do bloco do pai).
+                          className="p-3 border-l-4 border-l-pink-500 cursor-pointer hover:bg-gray-50 border-t border-t-gray-100"
                           onClick={() => onPersonClick?.(pessoa.mae!)}
                         >
                           <div className="flex items-center gap-2">
