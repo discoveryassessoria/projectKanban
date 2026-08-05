@@ -87,7 +87,10 @@ export const FONTES: Record<string, { model: string; valor: string; label: strin
   tiposProcesso: { model: "tipoProcessoNacionalidade", valor: "id", label: ["name"], where: { arquivado: false } },
   fases: { model: "catalogoFase", valor: "phaseKey", label: ["label"], where: { ativo: true } },
   usuarios: { model: "usuario", valor: "id", label: ["nome"] },
-  modelos: { model: "modeloDocumento", valor: "code", label: ["nome"], where: { ativo: true } },
+  // MODELO DE MENSAGEM (e-mail/mensagem de notificação) — NÃO é modelo documental.
+  // O repositório de modelos documentais (DOCX versionado) é outro domínio e vive
+  // em ModeloDocumental. O nome distinto existe para que ninguém confunda os dois.
+  modelosMensagem: { model: "modeloDocumento", valor: "code", label: ["nome"], where: { ativo: true } },
 }
 
 const CAMPOS_BASE: CampoSpec[] = [
@@ -214,38 +217,13 @@ export const CADASTROS: Record<string, CadastroSpec> = {
     ],
   },
 
-  // ── Sistema › Cadastros Auxiliares › Modelos ───────────────────────────────
-  modelos: {
-    entidade: "modelos",
-    model: "modeloDocumento",
-    titulo: "Modelos",
-    descricao:
-      "Textos reutilizáveis de e-mail, documento e mensagem. Use chaves entre chaves duplas para os campos variáveis (ex.: {{cliente}}).",
-    novoLabel: "+ Novo modelo",
-    codeDe: "nome",
-    ordenarPor: [{ campo: "nome", direcao: "asc" }],
-    colunas: [
-      { key: "nome", label: "Modelo" },
-      { key: "code", label: "Código" },
-      { key: "tipo", label: "Tipo" },
-      { key: "categoria", label: "Categoria" },
-    ],
-    campos: [
-      { key: "nome", label: "Nome do modelo", tipo: "text", obrigatorio: true, largura: "cheia" },
-      {
-        key: "tipo", label: "Tipo", tipo: "select", largura: "meia",
-        opcoes: [
-          { valor: "email", label: "E-mail" },
-          { valor: "documento", label: "Documento" },
-          { valor: "mensagem", label: "Mensagem" },
-        ],
-      },
-      { key: "categoria", label: "Categoria", tipo: "text", largura: "meia" },
-      { key: "conteudo", label: "Conteúdo", tipo: "textarea", largura: "cheia" },
-      { key: "variaveis", label: "Variáveis disponíveis", tipo: "text", ajuda: "Separe por vírgula.", largura: "cheia" },
-      ...CAMPOS_BASE,
-    ],
-  },
+  // ── Sistema › Modelos ─────────────────────────────────────────────────────
+  // O cadastro genérico de "modelos de texto" (ModeloDocumento, com o conteúdo
+  // numa coluna `conteudo`) foi REMOVIDO daqui: ele era um mecanismo paralelo de
+  // template, e o texto oficial não mora em coluna de banco. O repositório
+  // oficial é a tela própria `?screen=templates` (ModelosDocumentaisTab), sobre
+  // ModeloDocumental + ModeloDocumentalVersao, com DOCX versionado e publicação
+  // auditada. Não existe entrada `modelos` no motor genérico de cadastros.
 
   // ── Sistema › Comunicações › Notificações ──────────────────────────────────
   notificacoes: {
@@ -270,7 +248,7 @@ export const CADASTROS: Record<string, CadastroSpec> = {
       { key: "entidade", label: "Entidade", tipo: "text", largura: "meia" },
       { key: "canais", label: "Canais", tipo: "text", ajuda: "Ex.: email, sistema", largura: "meia" },
       { key: "destinatarios", label: "Destinatários", tipo: "text", ajuda: "Cargos, equipes ou e-mails separados por vírgula.", largura: "cheia" },
-      { key: "modeloCode", label: "Modelo de texto", tipo: "select", fonte: "modelos", largura: "cheia" },
+      { key: "modeloCode", label: "Modelo de mensagem", tipo: "select", fonte: "modelosMensagem", largura: "cheia" },
       ...CAMPOS_BASE,
     ],
   },

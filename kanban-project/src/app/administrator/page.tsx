@@ -108,6 +108,10 @@ const PhaseAutomationsFasesTab = dynamic(() => import("@/src/components/gerencia
 const DepartamentosTab = dynamic(() => import("@/src/components/gerenciamentoComponents/DepartamentosTab"), { ssr: false, loading: () => <CarregandoTela /> })
 const TiposDocumentoTab = dynamic(() => import("@/src/components/gerenciamentoComponents/TiposDocumentoTab"), { ssr: false, loading: () => <CarregandoTela /> })
 const CategoriasDocumentaisTab = dynamic(() => import("@/src/components/gerenciamentoComponents/CategoriasDocumentaisTab"), { ssr: false, loading: () => <CarregandoTela /> })
+// REPOSITÓRIO OFICIAL DE MODELOS — substitui o CRUD genérico de textos (cad("modelos")),
+// que guardava o conteúdo do documento numa coluna do banco. O texto passa a viver
+// exclusivamente dentro do DOCX versionado do repositório.
+const ModelosDocumentaisTab = dynamic(() => import("@/src/components/gerenciamentoComponents/ModelosDocumentaisTab"), { ssr: false, loading: () => <CarregandoTela /> })
 const RuntimeWorkflowDiagnostics = dynamic(() => import("@/src/components/gerenciamentoComponents/RuntimeWorkflowDiagnostics"), { ssr: false, loading: () => <CarregandoTela /> })
 const OrgaosProtocoloTab = dynamic(() => import("@/src/components/gerenciamentoComponents/OrgaosProtocoloTab"), { ssr: false, loading: () => <CarregandoTela /> })
 const MatrizDocumentalTab = dynamic(() => import("@/src/components/gerenciamentoComponents/MatrizDocumentalTab"), { ssr: false, loading: () => <CarregandoTela /> })
@@ -219,7 +223,7 @@ const TELAS: Record<string, React.ComponentType> = {
   transicoes: TransicoesTab,
   integracoes: IntegracoesTab,
   governanca: function GovernancaFinanceira() { return <LogAuditoriaTab escopo="financeiro" /> },
-  templates: cad("modelos"),
+  templates: ModelosDocumentaisTab,
   "templates-rascunho": TemplatesTab,
   notifications: cad("notificacoes"),
   "notifications-rascunho": NotificationsTab,

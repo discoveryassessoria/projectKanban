@@ -27,6 +27,7 @@ import {
   Loader2,
   AlertTriangle,
   Smartphone,  // ← ADICIONAR
+  Stamp,
 } from "lucide-react"
 import {
   DropdownMenu,
@@ -40,6 +41,7 @@ import { DatePickerField } from "@/components/ui/date-picker-field"
 import { Upload, CheckCircle2, XCircle, FileImage, Shield, Home, CreditCard as CreditCardIcon, Car } from "lucide-react"
 import RelatorioClientesButton from "@/src/components/contratantesComponents/RelatorioClientesButton"
 import { AcessoAppTab } from "./contratantesComponents/AcessoAppTab"
+import { DocumentosGeradosTab } from "./contratantesComponents/DocumentosGeradosTab"
 import { usePermissoes } from "@/src/hooks/use-permissoes"
 import { useIsClient } from "@/src/lib/cliente"
 
@@ -424,7 +426,11 @@ function ConteudoModal({
   errors = {},
   setErrors,
 }: ContratanteModalProps) {
-  const [activeTab, setActiveTab] = useState<"dados" | "endereco" | "observacoes" | "acesso">("dados")
+  const [activeTab, setActiveTab] = useState<"dados" | "endereco" | "observacoes" | "procuracoes" | "acesso">("dados")
+  // Processos do cliente — o gerador precisa deles para oferecer o vínculo.
+  const processosDoCliente = useApi<{ processos?: Array<{ id: number; codigo?: string | null; nome?: string; pais?: string }> }>(
+    editingId ? `/api/processos?${editingTipo === "requerente" ? "requerenteId" : "contratanteId"}=${editingId}` : null,
+  )
   const mounted = useIsClient()
   const [buscandoCep, setBuscandoCep] = useState(false)
   const [isUploading, setIsUploading] = useState(false)  // ← R2: controla estado de upload manualmente
@@ -1107,6 +1113,7 @@ const removerDocumentoObrigatorio = async (categoria: string) => {
             { id: "dados", label: "Dados Pessoais", icon: User },
             { id: "endereco", label: "Endereço", icon: MapPin },
             { id: "observacoes", label: "Observações e Anexos", icon: FileText },
+            { id: "procuracoes", label: "Procurações", icon: Stamp },
             { id: "acesso", label: "Acesso ao App", icon: Smartphone },
           ].map((tab) => (
             <button
@@ -1911,6 +1918,23 @@ style={{
               </div>
             )}
             
+            {/* Tab Procurações — geração a partir do repositório oficial de modelos */}
+            {activeTab === "procuracoes" && (
+              editingId ? (
+                <DocumentosGeradosTab
+                  papel={editingTipo === "requerente" ? "requerente" : "contratante"}
+                  clienteId={editingId}
+                  clienteNome={formData.nome}
+                  processos={processosDoCliente.dados?.processos ?? []}
+                  podeGerar={!isViewMode && podeEditar}
+                />
+              ) : (
+                <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-700">
+                  Salve o cliente primeiro para gerar procurações.
+                </div>
+              )
+            )}
+
             {/* Tab Acesso ao App */}
             {activeTab === "acesso" && (
               <AcessoAppTab

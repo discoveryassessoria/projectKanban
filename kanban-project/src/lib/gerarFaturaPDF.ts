@@ -707,8 +707,10 @@ export async function downloadFaturaPDF(dados: DadosFatura): Promise<void> {
 
 export async function abrirFaturaPDF(dados: DadosFatura): Promise<void> {
   const doc = await gerarFaturaPDF(dados)
+  // `output('bloburl')` devolve um objeto URL, não string — e `window.open` já
+  // aceita `string | URL`. O cast antigo (`as string`) mentia sobre o tipo.
   const blobUrl = doc.output('bloburl')
-  window.open(blobUrl as string, '_blank')
+  window.open(blobUrl, '_blank')
 }
 
 export async function downloadFaturaConsolidadaPDF(dados: DadosFaturaConsolidada): Promise<void> {
@@ -720,6 +722,8 @@ export async function downloadFaturaConsolidadaPDF(dados: DadosFaturaConsolidada
 
 export async function abrirFaturaConsolidadaPDF(dados: DadosFaturaConsolidada): Promise<void> {
   const doc = await gerarFaturaConsolidadaPDF(dados)
+  // `output('bloburl')` devolve um objeto URL, não string — e `window.open` já
+  // aceita `string | URL`. O cast antigo (`as string`) mentia sobre o tipo.
   const blobUrl = doc.output('bloburl')
-  window.open(blobUrl as string, '_blank')
+  window.open(blobUrl, '_blank')
 }

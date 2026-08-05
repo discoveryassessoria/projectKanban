@@ -86,7 +86,22 @@ const MIGRATION = join(DIR_MIGRATIONS, '0000_baseline', 'migration.sql')
 // TipoDocumentoCadastro e PhaseInternalWorkflow. Diff do baseline: SO insercoes.
 //   anterior : c3b59b340c8b529cc31cc98c770622897a093bac3c4cc6bc154e1580682b4c43
 //   atual    : 503a30b46aa6ea92de7bba1441603b2bec79351deee4c8ec6f70f756ba4ba02a
-const CHECKSUM_LEDGER = '503a30b46aa6ea92de7bba1441603b2bec79351deee4c8ec6f70f756ba4ba02a'
+// ATUALIZACAO 05/08/2026 (modelos documentais) — migration ADITIVA
+// 20260805_modelos_documentais: ModeloDocumental, ModeloDocumentalVersao,
+// DocumentoGerado, DocumentoGeradoVersao e quatro enums novos. Diff do baseline:
+// 223 linhas inseridas, ZERO removidas (a unica linha alterada e a data do
+// cabecalho gerado). Nenhuma tabela existente foi tocada.
+//
+//   anterior : 503a30b46aa6ea92de7bba1441603b2bec79351deee4c8ec6f70f756ba4ba02a
+//   atual    : 62e887f885d8725aad4a7359ba857fff2e457deffa96d8624139c0ca1e8c0e94
+//
+// Procedimento executado: pg_dump completo de producao -> copia de
+// `_prisma_migrations` para CSV -> conferencia de que o diff do baseline nao tem
+// DROP/TRUNCATE/DELETE -> UPDATE de UMA coluna na linha 0000_baseline (com o
+// checksum anterior no WHERE, para nao acertar linha errada) -> `prisma migrate
+// status` = "Database schema is up to date". Nenhuma outra migration foi tocada;
+// nenhum dado de negocio foi lido ou alterado.
+const CHECKSUM_LEDGER = '62e887f885d8725aad4a7359ba857fff2e457deffa96d8624139c0ca1e8c0e94'
 
 /**
  * Migrations criadas DEPOIS da consolidacao de 02/08/2026. Toda migration nova
@@ -101,6 +116,7 @@ const MIGRATIONS_POS_BASELINE: string[] = [
   '20260804_solicitacao_documental',
   '20260804b_requerimento_doc21_vinculo',
   '20260804c_contrato_documental',
+  '20260805_modelos_documentais',
 ]
 
 const sha256 = (t: string) => createHash('sha256').update(t).digest('hex')

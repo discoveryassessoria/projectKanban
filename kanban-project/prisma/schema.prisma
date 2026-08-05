@@ -52,6 +52,15 @@ model Usuario {
   arquivosDocumento     DocumentoArquivo[]     @relation("DocumentoArquivoAutor")
   observacoesDocumento  DocumentoObservacao[]  @relation("DocumentoObservacaoAutor")
 
+  // REPOSITÓRIO DE MODELOS DOCUMENTAIS — autoria e atos administrativos.
+  modelosCriados               ModeloDocumental[]       @relation("ModeloDocumentalAutor")
+  modeloVersoesCriadas         ModeloDocumentalVersao[] @relation("ModeloVersaoAutor")
+  modeloVersoesPublicadas      ModeloDocumentalVersao[] @relation("ModeloVersaoPublicador")
+  modeloVersoesRevogadas       ModeloDocumentalVersao[] @relation("ModeloVersaoRevogador")
+  documentosGeradosCriados     DocumentoGerado[]        @relation("DocumentoGeradoAutor")
+  documentosGeradosVersoes     DocumentoGeradoVersao[]  @relation("DocumentoGeradoVersaoAutor")
+  documentosGeradosInvalidados DocumentoGeradoVersao[]  @relation("DocumentoGeradoVersaoInvalidador")
+
   @@index([perfilId])
 }
 
@@ -127,6 +136,9 @@ model Pessoa {
   evidenciasRegistrais       EvidenciaRegistral[]        @relation("EvidenciaPessoa")
   conflitosRegistrais        ConflitoRegistral[]         @relation("ConflitoPessoa")
   phaseWorkflowStepInstances PhaseWorkflowStepInstance[]
+
+  // MODELOS DOCUMENTAIS — documentos gerados sobre esta identidade.
+  documentosGerados DocumentoGerado[] @relation("DocumentoGeradoPessoa")
 
   @@index([arvoreId])
   @@index([pais_nasc])
@@ -328,6 +340,9 @@ model Documento {
   ocorrenciasRegistrais OcorrenciaDocumental[]
   evidenciasRegistrais  EvidenciaRegistral[]
 
+  // MODELOS DOCUMENTAIS — geração que produziu este documento operacional.
+  documentosGerados DocumentoGerado[] @relation("DocumentoGeradoOperacional")
+
   @@index([documentTypeId])
   @@index([necessidadeId])
   @@index([pessoaId])
@@ -448,6 +463,9 @@ model Processo {
   lotesRegistrais     LoteRegistral[]
   propostasRegistrais PropostaReconciliacao[]
   conflitosRegistrais ConflitoRegistral[]
+
+  // MODELOS DOCUMENTAIS — documentos gerados vinculados a este processo.
+  documentosGerados DocumentoGerado[] @relation("DocumentoGeradoProcesso")
 
   @@index([pais])
   @@index([arvoreId])
@@ -614,6 +632,9 @@ model Contratante {
   personId Int?
   pessoa   Pessoa? @relation("ContratantePessoa", fields: [personId], references: [id], onDelete: SetNull)
 
+  // MODELOS DOCUMENTAIS — documentos gerados em que este cliente é OUTORGANTE.
+  documentosGerados DocumentoGerado[]
+
   @@index([personId])
 }
 
@@ -655,6 +676,9 @@ model Requerente {
   personId Int?
   pessoa   Pessoa? @relation("RequerentePessoa", fields: [personId], references: [id], onDelete: SetNull)
 
+  // MODELOS DOCUMENTAIS — documentos gerados em que este cliente é OUTORGANTE.
+  documentosGerados DocumentoGerado[]
+
   @@index([personId])
 }
 
@@ -695,7 +719,7 @@ model Protocolo {
   /// Arquivos da operacao documental ligados a ESTE protocolo (o requerimento
   /// enviado, os comprovantes). E REFERENCIA ao mesmo DocumentoArquivo que a etapa
   /// e o documento leem - nao existe copia do binario nem segunda linha.
-  arquivos        DocumentoArquivo[]   @relation("ArquivoProtocolo")
+  arquivos        DocumentoArquivo[]    @relation("ArquivoProtocolo")
   contratante     Contratante?          @relation(fields: [contratanteId], references: [id], onDelete: Cascade)
   processo        Processo              @relation(fields: [processoId], references: [id], onDelete: Cascade)
   requerente      Requerente?           @relation(fields: [requerenteId], references: [id], onDelete: Cascade)
@@ -2489,6 +2513,8 @@ model ServicoProduto {
 
   condicoesPagamento CondicaoPagamentoServico[]
 
+  documentosGerados DocumentoGerado[] @relation("DocumentoGeradoServico")
+
   @@index([itemCatalogoId])
 }
 
@@ -2933,15 +2959,15 @@ model PhaseInternalWorkflow {
   // vinha do catálogo em código — o cadastro não tinha como recusar um workflow
   // documental materializado sem documento.
   /// Natureza da execução: sobre processo, pessoa, necessidade ou documento.
-  escopoExecucao EscopoExecucao?
+  escopoExecucao      EscopoExecucao?
   /// Perfis que apontam para este workflow (back-relation).
-  perfis         PerfilOperacionalDocumento[] @relation("PerfilWorkflow")
+  perfis              PerfilOperacionalDocumento[] @relation("PerfilWorkflow")
   /// Família documental aceita (null = não é workflow documental, ou aceita qualquer).
   familiaDocumentalId Int?
-  familiaDocumental   FamiliaDocumental? @relation(fields: [familiaDocumentalId], references: [id], onDelete: SetNull)
+  familiaDocumental   FamiliaDocumental?           @relation(fields: [familiaDocumentalId], references: [id], onDelete: SetNull)
   /// Contrato de materialização: sem estes, a instância documental não nasce.
-  exigeDocumento Boolean @default(false)
-  exigePessoa    Boolean @default(false)
+  exigeDocumento      Boolean                      @default(false)
+  exigePessoa         Boolean                      @default(false)
 
   @@index([phaseKey])
   @@index([tipoProcessoId])
@@ -3120,49 +3146,53 @@ enum FuncaoOrganizacao {
 
 // Tipos de Documento (op_doctypes) â tipos documentais usados nos processos
 model TipoDocumentoCadastro {
-  publicCode            String?              @unique @db.VarChar(20) // DOC1, DOC2… — código público do TIPO (não é o DOC-n do documento concreto)
-  id                    Int                  @id @default(autoincrement())
-  code                  String?              @db.VarChar(40)
-  name                  String               @db.VarChar(200)
-  category              String?              @db.VarChar(30) // civil_registry|identity|judicial|consular|translation|apostille|other
-  ativo                 Boolean              @default(true)
-  criadoEm              DateTime             @default(now())
-  atualizadoEm          DateTime             @updatedAt
-  itemCatalogoId        Int?
-  itemCatalogo          ItemCatalogo?        @relation(fields: [itemCatalogoId], references: [id])
-  legacyEnumKey         String?              @unique @db.VarChar(60) // â valor do enum TipoDocumento (ponte)
-  nature                String?              @db.VarChar(30) // documento|certidao|identidade|... (config futura)
-  countryCode           String?              @db.VarChar(8) // opcional (paÃ­s)
-  description           String?              @db.Text
-  documentos            Documento[] // back-relation (docs que apontam pra este tipo)
+  publicCode              String?                   @unique @db.VarChar(20) // DOC1, DOC2… — código público do TIPO (não é o DOC-n do documento concreto)
+  id                      Int                       @id @default(autoincrement())
+  code                    String?                   @db.VarChar(40)
+  name                    String                    @db.VarChar(200)
+  category                String?                   @db.VarChar(30) // civil_registry|identity|judicial|consular|translation|apostille|other
+  ativo                   Boolean                   @default(true)
+  criadoEm                DateTime                  @default(now())
+  atualizadoEm            DateTime                  @updatedAt
+  itemCatalogoId          Int?
+  itemCatalogo            ItemCatalogo?             @relation(fields: [itemCatalogoId], references: [id])
+  legacyEnumKey           String?                   @unique @db.VarChar(60) // â valor do enum TipoDocumento (ponte)
+  nature                  String?                   @db.VarChar(30) // documento|certidao|identidade|... (config futura)
+  countryCode             String?                   @db.VarChar(8) // opcional (paÃ­s)
+  description             String?                   @db.Text
+  documentos              Documento[] // back-relation (docs que apontam pra este tipo)
   // EMISSAO DOCUMENTAL - o tipo mestre CLASSIFICA arquivos operacionais (ex.: DOC21
   // "Requerimento inteiro teor" e o tipo do arquivo enviado ao cartorio) e aparece
   // nas exigencias de evidencia das etapas. Sempre por ID; nunca por nome/rotulo.
-  arquivosClassificados DocumentoArquivo[]   @relation("ArquivoTipoMestre")
-  exigenciasComoAlvo    ExigenciaEvidenciaEtapa[] @relation("ExigenciaDocumentoOperacional")
+  arquivosClassificados   DocumentoArquivo[]        @relation("ArquivoTipoMestre")
+  exigenciasComoAlvo      ExigenciaEvidenciaEtapa[] @relation("ExigenciaDocumentoOperacional")
   exigenciasComoEvidencia ExigenciaEvidenciaEtapa[] @relation("ExigenciaEvidenciaMestre")
-  configFinanceiras     ProdutoFinanceiro[]  @relation("ConfigFinTipoDocumento")
-  econRules             PhaseEconomicRule[]  @relation("EconTipoDocumento")
-  participaPlanilha     Boolean              @default(false)
+  configFinanceiras       ProdutoFinanceiro[]       @relation("ConfigFinTipoDocumento")
+  econRules               PhaseEconomicRule[]       @relation("EconTipoDocumento")
+  participaPlanilha       Boolean                   @default(false)
   // LOTE A â categoriaDocumentalId Ã© a CLASSIFICAÃÃO CANÃNICA (consumida por ID).
   // FK nullable p/ backfill seguro. A coluna `category` (String) permanece SÃ como
   // compatibilidade transitÃ³ria (dual-read/dual-write). NÃ£o remover neste lote.
   // onDelete: Restrict â a API jÃ¡ proÃ­be excluir categoria em uso; a FK impede
   // desclassificaÃ§Ã£o silenciosa via SQL cru (alinha DB e regra de negÃ³cio).
-  categoriaDocumentalId Int?
-  categoriaDocumental   CategoriaDocumental? @relation(fields: [categoriaDocumentalId], references: [id], onDelete: Restrict)
+  categoriaDocumentalId   Int?
+  categoriaDocumental     CategoriaDocumental?      @relation(fields: [categoriaDocumentalId], references: [id], onDelete: Restrict)
 
   // ── CONTRATO OPERACIONAL ───────────────────────────────────────────────────
   // Categoria diz ONDE o documento se arquiva. Estes três dizem COMO ele opera:
   // o que ele é (familia), como entra (natureza) e qual workflow o processa
   // (perfil). Nullable porque a classificação é gradual — documento sem perfil
   // continua sendo anexável; o que ele não faz é materializar workflow.
-  familiaDocumentalId  Int?
-  familiaDocumental    FamiliaDocumental? @relation(fields: [familiaDocumentalId], references: [id], onDelete: SetNull)
+  familiaDocumentalId   Int?
+  familiaDocumental     FamiliaDocumental?            @relation(fields: [familiaDocumentalId], references: [id], onDelete: SetNull)
   naturezaOperacionalId Int?
   naturezaOperacional   NaturezaOperacionalDocumento? @relation(fields: [naturezaOperacionalId], references: [id], onDelete: SetNull)
-  perfilOperacionalId  Int?
-  perfilOperacional    PerfilOperacionalDocumento? @relation(fields: [perfilOperacionalId], references: [id], onDelete: SetNull)
+  perfilOperacionalId   Int?
+  perfilOperacional     PerfilOperacionalDocumento?   @relation(fields: [perfilOperacionalId], references: [id], onDelete: SetNull)
+
+  // REPOSITÓRIO DE MODELOS — o tipo mestre é o QUE o modelo produz (por ID).
+  modelosDocumentais ModeloDocumental[] @relation("ModeloTipoDocumento")
+  documentosGerados  DocumentoGerado[]  @relation("DocumentoGeradoTipo")
 
   @@index([itemCatalogoId])
   @@index([categoriaDocumentalId])
@@ -6000,10 +6030,10 @@ model DocumentoArquivo {
   /// Finalidade do arquivo dentro da operacao (dimensao fechada).
   tipo TipoArquivoDocumento @default(OUTRO)
 
-  url      String
-  nome     String  @db.VarChar(300)
-  mimeType String? @db.VarChar(120)
-  tamanho  Int?
+  url          String
+  nome         String  @db.VarChar(300)
+  mimeType     String? @db.VarChar(120)
+  tamanho      Int?
   /// Impressao digital do conteudo (sha256:<hex>), calculada na origem do upload.
   /// Serve para provar que o binario e o mesmo e para reconhecer reenvio identico.
   hashConteudo String? @db.VarChar(80)
@@ -6011,15 +6041,15 @@ model DocumentoArquivo {
   // ── VERSIONAMENTO (a etapa reaberta e o botao "Trocar") ────────────────────
   /// Versao vigente do vinculo. Substituir NAO apaga: marca a anterior como nao
   /// vigente e preserva storageKey, autoria, data e historico.
-  vigente Boolean @default(true)
+  vigente            Boolean           @default(true)
   /// Arquivo que ESTE registro substituiu (a versao anterior).
-  substituiId Int?              @unique
-  substitui   DocumentoArquivo? @relation("VersaoArquivo", fields: [substituiId], references: [id], onDelete: SetNull)
+  substituiId        Int?              @unique
+  substitui          DocumentoArquivo? @relation("VersaoArquivo", fields: [substituiId], references: [id], onDelete: SetNull)
   /// Back-relation: a versao que substituiu este registro.
-  substituidoPor DocumentoArquivo? @relation("VersaoArquivo")
+  substituidoPor     DocumentoArquivo? @relation("VersaoArquivo")
   /// Quando este registro deixou de ser vigente (null = vigente).
   substituidoEm      DateTime?
-  motivoSubstituicao String?   @db.VarChar(300)
+  motivoSubstituicao String?           @db.VarChar(300)
 
   criadoPorId Int?
   criadoPor   Usuario? @relation("DocumentoArquivoAutor", fields: [criadoPorId], references: [id], onDelete: SetNull)
@@ -6069,9 +6099,9 @@ model ExigenciaEvidenciaEtapa {
   /// Finalidade do arquivo dentro da operacao (dimensao fechada ja existente).
   finalidade TipoArquivoDocumento @default(REQUERIMENTO_ENVIADO)
 
-  obrigatoria Boolean @default(true)
+  obrigatoria      Boolean @default(true)
   /// Quantos arquivos VIGENTES desta evidencia a etapa admite.
-  cardinalidadeMax Int @default(1)
+  cardinalidadeMax Int     @default(1)
   ativo            Boolean @default(true)
 
   /// Chave de identidade DERIVADA DOS IDS (step + tipo + canal + evidencia).
@@ -6110,4 +6140,266 @@ model DocumentoObservacao {
 
   @@index([documentoId, createdAt])
   @@index([stepInstanceId])
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+// REPOSITÓRIO OFICIAL DE MODELOS DOCUMENTAIS
+//
+// Um MODELO não é um documento — é um TEMPLATE. O documento é o RESULTADO da
+// aplicação de uma versão publicada do modelo a um outorgante concreto. A relação
+// nunca se inverte: Modelo → Versão publicada → Motor de geração → Documento
+// Gerado → Cliente/Pessoa/Processo.
+//
+// O TEXTO JURÍDICO NÃO MORA AQUI. Não mora em coluna, não mora em código, não
+// mora em componente. Ele mora exclusivamente dentro do DOCX versionado, no
+// storage privado. O banco guarda IDENTIDADE, VERSÃO, CHECKSUM, ESTADO e AUTORIA
+// — o que permite provar QUAL texto foi usado sem nunca duplicá-lo.
+//
+// POR QUE ESTENDE E NÃO ALTERA: nada aqui toca Documento, DocumentoArquivo,
+// PhaseWorkflowInstance, materializador, ciclo ou obrigação. O módulo apenas
+// FORNECE templates ao motor de geração e REFERENCIA (por id) o Cadastro Mestre
+// de Documentos, que continua sendo a fonte única do que o documento É.
+// ════════════════════════════════════════════════════════════════════════════
+
+/// Categoria do modelo — dimensão FECHADA de domínio (mesma natureza de
+/// TipoArquivoDocumento): não tem atributo administrável, só identidade. O que o
+/// documento É continua sendo TipoDocumentoCadastro (Cadastro Mestre), por ID.
+enum ModeloDocumentalCategoria {
+  PROCURACAO
+  CONTRATO
+  DECLARACAO
+  REQUERIMENTO
+  FORMULARIO
+  AUTORIZACAO
+  NOTIFICACAO
+  OUTRO
+}
+
+/// Ciclo de vida da VERSÃO. Só PUBLICADA gera documento oficial; publicada nunca
+/// se edita — alteração jurídica cria versão nova e a anterior é preservada.
+enum ModeloDocumentalVersaoStatus {
+  RASCUNHO
+  PUBLICADA
+  REVOGADA
+}
+
+/// Estado do documento gerado (o agregado, não a versão).
+enum DocumentoGeradoStatus {
+  VIGENTE
+  INVALIDADO
+}
+
+/// Estado de cada versão gerada. Uma nova geração nunca sobrescreve a anterior:
+/// a anterior vira SUBSTITUIDA e o arquivo dela permanece acessível.
+enum DocumentoGeradoVersaoStatus {
+  GERADA
+  VIGENTE
+  SUBSTITUIDA
+  INVALIDADA
+}
+
+/// MODELO DOCUMENTAL — a identidade do template no repositório oficial
+/// (Gerenciamento › Sistema › Modelos). Procuração Judicial e Administrativa são
+/// duas linhas desta tabela; contrato, declaração e requerimento serão outras.
+/// Não existe cadastro paralelo por tipo de documento inteligente.
+model ModeloDocumental {
+  id        Int                       @id @default(autoincrement())
+  codigo    String                    @unique @db.VarChar(40)
+  nome      String                    @db.VarChar(200)
+  descricao String?                   @db.Text
+  categoria ModeloDocumentalCategoria
+
+  /// O QUE o documento é, no Cadastro Mestre de Documentos. Sempre por ID —
+  /// nunca por nome. Restrict: não se apaga do cadastro um tipo que é modelo.
+  documentTypeId Int
+  documentType   TipoDocumentoCadastro @relation("ModeloTipoDocumento", fields: [documentTypeId], references: [id], onDelete: Restrict)
+
+  ativo Boolean @default(true)
+
+  criadoPorId Int?
+  criadoPor   Usuario? @relation("ModeloDocumentalAutor", fields: [criadoPorId], references: [id], onDelete: SetNull)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  versoes           ModeloDocumentalVersao[]
+  documentosGerados DocumentoGerado[]
+
+  @@index([documentTypeId])
+  @@index([categoria])
+  @@index([ativo])
+}
+
+/// VERSÃO do modelo — o DOCX oficial, imutável depois de publicado.
+///
+/// O arquivo vive em storage PRIVADO (chave, não URL pública): o template carrega
+/// texto jurídico da banca e é servido apenas por rota autenticada com URL
+/// assinada de curta duração.
+model ModeloDocumentalVersao {
+  id       Int              @id @default(autoincrement())
+  modeloId Int
+  modelo   ModeloDocumental @relation(fields: [modeloId], references: [id], onDelete: Cascade)
+  numero   Int
+
+  /// Chave do objeto no storage privado. Nunca URL pública: o DOCX oficial só sai
+  /// por rota autenticada.
+  arquivoChave   String  @db.VarChar(400)
+  arquivoNome    String  @db.VarChar(300)
+  arquivoMime    String? @db.VarChar(120)
+  arquivoTamanho Int?
+  /// sha256:<hex> do DOCX. É o que prova que o binário publicado é o mesmo.
+  checksum       String  @db.VarChar(80)
+
+  status ModeloDocumentalVersaoStatus @default(RASCUNHO)
+
+  /// Variáveis efetivamente encontradas no DOCX (todas conhecidas pelo registry).
+  placeholders         Json
+  /// Subconjunto exigido para gerar — sem elas a geração é bloqueada.
+  obrigatorios         Json
+  /// Variáveis que o modelo usa mas tolera ausentes (segmentos opcionais).
+  opcionais            Json
+  /// Literais de identificação (CPF/RG/CEP) declarados como DADO FIXO do outorgado.
+  /// Publicação é bloqueada enquanto existir literal não declarado.
+  dadosFixosDeclarados Json?
+
+  observacao String? @db.Text
+
+  criadoPorId Int?
+  criadoPor   Usuario? @relation("ModeloVersaoAutor", fields: [criadoPorId], references: [id], onDelete: SetNull)
+
+  publicadoEm    DateTime?
+  publicadoPorId Int?
+  publicadoPor   Usuario?  @relation("ModeloVersaoPublicador", fields: [publicadoPorId], references: [id], onDelete: SetNull)
+
+  revogadoEm    DateTime?
+  revogadoPorId Int?
+  revogadoPor   Usuario?  @relation("ModeloVersaoRevogador", fields: [revogadoPorId], references: [id], onDelete: SetNull)
+
+  vigenteDe  DateTime?
+  vigenteAte DateTime?
+
+  criadoEm     DateTime @default(now())
+  atualizadoEm DateTime @updatedAt
+
+  geracoes DocumentoGeradoVersao[]
+
+  @@unique([modeloId, numero])
+  @@index([modeloId, status])
+  @@index([checksum])
+}
+
+/// DOCUMENTO GERADO — o agregado. Uma linha por (tipo documental × outorgante ×
+/// processo): é ela que garante "uma versão vigente por pessoa + tipo + processo".
+/// As gerações seguintes criam VERSÃO nova aqui dentro, nunca outro agregado.
+model DocumentoGerado {
+  id Int @id @default(autoincrement())
+
+  modeloId Int
+  modelo   ModeloDocumental @relation(fields: [modeloId], references: [id], onDelete: Restrict)
+
+  /// Classificação mestre do resultado — o mesmo id do modelo no momento da
+  /// geração, materializado aqui porque é o que as telas consultam.
+  documentTypeId Int
+  documentType   TipoDocumentoCadastro @relation("DocumentoGeradoTipo", fields: [documentTypeId], references: [id], onDelete: Restrict)
+
+  // ── OUTORGANTE ────────────────────────────────────────────────────────────
+  // O papel concreto no cadastro do cliente. Exatamente um dos dois — a trava
+  // está no banco (CHECK), não na boa vontade da aplicação.
+  contratanteId Int?
+  contratante   Contratante? @relation(fields: [contratanteId], references: [id], onDelete: Restrict)
+  requerenteId  Int?
+  requerente    Requerente?  @relation(fields: [requerenteId], references: [id], onDelete: Restrict)
+
+  /// Identidade humana única (CP-1), quando o papel já está vinculado a ela.
+  pessoaId Int?
+  pessoa   Pessoa? @relation("DocumentoGeradoPessoa", fields: [pessoaId], references: [id], onDelete: SetNull)
+
+  processoId Int?
+  processo   Processo? @relation("DocumentoGeradoProcesso", fields: [processoId], references: [id], onDelete: SetNull)
+
+  servicoId Int?
+  servico   ServicoProduto? @relation("DocumentoGeradoServico", fields: [servicoId], references: [id], onDelete: SetNull)
+
+  /// DOCUMENTO OPERACIONAL correspondente, quando o outorgante tem identidade
+  /// (Pessoa) e o documento gerado passa a valer como peça da pasta documental.
+  /// Nullable: sem Pessoa vinculada o documento gerado continua existindo e
+  /// vinculado ao cliente — o que não existe é documento operacional órfão.
+  documentoId Int?
+  documento   Documento? @relation("DocumentoGeradoOperacional", fields: [documentoId], references: [id], onDelete: SetNull)
+
+  status DocumentoGeradoStatus @default(VIGENTE)
+
+  /// Identidade do agregado, derivada dos IDS (tipo + outorgante + processo).
+  /// Existe porque UNIQUE com coluna nula não deduplica em Postgres — é a trava
+  /// que impede dois agregados rivais para o mesmo par.
+  chaveIdentidade String @unique @db.VarChar(200)
+
+  criadoPorId Int?
+  criadoPor   Usuario? @relation("DocumentoGeradoAutor", fields: [criadoPorId], references: [id], onDelete: SetNull)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  versoes DocumentoGeradoVersao[]
+
+  @@index([contratanteId])
+  @@index([requerenteId])
+  @@index([pessoaId])
+  @@index([processoId])
+  @@index([documentTypeId])
+  @@index([documentoId])
+}
+
+/// VERSÃO GERADA — o par DOCX+PDF de uma geração, com o snapshot dos dados que a
+/// produziram. Os dois arquivos pertencem à MESMA versão: não existe PDF sem
+/// DOCX, nem DOCX sem PDF, nem PDF vindo de outra origem que não este DOCX.
+///
+/// O snapshot é imutável: mudar o cadastro do cliente depois não altera versão
+/// nenhuma já gerada — a versão nova é que usa o dado novo.
+model DocumentoGeradoVersao {
+  id                Int             @id @default(autoincrement())
+  documentoGeradoId Int
+  documentoGerado   DocumentoGerado @relation(fields: [documentoGeradoId], references: [id], onDelete: Cascade)
+  numero            Int
+
+  /// Versão do TEMPLATE usada. Restrict: versão de modelo que já gerou documento
+  /// não some do repositório.
+  modeloVersaoId Int
+  modeloVersao   ModeloDocumentalVersao @relation(fields: [modeloVersaoId], references: [id], onDelete: Restrict)
+
+  docxChave    String @db.VarChar(400)
+  docxNome     String @db.VarChar(300)
+  docxChecksum String @db.VarChar(80)
+  docxTamanho  Int?
+
+  pdfChave    String @db.VarChar(400)
+  pdfNome     String @db.VarChar(300)
+  pdfChecksum String @db.VarChar(80)
+  pdfTamanho  Int?
+
+  /// Dados de origem congelados — com os IDS de origem, não só os textos.
+  dadosSnapshot Json
+
+  status DocumentoGeradoVersaoStatus @default(GERADA)
+
+  geradoEm    DateTime @default(now())
+  geradoPorId Int?
+  geradoPor   Usuario? @relation("DocumentoGeradoVersaoAutor", fields: [geradoPorId], references: [id], onDelete: SetNull)
+
+  substituidaEm    DateTime?
+  substituidaPorId Int?                   @unique
+  substituidaPor   DocumentoGeradoVersao? @relation("VersaoGeradaSubstituicao", fields: [substituidaPorId], references: [id], onDelete: SetNull)
+  substitui        DocumentoGeradoVersao? @relation("VersaoGeradaSubstituicao")
+
+  invalidadaEm      DateTime?
+  invalidadaPorId   Int?
+  invalidadaPor     Usuario?  @relation("DocumentoGeradoVersaoInvalidador", fields: [invalidadaPorId], references: [id], onDelete: SetNull)
+  motivoInvalidacao String?   @db.VarChar(300)
+
+  /// Idempotência do ato: duplo clique e retry caem na MESMA versão.
+  chaveIdempotencia String @unique @db.VarChar(200)
+
+  @@unique([documentoGeradoId, numero])
+  @@index([modeloVersaoId])
+  @@index([status])
 }

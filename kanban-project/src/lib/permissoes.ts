@@ -129,6 +129,25 @@ export const PERMISSOES = {
   // FINANCEIRO V3 — ativação por DATA DE CORTE (Ledger vira a fonte). OPT-IN: ação
   // operacional sensível (grava aberturas/estornos no Ledger); exige permissão explícita.
   'financeiro.dataCorte': 'Administrar a DATA DE CORTE do Motor Financeiro V3 (ativar/reverter aberturas no Ledger)',
+
+  // MODELOS DOCUMENTAIS — repositório oficial de templates (Sistema › Modelos).
+  // Segregação de funções: VER modelo ≠ ADMINISTRAR versão ≠ PUBLICAR texto
+  // jurídico. Publicar é o ato que passa a valer para todos os documentos
+  // gerados dali em diante; por isso é permissão própria, e não "quem edita
+  // também publica".
+  'modelos.ver': 'Ver o repositório de modelos documentais e suas versões',
+  'modelos.gerenciar': 'Criar e editar modelos e enviar novas versões (rascunho)',
+  'modelos.publicar': 'Publicar versão de modelo (passa a valer para as gerações seguintes)',
+  'modelos.revogar': 'Revogar versão de modelo',
+
+  // DOCUMENTOS GERADOS — o resultado da aplicação de um modelo a um outorgante.
+  // Gerar ≠ baixar ≠ vincular ≠ invalidar: o arquivo carrega CPF, RG e endereço,
+  // e cada um desses atos tem consequência diferente.
+  'documentos_gerados.ver': 'Ver documentos gerados do cliente e do processo',
+  'documentos_gerados.gerar': 'Gerar documento a partir de modelo publicado',
+  'documentos_gerados.baixar': 'Baixar ou visualizar o DOCX e o PDF gerados',
+  'documentos_gerados.vincular': 'Vincular documento gerado a processo ou a documento operacional',
+  'documentos_gerados.invalidar': 'Invalidar versão de documento gerado',
 } as const
 
 export type PermissaoChave = keyof typeof PERMISSOES
@@ -259,6 +278,27 @@ export const MODULOS_PERMISSOES = [
       'usuarios.criar',
       'usuarios.editar',
       'usuarios.excluir',
+    ],
+  },
+  {
+    modulo: 'Modelos Documentais',
+    icone: '📄',
+    permissoes: [
+      'modelos.ver',
+      'modelos.gerenciar',
+      'modelos.publicar',
+      'modelos.revogar',
+    ],
+  },
+  {
+    modulo: 'Documentos Gerados',
+    icone: '🖋️',
+    permissoes: [
+      'documentos_gerados.ver',
+      'documentos_gerados.gerar',
+      'documentos_gerados.baixar',
+      'documentos_gerados.vincular',
+      'documentos_gerados.invalidar',
     ],
   },
 ] as const

@@ -17,6 +17,7 @@ import { ProcessoCentralOperacional } from "./ProcessoCentralOperacional"
 // movido para Gerenciamento → Motor → Diagnóstico do Runtime. A Central Operacional
 // é puramente operacional.
 import { ProcessoDocumentos } from "./ProcessoDocumentos"
+import { ProcuracaoDoProcesso } from "./ProcuracaoDoProcesso"
 import { ProcessoProtocolos } from "./ProcessoProtocolos"
 import { ProcessoInformacoes } from "./ProcessoInformacoes"
 import { ProcessoHistorico } from "./ProcessoHistorico"
@@ -972,7 +973,17 @@ function ConteudoModal({
           )}
 
           {activeTab === "documentos" && (
-            <ProcessoDocumentos processo={processo} />
+            <div className="space-y-6">
+              <ProcessoDocumentos processo={processo} />
+              {/* AÇÃO CONTEXTUAL — o MESMO gerador do cadastro do cliente, com o
+                  processo já preenchido. Não existe segundo gerador. */}
+              <ProcuracaoDoProcesso
+                processoId={processo.id}
+                processoRotulo={processo.nome || `#${processo.id}`}
+                contratantes={contratantesSelecionados.map((c) => ({ id: c.id, nome: c.nome }))}
+                requerentes={requerentesSelecionados.map((r) => ({ id: r.id, nome: r.nome }))}
+              />
+            </div>
           )}
 
           {activeTab === "arvore" && (
