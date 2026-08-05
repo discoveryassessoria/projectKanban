@@ -98,6 +98,30 @@ Um modelo futuro que use `{{OUTORGANTE_NOME_COMPLETO}}` herda o tratamento sem
 alteração no motor: a regra mora no registry, não no template nem no código de
 substituição.
 
+## Formatação do parágrafo
+
+O motor **não encosta no `w:pPr`**. Alinhamento, entrelinha, espaçamento antes e
+depois, recuos, margens, fonte e tamanho saem do documento gerado byte a byte
+como estão no template; a substituição só reescreve `<w:t>` e, no caso do nome do
+outorgante, divide o `<w:r>`. Cabeçalho, rodapé, estilos, tema e mídia nem são
+abertos para escrita — de todo o pacote, só `word/document.xml` muda.
+
+É por isso que **corrigir alinhamento não é trabalho do motor**. Um motor que
+"consertasse" a formatação na hora de gerar teria de reescrever `w:pPr`, e a
+partir daí nada garantiria que o documento gerado é o documento aprovado. Quando
+o alinhamento de um modelo precisa mudar, o caminho é o mesmo de qualquer
+alteração de redação: **versão nova**, que preserva a anterior e passa pela
+publicação auditada (`scripts/modelo-versao-alinhamento.ts` prepara o DOCX;
+`definirAlinhamentoDoCorpo` vive na seção de PREPARAÇÃO, nunca no runtime).
+
+O corpo das duas procurações está JUSTIFICADO. A Administrativa já nascia assim
+e foi preservada exatamente. Na Judicial, os parágrafos OUTORGANTE, OUTORGADA e
+a linha de data herdavam `left` do estilo `p1`; a **versão 2**, publicada em
+05/08/2026, os traz com `w:jc="both"`. Título e linha de assinatura seguem
+centralizados — são decisão de desenho, não corpo. A versão 1 permanece no
+repositório como REVOGADA, e os documentos gerados por ela continuam apontando
+para ela.
+
 ## O validador de template
 
 Publicação é bloqueada quando o DOCX não abre, quando usa variável desconhecida,

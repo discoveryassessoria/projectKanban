@@ -394,7 +394,82 @@ function aplicarNegrito(rPr: string): string {
 
 // ════════════════════════════════════════════════════════════════════════════
 // PREPARAÇÃO DE TEMPLATE — converter um documento real em modelo
+//
+// Tudo nesta seção é ferramenta de AUTORIA: roda uma vez, com o documento na
+// mão, para produzir o DOCX que será publicado como versão. Nada aqui é chamado
+// pelo runtime — o guard de arquitetura verifica isso.
 // ════════════════════════════════════════════════════════════════════════════
+
+/**
+ * Define o alinhamento dos parágrafos do CORPO, preservando todo o resto do
+ * `w:pPr`.
+ *
+ * POR QUE ISTO É PREPARAÇÃO, E NÃO RUNTIME: o alinhamento é decisão de redação,
+ * e mora no template. Um motor que "corrigisse" alinhamento na hora de gerar
+ * teria de reescrever `w:pPr` — exatamente o que a arquitetura proíbe, porque a
+ * partir daí nada garante que o documento gerado é o documento aprovado. Quando
+ * o alinhamento de um modelo precisa mudar, o caminho é uma VERSÃO NOVA, que
+ * preserva a anterior e passa pela publicação auditada.
+ *
+ * `preservarAlinhados` protege quem já está do jeito que o autor quis: um
+ * parágrafo centralizado (título, linha de assinatura) não é corpo e não vira
+ * justificado por engano.
+ */
+export async function definirAlinhamentoDoCorpo(
+  buffer: Buffer | Uint8Array,
+  opcoes: { alinhamento: "both" | "left" | "center" | "right"; naoTocarEm?: string[] } = {
+    alinhamento: "both",
+  },
+): Promise<{ buffer: Buffer; ajustados: number; preservados: number }> {
+  const intocaveis = new Set(opcoes.naoTocarEm ?? ["center", "right"])
+  const zip = await abrirDocx(buffer)
+  // SÓ o corpo: cabeçalho e rodapé não são corpo e ficam byte a byte como estão.
+  const xml = await zip.file("word/document.xml")!.async("string")
+
+  let ajustados = 0
+  let preservados = 0
+
+  const novo = xml.replace(
+    /<w:p(?:\s[^>]*)?>[\s\S]*?<\/w:p>|<w:p(?:\s[^>]*)?\/>/g,
+    (paragrafo) => {
+      // Parágrafo sem texto visível não tem alinhamento observável.
+      if (segmentosDeTexto(paragrafo).every((s) => !s.texto.trim())) return paragrafo
+
+      const pPr = paragrafo.match(/<w:pPr>[\s\S]*?<\/w:pPr>|<w:pPr\s*\/>/)?.[0]
+      const atual = pPr?.match(/<w:jc\b[^>]*w:val="([^"]*)"/)?.[1]
+
+      if (atual === opcoes.alinhamento) { preservados++; return paragrafo }
+      if (atual && intocaveis.has(atual)) { preservados++; return paragrafo }
+
+      ajustados++
+      const jc = `<w:jc w:val="${opcoes.alinhamento}"/>`
+
+      if (atual) {
+        return paragrafo.replace(/<w:jc\b[^>]*\/>/, jc)
+      }
+      if (pPr && pPr !== "<w:pPr/>") {
+        // `w:jc` vem depois de spacing/ind e antes de `w:rPr`, que é o último
+        // filho do `w:pPr`. Fora de ordem, o Word recusa o documento.
+        const comJc = pPr.includes("<w:rPr>")
+          ? pPr.replace("<w:rPr>", `${jc}<w:rPr>`)
+          : pPr.replace("</w:pPr>", `${jc}</w:pPr>`)
+        return paragrafo.replace(pPr, comJc)
+      }
+      // Sem `w:pPr`: ele nasce logo depois da abertura do parágrafo.
+      return paragrafo.replace(/^(<w:p(?:\s[^>]*)?>)/, `$1<w:pPr>${jc}</w:pPr>`)
+    },
+  )
+
+  if (novo !== xml) zip.file("word/document.xml", novo, OPCOES_DE_ENTRADA)
+
+  const saida = await zip.generateAsync({
+    type: "nodebuffer",
+    compression: "DEFLATE",
+    compressionOptions: { level: 6 },
+  })
+
+  return { buffer: saida, ajustados, preservados }
+}
 
 /**
  * Troca TRECHOS LITERAIS de texto pelo marcador de variável, preservando runs.

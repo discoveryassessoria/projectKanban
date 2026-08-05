@@ -313,6 +313,31 @@ ok(/PLACEHOLDER_REMANESCENTE/.test(motor) && /PDF_INVALIDO/.test(motor) && /DOCX
   "10.6 DOCX, PDF e ausência de placeholder são conferidos antes de persistir")
 
 // ════════════════════════════════════════════════════════════════════════════
+console.log("\n(10B) O motor não encosta na formatação do parágrafo:")
+
+const docxEngine = ler("src/lib/documentos/modelos/docx.ts")
+const runtimeDoDocx = semComentarios(
+  docxEngine.slice(0, docxEngine.indexOf("// PREPARAÇÃO DE TEMPLATE")),
+)
+ok(!/w:pPr/.test(runtimeDoDocx),
+  "10B.1 o caminho de SUBSTITUIÇÃO não menciona w:pPr — a formatação do parágrafo é intocável")
+ok(!/w:jc/.test(runtimeDoDocx),
+  "10B.2 o caminho de substituição nunca escreve alinhamento")
+ok(!/w:spacing|w:ind\b/.test(runtimeDoDocx),
+  "10B.3 nem entrelinha, nem espaçamento, nem recuo")
+
+const preparacao = docxEngine.slice(docxEngine.indexOf("// PREPARAÇÃO DE TEMPLATE"))
+ok(/export async function definirAlinhamentoDoCorpo/.test(preparacao),
+  "10B.4 mudar alinhamento é ferramenta de PREPARAÇÃO, e vive na seção de preparação")
+const usaAlinhamento = [...conteudoSrc.entries()]
+  .filter(([f, c]) => /definirAlinhamentoDoCorpo/.test(c) && !f.includes("documentos/modelos/docx.ts"))
+  .map(([f]) => f.replace(ROOT + "/", ""))
+ok(usaAlinhamento.length === 0,
+  `10B.5 nenhum runtime chama o ajuste de alinhamento${usaAlinhamento.length ? " — vazou: " + usaAlinhamento.join(", ") : ""}`)
+ok(!/word\/(header|footer)/.test(semComentarios(preparacao.split("definirAlinhamentoDoCorpo")[1] ?? "").slice(0, 2000)),
+  "10B.6 o ajuste de alinhamento só toca word/document.xml — cabeçalho e rodapé ficam fora")
+
+// ════════════════════════════════════════════════════════════════════════════
 console.log("\n(11) Módulo congelado (05/08/2026):")
 
 const doc = ler("docs/architecture/10-modelos-documentais.md")

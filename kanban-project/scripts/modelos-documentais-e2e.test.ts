@@ -16,7 +16,14 @@ import {
   urlDoArquivo,
 } from "../src/services/modelos/documentos-gerados"
 import { lerObjetoPrivado, removerObjetoPrivado } from "../src/lib/documentos/modelos/storage-privado"
-import { textoDoDocx } from "../src/lib/documentos/modelos/docx"
+import { abrirDocx, estruturaDoDocx, textoDoDocx } from "../src/lib/documentos/modelos/docx"
+
+/** `w:pPr` de cada parágrafo, na ordem — para comparar template × gerado. */
+async function pPrDoCorpo(buffer: Buffer | Uint8Array): Promise<string[]> {
+  const zip = await abrirDocx(buffer)
+  const xml = await zip.file("word/document.xml")!.async("string")
+  return [...xml.matchAll(/<w:pPr>[\s\S]*?<\/w:pPr>|<w:pPr\s*\/>/g)].map((m) => m[0])
+}
 
 const MARCA = "[TESTE-MODELOS]"
 
@@ -137,6 +144,36 @@ async function main() {
     ok(!texto.includes("EDISON") && !texto.includes("218.673.738-82"),
       "1.18 nenhum dado do cliente do modelo de origem restou")
 
+    // ── Formatação: o gerado é o template, com outro texto ─────────────────
+    const versaoModelo = await prisma.modeloDocumentalVersao.findUniqueOrThrow({
+      where: { id: v1.modeloVersaoId },
+    })
+    const template = await lerObjetoPrivado(versaoModelo.arquivoChave)
+    ok(JSON.stringify(await pPrDoCorpo(template)) === JSON.stringify(await pPrDoCorpo(docx)),
+      "1.18b o w:pPr do template sai byte a byte no documento gerado")
+
+    const zipT = await abrirDocx(template)
+    const zipG = await abrirDocx(docx)
+    const partes = Object.values(zipT.files).filter((f) => !f.dir).map((f) => f.name)
+    const mudaram: string[] = []
+    for (const nome of partes) {
+      const a = await zipT.file(nome)!.async("nodebuffer")
+      const b = await zipG.file(nome)?.async("nodebuffer")
+      if (!b || !a.equals(b)) mudaram.push(nome)
+    }
+    ok(mudaram.length === 1 && mudaram[0] === "word/document.xml",
+      `1.18c só o corpo muda — cabeçalho, rodapé, estilos e mídia intactos (mudou: ${mudaram.join(", ")})`)
+
+    const estrutura = await estruturaDoDocx(docx)
+    const comTexto = estrutura.paragrafos.filter((p) =>
+      p.trechos.map((t) => t.texto).join("").trim().length > 0,
+    )
+    const corpo = comTexto.filter((p) => p.alinhamento !== "center")
+    ok(corpo.length > 0 && corpo.every((p) => p.alinhamento === "justify"),
+      `1.18d todo parágrafo do corpo está JUSTIFICADO (${corpo.map((p) => p.alinhamento).join(", ")})`)
+    ok(comTexto.some((p) => p.alinhamento === "center"),
+      "1.18e título e assinatura seguem centralizados — o corpo não os arrastou")
+
     const agregado = await prisma.documentoGerado.findUniqueOrThrow({
       where: { id: g1.documentoGeradoId },
       include: { versoes: true },
@@ -194,6 +231,13 @@ async function main() {
     ok(!texto2.includes("SYLVIA") && !texto2.includes("256.516.318-52"),
       "2.8 nenhum dado do cliente do modelo de origem restou")
     ok(!texto2.includes("residente na na "), "2.9 a duplicação de 'na' do modelo de origem foi corrigida")
+
+    const estrutura2 = await estruturaDoDocx(await lerObjetoPrivado(v2.docxChave))
+    const corpo2 = estrutura2.paragrafos
+      .filter((p) => p.trechos.map((t) => t.texto).join("").trim().length > 0)
+      .filter((p) => p.alinhamento !== "center")
+    ok(corpo2.length > 0 && corpo2.every((p) => p.alinhamento === "justify"),
+      "2.9b o corpo da administrativa também está JUSTIFICADO")
     ok(!texto2.includes("{{"), "2.10 nenhum placeholder restou")
 
     // ══════════════════════════════════════════════════════════════════════

@@ -12,6 +12,8 @@ import { readFileSync, existsSync } from "node:fs"
 import { fileURLToPath } from "node:url"
 import { dirname, join } from "node:path"
 import {
+  abrirDocx,
+  definirAlinhamentoDoCorpo,
   substituirLiteraisDocx,
   substituirPlaceholdersDocx,
   textoDoDocx,
@@ -78,6 +80,32 @@ async function docxDeTeste(paragrafos: string[][]): Promise<Buffer> {
           .join("")}</w:p>`,
     )
     .join("")
+  zip.file(
+    "word/document.xml",
+    `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body>${corpo}<w:sectPr><w:pgSz w:w="11906" w:h="16838"/><w:pgMar w:top="1417" w:right="1701" w:bottom="1417" w:left="1701" w:header="708" w:footer="708"/></w:sectPr></w:body></w:document>`,
+  )
+  return zip.generateAsync({ type: "nodebuffer" }) as Promise<Buffer>
+}
+
+/** DOCX de teste com `w:pPr` controlado pelo chamador. */
+async function docxDeTesteComPPr(pPr: string, runs: string[]): Promise<Buffer> {
+  const { default: JSZip } = await import("jszip")
+  const zip = new JSZip()
+  zip.file(
+    "[Content_Types].xml",
+    `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="xml" ContentType="application/xml"/><Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/></Types>`,
+  )
+  zip.file(
+    "_rels/.rels",
+    `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/></Relationships>`,
+  )
+  zip.file(
+    "word/footer1.xml",
+    `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><w:ftr xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:p><w:r><w:t>rodapé do escritório</w:t></w:r></w:p></w:ftr>`,
+  )
+  const corpo = `<w:p>${pPr}${runs
+    .map((t) => `<w:r><w:rPr><w:sz w:val="24"/></w:rPr><w:t xml:space="preserve">${t}</w:t></w:r>`)
+    .join("")}</w:p>`
   zip.file(
     "word/document.xml",
     `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body>${corpo}<w:sectPr><w:pgSz w:w="11906" w:h="16838"/><w:pgMar w:top="1417" w:right="1701" w:bottom="1417" w:left="1701" w:header="708" w:footer="708"/></w:sectPr></w:body></w:document>`,
@@ -337,6 +365,84 @@ async function main() {
     "4B.11 template com o nome já em negrito continua correto")
   ok((await textoDoDocx(jaNegrito.buffer)).includes("MARIA APARECIDA DE SOUZA"),
     "4B.12 e o valor continua em caixa alta")
+
+  // ══════════════════════════════════════════════════════════════════════
+  console.log("\n(4C) Formatação do parágrafo: o motor não encosta no w:pPr:")
+
+  // Template com pPr rico: alinhamento, entrelinha, espaçamento e recuos. Se a
+  // substituição mexesse em qualquer um, o teste veria.
+  const PPR_RICO =
+    '<w:pPr><w:pStyle w:val="p1"/><w:spacing w:after="120" w:line="360" w:lineRule="auto"/>' +
+    '<w:ind w:left="284" w:right="142" w:firstLine="709"/><w:jc w:val="both"/></w:pPr>'
+  const templateFormatado = await docxDeTesteComPPr(PPR_RICO, [
+    "OUTORGANTE: ", "{{OUTORGANTE_NOME_COMPLETO}}", ", {{OUTORGANTE_NACIONALIDADE}}, CPF nº {{OUTORGANTE_CPF}}.",
+  ])
+  const formatado = await substituirPlaceholdersDocx(templateFormatado, r.valores)
+
+  const pPrDe = async (buf: Buffer | Uint8Array) => {
+    const zip = await abrirDocx(buf)
+    const xml = await zip.file("word/document.xml")!.async("string")
+    return [...xml.matchAll(/<w:pPr>[\s\S]*?<\/w:pPr>|<w:pPr\s*\/>/g)].map((m) => m[0])
+  }
+  const pPrAntes = await pPrDe(templateFormatado)
+  const pPrDepois = await pPrDe(formatado.buffer)
+
+  ok(JSON.stringify(pPrAntes) === JSON.stringify(pPrDepois),
+    "4C.1 o w:pPr sai da substituição byte a byte como entrou")
+  ok(pPrDepois[0] === PPR_RICO,
+    "4C.2 alinhamento, entrelinha, espaçamento e recuos intactos")
+
+  const estFormatado = await estruturaDoDocx(formatado.buffer)
+  ok(estFormatado.paragrafos[0].alinhamento === "justify",
+    "4C.3 o parágrafo com placeholders continua JUSTIFICADO depois de substituído")
+  ok(estFormatado.paragrafos[0].entrelinha === 1.5,
+    "4C.4 a entrelinha do template é a que vale")
+  ok(estFormatado.paragrafos[0].espacoDepois === 6 &&
+     Math.round(estFormatado.paragrafos[0].recuoEsquerda) === 14 &&
+     Math.round(estFormatado.paragrafos[0].recuoPrimeiraLinha) === 35,
+    "4C.5 espaçamento e recuos do template são os que valem")
+  ok(estFormatado.paragrafos[0].trechos.every((t) => t.tamanho === 12),
+    "4C.6 tamanho da fonte preservado")
+
+  // O negrito do nome divide o run — e nem por isso o parágrafo muda de forma.
+  ok(estFormatado.paragrafos[0].trechos.some((t) => t.negrito) &&
+     estFormatado.paragrafos[0].trechos.some((t) => !t.negrito),
+    "4C.7 a divisão de run para o negrito não altera o parágrafo")
+
+  console.log("\n(4D) Alinhamento do corpo é ato de PREPARAÇÃO, não de runtime:")
+
+  const semAlinhamento = await docxDeTesteComPPr('<w:pPr><w:spacing w:after="120"/></w:pPr>', ["Corpo sem jc."])
+  const alinhado = await definirAlinhamentoDoCorpo(semAlinhamento, { alinhamento: "both" })
+  const pPrAlinhado = (await pPrDe(alinhado.buffer))[0]
+  ok(alinhado.ajustados === 1, "4D.1 parágrafo do corpo sem alinhamento é ajustado")
+  ok(pPrAlinhado.includes('<w:jc w:val="both"/>'), "4D.2 o corpo passa a JUSTIFICADO")
+  ok(pPrAlinhado.includes('<w:spacing w:after="120"/>'),
+    "4D.3 o resto do w:pPr é preservado — só o alinhamento entra")
+
+  const jaJustificado = await docxDeTesteComPPr('<w:pPr><w:jc w:val="both"/></w:pPr>', ["Já justificado."])
+  const mantido = await definirAlinhamentoDoCorpo(jaJustificado, { alinhamento: "both" })
+  ok(mantido.ajustados === 0 && mantido.preservados === 1,
+    "4D.4 template já justificado é preservado EXATAMENTE — nada é reescrito")
+
+  const centralizado = await docxDeTesteComPPr('<w:pPr><w:jc w:val="center"/></w:pPr>', ["PROCURAÇÃO"])
+  const preservado = await definirAlinhamentoDoCorpo(centralizado, { alinhamento: "both" })
+  ok(preservado.ajustados === 0,
+    "4D.5 título e assinatura centralizados NÃO viram justificados")
+
+  // Cabeçalho e rodapé não são corpo.
+  const zipComRodape = await abrirDocx(semAlinhamento)
+  const zipAlinhado = await abrirDocx(alinhado.buffer)
+  const outrasPartes = Object.values(zipComRodape.files)
+    .filter((f) => !f.dir && f.name !== "word/document.xml")
+    .map((f) => f.name)
+  const iguais: string[] = []
+  for (const nome of outrasPartes) {
+    const a = await zipComRodape.file(nome)!.async("string")
+    const b = await zipAlinhado.file(nome)?.async("string")
+    if (a === b) iguais.push(nome)
+  }
+  ok(outrasPartes.includes("word/footer1.xml") && iguais.length === outrasPartes.length,
+    "4D.6 só o corpo muda — rodapé e demais partes do pacote saem idênticas")
 
   // ══════════════════════════════════════════════════════════════════════
   console.log("\n(5) Motor PDF — a partir do DOCX gerado:")
