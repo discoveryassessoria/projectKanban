@@ -312,6 +312,30 @@ ok(
 ok(/PLACEHOLDER_REMANESCENTE/.test(motor) && /PDF_INVALIDO/.test(motor) && /DOCX_INVALIDO/.test(motor),
   "10.6 DOCX, PDF e ausência de placeholder são conferidos antes de persistir")
 
+// ════════════════════════════════════════════════════════════════════════════
+console.log("\n(11) Módulo congelado (05/08/2026):")
+
+const doc = ler("docs/architecture/10-modelos-documentais.md")
+ok(/M[ÓO]DULO CONGELADO em 05\/08\/2026/.test(doc),
+  "11.1 o congelamento está declarado no documento de arquitetura")
+ok(/corre[çc][ãa]o de bug/.test(doc) && /nova vers[ãa]o de template/.test(doc),
+  "11.2 as duas exceções admitidas estão nomeadas")
+
+const variaveis = ler("src/lib/documentos/modelos/variaveis.ts")
+ok(/renderizacao: \{ caixaAlta: true, negrito: true \}/.test(variaveis),
+  "11.3 a renderização do nome do outorgante é declarada no REGISTRY, não no motor")
+ok((variaveis.match(/renderizacao: \{ caixaAlta: true, negrito: true \}/g) || []).length === 2,
+  "11.4 vale para a qualificação e para a assinatura — o mesmo nome, do mesmo jeito")
+ok(/valorRenderizado/.test(ler("src/lib/documentos/modelos/docx.ts")),
+  "11.5 a caixa alta acontece na escrita do DOCX")
+
+const resolver = semComentarios(ler("src/services/modelos/outorgante.ts"))
+ok(!/toLocaleUpperCase|toUpperCase/.test(resolver),
+  "11.6 o resolvedor NÃO altera a grafia — cadastro, checklist e snapshot ficam como estão")
+const motorGeracao = semComentarios(ler("src/services/modelos/gerar-documento.ts"))
+ok(!/toLocaleUpperCase|toUpperCase/.test(motorGeracao),
+  "11.7 o snapshot guarda o valor do cadastro, não o desenhado")
+
 console.log(`\n${passou} passaram, ${falhou} falharam`)
 if (falhou > 0) {
   console.log("FALHAS: " + falhas.join("; "))

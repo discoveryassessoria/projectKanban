@@ -1,5 +1,12 @@
 # 10 — Repositório Oficial de Modelos Documentais
 
+> **MÓDULO CONGELADO em 05/08/2026.** A arquitetura descrita aqui está fechada.
+> Alteração futura admitida em exatamente dois casos: **correção de bug** e
+> **nova versão de template** (que é um ato de operação, feito pela tela, sem
+> tocar em código). Mudança arquitetural — entidade nova, gerador novo, fonte de
+> dado nova, mudança de invariante — exige decisão explícita e ADR próprio, como
+> qualquer alteração na baseline.
+
 > Extensão da baseline congelada em 04/08/2026. **Nada aqui altera** Cadastro
 > Mestre, Documento Operacional, Matriz Documental, PhaseWorkflowInstance,
 > materializador, runtime, ciclos, movimentação manual, obrigações, Operação
@@ -68,6 +75,28 @@ estado e autoria — o que permite provar qual texto foi usado sem duplicá-lo.
 10. **Arquivo é privado.** Storage com prefixo dedicado, chave opaca, URL assinada
     de 5 minutos, emitida só depois da checagem de permissão. A rota nunca aceita
     chave de storage vinda do cliente.
+
+## Renderização do nome do outorgante
+
+O nome do outorgante sai do gerador em **CAIXA ALTA e negrito**, nos dois lugares
+em que aparece: a qualificação e a linha de assinatura.
+
+É regra de **renderização**, declarada no registry
+(`renderizacao: { caixaAlta: true, negrito: true }`) e aplicada na hora de
+escrever no DOCX. O cadastro continua guardando "João da Silva", o checklist da
+tela continua mostrando "João da Silva" e o snapshot da versão gerada continua
+registrando "João da Silva" — só o documento desenha "**JOÃO DA SILVA**".
+
+O negrito é atributo de *run*, não de parágrafo. Engrossar o run inteiro deixaria
+a qualificação toda em negrito; por isso o motor **divide o run**: fecha o
+corrente depois do prefixo, abre um com as mesmas propriedades acrescidas de
+`w:b`, e reabre outro igual ao original para o sufixo. Fonte, tamanho, cor,
+sublinhado, alinhamento e entrelinha vêm do próprio `w:rPr` copiado — nada mais
+muda. Se o run já era negrito, nada é acrescentado.
+
+Um modelo futuro que use `{{OUTORGANTE_NOME_COMPLETO}}` herda o tratamento sem
+alteração no motor: a regra mora no registry, não no template nem no código de
+substituição.
 
 ## O validador de template
 

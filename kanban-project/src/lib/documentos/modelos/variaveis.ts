@@ -40,6 +40,26 @@ export interface DefinicaoVariavel {
   exigidaQuandoUsada: boolean
   /** Explicação curta para a tela de administração de modelos. */
   descricao: string
+  /**
+   * Como o valor é DESENHADO no documento.
+   *
+   * É regra de RENDERIZAÇÃO, não de dado: o cadastro continua guardando "João da
+   * Silva", o checklist continua mostrando "João da Silva" e o snapshot da versão
+   * gerada continua registrando "João da Silva". Só o texto que entra no DOCX
+   * recebe o tratamento — e ele é declarado aqui, no registry, para que um modelo
+   * futuro que use a mesma variável herde a regra sem tocar no motor.
+   */
+  renderizacao?: RegraDeRenderizacao
+}
+
+export interface RegraDeRenderizacao {
+  /** Escreve o valor em caixa alta. */
+  caixaAlta?: boolean
+  /**
+   * Aplica negrito APENAS ao texto inserido — o run é dividido, e o restante do
+   * parágrafo conserva a formatação original.
+   */
+  negrito?: boolean
 }
 
 export const VARIAVEIS_MODELO: readonly DefinicaoVariavel[] = [
@@ -49,7 +69,9 @@ export const VARIAVEIS_MODELO: readonly DefinicaoVariavel[] = [
     origem: "cadastro_outorgante",
     campo: "nome",
     exigidaQuandoUsada: true,
-    descricao: "Nome civil completo do outorgante, como consta no cadastro.",
+    descricao:
+      "Nome civil completo do outorgante, como consta no cadastro. No instrumento é sempre desenhado em CAIXA ALTA e negrito.",
+    renderizacao: { caixaAlta: true, negrito: true },
   },
   {
     chave: "OUTORGANTE_NACIONALIDADE",
@@ -203,7 +225,11 @@ export const VARIAVEIS_MODELO: readonly DefinicaoVariavel[] = [
     origem: "cadastro_outorgante_derivado",
     campo: "nome",
     exigidaQuandoUsada: true,
-    descricao: "Nome que aparece sob a linha de assinatura — o mesmo nome civil do cadastro.",
+    descricao:
+      "Nome que aparece sob a linha de assinatura — o mesmo nome civil do cadastro, também em CAIXA ALTA e negrito.",
+    // É o nome do OUTORGANTE outra vez, no pé do instrumento. Tratá-lo diferente
+    // faria o mesmo nome aparecer de duas formas no mesmo documento.
+    renderizacao: { caixaAlta: true, negrito: true },
   },
 ] as const
 
@@ -217,6 +243,21 @@ export function definicaoDaVariavel(chave: string): DefinicaoVariavel | null {
 
 export function variavelConhecida(chave: string): boolean {
   return PORDEFINICAO.has(chave)
+}
+
+/** Regra de desenho da variável no DOCX. Vazio = escreve como veio. */
+export function regraDeRenderizacao(chave: string): RegraDeRenderizacao {
+  return PORDEFINICAO.get(chave)?.renderizacao ?? {}
+}
+
+/**
+ * Aplica a regra de renderização ao VALOR, sem tocar na origem.
+ *
+ * Só o que é textual mora aqui (caixa alta). O negrito é atributo do run e é
+ * resolvido no motor OOXML, na hora de escrever.
+ */
+export function valorRenderizado(chave: string, valor: string): string {
+  return regraDeRenderizacao(chave).caixaAlta ? valor.toLocaleUpperCase("pt-BR") : valor
 }
 
 /** Sintaxe oficial: {{CHAVE}}. Uma só, em todo o sistema. */

@@ -17,6 +17,7 @@
 // continua no run em negrito).
 
 import JSZip from "jszip"
+import { regraDeRenderizacao, valorRenderizado } from "./variaveis"
 
 /**
  * Data fixa das entradas do ZIP.
@@ -182,7 +183,7 @@ function substituirEmParagrafo(
   const juntos = segmentos.map((s) => s.texto).join("")
   if (!juntos.includes("{{")) return paragrafo
 
-  const ocorrencias: Array<{ inicio: number; fim: number; valor: string }> = []
+  const ocorrencias: Ocorrencia[] = []
   for (const oc of juntos.matchAll(/\{\{\s*([A-Z0-9_]+)\s*\}\}/g)) {
     const chave = oc[1]
     if (!Object.prototype.hasOwnProperty.call(valores, chave)) {
@@ -190,11 +191,26 @@ function substituirEmParagrafo(
       continue
     }
     substituidas.add(chave)
-    ocorrencias.push({ inicio: oc.index!, fim: oc.index! + oc[0].length, valor: valores[chave] })
+    ocorrencias.push({
+      inicio: oc.index!,
+      fim: oc.index! + oc[0].length,
+      // A regra de desenho é do REGISTRY, não do template: um modelo novo que use
+      // a mesma variável herda o tratamento sem alterar nada aqui.
+      valor: valorRenderizado(chave, valores[chave]),
+      negrito: regraDeRenderizacao(chave).negrito === true,
+    })
   }
   if (ocorrencias.length === 0) return paragrafo
 
   return reescreverParagrafo(paragrafo, segmentos, ocorrencias)
+}
+
+interface Ocorrencia {
+  inicio: number
+  fim: number
+  valor: string
+  /** true = o texto inserido sai em run próprio, com negrito. */
+  negrito?: boolean
 }
 
 /**
@@ -207,7 +223,7 @@ function substituirEmParagrafo(
 function reescreverParagrafo(
   paragrafo: string,
   segmentos: SegmentoTexto[],
-  ocorrencias: Array<{ inicio: number; fim: number; valor: string }>,
+  ocorrencias: Ocorrencia[],
 ): string {
   const limites: number[] = []
   let acc = 0
@@ -219,7 +235,9 @@ function reescreverParagrafo(
   // Cada segmento vira uma lista de pedaços do texto original, com os intervalos
   // cobertos removidos e o valor inserido no primeiro deles.
   const partes = segmentos.map((s) => [{ inicio: 0, fim: s.texto.length }] as Array<{ inicio: number; fim: number }>)
-  const inseridos = segmentos.map(() => [] as Array<{ pos: number; valor: string }>)
+  const inseridos = segmentos.map(
+    () => [] as Array<{ pos: number; valor: string; negrito: boolean }>,
+  )
 
   for (const oc of [...ocorrencias].sort((a, b) => a.inicio - b.inicio)) {
     let primeiro = true
@@ -240,7 +258,7 @@ function reescreverParagrafo(
       })
 
       if (primeiro) {
-        inseridos[i].push({ pos: localInicio, valor: oc.valor })
+        inseridos[i].push({ pos: localInicio, valor: oc.valor, negrito: oc.negrito === true })
         primeiro = false
       }
     }
@@ -250,8 +268,12 @@ function reescreverParagrafo(
   for (let i = segmentos.length - 1; i >= 0; i--) {
     const original = segmentos[i].texto
     const eventos = [
-      ...partes[i].map((p) => ({ pos: p.inicio, texto: original.slice(p.inicio, p.fim) })),
-      ...inseridos[i].map((ins) => ({ pos: ins.pos, texto: ins.valor })),
+      ...partes[i].map((p) => ({
+        pos: p.inicio,
+        texto: original.slice(p.inicio, p.fim),
+        negrito: false,
+      })),
+      ...inseridos[i].map((ins) => ({ pos: ins.pos, texto: ins.valor, negrito: ins.negrito })),
     ].sort((a, b) => a.pos - b.pos)
 
     const novo = eventos.map((e) => e.texto).join("")
@@ -260,10 +282,114 @@ function reescreverParagrafo(
     const seg = segmentos[i]
     saida =
       saida.slice(0, seg.inicio) +
-      `<w:t xml:space="preserve">${escaparXml(novo)}</w:t>` +
+      montarTexto(paragrafo, seg, eventos) +
       saida.slice(seg.fim)
   }
   return saida
+}
+
+interface PedacoDeTexto {
+  texto: string
+  negrito: boolean
+}
+
+/**
+ * Reescreve UM `<w:t>`.
+ *
+ * Sem pedaço em negrito, o resultado é o mesmo `<w:t>` de sempre — o caminho
+ * comum não muda em nada.
+ *
+ * Com negrito, o texto inserido precisa de um run PRÓPRIO: negrito é atributo de
+ * run (`w:rPr/w:b`), e engrossar o run inteiro deixaria a qualificação toda em
+ * negrito. A solução é fechar o run corrente depois do prefixo, abrir um run com
+ * as MESMAS propriedades acrescidas de `w:b`, e reabrir outro run igual ao
+ * original para o sufixo — que a marcação de fechamento já existente no XML
+ * encerra. Fonte, tamanho, cor, sublinhado e alinhamento seguem intactos, porque
+ * o `w:rPr` copiado é o do próprio run.
+ */
+function montarTexto(paragrafo: string, seg: SegmentoTexto, pedacos: PedacoDeTexto[]): string {
+  const comNegrito = pedacos.some((p) => p.negrito && p.texto.length > 0)
+  const escrever = (t: string) => `<w:t xml:space="preserve">${escaparXml(t)}</w:t>`
+
+  if (!comNegrito) {
+    return escrever(pedacos.map((p) => p.texto).join(""))
+  }
+
+  const run = runQueEnvolve(paragrafo, seg.inicio)
+  // Sem run identificável (marcação inesperada), o texto entra sem negrito em vez
+  // de sair XML quebrado: um documento sem ênfase é corrigível; um DOCX que não
+  // abre, não.
+  if (!run) return escrever(pedacos.map((p) => p.texto).join(""))
+
+  const partes: string[] = []
+  let dentroDoRunOriginal = true
+
+  for (const pedaco of pedacos) {
+    if (!pedaco.texto) continue
+    if (pedaco.negrito) {
+      partes.push(`</w:r>${run.abertura}${aplicarNegrito(run.rPr)}${escrever(pedaco.texto)}</w:r>`)
+      dentroDoRunOriginal = false
+      continue
+    }
+    if (!dentroDoRunOriginal) {
+      partes.push(`${run.abertura}${run.rPr}${escrever(pedaco.texto)}`)
+      dentroDoRunOriginal = true
+      continue
+    }
+    partes.push(escrever(pedaco.texto))
+  }
+
+  // O `</w:r>` original do documento fecha o último run aberto aqui. Quando o
+  // último pedaço foi o negrito (já fechado), é preciso reabrir um run vazio para
+  // esse fechamento ter par.
+  if (!dentroDoRunOriginal) partes.push(`${run.abertura}${run.rPr}`)
+
+  return partes.join("")
+}
+
+/**
+ * Marcação de abertura e `w:rPr` do `<w:r>` que contém a posição informada.
+ *
+ * A busca anda para trás porque `<w:rPr>` e `<w:rFonts>` também começam com
+ * "<w:r": o primeiro casamento quase nunca é o run. O laço recua até achar uma
+ * abertura de run de verdade.
+ */
+function runQueEnvolve(xml: string, posicao: number): { abertura: string; rPr: string } | null {
+  let cursor = posicao
+  while (cursor > 0) {
+    const inicio = xml.lastIndexOf("<w:r", cursor - 1)
+    if (inicio < 0) return null
+
+    const fimDaAbertura = xml.indexOf(">", inicio)
+    if (fimDaAbertura < 0) return null
+
+    const abertura = xml.slice(inicio, fimDaAbertura + 1)
+    if (fimDaAbertura < posicao && /^<w:r(\s[^>]*)?>$/.test(abertura)) {
+      const resto = xml.slice(fimDaAbertura + 1, posicao)
+      const rPr = resto.match(/^\s*(<w:rPr>[\s\S]*?<\/w:rPr>|<w:rPr\s*\/>)/)?.[1] ?? ""
+      return { abertura, rPr }
+    }
+    cursor = inicio
+  }
+  return null
+}
+
+/**
+ * `w:rPr` com negrito ligado, respeitando a ordem exigida pelo esquema.
+ *
+ * `w:b` e `w:bCs` vêm logo depois de `w:rFonts` — fora de ordem, o Word recusa o
+ * documento. Se o run já era negrito, nada é acrescentado.
+ */
+function aplicarNegrito(rPr: string): string {
+  if (!rPr || /^<w:rPr\s*\/>$/.test(rPr)) return "<w:rPr><w:b/><w:bCs/></w:rPr>"
+  if (/<w:b\s*\/>|<w:b\s[^>]*\/>/.test(rPr)) return rPr
+
+  const fontes = rPr.match(/<w:rFonts\b[^>]*\/>/)
+  if (fontes) {
+    const posicao = rPr.indexOf(fontes[0]) + fontes[0].length
+    return rPr.slice(0, posicao) + "<w:b/><w:bCs/>" + rPr.slice(posicao)
+  }
+  return rPr.replace("<w:rPr>", "<w:rPr><w:b/><w:bCs/>")
 }
 
 // ════════════════════════════════════════════════════════════════════════════

@@ -85,11 +85,30 @@ async function docxDeTeste(paragrafos: string[][]): Promise<Buffer> {
   return zip.generateAsync({ type: "nodebuffer" }) as Promise<Buffer>
 }
 
+/** DOCX de teste com o parágrafo inteiro num run JÁ negrito. */
+async function docxDeTesteComNegrito(texto: string): Promise<Buffer> {
+  const { default: JSZip } = await import("jszip")
+  const zip = new JSZip()
+  zip.file(
+    "[Content_Types].xml",
+    `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="xml" ContentType="application/xml"/><Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/></Types>`,
+  )
+  zip.file(
+    "_rels/.rels",
+    `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/></Relationships>`,
+  )
+  zip.file(
+    "word/document.xml",
+    `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:p><w:r><w:rPr><w:b/><w:bCs/><w:sz w:val="24"/></w:rPr><w:t xml:space="preserve">${texto}</w:t></w:r></w:p><w:sectPr><w:pgSz w:w="11906" w:h="16838"/><w:pgMar w:top="1417" w:right="1701" w:bottom="1417" w:left="1701"/></w:sectPr></w:body></w:document>`,
+  )
+  return zip.generateAsync({ type: "nodebuffer" }) as Promise<Buffer>
+}
+
 const CADASTRO_COMPLETO: CadastroOutorgante = {
   papel: "contratante",
   id: 1,
   publicCode: "CLI-TESTE",
-  nome: "MARIA APARECIDA DE SOUZA",
+  nome: "Maria Aparecida de Souza",
   cpf: "12345678909",
   rg: "12.345.678-9",
   sexo: "Feminino",
@@ -179,7 +198,8 @@ async function main() {
 
   const r = resolverOutorgante({ cadastro: CADASTRO_COMPLETO, ato: ATO, variaveisDoTemplate: usadas })
   ok(r.podeGerar, "3.1 cadastro completo libera a geração")
-  ok(r.valores.OUTORGANTE_NOME_COMPLETO === "MARIA APARECIDA DE SOUZA", "3.2 nome vem do cadastro")
+  ok(r.valores.OUTORGANTE_NOME_COMPLETO === "Maria Aparecida de Souza",
+    "3.2 nome vem do cadastro, com a grafia do cadastro")
   ok(r.valores.OUTORGANTE_NACIONALIDADE === "brasileira",
     "3.3 nacionalidade flexionada e em minúscula — é adjetivo no corpo da frase")
   ok(r.valores.OUTORGANTE_ESTADO_CIVIL === "casada", "3.4 estado civil flexionado")
@@ -264,6 +284,59 @@ async function main() {
   const doisIguais = await substituirPlaceholdersDocx(template, r.valores)
   ok(checksumDoBuffer(gerado.buffer) === checksumDoBuffer(doisIguais.buffer),
     "4.14 geração é determinística: mesmos dados, mesmo checksum")
+
+  // ══════════════════════════════════════════════════════════════════════
+  console.log("\n(4B) Nome do outorgante: CAIXA ALTA e negrito na renderização:")
+
+  // O template escreve o nome num run SEM negrito e cercado de texto comum — é
+  // assim que se prova que a ênfase vem do motor e atinge só o nome.
+  const templateNome = await docxDeTeste([
+    ["OUTORGANTE: ", "{{OUTORGANTE_NOME_COMPLETO}}", ", ", "{{OUTORGANTE_NACIONALIDADE}}", ", CPF nº {{OUTORGANTE_CPF}}."],
+    ["_______________________", "{{ASSINATURA_NOME}}"],
+  ])
+  const comNome = await substituirPlaceholdersDocx(templateNome, r.valores)
+  const textoNome = await textoDoDocx(comNome.buffer)
+  const estruturaNome = await estruturaDoDocx(comNome.buffer)
+  const trechos = estruturaNome.paragrafos.flatMap((p) => p.trechos)
+  const trechoDoNome = trechos.find((t) => t.texto.includes("MARIA APARECIDA DE SOUZA"))
+  const trechoDaAssinatura = estruturaNome.paragrafos[1].trechos.find((t) =>
+    t.texto.includes("MARIA APARECIDA DE SOUZA"),
+  )
+
+  ok(textoNome.includes("MARIA APARECIDA DE SOUZA"),
+    "4B.1 o nome é renderizado em CAIXA ALTA")
+  ok(!textoNome.includes("Maria Aparecida de Souza"),
+    "4B.2 a grafia do cadastro não aparece no documento")
+  ok(trechoDoNome?.negrito === true, "4B.3 o nome é renderizado em NEGRITO")
+  ok(trechoDaAssinatura?.negrito === true, "4B.4 o nome sob a assinatura também sai em negrito")
+
+  ok(r.valores.OUTORGANTE_NOME_COMPLETO === "Maria Aparecida de Souza",
+    "4B.5 o VALOR resolvido — e portanto o snapshot da versão — conserva a grafia do cadastro")
+  ok(CADASTRO_COMPLETO.nome === "Maria Aparecida de Souza",
+    "4B.6 o cadastro de origem não é tocado pela renderização")
+
+  const outros = trechos.filter(
+    (t) => !t.texto.includes("MARIA APARECIDA DE SOUZA") && t.texto.trim().length > 0,
+  )
+  ok(outros.length > 0 && outros.every((t) => !t.negrito),
+    "4B.7 nenhum outro trecho do parágrafo virou negrito")
+  ok(textoNome.includes("brasileira") && textoNome.includes("123.456.789-09"),
+    "4B.8 os demais placeholders continuam como estavam — sem caixa alta")
+  ok(trechos.some((t) => t.texto.includes("OUTORGANTE: ") && !t.negrito),
+    "4B.9 o texto fixo em volta do nome conserva a formatação original")
+  ok(estruturaNome.paragrafos[0].trechos.every((t) => t.tamanho === 12),
+    "4B.10 fonte e tamanho do parágrafo permanecem os do template")
+
+  // Um run que JÁ era negrito não deve ganhar marcação duplicada.
+  const jaNegrito = await substituirPlaceholdersDocx(
+    await docxDeTesteComNegrito("{{OUTORGANTE_NOME_COMPLETO}}"),
+    r.valores,
+  )
+  const estruturaJa = await estruturaDoDocx(jaNegrito.buffer)
+  ok(estruturaJa.paragrafos[0].trechos.every((t) => t.negrito),
+    "4B.11 template com o nome já em negrito continua correto")
+  ok((await textoDoDocx(jaNegrito.buffer)).includes("MARIA APARECIDA DE SOUZA"),
+    "4B.12 e o valor continua em caixa alta")
 
   // ══════════════════════════════════════════════════════════════════════
   console.log("\n(5) Motor PDF — a partir do DOCX gerado:")

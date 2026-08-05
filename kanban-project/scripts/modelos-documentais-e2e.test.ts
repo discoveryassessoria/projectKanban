@@ -115,9 +115,15 @@ async function main() {
       "1.8 cada arquivo tem seu checksum")
 
     const texto = await textoDoDocx(docx)
-    ok(texto.includes("Amanda Ferreira Lima"), "1.9 nome do outorgante no documento")
-    ok(/Amanda Ferreira Lima, brasileira, portadora/.test(texto),
-      "1.10 flexão gramatical correta para o gênero do cadastro")
+    ok(texto.includes("AMANDA FERREIRA LIMA"),
+      "1.9 nome do outorgante no documento, em CAIXA ALTA")
+    ok(!texto.includes("Amanda Ferreira Lima"),
+      "1.9b a grafia do cadastro não vaza para o documento")
+    ok((await prisma.contratante.findUniqueOrThrow({ where: { id: completo.id } })).nome
+        === `${MARCA} Amanda Ferreira Lima`,
+      "1.9c o cadastro permanece com a grafia original — a caixa alta é só renderização")
+    ok(/AMANDA FERREIRA LIMA, brasileira, portadora/.test(texto),
+      "1.10 flexão gramatical correta e demais placeholders sem caixa alta")
     ok(texto.includes("45.678.901-2") && texto.includes("529.982.247-25"),
       "1.11 RG e CPF do outorgante no documento")
     ok(texto.includes("Rua das Acácias, 742, Jardim Europa, Amparo – SP, CEP 13900-111"),
@@ -176,8 +182,8 @@ async function main() {
     const v2 = await prisma.documentoGeradoVersao.findUniqueOrThrow({ where: { id: g2.versaoId } })
     chaves.push(v2.docxChave, v2.pdfChave)
     const texto2 = await textoDoDocx(await lerObjetoPrivado(v2.docxChave))
-    ok(texto2.includes("Amanda Ferreira Lima"), "2.3 nome do outorgante")
-    ok(/Amanda Ferreira Lima, brasileira, casada, portadora/.test(texto2),
+    ok(texto2.includes("AMANDA FERREIRA LIMA"), "2.3 nome do outorgante em caixa alta")
+    ok(/AMANDA FERREIRA LIMA, brasileira, casada, portadora/.test(texto2),
       "2.4 nacionalidade, estado civil e concordância flexionados")
     ok(texto2.includes("MARCO ANTONIO FRIEDRICH BRINKER ROVATTI"),
       "2.5 dados fixos do outorgado permanecem")
@@ -260,6 +266,8 @@ async function main() {
     const snapshotV1 = v1Depois.dadosSnapshot as { variaveis?: Record<string, string> }
     ok(snapshotV1.variaveis?.OUTORGANTE_ENDERECO_LINHA?.includes("Rua das Acácias") === true,
       "4.9 o snapshot da versão 1 preserva os dados de origem")
+    ok(snapshotV1.variaveis?.OUTORGANTE_NOME_COMPLETO?.includes("Amanda Ferreira Lima") === true,
+      "4.9b o snapshot guarda o nome como está no cadastro, não como foi desenhado")
 
     const vigentes = await prisma.documentoGeradoVersao.count({
       where: { documentoGeradoId: g1.documentoGeradoId, status: "VIGENTE" },
