@@ -117,8 +117,9 @@ export function PainelInteligencia({ analise, aberto, onFechar, onIrParaPessoa, 
   const q = analise?.qualidade
   const totalAchados = analise ? Object.values(analise.totais).reduce((s, n) => s + n, 0) : 0
 
+  // Cor própria na raiz — ver comentário equivalente em tree-onboarding.tsx.
   return (
-    <div className="fixed right-0 top-0 z-[10002] flex h-full w-[380px] flex-col border-l border-gray-200 bg-white shadow-2xl">
+    <div className="fixed right-0 top-0 z-[10002] flex h-full w-[380px] flex-col border-l border-gray-200 bg-white text-gray-900 shadow-2xl">
       <div className="flex items-center justify-between border-b border-gray-100 px-4 py-3">
         <div>
           <h2 className="text-sm font-semibold text-gray-900">Inteligência da árvore</h2>

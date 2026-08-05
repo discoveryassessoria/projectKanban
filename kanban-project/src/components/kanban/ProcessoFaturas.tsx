@@ -1,5 +1,25 @@
 // src/components/kanban/ProcessoFaturas.tsx
 // ✅ ATUALIZADO - Usando totaisGeralBRL da API + campo cambio na fatura
+//
+// ⚠️ ESTE ARQUIVO NÃO É RENDERIZADO POR NINGUÉM — 1.792 linhas de código morto.
+//
+// Verificado em 05/08/2026 por quatro vias, todas negativas: import estático,
+// import dinâmico/`lazy`, uso como JSX, e menção ao nome. As duas únicas
+// referências no repositório são comentários — `styles/financeiro.css` e
+// `financeiro/cards/FaturaCard.tsx` —, e a segunda registra que a tela "foi
+// renomeada como Receitas.tsx". Quem serve a aba `faturas` hoje é o
+// `ProcessoFinanceiroShell` (financeiro/v3), não este arquivo.
+//
+// CORREÇÃO DE REGISTRO: o commit efebefa6 alterou a linha ~910 daqui (cor de
+// texto do nome do destinatário) e a mensagem daquele commit justifica a
+// mudança dizendo que "a aba faturas roda com finDark". A afirmação está
+// ERRADA — este componente não renderiza, então não está sob subárvore nenhuma.
+// A alteração em si é correta e inofensiva; só a justificativa não procede. O
+// commit não foi reescrito de propósito: já estava em produção e havia trabalho
+// de terceiros em cima dele.
+//
+// Antes de investir tempo mantendo este arquivo, decida se ele deve ser
+// excluído — a exclusão é a leitura provável, mas é chamada de produto.
 
 "use client"
 

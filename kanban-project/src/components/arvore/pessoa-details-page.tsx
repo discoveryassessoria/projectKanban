@@ -213,8 +213,9 @@ export function PessoaDetailsPage({
     { id: 'fontes', label: `Fontes (${pessoa.documentos?.length || 0})` },
   ]
   
+  // Cor própria na raiz — ver comentário equivalente em tree-onboarding.tsx.
   return (
-    <div className="fixed inset-0 bg-gray-100 z-[10002] overflow-auto">
+    <div className="fixed inset-0 bg-gray-100 text-gray-900 z-[10002] overflow-auto">
       {/* Header fixo */}
       <div className="bg-white border-b border-gray-200 sticky top-0 z-10">
         <div className="max-w-4xl mx-auto">

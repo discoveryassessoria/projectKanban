@@ -335,7 +335,11 @@ function Step2PersonForm({
             Voltar
           </button>
 
-          <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-6">
+          {/* Cor própria na raiz do card, não só nos campos: a subárvore do modal de
+              processo recebe `text-white/80` com `finDark` ligado, e `position: fixed`
+              não interrompe herança. Corrigir só os inputs deixaria qualquer outro
+              texto deste card sem cor — e o próximo campo adicionado nasceria invisível. */}
+          <div className="bg-white text-gray-900 rounded-2xl shadow-sm border border-gray-200 p-6">
           <h2 className="text-2xl font-bold text-gray-900 mb-1">
             Adicionar {typeRoleLabel(type, paisProcesso)}
           </h2>

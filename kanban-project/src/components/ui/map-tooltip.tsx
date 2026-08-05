@@ -63,7 +63,10 @@ export function MapTooltip(props: MapTooltipProps) {
 
       {showMap ? (
         <div 
-          className="absolute left-full top-0 ml-3 z-[10000] bg-white rounded-lg shadow-2xl border border-gray-200 overflow-hidden"
+          // Cor própria na raiz: este tooltip é usado dentro do modal de processo,
+          // cuja subárvore recebe `text-white/80` com `finDark` ligado. Superfície
+          // clara que não declara a própria cor herda branco sobre branco.
+          className="absolute left-full top-0 ml-3 z-[10000] bg-white text-gray-900 rounded-lg shadow-2xl border border-gray-200 overflow-hidden"
           style={{ width: 450 }}
           onMouseEnter={handleMouseEnter}
           onMouseLeave={handleMouseLeave}

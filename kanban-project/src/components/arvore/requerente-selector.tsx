@@ -166,7 +166,8 @@ export function RequerenteSelector({
         </button>
       )}
 
-      <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-6">
+      {/* Cor própria na raiz — ver comentário equivalente em tree-onboarding.tsx. */}
+      <div className="bg-white text-gray-900 rounded-2xl shadow-sm border border-gray-200 p-6">
         <h2 className="text-xl font-bold text-gray-900 mb-1">Selecionar requerente</h2>
         <p className="text-sm text-gray-500 mb-5">
           O requerente já cadastrado no processo é reaproveitado — a árvore não cria uma

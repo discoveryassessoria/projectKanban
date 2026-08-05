@@ -68,7 +68,8 @@ export function PaletaComandos({ indice, aberto, onFechar, onEscolher }: Props) 
       <div
         role="dialog"
         aria-label="Buscar pessoa na árvore"
-        className="fixed left-1/2 top-[15%] z-[10004] w-full max-w-lg -translate-x-1/2 overflow-hidden rounded-xl border border-gray-200 bg-white shadow-2xl"
+        // Cor própria na raiz — ver comentário equivalente em tree-onboarding.tsx.
+        className="fixed left-1/2 top-[15%] z-[10004] w-full max-w-lg -translate-x-1/2 overflow-hidden rounded-xl border border-gray-200 bg-white text-gray-900 shadow-2xl"
       >
         <div className="flex items-center gap-2 border-b border-gray-100 px-4">
           <Search className="h-4 w-4 shrink-0 text-gray-400" />

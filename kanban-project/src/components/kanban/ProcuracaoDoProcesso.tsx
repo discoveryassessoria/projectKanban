@@ -48,7 +48,10 @@ export function ProcuracaoDoProcesso({
 
   return (
     <div className="space-y-4">
-      <div className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
+      {/* Cor própria na raiz: superfície clara dentro da subárvore que recebe
+          `text-white/80` quando `finDark` está ligado (atividade-details-modal).
+          Sem isto, qualquer texto sem `text-` explícito aqui sai branco no branco. */}
+      <div className="rounded-xl border border-gray-200 bg-white p-6 text-gray-900 shadow-sm">
         <h3 className="mb-1 flex items-center gap-2 text-sm font-semibold text-gray-900">
           <Stamp className="h-4 w-4 text-indigo-600" />
           Gerar procuração
