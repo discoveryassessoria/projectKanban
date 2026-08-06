@@ -29,6 +29,7 @@ import { randomUUID } from "crypto"
 import { prisma } from "@/lib/prisma"
 import type { Prisma } from "@prisma/client"
 import { instanciarWorkflowDaFase } from "@/src/services/phase-workflow"
+import { materializarGenealogia } from "@/src/services/genealogia/materializar-genealogia"
 import { garantirTarefaDePasso, carregarPreCondicoes } from "@/src/services/passo-tarefa"
 import type { WorkflowValidationIssue } from "@/src/services/phase-workflow-helpers"
 import { phaseKeyToFaseCode, FASES } from "@/src/lib/process-stage/fases-catalog"
@@ -223,6 +224,28 @@ export async function materializarExecucaoDaFase(input: MaterializarInput): Prom
   const passosAntes = phaseInstanceId != null
     ? await prisma.phaseWorkflowStepInstance.count({ where: { workflowInstanceId: phaseInstanceId } })
     : 0
+
+  // ── 1.5) OBRIGAÇÕES DOCUMENTAIS — motor ÚNICO, antes dos passos ──────────
+  //
+  // As necessidades da fase nascem AQUI, das Regras Documentais PUBLICADAS, e de
+  // lugar nenhum mais. Antes existiam DOIS motores: este e a geração por árvore
+  // (DOCUMENT_RULES) embutida em `carregarContextoEscopo`. Como cada um gravava
+  // um `varianteKey` diferente para a mesma obrigação, a chave de idempotência
+  // não os reconhecia como iguais e a mesma pessoa recebia a certidão duas vezes
+  // — uma por motor.
+  //
+  // A ordem importa: as necessidades precisam existir ANTES de
+  // `instanciarWorkflowDaFase`, que é quem transforma alvo em passo.
+  if (faseMacroKey === "genealogia") {
+    try {
+      await materializarGenealogia(input.processoId)
+    } catch (e) {
+      // Falha aqui não derruba a materialização da fase: os passos que não
+      // dependem de necessidade continuam válidos, e o relatório dirá que a
+      // fase ficou sem alvo documental.
+      console.error(`[materializar-fase] materializarGenealogia falhou (proc ${input.processoId}):`, e)
+    }
+  }
 
   // ── 2) workflow publicado → alvos → passos (serviço canônico) ────────────
   const inst = await instanciarWorkflowDaFase({

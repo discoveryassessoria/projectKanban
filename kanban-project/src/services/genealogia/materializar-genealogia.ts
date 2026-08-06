@@ -83,7 +83,11 @@ export function aplicaAoProcesso(r: RegraDocumental, tipoProcessoId: number | nu
 
 // ---- regras PUBLICADAS exigidas na Genealogia aplicáveis ao processo ----
 export async function regrasGenealogiaDoProcesso(tipoProcessoId: number | null, db: DB = prisma): Promise<RegraDocumental[]> {
-  const rows = await db.matrizDocumental.findMany({ where: { status: "PUBLICADA" } })
+  // ARQUIVADA não materializa. Sem este filtro, arquivar a v1 e publicar a v2 da
+  // mesma regra deixava as duas materializando: como o `varianteKey` carrega a
+  // versão, nasciam DUAS necessidades para a mesma obrigação — a mesma família de
+  // duplicidade que a eliminação do segundo motor acabou de fechar.
+  const rows = await db.matrizDocumental.findMany({ where: { status: "PUBLICADA", arquivado: false } })
   return rows.map(matrizParaRegra).filter((r) => aplicaAoProcesso(r, tipoProcessoId) && exigidaNaGenealogia(r))
 }
 

@@ -247,7 +247,11 @@
     "test:config-somente-nome": "tsx scripts/config-financeira-somente-nome.test.ts",
     "smoke:tabela-valores": "tsx scripts/prod-smoke-tabela-valores.ts",
     "usuario:smoke-tecnico": "tsx scripts/usuario-smoke-tecnico.ts",
-    "test:obrigacao-unica": "tsx scripts/obrigacao-documental-unica.test.ts"
+    "test:obrigacao-unica": "tsx scripts/obrigacao-documental-unica.test.ts",
+    "test:motor-unico": "tsx scripts/motor-documental-unico.test.ts",
+    "test:motor-unico:e2e": "tsx scripts/motor-documental-idempotencia.test.ts",
+    "backfill:nec-duplicada": "npm run guard:escrita && tsx scripts/backfill-necessidade-duplicada-motor-legado.ts --execute",
+    "backfill:nec-duplicada:dry": "tsx scripts/backfill-necessidade-duplicada-motor-legado.ts"
   },
   "prisma": {
     "seed": "npm run guard:escrita && tsx prisma/seed.ts"

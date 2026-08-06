@@ -9,7 +9,6 @@ import { prisma } from "@/lib/prisma"
 import type { Prisma } from "@prisma/client"
 import { montarChaveIdempotencia } from "@/src/services/necessidade-documental-helpers"
 import { codeDocumentoMestre } from "@/src/services/catalogo-helpers"
-import { analyzePessoa, DOCUMENT_RULES } from "@/src/lib/document-generator"
 
 export { montarChaveIdempotencia, sujeitoValido } from "@/src/services/necessidade-documental-helpers"
 
@@ -283,102 +282,14 @@ async function resolverUniaoUnica(pessoaId: number, db: DB): Promise<number | nu
   return unioes.length === 1 ? unioes[0].id : null
 }
 
-/** Gera necessidades a partir da ÁRVORE do processo (regras NASC/CAS/OBT). */
-export async function garantirNecessidadesArvoreDoProcesso(processoId: number, db: DB = prisma) {
-  const proc = await db.processo.findUnique({ where: { id: processoId }, select: { id: true, arvoreId: true } })
-  if (!proc?.arvoreId) return { criadas: 0, puladas: 0 }
+// MOTORES LEGADOS ELIMINADOS (não desativados).
+//
+// `garantirNecessidadesArvoreDoProcesso` (regras hardcoded em DOCUMENT_RULES) e
+// `garantirNecessidadesDaMatriz` (matriz sem filtro de PUBLICADA e sem avaliar
+// condição) criavam NecessidadeDocumental por fora do motor oficial, cada um com
+// seu `varianteKey`. Como a chave de idempotência inclui a variante, a mesma
+// obrigação nascia duas vezes — uma por motor — e aparecia duplicada na Central.
+//
+// Existe UM materializador: materializarExecucaoDaFase → materializarGenealogia,
+// sobre as Regras Documentais PUBLICADAS.
 
-  const pessoas = await db.pessoa.findMany({
-    where: { arvoreId: proc.arvoreId },
-    select: { id: true, nome: true, sobrenome: true, casado: true, vivo: true },
-  })
-
-  let criadas = 0
-  let puladas = 0
-  for (const p of pessoas) {
-    const flags = analyzePessoa({ id: p.id, nome: p.nome, sobrenome: p.sobrenome, casado: p.casado, vivo: p.vivo })
-    for (const rule of DOCUMENT_RULES) {
-      if (!flags[rule.flag]) continue
-      const itemCatalogoId = await resolverItemCatalogoDeEnum(rule.tipo, db)
-      if (!itemCatalogoId) {
-        puladas++
-        continue
-      }
-      // Casamento -> sujeito UNIÃO; nascimento/óbito -> sujeito PESSOA.
-      let sujeito: { pessoaId?: number; uniaoId?: number }
-      if (rule.code === "CAS_IT") {
-        const uniaoId = await resolverUniaoUnica(p.id, db)
-        if (!uniaoId) {
-          puladas++ // sem união única — não inventar vínculo (Regra 11)
-          continue
-        }
-        sujeito = { uniaoId }
-      } else {
-        sujeito = { pessoaId: p.id }
-      }
-      const { criada } = await garantirNecessidade(
-        { processoId, itemCatalogoId, ...sujeito, origem: "ARVORE", ruleCode: rule.code, arvoreId: proc.arvoreId },
-        db
-      )
-      if (criada) criadas++
-    }
-  }
-  return { criadas, puladas }
-}
-
-/** Gera necessidades a partir da MATRIZ documental (snapshot da regra+versão). */
-export async function garantirNecessidadesDaMatriz(processoId: number, phaseKey: string | null = null, db: DB = prisma) {
-  const proc = await db.processo.findUnique({
-    where: { id: processoId },
-    select: { id: true, arvoreId: true, tipoProcessoMotorId: true },
-  })
-  if (!proc?.tipoProcessoMotorId) return { criadas: 0, puladas: 0 }
-
-  const regras = await db.matrizDocumental.findMany({
-    where: {
-      tipoProcessoId: proc.tipoProcessoMotorId,
-      arquivado: false,
-      ...(phaseKey ? { OR: [{ phaseKey }, { phaseKey: null }] } : {}),
-    },
-  })
-
-  const pessoas = proc.arvoreId
-    ? await db.pessoa.findMany({ where: { arvoreId: proc.arvoreId, linhaReta: true }, select: { id: true } })
-    : []
-
-  let criadas = 0
-  let puladas = 0
-  for (const r of regras) {
-    const itemCatalogoId = await resolverItemCatalogoDeCode(r.documentTypeCode, db)
-    if (!itemCatalogoId) {
-      puladas++
-      continue
-    }
-    const snapshot = {
-      matrizRegraId: r.id,
-      versao: r.versao,
-      target: r.target,
-      generationRule: r.generationRule,
-      condition: r.condition ?? null,
-    }
-    for (const p of pessoas) {
-      const { criada } = await garantirNecessidade(
-        {
-          processoId,
-          itemCatalogoId,
-          pessoaId: p.id,
-          origem: "MATRIZ",
-          obrigatoriedade: r.required ? "OBRIGATORIA" : "OPCIONAL",
-          matrizRegraId: r.id,
-          matrizRegraVersao: r.versao,
-          matrizSnapshot: snapshot,
-          motivoAplicabilidade: r.condition ?? null,
-          arvoreId: proc.arvoreId,
-        },
-        db
-      )
-      if (criada) criadas++
-    }
-  }
-  return { criadas, puladas }
-}
