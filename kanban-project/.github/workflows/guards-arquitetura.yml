@@ -1,0 +1,49 @@
+# Guards arquiteturais do Discovery — obrigatórios.
+#
+# Rodam em TODO push e TODA pull request. São estáticos (varrem o código-fonte),
+# não precisam de banco e terminam em segundos.
+#
+# O que eles impedem, concretamente: o Discovery já teve dois materializadores
+# documentais criando NecessidadeDocumental em paralelo, cada um com sua chave.
+# A mesma pessoa recebia a certidão duas vezes e nada quebrava — o sistema
+# respondia, os testes passavam, só a contagem estava errada. Um guard que falha
+# no CI é o que impede esse tipo de regressão de voltar por descuido.
+name: Guards arquiteturais
+
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+    branches: ["**"]
+
+jobs:
+  guards:
+    name: Arquitetura documental
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Instalar dependências
+        run: npm ci --ignore-scripts
+
+      # `prisma generate` é necessário porque os guards importam tipos do client.
+      - name: Gerar Prisma Client
+        run: npx prisma generate
+
+      # ── O GUARD OBRIGATÓRIO ────────────────────────────────────────────────
+      # Escrita em NecessidadeDocumental: um único dono em runtime, allowlist
+      # nominal fora dele, sem desvio por SQL cru, motores legados mortos.
+      - name: Guard — escrita em NecessidadeDocumental
+        run: npm run test:guard-necessidade
+
+      - name: Guard — materializador documental único
+        run: npm run test:motor-unico
+
+      - name: Guard — uma obrigação, um nome, uma linha
+        run: npm run test:obrigacao-unica

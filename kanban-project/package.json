@@ -35,7 +35,7 @@
     "backfill:solicitacao": "tsx scripts/backfill-solicitacao-documental.ts --execute",
     "backfill:solicitacao:dry": "tsx scripts/backfill-solicitacao-documental.ts",
     "baseline:gerar": "node scripts/baseline-gerar.mjs",
-    "build": "node scripts/guard-env-producao.mjs && prisma generate && npm run test:baseline && npm run test:arquitetura-baseline && npm run test:modelos && npm run test:modelos-guard && next build --turbopack",
+    "build": "node scripts/guard-env-producao.mjs && prisma generate && npm run test:baseline && npm run test:arquitetura-baseline && npm run test:guards-arquitetura && npm run test:modelos && npm run test:modelos-guard && next build --turbopack",
     "build:prod-migrate": "node scripts/guard-env-producao.mjs && prisma generate && node scripts/prod-migrate-guard.mjs && next build --turbopack",
     "build:safe": "node scripts/guard-env-producao.mjs && npm run guard:db && prisma generate && next build --turbopack",
     "catalogo:certidoes": "tsx scripts/catalogo-certidoes-vinculo.ts",
@@ -251,7 +251,9 @@
     "test:motor-unico": "tsx scripts/motor-documental-unico.test.ts",
     "test:motor-unico:e2e": "tsx scripts/motor-documental-idempotencia.test.ts",
     "backfill:nec-duplicada": "npm run guard:escrita && tsx scripts/backfill-necessidade-duplicada-motor-legado.ts --execute",
-    "backfill:nec-duplicada:dry": "tsx scripts/backfill-necessidade-duplicada-motor-legado.ts"
+    "backfill:nec-duplicada:dry": "tsx scripts/backfill-necessidade-duplicada-motor-legado.ts",
+    "test:guard-necessidade": "tsx scripts/guard-necessidade-documental.test.ts",
+    "test:guards-arquitetura": "npm run test:guard-necessidade && npm run test:motor-unico && npm run test:obrigacao-unica"
   },
   "prisma": {
     "seed": "npm run guard:escrita && tsx prisma/seed.ts"

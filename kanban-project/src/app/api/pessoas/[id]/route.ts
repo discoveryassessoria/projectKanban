@@ -8,6 +8,7 @@ import { dispararMaterializacaoPorArvore } from "@/src/services/genealogia/mater
 import { houveTransicaoParaRequerente, ehRequerente } from "@/lib/genealogia/requerente-flag"
 import { enfileirarEventoRequerente, TIPO_EVENTO_REQUERENTE } from "@/src/services/genealogia/emitir-evento-requerente"
 import { processarOutbox } from "@/src/services/outbox-dispatcher"
+import { removerNecessidadesDoSujeito } from "@/src/services/necessidade-documental"
 // LEGADO_INATIVO (desativação Genealogia): editar Pessoa NÃO reconcilia mais
 // Documento (reconcileDocsForPessoa removido). A materialização V2 (Fatia 2) é
 // aditiva/idempotente e não cria Documento.
@@ -236,15 +237,9 @@ export async function DELETE(request: NextRequest, { params }: { params: Promise
       //    violaria o CHECK (0 ≠ 1), travando a exclusão da pessoa. Passos operacionais
       //    vinculados (localizar_registro) saem junto (a necessidade é reproduzível
       //    pela materialização; eventos caem em cascata).
-      const necsAlvo = await tx.necessidadeDocumental.findMany({
-        where: { OR: [{ pessoaId: id }, ...(uniaoIds.length ? [{ uniaoId: { in: uniaoIds } }] : [])] },
-        select: { id: true },
-      })
-      if (necsAlvo.length > 0) {
-        const necIds = necsAlvo.map((n) => n.id)
-        await tx.phaseWorkflowStepInstance.deleteMany({ where: { necessidadeId: { in: necIds } } })
-        await tx.necessidadeDocumental.deleteMany({ where: { id: { in: necIds } } })
-      }
+      // A cascata roda pelo serviço canônico: NecessidadeDocumental tem UM dono
+      // de escrita, e é ele que responde pelo guard arquitetural.
+      await removerNecessidadesDoSujeito({ pessoaId: id, uniaoIds }, tx)
 
       // 1. Deletar documentos da pessoa
       if (pessoa.documentos.length > 0) {

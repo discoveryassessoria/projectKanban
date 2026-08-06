@@ -293,3 +293,30 @@ async function resolverUniaoUnica(pessoaId: number, db: DB): Promise<number | nu
 // Existe UM materializador: materializarExecucaoDaFase → materializarGenealogia,
 // sobre as Regras Documentais PUBLICADAS.
 
+
+/**
+ * Remove as necessidades de uma pessoa (e das uniões dela) ao EXCLUIR a pessoa.
+ *
+ * Não é materialização nem transição de estado: é a cascata da exclusão do
+ * sujeito. Vive aqui porque `NecessidadeDocumental` tem UM dono de escrita — se
+ * cada rota apagasse por conta própria, o guard arquitetural viraria letra morta
+ * e a próxima escrita direta entraria sem ninguém notar.
+ *
+ * Apaga os passos vinculados antes: a necessidade é reproduzível pela
+ * materialização, o passo órfão não.
+ */
+export async function removerNecessidadesDoSujeito(
+  args: { pessoaId: number; uniaoIds?: number[] },
+  db: DB = prisma,
+): Promise<{ necessidades: number; passos: number }> {
+  const uniaoIds = args.uniaoIds ?? []
+  const alvos = await db.necessidadeDocumental.findMany({
+    where: { OR: [{ pessoaId: args.pessoaId }, ...(uniaoIds.length ? [{ uniaoId: { in: uniaoIds } }] : [])] },
+    select: { id: true },
+  })
+  if (alvos.length === 0) return { necessidades: 0, passos: 0 }
+  const ids = alvos.map((n) => n.id)
+  const passos = await db.phaseWorkflowStepInstance.deleteMany({ where: { necessidadeId: { in: ids } } })
+  const necessidades = await db.necessidadeDocumental.deleteMany({ where: { id: { in: ids } } })
+  return { necessidades: necessidades.count, passos: passos.count }
+}
