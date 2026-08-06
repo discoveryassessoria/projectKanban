@@ -244,7 +244,9 @@
     "backfill:codigo-servicos:dry": "tsx scripts/backfill-codigo-servicos-catalogo.ts",
     "test:codigo-servicos:e2e": "tsx scripts/codigo-servicos-e2e.test.ts",
     "smoke:codigo-servicos": "tsx scripts/smoke-codigo-catalogo-servicos.ts",
-    "test:config-somente-nome": "tsx scripts/config-financeira-somente-nome.test.ts"
+    "test:config-somente-nome": "tsx scripts/config-financeira-somente-nome.test.ts",
+    "smoke:tabela-valores": "tsx scripts/prod-smoke-tabela-valores.ts",
+    "usuario:smoke-tecnico": "tsx scripts/usuario-smoke-tecnico.ts"
   },
   "prisma": {
     "seed": "npm run guard:escrita && tsx prisma/seed.ts"
