@@ -2258,6 +2258,18 @@ CREATE TABLE "ModalidadePais" (
 );
 
 -- CreateTable
+CREATE TABLE "FaseNaturezaPermitida" (
+    "id" SERIAL NOT NULL,
+    "catalogoFaseId" INTEGER NOT NULL,
+    "naturezaOperacionalId" INTEGER NOT NULL,
+    "ativo" BOOLEAN NOT NULL DEFAULT true,
+    "criadoEm" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "atualizadoEm" TIMESTAMP(3) NOT NULL,
+
+    CONSTRAINT "FaseNaturezaPermitida_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
 CREATE TABLE "CatalogoFase" (
     "id" SERIAL NOT NULL,
     "phaseKey" VARCHAR(60) NOT NULL,
@@ -4927,6 +4939,12 @@ CREATE INDEX "ModalidadePais_countryKey_idx" ON "ModalidadePais"("countryKey");
 CREATE UNIQUE INDEX "ModalidadePais_countryKey_modalityKey_key" ON "ModalidadePais"("countryKey", "modalityKey");
 
 -- CreateIndex
+CREATE INDEX "FaseNaturezaPermitida_catalogoFaseId_idx" ON "FaseNaturezaPermitida"("catalogoFaseId");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "FaseNaturezaPermitida_catalogoFaseId_naturezaOperacionalId_key" ON "FaseNaturezaPermitida"("catalogoFaseId", "naturezaOperacionalId");
+
+-- CreateIndex
 CREATE UNIQUE INDEX "CatalogoFase_phaseKey_key" ON "CatalogoFase"("phaseKey");
 
 -- CreateIndex
@@ -6194,6 +6212,12 @@ ALTER TABLE "TaxaPagamentoPais" ADD CONSTRAINT "TaxaPagamentoPais_taxaId_fkey" F
 
 -- AddForeignKey
 ALTER TABLE "TaxaPagamentoPais" ADD CONSTRAINT "TaxaPagamentoPais_paisId_fkey" FOREIGN KEY ("paisId") REFERENCES "CatalogoPais"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "FaseNaturezaPermitida" ADD CONSTRAINT "FaseNaturezaPermitida_catalogoFaseId_fkey" FOREIGN KEY ("catalogoFaseId") REFERENCES "CatalogoFase"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "FaseNaturezaPermitida" ADD CONSTRAINT "FaseNaturezaPermitida_naturezaOperacionalId_fkey" FOREIGN KEY ("naturezaOperacionalId") REFERENCES "NaturezaOperacionalDocumento"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "MacroWorkflow" ADD CONSTRAINT "MacroWorkflow_tipoProcessoId_fkey" FOREIGN KEY ("tipoProcessoId") REFERENCES "TipoProcessoNacionalidade"("id") ON DELETE CASCADE ON UPDATE CASCADE;

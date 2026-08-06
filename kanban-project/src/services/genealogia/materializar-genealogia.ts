@@ -16,7 +16,11 @@ import { garantirNecessidade, dispensarNecessidade, reativarNecessidade } from "
 import { matrizParaRegra } from "@/src/lib/documentos/regras-documentais/mapear"
 import { avaliarRegrasDocumentais } from "@/src/lib/documentos/regras-documentais/avaliador"
 import type { RegraDocumental, SujeitoContexto } from "@/src/lib/documentos/regras-documentais/tipos"
-import { ehNaturezaCertidao } from "@/src/lib/documentos/natureza-certidao"
+import {
+  politicaDaFase, resolverTiposDocumentais, naturezaPermitidaNaFase, recebeWorkflowOperacional,
+  type TipoDocumentalResolvido,
+} from "@/src/lib/documentos/politica-natureza-fase"
+import { idadeEmAnos, maioridadeEfetiva, ehRequerente } from "@/src/lib/documentos/maioridade"
 import { aplicarHonorariosCidadaniaItaliana } from "@/src/lib/motor/executor"
 import { materializarExecucaoDaFase } from "@/src/services/materializar-fase"
 
@@ -46,7 +50,11 @@ export interface MaterializarResultado {
 export function contextoDaPessoa(p: {
   id: number; nome?: string | null; sobrenome?: string | null
   documentacao: boolean; casado: boolean; vivo: boolean; linhaReta: boolean; requerente: string | null
-}): SujeitoContexto {
+  data_nasc?: Date | string | null
+}, referencia: Date = new Date()): SujeitoContexto {
+  // A idade vem da política canônica de maioridade, com data de referência
+  // EXPLÍCITA — nunca de "hoje" implícito espalhado pelo código.
+  const idade = idadeEmAnos(p.data_nasc ?? null, referencia)
   return {
     id: p.id,
     nome: [p.nome, p.sobrenome].filter(Boolean).join(" ") || `Pessoa ${p.id}`,
@@ -55,8 +63,12 @@ export function contextoDaPessoa(p: {
     casado: p.casado === true,
     vivo: p.vivo === true,
     falecido: p.vivo === false,
-    requerente: String(p.requerente ?? "nao").toLowerCase() === "sim",
+    // domínio canônico: "sim" | "maior" | "menor" contam como requerente.
+    requerente: ehRequerente(p.requerente),
     linhaReta: p.linhaReta === true,
+    idade,
+    maiorDeIdade: maioridadeEfetiva(p.data_nasc ?? null, p.requerente, referencia),
+    dataNascimento: p.data_nasc ? new Date(p.data_nasc).toISOString() : null,
   }
 }
 
@@ -97,14 +109,21 @@ export async function materializarGenealogia(processoId: number, db: DB = prisma
 
   const pessoas = await db.pessoa.findMany({
     where: { arvoreId: processo.arvoreId },
-    select: { id: true, nome: true, sobrenome: true, documentacao: true, casado: true, vivo: true, linhaReta: true, requerente: true },
+    select: { id: true, nome: true, sobrenome: true, documentacao: true, casado: true, vivo: true, linhaReta: true, requerente: true, data_nasc: true },
   })
 
-  // mapa code → itemCatalogoId + NATUREZA estruturada (Genealogia só materializa
-  // CERTIDÃO — nunca identidade/comprovante/apostila/tradução/outros; sem texto).
-  const docTypes = await db.tipoDocumentoCadastro.findMany({ select: { id: true, code: true, itemCatalogoId: true, nature: true } })
-  const itemCatalogoDeCode = (code: string): number | null => docTypes.find((x) => x.code === code)?.itemCatalogoId ?? null
-  const ehCertidaoCode = (code: string): boolean => ehNaturezaCertidao(docTypes.find((x) => x.code === code)?.nature)
+  // POLÍTICA DA FASE — o que a Genealogia materializa vem do CADASTRO (quais
+  // naturezas a fase aceita), não de uma premissa no motor. Fase sem política
+  // declarada não materializa nada: esquecimento de cadastro não pode virar
+  // materialização indevida.
+  const politica = await politicaDaFase(FASE_GENEALOGIA, db)
+  if (!politica) res.pendencias.push(`fase "${FASE_GENEALOGIA}" não existe no Catálogo de Fases`)
+  else if (politica.naturezasPermitidas.size === 0) {
+    res.pendencias.push(`fase "${FASE_GENEALOGIA}" sem naturezas documentais habilitadas — cadastre a política da fase`)
+  }
+  const tiposPorId = await resolverTiposDocumentais(db)
+  const tipoPorCode = new Map<string, TipoDocumentalResolvido>()
+  for (const t of tiposPorId.values()) if (t.code) tipoPorCode.set(t.code, t)
 
   // instância ativa do Workflow Interno da Genealogia (para pendurar o passo)
   const instancia = await db.phaseWorkflowInstance.findFirst({
@@ -125,14 +144,16 @@ export async function materializarGenealogia(processoId: number, db: DB = prisma
     })
     for (const ap of av.aplicaveis) {
       res.aplicaveis++
-      // ELEGIBILIDADE ESTRUTURAL: na Genealogia só existem CERTIDÕES. Se o requisito
-      // aplicável apontar para um TipoDocumental que NÃO é certidão (natureza), NÃO
-      // materializa (nem necessidade, nem passo localizar_registro).
-      if (!ehCertidaoCode(ap.documentTypeCode)) { res.pendencias.push(`"${ap.documentTypeCode}" não é CERTIDÃO (natureza estruturada) — Genealogia não materializa`); continue }
+      // ELEGIBILIDADE ESTRUTURAL — por CADASTRO, comparando IDs: a fase declara as
+      // naturezas que aceita, o tipo documental declara a sua. Nunca por código
+      // DOC, nome ou substring. Cada recusa tem motivo nomeado.
+      const tipoDoc = tipoPorCode.get(ap.documentTypeCode)
+      const elegivel = naturezaPermitidaNaFase(politica, tipoDoc)
+      if (!elegivel.permitido) { res.pendencias.push(`"${ap.documentTypeCode}": ${elegivel.detalhe}`); continue }
       const regra = regras.find((r) => r.id === ap.regraId)!
       const codigo = regra.codigo ?? `MDX_${regra.id}`
       const varianteKey = `rd:${codigo}:v${regra.versao}`
-      const itemCatalogoId = itemCatalogoDeCode(ap.documentTypeCode)
+      const itemCatalogoId = tipoDoc?.itemCatalogoId ?? null
       if (itemCatalogoId == null) { res.pendencias.push(`sem ItemCatalogo para "${ap.documentTypeCode}" (pessoa ${p.id}, regra ${codigo}) — necessidade não materializada`); continue }
 
       // materializa a variante aplicável (para reconciliação depois)
@@ -157,8 +178,11 @@ export async function materializarGenealogia(processoId: number, db: DB = prisma
         res.reativadas++
       }
 
-      // passo operacional "Localizar registro" vinculado à necessidade (idempotente)
-      if (instancia) {
+      // PASSO OPERACIONAL — só para documento cujo PERFIL declara workflow.
+      // É o que impede RG, comprovante e procuração de herdarem os cinco passos
+      // da emissão de certidão: eles entram na fase como necessidade, sem passo.
+      // A distinção vem do perfil cadastrado, não de uma lista de exceções.
+      if (instancia && recebeWorkflowOperacional(tipoDoc)) {
         const chave = chaveStep(necessidade.id, instancia.ciclo)
         const existente = await db.phaseWorkflowStepInstance.findUnique({ where: { chaveIdempotencia: chave }, select: { id: true } })
         if (existente) { res.stepsReusados++ }

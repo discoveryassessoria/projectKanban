@@ -18,6 +18,8 @@ export function valorDoSujeito(campo: CampoCondicao, s: SujeitoContexto): ValorC
     case "contratante": return s.contratante
     case "linhaReta": return s.linhaReta
     case "casado": return s.casado
+    case "idade": return s.idade ?? undefined
+    case "maiorDeIdade": return s.maiorDeIdade ?? undefined
     case "falecido": return s.falecido ?? (s.vivo === undefined ? undefined : !s.vivo)
     case "vivo": return s.vivo ?? (s.falecido === undefined ? undefined : !s.falecido)
     case "possuiConjuge": return s.possuiConjuge ?? s.casado
@@ -32,6 +34,10 @@ export function valorDoSujeito(campo: CampoCondicao, s: SujeitoContexto): ValorC
 // Normaliza "Sim"/"Não"/"true"/1 → boolean quando o campo é booleano.
 const CAMPOS_BOOL: CampoCondicao[] = [
   "precisaDeDocumentacao", "requerente", "contratante", "linhaReta", "casado", "falecido", "vivo", "possuiConjuge",
+  // `maiorDeIdade` é booleano; `idade` é NUMÉRICO e usa maior/menor — por isso
+  // fica de fora desta lista, senão "idade maior que 17" viraria comparação de
+  // booleano e nunca casaria.
+  "maiorDeIdade",
 ]
 function coerceBool(v: ValorCondicao | undefined): boolean | undefined {
   if (v === undefined || v === null) return undefined

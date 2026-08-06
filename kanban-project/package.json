@@ -234,7 +234,10 @@
     "test:assistente": "tsx scripts/assistente-parametrizacao.test.ts",
     "backfill:codigo-cliente": "tsx scripts/backfill-codigo-cliente.ts",
     "backfill:codigo-cliente:execute": "tsx scripts/backfill-codigo-cliente.ts --execute",
-    "test:codigo-cliente": "tsx scripts/codigo-cliente.test.ts"
+    "test:codigo-cliente": "tsx scripts/codigo-cliente.test.ts",
+    "cadastrar:regras-genealogia": "tsx prisma/cadastrar-regras-genealogia.ts",
+    "cadastrar:regras-genealogia:execute": "tsx prisma/cadastrar-regras-genealogia.ts --execute",
+    "test:genealogia-regras": "tsx scripts/genealogia-regras-canonicas.test.ts"
   },
   "prisma": {
     "seed": "npm run guard:escrita && tsx prisma/seed.ts"

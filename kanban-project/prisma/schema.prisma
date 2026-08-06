@@ -2862,6 +2862,27 @@ model ModalidadePais {
 }
 
 // CatÃ¡logo das fases (building blocks do workflow)
+/// POLÍTICA DOCUMENTAL DA FASE — quais NATUREZAS a fase materializa.
+///
+/// Substitui a premissa histórica "Genealogia só aceita certidão", que vivia em
+/// código. Qual documento entra numa fase deixa de ser decidido por natureza
+/// escrita no motor e passa a ser CADASTRO: a fase declara as naturezas que
+/// aceita, o Tipo de Documento declara a sua, e a materialização compara IDs.
+/// Nenhum código DOC, nenhum nome, nenhum substring.
+model FaseNaturezaPermitida {
+  id                    Int                          @id @default(autoincrement())
+  catalogoFaseId        Int
+  catalogoFase          CatalogoFase                 @relation(fields: [catalogoFaseId], references: [id], onDelete: Cascade)
+  naturezaOperacionalId Int
+  naturezaOperacional   NaturezaOperacionalDocumento @relation(fields: [naturezaOperacionalId], references: [id], onDelete: Restrict)
+  ativo                 Boolean                      @default(true)
+  criadoEm              DateTime                     @default(now())
+  atualizadoEm          DateTime                     @updatedAt
+
+  @@unique([catalogoFaseId, naturezaOperacionalId])
+  @@index([catalogoFaseId])
+}
+
 model CatalogoFase {
   id                Int      @id @default(autoincrement())
   phaseKey          String   @unique @db.VarChar(60)
@@ -2873,6 +2894,8 @@ model CatalogoFase {
   ativo             Boolean  @default(true)
   criadoEm          DateTime @default(now())
   atualizadoEm      DateTime @updatedAt
+
+  naturezasPermitidas FaseNaturezaPermitida[]
 }
 
 // Workflow Macro â 1:1 com o tipo de processo
@@ -3247,7 +3270,8 @@ model NaturezaOperacionalDocumento {
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
 
-  tipos TipoDocumentoCadastro[]
+  tipos           TipoDocumentoCadastro[]
+  fasesQueAceitam FaseNaturezaPermitida[]
 }
 
 /// PERFIL OPERACIONAL — a ponte entre o Cadastro Mestre e o Workflow publicado.

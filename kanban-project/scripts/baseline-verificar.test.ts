@@ -147,7 +147,15 @@ const MIGRATION = join(DIR_MIGRATIONS, '0000_baseline', 'migration.sql')
 //
 //   anterior : 384a83bff1a33778dbb0b3026463a3f348e7907c8c7f305aabed6a26834039ed
 //   atual    : 7cd1f90827eef93f97a0fc35efe238d1d4e0a5dc45138c388ad53cc0f2fafb37
-const CHECKSUM_LEDGER = '7cd1f90827eef93f97a0fc35efe238d1d4e0a5dc45138c388ad53cc0f2fafb37'
+// ATUALIZACAO 06/08/2026 (politica de natureza por fase) — migration ADITIVA
+// 20260806d_politica_natureza_por_fase: UMA tabela nova (FaseNaturezaPermitida),
+// que liga CatalogoFase a NaturezaOperacionalDocumento por ID. Substitui a
+// premissa "a Genealogia so materializa certidao", que vivia em codigo.
+// Diff do baseline: 24 linhas inseridas, ZERO removidas.
+//
+//   anterior : 7cd1f90827eef93f97a0fc35efe238d1d4e0a5dc45138c388ad53cc0f2fafb37
+//   atual    : dc38860b04bca0a0355e2eabd00c3bbe28659a9688e44b1f1cea7296cd7622b4
+const CHECKSUM_LEDGER = 'dc38860b04bca0a0355e2eabd00c3bbe28659a9688e44b1f1cea7296cd7622b4'
 
 /**
  * Migrations criadas DEPOIS da consolidacao de 02/08/2026. Toda migration nova
@@ -166,6 +174,7 @@ const MIGRATIONS_POS_BASELINE: string[] = [
   '20260806_custo_documental_vinculo',
   '20260806b_assistente_parametrizacao',
   '20260806c_remover_variacao_fase',
+  '20260806d_politica_natureza_por_fase',
 ]
 
 const sha256 = (t: string) => createHash('sha256').update(t).digest('hex')
