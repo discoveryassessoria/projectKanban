@@ -226,7 +226,11 @@
     "validar:perfis-custo": "tsx scripts/prod-validar-perfis-custo.ts",
     "reconciliar:custo-documental": "tsx scripts/reconciliar-custo-documental.ts",
     "reconciliar:custo-documental:execute": "npm run guard:escrita && tsx scripts/reconciliar-custo-documental.ts --execute",
-    "test:custo-documental": "tsx scripts/custo-documental.test.ts"
+    "test:custo-documental": "tsx scripts/custo-documental.test.ts",
+    "pendencias:parametrizacao": "tsx scripts/pendencias-parametrizacao.ts",
+    "pre-cadastro:estrutural": "tsx prisma/pre-cadastro-estrutural.ts",
+    "pre-cadastro:estrutural:execute": "tsx prisma/pre-cadastro-estrutural.ts --execute",
+    "test:pre-cadastro": "tsx scripts/pre-cadastro-guards.test.ts"
   },
   "prisma": {
     "seed": "npm run guard:escrita && tsx prisma/seed.ts"

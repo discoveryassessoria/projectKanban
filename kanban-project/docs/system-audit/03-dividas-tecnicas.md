@@ -102,6 +102,16 @@ para 1 falha; rodando a suíte de materialização de novo, volta a 4.
 é de isolamento de fixture, e é exatamente o que o Processo Golden da Fase 1
 resolve: nenhuma suíte deve deixar cadastro para trás.
 
+## D-04c · Suítes financeiras acumulam lançamentos entre execuções
+
+`custo-f81-inteligencia.test.ts` cria três obrigações de histórico por execução e
+não as remove. Na segunda rodada `baseHistorica` vale 6, na sexta vale 18, e as
+asserções de "mais frequente" e "valor típico" passam a medir lixo. Provado em
+06/08: 18 linhas acumuladas; limpas, a suíte volta a 39/39.
+
+Mesma classe do D-04b — fixture que não devolve o banco como encontrou. Entra no
+escopo do Processo Golden (Fase 1).
+
 ## D-05 · Migrations pós-baseline não são idempotentes
 
 **Evidência.** `prisma migrate deploy` num banco virgem morre na terceira:

@@ -99,7 +99,7 @@ async function montarCenario() {
     data: {
       tipoProcessoId: TIPO_PROCESSO, phaseKey: FASE, documentTypeCode: CODE_DOC,
       target: "direct_line_person", generationRule: "all_direct_line",
-      createsTask: false, createsCost: true, createsRevenue: false,
+      createsTask: false, createsCost: true, createsRevenue: false, status: 'PUBLICADA',
     },
   })
   criado.matrizIds.push(matriz.id)
@@ -270,7 +270,7 @@ async function main() {
     data: {
       tipoProcessoId: TIPO_PROCESSO, phaseKey: FASE, documentTypeCode: tipoNovo.code as string,
       target: "direct_line_person", generationRule: "all_direct_line",
-      createsTask: false, createsCost: true, createsRevenue: false,
+      createsTask: false, createsCost: true, createsRevenue: false, status: 'PUBLICADA',
     },
   })
   const econNova = await prisma.phaseEconomicRule.create({
@@ -299,7 +299,7 @@ async function main() {
     data: {
       tipoProcessoId: TIPO_PROCESSO, phaseKey: FASE, documentTypeCode: `INEXISTENTE_${TS}`.slice(0, 40),
       target: "direct_line_person", generationRule: "all_direct_line",
-      createsTask: false, createsCost: true, createsRevenue: false,
+      createsTask: false, createsCost: true, createsRevenue: false, status: 'PUBLICADA',
     },
   })
   const recOrfa = await reconciliarDocumentalFinanceiro({ processoId: pid, executar: false })
@@ -349,6 +349,14 @@ async function main() {
   criado.econIds.push(econNova.id)
   criado.tipoDocExtraIds.push(tipoNovo.id)
   criado.documentoExtraIds.push(docSemEnum.id)
+
+  // ── 14. GUARD: regra despublicada deixa de gerar, e diz por quê ──────────
+  await prisma.matrizDocumental.updateMany({ where: { id: { in: criado.matrizIds } }, data: { status: "RASCUNHO" } })
+  const recRascunho = await reconciliarDocumentalFinanceiro({ processoId: pid, executar: true })
+  chk(recRascunho.reparados === 0, "regra em rascunho não gera lançamento nem no --execute")
+  chk(recRascunho.achados.some((a) => a.detalhe.includes("não publicada")),
+    "e o relatório nomeia: regra documental ainda não publicada")
+  await prisma.matrizDocumental.updateMany({ where: { id: { in: criado.matrizIds } }, data: { status: "PUBLICADA" } })
 
   console.log(`\n${ok} passaram, ${fail} falharam`)
 }

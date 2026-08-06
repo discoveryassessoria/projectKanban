@@ -126,9 +126,23 @@ export async function resolverElegibilidadeDocumental(
   const itens: ItemElegivel[] = []
   const pulados: { motivo: string; detalhe?: string }[] = []
 
-  const regras = await prisma.matrizDocumental.findMany({ where: { tipoProcessoId, phaseKey, arquivado: false } })
+  // SÓ REGRA PUBLICADA EXECUTA. Uma regra em RASCUNHO existe para ser trabalhada,
+  // não para gerar dinheiro: sem esta trava, cadastrar a estrutura antes de ter
+  // preço faria o motor tentar lançar na hora em que a regra fosse salva. A
+  // diferença entre "não existe regra" e "existe, mas não publicada" é dita em
+  // voz alta — é a pendência que o operador precisa ver.
+  const todas = await prisma.matrizDocumental.findMany({ where: { tipoProcessoId, phaseKey, arquivado: false } })
+  const regras = todas.filter((r) => r.status === 'PUBLICADA')
   if (regras.length === 0) {
-    pulados.push({ motivo: `sem regra na Matriz para tipoProcesso ${tipoProcessoId} + fase "${phaseKey}"` })
+    const naoPublicadas = todas.length
+    pulados.push({
+      motivo: naoPublicadas > 0
+        ? `regra documental ainda não publicada`
+        : `sem regra na Matriz para tipoProcesso ${tipoProcessoId} + fase "${phaseKey}"`,
+      detalhe: naoPublicadas > 0
+        ? `${naoPublicadas} regra(s) em rascunho/inativa para a fase "${phaseKey}" — publique em Gerenciamento › Regras Documentais`
+        : undefined,
+    })
     return { itens, pulados }
   }
 
