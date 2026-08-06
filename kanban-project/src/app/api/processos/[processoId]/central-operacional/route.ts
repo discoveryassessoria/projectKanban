@@ -6,6 +6,7 @@ import { prisma } from "@/lib/prisma"
 import { verificarPermissao } from "@/src/lib/verificar-permissao"
 import { getOrdemFase, getStepsForFase, getFase, phaseKeyToFaseCode, faseCodeToPhaseKey } from "@/src/lib/process-stage/fases-catalog"
 import { itemCatalogosDeCertidao } from "@/src/lib/documentos/natureza-certidao"
+import { nomeCanonicoDaObrigacao } from "@/src/lib/documentos/nome-canonico-obrigacao"
 import { resolveProgressoFaseDocumento } from "@/src/lib/process-stage/resolve-fase-progresso"
 import { resolveOperationalProjection, type OperationalProjection } from "@/src/lib/process-stage/operational-projection"
 import {
@@ -802,7 +803,25 @@ export async function GET(
       for (const s of stepsLR) if (s.necessidadeId != null && !stepByNec.has(s.necessidadeId)) stepByNec.set(s.necessidadeId, s)
       const CONCLUIDO = new Set(["CONCLUIDO", "DISPENSADO", "SUPERSEDIDO"])
       const localizado = (necId: number) => { const s = stepByNec.get(necId); return !!s && CONCLUIDO.has(s.status) }
-      const requisitoDe = (snap: unknown) => (snap && typeof snap === "object" && "requisito" in snap ? String((snap as { requisito: unknown }).requisito) : "Certidão")
+      // NOME DA OBRIGAÇÃO pelo Cadastro Mestre. `requisito` é o texto da regra e
+      // não nomeia documento — usá-lo aqui fazia a mesma exigência aparecer com
+      // dois nomes ("Certidão de Nascimento" × "Certidão de nascimento - Inteiro
+      // Teor") e ser lida como duas obrigações.
+      const tiposCad = await prisma.tipoDocumentoCadastro.findMany({ select: { code: true, name: true } })
+      const nomeTipoPorCode = new Map(tiposCad.filter((t) => t.code).map((t) => [t.code as string, t.name]))
+      const itemNomePorId = new Map(
+        (await prisma.itemCatalogo.findMany({ where: { id: { in: [...new Set(necsRaw.map((n) => n.itemCatalogoId))] } }, select: { id: true, name: true } }))
+          .map((i) => [i.id, i.name]),
+      )
+      const requisitoDe = (n: { matrizSnapshot: unknown; itemCatalogoId: number }) => {
+        const snap = (n.matrizSnapshot ?? null) as { requisito?: unknown; documentosAceitos?: unknown } | null
+        return nomeCanonicoDaObrigacao({
+          documentosAceitos: snap?.documentosAceitos,
+          requisitoNome: typeof snap?.requisito === "string" ? snap.requisito : null,
+          itemCatalogoNome: itemNomePorId.get(n.itemCatalogoId) ?? null,
+          nomePorCode: (code) => nomeTipoPorCode.get(code) ?? null,
+        }) ?? "Certidão"
+      }
 
       // progresso = passos OBRIGATÓRIOS localizar_registro concluídos / aplicáveis
       const obrig = necs.filter((n) => n.obrigatoriedade === "OBRIGATORIA")
@@ -832,8 +851,8 @@ export async function GET(
           docId: s?.documentoId ?? 0,
           pessoaId: n.pessoaId ?? 0,
           pessoaNome: pessoa ? nomeCompleto(pessoa) : "—",
-          docType: requisitoDe(n.matrizSnapshot),
-          docTypeLabel: requisitoDe(n.matrizSnapshot),
+          docType: requisitoDe(n),
+          docTypeLabel: requisitoDe(n),
           status: ok ? "Registro localizado" : "A localizar",
           statusRaw: ok ? "LOCALIZADO" : "A_LOCALIZAR",
           responsavelNome: s?.responsavelId != null ? respNomes.get(s.responsavelId) ?? null : null,

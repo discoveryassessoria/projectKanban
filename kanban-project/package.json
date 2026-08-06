@@ -246,7 +246,8 @@
     "smoke:codigo-servicos": "tsx scripts/smoke-codigo-catalogo-servicos.ts",
     "test:config-somente-nome": "tsx scripts/config-financeira-somente-nome.test.ts",
     "smoke:tabela-valores": "tsx scripts/prod-smoke-tabela-valores.ts",
-    "usuario:smoke-tecnico": "tsx scripts/usuario-smoke-tecnico.ts"
+    "usuario:smoke-tecnico": "tsx scripts/usuario-smoke-tecnico.ts",
+    "test:obrigacao-unica": "tsx scripts/obrigacao-documental-unica.test.ts"
   },
   "prisma": {
     "seed": "npm run guard:escrita && tsx prisma/seed.ts"
