@@ -5,7 +5,8 @@
 // saldo direto — grava entries balanceados e RECALCULA a projeção (replay).
 // Emite domain events no Outbox (DomainOutbox). Ver spec §4, §0.
 // ============================================================================
-import type { Prisma, PrismaClient } from '@prisma/client'
+import { Prisma } from '@prisma/client'
+import type { PrismaClient } from '@prisma/client'
 import { prisma } from '@/lib/prisma'
 import { lancObrigacaoCriada, type Lancamento, type Direcao as PernaDirecao } from './lancamentos'
 import { projetar, type EntryProjecao } from './projecao'
@@ -89,6 +90,65 @@ export interface CriarObrigacaoInput {
   estadoCusto?: string | null // F4 — estado de negócio inicial (só custo); default CONTRATADO
   criadoPorId?: number | null
   db?: PrismaClient
+  /**
+   * VÍNCULO DOCUMENTAL + snapshot de preço. Opcional: o lançamento manual não
+   * tem cadeia documental e passa sem isto. Quando presente, a obrigação passa a
+   * saber DE QUEM e DE QUÊ ela é — o que a Planilha Documental projeta. Não é
+   * segunda fonte de verdade: o Ledger continua sendo a única verdade do saldo.
+   */
+  vinculo?: VinculoDocumental | null
+}
+
+/**
+ * Vínculo operacional de uma obrigação com a cadeia documental que a originou,
+ * mais o preço CONGELADO no instante do lançamento. Tudo por ID — nunca por
+ * nome de pessoa, título de tarefa ou rótulo de serviço.
+ */
+export interface VinculoDocumental {
+  personId?: number | null
+  documentoId?: number | null
+  tipoServicoId?: number | null
+  phaseKey?: string | null
+  phaseCycle?: number | null
+  configFinanceiraId?: number | null
+  /** AUTOMATICO_DOCUMENTAL | BACKFILL_DOCUMENTAL | MANUAL */
+  origemLancamento?: string | null
+  eventoOrigemTipo?: string | null
+  eventoOrigemId?: number | null
+  // snapshot §7 — mudar a Tabela de Preços não reescreve história
+  pricingRuleId?: number | null
+  valorUnitario?: number | null
+  quantidade?: number | null
+  modoCalculoAplicado?: string | null
+  naturezaPreco?: string | null
+  contextoAplicado?: Prisma.InputJsonValue | null
+  dataReferencia?: Date | null
+  /** chave idempotente do lançamento (@unique no banco — trava a duplicação) */
+  chaveIdempotencia?: string | null
+}
+
+/** Traduz o vínculo para os campos da obrigação (undefined = não mexe). */
+function camposDoVinculo(v?: VinculoDocumental | null) {
+  if (!v) return {}
+  return {
+    personId: v.personId ?? null,
+    documentoId: v.documentoId ?? null,
+    tipoServicoId: v.tipoServicoId ?? null,
+    phaseKey: v.phaseKey ?? null,
+    phaseCycle: v.phaseCycle ?? null,
+    configFinanceiraId: v.configFinanceiraId ?? null,
+    origemLancamento: v.origemLancamento ?? null,
+    eventoOrigemTipo: v.eventoOrigemTipo ?? null,
+    eventoOrigemId: v.eventoOrigemId ?? null,
+    pricingRuleId: v.pricingRuleId ?? null,
+    valorUnitario: v.valorUnitario ?? null,
+    quantidade: v.quantidade ?? null,
+    modoCalculoAplicado: v.modoCalculoAplicado ?? null,
+    naturezaPreco: v.naturezaPreco ?? null,
+    contextoAplicado: v.contextoAplicado ?? Prisma.DbNull,
+    dataReferencia: v.dataReferencia ?? null,
+    chaveIdempotencia: v.chaveIdempotencia ?? null,
+  }
 }
 
 export async function criarObrigacaoEconomicaComLedger(input: CriarObrigacaoInput): Promise<{ obrigacaoId: number; reaproveitada: boolean }> {
@@ -110,6 +170,14 @@ export async function criarObrigacaoEconomicaComLedgerTx(tx: Tx, input: CriarObr
       const existente = await tx.obrigacaoEconomica.findUnique({ where: { origemTipo_origemId: { origemTipo: input.origemTipo, origemId: input.origemId } } })
       if (existente) return { obrigacaoId: existente.id, reaproveitada: true }
     }
+    // Idempotência do lançamento DOCUMENTAL: o custo derivado da cadeia documental
+    // não tem Receita/Custo de origem (origemTipo='nativo', origemId=null), então a
+    // chave acima não o protege. `chaveIdempotencia` é @unique no banco: reprocessar
+    // o mesmo evento devolve a MESMA obrigação em vez de criar a segunda.
+    if (input.vinculo?.chaveIdempotencia) {
+      const jaExiste = await tx.obrigacaoEconomica.findUnique({ where: { chaveIdempotencia: input.vinculo.chaveIdempotencia } })
+      if (jaExiste) return { obrigacaoId: jaExiste.id, reaproveitada: true }
+    }
 
     const obr = await tx.obrigacaoEconomica.create({ data: {
       codigoOperacional: input.codigoOperacional ?? null,
@@ -123,6 +191,7 @@ export async function criarObrigacaoEconomicaComLedgerTx(tx: Tx, input: CriarObr
       status: 'ATIVO', origemTipo: input.origemTipo ?? 'nativo', origemId: input.origemId ?? null,
       estadoCusto: input.natureza === 'CUSTO' ? (input.estadoCusto ?? ESTADO_CUSTO_INICIAL) : null,
       criadoPorId: input.criadoPorId ?? null,
+      ...camposDoVinculo(input.vinculo),
     } })
 
     const ledger = await tx.ledgerFinanceiro.create({ data: { obrigacaoId: obr.id, moedaContabil: moeda } })

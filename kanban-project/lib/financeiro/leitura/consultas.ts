@@ -30,6 +30,17 @@ export interface ObrigacaoLista {
   fornecedor: string | null
   estadoCusto: string | null
   temAbertura: boolean
+  // ── VÍNCULO DOCUMENTAL — de quem e de quê é este lançamento ────────────────
+  // Vem das colunas da obrigação (por ID), não de parsing da descrição. É o que
+  // permite à Planilha Documental projetar a grade pessoa × documento × serviço
+  // e à lista separar custo automático de despesa extraordinária.
+  personId: number | null
+  documentoId: number | null
+  tipoServicoId: number | null
+  phaseKey: string | null
+  phaseCycle: number | null
+  /** AUTOMATICO_DOCUMENTAL | BACKFILL_DOCUMENTAL | MANUAL | null (não classificado) */
+  origemLancamento: string | null
   // ── câmbio-aware (FONTE ÚNICA: computeCambioAging — Ledger + fx congelado). Elimina
   // o `fx=5.5` dos consumidores (Custos/Extrato/Timeline/Visão Geral). ──
   contratadoBrl: number
@@ -120,6 +131,12 @@ export async function listarObrigacoes(f?: { processoId?: number; status?: strin
       fornecedor: o.fornecedorId != null ? (fornPor.get(o.fornecedorId) ?? null) : null,
       estadoCusto: o.estadoCusto ?? null,
       temAbertura: comAbertura.has(o.id),
+      personId: o.personId ?? null,
+      documentoId: o.documentoId ?? null,
+      tipoServicoId: o.tipoServicoId ?? null,
+      phaseKey: o.phaseKey ?? null,
+      phaseCycle: o.phaseCycle ?? null,
+      origemLancamento: o.origemLancamento ?? null,
       contratadoBrl: ca.valorContratadoBrl, recebidoBrl: ca.recebidoBrl, saldoBrl: ca.saldoBrl,
       aVencerBrl: ca.aVencerBrl, vencidoBrl: ca.vencidoBrl, cotacao: ca.cotacaoAplicada, statusAging: ca.statusLabel,
       // ETAPA 3 — ausência de cotação é explícita: > 0 significa que os campos

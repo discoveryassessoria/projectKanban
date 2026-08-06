@@ -113,6 +113,21 @@ function docFact(id: number, d: DocRegistral): DocumentFact {
   }
 }
 
+/**
+ * O documento está LOCALIZADO pela regra oficial? (cartório + livro/folha/termo).
+ *
+ * Exportado porque a projeção financeira documental precisa da MESMA régua que o
+ * gate de conclusão do passo usa. Reimplementar "localizado" do lado do
+ * financeiro criaria duas verdades sobre o mesmo fato — e elas divergiriam no
+ * primeiro ajuste de regra. Documento cancelado/inválido nunca conta.
+ */
+export async function documentoEstaLocalizado(documentoId: number): Promise<boolean> {
+  const d = await prisma.documento.findUnique({ where: { id: documentoId }, select: SELECT_REGISTRAL })
+  if (!d) return false
+  const f = docFact(documentoId, d as DocRegistral)
+  return f.located && !f.cancelled
+}
+
 const SELECT_REGISTRAL = {
   status: true,
   cartorio: true,

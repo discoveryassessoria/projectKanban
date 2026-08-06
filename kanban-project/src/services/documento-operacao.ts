@@ -30,6 +30,7 @@ import { evoluirNecessidadePorPasso, reabrirAtendimentoNecessidade } from "@/src
 import { chaveEvento } from "@/src/services/task-step-sync-helpers"
 import { recalcularFaseDoProcesso } from "@/src/lib/process-stage/recalcular-fase"
 import { projetarTarefaDoPasso, assegurarCoerenciaPassoTarefa } from "@/src/services/passo-tarefa-projecao"
+import { projetarCustosDocumentaisDoPasso } from "@/src/services/financeiro/projecao-documental"
 
 // Transição de estado do passo → evento operacional do motor. Fonte única desta
 // tradução para a operação por-documento; espelha o vocabulário de WorkflowEventoTipo.
@@ -425,9 +426,31 @@ export async function atualizarPassoV2(
   // rota HTTP fazia o comportamento depender de por onde a conclusão entrou.
   // Idempotente e gated pelo BlockingEngine: sem todas as obrigatórias feitas, não anda.
   // Fora da transação de propósito: o avanço abre a sua própria.
-  if (liberarProximo) await avancarFaseSeCouber(documentoId)
+  if (liberarProximo) {
+    // PROJEÇÃO FINANCEIRA DOCUMENTAL — mesma razão de estar aqui e não na rota: o
+    // efeito não pode depender de por onde a conclusão entrou. Roda ANTES do
+    // avanço porque o custo pertence ao documento que acabou de ser localizado,
+    // não à fase seguinte. Post-commit e isolado: o passo já está concluído e uma
+    // falha aqui não o desfaz — o evento `step.concluido` na fila reprocessa
+    // (idempotente pela chave única da obrigação).
+    await projetarCustosDocumentaisSeCouber(stepInstanceId)
+    await avancarFaseSeCouber(documentoId)
+  }
 
   return { ok: true, workflow: await montarWorkflowV2(documentoId, ctx) }
+}
+
+/**
+ * Projeta os custos documentais do passo recém-concluído. O serviço decide
+ * sozinho se ESTE passo autoriza projeção (passo registral + registro localizado
+ * pela régua oficial) — aqui não há nenhuma regra, só o disparo.
+ */
+export async function projetarCustosDocumentaisSeCouber(stepInstanceId: number): Promise<void> {
+  try {
+    await projetarCustosDocumentaisDoPasso(stepInstanceId)
+  } catch (e) {
+    console.error("[projeção documental] erro ao projetar custos do passo:", e)
+  }
 }
 
 /** Dispara o recálculo/avanço de fase. Fora de transação, e tolerante a falha. */

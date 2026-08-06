@@ -223,7 +223,10 @@
     "test:usuarios": "tsx scripts/usuarios-acessos.test.ts",
     "test:wizard-multiselect": "tsx scripts/wizard-multiselect-guard.test.ts",
     "typecheck": "tsc --noEmit",
-    "validar:perfis-custo": "tsx scripts/prod-validar-perfis-custo.ts"
+    "validar:perfis-custo": "tsx scripts/prod-validar-perfis-custo.ts",
+    "reconciliar:custo-documental": "tsx scripts/reconciliar-custo-documental.ts",
+    "reconciliar:custo-documental:execute": "npm run guard:escrita && tsx scripts/reconciliar-custo-documental.ts --execute",
+    "test:custo-documental": "tsx scripts/custo-documental.test.ts"
   },
   "prisma": {
     "seed": "npm run guard:escrita && tsx prisma/seed.ts"

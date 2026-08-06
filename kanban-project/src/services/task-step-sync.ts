@@ -13,6 +13,7 @@ import { Prisma, type Tarefa, type PhaseWorkflowStepInstance, type WorkflowEvent
 import { resolveWorkflowRuntime } from "@/src/lib/workflow-runtime"
 import * as H from "@/src/services/task-step-sync-helpers"
 import { projetarTarefaDoPasso, assegurarCoerenciaPassoTarefa } from "@/src/services/passo-tarefa-projecao"
+import { processarOutbox } from "@/src/services/outbox-dispatcher"
 
 const TAREFA_CONCLUIDA_STATUS = "CONCLUIDO_RECEBIDO"
 
@@ -359,7 +360,7 @@ export async function concluirPasso(stepInstanceId: number, ctx: SyncContexto): 
   const base: ApplyOpts = { correlationId, causationId: ctx.causationId ?? H.chaveComando("step-complete", "step_instance", stepInstanceId, "CONCLUIDO", ciclo), ciclo, processoId: step.processoId, workflowInstanceId: step.workflowInstanceId }
   const tarefa = step.tarefas[0]
   try {
-    return await prisma.$transaction(async (tx) => {
+    const resultado = await prisma.$transaction(async (tx) => {
       const eventos: string[] = []
       let pAnt: string | undefined, pAt: string | undefined
       if (exigeAprovacao) {
@@ -384,6 +385,12 @@ export async function concluirPasso(stepInstanceId: number, ctx: SyncContexto): 
       await assegurarCoerenciaPassoTarefa(tx, [stepInstanceId])
       return ok(true, correlationId, { passo: pAnt, tarefa: tAnt }, { passo: pAt, tarefa: tAt }, eventos)
     })
+    // O `step.concluido` já foi emitido DENTRO da transação acima. Drenar aqui só
+    // antecipa o efeito (projeção financeira documental) para o mesmo clique, em
+    // vez de esperar o próximo ciclo da fila. Best-effort: se falhar, o evento
+    // continua PENDENTE e reprocessa — nada se perde.
+    await processarOutbox({ tipos: ["step.concluido"], limite: 20 }).catch(() => {})
+    return resultado
   } catch (e) { return convergirOuThrow(e, correlationId) }
 }
 

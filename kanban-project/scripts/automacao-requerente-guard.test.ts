@@ -112,8 +112,15 @@ console.log('\nGuardas estruturais (arquitetura)')
   // `const tipos = opts?.tipos ?? [` — o guard acusava um defeito que não existia.
   // Guard que mente sobre código correto é pior que guard nenhum: ensina a ignorar
   // a suíte. O que importa é o tipo estar na lista DEFAULT, não a sintaxe dela.
-  const listaDefault = disp.slice(disp.indexOf('opts?.tipos ??'), disp.indexOf(']', disp.indexOf('opts?.tipos ??')))
-  ok('requerente.adicionado nos tipos default drenados', listaDefault.includes('"requerente.adicionado"'))
+  //
+  // 06/08/2026 — o guard voltou a mentir pelo MESMO motivo: a default deixou de
+  // ser um literal e passou a ser `[...TIPOS_DRENADOS]`, então recortar até o
+  // primeiro `]` devolvia o spread, nunca os tipos. A asserção agora verifica os
+  // dois fatos que de fato importam, cada um onde ele mora: o tipo está declarado
+  // em TIPOS_DRENADOS, e TIPOS_DRENADOS é a lista usada por padrão.
+  const declarados = disp.slice(disp.indexOf('export const TIPOS_DRENADOS'), disp.indexOf('as const', disp.indexOf('export const TIPOS_DRENADOS')))
+  ok('requerente.adicionado declarado em TIPOS_DRENADOS', declarados.includes('"requerente.adicionado"'))
+  ok('TIPOS_DRENADOS é a lista drenada por padrão', /opts\?\.tipos \?\? \[\.\.\.TIPOS_DRENADOS\]/.test(disp))
 
   const emit = src('src/services/genealogia/emitir-evento-requerente.ts')
   ok('evento publicado via DomainOutbox (não HTTP direto)', emit.includes('domainOutbox.create') && emit.includes("tipo: TIPO_EVENTO_REQUERENTE"))

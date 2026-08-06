@@ -4437,6 +4437,46 @@ model ObrigacaoEconomica {
   criadoEm          DateTime  @default(now())
   atualizadoEm      DateTime  @updatedAt
 
+  // ── VÍNCULO DOCUMENTAL ────────────────────────────────────────────────────
+  // O model Custo legado carregava personId/documentoId/tipoServicoId/phaseKey e
+  // era por eles que a Planilha Documental montava a grade (linha = documento,
+  // coluna = serviço). Quando o motor passou a nascer V3-native (F3.5), o custo
+  // deixou de gravar o Custo legado e o vínculo virou TEXTO em `observacoes` —
+  // o financeiro passou a saber QUANTO sem saber DE QUEM e DE QUÊ. Estas colunas
+  // devolvem o vínculo à obrigação, por ID. Elas NÃO duplicam o Ledger (que
+  // continua sendo a única verdade do movimento): dizem a que fato operacional a
+  // obrigação pertence. Simétricas às que a Receita já possui.
+  personId           Int?
+  documentoId        Int?
+  tipoServicoId      Int?
+  phaseKey           String? @db.VarChar(60)
+  phaseCycle         Int?
+  /// ProdutoFinanceiro (Configuração Financeira) que originou o lançamento.
+  configFinanceiraId Int?
+
+  /// COMO o lançamento nasceu. AUTOMATICO_DOCUMENTAL = projetado pela cadeia
+  /// documental (registro localizado); BACKFILL_DOCUMENTAL = reparo determinístico
+  /// da mesma cadeia; MANUAL = despesa extraordinária lançada por pessoa. Null =
+  /// anterior à classificação (nunca inferido por heurística — a reconciliação
+  /// apenas RELATA os não classificados).
+  origemLancamento String? @db.VarChar(28)
+  /// Evento de domínio que causou o lançamento (ex.: PhaseWorkflowStepInstance).
+  eventoOrigemTipo String? @db.VarChar(40)
+  eventoOrigemId   Int?
+
+  // ── SNAPSHOT DE PREÇO (§7) — imutável no instante do lançamento ────────────
+  // Mudar a Tabela de Preços não pode reescrever história: o que foi lançado
+  // guarda a regra, o unitário, a quantidade e o contexto que o produziram.
+  pricingRuleId       Int?
+  valorUnitario       Decimal?  @db.Decimal(14, 2)
+  quantidade          Int?
+  modoCalculoAplicado String?   @db.VarChar(30)
+  naturezaPreco       String?   @db.VarChar(10)
+  contextoAplicado    Json?
+  dataReferencia      DateTime?
+  /// Chave idempotente do lançamento documental (mesma automaticKey do MotorArtefato).
+  chaveIdempotencia   String?   @unique @db.VarChar(200)
+
   ledger           LedgerFinanceiro?
   ledgerEntries    LedgerEntry[] // LedgerEntry.obrigacaoId é denormalizado (o caminho canônico é ledger→obrigacao); a relação existe para a FK proteger o valor
   saldoProjecao    SaldoProjecao? // 1-1: SaldoProjecao.obrigacaoId é @unique
@@ -4452,6 +4492,9 @@ model ObrigacaoEconomica {
   @@index([natureza])
   @@index([codigoOperacional])
   @@index([itemCatalogoId]) // criado em 20260814000000_obrigacao_item_catalogo; faltava aqui
+  @@index([documentoId])
+  @@index([personId])
+  @@index([processoId, documentoId, tipoServicoId]) // grade da Planilha Documental
 }
 
 // F5 — CRONOGRAMA de vencimentos de PAGÁVEIS (Contas a Pagar). Componente OFICIAL e

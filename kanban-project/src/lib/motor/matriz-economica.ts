@@ -24,60 +24,15 @@ import {
 import { gerarCodigoReceita, gerarCodigoCusto } from '@/lib/financeiro/codigos'
 import { aplicarCondicaoPagamento } from '@/lib/financeiro/aplicar-condicao'
 import { criarObrigacaoEconomicaComLedger, removerObrigacaoOrfaTx } from '@/lib/financeiro/ledger/ledger-service'
-// LOTE A · B4 — trava de estado civil (reusa a MESMA engine da árvore, não recria)
-import { analyzePessoa } from '@/src/lib/document-generator'
+import type { VinculoDocumental } from '@/lib/financeiro/ledger/ledger-service'
+import { ORIGEM_AUTOMATICA } from '@/lib/financeiro/dominio/origem-lancamento'
 // LOTE A · B3 — preço hierárquico (arquivo separado, testável isolado)
 import { resolverPrecoPorConfigDB } from './resolver-preco-financeiro.prisma'
 import type { ResultadoPreco, ResultadoPrecoOK } from './resolver-preco-financeiro'
 import { resolverPendenciaPorChave } from '@/lib/financeiro/pendencia'
 import { NaturezaPreco } from '@prisma/client'
 import { criarTarefaDeSpec } from '@/src/services/processEngine/taskEngine'
-
-// ── (a/c) COMPONENTE ECONÔMICO: CONFIGURÁVEL via PhaseEconomicRule ────────────
-// Antes era hardcoded (switch por fase + mapa de preços). Agora o administrador
-// cadastra pela tela: fase → componente (+ produtos de custo/receita separados).
-// Regra aplicável = 1ª ativa cujo documentTypeCode casa (ou é null = qualquer).
-// appliesTo (natureza do doc) fica pronto p/ o caso "mesma fase, doc diferente,
-// componente diferente" (tradução vs original) — hoje 'any' casa tudo.
-type RegraEconomica = {
-  documentTypeCode: string | null
-  appliesTo: string
-  componentKey: string
-  componentName: string
-  custoProdutoCode: string | null
-  receitaProdutoCode: string | null
-  custoConfigId?: number | null
-  receitaConfigId?: number | null
-}
-function resolverRegraEconomica(rules: RegraEconomica[], docCode: string): RegraEconomica | null {
-  return (
-    rules.find((r) => r.documentTypeCode === docCode) ?? // match exato tem prioridade
-    rules.find((r) => r.documentTypeCode == null) ??      // regra "qualquer doc"
-    null
-  )
-}
-
-type PessoaMin = {
-  id: number; nome: string; sobrenome: string | null; linhaReta: boolean
-  casado: boolean; vivo: boolean
-  documentos: { id: number; tipo: string }[]
-}
-
-// ── (b) SELEÇÃO DE PESSOAS: vem do target/generationRule da REGRA ────────────
-function selecionarPessoas(regra: { target: string; generationRule: string }, pessoas: PessoaMin[]): PessoaMin[] {
-  if (regra.generationRule === 'all_direct_line') return pessoas.filter((p) => p.linhaReta)
-  if (regra.target === 'whole_process') return pessoas
-  // futuros: requerente, cônjuge, pacote, entidade…
-  return pessoas.filter((p) => p.linhaReta) // default conservador
-}
-
-function tipoDocKeyword(code: string): 'NASCIMENTO' | 'CASAMENTO' | 'OBITO' | null {
-  const c = code.toUpperCase()
-  if (c.includes('NAS')) return 'NASCIMENTO'
-  if (c.includes('CAS')) return 'CASAMENTO'
-  if (c.includes('OB')) return 'OBITO'
-  return null
-}
+import { resolverElegibilidadeDocumental } from './elegibilidade-documental'
 
 export interface ItemEconomico {
   pessoaId: number; documentoId: number; componente: string
@@ -95,11 +50,31 @@ export interface ResultadoMatriz {
 }
 
 /**
+ * ESCOPO da geração. Sem escopo, o motor projeta a fase inteira (comportamento de
+ * sempre, usado pelo `phase.entered`). Com `documentoId`, projeta SÓ aquele
+ * documento — que é o que o evento "registro localizado" pede: o custo nasce
+ * quando o registro DAQUELE documento é encontrado, não quando a fase abre.
+ *
+ * É filtro, não motor paralelo: a resolução (Matriz → regra econômica → Tabela de
+ * Preços → congelamento → idempotência) é exatamente a mesma.
+ */
+export interface EscopoGeracao {
+  /** projeta apenas este Documento Operacional */
+  documentoId?: number | null
+  /** origem a gravar na obrigação (default AUTOMATICO_DOCUMENTAL) */
+  origemLancamento?: string | null
+  /** evento de domínio que causou a projeção (rastreabilidade) */
+  eventoOrigemTipo?: string | null
+  eventoOrigemId?: number | null
+}
+
+/**
  * Gera os itens econômicos elegíveis pela Matriz numa fase/ciclo. Idempotente.
  * Mesmo ciclo = não duplica; novo ciclo = novo conjunto.
  */
 export async function gerarEconomicoDaMatriz(
   processoId: number, tipoProcessoId: number, phaseKey: string, phaseCycle = 1,
+  escopo: EscopoGeracao = {},
 ): Promise<ResultadoMatriz> {
   const criados: ItemEconomico[] = []
   const pulados: { motivo: string; detalhe?: string }[] = []
@@ -107,120 +82,81 @@ export async function gerarEconomicoDaMatriz(
   // Chaves que DEVEM existir (documento/serviço elegível AGORA) — base do reconcile.
   const esperados: string[] = []
 
-  const regras = await prisma.matrizDocumental.findMany({ where: { tipoProcessoId, phaseKey, arquivado: false } })
-  if (regras.length === 0) {
-    pulados.push({ motivo: `sem regra na Matriz para tipoProcesso ${tipoProcessoId} + fase "${phaseKey}"` })
-    return { criados, pulados, erros, esperados }
-  }
+  // RESOLUÇÃO ÚNICA — a mesma que a reconciliação usa para dizer o que falta.
+  // Ela decide QUEM, QUAL documento e QUAL componente, tudo por vínculo de
+  // cadastro. Aqui só se cria o que ela apontou.
+  const eleg = await resolverElegibilidadeDocumental(processoId, tipoProcessoId, phaseKey, phaseCycle, { documentoId: escopo.documentoId })
+  pulados.push(...eleg.pulados)
 
-  // Regras econômicas CONFIGURADAS p/ esta fase (tipo específico OU qualquer tipo).
-  const economicRules = await prisma.phaseEconomicRule.findMany({
-    where: { phaseKey, ativo: true, OR: [{ tipoProcessoId }, { tipoProcessoId: null }] },
-    orderBy: { ordem: 'asc' },
-  })
+  for (const el of eleg.itens) {
+    const componente = el.componente
+    const desc = `${componente} · ${el.pessoaNome}`
+    const base = el.chaveBase
 
-  const proc = await prisma.processo.findUnique({
-    where: { id: processoId },
-    select: { arvore: { select: { pessoas: { select: {
-      id: true, nome: true, sobrenome: true, linhaReta: true, casado: true, vivo: true,
-      documentos: { where: { status: { notIn: ['CANCELADO', 'INVALIDO'] } }, select: { id: true, tipo: true } },
-    } } } } },
-  })
-  const pessoas = (proc?.arvore?.pessoas ?? []) as PessoaMin[]
-  if (pessoas.length === 0) { pulados.push({ motivo: 'processo sem pessoas na árvore' }); return { criados, pulados, erros, esperados } }
+    // (c) dois preços INDEPENDENTES — a Configuração Financeira vem do componente.
+    const prodCusto = el.custoConfigId ? await prisma.produtoFinanceiro.findUnique({ where: { id: el.custoConfigId } }) : null
+    const prodReceita = el.receitaConfigId ? await prisma.produtoFinanceiro.findUnique({ where: { id: el.receitaConfigId } }) : null
 
-  for (const regra of regras) {
-    const econ = resolverRegraEconomica(economicRules, regra.documentTypeCode)
-    if (!econ) { pulados.push({ motivo: `fase "${phaseKey}" sem regra econômica configurada`, detalhe: `cadastre em PhaseEconomicRule (doc "${regra.documentTypeCode}")` }); continue }
-
-    const componente = econ.componentName
-
-    // (c) dois preços INDEPENDENTES — códigos vêm da regra configurada
-    // F2 — dual-read: FK real (custoConfigId/receitaConfigId) tem prioridade; código-texto = fallback legado.
-    const prodCusto = econ.custoConfigId
-      ? await prisma.produtoFinanceiro.findUnique({ where: { id: econ.custoConfigId } })
-      : econ.custoProdutoCode ? await prisma.produtoFinanceiro.findFirst({ where: { codigo: econ.custoProdutoCode, ativo: true } }) : null
-    const prodReceita = econ.receitaConfigId
-      ? await prisma.produtoFinanceiro.findUnique({ where: { id: econ.receitaConfigId } })
-      : econ.receitaProdutoCode ? await prisma.produtoFinanceiro.findFirst({ where: { codigo: econ.receitaProdutoCode, ativo: true } }) : null
-
+    // Só AQUI se escreve: o serviço do processo nasce quando há o que lançar.
     const tipoServico = await acharOuCriarTipoServico(processoId, componente)
-    const kw = tipoDocKeyword(regra.documentTypeCode)
-    if (!kw) { pulados.push({ motivo: `documentTypeCode "${regra.documentTypeCode}" não reconhecido` }); continue }
+    const vinc = { personId: el.pessoaId, documentoId: el.documentoId, tipoServicoId: tipoServico.id, phaseKey, phaseCycle }
+    const item: ItemEconomico = { pessoaId: el.pessoaId, documentoId: el.documentoId, componente }
 
-    // (b) quem é elegível vem da REGRA
-    for (const pessoa of selecionarPessoas(regra, pessoas)) {
-      // (B4) TRAVA DE ESTADO CIVIL — reusa a MESMA engine da árvore.
-      // Nascimento: sempre. Casamento: só se casado. Óbito: só se falecido.
-      // Mesmo que um doc "errado" exista na pessoa, o motor NÃO gera fora do estado civil.
-      const flags = analyzePessoa({ id: pessoa.id, nome: pessoa.nome, sobrenome: pessoa.sobrenome, casado: pessoa.casado, vivo: pessoa.vivo })
-      const permitido = kw === 'NASCIMENTO' ? flags.needsBirth : kw === 'CASAMENTO' ? flags.needsMarriage : kw === 'OBITO' ? flags.needsDeath : false
-      if (!permitido) { pulados.push({ motivo: `estado civil não exige ${kw.toLowerCase()}`, detalhe: `${pessoa.nome} ${pessoa.sobrenome ?? ''}`.trim() }); continue }
-
-      for (const doc of pessoa.documentos.filter((d) => String(d.tipo).includes(kw))) {
-        const nomePessoa = `${pessoa.nome} ${pessoa.sobrenome ?? ''}`.trim()
-        const desc = `${componente} · ${nomePessoa}`
-        const base = `${processoId}::${phaseKey}::c${phaseCycle}::matriz:${regra.id}::doc:${doc.id}` // (d) inclui ciclo
-        const vinc = { personId: pessoa.id, documentoId: doc.id, tipoServicoId: tipoServico.id, phaseKey, phaseCycle }
-        const item: ItemEconomico = { pessoaId: pessoa.id, documentoId: doc.id, componente }
-
-        if (regra.createsTask) {
-          await comIdempotencia(`${base}::tarefa`, processoId, tipoProcessoId, phaseKey, 'task', regra.id, 'Tarefa', `Solicitar ${componente} de ${nomePessoa}`,
-            async () => (await criarTarefaDeSpec({
-              titulo: `Solicitar ${componente} de ${nomePessoa}`, processoId,
-              observacoes: `Motor econômico (Matriz) · fase "${phaseKey}" · ciclo ${phaseCycle} · doc ${doc.id}`,
-            })).id,
-            (id) => { item.tarefaId = id }, pulados, erros)
+    if (el.criaTarefa) {
+      await comIdempotencia(`${base}::tarefa`, processoId, tipoProcessoId, phaseKey, 'task', el.regraId, 'Tarefa', `Solicitar ${componente} de ${el.pessoaNome}`,
+        async () => (await criarTarefaDeSpec({
+          titulo: `Solicitar ${componente} de ${el.pessoaNome}`, processoId,
+          observacoes: `Motor econômico (Matriz) · fase "${phaseKey}" · ciclo ${phaseCycle} · doc ${el.documentoId}`,
+        })).id,
+        (id) => { item.tarefaId = id }, pulados, erros)
+    }
+    // PREÇO-FONTE-ÚNICA (§5): a Configuração Financeira NÃO é preço. Resolve SÓ
+    // pela Tabela de Preços; sem fallback de valorPadrao; sem zero silencioso.
+    // Sem preço válido → PENDÊNCIA rastreável (não lança). Conflito de mesma
+    // precedência → BLOQUEIA + pendência. Sucesso → lança com preço CONGELADO.
+    if (el.criaCusto) {
+      if (!prodCusto) {
+        pulados.push({ motivo: 'regra gera CUSTO mas sem Configuração Financeira de custo', detalhe: componente })
+      } else {
+        const chave = `${base}::custo`
+        esperados.push(chave)
+        const rC = await resolverPrecoPorConfigDB(prodCusto.id, { processoId, tipoProcessoId: String(tipoProcessoId), natureza: NaturezaPreco.CUSTO })
+        const bloqueio = motivoBloqueio(rC)
+        if (bloqueio) {
+          await registrarPendencia({ chave, processoId, tipoProcessoId, phaseKey, phaseCycle, configId: prodCusto.id, regraId: el.regraId, natureza: NaturezaPreco.CUSTO, motivo: bloqueio.motivo, detalhe: `${componente}: ${bloqueio.detalhe}`, contexto: bloqueio.contexto }, pulados, erros)
+        } else {
+          // Sem conta contábil de cadastro: a classificação intermediária foi
+          // eliminada. O Ledger V3 usa o plano fixo em ledger/plano-contas.ts.
+          const cong = congelar(rC, NaturezaPreco.CUSTO, prodCusto.id, el.regraId, chave, { tipoProcessoId, phaseKey, phaseCycle })
+          await comIdempotencia(chave, processoId, tipoProcessoId, phaseKey, 'financial', el.regraId, 'ObrigacaoEconomica', desc,
+            () => criarCusto(processoId, desc, cong, { ...vinc, productServiceId: prodCusto.id }, escopo),
+            (id) => { item.custoId = id; item.custo = { valor: cong.valor, moeda: cong.moeda } }, pulados, erros)
+          // §13 — se havia pendência para esta chave, o reprocesso bem-sucedido a resolve.
+          await resolverPendenciaPorChave(`pend::${chave}`, 'Preço de custo resolvido e lançamento criado')
         }
-        // PREÇO-FONTE-ÚNICA (§5): a Configuração Financeira NÃO é preço. Resolve SÓ
-        // pela Tabela de Preços; sem fallback de valorPadrao; sem zero silencioso.
-        // Sem preço válido → PENDÊNCIA rastreável (não lança). Conflito de mesma
-        // precedência → BLOQUEIA + pendência. Sucesso → lança com preço CONGELADO.
-        if (regra.createsCost) {
-          if (!prodCusto) {
-            pulados.push({ motivo: 'regra gera CUSTO mas sem Configuração Financeira de custo', detalhe: componente })
-          } else {
-            const chave = `${base}::custo`
-            esperados.push(chave)
-            const rC = await resolverPrecoPorConfigDB(prodCusto.id, { processoId, tipoProcessoId: String(tipoProcessoId), natureza: NaturezaPreco.CUSTO })
-            const bloqueio = motivoBloqueio(rC)
-            if (bloqueio) {
-              await registrarPendencia({ chave, processoId, tipoProcessoId, phaseKey, phaseCycle, configId: prodCusto.id, regraId: regra.id, natureza: NaturezaPreco.CUSTO, motivo: bloqueio.motivo, detalhe: `${componente}: ${bloqueio.detalhe}`, contexto: bloqueio.contexto }, pulados, erros)
-            } else {
-              // Sem conta contábil de cadastro: a classificação intermediária foi
-              // eliminada. O Ledger V3 usa o plano fixo em ledger/plano-contas.ts.
-              const cong = congelar(rC, NaturezaPreco.CUSTO, prodCusto.id, regra.id, chave, { tipoProcessoId, phaseKey, phaseCycle })
-              await comIdempotencia(chave, processoId, tipoProcessoId, phaseKey, 'financial', regra.id, 'ObrigacaoEconomica', desc,
-                () => criarCusto(processoId, desc, cong, { ...vinc, productServiceId: prodCusto.id }),
-                (id) => { item.custoId = id; item.custo = { valor: cong.valor, moeda: cong.moeda } }, pulados, erros)
-              // §13 — se havia pendência para esta chave, o reprocesso bem-sucedido a resolve.
-              await resolverPendenciaPorChave(`pend::${chave}`, 'Preço de custo resolvido e lançamento criado')
-            }
-          }
-        }
-        if (regra.createsRevenue) {
-          if (!prodReceita) {
-            pulados.push({ motivo: 'regra gera RECEITA mas sem Configuração Financeira de receita', detalhe: componente })
-          } else {
-            const chave = `${base}::receita`
-            esperados.push(chave)
-            const rR = await resolverPrecoPorConfigDB(prodReceita.id, { processoId, tipoProcessoId: String(tipoProcessoId), natureza: NaturezaPreco.VENDA })
-            const bloqueio = motivoBloqueio(rR)
-            if (bloqueio) {
-              await registrarPendencia({ chave, processoId, tipoProcessoId, phaseKey, phaseCycle, configId: prodReceita.id, regraId: regra.id, natureza: NaturezaPreco.VENDA, motivo: bloqueio.motivo, detalhe: `${componente}: ${bloqueio.detalhe}`, contexto: bloqueio.contexto }, pulados, erros)
-            } else {
-              const cong = congelar(rR, NaturezaPreco.VENDA, prodReceita.id, regra.id, chave, { tipoProcessoId, phaseKey, phaseCycle })
-              await comIdempotencia(chave, processoId, tipoProcessoId, phaseKey, 'financial', regra.id, 'Receita', desc,
-                () => criarReceita(processoId, desc, cong, { ...vinc, productServiceId: prodReceita.id }),
-                (id) => { item.receitaId = id; item.receita = { valor: cong.valor, moeda: cong.moeda } }, pulados, erros)
-              // §13 — reprocesso bem-sucedido resolve a pendência da chave (se houver).
-              await resolverPendenciaPorChave(`pend::${chave}`, 'Preço de venda resolvido e lançamento criado')
-            }
-          }
-        }
-        if (item.tarefaId || item.custoId || item.receitaId) criados.push(item)
       }
     }
+    if (el.criaReceita) {
+      if (!prodReceita) {
+        pulados.push({ motivo: 'regra gera RECEITA mas sem Configuração Financeira de receita', detalhe: componente })
+      } else {
+        const chave = `${base}::receita`
+        esperados.push(chave)
+        const rR = await resolverPrecoPorConfigDB(prodReceita.id, { processoId, tipoProcessoId: String(tipoProcessoId), natureza: NaturezaPreco.VENDA })
+        const bloqueio = motivoBloqueio(rR)
+        if (bloqueio) {
+          await registrarPendencia({ chave, processoId, tipoProcessoId, phaseKey, phaseCycle, configId: prodReceita.id, regraId: el.regraId, natureza: NaturezaPreco.VENDA, motivo: bloqueio.motivo, detalhe: `${componente}: ${bloqueio.detalhe}`, contexto: bloqueio.contexto }, pulados, erros)
+        } else {
+          const cong = congelar(rR, NaturezaPreco.VENDA, prodReceita.id, el.regraId, chave, { tipoProcessoId, phaseKey, phaseCycle })
+          await comIdempotencia(chave, processoId, tipoProcessoId, phaseKey, 'financial', el.regraId, 'Receita', desc,
+            () => criarReceita(processoId, desc, cong, { ...vinc, productServiceId: prodReceita.id }),
+            (id) => { item.receitaId = id; item.receita = { valor: cong.valor, moeda: cong.moeda } }, pulados, erros)
+          // §13 — reprocesso bem-sucedido resolve a pendência da chave (se houver).
+          await resolverPendenciaPorChave(`pend::${chave}`, 'Preço de venda resolvido e lançamento criado')
+        }
+      }
+    }
+    if (item.tarefaId || item.custoId || item.receitaId) criados.push(item)
   }
   return { criados, pulados, erros, esperados }
 }
@@ -381,7 +317,7 @@ async function registrarPendencia(
   }
 }
 
-async function criarCusto(pid: number, descricao: string, c: Congelado, v: Vinc): Promise<number> {
+async function criarCusto(pid: number, descricao: string, c: Congelado, v: Vinc, escopo: EscopoGeracao = {}): Promise<number> {
   const codigo = await gerarCodigoCusto()
   const dataBase = new Date()
   // condição → vencimento (data1); parcelas eram do legado. Rastreabilidade do documento
@@ -394,12 +330,31 @@ async function criarCusto(pid: number, descricao: string, c: Congelado, v: Vinc)
   // de qual condição definiu o vencimento.
   const observacoes = `Custo do motor (Matriz)${docRef}: ${descricao}${ap.resumo}`.slice(0, 300)
   // V3-native: nasce DIRETO como ObrigacaoEconomica + Ledger. NÃO grava no model Custo legado.
+  // O VÍNCULO vai em coluna, não em texto: `observacoes` continua legível para quem lê
+  // a linha, mas quem PROJETA a Planilha lê documentoId/tipoServicoId/personId.
   const { obrigacaoId } = await criarObrigacaoEconomicaComLedger({
     natureza: 'CUSTO', valorContratado: Number(c.valor), moedaContratual: String(c.moeda), codigoOperacional: codigo,
     processoId: pid, regraFinanceiraId: c.regraFinanceiraId ?? null, vencimento: ap.data1, observacoes,
     origemTipo: 'nativo', origemId: null, criadoPorId: null,
+    vinculo: vinculoDocumental(c, v, escopo),
   })
   return obrigacaoId
+}
+
+/** Vínculo + snapshot que a obrigação passa a carregar (tudo por ID). */
+function vinculoDocumental(c: Congelado, v: Vinc, escopo: EscopoGeracao): VinculoDocumental {
+  return {
+    personId: v.personId, documentoId: v.documentoId, tipoServicoId: v.tipoServicoId,
+    phaseKey: v.phaseKey, phaseCycle: v.phaseCycle,
+    configFinanceiraId: v.productServiceId ?? c.configId,
+    origemLancamento: escopo.origemLancamento ?? ORIGEM_AUTOMATICA,
+    eventoOrigemTipo: escopo.eventoOrigemTipo ?? null,
+    eventoOrigemId: escopo.eventoOrigemId ?? null,
+    pricingRuleId: c.tabelaValorId, valorUnitario: c.valorUnitario, quantidade: c.quantidade,
+    modoCalculoAplicado: c.modoCalculo, naturezaPreco: c.natureza,
+    contextoAplicado: c.contexto, dataReferencia: c.dataReferencia,
+    chaveIdempotencia: c.chaveIdempotencia,
+  }
 }
 
 async function criarReceita(pid: number, descricao: string, c: Congelado, v: Vinc): Promise<number> {

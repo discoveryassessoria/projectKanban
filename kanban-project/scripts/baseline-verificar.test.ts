@@ -101,7 +101,27 @@ const MIGRATION = join(DIR_MIGRATIONS, '0000_baseline', 'migration.sql')
 // checksum anterior no WHERE, para nao acertar linha errada) -> `prisma migrate
 // status` = "Database schema is up to date". Nenhuma outra migration foi tocada;
 // nenhum dado de negocio foi lido ou alterado.
-const CHECKSUM_LEDGER = '62e887f885d8725aad4a7359ba857fff2e457deffa96d8624139c0ca1e8c0e94'
+// ATUALIZACAO 06/08/2026 (vinculo documental do custo) — migration ADITIVA
+// 20260806_custo_documental_vinculo: 17 colunas novas em ObrigacaoEconomica
+// (vinculo pessoa/documento/servico/fase + origem do lancamento + snapshot de
+// preco + chaveIdempotencia), 1 unique e 3 indices. Diff do baseline: 30 linhas
+// inseridas, ZERO removidas, ZERO DROP/TRUNCATE/DELETE (a unica linha alterada e
+// a data do cabecalho gerado). Nenhuma tabela existente foi tocada.
+//
+//   anterior : 62e887f885d8725aad4a7359ba857fff2e457deffa96d8624139c0ca1e8c0e94
+//   atual    : 597b1cd360c5871297e7475528074aa8f639ba3bbf00c1c8206254e37d775bb8
+//
+// Procedimento executado: backup do ledger em
+// ~/.discovery-backups/prisma-migrations-20260806-pre-checksum.json (9 linhas,
+// todas com finished_at) -> conferencia do diff do baseline por `git diff
+// --numstat` (30 insercoes / 1 alteracao de cabecalho / 0 remocoes) e por busca
+// de DROP|TRUNCATE|DELETE nas linhas adicionadas (nenhuma) -> UPDATE de UMA
+// coluna na linha 0000_baseline, com o checksum anterior no WHERE (1 linha
+// afetada, conferida) -> `prisma migrate status` = 10 migrations encontradas,
+// nenhuma acusada como modificada, apenas 20260806_custo_documental_vinculo
+// pendente de aplicacao. Nenhuma outra migration foi tocada; nenhum dado de
+// negocio foi lido ou alterado.
+const CHECKSUM_LEDGER = '597b1cd360c5871297e7475528074aa8f639ba3bbf00c1c8206254e37d775bb8'
 
 /**
  * Migrations criadas DEPOIS da consolidacao de 02/08/2026. Toda migration nova
@@ -117,6 +137,7 @@ const MIGRATIONS_POS_BASELINE: string[] = [
   '20260804b_requerimento_doc21_vinculo',
   '20260804c_contrato_documental',
   '20260805_modelos_documentais',
+  '20260806_custo_documental_vinculo',
 ]
 
 const sha256 = (t: string) => createHash('sha256').update(t).digest('hex')

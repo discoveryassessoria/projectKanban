@@ -10,6 +10,7 @@ import { prisma } from '@/lib/prisma'
 import { criarObrigacaoEconomicaComLedger } from '../ledger/ledger-service'
 import { resolverDistribuicao, type Natureza, type ModoDistribuicao } from '../dominio/obrigacao-economica'
 import { registrarOcorrencia } from '../ocorrencias/ocorrencia-service'
+import { ORIGEM_MANUAL } from '../dominio/origem-lancamento'
 
 export interface EntradaLancamentoExtra {
   natureza: Natureza
@@ -49,6 +50,10 @@ export async function criarLancamentoExtra(e: EntradaLancamentoExtra) {
     origemTipo: 'nativo',
     origemId: null,
     criadoPorId: e.criadoPorId ?? null,
+    // ORIGEM DECLARADA: este é o caminho do lançamento feito por uma pessoa
+    // (inclusive o botão "Novo Custo"). Declarar aqui é o que permite à lista e à
+    // planilha separarem despesa extraordinária de custo documental sem adivinhar.
+    vinculo: { origemLancamento: ORIGEM_MANUAL },
   })
 
   // distribuição econômica flexível (independente de quem paga)

@@ -5,7 +5,7 @@
 --   corpo        → gerado do prisma/schema.prisma
 --   bloco manual → prisma/baseline/bloco-manual.sql (edite LÁ)
 --
--- Gerado em : 2026-08-05
+-- Gerado em : 2026-08-06
 -- Prisma    : 6.19.3
 --
 -- PARA QUE SERVE: reconstruir o banco DO ZERO. O histórico de migrations NÃO
@@ -2980,6 +2980,23 @@ CREATE TABLE "ObrigacaoEconomica" (
     "criadoPorId" INTEGER,
     "criadoEm" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "atualizadoEm" TIMESTAMP(3) NOT NULL,
+    "personId" INTEGER,
+    "documentoId" INTEGER,
+    "tipoServicoId" INTEGER,
+    "phaseKey" VARCHAR(60),
+    "phaseCycle" INTEGER,
+    "configFinanceiraId" INTEGER,
+    "origemLancamento" VARCHAR(28),
+    "eventoOrigemTipo" VARCHAR(40),
+    "eventoOrigemId" INTEGER,
+    "pricingRuleId" INTEGER,
+    "valorUnitario" DECIMAL(14,2),
+    "quantidade" INTEGER,
+    "modoCalculoAplicado" VARCHAR(30),
+    "naturezaPreco" VARCHAR(10),
+    "contextoAplicado" JSONB,
+    "dataReferencia" TIMESTAMP(3),
+    "chaveIdempotencia" VARCHAR(200),
 
     CONSTRAINT "ObrigacaoEconomica_pkey" PRIMARY KEY ("id")
 );
@@ -5220,6 +5237,9 @@ CREATE INDEX "OperacaoAntecipada_status_idx" ON "OperacaoAntecipada"("status");
 CREATE UNIQUE INDEX "OperacaoAntecipada_processoId_necessidadeId_targetOperation_key" ON "OperacaoAntecipada"("processoId", "necessidadeId", "targetOperationType", "targetTipoDocumentoId");
 
 -- CreateIndex
+CREATE UNIQUE INDEX "ObrigacaoEconomica_chaveIdempotencia_key" ON "ObrigacaoEconomica"("chaveIdempotencia");
+
+-- CreateIndex
 CREATE INDEX "ObrigacaoEconomica_processoId_idx" ON "ObrigacaoEconomica"("processoId");
 
 -- CreateIndex
@@ -5233,6 +5253,15 @@ CREATE INDEX "ObrigacaoEconomica_codigoOperacional_idx" ON "ObrigacaoEconomica"(
 
 -- CreateIndex
 CREATE INDEX "ObrigacaoEconomica_itemCatalogoId_idx" ON "ObrigacaoEconomica"("itemCatalogoId");
+
+-- CreateIndex
+CREATE INDEX "ObrigacaoEconomica_documentoId_idx" ON "ObrigacaoEconomica"("documentoId");
+
+-- CreateIndex
+CREATE INDEX "ObrigacaoEconomica_personId_idx" ON "ObrigacaoEconomica"("personId");
+
+-- CreateIndex
+CREATE INDEX "ObrigacaoEconomica_processoId_documentoId_tipoServicoId_idx" ON "ObrigacaoEconomica"("processoId", "documentoId", "tipoServicoId");
 
 -- CreateIndex
 CREATE UNIQUE INDEX "ObrigacaoEconomica_origemTipo_origemId_key" ON "ObrigacaoEconomica"("origemTipo", "origemId");
