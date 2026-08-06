@@ -36,6 +36,17 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
       if (!NATUREZAS.includes(b.natureza)) {
         return NextResponse.json({ error: `Natureza "${b.natureza}" não existe mais no Cadastro Mestre. Use uma das oficiais: ${NATUREZAS.join(', ')}.` }, { status: 400 })
       }
+      // Virar SERVIÇO por aqui produziria um serviço sem portador de SRV-n (o
+      // código vive em ServicoProduto.publicCode). Item que JÁ é o espelho de um
+      // serviço passa — nesse caso a natureza só está sendo reafirmada.
+      if (b.natureza === NaturezaItem.SERVICO) {
+        const temServico = await prisma.servicoProduto.count({ where: { itemCatalogoId: parseInt(id) } })
+        if (temServico === 0) {
+          return NextResponse.json({
+            error: 'Um item do mestre não vira serviço por edição — o serviço nasce no Catálogo de Serviços, que gera o código SRV-n.',
+          }, { status: 400 })
+        }
+      }
       data.natureza = b.natureza
     }
     if (b.unidade !== undefined && UNIDADES.includes(b.unidade)) data.unidade = b.unidade
