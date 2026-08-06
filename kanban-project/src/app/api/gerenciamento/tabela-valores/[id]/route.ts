@@ -54,6 +54,10 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
     if (b.configuracaoFinanceiraItemId !== undefined && Number(b.configuracaoFinanceiraItemId) !== atual.configuracaoFinanceiraItemId) {
       return NextResponse.json({ error: 'Não é permitido trocar a Configuração Financeira de um preço existente. Crie um novo preço e arquive este.' }, { status: 400 })
     }
+    // Mesma regra pelo vínculo canônico do item (é o que a tela envia hoje).
+    if (b.itemCatalogoId !== undefined && atual.itemCatalogoId != null && Number(b.itemCatalogoId) !== atual.itemCatalogoId) {
+      return NextResponse.json({ error: 'Não é permitido trocar o item de um preço existente. Crie um novo preço e arquive este.' }, { status: 400 })
+    }
     // ESTRATÉGIA efetiva (modoCalculo canônico). A UNIDADE é escolhida pelo usuário
     // (enum UnidadeItem) — NÃO é mais derivada do modo.
     const modoFinal = b.modoCalculo !== undefined ? (b.modoCalculo ? String(b.modoCalculo) : '') : atual.modoCalculo

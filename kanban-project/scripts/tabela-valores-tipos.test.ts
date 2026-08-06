@@ -63,7 +63,7 @@ secao('4) Tipos oficiais e UX')
   ok('busca no campo Item', tela.includes('Buscar item por nome ou código'))
   ok('estado vazio correto', tela.includes('Nenhum item encontrado para esta busca') && tela.includes('Nenhum item ativo de'))
   ok('exibe código público só para apresentação', tela.includes('${c.codigo}'))
-  ok('Salvar desabilitado sem item válido', tela.includes('disabled={salvando || (!form.itemCatalogoId && !form.configuracaoFinanceiraItemId)}'))
+  ok('Salvar desabilitado sem item válido', tela.includes('disabled={salvando || !form.itemCatalogoId}'))
   ok('erro mantém o formulário preenchido', tela.includes('setErroModal'))
 }
 

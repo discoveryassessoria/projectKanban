@@ -22,7 +22,7 @@ type Item = {
   id: number; name: string
   // O papel (CUSTO/RECEITA) vive no PRÓPRIO preço, não na config.
   natureza: string | null
-  itemCatalogoId?: number
+  itemCatalogoId?: number | null
   codigo?: string | null
   configuracaoFinanceiraItemId: number | null
   configuracaoFinanceiraItem?: CfgEmbed | null
@@ -41,6 +41,23 @@ type Item = {
   prioridade: number
   arquivado: boolean
   fornecedor?: FornecedorRef | null
+}
+
+// Item ofertável no seletor — a linha que o GET devolve em `configs`. `id` é a
+// Configuração Financeira e é NULA enquanto o item nunca foi precificado; o que
+// identifica o item é sempre `itemCatalogoId`.
+type ItemOfertavel = {
+  itemCatalogoId: number
+  natureza: string
+  mestre: string
+  codigo: string | null
+  categoria: string | null
+  unidade: string | null
+  id: number | null
+  possuiCusto: boolean
+  possuiReceita: boolean
+  moedaPadrao: string | null
+  label: string
 }
 
 const MOEDAS: [string, string][] = [['EUR', 'EUR'], ['BRL', 'BRL'], ['USD', 'USD']]
@@ -94,8 +111,12 @@ const rotuloValorUnico = (modo: string, u: string) => {
 
 const EMPTY = {
   categoria: '', // filtro de navegação (origem estrutural) — NÃO enviado no payload
+  // ÚNICO campo de vínculo do item — fonte da verdade do formulário, da validação,
+  // do que a tela exibe e do que o payload envia. A Configuração Financeira NÃO é
+  // estado desta tela: ela é resolvida (find-or-create) pelo backend a partir deste
+  // id. Mantê-la aqui criava uma segunda fonte da verdade que ficava vazia sempre
+  // que o item ainda não tinha config — e travava o cadastro.
   itemCatalogoId: '',     // identidade OFICIAL do item precificado
-  configuracaoFinanceiraItemId: '',
   // Naturezas do domínio (apenas duas). Cada uma marcada = 1 registro; ambas = 2 registros.
   precoCusto: false, precoVenda: false,
   // Custo: fornecedor + moeda + valor. Venda: moeda + valor (registros independentes).
@@ -110,6 +131,14 @@ const EMPTY = {
   vigenciaInicio: '', vigenciaFim: '', arquivado: false,
 }
 type FormState = typeof EMPTY
+
+// Campos que só fazem sentido depois de um item escolhido — limpos junto com ele
+// quando o item sai (troca de tipo ou "Selecione um item").
+const SEM_ITEM: Partial<FormState> = {
+  itemCatalogoId: '', precoCusto: false, precoVenda: false,
+  moeda: '', valor: '', moedaVenda: '', valorVenda: '',
+  valorBase: '', valorAdicional: '', valorBaseVenda: '', valorAdicionalVenda: '', fornecedorId: '',
+}
 
 // Identidade estável para a ausência de dados (evita recomputar memos).
 const SEM_ITENS: never[] = Object.freeze([]) as never[]
@@ -128,9 +157,9 @@ export default function TabelaValoresTab() {
 
   // UMA consulta, várias listas derivadas da MESMA resposta — o endpoint já
   // devolve tudo junto. loading/erro vêm da camada; nada de setState em efeito.
-  const { dados, carregando: loading, erro, recarregar: carregar } = useApi<{ tabelaValores?: Item[], configs?: any[], fornecedores?: any[] }>('/api/gerenciamento/tabela-valores')
+  const { dados, carregando: loading, erro, recarregar: carregar } = useApi<{ tabelaValores?: Item[], configs?: ItemOfertavel[], fornecedores?: any[] }>('/api/gerenciamento/tabela-valores')
   const itens: Item[] = dados?.tabelaValores ?? SEM_ITENS
-  const configs: any[] = dados?.configs ?? SEM_ITENS
+  const configs: ItemOfertavel[] = dados?.configs ?? SEM_ITENS
   const fornecedores: any[] = dados?.fornecedores ?? SEM_ITENS
   const erroLista = erro ? (erro.message || 'Não foi possível carregar os preços.') : null
 
@@ -143,7 +172,20 @@ export default function TabelaValoresTab() {
     })
   }, [itens, busca])
 
-  const cfgSelecionada = configs.find((c) => String(c.id) === form.configuracaoFinanceiraItemId) || null
+  // ITEM SELECIONADO — resolvido pelo MESMO id que o formulário grava e envia.
+  // Antes isto era resolvido pela Configuração Financeira (`c.id`), que é NULA para
+  // todo item ainda não precificado (hoje, em produção, TODO Documento Mestre): o
+  // item ficava escolhido no select e o resto da tela continuava achando que nada
+  // havia sido selecionado — naturezas desabilitadas, cadastro impossível.
+  const itemSelecionado = configs.find((c) => String(c.itemCatalogoId) === form.itemCatalogoId) ?? null
+  // Rótulo exibido: SEMPRE derivado do id vinculado, nunca de texto digitado. Em
+  // edição o item é imutável e pode nem estar mais entre os ofertáveis — aí o
+  // rótulo vem do próprio registro.
+  const rotuloItemVinculado = itemSelecionado
+    ? `${itemSelecionado.mestre}${itemSelecionado.codigo ? ` · ${itemSelecionado.codigo}` : ''}`
+    : editando
+      ? origemMestre(editando.configuracaoFinanceiraItem).mestre
+      : null
   // Categorias = origens ESTRUTURAIS distintas presentes nas configs (dinâmico, sem categorias fictícias).
   // Documentos/Serviços primeiro; demais origens reais depois, em ordem alfabética.
   const categorias = useMemo(() => {
@@ -163,12 +205,15 @@ export default function TabelaValoresTab() {
       .sort((a, b) => a.mestre.localeCompare(b.mestre))
   }, [configs, form.categoria, buscaItem])
 
-  function abrirNovo() { setEditando(null); setForm(EMPTY); setErroModal(null); setModalAberto(true) }
+  function abrirNovo() { setEditando(null); setForm(EMPTY); setBuscaItem(''); setErroModal(null); setModalAberto(true) }
   function abrirEditar(i: Item) {
     setEditando(i)
-    // Categoria derivada da ORIGEM estrutural da config vinculada (nunca por texto).
-    const daConfig = configs.find((c) => c.id === i.configuracaoFinanceiraItemId)
-    const categoria = daConfig?.natureza ?? ''
+    // Item vinculado do registro: o id canônico é o do PRÓPRIO preço; a lista de
+    // ofertáveis só serve para descobrir o TIPO (natureza) do item.
+    const itemCatalogoId = i.itemCatalogoId ?? configs.find((c) => c.id === i.configuracaoFinanceiraItemId)?.itemCatalogoId ?? null
+    const doItem = itemCatalogoId != null ? configs.find((c) => c.itemCatalogoId === itemCatalogoId) : undefined
+    // Categoria derivada da natureza ESTRUTURAL do item (nunca por texto).
+    const categoria = doItem?.natureza ?? i.configuracaoFinanceiraItem?.itemCatalogo?.natureza ?? ''
     // Edição é sempre de UM registro individual: exatamente uma natureza (RECEITA legado ≡ VENDA).
     const ehVenda = i.natureza === 'VENDA' || i.natureza === 'RECEITA'
     const valorStr = i.valor != null ? String(i.valor) : ''
@@ -176,8 +221,7 @@ export default function TabelaValoresTab() {
     const adicStr = i.valorAdicional != null ? String(i.valorAdicional) : ''
     setForm({
       categoria,
-      itemCatalogoId: daConfig?.itemCatalogoId ? String(daConfig.itemCatalogoId) : '',
-      configuracaoFinanceiraItemId: i.configuracaoFinanceiraItemId ? String(i.configuracaoFinanceiraItemId) : '',
+      itemCatalogoId: itemCatalogoId != null ? String(itemCatalogoId) : '',
       precoCusto: i.natureza === 'CUSTO', precoVenda: ehVenda,
       // Custo usa fornecedor/moeda/valor; Venda usa moedaVenda/valorVenda.
       fornecedorId: i.fornecedorId ? String(i.fornecedorId) : '',
@@ -194,12 +238,33 @@ export default function TabelaValoresTab() {
       vigenciaInicio: i.vigenciaInicio || '', vigenciaFim: i.vigenciaFim || '',
       arquivado: i.arquivado,
     })
-    setErroModal(null); setModalAberto(true)
+    setBuscaItem(''); setErroModal(null); setModalAberto(true)
+  }
+
+  // SELEÇÃO DO ITEM — um único ponto de gravação: id canônico no formulário.
+  // Selecionar habilita as naturezas (a lista já diz quais o item admite) e limpa
+  // o erro de validação; desmarcar limpa tudo que dependia do item.
+  function selecionarItem(id: string) {
+    const c = configs.find((x) => String(x.itemCatalogoId) === id) ?? null
+    if (!c) { setForm((f) => ({ ...f, ...SEM_ITEM })); setErroModal(null); return }
+    setForm((f) => ({
+      ...f,
+      itemCatalogoId: String(c.itemCatalogoId),
+      moeda: f.moeda || (c.moedaPadrao ?? ''),
+      moedaVenda: f.moedaVenda || (c.moedaPadrao ?? ''),
+      // marca por padrão as naturezas que o item habilita quando só uma;
+      // ambas habilitadas → deixa o usuário escolher os checkboxes.
+      precoCusto: c.possuiCusto && !c.possuiReceita,
+      precoVenda: c.possuiReceita && !c.possuiCusto,
+    }))
+    setErroModal(null)
   }
 
   async function salvar() {
     if (!form.categoria) { setErroModal('Selecione o tipo de item.'); return }
-    if (!form.itemCatalogoId && !form.configuracaoFinanceiraItemId) { setErroModal('Selecione o item.'); return }
+    // Vínculo do item = um único campo canônico. Se ele está preenchido, o item
+    // está vinculado — não existe segunda condição para "reconhecer" a seleção.
+    if (!form.itemCatalogoId) { setErroModal('Selecione o item.'); return }
     if (!form.precoCusto && !form.precoVenda) { setErroModal('Marque pelo menos uma natureza: Preço de Custo e/ou Preço de Venda.'); return }
     // "Válido a partir de" é obrigatório (início da validade comercial).
     if (!form.vigenciaInicio) { setErroModal('Informe "Válido a partir de".'); return }
@@ -249,8 +314,12 @@ export default function TabelaValoresTab() {
         : { natureza: 'VENDA', ...blocoVenda, fornecedorId: null }
       const body = JSON.stringify({
         ...compartilhados,
+        // VÍNCULO: só o ID canônico do item. A Configuração Financeira é resolvida
+        // (ou criada) pelo backend a partir dele — a tela não a carrega nem a envia.
+        // Nenhum nome, código ou rótulo é enviado como vínculo.
         itemCatalogoId: Number(form.itemCatalogoId),
-        ...(form.configuracaoFinanceiraItemId ? { configuracaoFinanceiraItemId: Number(form.configuracaoFinanceiraItemId) } : {}),
+        // TIPO só para o backend VALIDAR a compatibilidade tipo × item. Não é persistido.
+        itemTipo: form.categoria,
         prioridade: 0, // não editável — fonte única de vigência dispensa prioridade
         ...(editando
           ? editPayload
@@ -275,6 +344,10 @@ export default function TabelaValoresTab() {
   }
 
   const inputCls = 'w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-white placeholder-white/30 outline-none focus:border-white/20'
+  // Naturezas só existem depois de um item vinculado — e é o ITEM que diz quais admite.
+  const itemVinculado = !!form.itemCatalogoId
+  const podeCusto = !!itemSelecionado?.possuiCusto
+  const podeVenda = !!itemSelecionado?.possuiReceita
 
   return (
     <div className="space-y-5">
@@ -359,15 +432,19 @@ export default function TabelaValoresTab() {
               <button onClick={() => setModalAberto(false)} className="text-white/40 transition hover:text-white">✕</button>
             </div>
             <div className="space-y-4 px-6 py-4">
-              {/* Configuração Financeira via dois selects DEPENDENTES (sem digitação livre).
-                  Categoria = origem estrutural (filtro de navegação); Item = a config em si. */}
+              {/* Item via dois selects DEPENDENTES (sem digitação livre). Tipo = natureza
+                  do item (filtro de navegação); Item = o id canônico gravado. */}
               <div className="grid grid-cols-[35fr_65fr] gap-3">
                 <div>
                   <label className="mb-1 block text-xs text-white/60">Tipo de item *</label>
                   <select
+                    aria-label="Tipo de item"
                     value={form.categoria}
                     disabled={!!editando}
-                    onChange={(e) => { setBuscaItem(''); setForm((f) => ({ ...f, categoria: e.target.value, itemCatalogoId: '', configuracaoFinanceiraItemId: '', precoCusto: false, precoVenda: false, moeda: '', valor: '', moedaVenda: '', valorVenda: '', valorBase: '', valorAdicional: '', valorBaseVenda: '', valorAdicionalVenda: '', fornecedorId: '' })) }}
+                    // Trocar o tipo derruba o item anterior e tudo que dependia dele
+                    // (naturezas, moedas, valores, fornecedor) — nunca resta um item
+                    // incompatível com o tipo escolhido.
+                    onChange={(e) => { setBuscaItem(''); setErroModal(null); setForm((f) => ({ ...f, ...SEM_ITEM, categoria: e.target.value })) }}
                     // (unidade e estratégia preservadas — não dependem do tipo)
                     className={inputCls + (editando ? ' cursor-not-allowed opacity-60' : '')}
                   >
@@ -386,26 +463,12 @@ export default function TabelaValoresTab() {
                       className={inputCls + ' mb-1.5'}
                     />
                   )}
+                  {/* value e option carregam o MESMO id canônico que o formulário grava. */}
                   <select
+                    aria-label="Item"
                     value={form.itemCatalogoId}
                     disabled={!form.categoria || !!editando}
-                    onChange={(e) => {
-                      const id = e.target.value
-                      const c = configs.find((x) => String(x.itemCatalogoId) === id)
-                      setForm((f) => ({
-                        ...f,
-                        itemCatalogoId: id,
-                        // Config existente vai junto quando houver; sem ela, o
-                        // backend cria a config oficial ao salvar.
-                        configuracaoFinanceiraItemId: c?.id ? String(c.id) : '',
-                        moeda: f.moeda || (c?.moedaPadrao ?? ''),
-                        moedaVenda: f.moedaVenda || (c?.moedaPadrao ?? ''),
-                        // marca por padrão as naturezas que a config habilita quando só uma;
-                        // ambas habilitadas → deixa o usuário escolher os checkboxes.
-                        precoCusto: c ? (c.possuiCusto && !c.possuiReceita) : f.precoCusto,
-                        precoVenda: c ? (c.possuiReceita && !c.possuiCusto) : f.precoVenda,
-                      }))
-                    }}
+                    onChange={(e) => selecionarItem(e.target.value)}
                     className={inputCls + ((!form.categoria || editando) ? ' cursor-not-allowed opacity-60' : '')}
                   >
                     <option value="" className="bg-zinc-900">
@@ -415,38 +478,50 @@ export default function TabelaValoresTab() {
                           ? (buscaItem ? 'Nenhum item encontrado para esta busca' : `Nenhum item ativo de ${tipoItemLabel(form.categoria).toLowerCase()}`)
                           : 'Selecione um item'}
                     </option>
+                    {/* Em edição o item é imutável e pode estar fora da lista de ofertáveis
+                        (inativo, por exemplo): a opção do próprio registro garante que o
+                        campo mostre o item vinculado em vez de ficar vazio. */}
+                    {editando && form.itemCatalogoId && !itemSelecionado && (
+                      <option value={form.itemCatalogoId} className="bg-zinc-900">{rotuloItemVinculado}</option>
+                    )}
                     {itensDaCategoria.map((c) => (
                       <option key={c.itemCatalogoId} value={c.itemCatalogoId} className="bg-zinc-900">
                         {c.mestre}{c.codigo ? ` · ${c.codigo}` : ''}
                       </option>
                     ))}
                   </select>
-                  {form.categoria && itensDaCategoria.length === 0 && (
+                  {/* Confirmação do VÍNCULO — o que a tela mostra é o item resolvido pelo id. */}
+                  {itemVinculado && rotuloItemVinculado && (
+                    <p className="mt-1 text-[11px] text-emerald-300/80">Item vinculado: {rotuloItemVinculado}</p>
+                  )}
+                  {form.categoria && !editando && itensDaCategoria.length === 0 && (
                     <p className="mt-1 text-[11px] text-white/40">Nenhum item nesta categoria. Cadastre a Configuração Financeira do mestre.</p>
                   )}
                 </div>
               </div>
 
               {/* Naturezas do preço — DUAS independentes (não existe "AMBOS"). Marcar as duas
-                  apenas cria dois registros (CUSTO e VENDA) na mesma transação atômica. */}
+                  apenas cria dois registros (CUSTO e VENDA) na mesma transação atômica.
+                  Habilitadas assim que existe item vinculado: quem diz o que o item admite
+                  é o próprio item (a config, quando ainda não existe, nasce ao salvar). */}
               <div>
                 <label className="mb-1 block text-xs text-white/60">Natureza do preço *</label>
                 <div className="flex flex-wrap gap-x-6 gap-y-2">
-                  <label className={`flex items-center gap-2 text-sm ${(!cfgSelecionada || editando || (cfgSelecionada && !cfgSelecionada.possuiCusto)) ? 'cursor-not-allowed text-white/30' : 'text-white/80'}`}>
+                  <label className={`flex items-center gap-2 text-sm ${(!itemVinculado || editando || !podeCusto) ? 'cursor-not-allowed text-white/30' : 'text-white/80'}`}>
                     <input type="checkbox" checked={form.precoCusto}
-                      disabled={!cfgSelecionada || !!editando || (!!cfgSelecionada && !cfgSelecionada.possuiCusto)}
+                      disabled={!itemVinculado || !!editando || !podeCusto}
                       onChange={(e) => set('precoCusto', e.target.checked)} className="h-4 w-4 accent-amber-500" />
                     Preço de Custo
                   </label>
-                  <label className={`flex items-center gap-2 text-sm ${(!cfgSelecionada || editando || (cfgSelecionada && !cfgSelecionada.possuiReceita)) ? 'cursor-not-allowed text-white/30' : 'text-white/80'}`}>
+                  <label className={`flex items-center gap-2 text-sm ${(!itemVinculado || editando || !podeVenda) ? 'cursor-not-allowed text-white/30' : 'text-white/80'}`}>
                     <input type="checkbox" checked={form.precoVenda}
-                      disabled={!cfgSelecionada || !!editando || (!!cfgSelecionada && !cfgSelecionada.possuiReceita)}
+                      disabled={!itemVinculado || !!editando || !podeVenda}
                       onChange={(e) => set('precoVenda', e.target.checked)} className="h-4 w-4 accent-emerald-500" />
                     Preço de Venda
                   </label>
                 </div>
-                {!cfgSelecionada && <p className="mt-1 text-[11px] text-white/40">Selecione um item para escolher as naturezas.</p>}
-                {cfgSelecionada && !cfgSelecionada.possuiCusto && !cfgSelecionada.possuiReceita && (
+                {!itemVinculado && <p className="mt-1 text-[11px] text-white/40">Selecione um item para escolher as naturezas.</p>}
+                {itemVinculado && itemSelecionado && !podeCusto && !podeVenda && (
                   <p className="mt-1 text-[11px] text-amber-300/80">Esta configuração não habilita custo nem venda. Ajuste a Natureza Financeira em Configurações Financeiras.</p>
                 )}
               </div>
@@ -590,12 +665,13 @@ export default function TabelaValoresTab() {
             </div>
             <div className="flex items-center justify-end gap-2 border-t border-white/10 px-6 py-4">
               <button onClick={() => setModalAberto(false)} className="rounded-lg px-4 py-2 text-sm text-white/60 transition hover:text-white">Cancelar</button>
-              {/* Sem item oficial selecionado não há o que salvar — o botão diz
-                  isso antes do clique, em vez de deixar o operador descobrir no erro. */}
+              {/* Sem item oficial vinculado não há o que salvar — o botão diz
+                  isso antes do clique, em vez de deixar o operador descobrir no erro.
+                  A condição é a MESMA do vínculo: um único campo canônico. */}
               <button
                 onClick={salvar}
-                disabled={salvando || (!form.itemCatalogoId && !form.configuracaoFinanceiraItemId)}
-                title={!form.itemCatalogoId && !form.configuracaoFinanceiraItemId ? 'Selecione o tipo e o item primeiro' : undefined}
+                disabled={salvando || !form.itemCatalogoId}
+                title={!form.itemCatalogoId ? 'Selecione o tipo e o item primeiro' : undefined}
                 className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-blue-500 disabled:opacity-50"
               >{salvando ? 'Salvando...' : 'Salvar'}</button>
             </div>

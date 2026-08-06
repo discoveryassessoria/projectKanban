@@ -237,7 +237,8 @@
     "test:codigo-cliente": "tsx scripts/codigo-cliente.test.ts",
     "cadastrar:regras-genealogia": "tsx prisma/cadastrar-regras-genealogia.ts",
     "cadastrar:regras-genealogia:execute": "tsx prisma/cadastrar-regras-genealogia.ts --execute",
-    "test:genealogia-regras": "tsx scripts/genealogia-regras-canonicas.test.ts"
+    "test:genealogia-regras": "tsx scripts/genealogia-regras-canonicas.test.ts",
+    "test:tabela-valores-vinculo": "tsx scripts/tabela-valores-vinculo.test.ts"
   },
   "prisma": {
     "seed": "npm run guard:escrita && tsx prisma/seed.ts"

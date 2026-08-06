@@ -145,15 +145,25 @@ export async function POST(request: NextRequest) {
     // exigir um cadastro prévio que o operador não teria como adivinhar.
     let configId = toIntOrNull(b.configuracaoFinanceiraItemId)
     const itemCatalogoId = toIntOrNull(b.itemCatalogoId)
-    if (!configId && itemCatalogoId) {
+    // TIPO DE ITEM declarado pela tela — usado só para VALIDAR o vínculo (não é
+    // persistido). Se o tipo escolhido não bate com a natureza real do item, o
+    // pedido é recusado: nada de resolver por aproximação ou aceitar em silêncio.
+    const itemTipo = toStrOrNull(b.itemTipo)?.toUpperCase() ?? null
+    const tipoIncompativel = (natureza: string, tipo: string) =>
+      NextResponse.json({ error: `Item incompatível com o tipo selecionado: o item é de natureza ${natureza}, e o tipo escolhido foi ${tipo}.` }, { status: 400 })
+    if (itemCatalogoId) {
       const item = await prisma.itemCatalogo.findUnique({
         where: { id: itemCatalogoId },
         select: { id: true, name: true, ativo: true, natureza: true },
       })
+      // O vínculo é sempre por ID: item inexistente é erro, nunca busca por nome.
       if (!item) return NextResponse.json({ error: `Item do catálogo inexistente (#${itemCatalogoId}).` }, { status: 400 })
       if (!item.ativo) return NextResponse.json({ error: 'Item inativo não pode receber preço.' }, { status: 400 })
-      const criada = await garantirConfigFinanceiraDeItem(prisma, { itemCatalogoId: item.id, nome: item.name })
-      configId = criada.id
+      if (itemTipo && String(item.natureza) !== itemTipo) return tipoIncompativel(String(item.natureza), itemTipo)
+      if (!configId) {
+        const criada = await garantirConfigFinanceiraDeItem(prisma, { itemCatalogoId: item.id, nome: item.name })
+        configId = criada.id
+      }
     }
     if (!configId) return NextResponse.json({ error: 'Selecione o item.' }, { status: 400 })
 
@@ -166,6 +176,9 @@ export async function POST(request: NextRequest) {
       },
     })
     if (!cfg) return NextResponse.json({ error: 'Configuração Financeira não encontrada.' }, { status: 404 })
+    // Mesma guarda pelo caminho legado (config enviada sem itemCatalogoId).
+    if (itemTipo && !itemCatalogoId && cfg.itemCatalogo && String(cfg.itemCatalogo.natureza) !== itemTipo)
+      return tipoIncompativel(String(cfg.itemCatalogo.natureza), itemTipo)
 
     // §2 — o PREÇO define a natureza; deve ser compatível com a NaturezaFinanceira da
     // config. VENDA é a nomenclatura da Tabela de Preços (RECEITA legado ≡ VENDA).
