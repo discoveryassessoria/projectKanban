@@ -15,6 +15,7 @@ import { prisma } from "@/lib/prisma"
 import { estadoParametrizacao, ETAPAS } from "@/src/services/parametrizacao/estado-parametrizacao"
 import { simularParametrizacao } from "@/src/services/parametrizacao/simulacao-parametrizacao"
 import { publicarParametrizacao } from "@/src/services/parametrizacao/publicacao-coordenada"
+import { concluirParametrizacao } from "@/src/services/parametrizacao/concluir-parametrizacao"
 
 let ok = 0, fail = 0
 const chk = (c: boolean, m: string) => { if (c) { ok++; console.log("  ✅", m) } else { fail++; console.log("  ❌", m) } }
@@ -140,6 +141,40 @@ async function main() {
   const migr = src("prisma/migrations/20260806b_assistente_parametrizacao/migration.sql")
   chk(!/valor|preco|documentTypeCode|fornecedor/i.test(migr.split("CREATE TABLE")[1] ?? ""),
     "a tabela de progresso não tem coluna de configuração")
+
+  // ── 8. CONCLUIR: o ciclo inteiro pela interface, sem terminal ───────────
+  // O escopo aqui não tem processo nenhum, então nada é materializado — o que
+  // importa provar é que as OITO etapas executam em ordem, cada uma com
+  // métrica, e que o relatório final sai com o resumo administrativo.
+  const eventos: any[] = []
+  for await (const ev of concluirParametrizacao({ tipoProcessoId: tipoId, usuarioId: 1 })) eventos.push(ev)
+  const passos = eventos.filter((e) => !("relatorio" in e))
+  const rel = eventos.find((e) => "relatorio" in e)?.relatorio
+  chk(passos.length === 8, `as 8 etapas de execução rodam em sequência (${passos.length})`)
+  chk(passos.every((p) => typeof p.duracaoMs === "number" && typeof p.processados === "number"),
+    "cada etapa reporta duração e quantidades")
+  chk(passos.map((p) => p.etapa).join(",") === "validar,publicar,materializar,reconciliar,projecoes,financeiro,planilha,guards",
+    `a ordem é a canônica (${passos.map((p: any) => p.etapa).join(" → ")})`)
+  chk(!!rel && typeof rel.resumo?.documentos?.criados === "number" && typeof rel.resumo?.reconciliacao?.restantes === "number",
+    "o relatório final traz o resumo administrativo completo")
+  chk(rel?.pendencias !== undefined, "o relatório lista as pendências restantes em vez de mandar procurar")
+
+  // idempotência do ciclo inteiro: rodar de novo não republica nem duplica
+  const antesRegras = await prisma.matrizDocumental.count({ where: { tipoProcessoId: tipoId, status: "PUBLICADA" } })
+  const eventos2: any[] = []
+  for await (const ev of concluirParametrizacao({ tipoProcessoId: tipoId, usuarioId: 1 })) eventos2.push(ev)
+  const depoisRegras = await prisma.matrizDocumental.count({ where: { tipoProcessoId: tipoId, status: "PUBLICADA" } })
+  chk(antesRegras === depoisRegras, `concluir de novo não republica (${antesRegras} → ${depoisRegras})`)
+
+  // ── 9. o ciclo NÃO depende de terminal ─────────────────────────────────
+  const rota = src("src/app/api/gerenciamento/parametrizacao/concluir/route.ts")
+  chk(/concluirParametrizacao/.test(rota), "existe endpoint HTTP que executa o ciclo")
+  chk(/verificarPermissao/.test(rota), "o endpoint é gated por permissão restrita")
+  const svc = src("src/services/parametrizacao/concluir-parametrizacao.ts")
+  chk(/materializarExecucaoDaFase/.test(svc), "usa o materializador canônico (não recria)")
+  chk(/reconciliarDocumentalFinanceiro/.test(svc), "usa o reconciliador canônico (não recria)")
+  chk(/publicarParametrizacao/.test(svc), "usa a publicação coordenada (não republica por conta própria)")
+  chk(!/execSync|spawn|child_process/.test(svc + rota), "nenhuma etapa chama processo de terminal")
 
   console.log(`\n${ok} passaram, ${fail} falharam`)
 }

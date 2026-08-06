@@ -64,6 +64,51 @@ function TelaDaEtapa({ etapa }: { etapa: string }) {
   }
 }
 
+/** Resumo administrativo do que a conclusão fez. Números, não adjetivos. */
+function RelatorioFinal({ r }: { r: any }) {
+  const bloco = (titulo: string, itens: [string, number | string][]) => (
+    <div className="rounded-[var(--radius-sm)] border border-[var(--border-default)] p-3">
+      <p className="mb-1.5 text-[11px] font-semibold uppercase tracking-wide text-[var(--text-muted)]">{titulo}</p>
+      {itens.map(([k, v]) => (
+        <div key={k} className="flex justify-between text-sm"><span className="text-[var(--text-secondary)]">{k}</span><span className="tabular-nums text-[var(--text-primary)]">{v}</span></div>
+      ))}
+    </div>
+  )
+  const s = r.resumo
+  return (
+    <div className="mt-5 border-t border-[var(--border-default)] pt-4">
+      <p className="mb-3 text-sm font-semibold" style={{ color: r.concluiu ? "var(--success)" : "var(--warning)" }}>
+        {r.concluiu ? "Parametrização concluída" : "Concluída com etapa(s) em erro"} · {r.duracaoMs}ms
+      </p>
+      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+        {bloco("Documentos", [["criados", s.documentos.criados], ["atualizados", s.documentos.atualizados], ["ignorados", s.documentos.ignorados], ["com erro", s.documentos.erros]])}
+        {bloco("Workflows", [["criados", s.workflows.criados], ["reutilizados", s.workflows.reutilizados], ["ignorados", s.workflows.ignorados]])}
+        {bloco("Tarefas", [["criadas", s.tasks.criadas], ["reutilizadas", s.tasks.reutilizadas]])}
+        {bloco("Financeiro", [["custos", s.financeiro.custosGerados], ["receitas", s.financeiro.receitasGeradas]])}
+        {bloco("Planilha", [["linhas", s.planilha.linhas], ["colunas de serviço", s.planilha.colunas], ["total BRL", s.planilha.totalBrl]])}
+        {bloco("Reconciliação", [["encontradas", s.reconciliacao.encontradas], ["corrigidas", s.reconciliacao.corrigidas], ["restantes", s.reconciliacao.restantes]])}
+        {bloco("Parametrização", [["matrizes publicadas", s.parametrizacao.matrizesPublicadas], ["componentes ativos", s.parametrizacao.componentesAtivos]])}
+      </div>
+      {r.pendencias?.length > 0 && (
+        <div className="mt-4">
+          <p className="mb-1.5 text-sm font-semibold text-[var(--text-primary)]">Pendências restantes</p>
+          <ul className="space-y-1">
+            {r.pendencias.map((p: any, i: number) => (
+              <li key={i} className="text-sm">
+                <span style={{ color: p.bloqueia ? "var(--danger)" : "var(--warning)" }}>{p.bloqueia ? "⛔" : "⚠"}</span>{" "}
+                <span className="text-[var(--text-primary)]">{p.mensagem}</span>
+                <span className="block pl-5 text-[11px] text-[var(--text-muted)]">
+                  {p.phaseKey ? `fase ${p.phaseKey} · ` : ""}ação: preencher em {p.onde}
+                </span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+    </div>
+  )
+}
+
 export default function AssistenteParametrizacaoTab() {
   const tiposReq = useApi<{ tipos?: TipoProcesso[] } | TipoProcesso[]>("/api/gerenciamento/tipos-processo")
   const tipos: TipoProcesso[] = Array.isArray(tiposReq.dados) ? tiposReq.dados : (tiposReq.dados?.tipos ?? [])
@@ -83,6 +128,11 @@ export default function AssistenteParametrizacaoTab() {
   const [simulacao, setSimulacao] = useState<any | null>(null)
   const [publicando, setPublicando] = useState(false)
   const [resultadoPub, setResultadoPub] = useState<any | null>(null)
+  // Conclusão: as etapas chegam UMA A UMA pelo stream, para o progresso ser real
+  // em vez de um spinner que não diz se está andando.
+  const [concluindo, setConcluindo] = useState(false)
+  const [etapasExec, setEtapasExec] = useState<any[]>([])
+  const [relatorio, setRelatorio] = useState<any | null>(null)
 
   // Progresso é marcador de lugar — salvo ao trocar de etapa, nunca conteúdo.
   const salvarProgresso = useCallback(async (etapa: string) => {
@@ -116,6 +166,36 @@ export default function AssistenteParametrizacaoTab() {
       setResultadoPub(await r.json())
       void estadoReq.recarregar()
     } finally { setPublicando(false) }
+  }
+
+  const concluir = async () => {
+    if (!tipoId) return
+    setConcluindo(true); setEtapasExec([]); setRelatorio(null)
+    try {
+      const resp = await fetch("/api/gerenciamento/parametrizacao/concluir", {
+        method: "POST", headers: { "Content-Type": "application/json", ...authHeaders() },
+        body: JSON.stringify({ tipoProcessoId: tipoId, phaseKey: phaseKey || null }),
+      })
+      const reader = resp.body?.getReader()
+      if (!reader) return
+      const dec = new TextDecoder()
+      let buffer = ""
+      for (;;) {
+        const { done, value } = await reader.read()
+        if (done) break
+        buffer += dec.decode(value, { stream: true })
+        const linhas = buffer.split("\n")
+        buffer = linhas.pop() ?? ""
+        for (const l of linhas) {
+          if (!l.trim()) continue
+          const ev = JSON.parse(l)
+          if (ev.relatorio) setRelatorio(ev.relatorio)
+          else if (ev.erroFatal) setEtapasExec((x) => [...x, { etapa: "erro", titulo: "Falha", status: "ERRO", detalhe: ev.erroFatal, mensagens: [] }])
+          else setEtapasExec((x) => [...x, ev])
+        }
+      }
+      void estadoReq.recarregar()
+    } finally { setConcluindo(false) }
   }
 
   const etapa = estado?.etapas.find((e) => e.etapa === etapaAtiva) ?? null
@@ -289,6 +369,43 @@ export default function AssistenteParametrizacaoTab() {
                         </>}
                   </div>
                 )}
+              </div>
+            )}
+
+            {/* CONCLUSÃO — um botão, o ciclo inteiro, sem terminal */}
+            {etapaAtiva === "validacao" && (
+              <div className="rounded-[var(--radius-md)] border border-[var(--border-default)] bg-[var(--surface-primary)] p-4">
+                <p className="text-sm text-[var(--text-secondary)]">
+                  Valida, publica, materializa, reconcilia, atualiza projeções e confere Financeiro,
+                  Planilha e guards — nesta ordem, chamando os serviços canônicos. Rodar de novo converge; não duplica.
+                </p>
+                <button onClick={concluir} disabled={concluindo}
+                  className="mt-3 inline-flex items-center gap-1.5 rounded-[var(--radius-sm)] bg-[var(--accent-primary)] px-3.5 py-2 text-sm font-medium text-[var(--accent-ink)] disabled:opacity-40">
+                  {concluindo ? <Loader2 className="h-4 w-4 animate-spin" /> : <CheckCircle2 className="h-4 w-4" />} Concluir Parametrização
+                </button>
+
+                {etapasExec.length > 0 && (
+                  <ul className="mt-4 space-y-2">
+                    {etapasExec.map((e, i) => (
+                      <li key={i} className="text-sm">
+                        <span style={{ color: e.status === "OK" ? "var(--success)" : e.status === "ERRO" ? "var(--danger)" : "var(--text-muted)" }}>
+                          {e.status === "OK" ? "✓" : e.status === "ERRO" ? "✕" : "○"}
+                        </span>{" "}
+                        <span className="text-[var(--text-primary)]">{e.titulo}</span>
+                        <span className="text-[var(--text-muted)]"> — {e.detalhe}</span>
+                        {typeof e.duracaoMs === "number" && <span className="text-[11px] text-[var(--text-muted)]"> ({e.duracaoMs}ms)</span>}
+                        {e.mensagens?.length > 0 && (
+                          <ul className="mt-1 space-y-0.5 pl-5">
+                            {e.mensagens.slice(0, 8).map((m: string, k: number) => <li key={k} className="text-[11px] text-[var(--text-muted)]">· {m}</li>)}
+                          </ul>
+                        )}
+                      </li>
+                    ))}
+                    {concluindo && <li className="text-sm text-[var(--text-muted)]"><Loader2 className="inline h-3.5 w-3.5 animate-spin" /> executando…</li>}
+                  </ul>
+                )}
+
+                {relatorio && <RelatorioFinal r={relatorio} />}
               </div>
             )}
 
