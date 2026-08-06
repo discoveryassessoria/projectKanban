@@ -51,22 +51,25 @@ em runtime.
 
 ---
 
-## R-03 · ALTO · O baseline do schema exige reconciliação do ledger de produção
+## R-03 · ~~ALTO~~ · **RESOLVIDO em 06/08** · Baseline reconciliado, migration aplicada
 
-**Evidência.** `npm run test:baseline` reprova: checksum do baseline mudou de
+**Era.** `npm run test:baseline` reprovava: o checksum do baseline mudou de
 `62e887…` para `597b1cd…` por causa da migration `20260806_custo_documental_vinculo`.
+`npm run build` ficava vermelho e `prisma migrate deploy` pararia no meio do deploy.
 
-**Consequência.** `npm run build` está **vermelho** e `prisma migrate deploy`
-pararia no meio do deploy acusando migration modificada depois de aplicada.
+**Procedimento executado** (o do `prisma/baseline/README.md`, sem atalho):
+backup completo de produção (`pg_dump`, 3,0 MB, 213 tabelas, sha256
+`f0db0e59…`) em `~/.discovery-backups/prod-20260806-pre-custo-documental/`, mais o
+ledger em `prisma-migrations-20260806-pre-checksum.json` → conferência do diff
+(30 inserções, ZERO remoções, ZERO `DROP`/`TRUNCATE`/`DELETE`) → `UPDATE` de UMA
+coluna na linha `0000_baseline`, com o checksum anterior no `WHERE` → constante
+atualizada no guard, no mesmo commit.
 
-**Não é para forçar.** O procedimento é o do `prisma/baseline/README.md`: backup
-do ledger → `UPDATE` explícito e auditado de UMA coluna na linha `0000_baseline`
-→ atualização de `CHECKSUM_LEDGER` no mesmo commit. O diff do baseline já foi
-conferido: **30 linhas inseridas, zero removidas, zero DROP/TRUNCATE/DELETE**.
-
-**Fecha quando:** ledger reconciliado, constante atualizada, `test:baseline` verde.
-
----
+**Migration aplicada em produção** pelo guard oficial
+(`scripts/prod-migrate-guard.mjs`, `MIGRATE_ON_BUILD=1` + `VERCEL_ENV=production`
++ `EU_CONFIRMO_ESCRITA_EM_PRODUCAO`), exclusivamente via `prisma migrate deploy`:
+9 → 10 migrations, 17/17 colunas presentes, 764 requerentes antes e depois.
+Rollback validado num banco descartável: 28 → 45 → 28 → 45 colunas.
 
 ## R-04 · ALTO · 87 rotas de API sem gate de autenticação/permissão
 

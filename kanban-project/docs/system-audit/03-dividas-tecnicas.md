@@ -90,6 +90,18 @@ Ledger), ou o teste é atualizado para cobrar o que a arquitetura atual promete.
 
 ---
 
+## D-04b · Suítes contaminam umas às outras no banco compartilhado
+
+`materializacao-fase-unica.test.ts` cria uma `FaseMacro` com `phaseKey`
+`"traducao"` (macro `MAT-TEST`) e um workflow publicado com essa chave, e **não
+limpa**. `phasekeys-guard` — que existe justamente para reprovar chave fora do
+catálogo — passa a acusar 4 achados. Provado em 06/08: removido o resíduo, cai
+para 1 falha; rodando a suíte de materialização de novo, volta a 4.
+
+**Contra PRODUÇÃO o guard passa 44/44** — o cadastro real está íntegro. O defeito
+é de isolamento de fixture, e é exatamente o que o Processo Golden da Fase 1
+resolve: nenhuma suíte deve deixar cadastro para trás.
+
 ## D-05 · Migrations pós-baseline não são idempotentes
 
 **Evidência.** `prisma migrate deploy` num banco virgem morre na terceira:

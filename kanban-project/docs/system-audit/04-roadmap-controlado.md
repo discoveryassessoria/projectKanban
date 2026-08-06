@@ -121,7 +121,7 @@ DOC21 aparece nas duas abas de anexo sem segunda cópia.
 
 ---
 
-## Fase 6 — Financeiro integrado 🔶 *máquina pronta, cadastro pendente*
+## Fase 6 — Financeiro integrado 🔶 *máquina pronta e em produção; cadastro pendente*
 
 **Já entregue (06/08).** Gatilho canônico (`step.concluido` do passo registral +
 régua oficial de "localizado"); vínculo documental e snapshot de preço na
@@ -129,9 +129,12 @@ obrigação (migration aditiva); plano multi-serviço por documento; separação
 automático × manual; Planilha Documental restaurada como terceira vista de
 Custos; reconciliação + backfill idempotentes; 30/30 em `test:custo-documental`.
 
-**Falta** o cadastro (R-01): Matriz, componentes econômicos, configuração
-financeira de custo, preços de custo, fornecedores. E a reconciliação do ledger
-(R-03) para poder fazer deploy.
+**Migration aplicada em produção em 06/08** (`20260806_custo_documental_vinculo`,
+estritamente aditiva, rollback validado). O schema está pronto; o código está no
+commit `51395017`, ainda sem deploy da aplicação.
+
+**Falta** só o cadastro (R-01): Matriz, componentes econômicos, configuração
+financeira de custo, preços de custo, fornecedores. R-03 está fechado.
 
 **Afeta** `ObrigacaoEconomica` (7 colunas + snapshot + índices — **aditivo**),
 `matriz-economica.ts`, `outbox-dispatcher.ts`, `documento-operacao.ts`,
