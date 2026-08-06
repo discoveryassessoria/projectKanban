@@ -34,7 +34,7 @@ export const ESTADO_LABEL: Record<EstadoSaude, string> = {
 /** Domínios obrigatórios de auditoria. Cobertura é medida contra esta lista. */
 export const DOMINIOS = [
   'BANCO', 'MIGRATIONS', 'INTEGRIDADE', 'DUPLICIDADES', 'PROCESSOS', 'WORKFLOW', 'FASES',
-  'VARIACOES_FASE', 'TRANSICOES', 'SLA', 'SERVICOS', 'DOCUMENTOS', 'SISTEMA_DOCUMENTAL', 'PESSOAS',
+  'TRANSICOES', 'SLA', 'SERVICOS', 'DOCUMENTOS', 'SISTEMA_DOCUMENTAL', 'PESSOAS',
   'ARVORE', 'ORGANIZACOES', 'FINANCEIRO', 'TABELA_VALORES', 'COBRANCAS', 'CONTAS_PAGAR',
   'CONTAS_RECEBER', 'TESOURARIA', 'CAMBIO', 'AUTOMACOES', 'EVENTOS', 'FILAS', 'TAREFAS',
   'USUARIOS', 'PERMISSOES', 'AUDITORIA', 'ARQUIVOS', 'APIS', 'ROTAS', 'INTERFACE', 'INTEGRACOES',
@@ -46,7 +46,7 @@ export type Dominio = (typeof DOMINIOS)[number]
 export const DOMINIO_LABEL: Record<Dominio, string> = {
   BANCO: 'Banco de dados', MIGRATIONS: 'Migrations', INTEGRIDADE: 'Integridade referencial',
   DUPLICIDADES: 'Duplicidades', PROCESSOS: 'Processos', WORKFLOW: 'Workflow', FASES: 'Fases',
-  VARIACOES_FASE: 'Variações de fase', TRANSICOES: 'Transições', SLA: 'SLA', SERVICOS: 'Serviços',
+  TRANSICOES: 'Transições', SLA: 'SLA', SERVICOS: 'Serviços',
   DOCUMENTOS: 'Documentos', SISTEMA_DOCUMENTAL: 'Sistema Documental', PESSOAS: 'Pessoas',
   ARVORE: 'Árvore Genealógica', ORGANIZACOES: 'Órgãos e Organizações', FINANCEIRO: 'Financeiro',
   TABELA_VALORES: 'Tabela de Valores', COBRANCAS: 'Cobranças', CONTAS_PAGAR: 'Contas a pagar',

@@ -165,7 +165,6 @@ export const MANAGEMENT_NAVIGATION: ManagementNavigationItem[] = [
 
       // ESTRUTURA — o catálogo de fases é a fonte única das fases do sistema.
       a(40, "fases", "Fases", ["fase", "fases", "catalogo", "catálogo", "etapa", "phase"], "Estrutura"),
-      a(50, "phasemodes", "Variações da Fase", ["variacao", "variação", "modo", "interno", "fase"], "Estrutura"),
 
       // CONFIGURAÇÕES
       a(70, "sla", "SLA", ["sla", "prazo", "vencimento", "alerta"], "Configurações"),

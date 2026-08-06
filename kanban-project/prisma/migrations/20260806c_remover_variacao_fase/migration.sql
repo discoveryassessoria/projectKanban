@@ -1,0 +1,56 @@
+-- REMOÇÃO DA "VARIAÇÃO DA FASE" (PhaseInternalMode)
+--
+-- POR QUE ELA SAI
+-- ---------------
+-- "Variação da Fase" não era um conceito de domínio: era um cadastro sem
+-- consumidor. Varredura de 06/08/2026 sobre `src/services`, `src/lib/motor` e
+-- `src/lib/process-stage`: NENHUM ponto do runtime lê `PhaseInternalMode`. Não o
+-- materializador, não o motor de fases, não o financeiro, não a Central.
+--
+-- Todo o comportamento operacional que ela prometia diferenciar já é determinado
+-- por País, Tipo de Processo, Modalidade, Fase, Workflow Interno, Matriz
+-- Documental, Regras Documentais, Serviços, Eventos e Regras Econômicas. Manter a
+-- tabela era manter um vocabulário que ninguém consultava — e uma tela que
+-- convidava a configurar algo sem efeito.
+--
+-- O QUE HAVIA (preservado aqui e em backup)
+-- -----------------------------------------
+-- 20 linhas, todas de seed, mais uma de teste. Nenhuma referenciada por FK.
+-- Backup: ~/.discovery-backups/prod-20260806d-pre-remocao-variacao-fase/
+--   · PhaseInternalMode.json  (as 20 linhas)
+--   · prod-completo.sql       (dump completo, sha256 2864590b119c97b3…)
+--
+-- id  fase                 chave                      rótulo
+--    1  retificacao          pending_definition         A definir
+--    2  retificacao          administrative             Administrativa
+--    3  retificacao          judicial                   Judicial
+--    4  retificacao          mixed                      Mista
+--    5  retificacao          not_required               Não necessária
+--    6  protocolado          per_applicant              Por requerente
+--    7  protocolado          per_family                 Por família/processo
+--    8  protocolado          judicial_case              Processo judicial
+--    9  protocolado          consular_case              Consular
+--   10  protocolado          comune_case                Comune
+--   11  protocolado          conservatoria_case         Conservatória
+--   12  protocolado          administrative_case        Administrativo
+--   13  traducao             full_package_translation   Pacote completo
+--   14  traducao             partial_translation        Parcial
+--   15  traducao             not_required               Não necessária
+--   16  apostilamento        full_package_apostille     Pacote completo
+--   17  apostilamento        partial_apostille          Parcial
+--   18  apostilamento        legalization_required      Legalização
+--   19  apostilamento        not_required               Não necessário
+--   20  emissao_documental   aaaaaaaaaaaaaa             AAAAAAAAAAAAAA
+--
+-- NÃO HÁ DADO ÚTIL A MIGRAR: o conteúdo é vocabulário ("Judicial", "Parcial",
+-- "Por requerente") que nunca virou comportamento. Transformá-lo em regra de
+-- Matriz agora seria INVENTAR política documental — decisão de negócio, não de
+-- migration. O que ele descreve continua expressável por condição de regra, se e
+-- quando o negócio decidir.
+--
+-- SEM FK, SEM ÍNDICE EXTERNO: a tabela é folha. Só ela cai.
+--
+-- ROLLBACK: recriar a tabela a partir de prisma/baseline/baseline.sql (versão
+-- anterior a este commit) e recarregar PhaseInternalMode.json.
+
+DROP TABLE IF EXISTS "PhaseInternalMode";

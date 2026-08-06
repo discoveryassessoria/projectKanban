@@ -41,7 +41,6 @@ async function main() {
   const referencias: Array<[string, number]> = [
     ["FaseMacro", await prisma.faseMacro.count({ where: { phaseKey: PHASE_KEY } })],
     ["PhaseInternalWorkflow", await prisma.phaseInternalWorkflow.count({ where: { phaseKey: PHASE_KEY } })],
-    ["PhaseInternalMode", await prisma.phaseInternalMode.count({ where: { phaseKey: PHASE_KEY } })],
     ["PhaseWorkflowInstance", await prisma.phaseWorkflowInstance.count({ where: { faseMacroKey: PHASE_KEY } })],
     ["PhaseWorkflowStepInstance", await prisma.phaseWorkflowStepInstance.count({ where: { faseMacroKey: PHASE_KEY } })],
     ["Processo.faseAtualKey", await prisma.processo.count({ where: { faseAtualKey: PHASE_KEY } })],

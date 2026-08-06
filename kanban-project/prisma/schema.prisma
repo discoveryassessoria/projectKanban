@@ -2910,29 +2910,6 @@ model FaseMacro {
   @@index([macroWorkflowId])
 }
 
-model PhaseInternalMode {
-  id                Int      @id @default(autoincrement())
-  modeUid           String   @unique @db.VarChar(140) // {tipoProcessoId|'all'}::{phaseKey}::{key}
-  templateId        Int? // â ModeloInternoFase (solto; null = ad-hoc/seed)
-  tipoProcessoId    Int? // â TipoProcessoNacionalidade (solto; null = todos os processos)
-  phaseKey          String   @db.VarChar(40)
-  key               String   @db.VarChar(60) // chave do modo (slug, Ãºnico dentro de processo+fase)
-  label             String   @db.VarChar(200)
-  description       String?  @db.Text
-  condition         String?  @db.Text // condiÃ§Ã£o de uso (vem de conditionOfUse do modelo)
-  impactOperational String?  @db.Text
-  impactDocument    String?  @db.Text
-  impactFinancial   String?  @db.Text
-  impactProtocol    String?  @db.Text
-  active            Boolean  @default(true)
-  arquivado         Boolean  @default(false)
-  criadoEm          DateTime @default(now())
-  atualizadoEm      DateTime @updatedAt
-
-  @@index([phaseKey])
-  @@index([tipoProcessoId])
-}
-
 model PhaseInternalWorkflow {
   id             Int      @id @default(autoincrement())
   // {tipoProcessoId|'all'}::{phaseKey} para o workflow PRIMÃRIO de uma fase.

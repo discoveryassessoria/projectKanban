@@ -658,47 +658,6 @@ registrar({
 
 // ── DEMAIS DOMÍNIOS DECLARADOS ───────────────────────────────────────────────
 
-registrar({
-  id: 'saude.variacoes.fase-existente',
-  codigo: 'VAR-001',
-  nome: 'Variação de fase apontando para fase existente',
-  descricao: 'Variação órfã não pode ser aplicada a processo nenhum.',
-  dominio: 'VARIACOES_FASE',
-  modulo: 'Variações da Fase',
-  severidadePadrao: 'ERRO',
-  obrigatoria: true,
-  modos: ['COMPLETO', 'PROFUNDO'],
-  introduzidaEm: '1.0.0',
-  timeoutMs: 15_000,
-  orientacao: 'Reaponte a variação para uma fase do catálogo ou remova-a.',
-  rotaCorrecao: '/administrator?screen=phasemodes',
-  responsavel: 'Workflow',
-  ativo: true,
-  executar: async (): Promise<ResultadoVerificacao> => {
-    const r = await prisma.$queryRawUnsafe<{ n: number }[]>(
-      `SELECT COUNT(*)::int AS n FROM "PhaseInternalMode" m
-        WHERE NOT EXISTS (SELECT 1 FROM "CatalogoFase" c WHERE c."phaseKey" = m."phaseKey")`,
-    )
-    const n = r?.[0]?.n ?? 0
-    if (!n) return { achados: [], metricas: { orfas: 0 }, resumo: 'Toda variação aponta para fase existente.' }
-    return {
-      achados: [{
-        chave: 'variacao-fase-orfa',
-        severidade: 'ERRO',
-        titulo: `${n} variação(ões) de fase órfã(s)`,
-        descricao: `${n} variação(ões) apontam para fase que não existe no catálogo.`,
-        explicacao: 'A variação personaliza o comportamento de uma fase; sem a fase, ela não se aplica.',
-        impacto: 'Configuração morta que confunde quem edita o workflow.',
-        entidade: 'PhaseInternalMode',
-        quantidade: n,
-        link: '/administrator?screen=phasemodes',
-        recomendacao: 'Reaponte ou remova as variações órfãs.',
-        evidencia: { orfas: n },
-      }],
-      metricas: { orfas: n },
-    }
-  },
-})
 
 registrar({
   id: 'saude.transicoes.destino-valido',

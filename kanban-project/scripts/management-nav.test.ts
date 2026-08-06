@@ -120,7 +120,10 @@ for (const [k, esperado] of Object.entries(ARVORE_OFICIAL)) {
 const itensDaSecao = (gk: string, secao: string) =>
   (gDe(gk)?.children ?? []).filter((c) => c.section === secao && c.status !== "hidden").map((c) => c.key)
 ok(JSON.stringify(itensDaSecao("grp_processos", "Cadastros")) === JSON.stringify(["proctypes", "modalidades", "countrycatalog"]), "Processos › Cadastros = Tipos de Processo, Modalidades, Países e Regiões")
-ok(JSON.stringify(itensDaSecao("grp_processos", "Estrutura")) === JSON.stringify(["fases", "phasemodes"]), "Processos › Estrutura = Fases, Variações da Fase")
+// "Variações da Fase" (PhaseInternalMode) foi ELIMINADA em 06/08: não era conceito
+// de domínio — o comportamento já é determinado por Fase, Workflow Interno, Matriz
+// e Regras. Nenhum runtime a consumia; era cadastro sem consumidor.
+ok(JSON.stringify(itensDaSecao("grp_processos", "Estrutura")) === JSON.stringify(["fases"]), "Processos › Estrutura = Fases")
 ok(JSON.stringify(itensDaSecao("grp_processos", "Configurações")) === JSON.stringify(["sla", "cfgversions", "proccfg"]), "Processos › Configurações = SLA, Versões, Configurações Gerais")
 ok(JSON.stringify(itensDaSecao("grp_workflow", "Fluxos")) === JSON.stringify(["macrokanban", "phaseiwf"]), "Workflow › Fluxos = Workflow Macro + Workflow Interno")
 // Classificação financeira ELIMINADA (02/08/2026): o comportamento financeiro vive na
@@ -152,7 +155,7 @@ console.log("\n4) Inventário: nenhuma tela antiga ficou órfã")
 // telas que estavam ATIVAS no menu antes da reestruturação
 const ANTES_ATIVAS = [
   "overview", "proctypes", "countrycatalog", "cfgversions",
-  "macrokanban", "phaseiwf", "phasemodes", "opauto", "simfase", "execmatrix",
+  "macrokanban", "phaseiwf", "opauto", "simfase", "execmatrix",
   "doctypes", "doccats", "docrules", "prottypes", "products",
   "catalog", "categories", "coa", "costcenters", "suppliers",
   "pricingtable", "discrules", "pricing", "accounts", "banks", "wallets",

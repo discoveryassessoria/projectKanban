@@ -1,5 +1,10 @@
 # Discovery — Arquitetura Atual (estado congelado em 30/07/2026)
 
+> **Superado em 06/08/2026 neste ponto:** "Variação da Fase" (`PhaseInternalMode`) foi ELIMINADA. Não era conceito de domínio — nenhum
+> ponto do runtime a consumia. O comportamento é determinado por Fase, Workflow
+> Interno, Matriz Documental e Regras. Ver `prisma/migrations/20260806c_remover_variacao_fase`.
+> O texto abaixo é o registro do que valia em 30/07/2026 e não é reescrito.
+
 Documento de **estado**, não de proposta. Descreve exclusivamente o que está
 definido e implementado. Não contém sugestão, refatoração, melhoria ou ideia nova.
 

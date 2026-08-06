@@ -52,7 +52,7 @@ import {
 import { HealthTab } from "@/src/components/gerenciamentoComponents/GerenciamentoScaffolds2"
 
 // Lote 3 — Centro do Processo (fases): telas substituídas pelas versões reais
-// (PhaseWorkflowsFasesTab / ModosInternosFasesTab) — nada a importar aqui.
+// (PhaseWorkflowsFasesTab) — nada a importar aqui.
 
 // Lote 4 — Diagnóstico do Sistema
 import { DiagnosticsTab } from "@/src/components/gerenciamentoComponents/GerenciamentoScaffolds4"
@@ -102,7 +102,6 @@ const TipoProcessoTab = dynamic(() => import("@/src/components/gerenciamentoComp
 const MacroKanbanTab = dynamic(() => import("@/src/components/gerenciamentoComponents/MacroKanbanTab"), { ssr: false, loading: () => <CarregandoTela /> })
 // LEGADO REMOVIDO — Biblioteca de Modelos (Workflow Interno / Variações da Fase / Automação)
 // eliminada. Fonte de verdade é o Workflow Macro/Interno + config real por fase. Ver migração.
-const ModosInternosFasesTab = dynamic(() => import("@/src/components/gerenciamentoComponents/ModosInternosFasesTab"), { ssr: false, loading: () => <CarregandoTela /> })
 const PhaseWorkflowsFasesTab = dynamic(() => import("@/src/components/gerenciamentoComponents/PhaseWorkflowsFasesTab"), { ssr: false, loading: () => <CarregandoTela /> })
 const PhaseAutomationsFasesTab = dynamic(() => import("@/src/components/gerenciamentoComponents/PhaseAutomationsFasesTab"), { ssr: false, loading: () => <CarregandoTela /> })
 const DepartamentosTab = dynamic(() => import("@/src/components/gerenciamentoComponents/DepartamentosTab"), { ssr: false, loading: () => <CarregandoTela /> })
@@ -244,7 +243,6 @@ const TELAS: Record<string, React.ComponentType> = {
 
   // bespoke (lote 3)
   phaseiwf: PhaseWorkflowsFasesTab,
-  phasemodes: ModosInternosFasesTab,
 
   // bespoke (lote 4)
   catalog: ProdutosTab,

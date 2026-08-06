@@ -2307,29 +2307,6 @@ CREATE TABLE "FaseMacro" (
 );
 
 -- CreateTable
-CREATE TABLE "PhaseInternalMode" (
-    "id" SERIAL NOT NULL,
-    "modeUid" VARCHAR(140) NOT NULL,
-    "templateId" INTEGER,
-    "tipoProcessoId" INTEGER,
-    "phaseKey" VARCHAR(40) NOT NULL,
-    "key" VARCHAR(60) NOT NULL,
-    "label" VARCHAR(200) NOT NULL,
-    "description" TEXT,
-    "condition" TEXT,
-    "impactOperational" TEXT,
-    "impactDocument" TEXT,
-    "impactFinancial" TEXT,
-    "impactProtocol" TEXT,
-    "active" BOOLEAN NOT NULL DEFAULT true,
-    "arquivado" BOOLEAN NOT NULL DEFAULT false,
-    "criadoEm" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    "atualizadoEm" TIMESTAMP(3) NOT NULL,
-
-    CONSTRAINT "PhaseInternalMode_pkey" PRIMARY KEY ("id")
-);
-
--- CreateTable
 CREATE TABLE "PhaseInternalWorkflow" (
     "id" SERIAL NOT NULL,
     "wfUid" VARCHAR(140) NOT NULL,
@@ -4960,15 +4937,6 @@ CREATE INDEX "FaseMacro_macroWorkflowId_idx" ON "FaseMacro"("macroWorkflowId");
 
 -- CreateIndex
 CREATE UNIQUE INDEX "FaseMacro_macroWorkflowId_phaseKey_key" ON "FaseMacro"("macroWorkflowId", "phaseKey");
-
--- CreateIndex
-CREATE UNIQUE INDEX "PhaseInternalMode_modeUid_key" ON "PhaseInternalMode"("modeUid");
-
--- CreateIndex
-CREATE INDEX "PhaseInternalMode_phaseKey_idx" ON "PhaseInternalMode"("phaseKey");
-
--- CreateIndex
-CREATE INDEX "PhaseInternalMode_tipoProcessoId_idx" ON "PhaseInternalMode"("tipoProcessoId");
 
 -- CreateIndex
 CREATE UNIQUE INDEX "PhaseInternalWorkflow_wfUid_key" ON "PhaseInternalWorkflow"("wfUid");

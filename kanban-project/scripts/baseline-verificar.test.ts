@@ -136,7 +136,18 @@ const MIGRATION = join(DIR_MIGRATIONS, '0000_baseline', 'migration.sql')
 // + copia do ledger -> conferencia do diff (22 insercoes / 0 remocoes) -> UPDATE
 // de UMA coluna na linha 0000_baseline, com o checksum anterior no WHERE (1 linha
 // afetada) -> `prisma migrate status` consistente.
-const CHECKSUM_LEDGER = '384a83bff1a33778dbb0b3026463a3f348e7907c8c7f305aabed6a26834039ed'
+// ATUALIZACAO 06/08/2026 (remocao da "Variacao da Fase") — migration DESTRUTIVA
+// APROVADA: 20260806c_remover_variacao_fase derruba a tabela PhaseInternalMode.
+// Ela era cadastro SEM CONSUMIDOR — varredura em src/services, src/lib/motor e
+// src/lib/process-stage nao encontrou nenhuma leitura pelo runtime. Tabela folha,
+// sem FK apontando para ela. As 20 linhas ficaram preservadas em
+// ~/.discovery-backups/prod-20260806d-pre-remocao-variacao-fase/ (JSON + dump
+// completo) e transcritas no cabecalho da propria migration.
+// Diff do baseline: 32 linhas REMOVIDAS (a tabela e seus indices), 0 inseridas.
+//
+//   anterior : 384a83bff1a33778dbb0b3026463a3f348e7907c8c7f305aabed6a26834039ed
+//   atual    : 7cd1f90827eef93f97a0fc35efe238d1d4e0a5dc45138c388ad53cc0f2fafb37
+const CHECKSUM_LEDGER = '7cd1f90827eef93f97a0fc35efe238d1d4e0a5dc45138c388ad53cc0f2fafb37'
 
 /**
  * Migrations criadas DEPOIS da consolidacao de 02/08/2026. Toda migration nova
@@ -154,6 +165,7 @@ const MIGRATIONS_POS_BASELINE: string[] = [
   '20260805_modelos_documentais',
   '20260806_custo_documental_vinculo',
   '20260806b_assistente_parametrizacao',
+  '20260806c_remover_variacao_fase',
 ]
 
 const sha256 = (t: string) => createHash('sha256').update(t).digest('hex')

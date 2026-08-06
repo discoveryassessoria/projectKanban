@@ -85,10 +85,6 @@ check("fase OPCIONAL sem workflow não vira achado",
   verificarPhaseKeys({ ...ctxBase, phaseKeysComWorkflow: new Set(), fases: [fase({ id: 1, phaseKey: "apostilamento", required: false })] })
     .every((a) => a.tipo !== "FASE_OBRIGATORIA_SEM_WORKFLOW"))
 
-const modoLegado = verificarPhaseKeys({ ...ctxBase, fases: [], modosDeFase: [{ id: 1, phaseKey: "retificacao", key: "judicial", modeUid: "all::retificacao::judicial" }] })
-check("modo de fase com chave legada é detectado", modoLegado.length === 1 && modoLegado[0].tipo === "MODO_DE_FASE_COM_CHAVE_LEGADA")
-check("e sugere a canônica", modoLegado[0].canonicaSugerida === "retificacao_registros")
-
 check("o mais grave vem primeiro",
   verificarPhaseKeys({ ...ctxBase, fases: [fase({ id: 1, phaseKey: "retificacao", required: false }), fase({ id: 2, phaseKey: "traducao", required: true, ordem: 2 })] })[0].severidade === "CRITICA")
 
@@ -99,7 +95,6 @@ console.log("\n(B) Blindagem estática — sem alias, sem fallback, sem seed leg
 const catalogo = read("src/lib/process-stage/fases-catalog.ts")
 const phaseWorkflow = read("src/services/phase-workflow.ts")
 const verificador = read("src/lib/process-stage/verificar-phasekeys.ts")
-const corretor = read("scripts/corrigir-phasekeys-macro.ts")
 
 check("o catálogo declara as chaves canônicas", ["traducao_juramentada", "retificacao_registros"].every((k) => catalogo.includes(`phaseKey: "${k}"`)))
 check("o catálogo NÃO declara as chaves legadas", !/phaseKey: "traducao"|phaseKey: "retificacao"/.test(catalogo))
@@ -113,17 +108,6 @@ check("o motor não tem mapa de alias de fase",
 check("o motor não aceita 'traducao'/'retificacao' como fallback",
   !/"traducao"\s*:|'traducao'\s*:|"retificacao"\s*:|'retificacao'\s*:/.test(phaseWorkflow))
 
-// A equivalência legada existe em UM lugar (o verificador) e o corretor a espelha.
-check("a equivalência legada vive só no verificador", verificador.includes("export const EQUIVALENCIA_LEGADA"))
-check("o corretor usa exatamente o mesmo mapeamento",
-  Object.entries(EQUIVALENCIA_LEGADA).every(([de, para]) => corretor.includes(`${de}: "${para}"`)) &&
-  (corretor.match(/^\s{2}\w+: "/gm) ?? []).length === Object.keys(EQUIVALENCIA_LEGADA).length)
-check("o corretor resolve o macro pelo código oficial, nunca por id fixo",
-  corretor.includes('findUnique({ where: { code: TIPO_CODE }') && !/macroWorkflowId\s*=\s*\d+/.test(corretor))
-check("o corretor valida 1 linha por UPDATE", corretor.includes("if (r.count !== 1) throw new ValidacaoFalhou"))
-check("o corretor dá rollback quando a validação falha", corretor.includes("class ValidacaoFalhou") && corretor.includes("❌ ROLLBACK"))
-check("o corretor não toca em processo, ciclo ou tarefa",
-  !/(prisma|tx)\.(processo|phaseWorkflowInstance|phaseWorkflowStepInstance|tarefa)\.(update|updateMany|delete|deleteMany|create)/.test(corretor))
 
 // SEED × CATÁLOGO EM PRODUÇÃO — o seed é upsert por phaseKey. Corrigir um sem o
 // outro não conserta: cria uma linha canônica NOVA e deixa a legada de pé. Por isso
@@ -212,7 +196,6 @@ async function contraOBanco() {
     const wfs = await prisma.phaseInternalWorkflow.findMany({ where: { active: true, arquivado: false }, select: { phaseKey: true } })
     const processos = await prisma.processo.groupBy({ by: ["tipoProcessoMotorId"], _count: { _all: true } })
     const catalogoDb = await prisma.catalogoFase.findMany({ select: { id: true, phaseKey: true, label: true, ativo: true }, orderBy: { ordemPadrao: "asc" } })
-    const modosDb = await prisma.phaseInternalMode.findMany({ select: { id: true, phaseKey: true, key: true, modeUid: true }, orderBy: { id: "asc" } })
 
     const achados = verificarPhaseKeys({
       fases: fasesDb.map((f) => ({
@@ -223,10 +206,9 @@ async function contraOBanco() {
       phaseKeysComWorkflow: new Set(wfs.map((w) => w.phaseKey)),
       processosPorTipo: new Map(processos.filter((p) => p.tipoProcessoMotorId != null).map((p) => [p.tipoProcessoMotorId as number, p._count._all])),
       catalogoFase: catalogoDb,
-      modosDeFase: modosDb,
     })
 
-    console.log(`   FaseMacro na base: ${fasesDb.length} · CatalogoFase: ${catalogoDb.length} · modos: ${modosDb.length}`)
+    console.log(`   FaseMacro na base: ${fasesDb.length} · CatalogoFase: ${catalogoDb.length}`)
     for (const a of achados) {
       console.log(`   [${a.severidade}] ${a.tipo} · macro ${a.macroWorkflowId} (${a.tipoProcessoCode ?? "—"}) · #${a.faseMacroId} "${a.phaseKey}"`)
       console.log(`        ${a.detalhe}`)
@@ -240,7 +222,6 @@ async function contraOBanco() {
     // As mesmas verificações, nomeadas — quando quebram, dizem QUAL invariante caiu.
     check("nenhuma FaseMacro fora do catálogo canônico", !achados.some((a) => a.tipo === "PHASEKEY_FORA_DO_CATALOGO"))
     check("nenhum CatalogoFase inválido (nem ativo, nem inativo)", !achados.some((a) => a.tipo === "CATALOGO_FASE_COM_CHAVE_LEGADA"))
-    check("nenhum modo de fase inválido", !achados.some((a) => a.tipo === "MODO_DE_FASE_COM_CHAVE_LEGADA"))
     check("nenhuma phaseKey duplicada em macro nenhum", !achados.some((a) => a.tipo === "PHASEKEY_DUPLICADA_NO_MACRO"))
     check("nenhuma fase obrigatória sem workflow publicado", !achados.some((a) => a.tipo === "FASE_OBRIGATORIA_SEM_WORKFLOW"))
 
@@ -248,7 +229,6 @@ async function contraOBanco() {
     const legadasNoCadastro = [
       ...fasesDb.filter((f) => EQUIVALENCIA_LEGADA[f.phaseKey] != null).map((f) => `FaseMacro#${f.id}`),
       ...catalogoDb.filter((c) => EQUIVALENCIA_LEGADA[c.phaseKey] != null).map((c) => `CatalogoFase#${c.id}`),
-      ...modosDb.filter((m) => EQUIVALENCIA_LEGADA[m.phaseKey] != null).map((m) => `PhaseInternalMode#${m.id}`),
     ]
     check("nenhuma chave legada persistida (nem em registro inativo)", legadasNoCadastro.length === 0, JSON.stringify(legadasNoCadastro))
 

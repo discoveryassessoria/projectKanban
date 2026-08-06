@@ -30,7 +30,7 @@ interface Fase {
 interface Contagens {
   fases: number; fasesNoKanban: number; fasesComInterno: number; passos: number
   automacoesFinanceiras: number; automacoesEvento: number; automacoesProtocolo: number
-  variacoes: number; regrasDocumentais: number; configsFinanceiras: number
+  regrasDocumentais: number; configsFinanceiras: number
 }
 interface Tipo {
   id: number; code: string; name: string
@@ -438,9 +438,6 @@ function diagnosticar(t: Tipo): Checagem[] {
   out.push(auto > 0
     ? { nome: "Automações por fase", sev: "ok", detalhe: `${c.automacoesFinanceiras} financeira(s) · ${c.automacoesEvento} de evento · ${c.automacoesProtocolo} de protocolo` }
     : { nome: "Automações por fase", sev: "alerta", detalhe: "nenhum efeito automático configurado" })
-  out.push(c.variacoes > 0
-    ? { nome: "Variações da fase", sev: "ok", detalhe: `${c.variacoes} variação(ões)` }
-    : { nome: "Variações da fase", sev: "alerta", detalhe: "nenhuma variação — todas as fases rodam no modo padrão" })
   out.push(t.ativo
     ? { nome: "Situação", sev: "ok", detalhe: "tipo ativo (aceita novos processos)" }
     : { nome: "Situação", sev: "alerta", detalhe: "tipo inativo — não aparece na criação de processo" })
