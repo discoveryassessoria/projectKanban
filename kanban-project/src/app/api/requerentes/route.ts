@@ -2,6 +2,7 @@
 
 import { NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
+import { gerarCodigoPublico } from "@/lib/codigos/code-generator"
 import { logRequerente } from "@/lib/auditoria"
 import { verificarPermissao } from '@/src/lib/verificar-permissao'
 
@@ -150,8 +151,20 @@ export async function POST(request: Request) {
     if (body.cep) createData.cep = body.cep
     if (body.observacoes) createData.observacoes = body.observacoes
 
-    const requerente = await prisma.requerente.create({
-      data: createData as any,
+    // CÓDIGO PÚBLICO — obrigatório, único, imutável, gerado no BACKEND.
+    //
+    // A criação nunca chamou o CodeGeneratorService: o cliente nascia com
+    // `publicCode` null e a ficha mostrava "—". Gerar aqui, e não no frontend,
+    // é o que torna o código à prova de concorrência — a sequência avança por
+    // uma única instrução atômica no Postgres (INSERT ... ON CONFLICT DO UPDATE
+    // ... RETURNING), e o lock de linha serializa criações simultâneas.
+    //
+    // Sequência e criação na MESMA transação: se o create falhar, o rollback
+    // desfaz tudo e nenhum cliente fica sem código. O contador não retrocede —
+    // um número queimado é preferível a um código reutilizado.
+    const requerente = await prisma.$transaction(async (tx) => {
+      const publicCode = await gerarCodigoPublico(tx, 'CLIENT')
+      return tx.requerente.create({ data: { ...createData, publicCode } as any })
     })
 
     // ✅ REGISTRAR LOG

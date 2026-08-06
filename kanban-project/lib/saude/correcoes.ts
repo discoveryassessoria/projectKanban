@@ -73,6 +73,11 @@ registrar({
       { tabela: 'OrgaoProtocolo', escopo: 'ORG', like: 'ORG%' },
       { tabela: 'TipoDocumentoCadastro', escopo: 'TDOC', like: 'DOC%' },
       { tabela: 'Contratante', escopo: 'CLI', like: 'CLI-%' },
+      // Requerente compartilha a sequência CLI e é quem de fato concentra os
+      // códigos de cliente. Sem ele aqui, a sincronização olhava a tabela com
+      // 2 registros e ignorava a de 765 — e o contador podia ficar atrás do
+      // maior código já gravado, entregando número repetido na próxima criação.
+      { tabela: 'Requerente', escopo: 'CLI', like: 'CLI-%' },
       { tabela: 'Usuario', escopo: 'USR', like: 'USR-%' },
       { tabela: 'Fornecedor', escopo: 'FOR', like: 'FOR-%' },
     ]

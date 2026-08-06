@@ -231,7 +231,10 @@
     "pre-cadastro:estrutural": "tsx prisma/pre-cadastro-estrutural.ts",
     "pre-cadastro:estrutural:execute": "tsx prisma/pre-cadastro-estrutural.ts --execute",
     "test:pre-cadastro": "tsx scripts/pre-cadastro-guards.test.ts",
-    "test:assistente": "tsx scripts/assistente-parametrizacao.test.ts"
+    "test:assistente": "tsx scripts/assistente-parametrizacao.test.ts",
+    "backfill:codigo-cliente": "tsx scripts/backfill-codigo-cliente.ts",
+    "backfill:codigo-cliente:execute": "tsx scripts/backfill-codigo-cliente.ts --execute",
+    "test:codigo-cliente": "tsx scripts/codigo-cliente.test.ts"
   },
   "prisma": {
     "seed": "npm run guard:escrita && tsx prisma/seed.ts"

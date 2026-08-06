@@ -1,6 +1,7 @@
 // src/app/api/contratantes/route.ts
 import { NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
+import { gerarCodigoPublico } from "@/lib/codigos/code-generator"
 import { logContratante } from "@/lib/auditoria"
 import { verificarPermissao } from '@/src/lib/verificar-permissao'
 
@@ -149,8 +150,12 @@ export async function POST(request: Request) {
     if (body.cep) createData.cep = body.cep
     if (body.observacoes) createData.observacoes = body.observacoes
 
-    const contratante = await prisma.contratante.create({
-      data: createData as any,
+    // MESMO defeito, MESMA correção: o Contratante compartilha a sequência CLI
+    // com o Requerente (ver o comentário do campo no schema) e também nascia sem
+    // código. Sequência e criação na mesma transação.
+    const contratante = await prisma.$transaction(async (tx) => {
+      const publicCode = await gerarCodigoPublico(tx, 'CLIENT')
+      return tx.contratante.create({ data: { ...createData, publicCode } as any })
     })
 
     // ✅ REGISTRAR LOG
