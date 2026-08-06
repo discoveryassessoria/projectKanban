@@ -100,9 +100,13 @@ const ARVORE_OFICIAL: Record<string, string[]> = {
   ],
   grp_orgaos: ["Organizações", "Categorias"],
   grp_usuarios: ["Usuários", "Perfis", "Permissões", "Grupos", "Auditoria de Acessos"],
+  // "Assistente de Parametrização" entrou em 06/08 como item VISÍVEL de Sistema:
+  // é a condução transversal do cadastro (Documentos + Serviços + Financeiro) e
+  // não pertence a nenhum módulo isolado. Ele orquestra as telas oficiais — não
+  // cria cadastro paralelo, por isso não abre módulo novo nem duplica item.
   grp_sistema: [
-    "Configurações Gerais", "Cadastros Auxiliares", "Identidade Visual",
-    "Comunicações", "Integrações", "Auditoria e Logs",
+    "Configurações Gerais", "Assistente de Parametrização", "Cadastros Auxiliares",
+    "Identidade Visual", "Comunicações", "Integrações", "Auditoria e Logs",
   ],
   grp_relatorios: ["Relatórios", "Indicadores", "Dashboards", "Exportações"],
 }

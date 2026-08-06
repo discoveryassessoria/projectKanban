@@ -4497,6 +4497,36 @@ model ObrigacaoEconomica {
   @@index([processoId, documentoId, tipoServicoId]) // grade da Planilha Documental
 }
 
+/// ASSISTENTE DE PARAMETRIZAÇÃO — guarda PROGRESSO, nunca configuração.
+///
+/// O assistente é camada de orquestração: a Matriz vive em MatrizDocumental, o
+/// preço em TabelaValor, o fornecedor em Fornecedor. Se ele guardasse cópia
+/// desses dados, existiriam duas verdades e a tela administrativa e o assistente
+/// divergiriam no primeiro cadastro feito fora dele. O que ele guarda é só onde
+/// o administrador parou: escopo, etapa e quem mexeu.
+model AssistenteParametrizacaoProgresso {
+  id Int @id @default(autoincrement())
+
+  /// ESCOPO — por tipo de processo (o país vem do próprio tipo).
+  tipoProcessoId Int
+  /// Fase específica, quando o administrador escolheu recortar; null = todas.
+  phaseKey       String? @db.VarChar(60)
+
+  /// Etapa em que parou (chave estrutural da etapa, não rótulo de tela).
+  etapaAtual       String @db.VarChar(40)
+  /// Etapas já percorridas — só chaves, nunca conteúdo de configuração.
+  etapasConcluidas Json?
+
+  usuarioId    Int?
+  criadoEm     DateTime  @default(now())
+  atualizadoEm DateTime  @updatedAt
+  publicadoEm  DateTime?
+  publicadoPor Int?
+
+  @@unique([tipoProcessoId, phaseKey])
+  @@index([tipoProcessoId])
+}
+
 // F5 — CRONOGRAMA de vencimentos de PAGÁVEIS (Contas a Pagar). Componente OFICIAL e
 // genérico: qualquer ObrigacaoEconomica A_PAGAR (custo/reembolso/corporativo) pode ter
 // um cronograma. Guarda SÓ o plano (vencimento + valor planejado); NUNCA saldo/recebido

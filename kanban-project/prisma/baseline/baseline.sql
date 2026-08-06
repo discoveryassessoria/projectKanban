@@ -3002,6 +3002,22 @@ CREATE TABLE "ObrigacaoEconomica" (
 );
 
 -- CreateTable
+CREATE TABLE "AssistenteParametrizacaoProgresso" (
+    "id" SERIAL NOT NULL,
+    "tipoProcessoId" INTEGER NOT NULL,
+    "phaseKey" VARCHAR(60),
+    "etapaAtual" VARCHAR(40) NOT NULL,
+    "etapasConcluidas" JSONB,
+    "usuarioId" INTEGER,
+    "criadoEm" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "atualizadoEm" TIMESTAMP(3) NOT NULL,
+    "publicadoEm" TIMESTAMP(3),
+    "publicadoPor" INTEGER,
+
+    CONSTRAINT "AssistenteParametrizacaoProgresso_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
 CREATE TABLE "ParcelaPagavel" (
     "id" SERIAL NOT NULL,
     "obrigacaoId" INTEGER NOT NULL,
@@ -5265,6 +5281,12 @@ CREATE INDEX "ObrigacaoEconomica_processoId_documentoId_tipoServicoId_idx" ON "O
 
 -- CreateIndex
 CREATE UNIQUE INDEX "ObrigacaoEconomica_origemTipo_origemId_key" ON "ObrigacaoEconomica"("origemTipo", "origemId");
+
+-- CreateIndex
+CREATE INDEX "AssistenteParametrizacaoProgresso_tipoProcessoId_idx" ON "AssistenteParametrizacaoProgresso"("tipoProcessoId");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "AssistenteParametrizacaoProgresso_tipoProcessoId_phaseKey_key" ON "AssistenteParametrizacaoProgresso"("tipoProcessoId", "phaseKey");
 
 -- CreateIndex
 CREATE INDEX "ParcelaPagavel_obrigacaoId_idx" ON "ParcelaPagavel"("obrigacaoId");

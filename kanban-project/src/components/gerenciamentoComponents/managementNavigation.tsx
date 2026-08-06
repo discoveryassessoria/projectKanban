@@ -336,6 +336,14 @@ export const MANAGEMENT_NAVIGATION: ManagementNavigationItem[] = [
     children: [
       a(10, "settings", "Configurações Gerais", ["configuracao", "configuração", "geral", "empresa", "moeda", "fuso"]),
 
+      // ASSISTENTE DE PARAMETRIZAÇÃO — camada de CONDUÇÃO sobre as telas que já
+      // existem (Regras Documentais, Serviços, Fornecedores, Aplicabilidade
+      // Econômica, Tabela de Valores, Moedas). Ele não cadastra nada por conta
+      // própria: embute a tela oficial de cada etapa. Fica em Sistema porque é
+      // transversal — atravessa Documentos, Serviços e Financeiro.
+      a(20, "paramwizard", "Assistente de Parametrização",
+        ["assistente", "parametrizacao", "parametrização", "configuracao inicial", "configuração inicial", "wizard", "onboarding", "matriz", "preco", "preço"]),
+
       // "Catálogo Mestre" SAIU do menu: o cadastro mestre (ItemCatalogo) é
       // ESTRUTURA TÉCNICA INTERNA — todos os registros, ids e vínculos seguem
       // intactos, mas a única tela de usuário sobre ele é Serviços › Catálogo de

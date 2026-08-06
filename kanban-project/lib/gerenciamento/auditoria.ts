@@ -16,6 +16,10 @@ export type AcaoAuditoria =
   // Correção automática da Saúde do Sistema: ação executada PELO sistema a pedido
   // do operador. Precisa de rótulo próprio — não é criar, editar nem excluir.
   | 'CORRECAO_AUTOMATICA' | 'CORRECAO_AUTOMATICA_FALHOU'
+  // Publicação de configuração: ato administrativo que LIGA regras — não é criar
+  // nem editar. Quem publicou, o que passou a valer e quando é o que a auditoria
+  // precisa responder depois.
+  | 'PUBLICAR'
 
 export interface EntradaAuditoria {
   acao: AcaoAuditoria

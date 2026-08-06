@@ -152,6 +152,24 @@ export async function pendenciasDoComponente(econId: number): Promise<Pendencia[
   return p
 }
 
+/**
+ * Estados que a PRÓPRIA publicação resolve. Eles bloqueiam a EXECUÇÃO do motor
+ * — e é por isso que são pendências —, mas não podem bloquear o ato de publicar:
+ * publicar é justamente ativar o componente e publicar a regra. Tratá-los como
+ * impedimento faria o estado dizer "não pode publicar" enquanto a publicação
+ * diria "posso", e o operador olharia um botão desabilitado sem motivo.
+ */
+const RESOLVIDOS_PELA_PUBLICACAO: TipoPendencia[] = ["COMPONENTE_INATIVO", "REGRA_NAO_PUBLICADA"]
+
+/**
+ * O que IMPEDE publicar, entre as pendências apuradas. Uma regra só, usada pelo
+ * estado do assistente e pela publicação coordenada — se fossem duas, o botão e
+ * o servidor discordariam.
+ */
+export function impedimentosDePublicacao(pendencias: Pendencia[]): Pendencia[] {
+  return pendencias.filter((p) => p.bloqueia && !RESOLVIDOS_PELA_PUBLICACAO.includes(p.tipo))
+}
+
 export interface RelatorioPendencias {
   componentes: number
   componentesProntos: number
@@ -160,10 +178,22 @@ export interface RelatorioPendencias {
   bloqueantes: number
 }
 
-/** Visão geral do cadastro — o que a tela administrativa mostra. */
-export async function pendenciasDaParametrizacao(filtro?: { phaseKey?: string }): Promise<RelatorioPendencias> {
+/**
+ * Visão geral do cadastro — o que a tela administrativa mostra.
+ *
+ * `phaseKeys` recorta o ESCOPO. Sem ele, a apuração é do cadastro inteiro, o que
+ * é certo para o painel global e ERRADO para o assistente: uma pendência de
+ * outro tipo de processo bloquearia a publicação deste. O escopo é do chamador,
+ * não uma decisão desta função.
+ */
+export async function pendenciasDaParametrizacao(
+  filtro?: { phaseKey?: string; phaseKeys?: string[] },
+): Promise<RelatorioPendencias> {
+  const escopoFase = filtro?.phaseKey
+    ? { phaseKey: filtro.phaseKey }
+    : filtro?.phaseKeys?.length ? { phaseKey: { in: filtro.phaseKeys } } : {}
   const econs = await prisma.phaseEconomicRule.findMany({
-    where: filtro?.phaseKey ? { phaseKey: filtro.phaseKey } : {},
+    where: escopoFase,
     select: { id: true }, orderBy: [{ phaseKey: "asc" }, { ordem: "asc" }],
   })
   const pendencias: Pendencia[] = []
@@ -176,7 +206,7 @@ export async function pendenciasDaParametrizacao(filtro?: { phaseKey?: string })
 
   // Regra documental existente mas não publicada — o motor não a executa.
   const naoPublicadas = await prisma.matrizDocumental.findMany({
-    where: { arquivado: false, status: { not: "PUBLICADA" } },
+    where: { arquivado: false, status: { not: "PUBLICADA" }, ...escopoFase },
     select: { id: true, phaseKey: true, status: true, documentTypeCode: true },
   })
   for (const r of naoPublicadas) {

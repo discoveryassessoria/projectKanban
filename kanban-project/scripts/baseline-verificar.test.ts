@@ -121,7 +121,22 @@ const MIGRATION = join(DIR_MIGRATIONS, '0000_baseline', 'migration.sql')
 // nenhuma acusada como modificada, apenas 20260806_custo_documental_vinculo
 // pendente de aplicacao. Nenhuma outra migration foi tocada; nenhum dado de
 // negocio foi lido ou alterado.
-const CHECKSUM_LEDGER = '597b1cd360c5871297e7475528074aa8f639ba3bbf00c1c8206254e37d775bb8'
+// ATUALIZACAO 06/08/2026 (assistente de parametrizacao) — migration ADITIVA
+// 20260806b_assistente_parametrizacao: UMA tabela nova
+// (AssistenteParametrizacaoProgresso), que guarda so PROGRESSO do assistente —
+// escopo, etapa, usuario e datas. Nenhuma coluna de configuracao: a Matriz, o
+// preco e o fornecedor continuam nas suas entidades. Diff do baseline: 22 linhas
+// inseridas, ZERO removidas, ZERO DROP/TRUNCATE/DELETE.
+//
+//   anterior : 597b1cd360c5871297e7475528074aa8f639ba3bbf00c1c8206254e37d775bb8
+//   atual    : 384a83bff1a33778dbb0b3026463a3f348e7907c8c7f305aabed6a26834039ed
+//
+// Procedimento executado: pg_dump completo de producao
+// (~/.discovery-backups/prod-20260806b-pre-assistente/, sha256 7088c90975dc7ae3...)
+// + copia do ledger -> conferencia do diff (22 insercoes / 0 remocoes) -> UPDATE
+// de UMA coluna na linha 0000_baseline, com o checksum anterior no WHERE (1 linha
+// afetada) -> `prisma migrate status` consistente.
+const CHECKSUM_LEDGER = '384a83bff1a33778dbb0b3026463a3f348e7907c8c7f305aabed6a26834039ed'
 
 /**
  * Migrations criadas DEPOIS da consolidacao de 02/08/2026. Toda migration nova
@@ -138,6 +153,7 @@ const MIGRATIONS_POS_BASELINE: string[] = [
   '20260804c_contrato_documental',
   '20260805_modelos_documentais',
   '20260806_custo_documental_vinculo',
+  '20260806b_assistente_parametrizacao',
 ]
 
 const sha256 = (t: string) => createHash('sha256').update(t).digest('hex')
