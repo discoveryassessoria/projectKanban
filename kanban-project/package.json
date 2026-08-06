@@ -242,7 +242,8 @@
     "test:codigo-servicos": "tsx scripts/codigo-catalogo-servicos.test.ts",
     "backfill:codigo-servicos": "npm run guard:escrita && tsx scripts/backfill-codigo-servicos-catalogo.ts --execute",
     "backfill:codigo-servicos:dry": "tsx scripts/backfill-codigo-servicos-catalogo.ts",
-    "test:codigo-servicos:e2e": "tsx scripts/codigo-servicos-e2e.test.ts"
+    "test:codigo-servicos:e2e": "tsx scripts/codigo-servicos-e2e.test.ts",
+    "smoke:codigo-servicos": "tsx scripts/smoke-codigo-catalogo-servicos.ts"
   },
   "prisma": {
     "seed": "npm run guard:escrita && tsx prisma/seed.ts"
