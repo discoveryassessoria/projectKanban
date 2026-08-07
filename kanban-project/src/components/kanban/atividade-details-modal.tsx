@@ -2,6 +2,7 @@
 
 "use client"
 
+import { nomePessoa } from "@/src/lib/ui/pessoa-exibicao"
 import { useState, useEffect, useRef, useCallback } from "react"
 import { createPortal } from "react-dom"
 import { Button } from "@/components/ui/button"
@@ -653,7 +654,7 @@ function ConteudoModal({
                               onClick={() => pode('clientes.ver') && abrirDetalhesCliente(cont, "contratante")}
                               className={`p-4 bg-[#1b2027] border border-white/10 rounded-xl transition-colors ${pode('clientes.ver') ? 'hover:bg-[#252c35] cursor-pointer' : 'cursor-default'}`}
                             >
-                              <p className="text-white/95 font-semibold">{cont.publicCode ? cont.publicCode + ' — ' : ''}{cont.nome}</p>
+                              <p className="text-white/95 font-semibold">{nomePessoa(cont)}</p>
 
                               {cont.telefone && (
                                 <div className="flex items-center gap-2 text-sm text-white/68 mt-2">
@@ -725,7 +726,7 @@ function ConteudoModal({
                               onClick={() => pode('clientes.ver') && abrirDetalhesCliente(req, "requerente")}
                               className={`p-3 bg-[#1b2027] border border-white/10 rounded-xl transition-colors ${pode('clientes.ver') ? 'hover:bg-[#252c35] cursor-pointer' : 'cursor-default'}`}
                             >
-                              <p className="text-white/95 font-medium">{req.publicCode ? req.publicCode + ' — ' : ''}{req.nome}</p>
+                              <p className="text-white/95 font-medium">{nomePessoa(req)}</p>
                               {req.telefone && (
                                 <div className="flex items-center gap-2 text-sm text-white/68 mt-1">
                                   <Phone className="h-3 w-3" />
@@ -794,7 +795,7 @@ function ConteudoModal({
                             <div key={cont.id} className="flex items-center justify-between p-2 bg-[#1b2027] border border-white/10 rounded-xl">
                               <div className="flex items-center gap-2">
                                 <User className="h-4 w-4 text-white/68" />
-                                <span className="text-white/95 text-sm">{cont.publicCode ? cont.publicCode + ' — ' : ''}{cont.nome}</span>
+                                <span className="text-white/95 text-sm">{nomePessoa(cont)}</span>
                               </div>
                               <button
                                 onClick={() => removeContratante(cont.id)}
@@ -839,7 +840,7 @@ function ConteudoModal({
                                       <User className="h-4 w-4 text-[#7dd3fc]" />
                                     </div>
                                     <div>
-                                      <p className="font-medium text-white/95 text-sm">{c.publicCode ? c.publicCode + ' — ' : ''}{c.nome}</p>
+                                      <p className="font-medium text-white/95 text-sm">{nomePessoa(c)}</p>
                                       <p className="text-xs text-white/40">{c.email || c.telefone}</p>
                                     </div>
                                   </button>
@@ -865,7 +866,7 @@ function ConteudoModal({
                             <div key={req.id} className="flex items-center justify-between p-2 bg-[#1b2027] border border-white/10 rounded-xl">
                               <div className="flex items-center gap-2">
                                 <User className="h-4 w-4 text-[#7dd3fc]" />
-                                <span className="text-white/95 text-sm">{req.publicCode ? req.publicCode + ' — ' : ''}{req.nome}</span>
+                                <span className="text-white/95 text-sm">{nomePessoa(req)}</span>
                               </div>
                               <button
                                 onClick={() => removeRequerente(req.id)}
@@ -910,7 +911,7 @@ function ConteudoModal({
                                       <User className="h-4 w-4 text-[#4ade80]" />
                                     </div>
                                     <div>
-                                      <p className="font-medium text-white/95 text-sm">{r.publicCode ? r.publicCode + ' — ' : ''}{r.nome}</p>
+                                      <p className="font-medium text-white/95 text-sm">{nomePessoa(r)}</p>
                                       <p className="text-xs text-white/40">{r.email || r.telefone}</p>
                                     </div>
                                   </button>

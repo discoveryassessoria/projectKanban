@@ -5,6 +5,7 @@
  * Com opção de vincular a um processo do kanban
  */
 
+import { nomePessoa } from "@/src/lib/ui/pessoa-exibicao"
 import { useState, useEffect, useMemo } from "react"
 import { useApi } from '@/src/lib/dados'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog"
@@ -280,7 +281,7 @@ function ConteudoModal({
                 <SelectItem value="none">Sem responsável</SelectItem>
                 {usuarios.map((usuario) => (
                   <SelectItem key={usuario.id} value={usuario.id.toString()}>
-                    {usuario.publicCode ? usuario.publicCode + ' — ' : ''}{usuario.nome}
+                    {nomePessoa(usuario)}
                   </SelectItem>
                 ))}
               </SelectContent>

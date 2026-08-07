@@ -389,7 +389,7 @@ function PessoaCard({
                 G{p.geracao + 1}
               </span>
             )}
-            <span className="truncate">{[p.publicCode, p.requerente ? "Requerente" : p.posicao].filter(Boolean).join(" · ")}</span>
+            <span className="truncate">{p.requerente ? "Requerente" : p.posicao}</span>
             <span className={`flex items-center gap-1 ${transmissao.cor}`}>
               <span className={`w-1.5 h-1.5 rounded-full ${transmissao.dot}`} />
               {transmissao.label}

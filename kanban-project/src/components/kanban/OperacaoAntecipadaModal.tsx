@@ -4,6 +4,7 @@
 // (dinâmico) — nunca de uma lista fixa. A fase-destino também é catálogo (dinâmica).
 "use client"
 
+import { nomePessoa } from "@/src/lib/ui/pessoa-exibicao"
 import { useState, useEffect, useCallback } from "react"
 import { Loader2, ArrowLeftRight, X } from "lucide-react"
 
@@ -187,7 +188,7 @@ export function OperacaoAntecipadaModal({ processoId, necessidadeId, necessidade
               <span className="block text-[11.5px] font-semibold text-white/68 mb-1">Responsável</span>
               <select value={responsavelId} onChange={(e) => setResponsavelId(e.target.value)} className="w-full text-[13px] rounded-lg border border-white/10 px-2.5 py-2 bg-[#1b2027] focus:outline-none focus:border-blue-400">
                 <option value="">—</option>
-                {(usuarios ?? []).map((u) => <option key={u.id} value={u.id}>{u.publicCode ? u.publicCode + ' — ' : ''}{u.nome}</option>)}
+                {(usuarios ?? []).map((u) => <option key={u.id} value={u.id}>{nomePessoa(u)}</option>)}
               </select>
             </label>
           </div>

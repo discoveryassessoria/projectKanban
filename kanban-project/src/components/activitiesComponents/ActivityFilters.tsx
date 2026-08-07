@@ -1,5 +1,6 @@
 "use client"
 
+import { nomePessoa } from "@/src/lib/ui/pessoa-exibicao"
 import { useState, useEffect, useMemo } from "react"
 import { useApi } from '@/src/lib/dados'
 import { Button } from "@/components/ui/button"
@@ -332,7 +333,7 @@ export default function ActivityFilters({ onFiltersChange, activeFilters }: Acti
                   <SelectItem value="all" className="text-white hover:bg-white/10">Todos os Responsáveis</SelectItem>
                   {usuarios.map((usuario) => (
                     <SelectItem key={usuario.id} value={usuario.id.toString()} className="text-white hover:bg-white/10">
-                      {usuario.publicCode ? usuario.publicCode + ' — ' : ''}{usuario.nome}
+                      {nomePessoa(usuario)}
                     </SelectItem>
                   ))}
                 </SelectContent>
