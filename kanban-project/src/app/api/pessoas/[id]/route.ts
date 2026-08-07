@@ -9,7 +9,6 @@ import { houveTransicaoParaRequerente, ehRequerente } from "@/lib/genealogia/req
 import { enfileirarEventoRequerente, TIPO_EVENTO_REQUERENTE } from "@/src/services/genealogia/emitir-evento-requerente"
 import { processarOutbox } from "@/src/services/outbox-dispatcher"
 import { removerPessoaDaArvore, type ModoRemocao } from "@/src/services/pessoa-ciclo-vida"
-import { reconciliarEconomicoDoProcesso } from "@/src/lib/motor/matriz-economica"
 // LEGADO_INATIVO (desativação Genealogia): editar Pessoa NÃO reconcilia mais
 // Documento (reconcileDocsForPessoa removido). A materialização V2 (Fatia 2) é
 // aditiva/idempotente e não cria Documento.
@@ -208,9 +207,8 @@ export async function DELETE(request: NextRequest, { params }: { params: Promise
       return NextResponse.json({ error: "ID inválido" }, { status: 400 })
     }
 
-    // A árvore é lida ANTES: depois da remoção a Pessoa pode não existir mais.
-    const antes = await prisma.pessoa.findUnique({ where: { id }, select: { arvoreId: true } })
-    if (!antes) {
+    const existe = await prisma.pessoa.findUnique({ where: { id }, select: { id: true } })
+    if (!existe) {
       return NextResponse.json({ error: "Pessoa não encontrada" }, { status: 404 })
     }
 
@@ -236,15 +234,10 @@ export async function DELETE(request: NextRequest, { params }: { params: Promise
       )
     }
 
-    // Reconciliação pós-remoção: a árvore reavalia as regras documentais e o
-    // financeiro do processo reconverge. Best-effort — a remoção já está commitada.
-    await dispararMaterializacaoPorArvore(antes.arvoreId).catch(() => {})
-    for (const processoId of resultado.processosAfetados) {
-      await reconciliarEconomicoDoProcesso(processoId).catch((e) =>
-        console.error("[pessoa removida → reconcile econômico]", e),
-      )
-    }
-
+    // A reconciliação NÃO é feita aqui: ela é parte do ato e vive no serviço
+    // canônico (reconciliarAposRemocao), para que toda porta de entrada termine
+    // no mesmo estado final. Rota que reconcilia por conta própria é a origem
+    // da divergência que `DELETE /api/arvore/[id]` tinha.
     return NextResponse.json({
       message:
         resultado.modoExecutado === "HARD"

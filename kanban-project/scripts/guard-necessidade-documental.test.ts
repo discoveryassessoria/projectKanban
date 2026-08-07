@@ -68,6 +68,7 @@ const AUTORIZADOS_FORA_DO_RUNTIME: Record<string, string> = {
   "scripts/backfill-residuos-pessoa.ts":
     "backfill: remove necessidade SEM SUJEITO (viola pessoaId XOR uniaoId); dry-run por padrão",
   "scripts/pessoa-tortura.test.ts": "teste de tortura do ciclo de vida da Pessoa: monta e limpa o cenário",
+  "scripts/pessoa-equivalencia-rotas.test.ts": "teste de equivalência das duas rotas: monta dois cenários e limpa",
   "scripts/exclusao-servico.test.ts": "teste de exclusão definitiva de serviço: monta e limpa o cenário",
 }
 

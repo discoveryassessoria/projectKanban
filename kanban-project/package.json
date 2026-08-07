@@ -262,7 +262,8 @@
     "test:pessoa-tortura": "tsx scripts/pessoa-tortura.test.ts",
     "backfill:residuos-pessoa": "tsx scripts/backfill-residuos-pessoa.ts",
     "backfill:residuos-pessoa:execute": "tsx scripts/backfill-residuos-pessoa.ts --execute",
-    "diagnostico:residuos-pessoa": "tsx scripts/diagnostico-pessoa-residuos.ts"
+    "diagnostico:residuos-pessoa": "tsx scripts/diagnostico-pessoa-residuos.ts",
+    "test:pessoa-equivalencia": "tsx scripts/pessoa-equivalencia-rotas.test.ts"
   },
   "prisma": {
     "seed": "npm run guard:escrita && tsx prisma/seed.ts"

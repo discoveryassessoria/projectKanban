@@ -42,6 +42,8 @@ import { prisma } from "@/lib/prisma"
 import type { Prisma } from "@prisma/client"
 import { removerNecessidadesDoSujeito } from "@/src/services/necessidade-documental"
 import { removerDocumentosDoSujeito } from "@/src/services/documento-operacional"
+import { dispararMaterializacaoPorArvore } from "@/src/services/genealogia/materializar-genealogia"
+import { reconciliarEconomicoDoProcesso } from "@/src/lib/motor/matriz-economica"
 
 type DB = Prisma.TransactionClient | typeof prisma
 
@@ -435,6 +437,10 @@ export async function analisarRemocaoPessoa(
 
 export async function removerPessoaDaArvore(input: RemocaoInput): Promise<ResultadoRemocao> {
   const modo = input.modo ?? "AUTO"
+  // A árvore de origem é lida ANTES: depois do commit a Pessoa pode não existir.
+  const arvoreOrigem = (await prisma.pessoa.findUnique({
+    where: { id: input.pessoaId }, select: { arvoreId: true },
+  }))?.arvoreId ?? null
 
   // TIMEOUT EXPLÍCITO. A remoção é uma transação LONGA por natureza: o plano
   // levanta onze tipos de fato protegido, o contexto resolve doze conjuntos de
@@ -448,7 +454,7 @@ export async function removerPessoaDaArvore(input: RemocaoInput): Promise<Result
   //
   // Encurtar a transação não é opção: meia exclusão é o defeito que este
   // serviço existe para impedir. O que se ajusta é o tempo.
-  return prisma.$transaction(async (tx) => {
+  const resultado: ResultadoRemocao = await prisma.$transaction(async (tx) => {
     // LOCK: a linha da Pessoa é reservada antes de qualquer leitura de plano.
     // Duas remoções concorrentes serializam aqui; a segunda encontra o contexto
     // já vazio e sai idempotente, sem apagar nada de ninguém.
@@ -522,6 +528,61 @@ export async function removerPessoaDaArvore(input: RemocaoInput): Promise<Result
 
     return { ok: true, modoExecutado: efetivo, plano, removidos, processosAfetados: plano.processoIds }
   }, { timeout: 60_000, maxWait: 15_000 })
+
+  // RECONCILIAÇÃO PÓS-COMMIT — parte do ato, não da rota.
+  //
+  // Ela vivia na rota `DELETE /api/pessoas/[id]`. A rota `DELETE /api/arvore/[id]`
+  // chamava o mesmo serviço e NÃO reconciliava: duas portas de entrada, dois
+  // estados finais. A origem da ação não pode mudar o estado final do domínio,
+  // então a reconciliação desceu para cá — onde toda porta a herda.
+  //
+  // Fora da transação porque materialização e reconciliação abrem as suas
+  // próprias; dentro, o `tx` já estaria fechado quando elas commitassem.
+  if (resultado.ok) {
+    await reconciliarAposRemocao({ arvoreId: arvoreOrigem, processoIds: resultado.processosAfetados })
+  }
+  return resultado
+}
+
+/**
+ * O estado final do processo depois que alguém sai. IDEMPOTENTE: rodar de novo
+ * não recria pessoa, participante, documento, tarefa, custo nem receita —
+ * os dois serviços chamados aqui convergem, não somam.
+ *
+ * Reutiliza os serviços canônicos existentes; não há versão alternativa deles.
+ */
+export async function reconciliarAposRemocao(
+  args: { arvoreId: number | null; processoIds: number[] },
+): Promise<{ arvore: boolean; processos: number[]; erros: string[] }> {
+  const erros: string[] = []
+
+  // (1) Documental: reavalia as Regras Documentais publicadas contra quem SOBROU
+  //     na árvore. É o mesmo serviço que a criação e a edição de pessoa chamam.
+  //     Pessoa removida não volta: a leitura já é escopada por `pessoasAtivasDaArvore`.
+  if (args.arvoreId != null) {
+    try {
+      await dispararMaterializacaoPorArvore(args.arvoreId)
+    } catch (e) {
+      erros.push(`materialização da árvore ${args.arvoreId}: ${e instanceof Error ? e.message : String(e)}`)
+    }
+  }
+
+  // (2) Econômico: recria o que falta e REMOVE os órfãos do processo — custo,
+  //     receita e obrigação que dependiam de documento/pessoa que saiu. É o que
+  //     mantém Central, Planilha e indicadores corretos, porque todos derivam
+  //     dessas mesmas linhas (nenhum tem estado próprio a atualizar).
+  const reconciliados: number[] = []
+  for (const processoId of args.processoIds) {
+    try {
+      await reconciliarEconomicoDoProcesso(processoId)
+      reconciliados.push(processoId)
+    } catch (e) {
+      erros.push(`reconcile econômico do processo ${processoId}: ${e instanceof Error ? e.message : String(e)}`)
+    }
+  }
+
+  if (erros.length) console.error("[pessoa removida → reconciliação]", erros.join(" ; "))
+  return { arvore: args.arvoreId != null, processos: reconciliados, erros }
 }
 
 /**

@@ -118,6 +118,7 @@ const AUTORIZADOS_FORA_DO_RUNTIME: Record<string, string> = {
 
   // ── Teste do próprio ciclo de vida ───────────────────────────────────────
   "scripts/pessoa-tortura.test.ts": "teste de tortura: 10 ciclos criar→excluir→recriar",
+  "scripts/pessoa-equivalencia-rotas.test.ts": "teste de equivalência das duas rotas: monta dois cenários e limpa",
 
   // ── Testes de integração que montam e derrubam cenário com banco ─────────
   // Cada um limpa o que ele mesmo criou. Nenhum é caminho de runtime.
@@ -263,9 +264,33 @@ ok("o vínculo pessoa↔processo é removido no hard delete",
 ok("toda remoção é auditada", /logAuditoria\.create\(/.test(servico))
 
 const rota = ler("src/app/api/pessoas/[id]/route.ts")
+const rotaArvore = ler("src/app/api/arvore/[arvoreid]/route.ts")
 ok("DELETE /api/pessoas/[id] delega ao serviço", /removerPessoaDaArvore\(/.test(rota))
-ok("a rota não apaga nada por conta própria",
+ok("DELETE /api/arvore/[arvoreid] delega ao MESMO serviço", /removerPessoaDaArvore\(/.test(rotaArvore))
+ok("a rota de pessoa não apaga nada por conta própria",
   !/tx\.(pessoa|documento|uniao)\.delete/.test(rota))
+ok("a rota de árvore não apaga pessoa por conta própria",
+  !/pessoa\.deleteMany\(/.test(rotaArvore))
+
+// A ORIGEM DA AÇÃO NÃO PODE MUDAR O ESTADO FINAL. A reconciliação vivia na rota
+// de pessoa; a de árvore chamava o mesmo serviço e não reconciliava — duas
+// portas, dois estados finais. Agora ela é do serviço, e rota que reconciliar
+// por conta própria reprova aqui.
+ok("a reconciliação é do SERVIÇO, não da rota",
+  /export async function reconciliarAposRemocao/.test(servico) &&
+  /await reconciliarAposRemocao\(/.test(servico))
+ok("a reconciliação roda DEPOIS do commit",
+  servico.indexOf("}, { timeout: 60_000") < servico.indexOf("await reconciliarAposRemocao("),
+  "materialização e reconcile abrem transações próprias")
+for (const [arquivo, texto] of [["pessoas/[id]", rota], ["arvore/[arvoreid]", rotaArvore]] as const) {
+  ok(`rota ${arquivo} não tem reconciliação própria`,
+    !/dispararMaterializacaoPorArvore\(|reconciliarEconomicoDoProcesso\(/.test(
+      texto.slice(texto.indexOf("export async function DELETE")),
+    ))
+}
+ok("a reconciliação reusa os serviços canônicos existentes",
+  /dispararMaterializacaoPorArvore\(/.test(servico) && /reconciliarEconomicoDoProcesso\(/.test(servico),
+  "sem versão alternativa deles")
 
 // ── 5) O recorte "ativo" tem fonte única ───────────────────────────────────
 secao("5) Recorte ATIVO — fonte única, sem definição improvisada")

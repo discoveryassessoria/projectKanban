@@ -143,9 +143,18 @@ export async function DELETE(request: NextRequest, { params }: { params: Promise
       )
     }
 
+    // Cada pessoa sai pelo serviço canônico — que já reconcilia depois de commitar.
+    // Esta rota NÃO tem limpeza nem reconciliação própria: se tivesse, voltaria a
+    // existir um segundo comportamento, que é exatamente o defeito corrigido aqui.
     const actorUserId = (await extrairUsuarioComPermissoes(request))?.userId ?? null
     for (const p of pessoas) {
-      await removerPessoaDaArvore({ pessoaId: p.id, actorUserId, modo: "HARD" })
+      const r = await removerPessoaDaArvore({ pessoaId: p.id, actorUserId, modo: "HARD" })
+      if (!r.ok) {
+        return NextResponse.json(
+          { error: r.erro, code: r.code, pessoaId: p.id },
+          { status: r.code === "PESSOA_NAO_ENCONTRADA" ? 404 : 409 },
+        )
+      }
     }
     await prisma.arvore.delete({ where: { id } })
 
