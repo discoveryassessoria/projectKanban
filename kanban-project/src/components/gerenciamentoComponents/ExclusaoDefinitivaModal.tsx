@@ -114,10 +114,13 @@ export function ExclusaoDefinitivaModal({ titulo, previewUrl, deleteUrl, entidad
           {carregando && <div className="text-[13px] text-white/50">Carregando prévia…</div>}
           {analise && (
             <>
-              {/* CONFIGURAÇÃO — o que cai em cascata */}
+              {/* CONFIGURAÇÃO — o que cai em cascata. Com histórico NADA cai: o rótulo não pode
+                  prometer exclusão que não vai acontecer. */}
               <div className="rounded-lg border border-white/10 bg-white/[0.03] p-3">
-                <div className="text-[11px] uppercase font-bold tracking-wide text-white/40 mb-1.5">Serão excluídos</div>
-                <ul className="text-[12.5px] space-y-0.5">
+                <div className="text-[11px] uppercase font-bold tracking-wide text-white/40 mb-1.5">
+                  {analise.deletionAllowed ? "Serão excluídos" : "Seriam excluídos, se não houvesse histórico"}
+                </div>
+                <ul className={`text-[12.5px] space-y-0.5 ${analise.deletionAllowed ? "" : "opacity-50"}`}>
                   <li className="flex items-center gap-2"><span className="font-semibold">{entidadeLabel}</span><span className="text-white/50">{analise.alvo.nome}</span></li>
                   {emCascata.map((d) => (
                     <li key={d.entidade} className="flex items-center gap-2">
