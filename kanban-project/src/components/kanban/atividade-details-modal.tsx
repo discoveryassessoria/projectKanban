@@ -186,6 +186,9 @@ function ConteudoModal({
   const [clienteModalOpen, setClienteModalOpen] = useState(false)
   const [clienteFormData, setClienteFormData] = useState(initialFormData)
   const [clienteEditingId, setClienteEditingId] = useState<number | null>(null)
+  // O código público do cliente é identidade de CADASTRO: não aparece no processo,
+  // mas a FICHA do cliente (contexto administrativo) tem de mostrá-lo.
+  const [clienteCodigo, setClienteCodigo] = useState<string | null>(null)
   const [clienteTipo, setClienteTipo] = useState<string>("contratante")
   const [clienteIsViewMode, setClienteIsViewMode] = useState(true)
   
@@ -235,6 +238,7 @@ function ConteudoModal({
       cep: cliente.cep || "",
       observacoes: cliente.observacoes || "",
     })
+    setClienteCodigo(cliente.publicCode ?? null)
     setClienteEditingId(cliente.id)
     setClienteTipo(tipo)
     setClienteIsViewMode(true)
@@ -1048,11 +1052,14 @@ function ConteudoModal({
           setClienteModalOpen(false)
           setClienteFormData(initialFormData)
           setClienteEditingId(null)
+          setClienteCodigo(null)
         }}
         isViewMode={clienteIsViewMode}
         setIsViewMode={setClienteIsViewMode}
         editingId={clienteEditingId}
         editingTipo={clienteTipo}
+        codigoPublico={clienteCodigo}
+        clienteExistente
         formData={clienteFormData}
         setFormData={setClienteFormData}
         onSave={handleSaveCliente}

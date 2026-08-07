@@ -148,6 +148,11 @@ verificar(
   'rótulo administrativo mantém código + nome',
   rotuloAdministrativoPessoa({ nome: 'Caroline Abellan Pelluci', publicCode: 'CLI-135' }) === 'CLI-135 — Caroline Abellan Pelluci',
 )
+verificar(
+  'ficha do cliente aberta de dentro do processo recebe o código público',
+  /codigoPublico=\{clienteCodigo\}/.test(modal) && /clienteExistente/.test(modal) &&
+  /setClienteCodigo\(cliente\.publicCode \?\? null\)/.test(modal),
+)
 const ficha = readFileSync(join(RAIZ, FICHA_CLIENTE), 'utf8')
 verificar(
   'listagem de clientes segue exibindo o código em coluna própria',
