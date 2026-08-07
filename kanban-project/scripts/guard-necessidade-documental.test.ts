@@ -69,6 +69,7 @@ const AUTORIZADOS_FORA_DO_RUNTIME: Record<string, string> = {
     "backfill: remove necessidade SEM SUJEITO (viola pessoaId XOR uniaoId); dry-run por padrão",
   "scripts/pessoa-tortura.test.ts": "teste de tortura do ciclo de vida da Pessoa: monta e limpa o cenário",
   "scripts/pessoa-equivalencia-rotas.test.ts": "teste de equivalência das duas rotas: monta dois cenários e limpa",
+  "scripts/smoke-ui-setup.ts": "smoke autenticado em produção: monta e REMOVE o cenário marcado (SMOKE-UI-CICLO-VIDA)",
   "scripts/exclusao-servico.test.ts": "teste de exclusão definitiva de serviço: monta e limpa o cenário",
 }
 

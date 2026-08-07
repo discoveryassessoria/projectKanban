@@ -119,6 +119,7 @@ const AUTORIZADOS_FORA_DO_RUNTIME: Record<string, string> = {
   // ── Teste do próprio ciclo de vida ───────────────────────────────────────
   "scripts/pessoa-tortura.test.ts": "teste de tortura: 10 ciclos criar→excluir→recriar",
   "scripts/pessoa-equivalencia-rotas.test.ts": "teste de equivalência das duas rotas: monta dois cenários e limpa",
+  "scripts/smoke-ui-setup.ts": "smoke autenticado em produção: monta e REMOVE o cenário marcado (SMOKE-UI-CICLO-VIDA)",
 
   // ── Testes de integração que montam e derrubam cenário com banco ─────────
   // Cada um limpa o que ele mesmo criou. Nenhum é caminho de runtime.

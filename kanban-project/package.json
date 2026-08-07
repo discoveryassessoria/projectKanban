@@ -263,7 +263,11 @@
     "backfill:residuos-pessoa": "tsx scripts/backfill-residuos-pessoa.ts",
     "backfill:residuos-pessoa:execute": "tsx scripts/backfill-residuos-pessoa.ts --execute",
     "diagnostico:residuos-pessoa": "tsx scripts/diagnostico-pessoa-residuos.ts",
-    "test:pessoa-equivalencia": "tsx scripts/pessoa-equivalencia-rotas.test.ts"
+    "test:pessoa-equivalencia": "tsx scripts/pessoa-equivalencia-rotas.test.ts",
+    "smoke:ui-exclusao": "tsx scripts/smoke-ui-setup.ts",
+    "smoke:ui-exclusao:verificar": "tsx scripts/smoke-ui-setup.ts --verificar",
+    "smoke:ui-exclusao:residuo": "tsx scripts/smoke-ui-setup.ts --residuo",
+    "smoke:ui-exclusao:limpar": "tsx scripts/smoke-ui-setup.ts --limpar"
   },
   "prisma": {
     "seed": "npm run guard:escrita && tsx prisma/seed.ts"
