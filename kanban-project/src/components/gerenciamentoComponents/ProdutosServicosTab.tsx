@@ -204,9 +204,10 @@ export default function ProdutosServicosTab() {
   async function excluir(l: ItemUnificado) {
     // Com permissão de exclusão definitiva: modal com 2 opções (inativar × excluir).
     if (podeExcluirDefinitivo) { setModalExcluir(l); return }
-    // Sem permissão: o botão não mente — informa o que REALMENTE aconteceu.
+    // Sem permissão de exclusão definitiva o caminho é UM só: inativar. O botão não promete
+    // exclusão que não vai acontecer — a exclusão física é ato administrativo (§13).
     const alvo = l.origem === 'servico' ? 'serviço' : 'item'
-    if (!confirm(`Excluir o ${alvo} "${l.nome}"?\n\nSe já tiver uso, será apenas inativado para preservar o histórico.`)) return
+    if (!confirm(`Inativar o ${alvo} "${l.nome}"?\n\nO cadastro sai de circulação e todo o histórico é preservado. Excluir definitivamente é restrito a administradores.`)) return
     try {
       const base = l.origem === 'servico' ? URL_SERVICOS : URL_MESTRE
       const r: any = await jsonFetch(`${base}/${l.id}`, { method: 'DELETE' })

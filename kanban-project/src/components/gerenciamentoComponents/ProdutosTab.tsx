@@ -291,7 +291,7 @@ export default function ProdutosTab() {
     if (podeExcluirDefinitivo) { setModalExcluir(p); return }
     // Usuário comum: regra geral inalterada — nunca apaga; no máximo inativa (o backend decide).
     const nome = p.mestre?.nome || p.nome
-    if (!confirm(`Excluir a Configuração Financeira de "${nome}"?\n\nSe nada estiver usando esta configuração (preço, regra ou vínculo de serviço), ela é apagada de vez. Caso contrário, é inativada para preservar o histórico.`)) return
+    if (!confirm(`Inativar a Configuração Financeira de "${nome}"?\n\nPreços, regras e histórico são preservados. Excluir definitivamente é restrito a administradores.`)) return
     try {
       const r: any = await jsonFetch(`/api/gerenciamento/produtos/${p.id}`, { method: 'DELETE' })
       await carregar()

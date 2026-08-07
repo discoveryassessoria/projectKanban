@@ -12,7 +12,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
   if (!itemId || Number.isNaN(itemId)) return NextResponse.json({ error: "ID inválido" }, { status: 400 })
   const analise = await analisarExclusaoItemCatalogo(itemId)
   if (!analise) return NextResponse.json({ error: "Item de catálogo não encontrado" }, { status: 404 })
-  return NextResponse.json({ ...analise, fraseConfirmacao: FRASE_CONFIRMACAO })
+  return NextResponse.json(analise)
 }
 
 export async function DELETE(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
@@ -30,9 +30,9 @@ export async function DELETE(request: NextRequest, { params }: { params: Promise
     const r = await excluirItemCatalogoDefinitivo(itemId, { usuarioId: usuario.userId, motivo: typeof body?.motivo === "string" ? body.motivo : null })
     return NextResponse.json({ ok: true, excluidoDefinitivo: true, ...r })
   } catch (e) {
-    const err = e as { code?: string; message?: string; blockers?: unknown }
+    const err = e as { code?: string; message?: string; historicalFacts?: unknown }
     if (err.code === "NAO_ENCONTRADA") return NextResponse.json({ error: err.message }, { status: 404 })
-    if (err.code === "USO_REAL" || err.code === "USO_REAL_RACE") return NextResponse.json({ error: err.message, blockers: err.blockers }, { status: 409 })
+    if (err.code === "FATO_HISTORICO" || err.code === "FATO_HISTORICO_RACE") return NextResponse.json({ error: err.message, historicalFacts: err.historicalFacts }, { status: 409 })
     console.error("[DELETE exclusao-definitiva item]", e)
     return NextResponse.json({ error: err.message ?? "Erro ao excluir definitivamente" }, { status: 500 })
   }
