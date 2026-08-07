@@ -117,6 +117,11 @@ secao("4) Transação, lock e recusa explícita")
 // ═══════════════════════════════════════════════════════════════════════════
 
 ok("tudo roda dentro de UMA transação", /prisma\.\$transaction\(async \(tx\)/.test(servico))
+// O timeout padrão do Prisma (5s) não cobre a cascata contra banco remoto: o
+// smoke em produção reprovou com P2028 no meio da exclusão. Encurtar a
+// transação seria aceitar meia exclusão — o defeito que este serviço impede.
+ok("a transação tem timeout explícito, dimensionado para banco remoto",
+  /timeout: 60_000/.test(servico) && /maxWait: 15_000/.test(servico))
 ok("a Pessoa é travada com FOR UPDATE antes de decidir", /FOR UPDATE/.test(servico))
 ok("o plano é recalculado DENTRO da transação, não confiado da tela",
   /analisarRemocaoPessoa\(input\.pessoaId, tx\)/.test(servico))

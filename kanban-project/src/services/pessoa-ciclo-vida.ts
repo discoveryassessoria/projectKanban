@@ -436,6 +436,18 @@ export async function analisarRemocaoPessoa(
 export async function removerPessoaDaArvore(input: RemocaoInput): Promise<ResultadoRemocao> {
   const modo = input.modo ?? "AUTO"
 
+  // TIMEOUT EXPLÍCITO. A remoção é uma transação LONGA por natureza: o plano
+  // levanta onze tipos de fato protegido, o contexto resolve doze conjuntos de
+  // IDs e a cascata executa cerca de vinte comandos — tudo sequencial, porque
+  // cada passo depende do anterior. São ~45 idas ao banco.
+  //
+  // Com o banco local isso cabe folgado nos 5s padrão do Prisma. Contra o banco
+  // de produção (pooled, remoto) não cabe: o smoke reprovou com P2028
+  // "Transaction not found" no meio da cascata. O rollback funcionou — nada
+  // ficou pela metade —, mas a exclusão não completava.
+  //
+  // Encurtar a transação não é opção: meia exclusão é o defeito que este
+  // serviço existe para impedir. O que se ajusta é o tempo.
   return prisma.$transaction(async (tx) => {
     // LOCK: a linha da Pessoa é reservada antes de qualquer leitura de plano.
     // Duas remoções concorrentes serializam aqui; a segunda encontra o contexto
@@ -509,7 +521,7 @@ export async function removerPessoaDaArvore(input: RemocaoInput): Promise<Result
     })
 
     return { ok: true, modoExecutado: efetivo, plano, removidos, processosAfetados: plano.processoIds }
-  })
+  }, { timeout: 60_000, maxWait: 15_000 })
 }
 
 /**
