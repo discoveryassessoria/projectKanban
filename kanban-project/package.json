@@ -149,6 +149,8 @@
     "test:env-producao": "tsx scripts/guard-env-producao.test.ts",
     "test:estrutura-operacional": "tsx scripts/estrutura-operacional.test.ts",
     "test:estrutura-operacional-integracao": "tsx scripts/estrutura-operacional-integracao.test.ts",
+    "test:exclusao-servico": "tsx scripts/exclusao-servico-guard.test.ts && tsx scripts/exclusao-servico.test.ts",
+    "test:exclusao-servico-guard": "tsx scripts/exclusao-servico-guard.test.ts",
     "test:excluir-receita": "tsx scripts/excluir-receita.test.ts",
     "test:excluir-receita-lista": "tsx scripts/excluir-receita-lista.test.ts",
     "test:fases": "tsx scripts/fases-catalog.test.ts",
@@ -254,7 +256,13 @@
     "backfill:nec-duplicada": "npm run guard:escrita && tsx scripts/backfill-necessidade-duplicada-motor-legado.ts --execute",
     "backfill:nec-duplicada:dry": "tsx scripts/backfill-necessidade-duplicada-motor-legado.ts",
     "test:guard-necessidade": "tsx scripts/guard-necessidade-documental.test.ts",
-    "test:guards-arquitetura": "npm run test:guard-necessidade && npm run test:motor-unico && npm run test:obrigacao-unica && npm run test:pessoa-nome"
+    "test:guards-arquitetura": "npm run test:guard-necessidade && npm run test:motor-unico && npm run test:obrigacao-unica && npm run test:pessoa-nome && npm run test:guard-pessoa",
+    "test:guard-pessoa": "tsx scripts/guard-ciclo-vida-pessoa.test.ts",
+    "test:pessoa-ciclo-vida": "tsx scripts/pessoa-ciclo-vida.test.ts",
+    "test:pessoa-tortura": "tsx scripts/pessoa-tortura.test.ts",
+    "backfill:residuos-pessoa": "tsx scripts/backfill-residuos-pessoa.ts",
+    "backfill:residuos-pessoa:execute": "tsx scripts/backfill-residuos-pessoa.ts --execute",
+    "diagnostico:residuos-pessoa": "tsx scripts/diagnostico-pessoa-residuos.ts"
   },
   "prisma": {
     "seed": "npm run guard:escrita && tsx prisma/seed.ts"

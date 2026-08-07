@@ -9,6 +9,7 @@ import { Prisma, TipoDocumento, StatusDocumento } from "@prisma/client"
 import { verificarPermissao } from '@/src/lib/verificar-permissao'
 import { reconciliarEconomicoDoProcesso } from '@/src/lib/motor/matriz-economica'
 import { notificarDocumentoAlterado } from '@/src/services/registral/gancho-documental'
+import { removerDocumento } from '@/src/services/documento-operacional'
 
 // Helper para obter label do tipo de documento
 function getTipoDocumentoLabel(tipo: string): string {
@@ -377,79 +378,29 @@ export async function DELETE(request: NextRequest, { params }: { params: Promise
       return NextResponse.json({ error: "ID inválido" }, { status: 400 })
     }
 
-    // Buscar documento COM pessoa para encontrar as tarefas relacionadas
+    // O processo vem pela ÁRVORE da pessoa — é o vínculo que existe por ID.
     const documento = await prisma.documento.findUnique({
       where: { id },
-      include: {
-        pessoa: {
-          select: {
-            nome: true,
-            sobrenome: true,
-            arvore: {
-              select: {
-                processos: {
-                  select: { id: true },
-                  take: 1
-                }
-              }
-            }
-          }
-        }
-      }
+      select: { id: true, pessoa: { select: { arvore: { select: { processos: { select: { id: true }, take: 1 } } } } } },
     })
 
     if (!documento) {
       return NextResponse.json({ error: "Documento não encontrado" }, { status: 404 })
     }
 
-    // Tentar excluir as tarefas relacionadas (se existirem)
     const processoId = documento.pessoa.arvore?.processos[0]?.id
-    if (processoId) {
-      const tipoLabel = getTipoDocumentoLabel(documento.tipo ?? "")
-      const nomePessoa = `${documento.pessoa.nome} ${documento.pessoa.sobrenome || ""}`.trim()
 
-      // Buscar tarefa de busca
-      const tarefaBusca = await prisma.tarefa.findFirst({
-        where: {
-          processoId,
-          titulo: `${tipoLabel} - ${nomePessoa}`
-        }
-      })
-
-      if (tarefaBusca) {
-        // Primeiro excluir subtarefas (solicitar)
-        await prisma.tarefa.deleteMany({
-          where: {
-            processoId,
-            tarefaPaiId: tarefaBusca.id
-          }
-        })
-
-        // Depois excluir a tarefa de busca
-        await prisma.tarefa.delete({
-          where: { id: tarefaBusca.id }
-        })
-      }
-
-      // Fallback: excluir tarefas antigas com título "Solicitar..." (caso existam)
-      await prisma.tarefa.deleteMany({
-        where: {
-          processoId,
-          titulo: `Solicitar ${tipoLabel} - ${nomePessoa}`
-        }
-      })
-    }
-
-    // Excluir o documento
-    await prisma.documento.delete({
-      where: { id }
-    })
+    // A remoção — documento, tarefas, passos e vínculo financeiro — vive no
+    // serviço canônico, POR ID. A versão anterior desta rota procurava a tarefa
+    // por igualdade de TÍTULO (`"${tipoLabel} - ${nomePessoa}"`): rótulo mudado
+    // ou nome editado e a tarefa ficava órfã na fila ativa.
+    const removido = await prisma.$transaction((tx) => removerDocumento(id, tx))
 
     // GRANULARIDADE POR DOCUMENTO: documento removido → o motor remove os lançamentos
     // que dependiam dele (reconcile). Best-effort, não bloqueia a resposta.
     if (processoId) reconciliarEconomicoDoProcesso(processoId).catch((e) => console.error('[doc removido → reconcile econômico]', e))
 
-    return NextResponse.json({ message: "Documento e tarefas excluídos com sucesso", id })
+    return NextResponse.json({ message: "Documento e tarefas excluídos com sucesso", id, removidos: removido })
   } catch (error) {
     console.error("Erro ao excluir documento:", error)
 

@@ -98,12 +98,26 @@ export async function vincularRequerenteTx(
   if (requerente.personId != null) {
     const pessoa = await tx.pessoa.findUnique({
       where: { id: requerente.personId },
-      select: { id: true, arvoreId: true },
+      select: { id: true, arvoreId: true, removidaEm: true },
     })
 
     // Vínculo consistente: a Pessoa existe.
     if (pessoa) {
       if (pessoa.arvoreId === arvoreId) {
+        // REINSERÇÃO: o nó existe mas estava removido com histórico preservado.
+        // Reativar é obrigatório — criar um segundo nó seria exatamente a
+        // duplicação que este fluxo existe para impedir. `criar → excluir →
+        // recriar` é cenário suportado, não exceção.
+        if (pessoa.removidaEm != null) {
+          await tx.pessoa.update({
+            where: { id: pessoa.id },
+            data: { removidaEm: null, removidaPorId: null, motivoRemocao: null, requerente: flagRequerente },
+          })
+          await tx.processoRequerente.updateMany({
+            where: { requerenteId, removidoEm: { not: null } },
+            data: { removidoEm: null, removidoPorId: null, motivoRemocao: null },
+          })
+        }
         // Idempotente: já é nó DESTA árvore. Só atualiza posição/vínculos se enviados.
         if (Object.keys(patchPosicao).length > 0) {
           await tx.pessoa.update({ where: { id: pessoa.id }, data: patchPosicao })
@@ -124,7 +138,14 @@ export async function vincularRequerenteTx(
       // Pessoa solta (arvoreId null) → adota nesta árvore, sem criar nova.
       await tx.pessoa.update({
         where: { id: pessoa.id },
-        data: { arvoreId, requerente: flagRequerente, ...patchPosicao },
+        data: {
+          arvoreId, requerente: flagRequerente, ...patchPosicao,
+          removidaEm: null, removidaPorId: null, motivoRemocao: null,
+        },
+      })
+      await tx.processoRequerente.updateMany({
+        where: { requerenteId, removidoEm: { not: null } },
+        data: { removidoEm: null, removidoPorId: null, motivoRemocao: null },
       })
       if (arvore.pessoaPrincipalId == null) {
         await tx.arvore.update({ where: { id: arvore.id }, data: { pessoaPrincipalId: pessoa.id } })

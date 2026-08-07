@@ -140,7 +140,15 @@ model Pessoa {
   // MODELOS DOCUMENTAIS — documentos gerados sobre esta identidade.
   documentosGerados DocumentoGerado[] @relation("DocumentoGeradoPessoa")
 
+  /// SAIDA DA ARVORE ATIVA sem apagar a linha. Usado quando ha fato historico
+  /// protegido apontando para esta Pessoa: apagar destruiria a evidencia. Toda
+  /// leitura de arvore/roster ativo filtra `removidaEm: null`.
+  removidaEm    DateTime?
+  removidaPorId Int?
+  motivoRemocao String?   @db.VarChar(300)
+
   @@index([arvoreId])
+  @@index([removidaEm])
   @@index([pais_nasc])
   @@index([maeId])
   @@index([paiId])
@@ -594,7 +602,16 @@ model ProcessoRequerente {
   processo     Processo   @relation(fields: [processoId], references: [id], onDelete: Cascade)
   requerente   Requerente @relation(fields: [requerenteId], references: [id], onDelete: Cascade)
 
+  /// REMOCAO COM PRESERVACAO DE HISTORICO. Quando ha fato protegido (pagamento,
+  /// fatura, protocolo, arquivo oficial), o vinculo NAO e apagado: e marcado como
+  /// removido. O fato continua amarrado ao processo; a pessoa sai da operacao ativa.
+  /// Leitura de "requerentes do processo" filtra `removidoEm: null`.
+  removidoEm    DateTime?
+  removidoPorId Int?
+  motivoRemocao String?   @db.VarChar(300)
+
   @@id([processoId, requerenteId])
+  @@index([removidoEm])
 }
 
 model Contratante {
@@ -673,13 +690,14 @@ model Requerente {
   recibosPagos         Recibo[]                @relation("ReciboRequerente")
 
   // CP-1 â vÃ­nculo com a identidade humana Ãºnica (Pessoa). Papel = contexto.
-  personId Int?
+  /// IDENTIDADE CANONICA: uma Pessoa (no da arvore) tem no maximo UM Requerente.
+  /// O indice unico e PARCIAL (so quando personId nao e nulo) — a maioria do
+  /// cadastro de clientes nao tem no na arvore e nao compete entre si.
+  personId Int?    @unique
   pessoa   Pessoa? @relation("RequerentePessoa", fields: [personId], references: [id], onDelete: SetNull)
 
   // MODELOS DOCUMENTAIS — documentos gerados em que este cliente é OUTORGANTE.
   documentosGerados DocumentoGerado[]
-
-  @@index([personId])
 }
 
 /// PROTOCOLIZAÇÃO — ocorrência operacional realizada DENTRO do processo.
@@ -1683,6 +1701,9 @@ model ReceitaRequerente {
   requerente     Requerente? @relation("ReceitaRequerentes", fields: [requerenteId], references: [id])
 
   @@unique([receitaId, idx])
+  /// Um requerente participa UMA vez de cada receita. A unicidade por `idx` e
+  /// posicao na lista: dois idx diferentes para o mesmo requerente passavam.
+  @@unique([receitaId, requerenteId])
   @@index([receitaId])
   @@index([requerenteId])
 }

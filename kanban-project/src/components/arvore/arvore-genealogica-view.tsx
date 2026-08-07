@@ -7,6 +7,7 @@ import { useApi } from '@/src/lib/dados'
 import { jsPDF } from "jspdf"
 import dagre from "dagre"
 import type { PessoaArvore, UniaoArvore, DocumentoArvore } from "./types"
+import { RemocaoPessoaModal, type PlanoRemocaoUI } from '@/src/components/arvore/remocao-pessoa-modal'
 import { PessoaSidebar } from "./pessoa-sidebar"
 import { PessoaDetailsPage } from "./pessoa-details-page"
 import { ReactFlowTree, ReactFlowTreeRef } from "./react-flow-tree"
@@ -142,7 +143,8 @@ export function ArvoreGenealogicaView({
   const irParaPessoa = useCallback((pessoaId: number) => {
     reactFlowTreeRef.current?.centerOnPerson(pessoaId)
   }, [])
-  const fetchArvore = async () => { await arvoreReq.recarregar() }
+  // Estável entre renders: é dependência de callbacks (ex.: confirmar remoção).
+  const fetchArvore = useCallback(async () => { await arvoreReq.recarregar() }, [arvoreReq])
   // Onboarding aparece quando a árvore existe e está VAZIA — derivação, não um estado
   // que o carregador precisava ligar e desligar. Continua podendo ser aberto e fechado
   // à mão (botão "como começar" / concluir).
@@ -360,6 +362,8 @@ export function ArvoreGenealogicaView({
     }
   }, [pessoas, pessoaPrincipal, nomeFamilia])
 
+  const [pessoaParaRemover, setPessoaParaRemover] = useState<number | null>(null)
+
   const handleDeleteDocumento = async (documento: DocumentoArvore) => {
     try {
       const response = await authFetch(`/api/documentos/${documento.id}`, {
@@ -384,24 +388,29 @@ export function ArvoreGenealogicaView({
     setSelectedPerson(null)
   }
 
-  const handleDeletePerson = async (pessoa: PessoaArvore) => {
-    try {
-      const response = await authFetch(`/api/pessoas/${pessoa.id}`, {
-        method: 'DELETE'
-      })
-
-      if (response.ok) {
-        await fetchArvore()
-        setSelectedPerson(null)
-      } else {
-        const error = await response.json()
-        alert(error.error || 'Erro ao excluir pessoa')
-      }
-    } catch (error) {
-      console.error('Erro ao excluir pessoa:', error)
-      alert('Erro ao excluir pessoa')
-    }
+  // O clique só ABRE o plano. Quem decide o que sai e o que fica é o domínio —
+  // e ele recalcula tudo de novo dentro da transação quando a ação é confirmada.
+  const handleDeletePerson = (pessoa: PessoaArvore) => {
+    setPessoaParaRemover(pessoa.id)
   }
+
+  const carregarPlanoRemocao = useCallback(async (id: number): Promise<PlanoRemocaoUI | null> => {
+    const r = await authFetch(`/api/pessoas/${id}/plano-remocao`)
+    if (!r.ok) return null
+    return (await r.json()) as PlanoRemocaoUI
+  }, [])
+
+  const confirmarRemocao = useCallback(async (modo: 'HARD' | 'DESATIVAR') => {
+    if (pessoaParaRemover == null) return
+    const r = await authFetch(`/api/pessoas/${pessoaParaRemover}?modo=${modo}`, { method: 'DELETE' })
+    if (!r.ok) {
+      const erro = await r.json().catch(() => ({}))
+      throw new Error(erro.error || 'Não foi possível remover a pessoa.')
+    }
+    setPessoaParaRemover(null)
+    setSelectedPerson(null)
+    await fetchArvore()
+  }, [pessoaParaRemover, fetchArvore, setSelectedPerson])
 
   const handleAddConjuge = (pessoa: PessoaArvore) => {
     setAddPersonType('conjuge')
@@ -895,6 +904,16 @@ export function ArvoreGenealogicaView({
         onSelectPerson={handleSelectPersonFromSidebar}
         initialTab={sidebarTabInicial}
       />
+
+      {pessoaParaRemover != null && (
+        <RemocaoPessoaModal
+          key={pessoaParaRemover}
+          pessoaId={pessoaParaRemover}
+          onFechar={() => setPessoaParaRemover(null)}
+          onConfirmar={confirmarRemocao}
+          carregarPlano={carregarPlanoRemocao}
+        />
+      )}
 
       {/* Full Details Page */}
       {fullDetailsPerson && (

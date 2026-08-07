@@ -11,6 +11,7 @@
 // Documento materializado pela operação (seção 3.4 da tarefa).
 
 import { prisma } from "@/lib/prisma"
+import { pessoasAtivasDaArvore } from "@/src/lib/genealogia/vinculo-ativo"
 import type { Prisma } from "@prisma/client"
 import { garantirNecessidade, dispensarNecessidade, reativarNecessidade } from "@/src/services/necessidade-documental"
 import { matrizParaRegra } from "@/src/lib/documentos/regras-documentais/mapear"
@@ -111,8 +112,10 @@ export async function materializarGenealogia(processoId: number, db: DB = prisma
   const regras = await regrasGenealogiaDoProcesso(processo.tipoProcessoMotorId ?? null, db)
   if (regras.length === 0) { res.pendencias.push("nenhuma Regra Documental publicada exigida na Genealogia"); return res }
 
+  // Pessoa REMOVIDA com histórico preservado não volta a materializar: seria
+  // recriar necessidade, passo e tarefa para quem já saiu da operação.
   const pessoas = await db.pessoa.findMany({
-    where: { arvoreId: processo.arvoreId },
+    where: pessoasAtivasDaArvore(processo.arvoreId),
     select: { id: true, nome: true, sobrenome: true, documentacao: true, casado: true, vivo: true, linhaReta: true, requerente: true, data_nasc: true },
   })
 

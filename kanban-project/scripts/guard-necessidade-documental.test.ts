@@ -65,6 +65,10 @@ const AUTORIZADOS_FORA_DO_RUNTIME: Record<string, string> = {
   "scripts/mrg-e2e.test.ts": "teste e2e do Motor Registral: monta cenário",
   "scripts/estrutura-operacional-integracao.test.ts": "teste de integração: monta cenário",
   "scripts/guard-necessidade-documental.test.ts": "este guard (cita os padrões que procura)",
+  "scripts/backfill-residuos-pessoa.ts":
+    "backfill: remove necessidade SEM SUJEITO (viola pessoaId XOR uniaoId); dry-run por padrão",
+  "scripts/pessoa-tortura.test.ts": "teste de tortura do ciclo de vida da Pessoa: monta e limpa o cenário",
+  "scripts/exclusao-servico.test.ts": "teste de exclusão definitiva de serviço: monta e limpa o cenário",
 }
 
 /** Diretórios de RUNTIME — onde a regra é absoluta. */
@@ -162,8 +166,14 @@ for (const f of escritoresFora) {
   ok(`autorizado: ${f}`, !!motivo, motivo ?? "NÃO está na allowlist — justifique no guard ou use o serviço canônico")
 }
 // allowlist não pode acumular entradas mortas: quem saiu da lista tem de sair do código
+// Entrada MORTA = o arquivo existe e deixou de escrever (a exceção virou depósito).
+// Arquivo AUSENTE não é entrada morta: ele não autoriza nada enquanto não existir,
+// e some sozinho do repositório. Reprovar por ausência quebraria o build de quem
+// não tem o arquivo — que é justamente quem não precisa da exceção.
 const mortas = Object.keys(AUTORIZADOS_FORA_DO_RUNTIME).filter(
-  (f) => f !== "scripts/guard-necessidade-documental.test.ts" && !escritoresFora.includes(f),
+  (f) => f !== "scripts/guard-necessidade-documental.test.ts" &&
+         !escritoresFora.includes(f) &&
+         existsSync(join(RAIZ, f)),
 )
 ok("a allowlist não tem entrada morta", mortas.length === 0, mortas.join(", ") || "—")
 

@@ -8,6 +8,7 @@
 
 import { NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
+import { VINCULO_PROCESSO_ATIVO } from "@/src/lib/genealogia/vinculo-ativo"
 import { verificarPermissao, extrairUsuarioComPermissoes } from '@/src/lib/verificar-permissao'
 import { garantirFamiliaParaProcesso } from '@/src/services/familia'
 import { criarProcessoV2 } from '@/src/services/criar-processo'
@@ -65,6 +66,7 @@ export async function GET(request: Request) {
         arvore: true,
         familia: { select: { id: true, nome: true } }, // CP-1 dual-read
         requerentes: {
+          where: VINCULO_PROCESSO_ATIVO,
           include: {
             requerente: true
           }
@@ -177,7 +179,7 @@ export async function POST(request: Request) {
         contratantes: { include: { contratante: true } },
         arvore: true,
         familia: { select: { id: true, nome: true } }, // CP-1 dual-read
-        requerentes: { include: { requerente: true } },
+        requerentes: { where: VINCULO_PROCESSO_ATIVO, include: { requerente: true } },
       },
     })
 

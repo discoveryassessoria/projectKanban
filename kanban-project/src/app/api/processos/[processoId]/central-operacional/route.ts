@@ -3,6 +3,7 @@
 import { randomUUID } from "crypto"
 import { NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
+import { pessoasAtivasDaArvore } from "@/src/lib/genealogia/vinculo-ativo"
 import { verificarPermissao } from "@/src/lib/verificar-permissao"
 import { getOrdemFase, getStepsForFase, getFase, phaseKeyToFaseCode, faseCodeToPhaseKey } from "@/src/lib/process-stage/fases-catalog"
 import { itemCatalogosDeCertidao } from "@/src/lib/documentos/natureza-certidao"
@@ -356,7 +357,7 @@ export async function GET(
     const [pessoas, unioes, docsRaw] = await Promise.all([
       processo.arvoreId
         ? prisma.pessoa.findMany({
-            where: { arvoreId: processo.arvoreId },
+            where: pessoasAtivasDaArvore(processo.arvoreId),
             select: {
               id: true,
               nome: true,

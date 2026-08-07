@@ -437,13 +437,10 @@ function ConteudoSidebar({
   const isDeceased = pessoa.vivo === false || !!pessoa.data_obito
   const documentos = pessoa.documentos || []
 
+  // Sem "Confirmar?" aqui: a confirmação é o PLANO DE REMOÇÃO, que diz o que sai
+  // e o que fica. Um segundo clique não é informação — é só atrito.
   const handleDelete = () => {
-    if (confirmDelete) {
-      onDelete?.(pessoa)
-      setConfirmDelete(false)
-    } else {
-      setConfirmDelete(true)
-    }
+    onDelete?.(pessoa)
   }
 
   // Handler para selecionar um familiar
@@ -512,27 +509,13 @@ function ConteudoSidebar({
               </button>
             )}
             {pode('arvore.excluir') && onDelete && (
-              <>
-                <button 
-                  onClick={handleDelete}
-                  className={`flex items-center justify-center gap-2 px-3 py-2 rounded-lg transition-colors ${
-                    confirmDelete 
-                      ? 'bg-red-600 text-white hover:bg-red-700 flex-1' 
-                      : 'bg-red-50 text-red-600 hover:bg-red-100'
-                  }`}
-                >
-                  <Trash2 className="h-4 w-4" />
-                  {confirmDelete && <span className="text-sm font-medium">Confirmar?</span>}
-                </button>
-                {confirmDelete && (
-                  <button 
-                    onClick={() => setConfirmDelete(false)}
-                    className="px-3 py-2 text-sm text-slate-600 hover:text-slate-800 hover:bg-slate-100 rounded-lg"
-                  >
-                    Cancelar
-                  </button>
-                )}
-              </>
+              <button
+                onClick={handleDelete}
+                title="Remover da árvore"
+                className="flex items-center justify-center gap-2 px-3 py-2 rounded-lg bg-red-50 text-red-600 hover:bg-red-100 transition-colors"
+              >
+                <Trash2 className="h-4 w-4" />
+              </button>
             )}
           </div>
         )}

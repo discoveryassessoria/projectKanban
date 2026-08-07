@@ -8,7 +8,8 @@ import { dispararMaterializacaoPorArvore } from "@/src/services/genealogia/mater
 import { houveTransicaoParaRequerente, ehRequerente } from "@/lib/genealogia/requerente-flag"
 import { enfileirarEventoRequerente, TIPO_EVENTO_REQUERENTE } from "@/src/services/genealogia/emitir-evento-requerente"
 import { processarOutbox } from "@/src/services/outbox-dispatcher"
-import { removerNecessidadesDoSujeito } from "@/src/services/necessidade-documental"
+import { removerPessoaDaArvore, type ModoRemocao } from "@/src/services/pessoa-ciclo-vida"
+import { reconciliarEconomicoDoProcesso } from "@/src/lib/motor/matriz-economica"
 // LEGADO_INATIVO (desativação Genealogia): editar Pessoa NÃO reconcilia mais
 // Documento (reconcileDocsForPessoa removido). A materialização V2 (Fatia 2) é
 // aditiva/idempotente e não cria Documento.
@@ -207,83 +208,52 @@ export async function DELETE(request: NextRequest, { params }: { params: Promise
       return NextResponse.json({ error: "ID inválido" }, { status: 400 })
     }
 
-    // Verificar se a pessoa existe
-    const pessoa = await prisma.pessoa.findUnique({
-      where: { id },
-      include: {
-        filhosComoPai: true,
-        filhosComoMae: true,
-        unioesComoPessoa1: true,
-        unioesComoPessoa2: true,
-        documentos: true,
-      },
-    })
-
-    if (!pessoa) {
+    // A árvore é lida ANTES: depois da remoção a Pessoa pode não existir mais.
+    const antes = await prisma.pessoa.findUnique({ where: { id }, select: { arvoreId: true } })
+    if (!antes) {
       return NextResponse.json({ error: "Pessoa não encontrada" }, { status: 404 })
     }
 
-    const uniaoIds = [
-      ...pessoa.unioesComoPessoa1.map((u) => u.id),
-      ...pessoa.unioesComoPessoa2.map((u) => u.id),
-    ]
+    // MODO: a rota não decide política. `AUTO` deixa o domínio escolher entre
+    // exclusão definitiva e preservação de histórico; a UI pode forçar um dos
+    // dois depois de ver o plano. Modo inválido cai em AUTO, nunca em hard delete.
+    const url = new URL(request.url)
+    const modoParam = (url.searchParams.get("modo") ?? "").toUpperCase()
+    const modo: ModoRemocao =
+      modoParam === "HARD" || modoParam === "DESATIVAR" ? modoParam : "AUTO"
+    const motivo = url.searchParams.get("motivo")
+    const actorUserId = (await extrairUsuarioComPermissoes(request))?.userId ?? null
 
-    // Executar deleção dentro de uma transação
-    await prisma.$transaction(async (tx) => {
-      // 0. Remover NecessidadeDocumental (materializadas pela Genealogia V2) da
-      //    pessoa E das uniões que serão excluídas — ANTES de excluir pessoa/uniões.
-      //    Necessário porque o sujeito tem CHECK (pessoaId XOR uniaoId) e as FKs são
-      //    onDelete: SetNull: sem isto, a exclusão setaria o sujeito para NULL e
-      //    violaria o CHECK (0 ≠ 1), travando a exclusão da pessoa. Passos operacionais
-      //    vinculados (localizar_registro) saem junto (a necessidade é reproduzível
-      //    pela materialização; eventos caem em cascata).
-      // A cascata roda pelo serviço canônico: NecessidadeDocumental tem UM dono
-      // de escrita, e é ele que responde pelo guard arquitetural.
-      await removerNecessidadesDoSujeito({ pessoaId: id, uniaoIds }, tx)
+    // TODA a exclusão vive no serviço canônico: uma transação, um dono, sem
+    // meia exclusão. A rota só traduz HTTP.
+    const resultado = await removerPessoaDaArvore({ pessoaId: id, actorUserId, modo, motivo })
 
-      // 1. Deletar documentos da pessoa
-      if (pessoa.documentos.length > 0) {
-        await tx.documento.deleteMany({
-          where: { pessoaId: id },
-        })
-      }
+    if (!resultado.ok) {
+      const status = resultado.code === "PESSOA_NAO_ENCONTRADA" ? 404 : 409
+      return NextResponse.json(
+        { error: resultado.erro, code: resultado.code, plano: resultado.plano ?? null },
+        { status },
+      )
+    }
 
-      // 2. Deletar uniões onde a pessoa participa
-      if (pessoa.unioesComoPessoa1.length > 0) {
-        await tx.uniao.deleteMany({
-          where: { pessoa1Id: id },
-        })
-      }
-
-      if (pessoa.unioesComoPessoa2.length > 0) {
-        await tx.uniao.deleteMany({
-          where: { pessoa2Id: id },
-        })
-      }
-
-      // 3. Remover referências de pai/mãe nos filhos
-      await tx.pessoa.updateMany({
-        where: { paiId: id },
-        data: { paiId: null },
-      })
-
-      await tx.pessoa.updateMany({
-        where: { maeId: id },
-        data: { maeId: null },
-      })
-
-      // 4. Deletar a pessoa
-      await tx.pessoa.delete({
-        where: { id },
-      })
-    })
-
-    // Requerente removido da árvore → recalcula os honorários (evento REQUERENTES_ATUALIZADOS).
-    await dispararMaterializacaoPorArvore(pessoa.arvoreId)
+    // Reconciliação pós-remoção: a árvore reavalia as regras documentais e o
+    // financeiro do processo reconverge. Best-effort — a remoção já está commitada.
+    await dispararMaterializacaoPorArvore(antes.arvoreId).catch(() => {})
+    for (const processoId of resultado.processosAfetados) {
+      await reconciliarEconomicoDoProcesso(processoId).catch((e) =>
+        console.error("[pessoa removida → reconcile econômico]", e),
+      )
+    }
 
     return NextResponse.json({
-      message: "Pessoa excluída com sucesso",
-      id: id,
+      message:
+        resultado.modoExecutado === "HARD"
+          ? "Pessoa e toda a cadeia derivada foram excluídas"
+          : "Pessoa removida da árvore; histórico preservado",
+      id,
+      modo: resultado.modoExecutado,
+      removidos: resultado.removidos,
+      fatosPreservados: resultado.plano.fatosProtegidos,
     })
   } catch (error) {
     console.error("Erro ao excluir pessoa:", error)

@@ -8,6 +8,7 @@
 // ============================================================
 
 import { prisma } from '@/lib/prisma'
+import { PESSOA_ATIVA } from '@/src/lib/genealogia/vinculo-ativo'
 import {
   Prisma, PrioridadeTarefa,
   CategoriaReceita, CategoriaCusto, TipoCusto, Moeda, FxRule, ReceitaStatus, CustoStatus,
@@ -952,7 +953,7 @@ export async function processarRequerenteAdicionado(evt: EventoRequerentePayload
 
   // Ordem DETERMINÍSTICA dos requerentes do processo (createdAt, id) — fonte única de flag.
   const reqArvore = await prisma.pessoa.findMany({
-    where: { arvoreId, requerente: { in: [...REQUERENTE_VALORES] } },
+    where: { arvoreId, requerente: { in: [...REQUERENTE_VALORES] }, ...PESSOA_ATIVA },
     select: { id: true, createdAt: true },
   })
   const ordenados = ordenarRequerentes(reqArvore.map((p) => ({ pessoaId: p.id, createdAt: p.createdAt })))

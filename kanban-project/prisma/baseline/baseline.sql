@@ -5,7 +5,7 @@
 --   corpo        → gerado do prisma/schema.prisma
 --   bloco manual → prisma/baseline/bloco-manual.sql (edite LÁ)
 --
--- Gerado em : 2026-08-06
+-- Gerado em : 2026-08-07
 -- Prisma    : 6.19.3
 --
 -- PARA QUE SERVE: reconstruir o banco DO ZERO. O histórico de migrations NÃO
@@ -304,6 +304,9 @@ CREATE TABLE "Pessoa" (
     "documentacao" BOOLEAN NOT NULL DEFAULT true,
     "casado" BOOLEAN NOT NULL DEFAULT false,
     "linhaReta" BOOLEAN NOT NULL DEFAULT true,
+    "removidaEm" TIMESTAMP(3),
+    "removidaPorId" INTEGER,
+    "motivoRemocao" VARCHAR(300),
 
     CONSTRAINT "Pessoa_pkey" PRIMARY KEY ("id")
 );
@@ -564,6 +567,9 @@ CREATE TABLE "TarefaHistorico" (
 CREATE TABLE "ProcessoRequerente" (
     "processoId" INTEGER NOT NULL,
     "requerenteId" INTEGER NOT NULL,
+    "removidoEm" TIMESTAMP(3),
+    "removidoPorId" INTEGER,
+    "motivoRemocao" VARCHAR(300),
 
     CONSTRAINT "ProcessoRequerente_pkey" PRIMARY KEY ("processoId","requerenteId")
 );
@@ -4120,6 +4126,9 @@ CREATE UNIQUE INDEX "Pessoa_publicCode_key" ON "Pessoa"("publicCode");
 CREATE INDEX "Pessoa_arvoreId_idx" ON "Pessoa"("arvoreId");
 
 -- CreateIndex
+CREATE INDEX "Pessoa_removidaEm_idx" ON "Pessoa"("removidaEm");
+
+-- CreateIndex
 CREATE INDEX "Pessoa_pais_nasc_idx" ON "Pessoa"("pais_nasc");
 
 -- CreateIndex
@@ -4258,6 +4267,9 @@ CREATE INDEX "TarefaHistorico_usuarioId_idx" ON "TarefaHistorico"("usuarioId");
 CREATE INDEX "TarefaHistorico_createdAt_idx" ON "TarefaHistorico"("createdAt");
 
 -- CreateIndex
+CREATE INDEX "ProcessoRequerente_removidoEm_idx" ON "ProcessoRequerente"("removidoEm");
+
+-- CreateIndex
 CREATE UNIQUE INDEX "Contratante_publicCode_key" ON "Contratante"("publicCode");
 
 -- CreateIndex
@@ -4267,7 +4279,7 @@ CREATE INDEX "Contratante_personId_idx" ON "Contratante"("personId");
 CREATE UNIQUE INDEX "Requerente_publicCode_key" ON "Requerente"("publicCode");
 
 -- CreateIndex
-CREATE INDEX "Requerente_personId_idx" ON "Requerente"("personId");
+CREATE UNIQUE INDEX "Requerente_personId_key" ON "Requerente"("personId");
 
 -- CreateIndex
 CREATE UNIQUE INDEX "Protocolo_publicCode_key" ON "Protocolo"("publicCode");
@@ -4652,6 +4664,9 @@ CREATE INDEX "ReceitaRequerente_requerenteId_idx" ON "ReceitaRequerente"("requer
 
 -- CreateIndex
 CREATE UNIQUE INDEX "ReceitaRequerente_receitaId_idx_key" ON "ReceitaRequerente"("receitaId", "idx");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "ReceitaRequerente_receitaId_requerenteId_key" ON "ReceitaRequerente"("receitaId", "requerenteId");
 
 -- CreateIndex
 CREATE INDEX "ReceitaDocumento_receitaId_idx" ON "ReceitaDocumento"("receitaId");

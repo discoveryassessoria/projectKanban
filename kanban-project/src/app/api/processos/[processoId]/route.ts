@@ -2,6 +2,7 @@
 
 import { NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
+import { VINCULO_PROCESSO_ATIVO } from "@/src/lib/genealogia/vinculo-ativo"
 import { logProcesso } from "@/lib/auditoria"
 import { verificarPermissao } from '@/src/lib/verificar-permissao'
 import { tentarAvancoAutomatico } from "@/src/lib/motor/auto-avanco"
@@ -32,6 +33,7 @@ export async function GET(
         },
         arvore: true,
         requerentes: {
+          where: VINCULO_PROCESSO_ATIVO,
           include: {
             requerente: true
           }
@@ -196,6 +198,7 @@ export async function PUT(
         },
         arvore: true,
         requerentes: {
+          where: VINCULO_PROCESSO_ATIVO,
           include: {
             requerente: true
           }
