@@ -1,6 +1,7 @@
 /** Cenário do smoke autenticado. `--limpar` remove tudo. Só dados MARCADOS. */
 import { prisma } from "../src/lib/prisma"
 import { vincularRequerenteTx } from "../lib/genealogia/vincular-requerente"
+import { removerNecessidadesDoSujeito } from "../src/services/necessidade-documental"
 
 export const MARCA = "SMOKE-UI-CICLO-VIDA"
 const PROCESSO = 513
@@ -42,8 +43,12 @@ async function limpar() {
   await prisma.tarefa.deleteMany({ where: { titulo: { startsWith: MARCA } } })
   if (pids.length) {
     await prisma.documento.deleteMany({ where: { pessoaId: { in: pids } } })
+    // Pelo SERVIÇO CANÔNICO. Apagar `NecessidadeDocumental` direto deixa vivo o
+    // passo escopado por ela — `necessidadeId` é `onDelete: SetNull`, então o
+    // passo sobrevive sem escopo nenhum. Foi o que aconteceu na primeira versão
+    // desta limpeza: sobrou um `localizar_registro` órfão em produção.
+    for (const pessoaId of pids) await removerNecessidadesDoSujeito({ pessoaId }, prisma)
     await prisma.phaseWorkflowStepInstance.deleteMany({ where: { pessoaId: { in: pids } } })
-    await prisma.necessidadeDocumental.deleteMany({ where: { pessoaId: { in: pids } } })
     await prisma.requerente.updateMany({ where: { id: { in: reqs.map(r=>r.id) } }, data: { personId: null } })
     await prisma.arvore.updateMany({ where: { pessoaPrincipalId: { in: pids } }, data: { pessoaPrincipalId: null } })
     await prisma.pessoa.deleteMany({ where: { id: { in: pids } } })
