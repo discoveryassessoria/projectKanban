@@ -22,11 +22,13 @@ import {
   ExternalLink,
   ListChecks,
   Wallet,
-  TriangleAlert
+  TriangleAlert,
+  History
 } from "lucide-react"
 import type { PessoaArvore, UniaoArvore, DocumentoArvore } from "./types"
 import { usePermissoes } from "@/src/hooks/use-permissoes"
 import type { DossiePessoa, TotalPorMoeda } from "@/src/lib/genealogia/operacional/dossie"
+import { ROTULO_EVENTO, type EventoProjetado } from "@/src/lib/genealogia/motor/eventos"
 
 // ========================================
 // TIPOS
@@ -60,6 +62,11 @@ interface PessoaSidebarProps {
   financeiroVisivel?: boolean
   /** Requerentes cuja linha depende desta pessoa — para explicar a prioridade. */
   nomeDeRequerente?: (pessoaId: number) => string
+  /**
+   * Linha do tempo desta pessoa. É PROJEÇÃO das colunas de Pessoa/Uniao
+   * (`motor/eventos.ts`), não uma tabela nova — a árvore não guarda histórico.
+   */
+  eventos?: EventoProjetado[]
 }
 
 // ========================================
@@ -586,7 +593,8 @@ function ConteudoSidebar({
   initialTab,
   dossie,
   financeiroVisivel = false,
-  nomeDeRequerente
+  nomeDeRequerente,
+  eventos
 }: PessoaSidebarProps) {
   // Aba inicial: a do deep-link, quando veio uma reconhecida; senão "info".
   const [activeTab, setActiveTab] = useState<"info" | "familia" | "docs" | "operacao">(() => {
@@ -1090,6 +1098,52 @@ function ConteudoSidebar({
                     </li>
                   ))}
                 </ul>
+              )}
+            </CollapsibleSection>
+
+            <CollapsibleSection title="Histórico" icon={History} defaultOpen={false}>
+              {!eventos || eventos.length === 0 ? (
+                <p className="py-2 text-sm italic text-slate-400">
+                  Nenhum evento de vida registrado no cadastro desta pessoa.
+                </p>
+              ) : (
+                <>
+                  <ol className="space-y-2">
+                    {eventos.map((e) => (
+                      <li key={e.id} className="flex gap-2">
+                        <span
+                          aria-hidden
+                          className={`mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full ${
+                            e.precisao === "conflito"
+                              ? "bg-red-500"
+                              : e.precisao === "ausente"
+                                ? "bg-slate-300"
+                                : "bg-slate-400"
+                          }`}
+                        />
+                        <span className="min-w-0">
+                          <span className="block text-sm text-slate-900">
+                            {ROTULO_EVENTO[e.tipo]}
+                            {e.local ? <span className="text-slate-500"> · {e.local}</span> : null}
+                          </span>
+                          <span className="block text-[11px] text-slate-500">
+                            {/* Data ausente e PENDENCIA de pesquisa, nao vazio —
+                                por isso ela e nomeada, nao escondida. */}
+                            {e.data
+                              ? formatDateFull(e.data)
+                              : e.precisao === "conflito"
+                                ? "data em conflito com outra da árvore"
+                                : "data não localizada"}
+                            {e.origem ? ` · ${e.origem}` : ""}
+                          </span>
+                        </span>
+                      </li>
+                    ))}
+                  </ol>
+                  <p className="mt-2 text-[11px] leading-snug text-slate-500">
+                    Projeção dos dados do cadastro — a árvore não mantém histórico próprio.
+                  </p>
+                </>
               )}
             </CollapsibleSection>
 

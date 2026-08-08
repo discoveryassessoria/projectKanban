@@ -20,6 +20,7 @@ import {
   type AlteracaoDescrita,
   type PropostaImpacto,
 } from "./inteligencia/preview-impacto"
+import type { EstadoAtual } from "@/src/lib/genealogia/operacional/comparacao"
 import { PainelInteligencia } from "./inteligencia/painel-inteligencia"
 import { PaletaComandos } from "./inteligencia/paleta-comandos"
 import { ImportarArvoreModal } from "./importar-arvore-modal"
@@ -1080,6 +1081,7 @@ export function ArvoreGenealogicaView({
             saudeLigada={operacional.saudeLigada}
             onAlternarSaude={operacional.alternarSaude}
             contagemSaude={operacional.contagemSaude}
+            contagemFiltros={operacional.contagemFiltros}
             totalRecuado={operacional.foco.totalRecuado}
             totalRecolhivel={operacional.totalRecolhivel}
             onRecolherTudo={operacional.recolherTudo}
@@ -1197,6 +1199,7 @@ export function ArvoreGenealogicaView({
         dossie={selectedPersonId != null ? operacional.dossies.get(selectedPersonId) ?? null : null}
         financeiroVisivel={operacional.financeiroVisivel}
         nomeDeRequerente={nomeDePessoa}
+        eventos={selectedPersonId != null ? operacional.eventosDe(selectedPersonId) : undefined}
       />
 
       {pessoaParaRemover != null && (
@@ -1260,6 +1263,7 @@ export function ArvoreGenealogicaView({
           unioes={unioes}
           processoId={processoId}
           requerentesAfetadosPor={requerentesAfetadosPor}
+          estadoAtual={operacional.estadoAtual}
           onClose={() => {
             setShowEditPersonModal(false)
             setEditingPerson(null)
@@ -1725,6 +1729,7 @@ function EditPersonModal({
   unioes,
   processoId,
   requerentesAfetadosPor,
+  estadoAtual,
   onClose,
   onSuccess
 }: {
@@ -1734,6 +1739,8 @@ function EditPersonModal({
   processoId: number
   /** Nomes dos requerentes cuja linha passa por esta pessoa. */
   requerentesAfetadosPor: (pessoaId: number) => string[]
+  /** Números de hoje, para o preview montar a coluna ANTES. */
+  estadoAtual?: EstadoAtual
   onClose: () => void
   onSuccess: () => void
 }) {
@@ -1836,6 +1843,7 @@ function EditPersonModal({
         : undefined,
     alteracoes: descreverAlteracoes(),
     requerentesAfetados: requerentesAfetadosPor(pessoa.id),
+    estadoAtual,
   })
 
   const [proposta, setProposta] = useState<PropostaImpacto | null>(null)

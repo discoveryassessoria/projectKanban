@@ -22,7 +22,13 @@
 // ============================================================================
 
 import { useEffect, useState } from "react"
-import { AlertTriangle, Loader2, X } from "lucide-react"
+import { AlertTriangle, ArrowDown, Loader2, X } from "lucide-react"
+import {
+  compararEstados,
+  semDiferenca,
+  type EstadoAtual,
+  type LinhaComparacao,
+} from "@/src/lib/genealogia/operacional/comparacao"
 
 function authFetch(url: string, options: RequestInit = {}): Promise<Response> {
   const token = typeof window !== "undefined" ? localStorage.getItem("authToken") : null
@@ -75,6 +81,8 @@ export interface PropostaImpacto {
   alteracoes: AlteracaoDescrita[]
   /** Requerentes afetados, calculados no cliente pelo motor puro de linhagem. */
   requerentesAfetados?: string[]
+  /** Estado de hoje, para montar a coluna ANTES. */
+  estadoAtual?: EstadoAtual
 }
 
 interface Props {
@@ -185,6 +193,20 @@ export function PreviewImpactoModal({ proposta, onCancelar, onConfirmar }: Props
 
           {resultado && !carregando && (
             <>
+              {proposta.estadoAtual && !resultado.semImpacto && (
+                <AntesDepois
+                  linhas={compararEstados(proposta.estadoAtual, {
+                    documentosAdicionados: doc!.adicionados.length,
+                    documentosDispensados: doc!.dispensados.length,
+                    bloqueiosAdicionados: op!.bloqueiosAdicionados,
+                    bloqueiosRemovidos: op!.bloqueiosRemovidos,
+                    passosAdicionados: op!.passosAdicionados,
+                    linhagensAfetadas: proposta.requerentesAfetados ?? [],
+                    transmissorAlterado: false,
+                  })}
+                />
+              )}
+
               {resultado.semImpacto ? (
                 <p className="rounded-lg border border-gray-100 bg-gray-50 p-3 text-[13px] text-gray-700">
                   Esta alteração não produz impacto operacional conhecido.
@@ -313,6 +335,52 @@ export function PreviewImpactoModal({ proposta, onCancelar, onConfirmar }: Props
         </div>
       </div>
     </div>
+  )
+}
+
+/**
+ * ANTES × DEPOIS.
+ *
+ * Verde = melhora, vermelho = novo impacto, cinza = sem alteração. A cor vem da
+ * `direcao` que o motor declarou por linha — não do sinal do número: mais
+ * documento concluído é bom, mais bloqueio é ruim, e um comparador ingênuo
+ * pintaria os dois igual.
+ */
+const COR_DIRECAO: Record<LinhaComparacao["direcao"], string> = {
+  melhora: "text-emerald-700",
+  piora: "text-red-700",
+  igual: "text-gray-500",
+}
+
+function AntesDepois({ linhas }: { linhas: LinhaComparacao[] }) {
+  if (semDiferenca(linhas)) return null
+  return (
+    <section>
+      <h3 className="mb-1.5 text-[11px] font-semibold uppercase tracking-wide text-gray-500">
+        Como fica
+      </h3>
+      <div className="overflow-hidden rounded-lg border border-gray-200">
+        <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-x-2 border-b border-gray-100 bg-gray-50 px-2.5 py-1.5">
+          <span className="text-[10px] font-semibold uppercase tracking-wide text-gray-500">Antes</span>
+          <ArrowDown aria-hidden className="h-3 w-3 -rotate-90 text-gray-300" />
+          <span className="text-[10px] font-semibold uppercase tracking-wide text-gray-500">Depois</span>
+        </div>
+        <ul className="divide-y divide-gray-100">
+          {linhas.map((l) => (
+            <li key={l.rotulo} className="px-2.5 py-1.5" title={l.dica}>
+              <p className="text-[10px] uppercase tracking-wide text-gray-400">{l.rotulo}</p>
+              <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-x-2">
+                <span className="truncate text-[12px] text-gray-600">{l.antes}</span>
+                <span aria-hidden className="text-[11px] text-gray-300">→</span>
+                <span className={`truncate text-[12px] font-medium ${COR_DIRECAO[l.direcao]}`}>
+                  {l.depois}
+                </span>
+              </div>
+            </li>
+          ))}
+        </ul>
+      </div>
+    </section>
   )
 }
 

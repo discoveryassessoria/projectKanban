@@ -67,6 +67,8 @@ interface Props {
   saudeLigada: boolean
   onAlternarSaude: () => void
   contagemSaude: Record<NivelSaudePessoa, number>
+  /** Quantas pessoas cada filtro casaria agora. */
+  contagemFiltros: Record<string, number>
   totalRecuado: number
   totalRecolhivel: number
   onRecolherTudo: () => void
@@ -133,7 +135,7 @@ export function BarraLinhagem(props: Props) {
     filtros, filtrosAtivos, onAlternarFiltro, onLimparFiltros,
     resumo, comparacao, trilha, proximaAcao,
     relacionadosVisiveis, onAlternarRelacionados, totalRelacionados,
-    saudeLigada, onAlternarSaude, contagemSaude,
+    saudeLigada, onAlternarSaude, contagemSaude, contagemFiltros,
     totalRecuado, totalRecolhivel, onRecolherTudo, onIrParaPessoa, carregando,
   } = props
 
@@ -535,6 +537,55 @@ export function BarraLinhagem(props: Props) {
         )}
       </div>
 
+      {/* ── FAIXA FIXA DE CONTEXTO ─────────────────────────────────────────
+          Uma linha, sempre visível: quem, quantos, quem transmite, quanto falta
+          e o que fazer agora. Não é dashboard — é a legenda do que está na tela,
+          e sem ela o operador precisa abrir três popovers para saber onde está.
+          Rótulo em cima do número: "0/4" sozinho não diz nada. */}
+      {resumo && (
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-1 rounded-lg border border-gray-200 bg-white px-3 py-1.5 shadow-sm">
+          <Campo rotulo="Requerente" valor={resumo.nome} destaque />
+          <Campo
+            rotulo="Ascendente transmissor"
+            valor={resumo.danteCausaNome ?? "não identificado"}
+            aoClicar={resumo.danteCausaId != null ? () => onIrParaPessoa(resumo.danteCausaId!) : undefined}
+            dica="Ascendente mais próximo com nacionalidade do país-alvo — é ele que fundamenta o pedido."
+          />
+          <Campo
+            rotulo="Linhagem"
+            valor={`${resumo.pessoas} pessoa${resumo.pessoas === 1 ? "" : "s"}`}
+            dica="Cadeia do requerente mais os cônjuges dela."
+          />
+          <Campo
+            rotulo="Documentos"
+            valor={
+              resumo.documental.necessarias > 0
+                ? `${resumo.documental.atendidas + resumo.documental.dispensadas} de ${resumo.documental.necessarias}`
+                : "sem exigência"
+            }
+            dica="Atendidos ou dispensados, sobre o total exigido pelas Regras Documentais."
+          />
+          <Campo
+            rotulo="Pendências"
+            valor={String(resumo.documental.pendentes)}
+            dica="Exigências que ainda não foram iniciadas."
+          />
+          <Campo
+            rotulo="Bloqueios"
+            valor={String(resumo.bloqueios)}
+            alerta={resumo.bloqueios > 0}
+            dica="Documentos marcados como não localizados — é o que impede concluir."
+          />
+          <span aria-hidden className="hidden h-5 w-px bg-gray-200 lg:block" />
+          <Campo
+            rotulo="Próxima ação"
+            valor={`${proximaAcao.pessoaNome ? `${proximaAcao.pessoaNome}: ` : ""}${proximaAcao.acao}`}
+            aoClicar={proximaAcao.pessoaId != null ? () => onIrParaPessoa(proximaAcao.pessoaId!) : undefined}
+            dica={`Prioridade ${proximaAcao.prioridade}/7 · ${proximaAcao.fonte}`}
+          />
+        </div>
+      )}
+
       {/* ── LEGENDA DA SAÚDE ───────────────────────────────────────────────
           Números reais, não só cores: "amarelo" não diz quantas pessoas. */}
       {saudeLigada && (
@@ -582,6 +633,50 @@ export function BarraLinhagem(props: Props) {
         </nav>
       )}
     </div>
+  )
+}
+
+/** Rótulo em cima, valor embaixo. Nenhum número aparece sem dizer o que é. */
+function Campo({
+  rotulo,
+  valor,
+  dica,
+  destaque = false,
+  alerta = false,
+  aoClicar,
+}: {
+  rotulo: string
+  valor: string
+  dica?: string
+  destaque?: boolean
+  alerta?: boolean
+  aoClicar?: () => void
+}) {
+  const corpo = (
+    <>
+      <span className="block text-[9px] uppercase leading-none tracking-wide text-gray-400">
+        {rotulo}
+      </span>
+      <span
+        className={`block max-w-[240px] truncate text-[12px] leading-tight ${
+          alerta ? "font-semibold text-red-700" : destaque ? "font-semibold text-gray-900" : "text-gray-700"
+        }`}
+      >
+        {valor}
+      </span>
+    </>
+  )
+  if (!aoClicar) {
+    return (
+      <span className="min-w-0" title={dica}>
+        {corpo}
+      </span>
+    )
+  }
+  return (
+    <button onClick={aoClicar} title={dica} className="min-w-0 text-left transition hover:opacity-70">
+      {corpo}
+    </button>
   )
 }
 

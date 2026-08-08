@@ -60,6 +60,8 @@ import {
   porQueValor,
 } from "@/src/lib/genealogia/operacional/auditor"
 import { calcularSaude, contarPorNivel } from "@/src/lib/genealogia/operacional/saude"
+import { compararEstados, semDiferenca } from "@/src/lib/genealogia/operacional/comparacao"
+import { eventosDaPessoa, marcarConflitos, ROTULO_EVENTO } from "@/src/lib/genealogia/motor/eventos"
 import {
   compararLinhagens,
   relacionadosDaLinhagem,
@@ -881,6 +883,87 @@ ok(
   cont.critico + cont.atencao + cont.saudavel + cont.fora === PESSOAS.length,
   "a contagem fecha com o total",
   cont,
+)
+
+// ── 5j. ANTES × DEPOIS ──────────────────────────────────────────────────────
+secao("5j) comparação antes × depois")
+
+const estadoHoje = {
+  documentosExigidos: 4,
+  documentosConcluidos: 1,
+  pendencias: 3,
+  bloqueios: 2,
+  pessoasNaLinhagem: 1,
+  ascendenteTransmissor: null,
+}
+const comp = compararEstados(estadoHoje, {
+  documentosAdicionados: 3,
+  documentosDispensados: 0,
+  bloqueiosAdicionados: 0,
+  bloqueiosRemovidos: 2,
+  passosAdicionados: 2,
+  linhagensAfetadas: ["Marcos Rossi"],
+  transmissorAlterado: true,
+})
+const porRotulo = new Map(comp.map((l) => [l.rotulo, l]))
+ok(porRotulo.get("Documentos exigidos")!.depois === "7", "exigidos = antes + adicionados", porRotulo.get("Documentos exigidos")!.depois)
+ok(porRotulo.get("Bloqueios")!.depois === "0", "bloqueios caem para zero", porRotulo.get("Bloqueios")!.depois)
+// A cor não sai do sinal do número: menos bloqueio é MELHORA, mais exigência é PIORA.
+ok(porRotulo.get("Bloqueios")!.direcao === "melhora", "resolver bloqueio é melhora")
+ok(porRotulo.get("Documentos exigidos")!.direcao === "piora", "mais exigência é mais trabalho")
+ok(porRotulo.get("Documentos concluídos")!.direcao === "igual", "alterar cadastro não conclui documento")
+ok(
+  /recalcula ao confirmar/.test(porRotulo.get("Ascendente transmissor")!.depois),
+  "não adivinha o novo transmissor — diz que o motor recalcula",
+  porRotulo.get("Ascendente transmissor")!.depois,
+)
+ok(comp.every((l) => (l.dica ?? "").length > 0), "toda linha tem tooltip explicativo")
+
+// Delta vazio: nada muda, e a tela então não mostra a comparação.
+const semMudanca = compararEstados(estadoHoje, {
+  documentosAdicionados: 0, documentosDispensados: 0,
+  bloqueiosAdicionados: 0, bloqueiosRemovidos: 0, passosAdicionados: 0,
+  linhagensAfetadas: [], transmissorAlterado: false,
+})
+ok(semDiferenca(semMudanca), "delta vazio produz comparação sem diferença")
+
+// Aritmética pura: nunca negativo na tela.
+const exagero = compararEstados(estadoHoje, {
+  documentosAdicionados: 0, documentosDispensados: 0,
+  bloqueiosAdicionados: 0, bloqueiosRemovidos: 99, passosAdicionados: 0,
+  linhagensAfetadas: [], transmissorAlterado: false,
+})
+ok(
+  new Map(exagero.map((l) => [l.rotulo, l])).get("Bloqueios")!.depois === "0",
+  "remoção maior que o total não vira número negativo",
+)
+
+// ── 5k. TIMELINE DA PESSOA ──────────────────────────────────────────────────
+secao("5k) timeline — projeção, não tabela nova")
+
+const linha1 = eventosDaPessoa(grafo, 1)
+ok(linha1.length > 0, "gera eventos de vida a partir do cadastro", linha1.length)
+ok(linha1.every((e) => ROTULO_EVENTO[e.tipo] !== undefined), "todo evento tem rótulo em português")
+ok(linha1.every((e) => e.origem.length > 0), "todo evento declara o campo de origem")
+ok(
+  linha1.some((e) => e.tipo === "nascimento"),
+  "nascimento aparece para quem tem data",
+)
+// Data ausente é pendência de pesquisa, não vazio silencioso.
+const semData = eventosDaPessoa(grafo, 9)
+ok(
+  semData.every((e) => e.data != null || e.precisao === "ausente"),
+  "evento sem data é marcado como ausente, não descartado",
+)
+// Conflito vem do motor de cronologia, não de reavaliação local.
+const marcados = marcarConflitos(linha1, new Set([1]))
+ok(
+  marcados.some((e) => e.precisao === "conflito") || linha1.every((e) => e.precisao !== "exata"),
+  "ids com conflito recebem a marca",
+)
+ok(
+  marcarConflitos(linha1, new Set()).every((e) => e.precisao !== "conflito"),
+  "sem conflito apontado pelo motor, nada é marcado",
 )
 
 // ── 6. ESCALA ───────────────────────────────────────────────────────────────

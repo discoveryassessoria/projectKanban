@@ -58,6 +58,8 @@ import {
 } from "@/src/lib/genealogia/navegacao/filtros"
 import { analisarLacunas, type LacunaParental } from "@/src/lib/genealogia/navegacao/lacunas"
 import { calcularSaude, contarPorNivel, type NivelSaudePessoa, type SaudePessoa } from "@/src/lib/genealogia/operacional/saude"
+import type { EstadoAtual } from "@/src/lib/genealogia/operacional/comparacao"
+import { eventosDaPessoa, marcarConflitos, type EventoProjetado } from "@/src/lib/genealogia/motor/eventos"
 import { projetarIndicadores } from "@/src/lib/genealogia/documental/indicadores"
 import {
   fatosVazios,
@@ -126,6 +128,13 @@ export interface ArvoreOperacional {
   alternarSaude: () => void
   saude: Map<number, SaudePessoa> | undefined
   contagemSaude: Record<NivelSaudePessoa, number>
+
+  /** Números de hoje, para o preview montar a coluna ANTES. */
+  estadoAtual: EstadoAtual | undefined
+  /** Quantas pessoas cada filtro rápido casaria, agora. */
+  contagemFiltros: Record<string, number>
+  /** Linha do tempo de uma pessoa — projeção oficial, sem tabela nova. */
+  eventosDe: (pessoaId: number) => EventoProjetado[]
 
   /** Grupos "+N irmãos" que ainda estão recolhidos. */
   expandirGrupo: (chave: string) => void
@@ -375,6 +384,64 @@ export function useArvoreOperacional(params: {
     [analise, mapa, dossies, linhagem],
   )
 
+  // ANTES do preview: os mesmos números que a barra já mostra. Nada é lido de
+  // novo — se o resumo e o preview discordassem, um dos dois estaria mentindo.
+  const estadoAtual = useMemo<EstadoAtual | undefined>(
+    () =>
+      resumo
+        ? {
+            documentosExigidos: resumo.documental.necessarias,
+            documentosConcluidos: resumo.documental.atendidas + resumo.documental.dispensadas,
+            pendencias: resumo.documental.pendentes,
+            bloqueios: resumo.bloqueios,
+            pessoasNaLinhagem: resumo.pessoas,
+            ascendenteTransmissor: resumo.danteCausaNome,
+          }
+        : undefined,
+    [resumo],
+  )
+
+  // CONTADOR POR FILTRO. Cada chave é avaliada isoladamente contra a árvore —
+  // é o que responde "quantas pessoas isso pega?" ANTES de o usuário ligar o
+  // filtro e ter de contar cartão na tela.
+  const contagemFiltros = useMemo<Record<string, number>>(() => {
+    if (!analise) return {}
+    const documental = projetarIndicadores(fatos.necessidades)
+    const ctx = { grafo: analise.grafo, analise, documental }
+    const chaves: ChaveFiltro[] = [
+      "requerentes", "pendencia_documental", "inconsistencia",
+      "incompletas", "vivas", "falecidas", "casadas",
+    ]
+    const saidaFiltros: Record<string, number> = {}
+    for (const chave of chaves) {
+      saidaFiltros[chave] = aplicarFiltros(ctx, {
+        ...filtrosVazios(),
+        chaves: new Set([chave]),
+        referenciaId: requerenteSelecionadoId,
+      }).size
+    }
+    return saidaFiltros
+  }, [analise, fatos.necessidades, requerenteSelecionadoId])
+
+  // Timeline: projeção de `motor/eventos.ts` sobre as colunas de Pessoa/Uniao.
+  // `marcarConflitos` sinaliza data que contradiz outra da própria árvore — a
+  // linha do tempo mostra o conflito em vez de escolher uma das duas datas.
+  // Quem tem conflito de data quem diz é o motor de cronologia, não a timeline:
+  // reavaliar as datas aqui seria uma segunda opinião sobre a mesma contradição.
+  const pessoasComConflito = useMemo(() => {
+    const ids = new Set<number>()
+    for (const i of analise?.insights ?? []) {
+      if (i.categoria === "conflito") for (const id of i.pessoaIds) ids.add(id)
+    }
+    return ids
+  }, [analise])
+
+  const eventosDe = useCallback(
+    (pessoaId: number): EventoProjetado[] =>
+      analise ? marcarConflitos(eventosDaPessoa(analise.grafo, pessoaId), pessoasComConflito) : [],
+    [analise, pessoasComConflito],
+  )
+
   const selecionarRequerente = useCallback((id: number | null) => setEscolhaManual(id), [])
   const alternarRelacionados = useCallback(() => setRelacionadosVisiveis((v) => !v), [])
   const alternarSaude = useCallback(() => setSaudeLigada((v) => !v), [])
@@ -438,6 +505,9 @@ export function useArvoreOperacional(params: {
     alternarSaude,
     saude: saudeCalculada,
     contagemSaude,
+    estadoAtual,
+    contagemFiltros,
+    eventosDe,
     expandirGrupo,
     recolherTudo,
     totalRecolhivel,
