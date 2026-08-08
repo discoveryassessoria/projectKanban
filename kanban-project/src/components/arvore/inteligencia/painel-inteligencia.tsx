@@ -19,9 +19,15 @@
 //    fingir cobertura completa — e é assim que um conflito real passa batido.
 // ============================================================================
 
-import { useMemo } from "react"
-import { X, AlertTriangle, TriangleAlert, Info, Target, Users } from "lucide-react"
+import { useMemo, useState } from "react"
+import { X, AlertTriangle, TriangleAlert, Info, Target, Users, MessageCircleQuestion } from "lucide-react"
 import type { AnaliseArvore, Insight, Severidade } from "@/src/lib/genealogia/motor/tipos"
+import {
+  PERGUNTAS,
+  responder,
+  type ChavePergunta,
+  type ContextoPerguntas,
+} from "@/src/lib/genealogia/operacional/perguntas"
 
 interface Props {
   analise: AnaliseArvore | null
@@ -30,6 +36,83 @@ interface Props {
   /** Levar o usuário até a pessoa no canvas (não altera o layout, só navega). */
   onIrParaPessoa?: (pessoaId: number) => void
   nomeDePessoa: (pessoaId: number) => string
+  /**
+   * Contexto das perguntas da árvore. Ausente = a seção de perguntas não
+   * aparece; ela não tem como responder sem os dossiês.
+   */
+  perguntas?: ContextoPerguntas | null
+}
+
+/**
+ * PERGUNTAS DA ÁRVORE — cinco perguntas fixas, resposta por consulta.
+ *
+ * Não há campo de texto livre de propósito: campo livre promete entender
+ * qualquer pergunta, e o que existe atrás é uma consulta determinística sobre os
+ * dados do processo. Cinco perguntas explícitas dizem a verdade sobre o que a
+ * árvore sabe responder — e cada resposta mostra de onde saiu.
+ */
+function SecaoPerguntas({
+  ctx,
+  onIrParaPessoa,
+}: {
+  ctx: ContextoPerguntas
+  onIrParaPessoa?: (id: number) => void
+}) {
+  const [ativa, setAtiva] = useState<ChavePergunta | null>(null)
+  const resposta = useMemo(() => (ativa ? responder(ativa, ctx) : null), [ativa, ctx])
+
+  return (
+    <section>
+      <h3 className="mb-2 flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wide text-gray-500">
+        <MessageCircleQuestion className="h-3.5 w-3.5" /> Perguntas
+      </h3>
+      <div className="space-y-1.5">
+        {PERGUNTAS.map((p) => {
+          const aberta = ativa === p.chave
+          return (
+            <div key={p.chave} className="overflow-hidden rounded-lg border border-gray-100">
+              <button
+                onClick={() => setAtiva(aberta ? null : p.chave)}
+                className={`w-full px-2.5 py-2 text-left text-[12px] transition ${
+                  aberta ? "bg-gray-50 font-medium text-gray-900" : "text-gray-700 hover:bg-gray-50"
+                }`}
+              >
+                {p.texto}
+              </button>
+              {aberta && resposta && (
+                <div className="border-t border-gray-100 px-2.5 py-2">
+                  <p className="text-[12px] leading-relaxed text-gray-800">{resposta.resumo}</p>
+                  {resposta.itens.length > 0 && (
+                    <ul className="mt-1.5 space-y-1">
+                      {resposta.itens.map((item, i) => (
+                        <li key={`${resposta.chave}-${i}`} className="text-[11px] leading-snug">
+                          {item.pessoaId != null && onIrParaPessoa ? (
+                            <button
+                              onClick={() => onIrParaPessoa(item.pessoaId!)}
+                              className="text-left text-gray-600 underline decoration-gray-300 underline-offset-2 transition hover:text-gray-900"
+                            >
+                              {item.texto}
+                            </button>
+                          ) : (
+                            <span className="text-gray-600">{item.texto}</span>
+                          )}
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                  {/* Resposta sem fonte não é resposta: o operador precisa saber
+                      onde conferir antes de agir sobre um processo. */}
+                  <p className="mt-2 text-[10px] uppercase tracking-wide text-gray-400">
+                    Fonte: {resposta.fonte}
+                  </p>
+                </div>
+              )}
+            </div>
+          )
+        })}
+      </div>
+    </section>
+  )
 }
 
 const CORES: Record<Severidade, { texto: string; fundo: string; borda: string }> = {
@@ -100,7 +183,14 @@ function CartaoInsight({
   )
 }
 
-export function PainelInteligencia({ analise, aberto, onFechar, onIrParaPessoa, nomeDePessoa }: Props) {
+export function PainelInteligencia({
+  analise,
+  aberto,
+  onFechar,
+  onIrParaPessoa,
+  nomeDePessoa,
+  perguntas,
+}: Props) {
   // Agrupa por severidade preservando a ordem que o motor já priorizou.
   const porSeveridade = useMemo(() => {
     const grupos = new Map<Severidade, Insight[]>()
@@ -147,6 +237,8 @@ export function PainelInteligencia({ analise, aberto, onFechar, onIrParaPessoa, 
                 {analise.paisAlvo ? ` (${analise.paisAlvo.toLowerCase()})` : ""}
               </p>
             </section>
+
+            {perguntas && <SecaoPerguntas ctx={perguntas} onIrParaPessoa={onIrParaPessoa} />}
 
             {analise.proximosPassos.length > 0 && (
               <section>

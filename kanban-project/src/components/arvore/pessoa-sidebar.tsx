@@ -19,10 +19,14 @@ import {
   CheckCircle2,
   Clock,
   ChevronDown,
-  ExternalLink
+  ExternalLink,
+  ListChecks,
+  Wallet,
+  TriangleAlert
 } from "lucide-react"
 import type { PessoaArvore, UniaoArvore, DocumentoArvore } from "./types"
 import { usePermissoes } from "@/src/hooks/use-permissoes"
+import type { DossiePessoa, TotalPorMoeda } from "@/src/lib/genealogia/operacional/dossie"
 
 // ========================================
 // TIPOS
@@ -46,6 +50,17 @@ interface PessoaSidebarProps {
   onSelectPerson?: (pessoa: PessoaArvore) => void
   // Prop para abrir em aba específica (ex: "documentos" vindo da pesquisa)
   initialTab?: string
+  /**
+   * Dossiê operacional desta pessoa — exigência, divergência, tarefa e valor,
+   * projetados de fontes oficiais (ver `operacional/dossie.ts`). Ausente quando
+   * o painel abre fora do contexto de processo: nesse caso o resumo e a aba
+   * Operação simplesmente não aparecem, em vez de mostrarem zero.
+   */
+  dossie?: DossiePessoa | null
+  /** false quando o usuário não tem `financeiro.ver`. Muda o texto, não o zero. */
+  financeiroVisivel?: boolean
+  /** Requerentes cuja linha depende desta pessoa — para explicar a prioridade. */
+  nomeDeRequerente?: (pessoaId: number) => string
 }
 
 // ========================================
@@ -223,8 +238,158 @@ function CollapsibleSection({
   )
 }
 
-function DocumentoCard({ 
-  documento, 
+// ========================================
+// RESUMO OPERACIONAL — o que a pessoa custa de trabalho, em cinco números
+// ========================================
+// Fica no topo do painel, antes das abas, porque é a pergunta que se faz ao
+// abrir alguém: "o que falta aqui?". Cada número tem dono declarado em
+// `operacional/dossie.ts` — nenhum é calculado nesta tela.
+function ResumoOperacional({
+  dossie,
+  nomeDeRequerente,
+}: {
+  dossie: DossiePessoa
+  nomeDeRequerente?: (id: number) => string
+}) {
+  const d = dossie.documental
+  const compartilhada = dossie.requerentesDependentes.length > 1
+
+  return (
+    <div className="border-b border-slate-200 bg-slate-50/60 px-5 py-3">
+      <div className="flex items-center justify-between gap-2">
+        <span className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+          Resumo operacional
+        </span>
+        <span className="text-xs font-medium text-slate-600">
+          {d.progresso == null ? "Sem exigência" : `${d.progresso}% do dossiê`}
+        </span>
+      </div>
+
+      <div className="mt-2 grid grid-cols-5 gap-1.5 text-center">
+        <Numero rotulo="Exig." valor={d.necessarias} />
+        <Numero rotulo="Receb." valor={d.atendidas + d.dispensadas} />
+        <Numero rotulo="Pend." valor={d.pendentes} destaque={d.pendentes > 0} />
+        <Numero
+          rotulo="Diverg."
+          valor={dossie.divergencias.length}
+          destaque={dossie.divergencias.length > 0}
+        />
+        <Numero
+          rotulo="Tarefas"
+          valor={dossie.tarefasAbertas.length}
+          destaque={dossie.tarefasAbertas.length > 0}
+        />
+      </div>
+
+      {d.naoLocalizadas > 0 && (
+        <p className="mt-2 rounded-md bg-red-50 px-2 py-1 text-[11px] font-medium text-red-700">
+          {d.naoLocalizadas} documento(s) marcado(s) como não localizado(s).
+        </p>
+      )}
+
+      {compartilhada && (
+        <p className="mt-2 text-[11px] leading-snug text-slate-600">
+          {dossie.requerentesDependentes.length} requerentes dependem desta pessoa
+          {nomeDeRequerente
+            ? `: ${dossie.requerentesDependentes.map(nomeDeRequerente).join(", ")}`
+            : ""}
+          . Resolver aqui destrava todos.
+        </p>
+      )}
+
+      {dossie.proximaAcao && (
+        <div className="mt-2 rounded-md border border-slate-200 bg-white px-2.5 py-2">
+          <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-500">
+            Próxima ação
+          </p>
+          <p className="mt-0.5 text-xs leading-snug text-slate-800">{dossie.proximaAcao}</p>
+        </div>
+      )}
+    </div>
+  )
+}
+
+function Numero({
+  rotulo,
+  valor,
+  destaque = false,
+}: {
+  rotulo: string
+  valor: number
+  destaque?: boolean
+}) {
+  return (
+    <div className="rounded-md bg-white px-1 py-1.5 ring-1 ring-slate-200">
+      <p
+        className={`text-sm font-semibold tabular-nums ${destaque ? "text-amber-700" : "text-slate-900"}`}
+      >
+        {valor}
+      </p>
+      <p className="text-[10px] leading-none text-slate-500">{rotulo}</p>
+    </div>
+  )
+}
+
+/** Moeda formatada pela moeda do próprio lançamento — nunca convertida aqui. */
+function formatarTotal(t: TotalPorMoeda): string {
+  try {
+    return new Intl.NumberFormat("pt-BR", { style: "currency", currency: t.moeda }).format(t.valor)
+  } catch {
+    return `${t.moeda} ${t.valor.toFixed(2)}`
+  }
+}
+
+function BlocoValores({
+  titulo,
+  totais,
+  visivel,
+}: {
+  titulo: string
+  totais: TotalPorMoeda[]
+  visivel: boolean
+}) {
+  // Sem permissão financeira o painel DIZ isso. Exibir "R$ 0,00" seria informar
+  // um valor falso a quem não pode ver o verdadeiro.
+  if (!visivel) {
+    return (
+      <div className="py-2">
+        <p className="text-xs font-medium text-slate-500">{titulo}</p>
+        <p className="mt-0.5 text-sm text-slate-400 italic">Sem permissão para ver valores</p>
+      </div>
+    )
+  }
+  if (totais.length === 0) {
+    return (
+      <div className="py-2">
+        <p className="text-xs font-medium text-slate-500">{titulo}</p>
+        <p className="mt-0.5 text-sm text-slate-400 italic">Nenhum lançamento para esta pessoa</p>
+      </div>
+    )
+  }
+  return (
+    <div className="py-2">
+      <p className="text-xs font-medium text-slate-500">{titulo}</p>
+      <ul className="mt-1 space-y-1">
+        {totais.map((t) => (
+          <li key={t.moeda} className="flex items-baseline justify-between text-sm">
+            <span className="text-slate-700">{t.moeda}</span>
+            <span className="font-medium tabular-nums text-slate-900">
+              {formatarTotal(t)}
+              {t.recebido > 0 && (
+                <span className="ml-1 text-[11px] font-normal text-slate-500">
+                  (liquidado {formatarTotal({ ...t, valor: t.recebido })})
+                </span>
+              )}
+            </span>
+          </li>
+        ))}
+      </ul>
+    </div>
+  )
+}
+
+function DocumentoCard({
+  documento,
   onClick,
   onDelete 
 }: { 
@@ -420,12 +585,16 @@ function ConteudoSidebar({
   onEditDocumento,
   onDeleteDocumento,
   onSelectPerson,
-  initialTab
+  initialTab,
+  dossie,
+  financeiroVisivel = false,
+  nomeDeRequerente
 }: PessoaSidebarProps) {
   // Aba inicial: a do deep-link, quando veio uma reconhecida; senão "info".
-  const [activeTab, setActiveTab] = useState<"info" | "familia" | "docs">(() => {
+  const [activeTab, setActiveTab] = useState<"info" | "familia" | "docs" | "operacao">(() => {
     if (initialTab === "documentos" || initialTab === "docs") return "docs"
     if (initialTab === "familia") return "familia"
+    if (initialTab === "operacao") return "operacao"
     return "info"
   })
   const [confirmDelete, setConfirmDelete] = useState(false)
@@ -521,27 +690,34 @@ function ConteudoSidebar({
         )}
       </div>
       
-      {/* Tabs */}
+      {/* Resumo operacional — só existe quando há dossiê projetado. Fora do
+          contexto de processo o painel continua exatamente como era. */}
+      {dossie && <ResumoOperacional dossie={dossie} nomeDeRequerente={nomeDeRequerente} />}
+
+      {/* Tabs
+          Com a 4ª aba (Operação), os rótulos encurtam para caber nos 420px do
+          painel — os ícones, que são a âncora visual, ficam. Sem dossiê são as
+          MESMAS três abas de antes, com os mesmos rótulos longos. */}
       <div className="flex border-b border-slate-200 bg-slate-50">
         <button
           onClick={() => setActiveTab("info")}
-          className={`flex-1 flex items-center justify-center gap-2 px-4 py-3 text-sm font-medium transition-colors relative ${
-            activeTab === "info" 
-              ? 'text-teal-600 bg-white' 
+          className={`flex-1 flex items-center justify-center gap-2 ${dossie ? 'px-2' : 'px-4'} py-3 text-sm font-medium transition-colors relative ${
+            activeTab === "info"
+              ? 'text-teal-600 bg-white'
               : 'text-slate-600 hover:text-slate-900'
           }`}
         >
           <User className="h-4 w-4" />
-          Informações
+          {dossie ? "Info" : "Informações"}
           {activeTab === "info" && (
             <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-teal-500" />
           )}
         </button>
         <button
           onClick={() => setActiveTab("familia")}
-          className={`flex-1 flex items-center justify-center gap-2 px-4 py-3 text-sm font-medium transition-colors relative ${
-            activeTab === "familia" 
-              ? 'text-teal-600 bg-white' 
+          className={`flex-1 flex items-center justify-center gap-2 ${dossie ? 'px-2' : 'px-4'} py-3 text-sm font-medium transition-colors relative ${
+            activeTab === "familia"
+              ? 'text-teal-600 bg-white'
               : 'text-slate-600 hover:text-slate-900'
           }`}
         >
@@ -553,14 +729,14 @@ function ConteudoSidebar({
         </button>
         <button
           onClick={() => setActiveTab("docs")}
-          className={`flex-1 flex items-center justify-center gap-2 px-4 py-3 text-sm font-medium transition-colors relative ${
-            activeTab === "docs" 
-              ? 'text-teal-600 bg-white' 
+          className={`flex-1 flex items-center justify-center gap-2 ${dossie ? 'px-2' : 'px-4'} py-3 text-sm font-medium transition-colors relative ${
+            activeTab === "docs"
+              ? 'text-teal-600 bg-white'
               : 'text-slate-600 hover:text-slate-900'
           }`}
         >
           <FileText className="h-4 w-4" />
-          Documentos
+          {dossie ? "Docs" : "Documentos"}
           {documentos.length > 0 && (
             <span className="px-1.5 py-0.5 text-[10px] font-medium rounded-full bg-teal-100 text-teal-700">
               {documentos.length}
@@ -570,8 +746,29 @@ function ConteudoSidebar({
             <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-teal-500" />
           )}
         </button>
+        {dossie && (
+          <button
+            onClick={() => setActiveTab("operacao")}
+            className={`flex-1 flex items-center justify-center gap-2 px-2 py-3 text-sm font-medium transition-colors relative ${
+              activeTab === "operacao"
+                ? 'text-teal-600 bg-white'
+                : 'text-slate-600 hover:text-slate-900'
+            }`}
+          >
+            <ListChecks className="h-4 w-4" />
+            Operação
+            {dossie.tarefasAbertas.length > 0 && (
+              <span className="px-1.5 py-0.5 text-[10px] font-medium rounded-full bg-teal-100 text-teal-700">
+                {dossie.tarefasAbertas.length}
+              </span>
+            )}
+            {activeTab === "operacao" && (
+              <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-teal-500" />
+            )}
+          </button>
+        )}
       </div>
-      
+
       {/* Conteúdo */}
       <div className="flex-1 overflow-y-auto">
         {/* TAB: Informações */}
@@ -847,8 +1044,70 @@ function ConteudoSidebar({
             </button>}
           </div>
         )}
+
+        {/* TAB: Operação — tarefas, divergências e valores desta pessoa.
+            Somente LEITURA: a árvore indexa e leva até a ação; quem executa é o
+            módulo dono (Central Operacional, Tarefas, Financeiro). */}
+        {activeTab === "operacao" && dossie && (
+          <div>
+            <CollapsibleSection title="Tarefas abertas" icon={ListChecks} defaultOpen>
+              {dossie.tarefasAbertas.length === 0 ? (
+                <p className="py-2 text-sm italic text-slate-400">
+                  {dossie.tarefasConcluidas > 0
+                    ? `Nenhuma tarefa aberta. ${dossie.tarefasConcluidas} já concluída(s).`
+                    : "Nenhuma tarefa vinculada a esta pessoa."}
+                </p>
+              ) : (
+                <ul className="space-y-2">
+                  {dossie.tarefasAbertas.map((t) => (
+                    <li
+                      key={t.id}
+                      className="rounded-lg border border-slate-200 bg-white px-3 py-2"
+                    >
+                      <p className="text-sm font-medium leading-snug text-slate-900">{t.titulo}</p>
+                      <p className="mt-0.5 text-[11px] text-slate-500">
+                        {t.statusTarefa ? t.statusTarefa.replace(/_/g, " ").toLowerCase() : "sem status"}
+                        {t.responsavel ? ` · ${t.responsavel}` : ""}
+                        {t.dataPrazo ? ` · prazo ${formatDateFull(t.dataPrazo)}` : ""}
+                      </p>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </CollapsibleSection>
+
+            <CollapsibleSection title="Divergências" icon={TriangleAlert} defaultOpen={false}>
+              {dossie.divergencias.length === 0 ? (
+                <p className="py-2 text-sm italic text-slate-400">
+                  Nenhuma contradição de dado encontrada.
+                </p>
+              ) : (
+                <ul className="space-y-2">
+                  {dossie.divergencias.map((i) => (
+                    <li key={i.id} className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2">
+                      <p className="text-sm font-medium leading-snug text-amber-900">{i.titulo}</p>
+                      <p className="mt-0.5 text-[11px] leading-snug text-amber-800">{i.explicacao}</p>
+                      {i.acao && (
+                        <p className="mt-1 text-[11px] font-medium text-amber-900">→ {i.acao}</p>
+                      )}
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </CollapsibleSection>
+
+            <CollapsibleSection title="Custos e receitas" icon={Wallet} defaultOpen={false}>
+              <BlocoValores titulo="Custos" totais={dossie.custos} visivel={financeiroVisivel} />
+              <BlocoValores titulo="Receitas" totais={dossie.receitas} visivel={financeiroVisivel} />
+              <p className="mt-2 text-[11px] leading-snug text-slate-500">
+                Valores por moeda, sem conversão: converter aqui exigiria uma taxa, e a taxa é do
+                motor de câmbio. O saldo vem do Ledger.
+              </p>
+            </CollapsibleSection>
+          </div>
+        )}
       </div>
-      
+
       {/* Footer */}
       <div className="p-4 border-t border-slate-200 bg-slate-50">
         <button 

@@ -136,6 +136,8 @@ const AUTORIZADOS_FORA_DO_RUNTIME: Record<string, string> = {
   "scripts/mrg-e2e.test.ts": "e2e do Motor Registral: monta e limpa cenário documental",
   "scripts/participante-conta.test.ts": "integração de participante: limpa participantes do cenário",
   "scripts/requerimento-doc21.test.ts": "integração DOC21: limpa documentos do cenário",
+  "scripts/arvore-preview-impacto.test.ts":
+    "integração do preview de impacto: limpa a árvore de teste que ele mesmo criou (a simulação não grava — ver o rollback)",
 
   // ── Preparação de ambiente ───────────────────────────────────────────────
   "scripts/preview-sandbox-setup.mjs": "sandbox de Preview: derruba dados do ambiente descartável",

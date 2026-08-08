@@ -2,6 +2,7 @@ import { type NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import { Prisma } from "@prisma/client"
 import { verificarPermissao } from '@/src/lib/verificar-permissao'
+import { dispararMaterializacaoPorArvore } from "@/src/services/genealogia/materializar-genealogia"
 
 // GET - Buscar união por ID
 export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
@@ -94,6 +95,13 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
       },
     })
 
+    // Editar a união muda o fato que sustenta a exigência de casamento (trocar
+    // cônjuge muda de QUEM é a certidão). Mesmo elo causal do POST — reusando o
+    // materializador ÚNICO, nunca reimplementado aqui.
+    await dispararMaterializacaoPorArvore(
+      uniaoAtualizada.pessoa1?.arvoreId ?? uniaoAtualizada.pessoa2?.arvoreId,
+    )
+
     return NextResponse.json(uniaoAtualizada)
   } catch (error) {
     console.error("Erro ao atualizar união:", error)
@@ -121,9 +129,20 @@ export async function DELETE(request: NextRequest, { params }: { params: Promise
       return NextResponse.json({ error: "ID inválido" }, { status: 400 })
     }
 
+    // A árvore precisa ser lida ANTES do delete: depois dele não há mais como
+    // saber a qual árvore a união pertencia, e o materializador ficaria sem alvo.
+    const antes = await prisma.uniao.findUnique({
+      where: { id },
+      select: { pessoa1: { select: { arvoreId: true } }, pessoa2: { select: { arvoreId: true } } },
+    })
+
     await prisma.uniao.delete({
       where: { id },
     })
+
+    // Desfazer o casamento também é mudança de estado civil: a exigência da
+    // certidão deixa de ser aplicável e o motor oficial precisa reconciliar.
+    await dispararMaterializacaoPorArvore(antes?.pessoa1?.arvoreId ?? antes?.pessoa2?.arvoreId)
 
     return NextResponse.json({ message: "União excluída com sucesso" })
   } catch (error) {
