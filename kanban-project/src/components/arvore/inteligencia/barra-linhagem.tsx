@@ -71,6 +71,16 @@ interface Props {
 }
 
 export const MARCA_MENU_ABERTO = "arvoreMenuAberto"
+/**
+ * Evento com que a árvore manda fechar a camada mais externa.
+ *
+ * Por que não um listener de Escape aqui: a árvore abre DENTRO do modal do
+ * processo, e o modal também fecha no Escape, por um listener próprio em
+ * `document`. Dois donos do mesmo Escape significa que dispensar o menu de
+ * filtros fechava o processo inteiro. Agora existe um dono só — o handler em
+ * fase de CAPTURA da árvore — e ele avisa por este evento quem precisa fechar.
+ */
+export const EVENTO_FECHAR_CAMADA = "arvore:fechar-camada"
 let menusAbertos = 0
 
 function marcarMenu(aberto: boolean) {
@@ -99,14 +109,13 @@ function useFecharFora(aberto: boolean, fechar: () => void) {
     const aoClicar = (e: MouseEvent) => {
       if (ref.current && !ref.current.contains(e.target as Node)) fechar()
     }
-    const aoTeclar = (e: KeyboardEvent) => {
-      if (e.key === "Escape") fechar()
-    }
+    // Sem listener de Escape próprio — ver EVENTO_FECHAR_CAMADA.
+    const aoFecharCamada = () => fechar()
     document.addEventListener("mousedown", aoClicar)
-    document.addEventListener("keydown", aoTeclar)
+    document.addEventListener(EVENTO_FECHAR_CAMADA, aoFecharCamada)
     return () => {
       document.removeEventListener("mousedown", aoClicar)
-      document.removeEventListener("keydown", aoTeclar)
+      document.removeEventListener(EVENTO_FECHAR_CAMADA, aoFecharCamada)
       desmarcar()
     }
   }, [aberto, fechar])

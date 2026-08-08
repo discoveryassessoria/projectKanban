@@ -13,7 +13,7 @@ import { PessoaDetailsPage } from "./pessoa-details-page"
 import { ReactFlowTree, ReactFlowTreeRef } from "./react-flow-tree"
 import { useAnaliseArvore, paisAlvoDe } from "./inteligencia/use-analise-arvore"
 import { useArvoreOperacional } from "./inteligencia/use-arvore-operacional"
-import { BarraLinhagem, MARCA_MENU_ABERTO } from "./inteligencia/barra-linhagem"
+import { BarraLinhagem, EVENTO_FECHAR_CAMADA, MARCA_MENU_ABERTO } from "./inteligencia/barra-linhagem"
 import { PainelDiagnostico, SeloSaude } from "./inteligencia/painel-diagnostico"
 import {
   PreviewImpactoModal,
@@ -659,19 +659,37 @@ export function ArvoreGenealogicaView({
       }
 
       if (e.key === "Escape") {
-        // Um menu da barra de linhagem aberto já consome este ESC por conta
-        // própria. Sem esta guarda, dispensar o menu de filtros fecharia junto o
-        // painel da pessoa que o usuário estava lendo.
-        if (document.body.dataset[MARCA_MENU_ABERTO]) return
+        // DONO ÚNICO DO ESCAPE, e só enquanto a árvore tem algo a fechar.
+        //
+        // A árvore abre dentro do modal do processo, que fecha no Escape por um
+        // listener próprio em `document`. Este handler roda em fase de CAPTURA
+        // (ver o addEventListener abaixo), então chega primeiro: quando ele
+        // CONSOME o Escape, o modal não o vê e o processo não se fecha às costas
+        // do usuário. Quando não há camada nenhuma aberta, ele deixa passar — e o
+        // Escape volta a fazer o que sempre fez, que é fechar o processo.
+        const consumir = () => {
+          e.preventDefault()
+          e.stopImmediatePropagation()
+        }
         // Uma camada por ESC, da mais externa para a mais interna. Fechar tudo de
         // uma vez faria o usuário perder contexto que não pediu para perder.
-        if (paletaAberta) { setPaletaAberta(false); return }
-        if (diagnosticoAberto) { setDiagnosticoAberto(false); return }
-        if (painelAberto) { setPainelAberto(false); return }
-        if (fullDetailsPerson) { setFullDetailsPerson(null); return }
-        if (selectedPersonId != null) { setSelectedPersonId(null); setSidebarTabInicial(undefined); return }
-        // Última camada: ESC sai do foco e devolve a árvore completa.
-        if (operacional.modo === "linhagem") operacional.setModo("todos")
+        if (document.body.dataset[MARCA_MENU_ABERTO]) {
+          consumir()
+          document.dispatchEvent(new Event(EVENTO_FECHAR_CAMADA))
+          return
+        }
+        if (paletaAberta) { consumir(); setPaletaAberta(false); return }
+        if (diagnosticoAberto) { consumir(); setDiagnosticoAberto(false); return }
+        if (painelAberto) { consumir(); setPainelAberto(false); return }
+        if (fullDetailsPerson) { consumir(); setFullDetailsPerson(null); return }
+        if (selectedPersonId != null) {
+          consumir()
+          setSelectedPersonId(null)
+          setSidebarTabInicial(undefined)
+          return
+        }
+        // Última camada da árvore: sair do foco e devolver a árvore completa.
+        if (operacional.modo === "linhagem") { consumir(); operacional.setModo("todos") }
         return
       }
 
@@ -729,9 +747,12 @@ export function ArvoreGenealogicaView({
     ],
   )
 
+  // CAPTURA (`true`): este handler precisa ver o Escape ANTES do listener do
+  // modal do processo, que também fecha no Escape. É o que permite consumir o
+  // evento quando a árvore tem camada aberta — e só nesse caso.
   useEffect(() => {
-    document.addEventListener("keydown", teclaGlobal)
-    return () => document.removeEventListener("keydown", teclaGlobal)
+    document.addEventListener("keydown", teclaGlobal, true)
+    return () => document.removeEventListener("keydown", teclaGlobal, true)
   }, [teclaGlobal])
 
   const findConjuge = (pessoa: PessoaArvore): PessoaArvore | null => {
