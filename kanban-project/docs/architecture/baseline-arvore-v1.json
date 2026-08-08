@@ -1,0 +1,139 @@
+{
+  "$comentario": [
+    "BASELINE OFICIAL DA ÁRVORE GENEALÓGICA — declaração VERIFICÁVEL, não decorativa.",
+    "",
+    "Este arquivo não é documentação: `scripts/arvore-arquitetura-guard.test.ts` o LÊ e",
+    "reprova o build quando a realidade diverge dele. Uma baseline que ninguém verifica",
+    "envelhece em silêncio — e a promessa de congelamento vira folclore.",
+    "",
+    "O que ele protege que nenhum outro guard protegia: AS PRÓPRIAS PROTEÇÕES. Remover um",
+    "guard, desligá-lo da baseline do build, ou apagar verificações de uma suíte passa a",
+    "ser falha de CI. Foi assim que a fronteira já foi rompida uma vez sem sinal nenhum.",
+    "",
+    "Alterar este arquivo é ato consciente e exige ADR — ver ADR 13, seção Governança."
+  ],
+
+  "componente": "Árvore Genealógica do Discovery",
+  "versao": "Genealogical Tree Baseline v1.0",
+  "tag": "genealogical-tree-v1.0-stable",
+  "status": "CONGELADA",
+  "congeladaEm": "2026-08-08",
+  "adr": "docs/architecture/13-arvore-camada-de-projecao.md",
+
+  "responsabilidades": [
+    "representar relações familiares",
+    "calcular linhagens",
+    "foco por requerente",
+    "projeções visuais",
+    "diagnóstico",
+    "Explain Engine",
+    "Simulador Read-Only",
+    "navegação",
+    "agregação de projeções",
+    "resumo operacional",
+    "busca",
+    "filtros",
+    "indicadores",
+    "heatmap",
+    "timeline oficial",
+    "comparação entre requerentes"
+  ],
+
+  "proibicoes": [
+    "materializar documentos",
+    "criar tarefas",
+    "criar custos",
+    "criar receitas",
+    "executar workflow",
+    "alterar regras documentais",
+    "alterar regras financeiras",
+    "alterar regras operacionais",
+    "decidir negócio",
+    "possuir motores paralelos",
+    "criar segunda árvore",
+    "criar segunda fonte da verdade",
+    "duplicar resolvers ou regras",
+    "acessar Prisma direto a partir da UI ou dos motores puros",
+    "importar repositório ou implementação interna de outro domínio"
+  ],
+
+  "invariantes": [
+    "uma única fonte da verdade por domínio",
+    "preview sempre read-only (rollback por construção)",
+    "Explain Engine determinístico, sem modelo de linguagem",
+    "zero motores paralelos",
+    "zero escrita direta em domínio alheio",
+    "layout base preservado",
+    "identidade visual preservada",
+    "dependências unidirecionais",
+    "projeções consumidas apenas por contratos oficiais",
+    "requerente do processo nunca é tratado automaticamente como membro ativo da árvore"
+  ],
+
+  "$comentarioGuards": [
+    "`naBaseline: true` significa que o script tem de estar encadeado em",
+    "`test:guards-arquitetura` — a cadeia que o `build` executa. Um guard existente",
+    "mas desligado do build é um guard que não protege nada."
+  ],
+  "guards": [
+    {
+      "script": "scripts/arvore-layout-congelado.test.ts",
+      "npm": "test:arvore-layout",
+      "protege": "o desenho aprovado (componentes, motor de layout, elementos do card, canvas claro)",
+      "minimoVerificacoes": 16,
+      "naBaseline": true
+    },
+    {
+      "script": "scripts/arvore-arquitetura-guard.test.ts",
+      "npm": "test:arvore-arquitetura",
+      "protege": "a fronteira de domínio (escrita, imports, projeção, owner, direção, preview)",
+      "minimoVerificacoes": 14,
+      "naBaseline": true
+    },
+    {
+      "script": "scripts/arvore-inteligencia-guard.test.ts",
+      "npm": "test:arvore-inteligencia",
+      "protege": "determinismo sem LLM, foco fora do layout, heatmap fora do cartão, papéis não duplicados",
+      "minimoVerificacoes": 45,
+      "naBaseline": false
+    },
+    {
+      "script": "scripts/arvore-motor-operacional.test.ts",
+      "npm": "test:arvore-motor",
+      "protege": "linhagem, foco, dossiê, diagnóstico, auditor, saúde, comparação, timeline e escala",
+      "minimoVerificacoes": 187,
+      "naBaseline": false
+    }
+  ],
+
+  "$comentarioIntegracao": [
+    "Exigem banco e por isso não entram na cadeia do build. `preview-impacto` roda em",
+    "kanban_test e prova o contrato de rollback medindo o banco INTEIRO antes e depois;",
+    "`prod-smoke-arvore` é somente leitura contra produção."
+  ],
+  "testesDeIntegracao": [
+    { "script": "scripts/arvore-preview-impacto.test.ts", "npm": "test:arvore-preview", "minimoVerificacoes": 33 },
+    { "script": "scripts/arvore-membership.test.ts", "npm": "test:arvore-membership", "minimoVerificacoes": 24 },
+    { "script": "scripts/prod-smoke-arvore.ts", "npm": "smoke:prod-arvore", "minimoVerificacoes": 12 }
+  ],
+
+  "owners": {
+    "Árvore": "genealogia, visualização, diagnóstico, simulação read-only",
+    "NecessidadeDocumental": "src/services/necessidade-documental.ts",
+    "Documento": "Sistema Documental (materializarExecucaoDaFase → materializarGenealogia)",
+    "PhaseWorkflowInstance": "src/services/phase-workflow.ts",
+    "PhaseWorkflowStepInstance": "src/services/phase-workflow.ts",
+    "Tarefa": "motor de workflow (a tarefa é projeção do passo)",
+    "ObrigacaoEconomica": "Motor Financeiro V3",
+    "LedgerFinanceiro": "Motor Financeiro V3",
+    "ProdutoFinanceiro": "Configuração Financeira (Cadastro Mestre)"
+  },
+
+  "contratos": "src/lib/genealogia/contratos.ts",
+
+  "categoriasDeAlteracao": {
+    "BUG": "correção de comportamento inesperado — não exige ADR",
+    "MELHORIA_PONTUAL": "refinamento sem alterar arquitetura, fronteira ou layout — não exige ADR",
+    "EVOLUCAO": "nova capacidade — EXIGE ADR, revisão arquitetural, análise de impacto e aprovação"
+  }
+}

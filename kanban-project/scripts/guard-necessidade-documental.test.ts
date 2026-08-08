@@ -70,6 +70,8 @@ const AUTORIZADOS_FORA_DO_RUNTIME: Record<string, string> = {
   "scripts/pessoa-tortura.test.ts": "teste de tortura do ciclo de vida da Pessoa: monta e limpa o cenário",
   "scripts/pessoa-equivalencia-rotas.test.ts": "teste de equivalência das duas rotas: monta dois cenários e limpa",
   "scripts/exclusao-servico.test.ts": "teste de exclusão definitiva de serviço: monta e limpa o cenário",
+  "scripts/arvore-membership.test.ts":
+    "teste de membership: monta e limpa o próprio cenário; prova que requerente do processo ≠ membro da árvore",
   "scripts/arvore-preview-impacto.test.ts":
     "teste do preview de impacto: só LIMPA o cenário que ele mesmo criou — quem cria a necessidade no teste é o materializador oficial",
 }

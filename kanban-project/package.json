@@ -110,6 +110,7 @@
     "test:arvore-arquitetura": "tsx scripts/arvore-arquitetura-guard.test.ts",
     "test:arvore-inteligencia": "tsx scripts/arvore-inteligencia-guard.test.ts",
     "test:arvore-layout": "tsx scripts/arvore-layout-congelado.test.ts",
+    "test:arvore-membership": "tsx scripts/arvore-membership.test.ts",
     "test:arvore-motor": "tsx scripts/arvore-motor-operacional.test.ts",
     "test:arvore-preview": "tsx scripts/arvore-preview-impacto.test.ts",
     "test:auth": "tsx scripts/cp-sec.test.ts && tsx scripts/sessao.test.ts && tsx scripts/usuarios-acessos.test.ts && tsx scripts/ssr-hidratacao.test.ts",

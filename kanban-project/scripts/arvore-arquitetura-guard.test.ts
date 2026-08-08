@@ -262,6 +262,153 @@ const regraNoSimulador = ["avaliarRegrasDocumentais", "publicoAlvoAplica", "aval
 if (regraNoSimulador.length === 0) ok("o simulador não reimplementa avaliação de regra")
 else falhar(`simulador com ${regraNoSimulador.join(", ")}`, "a regra vive no motor documental, e só lá")
 
+// ── 6b) MEMBERSHIP: processo ≠ árvore ───────────────────────────────────────
+//
+// "Requerente do processo" e "membro da árvore" são dois vínculos independentes.
+// Tratar um como o outro faz o requerente sumir da lista de disponíveis e ficar
+// impossível de inserir — sem mensagem nenhuma dizendo por quê.
+//
+// O caso que o predicado ingênuo erra: a remoção de pessoa é SOFT
+// (`removidaEm`), porque fato histórico protegido precisa continuar apontando
+// para alguém. Só `arvoreId` conta o removido como membro, para sempre.
+console.log("\n6b) membership: requerente do processo ≠ membro da árvore")
+
+const rotaDisponiveis = codigo(ler("src/app/api/processos/[processoId]/requerentes-disponiveis/route.ts"))
+if (/removidaEm\s*==\s*null/.test(rotaDisponiveis)) {
+  ok("a disponibilidade exige vínculo ATIVO na árvore (removidaEm == null)")
+} else {
+  falhar(
+    "o predicado voltou a ignorar `removidaEm`",
+    "quem foi removido da árvore contaria como membro e nunca mais poderia ser reinserido",
+  )
+}
+if (/availableForTree/.test(rotaDisponiveis) && /alreadyInTree/.test(rotaDisponiveis)) {
+  ok("o backend entrega o estado decidido (alreadyInTree / availableForTree)")
+} else {
+  falhar("a rota parou de entregar o estado decidido", "inferir na tela é como a regra se perde")
+}
+// Identidade por ID canônico. Nome e CPF não decidem pertencimento.
+if (!/\.nome\s*===|cpf\s*===/.test(rotaDisponiveis)) {
+  ok("a comparação é por id canônico — nunca por nome ou CPF")
+} else {
+  falhar("a rota compara por nome ou CPF", "pertencimento se decide por id, não por texto")
+}
+if (existsSync(join(RAIZ, "scripts/arvore-membership.test.ts"))) {
+  ok("a suíte de membership existe")
+} else {
+  falhar("scripts/arvore-membership.test.ts sumiu", "é a prova dos 4 estados de pertencimento")
+}
+
+// ── 7) A BASELINE PROTEGE AS PRÓPRIAS PROTEÇÕES ─────────────────────────────
+//
+// Todas as fronteiras acima dependem de guards existirem, estarem ligados ao
+// build e continuarem verificando o que verificavam. Nada disso era protegido:
+// apagar um guard, ou só removê-lo da cadeia do `build`, deixava o CI verde e a
+// fronteira desprotegida — exatamente o modo de falha que já custou caro aqui.
+//
+// A baseline é declarada em JSON e LIDA por este bloco. Declaração que ninguém
+// verifica envelhece em silêncio.
+console.log("\n7) baseline oficial (Genealogical Tree v1.0)")
+
+interface GuardDeclarado {
+  script: string
+  npm: string
+  protege: string
+  minimoVerificacoes: number
+  naBaseline: boolean
+}
+interface Baseline {
+  versao: string
+  status: string
+  responsabilidades: string[]
+  proibicoes: string[]
+  invariantes: string[]
+  guards: GuardDeclarado[]
+  testesDeIntegracao: Array<{ script: string; npm: string; minimoVerificacoes: number }>
+  contratos: string
+  adr: string
+}
+
+const CAMINHO_BASELINE = "docs/architecture/baseline-arvore-v1.json"
+const bruto = ler(CAMINHO_BASELINE)
+if (!bruto) {
+  falhar("baseline ausente", `${CAMINHO_BASELINE} é a declaração oficial — não pode sumir`)
+} else {
+  const baseline = JSON.parse(bruto) as Baseline
+  ok(`baseline declarada: ${baseline.versao} (${baseline.status})`)
+
+  if (baseline.status === "CONGELADA") ok("status CONGELADA")
+  else falhar(`status é "${baseline.status}"`, "descongelar exige ADR, não edição de JSON")
+
+  if (existsSync(join(RAIZ, baseline.adr))) ok("o ADR referenciado existe")
+  else falhar(`ADR ausente: ${baseline.adr}`, "baseline sem ADR é regra sem justificativa")
+
+  if (existsSync(join(RAIZ, baseline.contratos))) ok("os contratos referenciados existem")
+  else falhar(`contratos ausentes: ${baseline.contratos}`, "sem contrato não há fronteira")
+
+  // A cadeia que o `build` executa. Um guard fora dela não protege deploy nenhum.
+  const pkg = JSON.parse(ler("package.json")) as { scripts?: Record<string, string> }
+  const cadeiaBuild = pkg.scripts?.["test:guards-arquitetura"] ?? ""
+  const comandoBuild = pkg.scripts?.build ?? ""
+
+  if (comandoBuild.includes("test:guards-arquitetura")) {
+    ok("o build executa a cadeia de guards arquiteturais")
+  } else {
+    falhar("o build não chama test:guards-arquitetura", "guard fora do build não impede deploy")
+  }
+
+  for (const g of baseline.guards) {
+    if (!existsSync(join(RAIZ, g.script))) {
+      falhar(`guard removido: ${g.script}`, `protegia: ${g.protege}`)
+      continue
+    }
+    if (!pkg.scripts?.[g.npm]) {
+      falhar(`script npm ausente: ${g.npm}`, `o guard ${g.script} ficou sem porta de entrada`)
+      continue
+    }
+    if (g.naBaseline && !cadeiaBuild.includes(g.npm)) {
+      falhar(`${g.npm} saiu da baseline do build`, `protegia: ${g.protege}`)
+      continue
+    }
+    ok(`${g.npm} presente${g.naBaseline ? " e na baseline do build" : ""}`)
+  }
+
+  for (const t of baseline.testesDeIntegracao) {
+    if (existsSync(join(RAIZ, t.script)) && pkg.scripts?.[t.npm]) ok(`${t.npm} presente`)
+    else falhar(`teste de integração ausente: ${t.npm}`, "exige banco, mas não pode ser apagado")
+  }
+
+  // NENHUM TESTE PODE SER REMOVIDO. O piso é o número de verificações do dia do
+  // congelamento: a suíte pode crescer, nunca encolher. Isto pega a remoção
+  // silenciosa de asserção — que passa despercebida por qualquer outro sinal.
+  //
+  // A contagem é lida do PRÓPRIO arquivo, contando chamadas de asserção, para
+  // não precisar executar quatro suítes dentro de um guard de build.
+  for (const g of [...baseline.guards, ...baseline.testesDeIntegracao]) {
+    const src = ler(g.script)
+    if (!src) continue
+    // Conta CHAMADAS de `ok(`, inclusive inline (`if (x) ok(y)`), descontando a
+    // definição do helper. Um regex ancorado no início da linha não pegava as
+    // inline e reprovava a suíte de layout, que usa esse estilo.
+    const asserts =
+      (src.match(/\bok\(/g) ?? []).length - (src.match(/function ok\(/g) ?? []).length
+    if (asserts === 0) {
+      falhar(`${g.script} não tem asserção`, "suíte vazia é pior do que suíte ausente")
+      continue
+    }
+    // Muitas asserções nascem em laço; por isso o piso é sobre CHAMADAS
+    // escritas, com folga. O que se quer pegar é o corte grosseiro.
+    const piso = Math.ceil(g.minimoVerificacoes * 0.25)
+    if (asserts >= piso) ok(`${g.script.split("/").pop()}: ${asserts} asserções (piso ${piso})`)
+    else falhar(`${g.script} encolheu para ${asserts} asserções`, `piso é ${piso} — nenhum teste pode ser removido`)
+  }
+
+  if (baseline.responsabilidades.length >= 16) ok(`${baseline.responsabilidades.length} responsabilidades declaradas`)
+  else falhar("a lista de responsabilidades encolheu", "responsabilidade some por ADR, não por edição")
+  if (baseline.invariantes.length >= 9) ok(`${baseline.invariantes.length} invariantes declarados`)
+  else falhar("a lista de invariantes encolheu", "invariante não se remove — se caiu, o sistema quebrou")
+}
+
 // ── veredito ────────────────────────────────────────────────────────────────
 console.log("\n" + "─".repeat(64))
 if (falhas === 0) {
