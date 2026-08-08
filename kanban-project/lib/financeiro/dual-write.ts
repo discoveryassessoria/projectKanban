@@ -22,6 +22,20 @@ export async function espelharReceitaComoObrigacao(receita: {
 }, opts?: { cobrancaId?: number | null; criadoPorId?: number | null }): Promise<void> {
   if (!dualWriteAtivo()) return
   try {
+    // PROVENIÊNCIA DO ESPELHO. A obrigação nascia sem `personId` e sem
+    // `chaveIdempotencia`: o seu único vínculo com a causa era `origemId`, uma
+    // coluna SOLTA (sem FK) apontando para a Receita. Apagada a Receita, o espelho
+    // ficava ATIVO, sem dono e sem nome de participante — medido em produção
+    // (processo 513: obrigações 16 e 18, R$ 4.800 fantasmas).
+    //
+    // Copiar a proveniência da Receita não conserta o passado (a reconciliação
+    // faz isso), mas faz o espelho novo saber DE QUEM ele é sem depender de
+    // arqueologia. Leitura extra e barata; nada aqui muda valor ou Ledger.
+    const origem = await prisma.receita.findUnique({
+      where: { id: receita.id },
+      select: { personId: true, chaveIdempotencia: true, phaseKey: true, phaseCycle: true, configFinanceiraId: true, regraFinanceiraId: true, documentoId: true, tipoServicoId: true },
+    }).catch(() => null)
+
     // 1) Obrigação econômica + Ledger (OBRIGACAO_CRIADA balanceado) + evento Outbox.
     //    Idempotente por (origemTipo, origemId): nunca duplica.
     const { obrigacaoId } = await criarObrigacaoEconomicaComLedger({
@@ -32,6 +46,14 @@ export async function espelharReceitaComoObrigacao(receita: {
       processoId: receita.processoId ?? null,
       origemTipo: 'Receita', origemId: receita.id,
       criadoPorId: opts?.criadoPorId ?? null,
+      regraFinanceiraId: origem?.regraFinanceiraId ?? null,
+      vinculo: origem
+        ? {
+            personId: origem.personId, documentoId: origem.documentoId, tipoServicoId: origem.tipoServicoId,
+            phaseKey: origem.phaseKey, phaseCycle: origem.phaseCycle,
+            configFinanceiraId: origem.configFinanceiraId, chaveIdempotencia: origem.chaveIdempotencia,
+          }
+        : null,
     })
 
     // 2) Vínculo da cobrança (parcelas pertencem à cobrança → ao agregado).
@@ -45,6 +67,10 @@ export async function espelharReceitaComoObrigacao(receita: {
     if (jaDist === 0) {
       const reqs = await prisma.receitaRequerente.findMany({ where: { receitaId: receita.id }, select: { requerenteId: true, percentual: true, idx: true } })
       if (reqs.length > 0) {
+        // ATENÇÃO À SEMÂNTICA: `ParticipacaoEconomica.pessoaId` recebe `Requerente.id`,
+        // não `Pessoa.id` — o participante de uma distribuição é a ENTIDADE DE COBRANÇA,
+        // que existe mesmo quando não há nó na árvore. A coluna tem nome enganoso e não
+        // tem FK; quem LÊ resolve por lib/financeiro/leitura/participante-identidade.
         await prisma.distribuicaoEconomica.create({ data: {
           obrigacaoId, modo: 'PERCENTUAL',
           participacoes: { create: reqs.map((r, i) => ({ pessoaId: r.requerenteId ?? 0, percentual: Number(r.percentual ?? 0), ordem: r.idx ?? i })) },

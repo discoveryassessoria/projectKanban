@@ -13,6 +13,7 @@
 import { prisma } from '@/lib/prisma'
 import { computeCambioAging, cotacoesVivas } from './cambio-aging'
 import { temMarcaExclusao } from './exclusao-filtro'
+import { nomesDeParticipantes, rotuloParticipante, PARTICIPANTE_SEM_IDENTIDADE } from './participante-identidade'
 
 const cent = (v: number) => Math.round((Number(v) || 0) * 100) / 100
 const num = (x: unknown): number | null => (x == null ? null : Number(x))
@@ -221,14 +222,12 @@ export async function listarReceitas(processoId?: number): Promise<ReceitasLista
   const itensMestre = itemIds.length ? await prisma.itemCatalogo.findMany({ where: { id: { in: itemIds } }, select: { id: true, name: true, categoria: true } }).catch(() => []) : []
   const itemPor = new Map(itensMestre.map((i) => [i.id, i]))
 
-  const pessoaIds = new Set<number>()
-  for (const o of obrs) (o.distribuicoes[0]?.participacoes ?? []).forEach((p) => { if (p.incluido) pessoaIds.add(p.pessoaId) })
-  const pessoas = pessoaIds.size ? await prisma.pessoa.findMany({ where: { id: { in: [...pessoaIds] } }, select: { id: true, nome: true, sobrenome: true } }) : []
-  const nomePessoa = (pid: number): string => {
-    const p = pessoas.find((x) => x.id === pid)
-    const n = p ? [p.nome, p.sobrenome].filter(Boolean).join(' ').trim() : ''
-    return n || 'Requerente não identificado'
-  }
+  // IDENTIDADE DO PARTICIPANTE — resolvida pelo que a coluna guarda de verdade
+  // (`Requerente.id`), não pelo que o nome dela sugere. Ver participante-identidade.
+  const participanteIds = new Set<number>()
+  for (const o of obrs) (o.distribuicoes[0]?.participacoes ?? []).forEach((p) => { if (p.incluido) participanteIds.add(p.pessoaId) })
+  const nomesParticipante = await nomesDeParticipantes(participanteIds)
+  const nomePessoa = (pid: number): string => rotuloParticipante(pid, nomesParticipante)
 
   // Cotações vigentes — FONTE ÚNICA via cambio-aging → serviço canônico.
   const live = await cotacoesVivas()
@@ -334,7 +333,7 @@ export async function listarReceitas(processoId?: number): Promise<ReceitasLista
     const participantes: ReceitaParticipante[] = membros.map((m) => ({
       obrigacaoId: m.linha.obrigacaoId,
       receitaId: m.linha.receitaId,
-      nome: m.linha.requerente?.nome ?? 'Requerente não identificado',
+      nome: m.linha.requerente?.nome ?? PARTICIPANTE_SEM_IDENTIDADE,
       papel: m.papel,
       valorBase: m.linha.valorBase,
       moedaBase: m.linha.moedaBase,

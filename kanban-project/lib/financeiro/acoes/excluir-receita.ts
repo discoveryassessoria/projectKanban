@@ -45,7 +45,15 @@ export async function podeExcluir(ref: string): Promise<PodeExcluirResultado> {
     select: { id: true, origemTipo: true, origemId: true, observacoes: true },
   })
   if (!obr) throw new AcaoReceitaError('Receita não encontrada.', 404)
-  const receitaId = obr.origemTipo === 'Receita' ? obr.origemId ?? null : null
+  // A Receita de origem pode NÃO EXISTIR MAIS: o espelho V3 (dual-write) guarda
+  // `origemId` como coluna solta, sem FK, e sobrevive ao apagamento da Receita.
+  // Um espelho nessa situação não tem onde receber a marca de exclusão lógica —
+  // ele é tratado como obrigação sem receita de origem e ARQUIVADO. Resolver isto
+  // aqui, no dono, evita que cada chamador invente o seu próprio desvio.
+  const origemId = obr.origemTipo === 'Receita' ? obr.origemId ?? null : null
+  const receitaId = origemId != null && (await prisma.receita.count({ where: { id: origemId } })) > 0
+    ? origemId
+    : null
 
   const motivos: string[] = []
 
@@ -106,6 +114,14 @@ export async function excluirReceita(ref: string, ctx: { usuarioId?: number | nu
   // Exclusão LÓGICA (soft-delete): oculta + marca de origem. Ledger intacto.
   // Receita → Receita.arquivadaEm + contextoAplicado.exclusao (fonte do filtro de receitas).
   // Custo (sem Receita) → ObrigacaoEconomica.arquivadaEm (fonte do filtro de obrigações).
+  // "Sem Receita de origem" = Custo nativo OU espelho cuja Receita já não existe.
+  // Nos dois casos a marca vai na própria obrigação; o rótulo da auditoria segue a
+  // NATUREZA, não a ausência da origem — senão uma receita órfã seria auditada
+  // como custo.
+  const obrNatureza = await prisma.obrigacaoEconomica.findUnique({
+    where: { id: check.obrigacaoId }, select: { natureza: true },
+  })
+  const rotulo = obrNatureza?.natureza === 'CUSTO' ? 'Custo' : 'Receita'
   const isCusto = check.receitaId == null
   if (!isCusto) {
     const rec = await prisma.receita.findUnique({ where: { id: check.receitaId! }, select: { contextoAplicado: true } })
@@ -128,8 +144,8 @@ export async function excluirReceita(ref: string, ctx: { usuarioId?: number | nu
   await prisma.logAuditoria.create({
     data: {
       acao: 'EXCLUIR', entidade: 'ObrigacaoEconomica', entidadeId: check.obrigacaoId,
-      descricao: `${isCusto ? 'Custo' : 'Receita'} excluído (exclusão lógica).${motivo ? ` Motivo: ${motivo}` : ''} Ledger preservado.`.slice(0, 1000),
-      detalhes: { acao: 'EXCLUIR', natureza: isCusto ? 'CUSTO' : 'RECEITA', receitaId: check.receitaId, motivo } as Prisma.InputJsonValue,
+      descricao: `${rotulo} excluído (exclusão lógica).${motivo ? ` Motivo: ${motivo}` : ''} Ledger preservado.`.slice(0, 1000),
+      detalhes: { acao: 'EXCLUIR', natureza: obrNatureza?.natureza ?? 'RECEITA', receitaId: check.receitaId, motivo } as Prisma.InputJsonValue,
       usuarioId: ctx.usuarioId ?? null,
     },
   }).catch(() => {})

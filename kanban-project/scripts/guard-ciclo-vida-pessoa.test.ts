@@ -120,6 +120,10 @@ const AUTORIZADOS_FORA_DO_RUNTIME: Record<string, string> = {
   "scripts/pessoa-tortura.test.ts": "teste de tortura: 10 ciclos criar→excluir→recriar",
   "scripts/pessoa-equivalencia-rotas.test.ts": "teste de equivalência das duas rotas: monta dois cenários e limpa",
   "scripts/smoke-ui-setup.ts": "smoke autenticado em produção: monta e REMOVE o cenário marcado (SMOKE-UI-CICLO-VIDA)",
+  "scripts/reconciliacao-derivada-requerente.test.ts":
+    "cenários A–N da reconciliação do estado derivado: monta e limpa o próprio cenário (marca RECONC-DERIVADO)",
+  "scripts/guard-estado-derivado.test.ts":
+    "guard do estado derivado (cita os padrões de escrita que procura, como este arquivo)",
 
   // ── Testes de integração que montam e derrubam cenário com banco ─────────
   // Cada um limpa o que ele mesmo criou. Nenhum é caminho de runtime.

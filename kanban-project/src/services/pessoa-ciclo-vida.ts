@@ -44,6 +44,8 @@ import { removerNecessidadesDoSujeito } from "@/src/services/necessidade-documen
 import { removerDocumentosDoSujeito } from "@/src/services/documento-operacional"
 import { dispararMaterializacaoPorArvore } from "@/src/services/genealogia/materializar-genealogia"
 import { reconciliarEconomicoDoProcesso } from "@/src/lib/motor/matriz-economica"
+import { reconciliarAutomacaoPorRequerente } from "@/src/lib/motor/reconciliar-requerente-economico"
+import { CONTA } from "@/lib/financeiro/ledger/plano-contas"
 
 type DB = Prisma.TransactionClient | typeof prisma
 
@@ -299,12 +301,22 @@ async function levantarFatosProtegidos(ctx: ContextoPessoa, db: DB): Promise<Fat
     registrar("PAGAMENTO_OU_MOVIMENTO", ocorrencias.map((o) => o.id),
       (n) => `${n} movimento(s) financeiro(s) registrado(s) — pagamento, estorno ou baixa`)
 
+    // MOVIMENTO CONTÁBIL ≠ NASCIMENTO DA OBRIGAÇÃO. Toda obrigação nasce com um
+    // par balanceado `OBRIGACAO_CRIADA` no Ledger; contar esses dois entries como
+    // fato protegido tornaria QUALQUER lançamento automático inapagável — e a
+    // remoção degradaria para DESATIVAR sempre, deixando exatamente o resíduo que
+    // este serviço existe para evitar. O próprio `executarHard` já trata
+    // OBRIGACAO_CRIADA como registro de nascimento e o remove com a obrigação.
+    //
+    // Movimento é LIQUIDAÇÃO: entry na conta Caixa/Banco. É a MESMA régua do dono
+    // do domínio (`podeExcluir`, em lib/financeiro/acoes/excluir-receita) — uma
+    // definição só de "o dinheiro se mexeu", não duas.
     const entries = await db.ledgerEntry.findMany({
-      where: { obrigacaoId: { in: ctx.obrigacaoIds } },
+      where: { obrigacaoId: { in: ctx.obrigacaoIds }, contaContabil: CONTA.CAIXA_BANCO },
       select: { id: true },
     })
     registrar("LANCAMENTO_CONTABIL", entries.map((e) => e.id),
-      (n) => `${n} lançamento(s) no Ledger — a verdade contábil do movimento`)
+      (n) => `${n} lançamento(s) de liquidação no Ledger — dinheiro que entrou ou saiu`)
   }
 
   if (ctx.requerenteId != null) {
@@ -578,6 +590,27 @@ export async function reconciliarAposRemocao(
       reconciliados.push(processoId)
     } catch (e) {
       erros.push(`reconcile econômico do processo ${processoId}: ${e instanceof Error ? e.message : String(e)}`)
+    }
+
+    // (3) Econômico POR REQUERENTE. `reconciliarEconomicoDoProcesso` filtra
+    //     `ruleSource: 'matriz'` — o efeito que nasce da ENTRADA da pessoa na árvore
+    //     grava `ruleSource: 'automation'` e nunca era visitado por ninguém. Era o
+    //     buraco que deixava a receita do requerente removido ATIVA no Financeiro,
+    //     exibida como "Requerente não identificado" (processo 513, 08/08/2026).
+    //
+    //     Decide por CAUSA, não por tabela, e retira pelo dono do domínio
+    //     (exclusão lógica — o Ledger nunca é apagado). Lançamento com fato
+    //     protegido é PRESERVADO e relatado.
+    try {
+      const r = await reconciliarAutomacaoPorRequerente(processoId, { dryRun: false })
+      if (r.resumo.erros > 0) {
+        erros.push(
+          `reconcile por requerente do processo ${processoId}: ` +
+            r.efeitos.filter((e) => e.erro).map((e) => `${e.entidade}#${e.entidadeId}: ${e.erro}`).join(" ; "),
+        )
+      }
+    } catch (e) {
+      erros.push(`reconcile por requerente do processo ${processoId}: ${e instanceof Error ? e.message : String(e)}`)
     }
   }
 

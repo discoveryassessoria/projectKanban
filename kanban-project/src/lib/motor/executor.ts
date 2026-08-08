@@ -991,9 +991,22 @@ export async function processarRequerenteAdicionado(evt: EventoRequerentePayload
     }
 
     // Idempotência POR REQUERENTE.
+    //
+    // O STATUS do artefato é parte da chave de decisão, não decoração. Um artefato
+    // ENCERRADO ('removed') significa "este efeito já foi retirado porque a causa
+    // sumiu" — e a mesma pessoa pode voltar. Enquanto este teste ignorava o status,
+    // reinserir a pessoa (§12) não recriava a receita: o artefato morto respondia
+    // "já existe" para sempre, e `automaticKey` é @unique, então nem o create
+    // alternativo passava. Efeito perdido em silêncio.
+    //
+    // Com o status na conta: 'active' → nada a fazer; 'removed' → REAPROVEITA a
+    // linha (mesma chave, nova receita). Não nasce um segundo artefato: a
+    // proveniência do requerente continua sendo UMA linha.
     const akey = chaveIdempotenciaRequerente({ processoId: evt.processoId, configId, ruleId: r.id, pessoaId: evt.pessoaId })
-    const jaExiste = await prisma.motorArtefato.findFirst({ where: { automaticKey: akey }, select: { targetId: true } })
-    if (jaExiste) { res.detalhes.push({ ruleId: r.id, acao: 'inalterado', receitaId: jaExiste.targetId ?? undefined, classificacao: cls.classificacao }); continue }
+    const artefatoExistente = await prisma.motorArtefato.findFirst({ where: { automaticKey: akey }, select: { id: true, targetId: true, status: true } })
+    if (artefatoExistente?.status === 'active') {
+      res.detalhes.push({ ruleId: r.id, acao: 'inalterado', receitaId: artefatoExistente.targetId ?? undefined, classificacao: cls.classificacao }); continue
+    }
 
     const rotuloCls = cls.classificacao === 'primeiro' ? 'Primeiro requerente' : 'Requerente adicional'
     const descricao = ['Honorários', nac, rotuloCls, nomeCompleto].filter(Boolean).join(' — ')
@@ -1014,12 +1027,20 @@ export async function processarRequerenteAdicionado(evt: EventoRequerentePayload
           personId: evt.pessoaId,
           requerentes: { create: { idx: 0, nome: nomeCompleto.slice(0, 200) || 'Requerente', requerenteId: billingReqId } },
         } })
-        await tx.motorArtefato.create({ data: {
-          processoId: evt.processoId, tipoProcessoId, phaseKey: r.phaseKey, event: 'entered',
-          ruleKind: 'financial', ruleSource: 'automation', ruleId: r.id, automaticKey: akey,
-          targetTable: 'Receita', targetId: rid, status: 'active', descricao: descricao.slice(0, 300),
-          detalhes: { classificacao: cls.classificacao, posicao: cls.posicao, pessoaId: evt.pessoaId, tabelaValorId: preco.tabelaValorId } as Prisma.InputJsonValue,
-        } })
+        const detalhesArtefato = { classificacao: cls.classificacao, posicao: cls.posicao, pessoaId: evt.pessoaId, tabelaValorId: preco.tabelaValorId } as Prisma.InputJsonValue
+        if (artefatoExistente) {
+          // Reinserção: a chave é a mesma pessoa, então a linha é a mesma.
+          await tx.motorArtefato.update({ where: { id: artefatoExistente.id }, data: {
+            targetTable: 'Receita', targetId: rid, status: 'active', descricao: descricao.slice(0, 300), detalhes: detalhesArtefato,
+          } })
+        } else {
+          await tx.motorArtefato.create({ data: {
+            processoId: evt.processoId, tipoProcessoId, phaseKey: r.phaseKey, event: 'entered',
+            ruleKind: 'financial', ruleSource: 'automation', ruleId: r.id, automaticKey: akey,
+            targetTable: 'Receita', targetId: rid, status: 'active', descricao: descricao.slice(0, 300),
+            detalhes: detalhesArtefato,
+          } })
+        }
         return rid
       }, { timeout: 30000, maxWait: 10000 })
       // Espelha a Receita da automação no motor V3 (ObrigacaoEconomica) para

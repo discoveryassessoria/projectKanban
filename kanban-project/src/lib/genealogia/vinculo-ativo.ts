@@ -18,6 +18,7 @@
 // ============================================================================
 
 import type { Prisma } from "@prisma/client"
+import { REQUERENTE_VALORES } from "@/lib/genealogia/requerente-flag"
 
 /** Nó da árvore que ainda participa da operação. */
 export const PESSOA_ATIVA = { removidaEm: null } satisfies Prisma.PessoaWhereInput
@@ -28,6 +29,20 @@ export const VINCULO_PROCESSO_ATIVO = { removidoEm: null } satisfies Prisma.Proc
 /** Pessoas ATIVAS de uma árvore. Recorte usado pela materialização e pelo roster. */
 export function pessoasAtivasDaArvore(arvoreId: number): Prisma.PessoaWhereInput {
   return { arvoreId, ...PESSOA_ATIVA }
+}
+
+/**
+ * REQUERENTES ATIVOS da árvore — a CAUSA VÁLIDA do efeito econômico por requerente.
+ *
+ * Este recorte é lido por DOIS lados que precisam concordar exatamente: quem CRIA
+ * o efeito (`processarRequerenteAdicionado`, que ordena e classifica os requerentes)
+ * e quem o RETIRA (`reconciliarAutomacaoPorRequerente`, que decide se a causa ainda
+ * existe). Se cada lado escrevesse o seu, um requerente poderia ser cobrado por uma
+ * régua e reconciliado por outra — e a diferença viraria lançamento órfão ou
+ * lançamento apagado indevidamente.
+ */
+export function requerentesAtivosDaArvore(arvoreId: number): Prisma.PessoaWhereInput {
+  return { arvoreId, requerente: { in: [...REQUERENTE_VALORES] }, ...PESSOA_ATIVA }
 }
 
 /**
