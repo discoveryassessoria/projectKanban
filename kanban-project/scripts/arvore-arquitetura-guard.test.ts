@@ -299,6 +299,29 @@ if (existsSync(join(RAIZ, "scripts/arvore-membership.test.ts"))) {
   falhar("scripts/arvore-membership.test.ts sumiu", "é a prova dos 4 estados de pertencimento")
 }
 
+// TODO MEMBRO ATIVO É DESENHADO.
+//
+// O canvas é alimentado por `GET /api/arvore/:id`, que devolve as pessoas
+// filtradas por `PESSOA_ATIVA` — o MESMO recorte que o materializador, o roster
+// da Central e o motor financeiro usam. O canvas já foi o único consumidor que
+// estreitava esse recorte por conta própria (só a componente conexa da pessoa
+// principal), e pessoa sem vínculo sumia da tela existindo no banco.
+const builder = codigo(ler("src/components/arvore/react-flow-tree.tsx"))
+if (/for \(const pessoa of pessoas\)[\s\S]{0,400}?addPersonNode\(pessoa/.test(builder)) {
+  ok("o builder desenha TODO membro ativo, não só a componente conexa")
+} else {
+  falhar(
+    "o builder voltou a desenhar só quem está conectado",
+    "pessoa na árvore e fora da tela é o pior defeito: existe na busca, no diagnóstico e no painel, e some do canvas",
+  )
+}
+const rotaArvore = codigo(ler("src/app/api/arvore/[arvoreid]/route.ts"))
+if (/where:\s*PESSOA_ATIVA/.test(rotaArvore)) {
+  ok("a rota da árvore entrega exatamente os membros ativos")
+} else {
+  falhar("a rota da árvore mudou de recorte", "é ela que define o contrato do que o canvas recebe")
+}
+
 // ── 7) A BASELINE PROTEGE AS PRÓPRIAS PROTEÇÕES ─────────────────────────────
 //
 // Todas as fronteiras acima dependem de guards existirem, estarem ligados ao

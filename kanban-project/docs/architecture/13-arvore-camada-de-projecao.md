@@ -231,14 +231,42 @@ hipótese como *sugestão a confirmar* — que é o comportamento correto.
 
 ## Limitações conhecidas (registradas, não resolvidas)
 
-- `buildTreeNodesAndEdges` desenha apenas a **componente conexa** de
-  `pessoaPrincipal`: pessoa sem vínculo existe no banco, na busca, no diagnóstico
-  e no painel, mas não aparece no canvas. Corrigir toca o builder do layout
-  congelado — exige ADR.
 - `removerPessoaDaArvore` em modo HARD apaga o `ProcessoRequerente` e a
   reinserção não o recria. É domínio do ciclo de vida da Pessoa, fora da árvore.
 - Produção tem hoje um único processo com árvore povoada; os números de
   desempenho de 500/1.000 pessoas vêm da suíte sintética.
+
+## Contrato de renderização — e uma classificação que eu errei
+
+**Todo membro ATIVO da árvore é desenhado.** Não é regra nova: é o contrato que
+`GET /api/arvore/:id` sempre teve, ao devolver as pessoas filtradas por
+`PESSOA_ATIVA` — "nó da árvore que ainda participa da operação"
+(`vinculo-ativo.ts`). É o mesmo recorte usado pelo materializador
+(`pessoasAtivasDaArvore`), pelo roster da Central, pelo motor financeiro e pelo
+executor.
+
+O canvas era o **único** consumidor que estreitava esse recorte por conta
+própria, desenhando só a componente conexa da pessoa principal. Pessoa sem
+vínculo existia no banco, aparecia na busca, no diagnóstico e no painel — e
+sumia da tela.
+
+Eu classifiquei isso como EVOLUÇÃO (exigindo ADR) e estava errado: classifiquei
+pela implementação, não pelo contrato. A revisão foi feita procurando a
+especificação em cinco lugares — o guard de layout congelado, o cabeçalho do
+canvas, o próprio builder, os documentos de arquitetura e o histórico de commits
+— e **nenhum deles jamais declarou "somente componentes conectados são
+renderizados"**. Pelo contrário: o laço de adoção que já existia no builder
+(`while (changed)`) só existe para puxar quem a caminhada recursiva não
+alcançou; ele estava incompleto, adotando apenas quem tivesse pai ou mãe já
+desenhado.
+
+Portanto: **BUG, corrigido sem ADR**, sob a categoria "correção de comportamento
+inesperado". A árvore conectada continua pixel a pixel idêntica ao baseline
+anterior a toda a evolução (0 de 1.296.000); o nó solto entra com o mesmo
+cartão, num componente próprio do dagre, sem deslocar ninguém.
+
+O contrato passou a ser verificado: `arvore-arquitetura-guard` reprova se o
+builder voltar a filtrar por conexidade, ou se a rota mudar de recorte.
 
 ## Ver também
 

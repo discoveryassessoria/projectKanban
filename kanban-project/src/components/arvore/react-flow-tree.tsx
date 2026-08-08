@@ -1360,10 +1360,19 @@ function buildTreeNodesAndEdges(options: BuildTreeOptions): { nodes: Node[]; edg
 
   addAllDescendants(pessoaPrincipal)
 
+  // ADOÇÃO — puxa para o desenho quem a caminhada recursiva não alcançou.
+  //
+  // Este laço já existia e revela a intenção: o desenho deve conter TODOS os
+  // membros da árvore, não só os que a caminhada a partir da pessoa principal
+  // encontrou. Ele estava incompleto — só adotava quem tivesse pai ou mãe JÁ
+  // desenhado. Quem entrasse na árvore sem nenhum vínculo ficava de fora, e o
+  // resultado é o pior tipo de defeito: a pessoa existe no banco, aparece na
+  // busca, no diagnóstico e no painel, e não está na tela. Ver o bloco logo
+  // abaixo, que fecha a lacuna.
   let changed = true
   let iterations = 0
   const maxIterations = 100
-  
+
   while (changed && iterations < maxIterations) {
     changed = false
     iterations++
@@ -1392,6 +1401,30 @@ function buildTreeNodesAndEdges(options: BuildTreeOptions): { nodes: Node[]; edg
         })
       }
     })
+  }
+
+  // CONTRATO: todo MEMBRO ATIVO da árvore é desenhado.
+  //
+  // Quem alimenta este canvas é `GET /api/arvore/:id`, que devolve as pessoas
+  // filtradas por `PESSOA_ATIVA` — "nó da árvore que ainda participa da
+  // operação" (`vinculo-ativo.ts`). É o mesmo recorte que o materializador, o
+  // roster da Central e o motor financeiro usam. O canvas era o ÚNICO consumidor
+  // que estreitava esse recorte por conta própria, para a componente conexa da
+  // pessoa principal — e isso nunca foi decisão documentada em lugar nenhum:
+  // não está no guard de layout congelado, nem no ADR, nem em commit.
+  //
+  // Pessoa sem vínculo é cadastro em andamento, não pessoa inexistente. Ela entra
+  // como nó solto, exatamente com o mesmo cartão — o dagre a posiciona num
+  // componente próprio, sem tocar nas coordenadas de quem já estava conectado.
+  for (const pessoa of pessoas) {
+    if (processedIds.has(pessoa.id)) continue
+    addPersonNode(pessoa, false, false)
+    // Cônjuge de quem acabou de entrar também entra: senão o casal aparece pela
+    // metade, que é uma forma diferente do mesmo defeito.
+    for (const conjuge of findConjuges(pessoa)) {
+      addPersonNode(conjuge, false, false)
+      addMarriageEdge(pessoa.id, conjuge.id)
+    }
   }
 
   return { nodes, edges }
