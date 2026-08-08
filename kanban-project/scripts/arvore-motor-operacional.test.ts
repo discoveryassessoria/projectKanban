@@ -47,6 +47,14 @@ import {
   tarefaVencida,
 } from "@/src/lib/genealogia/operacional/diagnostico"
 import { analisarIntegridade } from "@/src/lib/genealogia/motor/regras/integridade"
+import { analisarLacunaParental, analisarLacunas } from "@/src/lib/genealogia/navegacao/lacunas"
+import {
+  porQueExigencia,
+  porQueNaLinhagem,
+  porQueProblema,
+  porQueProximaAcao,
+  porQueTarefa,
+} from "@/src/lib/genealogia/operacional/auditor"
 import {
   compararLinhagens,
   relacionadosDaLinhagem,
@@ -715,6 +723,88 @@ ok(delta.transmissorAlterado, "o ascendente transmissor muda")
 const semEfeito = compararLinhagens(mapa, mapaDeLinhagens(grafo, "ITALIA", 4), grafo)
 ok(semEfeito.requerentesAfetados.length === 0, "alteração sem impacto estrutural gera delta vazio")
 ok(!semEfeito.transmissorAlterado, "e nenhum transmissor muda")
+
+// ── 5f. LACUNAS PARENTAIS CONTEXTUAIS ───────────────────────────────────────
+secao("5f) o que significa faltar pai/mãe")
+
+// Giuseppe (1) é o topo da cadeia dos dois requerentes: sem o pai dele, a linha para.
+const lacTopo = analisarLacunaParental(grafo, mapa, 1, "pai")
+ok(lacTopo.relevancia === "continua_linha", "no topo da cadeia: continua a linha", lacTopo.relevancia)
+ok(lacTopo.requerentesAfetados.length === 2, "e nomeia os 2 requerentes afetados")
+ok(/Necessário para continuar/.test(lacTopo.explicacao), "com texto forte", lacTopo.explicacao)
+
+// Carlos (3) está na cadeia mas não é o topo: falta a MÃE, e a linha segue pelo pai.
+const lacMeio = analisarLacunaParental(grafo, mapa, 3, "mae")
+ok(lacMeio.relevancia === "ancora_linha", "no meio da cadeia: complementa o dossiê", lacMeio.relevancia)
+ok(/já segue pelo outro genitor/.test(lacMeio.explicacao), "e diz que a linha não para")
+
+// Pessoa solta (9): não inventa urgência.
+const lacFora = analisarLacunaParental(grafo, mapa, 9, "pai")
+ok(lacFora.relevancia === "fora_da_linha", "fora de qualquer linha", lacFora.relevancia)
+ok(/não participa da transmissão/.test(lacFora.explicacao), "e diz isso sem inventar impacto")
+
+// Só gera lacuna para quem realmente NÃO tem o genitor.
+const mapaLac = analisarLacunas(grafo, mapa, [1, 4])
+ok(mapaLac.has("pai-1") && mapaLac.has("mae-1"), "gera os dois slots de quem não tem nenhum genitor")
+ok(!mapaLac.has("pai-4") && !mapaLac.has("mae-4"), "não gera slot para quem já tem pai e mãe")
+
+// ── 5g. MODO AUDITOR ────────────────────────────────────────────────────────
+secao("5g) modo auditor — cadeia causal com fonte")
+
+const ctxAud = { grafo, analise, mapa, dossies, linhagem: lMarcos }
+
+const expLinha = porQueNaLinhagem(ctxAud, 1)
+ok(expLinha.cadeia.length >= 2, "explica a presença na linhagem em vários elos", expLinha.cadeia.length)
+ok(expLinha.cadeia.every((e) => e.fonte.trim().length > 0), "TODO elo declara a fonte")
+ok(
+  expLinha.cadeia.some((e) => /ascendente transmissor/i.test(e.fato)),
+  "e identifica o transmissor no fim da cadeia",
+)
+ok(!expLinha.inconclusiva, "com dado suficiente, a resposta é conclusiva")
+
+// Cônjuge NÃO pode ser confundido com quem transmite.
+const expConjuge = porQueNaLinhagem(ctxAud, 8)
+ok(/NÃO está na cadeia/.test(expConjuge.resposta), "cônjuge é distinguido de quem transmite", expConjuge.resposta)
+
+// Pessoa fora de tudo: resposta honesta, sem inventar vínculo.
+const expFora = porQueNaLinhagem(ctxAud, 9)
+ok(/não pertence a nenhuma linhagem/.test(expFora.resposta), "pessoa solta recebe resposta honesta")
+
+const expDoc = porQueExigencia(ctxAud, 1)
+ok(expDoc.cadeia.some((e) => /MatrizDocumental/.test(e.fonte)), "a exigência aponta para a Regra publicada")
+ok(
+  expDoc.cadeia.some((e) => /materializarExecucaoDaFase/.test(e.fonte)),
+  "e nomeia o materializador canônico",
+)
+ok(expDoc.cadeia.every((e) => e.fonte.trim().length > 0), "nenhum elo sem fonte")
+
+// Sem exigência, o auditor diz que não sabe — não inventa regra.
+const expSemDoc = porQueExigencia(ctxAud, 9)
+ok(expSemDoc.inconclusiva, "sem exigência materializada, a explicação é inconclusiva")
+
+const dossie3 = dossies.get(3)!
+const expTarefa = porQueTarefa(ctxAud, 3, dossie3.tarefasAbertas[0].id)
+ok(
+  expTarefa.cadeia.some((e) => /projeção desse passo|projeção do passo/.test(e.fato)),
+  "a tarefa é explicada como projeção do passo",
+)
+const expTarefaInexistente = porQueTarefa(ctxAud, 3, 999999)
+ok(expTarefaInexistente.inconclusiva, "tarefa inexistente não recebe explicação inventada")
+
+const problemaCritico = diag.problemas.find((p) => p.impeditivo)!
+const expProb = porQueProblema(ctxAud, problemaCritico)
+ok(
+  expProb.cadeia.some((e) => /IMPEDITIVO/.test(e.fato)),
+  "o bloqueio explica por que é impeditivo",
+)
+ok(expProb.cadeia.every((e) => e.fonte.trim().length > 0), "e cada elo tem fonte")
+
+const expAcao = porQueProximaAcao(acao.prioridade, acao.fonte, acao.motivo)
+ok(/fila fixa de prioridade/.test(expAcao.resposta), "a próxima ação explica a fila fixa", expAcao.resposta)
+ok(
+  expAcao.cadeia.some((e) => /não heurística/.test(e.fonte)),
+  "e deixa claro que não é heurística",
+)
 
 // ── 6. ESCALA ───────────────────────────────────────────────────────────────
 // O requisito é explícito: 500 e 1000 pessoas sem travar. O que se mede aqui é

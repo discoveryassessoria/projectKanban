@@ -56,6 +56,7 @@ import {
   type ChaveFiltro,
   type EstadoFiltros,
 } from "@/src/lib/genealogia/navegacao/filtros"
+import { analisarLacunas, type LacunaParental } from "@/src/lib/genealogia/navegacao/lacunas"
 import { projetarIndicadores } from "@/src/lib/genealogia/documental/indicadores"
 import {
   fatosVazios,
@@ -66,6 +67,7 @@ import {
   type PrazoDoProcesso,
   type ResumoLinhagem,
 } from "@/src/lib/genealogia/operacional/dossie"
+import type { ContextoAuditor } from "@/src/lib/genealogia/operacional/auditor"
 import { calcularParentesco } from "@/src/lib/genealogia/motor/parentesco"
 import type { ContextoPerguntas } from "@/src/lib/genealogia/operacional/perguntas"
 import type { SinaisPessoa } from "../react-flow-tree"
@@ -113,6 +115,10 @@ export interface ArvoreOperacional {
   totalRelacionados: number
   /** Contexto da pessoa para a busca ("Bisavô de Marco"). */
   contextoDe: (pessoaId: number) => string | null
+  /** O que significa faltar pai/mãe em cada slot desenhado. */
+  lacunas: Map<string, LacunaParental>
+  /** Contexto do Modo Auditor. null sem análise. */
+  auditor: ContextoAuditor | null
 
   /** Grupos "+N irmãos" que ainda estão recolhidos. */
   expandirGrupo: (chave: string) => void
@@ -287,6 +293,14 @@ export function useArvoreOperacional(params: {
     [mapa, dossies, prazo, agora],
   )
 
+  // O canvas só desenha slot "+pai/+mãe" para a pessoa RAIZ (profundidade 0);
+  // calcular para a árvore inteira seria explicar slot que ninguém vê.
+  const lacunas = useMemo<Map<string, LacunaParental>>(() => {
+    if (!analise) return new Map()
+    const raiz = analise.linhaCidadania[0] ?? pessoas[0]?.id
+    return raiz != null ? analisarLacunas(analise.grafo, mapa, [raiz]) : new Map()
+  }, [analise, mapa, pessoas])
+
   const trilha = useMemo<DegrauLinhagem[]>(
     () => (analise && linhagem ? trilhaDaLinhagem(analise.grafo, linhagem, mapa) : []),
     [analise, linhagem, mapa],
@@ -316,6 +330,13 @@ export function useArvoreOperacional(params: {
             semExigenciaMaterializada: true,
           },
     [analise, mapa, dossies, modo, linhagem, prazo, agora],
+  )
+
+  // O Auditor come exatamente o mesmo contexto do diagnóstico — nenhuma
+  // projeção nova, nenhuma segunda leitura. Ele só narra o que já foi apurado.
+  const auditor = useMemo<ContextoAuditor | null>(
+    () => (analise ? { grafo: analise.grafo, analise, mapa, dossies, linhagem } : null),
+    [analise, mapa, dossies, linhagem],
   )
 
   const proximaAcao = useMemo<AcaoRecomendada>(
@@ -387,6 +408,8 @@ export function useArvoreOperacional(params: {
     alternarRelacionados,
     totalRelacionados,
     contextoDe,
+    lacunas,
+    auditor,
     expandirGrupo,
     recolherTudo,
     totalRecolhivel,

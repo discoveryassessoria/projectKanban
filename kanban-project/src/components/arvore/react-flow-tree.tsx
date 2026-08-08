@@ -515,10 +515,15 @@ interface AddPersonNodeData {
   type: 'pai' | 'mae' | 'filho' | 'conjuge'
   mode: ViewMode
   onClick?: () => void
+  /**
+   * O que a ausência significa, apurado pelo grafo (`navegacao/lacunas.ts`).
+   * Ausente = o placeholder se comporta exatamente como antes.
+   */
+  contexto?: { titulo: string; explicacao: string; relevancia: string }
 }
 
 function AddPersonNode({ data }: NodeProps<AddPersonNodeData>) {
-  const { type, mode, onClick } = data
+  const { type, mode, onClick, contexto } = data
 
   const config = {
     pai: { label: 'Adicionar Pai', color: colors.neutral },
@@ -528,12 +533,25 @@ function AddPersonNode({ data }: NodeProps<AddPersonNodeData>) {
   }
   const { label, color } = config[type]
 
+  // O CONTEXTO VAI NO `title`, não em texto novo dentro do card.
+  //
+  // A caixa tracejada é parte do desenho aprovado e tem dimensão fixa: enfiar
+  // duas linhas de explicação dentro dela mudaria o layout. O tooltip nativo
+  // entrega a mesma informação sem tocar num pixel — e some quando não há o que
+  // dizer, em vez de repetir uma frase genérica.
+  const dica = contexto ? `${contexto.titulo}. ${contexto.explicacao}` : undefined
+  // Único sinal visual: quem CONTINUA a linha ganha a borda um tom mais firme.
+  // Mesma cor da paleta, mesma espessura — só deixa de ser cinza-claro.
+  const bordaContexto =
+    contexto?.relevancia === 'continua_linha' ? 'border-gray-400' : 'border-gray-300'
+
   if (mode === 'paisagem') {
     return (
       <div
-        className="relative bg-white rounded-lg border-2 border-dashed border-gray-300 cursor-pointer hover:border-gray-400 hover:bg-gray-50 transition-all"
+        className={`relative bg-white rounded-lg border-2 border-dashed ${bordaContexto} cursor-pointer hover:border-gray-400 hover:bg-gray-50 transition-all`}
         style={{ width: NODE_SIZES.paisagem.width, height: NODE_SIZES.paisagem.height }}
         onClick={onClick}
+        title={dica}
       >
         <Handle type="source" position={Position.Right} className="!bg-gray-300 !w-2 !h-2" />
         <Handle type="target" position={Position.Left} className="!bg-gray-300 !w-2 !h-2" />
@@ -550,9 +568,10 @@ function AddPersonNode({ data }: NodeProps<AddPersonNodeData>) {
   // RETRATO
   return (
     <div
-      className="relative bg-white rounded-lg border-2 border-dashed border-gray-300 cursor-pointer hover:border-gray-400 hover:bg-gray-50 transition-all"
+      className={`relative bg-white rounded-lg border-2 border-dashed ${bordaContexto} cursor-pointer hover:border-gray-400 hover:bg-gray-50 transition-all`}
       style={{ width: NODE_SIZES.retrato.width, height: NODE_SIZES.retrato.height }}
       onClick={onClick}
+      title={dica}
     >
       <Handle type="source" position={Position.Top} className="!bg-gray-300 !w-2 !h-2" />
       <Handle type="target" position={Position.Bottom} className="!bg-gray-300 !w-2 !h-2" />
@@ -1398,6 +1417,8 @@ interface OpcoesFoco {
   foco?: ReadonlyMap<number, EstadoFoco>
   sinais?: ReadonlyMap<number, SinaisPessoa>
   grupos?: readonly GrupoRecolhivel[]
+  /** Contexto dos slots "+pai/+mãe", por chave `pai-<id>` / `mae-<id>`. */
+  lacunas?: ReadonlyMap<string, { titulo: string; explicacao: string; relevancia: string }>
   mode: ViewMode
   onExpandirGrupo?: (chave: string) => void
 }
@@ -1417,14 +1438,15 @@ function aplicarFoco(
   edges: Edge[],
   opcoes: OpcoesFoco,
 ): { nodes: Node[]; edges: Edge[] } {
-  const { foco, sinais, grupos, mode, onExpandirGrupo } = opcoes
+  const { foco, sinais, grupos, lacunas, mode, onExpandirGrupo } = opcoes
   const temFoco = Boolean(foco && foco.size)
   const temSinais = Boolean(sinais && sinais.size)
   const temGrupos = Boolean(grupos && grupos.length)
+  const temLacunas = Boolean(lacunas && lacunas.size)
 
   // Caminho de custo zero: sem foco, sem sinais e sem grupos a árvore é a de
   // antes, referência por referência. Nenhum objeto novo, nenhum re-render.
-  if (!temFoco && !temSinais && !temGrupos) return { nodes, edges }
+  if (!temFoco && !temSinais && !temGrupos && !temLacunas) return { nodes, edges }
 
   const estadoDe = (nodeId: string): EstadoFoco => {
     const pessoaId = idPessoaDoNode(nodeId)
@@ -1443,6 +1465,20 @@ function aplicarFoco(
     const pessoaId = idPessoaDoNode(n.id)
     const marcas = pessoaId != null ? sinais?.get(pessoaId) : undefined
     const precisaData = n.type === 'person' && marcas !== (n.data as PersonNodeData)?.sinais
+
+    // Slot "+pai/+mãe": recebe o contexto apurado pelo grafo, quando existe.
+    if (n.type === 'addPerson' && lacunas) {
+      const chave = n.id.replace(/^add-/, '').replace(/-(\d+)$/, '-$1')
+      const contexto = lacunas.get(chave)
+      if (contexto) {
+        return {
+          ...n,
+          hidden: estado === 'oculto',
+          style: { ...n.style, opacity: opacidadeDe(estado) },
+          data: { ...(n.data as AddPersonNodeData), contexto },
+        }
+      }
+    }
 
     return {
       ...n,
@@ -1533,6 +1569,8 @@ interface ReactFlowTreeProps {
   /** Ramos recolhidos a exibir como "+N irmãos". */
   gruposRecolhidos?: readonly GrupoRecolhivel[]
   onExpandirGrupo?: (chave: string) => void
+  /** Contexto dos slots "+pai/+mãe" (`navegacao/lacunas.ts`). */
+  lacunas?: ReadonlyMap<string, { titulo: string; explicacao: string; relevancia: string }>
 }
 
 const ReactFlowTreeInner = forwardRef<ReactFlowTreeRef, ReactFlowTreeProps>(({
@@ -1551,6 +1589,7 @@ const ReactFlowTreeInner = forwardRef<ReactFlowTreeRef, ReactFlowTreeProps>(({
   sinais,
   gruposRecolhidos,
   onExpandirGrupo,
+  lacunas,
 }, ref) => {
   const [nodes, setNodes, onNodesChange] = useNodesState([])
   const [edges, setEdges, onEdgesChange] = useEdgesState([])
@@ -1691,8 +1730,8 @@ const ReactFlowTreeInner = forwardRef<ReactFlowTreeRef, ReactFlowTreeProps>(({
   // Foco aplicado sobre o layout já calculado. Ver `aplicarFoco`: nada aqui
   // recalcula dagre, então trocar de linhagem não move card nenhum.
   const { nodes: nodesEmTela, edges: edgesEmTela } = useMemo(
-    () => aplicarFoco(nodes, edges, { foco, sinais, grupos: gruposRecolhidos, mode, onExpandirGrupo }),
-    [nodes, edges, foco, sinais, gruposRecolhidos, mode, onExpandirGrupo],
+    () => aplicarFoco(nodes, edges, { foco, sinais, grupos: gruposRecolhidos, lacunas, mode, onExpandirGrupo }),
+    [nodes, edges, foco, sinais, gruposRecolhidos, lacunas, mode, onExpandirGrupo],
   )
 
   return (

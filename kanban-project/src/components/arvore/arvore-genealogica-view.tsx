@@ -133,6 +133,19 @@ export function ArvoreGenealogicaView({
   // novo. Ver `aplicarFoco` em react-flow-tree.tsx.
   const operacional = useArvoreOperacional({ processoId, pessoas, unioes, analise })
 
+  // SEM BECO SEM SAÍDA: quantos requerentes do processo ainda NÃO estão na
+  // árvore. É lido AQUI, com a árvore, e não dentro do modal — porque a decisão
+  // de oferecer (ou não) a aba "Requerente do processo" precisa acontecer ANTES
+  // de o modal abrir. Abrir um formulário para o usuário descobrir lá dentro que
+  // não há nada a fazer é gastar dois cliques dele para dar uma má notícia.
+  const requerentesReq = useApi<{ requerentes?: Array<{ jaNaArvore: boolean }> }>(
+    `/api/processos/${processoId}/requerentes-disponiveis`,
+  )
+  const requerentesForaDaArvore = useMemo(
+    () => (requerentesReq.dados?.requerentes ?? []).filter((r) => !r.jaNaArvore).length,
+    [requerentesReq.dados],
+  )
+
   const nomeDePessoa = useCallback(
     (id: number) => {
       const p = pessoas.find((x) => x.id === id)
@@ -1035,6 +1048,7 @@ export function ArvoreGenealogicaView({
             sinais={operacional.sinais}
             gruposRecolhidos={operacional.foco.gruposAtivos}
             onExpandirGrupo={operacional.expandirGrupo}
+            lacunas={operacional.lacunas}
           />
         )}
 
@@ -1081,6 +1095,7 @@ export function ArvoreGenealogicaView({
               ? `Linhagem de ${operacional.linhagem.nome}`
               : "Árvore inteira"
           }
+          auditor={operacional.auditor}
         />
 
         {/* TELAS NOVAS — sobrepostas ao canvas, NUNCA dentro dele. Ficam em
@@ -1216,6 +1231,7 @@ export function ArvoreGenealogicaView({
           conjugeDePessoaId={addConjugeForPessoaId}
           pessoas={pessoas}
           unioes={unioes}
+          requerentesForaDaArvore={requerentesForaDaArvore}
           onClose={() => {
             setShowAddPersonModal(false)
             setAddPersonType(null)
@@ -1266,6 +1282,7 @@ function AddPersonModal({
   conjugeDePessoaId,
   pessoas,
   unioes,
+  requerentesForaDaArvore,
   onClose,
   onSuccess
 }: {
@@ -1276,12 +1293,18 @@ function AddPersonModal({
   conjugeDePessoaId?: number | null
   pessoas: PessoaArvore[]
   unioes: UniaoArvore[]
+  /** Quantos requerentes do processo ainda não estão na árvore. */
+  requerentesForaDaArvore: number
   onClose: () => void
   onSuccess: () => void
 }) {
   // Modo de cadastro: pessoa comum (cria Pessoa) OU requerente do processo (REUSA a
   // Pessoa já existente — nunca duplica). O requerente NUNCA é criado por este form.
-  const [modo, setModo] = useState<'pessoa' | 'requerente'>('pessoa')
+  // Quando não há requerente fora da árvore, a aba nem é oferecida — e um modo
+  // 'requerente' herdado de um estado anterior é forçado de volta para 'pessoa'.
+  const semRequerenteDisponivel = requerentesForaDaArvore === 0
+  const [modoEscolhido, setModo] = useState<'pessoa' | 'requerente'>('pessoa')
+  const modo: 'pessoa' | 'requerente' = semRequerenteDisponivel ? 'pessoa' : modoEscolhido
   const [nome, setNome] = useState('')
   const [sobrenome, setSobrenome] = useState('')
   const [sexo, setSexo] = useState<string>('')
@@ -1501,13 +1524,23 @@ function AddPersonModal({
             <button
               type="button"
               onClick={() => setModo('requerente')}
-              className={`px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${modo === 'requerente' ? 'bg-white shadow-sm text-gray-900' : 'text-gray-500 hover:text-gray-700'}`}
+              disabled={semRequerenteDisponivel}
+              title={semRequerenteDisponivel ? 'Todos os requerentes deste processo já estão na árvore' : undefined}
+              className={`px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
+                semRequerenteDisponivel
+                  ? 'text-gray-300 cursor-not-allowed'
+                  : modo === 'requerente' ? 'bg-white shadow-sm text-gray-900' : 'text-gray-500 hover:text-gray-700'
+              }`}
             >
               Requerente do processo
             </button>
           </div>
+          {/* A explicação vem ANTES do clique, não depois. Botão morto com
+              tooltip honesto é melhor do que botão vivo que leva a um aviso. */}
           <p className="text-xs text-gray-400 mt-1.5">
-            Requerentes do processo são reaproveitados — a árvore não cria uma pessoa duplicada.
+            {semRequerenteDisponivel
+              ? 'Requerente do processo: indisponível — todos já estão na árvore. Siga em Pessoa da família.'
+              : 'Requerentes do processo são reaproveitados — a árvore não cria uma pessoa duplicada.'}
           </p>
         </div>
 

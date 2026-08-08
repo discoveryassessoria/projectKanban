@@ -17,13 +17,21 @@
 // direto à pessoa, com o painel dela já aberto. O operador não procura à mão.
 // ============================================================================
 
-import { AlertTriangle, CircleCheck, TriangleAlert, X } from "lucide-react"
+import { useState } from "react"
+import { AlertTriangle, CircleCheck, HelpCircle, TriangleAlert, X } from "lucide-react"
 import {
   ROTULO_CATEGORIA,
   type Diagnostico,
   type NivelSaude,
   type AcaoRecomendada,
+  type Problema,
 } from "@/src/lib/genealogia/operacional/diagnostico"
+import {
+  porQueProblema,
+  porQueProximaAcao,
+  type ContextoAuditor,
+  type Explicacao,
+} from "@/src/lib/genealogia/operacional/auditor"
 
 /** Cores por nível. Mesma paleta dos cartões de insight que já existiam. */
 const CORES: Record<NivelSaude, { texto: string; fundo: string; borda: string }> = {
@@ -80,6 +88,64 @@ interface Props {
   onIrParaPessoa: (pessoaId: number) => void
   /** Escopo em texto ("linhagem de Marco" | "árvore inteira"). */
   escopo: string
+  /** Contexto do Modo Auditor. Ausente = o "Por que isso?" não aparece. */
+  auditor?: ContextoAuditor | null
+}
+
+/**
+ * A cadeia causal, aberta sob demanda.
+ *
+ * Fica fechada por padrão: quem já sabe por que a pendência existe não precisa
+ * ler a explicação toda vez. Cada elo mostra a FONTE — elo sem fonte é opinião
+ * com cara de auditoria.
+ */
+function CadeiaCausal({ e, onIrParaPessoa }: { e: Explicacao; onIrParaPessoa?: (id: number) => void }) {
+  return (
+    <div className="mt-2 rounded-md border border-gray-200 bg-white p-2.5">
+      <p className="text-[12px] font-medium leading-snug text-gray-900">{e.resposta}</p>
+      <ol className="mt-2 space-y-1.5">
+        {e.cadeia.map((elo, i) => (
+          <li key={i} className="flex gap-2">
+            <span aria-hidden className="mt-1 text-[10px] leading-none text-gray-300">
+              {i === 0 ? "●" : "↓"}
+            </span>
+            <span className="min-w-0">
+              {elo.pessoaId != null && onIrParaPessoa ? (
+                <button
+                  onClick={() => onIrParaPessoa(elo.pessoaId!)}
+                  className="text-left text-[11px] leading-snug text-gray-800 underline decoration-gray-300 underline-offset-2 hover:text-gray-950"
+                >
+                  {elo.fato}
+                </button>
+              ) : (
+                <span className="block text-[11px] leading-snug text-gray-800">{elo.fato}</span>
+              )}
+              <span className="block text-[10px] uppercase tracking-wide text-gray-400">
+                {elo.fonte}
+              </span>
+            </span>
+          </li>
+        ))}
+      </ol>
+      {e.inconclusiva && (
+        <p className="mt-2 rounded bg-gray-50 px-2 py-1 text-[10px] leading-snug text-gray-600">
+          Os dados não sustentam uma afirmação mais forte do que esta.
+        </p>
+      )}
+    </div>
+  )
+}
+
+function BotaoPorQue({ aberto, onToggle }: { aberto: boolean; onToggle: () => void }) {
+  return (
+    <button
+      onClick={onToggle}
+      className="flex shrink-0 items-center gap-1 rounded-md border border-gray-200 bg-white px-2 py-0.5 text-[11px] text-gray-600 transition hover:border-gray-300 hover:text-gray-900"
+    >
+      <HelpCircle className="h-3 w-3" />
+      {aberto ? "Ocultar" : "Por que isso?"}
+    </button>
+  )
 }
 
 export function PainelDiagnostico({
@@ -89,7 +155,9 @@ export function PainelDiagnostico({
   onFechar,
   onIrParaPessoa,
   escopo,
+  auditor,
 }: Props) {
+  const [explicando, setExplicando] = useState<string | null>(null)
   if (!aberto) return null
   const cor = CORES[diagnostico.saude]
 
@@ -144,9 +212,23 @@ export function PainelDiagnostico({
               {proximaAcao.acao}
             </p>
             <p className="mt-1 text-[11px] leading-snug text-gray-500">{proximaAcao.motivo}</p>
-            <p className="mt-1 text-[10px] uppercase tracking-wide text-gray-400">
-              Prioridade {proximaAcao.prioridade}/7 · Fonte: {proximaAcao.fonte}
-            </p>
+            <div className="mt-1 flex items-center justify-between gap-2">
+              <p className="text-[10px] uppercase tracking-wide text-gray-400">
+                Prioridade {proximaAcao.prioridade}/7 · Fonte: {proximaAcao.fonte}
+              </p>
+              {auditor && (
+                <BotaoPorQue
+                  aberto={explicando === "acao"}
+                  onToggle={() => setExplicando(explicando === "acao" ? null : "acao")}
+                />
+              )}
+            </div>
+            {explicando === "acao" && auditor && (
+              <CadeiaCausal
+                e={porQueProximaAcao(proximaAcao.prioridade, proximaAcao.fonte, proximaAcao.motivo)}
+                onIrParaPessoa={onIrParaPessoa}
+              />
+            )}
             {proximaAcao.pessoaId != null && (
               <button
                 onClick={() => onIrParaPessoa(proximaAcao.pessoaId!)}
@@ -194,15 +276,26 @@ export function PainelDiagnostico({
                       <span className="truncate text-[10px] uppercase tracking-wide text-gray-400">
                         Fonte: {p.fonte}
                       </span>
-                      {p.pessoaId != null && (
-                        <button
-                          onClick={() => onIrParaPessoa(p.pessoaId!)}
-                          className="shrink-0 rounded-md border border-gray-200 bg-white px-2 py-0.5 text-[11px] text-gray-700 transition hover:border-gray-300 hover:text-gray-900"
-                        >
-                          Abrir pessoa
-                        </button>
-                      )}
+                      <span className="flex shrink-0 items-center gap-1.5">
+                        {auditor && (
+                          <BotaoPorQue
+                            aberto={explicando === p.id}
+                            onToggle={() => setExplicando(explicando === p.id ? null : p.id)}
+                          />
+                        )}
+                        {p.pessoaId != null && (
+                          <button
+                            onClick={() => onIrParaPessoa(p.pessoaId!)}
+                            className="shrink-0 rounded-md border border-gray-200 bg-white px-2 py-0.5 text-[11px] text-gray-700 transition hover:border-gray-300 hover:text-gray-900"
+                          >
+                            Abrir pessoa
+                          </button>
+                        )}
+                      </span>
                     </div>
+                    {explicando === p.id && auditor && (
+                      <CadeiaCausal e={porQueProblema(auditor, p as Problema)} onIrParaPessoa={onIrParaPessoa} />
+                    )}
                   </li>
                 )
               })}
