@@ -400,23 +400,18 @@ export function ArvoreGenealogicaView({
 
   const [pessoaParaRemover, setPessoaParaRemover] = useState<number | null>(null)
 
-  const handleDeleteDocumento = async (documento: DocumentoArvore) => {
-    try {
-      const response = await authFetch(`/api/documentos/${documento.id}`, {
-        method: 'DELETE'
-      })
-
-      if (response.ok) {
-        await fetchArvore()
-      } else {
-        const error = await response.json()
-        alert(error.error || 'Erro ao excluir documento')
-      }
-    } catch (error) {
-      console.error('Erro ao excluir documento:', error)
-      alert('Erro ao excluir documento')
-    }
-  }
+  // FRONTEIRA (ADR — Árvore como camada de projeção): a exclusão de Documento
+  // saiu daqui.
+  //
+  // Ela era a ÚNICA escrita da árvore num domínio alheio: `DELETE
+  // /api/documentos/:id` apagava um DocumentoOperacional, cujo dono é o Sistema
+  // Documental. Sobreviveu à remoção de 28/07 porque ficou pendurada numa
+  // permissão (`arvore.excluir_documento`) que ninguém mais concede — invisível
+  // na tela, viva no código, e pronta para voltar assim que a permissão fosse
+  // recriada por engano.
+  //
+  // A árvore LÊ status documental e leva o operador até o documento. Excluir é
+  // ato do módulo dono, com o ciclo de vida e a auditoria dele.
 
   const handleEditPerson = (pessoa: PessoaArvore) => {
     setEditingPerson(pessoa)
@@ -1178,7 +1173,6 @@ export function ArvoreGenealogicaView({
         onAddConjuge={pode('arvore.criar') ? handleAddConjugeById : undefined}
         onAddDocumento={undefined}
         onEditDocumento={undefined}
-        onDeleteDocumento={pode('arvore.excluir_documento') ? handleDeleteDocumento : undefined}
         onSelectPerson={handleSelectPersonFromSidebar}
         initialTab={sidebarTabInicial}
         dossie={selectedPersonId != null ? operacional.dossies.get(selectedPersonId) ?? null : null}

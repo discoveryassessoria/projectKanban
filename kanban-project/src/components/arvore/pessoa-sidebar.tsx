@@ -45,7 +45,6 @@ interface PessoaSidebarProps {
   onAddConjuge?: (pessoaId: number) => void
   onAddDocumento?: (pessoaId: number) => void
   onEditDocumento?: (documento: DocumentoArvore) => void
-  onDeleteDocumento?: (documento: DocumentoArvore) => void
   // NOVO: Callback para selecionar outra pessoa (navegar na sidebar + centralizar árvore)
   onSelectPerson?: (pessoa: PessoaArvore) => void
   // Prop para abrir em aba específica (ex: "documentos" vindo da pesquisa)
@@ -583,7 +582,6 @@ function ConteudoSidebar({
   onAddConjuge,
   onAddDocumento,
   onEditDocumento,
-  onDeleteDocumento,
   onSelectPerson,
   initialTab,
   dossie,
@@ -1022,7 +1020,6 @@ function ConteudoSidebar({
                     key={doc.id} 
                     documento={doc} 
                     onClick={onEditDocumento ? () => onEditDocumento(doc) : undefined}
-                    onDelete={pode('arvore.excluir_documento') ? () => onDeleteDocumento?.(doc) : undefined}
                   />
                 ))}
               </div>

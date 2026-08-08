@@ -361,6 +361,43 @@ async function main() {
       comFin.financeiro.observacao,
     )
 
+    // ── 6b. PREVIEW × EXECUÇÃO, ALTERAÇÃO POR ALTERAÇÃO ──────────────────────
+    // O §9 do escopo: para CADA mudança relevante, o delta previsto tem de ser
+    // semanticamente equivalente ao que a execução canônica produz. O laço abaixo
+    // prevê, executa de verdade pelo motor oficial e compara — e desfaz, para o
+    // cenário seguinte partir do mesmo lugar.
+    console.log("\n6b) preview × execução por tipo de alteração")
+    const cenarios: Array<{ nome: string; alvo: number; muda: Record<string, unknown>; volta: Record<string, unknown> }> = [
+      { nome: "estado civil (solteiro→casado)", alvo: cenario.filhoId, muda: { casado: true }, volta: { casado: false } },
+      { nome: "óbito (vivo→falecido)", alvo: cenario.paiId, muda: { vivo: false }, volta: { vivo: true } },
+      { nome: "requerente (não→sim)", alvo: cenario.filhoId, muda: { requerente: "sim" }, volta: { requerente: "nao" } },
+      { nome: "linha reta (não→sim)", alvo: cenario.conjugeId, muda: { linhaReta: true }, volta: { linhaReta: false } },
+    ]
+    for (const c of cenarios) {
+      const previsto = await simularImpactoPessoa(
+        { processoId: cenario.processoId, pessoaId: c.alvo, mudancas: c.muda },
+        true,
+      )
+      const nAntes = await prisma.necessidadeDocumental.count({ where: { processoId: cenario.processoId } })
+      await prisma.pessoa.update({ where: { id: c.alvo }, data: c.muda })
+      const real = await materializarGenealogia(cenario.processoId)
+      const nDepois = await prisma.necessidadeDocumental.count({ where: { processoId: cenario.processoId } })
+
+      ok(
+        previsto.documental.adicionados.length === nDepois - nAntes,
+        `${c.nome}: exigências previstas = executadas`,
+        { previsto: previsto.documental.adicionados.length, real: nDepois - nAntes },
+      )
+      ok(
+        previsto.operacional.passosAdicionados === real.stepsCriados,
+        `${c.nome}: passos previstos = executados`,
+        { previsto: previsto.operacional.passosAdicionados, real: real.stepsCriados },
+      )
+      // Desfaz para o próximo cenário partir do mesmo estado.
+      await prisma.pessoa.update({ where: { id: c.alvo }, data: c.volta })
+      await materializarGenealogia(cenario.processoId)
+    }
+
     // ── 6. ALTERAÇÃO SEM IMPACTO ─────────────────────────────────────────────
     console.log("\n6) alteração sem impacto")
     const nula = await simularImpactoPessoa(
