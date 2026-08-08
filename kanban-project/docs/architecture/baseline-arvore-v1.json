@@ -19,6 +19,7 @@
   "status": "CONGELADA",
   "congeladaEm": "2026-08-08",
   "adr": "docs/architecture/13-arvore-camada-de-projecao.md",
+  "changelog": "docs/architecture/CHANGELOG-arvore-v1.md",
 
   "responsabilidades": [
     "representar relações familiares",
