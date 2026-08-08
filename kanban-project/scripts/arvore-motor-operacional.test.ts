@@ -49,12 +49,17 @@ import {
 import { analisarIntegridade } from "@/src/lib/genealogia/motor/regras/integridade"
 import { analisarLacunaParental, analisarLacunas } from "@/src/lib/genealogia/navegacao/lacunas"
 import {
+  oQueImpedeAvancar,
+  porQueDivergencia,
   porQueExigencia,
+  porQueFaltamDocumentos,
   porQueNaLinhagem,
   porQueProblema,
   porQueProximaAcao,
   porQueTarefa,
+  porQueValor,
 } from "@/src/lib/genealogia/operacional/auditor"
+import { calcularSaude, contarPorNivel } from "@/src/lib/genealogia/operacional/saude"
 import {
   compararLinhagens,
   relacionadosDaLinhagem,
@@ -804,6 +809,78 @@ ok(/fila fixa de prioridade/.test(expAcao.resposta), "a próxima ação explica 
 ok(
   expAcao.cadeia.some((e) => /não heurística/.test(e.fonte)),
   "e deixa claro que não é heurística",
+)
+
+// ── 5h. EXPLAIN ENGINE — as perguntas que a IA responderia ──────────────────
+// A camada explicativa é DETERMINÍSTICA por decisão: uma explicação plausível e
+// errada sobre genealogia custa um processo, e o dado do cliente não sai daqui.
+secao("5h) explain engine determinístico")
+
+const expFaltam = porQueFaltamDocumentos(ctxAud, 1)
+ok(/Faltam 2 de 2/.test(expFaltam.resposta), "decompõe o que falta", expFaltam.resposta)
+ok(
+  expFaltam.cadeia.some((e) => /NÃO LOCALIZADA/.test(e.fato)),
+  "distingue 'não iniciado' de 'buscado e não encontrado'",
+)
+const expNadaFalta = porQueFaltamDocumentos(ctxAud, 9)
+ok(expNadaFalta.inconclusiva, "sem exigência, responde que não há o que faltar")
+
+const expImpede = oQueImpedeAvancar(ctxAud, diag.problemas)
+ok(expImpede.cadeia.length > 0, "lista o que impede", expImpede.cadeia.length)
+ok(
+  expImpede.cadeia.every((e) => e.fonte.trim().length > 0),
+  "cada impedimento com fonte",
+)
+const expNaoImpede = oQueImpedeAvancar(ctxAud, diag.problemas.filter((p) => !p.impeditivo))
+ok(
+  /Nada impede/.test(expNaoImpede.resposta) && /atenção|atrasam/.test(expNaoImpede.resposta),
+  "sem impeditivo, separa 'nada impede' de 'está tudo pronto'",
+  expNaoImpede.resposta,
+)
+
+const comDiv = [...dossies.values()].find((d) => d.divergencias.length > 0)
+if (comDiv) {
+  const expDiv = porQueDivergencia(ctxAud, comDiv.pessoaId, comDiv.divergencias[0].id)
+  ok(!expDiv.inconclusiva, "explica a divergência")
+  ok(
+    expDiv.cadeia.some((e) => /Confiança|Contradição provada/.test(e.fato)),
+    "e diz se é suspeita ou fato provado",
+  )
+}
+ok(
+  porQueDivergencia(ctxAud, 1, "inexistente").inconclusiva,
+  "divergência inexistente não recebe explicação inventada",
+)
+
+const expValor = porQueValor(ctxAud, 1, true)
+ok(
+  expValor.cadeia.some((e) => /Ledger/.test(e.fonte)),
+  "o valor aponta para o Ledger como fonte do movimento",
+)
+ok(porQueValor(ctxAud, 1, false).inconclusiva, "sem financeiro.ver, não explica valor")
+
+// ── 5i. HEATMAP ─────────────────────────────────────────────────────────────
+secao("5i) saúde por pessoa (heatmap)")
+
+const saude = calcularSaude(grafo, dossies, null)
+ok(saude.size === PESSOAS.length, "cobre todas as pessoas", saude.size)
+ok(saude.get(1)!.nivel === "critico", "documento não localizado = crítico", saude.get(1)!.nivel)
+ok(/impede/.test(saude.get(1)!.motivo), "e o motivo diz que impede")
+ok(saude.get(3)!.nivel === "atencao", "pendência/tarefa = atenção", saude.get(3)!.nivel)
+ok(/não impede/.test(saude.get(3)!.motivo), "e o motivo diz que não impede")
+ok(saude.get(9)!.nivel === "saudavel", "sem pendência = saudável", saude.get(9)!.nivel)
+ok(saude.get(9)!.semDossie, "mas sinaliza que não havia exigência para conferir")
+
+// Fora da linhagem tem nível próprio — não é 'saudável'.
+const saudeLinha = calcularSaude(grafo, dossies, lMarcos)
+ok(saudeLinha.get(9)!.nivel === "fora", "fora da linhagem tem nível próprio", saudeLinha.get(9)!.nivel)
+ok(saudeLinha.get(1)!.nivel === "critico", "quem está na linha mantém o nível real")
+
+const cont = contarPorNivel(saudeLinha)
+ok(
+  cont.critico + cont.atencao + cont.saudavel + cont.fora === PESSOAS.length,
+  "a contagem fecha com o total",
+  cont,
 )
 
 // ── 6. ESCALA ───────────────────────────────────────────────────────────────

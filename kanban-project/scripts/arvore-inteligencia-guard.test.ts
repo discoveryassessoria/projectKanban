@@ -167,17 +167,76 @@ if (/somarPorMoeda/.test(dossie) && !/(taxa|fx|cambio|conversao)\s*[*=]/i.test(d
 // ── 5) Determinística e local ───────────────────────────────────────────────
 console.log("\n5) inteligência determinística e local")
 const perguntas = ler("src/lib/genealogia/operacional/perguntas.ts")
-const MODELOS = /(anthropic|openai|gpt-|claude-|generativeai|\bllm\b)/i
-if (!MODELOS.test(perguntas) || /NÃO é isso|não é isso que está aqui/i.test(perguntas)) {
-  ok("as respostas não vêm de um modelo de linguagem")
+const auditor = ler("src/lib/genealogia/operacional/auditor.ts")
+const saude = ler("src/lib/genealogia/operacional/saude.ts")
+
+// TRAVA ANTI-LLM — agora sobre o EXPLAIN ENGINE inteiro, não só as perguntas.
+//
+// A capacidade explicativa cresceu (Auditor + cadeia causal + heatmap) e toda
+// ela é determinística, por decisão: uma explicação plausível e errada sobre
+// genealogia custa um processo, e a genealogia do cliente não sai daqui.
+// O teste olha o CÓDIGO, não os comentários — senão reprova a própria
+// explicação de por que não há modelo.
+const MODELOS = /(anthropic|openai|gpt-|claude-|generativeai|\bllm\b|fetch\s*\(\s*["'`]https?:)/i
+for (const [arquivo, conteudo] of [
+  ["perguntas.ts", perguntas],
+  ["auditor.ts", auditor],
+  ["saude.ts", saude],
+] as const) {
+  if (!MODELOS.test(semComentarios(conteudo))) {
+    ok(`${arquivo}: explicação determinística, sem modelo de linguagem`)
+  } else {
+    falhar(`${arquivo} passou a consultar um modelo`, "a genealogia do cliente não sai do processo")
+  }
+}
+
+// UMA IMPLEMENTAÇÃO POR PAPEL. `perguntas.ts` responde no AGREGADO ("o que falta
+// nesta linha?"); `auditor.ts` responde a CADEIA CAUSAL de um item ("por que
+// ISTO existe?"). Se um passar a fazer o do outro, vira segunda implementação.
+if (!/porQue[A-Z]/.test(semComentarios(perguntas))) {
+  ok("perguntas.ts não duplica a cadeia causal do auditor")
 } else {
-  falhar("a árvore passou a consultar um modelo", "a genealogia do cliente não sai do processo")
+  falhar("perguntas.ts implementa explicação causal", "isso é do auditor.ts — um papel, um dono")
+}
+if (!/responderTodas|PERGUNTAS\s*[:=]/.test(semComentarios(auditor))) {
+  ok("auditor.ts não duplica o catálogo de perguntas")
+} else {
+  falhar("auditor.ts implementa o catálogo de perguntas", "isso é do perguntas.ts")
+}
+
+// Toda explicação do auditor precisa carregar FONTE — elo sem fonte é opinião.
+if (/fonte:/.test(auditor) && /inconclusiva/.test(auditor)) {
+  ok("o auditor declara fonte e sabe dizer que não sabe")
+} else {
+  falhar("o auditor perdeu fonte ou o estado inconclusivo", "explicação sem fonte não é auditoria")
+}
+
+// HEATMAP NÃO TOCA O CARTÃO. O anel é aplicado no wrapper do nó; `PersonNode`
+// não pode nem saber que o modo Saúde existe.
+const canvasSrc = semComentarios(canvas)
+const corpoPersonNode = canvasSrc.slice(
+  canvasSrc.indexOf("function PersonNode("),
+  canvasSrc.indexOf("function AddPersonNode("),
+)
+if (corpoPersonNode && !/saude|SaudePessoa|COR_NIVEL/.test(corpoPersonNode)) {
+  ok("o heatmap não entra no PersonNode — o cartão congelado segue intocado")
+} else {
+  falhar("PersonNode passou a conhecer o heatmap", "o anel vive no wrapper do nó, não no cartão")
+}
+if (/boxShadow: `0 0 0 2px \$\{COR_NIVEL/.test(canvas)) {
+  ok("o anel de saúde é box-shadow no wrapper (não ocupa espaço, não move nó)")
+} else {
+  falhar("o anel de saúde mudou de técnica", "borda/tamanho no wrapper deslocaria os nós")
 }
 for (const [arquivo, conteudo] of [
   ["linhagens.ts", ler("src/lib/genealogia/motor/linhagens.ts")],
   ["foco.ts", foco],
   ["dossie.ts", dossie],
   ["perguntas.ts", perguntas],
+  ["auditor.ts", auditor],
+  ["saude.ts", saude],
+  ["lacunas.ts", ler("src/lib/genealogia/navegacao/lacunas.ts")],
+  ["diagnostico.ts", ler("src/lib/genealogia/operacional/diagnostico.ts")],
 ]) {
   if (/\bfetch\(|from ["']@\/lib\/prisma["']|Math\.random\(|Date\.now\(/.test(conteudo)) {
     falhar(`${arquivo} deixou de ser puro`, "rede, banco, relógio ou acaso quebram o determinismo")

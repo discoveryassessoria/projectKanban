@@ -21,7 +21,8 @@
 // ============================================================================
 
 import { useEffect, useRef, useState } from "react"
-import { ChevronDown, ChevronRight, Eye, Filter, Users2, X } from "lucide-react"
+import { Activity, ChevronDown, ChevronRight, Eye, Filter, Users2, X } from "lucide-react"
+import { COR_NIVEL, ROTULO_NIVEL, type NivelSaudePessoa } from "@/src/lib/genealogia/operacional/saude"
 import type { DegrauLinhagem, Linhagem, MapaLinhagens } from "@/src/lib/genealogia/motor/linhagens"
 import type { EstiloFoco, ModoFoco } from "@/src/lib/genealogia/navegacao/foco"
 import { ROTULO_FILTRO, type ChaveFiltro, type EstadoFiltros } from "@/src/lib/genealogia/navegacao/filtros"
@@ -63,6 +64,9 @@ interface Props {
   relacionadosVisiveis: boolean
   onAlternarRelacionados: () => void
   totalRelacionados: number
+  saudeLigada: boolean
+  onAlternarSaude: () => void
+  contagemSaude: Record<NivelSaudePessoa, number>
   totalRecuado: number
   totalRecolhivel: number
   onRecolherTudo: () => void
@@ -129,6 +133,7 @@ export function BarraLinhagem(props: Props) {
     filtros, filtrosAtivos, onAlternarFiltro, onLimparFiltros,
     resumo, comparacao, trilha, proximaAcao,
     relacionadosVisiveis, onAlternarRelacionados, totalRelacionados,
+    saudeLigada, onAlternarSaude, contagemSaude,
     totalRecuado, totalRecolhivel, onRecolherTudo, onIrParaPessoa, carregando,
   } = props
 
@@ -365,6 +370,16 @@ export function BarraLinhagem(props: Props) {
           )}
         </div>
 
+        {/* ── Modo Saúde (heatmap) ─────────────────────────────────────── */}
+        <button
+          onClick={onAlternarSaude}
+          className={saudeLigada ? CASCA_ATIVA : CASCA}
+          title="Sinalizar cada pessoa por saúde operacional — o cartão não muda, ganha um anel"
+        >
+          <Activity className="h-4 w-4" />
+          <span className="hidden md:inline">Saúde</span>
+        </button>
+
         {/* ── Resumo do requerente ─────────────────────────────────────── */}
         {resumo && (
           <div ref={refResumo} className="relative">
@@ -519,6 +534,27 @@ export function BarraLinhagem(props: Props) {
           </div>
         )}
       </div>
+
+      {/* ── LEGENDA DA SAÚDE ───────────────────────────────────────────────
+          Números reais, não só cores: "amarelo" não diz quantas pessoas. */}
+      {saudeLigada && (
+        <div className="flex flex-wrap items-center gap-3 rounded-lg border border-gray-200 bg-white px-2.5 py-1.5 shadow-sm">
+          {(["critico", "atencao", "saudavel", "fora"] as NivelSaudePessoa[]).map((n) => (
+            <span key={n} className="flex items-center gap-1.5 text-[12px] text-gray-600">
+              <span
+                aria-hidden
+                className="inline-block h-2.5 w-2.5 rounded-full"
+                style={{ backgroundColor: COR_NIVEL[n] }}
+              />
+              {ROTULO_NIVEL[n]}
+              <span className="font-medium tabular-nums text-gray-900">{contagemSaude[n]}</span>
+            </span>
+          ))}
+          <span className="text-[11px] text-gray-400">
+            Crítico = bloqueio impeditivo · Atenção = pendência, divergência ou tarefa
+          </span>
+        </div>
+      )}
 
       {/* ── BREADCRUMB DA LINHAGEM ─────────────────────────────────────────
           Projeção do caminho que já existe na árvore: cada degrau aponta para o

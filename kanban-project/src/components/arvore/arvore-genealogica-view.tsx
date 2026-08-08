@@ -1049,6 +1049,7 @@ export function ArvoreGenealogicaView({
             gruposRecolhidos={operacional.foco.gruposAtivos}
             onExpandirGrupo={operacional.expandirGrupo}
             lacunas={operacional.lacunas}
+            saude={operacional.saude}
           />
         )}
 
@@ -1076,6 +1077,9 @@ export function ArvoreGenealogicaView({
             relacionadosVisiveis={operacional.relacionadosVisiveis}
             onAlternarRelacionados={operacional.alternarRelacionados}
             totalRelacionados={operacional.totalRelacionados}
+            saudeLigada={operacional.saudeLigada}
+            onAlternarSaude={operacional.alternarSaude}
+            contagemSaude={operacional.contagemSaude}
             totalRecuado={operacional.foco.totalRecuado}
             totalRecolhivel={operacional.totalRecolhivel}
             onRecolherTudo={operacional.recolherTudo}

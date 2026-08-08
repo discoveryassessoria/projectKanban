@@ -57,6 +57,7 @@ import {
   type EstadoFiltros,
 } from "@/src/lib/genealogia/navegacao/filtros"
 import { analisarLacunas, type LacunaParental } from "@/src/lib/genealogia/navegacao/lacunas"
+import { calcularSaude, contarPorNivel, type NivelSaudePessoa, type SaudePessoa } from "@/src/lib/genealogia/operacional/saude"
 import { projetarIndicadores } from "@/src/lib/genealogia/documental/indicadores"
 import {
   fatosVazios,
@@ -120,6 +121,12 @@ export interface ArvoreOperacional {
   /** Contexto do Modo Auditor. null sem análise. */
   auditor: ContextoAuditor | null
 
+  /** Modo Saúde (heatmap). Desligado = o canvas não recebe anel nenhum. */
+  saudeLigada: boolean
+  alternarSaude: () => void
+  saude: Map<number, SaudePessoa> | undefined
+  contagemSaude: Record<NivelSaudePessoa, number>
+
   /** Grupos "+N irmãos" que ainda estão recolhidos. */
   expandirGrupo: (chave: string) => void
   recolherTudo: () => void
@@ -180,6 +187,7 @@ export function useArvoreOperacional(params: {
   const [gruposExpandidos, setGruposExpandidos] = useState<ReadonlySet<string>>(new Set())
   const [filtros, setFiltros] = useState<EstadoFiltros>(filtrosVazios)
   const [relacionadosVisiveis, setRelacionadosVisiveis] = useState(false)
+  const [saudeLigada, setSaudeLigada] = useState(false)
 
   /**
    * "Agora" congelado no ciclo de vida do componente.
@@ -339,6 +347,21 @@ export function useArvoreOperacional(params: {
     [analise, mapa, dossies, linhagem],
   )
 
+  // O heatmap sai dos MESMOS dossiês do diagnóstico — nenhuma leitura nova,
+  // nenhum segundo critério. Desligado, é `undefined`: o canvas então segue o
+  // caminho de custo zero e o cartão não recebe anel.
+  const saudeCalculada = useMemo<Map<number, SaudePessoa> | undefined>(
+    () =>
+      analise && saudeLigada
+        ? calcularSaude(analise.grafo, dossies, modo === "linhagem" ? linhagem : null)
+        : undefined,
+    [analise, dossies, saudeLigada, modo, linhagem],
+  )
+  const contagemSaude = useMemo(
+    () => contarPorNivel(saudeCalculada ?? new Map()),
+    [saudeCalculada],
+  )
+
   const proximaAcao = useMemo<AcaoRecomendada>(
     () => resolveNextGenealogyAction(diagnostico),
     [diagnostico],
@@ -354,6 +377,7 @@ export function useArvoreOperacional(params: {
 
   const selecionarRequerente = useCallback((id: number | null) => setEscolhaManual(id), [])
   const alternarRelacionados = useCallback(() => setRelacionadosVisiveis((v) => !v), [])
+  const alternarSaude = useCallback(() => setSaudeLigada((v) => !v), [])
 
   // Contexto da busca: parentesco em relação ao requerente em foco, mais o aviso
   // de que a pessoa está (ou não) na linha dele. Reusa `calcularParentesco` —
@@ -410,6 +434,10 @@ export function useArvoreOperacional(params: {
     contextoDe,
     lacunas,
     auditor,
+    saudeLigada,
+    alternarSaude,
+    saude: saudeCalculada,
+    contagemSaude,
     expandirGrupo,
     recolherTudo,
     totalRecolhivel,

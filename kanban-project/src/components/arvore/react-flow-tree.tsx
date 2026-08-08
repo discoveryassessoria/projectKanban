@@ -23,6 +23,7 @@ import dagre from "dagre"
 import "reactflow/dist/style.css"
 import type { PessoaArvore, UniaoArvore } from "./types"
 import { opacidadeDe, type EstadoFoco, type GrupoRecolhivel } from "@/src/lib/genealogia/navegacao/foco"
+import { COR_NIVEL, ROTULO_NIVEL, type SaudePessoa } from "@/src/lib/genealogia/operacional/saude"
 
 // Cores estilo FamilySearch
 const colors = {
@@ -1419,6 +1420,8 @@ interface OpcoesFoco {
   grupos?: readonly GrupoRecolhivel[]
   /** Contexto dos slots "+pai/+mãe", por chave `pai-<id>` / `mae-<id>`. */
   lacunas?: ReadonlyMap<string, { titulo: string; explicacao: string; relevancia: string }>
+  /** Heatmap. Ausente = nenhum anel; o cartão fica exatamente como sempre foi. */
+  saude?: ReadonlyMap<number, SaudePessoa>
   mode: ViewMode
   onExpandirGrupo?: (chave: string) => void
 }
@@ -1438,15 +1441,16 @@ function aplicarFoco(
   edges: Edge[],
   opcoes: OpcoesFoco,
 ): { nodes: Node[]; edges: Edge[] } {
-  const { foco, sinais, grupos, lacunas, mode, onExpandirGrupo } = opcoes
+  const { foco, sinais, grupos, lacunas, saude, mode, onExpandirGrupo } = opcoes
   const temFoco = Boolean(foco && foco.size)
   const temSinais = Boolean(sinais && sinais.size)
   const temGrupos = Boolean(grupos && grupos.length)
   const temLacunas = Boolean(lacunas && lacunas.size)
+  const temSaude = Boolean(saude && saude.size)
 
   // Caminho de custo zero: sem foco, sem sinais e sem grupos a árvore é a de
   // antes, referência por referência. Nenhum objeto novo, nenhum re-render.
-  if (!temFoco && !temSinais && !temGrupos && !temLacunas) return { nodes, edges }
+  if (!temFoco && !temSinais && !temGrupos && !temLacunas && !temSaude) return { nodes, edges }
 
   const estadoDe = (nodeId: string): EstadoFoco => {
     const pessoaId = idPessoaDoNode(nodeId)
@@ -1480,16 +1484,31 @@ function aplicarFoco(
       }
     }
 
+    // HEATMAP NO WRAPPER — o cartão continua intocado.
+    //
+    // O anel é um `box-shadow` no `.react-flow__node`, que é o div que o
+    // reactflow desenha EM VOLTA do componente. `PersonNode` não sabe que o modo
+    // Saúde existe, não recebe prop nova e não muda um pixel: desligar o modo
+    // devolve exatamente o cartão de sempre. Sombra não ocupa espaço no layout,
+    // então nenhum nó se desloca por causa dela.
+    const nivel = pessoaId != null ? saude?.get(pessoaId) : undefined
+    const anel = nivel
+      ? { boxShadow: `0 0 0 2px ${COR_NIVEL[nivel.nivel]}`, borderRadius: 8 }
+      : undefined
+
     return {
       ...n,
       hidden: estado === 'oculto',
-      // Só a OPACIDADE muda. Nem dimensão, nem cor, nem borda, nem posição — o
-      // guarda de layout congelado continua verdadeiro depois desta linha.
-      style: { ...n.style, opacity: opacidadeDe(estado) },
+      // Só a OPACIDADE muda (e o anel do heatmap, quando ligado). Nem dimensão,
+      // nem cor do cartão, nem borda dele, nem posição — o guarda de layout
+      // congelado continua verdadeiro depois desta linha.
+      style: { ...n.style, opacity: opacidadeDe(estado), ...anel },
       // Quem recuou CONTINUA clicável de propósito. Esmaecer é tirar do primeiro
       // plano, não desativar: o operador que vê um nome apagado e quer conferi-lo
       // não deveria ter de sair do modo linhagem para isso.
       data: precisaData ? { ...(n.data as PersonNodeData), sinais: marcas } : n.data,
+      // O motivo do nível vira tooltip do wrapper — texto nenhum entra no cartão.
+      title: nivel ? `${ROTULO_NIVEL[nivel.nivel]}: ${nivel.motivo}` : undefined,
     }
   })
 
@@ -1571,6 +1590,8 @@ interface ReactFlowTreeProps {
   onExpandirGrupo?: (chave: string) => void
   /** Contexto dos slots "+pai/+mãe" (`navegacao/lacunas.ts`). */
   lacunas?: ReadonlyMap<string, { titulo: string; explicacao: string; relevancia: string }>
+  /** Heatmap por pessoa. Ausente = modo Saúde desligado. */
+  saude?: ReadonlyMap<number, SaudePessoa>
 }
 
 const ReactFlowTreeInner = forwardRef<ReactFlowTreeRef, ReactFlowTreeProps>(({
@@ -1590,6 +1611,7 @@ const ReactFlowTreeInner = forwardRef<ReactFlowTreeRef, ReactFlowTreeProps>(({
   gruposRecolhidos,
   onExpandirGrupo,
   lacunas,
+  saude,
 }, ref) => {
   const [nodes, setNodes, onNodesChange] = useNodesState([])
   const [edges, setEdges, onEdgesChange] = useEdgesState([])
@@ -1730,8 +1752,8 @@ const ReactFlowTreeInner = forwardRef<ReactFlowTreeRef, ReactFlowTreeProps>(({
   // Foco aplicado sobre o layout já calculado. Ver `aplicarFoco`: nada aqui
   // recalcula dagre, então trocar de linhagem não move card nenhum.
   const { nodes: nodesEmTela, edges: edgesEmTela } = useMemo(
-    () => aplicarFoco(nodes, edges, { foco, sinais, grupos: gruposRecolhidos, lacunas, mode, onExpandirGrupo }),
-    [nodes, edges, foco, sinais, gruposRecolhidos, lacunas, mode, onExpandirGrupo],
+    () => aplicarFoco(nodes, edges, { foco, sinais, grupos: gruposRecolhidos, lacunas, saude, mode, onExpandirGrupo }),
+    [nodes, edges, foco, sinais, gruposRecolhidos, lacunas, saude, mode, onExpandirGrupo],
   )
 
   return (

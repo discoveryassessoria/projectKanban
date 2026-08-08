@@ -260,6 +260,179 @@ export function porQueProblema(ctx: ContextoAuditor, problema: Problema): Explic
   }
 }
 
+// ── POR QUE FALTAM DOCUMENTOS? ──────────────────────────────────────────────
+
+export function porQueFaltamDocumentos(ctx: ContextoAuditor, pessoaId: number): Explicacao {
+  const { grafo, dossies } = ctx
+  const d = dossies.get(pessoaId)
+  const pergunta = `Por que faltam documentos de ${nome(grafo, pessoaId)}?`
+
+  if (!d || d.documental.necessarias === 0) {
+    return {
+      pergunta,
+      resposta: "Não faltam: nenhuma exigência foi materializada para esta pessoa.",
+      cadeia: [{ fato: "Zero NecessidadeDocumental para este sujeito", fonte: FONTE_DOC, pessoaId }],
+      inconclusiva: true,
+    }
+  }
+
+  const doc = d.documental
+  const faltam = doc.necessarias - (doc.atendidas + doc.dispensadas)
+  if (faltam <= 0) {
+    return {
+      pergunta,
+      resposta: `Não faltam: as ${doc.necessarias} exigências estão atendidas ou dispensadas.`,
+      cadeia: [
+        { fato: `${doc.atendidas} atendida(s) e ${doc.dispensadas} dispensada(s)`, fonte: FONTE_DOC, pessoaId },
+        { fato: "Dispensada conta como resolvida — o Sistema Documental decidiu que não se aplica", fonte: FONTE_DOC },
+      ],
+      inconclusiva: false,
+    }
+  }
+
+  // A decomposição é o que responde "por quê": faltar por não ter começado é
+  // diferente de faltar porque a busca já foi feita e o registro não apareceu.
+  const cadeia: EloCausal[] = [
+    { fato: `${doc.necessarias} exigência(s) materializada(s) para esta pessoa`, fonte: FONTE_DOC, pessoaId },
+  ]
+  if (doc.pendentes > 0) {
+    cadeia.push({ fato: `${doc.pendentes} ainda não iniciada(s) — trabalho parado, não bloqueio`, fonte: FONTE_DOC })
+  }
+  if (doc.emAtendimento > 0) {
+    cadeia.push({ fato: `${doc.emAtendimento} em atendimento — já em andamento`, fonte: FONTE_DOC })
+  }
+  if (doc.naoLocalizadas > 0) {
+    cadeia.push({
+      fato: `${doc.naoLocalizadas} marcada(s) como NÃO LOCALIZADA — a busca foi feita e o registro não apareceu`,
+      fonte: FONTE_DOC,
+    })
+  }
+  cadeia.push({ fato: `Situação consolidada: ${d.rotuloSituacao}`, fonte: FONTE_DOC })
+
+  return {
+    pergunta,
+    resposta: `Faltam ${faltam} de ${doc.necessarias}: ${doc.pendentes} sem início, ${doc.emAtendimento} em atendimento, ${doc.naoLocalizadas} não localizada(s).`,
+    cadeia,
+    inconclusiva: false,
+  }
+}
+
+// ── O QUE IMPEDE ESTE REQUERENTE DE AVANÇAR? ────────────────────────────────
+
+export function oQueImpedeAvancar(ctx: ContextoAuditor, problemas: readonly Problema[]): Explicacao {
+  const { linhagem } = ctx
+  const alvo = linhagem?.nome ?? "esta linha"
+  const impeditivos = problemas.filter((p) => p.impeditivo)
+
+  if (impeditivos.length === 0) {
+    const atencao = problemas.length
+    return {
+      pergunta: `O que impede ${alvo} de avançar?`,
+      // A distinção que o operador precisa: nada IMPEDE ≠ está tudo pronto.
+      resposta:
+        atencao > 0
+          ? `Nada impede. Há ${atencao} pendência(s) de atenção — atrasam, mas não travam.`
+          : "Nada impede e não há pendência conhecida nesta linha.",
+      cadeia: [
+        { fato: "Nenhum problema classificado como impeditivo", fonte: "Diagnóstico da Árvore — critério fechado" },
+        ...(atencao > 0
+          ? [{ fato: `${atencao} item(ns) de atenção na fila de trabalho`, fonte: FONTE_DOC }]
+          : []),
+      ],
+      inconclusiva: false,
+    }
+  }
+
+  return {
+    pergunta: `O que impede ${alvo} de avançar?`,
+    resposta:
+      impeditivos.length === 1
+        ? impeditivos[0].titulo
+        : `${impeditivos.length} impedimentos, começando por: ${impeditivos[0].titulo}`,
+    cadeia: impeditivos.slice(0, 5).map((p) => ({
+      fato: `${p.titulo} — ${p.impacto}`,
+      fonte: p.fonte,
+      pessoaId: p.pessoaId ?? undefined,
+    })),
+    inconclusiva: false,
+  }
+}
+
+// ── EXPLIQUE ESTA DIVERGÊNCIA ───────────────────────────────────────────────
+
+export function porQueDivergencia(ctx: ContextoAuditor, pessoaId: number, insightId: string): Explicacao {
+  const { grafo, dossies } = ctx
+  const d = dossies.get(pessoaId)
+  const i = d?.divergencias.find((x) => x.id === insightId)
+  const pergunta = "Por que esta divergência foi apontada?"
+
+  if (!i) {
+    return {
+      pergunta,
+      resposta: "Divergência não encontrada para esta pessoa.",
+      cadeia: [{ fato: "Sem insight com este id", fonte: FONTE_MOTOR }],
+      inconclusiva: true,
+    }
+  }
+
+  const envolvidos = i.pessoaIds.map((id) => nome(grafo, id)).join(" e ")
+  const cadeia: EloCausal[] = [
+    { fato: `Envolve ${envolvidos}`, fonte: "Pessoa (Cadastro Mestre)", pessoaId },
+    { fato: i.explicacao, fonte: FONTE_MOTOR },
+  ]
+  // Confiança < 1 é SUSPEITA, não fato. Apresentar as duas do mesmo jeito é o
+  // que treina o operador a ignorar alerta.
+  if (typeof i.confianca === "number" && i.confianca < 1) {
+    cadeia.push({
+      fato: `Confiança ${Math.round(i.confianca * 100)}% — é suspeita a confirmar, não fato provado`,
+      fonte: FONTE_MOTOR,
+    })
+  } else {
+    cadeia.push({ fato: "Contradição provada pelos dados, não estimada", fonte: FONTE_MOTOR })
+  }
+  if (i.acao) cadeia.push({ fato: `Ação: ${i.acao}`, fonte: FONTE_MOTOR })
+
+  return { pergunta, resposta: i.titulo, cadeia, inconclusiva: false }
+}
+
+// ── POR QUE ESTE CUSTO/RECEITA ESTÁ PREVISTO? ───────────────────────────────
+
+export function porQueValor(ctx: ContextoAuditor, pessoaId: number, financeiroVisivel: boolean): Explicacao {
+  const { grafo, dossies } = ctx
+  const d = dossies.get(pessoaId)
+  const pergunta = `Por que ${nome(grafo, pessoaId)} tem valores lançados?`
+
+  if (!financeiroVisivel) {
+    return {
+      pergunta,
+      resposta: "Sem permissão para ver valores.",
+      cadeia: [{ fato: "O servidor omitiu o bloco financeiro (falta financeiro.ver)", fonte: "Autorização do processo" }],
+      inconclusiva: true,
+    }
+  }
+  const total = (d?.custos.length ?? 0) + (d?.receitas.length ?? 0)
+  if (!d || total === 0) {
+    return {
+      pergunta,
+      resposta: "Nenhum lançamento econômico está vinculado a esta pessoa.",
+      cadeia: [{ fato: "Sem ObrigacaoEconomica com personId desta pessoa", fonte: "Motor Financeiro V3", pessoaId }],
+      inconclusiva: false,
+    }
+  }
+
+  return {
+    pergunta,
+    resposta: `${d.custos.length} linha(s) de custo e ${d.receitas.length} de receita vinculadas a esta pessoa.`,
+    cadeia: [
+      { fato: "Existe ObrigacaoEconomica com esta pessoa no vínculo documental", fonte: "Motor Financeiro V3", pessoaId },
+      { fato: "O valor foi congelado no lançamento pela Tabela de Preços vigente", fonte: "Tabela de Preços — fonte única de preço" },
+      { fato: "Recebido e saldo vêm do Ledger — a árvore não soma movimento", fonte: "LedgerFinanceiro (única verdade do movimento)" },
+      { fato: "Somas por moeda, sem conversão: taxa é do motor de câmbio", fonte: "Motor de câmbio" },
+    ],
+    inconclusiva: false,
+  }
+}
+
 // ── POR QUE ESTA É A PRÓXIMA AÇÃO? ──────────────────────────────────────────
 
 const FILA = [
