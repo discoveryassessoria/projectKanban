@@ -178,6 +178,7 @@ const MIGRATIONS_POS_BASELINE: string[] = [
   '20260807_pessoa_ciclo_vida',
   '20260809_planilha_documental_colunas',
   '20260809210000_planilha_matriz_e_override',
+  '20260809220000_planilha_coluna_etapa_chk',
 ]
 
 const sha256 = (t: string) => createHash('sha256').update(t).digest('hex')
