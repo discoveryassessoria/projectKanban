@@ -69,8 +69,11 @@ secao("4–5) Diferença entre as dimensões NÃO duplica a linha")
   ])
   ok("4: fornecedor diferente entre custo e venda → continua 1 linha", l.length === 1)
   ok("4: cada dimensão carrega o SEU fornecedor",
-    l[0].custo?.fornecedor === "FOR-15 — CRC" && l[0].venda?.fornecedor === null,
+    l[0].custo?.fornecedor === "CRC" && l[0].venda?.fornecedor === null,
     `${l[0].custo?.fornecedor} / ${l[0].venda?.fornecedor}`)
+  // 3/4: o código do fornecedor identifica o FORNECEDOR, não o item — e não
+  // pode competir com o código canônico do cadastro mestre na primeira coluna.
+  ok("3·4: FOR-n não aparece na célula de custo", !/FOR-/.test(l[0].custo?.fornecedor ?? ""))
 }
 {
   const l = agruparPorCadastroMestre([
@@ -80,6 +83,23 @@ secao("4–5) Diferença entre as dimensões NÃO duplica a linha")
   ok("5: estratégias diferentes → continua 1 linha", l.length === 1)
   ok("5: cada dimensão mantém a sua estratégia",
     l[0].custo?.registro.modoCalculo === "fixed" && l[0].venda?.registro.modoCalculo === "first_additional")
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+secao("1–2·5·10) O código é o do MESTRE, e a tela o lê da origem")
+// ═══════════════════════════════════════════════════════════════════════════
+{
+  const tv = readFileSyncSafe("src/components/gerenciamentoComponents/TabelaValoresTab.tsx")
+  ok("1: documento lê o código do Cadastro Mestre Documental",
+    /cfg\.tipoDocumento\?\.publicCode/.test(tv) && /itemCatalogo\?\.tiposDocumento\?\.\[0\]\?\.publicCode/.test(tv))
+  ok("2: serviço lê o código do Catálogo de Serviços",
+    /itemCatalogo\?\.servicos\?\.\[0\]\?\.publicCode/.test(tv))
+  ok("5·10: NÃO usa o código da Configuração Financeira como identidade",
+    !/codigo:\s*cfg\.publicCode/.test(tv), "cfg.publicCode identifica a config, não o mestre")
+  ok("a coluna Código é a PRIMEIRA da tabela", /\['Código', 'Cadastro mestre', 'Origem', 'Custo', 'Venda', 'Status', ''\]/.test(tv))
+  ok("6·7: a busca aceita o código canônico", /\$\{om\.codigo \?\? ''\}/.test(tv))
+  ok("9: nenhum código é gerado na Tabela de Preços",
+    !/DOC\$\{|SRV-\$\{|`DOC|`SRV-/.test(tv), "código vem do cadastro, nunca é calculado aqui")
 }
 
 // ═══════════════════════════════════════════════════════════════════════════

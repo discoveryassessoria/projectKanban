@@ -111,8 +111,18 @@ export async function GET(request: NextRequest) {
           configuracaoFinanceiraItem: {
             select: {
               id: true, possuiCusto: true, possuiReceita: true,
-              tipoDocumento: { select: { name: true } }, honorario: { select: { name: true } },
-              tipoProcesso: { select: { name: true } }, itemCatalogo: { select: { name: true, natureza: true } },
+              tipoDocumento: { select: { name: true, publicCode: true } }, honorario: { select: { name: true } },
+              tipoProcesso: { select: { name: true } },
+              // CÓDIGO CANÔNICO DO MESTRE. Vem da entidade de origem — Cadastro
+              // Mestre Documental (DOCn) ou Catálogo de Serviços (SRV-n) —, nunca
+              // da Configuração Financeira, do preço ou do fornecedor.
+              itemCatalogo: {
+                select: {
+                  name: true, natureza: true,
+                  tiposDocumento: { select: { publicCode: true }, take: 1 },
+                  servicos: { select: { publicCode: true }, take: 1 },
+                },
+              },
             },
           },
         },

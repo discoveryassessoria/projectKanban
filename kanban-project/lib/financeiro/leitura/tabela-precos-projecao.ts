@@ -69,8 +69,10 @@ function papel(natureza: string | null | undefined): 'CUSTO' | 'VENDA' | null {
   return null
 }
 
-const nomeFornecedor = (f: RegistroPreco['fornecedor']): string | null =>
-  f ? `${f.publicCode ? `${f.publicCode} — ` : ''}${f.nome}` : null
+// SÓ O NOME AMIGÁVEL. O `publicCode` do fornecedor (FOR-1) identifica o
+// FORNECEDOR — não o documento nem o serviço — e competia visualmente com o
+// código canônico do cadastro mestre. Ele vive no cadastro do fornecedor.
+const nomeFornecedor = (f: RegistroPreco['fornecedor']): string | null => f?.nome ?? null
 
 /**
  * Agrupa registros de preço em UMA linha por cadastro mestre, preservando a

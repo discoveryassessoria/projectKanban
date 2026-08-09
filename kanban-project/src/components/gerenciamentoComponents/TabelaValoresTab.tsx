@@ -16,8 +16,13 @@ type ConfigRef = { id: number; publicCode: string | null; possuiCusto: boolean; 
 type FornecedorRef = { id: number; nome: string; publicCode?: string | null }
 type CfgEmbed = {
   id: number; publicCode?: string | null; possuiCusto: boolean; possuiReceita: boolean
-  tipoDocumento?: { name: string } | null; honorario?: { name: string } | null
-  tipoProcesso?: { name: string } | null; itemCatalogo?: { name: string; natureza: string } | null
+  tipoDocumento?: { name: string; publicCode?: string | null } | null; honorario?: { name: string } | null
+  tipoProcesso?: { name: string } | null
+  itemCatalogo?: {
+    name: string; natureza: string
+    tiposDocumento?: { publicCode: string | null }[]
+    servicos?: { publicCode: string | null }[]
+  } | null
 }
 type Item = {
   id: number; name: string
@@ -74,11 +79,24 @@ const TIPO_ITEM_LABEL: Record<string, string> = {
 const tipoItemLabel = (n: string) => TIPO_ITEM_LABEL[n] ?? n
 const ORDEM_TIPO = ['SERVICO', 'DOCUMENTO', 'TAXA', 'DESPESA', 'LOGISTICA', 'OUTRO']
 
-function origemMestre(cfg?: CfgEmbed | null): { origem: string; mestre: string; publicCode: string | null } {
-  if (!cfg) return { origem: '—', mestre: '—', publicCode: null }
+/**
+ * IDENTIDADE DA LINHA — nome, origem e CÓDIGO CANÔNICO do cadastro mestre.
+ *
+ * O código vem da entidade de ORIGEM: Cadastro Mestre Documental (DOC1, DOC2…)
+ * ou Catálogo de Serviços (SRV-1, SRV-4…). Nunca da Configuração Financeira, do
+ * registro de preço ou do fornecedor — nenhum desses identifica o item, e o
+ * `publicCode` do fornecedor (FOR-1) chegava a competir visualmente com ele.
+ */
+function origemMestre(cfg?: CfgEmbed | null): { origem: string; mestre: string; codigo: string | null } {
+  if (!cfg) return { origem: '—', mestre: '—', codigo: null }
   const origem = cfg.tipoDocumento ? 'Documento' : cfg.honorario ? 'Honorário' : cfg.tipoProcesso ? 'Processo' : (cfg.itemCatalogo?.natureza === 'SERVICO' ? 'Serviço' : 'Item')
   const mestre = cfg.tipoDocumento?.name ?? cfg.honorario?.name ?? cfg.tipoProcesso?.name ?? cfg.itemCatalogo?.name ?? '—'
-  return { origem, mestre, publicCode: cfg.publicCode ?? null }
+  const codigo =
+    cfg.tipoDocumento?.publicCode ??
+    cfg.itemCatalogo?.tiposDocumento?.[0]?.publicCode ??
+    cfg.itemCatalogo?.servicos?.[0]?.publicCode ??
+    null
+  return { origem, mestre, codigo }
 }
 
 async function jsonFetch(url: string, options: RequestInit = {}) {
@@ -169,7 +187,8 @@ export default function TabelaValoresTab() {
     if (!q) return itens
     return itens.filter((i) => {
       const om = origemMestre(i.configuracaoFinanceiraItem)
-      return `${om.mestre} ${om.origem} ${i.natureza ?? ''} ${i.name}`.toLowerCase().includes(q)
+      // A busca aceita o código canônico: "DOC1" e "SRV-4" encontram o item.
+      return `${om.codigo ?? ''} ${om.mestre} ${om.origem} ${i.natureza ?? ''} ${i.name}`.toLowerCase().includes(q)
     })
   }, [itens, busca])
 
@@ -369,8 +388,8 @@ export default function TabelaValoresTab() {
               {/* UMA LINHA POR CADASTRO MESTRE. "Papel" era coluna porque a tela
                   renderizava REGISTRO de preço; agora Custo e Venda são colunas
                   próprias do mesmo item, e "Preço" genérico deixou de existir. */}
-              {['Cadastro mestre', 'Origem', 'Custo', 'Venda', 'Status', ''].map((h, idx) => (
-                <th key={idx} className={`border-b border-white/10 px-3 py-2.5 text-[11px] font-semibold uppercase tracking-wide text-white/50 ${idx === 2 || idx === 3 || idx === 5 ? 'text-right' : 'text-left'}`}>{h}</th>
+              {['Código', 'Cadastro mestre', 'Origem', 'Custo', 'Venda', 'Status', ''].map((h, idx) => (
+                <th key={idx} className={`border-b border-white/10 px-3 py-2.5 text-[11px] font-semibold uppercase tracking-wide text-white/50 ${idx === 3 || idx === 4 || idx === 6 ? 'text-right' : 'text-left'}`}>{h}</th>
               ))}
             </tr></thead>
             <tbody>
@@ -379,6 +398,7 @@ export default function TabelaValoresTab() {
                 const ativo = !linha.referencia.arquivado
                 return (
                   <tr key={linha.configId} className="border-b border-white/5 last:border-0 hover:bg-white/[0.03]">
+                    <td className="px-3 py-2.5 font-mono text-[12px] text-white/70">{om.codigo ?? '—'}</td>
                     <td className="px-3 py-2.5 font-medium text-white">{om.mestre}</td>
                     <td className="px-3 py-2.5 text-white/60">{om.origem}</td>
                     <CelulaDimensao dim={linha.custo} onEditar={abrirEditar} onExcluir={excluir} />

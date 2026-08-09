@@ -196,6 +196,13 @@ const proj = ler("lib/financeiro/leitura/tabela-precos-projecao.ts")
 ok("o agrupamento usa o ID canônico, nunca nome", /configuracaoFinanceiraItemId/.test(proj) && !/\.nome\s*===/.test(proj))
 ok("a projeção é PURA — não conhece Prisma", !/@prisma\/client|lib\/prisma/.test(proj))
 ok("a projeção não reintroduz vigência", !/vigencia/i.test(proj))
+ok("o código do FORNECEDOR não identifica o item",
+  !/publicCode/.test(proj.split("nomeFornecedor")[1]?.slice(0, 200) ?? ""),
+  "FOR-n é do fornecedor; o item tem o seu próprio código canônico")
+ok("a primeira coluna é o CÓDIGO do cadastro mestre",
+  /\['Código', 'Cadastro mestre'/.test(tv))
+ok("o código vem da entidade de origem, nunca da Configuração Financeira",
+  /tipoDocumento\?\.publicCode/.test(tv) && /servicos\?\.\[0\]\?\.publicCode/.test(tv) && !/codigo:\s*cfg\.publicCode/.test(tv))
 
 // ── Resultado ──────────────────────────────────────────────────────────────
 console.log(`\n${"═".repeat(70)}`)
