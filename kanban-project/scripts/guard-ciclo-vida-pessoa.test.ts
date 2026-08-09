@@ -154,6 +154,9 @@ const AUTORIZADOS_FORA_DO_RUNTIME: Record<string, string> = {
   // ── Preparação de ambiente ───────────────────────────────────────────────
   "scripts/preview-sandbox-setup.mjs": "sandbox de Preview: derruba dados do ambiente descartável",
   "prisma/test-tipo-novo.ts": "script de verificação de tipo: cria e apaga o próprio documento",
+  "scripts/palco-planilha-referencia.ts":
+    "palco de comparação visual da Planilha Documental: monta e derruba a PRÓPRIA árvore fictícia, " +
+    "só no banco de teste (exigirBancoDeTeste) — nunca remove pessoa de árvore real",
 }
 
 const RUNTIME = ["src", "lib"]

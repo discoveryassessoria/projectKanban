@@ -118,6 +118,16 @@ export interface NovaColuna {
 export async function adicionarColuna(nova: NovaColuna): Promise<ColunaConfigurada> {
   const ehServico = nova.origem === 'SERVICO'
 
+  // `itemId` ausente não pode passar daqui. Sem esta guarda o `undefined`
+  // atravessa dois `where` do Prisma e vira coringa: `count({ id: undefined })`
+  // conta a tabela inteira (logo "o item existe") e
+  // `findFirst({ configId: undefined })` casa com a PRIMEIRA coluna que houver —
+  // então pedir uma coluna nova ALTERA silenciosamente uma coluna alheia. É
+  // exatamente o modo de falha que não dá erro e só aparece na tela do usuário.
+  if (!Number.isInteger(nova.itemId) || nova.itemId <= 0) {
+    throw new Error(`Coluna da planilha exige o id do item no cadastro; recebido: ${String(nova.itemId)}`)
+  }
+
   // O item PRECISA existir no cadastro canônico. Coluna apontando para o vazio é
   // exatamente o tipo de referência solta que este sistema já pagou caro.
   const existe = ehServico

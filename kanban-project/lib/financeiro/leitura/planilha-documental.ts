@@ -2,9 +2,10 @@
 // ============================================================================
 // PLANILHA DOCUMENTAL — projeção econômico-documental. Nunca fonte.
 //
-// A LINHA é um documento de uma pessoa; a COLUNA é um item do cadastro canônico
-// escolhido em Configuração da Planilha; a CÉLULA é o custo daquele serviço
-// naquele documento. Ela não guarda nada e não decide nada:
+// A LINHA é um TIPO documental de uma pessoa (os que o Cadastro Mestre marca com
+// `participaPlanilha`); a COLUNA é um item do cadastro canônico escolhido em
+// Configuração da Planilha; a CÉLULA é o custo daquele serviço naquele
+// documento. Ela não guarda nada e não decide nada:
 //
 //   quem aparece   → Árvore (pessoas ATIVAS) e Documento
 //   o que aplica   → resolverElegibilidadeDocumental (Matriz + Regra Econômica)
@@ -43,6 +44,7 @@ import { listarColunasConfiguradas, type ColunaConfigurada } from './planilha-co
 import { resolverElegibilidadeDocumental } from '@/src/lib/motor/elegibilidade-documental'
 import { resolverPrecoPorConfigDB } from '@/src/lib/motor/resolver-preco-financeiro.prisma'
 import { pessoasAtivasDaArvore } from '@/src/lib/genealogia/vinculo-ativo'
+import { montarPessoasDoProcesso } from '@/src/lib/process-stage/central-operacional-core'
 
 // ── DINHEIRO EM CENTAVOS ────────────────────────────────────────────────────
 // Soma de dinheiro não se faz em float: 146.24 + 7.64 + 151.05 já erra o
@@ -81,8 +83,26 @@ export interface CelulaPlanilha {
   explicacao: ExplicacaoCelula
 }
 
+/**
+ * UMA LINHA = UM TIPO DOCUMENTAL DE UMA PESSOA, não um documento.
+ *
+ * A planilha de referência mostra SEMPRE as mesmas linhas por pessoa, exista
+ * documento ou não — a ausência aparece como "-", nunca como linha faltando. É
+ * a leitura de conferência que o operador faz, e uma linha que some esconde
+ * justamente o que ele foi ali procurar.
+ *
+ * Quais linhas são essas quem decide é o Cadastro Mestre, por
+ * `TipoDocumentoCadastro.participaPlanilha`, lido POR ID. Hoje isso dá as três
+ * certidões de registro civil da referência; se o cadastro declarar uma quarta,
+ * ela aparece sozinha, sem tocar em código.
+ */
 export interface LinhaPlanilha {
+  /** 0 quando a linha existe por contrato (tipo declarado, documento ausente). */
   documentoId: number
+  /** Cônjuge relevante para ESTA linha (só o casamento costuma ter). */
+  conjuge: string | null
+  paiNome: string | null
+  maeNome: string | null
   pessoaId: number | null
   tipoDocumentoId: number | null
   tipoDocumentoNome: string | null
@@ -105,6 +125,12 @@ export interface BlocoPessoa {
   pessoaId: number | null
   nome: string
   numeroLinhagem: number | null
+  /** Geração canônica da árvore (1 = topo da linhagem exibida). */
+  geracao: number | null
+  /** LINHA_PRINCIPAL vai antes; o resto vai para "Fora da linhagem · Cônjuges / Apoio". */
+  linhagemPrincipal: boolean
+  /** "Requerente", "pai", "bisavó"… — do motor de parentesco, nunca deduzido da geração. */
+  posicao: string | null
   conjuges: string[]
   paiNome: string | null
   maeNome: string | null
@@ -134,6 +160,7 @@ export interface PlanilhaDocumental {
   /** por que algo não entrou — nunca silêncio (vem do resolvedor de elegibilidade) */
   pendencias: Array<{ motivo: string; detalhe?: string }>
 }
+
 
 const num = (v: unknown): number => (v == null ? 0 : Number(v))
 const nomeCompleto = (p: { nome: string; sobrenome: string | null }) =>
@@ -229,14 +256,16 @@ export async function montarPlanilhaDocumental(processoId: number): Promise<Plan
     realizadoPorCelula.set(k, [...(realizadoPorCelula.get(k) ?? []), o])
   }
 
-  // ── 5. LINHAS — documentos que o cadastro declara como da planilha ────────
+  // ── 5. LINHAS — os tipos que o cadastro declara como da planilha ──────────
+  // A ordem é a do cadastro (id), e é ela que a tela reproduz. Não há ordenação
+  // por nome: renomear um tipo não pode reordenar a planilha.
   const tiposDaPlanilha = await prisma.tipoDocumentoCadastro.findMany({
     where: { participaPlanilha: true },
-    select: { id: true, name: true, legacyEnumKey: true },
+    orderBy: { id: 'asc' },
+    select: { id: true, name: true, legacyEnumKey: true, code: true },
   })
   const idsTipo = tiposDaPlanilha.map((t) => t.id)
   const enumsTipo = tiposDaPlanilha.map((t) => t.legacyEnumKey).filter((v): v is string => !!v)
-  const nomeDoTipo = new Map(tiposDaPlanilha.map((t) => [t.id, t.name]))
   const tipoPorEnum = new Map(tiposDaPlanilha.filter((t) => t.legacyEnumKey).map((t) => [t.legacyEnumKey as string, t]))
 
   // PESSOAS ATIVAS da árvore — recorte canônico. Quem saiu não deixa bloco órfão,
@@ -246,7 +275,8 @@ export async function montarPlanilhaDocumental(processoId: number): Promise<Plan
         where: pessoasAtivasDaArvore(processo.arvoreId),
         orderBy: [{ numeroLinhagem: 'asc' }, { ordemCusto: 'asc' }, { id: 'asc' }],
         select: {
-          id: true, nome: true, sobrenome: true, numeroLinhagem: true,
+          id: true, nome: true, sobrenome: true, numeroLinhagem: true, sexo: true, requerente: true, linhaReta: true,
+          paiId: true, maeId: true,
           pai: { select: { nome: true, sobrenome: true } },
           mae: { select: { nome: true, sobrenome: true } },
           unioesComoPessoa1: { select: { pessoa2: { select: { nome: true, sobrenome: true } } } },
@@ -265,12 +295,46 @@ export async function montarPlanilhaDocumental(processoId: number): Promise<Plan
             select: {
               id: true, tipo: true, documentTypeId: true, observacoes: true,
               cartorio: true, livro: true, folha: true, termo: true, numero_registro: true,
-              data_registro: true, cidade_registro: true, estado_registro: true,
+              data_registro: true, cidade_registro: true, estado_registro: true, conjuge_registrado: true,
             },
           },
         },
       })
     : []
+
+  // ── 5b. GERAÇÃO E CLASSIFICAÇÃO — do motor canônico, nunca recalculadas ────
+  // `montarPessoasDoProcesso` é o MESMO resolvedor que a Central Operacional usa
+  // para dizer geração e linha principal. A planilha consome; não opina.
+  const unioes = processo?.arvoreId
+    ? await prisma.uniao.findMany({
+        where: { OR: [{ pessoa1: { arvoreId: processo.arvoreId } }, { pessoa2: { arvoreId: processo.arvoreId } }] },
+        select: { id: true, pessoa1Id: true, pessoa2Id: true },
+      })
+    : []
+  const roster = montarPessoasDoProcesso(
+    pessoas.map((p) => ({
+      id: p.id, nome: p.nome, sobrenome: p.sobrenome, sexo: p.sexo, publicCode: null,
+      numeroLinhagem: p.numeroLinhagem, requerente: p.requerente, linhaReta: p.linhaReta,
+      paiId: p.paiId, maeId: p.maeId,
+    })) as never,
+    unioes,
+  )
+  // GERAÇÃO EXIBIDA CONTA DE CIMA PARA BAIXO, como na referência: 1 é o
+  // ascendente mais antigo da árvore e o requerente é o número mais alto.
+  //
+  // O motor conta ao contrário — `geracao` é a distância ATÉ o requerente (0 =
+  // requerente, 1 = pai, 2 = avô) — porque é isso que o parentesco precisa
+  // saber. Inverter é apresentação, não recálculo: não se toca no motor, só se
+  // lê a mesma medida a partir do outro extremo.
+  const maiorGeracao = roster.reduce((m, r) => (r.geracao == null ? m : Math.max(m, r.geracao)), 0)
+  const geracaoPorPessoa = new Map(
+    roster.map((r) => [r.pessoaId, r.geracao == null ? null : maiorGeracao - r.geracao + 1]),
+  )
+  const principalPorPessoa = new Map(roster.map((r) => [r.pessoaId, r.classificacao === "LINHA_PRINCIPAL"]))
+  // O papel na linhagem ("bisavô", "pai", "Requerente") é do motor de parentesco.
+  // Deduzi-lo do número da geração seria inventar: geração 1 é o topo EXIBIDO,
+  // não uma posição familiar, e o rótulo mudaria de significado a cada árvore.
+  const posicaoPorPessoa = new Map(roster.map((r) => [r.pessoaId, r.posicao]))
 
   // ── 6. GRADE ──────────────────────────────────────────────────────────────
   const totaisPorServicoCent: Record<number, number> = {}
@@ -278,13 +342,26 @@ export async function montarPlanilhaDocumental(processoId: number): Promise<Plan
   let totalGeralCent = 0, previstoCent = 0, realizadoCent = 0, naoConvertidoGeral = 0
 
   const blocos: BlocoPessoa[] = pessoas.map((p) => {
-    const linhas: LinhaPlanilha[] = p.documentos.map((d) => {
+    // A LINHA É O TIPO DECLARADO, não o documento. Ela existe mesmo sem
+    // documento — antes a linha nascia do documento, então o registro que
+    // faltava simplesmente não aparecia, e é exatamente a falta que esta
+    // planilha existe para mostrar.
+    //
+    // O casamento por `documentTypeId` é por ID; `tipo` (enum legado) só é
+    // consultado quando o documento ainda não migrou para a FK.
+    const docPorTipo = new Map<number, (typeof p.documentos)[number]>()
+    for (const d of p.documentos) {
+      const tipoId = d.documentTypeId ?? (d.tipo ? tipoPorEnum.get(String(d.tipo))?.id ?? null : null)
+      if (tipoId != null && !docPorTipo.has(tipoId)) docPorTipo.set(tipoId, d)
+    }
+    const linhas: LinhaPlanilha[] = tiposDaPlanilha.map((tipoLinha) => {
+      const d = docPorTipo.get(tipoLinha.id) ?? null
       let totalLinhaCent = 0
       let naoConvLinha = 0
 
       const celulas: CelulaPlanilha[] = configuradas.map((cfg, i) => {
         const col = colunas[i]
-        const chave = `${d.id}::${cfg.configId}`
+        const chave = `${d?.id ?? 0}::${cfg.configId}`
         const obrs = cfg.configId != null ? realizadoPorCelula.get(chave) ?? [] : []
         const aplica = cfg.configId != null && aplicavel.has(chave)
         const preco = cfg.configId != null ? precoPorConfig.get(cfg.configId) : undefined
@@ -377,22 +454,25 @@ export async function montarPlanilhaDocumental(processoId: number): Promise<Plan
 
       totalGeralCent += totalLinhaCent
       naoConvertidoGeral += naoConvLinha
-      const tipoCad = d.documentTypeId != null
-        ? { id: d.documentTypeId, name: nomeDoTipo.get(d.documentTypeId) ?? null }
-        : (d.tipo ? tipoPorEnum.get(String(d.tipo)) ?? null : null)
-
       return {
-        documentoId: d.id,
+        documentoId: d?.id ?? 0,
+        // O cônjuge que a referência mostra é o que CONSTA NA CERTIDÃO, não o da
+        // árvore. Só o registro de casamento costuma trazê-lo, e é por isso que
+        // as outras linhas ficam vazias — sem nenhuma regra por tipo aqui: a
+        // linha mostra o que o documento dela registrou.
+        conjuge: d?.conjuge_registrado ?? null,
+        paiNome: p.pai ? nomeCompleto(p.pai) : null,
+        maeNome: p.mae ? nomeCompleto(p.mae) : null,
         pessoaId: p.id,
-        tipoDocumentoId: tipoCad?.id ?? null,
-        tipoDocumentoNome: tipoCad?.name ?? null,
-        tipoRegistro: tipoCad?.name ?? (d.tipo ? String(d.tipo) : null),
-        dataRegistro: d.data_registro ? new Date(d.data_registro).toISOString() : null,
-        local: [d.cidade_registro, d.estado_registro].filter(Boolean).join(' - ') || null,
-        cartorio: d.cartorio, livro: d.livro, folha: d.folha, termo: d.termo,
-        numeroRegistro: d.numero_registro,
-        observacao: d.observacoes,
-        localizado: estaLocalizado(d),
+        tipoDocumentoId: tipoLinha.id,
+        tipoDocumentoNome: tipoLinha.name,
+        tipoRegistro: tipoLinha.name,
+        dataRegistro: d?.data_registro ? new Date(d.data_registro).toISOString() : null,
+        local: d ? ([d.cidade_registro, d.estado_registro].filter(Boolean).join(' - ') || null) : null,
+        cartorio: d?.cartorio ?? null, livro: d?.livro ?? null, folha: d?.folha ?? null, termo: d?.termo ?? null,
+        numeroRegistro: d?.numero_registro ?? null,
+        observacao: d?.observacoes ?? null,
+        localizado: d ? estaLocalizado(d) : false,
         celulas,
         totalBrl: paraReais(totalLinhaCent),
         naoConvertido: naoConvLinha,
@@ -403,6 +483,11 @@ export async function montarPlanilhaDocumental(processoId: number): Promise<Plan
       pessoaId: p.id,
       nome: nomeCompleto(p),
       numeroLinhagem: p.numeroLinhagem ?? null,
+      // Geração e classificação vêm do MOTOR canônico da árvore, o mesmo que a
+      // Central usa — a planilha não recalcula parentesco.
+      geracao: geracaoPorPessoa.get(p.id) ?? null,
+      linhagemPrincipal: principalPorPessoa.get(p.id) ?? false,
+      posicao: posicaoPorPessoa.get(p.id) ?? null,
       conjuges: [
         ...p.unioesComoPessoa1.map((u) => (u.pessoa2 ? nomeCompleto(u.pessoa2) : '')),
         ...p.unioesComoPessoa2.map((u) => (u.pessoa1 ? nomeCompleto(u.pessoa1) : '')),

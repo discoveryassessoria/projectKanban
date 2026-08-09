@@ -87,6 +87,14 @@ async function limpar() {
     }
     await prisma.arvore.deleteMany({ where: { id: { in: arvIds } } })
   }
+  // A CONFIGURAÇÃO DE COLUNAS É GLOBAL — não tem processo nem marca a que
+  // pertencer. Um cenário que afirma "sem configuração, zero colunas" precisa
+  // portanto zerar a configuração inteira, e não só a parte que ele criou:
+  // qualquer coluna deixada por outro cenário (o palco visual, por exemplo)
+  // apareceria aqui como coluna "do sistema" e derrubaria a asserção.
+  for (const c of await prisma.planilhaDocumentalColuna.findMany({ select: { id: true } })) {
+    await prisma.planilhaDocumentalColuna.delete({ where: { id: c.id } })
+  }
   await prisma.requerente.deleteMany({ where: { nome: { startsWith: MARCA } } })
   await prisma.matrizDocumental.deleteMany({ where: { documentTypeCode: { startsWith: MARCA } } })
   await prisma.phaseEconomicRule.deleteMany({ where: { componentKey: { startsWith: MARCA } } })

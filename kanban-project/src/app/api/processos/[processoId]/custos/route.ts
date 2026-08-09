@@ -40,7 +40,7 @@ export async function GET(
     const id = parseInt(processoId)
     if (isNaN(id)) return NextResponse.json({ error: "ID inválido" }, { status: 400 })
 
-    const processoExiste = await prisma.processo.findUnique({ where: { id }, select: { id: true } })
+    const processoExiste = await prisma.processo.findUnique({ where: { id }, select: { id: true, nome: true } })
     if (!processoExiste) return NextResponse.json({ error: "Processo não encontrado" }, { status: 404 })
 
     // FONTE ÚNICA: a projeção. Tudo abaixo é formatação dela.
@@ -89,7 +89,8 @@ export async function GET(
       totaisPorServico: planilha.totaisPorServico,
       totalGeral: planilha.totalGeralBrl,
       // Projeção rica — o que a visão "Planilha documental" consome.
-      planilha,
+      // O nome do processo entra aqui porque a faixa de título da planilha o exibe.
+      planilha: { ...planilha, nomeProcesso: processoExiste.nome },
     })
   } catch (error) {
     console.error("Erro ao montar a planilha documental:", error)

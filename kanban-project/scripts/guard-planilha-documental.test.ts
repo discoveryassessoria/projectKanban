@@ -8,7 +8,7 @@
  * A Planilha não é fonte de nada. Ela organiza o que outros domínios já sabem:
  *
  *   colunas  → Cadastro Mestre (ProdutoFinanceiro / TipoDocumentoCadastro), por ID
- *   linhas   → Árvore (pessoas ATIVAS) + Documento
+ *   linhas   → Árvore (pessoas ATIVAS) × tipos com `participaPlanilha`, por ID
  *   aplica?  → resolverElegibilidadeDocumental (Matriz + Regra Econômica)
  *   quanto?  → resolverPrecoPorConfigDB (Tabela de Preços)
  *   fato     → ObrigacaoEconomica (valor congelado no lançamento)
@@ -227,6 +227,53 @@ ok("não há fallback quando a configuração está vazia",
 // Autoria: coluna nova passa a ter dono registrado.
 const rotaColuna = ler("src/app/api/financeiro/planilha-colunas/route.ts")
 ok("criar coluna é auditado com o autor", /PLANILHA_COLUNA_ADICIONADA/.test(rotaColuna) && /usuarioId: autor/.test(rotaColuna))
+
+// ═══════════════════════════════════════════════════════════════════════════
+secao("12) A LINHA é um tipo declarado, não um documento encontrado")
+// ═══════════════════════════════════════════════════════════════════════════
+// A versão anterior gerava a linha a partir de `p.documentos.map(...)`: o
+// registro que faltava não aparecia, e é a falta que esta planilha existe para
+// mostrar. Agora a linha nasce do cadastro e o documento apenas a preenche.
+ok("a linha nasce dos tipos declarados na planilha", /tiposDaPlanilha\.map\(\(tipoLinha\)/.test(projecao))
+ok("a linha NÃO nasce mais da lista de documentos", !/linhas[\s\S]{0,60}p\.documentos\.map/.test(projecao))
+ok("o documento é casado ao tipo por ID", /docPorTipo\.get\(tipoLinha\.id\)/.test(projecao))
+ok("a linha existe sem documento (documentoId 0)", /documentoId: d\?\.id \?\? 0/.test(projecao))
+
+// A armadilha que isto fecha: um mapeamento por SUBSTRING do código/rótulo.
+// Em produção o código é "IT - NAS" — `includes("NASCIMENTO")` só acertava por
+// acidente, via `legacyEnumKey`, e um tipo novo cairia calado fora da planilha.
+for (const termo of ['includes("NASCIMENTO")', 'includes("CASAMENTO")', 'includes("OBITO")', "RegistroCivil", "REGISTROS_CIVIS"]) {
+  ok(`a projeção não classifica linha por texto (${termo})`, !projecao.includes(termo))
+}
+ok("a ordem das linhas é a do cadastro, não alfabética",
+  /participaPlanilha: true \},\s*\n\s*orderBy: \{ id: 'asc' \}/.test(projecao))
+ok("o cônjuge exibido é o que consta na certidão", /conjuge: d\?\.conjuge_registrado/.test(projecao),
+  "não o cônjuge da árvore — a coluna mostra o que o documento registrou")
+
+// ═══════════════════════════════════════════════════════════════════════════
+secao("13) A grade REPRODUZ a planilha de referência")
+// ═══════════════════════════════════════════════════════════════════════════
+// A referência é branca, quadrada e densa. Ela não é um dashboard, e o guard
+// existe porque a tentação de "modernizar" volta a cada refatoração.
+ok("a área da planilha é branca e clara, não o tema escuro", /bg-white/.test(view) && /colorScheme: "light"/.test(view))
+ok("as faixas usam a paleta medida no arquivo",
+  /#44546A/.test(view) && /#DDEBF7/.test(view) && /#E2EFDA/.test(view) && /#D0CECE/.test(view))
+ok("as bordas são pretas e retas", /const BORDA = "#000000"/.test(view) && /border-collapse/.test(view))
+ok("as larguras de coluna são as proporções medidas, não flex",
+  /const LARGURA_FIXA = \[/.test(view) && /tableLayout: "fixed"/.test(view) && /<colgroup>/.test(view))
+ok("o cabeçalho se repete por pessoa, como no arquivo", /function BlocoPessoa\(/.test(view) && /<thead>/.test(view))
+ok("a seção de apoio troca o rótulo da primeira coluna", /rotuloPrimeira="Numero"/.test(view))
+ok("os rótulos fixos são os do arquivo",
+  /"Geração", "Registro", "Data", "Local", "Dados do registro", "Cônjuge", "Genitores"/.test(view))
+ok("o bloco de uma pessoa não se parte entre páginas", /breakInside: "avoid"/.test(view))
+
+// Nenhum enfeite de dashboard DENTRO da planilha. Fora dela (erro, vazio) o
+// Discovery segue sendo o Discovery — por isso a varredura é só do corpo.
+const corpoPlanilha = view.slice(view.indexOf('style={{ colorScheme: "light" }}'))
+for (const enfeite of ["shadow", "rounded-", "gradient", "backdrop-", "badge"]) {
+  ok(`a planilha não tem ${enfeite}`, !corpoPlanilha.includes(enfeite))
+}
+ok("a planilha não usa token de tema dentro da área reproduzida", !/var\(--/.test(corpoPlanilha))
 
 // ── Resultado ──────────────────────────────────────────────────────────────
 console.log(`\n${"═".repeat(70)}`)
