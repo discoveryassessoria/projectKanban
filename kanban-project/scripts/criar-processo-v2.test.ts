@@ -6,6 +6,11 @@ import { randomUUID } from "crypto"
 import { criarProcessoV2 } from "@/src/services/criar-processo"
 import { primeiraFasePorOrdem, montarEventoEntered } from "@/src/lib/motor/phase-advance-helpers"
 
+import { exigirBancoDeTeste } from "./_banco-de-teste"
+
+// TRAVA DE AMBIENTE: este arquivo ESCREVE. Sem banco de teste local, não roda.
+exigirBancoDeTeste()
+
 const TIPO_ID = 14 // Nacionalidade Alemã · Administrativa (alemanha)
 const PAIS = "alemanha"
 const MARK = "__TEST_V2__"

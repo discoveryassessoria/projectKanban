@@ -24,6 +24,11 @@ import {
 } from '@/lib/financeiro/catalogo-oficial'
 import { unificarCatalogo, filtrarCatalogo } from '@/lib/gerenciamento/catalogo-servicos'
 
+import { exigirBancoDeTeste } from "./_banco-de-teste"
+
+// TRAVA DE AMBIENTE: este arquivo ESCREVE. Sem banco de teste local, não roda.
+exigirBancoDeTeste()
+
 let ok = 0, fail = 0
 const falhas: string[] = []
 const chk = (c: boolean, m: string) => {

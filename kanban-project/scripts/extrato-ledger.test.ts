@@ -8,6 +8,11 @@ import { registrarPagamentoComposto } from '@/lib/financeiro/pagamentos/registra
 import { registrarOcorrencia } from '@/lib/financeiro/ocorrencias/ocorrencia-service'
 import { listarExtratoLedger } from '@/lib/financeiro/leitura/extrato-ledger'
 
+import { exigirBancoDeTeste } from "./_banco-de-teste"
+
+// TRAVA DE AMBIENTE: este arquivo ESCREVE. Sem banco de teste local, não roda.
+exigirBancoDeTeste()
+
 let ok = 0, fail = 0
 const t = (n: string, c: boolean, extra = '') => { if (c) { ok++; console.log(`  ✅ ${n}`) } else { fail++; console.log(`  ❌ ${n} ${extra}`) } }
 const CFG = 9600

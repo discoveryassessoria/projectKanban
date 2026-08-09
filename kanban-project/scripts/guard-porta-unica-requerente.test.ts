@@ -73,7 +73,9 @@ secao("1) A segunda porta não existe mais — foi removida, não proibida")
 // ═══════════════════════════════════════════════════════════════════════════
 // O EMISSOR e este guard citam o nome de propósito — um registra a remoção, o
 // outro a vigia. Qualquer outro arquivo que o mencione é resquício.
-const ESCREVEM_SOBRE_A_PORTA = [EMISSOR, "scripts/guard-porta-unica-requerente.test.ts"]
+const ESCREVEM_SOBRE_A_PORTA = [EMISSOR, "scripts/guard-porta-unica-requerente.test.ts",
+  // O guard do contrato de estados verifica que as rotas de CADASTRO não a chamam.
+  "scripts/guard-cadastro-nao-e-arvore.test.ts"]
 const resquicios = quemUsa(/emitirEDrenarEventoRequerente/, ESCREVEM_SOBRE_A_PORTA)
 ok("`emitirEDrenarEventoRequerente` não existe em lugar nenhum",
   resquicios.length === 0, resquicios.join(", ") || "nenhum resquício")
@@ -175,6 +177,7 @@ const DONOS_PONTEIRO: Record<string, string> = {
   "scripts/pessoa-equivalencia-rotas.test.ts": "limpeza do próprio cenário de teste",
   "scripts/reconciliacao-derivada-requerente.test.ts": "limpeza do próprio cenário de teste",
   "scripts/porta-unica-requerente.test.ts": "limpeza do próprio cenário de teste",
+  "scripts/matriz-estados-requerente.test.ts": "limpeza do próprio cenário de teste",
   "scripts/smoke-ui-setup.ts": "smoke em produção: monta e remove o cenário marcado",
   // CP-1: liga o cadastro a uma Pessoa canônica STANDALONE (sem árvore). Não é
   // inserção na árvore — sem árvore não há processo, logo não há efeito a emitir.

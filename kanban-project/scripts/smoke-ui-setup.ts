@@ -2,6 +2,7 @@
 import { prisma } from "../src/lib/prisma"
 import { vincularRequerente } from "../lib/genealogia/vincular-requerente"
 import { removerNecessidadesDoSujeito } from "../src/services/necessidade-documental"
+import { exigirConfirmacaoDeEscritaEmProducao } from "./_banco-de-teste"
 
 export const MARCA = "SMOKE-UI-CICLO-VIDA"
 const PROCESSO = 513
@@ -130,6 +131,17 @@ async function conferirResiduo() {
 }
 
 async function main() {
+  // ESCREVE NO PROCESSO 513 REAL. O cenário é marcado e é removido depois, mas
+  // vive DENTRO do processo de um cliente — e, desde que a inserção passou a ter
+  // porta única, `montar()` também aciona o motor financeiro ali. Um smoke que
+  // faz isso por engano não é smoke, é incidente. Passa a exigir confirmação.
+  const soLeitura = process.argv.includes("--verificar") || process.argv.includes("--residuo")
+  if (!soLeitura) {
+    exigirConfirmacaoDeEscritaEmProducao(
+      "monta/remove o cenário SMOKE-UI-CICLO-VIDA dentro do processo 513 real",
+      "smoke-ui-setup",
+    )
+  }
   if (process.argv.includes("--limpar")) { await limpar(); console.log(JSON.stringify({ limpo: true })) }
   else if (process.argv.includes("--verificar")) { await verificar() }
   else if (process.argv.includes("--residuo")) { await conferirResiduo() }

@@ -9,6 +9,11 @@ import { registrarRepasse } from '@/lib/financeiro/pagavel/repasse'
 import { listarContasAPagar } from '@/lib/financeiro/leitura/contas-a-pagar'
 import { timelineIndividualParticipante } from '@/lib/financeiro/leitura/timeline-financeira'
 
+import { exigirBancoDeTeste } from "./_banco-de-teste"
+
+// TRAVA DE AMBIENTE: este arquivo ESCREVE. Sem banco de teste local, não roda.
+exigirBancoDeTeste()
+
 let ok = 0, fail = 0
 const chk = (c: boolean, m: string) => { if (c) { ok++; console.log('  ✅', m) } else { fail++; console.log('  ❌', m) } }
 const TS = Date.now(); const dias = (n: number) => new Date(Date.now() + n * 86_400_000)

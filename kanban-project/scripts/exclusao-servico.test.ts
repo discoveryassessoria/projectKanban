@@ -13,6 +13,11 @@ import {
   deactivateService,
 } from "@/src/services/exclusao-definitiva"
 
+import { exigirBancoDeTeste } from "./_banco-de-teste"
+
+// TRAVA DE AMBIENTE: este arquivo ESCREVE. Sem banco de teste local, não roda.
+exigirBancoDeTeste()
+
 const MARCA = "TEST_DELETE_SERVICE"
 // LogAuditoria.usuarioId tem FK para Usuario — o ator do teste é um usuário REAL do banco.
 let USUARIO_TESTE = 0

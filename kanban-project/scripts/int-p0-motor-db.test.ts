@@ -7,6 +7,11 @@ import { criarObrigacaoEconomicaComLedger } from '@/lib/financeiro/ledger/ledger
 import { registrarPagamentoComposto } from '@/lib/financeiro/pagamentos/registrar-pagamento-composto'
 import { registrarOcorrencia } from '@/lib/financeiro/ocorrencias/ocorrencia-service'
 
+import { exigirBancoDeTeste } from "./_banco-de-teste"
+
+// TRAVA DE AMBIENTE: este arquivo ESCREVE. Sem banco de teste local, não roda.
+exigirBancoDeTeste()
+
 let passed = 0, failed = 0
 const ok = (cond: boolean, nome: string) => { if (cond) { passed++; console.log(`  ✅ ${nome}`) } else { failed++; console.log(`  ❌ ${nome}`) } }
 const near = (a: number, b: number) => Math.abs(a - b) < 0.02

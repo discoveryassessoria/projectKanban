@@ -8,7 +8,7 @@
 // ============================================================
 
 import { prisma } from '@/lib/prisma'
-import { PESSOA_ATIVA } from '@/src/lib/genealogia/vinculo-ativo'
+import { PESSOA_ATIVA, requerentesAtivosDaArvore } from '@/src/lib/genealogia/vinculo-ativo'
 import {
   Prisma, PrioridadeTarefa,
   CategoriaReceita, CategoriaCusto, TipoCusto, Moeda, FxRule, ReceitaStatus, CustoStatus,
@@ -738,9 +738,12 @@ export async function aplicarHonorariosPorRequerente(processoId: number): Promis
     if (superseder) return { aplicavel: false, motivo: `honorário agregado legado desativado p/ este tipo de processo: automação por requerente #${superseder.id} é a fonte da cobrança` }
   }
 
-  // Conta EXCLUSIVAMENTE requerentes marcados na árvore (maior|menor = 1; nunca idade/parentesco).
+  // Conta requerentes ATIVOS da árvore pela FONTE ÚNICA do recorte (vinculo-ativo).
+  // A régua local anterior — `requerente in ('maior','menor')`, sem filtrar removidos —
+  // ignorava todo requerente a partir do segundo (vincularRequerente grava 'sim' neles)
+  // e ainda contava quem já havia saído. Medido no 513: régua local 0, canônica 1.
   const n = proc.arvoreId
-    ? await prisma.pessoa.count({ where: { arvoreId: proc.arvoreId, requerente: { in: ['maior', 'menor'] } } })
+    ? await prisma.pessoa.count({ where: requerentesAtivosDaArvore(proc.arvoreId) })
     : 0
 
   const akey = `${processoId}::honorario_por_requerente::VENDA`

@@ -5,6 +5,11 @@ import { prisma } from '@/lib/prisma'
 import { criarObrigacaoEconomicaComLedger } from '@/lib/financeiro/ledger/ledger-service'
 import { mudarEstadoCusto } from '@/lib/financeiro/acoes/estado-custo-service'
 
+import { exigirBancoDeTeste } from "./_banco-de-teste"
+
+// TRAVA DE AMBIENTE: este arquivo ESCREVE. Sem banco de teste local, não roda.
+exigirBancoDeTeste()
+
 let ok = 0, fail = 0
 const chk = (c: boolean, m: string) => { if (c) { ok++; console.log('  ✅', m) } else { fail++; console.log('  ❌', m) } }
 const estado = async (id: number) => (await prisma.obrigacaoEconomica.findUnique({ where: { id }, select: { estadoCusto: true } }))?.estadoCusto

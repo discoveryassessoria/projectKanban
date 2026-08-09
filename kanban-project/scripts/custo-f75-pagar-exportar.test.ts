@@ -13,6 +13,11 @@ import { carregarReceitaDetalhe } from '@/lib/financeiro/leitura/receita-detalhe
 import { criarFornecedor } from '@/src/services/fornecedor'
 import { calcularRecebimento } from '@/lib/financeiro/dominio/calculo-recebimento'
 
+import { exigirBancoDeTeste } from "./_banco-de-teste"
+
+// TRAVA DE AMBIENTE: este arquivo ESCREVE. Sem banco de teste local, não roda.
+exigirBancoDeTeste()
+
 let ok = 0, fail = 0
 const chk = (c: boolean, m: string) => { if (c) { ok++; console.log('  ✅', m) } else { fail++; console.log('  ❌', m) } }
 const RAIZ = join(__dirname, '..')

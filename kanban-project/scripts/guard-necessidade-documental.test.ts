@@ -72,6 +72,8 @@ const AUTORIZADOS_FORA_DO_RUNTIME: Record<string, string> = {
     "cenários A–N da reconciliação do estado derivado: monta e limpa o próprio cenário (marca RECONC-DERIVADO)",
   "scripts/porta-unica-requerente.test.ts":
     "equivalência das três portas de inserção: monta e limpa o próprio cenário (marca PORTA-UNICA)",
+  "scripts/matriz-estados-requerente.test.ts":
+    "matriz de estados do requerente: monta e limpa o próprio cenário (marca MATRIZ-ESTADOS)",
   "scripts/pessoa-equivalencia-rotas.test.ts": "teste de equivalência das duas rotas: monta dois cenários e limpa",
   "scripts/exclusao-servico.test.ts": "teste de exclusão definitiva de serviço: monta e limpa o cenário",
   "scripts/arvore-membership.test.ts":

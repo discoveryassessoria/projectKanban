@@ -41,7 +41,14 @@ const TIPO = 'servico'
 /** Portão único das rotas de /api/gerenciamento. Nada além disto. */
 const PERMISSOES = { 'usuarios.gerenciar': true } as const
 
+import { exigirConfirmacaoDeEscritaEmProducao } from './_banco-de-teste'
+
 const executar = process.argv.includes('--execute')
+if (executar) {
+  // Ato administrativo deliberado: cria/reconcilia a identidade técnica de smoke
+  // no ambiente real. Auditado em LogAuditoria. Não é teste.
+  exigirConfirmacaoDeEscritaEmProducao('cria/reconcilia o usuário técnico de smoke', 'usuario-smoke-tecnico')
+}
 
 async function main() {
   const senha = process.env.SMOKE_USER_PASSWORD

@@ -27,6 +27,7 @@
 // ============================================================================
 import { chromium } from 'playwright'
 import { prisma } from '@/lib/prisma'
+import { exigirConfirmacaoDeEscritaEmProducao } from './_banco-de-teste'
 
 const BASE = process.env.SMOKE_BASE ?? 'https://app.discovery.com.br'
 let ok = 0, fail = 0
@@ -34,6 +35,8 @@ const chk = (c: boolean, m: string) => { if (c) { ok++; console.log('  ✅', m) 
 const passo = (n: number, t: string) => console.log(`\n── ${n}) ${t} ${'─'.repeat(Math.max(0, 52 - t.length))}`)
 
 async function definirTipo(email: string, tipo: 'admin' | 'servico', motivo: string) {
+  // Alterna o tipo do usuário TÉCNICO de smoke no ambiente real (e audita).
+  exigirConfirmacaoDeEscritaEmProducao(`ajusta o tipo do usuário técnico ${email} para ${tipo}`, 'prod-smoke-tabela-valores')
   const u = await prisma.usuario.update({ where: { email }, data: { tipo }, select: { id: true } })
   await prisma.logAuditoria.create({
     data: { acao: 'EDITAR', entidade: 'Usuario', entidadeId: u.id, usuarioId: u.id, descricao: `Identidade técnica de smoke: tipo → ${tipo} (${motivo})` },

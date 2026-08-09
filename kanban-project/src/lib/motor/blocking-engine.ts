@@ -22,6 +22,7 @@ import { itemCatalogosDeCertidao } from "@/src/lib/documentos/natureza-certidao"
 import { computeGate, type ProjectionInput, type NecessidadeData, type DocumentoData } from "@/src/lib/motor/operational-projection-core"
 import { getFase, phaseKeyToFaseCode } from "@/src/lib/process-stage/fases-catalog"
 import { mapStepToGate } from "@/src/lib/process-stage/operational-projection"
+import { requerentesAtivosDaArvore } from "@/src/lib/genealogia/vinculo-ativo"
 
 export interface PhaseBlockingResult {
   issues: BlockingIssue[]
@@ -82,7 +83,7 @@ export async function calcularPendencias(
     // requerente ('maior'|'menor') na ÁRVORE, NÃO o vínculo comercial ProcessoRequerente
     // (que travava a fase em 99% e impedia o avanço). Gate do avanço = gate da projeção.
     processo.arvoreId != null
-      ? prisma.pessoa.count({ where: { arvoreId: processo.arvoreId, requerente: { in: ['maior', 'menor'] } } })
+      ? prisma.pessoa.count({ where: requerentesAtivosDaArvore(processo.arvoreId) })
       : Promise.resolve(0),
     // Documentos da LINHA RETA (com necessidadeId) — o gate DOCUMENTO precisa deles para
     // exigir TODAS as certidões obrigatórias resolvidas. Sem isso o advance congelaria a fase.

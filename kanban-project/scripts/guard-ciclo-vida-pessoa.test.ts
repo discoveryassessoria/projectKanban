@@ -124,6 +124,8 @@ const AUTORIZADOS_FORA_DO_RUNTIME: Record<string, string> = {
     "cenários A–N da reconciliação do estado derivado: monta e limpa o próprio cenário (marca RECONC-DERIVADO)",
   "scripts/porta-unica-requerente.test.ts":
     "equivalência das três portas de inserção: monta e limpa o próprio cenário (marca PORTA-UNICA)",
+  "scripts/matriz-estados-requerente.test.ts":
+    "matriz de estados do requerente: monta e limpa o próprio cenário (marca MATRIZ-ESTADOS)",
   "scripts/guard-estado-derivado.test.ts":
     "guard do estado derivado (cita os padrões de escrita que procura, como este arquivo)",
 

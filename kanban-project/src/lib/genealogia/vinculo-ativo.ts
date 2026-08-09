@@ -41,8 +41,14 @@ export function pessoasAtivasDaArvore(arvoreId: number): Prisma.PessoaWhereInput
  * régua e reconciliado por outra — e a diferença viraria lançamento órfão ou
  * lançamento apagado indevidamente.
  */
+export const REQUERENTE_ATIVO = {
+  requerente: { in: [...REQUERENTE_VALORES] },
+  ...PESSOA_ATIVA,
+} satisfies Prisma.PessoaWhereInput
+
+/** O mesmo recorte, fixado numa árvore. */
 export function requerentesAtivosDaArvore(arvoreId: number): Prisma.PessoaWhereInput {
-  return { arvoreId, requerente: { in: [...REQUERENTE_VALORES] }, ...PESSOA_ATIVA }
+  return { arvoreId, ...REQUERENTE_ATIVO }
 }
 
 /**

@@ -11,6 +11,11 @@ import { criarObrigacaoEconomicaComLedger } from '@/lib/financeiro/ledger/ledger
 import { criarFornecedor } from '@/src/services/fornecedor'
 import { listarObrigacoes } from '@/lib/financeiro/leitura/consultas'
 
+import { exigirBancoDeTeste } from "./_banco-de-teste"
+
+// TRAVA DE AMBIENTE: este arquivo ESCREVE. Sem banco de teste local, não roda.
+exigirBancoDeTeste()
+
 let ok = 0, fail = 0
 const chk = (c: boolean, m: string) => { if (c) { ok++; console.log('  ✅', m) } else { fail++; console.log('  ❌', m) } }
 const DIGITS = `9${Date.now().toString().slice(-13)}`.padStart(14, '9').slice(0, 14) // CNPJ sintético único

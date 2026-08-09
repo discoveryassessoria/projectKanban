@@ -20,6 +20,11 @@ import { PERMISSOES } from "../src/lib/permissoes"
 import { lerAndamento } from "../src/lib/process-stage/andamento-etapa"
 import { Prisma } from "@prisma/client"
 
+import { exigirBancoDeTeste } from "./_banco-de-teste"
+
+// TRAVA DE AMBIENTE: este arquivo ESCREVE. Sem banco de teste local, não roda.
+exigirBancoDeTeste()
+
 let passed = 0, failed = 0
 const falhas: string[] = []
 function ok(cond: boolean, nome: string) {

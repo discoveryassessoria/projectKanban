@@ -18,6 +18,11 @@ import { criarLancamentoExtra } from "@/lib/financeiro/extras/lancamento-extra-s
 import { reconciliarDocumentalFinanceiro } from "@/src/services/financeiro/reconciliacao-documental-financeira"
 import { ORIGEM_AUTOMATICA, ORIGEM_MANUAL, ehAutomatico } from "@/lib/financeiro/dominio/origem-lancamento"
 
+import { exigirBancoDeTeste } from "./_banco-de-teste"
+
+// TRAVA DE AMBIENTE: este arquivo ESCREVE. Sem banco de teste local, não roda.
+exigirBancoDeTeste()
+
 let ok = 0, fail = 0
 const chk = (c: boolean, m: string) => { if (c) { ok++; console.log("  ✅", m) } else { fail++; console.log("  ❌", m) } }
 const TS = Date.now()

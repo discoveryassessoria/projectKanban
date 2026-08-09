@@ -3,6 +3,11 @@ import { prisma } from '@/lib/prisma'
 import { criarObrigacaoEconomicaComLedger } from '@/lib/financeiro/ledger/ledger-service'
 import { definirCronogramaPagavel } from '@/lib/financeiro/pagavel/cronograma-pagavel'
 import { carregarReceitaDetalhe } from '@/lib/financeiro/leitura/receita-detalhe'
+
+import { exigirBancoDeTeste } from "./_banco-de-teste"
+
+// TRAVA DE AMBIENTE: este arquivo ESCREVE. Sem banco de teste local, não roda.
+exigirBancoDeTeste()
 let ok=0,fail=0; const chk=(c:boolean,m:string)=>{if(c){ok++;console.log('  ✅',m)}else{fail++;console.log('  ❌',m)}}
 const dias=(n:number)=>new Date(Date.now()+n*86400000).toISOString()
 async function main(){
