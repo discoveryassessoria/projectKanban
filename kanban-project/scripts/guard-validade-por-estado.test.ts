@@ -202,7 +202,10 @@ ok("o código do FORNECEDOR não identifica o item",
 ok("a primeira coluna é o CÓDIGO do cadastro mestre",
   /\['Código', 'Cadastro mestre'/.test(tv))
 ok("o código vem da entidade de origem, nunca da Configuração Financeira",
-  /tipoDocumento\?\.publicCode/.test(tv) && /servicos\?\.\[0\]\?\.publicCode/.test(tv) && !/codigo:\s*cfg\.publicCode/.test(tv))
+  /cfg\.tipoDocumento\.publicCode/.test(tv) && /srv\.publicCode/.test(tv) && !/codigo:\s*cfg\.publicCode/.test(tv))
+ok("origem e código saem da MESMA resolução do mestre",
+  /function resolverMestre/.test(tv) && !/'Item'/.test(tv),
+  "derivações separadas fizeram DOC1 exibir origem 'Item'")
 
 // ── Resultado ──────────────────────────────────────────────────────────────
 console.log(`\n${"═".repeat(70)}`)

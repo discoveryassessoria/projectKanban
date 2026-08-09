@@ -87,16 +87,56 @@ const ORDEM_TIPO = ['SERVICO', 'DOCUMENTO', 'TAXA', 'DESPESA', 'LOGISTICA', 'OUT
  * registro de preço ou do fornecedor — nenhum desses identifica o item, e o
  * `publicCode` do fornecedor (FOR-1) chegava a competir visualmente com ele.
  */
+/**
+ * QUAL ENTIDADE MESTRE esta Configuração Financeira representa — resolvida UMA
+ * vez, e é dela que saem rótulo, código e origem.
+ *
+ * A Configuração pode apontar para o mestre por vínculo DIRETO (`tipoDocumento`)
+ * ou pelo PIVÔ (`itemCatalogo`, que por sua vez tem o tipo documental ou o
+ * serviço). As configs 182 e 183 usam o pivô: `tipoDocumentoId` é nulo nelas.
+ *
+ * Antes, `codigo` percorria a cadeia inteira e `origem` olhava só o vínculo
+ * direto — duas derivações da MESMA pergunta, e só uma completa. O resultado era
+ * uma certidão exibindo o código certo (DOC1) e a origem errada ("Item").
+ * Resolver o mestre uma vez só é o que impede as duas voltarem a divergir.
+ */
+function resolverMestre(cfg?: CfgEmbed | null): { tipo: 'DOCUMENTO' | 'SERVICO' | 'HONORARIO' | 'PROCESSO' | null; nome: string | null; codigo: string | null } {
+  if (!cfg) return { tipo: null, nome: null, codigo: null }
+
+  // Vínculo DIRETO com o Cadastro Mestre Documental.
+  if (cfg.tipoDocumento) return { tipo: 'DOCUMENTO', nome: cfg.tipoDocumento.name, codigo: cfg.tipoDocumento.publicCode ?? null }
+
+  // Pelo PIVÔ: o ItemCatalogo sabe se é documento ou serviço porque a entidade
+  // mestre correspondente aponta para ele. É o TIPO REAL — não o nome, não o
+  // prefixo do código.
+  const doc = cfg.itemCatalogo?.tiposDocumento?.[0]
+  if (doc) return { tipo: 'DOCUMENTO', nome: cfg.itemCatalogo?.name ?? null, codigo: doc.publicCode ?? null }
+  const srv = cfg.itemCatalogo?.servicos?.[0]
+  if (srv) return { tipo: 'SERVICO', nome: cfg.itemCatalogo?.name ?? null, codigo: srv.publicCode ?? null }
+
+  if (cfg.honorario) return { tipo: 'HONORARIO', nome: cfg.honorario.name, codigo: null }
+  if (cfg.tipoProcesso) return { tipo: 'PROCESSO', nome: cfg.tipoProcesso.name, codigo: null }
+
+  // Último recurso: a natureza declarada no próprio Catálogo. Ainda é o tipo
+  // canônico do cadastro — só que sem a entidade mestre alcançável daqui.
+  const nat = cfg.itemCatalogo?.natureza
+  const porNatureza = nat === 'DOCUMENTO' ? 'DOCUMENTO' : nat === 'SERVICO' ? 'SERVICO' : nat === 'HONORARIO' ? 'HONORARIO' : null
+  return { tipo: porNatureza as 'DOCUMENTO' | 'SERVICO' | 'HONORARIO' | null, nome: cfg.itemCatalogo?.name ?? null, codigo: null }
+}
+
+const ROTULO_ORIGEM: Record<string, string> = {
+  DOCUMENTO: 'Documento', SERVICO: 'Serviço', HONORARIO: 'Honorário', PROCESSO: 'Processo',
+}
+
 function origemMestre(cfg?: CfgEmbed | null): { origem: string; mestre: string; codigo: string | null } {
-  if (!cfg) return { origem: '—', mestre: '—', codigo: null }
-  const origem = cfg.tipoDocumento ? 'Documento' : cfg.honorario ? 'Honorário' : cfg.tipoProcesso ? 'Processo' : (cfg.itemCatalogo?.natureza === 'SERVICO' ? 'Serviço' : 'Item')
-  const mestre = cfg.tipoDocumento?.name ?? cfg.honorario?.name ?? cfg.tipoProcesso?.name ?? cfg.itemCatalogo?.name ?? '—'
-  const codigo =
-    cfg.tipoDocumento?.publicCode ??
-    cfg.itemCatalogo?.tiposDocumento?.[0]?.publicCode ??
-    cfg.itemCatalogo?.servicos?.[0]?.publicCode ??
-    null
-  return { origem, mestre, codigo }
+  const m = resolverMestre(cfg)
+  return {
+    // Sem tipo resolvido a tela diz "—", não "Item": inventar uma categoria
+    // genérica foi o que fez uma certidão passar por outra coisa.
+    origem: m.tipo ? ROTULO_ORIGEM[m.tipo] : '—',
+    mestre: m.nome ?? '—',
+    codigo: m.codigo,
+  }
 }
 
 async function jsonFetch(url: string, options: RequestInit = {}) {

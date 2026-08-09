@@ -91,15 +91,38 @@ secao("1–2·5·10) O código é o do MESTRE, e a tela o lê da origem")
 {
   const tv = readFileSyncSafe("src/components/gerenciamentoComponents/TabelaValoresTab.tsx")
   ok("1: documento lê o código do Cadastro Mestre Documental",
-    /cfg\.tipoDocumento\?\.publicCode/.test(tv) && /itemCatalogo\?\.tiposDocumento\?\.\[0\]\?\.publicCode/.test(tv))
-  ok("2: serviço lê o código do Catálogo de Serviços",
-    /itemCatalogo\?\.servicos\?\.\[0\]\?\.publicCode/.test(tv))
+    /cfg\.tipoDocumento\.publicCode/.test(tv) && /doc\.publicCode/.test(tv))
+  ok("2: serviço lê o código do Catálogo de Serviços", /srv\.publicCode/.test(tv))
   ok("5·10: NÃO usa o código da Configuração Financeira como identidade",
     !/codigo:\s*cfg\.publicCode/.test(tv), "cfg.publicCode identifica a config, não o mestre")
   ok("a coluna Código é a PRIMEIRA da tabela", /\['Código', 'Cadastro mestre', 'Origem', 'Custo', 'Venda', 'Status', ''\]/.test(tv))
   ok("6·7: a busca aceita o código canônico", /\$\{om\.codigo \?\? ''\}/.test(tv))
   ok("9: nenhum código é gerado na Tabela de Preços",
     !/DOC\$\{|SRV-\$\{|`DOC|`SRV-/.test(tv), "código vem do cadastro, nunca é calculado aqui")
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+secao("ORIGEM) O rótulo é o TIPO CANÔNICO da entidade mestre resolvida")
+// ═══════════════════════════════════════════════════════════════════════════
+// As configs 182/183 chegam ao mestre pelo PIVÔ (`itemCatalogo`), com
+// `tipoDocumentoId` nulo. A origem olhava só o vínculo direto e caía em "Item":
+// código certo (DOC1), semântica errada.
+{
+  const tv = readFileSyncSafe("src/components/gerenciamentoComponents/TabelaValoresTab.tsx")
+  ok("1·2·10: documento alcançado pelo pivô é DOCUMENTO, não 'Item'",
+    /const doc = cfg\.itemCatalogo\?\.tiposDocumento\?\.\[0\][\s\S]{0,140}tipo: 'DOCUMENTO'/.test(tv))
+  ok("3·4: serviço alcançado pelo pivô é SERVICO",
+    /const srv = cfg\.itemCatalogo\?\.servicos\?\.\[0\][\s\S]{0,140}tipo: 'SERVICO'/.test(tv))
+  ok("10: 'Item' deixou de ser rótulo de origem", !/'Item'/.test(tv))
+  ok("origem e código saem da MESMA resolução do mestre",
+    /function resolverMestre/.test(tv) && /const m = resolverMestre\(cfg\)/.test(tv),
+    "eram duas derivações da mesma cadeia; só uma estava completa")
+  ok("o tipo NÃO é inferido por nome nem por prefixo do código",
+    !/startsWith\(['"]DOC|startsWith\(['"]SRV|includes\(['"]DOC/.test(tv))
+  ok("5: o fornecedor não participa da resolução da origem",
+    !/resolverMestre[\s\S]{0,700}fornecedor/.test(tv))
+  ok("sem tipo resolvido a tela diz '—', não uma categoria inventada",
+    /origem: m\.tipo \? ROTULO_ORIGEM\[m\.tipo\] : '—'/.test(tv))
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
