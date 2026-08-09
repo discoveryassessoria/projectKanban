@@ -5,7 +5,7 @@
 --   corpo        → gerado do prisma/schema.prisma
 --   bloco manual → prisma/baseline/bloco-manual.sql (edite LÁ)
 --
--- Gerado em : 2026-08-07
+-- Gerado em : 2026-08-09
 -- Prisma    : 6.19.3
 --
 -- PARA QUE SERVE: reconstruir o banco DO ZERO. O histórico de migrations NÃO
@@ -4095,6 +4095,21 @@ CREATE TABLE "DocumentoGeradoVersao" (
 );
 
 -- CreateTable
+CREATE TABLE "PlanilhaDocumentalColuna" (
+    "id" SERIAL NOT NULL,
+    "origem" VARCHAR(20) NOT NULL,
+    "configId" INTEGER,
+    "tipoDocumentoId" INTEGER,
+    "posicao" INTEGER NOT NULL DEFAULT 0,
+    "ativa" BOOLEAN NOT NULL DEFAULT true,
+    "rotuloOverride" VARCHAR(60),
+    "criadoEm" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "atualizadoEm" TIMESTAMP(3) NOT NULL,
+
+    CONSTRAINT "PlanilhaDocumentalColuna_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
 CREATE TABLE "_ReciboPagamento" (
     "A" INTEGER NOT NULL,
     "B" INTEGER NOT NULL,
@@ -5776,6 +5791,15 @@ CREATE INDEX "DocumentoGeradoVersao_status_idx" ON "DocumentoGeradoVersao"("stat
 CREATE UNIQUE INDEX "DocumentoGeradoVersao_documentoGeradoId_numero_key" ON "DocumentoGeradoVersao"("documentoGeradoId", "numero");
 
 -- CreateIndex
+CREATE UNIQUE INDEX "PlanilhaDocumentalColuna_configId_key" ON "PlanilhaDocumentalColuna"("configId");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "PlanilhaDocumentalColuna_tipoDocumentoId_key" ON "PlanilhaDocumentalColuna"("tipoDocumentoId");
+
+-- CreateIndex
+CREATE INDEX "PlanilhaDocumentalColuna_ativa_posicao_idx" ON "PlanilhaDocumentalColuna"("ativa", "posicao");
+
+-- CreateIndex
 CREATE INDEX "_ReciboPagamento_B_index" ON "_ReciboPagamento"("B");
 
 -- CreateIndex
@@ -6638,6 +6662,12 @@ ALTER TABLE "DocumentoGeradoVersao" ADD CONSTRAINT "DocumentoGeradoVersao_substi
 
 -- AddForeignKey
 ALTER TABLE "DocumentoGeradoVersao" ADD CONSTRAINT "DocumentoGeradoVersao_invalidadaPorId_fkey" FOREIGN KEY ("invalidadaPorId") REFERENCES "Usuario"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "PlanilhaDocumentalColuna" ADD CONSTRAINT "PlanilhaDocumentalColuna_configId_fkey" FOREIGN KEY ("configId") REFERENCES "ProdutoFinanceiro"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "PlanilhaDocumentalColuna" ADD CONSTRAINT "PlanilhaDocumentalColuna_tipoDocumentoId_fkey" FOREIGN KEY ("tipoDocumentoId") REFERENCES "TipoDocumentoCadastro"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "_ReciboPagamento" ADD CONSTRAINT "_ReciboPagamento_A_fkey" FOREIGN KEY ("A") REFERENCES "PagamentoFatura"("id") ON DELETE CASCADE ON UPDATE CASCADE;

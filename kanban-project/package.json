@@ -263,7 +263,7 @@
     "backfill:nec-duplicada": "npm run guard:escrita && tsx scripts/backfill-necessidade-duplicada-motor-legado.ts --execute",
     "backfill:nec-duplicada:dry": "tsx scripts/backfill-necessidade-duplicada-motor-legado.ts",
     "test:guard-necessidade": "tsx scripts/guard-necessidade-documental.test.ts",
-    "test:guards-arquitetura": "npm run test:guard-necessidade && npm run test:motor-unico && npm run test:obrigacao-unica && npm run test:pessoa-nome && npm run test:guard-pessoa && npm run test:guard-derivado && npm run test:guard-porta-requerente && npm run test:guard-cadastro-arvore && npm run test:arvore-arquitetura && npm run test:arvore-layout",
+    "test:guards-arquitetura": "npm run test:guard-necessidade && npm run test:motor-unico && npm run test:obrigacao-unica && npm run test:pessoa-nome && npm run test:guard-pessoa && npm run test:guard-derivado && npm run test:guard-porta-requerente && npm run test:guard-cadastro-arvore && npm run test:guard-planilha && npm run test:arvore-arquitetura && npm run test:arvore-layout",
     "test:guard-pessoa": "tsx scripts/guard-ciclo-vida-pessoa.test.ts",
     "test:pessoa-ciclo-vida": "tsx scripts/pessoa-ciclo-vida.test.ts",
     "test:pessoa-tortura": "tsx scripts/pessoa-tortura.test.ts",
@@ -281,7 +281,9 @@
     "test:guard-porta-requerente": "tsx scripts/guard-porta-unica-requerente.test.ts",
     "test:porta-requerente": "tsx scripts/porta-unica-requerente.test.ts",
     "test:guard-cadastro-arvore": "tsx scripts/guard-cadastro-nao-e-arvore.test.ts",
-    "test:matriz-estados": "tsx scripts/matriz-estados-requerente.test.ts"
+    "test:matriz-estados": "tsx scripts/matriz-estados-requerente.test.ts",
+    "test:guard-planilha": "tsx scripts/guard-planilha-documental.test.ts",
+    "test:planilha-projecao": "tsx scripts/planilha-documental-projecao.test.ts"
   },
   "prisma": {
     "seed": "npm run guard:escrita && tsx prisma/seed.ts"

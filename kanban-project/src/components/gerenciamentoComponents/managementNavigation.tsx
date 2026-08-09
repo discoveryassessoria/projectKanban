@@ -262,6 +262,9 @@ export const MANAGEMENT_NAVIGATION: ManagementNavigationItem[] = [
       a(50, "pricingtable", "Tabelas de Preços", ["preco", "preço", "tabela", "valor", "vigencia", "vigência"], "Tabela de Valores"),
       a(60, "discrules", "Regras de Precificação", ["preco", "preço", "regra", "desconto", "economica"], "Tabela de Valores"),
       a(70, "pricing", "Aplicabilidade Econômica", ["preco", "preço", "aplicabilidade", "economica", "econômica"], "Tabela de Valores"),
+      // A Planilha Documental é PROJEÇÃO: aqui se escolhe QUAIS itens do cadastro
+      // viram coluna. Preço continua só na Tabela de Preços.
+      a(75, "planilhacolunas", "Planilha Documental", ["planilha", "coluna", "documental", "custo", "projecao", "projeção"], "Tabela de Valores"),
 
       a(80, "accounts", "Contas Bancárias", ["conta", "banco", "bancaria", "tesouraria"], "Tesouraria"),
       a(90, "banks", "Bancos", ["banco", "tesouraria"], "Tesouraria"),

@@ -74,6 +74,8 @@ const AUTORIZADOS_FORA_DO_RUNTIME: Record<string, string> = {
     "equivalência das três portas de inserção: monta e limpa o próprio cenário (marca PORTA-UNICA)",
   "scripts/matriz-estados-requerente.test.ts":
     "matriz de estados do requerente: monta e limpa o próprio cenário (marca MATRIZ-ESTADOS)",
+  "scripts/planilha-documental-projecao.test.ts":
+    "projeção da Planilha Documental: monta e limpa o próprio cenário (marca PLANILHA-PROJ)",
   "scripts/pessoa-equivalencia-rotas.test.ts": "teste de equivalência das duas rotas: monta dois cenários e limpa",
   "scripts/exclusao-servico.test.ts": "teste de exclusão definitiva de serviço: monta e limpa o cenário",
   "scripts/arvore-membership.test.ts":

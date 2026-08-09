@@ -2065,50 +2065,51 @@ model CarteiraRecebimento {
 }
 
 model ProdutoFinanceiro {
-  publicCode         String?             @unique @db.VarChar(20) // CodeGeneratorService central â aditivo, Ãºnico, nÃ£o editÃ¡vel
-  id                 Int                 @id @default(autoincrement())
-  codigo             String              @db.VarChar(30)
-  nome               String              @db.VarChar(200)
-  especie            String?             @db.VarChar(20) // kind
-  tipoFinanceiro     String?             @db.VarChar(20) // financialType
-  moedaPadrao        Moeda               @default(BRL)
-  valorPadrao        Decimal?            @db.Decimal(12, 2) // LEGADO: fallback Ãºnico (prÃ©-unificaÃ§Ã£o). NÃO Ã© preÃ§o â migrar p/ TabelaValor.
+  publicCode         String?                   @unique @db.VarChar(20) // CodeGeneratorService central â aditivo, Ãºnico, nÃ£o editÃ¡vel
+  id                 Int                       @id @default(autoincrement())
+  codigo             String                    @db.VarChar(30)
+  nome               String                    @db.VarChar(200)
+  especie            String?                   @db.VarChar(20) // kind
+  tipoFinanceiro     String?                   @db.VarChar(20) // financialType
+  moedaPadrao        Moeda                     @default(BRL)
+  valorPadrao        Decimal?                  @db.Decimal(12, 2) // LEGADO: fallback Ãºnico (prÃ©-unificaÃ§Ã£o). NÃO Ã© preÃ§o â migrar p/ TabelaValor.
   // M-UNIFICA â UMA config por mestre. possuiCusto/possuiReceita seguem sendo a
   // fonte de "o QUE o item pode gerar" (derivam naturezaFin abaixo).
-  possuiCusto        Boolean             @default(false)
-  possuiReceita      Boolean             @default(false)
+  possuiCusto        Boolean                   @default(false)
+  possuiReceita      Boolean                   @default(false)
   // PREÃO-FONTE-ÃNICA (aditivo): a ConfiguraÃ§Ã£o Financeira NÃO guarda mais preÃ§o.
   // Estes campos viram LEGADO â migrados p/ TabelaValor (CUSTO/VENDA) pelo backfill
   // `backfill-precos-legado-tabelavalor.ts`. Preservados atÃ© a migration de remoÃ§Ã£o.
-  valorCustoPadrao   Decimal?            @db.Decimal(12, 2) // LEGADO â TabelaValor(natureza=CUSTO)
-  valorReceitaPadrao Decimal?            @db.Decimal(12, 2) // LEGADO â TabelaValor(natureza=VENDA)
+  valorCustoPadrao   Decimal?                  @db.Decimal(12, 2) // LEGADO â TabelaValor(natureza=CUSTO)
+  valorReceitaPadrao Decimal?                  @db.Decimal(12, 2) // LEGADO â TabelaValor(natureza=VENDA)
   // Natureza financeira canÃ´nica (o QUE Ã© o item). Nullable durante a transiÃ§Ã£o;
   // deriva de possuiCusto/possuiReceita quando ausente (deriveNaturezaFinanceira).
   naturezaFin        NaturezaFinanceira?
-  aplicaA            String?             @db.VarChar(20) // appliesTo
-  cobravelDoCliente  Boolean             @default(false)
+  aplicaA            String?                   @db.VarChar(20) // appliesTo
+  cobravelDoCliente  Boolean                   @default(false)
   /// COMISSÃO (quando aplicável) — regra que remunera quem vendeu/executou o item.
   /// Nullable: a maioria dos itens não comissiona.
   regraComissaoId    Int?
-  regraComissao      RegraComissao?      @relation("ConfigFinComissao", fields: [regraComissaoId], references: [id])
-  ativo              Boolean             @default(true)
-  criadoEm           DateTime            @default(now())
-  atualizadoEm       DateTime            @updatedAt
-  naturezaFinanceira String?             @default("revenue") @db.VarChar(20)
+  regraComissao      RegraComissao?            @relation("ConfigFinComissao", fields: [regraComissaoId], references: [id])
+  ativo              Boolean                   @default(true)
+  criadoEm           DateTime                  @default(now())
+  atualizadoEm       DateTime                  @updatedAt
+  naturezaFinanceira String?                   @default("revenue") @db.VarChar(20)
   // DEPRECIADO (redundante com naturezaFin): apenas indicava que o item gera custo â
   // o que jÃ¡ Ã© determinado pela Natureza Financeira (SOMENTE_CUSTO/CUSTO_E_RECEITA).
   // Removido da UI. Coluna preservada (sem DROP) sÃ³ por compatibilidade de dados.
-  custoInterno       Boolean             @default(false)
+  custoInterno       Boolean                   @default(false)
   // REPASSE â conceito ÃNICO: item Ã© um valor de TERCEIROS repassado ao cliente
   // (pass-through, sem margem/serviÃ§o prÃ³prio do escritÃ³rio). NÃO confundir com
   // TabelaValor/valorRealRepasse (repasse de VALOR em template) nem com cobravelDoCliente.
-  repasse            Boolean             @default(false)
+  repasse            Boolean                   @default(false)
   // REEMBOLSÃVEL â significado EXCLUSIVO: os CUSTOS gerados por este item podem ser
   // reembolsados pelo cliente. SÃ³ faz sentido quando o item gera custo (validado na API).
-  reembolsavel       Boolean             @default(false)
-  servicos           ServicoProduto[]    @relation("ServicoProdutoItens")
+  reembolsavel       Boolean                   @default(false)
+  servicos           ServicoProduto[]          @relation("ServicoProdutoItens")
   itemCatalogoId     Int?
-  itemCatalogo       ItemCatalogo?       @relation(fields: [itemCatalogoId], references: [id])
+  itemCatalogo       ItemCatalogo?             @relation(fields: [itemCatalogoId], references: [id])
+  colunaPlanilha     PlanilhaDocumentalColuna? @relation("ColunaPlanilhaConfig")
 
   // F1 â ConfiguraÃ§Ã£o Financeira canÃ´nica: FKs DIRETAS aos mestres reais.
   // itemCatalogoId Ã© o pivÃ´ (spine) e alvo de preÃ§o (TabelaValor/resolverPreco).
@@ -3191,6 +3192,7 @@ model TipoDocumentoCadastro {
   configFinanceiras       ProdutoFinanceiro[]       @relation("ConfigFinTipoDocumento")
   econRules               PhaseEconomicRule[]       @relation("EconTipoDocumento")
   participaPlanilha       Boolean                   @default(false)
+  colunaPlanilha          PlanilhaDocumentalColuna? @relation("ColunaPlanilhaTipoDoc")
   // LOTE A â categoriaDocumentalId Ã© a CLASSIFICAÃÃO CANÃNICA (consumida por ID).
   // FK nullable p/ backfill seguro. A coluna `category` (String) permanece SÃ como
   // compatibilidade transitÃ³ria (dual-read/dual-write). NÃ£o remover neste lote.
@@ -6497,4 +6499,53 @@ model DocumentoGeradoVersao {
   @@unique([documentoGeradoId, numero])
   @@index([modeloVersaoId])
   @@index([status])
+}
+
+// ============================================================================
+// PLANILHA DOCUMENTAL — CONFIGURAÇÃO DAS COLUNAS ECONÔMICAS.
+//
+// A Planilha é PROJEÇÃO: não guarda preço, não guarda serviço, não guarda
+// documento. Esta tabela guarda a única coisa que é dela — QUAIS itens do
+// cadastro canônico aparecem como coluna, em que ordem, e se estão ativos.
+//
+// O que NÃO está aqui, de propósito: valor, moeda, fornecedor, vigência. Preço
+// vive só em TabelaValor, resolvido em tempo de leitura. Uma coluna que
+// guardasse valor seria a segunda fonte da verdade que este desenho existe para
+// impedir.
+//
+// A ANCORAGEM É POR ID, NUNCA POR NOME. A versão anterior casava
+// `PhaseEconomicRule.componentName` com `TipoServico.nome` por igualdade de
+// texto: renomear o serviço no cadastro fazia a coluna sumir da planilha sem
+// nenhum erro.
+// ============================================================================
+model PlanilhaDocumentalColuna {
+  id Int @id @default(autoincrement())
+
+  /// SERVICO (ProdutoFinanceiro) | DOCUMENTO (TipoDocumentoCadastro).
+  origem String @db.VarChar(20)
+
+  /// Configuração Financeira do serviço — é ela que o resolvedor de preço recebe.
+  /// `@unique` (parcial no Postgres, nulos não competem): um item, uma coluna.
+  configId Int?               @unique
+  config   ProdutoFinanceiro? @relation("ColunaPlanilhaConfig", fields: [configId], references: [id], onDelete: Cascade)
+
+  /// Tipo documental do Cadastro Mestre, quando a coluna é um DOCUMENTO.
+  tipoDocumentoId Int?                   @unique
+  tipoDocumento   TipoDocumentoCadastro? @relation("ColunaPlanilhaTipoDoc", fields: [tipoDocumentoId], references: [id], onDelete: Cascade)
+
+  /// Ordem de exibição. Chave de ordenação é POSIÇÃO, nunca nome.
+  posicao Int @default(0)
+
+  /// Inativar ESCONDE a coluna. Não apaga serviço, preço nem custo histórico —
+  /// reativar traz tudo de volta.
+  ativa Boolean @default(true)
+
+  /// Nome curto só para a tela (ex.: "Apostilamento Certidão"). Não altera o
+  /// cadastro mestre; ausente, a planilha usa o nome canônico.
+  rotuloOverride String? @db.VarChar(60)
+
+  criadoEm     DateTime @default(now())
+  atualizadoEm DateTime @updatedAt
+
+  @@index([ativa, posicao])
 }

@@ -179,6 +179,8 @@ const DONOS_PONTEIRO: Record<string, string> = {
   "scripts/porta-unica-requerente.test.ts": "limpeza do próprio cenário de teste",
   "scripts/matriz-estados-requerente.test.ts": "limpeza do próprio cenário de teste",
   "scripts/smoke-ui-setup.ts": "smoke em produção: monta e remove o cenário marcado",
+  "scripts/planilha-documental-projecao.test.ts":
+    "projeção da Planilha Documental: monta e limpa o próprio cenário (marca PLANILHA-PROJ)",
   // CP-1: liga o cadastro a uma Pessoa canônica STANDALONE (sem árvore). Não é
   // inserção na árvore — sem árvore não há processo, logo não há efeito a emitir.
   "prisma/backfill-cp1-identidade.ts": "backfill de identidade canônica: cria Pessoa SEM árvore",

@@ -23,12 +23,18 @@ import { AvisoNaoConvertido } from "./ValorBrl"
 
 interface Celula {
   tipoServicoId: number
-  valor: number
-  valorBrl: number
+  // ESTADO da célula. O número só aparece quando significa alguma coisa: R$ 0,00
+  // é preço válido e não pode ser usado para dizer "não sei".
+  estado: "NAO_APLICAVEL" | "SEM_PRECO" | "PREVISTO" | "REALIZADO"
+  valorBrl: number | null
   moeda: string | null
-  naoConvertido: number
-  automatico: boolean
-  obrigacoes: number[]
+  explicacao?: {
+    servico: string
+    origem: string | null
+    tabelaValorId: number | null
+    regra: string | null
+    motivo: string | null
+  }
 }
 interface Linha {
   documentoId: number
@@ -143,6 +149,9 @@ export function PlanilhaDocumentalView({ processoId }: { processoId: number }) {
                 <th className="px-4 py-3 font-medium">Data</th>
                 <th className="px-4 py-3 font-medium">Local</th>
                 <th className="px-4 py-3 font-medium">Dados do registro</th>
+                <th className="px-4 py-3 font-medium">Cônjuge</th>
+                <th className="px-4 py-3 font-medium">Genitores</th>
+                <th className="px-4 py-3 font-medium">Observação</th>
                 {colunas.map((c) => (
                   <th key={c.tipoServicoId} className="px-4 py-3 text-right font-medium">{c.nome}</th>
                 ))}
@@ -156,7 +165,7 @@ export function PlanilhaDocumentalView({ processoId }: { processoId: number }) {
             </tbody>
             <tfoot>
               <tr className="border-t-2 border-[var(--border-strong)] bg-[var(--surface-hover)]">
-                <td colSpan={4} className="px-4 py-3 font-semibold text-[var(--text-primary)]">Total do processo</td>
+                <td colSpan={7} className="px-4 py-3 font-semibold text-[var(--text-primary)]">Total do processo</td>
                 {colunas.map((c) => (
                   <td key={c.tipoServicoId} className="px-4 py-3 text-right tabular-nums font-medium text-[var(--text-secondary)]">
                     {fmt(p.totaisPorServico[c.tipoServicoId] ?? 0)}
@@ -173,7 +182,7 @@ export function PlanilhaDocumentalView({ processoId }: { processoId: number }) {
 }
 
 function PessoaBloco({ bloco, colunas }: { bloco: Bloco; colunas: Planilha["colunas"] }) {
-  const cols = colunas.length + 5
+  const cols = colunas.length + 8
   return (
     <>
       <tr className="border-t border-[var(--border-default)] bg-[var(--surface-hover)]">
@@ -207,20 +216,22 @@ function PessoaBloco({ bloco, colunas }: { bloco: Bloco; colunas: Planilha["colu
             <div>{dadosRegistro(l)}</div>
             {l.cartorio && <div className="text-[11px] text-[var(--text-muted)]">{l.cartorio}</div>}
           </td>
+          <td className="px-4 py-3 text-[var(--text-secondary)]">{bloco.conjuges[0] ?? "—"}</td>
+          <td className="px-4 py-3 text-[var(--text-secondary)]">
+            {bloco.paiNome || bloco.maeNome
+              ? [bloco.paiNome, bloco.maeNome].filter(Boolean).join(" e ")
+              : "—"}
+          </td>
+          <td className="px-4 py-3 text-[var(--text-secondary)]">{l.observacao ?? "—"}</td>
           {colunas.map((c) => {
             const cel = l.celulas.find((x) => x.tipoServicoId === c.tipoServicoId)
-            const v = cel?.valorBrl ?? 0
-            return (
-              <td key={c.tipoServicoId} className="px-4 py-3 text-right tabular-nums text-[var(--text-secondary)]">
-                {v > 0 ? fmt(v) : <span className="text-[var(--text-muted)]">—</span>}
-              </td>
-            )
+            return <CelulaEconomica key={c.tipoServicoId} cel={cel} />
           })}
           <td className="px-4 py-3 text-right tabular-nums font-medium text-[var(--text-primary)]">{fmt(l.totalBrl)}</td>
         </tr>
       ))}
       <tr className="border-t border-[var(--border-default)]">
-        <td colSpan={4} className="px-4 py-2 text-right text-xs text-[var(--text-muted)]">Total de {bloco.nome}</td>
+        <td colSpan={7} className="px-4 py-2 text-right text-xs text-[var(--text-muted)]">Total de {bloco.nome}</td>
         {colunas.map((c) => (
           <td key={c.tipoServicoId} className="px-4 py-2 text-right tabular-nums text-xs text-[var(--text-muted)]">
             {fmt(bloco.linhas.reduce((s, l) => s + (l.celulas.find((x) => x.tipoServicoId === c.tipoServicoId)?.valorBrl ?? 0), 0))}
@@ -229,6 +240,51 @@ function PessoaBloco({ bloco, colunas }: { bloco: Bloco; colunas: Planilha["colu
         <td className="px-4 py-2 text-right tabular-nums text-sm font-semibold text-[var(--text-primary)]">{fmt(bloco.totalBrl)}</td>
       </tr>
     </>
+  )
+}
+
+/**
+ * A CÉLULA DIZ O QUE SABE.
+ *
+ * Antes toda célula era um número, e "0" servia para três coisas diferentes:
+ * não se aplica, não tem preço, e custa zero. Agora cada estado tem a sua forma,
+ * e o `title` carrega a proveniência — de onde veio o valor, ou por que não há um.
+ */
+function CelulaEconomica({ cel }: { cel?: Celula }) {
+  const e = cel?.explicacao
+  const titulo = e
+    ? [
+        e.servico,
+        e.origem ? `Origem: ${e.origem}` : null,
+        e.tabelaValorId != null ? `Linha de preço #${e.tabelaValorId}` : null,
+        e.regra || null,
+        e.motivo || null,
+      ].filter(Boolean).join("\n")
+    : undefined
+
+  if (!cel || cel.estado === "NAO_APLICAVEL") {
+    return (
+      <td title={titulo} className="px-4 py-3 text-right text-[var(--text-muted)]">—</td>
+    )
+  }
+  if (cel.estado === "SEM_PRECO") {
+    return (
+      <td title={titulo} className="px-4 py-3 text-right text-[11px] text-[var(--warning)]">
+        Sem valor
+      </td>
+    )
+  }
+  const realizado = cel.estado === "REALIZADO"
+  return (
+    <td
+      title={titulo}
+      className={`px-4 py-3 text-right tabular-nums ${
+        realizado ? "font-medium text-[var(--text-primary)]" : "text-[var(--text-secondary)]"
+      }`}
+    >
+      {fmt(cel.valorBrl ?? 0)}
+      {!realizado && <span className="ml-1 text-[10px] text-[var(--text-muted)]">prev.</span>}
+    </td>
   )
 }
 

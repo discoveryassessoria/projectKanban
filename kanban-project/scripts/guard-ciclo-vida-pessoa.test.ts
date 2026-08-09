@@ -126,6 +126,8 @@ const AUTORIZADOS_FORA_DO_RUNTIME: Record<string, string> = {
     "equivalência das três portas de inserção: monta e limpa o próprio cenário (marca PORTA-UNICA)",
   "scripts/matriz-estados-requerente.test.ts":
     "matriz de estados do requerente: monta e limpa o próprio cenário (marca MATRIZ-ESTADOS)",
+  "scripts/planilha-documental-projecao.test.ts":
+    "projeção da Planilha Documental: monta e limpa o próprio cenário (marca PLANILHA-PROJ)",
   "scripts/guard-estado-derivado.test.ts":
     "guard do estado derivado (cita os padrões de escrita que procura, como este arquivo)",
 

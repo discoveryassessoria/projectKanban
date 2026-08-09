@@ -37,6 +37,10 @@ export interface ObrigacaoLista {
   personId: number | null
   documentoId: number | null
   tipoServicoId: number | null
+  /** Configuração Financeira do lançamento — a MESMA âncora que a coluna da
+   *  Planilha Documental usa e que o resolvedor de preço recebe. Sem ela, casar
+   *  obrigação com coluna só sobrava por nome de serviço. */
+  configFinanceiraId: number | null
   phaseKey: string | null
   phaseCycle: number | null
   /** AUTOMATICO_DOCUMENTAL | BACKFILL_DOCUMENTAL | MANUAL | null (não classificado) */
@@ -134,6 +138,7 @@ export async function listarObrigacoes(f?: { processoId?: number; status?: strin
       personId: o.personId ?? null,
       documentoId: o.documentoId ?? null,
       tipoServicoId: o.tipoServicoId ?? null,
+      configFinanceiraId: o.configFinanceiraId ?? null,
       phaseKey: o.phaseKey ?? null,
       phaseCycle: o.phaseCycle ?? null,
       origemLancamento: o.origemLancamento ?? null,

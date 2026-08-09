@@ -133,7 +133,9 @@ ok(itensDaSecao("grp_financeiro", "Classificação").length === 0, 'Financeiro n
 
 ok(JSON.stringify(itensDaSecao("grp_financeiro", "Tesouraria")) === JSON.stringify(["accounts", "banks", "wallets"]), "Financeiro › Tesouraria = Contas, Bancos, Carteiras")
 ok(JSON.stringify(itensDaSecao("grp_financeiro", "Cobrança")) === JSON.stringify(["methods", "paycond", "fees"]), "Financeiro › Cobrança = Formas, Condições, Taxas")
-ok(JSON.stringify(itensDaSecao("grp_financeiro", "Tabela de Valores")) === JSON.stringify(["pricingtable", "discrules", "pricing"]), "Financeiro › Tabela de Valores = Tabelas de Preços, Regras de Precificação, Aplicabilidade")
+// A Planilha Documental entra aqui porque é onde se escolhe QUAIS itens do
+// cadastro viram coluna — decisão vizinha ao preço, e que não define preço.
+ok(JSON.stringify(itensDaSecao("grp_financeiro", "Tabela de Valores")) === JSON.stringify(["pricingtable", "discrules", "pricing", "planilhacolunas"]), "Financeiro › Tabela de Valores = Tabelas de Preços, Regras, Aplicabilidade, Planilha Documental")
 ok(JSON.stringify(itensDaSecao("grp_orgaos", "Organizações")) === JSON.stringify(["organs", "suppliers"]), "Órgãos › Organizações = Cartórios e Órgãos + Fornecedores")
 ok(JSON.stringify(itensDaSecao("grp_usuarios", "Grupos")) === JSON.stringify(["teams", "departments", "rolecat"]), "Usuários › Grupos = Equipes, Departamentos, Cargos")
 

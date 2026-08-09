@@ -91,6 +91,7 @@ const ImpostosTab = dynamic(() => import("@/src/components/gerenciamentoComponen
 const CarteirasTab = dynamic(() => import("@/src/components/gerenciamentoComponents/CarteirasTab"), { ssr: false, loading: () => <CarregandoTela /> })
 const ProdutosTab = dynamic(() => import("@/src/components/gerenciamentoComponents/ProdutosTab"), { ssr: false, loading: () => <CarregandoTela /> })
 const TabelaValoresTab = dynamic(() => import("@/src/components/gerenciamentoComponents/TabelaValoresTab"), { ssr: false, loading: () => <CarregandoTela /> })
+const ConfiguracaoPlanilhaDocumental = dynamic(() => import("@/src/components/financeiro/v3/ConfiguracaoPlanilhaDocumental"), { ssr: false, loading: () => <CarregandoTela /> })
 const CondicoesPagamentoTab = dynamic(() => import("@/src/components/gerenciamentoComponents/CondicoesPagamentoTab"), { ssr: false, loading: () => <CarregandoTela /> })
 const RegrasComissaoTab = dynamic(() => import("@/src/components/gerenciamentoComponents/RegrasComissaoTab"), { ssr: false, loading: () => <CarregandoTela /> })
 const RegrasDescontoTab = dynamic(() => import("@/src/components/gerenciamentoComponents/RegrasDescontoTab"), { ssr: false, loading: () => <CarregandoTela /> })
@@ -277,6 +278,7 @@ const TELAS: Record<string, React.ComponentType> = {
   // Usuários e Acessos → Permissões (perfis de permissão do motor).
   permmotor: PerfisPermissaoMotorTab,
   pricingtable: TabelaValoresTab,
+  planilhacolunas: ConfiguracaoPlanilhaDocumental,
   docmatrix: MatrizDocumentalTab,
   // Assistente de Parametrização — orquestra as telas oficiais; não as substitui.
   paramwizard: AssistenteParametrizacaoTab,
