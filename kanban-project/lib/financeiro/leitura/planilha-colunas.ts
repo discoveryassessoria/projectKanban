@@ -19,12 +19,18 @@
 // verdade que este desenho existe para impedir.
 // ============================================================================
 import { prisma } from '@/lib/prisma'
+import { ehEstrategia, type EstrategiaColuna } from './planilha-matriz'
 
 export type OrigemColuna = 'SERVICO' | 'DOCUMENTO'
 
 export interface ColunaConfigurada {
   id: number
   origem: OrigemColuna
+  /** Como a célula descobre o item canônico: item fixo ou item da linha. */
+  estrategia: EstrategiaColuna
+  /** Categoria do catálogo que delimita a coluna ITEM_DO_REGISTRO. */
+  categoriaItemId: number | null
+  categoriaItemNome: string | null
   /** ProdutoFinanceiro.id — o que `resolverPrecoPorConfigDB` recebe. */
   configId: number | null
   /** TipoDocumentoCadastro.id. */
@@ -53,16 +59,28 @@ export async function listarColunasConfiguradas(
     select: {
       id: true, origem: true, configId: true, tipoDocumentoId: true,
       posicao: true, ativa: true, rotuloOverride: true,
+      estrategia: true, categoriaItemId: true,
       config: { select: { nome: true } },
       tipoDocumento: { select: { name: true } },
+      categoriaItem: { select: { nome: true } },
     },
   })
 
   return linhas.map((l) => {
-    const canonico = l.config?.nome ?? l.tipoDocumento?.name ?? '(item removido do cadastro)'
+    // Coluna ITEM_DO_REGISTRO não tem item próprio — o nome canônico dela é o da
+    // CATEGORIA que a delimita, porque é isso que ela representa: a etapa, não
+    // um documento. Cair no rótulo de um item aqui recriaria a confusão entre as
+    // duas dimensões.
+    const canonico =
+      l.estrategia === 'ITEM_DO_REGISTRO'
+        ? l.categoriaItem?.nome ?? '(categoria removida do cadastro)'
+        : l.config?.nome ?? l.tipoDocumento?.name ?? '(item removido do cadastro)'
     return {
       id: l.id,
       origem: l.origem as OrigemColuna,
+      estrategia: ehEstrategia(l.estrategia) ? l.estrategia : 'SERVICO_FIXO',
+      categoriaItemId: l.categoriaItemId,
+      categoriaItemNome: l.categoriaItem?.nome ?? null,
       configId: l.configId,
       tipoDocumentoId: l.tipoDocumentoId,
       posicao: l.posicao,
@@ -190,6 +208,80 @@ export async function reordenarColunas(idsNaOrdem: number[]): Promise<void> {
       prisma.planilhaDocumentalColuna.update({ where: { id }, data: { posicao: i + 1 } }),
     ),
   )
+}
+
+/**
+ * COLUNA DE ETAPA — a que resolve o item pela LINHA.
+ *
+ * É esta a coluna "Certidão Inteiro Teor": ela não aponta para a certidão de
+ * nascimento nem para a de casamento, e sim para a CATEGORIA do catálogo a que
+ * as três pertencem. Quem escolhe qual delas vale é o registro da linha.
+ *
+ * Idempotente pela categoria: pedir duas vezes a mesma categoria reativa a
+ * coluna que já existe, em vez de criar uma segunda que resolveria as MESMAS
+ * células — a duplicidade que o §35 proíbe.
+ */
+export async function adicionarColunaDeEtapa(args: {
+  categoriaItemId: number
+  rotuloOverride?: string | null
+}): Promise<ColunaConfigurada> {
+  if (!Number.isInteger(args.categoriaItemId) || args.categoriaItemId <= 0) {
+    throw new Error(`Coluna de etapa exige o id da categoria do catálogo; recebido: ${String(args.categoriaItemId)}`)
+  }
+  const existe = await prisma.categoriaServico.count({ where: { id: args.categoriaItemId } })
+  if (existe === 0) throw new Error(`Categoria ${args.categoriaItemId} não existe no catálogo.`)
+
+  const rotulo = (args.rotuloOverride ?? '').trim() || null
+  const ja = await prisma.planilhaDocumentalColuna.findFirst({
+    where: { estrategia: 'ITEM_DO_REGISTRO', categoriaItemId: args.categoriaItemId },
+    select: { id: true },
+  })
+
+  let id: number
+  if (ja) {
+    await prisma.planilhaDocumentalColuna.update({
+      where: { id: ja.id },
+      data: { ativa: true, ...(rotulo !== null ? { rotuloOverride: rotulo } : {}) },
+    })
+    id = ja.id
+  } else {
+    const ultima = await prisma.planilhaDocumentalColuna.aggregate({ _max: { posicao: true } })
+    const criada = await prisma.planilhaDocumentalColuna.create({
+      data: {
+        origem: 'SERVICO',
+        estrategia: 'ITEM_DO_REGISTRO',
+        categoriaItemId: args.categoriaItemId,
+        configId: null,
+        tipoDocumentoId: null,
+        posicao: (ultima._max.posicao ?? 0) + 1,
+        rotuloOverride: rotulo,
+      },
+      select: { id: true },
+    })
+    id = criada.id
+  }
+  return (await listarColunasConfiguradas()).find((c) => c.id === id)!
+}
+
+/** Categorias do catálogo que podem virar coluna de etapa (para o editor). */
+export async function listarCategoriasDisponiveis(): Promise<
+  Array<{ id: number; nome: string; codigo: string; itens: number; jaEhColuna: boolean }>
+> {
+  const [cats, usadas] = await Promise.all([
+    prisma.categoriaServico.findMany({
+      where: { ativo: true },
+      select: { id: true, nome: true, code: true, _count: { select: { itens: true } } },
+      orderBy: [{ ordem: 'asc' }, { nome: 'asc' }],
+    }),
+    prisma.planilhaDocumentalColuna.findMany({
+      where: { estrategia: 'ITEM_DO_REGISTRO' },
+      select: { categoriaItemId: true },
+    }),
+  ])
+  const usados = new Set(usadas.map((u) => u.categoriaItemId).filter((v): v is number => v != null))
+  return cats.map((c) => ({
+    id: c.id, nome: c.nome, codigo: c.code, itens: c._count.itens, jaEhColuna: usados.has(c.id),
+  }))
 }
 
 /** Remove a coluna da configuração. O item canônico e o histórico permanecem. */

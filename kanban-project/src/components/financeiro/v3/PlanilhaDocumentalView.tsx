@@ -38,6 +38,7 @@
 // ============================================================================
 "use client"
 
+import { useState } from "react"
 import { useApi } from "@/src/lib/dados"
 
 // ── Paleta do arquivo ───────────────────────────────────────────────────────
@@ -85,11 +86,26 @@ const RECUO_NOME = LARGURA_FIXA[0] + LARGURA_FIXA[1]
 /** Rótulos exatamente como no arquivo — sem "corrigir" nada. */
 const CABECALHOS_FIXOS = ["Geração", "Registro", "Data", "Local", "Dados do registro", "Cônjuge", "Genitores"]
 
+type EstadoCelula = "NAO_APLICAVEL" | "SEM_PRECO" | "PREVISTO" | "REALIZADO" | "SOBRESCRITO" | "AMBIGUO"
+
 interface Celula {
+  colunaId: number
   tipoServicoId: number
-  estado: "NAO_APLICAVEL" | "SEM_PRECO" | "PREVISTO" | "REALIZADO"
+  estado: EstadoCelula
   valorBrl: number | null
-  explicacao?: { servico: string; origem: string | null; regra: string | null; motivo: string | null }
+  valorBase: number | null
+  valorOverride: number | null
+  valorEfetivo: number | null
+  editavel: boolean
+  explicacao?: {
+    servico: string
+    registro: string | null
+    origem: string | null
+    regra: string | null
+    motivo: string | null
+    itemResolvidoNome: string | null
+    valorBase: number | null
+  }
 }
 interface Linha {
   tipoDocumentoId: number | null
@@ -117,7 +133,7 @@ interface Bloco {
 }
 interface Planilha {
   nomeProcesso?: string | null
-  colunas: { tipoServicoId: number; nome: string }[]
+  colunas: { colunaId: number; tipoServicoId: number; nome: string }[]
   pessoas: Bloco[]
   totalGeralBrl: number
 }
@@ -142,27 +158,160 @@ function dadosDoRegistro(l: Linha): string {
 
 /**
  * A célula econômica: valor ou traço. Sem badge, sem ícone, sem botão.
- * "Sem valor" permanece porque é REGRA DE NEGÓCIO — a distinção entre "não se
- * aplica" e "não tem preço cadastrado" não pode sumir na tela.
+ *
+ * Cada estado diz uma coisa que R$ 0,00 não sabe dizer, e por isso nenhum deles
+ * cai em zero: "não se aplica", "não tem preço cadastrado" e "o cadastro está
+ * ambíguo" são situações diferentes, e a planilha existe para o operador
+ * distinguir as três num olhar.
  */
 function textoDaCelula(c?: Celula): string {
   if (!c || c.estado === "NAO_APLICAVEL") return "-"
   if (c.estado === "SEM_PRECO") return "Sem valor"
-  return fmt(c.valorBrl ?? 0)
+  if (c.estado === "AMBIGUO") return "Ambíguo"
+  return fmt(c.valorEfetivo ?? c.valorBrl ?? 0)
 }
 
 /**
- * De onde veio o número — no `title`. O tooltip não desenha nada: no papel e na
- * captura ele é invisível, então não disputa fidelidade com a referência. Mas
- * uma célula que diz "Sem valor" sem dizer POR QUE obriga quem confere a sair
- * da planilha para descobrir, e isso a referência em papel nunca precisou
- * resolver — lá o valor era digitado por alguém que sabia a origem.
+ * POR QUE ESTA CÉLULA VALE ISTO — a resposta do Modo Auditor, no `title`.
+ *
+ * O tooltip não desenha nada: no papel e na captura ele é invisível, então não
+ * disputa fidelidade com a referência. Mas uma célula que diz "Sem valor" sem
+ * dizer POR QUE obriga quem confere a sair da planilha para descobrir.
  */
 function tituloDaCelula(c?: Celula): string | undefined {
   const e = c?.explicacao
   if (!e) return undefined
-  const partes = [e.servico, e.motivo, e.origem, e.regra].filter(Boolean)
-  return partes.length > 0 ? partes.join(" · ") : undefined
+  const linhas = [
+    e.registro && e.servico ? `${e.registro} × ${e.servico}` : e.servico,
+    e.itemResolvidoNome ? `Item: ${e.itemResolvidoNome}` : null,
+    // Sob override, o preço da Tabela continua dito — ele não some, só deixa de
+    // valer AQUI. É essa distinção que impede o combinado de virar "o preço".
+    c?.estado === "SOBRESCRITO" && e.valorBase != null ? `Valor padrão: ${fmt(e.valorBase)}` : null,
+    c?.estado === "SOBRESCRITO" && c.valorOverride != null ? `Valor deste processo: ${fmt(c.valorOverride)}` : null,
+    e.motivo,
+    e.origem ? `Origem: ${e.origem}` : null,
+    e.regra,
+  ].filter(Boolean)
+  return linhas.length > 0 ? linhas.join("\n") : undefined
+}
+
+/** Aceita "1.234,56", "1234.56" e "1234" — o operador digita como fala. */
+function lerValor(texto: string): number | null {
+  const limpo = texto.replace(/[^\d,.-]/g, "").trim()
+  if (!limpo) return null
+  // Se tem vírgula, ela é o decimal e o ponto é milhar (pt-BR).
+  const normal = limpo.includes(",") ? limpo.replace(/\./g, "").replace(",", ".") : limpo
+  const n = Number(normal)
+  return Number.isFinite(n) && n >= 0 ? n : null
+}
+
+/**
+ * A CÉLULA EDITÁVEL.
+ *
+ * Fora de edição ela é exatamente uma célula de planilha — sem botão, sem
+ * coluna "Ações", sem ícone permanente. O único sinal de que existe um
+ * combinado é um triângulo de 4px no canto, a mesma convenção que o Excel usa
+ * para "esta célula tem uma nota": some no papel e não disputa atenção.
+ *
+ * `Enter` grava, `Escape` cancela, e o blur **cancela** em vez de gravar —
+ * clicar fora é o gesto de quem desistiu, e gravar aí produziria alteração
+ * financeira que o operador não pediu.
+ */
+function CelulaEconomica({
+  celula, processoId, pessoaId, tipoDocumentoId, aoMudar,
+}: {
+  celula?: Celula
+  processoId: number
+  pessoaId: number | null
+  tipoDocumentoId: number | null
+  aoMudar: () => void
+}) {
+  const [editando, setEditando] = useState(false)
+  const [texto, setTexto] = useState("")
+  const [salvando, setSalvando] = useState(false)
+  const [erro, setErro] = useState<string | null>(null)
+
+  const podeEditar = !!celula?.editavel && pessoaId != null && tipoDocumentoId != null
+  const texto0 = textoDaCelula(celula)
+  const titulo = tituloDaCelula(celula)
+
+  const gravar = async (remover: boolean) => {
+    if (!celula || pessoaId == null || tipoDocumentoId == null) return
+    const valor = remover ? null : lerValor(texto)
+    if (!remover && valor == null) { setErro("valor inválido"); return }
+    setSalvando(true); setErro(null)
+    try {
+      const r = await fetch(`/api/processos/${processoId}/planilha-override`, {
+        method: remover ? "DELETE" : "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ pessoaId, tipoDocumentoId, colunaId: celula.colunaId, valor }),
+      })
+      if (!r.ok) throw new Error((await r.json().catch(() => ({})))?.error ?? "falha ao salvar")
+      setEditando(false)
+      aoMudar()
+    } catch (e) {
+      setErro((e as Error).message)
+    } finally {
+      setSalvando(false)
+    }
+  }
+
+  if (editando) {
+    return (
+      <td className="relative border px-0 py-0" style={{ borderColor: BORDA, background: "#FFF9E6" }}>
+        <input
+          autoFocus
+          value={texto}
+          disabled={salvando}
+          onChange={(e) => setTexto(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") { e.preventDefault(); void gravar(false) }
+            if (e.key === "Escape") { e.preventDefault(); setEditando(false); setErro(null) }
+          }}
+          // Blur CANCELA. Clicar fora é desistir; gravar aqui alteraria dinheiro
+          // sem o operador ter confirmado nada.
+          onBlur={() => { setEditando(false); setErro(null) }}
+          className="w-full bg-transparent px-1 py-[1px] text-right text-[9px] tabular-nums outline-none"
+          title={erro ?? "Enter grava · Esc cancela"}
+        />
+        {celula?.valorOverride != null && (
+          <button
+            // `onMouseDown` porque o `onBlur` do input dispara antes do click.
+            onMouseDown={(e) => { e.preventDefault(); void gravar(true) }}
+            className="absolute right-0 top-full z-10 whitespace-nowrap border bg-white px-1 text-[8px]"
+            style={{ borderColor: BORDA }}
+          >
+            Restaurar padrão
+          </button>
+        )}
+      </td>
+    )
+  }
+
+  return (
+    <td
+      className={`relative border px-1 py-[1px] tabular-nums ${texto0 === "-" ? "text-center" : "text-left"} ${podeEditar ? "cursor-cell" : ""}`}
+      style={{ borderColor: BORDA }}
+      title={titulo}
+      onClick={() => {
+        if (!podeEditar) return
+        setTexto(celula?.valorEfetivo != null ? String(celula.valorEfetivo).replace(".", ",") : "")
+        setEditando(true)
+      }}
+    >
+      {texto0}
+      {celula?.estado === "SOBRESCRITO" && (
+        // O marcador do Excel para "esta célula tem algo": 4px no canto. No
+        // papel ele desaparece; na tela ele responde "por que este número é
+        // diferente do da tabela?" sem ocupar espaço nenhum.
+        <span
+          aria-label="valor combinado neste processo"
+          className="pointer-events-none absolute right-0 top-0"
+          style={{ width: 0, height: 0, borderTop: `4px solid ${AZUL}`, borderLeft: "4px solid transparent" }}
+        />
+      )}
+    </td>
+  )
 }
 
 export function PlanilhaDocumentalView({ processoId }: { processoId: number }) {
@@ -188,6 +337,10 @@ export function PlanilhaDocumentalView({ processoId }: { processoId: number }) {
   }
   if (!p) return null
 
+  // Depois de gravar um combinado a planilha inteira é relida: o total da
+  // linha, o da pessoa e o do processo mudam junto, e recalcular no cliente
+  // seria a segunda régua de soma.
+  const recarregar = () => { void req.recarregar() }
   const economicas = p.colunas
   const principais = p.pessoas.filter((b) => b.linhagemPrincipal)
   const apoio = p.pessoas.filter((b) => !b.linhagemPrincipal)
@@ -249,7 +402,7 @@ export function PlanilhaDocumentalView({ processoId }: { processoId: number }) {
         )}
 
         {principais.map((b) => (
-          <BlocoPessoa key={b.pessoaId} bloco={b} economicas={economicas} rotuloPrimeira="Geração" />
+          <BlocoPessoa key={b.pessoaId} bloco={b} economicas={economicas} rotuloPrimeira="Geração" processoId={processoId} aoMudar={recarregar} />
         ))}
 
         {apoio.length > 0 && (
@@ -263,7 +416,7 @@ export function PlanilhaDocumentalView({ processoId }: { processoId: number }) {
             {/* Nesta seção o arquivo troca o rótulo da primeira coluna: quem está
                 fora da linhagem não tem "geração", tem número de ordem. */}
             {apoio.map((b) => (
-              <BlocoPessoa key={b.pessoaId} bloco={b} economicas={economicas} rotuloPrimeira="Numero" />
+              <BlocoPessoa key={b.pessoaId} bloco={b} economicas={economicas} rotuloPrimeira="Numero" processoId={processoId} aoMudar={recarregar} />
             ))}
           </>
         )}
@@ -296,10 +449,14 @@ function BlocoPessoa({
   bloco,
   economicas,
   rotuloPrimeira,
+  processoId,
+  aoMudar,
 }: {
   bloco: Bloco
-  economicas: { tipoServicoId: number; nome: string }[]
+  economicas: { colunaId: number; tipoServicoId: number; nome: string }[]
   rotuloPrimeira: string
+  processoId: number
+  aoMudar: () => void
 }) {
   return (
     <div className="mb-4" style={{ breakInside: "avoid", pageBreakInside: "avoid" }}>
@@ -324,7 +481,7 @@ function BlocoPessoa({
               </th>
             ))}
             {economicas.map((c) => (
-              <th key={c.tipoServicoId} className="border px-1 py-[1px] text-center text-[8px] font-semibold text-white" style={{ borderColor: BORDA }}>
+              <th key={c.colunaId} className="border px-1 py-[1px] text-center text-[8px] font-semibold text-white" style={{ borderColor: BORDA }}>
                 {c.nome}
               </th>
             ))}
@@ -354,23 +511,16 @@ function BlocoPessoa({
                   "-"
                 )}
               </td>
-              {economicas.map((c) => {
-                const celula = l.celulas.find((x) => x.tipoServicoId === c.tipoServicoId)
-                const titulo = tituloDaCelula(celula)
-                const texto = textoDaCelula(celula)
-                return (
-                  <td
-                    key={c.tipoServicoId}
-                    // Valor à esquerda, ausência centrada: é o alinhamento do
-                    // arquivo, e ele faz a coluna de números ler como coluna.
-                    className={`border px-1 py-[1px] tabular-nums ${texto === "-" ? "text-center" : "text-left"}`}
-                    style={{ borderColor: BORDA }}
-                    title={titulo}
-                  >
-                    {texto}
-                  </td>
-                )
-              })}
+              {economicas.map((c) => (
+                <CelulaEconomica
+                  key={c.colunaId}
+                  celula={l.celulas.find((x) => x.colunaId === c.colunaId)}
+                  processoId={processoId}
+                  pessoaId={bloco.pessoaId}
+                  tipoDocumentoId={l.tipoDocumentoId}
+                  aoMudar={aoMudar}
+                />
+              ))}
               <td className="border px-1 py-[1px] text-right tabular-nums" style={{ borderColor: BORDA }}>
                 {fmt(l.totalBrl)}
               </td>

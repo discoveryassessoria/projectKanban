@@ -83,12 +83,16 @@ ok("o GET tem gate de permissão financeira", /verificarPermissao\(request, 'fin
 secao("2) Nenhuma coluna e nenhum preço escritos no código")
 // ═══════════════════════════════════════════════════════════════════════════
 const NOMES_DE_SERVICO = /["'](Certidão Inteiro Teor|Desmaterialização|Apostilamento[^"']*|Tradução Juramentada)["']/
+// COMENTÁRIO NÃO É CÓDIGO. Explicar POR QUE "Certidão Inteiro Teor" é uma
+// coluna só é justamente o que impede a próxima pessoa de recriar três; o que
+// não pode existir é o nome sendo COMPARADO ou EMITIDO em tempo de execução.
+const semComentarios = (src: string) =>
+  src.replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*\/\/[^\n]*$/gm, "").replace(/\/\/[^\n"']*$/gm, "")
 for (const [rotulo, src] of [["a projeção", projecao], ["a grade", view], ["o editor", editor]] as const) {
-  ok(`${rotulo} não tem nome de serviço escrito no código`, !NOMES_DE_SERVICO.test(src))
+  ok(`${rotulo} não tem nome de serviço escrito no código`, !NOMES_DE_SERVICO.test(semComentarios(src)))
 }
 const DINHEIRO = /\b\d+[.,]\d{2}\b/
-ok("a projeção não tem valor monetário escrito no código",
-  !DINHEIRO.test(projecao.replace(/\/\/[^\n]*/g, "").replace(/\/\*[\s\S]*?\*\//g, "")))
+ok("a projeção não tem valor monetário escrito no código", !DINHEIRO.test(semComentarios(projecao)))
 // A frase "o valor vem da Tabela de Preços" é PROSA na tela e é bem-vinda. O que
 // não pode existir é CAMPO: input, estado ou payload de preço no editor.
 ok("o editor de colunas não tem campo de preço",
@@ -274,6 +278,81 @@ for (const enfeite of ["shadow", "rounded-", "gradient", "backdrop-", "badge"]) 
   ok(`a planilha não tem ${enfeite}`, !corpoPlanilha.includes(enfeite))
 }
 ok("a planilha não usa token de tema dentro da área reproduzida", !/var\(--/.test(corpoPlanilha))
+
+// ═══════════════════════════════════════════════════════════════════════════
+secao("14) A PLANILHA É UMA MATRIZ — registro na linha, etapa na coluna")
+// ═══════════════════════════════════════════════════════════════════════════
+// A REGRA PERMANENTE. A configuração amarrava a coluna a UM item do Cadastro
+// Mestre, e como "Certidão de Nascimento - Inteiro Teor" e "Certidão de
+// Casamento - Inteiro Teor" são itens distintos, viravam DUAS COLUNAS — uma
+// matriz diagonal, com metade das células estruturalmente vazia porque a mesma
+// informação estava sendo dita duas vezes: uma na linha, outra na coluna.
+//
+// É UMA coluna ("Certidão Inteiro Teor") em três linhas. Este guard existe para
+// que ninguém volte a modelar documento-específico como coluna.
+const matriz = ler("lib/financeiro/leitura/planilha-matriz.ts")
+const override = ler("lib/financeiro/planilha-celula-override.ts")
+
+ok("existe um resolvedor de interseção separado da tela", /export function resolverIntersecao\(/.test(matriz))
+ok("as duas estratégias são declaradas", /'SERVICO_FIXO'/.test(matriz) && /'ITEM_DO_REGISTRO'/.test(matriz))
+ok("a coluna de etapa é ancorada em CATEGORIA, não em item",
+  /categoriaItemId/.test(matriz) && /categoriaItemId\s+Int\?/.test(schema))
+ok("a coluna declara a estratégia no banco", /estrategia\s+String/.test(schema))
+
+// O item da célula vem do vínculo que o Cadastro Mestre já declara
+// (TipoDocumentoCadastro.itemCatalogoId), FK a FK.
+ok("a interseção resolve pelo item do registro, por ID", /registro\.itemCatalogoId/.test(matriz))
+ok("a projeção lê itemCatalogoId do tipo documental", /itemCatalogoId: true/.test(projecao))
+
+// ZERO MATCH POR TEXTO em toda a cadeia da matriz.
+for (const proibido of ['includes("nascimento', 'includes("casamento', 'includes("óbito', 'includes("obito',
+                        'includes("apostila', 'includes("tradu', 'toLowerCase().includes']) {
+  for (const [rotulo, src] of [["a matriz", matriz], ["a projeção", projecao], ["a grade", view]] as const) {
+    ok(`${rotulo} não resolve regra por texto (${proibido})`, !src.toLowerCase().includes(proibido.toLowerCase()))
+  }
+}
+
+// AMBIGUIDADE não vira número.
+ok("duas candidatas produzem AMBIGUO, não uma soma", /tipo: 'AMBIGUO'/.test(matriz))
+ok("a projeção trata AMBIGUO como estado de célula", /'AMBIGUO'/.test(projecao))
+ok("a ambiguidade vira pendência visível", /mais de uma Configuração Financeira para a mesma célula/.test(projecao))
+
+// NADA POR CÉLULA — o custo cresce com o cadastro, não com a família.
+ok("a interseção é resolvida uma vez, fora do laço de pessoas",
+  projecao.indexOf("const intersecao = new Map") < projecao.indexOf("const blocos: BlocoPessoa[] = pessoas.map"))
+ok("o preço é resolvido por CONFIG distinta, não por célula", /for \(const configId of configsUsadas\)/.test(projecao))
+ok("os combinados vêm numa consulta só", /await overridesDoProcesso\(processoId\)/.test(projecao))
+const corpoCelula = projecao.slice(projecao.indexOf("const celulas: CelulaPlanilha[]"), projecao.indexOf("totalGeralCent +="))
+ok("nenhuma consulta ao banco dentro da célula", !/await |prisma\./.test(corpoCelula))
+
+// ═══════════════════════════════════════════════════════════════════════════
+secao("15) O combinado é do processo — a Tabela de Preços é de todos")
+// ═══════════════════════════════════════════════════════════════════════════
+ok("o override tem entidade própria", /model PlanilhaCelulaOverride \{/.test(schema))
+const corpoOverride = schema.slice(schema.indexOf("model PlanilhaCelulaOverride {"))
+const bodyOverride = corpoOverride.slice(0, corpoOverride.indexOf("\n}"))
+ok("a identidade é a interseção inteira",
+  /@@unique\(\[processoId, pessoaId, tipoDocumentoId, colunaId\]\)/.test(bodyOverride))
+ok("pessoa removida leva o override junto (nada de custo fantasma)",
+  /pessoaId[\s\S]{0,200}onDelete: Cascade/.test(bodyOverride))
+ok("o serviço de override NUNCA escreve na Tabela de Preços",
+  !/tabelaValor\.(create|update|updateMany|upsert|delete|deleteMany)/.test(override))
+ok("o serviço de override não toca no cadastro mestre",
+  !/produtoFinanceiro\.(create|update|upsert|delete)/.test(override) &&
+  !/itemCatalogo\.(create|update|upsert|delete)/.test(override))
+ok("toda escrita de override é auditada", /logAuditoria\.create/.test(override))
+ok("a auditoria guarda de-para", /de: ev\.de/.test(override) && /para: ev\.para/.test(override))
+ok("zero é valor legítimo; só negativo é recusado", /args\.valor < 0/.test(override))
+ok("o valor efetivo é override sobre base, calculado na leitura",
+  /valorEfetivo/.test(projecao) && /valorBase/.test(projecao))
+
+// A EDIÇÃO NÃO PODE POLUIR A PLANILHA.
+ok("a grade não tem coluna de ações", !/>\s*Ações\s*</.test(view))
+ok("a edição não põe botão em toda célula", !/Editar<\/button>/.test(view))
+ok("o marcador de override é discreto (4px no canto)", /borderTop: `4px solid/.test(view))
+ok("o frontend não decide qual documento nem qual preço",
+  !/CERT_|itemCatalogo|categoriaItem|resolverPreco/.test(view),
+  "quem resolve a interseção é a projeção; a tela renderiza")
 
 // ── Resultado ──────────────────────────────────────────────────────────────
 console.log(`\n${"═".repeat(70)}`)

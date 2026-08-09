@@ -4098,6 +4098,8 @@ CREATE TABLE "DocumentoGeradoVersao" (
 CREATE TABLE "PlanilhaDocumentalColuna" (
     "id" SERIAL NOT NULL,
     "origem" VARCHAR(20) NOT NULL,
+    "estrategia" VARCHAR(24) NOT NULL DEFAULT 'SERVICO_FIXO',
+    "categoriaItemId" INTEGER,
     "configId" INTEGER,
     "tipoDocumentoId" INTEGER,
     "posicao" INTEGER NOT NULL DEFAULT 0,
@@ -4107,6 +4109,23 @@ CREATE TABLE "PlanilhaDocumentalColuna" (
     "atualizadoEm" TIMESTAMP(3) NOT NULL,
 
     CONSTRAINT "PlanilhaDocumentalColuna_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "PlanilhaCelulaOverride" (
+    "id" SERIAL NOT NULL,
+    "processoId" INTEGER NOT NULL,
+    "pessoaId" INTEGER NOT NULL,
+    "tipoDocumentoId" INTEGER NOT NULL,
+    "colunaId" INTEGER NOT NULL,
+    "valor" DECIMAL(14,2) NOT NULL,
+    "moeda" VARCHAR(3) NOT NULL DEFAULT 'BRL',
+    "autorId" INTEGER,
+    "motivo" VARCHAR(300),
+    "criadoEm" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "atualizadoEm" TIMESTAMP(3) NOT NULL,
+
+    CONSTRAINT "PlanilhaCelulaOverride_pkey" PRIMARY KEY ("id")
 );
 
 -- CreateTable
@@ -5800,6 +5819,15 @@ CREATE UNIQUE INDEX "PlanilhaDocumentalColuna_tipoDocumentoId_key" ON "PlanilhaD
 CREATE INDEX "PlanilhaDocumentalColuna_ativa_posicao_idx" ON "PlanilhaDocumentalColuna"("ativa", "posicao");
 
 -- CreateIndex
+CREATE INDEX "PlanilhaDocumentalColuna_estrategia_idx" ON "PlanilhaDocumentalColuna"("estrategia");
+
+-- CreateIndex
+CREATE INDEX "PlanilhaCelulaOverride_processoId_idx" ON "PlanilhaCelulaOverride"("processoId");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "PlanilhaCelulaOverride_processoId_pessoaId_tipoDocumentoId__key" ON "PlanilhaCelulaOverride"("processoId", "pessoaId", "tipoDocumentoId", "colunaId");
+
+-- CreateIndex
 CREATE INDEX "_ReciboPagamento_B_index" ON "_ReciboPagamento"("B");
 
 -- CreateIndex
@@ -6664,10 +6692,28 @@ ALTER TABLE "DocumentoGeradoVersao" ADD CONSTRAINT "DocumentoGeradoVersao_substi
 ALTER TABLE "DocumentoGeradoVersao" ADD CONSTRAINT "DocumentoGeradoVersao_invalidadaPorId_fkey" FOREIGN KEY ("invalidadaPorId") REFERENCES "Usuario"("id") ON DELETE SET NULL ON UPDATE CASCADE;
 
 -- AddForeignKey
+ALTER TABLE "PlanilhaDocumentalColuna" ADD CONSTRAINT "PlanilhaDocumentalColuna_categoriaItemId_fkey" FOREIGN KEY ("categoriaItemId") REFERENCES "CategoriaServico"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
 ALTER TABLE "PlanilhaDocumentalColuna" ADD CONSTRAINT "PlanilhaDocumentalColuna_configId_fkey" FOREIGN KEY ("configId") REFERENCES "ProdutoFinanceiro"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "PlanilhaDocumentalColuna" ADD CONSTRAINT "PlanilhaDocumentalColuna_tipoDocumentoId_fkey" FOREIGN KEY ("tipoDocumentoId") REFERENCES "TipoDocumentoCadastro"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "PlanilhaCelulaOverride" ADD CONSTRAINT "PlanilhaCelulaOverride_processoId_fkey" FOREIGN KEY ("processoId") REFERENCES "Processo"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "PlanilhaCelulaOverride" ADD CONSTRAINT "PlanilhaCelulaOverride_pessoaId_fkey" FOREIGN KEY ("pessoaId") REFERENCES "Pessoa"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "PlanilhaCelulaOverride" ADD CONSTRAINT "PlanilhaCelulaOverride_tipoDocumentoId_fkey" FOREIGN KEY ("tipoDocumentoId") REFERENCES "TipoDocumentoCadastro"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "PlanilhaCelulaOverride" ADD CONSTRAINT "PlanilhaCelulaOverride_colunaId_fkey" FOREIGN KEY ("colunaId") REFERENCES "PlanilhaDocumentalColuna"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "PlanilhaCelulaOverride" ADD CONSTRAINT "PlanilhaCelulaOverride_autorId_fkey" FOREIGN KEY ("autorId") REFERENCES "Usuario"("id") ON DELETE SET NULL ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "_ReciboPagamento" ADD CONSTRAINT "_ReciboPagamento_A_fkey" FOREIGN KEY ("A") REFERENCES "PagamentoFatura"("id") ON DELETE CASCADE ON UPDATE CASCADE;

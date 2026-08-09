@@ -62,6 +62,7 @@ model Usuario {
   documentosGeradosInvalidados DocumentoGeradoVersao[]  @relation("DocumentoGeradoVersaoInvalidador")
 
   @@index([perfilId])
+  planilhaOverrides PlanilhaCelulaOverride[] @relation("OverridePlanilhaAutor")
 }
 
 model Pessoa {
@@ -152,6 +153,7 @@ model Pessoa {
   @@index([pais_nasc])
   @@index([maeId])
   @@index([paiId])
+  planilhaOverrides PlanilhaCelulaOverride[]
 }
 
 model Uniao {
@@ -480,6 +482,7 @@ model Processo {
   @@index([familiaId])
   @@index([tipoProcessoMotorId])
   @@index([enquadramentoLegalId])
+  planilhaOverrides PlanilhaCelulaOverride[]
 }
 
 model ProcessoContratante {
@@ -3193,6 +3196,7 @@ model TipoDocumentoCadastro {
   econRules               PhaseEconomicRule[]       @relation("EconTipoDocumento")
   participaPlanilha       Boolean                   @default(false)
   colunaPlanilha          PlanilhaDocumentalColuna? @relation("ColunaPlanilhaTipoDoc")
+  overridesPlanilha       PlanilhaCelulaOverride[]  @relation("OverrideTipoDoc")
   // LOTE A â categoriaDocumentalId Ã© a CLASSIFICAÃÃO CANÃNICA (consumida por ID).
   // FK nullable p/ backfill seguro. A coluna `category` (String) permanece SÃ como
   // compatibilidade transitÃ³ria (dual-read/dual-write). NÃ£o remover neste lote.
@@ -4971,7 +4975,8 @@ model CategoriaServico {
 
   // Fonte ÚNICA de categoria do catálogo. O vínculo vive no mestre
   // (ItemCatalogo) — serviço e item técnico compartilham o mesmo portador.
-  itens ItemCatalogo[]
+  itens         ItemCatalogo[]
+  colunasPlanilha PlanilhaDocumentalColuna[]
 }
 
 /// Categorias das organizações (cartório, consulado, tribunal, banco, tradutor…).
@@ -6518,14 +6523,45 @@ model DocumentoGeradoVersao {
 // texto: renomear o serviço no cadastro fazia a coluna sumir da planilha sem
 // nenhum erro.
 // ============================================================================
+/// UMA COLUNA DA PLANILHA É UMA ETAPA/SERVIÇO DOCUMENTAL — nunca um documento.
+///
+/// A planilha é uma MATRIZ: a LINHA é o registro civil (nascimento, casamento,
+/// óbito) e a COLUNA é a etapa que incide sobre ele (certidão inteiro teor,
+/// apostilamento, tradução). A célula é a interseção.
+///
+/// O modelo anterior amarrava `configId` a UM item do Cadastro Mestre, e isso
+/// obrigava "Certidão de Nascimento - Inteiro Teor" e "Certidão de Casamento -
+/// Inteiro Teor" a virarem DUAS COLUNAS — misturando as duas dimensões. São o
+/// mesmo serviço sobre registros diferentes: uma coluna, três linhas.
+///
+/// Daí as duas estratégias de resolução, ambas por ID:
+///
+///   SERVICO_FIXO      a coluna aponta para UMA Configuração Financeira, igual
+///                     em toda linha (tradução, apostilamento). `configId`.
+///
+///   ITEM_DO_REGISTRO  o item varia com a linha. A coluna aponta para a
+///                     CATEGORIA do catálogo (`categoriaItemId`), e a célula
+///                     resolve a Configuração Financeira do item que o tipo
+///                     documental daquela linha já declara em
+///                     `TipoDocumentoCadastro.itemCatalogoId`.
 model PlanilhaDocumentalColuna {
   id Int @id @default(autoincrement())
 
   /// SERVICO (ProdutoFinanceiro) | DOCUMENTO (TipoDocumentoCadastro).
   origem String @db.VarChar(20)
 
+  /// SERVICO_FIXO | ITEM_DO_REGISTRO — como a célula descobre o item canônico.
+  estrategia String @default("SERVICO_FIXO") @db.VarChar(24)
+
+  /// Categoria do catálogo que delimita os itens de uma coluna ITEM_DO_REGISTRO.
+  /// É o que impede a coluna "Certidão Inteiro Teor" de resolver um item de
+  /// tradução só porque o tipo documental da linha aponta para ele.
+  categoriaItemId Int?
+  categoriaItem   CategoriaServico? @relation(fields: [categoriaItemId], references: [id], onDelete: Restrict)
+
   /// Configuração Financeira do serviço — é ela que o resolvedor de preço recebe.
   /// `@unique` (parcial no Postgres, nulos não competem): um item, uma coluna.
+  /// Só em SERVICO_FIXO; em ITEM_DO_REGISTRO é nulo e quem manda é a categoria.
   configId Int?               @unique
   config   ProdutoFinanceiro? @relation("ColunaPlanilhaConfig", fields: [configId], references: [id], onDelete: Cascade)
 
@@ -6547,5 +6583,54 @@ model PlanilhaDocumentalColuna {
   criadoEm     DateTime @default(now())
   atualizadoEm DateTime @updatedAt
 
+  overrides PlanilhaCelulaOverride[]
+
   @@index([ativa, posicao])
+  @@index([estrategia])
+}
+
+/// VALOR DA CÉLULA COMBINADO PARA ESTE PROCESSO — e só para ele.
+///
+/// A Tabela de Preços continua sendo a fonte canônica do valor padrão. O
+/// override não a corrige nem a substitui: ele diz "neste processo, nesta
+/// pessoa, neste registro, nesta etapa, o combinado foi outro". Por isso a
+/// identidade é a interseção inteira, por IDs — trocar qualquer um dos quatro
+/// é outra célula.
+///
+/// O valor efetivo é `override ?? preço resolvido`. A origem nunca é
+/// substituída em silêncio: a célula continua sabendo (e mostrando) o preço
+/// base que deixou de valer.
+model PlanilhaCelulaOverride {
+  id Int @id @default(autoincrement())
+
+  processoId Int
+  processo   Processo @relation(fields: [processoId], references: [id], onDelete: Cascade)
+
+  /// A pessoa da árvore. `onDelete: Cascade` — pessoa removida não deixa
+  /// override órfão somando no total.
+  pessoaId Int
+  pessoa   Pessoa @relation(fields: [pessoaId], references: [id], onDelete: Cascade)
+
+  /// O REGISTRO da linha (o tipo documental), não o documento concreto: o
+  /// combinado vale para a certidão de nascimento daquela pessoa, tenha ela
+  /// sido localizada ou não.
+  tipoDocumentoId Int
+  tipoDocumento   TipoDocumentoCadastro @relation("OverrideTipoDoc", fields: [tipoDocumentoId], references: [id], onDelete: Cascade)
+
+  colunaId Int
+  coluna   PlanilhaDocumentalColuna @relation(fields: [colunaId], references: [id], onDelete: Cascade)
+
+  valor Decimal @db.Decimal(14, 2)
+  moeda String  @default("BRL") @db.VarChar(3)
+
+  /// Quem combinou e por quê — a auditoria completa vive em LogAuditoria.
+  autorId Int?
+  autor   Usuario? @relation("OverridePlanilhaAutor", fields: [autorId], references: [id], onDelete: SetNull)
+  motivo  String?  @db.VarChar(300)
+
+  criadoEm     DateTime @default(now())
+  atualizadoEm DateTime @updatedAt
+
+  @@unique([processoId, pessoaId, tipoDocumentoId, colunaId])
+  @@index([processoId])
 }

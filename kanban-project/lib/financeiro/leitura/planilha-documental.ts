@@ -2,10 +2,13 @@
 // ============================================================================
 // PLANILHA DOCUMENTAL — projeção econômico-documental. Nunca fonte.
 //
-// A LINHA é um TIPO documental de uma pessoa (os que o Cadastro Mestre marca com
-// `participaPlanilha`); a COLUNA é um item do cadastro canônico escolhido em
-// Configuração da Planilha; a CÉLULA é o custo daquele serviço naquele
-// documento. Ela não guarda nada e não decide nada:
+// ─── A PLANILHA É UMA MATRIZ ────────────────────────────────────────────────
+// LINHA  = registro civil da pessoa (os tipos com `participaPlanilha`)
+// COLUNA = etapa/serviço documental (certidão inteiro teor, apostilamento…)
+// CÉLULA = a interseção: o item canônico que aquela etapa produz sobre aquele
+//          registro (ver `planilha-matriz.ts`) e o preço dele.
+//
+// Ela não guarda nada e não decide nada:
 //
 //   quem aparece   → Árvore (pessoas ATIVAS) e Documento
 //   o que aplica   → resolverElegibilidadeDocumental (Matriz + Regra Econômica)
@@ -20,9 +23,11 @@
 //
 // Agora cada célula tem ESTADO, e o número só aparece quando significa algo:
 //
-//   NAO_APLICAVEL  —            a regra não manda este serviço para este documento
+//   NAO_APLICAVEL  —            a regra não manda esta etapa para este registro
 //   SEM_PRECO      Sem valor    aplicável, mas a Tabela de Preços não resolve
+//   AMBIGUO        —            duas configurações disputam a interseção
 //   PREVISTO       R$ x         aplicável, preço vigente resolvido (projeção)
+//   SOBRESCRITO    R$ x         combinado DESTE processo (não altera a Tabela)
 //   REALIZADO      R$ x         virou obrigação — valor CONGELADO, não recalcula
 //
 // ─── PREVISTO RECALCULA, REALIZADO NÃO ──────────────────────────────────────
@@ -32,8 +37,10 @@
 // reescreve o que foi cobrado ontem.
 //
 // ─── DESEMPENHO ─────────────────────────────────────────────────────────────
-// O preço é resolvido UMA VEZ POR COLUNA, não por célula: um processo com 100
-// pessoas, 300 documentos e 8 colunas faz 8 resoluções de preço, não 2.400.
+// Nada é consultado por célula. A interseção (coluna × registro) é resolvida
+// uma vez para a planilha toda; o preço, uma vez por configuração distinta; os
+// combinados, numa consulta só. Um processo com 100 pessoas, 3 registros e 8
+// colunas resolve 24 interseções e ~8 preços — não 2.400 consultas.
 // ============================================================================
 
 import { prisma } from '@/lib/prisma'
@@ -45,6 +52,11 @@ import { resolverElegibilidadeDocumental } from '@/src/lib/motor/elegibilidade-d
 import { resolverPrecoPorConfigDB } from '@/src/lib/motor/resolver-preco-financeiro.prisma'
 import { pessoasAtivasDaArvore } from '@/src/lib/genealogia/vinculo-ativo'
 import { montarPessoasDoProcesso } from '@/src/lib/process-stage/central-operacional-core'
+import {
+  resolverIntersecao, chaveDaCelula,
+  type ColunaMatriz, type ConfigCandidata, type ResolucaoMatriz,
+} from './planilha-matriz'
+import { overridesDoProcesso } from '../planilha-celula-override'
 
 // ── DINHEIRO EM CENTAVOS ────────────────────────────────────────────────────
 // Soma de dinheiro não se faz em float: 146.24 + 7.64 + 151.05 já erra o
@@ -52,12 +64,23 @@ import { montarPessoasDoProcesso } from '@/src/lib/process-stage/central-operaci
 const paraCentavos = (v: unknown): number => Math.round(Number(v ?? 0) * 100)
 const paraReais = (centavos: number): number => Math.round(centavos) / 100
 
-export type EstadoCelula = 'NAO_APLICAVEL' | 'SEM_PRECO' | 'PREVISTO' | 'REALIZADO'
+/**
+ * O QUE A CÉLULA SABE. `PREVISTO` e `REALIZADO` trazem número; os outros três
+ * dizem, cada um, uma coisa diferente que R$ 0,00 não sabe dizer:
+ *
+ *   NAO_APLICAVEL  a regra não manda esta etapa para este registro
+ *   SEM_PRECO      aplicável, mas a Tabela de Preços não resolve
+ *   AMBIGUO        duas configurações disputam a mesma interseção — erro de
+ *                  cadastro. Escolher uma esconderia o erro dentro de um
+ *                  número que parece certo; somar as duas, pior ainda.
+ *   SOBRESCRITO    vale o combinado deste processo, não o preço da tabela
+ */
+export type EstadoCelula = 'NAO_APLICAVEL' | 'SEM_PRECO' | 'PREVISTO' | 'REALIZADO' | 'SOBRESCRITO' | 'AMBIGUO'
 
 /** Por que esta célula mostra este número — a resposta do Explain Engine. */
 export interface ExplicacaoCelula {
   servico: string
-  origem: 'Tabela de Preços' | 'Lançamento realizado (valor congelado)' | null
+  origem: 'Tabela de Preços' | 'Lançamento realizado (valor congelado)' | 'Combinado deste processo' | null
   tabelaValorId: number | null
   regra: string | null
   moeda: string | null
@@ -65,10 +88,25 @@ export interface ExplicacaoCelula {
   obrigacoes: number[]
   /** motivo textual quando não há valor a mostrar */
   motivo: string | null
+  /** O registro desta linha e a etapa desta coluna — a interseção, por extenso. */
+  registro: string | null
+  /** O item do Cadastro Mestre que a interseção resolveu. Nunca um nome solto. */
+  itemResolvidoId: number | null
+  itemResolvidoNome: string | null
+  /** O preço da Tabela, mesmo quando um combinado passou na frente dele. */
+  valorBase: number | null
 }
 
 export interface CelulaPlanilha {
   colunaId: number
+  /** Preço da Tabela de Preços — continua visível mesmo sob override. */
+  valorBase: number | null
+  /** Combinado deste processo, quando existir. */
+  valorOverride: number | null
+  /** `override ?? base` — é este que entra nos totais. */
+  valorEfetivo: number | null
+  /** A célula aceita edição inline? Só faz sentido onde há etapa aplicável. */
+  editavel: boolean
   /** mantido para compatibilidade da resposta legada */
   tipoServicoId: number
   estado: EstadoCelula
@@ -232,19 +270,88 @@ export async function montarPlanilhaDocumental(processoId: number): Promise<Plan
     pendencias.push({ motivo: 'processo sem Tipo de Processo do motor — nenhuma regra documental se aplica' })
   }
 
-  // ── 3. PREÇO — uma resolução POR COLUNA (não por célula) ──────────────────
+  // ── 3. LINHAS — os registros que o cadastro declara como da planilha ──────
+  // Precisam vir ANTES do preço: a coluna sozinha não sabe qual item precifica,
+  // quem diz isso é a linha.
+  const tiposDaPlanilha = await prisma.tipoDocumentoCadastro.findMany({
+    where: { participaPlanilha: true },
+    orderBy: { id: 'asc' },
+    select: { id: true, name: true, legacyEnumKey: true, code: true, itemCatalogoId: true },
+  })
+  const idsTipo = tiposDaPlanilha.map((t) => t.id)
+  const enumsTipo = tiposDaPlanilha.map((t) => t.legacyEnumKey).filter((v): v is string => !!v)
+  const tipoPorEnum = new Map(tiposDaPlanilha.filter((t) => t.legacyEnumKey).map((t) => [t.legacyEnumKey as string, t]))
+
+  // ── 4. A MATRIZ — qual item canônico cada interseção resolve ──────────────
+  // Índice de Configurações Financeiras POR ITEM do catálogo, com a categoria do
+  // item lida do mestre. Uma consulta para a matriz inteira: a resolução depois
+  // é em memória, e é isso que impede o N+1 por célula.
+  const candidatos = await prisma.produtoFinanceiro.findMany({
+    where: { ativo: true, itemCatalogoId: { not: null } },
+    select: { id: true, itemCatalogoId: true, itemCatalogo: { select: { id: true, name: true, categoriaId: true } } },
+  })
+  const porItem = new Map<number, ConfigCandidata[]>()
+  const nomeDoItem = new Map<number, string>()
+  for (const c of candidatos) {
+    if (c.itemCatalogoId == null) continue
+    nomeDoItem.set(c.itemCatalogoId, c.itemCatalogo?.name ?? '')
+    porItem.set(c.itemCatalogoId, [
+      ...(porItem.get(c.itemCatalogoId) ?? []),
+      { configId: c.id, itemCatalogoId: c.itemCatalogoId, categoriaItemId: c.itemCatalogo?.categoriaId ?? null },
+    ])
+  }
+  // Coluna de serviço fixo também precisa saber que item ela resolve, para a
+  // explicação da célula poder nomeá-lo.
+  const itemDaConfig = new Map<number, number | null>(candidatos.map((c) => [c.id, c.itemCatalogoId]))
+
+  const colunasMatriz: ColunaMatriz[] = configuradas.map((c) => ({
+    id: c.id,
+    estrategia: c.estrategia,
+    configId: c.configId,
+    categoriaItemId: c.categoriaItemId,
+  }))
+
+  /** (coluna × registro) → item canônico. Resolvido UMA vez, não por pessoa. */
+  const intersecao = new Map<string, ResolucaoMatriz>()
+  for (const col of colunasMatriz) {
+    for (const t of tiposDaPlanilha) {
+      intersecao.set(
+        `${col.id}::${t.id}`,
+        resolverIntersecao(col, { tipoDocumentoId: t.id, itemCatalogoId: t.itemCatalogoId }, porItem),
+      )
+    }
+  }
+
+  // Ambiguidade é erro de cadastro e vira pendência VISÍVEL — nunca um número.
+  for (const [chave, r] of intersecao) {
+    if (r.tipo !== 'AMBIGUO') continue
+    const [colId, tipoId] = chave.split('::')
+    pendencias.push({
+      motivo: 'mais de uma Configuração Financeira para a mesma célula',
+      detalhe: `coluna ${colId} × registro ${tipoId}: candidatas ${r.candidatos.join(', ')} — a célula fica sem valor até o cadastro decidir`,
+    })
+  }
+
+  // ── 5. PREÇO — uma resolução por CONFIG RESOLVIDA, não por célula ─────────
+  // Com 6 pessoas × 3 registros × 5 colunas (90 células) e 7 configs distintas,
+  // são 7 resoluções de preço. O custo cresce com o CADASTRO, não com a família.
+  const configsUsadas = new Set<number>()
+  for (const r of intersecao.values()) if (r.tipo === 'RESOLVIDO') configsUsadas.add(r.configId)
+
   const precoPorConfig = new Map<number, PrecoDaColuna>()
-  for (const c of configuradas) {
-    if (c.configId == null) continue
-    const r = await resolverPrecoPorConfigDB(c.configId, {
+  for (const configId of configsUsadas) {
+    const r = await resolverPrecoPorConfigDB(configId, {
       processoId,
       tipoProcessoId: processo?.tipoProcessoMotorId != null ? String(processo.tipoProcessoMotorId) : '',
       natureza: NaturezaPreco.CUSTO, // PLANILHA DE CUSTOS: nunca preço de venda.
     })
-    precoPorConfig.set(c.configId, r.ok && !r.conflito
+    precoPorConfig.set(configId, r.ok && !r.conflito
       ? { ok: true, valor: r.valor, moeda: String(r.moeda), tabelaValorId: r.tabelaValorId, razao: r.razao, motivo: null }
       : { ok: false, valor: 0, moeda: null, tabelaValorId: null, razao: '', motivo: r.ok ? (r.conflito?.nota ?? 'conflito de preço') : r.razao })
   }
+
+  // ── 5b. COMBINADOS DESTE PROCESSO — uma consulta, não uma por célula ──────
+  const overrides = await overridesDoProcesso(processoId)
 
   // ── 4. REALIZADO — obrigações já lançadas (valor congelado) ───────────────
   const obrigacoes = await listarObrigacoes({ processoId, natureza: 'CUSTO' })
@@ -255,18 +362,6 @@ export async function montarPlanilhaDocumental(processoId: number): Promise<Plan
     const k = `${o.documentoId}::${o.configFinanceiraId}`
     realizadoPorCelula.set(k, [...(realizadoPorCelula.get(k) ?? []), o])
   }
-
-  // ── 5. LINHAS — os tipos que o cadastro declara como da planilha ──────────
-  // A ordem é a do cadastro (id), e é ela que a tela reproduz. Não há ordenação
-  // por nome: renomear um tipo não pode reordenar a planilha.
-  const tiposDaPlanilha = await prisma.tipoDocumentoCadastro.findMany({
-    where: { participaPlanilha: true },
-    orderBy: { id: 'asc' },
-    select: { id: true, name: true, legacyEnumKey: true, code: true },
-  })
-  const idsTipo = tiposDaPlanilha.map((t) => t.id)
-  const enumsTipo = tiposDaPlanilha.map((t) => t.legacyEnumKey).filter((v): v is string => !!v)
-  const tipoPorEnum = new Map(tiposDaPlanilha.filter((t) => t.legacyEnumKey).map((t) => [t.legacyEnumKey as string, t]))
 
   // PESSOAS ATIVAS da árvore — recorte canônico. Quem saiu não deixa bloco órfão,
   // e quem é requerente do processo mas nunca entrou na árvore não aparece aqui.
@@ -361,15 +456,49 @@ export async function montarPlanilhaDocumental(processoId: number): Promise<Plan
 
       const celulas: CelulaPlanilha[] = configuradas.map((cfg, i) => {
         const col = colunas[i]
-        const chave = `${d?.id ?? 0}::${cfg.configId}`
-        const obrs = cfg.configId != null ? realizadoPorCelula.get(chave) ?? [] : []
-        const aplica = cfg.configId != null && aplicavel.has(chave)
-        const preco = cfg.configId != null ? precoPorConfig.get(cfg.configId) : undefined
 
-        const base = { colunaId: cfg.id, tipoServicoId: col.tipoServicoId, naoConvertido: 0, obrigacoes: [] as number[] }
+        // A INTERSEÇÃO: qual item canônico esta ETAPA produz sobre ESTE
+        // registro. Já resolvida uma vez para toda a planilha.
+        const res = intersecao.get(`${cfg.id}::${tipoLinha.id}`) ?? { tipo: 'SEM_ITEM' as const, motivo: 'interseção não resolvida' }
+        const configResolvida = res.tipo === 'RESOLVIDO' ? res.configId : null
+        const itemId = configResolvida != null ? itemDaConfig.get(configResolvida) ?? null : null
 
-        // REALIZADO tem precedência sobre tudo: o fato manda, inclusive quando a
-        // regra deixou de aplicar depois. Esconder um custo lançado seria mentir.
+        const chave = `${d?.id ?? 0}::${configResolvida}`
+        const obrs = configResolvida != null ? realizadoPorCelula.get(chave) ?? [] : []
+        const aplica = configResolvida != null && aplicavel.has(chave)
+        const preco = configResolvida != null ? precoPorConfig.get(configResolvida) : undefined
+
+        const over = overrides.get(chaveDaCelula({
+          processoId, pessoaId: p.id, tipoDocumentoId: tipoLinha.id, colunaId: cfg.id,
+        }))
+
+        const explicaBase = {
+          servico: cfg.rotulo,
+          registro: tipoLinha.name,
+          itemResolvidoId: itemId,
+          itemResolvidoNome: itemId != null ? nomeDoItem.get(itemId) ?? null : null,
+        }
+        const base = {
+          colunaId: cfg.id, tipoServicoId: col.tipoServicoId, naoConvertido: 0, obrigacoes: [] as number[],
+          valorBase: null as number | null, valorOverride: over ? over.valor : null,
+          valorEfetivo: null as number | null, editavel: false,
+        }
+
+        // AMBIGUIDADE VEM ANTES DE TUDO: com duas configurações candidatas não
+        // existe "o" preço desta célula, e qualquer número aqui seria escolha
+        // arbitrária disfarçada de resultado.
+        if (res.tipo === 'AMBIGUO') {
+          return {
+            ...base, estado: 'AMBIGUO' as const, valor: null, valorBrl: null, moeda: null, automatico: false,
+            explicacao: {
+              ...explicaBase, origem: null, tabelaValorId: null, regra: null, moeda: null, obrigacoes: [],
+              motivo: `${res.motivo} Candidatas: ${res.candidatos.join(', ')}.`, valorBase: null,
+            },
+          }
+        }
+
+        // REALIZADO tem precedência sobre previsão e sobre combinado: o fato
+        // manda. Esconder um custo lançado seria mentir.
         if (obrs.length > 0) {
           const valorBrlCent = obrs.reduce((s, o) => s + paraCentavos(o.contratadoBrl), 0)
           const naoConv = obrs.reduce((s, o) => s + num(o.naoConvertido), 0)
@@ -383,17 +512,18 @@ export async function montarPlanilhaDocumental(processoId: number): Promise<Plan
             estado: 'REALIZADO' as const,
             valor: paraReais(obrs.reduce((s, o) => s + paraCentavos(o.valorContratado), 0)),
             valorBrl: paraReais(valorBrlCent),
+            valorEfetivo: paraReais(valorBrlCent),
             moeda: moedas.length === 1 ? moedas[0] : null,
             naoConvertido: naoConv,
             automatico: obrs.every((o) => ehAutomatico(o.origemLancamento)),
             obrigacoes: obrs.map((o) => o.obrigacaoId),
             explicacao: {
-              servico: cfg.rotuloCanonico,
+              ...explicaBase,
               origem: 'Lançamento realizado (valor congelado)' as const,
               tabelaValorId: null, regra: null,
               moeda: moedas.length === 1 ? moedas[0] : null,
               obrigacoes: obrs.map((o) => o.obrigacaoId),
-              motivo: null,
+              motivo: null, valorBase: null,
             },
           }
         }
@@ -402,8 +532,51 @@ export async function montarPlanilhaDocumental(processoId: number): Promise<Plan
           return {
             ...base, estado: 'NAO_APLICAVEL' as const, valor: null, valorBrl: null, moeda: null, automatico: false,
             explicacao: {
-              servico: cfg.rotuloCanonico, origem: null, tabelaValorId: null, regra: null, moeda: null, obrigacoes: [],
-              motivo: 'A Matriz Documental não aplica este serviço a este documento.',
+              ...explicaBase, origem: null, tabelaValorId: null, regra: null, moeda: null, obrigacoes: [],
+              motivo: res.tipo === 'SEM_ITEM'
+                ? res.motivo
+                : 'A Matriz Documental não aplica esta etapa a este registro.',
+              valorBase: null,
+            },
+          }
+        }
+
+        // A partir daqui a etapa APLICA — a célula aceita combinado, mesmo que a
+        // Tabela ainda não tenha preço para ela.
+        const precoBase = preco?.ok ? preco.valor : null
+
+        // O COMBINADO PASSA NA FRENTE DA TABELA — sem apagá-la. `valorBase`
+        // continua ali para a explicação poder dizer o que deixou de valer.
+        if (over) {
+          const cent = paraCentavos(over.valor)
+          const emBrl = over.moeda === 'BRL'
+          if (emBrl) {
+            totaisPorServicoCent[col.tipoServicoId] += cent
+            totalLinhaCent += cent
+            previstoCent += cent
+          } else {
+            naoConvLinha += over.valor
+          }
+          return {
+            ...base,
+            estado: 'SOBRESCRITO' as const,
+            valor: paraReais(cent),
+            valorBrl: emBrl ? paraReais(cent) : null,
+            valorBase: precoBase,
+            valorEfetivo: paraReais(cent),
+            moeda: over.moeda,
+            naoConvertido: emBrl ? 0 : over.valor,
+            automatico: false,
+            editavel: true,
+            explicacao: {
+              ...explicaBase,
+              origem: 'Combinado deste processo' as const,
+              tabelaValorId: preco?.tabelaValorId ?? null,
+              regra: preco?.razao || null,
+              moeda: over.moeda,
+              obrigacoes: [],
+              motivo: over.motivo,
+              valorBase: precoBase,
             },
           }
         }
@@ -411,10 +584,12 @@ export async function montarPlanilhaDocumental(processoId: number): Promise<Plan
         if (!preco?.ok) {
           return {
             ...base, estado: 'SEM_PRECO' as const, valor: null, valorBrl: null, moeda: null, automatico: false,
+            editavel: true,
             explicacao: {
-              servico: cfg.rotuloCanonico, origem: 'Tabela de Preços' as const, tabelaValorId: null, regra: null,
+              ...explicaBase, origem: 'Tabela de Preços' as const, tabelaValorId: null, regra: null,
               moeda: null, obrigacoes: [],
               motivo: preco?.motivo ?? 'Sem preço de custo vigente na Tabela de Preços.',
+              valorBase: null,
             },
           }
         }
@@ -437,17 +612,21 @@ export async function montarPlanilhaDocumental(processoId: number): Promise<Plan
           estado: 'PREVISTO' as const,
           valor: paraReais(valorCent),
           valorBrl: emBrl ? paraReais(valorCent) : null,
+          valorBase: preco.valor,
+          valorEfetivo: emBrl ? paraReais(valorCent) : null,
           moeda: preco.moeda,
           naoConvertido: emBrl ? 0 : preco.valor,
           automatico: true,
+          editavel: true,
           explicacao: {
-            servico: cfg.rotuloCanonico,
+            ...explicaBase,
             origem: 'Tabela de Preços' as const,
             tabelaValorId: preco.tabelaValorId,
             regra: preco.razao || null,
             moeda: preco.moeda,
             obrigacoes: [],
             motivo: null,
+            valorBase: preco.valor,
           },
         }
       })

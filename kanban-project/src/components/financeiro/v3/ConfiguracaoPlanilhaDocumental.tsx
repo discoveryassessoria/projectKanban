@@ -19,6 +19,9 @@ import { ArrowDown, ArrowUp, Plus, Trash2, Eye, EyeOff, Info } from "lucide-reac
 interface Coluna {
   id: number
   origem: "SERVICO" | "DOCUMENTO"
+  estrategia: "SERVICO_FIXO" | "ITEM_DO_REGISTRO"
+  categoriaItemId: number | null
+  categoriaItemNome: string | null
   configId: number | null
   tipoDocumentoId: number | null
   posicao: number
@@ -28,6 +31,35 @@ interface Coluna {
   rotuloOverride: string | null
 }
 interface Item { id: number; nome: string; codigo: string | null; jaEhColuna: boolean }
+interface Categoria { id: number; nome: string; codigo: string; itens: number; jaEhColuna: boolean }
+
+/**
+ * AS TRÊS MANEIRAS DE UMA COLUNA EXISTIR — e por que a do meio é a certa para
+ * "Certidão Inteiro Teor".
+ *
+ * A planilha é uma MATRIZ: o registro civil é a LINHA, a etapa é a COLUNA.
+ * Escolher um documento específico ("Certidão de Nascimento - Inteiro Teor")
+ * como coluna mistura as duas dimensões — ele pertence à linha. É o que
+ * produzia colunas repetidas, uma por certidão, com a metade das células
+ * estruturalmente vazia.
+ */
+const TIPOS_DE_COLUNA = [
+  {
+    chave: "ETAPA" as const,
+    rotulo: "Etapa sobre o registro",
+    ajuda: "Uma coluna para as três linhas. O item é resolvido pelo registro da linha — é assim que \u201CCertid\u00e3o Inteiro Teor\u201D vale nascimento, casamento e óbito.",
+  },
+  {
+    chave: "SERVICO" as const,
+    rotulo: "Serviço fixo",
+    ajuda: "O mesmo serviço em todas as linhas (tradução, apostilamento).",
+  },
+  {
+    chave: "DOCUMENTO" as const,
+    rotulo: "Documento específico",
+    ajuda: "Raro. Um documento que não é registro civil e não varia por linha.",
+  },
+]
 
 const COLUNAS_FIXAS = ["Data", "Local", "Dados do registro", "Cônjuge", "Genitores", "Observação"]
 
@@ -35,10 +67,11 @@ export function ConfiguracaoPlanilhaDocumental() {
   const [colunas, setColunas] = useState<Coluna[]>([])
   const [servicos, setServicos] = useState<Item[]>([])
   const [documentos, setDocumentos] = useState<Item[]>([])
+  const [categorias, setCategorias] = useState<Categoria[]>([])
   const [carregando, setCarregando] = useState(true)
   const [erro, setErro] = useState<string | null>(null)
   const [adicionando, setAdicionando] = useState(false)
-  const [origem, setOrigem] = useState<"SERVICO" | "DOCUMENTO">("SERVICO")
+  const [tipo, setTipo] = useState<"ETAPA" | "SERVICO" | "DOCUMENTO">("ETAPA")
   const [busca, setBusca] = useState("")
 
   const token = () => (typeof window === "undefined" ? "" : localStorage.getItem("authToken") ?? "")
@@ -57,6 +90,7 @@ export function ConfiguracaoPlanilhaDocumental() {
       setColunas(d.colunas ?? [])
       setServicos(d.disponiveis?.servicos ?? [])
       setDocumentos(d.disponiveis?.documentos ?? [])
+      setCategorias(d.categorias ?? [])
     } catch (e) {
       setErro(e instanceof Error ? e.message : "Não foi possível carregar a configuração.")
     } finally {
@@ -79,6 +113,7 @@ export function ConfiguracaoPlanilhaDocumental() {
         setColunas(d.colunas ?? [])
         setServicos(d.disponiveis?.servicos ?? [])
         setDocumentos(d.disponiveis?.documentos ?? [])
+        setCategorias(d.categorias ?? [])
         setCarregando(false)
       })
       .catch((e: unknown) => {
@@ -101,7 +136,15 @@ export function ConfiguracaoPlanilhaDocumental() {
 
   const adicionar = (itemId: number) =>
     acao(() => fetch("/api/financeiro/planilha-colunas", {
-      method: "POST", headers: cabecalho(), body: JSON.stringify({ origem, itemId }),
+      method: "POST",
+      headers: cabecalho(),
+      body: JSON.stringify(
+        // Coluna de ETAPA manda a CATEGORIA, não o item: quem escolhe o item é
+        // a linha, no momento em que a célula é resolvida.
+        tipo === "ETAPA"
+          ? { estrategia: "ITEM_DO_REGISTRO", categoriaItemId: itemId }
+          : { origem: tipo, itemId },
+      ),
     })).then(() => { setAdicionando(false); setBusca("") })
 
   const alternar = (c: Coluna) =>
@@ -123,9 +166,11 @@ export function ConfiguracaoPlanilhaDocumental() {
     }))
   }
 
-  const itens = (origem === "SERVICO" ? servicos : documentos).filter(
-    (i) => !i.jaEhColuna && i.nome.toLowerCase().includes(busca.trim().toLowerCase()),
-  )
+  const itens = (
+    tipo === "ETAPA"
+      ? categorias.map((c) => ({ id: c.id, nome: c.nome, codigo: `${c.itens} item(ns)`, jaEhColuna: c.jaEhColuna }))
+      : tipo === "SERVICO" ? servicos : documentos
+  ).filter((i) => !i.jaEhColuna && i.nome.toLowerCase().includes(busca.trim().toLowerCase()))
 
   return (
     <div className="space-y-5">
@@ -188,7 +233,9 @@ export function ConfiguracaoPlanilhaDocumental() {
                     {c.rotulo}
                   </div>
                   <div className="truncate text-[11px] text-[var(--text-muted)]">
-                    {c.origem === "SERVICO" ? "Serviço" : "Documento"} · {c.rotuloCanonico}
+                    {c.estrategia === "ITEM_DO_REGISTRO"
+                      ? `Etapa · resolve o item pelo registro da linha · ${c.categoriaItemNome ?? c.rotuloCanonico}`
+                      : `${c.origem === "SERVICO" ? "Serviço" : "Documento"} · ${c.rotuloCanonico}`}
                   </div>
                 </div>
 
@@ -215,19 +262,23 @@ export function ConfiguracaoPlanilhaDocumental() {
           </button>
         ) : (
           <div className="mt-3 space-y-2 rounded-[var(--radius-md)] border border-[var(--border-default)] p-3">
-            <div className="flex gap-2">
-              {(["SERVICO", "DOCUMENTO"] as const).map((o) => (
-                <button key={o} onClick={() => setOrigem(o)}
+            <div className="flex flex-wrap gap-2">
+              {TIPOS_DE_COLUNA.map((t) => (
+                <button key={t.chave} onClick={() => { setTipo(t.chave); setBusca("") }} title={t.ajuda}
                   className={`rounded-[var(--radius-sm)] border px-3 py-1 text-xs ${
-                    origem === o
+                    tipo === t.chave
                       ? "border-[var(--border-strong)] bg-[var(--surface-active)] text-[var(--text-primary)]"
                       : "border-[var(--border-default)] text-[var(--text-muted)]"
                   }`}>
-                  {o === "SERVICO" ? "Serviço" : "Documento"}
+                  {t.rotulo}
                 </button>
               ))}
             </div>
-            <input value={busca} onChange={(e) => setBusca(e.target.value)} placeholder="Buscar no cadastro mestre…"
+            <p className="text-[11px] text-[var(--text-muted)]">
+              {TIPOS_DE_COLUNA.find((t) => t.chave === tipo)?.ajuda}
+            </p>
+            <input value={busca} onChange={(e) => setBusca(e.target.value)}
+              placeholder={tipo === "ETAPA" ? "Buscar categoria do catálogo…" : "Buscar no cadastro mestre…"}
               className="w-full rounded-[var(--radius-sm)] border border-[var(--border-default)] bg-[var(--surface-primary)] px-3 py-1.5 text-sm text-[var(--text-primary)]" />
             <ul className="max-h-56 overflow-y-auto">
               {itens.length === 0 ? (

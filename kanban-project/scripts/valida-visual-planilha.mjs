@@ -11,8 +11,8 @@ const erros = []
 page.on('pageerror', (e) => erros.push(String(e)))
 page.on('console', (m) => { if (m.type() === 'error') erros.push(m.text()) })
 await page.addInitScript(([t, u]) => { localStorage.setItem('authToken', t); localStorage.setItem('user', u) }, [token, user])
-await page.goto(`${BASE}/financeiro/v3/processo-preview?processoId=${PROC}`, { waitUntil: 'networkidle' })
-await page.waitForTimeout(1200)
+await page.goto(`${BASE}/financeiro/v3/processo-preview?processoId=${PROC}`, { waitUntil: 'domcontentloaded', timeout: 90000 })
+await page.waitForTimeout(6000)
 const custos = page.getByRole('button', { name: /^Custos$/ }).first()
 if (await custos.count()) { await custos.click(); await page.waitForTimeout(2500) }
 const aba = page.getByRole('button', { name: /Planilha documental/ }).first()
