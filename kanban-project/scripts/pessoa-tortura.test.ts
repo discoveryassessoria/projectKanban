@@ -28,7 +28,7 @@
  *   lançamentos órfãos .................. 0
  */
 import { prisma } from "../src/lib/prisma"
-import { vincularRequerenteTx } from "../lib/genealogia/vincular-requerente"
+import { vincularRequerente } from "../lib/genealogia/vincular-requerente"
 import { removerPessoaDaArvore, analisarRemocaoPessoa } from "../src/services/pessoa-ciclo-vida"
 
 const URL_DB = process.env.PRISMA_DATABASE_URL || process.env.DATABASE_URL || ""
@@ -173,9 +173,7 @@ async function main() {
 
   for (let rodada = 1; rodada <= 10; rodada++) {
     // ── CRIAR: o requerente vira nó da árvore ──────────────────────────────
-    const vinculo = await prisma.$transaction((tx) =>
-      vincularRequerenteTx(tx, { arvoreId: arvore.id, requerenteId: requerente.id }),
-    )
+    const vinculo = await vincularRequerente({ arvoreId: arvore.id, requerenteId: requerente.id })
     if (!vinculo.ok) {
       ok(`rodada ${rodada}: vínculo criado`, false, vinculo.code)
       break
@@ -268,9 +266,7 @@ async function main() {
 
   // ── FATO PROTEGIDO IMPEDE HARD DELETE ────────────────────────────────────
   secao("Fato protegido: pagamento impede exclusão definitiva")
-  const v2 = await prisma.$transaction((tx) =>
-    vincularRequerenteTx(tx, { arvoreId: arvore.id, requerenteId: requerente.id }),
-  )
+  const v2 = await vincularRequerente({ arvoreId: arvore.id, requerenteId: requerente.id })
   if (v2.ok) {
     const obrig = await prisma.obrigacaoEconomica.create({
       data: {
@@ -305,9 +301,7 @@ async function main() {
 
     // ── REINSERÇÃO reativa em vez de duplicar ──────────────────────────────
     secao("Reinserção depois da desativação")
-    const v3 = await prisma.$transaction((tx) =>
-      vincularRequerenteTx(tx, { arvoreId: arvore.id, requerenteId: requerente.id }),
-    )
+    const v3 = await vincularRequerente({ arvoreId: arvore.id, requerenteId: requerente.id })
     ok("a reinserção REUSA o nó, não cria outro", v3.ok && !v3.criada && v3.pessoaId === v2.pessoaId)
     ok("a árvore volta com UMA pessoa ativa",
       (await prisma.pessoa.count({ where: { arvoreId: arvore.id, removidaEm: null } })) === 1)

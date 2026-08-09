@@ -70,6 +70,8 @@ const AUTORIZADOS_FORA_DO_RUNTIME: Record<string, string> = {
   "scripts/pessoa-tortura.test.ts": "teste de tortura do ciclo de vida da Pessoa: monta e limpa o cenário",
   "scripts/reconciliacao-derivada-requerente.test.ts":
     "cenários A–N da reconciliação do estado derivado: monta e limpa o próprio cenário (marca RECONC-DERIVADO)",
+  "scripts/porta-unica-requerente.test.ts":
+    "equivalência das três portas de inserção: monta e limpa o próprio cenário (marca PORTA-UNICA)",
   "scripts/pessoa-equivalencia-rotas.test.ts": "teste de equivalência das duas rotas: monta dois cenários e limpa",
   "scripts/exclusao-servico.test.ts": "teste de exclusão definitiva de serviço: monta e limpa o cenário",
   "scripts/arvore-membership.test.ts":

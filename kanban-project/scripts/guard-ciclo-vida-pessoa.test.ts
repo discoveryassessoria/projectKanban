@@ -122,6 +122,8 @@ const AUTORIZADOS_FORA_DO_RUNTIME: Record<string, string> = {
   "scripts/smoke-ui-setup.ts": "smoke autenticado em produção: monta e REMOVE o cenário marcado (SMOKE-UI-CICLO-VIDA)",
   "scripts/reconciliacao-derivada-requerente.test.ts":
     "cenários A–N da reconciliação do estado derivado: monta e limpa o próprio cenário (marca RECONC-DERIVADO)",
+  "scripts/porta-unica-requerente.test.ts":
+    "equivalência das três portas de inserção: monta e limpa o próprio cenário (marca PORTA-UNICA)",
   "scripts/guard-estado-derivado.test.ts":
     "guard do estado derivado (cita os padrões de escrita que procura, como este arquivo)",
 

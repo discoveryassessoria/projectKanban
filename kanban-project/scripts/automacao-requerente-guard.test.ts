@@ -127,11 +127,19 @@ console.log('\nGuardas estruturais (arquitetura)')
   ok('payload com campos do domínio', /processoId[\s\S]*pessoaId[\s\S]*servicoId[\s\S]*faseId[\s\S]*nacionalidade[\s\S]*actorId/.test(emit))
   ok('dedup por chaveIdempotencia', emit.includes('chaveIdempotencia: chave'))
 
+  // A EMISSÃO SAIU DAS ROTAS (09/08/2026). Elas eram donas de um efeito de negócio,
+  // e por isso entrar pela tela e entrar pelo serviço davam estados finais diferentes.
+  // O que se exige aqui agora é o oposto do que se exigia antes: que a rota NÃO emita
+  // e delegue ao serviço canônico. Ver `test:guard-porta-requerente`.
   const put = src('src/app/api/pessoas/[id]/route.ts')
-  ok('PUT emite só na transição', put.includes('houveTransicaoParaRequerente') && /houveTransicao[\s\S]*enfileirarEventoRequerente/.test(put))
-  ok('PUT enfileira na MESMA transação da atualização', /\$transaction[\s\S]*pessoa\.update[\s\S]*enfileirarEventoRequerente/.test(put))
+  ok('PUT age só na transição', put.includes('houveTransicaoParaRequerente') && /houveTransicao[\s\S]*registrarTransicaoParaRequerenteTx/.test(put))
+  ok('PUT registra na MESMA transação da atualização', /\$transaction[\s\S]*pessoa\.update[\s\S]*registrarTransicaoParaRequerenteTx/.test(put))
+  ok('PUT não conhece a DomainOutbox', !put.includes('enfileirarEventoRequerente') && !put.includes('processarOutbox'))
   const post = src('src/app/api/pessoas/route.ts')
-  ok('POST emite quando nasce requerente', post.includes('ehRequerente(pessoa.requerente)') && post.includes('emitirEDrenarEventoRequerente'))
+  ok('POST não emite — a Pessoa nunca nasce requerente por lá', !post.includes('emitirEDrenar') && !post.includes('enfileirarEventoRequerente'))
+
+  const vinc = src('lib/genealogia/vincular-requerente.ts')
+  ok('o serviço canônico é o dono da emissão', /enfileirarEventoRequerente\(tx,/.test(vinc))
 }
 
 console.log(`\n${'='.repeat(60)}`)

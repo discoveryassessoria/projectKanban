@@ -263,7 +263,7 @@
     "backfill:nec-duplicada": "npm run guard:escrita && tsx scripts/backfill-necessidade-duplicada-motor-legado.ts --execute",
     "backfill:nec-duplicada:dry": "tsx scripts/backfill-necessidade-duplicada-motor-legado.ts",
     "test:guard-necessidade": "tsx scripts/guard-necessidade-documental.test.ts",
-    "test:guards-arquitetura": "npm run test:guard-necessidade && npm run test:motor-unico && npm run test:obrigacao-unica && npm run test:pessoa-nome && npm run test:guard-pessoa && npm run test:guard-derivado && npm run test:arvore-arquitetura && npm run test:arvore-layout",
+    "test:guards-arquitetura": "npm run test:guard-necessidade && npm run test:motor-unico && npm run test:obrigacao-unica && npm run test:pessoa-nome && npm run test:guard-pessoa && npm run test:guard-derivado && npm run test:guard-porta-requerente && npm run test:arvore-arquitetura && npm run test:arvore-layout",
     "test:guard-pessoa": "tsx scripts/guard-ciclo-vida-pessoa.test.ts",
     "test:pessoa-ciclo-vida": "tsx scripts/pessoa-ciclo-vida.test.ts",
     "test:pessoa-tortura": "tsx scripts/pessoa-tortura.test.ts",
@@ -277,7 +277,9 @@
     "smoke:ui-exclusao:limpar": "tsx scripts/smoke-ui-setup.ts --limpar",
     "reconcile:requerente": "tsx scripts/reconciliar-derivados-requerente.ts",
     "test:guard-derivado": "tsx scripts/guard-estado-derivado.test.ts",
-    "test:reconciliacao-derivada": "tsx scripts/reconciliacao-derivada-requerente.test.ts"
+    "test:reconciliacao-derivada": "tsx scripts/reconciliacao-derivada-requerente.test.ts",
+    "test:guard-porta-requerente": "tsx scripts/guard-porta-unica-requerente.test.ts",
+    "test:porta-requerente": "tsx scripts/porta-unica-requerente.test.ts"
   },
   "prisma": {
     "seed": "npm run guard:escrita && tsx prisma/seed.ts"

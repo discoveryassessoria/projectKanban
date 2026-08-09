@@ -20,7 +20,7 @@
  * seja igual, campo a campo.
  */
 import { prisma } from "../src/lib/prisma"
-import { vincularRequerenteTx } from "../lib/genealogia/vincular-requerente"
+import { vincularRequerente } from "../lib/genealogia/vincular-requerente"
 import { removerPessoaDaArvore, reconciliarAposRemocao } from "../src/services/pessoa-ciclo-vida"
 
 const URL_DB = process.env.PRISMA_DATABASE_URL || process.env.DATABASE_URL || ""
@@ -97,7 +97,7 @@ async function montarCenario(sufixo: string): Promise<Cenario> {
   })
   await prisma.processoRequerente.create({ data: { processoId: processo.id, requerenteId: requerente.id } })
 
-  const v = await prisma.$transaction((tx) => vincularRequerenteTx(tx, { arvoreId: arvore.id, requerenteId: requerente.id }))
+  const v = await vincularRequerente({ arvoreId: arvore.id, requerenteId: requerente.id })
   if (!v.ok) throw new Error(`vínculo falhou: ${v.code}`)
 
   const doc = await prisma.documento.create({ data: { pessoaId: v.pessoaId, descricao: `${MARCA} certidão` }, select: { id: true } })

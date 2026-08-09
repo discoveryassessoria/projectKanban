@@ -1,6 +1,6 @@
 /** Cenário do smoke autenticado. `--limpar` remove tudo. Só dados MARCADOS. */
 import { prisma } from "../src/lib/prisma"
-import { vincularRequerenteTx } from "../lib/genealogia/vincular-requerente"
+import { vincularRequerente } from "../lib/genealogia/vincular-requerente"
 import { removerNecessidadesDoSujeito } from "../src/services/necessidade-documental"
 
 export const MARCA = "SMOKE-UI-CICLO-VIDA"
@@ -66,7 +66,7 @@ async function montar() {
   if (!proc?.arvoreId) throw new Error("processo 513 sem árvore")
   const req = await prisma.requerente.create({ data: { nome: `${MARCA} Fulano`, cpf: "111.111.111-11" }, select: { id: true } })
   await prisma.processoRequerente.create({ data: { processoId: PROCESSO, requerenteId: req.id } })
-  const v = await prisma.$transaction((tx) => vincularRequerenteTx(tx, { arvoreId: proc.arvoreId!, requerenteId: req.id }))
+  const v = await vincularRequerente({ arvoreId: proc.arvoreId!, requerenteId: req.id })
   if (!v.ok) throw new Error(v.code)
   const doc = await prisma.documento.create({ data: { pessoaId: v.pessoaId, descricao: `${MARCA} certidão` }, select: { id: true } })
   await prisma.tarefa.create({ data: { titulo: `${MARCA} localizar registro`, processoId: PROCESSO, documentoId: doc.id, pessoaId: v.pessoaId, origem: "reconciliacao" } })

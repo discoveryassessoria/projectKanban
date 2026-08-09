@@ -4,10 +4,8 @@ import { type NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import { Prisma } from "@prisma/client"
 import { verificarPermissao, extrairUsuarioComPermissoes } from '@/src/lib/verificar-permissao'
-import { dispararMaterializacaoPorArvore } from "@/src/services/genealogia/materializar-genealogia"
 import { houveTransicaoParaRequerente, ehRequerente } from "@/lib/genealogia/requerente-flag"
-import { enfileirarEventoRequerente, TIPO_EVENTO_REQUERENTE } from "@/src/services/genealogia/emitir-evento-requerente"
-import { processarOutbox } from "@/src/services/outbox-dispatcher"
+import { registrarTransicaoParaRequerenteTx, efeitosDoVinculoPosCommit } from "@/lib/genealogia/vincular-requerente"
 import { removerPessoaDaArvore, type ModoRemocao } from "@/src/services/pessoa-ciclo-vida"
 // LEGADO_INATIVO (desativação Genealogia): editar Pessoa NÃO reconcilia mais
 // Documento (reconcileDocsForPessoa removido). A materialização V2 (Fatia 2) é
@@ -166,8 +164,11 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
         })
         await tx.arvore.update({ where: { id: p.arvoreId }, data: { pessoaPrincipalId: p.id } })
       }
+      // MESMA transação da atualização. Quem sabe o que "virar requerente"
+      // significa é o serviço canônico — a rota só informa que a transição
+      // ocorreu. Ela não conhece a DomainOutbox.
       if (houveTransicao && p.arvoreId) {
-        await enfileirarEventoRequerente(tx, { pessoaId: p.id, arvoreId: p.arvoreId, actorId })
+        await registrarTransicaoParaRequerenteTx(tx, { pessoaId: p.id, arvoreId: p.arvoreId, actorId })
       }
       return p
     })
@@ -179,9 +180,11 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
     // Documentais e reconcilia as NecessidadeDocumental da Genealogia (best-effort,
     // idempotente, sem criar Documento, sem avançar fase). Nunca quebra a edição.
     // ============================================================
-    await dispararMaterializacaoPorArvore(pessoaAtualizada.arvoreId)
-    // Drena o evento REQUERENTE_ADICIONADO (best-effort; falha fica PENDENTE p/ retry).
-    if (houveTransicao) await processarOutbox({ tipos: [TIPO_EVENTO_REQUERENTE], limite: 20 }).catch(() => {})
+    // Os DOIS efeitos pós-commit ("virou requerente") vêm do serviço canônico, no
+    // mesmo par que a porta de vínculo usa — drenar a fila e reavaliar as Regras.
+    // Chamar sempre é de propósito: a materialização é necessária em qualquer
+    // edição de atributo relevante, e drenar fila vazia não custa nada.
+    await efeitosDoVinculoPosCommit({ arvoreId: pessoaAtualizada.arvoreId })
 
     return NextResponse.json(pessoaAtualizada)
   } catch (error) {

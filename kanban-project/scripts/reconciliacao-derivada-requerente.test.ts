@@ -25,9 +25,8 @@
  * Cenários A–N exigidos pela especificação.
  */
 import { prisma } from "../src/lib/prisma"
-import { vincularRequerenteTx } from "../lib/genealogia/vincular-requerente"
+import { vincularRequerente } from "../lib/genealogia/vincular-requerente"
 import { removerPessoaDaArvore } from "../src/services/pessoa-ciclo-vida"
-import { processarRequerenteAdicionado } from "../src/lib/motor/executor"
 import { reconciliarAutomacaoPorRequerente } from "../src/lib/motor/reconciliar-requerente-economico"
 import { listarReceitas } from "../lib/financeiro/leitura/receitas-lista"
 import { pessoaCausadoraDaReceita, pessoaDaChaveIdempotencia } from "../lib/financeiro/causa-requerente"
@@ -152,14 +151,20 @@ async function montarCenario(sufixo: string): Promise<Cenario> {
   return { processoId: processo.id, arvoreId: arvore.id, tipoProcessoId: tipo.id, configId: config.id, ruleId: regra.id }
 }
 
-/** Coloca um requerente na árvore e dispara o efeito econômico. Devolve pessoaId. */
+/**
+ * Coloca um requerente na árvore pela PORTA PÚBLICA — e mais nada.
+ *
+ * Antes deste arquivo existir o efeito econômico não vinha junto: era preciso
+ * marcar o flag na mão e chamar `processarRequerenteAdicionado` explicitamente,
+ * porque a emissão do evento morava na rota HTTP. As duas linhas saíram daqui
+ * quando o efeito voltou para o serviço; que os cenários abaixo continuem
+ * passando é a prova de que a porta faz o ato inteiro.
+ */
 async function entrarNaArvore(c: Cenario, nome: string): Promise<{ pessoaId: number; requerenteId: number }> {
   const requerente = await prisma.requerente.create({ data: { nome: `${MARCA} ${nome}` }, select: { id: true } })
   await prisma.processoRequerente.create({ data: { processoId: c.processoId, requerenteId: requerente.id } })
-  const v = await prisma.$transaction((tx) => vincularRequerenteTx(tx, { arvoreId: c.arvoreId, requerenteId: requerente.id }))
+  const v = await vincularRequerente({ arvoreId: c.arvoreId, requerenteId: requerente.id })
   if (!v.ok) throw new Error(`vínculo falhou: ${v.code}`)
-  await prisma.pessoa.update({ where: { id: v.pessoaId }, data: { requerente: "sim" } })
-  await processarRequerenteAdicionado({ processoId: c.processoId, pessoaId: v.pessoaId, requerenteId: requerente.id })
   return { pessoaId: v.pessoaId, requerenteId: requerente.id }
 }
 
@@ -203,7 +208,7 @@ async function main() {
   {
     const c = await montarCenario("A")
     const req = await prisma.requerente.create({ data: { nome: `${MARCA} SemEfeito` }, select: { id: true } })
-    const v = await prisma.$transaction((tx) => vincularRequerenteTx(tx, { arvoreId: c.arvoreId, requerenteId: req.id }))
+    const v = await vincularRequerente({ arvoreId: c.arvoreId, requerenteId: req.id })
     const r = await removerPessoaDaArvore({ pessoaId: (v as { pessoaId: number }).pessoaId })
     ok("remoção concluída", r.ok, r.erro ?? "")
     const f = await censoFinanceiro(c.processoId)
@@ -333,10 +338,7 @@ async function main() {
       create: { processoId: c.processoId, requerenteId: p.requerenteId },
       update: { removidoEm: null, removidoPorId: null, motivoRemocao: null },
     })
-    const v2 = await prisma.$transaction((tx) => vincularRequerenteTx(tx, { arvoreId: c.arvoreId, requerenteId: p.requerenteId }))
-    const pessoa2 = (v2 as { pessoaId: number }).pessoaId
-    await prisma.pessoa.update({ where: { id: pessoa2 }, data: { requerente: "sim" } })
-    await processarRequerenteAdicionado({ processoId: c.processoId, pessoaId: pessoa2, requerenteId: p.requerenteId })
+    await vincularRequerente({ arvoreId: c.arvoreId, requerenteId: p.requerenteId })
 
     const depois = await censoFinanceiro(c.processoId)
     ok("I: o efeito volta a existir", depois.linhas === 1, JSON.stringify(depois))
