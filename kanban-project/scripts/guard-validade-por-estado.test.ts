@@ -182,6 +182,21 @@ ok("nenhum modelo NOVO introduziu vigência de cadastro",
 ok("as colunas herdadas são nullable (nada novo as preenche)",
   !/vigenciaInicio\s+(String|DateTime)\s+@/.test(schema) || /vigenciaInicio\s+(String|DateTime)\?/.test(schema))
 
+// ═══════════════════════════════════════════════════════════════════════════
+secao("7) A Tabela de Preços mostra CADASTRO, não registro de preço")
+// ═══════════════════════════════════════════════════════════════════════════
+// Um item com custo e venda são DOIS registros no banco e UMA linha na tela.
+// A listagem renderizava registro, e o mesmo cadastro aparecia duas vezes.
+const tv = ler("src/components/gerenciamentoComponents/TabelaValoresTab.tsx")
+ok("a listagem agrupa pela projeção canônica", /agruparPorCadastroMestre\(filtrados\)/.test(tv))
+ok("a coluna 'Papel' saiu da listagem", !/'Papel'/.test(tv))
+ok("a coluna genérica 'Preço' virou Custo e Venda",
+  /'Custo', 'Venda'/.test(tv) && !/'Preço'/.test(tv))
+const proj = ler("lib/financeiro/leitura/tabela-precos-projecao.ts")
+ok("o agrupamento usa o ID canônico, nunca nome", /configuracaoFinanceiraItemId/.test(proj) && !/\.nome\s*===/.test(proj))
+ok("a projeção é PURA — não conhece Prisma", !/@prisma\/client|lib\/prisma/.test(proj))
+ok("a projeção não reintroduz vigência", !/vigencia/i.test(proj))
+
 // ── Resultado ──────────────────────────────────────────────────────────────
 console.log(`\n${"═".repeat(70)}`)
 console.log(`Total: ${passou + falhou} | ✅ ${passou} | ❌ ${falhou}`)

@@ -10,6 +10,7 @@ import { useState, useEffect, useMemo, useCallback } from 'react'
 import { ESTRATEGIAS_CALCULO, rotuloEstrategia, estrategiaDoModo, estrategiaUsaPrimeiroAdicional, estrategiaUsaFaixaQuantidade } from '@/lib/financeiro/modo-calculo'
 import { UNIDADES_COBRANCA_OPCOES, rotuloUnidade, rotuloUnidadeMinuscula } from '@/lib/financeiro/unidade-cobranca'
 import { useApi } from "@/src/lib/dados"
+import { agruparPorCadastroMestre, type DimensaoPreco } from '@/lib/financeiro/leitura/tabela-precos-projecao'
 
 type ConfigRef = { id: number; publicCode: string | null; possuiCusto: boolean; possuiReceita: boolean; origem: string; mestre: string; label: string; moedaPadrao: string }
 type FornecedorRef = { id: number; nome: string; publicCode?: string | null }
@@ -365,45 +366,27 @@ export default function TabelaValoresTab() {
         <div className="overflow-hidden rounded-xl border border-white/10 bg-white/5 backdrop-blur">
           <table className="w-full text-[13px]">
             <thead><tr className="bg-white/5">
-              {['Cadastro mestre', 'Origem', 'Papel', 'Fornecedor', 'Estratégia', 'Preço', 'Status', ''].map((h, idx) => (
-                <th key={idx} className={`border-b border-white/10 px-3 py-2.5 text-[11px] font-semibold uppercase tracking-wide text-white/50 ${idx === 5 || idx === 8 ? 'text-right' : 'text-left'}`}>{h}</th>
+              {/* UMA LINHA POR CADASTRO MESTRE. "Papel" era coluna porque a tela
+                  renderizava REGISTRO de preço; agora Custo e Venda são colunas
+                  próprias do mesmo item, e "Preço" genérico deixou de existir. */}
+              {['Cadastro mestre', 'Origem', 'Custo', 'Venda', 'Status', ''].map((h, idx) => (
+                <th key={idx} className={`border-b border-white/10 px-3 py-2.5 text-[11px] font-semibold uppercase tracking-wide text-white/50 ${idx === 2 || idx === 3 || idx === 5 ? 'text-right' : 'text-left'}`}>{h}</th>
               ))}
             </tr></thead>
             <tbody>
-              {filtrados.map((i) => {
-                const om = origemMestre(i.configuracaoFinanceiraItem)
+              {agruparPorCadastroMestre(filtrados).map((linha) => {
+                const om = origemMestre(linha.referencia.configuracaoFinanceiraItem)
+                const ativo = !linha.referencia.arquivado
                 return (
-                  <tr key={i.id} className="border-b border-white/5 last:border-0 hover:bg-white/[0.03]">
+                  <tr key={linha.configId} className="border-b border-white/5 last:border-0 hover:bg-white/[0.03]">
                     <td className="px-3 py-2.5 font-medium text-white">{om.mestre}</td>
                     <td className="px-3 py-2.5 text-white/60">{om.origem}</td>
-                    <td className="px-3 py-2.5"><span className={`rounded px-1.5 py-0.5 text-[11px] font-medium ${i.natureza === 'CUSTO' ? 'bg-amber-500/15 text-amber-300' : (i.natureza === 'RECEITA' || i.natureza === 'VENDA') ? 'bg-emerald-500/15 text-emerald-300' : 'bg-white/10 text-white/50'}`}>{i.natureza === 'CUSTO' ? 'Custo' : (i.natureza === 'RECEITA' || i.natureza === 'VENDA') ? 'Venda' : '—'}</span></td>
-                    <td className="px-3 py-2.5 text-white/70">{i.fornecedor ? `${i.fornecedor.publicCode ? i.fornecedor.publicCode + ' — ' : ''}${i.fornecedor.nome}` : '—'}</td>
-                    <td className="px-3 py-2.5 text-white/60">
-                      <span className="inline-flex flex-col leading-tight">
-                        <span>{rotuloEstrategia(i.modoCalculo)}</span>
-                        {i.unidade && <span className="text-[11px] text-white/40">{rotuloUnidade(i.unidade)}</span>}
-                      </span>
+                    <CelulaDimensao dim={linha.custo} onEditar={abrirEditar} onExcluir={excluir} />
+                    <CelulaDimensao dim={linha.venda} onEditar={abrirEditar} onExcluir={excluir} />
+                    <td className="px-3 py-2.5"><span className={`rounded px-2 py-0.5 text-[11px] font-medium ${ativo ? 'bg-green-500/15 text-green-300' : 'bg-white/10 text-white/50'}`}>{ativo ? 'Ativo' : 'Inativo'}</span></td>
+                    <td className="px-3 py-2.5 text-right text-[11px] text-white/40">
+                      {linha.outros.length > 0 && `+${linha.outros.length} sem papel`}
                     </td>
-                    <td className="px-3 py-2.5 text-right tabular-nums text-white/90">
-                      {estrategiaUsaPrimeiroAdicional(i.modoCalculo) && i.valorBase != null && i.valorAdicional != null ? (
-                        <span className="inline-flex flex-col items-end leading-tight gap-0.5">
-                          <span><span className="text-[11px] text-white/50">{rotuloPrimeiro(i.unidade || '')}: </span>{fmtMoeda(i.valorBase, i.moeda)}</span>
-                          <span className="text-[12px]"><span className="text-[11px] text-white/50">{rotuloAdicional(i.unidade || '')}: </span>{fmtMoeda(i.valorAdicional, i.moeda)}</span>
-                        </span>
-                      ) : (
-                        <span className="inline-flex flex-col items-end leading-tight gap-0.5">
-                          {estrategiaUsaFaixaQuantidade(i.modoCalculo) && (i.quantidadeMinima != null || i.quantidadeMaxima != null) && (
-                            <span className="text-[11px] text-white/40">{Number(i.quantidadeMinima ?? 0)}–{i.quantidadeMaxima != null ? Number(i.quantidadeMaxima) : '∞'} {rotuloUnidadeMinuscula(i.unidade || '')}</span>
-                          )}
-                          <span><span className="text-[11px] text-white/50">{rotuloValorUnico(i.modoCalculo, i.unidade || '')}: </span>{fmtMoeda(i.valor, i.moeda)}</span>
-                        </span>
-                      )}
-                    </td>
-                    <td className="px-3 py-2.5"><span className={`rounded px-2 py-0.5 text-[11px] font-medium ${!i.arquivado ? 'bg-green-500/15 text-green-300' : 'bg-white/10 text-white/50'}`}>{!i.arquivado ? 'Ativo' : 'Inativo'}</span></td>
-                    <td className="px-3 py-2.5"><div className="flex items-center justify-end gap-2">
-                      <button onClick={() => abrirEditar(i)} className="rounded-md border border-white/10 px-2.5 py-1 text-xs text-white/70 transition hover:bg-white/10 hover:text-white">Editar</button>
-                      <button onClick={() => excluir(i)} className="rounded-md border border-red-500/20 px-2.5 py-1 text-xs text-red-300/80 transition hover:bg-red-500/10 hover:text-red-200">Excluir</button>
-                    </div></td>
                   </tr>
                 )
               })}
@@ -660,5 +643,45 @@ export default function TabelaValoresTab() {
         </div>
       )}
     </div>
+  )
+}
+
+/**
+ * UMA DIMENSÃO FINANCEIRA (custo ou venda) do cadastro.
+ *
+ * Fornecedor e estratégia vivem AQUI, não na linha: o custo pode vir da CRC e a
+ * venda não ter fornecedor nenhum, e essa diferença era justamente o que antes
+ * "justificava" duas linhas para o mesmo item.
+ */
+function CelulaDimensao({
+  dim, onEditar, onExcluir,
+}: {
+  dim: DimensaoPreco<Item> | null
+  onEditar: (i: Item) => void
+  onExcluir: (i: Item) => void
+}) {
+  if (!dim) return <td className="px-3 py-2.5 text-right text-white/25">—</td>
+  const i = dim.registro
+  const valor = estrategiaUsaPrimeiroAdicional(i.modoCalculo) && i.valorBase != null && i.valorAdicional != null
+    ? (
+      <span className="inline-flex flex-col items-end leading-tight gap-0.5">
+        <span><span className="text-[11px] text-white/50">{rotuloPrimeiro(i.unidade || '')}: </span>{fmtMoeda(i.valorBase, i.moeda)}</span>
+        <span className="text-[12px]"><span className="text-[11px] text-white/50">{rotuloAdicional(i.unidade || '')}: </span>{fmtMoeda(i.valorAdicional, i.moeda)}</span>
+      </span>
+    )
+    : <span>{fmtMoeda(i.valor, i.moeda)}</span>
+
+  return (
+    <td className="group px-3 py-2.5 text-right tabular-nums text-white/90">
+      <div className="inline-flex flex-col items-end leading-tight gap-0.5">
+        {valor}
+        <span className="text-[11px] text-white/40">{rotuloEstrategia(i.modoCalculo)}</span>
+        {dim.fornecedor && <span className="text-[11px] text-white/40">{dim.fornecedor}</span>}
+        <span className="mt-0.5 hidden gap-2 group-hover:flex">
+          <button onClick={() => onEditar(i)} className="text-[11px] text-white/60 underline-offset-2 hover:text-white hover:underline">Editar</button>
+          <button onClick={() => onExcluir(i)} className="text-[11px] text-red-300/70 underline-offset-2 hover:text-red-200 hover:underline">Excluir</button>
+        </span>
+      </div>
+    </td>
   )
 }
