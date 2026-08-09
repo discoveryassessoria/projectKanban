@@ -97,12 +97,8 @@ function comoData(v: string | Date | null | undefined): Date | null {
 
 /** A taxa vale para este lançamento? Restrição não declarada é permissiva. */
 export function taxaAplicavel(t: TaxaView, ctx: ContextoTaxas): boolean {
+  // VALIDADE É ESTADO, NÃO DATA: taxa ativa vale; taxa inativa não. Sem janela.
   if (t.ativo === false) return false
-  const agora = ctx.emDatas ?? new Date()
-  const ini = comoData(t.vigenciaInicio)
-  const fim = comoData(t.vigenciaFim)
-  if (ini && agora.getTime() < ini.getTime()) return false
-  if (fim && agora.getTime() > fim.getTime()) return false
   if (t.parcelasDe != null && ctx.nParcelas < t.parcelasDe) return false
   if (t.parcelasAte != null && ctx.nParcelas > t.parcelasAte) return false
   return true

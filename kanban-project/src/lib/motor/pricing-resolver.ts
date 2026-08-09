@@ -38,12 +38,9 @@ export interface ContextoPreco {
   data?: Date                        // p/ respeitar vigência (default: hoje)
 }
 
-// vigência é VarChar(10) tipo 'YYYY-MM-DD' — comparação lexicográfica funciona
-function dentroDaVigencia(row: { vigenciaInicio: string | null; vigenciaFim: string | null }, hoje: string): boolean {
-  if (row.vigenciaInicio && hoje < row.vigenciaInicio) return false
-  if (row.vigenciaFim && hoje > row.vigenciaFim) return false
-  return true
-}
+// VALIDADE É ESTADO, NÃO DATA (09/08/2026): preço ativo vale por tempo
+// indeterminado. `dentroDaVigencia` saiu daqui e do resolvedor oficial juntos —
+// deixar num só teria produzido duas respostas para o mesmo preço.
 
 /**
  * Resolve UM preço (custo OU receita) pela precedência. null = nada configurado.
@@ -60,7 +57,7 @@ export async function resolverPreco(ctx: ContextoPreco): Promise<PrecoResolvido 
       arquivado: false,
     },
   })
-  const validas = linhas.filter((r) => dentroDaVigencia(r, hoje))
+  const validas = linhas
   if (validas.length === 0) return null
 
   // Cada nível: acha a 1ª linha que casa exatamente aquele critério.

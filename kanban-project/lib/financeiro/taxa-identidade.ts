@@ -152,14 +152,17 @@ export function chaveUnicidade(t: {
   adquirenteId?: number | null
   bandeiraId?: number | null
   finalidade?: string | null
-  vigenciaInicio?: Date | string | null
 }): string {
+  // A DATA SAIU DA IDENTIDADE (09/08/2026). Enquanto `vigenciaInicio` compunha a
+  // chave, duas taxas idênticas em forma/adquirente/bandeira/finalidade eram
+  // "diferentes" só por começarem em dias distintos — e conviviam como duplicata
+  // legítima. Sem data, a mesma taxa é a mesma taxa. Medido antes de mudar: das
+  // 14 taxas cadastradas, nenhuma colide ao remover a data da chave.
   const forma = t.formaId ?? '∅'
   const adq = t.adquirenteId ?? '∅'
   const band = t.bandeiraId ?? '∅'
   const fin = t.finalidade ? T(t.finalidade) : '∅'
-  const vig = t.vigenciaInicio ? new Date(t.vigenciaInicio).toISOString().slice(0, 10) : '∅'
-  return `F${forma}|A${adq}|B${band}|${fin}|V${vig}`
+  return `F${forma}|A${adq}|B${band}|${fin}`
 }
 
 /** Forma "principal" de uma taxa (1ª de formasAplicaveis, ou a legada). */

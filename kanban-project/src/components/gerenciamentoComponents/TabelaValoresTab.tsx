@@ -128,7 +128,7 @@ const EMPTY = {
   modoCalculo: 'fixed', unidade: '', quantidadeMinima: '', quantidadeMaxima: '',
   // Prioridade saiu da UI (não há mais múltiplas tabelas válidas p/ o mesmo contexto).
   // Persistida sempre como 0 no backend — mantida no schema por compatibilidade.
-  vigenciaInicio: '', vigenciaFim: '', arquivado: false,
+  arquivado: false,
 }
 type FormState = typeof EMPTY
 
@@ -235,7 +235,6 @@ export default function TabelaValoresTab() {
       unidade: i.unidade ? String(i.unidade).toUpperCase() : '',
       quantidadeMinima: estrategiaUsaFaixaQuantidade(i.modoCalculo) && i.quantidadeMinima != null ? String(i.quantidadeMinima) : '',
       quantidadeMaxima: estrategiaUsaFaixaQuantidade(i.modoCalculo) && i.quantidadeMaxima != null ? String(i.quantidadeMaxima) : '',
-      vigenciaInicio: i.vigenciaInicio || '', vigenciaFim: i.vigenciaFim || '',
       arquivado: i.arquivado,
     })
     setBuscaItem(''); setErroModal(null); setModalAberto(true)
@@ -266,9 +265,6 @@ export default function TabelaValoresTab() {
     // está vinculado — não existe segunda condição para "reconhecer" a seleção.
     if (!form.itemCatalogoId) { setErroModal('Selecione o item.'); return }
     if (!form.precoCusto && !form.precoVenda) { setErroModal('Marque pelo menos uma natureza: Preço de Custo e/ou Preço de Venda.'); return }
-    // "Válido a partir de" é obrigatório (início da validade comercial).
-    if (!form.vigenciaInicio) { setErroModal('Informe "Válido a partir de".'); return }
-    if (form.vigenciaFim && form.vigenciaInicio > form.vigenciaFim) { setErroModal('"Válido até" deve ser igual ou posterior a "Válido a partir de".'); return }
     // Estratégias derivam do modoCalculo (fonte única).
     const usaBaseAdic = estrategiaUsaPrimeiroAdicional(form.modoCalculo)
     const usaFaixa = estrategiaUsaFaixaQuantidade(form.modoCalculo)
@@ -354,7 +350,7 @@ export default function TabelaValoresTab() {
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h2 className="text-xl font-semibold text-white">Tabelas de Preços</h2>
-          <p className="text-sm text-white/50">Repositório de valores: quanto vale cada Configuração Financeira. Custo/venda por fornecedor e vigência — a decisão de onde aplicar cada preço é da Regra Financeira.</p>
+          <p className="text-sm text-white/50">Repositório de valores: quanto vale cada Configuração Financeira. Custo/venda por fornecedor — a decisão de onde aplicar cada preço é da Regra Financeira. Preço ativo vale por tempo indeterminado.</p>
         </div>
         <button onClick={abrirNovo} className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-blue-500">+ Novo valor</button>
       </div>
@@ -369,7 +365,7 @@ export default function TabelaValoresTab() {
         <div className="overflow-hidden rounded-xl border border-white/10 bg-white/5 backdrop-blur">
           <table className="w-full text-[13px]">
             <thead><tr className="bg-white/5">
-              {['Cadastro mestre', 'Origem', 'Papel', 'Fornecedor', 'Estratégia', 'Preço', 'Vigência', 'Status', ''].map((h, idx) => (
+              {['Cadastro mestre', 'Origem', 'Papel', 'Fornecedor', 'Estratégia', 'Preço', 'Status', ''].map((h, idx) => (
                 <th key={idx} className={`border-b border-white/10 px-3 py-2.5 text-[11px] font-semibold uppercase tracking-wide text-white/50 ${idx === 5 || idx === 8 ? 'text-right' : 'text-left'}`}>{h}</th>
               ))}
             </tr></thead>
@@ -402,14 +398,6 @@ export default function TabelaValoresTab() {
                           <span><span className="text-[11px] text-white/50">{rotuloValorUnico(i.modoCalculo, i.unidade || '')}: </span>{fmtMoeda(i.valor, i.moeda)}</span>
                         </span>
                       )}
-                    </td>
-                    <td className="px-3 py-2.5 text-[11px] text-white/60">
-                      {i.vigenciaInicio ? (
-                        <span className="inline-flex flex-col leading-tight">
-                          <span>Válido desde: {fmtData(i.vigenciaInicio)}</span>
-                          {i.vigenciaFim && <span className="text-white/40">até {fmtData(i.vigenciaFim)}</span>}
-                        </span>
-                      ) : '—'}
                     </td>
                     <td className="px-3 py-2.5"><span className={`rounded px-2 py-0.5 text-[11px] font-medium ${!i.arquivado ? 'bg-green-500/15 text-green-300' : 'bg-white/10 text-white/50'}`}>{!i.arquivado ? 'Ativo' : 'Inativo'}</span></td>
                     <td className="px-3 py-2.5"><div className="flex items-center justify-end gap-2">
@@ -644,18 +632,11 @@ export default function TabelaValoresTab() {
                 </div>
               )}
 
-              {/* Vigência — pertence à Tabela de Preços. Início obrigatório; fim opcional. */}
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="mb-1 block text-xs text-white/60">Válido a partir de *</label>
-                  <input type="date" value={form.vigenciaInicio} onChange={(e) => set('vigenciaInicio', e.target.value)} className={inputCls} />
-                </div>
-                <div>
-                  <label className="mb-1 block text-xs text-white/60">Válido até <span className="text-white/40">(opcional)</span></label>
-                  <input type="date" value={form.vigenciaFim} min={form.vigenciaInicio || undefined} onChange={(e) => set('vigenciaFim', e.target.value)} className={inputCls} />
-                  <p className="mt-1 text-[11px] text-white/40">Vazio = vigência indeterminada.</p>
-                </div>
-              </div>
+              {/* VALIDADE É ESTADO, NÃO DATA (09/08/2026): um preço ativo vale por
+                  tempo indeterminado, até ser editado, inativado ou excluído. Os
+                  campos "Válido a partir de" / "Válido até" saíram — eram
+                  parametrização genérica que escondia preço correto de quem o
+                  procurava. Histórico de fato continua protegido por snapshot. */}
 
               <div className="flex items-center gap-6">
                 <label className="flex items-center gap-2 text-sm text-white/80"><input type="checkbox" checked={!form.arquivado} onChange={(e) => set('arquivado', !e.target.checked)} className="h-4 w-4 accent-blue-500" />Ativo</label>

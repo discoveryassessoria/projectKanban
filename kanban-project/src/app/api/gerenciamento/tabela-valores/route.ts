@@ -185,24 +185,17 @@ export async function POST(request: NextRequest) {
     const natFin = deriveNaturezaFinanceira(cfg)
     const habil = [admiteCusto(natFin) ? 'CUSTO' : null, admiteVenda(natFin) ? 'VENDA' : null].filter(Boolean) as NaturezaPrecoRaw[]
 
-    // Vigência é COMPARTILHADA entre as linhas (custo/venda).
-    if (vigenciaInvalida(b.vigenciaInicio) || vigenciaInvalida(b.vigenciaFim))
-      return NextResponse.json({ error: 'Vigência deve estar no formato ISO YYYY-MM-DD.' }, { status: 400 })
+    // VALIDADE É ESTADO, NÃO DATA (09/08/2026). A rota deixa de aceitar e de exigir
+    // vigência: preço ativo vale por tempo indeterminado, até ser editado,
+    // inativado ou excluído. As colunas permanecem no schema (nullable) só para
+    // o histórico já gravado — nenhuma escrita nova as preenche.
 
     // Parâmetros COMPARTILHADOS (uma única vez para todas as linhas).
     const processoTipoId = toStrOrNull(b.processoTipoId)
     const modalidadeId = toIntOrNull(b.modalidadeId)
     const prioridade = toIntOrNull(b.prioridade) ?? 0
-    const vigenciaInicio = toStrOrNull(b.vigenciaInicio)
-    const vigenciaFim = toStrOrNull(b.vigenciaFim)
-    // "Válido a partir de" é OBRIGATÓRIO — define o início da validade comercial e garante
-    // que sempre exista uma tabela vigente determinável (sem escolha arbitrária).
-    if (!vigenciaInicio) {
-      return NextResponse.json({ error: 'Informe "Válido a partir de" (início da validade comercial).' }, { status: 400 })
-    }
-    if (vigenciaInicio && vigenciaFim && vigenciaInicio > vigenciaFim) {
-      return NextResponse.json({ error: '"Válido até" deve ser igual ou posterior a "Válido a partir de".' }, { status: 400 })
-    }
+    const vigenciaInicio: string | null = null
+    const vigenciaFim: string | null = null
     // ESTRATÉGIA de cálculo OBRIGATÓRIA (modoCalculo = código canônico da estratégia).
     const modoCalculo = toStrOrNull(b.modoCalculo) ?? ''
     if (!modoCalculoValido(modoCalculo)) return NextResponse.json({ error: 'Informe uma Estratégia de cálculo válida.' }, { status: 400 })

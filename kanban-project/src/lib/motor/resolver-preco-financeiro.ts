@@ -81,7 +81,6 @@ export interface ContextoPrecoFinanceiro {
 
 export type MotivoDescarte =
   | 'valor_zero_ou_negativo'
-  | 'fora_de_vigencia'
   | 'natureza_diferente'
   | 'arquivada'
   | 'incompativel_contexto' // linha exige uma dimensão que o contexto não satisfaz
@@ -89,7 +88,7 @@ export type MotivoDescarte =
 
 export type MotivoFalha =
   | 'NENHUMA_LINHA'
-  | 'SEM_PRECO_VALIDO' // havia linhas, mas todas zero/inválidas/fora de vigência/contexto
+  | 'SEM_PRECO_VALIDO' // havia linhas, mas todas zero/inválidas/incompatíveis com o contexto
   | 'ITEM_INVALIDO'
 
 export interface AlternativaDescartada {
@@ -142,12 +141,14 @@ function ymd(d: Date): string {
   return d.toISOString().slice(0, 10)
 }
 
-function dentroDaVigencia(r: LinhaPreco, hoje: string | null): boolean {
-  if (hoje == null) return true
-  if (r.vigenciaInicio && hoje < r.vigenciaInicio) return false
-  if (r.vigenciaFim && hoje > r.vigenciaFim) return false
-  return true
-}
+// VALIDADE É ESTADO, NÃO DATA (09/08/2026). Cadastro/configuração do Discovery
+// vale por tempo INDETERMINADO: nasce válido e continua válido até alguém
+// inativar, arquivar ou excluir. Vigência por data era parametrização genérica
+// que ninguém preenchia com intenção — e que silenciosamente escondia cadastro
+// correto de quem o procurava.
+// O que separa duas linhas do mesmo item continua sendo o que sempre separou:
+// especificidade do contexto e, no empate, prioridade explícita. Empate real
+// segue BLOQUEANDO com conflito nomeado — nunca escolha arbitrária.
 
 // preço válido = número finito estritamente positivo (pega NaN/Infinity/<=0).
 function precoValido(v: number): boolean {
@@ -230,7 +231,6 @@ export function resolverPrecoCore(
   for (const r of linhas) {
     if (natCtx != null && canonicalNaturezaPreco(r.natureza) !== natCtx) { descartadas.push({ tabelaValorId: r.id, nivel: '—', motivo: 'natureza_diferente', valor: r.valor }); continue }
     if (r.arquivado) { descartadas.push({ tabelaValorId: r.id, nivel: '—', motivo: 'arquivada', valor: r.valor }); continue }
-    if (!dentroDaVigencia(r, hoje)) { descartadas.push({ tabelaValorId: r.id, nivel: '—', motivo: 'fora_de_vigencia', valor: r.valor }); continue }
     if (!precoValido(r.valor)) { descartadas.push({ tabelaValorId: r.id, nivel: '—', motivo: 'valor_zero_ou_negativo', valor: r.valor }); continue }
     const incompat = DIMENSOES.find((d) => !d.compativel(r, dimCtx))
     if (incompat) { descartadas.push({ tabelaValorId: r.id, nivel: incompat.nome, motivo: 'incompativel_contexto', valor: r.valor }); continue }
@@ -251,12 +251,10 @@ export function resolverPrecoCore(
   // marca todo o resto como descartado por menor especificidade/prioridade
   for (const a of aplicaveis) if (!topo.includes(a)) descartadas.push({ tabelaValorId: a.r.id, nivel: `espec ${a.especificidade}`, motivo: 'menor_especificidade', valor: a.r.valor })
 
-  // desempate determinístico dentro do topo (vigência recente, depois id)
-  const ordenado = [...topo].sort((x, y) => {
-    const vx = x.r.vigenciaInicio ?? '', vy = y.r.vigenciaInicio ?? ''
-    if (vx !== vy) return vx < vy ? 1 : -1
-    return y.r.id - x.r.id
-  })
+  // Desempate determinístico dentro do topo: o cadastro mais recente (maior id).
+  // A vigência era o critério antes — e, como desempate, tornava a data um
+  // seletor escondido entre linhas igualmente válidas.
+  const ordenado = [...topo].sort((x, y) => y.r.id - x.r.id)
   const escolhida = ordenado[0].r
 
   // 4) AMBIGUIDADE: ≥2 no topo que DIVERGEM em valor/moeda → conflito (bloqueia).

@@ -61,10 +61,9 @@ export async function resolverIdentidade(
  */
 export async function acharDuplicata(
   ident: { formaId: number | null; adquirenteId: number | null; bandeiraId: number | null; finalidade: string | null },
-  vigenciaInicio: Date | null,
   exceto?: number,
 ): Promise<{ id: number; name: string } | null> {
-  const chave = chaveUnicidade({ ...ident, vigenciaInicio })
+  const chave = chaveUnicidade(ident)
   // Só compara taxas ativas da mesma forma (filtro barato) e confere a chave completa.
   const candidatas = await prisma.taxaPagamento.findMany({
     where: {
@@ -72,12 +71,12 @@ export async function acharDuplicata(
       ...(exceto != null ? { id: { not: exceto } } : {}),
       ...(ident.formaId != null ? { formasAplicaveis: { has: ident.formaId } } : {}),
     },
-    select: { id: true, name: true, formasAplicaveis: true, formaPagamentoId: true, adquirenteId: true, bandeiraId: true, finalidade: true, vigenciaInicio: true },
+    select: { id: true, name: true, formasAplicaveis: true, formaPagamentoId: true, adquirenteId: true, bandeiraId: true, finalidade: true },
   })
   for (const c of candidatas) {
     const chaveC = chaveUnicidade({
       formaId: formaPrincipalId(c), adquirenteId: c.adquirenteId, bandeiraId: c.bandeiraId,
-      finalidade: c.finalidade, vigenciaInicio: c.vigenciaInicio,
+      finalidade: c.finalidade,
     })
     if (chaveC === chave) return { id: c.id, name: c.name }
   }

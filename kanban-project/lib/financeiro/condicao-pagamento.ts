@@ -446,13 +446,8 @@ function listaContem(lista: string[] | null | undefined, valor: string | null | 
 export function condicaoAplicavel(c: CondicaoPagamentoView, ctx: ContextoAplicabilidade): Aplicabilidade {
   const nao = (motivo: string): Aplicabilidade => ({ aplicavel: false, motivo })
 
+  // VALIDADE É ESTADO, NÃO DATA: condição ativa vale; inativa não. Sem janela.
   if (c.ativo === false) return nao('Condição de pagamento inativa.')
-
-  const agora = ctx.emDatas ?? new Date()
-  const ini = comoData(c.vigenciaInicio)
-  const fim = comoData(c.vigenciaFim)
-  if (ini && agora.getTime() < ini.getTime()) return nao('Condição ainda não vigente.')
-  if (fim && agora.getTime() > fim.getTime()) return nao('Condição fora de vigência.')
 
   const aplicaA = c.aplicaA ?? 'AMBOS'
   if (aplicaA !== 'AMBOS' && aplicaA !== ctx.natureza) {

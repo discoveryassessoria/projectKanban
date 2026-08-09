@@ -97,7 +97,6 @@ export function validarRegraInput(input: RegraInput, obrigatorioProcessoEDoc = t
   if (input.vigenciaInicio && input.vigenciaFim) {
     const ini = new Date(input.vigenciaInicio).getTime()
     const fim = new Date(input.vigenciaFim).getTime()
-    if (!isNaN(ini) && !isNaN(fim) && fim < ini) erros.push({ campo: "vigenciaFim", mensagem: "Fim da vigência antes do início." })
   }
   return erros
 }
