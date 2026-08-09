@@ -28,7 +28,7 @@ exigirBancoDeTeste()
 
 import { montarPlanilhaDocumental } from "../lib/financeiro/leitura/planilha-documental"
 import {
-  adicionarColuna, listarColunasConfiguradas, definirAtiva, reordenarColunas, definirRotulo,
+  adicionarColuna, listarColunasConfiguradas, definirAtiva, reordenarColunas, definirRotulo, removerColuna,
 } from "../lib/financeiro/leitura/planilha-colunas"
 import { criarObrigacaoEconomicaComLedger } from "../lib/financeiro/ledger/ledger-service"
 import { vincularRequerente } from "../lib/genealogia/vincular-requerente"
@@ -183,6 +183,24 @@ async function main() {
   console.log("PLANILHA DOCUMENTAL — projeção configurável\n")
   await limpar()
   const p = await montarPalco()
+
+  // ═════════════════════════════════════════════════════════════════════════
+  secao("0) SEM configuração, nenhuma coluna econômica nasce")
+  // ═════════════════════════════════════════════════════════════════════════
+  // Em 09/08/2026 quatro colunas apareceram em produção sem o usuário as ter
+  // pedido. Não houve seed nem default — mas nada provava a ausência deles.
+  // Estas asserções provam: existir no cadastro, ter preço ou ser usado por uma
+  // Regra Documental NÃO faz um serviço virar coluna.
+  {
+    const vazia = await montarPlanilhaDocumental(p.processoId)
+    ok("planilha sem configuração não tem coluna econômica", vazia.colunas.length === 0, `${vazia.colunas.length}`)
+    ok("mesmo com o serviço cadastrado no mestre", (await prisma.produtoFinanceiro.count({ where: { id: p.cfgCertidao } })) === 1)
+    ok("mesmo com preço de CUSTO vigente", (await prisma.tabelaValor.count({ where: { configuracaoFinanceiraItemId: p.cfgCertidao, natureza: "CUSTO" } })) === 1)
+    ok("mesmo com Regra Documental publicada usando o serviço",
+      (await prisma.phaseEconomicRule.count({ where: { custoConfigId: p.cfgCertidao, ativo: true } })) === 1)
+    ok("a linha da pessoa existe, só não tem célula econômica",
+      vazia.pessoas.length === 1 && vazia.pessoas[0].linhas.length === 1 && vazia.pessoas[0].linhas[0].celulas.length === 0)
+  }
 
   // ═════════════════════════════════════════════════════════════════════════
   secao("1–3) Colunas vêm do cadastro canônico, e não carregam preço")
@@ -347,6 +365,22 @@ async function main() {
   await removerPessoaDaArvore({ pessoaId: p.pessoaId })
   pl = await montarPlanilhaDocumental(p.processoId)
   ok("13: pessoa removida da árvore não deixa bloco órfão", pl.pessoas.length === 0, `${pl.pessoas.length}`)
+
+  // ═════════════════════════════════════════════════════════════════════════
+  secao("8·10) Remover a coluna some — e nada a traz de volta sozinho")
+  // ═════════════════════════════════════════════════════════════════════════
+  {
+    for (const c of await listarColunasConfiguradas()) await removerColuna(c.id)
+    const semColunas = await montarPlanilhaDocumental(p.processoId)
+    ok("8: sem configuração, zero colunas econômicas", semColunas.colunas.length === 0)
+    ok("8: o cadastro mestre continua intacto",
+      (await prisma.produtoFinanceiro.count({ where: { id: { in: [p.cfgCertidao, p.cfgTraducao] } } })) === 2)
+    ok("8: o preço continua intacto", (await prisma.tabelaValor.count({ where: { configuracaoFinanceiraItemId: p.cfgCertidao } })) >= 1)
+    // Reler duas vezes: nenhuma leitura recria coluna (a projeção não escreve).
+    const a = await montarPlanilhaDocumental(p.processoId)
+    const b = await montarPlanilhaDocumental(p.processoId)
+    ok("10: releitura preserva exatamente a configuração (zero)", a.colunas.length === 0 && b.colunas.length === 0)
+  }
 
   await limpar()
 

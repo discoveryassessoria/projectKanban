@@ -27,7 +27,7 @@
  * E enquanto a célula só sabia somar obrigação lançada, documento sem lançamento
  * mostrava R$ 0,00 — dizendo "custa zero" quando queria dizer "ainda não sei".
  */
-import { readdirSync, statSync, readFileSync } from "node:fs"
+import { readdirSync, statSync, readFileSync, existsSync } from "node:fs"
 import { fileURLToPath } from "node:url"
 import { dirname, join, relative } from "node:path"
 
@@ -176,6 +176,57 @@ ok("o módulo de colunas não cria serviço nem documento",
   !/produtoFinanceiro\.create|tipoDocumentoCadastro\.create|tipoServico\.create/.test(colunas))
 ok("o módulo de colunas exige que o item JÁ exista no cadastro",
   /não existe no cadastro/.test(colunas))
+
+// ═══════════════════════════════════════════════════════════════════════════
+secao("11) Coluna econômica só nasce de configuração PERSISTIDA e ATIVA")
+// ═══════════════════════════════════════════════════════════════════════════
+// Colunas FIXAS (Data, Local, Dados do registro, Cônjuge, Genitores, Observação,
+// Total) são do produto e podem viver no código. Coluna ECONÔMICA, não: ela é
+// decisão de negócio e só existe se o usuário a cadastrou.
+//
+// Em 09/08/2026 quatro colunas apareceram em produção sem que o usuário as
+// tivesse pedido. Não houve seed nem default — foram criadas por chamadas de
+// validação técnica na rota real. O guard não teria evitado aquilo, mas evita o
+// que seria pior: um mecanismo que as recrie sozinho.
+const AUTOMATISMOS = [
+  "defaultColumns", "DEFAULT_COLUMNS", "colunasPadrao", "COLUNAS_PADRAO",
+  "ensureColumns", "garantirColunas", "createDefaultColumns", "criarColunasPadrao",
+  "upsertColumns", "bootstrapColunas", "seedColunas",
+]
+for (const nome of AUTOMATISMOS) {
+  const achados = arquivos.filter((f) => f !== ESTE && conteudo.get(f)!.includes(nome))
+  ok(`nenhum mecanismo \`${nome}\``, achados.length === 0, achados.join(", "))
+}
+
+// UM ponto de escrita, e ele exige que o item já exista no cadastro.
+const escrevem = arquivos.filter(
+  (f) => f !== ESTE && f !== COLUNAS && /planilhaDocumentalColuna\.(create|createMany|upsert)\s*\(/.test(conteudo.get(f)!),
+)
+ok("só o serviço canônico cria coluna", escrevem.length === 0, escrevem.join(", ") || "nenhum desvio")
+
+// A migration cria a TABELA, nunca linhas: seed de coluna em produção seria
+// exatamente "coluna econômica que nasce sozinha".
+const migrations = arquivos.length && existsSync(join(RAIZ, "prisma/migrations"))
+  ? readdirSync(join(RAIZ, "prisma/migrations")).filter((d) => statSync(join(RAIZ, "prisma/migrations", d)).isDirectory())
+  : []
+const comInsert = migrations.filter((d) => {
+  const f = join(RAIZ, "prisma/migrations", d, "migration.sql")
+  return existsSync(f) && /INSERT\s+INTO\s+"?PlanilhaDocumentalColuna"?/i.test(readFileSync(f, "utf8"))
+})
+ok("nenhuma migration insere coluna", comInsert.length === 0, comInsert.join(", ") || `${migrations.length} migrations varridas`)
+
+// Sem configuração ativa, a grade não inventa nada: as colunas são o `map` das
+// configuradas — não há caminho que produza coluna a partir de preço, serviço
+// ou Regra Documental.
+ok("as colunas são exatamente as configuradas ATIVAS",
+  /listarColunasConfiguradas\(\{ apenasAtivas: true \}\)/.test(projecao) &&
+  /const colunas: ColunaPlanilha\[\] = configuradas\.map/.test(projecao))
+ok("não há fallback quando a configuração está vazia",
+  !/colunas\.length === 0[\s\S]{0,200}(push|concat|\.\.\.)/.test(projecao))
+
+// Autoria: coluna nova passa a ter dono registrado.
+const rotaColuna = ler("src/app/api/financeiro/planilha-colunas/route.ts")
+ok("criar coluna é auditado com o autor", /PLANILHA_COLUNA_ADICIONADA/.test(rotaColuna) && /usuarioId: autor/.test(rotaColuna))
 
 // ── Resultado ──────────────────────────────────────────────────────────────
 console.log(`\n${"═".repeat(70)}`)
