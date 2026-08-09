@@ -183,6 +183,15 @@ export async function montarPlanilhaDocumental(processoId: number): Promise<Plan
       where: { tipoProcessoId: processo.tipoProcessoMotorId, arquivado: false, status: 'PUBLICADA' },
       select: { phaseKey: true }, distinct: ['phaseKey'],
     })
+    // SEM REGRA PUBLICADA A PLANILHA NÃO ADIVINHA — e também não fica muda. Toda
+    // célula viria "—" e o operador não teria como saber se o serviço não se
+    // aplica ou se o cadastro é que está incompleto.
+    if (fases.length === 0) {
+      pendencias.push({
+        motivo: 'nenhuma Regra Documental PUBLICADA para este tipo de processo',
+        detalhe: 'sem regra publicada nada é aplicável — publique em Gerenciamento › Regras Documentais',
+      })
+    }
     for (const { phaseKey } of fases) {
       if (!phaseKey) continue
       const eleg = await resolverElegibilidadeDocumental(processoId, processo.tipoProcessoMotorId, phaseKey, 1)
