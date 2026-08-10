@@ -96,12 +96,22 @@ for (const c of todas) porEstado[c.estado] = (porEstado[c.estado] ?? 0) + 1
 console.log(`  estados: ${Object.entries(porEstado).map(([k, v]) => `${k}=${v}`).join(' · ')}`)
 ok('nenhuma célula sem valor foi disfarçada de R$ 0,00',
   todas.every((c) => (c.estado === 'NAO_APLICAVEL' || c.estado === 'SEM_PRECO' || c.estado === 'AMBIGUO') ? c.valorEfetivo == null : true))
+// BASE_DISPONIVEL: preço cadastrado e resolvido, aplicabilidade em aberto. Ele
+// MOSTRA o valor e NÃO entra no total — é preço conhecido, não custo assumido.
+const base = todas.filter((c) => c.estado === 'BASE_DISPONIVEL')
+if (base.length) {
+  ok('o preço base cadastrado chega à célula', base.every((c) => c.valorBase != null), `${base.length} célula(s)`)
+  ok('e não é assumido como custo (fica fora do efetivo)', base.every((c) => c.valorEfetivo == null))
+  ok('e a célula aceita combinado manual', base.every((c) => c.editavel))
+}
 ok('toda célula com valor tem origem declarada',
   todas.filter((c) => c.valorEfetivo != null).every((c) => !!c.explicacao?.origem))
 ok('toda célula sem valor diz POR QUE',
   todas.filter((c) => c.valorEfetivo == null).every((c) => !!c.explicacao?.motivo))
-if ((porEstado.PREVISTO ?? 0) === 0 && (porEstado.REALIZADO ?? 0) === 0) {
-  console.log('  ⚠ nenhuma célula com valor neste processo — verifique se há Regra Documental PUBLICADA e preço de CUSTO')
+if ((porEstado.PREVISTO ?? 0) === 0 && (porEstado.REALIZADO ?? 0) === 0 && (porEstado.BASE_DISPONIVEL ?? 0) === 0) {
+  console.log('  ⚠ nenhuma célula com preço — verifique a Tabela de Preços dos itens da matriz')
+} else if ((porEstado.BASE_DISPONIVEL ?? 0) > 0) {
+  console.log(`  ℹ ${porEstado.BASE_DISPONIVEL} célula(s) com preço base e aplicabilidade em aberto (Regra Documental pendente)`)
 }
 
 // ═══════════════════════════════════════════════════════════════════════════

@@ -65,17 +65,35 @@ const paraCentavos = (v: unknown): number => Math.round(Number(v ?? 0) * 100)
 const paraReais = (centavos: number): number => Math.round(centavos) / 100
 
 /**
- * O QUE A CÉLULA SABE. `PREVISTO` e `REALIZADO` trazem número; os outros três
- * dizem, cada um, uma coisa diferente que R$ 0,00 não sabe dizer:
+ * O QUE A CÉLULA SABE. Cada estado diz uma coisa que R$ 0,00 não sabe dizer:
  *
- *   NAO_APLICAVEL  a regra não manda esta etapa para este registro
- *   SEM_PRECO      aplicável, mas a Tabela de Preços não resolve
- *   AMBIGUO        duas configurações disputam a mesma interseção — erro de
- *                  cadastro. Escolher uma esconderia o erro dentro de um
- *                  número que parece certo; somar as duas, pior ainda.
- *   SOBRESCRITO    vale o combinado deste processo, não o preço da tabela
+ *   NAO_APLICAVEL    a etapa não produz item canônico para este registro
+ *   BASE_DISPONIVEL  o item existe e TEM preço, mas a Regra Documental ainda
+ *                    não disse se a etapa se aplica aqui
+ *   SEM_PRECO        aplicável, mas a Tabela de Preços não resolve
+ *   AMBIGUO          duas configurações disputam a interseção — erro de
+ *                    cadastro. Escolher uma esconderia o erro dentro de um
+ *                    número que parece certo; somar as duas, pior ainda.
+ *   PREVISTO         aplicável, preço vigente resolvido
+ *   SOBRESCRITO      vale o combinado deste processo, não o preço da tabela
+ *   REALIZADO        virou obrigação — valor congelado
+ *
+ * ─── POR QUE `BASE_DISPONIVEL` EXISTE ───────────────────────────────────────
+ * Antes, a célula devolvia NAO_APLICAVEL antes mesmo de olhar o preço. O
+ * resultado: R$ 146,24 estava cadastrado, o resolvedor o encontrava, e a
+ * planilha exibia "—" — dizendo "não custa nada" quando queria dizer "ainda
+ * não sei se aplica".
+ *
+ * São duas perguntas diferentes: "quanto custa?" é da Tabela de Preços;
+ * "incide aqui?" é da Regra Documental. A segunda pode estar sem resposta
+ * enquanto a primeira já tem. Esconder o preço por causa disso torna a planilha
+ * inútil justamente na fase em que ela mais serve — a de orçar.
+ *
+ * `BASE_DISPONIVEL` NÃO entra no total previsto e NÃO gera lançamento: é preço
+ * conhecido, não custo assumido. Entra em `totalBaseBrl`, contado à parte.
  */
-export type EstadoCelula = 'NAO_APLICAVEL' | 'SEM_PRECO' | 'PREVISTO' | 'REALIZADO' | 'SOBRESCRITO' | 'AMBIGUO'
+export type EstadoCelula =
+  | 'NAO_APLICAVEL' | 'BASE_DISPONIVEL' | 'SEM_PRECO' | 'PREVISTO' | 'REALIZADO' | 'SOBRESCRITO' | 'AMBIGUO'
 
 /** Por que esta célula mostra este número — a resposta do Explain Engine. */
 export interface ExplicacaoCelula {
@@ -195,6 +213,12 @@ export interface PlanilhaDocumental {
   totalRealizadoBrl: number
   naoConvertido: number
   custosSemVinculo: number
+  /**
+   * Preço CONHECIDO cuja aplicabilidade ainda não foi decidida. Fica fora de
+   * `totalGeralBrl` de propósito: somá-lo seria afirmar um custo que a Regra
+   * Documental não assumiu.
+   */
+  totalBaseBrl: number
   /** por que algo não entrou — nunca silêncio (vem do resolvedor de elegibilidade) */
   pendencias: Array<{ motivo: string; detalhe?: string }>
 }
@@ -435,6 +459,8 @@ export async function montarPlanilhaDocumental(processoId: number): Promise<Plan
   const totaisPorServicoCent: Record<number, number> = {}
   for (const c of colunas) totaisPorServicoCent[c.tipoServicoId] = 0
   let totalGeralCent = 0, previstoCent = 0, realizadoCent = 0, naoConvertidoGeral = 0
+  // Preço conhecido cuja aplicabilidade está em aberto — contado À PARTE.
+  let baseCent = 0
 
   const blocos: BlocoPessoa[] = pessoas.map((p) => {
     // A LINHA É O TIPO DECLARADO, não o documento. Ela existe mesmo sem
@@ -528,22 +554,95 @@ export async function montarPlanilhaDocumental(processoId: number): Promise<Plan
           }
         }
 
+        const precoBase = preco?.ok ? preco.valor : null
+
         if (!aplica) {
+          // SEM ITEM não tem o que mostrar: a etapa não produz nada aqui.
+          if (res.tipo === 'SEM_ITEM' || precoBase == null) {
+            return {
+              ...base, estado: 'NAO_APLICAVEL' as const, valor: null, valorBrl: null, moeda: null, automatico: false,
+              explicacao: {
+                ...explicaBase, origem: null, tabelaValorId: null, regra: null, moeda: null, obrigacoes: [],
+                motivo: res.tipo === 'SEM_ITEM'
+                  ? res.motivo
+                  : 'A Regra Documental ainda não diz se esta etapa se aplica a este registro, e não há preço de custo cadastrado.',
+                valorBase: null,
+              },
+            }
+          }
+
+          // O ITEM EXISTE E TEM PREÇO — só a aplicabilidade está em aberto.
+          // Esconder o valor aqui era o defeito: a planilha dizia "—" com
+          // R$ 146,24 cadastrado e resolvível. O número aparece, e o total
+          // oficial não o assume (ele vai para `totalBaseBrl`).
+          //
+          // Um combinado manual continua valendo mesmo neste estado: definir o
+          // valor é decisão operacional explícita do usuário, não automação.
+          if (over) {
+            // O COMBINADO CONTA NO TOTAL, mesmo sem regra publicada.
+            //
+            // O preço base não conta porque ninguém o assumiu — ele é só o que
+            // a Tabela diz. Um combinado é o oposto: alguém digitou aquele
+            // valor naquela célula. Deixá-lo fora do total faria a planilha
+            // ignorar a única decisão explícita que existe ali.
+            const centO = paraCentavos(over.valor)
+            const emBrlO = over.moeda === 'BRL'
+            if (emBrlO) {
+              totaisPorServicoCent[col.tipoServicoId] += centO
+              totalLinhaCent += centO
+              previstoCent += centO
+            } else {
+              naoConvLinha += over.valor
+            }
+            return {
+              ...base,
+              estado: 'SOBRESCRITO' as const,
+              valor: paraReais(centO),
+              valorBrl: emBrlO ? paraReais(centO) : null,
+              valorBase: precoBase,
+              valorEfetivo: paraReais(centO),
+              moeda: over.moeda,
+              automatico: false,
+              editavel: true,
+              explicacao: {
+                ...explicaBase,
+                origem: 'Combinado deste processo' as const,
+                tabelaValorId: preco?.tabelaValorId ?? null,
+                regra: preco?.razao || null,
+                moeda: over.moeda, obrigacoes: [],
+                motivo: over.motivo ?? 'Aplicabilidade ainda não definida pela Regra Documental.',
+                valorBase: precoBase,
+              },
+            }
+          }
+
+          const centB = paraCentavos(precoBase)
+          if (preco?.moeda === 'BRL') baseCent += centB
           return {
-            ...base, estado: 'NAO_APLICAVEL' as const, valor: null, valorBrl: null, moeda: null, automatico: false,
+            ...base,
+            estado: 'BASE_DISPONIVEL' as const,
+            valor: paraReais(centB),
+            valorBrl: preco?.moeda === 'BRL' ? paraReais(centB) : null,
+            valorBase: precoBase,
+            valorEfetivo: null, // não é custo assumido: fora do total oficial
+            moeda: preco?.moeda ?? null,
+            automatico: false,
+            editavel: true,
             explicacao: {
-              ...explicaBase, origem: null, tabelaValorId: null, regra: null, moeda: null, obrigacoes: [],
-              motivo: res.tipo === 'SEM_ITEM'
-                ? res.motivo
-                : 'A Matriz Documental não aplica esta etapa a este registro.',
-              valorBase: null,
+              ...explicaBase,
+              origem: 'Tabela de Preços' as const,
+              tabelaValorId: preco?.tabelaValorId ?? null,
+              regra: preco?.razao || null,
+              moeda: preco?.moeda ?? null,
+              obrigacoes: [],
+              motivo: 'Preço cadastrado. A Regra Documental ainda não definiu se esta etapa se aplica — por isso não entra no total.',
+              valorBase: precoBase,
             },
           }
         }
 
         // A partir daqui a etapa APLICA — a célula aceita combinado, mesmo que a
         // Tabela ainda não tenha preço para ela.
-        const precoBase = preco?.ok ? preco.valor : null
 
         // O COMBINADO PASSA NA FRENTE DA TABELA — sem apagá-la. `valorBase`
         // continua ali para a explicação poder dizer o que deixou de valer.
@@ -689,6 +788,7 @@ export async function montarPlanilhaDocumental(processoId: number): Promise<Plan
     totalGeralBrl: paraReais(totalGeralCent),
     totalPrevistoBrl: paraReais(previstoCent),
     totalRealizadoBrl: paraReais(realizadoCent),
+    totalBaseBrl: paraReais(baseCent),
     naoConvertido: naoConvertidoGeral,
     custosSemVinculo,
     pendencias,

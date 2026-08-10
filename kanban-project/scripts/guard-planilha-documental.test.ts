@@ -135,7 +135,8 @@ for (const estado of ["NAO_APLICAVEL", "SEM_PRECO", "PREVISTO", "REALIZADO"]) {
   ok(`o estado ${estado} existe na projeção`, projecao.includes(estado))
 }
 ok("célula sem valor devolve null, não zero", /valor: null, valorBrl: null/.test(projecao))
-ok("a grade distingue os estados em vez de imprimir número sempre", /estado === "SEM_PRECO"/.test(view) && /NAO_APLICAVEL/.test(view))
+ok("a grade distingue os estados em vez de imprimir número sempre",
+  /case "SEM_PRECO"/.test(view) && /case "NAO_APLICAVEL"/.test(view) && /case "BASE_DISPONIVEL"/.test(view))
 ok("realizado tem precedência sobre previsto (o fato manda)",
   projecao.indexOf("if (obrs.length > 0)") < projecao.indexOf("if (!aplica)"))
 ok("o valor REALIZADO vem da obrigação, não da tabela",
@@ -159,7 +160,7 @@ secao("8) A célula é explicável")
 ok("toda célula carrega explicação", /explicacao:/.test(projecao))
 ok("a explicação diz a origem do valor", /'Tabela de Preços'/.test(projecao) && /congelado/.test(projecao))
 ok("a explicação diz POR QUE não há valor", /motivo:/.test(projecao))
-ok("a grade expõe a explicação ao usuário", /title=\{titulo\}/.test(view))
+ok("a grade expõe a explicação ao usuário", /title=\{tituloDaCelula\(celula\)\}/.test(view))
 
 // ═══════════════════════════════════════════════════════════════════════════
 secao("9) A configuração é GLOBAL — não fragmenta por processo")
@@ -255,29 +256,40 @@ ok("o cônjuge exibido é o que consta na certidão", /conjuge: d\?\.conjuge_reg
   "não o cônjuge da árvore — a coluna mostra o que o documento registrou")
 
 // ═══════════════════════════════════════════════════════════════════════════
-secao("13) A grade REPRODUZ a planilha de referência")
+secao("13) A grade é NATIVA do Discovery — estrutura do PDF, superfície do sistema")
 // ═══════════════════════════════════════════════════════════════════════════
-// A referência é branca, quadrada e densa. Ela não é um dashboard, e o guard
-// existe porque a tentação de "modernizar" volta a cada refatoração.
-ok("a área da planilha é branca e clara, não o tema escuro", /bg-white/.test(view) && /colorScheme: "light"/.test(view))
-ok("as faixas usam a paleta medida no arquivo",
-  /#44546A/.test(view) && /#DDEBF7/.test(view) && /#E2EFDA/.test(view) && /#D0CECE/.test(view))
-ok("as bordas são pretas e retas", /const BORDA = "#000000"/.test(view) && /border-collapse/.test(view))
-ok("as larguras de coluna são as proporções medidas, não flex",
-  /const LARGURA_FIXA = \[/.test(view) && /tableLayout: "fixed"/.test(view) && /<colgroup>/.test(view))
-ok("o cabeçalho se repete por pessoa, como no arquivo", /function BlocoPessoa\(/.test(view) && /<thead>/.test(view))
-ok("a seção de apoio troca o rótulo da primeira coluna", /rotuloPrimeira="Numero"/.test(view))
+// A REGRA. O arquivo de referência decide ESTRUTURA (quais colunas, em que
+// ordem, o agrupamento, as linhas de registro, a seção de fora da linhagem).
+// Ele NÃO decide superfície.
+//
+// A versão de 09/08 reproduzia a folha literal — `bg-white`, faixas #44546A,
+// bordas pretas, fonte de 9px — e o resultado foi um PDF colado dentro do
+// sistema: a tela deixou de parecer o Discovery. Estrutura é do arquivo;
+// cor, tipografia, espaçamento e borda são do Design System.
+ok("a grade usa tokens do sistema", /var\(--text-primary\)/.test(view) && /var\(--border-default\)/.test(view))
+ok("a grade não pinta fundo branco", !/bg-white/.test(view))
+ok("a grade não força esquema claro", !/colorScheme/.test(view))
+for (const literal of ["#44546A", "#DDEBF7", "#E2EFDA", "#D0CECE", "#000000", "#FFF9E6"]) {
+  ok(`a grade não tem a cor literal do arquivo (${literal})`, !view.includes(literal))
+}
+ok("a grade não usa borda preta", !/borderColor: BORDA/.test(view))
+ok("a grade não imita a fonte do arquivo", !/text-\[9px\]/.test(view) && !/text-\[8px\]/.test(view))
+ok("a grade não fixa larguras de coluna do arquivo", !/LARGURA_FIXA/.test(view) && !/tableLayout: "fixed"/.test(view))
+
+// A ESTRUTURA, essa continua sendo a do arquivo.
 ok("os rótulos fixos são os do arquivo",
   /"Geração", "Registro", "Data", "Local", "Dados do registro", "Cônjuge", "Genitores"/.test(view))
+ok("o cabeçalho se repete por pessoa", /function BlocoPessoa\(/.test(view) && /<thead>/.test(view))
+ok("a seção de apoio troca o rótulo da primeira coluna", /rotuloPrimeira="Número"/.test(view))
+ok("a coluna Total fecha cada bloco", /<th[^>]*>\s*Total\s*<\/th>/.test(view))
 ok("o bloco de uma pessoa não se parte entre páginas", /breakInside: "avoid"/.test(view))
 
-// Nenhum enfeite de dashboard DENTRO da planilha. Fora dela (erro, vazio) o
-// Discovery segue sendo o Discovery — por isso a varredura é só do corpo.
-const corpoPlanilha = view.slice(view.indexOf('style={{ colorScheme: "light" }}'))
-for (const enfeite of ["shadow", "rounded-", "gradient", "backdrop-", "badge"]) {
-  ok(`a planilha não tem ${enfeite}`, !corpoPlanilha.includes(enfeite))
+// Nada de enfeite de dashboard: a tela é densa de propósito.
+// "badge" fica de fora da lista: a palavra aparece só na PROSA que explica por
+// que não existe badge nenhum aqui — proibir a palavra proibiria a explicação.
+for (const enfeite of ["shadow", "gradient", "backdrop-", "rounded-full"]) {
+  ok(`a planilha não tem ${enfeite}`, !view.includes(enfeite))
 }
-ok("a planilha não usa token de tema dentro da área reproduzida", !/var\(--/.test(corpoPlanilha))
 
 // ═══════════════════════════════════════════════════════════════════════════
 secao("14) A PLANILHA É UMA MATRIZ — registro na linha, etapa na coluna")
@@ -349,7 +361,8 @@ ok("o valor efetivo é override sobre base, calculado na leitura",
 // A EDIÇÃO NÃO PODE POLUIR A PLANILHA.
 ok("a grade não tem coluna de ações", !/>\s*Ações\s*</.test(view))
 ok("a edição não põe botão em toda célula", !/Editar<\/button>/.test(view))
-ok("o marcador de override é discreto (4px no canto)", /borderTop: `4px solid/.test(view))
+ok("o marcador de override é discreto (sublinhado pontilhado, sem ocupar espaço)",
+  /case "SOBRESCRITO": return "[^"]*decoration-dotted/.test(view))
 ok("o frontend não decide qual documento nem qual preço",
   !/CERT_|itemCatalogo|categoriaItem|resolverPreco/.test(view),
   "quem resolve a interseção é a projeção; a tela renderiza")

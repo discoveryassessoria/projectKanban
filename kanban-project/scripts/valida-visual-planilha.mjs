@@ -22,13 +22,7 @@ await page.waitForTimeout(3000)
 try { await page.waitForSelector('table', { timeout: 20000 }) } catch { console.log('SEM TABELA apos 20s') }
 await page.waitForTimeout(1000)
 await page.screenshot({ path: `${OUT}/planilha.png`, fullPage: true })
-// A referência é uma folha inteira. Na tela a planilha rola dentro do painel;
-// em IMPRESSÃO ela abre por completo — é essa a vista comparável ao arquivo.
-await page.emulateMedia({ media: 'print' })
-await page.waitForTimeout(600)
-const folha = page.locator('table').first().locator('xpath=ancestor::div[contains(@style,"min-width")]')
-if (await folha.count()) await folha.first().screenshot({ path: `${OUT}/folha.png` })
-await page.emulateMedia({ media: 'screen' })
+
 console.log('TEXTO:\n' + (await page.locator('body').innerText()).slice(0, 1800))
 if (erros.length) console.log('\nERROS:', erros.slice(0, 5).join(' | '))
 await b.close()

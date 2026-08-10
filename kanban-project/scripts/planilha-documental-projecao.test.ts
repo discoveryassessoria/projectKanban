@@ -239,8 +239,18 @@ async function main() {
   const cCert = celula(pl, p.cfgCertidao)
   ok("preço vem da Tabela de Preços, resolvido (PREVISTO)",
     cCert?.estado === "PREVISTO" && cCert?.valorBrl === 146.24, `${cCert?.estado} ${cCert?.valorBrl}`)
-  ok("10: serviço sem regra econômica aplicável mostra —",
-    celula(pl, p.cfgTraducao)?.estado === "NAO_APLICAVEL", String(celula(pl, p.cfgTraducao)?.estado))
+  // SEM REGRA, MAS COM PREÇO: o valor NÃO some.
+  //
+  // A versão anterior devolvia NAO_APLICAVEL antes mesmo de olhar a Tabela, e
+  // a planilha exibia "—" com o preço cadastrado e resolvível — dizia "não
+  // custa nada" quando queria dizer "ainda não sei se aplica". São duas
+  // perguntas diferentes: quanto custa é da Tabela; se incide é da Regra.
+  const cTrad = celula(pl, p.cfgTraducao)
+  ok("10: serviço com preço mas sem regra vira BASE_DISPONIVEL, não —",
+    cTrad?.estado === "BASE_DISPONIVEL", String(cTrad?.estado))
+  ok("10: e o preço base cadastrado aparece", cTrad?.valorBase === 185.45, String(cTrad?.valorBase))
+  ok("10: mas NÃO entra no valor efetivo (não é custo assumido)", cTrad?.valorEfetivo === null, String(cTrad?.valorEfetivo))
+  ok("10: e a célula aceita combinado manual", cTrad?.editavel === true)
   ok("9: aplicável sem preço na tabela mostra 'Sem valor'",
     celula(pl, p.cfgSemPreco)?.estado === "SEM_PRECO" && celula(pl, p.cfgSemPreco)?.valorBrl === null)
   // ── 11 · DIVERGÊNCIA DECLARADA ────────────────────────────────────────────
@@ -256,8 +266,11 @@ async function main() {
   ok("11: preço 0,00 segue a régua do resolvedor oficial (recusa zero), sem régua paralela na planilha",
     cZero?.estado === "SEM_PRECO" && /zero/i.test(cZero?.explicacao.motivo ?? ""),
     `${cZero?.estado} — motivo: ${cZero?.explicacao.motivo}`)
-  ok("a célula não aplicável não tem valor nenhum (nem zero)",
-    celula(pl, p.cfgTraducao)?.valorBrl === null)
+  ok("a célula com preço em aberto não entra no total da linha",
+    pl.pessoas[0].linhas[0].totalBrl === 146.24,
+    `${pl.pessoas[0].linhas[0].totalBrl} — só o PREVISTO da certidão`)
+  ok("o preço em aberto é contado à parte, em totalBaseBrl",
+    pl.totalBaseBrl === 185.45, String(pl.totalBaseBrl))
 
   // ═════════════════════════════════════════════════════════════════════════
   secao("18–21) Totais e centavos")
@@ -313,8 +326,9 @@ async function main() {
   ok("40: célula prevista diz serviço, origem e a linha de preço usada",
     !!expPrev?.servico && expPrev?.origem === "Tabela de Preços" && expPrev?.tabelaValorId != null,
     JSON.stringify(expPrev))
-  ok("40: célula não aplicável diz POR QUE está vazia",
-    /Matriz Documental/.test(celula(pl, p.cfgTraducao)?.explicacao.motivo ?? ""))
+  ok("40: célula com preço em aberto diz por que não entra no total",
+    /Regra Documental ainda não definiu/.test(celula(pl, p.cfgTraducao)?.explicacao.motivo ?? ""),
+    celula(pl, p.cfgTraducao)?.explicacao.motivo ?? "")
   ok("40: célula sem preço diz POR QUE está vazia",
     (celula(pl, p.cfgSemPreco)?.explicacao.motivo ?? "").length > 0)
 
