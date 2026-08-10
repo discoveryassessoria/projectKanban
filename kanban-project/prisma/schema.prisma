@@ -527,14 +527,35 @@ model Tarefa {
   historico           TarefaHistorico[]
 
   // CP-4A â vÃ­nculos aditivos (nullable) com o runtime de workflow v2.
-  workflowInstanceId     Int?
+  // ── A TAREFA É DONA DO WORKFLOW ────────────────────────────────────────────
+  // UMA obrigação real = UMA Tarefa = UM workflow interno = N etapas.
+  //
+  // `@unique` é o que impede a arquitetura antiga de voltar: com uma instância
+  // por tarefa, não existe caminho em que sete passos virem sete tarefas. Etapa
+  // não é tarefa; ela é o "como" de uma tarefa que já existe.
+  workflowInstanceId     Int?                       @unique
   workflowInstance       PhaseWorkflowInstance?     @relation(fields: [workflowInstanceId], references: [id], onDelete: SetNull)
+  // A ETAPA CORRENTE é PROJEÇÃO, não identidade. Ela muda sete vezes durante a
+  // vida da tarefa, e a tarefa continua a mesma. Nada pode ancorar aqui.
   workflowStepInstanceId Int?
   workflowStepInstance   PhaseWorkflowStepInstance? @relation(fields: [workflowStepInstanceId], references: [id], onDelete: SetNull)
   necessidadeId          Int?
   necessidade            NecessidadeDocumental?     @relation("TarefaNecessidade", fields: [necessidadeId], references: [id], onDelete: SetNull)
   documentoId            Int?
   documento              Documento?                 @relation("TarefaDocumento", fields: [documentoId], references: [id], onDelete: SetNull)
+  // ── FILA E ATRIBUIÇÃO ──────────────────────────────────────────────────────
+  // EQUIPE responde pela fila e pela capacidade; RESPONSÁVEL é quem executa.
+  // Uma tarefa pode nascer só com equipe (`responsavelId` nulo) e esperar
+  // distribuição — é o estado "na fila", e ele não é uma tarefa diferente.
+  //
+  // `equipeKey` é texto porque NÃO EXISTE cadastro de Equipe no sistema: hoje a
+  // equipe vive como `papel` no passo ("equipe_documental"). Criar o cadastro é
+  // decisão de negócio pendente; até lá a chave é a mesma que o passo declara,
+  // e migrar para FK depois é trocar o tipo de UMA coluna.
+  equipeKey      String?   @db.VarChar(80)
+  dataAtribuicao DateTime?
+  atribuidoPorId Int?
+
   faseMacroKey           String?                    @db.VarChar(60)
   origem                 String?                    @db.VarChar(20)
   chaveIdempotencia      String?                    @unique @db.VarChar(200)
@@ -3886,7 +3907,10 @@ model PhaseWorkflowInstance {
   criadoPor            Usuario?  @relation("FaseCriadaPor", fields: [criadoPorId], references: [id], onDelete: SetNull)
 
   steps   PhaseWorkflowStepInstance[]
-  tarefas Tarefa[]
+  // 1:1 — a instância pertence a UMA tarefa. É a contraparte do `@unique` em
+  // `Tarefa.workflowInstanceId`, e é o que faz "etapa não é tarefa" ser uma
+  // propriedade do modelo, não uma convenção que alguém precisa lembrar.
+  tarefa  Tarefa?
 
   @@index([processoId, faseMacroKey, status])
   @@index([chaveIdempotencia])

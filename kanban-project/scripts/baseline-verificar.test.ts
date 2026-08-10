@@ -155,7 +155,7 @@ const MIGRATION = join(DIR_MIGRATIONS, '0000_baseline', 'migration.sql')
 //
 //   anterior : 7cd1f90827eef93f97a0fc35efe238d1d4e0a5dc45138c388ad53cc0f2fafb37
 //   atual    : dc38860b04bca0a0355e2eabd00c3bbe28659a9688e44b1f1cea7296cd7622b4
-const CHECKSUM_LEDGER = '46a8034f0ce646681dbf4d945e55bfe8189d9b5e030dc22c4a7fbade531e15d1'
+const CHECKSUM_LEDGER = 'f1e7d18aa83632a56aef471ee6164e0ce84354bc7128dece54ca7144372ce250'
 
 /**
  * Migrations criadas DEPOIS da consolidacao de 02/08/2026. Toda migration nova
@@ -179,6 +179,7 @@ const MIGRATIONS_POS_BASELINE: string[] = [
   '20260809_planilha_documental_colunas',
   '20260809210000_planilha_matriz_e_override',
   '20260809220000_planilha_coluna_etapa_chk',
+  '20260810120000_tarefa_unidade_operacional',
 ]
 
 const sha256 = (t: string) => createHash('sha256').update(t).digest('hex')

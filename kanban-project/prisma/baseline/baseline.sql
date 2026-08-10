@@ -5,7 +5,7 @@
 --   corpo        → gerado do prisma/schema.prisma
 --   bloco manual → prisma/baseline/bloco-manual.sql (edite LÁ)
 --
--- Gerado em : 2026-08-09
+-- Gerado em : 2026-08-10
 -- Prisma    : 6.19.3
 --
 -- PARA QUE SERVE: reconstruir o banco DO ZERO. O histórico de migrations NÃO
@@ -523,6 +523,9 @@ CREATE TABLE "Tarefa" (
     "workflowStepInstanceId" INTEGER,
     "necessidadeId" INTEGER,
     "documentoId" INTEGER,
+    "equipeKey" VARCHAR(80),
+    "dataAtribuicao" TIMESTAMP(3),
+    "atribuidoPorId" INTEGER,
     "faseMacroKey" VARCHAR(60),
     "origem" VARCHAR(20),
     "chaveIdempotencia" VARCHAR(200),
@@ -4248,6 +4251,9 @@ CREATE INDEX "Processo_enquadramentoLegalId_idx" ON "Processo"("enquadramentoLeg
 
 -- CreateIndex
 CREATE UNIQUE INDEX "Tarefa_publicCode_key" ON "Tarefa"("publicCode");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "Tarefa_workflowInstanceId_key" ON "Tarefa"("workflowInstanceId");
 
 -- CreateIndex
 CREATE UNIQUE INDEX "Tarefa_chaveIdempotencia_key" ON "Tarefa"("chaveIdempotencia");

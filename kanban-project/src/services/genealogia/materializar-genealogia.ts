@@ -10,6 +10,7 @@
 // Documento NÃO é criado aqui: Documento.necessidadeId é preenchido quando houver
 // Documento materializado pela operação (seção 3.4 da tarefa).
 
+import { reconciliarTarefas } from "@/lib/operacional/reconciliar-tarefas"
 import { prisma } from "@/lib/prisma"
 import { pessoasAtivasDaArvore } from "@/src/lib/genealogia/vinculo-ativo"
 import type { Prisma } from "@prisma/client"
@@ -198,7 +199,18 @@ export async function materializarGenealogia(processoId: number, db: DB = prisma
             data: {
               workflowInstanceId: instancia.id, stepKey: STEP_LOCALIZAR, processoId,
               faseMacroKey: FASE_GENEALOGIA, ordem: 1, tipo: "HUMANO",
-              obrigatorio: ap.obrigatoriedade === "OBRIGATORIA", geraTarefa: false, ciclo: instancia.ciclo,
+              // `geraTarefa` NÃO é mais decisão deste materializador — nem aqui
+              // nem em lugar nenhum. Ele descreve a ETAPA; quem responde "este
+              // trabalho entra na fila de alguém?" é a TAREFA da instância,
+              // materializada pelo reconciliador canônico
+              // (lib/operacional/reconciliar-tarefas.ts).
+              //
+              // O literal `false` que ficava aqui era uma decisão de negócio
+              // escondida num materializador local: ela deixou a operação
+              // inteira do Ademir invisível para a fila, o prazo e as
+              // notificações, sem erro e sem aviso. O valor abaixo é só o
+              // default do modelo, e nada o lê para decidir tarefa.
+              obrigatorio: ap.obrigatoriedade === "OBRIGATORIA", ciclo: instancia.ciclo,
               status: "DISPONIVEL", necessidadeId: necessidade.id, papel: "equipe_documental", slaDays: 5,
               chaveIdempotencia: chave,
               snapshot: { stepKey: STEP_LOCALIZAR, label: STEP_LABEL, requisito: snapshot } as Prisma.InputJsonValue,
@@ -211,7 +223,15 @@ export async function materializarGenealogia(processoId: number, db: DB = prisma
     }
   }
 
-  return await reconciliarEfinalizar(res, processoId, aplicaveisVariante, db)
+  const finalizado = await reconciliarEfinalizar(res, processoId, aplicaveisVariante, db)
+
+  // A TAREFA DO TRABALHO converge junto com a materialização: sair daqui com
+  // workflow ativo e sem tarefa é exatamente o estado em que o Ademir ficou.
+  // Fora de transação de propósito — o reconciliador abre as suas próprias, e
+  // aninhar transação do Prisma dentro de outra não é suportado.
+  await reconciliarTarefas({ processoId })
+
+  return finalizado
 }
 
 async function reconciliarEfinalizar(res: MaterializarResultado, processoId: number, aplicaveisVariante: Set<string>, db: DB): Promise<MaterializarResultado> {

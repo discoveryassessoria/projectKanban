@@ -154,6 +154,9 @@ const AUTORIZADOS_FORA_DO_RUNTIME: Record<string, string> = {
   // ── Preparação de ambiente ───────────────────────────────────────────────
   "scripts/preview-sandbox-setup.mjs": "sandbox de Preview: derruba dados do ambiente descartável",
   "prisma/test-tipo-novo.ts": "script de verificação de tipo: cria e apaga o próprio documento",
+  "scripts/tarefa-unidade-operacional.test.ts":
+    "unidade operacional da Tarefa: monta e derruba as próprias árvores (marca TAREFA-OP), " +
+    "só no banco de teste; prova que 7 etapas continuam sendo 1 tarefa",
   "scripts/override-isolamento.test.ts":
     "isolamento do override entre processos: monta e derruba as próprias árvores (marca ISOLAMENTO), " +
     "só no banco de teste",
