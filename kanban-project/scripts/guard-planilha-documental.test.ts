@@ -284,6 +284,23 @@ ok("a seção de apoio troca o rótulo da primeira coluna", /rotuloPrimeira="Nú
 ok("a coluna Total fecha cada bloco", /<th[^>]*>\s*Total\s*<\/th>/.test(view))
 ok("o bloco de uma pessoa não se parte entre páginas", /breakInside: "avoid"/.test(view))
 
+// ─── A EDIÇÃO PRECISA SER DESCOBRÍVEL ──────────────────────────────────────
+// O backend suportava override, o handler estava ligado, a célula respondia ao
+// clique — e mesmo assim ninguém editava, porque nada na tela dizia que dava
+// para clicar: cursor `cell`, hover quase invisível, e um tooltip que abria
+// explicando o preço em vez de convidar à ação. Funcionalidade que não se
+// anuncia não existe para quem usa.
+ok("a célula editável convida ao clique", /cursor-text/.test(view) && /hover:text-\[var\(--text-primary\)\]/.test(view))
+ok("o tooltip abre dizendo o que dá para FAZER",
+  /Clique para editar o valor deste processo/.test(view))
+ok("o lápis aparece no hover da própria célula, não em todas",
+  /group-hover:opacity/.test(view) && /className=\{`group /.test(view))
+ok("há ação de restaurar o padrão", /Restaurar valor padrão/.test(view))
+ok("o campo seleciona o valor ao abrir", /e\.currentTarget\.select\(\)/.test(view))
+ok("gravar não trava a planilha inteira", /salvando \? "opacity-50"/.test(view))
+ok("o erro aparece na própria célula e permite tentar de novo",
+  /\{erro && \(/.test(view) && /setErro\(null\)/.test(view))
+
 // Nada de enfeite de dashboard: a tela é densa de propósito.
 // "badge" fica de fora da lista: a palavra aparece só na PROSA que explica por
 // que não existe badge nenhum aqui — proibir a palavra proibiria a explicação.

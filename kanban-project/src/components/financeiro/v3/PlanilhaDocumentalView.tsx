@@ -26,6 +26,7 @@
 "use client"
 
 import { useState } from "react"
+import { Pencil, RotateCcw } from "lucide-react"
 import { useApi } from "@/src/lib/dados"
 
 type EstadoCelula =
@@ -133,11 +134,23 @@ function classeDaCelula(c?: Celula): string {
   }
 }
 
-/** Por que esta célula vale isto — a resposta do Modo Auditor, no `title`. */
+/**
+ * Por que esta célula vale isto — a resposta do Modo Auditor, no `title`.
+ *
+ * A PRIMEIRA LINHA É O CONVITE, não a explicação. O tooltip antigo abria com o
+ * item canônico e a razão do preço: cinco linhas de por quê, sem nunca dizer
+ * que dava para clicar. Quem passava o mouse lia uma justificativa e ia embora.
+ * O que a pessoa precisa saber primeiro é o que ela pode FAZER ali.
+ */
 function tituloDaCelula(c?: Celula): string | undefined {
   const e = c?.explicacao
   if (!e) return undefined
   const linhas = [
+    c?.editavel
+      ? c.valorOverride != null
+        ? "Valor personalizado deste processo · clique para editar"
+        : "Clique para editar o valor deste processo"
+      : null,
     e.registro && e.servico ? `${e.registro} × ${e.servico}` : e.servico,
     e.itemResolvidoNome ? `Item: ${e.itemResolvidoNome}` : null,
     // Sob combinado, o preço da Tabela continua dito: ele não some, só deixa de
@@ -213,29 +226,50 @@ function CelulaEconomica({
 
   if (editando) {
     return (
-      <td className="relative px-2 py-1 text-right">
+      // `px-1 py-1` e a mesma altura de linha: o input ocupa exatamente o lugar
+      // do texto. Trocar o padding aqui empurraria a linha inteira e a tabela
+      // "pularia" a cada clique.
+      <td className="relative whitespace-nowrap px-1 py-1 text-right">
         <input
           autoFocus
+          // Seleciona tudo ao abrir: quem clica quer trocar o valor, não
+          // posicionar cursor no meio de "146,24".
+          onFocus={(e) => e.currentTarget.select()}
           value={texto}
           disabled={salvando}
-          onChange={(e) => setTexto(e.target.value)}
+          onChange={(e) => { setTexto(e.target.value); setErro(null) }}
           onKeyDown={(e) => {
             if (e.key === "Enter") { e.preventDefault(); void gravar(false) }
             if (e.key === "Escape") { e.preventDefault(); setEditando(false); setErro(null) }
           }}
-          onBlur={() => { setEditando(false); setErro(null) }}
-          className={`w-full rounded-[var(--radius-sm)] border bg-[var(--surface-primary)] px-1.5 py-0.5 text-right text-xs tabular-nums text-[var(--text-primary)] outline-none ${
-            erro ? "border-[var(--danger)]" : "border-[var(--accent-primary)]"
-          }`}
+          // Clicar fora GRAVA quando o valor é válido e mudou; cancela quando
+          // não é. Sair do campo sem alterar nada não pode virar uma escrita.
+          onBlur={() => {
+            const v = lerValor(texto)
+            const atual = celula?.valorEfetivo ?? celula?.valorBase ?? null
+            if (v != null && v !== atual) { void gravar(false); return }
+            setEditando(false); setErro(null)
+          }}
+          // Enquanto grava, o campo esmaece: feedback dentro da própria célula,
+          // sem travar a planilha inteira nem inserir um elemento novo que
+          // mudasse a altura da linha.
+          className={`w-full rounded-[var(--radius-sm)] border bg-[var(--surface-primary)] px-1 py-0.5 text-right text-xs tabular-nums text-[var(--text-primary)] outline-none transition-opacity ${
+            salvando ? "opacity-50" : ""
+          } ${erro ? "border-[var(--danger)]" : "border-[var(--accent-primary)]"}`}
           title={erro ?? "Enter grava · Esc cancela"}
         />
-        {celula?.valorOverride != null && (
+        {erro && (
+          <span className="absolute right-1 top-full z-10 mt-0.5 whitespace-nowrap rounded-[var(--radius-sm)] border border-[var(--danger)] bg-[var(--surface-primary)] px-1.5 py-0.5 text-[10px] text-[var(--danger)]">
+            {erro}
+          </span>
+        )}
+        {celula?.valorOverride != null && !erro && (
           // `onMouseDown` porque o `onBlur` do input dispara antes do click.
           <button
             onMouseDown={(e) => { e.preventDefault(); void gravar(true) }}
-            className="absolute right-2 top-full z-10 mt-0.5 whitespace-nowrap rounded-[var(--radius-sm)] border border-[var(--border-default)] bg-[var(--surface-primary)] px-1.5 py-0.5 text-[10px] text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
+            className="absolute right-1 top-full z-10 mt-0.5 inline-flex items-center gap-1 whitespace-nowrap rounded-[var(--radius-sm)] border border-[var(--border-default)] bg-[var(--surface-primary)] px-1.5 py-0.5 text-[10px] text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
           >
-            Restaurar padrão
+            <RotateCcw className="h-2.5 w-2.5" aria-hidden /> Restaurar valor padrão
           </button>
         )}
       </td>
@@ -244,8 +278,10 @@ function CelulaEconomica({
 
   return (
     <td
-      className={`whitespace-nowrap px-2 py-1 text-right tabular-nums ${classeDaCelula(celula)} ${
-        podeEditar ? "cursor-cell hover:bg-[var(--surface-hover)]" : ""
+      // `group` liga o lápis ao hover DESTA célula: ele não existe em repouso e
+      // não aparece nas outras quinze ao mesmo tempo.
+      className={`group relative whitespace-nowrap px-2 py-1 text-right tabular-nums ${classeDaCelula(celula)} ${
+        podeEditar ? "cursor-text hover:bg-[var(--surface-hover)] hover:text-[var(--text-primary)]" : ""
       }`}
       title={tituloDaCelula(celula)}
       onClick={() => {
@@ -255,7 +291,20 @@ function CelulaEconomica({
         setEditando(true)
       }}
     >
-      {textoDaCelula(celula)}
+      <span className="inline-flex items-center justify-end gap-1">
+        {/* O marcador de combinado: um ponto de 4px. Some no papel, e responde
+            "por que este número é diferente do da tabela?" sem ocupar linha. */}
+        {celula?.valorOverride != null && (
+          <span
+            aria-label="valor personalizado deste processo"
+            className="h-1 w-1 shrink-0 rounded-[1px] bg-[var(--accent-primary)]"
+          />
+        )}
+        {textoDaCelula(celula)}
+        {podeEditar && (
+          <Pencil className="h-2.5 w-2.5 shrink-0 opacity-0 transition-opacity group-hover:opacity-60" aria-hidden />
+        )}
+      </span>
     </td>
   )
 }
