@@ -327,16 +327,20 @@ export function PlanilhaDocumentalView({ processoId }: { processoId: number }) {
         </section>
       )}
 
-      <div className="flex flex-wrap items-baseline justify-end gap-x-8 gap-y-1 border-t border-[var(--border-default)] pt-3 text-sm">
-        {p.totalBaseBrl != null && p.totalBaseBrl > 0 && (
-          <span
-            className="text-xs text-[var(--text-muted)]"
-            title="Preço cadastrado cuja aplicabilidade a Regra Documental ainda não definiu. Não é custo assumido, por isso fica fora do total."
-          >
-            Preço base disponível <span className="tabular-nums">{fmt(p.totalBaseBrl)}</span>
-          </span>
-        )}
-        <span className="text-[var(--text-secondary)]">
+      {/* UM TOTAL SÓ. Ter "preço base" ao lado de "total" dividia a conta em
+          dois números e obrigava o leitor a somá-los de cabeça para conferir o
+          que a planilha já mostra célula a célula. O que ainda depende de Regra
+          Documental é informação do domínio (`totalBaseBrl`) e vive no tooltip,
+          não numa segunda linha de resultado. */}
+      <div className="flex items-baseline justify-end border-t border-[var(--border-default)] pt-3 text-sm">
+        <span
+          className="text-[var(--text-secondary)]"
+          title={
+            p.totalBaseBrl != null && p.totalBaseBrl > 0
+              ? `Inclui ${fmt(p.totalBaseBrl)} de preço cadastrado cuja aplicabilidade a Regra Documental ainda não definiu. Projeção — nenhum custo foi lançado.`
+              : undefined
+          }
+        >
           Total <span className="ml-2 font-medium tabular-nums text-[var(--text-primary)]">{fmt(p.totalGeralBrl)}</span>
         </span>
       </div>

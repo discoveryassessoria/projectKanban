@@ -249,7 +249,12 @@ async function main() {
   ok("10: serviço com preço mas sem regra vira BASE_DISPONIVEL, não —",
     cTrad?.estado === "BASE_DISPONIVEL", String(cTrad?.estado))
   ok("10: e o preço base cadastrado aparece", cTrad?.valorBase === 185.45, String(cTrad?.valorBase))
-  ok("10: mas NÃO entra no valor efetivo (não é custo assumido)", cTrad?.valorEfetivo === null, String(cTrad?.valorEfetivo))
+  // VALOR VISÍVEL SOMA. A planilha é de previsão: um número impresso na célula
+  // que ficasse fora do total quebraria a conferência de quem lê — as células
+  // não fechariam com o rodapé. Projetar continua não sendo lançar: nenhuma
+  // obrigação nasce daqui, e `totalBaseBrl` diz quanto do total ainda depende
+  // de Regra Documental.
+  ok("10: e o valor visível entra no efetivo", cTrad?.valorEfetivo === 185.45, String(cTrad?.valorEfetivo))
   ok("10: e a célula aceita combinado manual", cTrad?.editavel === true)
   ok("9: aplicável sem preço na tabela mostra 'Sem valor'",
     celula(pl, p.cfgSemPreco)?.estado === "SEM_PRECO" && celula(pl, p.cfgSemPreco)?.valorBrl === null)
@@ -266,20 +271,20 @@ async function main() {
   ok("11: preço 0,00 segue a régua do resolvedor oficial (recusa zero), sem régua paralela na planilha",
     cZero?.estado === "SEM_PRECO" && /zero/i.test(cZero?.explicacao.motivo ?? ""),
     `${cZero?.estado} — motivo: ${cZero?.explicacao.motivo}`)
-  ok("a célula com preço em aberto não entra no total da linha",
-    pl.pessoas[0].linhas[0].totalBrl === 146.24,
-    `${pl.pessoas[0].linhas[0].totalBrl} — só o PREVISTO da certidão`)
-  ok("o preço em aberto é contado à parte, em totalBaseBrl",
+  ok("o total da linha soma TODAS as células visíveis",
+    pl.pessoas[0].linhas[0].totalBrl === 331.69,
+    `${pl.pessoas[0].linhas[0].totalBrl} = 146,24 (previsto) + 185,45 (base)`)
+  ok("e o domínio ainda sabe quanto disso depende de Regra Documental",
     pl.totalBaseBrl === 185.45, String(pl.totalBaseBrl))
 
   // ═════════════════════════════════════════════════════════════════════════
   secao("18–21) Totais e centavos")
   // ═════════════════════════════════════════════════════════════════════════
-  ok("18: total da linha soma só o que tem valor", pl.pessoas[0].linhas[0].totalBrl === 146.24, String(pl.pessoas[0].linhas[0].totalBrl))
-  ok("19: subtotal da pessoa confere", pl.pessoas[0].totalBrl === 146.24)
-  ok("20: total do processo confere", pl.totalGeralBrl === 146.24)
+  ok("18: total da linha soma toda célula com valor visível", pl.pessoas[0].linhas[0].totalBrl === 331.69, String(pl.pessoas[0].linhas[0].totalBrl))
+  ok("19: subtotal da pessoa confere", pl.pessoas[0].totalBrl === 331.69, String(pl.pessoas[0].totalBrl))
+  ok("20: total do processo confere", pl.totalGeralBrl === 331.69, String(pl.totalGeralBrl))
   ok("previsto e realizado são somados separadamente",
-    pl.totalPrevistoBrl === 146.24 && pl.totalRealizadoBrl === 0, `${pl.totalPrevistoBrl}/${pl.totalRealizadoBrl}`)
+    pl.totalPrevistoBrl === 331.69 && pl.totalRealizadoBrl === 0, `${pl.totalPrevistoBrl}/${pl.totalRealizadoBrl}`)
 
   // 21) centavos: três preços que quebram em float (146.24 + 7.64 + 151.05).
   const cfgA = await config("CentA", 7.64); const cfgB = await config("CentB", 151.05)
@@ -291,8 +296,11 @@ async function main() {
     await adicionarColuna({ origem: "SERVICO", itemId: cfg })
   }
   pl = await montarPlanilhaDocumental(p.processoId)
-  ok("21: 146,24 + 7,64 + 151,05 = 304,93 sem erro de centavo",
-    pl.pessoas[0].linhas[0].totalBrl === 304.93, String(pl.pessoas[0].linhas[0].totalBrl))
+  // 146,24 + 7,64 + 151,05 = 304,93 — e mais os 185,45 da tradução, que também
+  // está visível na linha. O que este caso trava é o CENTAVO: em float a soma
+  // dos três primeiros já erra, e é por isso que o acumulador é inteiro.
+  ok("21: 146,24 + 7,64 + 151,05 (+185,45) = 490,38 sem erro de centavo",
+    pl.pessoas[0].linhas[0].totalBrl === 490.38, String(pl.pessoas[0].linhas[0].totalBrl))
 
   // ═════════════════════════════════════════════════════════════════════════
   secao("4) Mudar o preço atualiza o PREVISTO")

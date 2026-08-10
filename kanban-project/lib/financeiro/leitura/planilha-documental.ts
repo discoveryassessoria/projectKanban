@@ -89,8 +89,10 @@ const paraReais = (centavos: number): number => Math.round(centavos) / 100
  * enquanto a primeira já tem. Esconder o preço por causa disso torna a planilha
  * inútil justamente na fase em que ela mais serve — a de orçar.
  *
- * `BASE_DISPONIVEL` NÃO entra no total previsto e NÃO gera lançamento: é preço
- * conhecido, não custo assumido. Entra em `totalBaseBrl`, contado à parte.
+ * `BASE_DISPONIVEL` ENTRA nos totais — a planilha é de previsão, e um número
+ * visível que não soma quebra a conferência de quem lê. O que ele não faz é
+ * gerar lançamento: projetar não é lançar. `totalBaseBrl` diz quanto do total
+ * é essa projeção, para o domínio; a tela mostra um total só.
  */
 export type EstadoCelula =
   | 'NAO_APLICAVEL' | 'BASE_DISPONIVEL' | 'SEM_PRECO' | 'PREVISTO' | 'REALIZADO' | 'SOBRESCRITO' | 'AMBIGUO'
@@ -214,9 +216,10 @@ export interface PlanilhaDocumental {
   naoConvertido: number
   custosSemVinculo: number
   /**
-   * Preço CONHECIDO cuja aplicabilidade ainda não foi decidida. Fica fora de
-   * `totalGeralBrl` de propósito: somá-lo seria afirmar um custo que a Regra
-   * Documental não assumiu.
+   * Quanto do total ainda depende de Regra Documental — a parcela em
+   * `BASE_DISPONIVEL`. Ela ESTÁ dentro de `totalGeralBrl`: a planilha é de
+   * previsão, e valor visível soma. Este número existe para o domínio saber o
+   * que é projeção pura, não para dividir a conta na tela.
    */
   totalBaseBrl: number
   /** por que algo não entrou — nunca silêncio (vem do resolvedor de elegibilidade) */
@@ -459,7 +462,9 @@ export async function montarPlanilhaDocumental(processoId: number): Promise<Plan
   const totaisPorServicoCent: Record<number, number> = {}
   for (const c of colunas) totaisPorServicoCent[c.tipoServicoId] = 0
   let totalGeralCent = 0, previstoCent = 0, realizadoCent = 0, naoConvertidoGeral = 0
-  // Preço conhecido cuja aplicabilidade está em aberto — contado À PARTE.
+  // Quanto do total é projeção sem regra publicada. Não é um total paralelo:
+  // é uma FATIA de `totalGeralCent`, para o domínio saber o que ainda depende
+  // de cadastro.
   let baseCent = 0
 
   const blocos: BlocoPessoa[] = pessoas.map((p) => {
@@ -616,15 +621,32 @@ export async function montarPlanilhaDocumental(processoId: number): Promise<Plan
             }
           }
 
+          // O VALOR VISÍVEL SOMA. A planilha é de previsão de custo: um número
+          // impresso na célula que não entra no total quebra a aritmética que o
+          // operador confere de cabeça — 15 células de R$ 146,24 têm de dar
+          // R$ 2.193,60, e não R$ 0,00 com o valor exilado num rótulo à parte.
+          //
+          // Projetar não é lançar. A distinção entre projeção e custo assumido
+          // continua existindo, mas no DOMÍNIO: `totalBaseBrl` diz quanto do
+          // total ainda depende de Regra Documental, e nenhuma obrigação nasce
+          // daqui. Ela não vive na conta que aparece na tela.
           const centB = paraCentavos(precoBase)
-          if (preco?.moeda === 'BRL') baseCent += centB
+          const emBrlB = preco?.moeda === 'BRL'
+          if (emBrlB) {
+            totaisPorServicoCent[col.tipoServicoId] += centB
+            totalLinhaCent += centB
+            previstoCent += centB
+            baseCent += centB
+          } else {
+            naoConvLinha += precoBase
+          }
           return {
             ...base,
             estado: 'BASE_DISPONIVEL' as const,
             valor: paraReais(centB),
-            valorBrl: preco?.moeda === 'BRL' ? paraReais(centB) : null,
+            valorBrl: emBrlB ? paraReais(centB) : null,
             valorBase: precoBase,
-            valorEfetivo: null, // não é custo assumido: fora do total oficial
+            valorEfetivo: emBrlB ? paraReais(centB) : null,
             moeda: preco?.moeda ?? null,
             automatico: false,
             editavel: true,

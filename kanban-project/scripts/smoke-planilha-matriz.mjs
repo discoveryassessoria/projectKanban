@@ -101,7 +101,9 @@ ok('nenhuma célula sem valor foi disfarçada de R$ 0,00',
 const base = todas.filter((c) => c.estado === 'BASE_DISPONIVEL')
 if (base.length) {
   ok('o preço base cadastrado chega à célula', base.every((c) => c.valorBase != null), `${base.length} célula(s)`)
-  ok('e não é assumido como custo (fica fora do efetivo)', base.every((c) => c.valorEfetivo == null))
+  // Valor visível soma: a planilha é de previsão e as células têm de fechar
+  // com o rodapé. Projetar não é lançar — nenhuma obrigação nasce daqui.
+  ok('e o valor visível entra no efetivo', base.every((c) => c.valorEfetivo === c.valorBase))
   ok('e a célula aceita combinado manual', base.every((c) => c.editavel))
 }
 ok('toda célula com valor tem origem declarada',
@@ -127,6 +129,12 @@ ok('o total do processo é a soma das pessoas',
   `${p.totalGeralBrl}`)
 ok('célula não aplicável não entra em total nenhum',
   todas.filter((c) => c.estado === 'NAO_APLICAVEL').every((c) => c.valorEfetivo == null))
+// A CONTA QUE O OPERADOR FAZ DE CABEÇA: o que está impresso nas células tem de
+// dar o total do rodapé. Se divergir, a planilha perde a função.
+const somaVisivel = todas.reduce((s, c) => s + cent(c.valorEfetivo), 0)
+ok('a soma das células visíveis é o total do processo',
+  Math.abs(somaVisivel - cent(p.totalGeralBrl)) <= 1,
+  `células ${(somaVisivel / 100).toFixed(2)} · total ${p.totalGeralBrl}`)
 
 // ═══════════════════════════════════════════════════════════════════════════
 secao('6) Reload preserva o resultado')
