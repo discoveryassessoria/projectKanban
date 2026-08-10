@@ -154,6 +154,9 @@ const AUTORIZADOS_FORA_DO_RUNTIME: Record<string, string> = {
   // ── Preparação de ambiente ───────────────────────────────────────────────
   "scripts/preview-sandbox-setup.mjs": "sandbox de Preview: derruba dados do ambiente descartável",
   "prisma/test-tipo-novo.ts": "script de verificação de tipo: cria e apaga o próprio documento",
+  "scripts/override-isolamento.test.ts":
+    "isolamento do override entre processos: monta e derruba as próprias árvores (marca ISOLAMENTO), " +
+    "só no banco de teste",
   "scripts/planilha-override.test.ts":
     "combinado da célula: monta e derrube o próprio cenário (marca OVERRIDE-TEST) e prova que " +
     "remover a Pessoa leva o override junto — a exclusão faz PARTE do que ele verifica",

@@ -287,6 +287,7 @@
     "test:planilha-matriz": "tsx scripts/planilha-matriz.test.ts",
     "test:planilha-override": "tsx scripts/planilha-override.test.ts",
     "test:preco-generico": "tsx scripts/preco-generico-planilha.test.ts",
+    "test:override-isolamento": "tsx scripts/override-isolamento.test.ts",
     "test:guard-validade": "tsx scripts/guard-validade-por-estado.test.ts",
     "test:tabela-precos-projecao": "tsx scripts/tabela-precos-projecao.test.ts"
   },
