@@ -179,13 +179,31 @@ secao("13–15) Sem vigência, sem agrupamento por nome, sem duplicação")
   ok("15: registro sem cadastro mestre aparece sozinho, não é escondido", l.length === 1 && l[0].custo?.registro.id === 9)
 }
 {
-  // Dois registros da MESMA natureza no mesmo item: um ocupa a coluna, o outro
-  // é declarado — nenhuma linha do banco desaparece da tela.
+  // MESMA natureza duas vezes no mesmo item: uma ocupa a coluna, a outra é
+  // declarada como VARIAÇÃO — nenhuma linha do banco desaparece da tela, e
+  // nenhuma delas é chamada de "sem papel", porque papel elas têm.
   const l = agruparPorCadastroMestre([
     reg({ id: 1, configuracaoFinanceiraItemId: 182, natureza: "CUSTO" }),
     reg({ id: 2, configuracaoFinanceiraItemId: 182, natureza: "CUSTO" }),
   ])
-  ok("15: natureza repetida não some — vai para `outros`", l.length === 1 && l[0].custo?.registro.id === 1 && l[0].outros.length === 1)
+  ok("15: natureza repetida não some — vira variação, não `outros`",
+    l.length === 1 && l[0].custo?.registro.id === 1 && l[0].variacoes.length === 1 && l[0].outros.length === 0)
+}
+{
+  // O GENÉRICO OCUPA A COLUNA, mesmo chegando depois do de fornecedor.
+  //
+  // É ele que a leitura sem fornecedor resolve — e a coluna tem de mostrar o
+  // preço que vale por padrão. Deixar o do fornecedor na coluna faria a Tabela
+  // anunciar um valor que a planilha não usa.
+  const comForn = reg({ id: 10, configuracaoFinanceiraItemId: 182, natureza: "CUSTO" })
+  comForn.fornecedor = { id: 15, nome: "Cartório X" }
+  const generico = reg({ id: 11, configuracaoFinanceiraItemId: 182, natureza: "CUSTO" })
+  const l = agruparPorCadastroMestre([comForn, generico])
+  ok("15: o genérico ocupa a coluna de Custo", l[0].custo?.registro.id === 11)
+  ok("15: o preço do fornecedor vira variação, com o nome dele",
+    l[0].variacoes.length === 1 && l[0].variacoes[0].registro.id === 10 && l[0].variacoes[0].fornecedor === "Cartório X")
+  ok("15: a variação declara o papel — nunca 'sem papel'", l[0].variacoes[0].papel === "CUSTO")
+  ok("15: nada foi para `outros`", l[0].outros.length === 0)
 }
 
 // ═══════════════════════════════════════════════════════════════════════════

@@ -445,6 +445,20 @@ export default function TabelaValoresTab() {
                     <CelulaDimensao dim={linha.venda} onEditar={abrirEditar} onExcluir={excluir} />
                     <td className="px-3 py-2.5"><span className={`rounded px-2 py-0.5 text-[11px] font-medium ${ativo ? 'bg-green-500/15 text-green-300' : 'bg-white/10 text-white/50'}`}>{ativo ? 'Ativo' : 'Inativo'}</span></td>
                     <td className="px-3 py-2.5 text-right text-[11px] text-white/40">
+                      {/* VARIAÇÃO ≠ SEM PAPEL. O preço de um fornecedor específico
+                          convivendo com o genérico é cadastro correto — é a régua
+                          de prioridade do resolvedor. Chamá-lo de "sem papel"
+                          fazia parecer defeito e escondia um preço vivo. */}
+                      {linha.variacoes.length > 0 && (
+                        <span
+                          className="mr-2 text-white/55"
+                          title={linha.variacoes
+                            .map((v) => `${v.papel}: ${v.fornecedor ?? 'genérico'} — ${v.registro.moeda} ${String(v.registro.valor)}`)
+                            .join('\n')}
+                        >
+                          +{linha.variacoes.length} por fornecedor
+                        </span>
+                      )}
                       {linha.outros.length > 0 && `+${linha.outros.length} sem papel`}
                     </td>
                   </tr>

@@ -58,6 +58,17 @@ export interface LinhaMestre<T extends RegistroPreco = RegistroPreco> {
   referencia: T
   custo: DimensaoPreco<T> | null
   venda: DimensaoPreco<T> | null
+  /**
+   * MESMO papel, OUTRO recorte — tipicamente o preço de um fornecedor
+   * específico convivendo com o genérico. Não é erro: é a régua de prioridade
+   * do resolvedor (fornecedor conhecido ganha; sem fornecedor, o genérico).
+   *
+   * Elas existem separadas de `outros` porque a diferença importa na tela: uma
+   * variação é um preço válido que só não coube na coluna, e chamá-la de "sem
+   * papel" faria o operador achar que o cadastro está quebrado — ou pior, não
+   * procurar por ela.
+   */
+  variacoes: Array<DimensaoPreco<T> & { papel: 'CUSTO' | 'VENDA' }>
   /** Registros que não são nem custo nem venda (natureza legada/nula). */
   outros: T[]
 }
@@ -92,7 +103,7 @@ export function agruparPorCadastroMestre<T extends RegistroPreco>(registros: T[]
 
   for (const r of registros) {
     if (r.configuracaoFinanceiraItemId == null) {
-      const linha: LinhaMestre<T> = { configId: -r.id, referencia: r, custo: null, venda: null, outros: [] }
+      const linha: LinhaMestre<T> = { configId: -r.id, referencia: r, custo: null, venda: null, variacoes: [], outros: [] }
       const p = papel(r.natureza)
       if (p === 'CUSTO') linha.custo = { registro: r, fornecedor: nomeFornecedor(r.fornecedor) }
       else if (p === 'VENDA') linha.venda = { registro: r, fornecedor: nomeFornecedor(r.fornecedor) }
@@ -105,16 +116,30 @@ export function agruparPorCadastroMestre<T extends RegistroPreco>(registros: T[]
     const cfg = r.configuracaoFinanceiraItemId
     let linha = porConfig.get(cfg)
     if (!linha) {
-      linha = { configId: cfg, referencia: r, custo: null, venda: null, outros: [] }
+      linha = { configId: cfg, referencia: r, custo: null, venda: null, variacoes: [], outros: [] }
       porConfig.set(cfg, linha)
       ordem.push({ configId: cfg })
     }
 
     const p = papel(r.natureza)
     const dim: DimensaoPreco<T> = { registro: r, fornecedor: nomeFornecedor(r.fornecedor) }
-    if (p === 'CUSTO' && linha.custo == null) linha.custo = dim
-    else if (p === 'VENDA' && linha.venda == null) linha.venda = dim
-    else linha.outros.push(r)
+    if (p == null) { linha.outros.push(r); continue }
+
+    const ocupada = p === 'CUSTO' ? linha.custo : linha.venda
+    // QUEM OCUPA A COLUNA É O GENÉRICO — porque é ele que a leitura sem
+    // fornecedor resolve, e a coluna precisa mostrar o preço que vale por
+    // padrão. O de fornecedor desce para as variações, sem sumir.
+    const ehGenerico = r.fornecedor == null
+    if (ocupada == null) {
+      if (p === 'CUSTO') linha.custo = dim
+      else linha.venda = dim
+    } else if (ehGenerico && ocupada.fornecedor != null) {
+      if (p === 'CUSTO') linha.custo = dim
+      else linha.venda = dim
+      linha.variacoes.push({ ...ocupada, papel: p })
+    } else {
+      linha.variacoes.push({ ...dim, papel: p })
+    }
   }
 
   return ordem.map((o) => ('configId' in o ? porConfig.get(o.configId)! : o.solto))
