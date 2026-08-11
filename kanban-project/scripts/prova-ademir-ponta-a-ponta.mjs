@@ -23,14 +23,25 @@ t('mostra UMA tarefa', lista.length===1, `${lista.length}`)
 t('com o MESMO taskId 3358', lista[0]?.id===TASK, String(lista[0]?.id))
 
 const antes=lista[0]
-t('responsável = não atribuído', antes?.responsavelId==null, String(antes?.responsavelId))
 t('equipe = equipe_documental', antes?.equipeKey==='equipe_documental', String(antes?.equipeKey))
 
-console.log('\nATRIBUIR à Daniela')
+// A PROVA SE ADAPTA AO ESTADO. Escrita só para "tarefa na fila", ela só valeria
+// uma vez — e uma prova que não pode ser repetida não serve para validar nada
+// depois da primeira execução.
+const jaAtribuida = antes?.responsavelId != null
+console.log(jaAtribuida ? '\nJÁ ATRIBUÍDA — validando o invariante da reatribuição' : '\nATRIBUIR à Daniela')
 const a=await j(`/api/tarefas/${TASK}/atribuir`,{method:'POST',body:JSON.stringify({responsavelId:DANIELA})})
-t('a porta canônica aceitou', a.s===200, `HTTP ${a.s} ${JSON.stringify(a.b).slice(0,120)}`)
-t('mesmo taskId', a.b?.tarefaId===TASK)
-t('criou UMA notificação', Number.isInteger(a.b?.notificacaoId))
+if (jaAtribuida) {
+  t('reatribuir para a MESMA pessoa é recusado', a.s===422 && a.b?.codigo==='MESMO_RESPONSAVEL', `HTTP ${a.s}`)
+  t('e a tarefa continua sendo a mesma', antes?.id===TASK)
+  const ns=await j(`/api/tarefas?processoId=${PROC}`)
+  const l=Array.isArray(ns.b)?ns.b:(ns.b?.tarefas??[])
+  t('sem duplicar', l.length===1, `${l.length}`)
+} else {
+  t('a porta canônica aceitou', a.s===200, `HTTP ${a.s} ${JSON.stringify(a.b).slice(0,120)}`)
+  t('mesmo taskId', a.b?.tarefaId===TASK)
+  t('criou UMA notificação', Number.isInteger(a.b?.notificacaoId))
+}
 
 const dep=await j(`/api/tarefas?processoId=${PROC}`)
 const l2=Array.isArray(dep.b)?dep.b:(dep.b?.tarefas??[])
