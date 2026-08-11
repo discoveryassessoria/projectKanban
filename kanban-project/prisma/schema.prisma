@@ -574,6 +574,25 @@ model Tarefa {
   motivoCodigo          String? @db.VarChar(40)
   justificativa         String? @db.Text
 
+  // ── ESPERA EXTERNA E O RELÓGIO DO SLA ──────────────────────────────────────
+  // Nem toda espera pausa o prazo, e presumir qualquer um dos dois lados
+  // globalmente seria inventar política de negócio: um cartório que demora 40
+  // dias não pode consumir um SLA de 5, e uma espera por resposta do cliente
+  // frequentemente DEVE contar. Quem decide é o workflow publicado
+  // (`pausarSlaEmEsperaExterna`); estes campos só guardam o que já aconteceu.
+  slaPausadoEm         DateTime?
+  slaPausaAcumuladaMin Int       @default(0)
+
+  // ── CAUSA REMOVIDA ─────────────────────────────────────────────────────────
+  // A obrigação que originou o trabalho deixou de existir DEPOIS que alguém já
+  // trabalhou nela. Cancelar sozinho jogaria fora trabalho feito; ignorar
+  // deixaria a fila mentindo. Fica marcado e espera decisão de quem pode tomá-la.
+  causaRemovidaEm     DateTime?
+  causaRemovidaMotivo String?   @db.VarChar(300)
+
+  dependeDe  TarefaDependencia[] @relation("TarefaDependente")
+  bloqueia   TarefaDependencia[] @relation("TarefaPreRequisito")
+
   // TAREFA TRANSVERSAL (aditivo) â aÃ§Ã£o antecipada de OUTRA fase p/ resolver uma necessidade
   // da fase ATUAL, sem avanÃ§ar o Macro. Refs "soltas" (padrÃ£o executedById): sem relation
   // p/ nÃ£o tocar outros models; os serviÃ§os resolvem os vÃ­nculos. necessidadeId/documentoId/
@@ -3020,6 +3039,13 @@ model PhaseInternalWorkflow {
   @@index([phaseKey])
   @@index([tipoProcessoId])
   @@index([familiaDocumentalId])
+  /// POLÍTICA DE SLA NA ESPERA EXTERNA — decisão do workflow, não do código.
+  /// `true`: o relógio para enquanto a tarefa aguarda terceiro (cartório que
+  /// demora 40 dias não deve consumir um SLA de 5). `false`: o prazo corre
+  /// mesmo assim (espera por resposta do cliente costuma contar).
+  pausarSlaEmEsperaExterna Boolean @default(false)
+  /// Mesma pergunta para bloqueio — e a resposta não é necessariamente a mesma.
+  pausarSlaEmBloqueio      Boolean @default(false)
 }
 
 model PhaseInternalWorkflowStep {
@@ -6704,4 +6730,34 @@ model NotificacaoOperacional {
 
   @@index([destinatarioId, lidaEm])
   @@index([tarefaId])
+}
+
+/// DEPENDÊNCIA ENTRE TAREFAS — duas obrigações distintas, uma esperando a outra.
+///
+/// Isto NÃO é etapa. "Traduzir a certidão" depende de "obter a certidão", e são
+/// dois trabalhos: têm responsáveis diferentes, prazos diferentes, podem estar
+/// em equipes diferentes. Modelar a segunda como passo da primeira faria a
+/// tradução herdar o dono da emissão e sumir da fila de quem traduz.
+///
+/// A dependência é entre IDs canônicos e não carrega regra: quem interpreta
+/// "posso executar?" é o motor, lendo se as pré-requisitos estão concluídas.
+model TarefaDependencia {
+  id Int @id @default(autoincrement())
+
+  /// A tarefa que ESPERA.
+  tarefaId Int
+  tarefa   Tarefa @relation("TarefaDependente", fields: [tarefaId], references: [id], onDelete: Cascade)
+
+  /// A tarefa que precisa terminar antes.
+  dependeDeId Int
+  dependeDe   Tarefa @relation("TarefaPreRequisito", fields: [dependeDeId], references: [id], onDelete: Cascade)
+
+  /// Dependência informativa não impede execução; obrigatória impede.
+  obrigatoria Boolean @default(true)
+  motivo      String? @db.VarChar(200)
+  criadoEm    DateTime @default(now())
+
+  /// Um par só existe uma vez — reconciliar N vezes não empilha dependências.
+  @@unique([tarefaId, dependeDeId])
+  @@index([dependeDeId])
 }

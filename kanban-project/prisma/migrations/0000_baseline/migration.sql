@@ -538,6 +538,10 @@ CREATE TABLE "Tarefa" (
     "blockedPreviousStatus" VARCHAR(30),
     "motivoCodigo" VARCHAR(40),
     "justificativa" TEXT,
+    "slaPausadoEm" TIMESTAMP(3),
+    "slaPausaAcumuladaMin" INTEGER NOT NULL DEFAULT 0,
+    "causaRemovidaEm" TIMESTAMP(3),
+    "causaRemovidaMotivo" VARCHAR(300),
     "tipo" "TipoTarefa" NOT NULL DEFAULT 'NORMAL',
     "faseOrigemCode" VARCHAR(60),
     "faseReferenciaCode" VARCHAR(60),
@@ -2345,6 +2349,8 @@ CREATE TABLE "PhaseInternalWorkflow" (
     "familiaDocumentalId" INTEGER,
     "exigeDocumento" BOOLEAN NOT NULL DEFAULT false,
     "exigePessoa" BOOLEAN NOT NULL DEFAULT false,
+    "pausarSlaEmEsperaExterna" BOOLEAN NOT NULL DEFAULT false,
+    "pausarSlaEmBloqueio" BOOLEAN NOT NULL DEFAULT false,
 
     CONSTRAINT "PhaseInternalWorkflow_pkey" PRIMARY KEY ("id")
 );
@@ -4149,6 +4155,18 @@ CREATE TABLE "NotificacaoOperacional" (
 );
 
 -- CreateTable
+CREATE TABLE "TarefaDependencia" (
+    "id" SERIAL NOT NULL,
+    "tarefaId" INTEGER NOT NULL,
+    "dependeDeId" INTEGER NOT NULL,
+    "obrigatoria" BOOLEAN NOT NULL DEFAULT true,
+    "motivo" VARCHAR(200),
+    "criadoEm" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT "TarefaDependencia_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
 CREATE TABLE "_ReciboPagamento" (
     "A" INTEGER NOT NULL,
     "B" INTEGER NOT NULL,
@@ -5860,6 +5878,12 @@ CREATE INDEX "NotificacaoOperacional_destinatarioId_lidaEm_idx" ON "NotificacaoO
 CREATE INDEX "NotificacaoOperacional_tarefaId_idx" ON "NotificacaoOperacional"("tarefaId");
 
 -- CreateIndex
+CREATE INDEX "TarefaDependencia_dependeDeId_idx" ON "TarefaDependencia"("dependeDeId");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "TarefaDependencia_tarefaId_dependeDeId_key" ON "TarefaDependencia"("tarefaId", "dependeDeId");
+
+-- CreateIndex
 CREATE INDEX "_ReciboPagamento_B_index" ON "_ReciboPagamento"("B");
 
 -- CreateIndex
@@ -6752,6 +6776,12 @@ ALTER TABLE "NotificacaoOperacional" ADD CONSTRAINT "NotificacaoOperacional_dest
 
 -- AddForeignKey
 ALTER TABLE "NotificacaoOperacional" ADD CONSTRAINT "NotificacaoOperacional_tarefaId_fkey" FOREIGN KEY ("tarefaId") REFERENCES "Tarefa"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "TarefaDependencia" ADD CONSTRAINT "TarefaDependencia_tarefaId_fkey" FOREIGN KEY ("tarefaId") REFERENCES "Tarefa"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "TarefaDependencia" ADD CONSTRAINT "TarefaDependencia_dependeDeId_fkey" FOREIGN KEY ("dependeDeId") REFERENCES "Tarefa"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "_ReciboPagamento" ADD CONSTRAINT "_ReciboPagamento_A_fkey" FOREIGN KEY ("A") REFERENCES "PagamentoFatura"("id") ON DELETE CASCADE ON UPDATE CASCADE;

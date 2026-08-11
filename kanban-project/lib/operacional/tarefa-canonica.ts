@@ -173,13 +173,19 @@ export async function materializarTarefaOperacional(
  * CONCLUIR ETAPA INTERMEDIÁRIA NÃO CONCLUI A TAREFA. Só o fim do workflow
  * conclui — é a diferença entre "enviei o pedido" e "tenho a certidão".
  */
-export function estadoDerivado(steps: Array<{
-  status: string
-  obrigatorio: boolean
-  ordem: number
-  stepKey: string
-}>): { status: StatusTarefa; motivo: string } {
-  if (steps.length === 0) return { status: 'NAO_INICIADA', motivo: 'workflow sem etapas' }
+export function estadoDerivado(
+  steps: Array<{ status: string; obrigatorio: boolean; ordem: number; stepKey: string }>,
+  // FATO REGISTRADO GANHA DE ESTADO DERIVADO. Se uma pessoa clicou em "iniciar",
+  // o trabalho começou — e nenhuma leitura das etapas pode desmentir isso.
+  // Sem este parâmetro a sincronização devolvia a tarefa para NAO_INICIADA logo
+  // depois de alguém tê-la iniciado, porque as etapas ainda não tinham andado.
+  contexto: { iniciada?: boolean } = {},
+): { status: StatusTarefa; motivo: string } {
+  if (steps.length === 0) {
+    return contexto.iniciada
+      ? { status: 'EM_ANDAMENTO', motivo: 'sem etapas, mas iniciada por uma pessoa' }
+      : { status: 'NAO_INICIADA', motivo: 'workflow sem etapas' }
+  }
 
   const vivos = steps.filter((s) => !['CANCELADO', 'SUPERSEDIDO', 'DISPENSADO'].includes(s.status))
   const obrigatorios = vivos.filter((s) => s.obrigatorio)
@@ -201,6 +207,7 @@ export function estadoDerivado(steps: Array<{
     // esteja só disponível. Voltar para NAO_INICIADA apagaria esse fato.
     return { status: 'EM_ANDAMENTO', motivo: 'etapas já concluídas, trabalho em curso' }
   }
+  if (contexto.iniciada) return { status: 'EM_ANDAMENTO', motivo: 'a tarefa foi iniciada por uma pessoa' }
   return { status: 'NAO_INICIADA', motivo: 'nenhuma etapa iniciada' }
 }
 
@@ -237,7 +244,7 @@ export async function sincronizarTarefaComWorkflow(
 ): Promise<{ mudou: boolean; status: StatusTarefa; stepAtualId: number | null }> {
   const tarefa = await tx.tarefa.findUnique({
     where: { id: tarefaId },
-    select: { id: true, workflowInstanceId: true, statusTarefa: true, workflowStepInstanceId: true, dataConclusao: true },
+    select: { id: true, workflowInstanceId: true, statusTarefa: true, workflowStepInstanceId: true, dataConclusao: true, dataInicio: true },
   })
   if (!tarefa?.workflowInstanceId) {
     return { mudou: false, status: tarefa?.statusTarefa ?? 'NAO_INICIADA', stepAtualId: null }
@@ -249,7 +256,7 @@ export async function sincronizarTarefaComWorkflow(
     orderBy: { ordem: 'asc' },
   })
 
-  const { status } = estadoDerivado(steps)
+  const { status } = estadoDerivado(steps, { iniciada: tarefa.dataInicio != null })
   const corrente = etapaCorrente(steps)
   const mudou = status !== tarefa.statusTarefa || (corrente?.id ?? null) !== tarefa.workflowStepInstanceId
   if (!mudou) return { mudou: false, status, stepAtualId: corrente?.id ?? null }

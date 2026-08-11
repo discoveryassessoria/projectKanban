@@ -55,6 +55,9 @@ const DONO_RUNTIME = "src/services/necessidade-documental.ts"
  * há regra "tudo em scripts/ pode".
  */
 const AUTORIZADOS_FORA_DO_RUNTIME: Record<string, string> = {
+  "scripts/motor-operacional-fases.test.ts":
+    "motor operacional através das fases: monta e derruba os PRÓPRIOS processos " +
+    "(marca MOTOR-FASE) só no banco de teste",
   "scripts/tarefa-atribuicao.test.ts":
     "atribuição/transferência/notificação: cria e derruba o PRÓPRIO cenário (marca ATRIB-TEST) " +
     "só no banco de teste",

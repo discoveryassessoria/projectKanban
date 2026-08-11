@@ -178,6 +178,80 @@ ok("nenhum tipo de notificação é de etapa",
   !/'STEP|PASSO_|ETAPA_/.test(comandos))
 ok("o link do aviso é o link canônico da tarefa", /link: linkDaTarefa\(ev\.tarefaId\)/.test(comandos))
 
+// ═══════════════════════════════════════════════════════════════════════════
+secao("10) O motor atravessa fases sem destruir trabalho")
+// ═══════════════════════════════════════════════════════════════════════════
+// Avançar de fase parece um bom momento para "limpar" as pendências da fase
+// anterior, e voltar parece um bom momento para "recomeçar". Os dois instintos
+// destroem trabalho real — e nenhum deles pode existir no código.
+const ciclo = ler("lib/operacional/tarefa-ciclo.ts")
+const projecoes = ler("lib/operacional/tarefa-projecoes.ts")
+
+// G/H — voltar não recria, avançar não conclui: só o RECONCILIADOR mexe em
+// tarefa por causa de fase, e ele nem sequer lê a fase do processo.
+ok("o reconciliador não lê a fase macro do processo para decidir",
+  !/faseAtualKey/.test(reconciler),
+  "se ele olhasse a fase, avançar ou voltar mudaria tarefa — e é exatamente o que não pode")
+ok("nada conclui tarefa por mudança de fase",
+  !/faseAtualKey[\s\S]{0,300}CONCLUID/.test(reconciler + ciclo))
+
+// I — retry não duplica notificação (já coberto), e o reconciliador não notifica.
+ok("o reconciliador não emite notificação", !/notificacaoOperacional\.create/.test(reconciler))
+
+// J — tarefa automática sem provenance não nasce.
+ok("tarefa sem causa não é materializada",
+  /if \(!nome\)/.test(reconciler) && /semTitulo\+\+/.test(reconciler))
+ok("o dossiê responde 'por que eu existo'", /porQueExisto/.test(projecoes))
+
+// K — ativa sem responsável E sem equipe é o que a fila não consegue mostrar.
+ok("a fila da equipe existe para o trabalho sem dono", /export async function filaDaEquipe/.test(projecoes))
+ok("e Minha Fila é projeção, não entidade",
+  /export async function minhaFila/.test(projecoes) && !/model MinhaFila/.test(schema))
+
+// §19 — atraso é condição derivada, jamais um status.
+ok("atraso NÃO é status", !/'ATRASADA'/.test(schema) && !/ATRASADA/.test(canonica))
+ok("atraso é calculado na projeção", /atrasada: !terminal && t\.dataPrazo != null/.test(projecoes))
+
+// §66 — carga conta tarefas, nunca etapas.
+ok("a carga conta tarefas", /cargaPorResponsavel/.test(projecoes) &&
+  !/phaseWorkflowStepInstance[\s\S]{0,200}cargaPorResponsavel/.test(projecoes))
+
+// ═══════════════════════════════════════════════════════════════════════════
+secao("11) Manual, reabertura e causa removida")
+// ═══════════════════════════════════════════════════════════════════════════
+// F — reabertura mantém o mesmo id; nenhuma porta do ciclo cria tarefa, exceto
+// a criação manual, que é trabalho NOVO e por isso tem identidade própria.
+const semCriarManual = ciclo.slice(ciclo.indexOf("// REABERTURA"))
+ok("reabrir não cria tarefa", !/tarefa\.create/.test(semCriarManual))
+ok("reabrir exige motivo", /codigo: 'SEM_MOTIVO'[\s\S]{0,200}reabertura/i.test(ciclo))
+ok("reabrir só funciona em tarefa encerrada", /NAO_TERMINAL/.test(ciclo))
+ok("a tarefa manual é marcada como MANUAL", /origem: 'MANUAL'/.test(ciclo))
+ok("e o reconciliador NUNCA cancela tarefa manual", /origem: \{ not: 'MANUAL' \}/.test(reconciler))
+
+// §50 — trabalho iniciado que perde a causa não é cancelado por robô.
+ok("causa removida depois de iniciada exige decisão humana",
+  /jaTrabalhou/.test(reconciler) && /TAREFA_CAUSA_REMOVIDA/.test(reconciler))
+ok("e o trabalho já feito é preservado", !/jaTrabalhou[\s\S]{0,400}statusTarefa: 'CANCELADA'/.test(reconciler))
+ok("tarefa concluída nunca é tocada por perda de causa",
+  /statusTarefa: \{ notIn: STATUS_TERMINAIS \}/.test(reconciler))
+
+// §54 — publicar versão nova não reescreve o roteiro de quem já trabalha.
+ok("a instância guarda a versão com que nasceu",
+  /workflowVersion/.test(schema) && /snapshot/.test(schema))
+ok("e o dossiê expõe essa versão", /workflowVersao/.test(projecoes))
+
+// §29/§30 — a política de SLA na espera é do cadastro, não do código.
+ok("a pausa de SLA é configurável no workflow publicado",
+  /pausarSlaEmEsperaExterna/.test(schema) && /pausarSlaEmBloqueio/.test(schema))
+ok("e o código apenas OBEDECE a política", /politicaDeSla/.test(ciclo))
+ok("sem workflow, o padrão é NÃO pausar",
+  /workflowInstanceId == null\) return \{ pausaEspera: false/.test(ciclo))
+
+// §35 — dependência é entre tarefas, não etapa disfarçada.
+ok("dependência tem entidade própria", /model TarefaDependencia \{/.test(schema))
+ok("com par único", /@@unique\(\[tarefaId, dependeDeId\]\)/.test(schema))
+ok("ciclo direto é recusado", /criaria um ciclo/.test(ciclo))
+
 // ── Resultado ──────────────────────────────────────────────────────────────
 console.log(`\n${"═".repeat(70)}`)
 console.log(`Total: ${passou + falhou} | ✅ ${passou} | ❌ ${falhou}`)

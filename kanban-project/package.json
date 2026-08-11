@@ -291,6 +291,7 @@
     "test:tarefa-operacional": "tsx scripts/tarefa-unidade-operacional.test.ts",
     "test:guard-tarefa": "tsx scripts/guard-tarefa-operacional.test.ts",
     "test:tarefa-atribuicao": "tsx scripts/tarefa-atribuicao.test.ts",
+    "test:motor-fases-tarefas": "tsx scripts/motor-operacional-fases.test.ts",
     "test:guard-validade": "tsx scripts/guard-validade-por-estado.test.ts",
     "test:tabela-precos-projecao": "tsx scripts/tabela-precos-projecao.test.ts"
   },

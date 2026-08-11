@@ -30,6 +30,8 @@ export interface ResultadoReconciliacao {
   tarefasCriadas: number
   tarefasSincronizadas: number
   tarefasEncerradasSemCausa: number
+  /** Perderam a causa DEPOIS de iniciadas — ninguém cancela sozinho. */
+  tarefasAguardandoDecisao: number
   semTitulo: number
   detalhes: Array<{ instanciaId: number; tarefaId: number; acao: string }>
 }
@@ -77,7 +79,7 @@ export async function reconciliarTarefas(
   const agora = new Date()
   const res: ResultadoReconciliacao = {
     instanciasAvaliadas: 0, tarefasCriadas: 0, tarefasSincronizadas: 0,
-    tarefasEncerradasSemCausa: 0, semTitulo: 0, detalhes: [],
+    tarefasEncerradasSemCausa: 0, tarefasAguardandoDecisao: 0, semTitulo: 0, detalhes: [],
   }
 
   const instancias = await prisma.phaseWorkflowInstance.findMany({
@@ -178,34 +180,74 @@ export async function reconciliarTarefas(
   }
 
   // ── TAREFA QUE PERDEU A CAUSA ────────────────────────────────────────────
-  // A instância foi cancelada ou superseditada e a tarefa ficou. Ela não é
-  // apagada: o histórico é fato. Sai da fila ativa como CANCELADA, e quem
-  // olhar depois consegue ver que existiu e por que saiu.
-  const orfas = await prisma.tarefa.findMany({
+  // O QUE FAZER DEPENDE DE QUANTO TRABALHO JÁ FOI FEITO. Tratar os três casos
+  // igual seria destruir esforço real ou deixar a fila mentindo:
+  //
+  //   nunca iniciada  → cancela. Ninguém perdeu nada.
+  //   já iniciada     → NÃO cancela sozinho. Alguém trabalhou nisso; jogar fora
+  //                     sem análise é decisão que o motor não pode tomar.
+  //                     Fica marcada e espera decisão de quem pode tomá-la.
+  //   já concluída    → não se toca. O trabalho ACONTECEU. Regra que muda
+  //                     depois não desfaz o passado.
+  //
+  // Tarefa MANUAL nunca entra aqui: ela não nasceu de obrigação automática, e
+  // foi uma pessoa que decidiu que o trabalho existe.
+  const semCausa = await prisma.tarefa.findMany({
     where: {
       workflowInstanceId: { not: null },
       statusTarefa: { notIn: STATUS_TERMINAIS },
+      origem: { not: 'MANUAL' },
       workflowInstance: { status: { in: ['CANCELADO', 'SUPERSEDIDO'] } },
       ...(opts.processoId ? { processoId: opts.processoId } : {}),
     },
-    select: { id: true, workflowInstanceId: true, titulo: true },
+    select: { id: true, workflowInstanceId: true, titulo: true, dataInicio: true, statusTarefa: true, causaRemovidaEm: true },
   })
-  for (const t of orfas) {
+
+  for (const t of semCausa) {
+    // "Iniciada" é sobre trabalho FEITO, não sobre estado nominal: quem começou
+    // tem `dataInicio`, e quem saiu de NAO_INICIADA andou de alguma forma.
+    const jaTrabalhou = t.dataInicio != null || t.statusTarefa !== 'NAO_INICIADA'
+
+    if (jaTrabalhou) {
+      if (t.causaRemovidaEm != null) continue // já marcada, aguardando decisão
+      res.tarefasAguardandoDecisao++
+      res.detalhes.push({ instanciaId: t.workflowInstanceId ?? 0, tarefaId: t.id, acao: 'causa removida · trabalho já iniciado · aguarda decisão' })
+      if (dryRun) continue
+      await prisma.$transaction(async (tx) => {
+        await tx.tarefa.update({
+          where: { id: t.id },
+          data: { causaRemovidaEm: agora, causaRemovidaMotivo: 'O workflow que originou este trabalho foi encerrado.' },
+        })
+        await tx.logAuditoria.create({
+          data: {
+            acao: 'TAREFA_CAUSA_REMOVIDA',
+            entidade: 'Tarefa',
+            entidadeId: t.id,
+            descricao:
+              `Tarefa "${t.titulo}" perdeu a causa DEPOIS de iniciada. Não foi cancelada: ` +
+              `o trabalho já realizado é preservado e a decisão cabe a quem tem autorização.`,
+            detalhes: { workflowInstanceId: t.workflowInstanceId, statusTarefa: t.statusTarefa, dataInicio: t.dataInicio?.toISOString() ?? null },
+          },
+        })
+      })
+      continue
+    }
+
     res.tarefasEncerradasSemCausa++
-    res.detalhes.push({ instanciaId: t.workflowInstanceId ?? 0, tarefaId: t.id, acao: 'causa encerrada · sairia da fila' })
+    res.detalhes.push({ instanciaId: t.workflowInstanceId ?? 0, tarefaId: t.id, acao: 'causa removida · nunca iniciada · cancelada' })
     if (dryRun) continue
     await prisma.$transaction(async (tx) => {
       await tx.tarefa.update({
         where: { id: t.id },
-        data: { statusTarefa: 'CANCELADA', motivoCodigo: 'CAUSA_ENCERRADA', dataConclusao: agora },
+        data: { statusTarefa: 'CANCELADA', motivoCodigo: 'CAUSA_REMOVIDA', dataConclusao: agora, causaRemovidaEm: agora },
       })
       await tx.logAuditoria.create({
         data: {
           acao: 'TAREFA_CANCELADA',
           entidade: 'Tarefa',
           entidadeId: t.id,
-          descricao: `Tarefa "${t.titulo}" retirada da fila ativa: o workflow que a originou foi encerrado. Histórico preservado.`,
-          detalhes: { workflowInstanceId: t.workflowInstanceId },
+          descricao: `Tarefa "${t.titulo}" retirada da fila: o workflow que a originou foi encerrado e o trabalho nunca começou. Histórico preservado.`,
+          detalhes: { workflowInstanceId: t.workflowInstanceId, origem: 'RECONCILIADOR', motivo: 'CAUSA_REMOVIDA' },
         },
       })
     })
