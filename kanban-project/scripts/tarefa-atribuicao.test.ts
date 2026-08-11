@@ -178,11 +178,15 @@ async function main() {
     where: { id: p.tarefaId },
     data: { dataPrazo: new Date(Date.now() - 86400000), statusTarefa: "EM_ANDAMENTO", concluida: false },
   })
-  const v1 = await avisarPrazosEAtrasos()
-  ok("a varredura acha a tarefa atrasada", v1.atraso === 1, JSON.stringify(v1))
+  // A varredura é GLOBAL de propósito (em produção ela roda para todo mundo),
+  // então a asserção não pode ser sobre o contador dela: uma tarefa vencida
+  // deixada por outro cenário entraria na conta e o teste passaria a depender
+  // da ordem de execução. O que é DESTE cenário é o aviso desta tarefa.
+  await avisarPrazosEAtrasos()
+  ok("a varredura avisa a tarefa atrasada", (await notifs(p.tarefaId, "ATRASO")).length === 1)
   const v2 = await avisarPrazosEAtrasos()
   ok("rodar de novo no mesmo dia não duplica", (await notifs(p.tarefaId, "ATRASO")).length === 1, `${(await notifs(p.tarefaId, "ATRASO")).length}`)
-  ok("e a segunda varredura não conta aviso novo", v2.atraso === 0, JSON.stringify(v2))
+  ok("e a segunda varredura não conta ESTE aviso como novo", v2.atraso === 0, JSON.stringify(v2))
   ok("o atraso não criou tarefa nova", (await prisma.tarefa.count({ where: { processoId: p.processoId } })) === 1)
   const nAtraso = await notifs(p.tarefaId, "ATRASO")
   ok("o aviso é da tarefa e aponta para ela", nAtraso[0]?.link === linkDaTarefa(p.tarefaId))
