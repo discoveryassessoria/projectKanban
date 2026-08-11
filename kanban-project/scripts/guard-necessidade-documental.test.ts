@@ -76,6 +76,10 @@ const AUTORIZADOS_FORA_DO_RUNTIME: Record<string, string> = {
     "então o cenário tem de ser construído aqui, não herdado",
   "scripts/fronteira-documento-operacao.test.ts":
     "fronteira de documento-operacao: monta e derruba a PRÓPRIA operação por documento (marca FRONT), só no banco de teste — prova que a transição migrou para o motor sem perder metadata, necessidade nem ativação do próximo passo",
+  "scripts/fluxo-distribuicao.test.ts":
+    "fluxo de distribuição: monta e derruba os PRÓPRIOS processos (marca DISTR), só no banco de teste — o cenário precisa de obrigação real para o motor criar a tarefa sozinho, que é justamente o que se prova",
+  "scripts/palco-distribuicao.ts":
+    "palco visual da Operação: monta e derruba os PRÓPRIOS processos (marca PALCO), só no banco de teste, para a captura de tela com dados realistas — não roda em produção",
   "scripts/backfill-necessidade-duplicada-motor-legado.ts":
     "backfill: consolida duplicidades do motor legado; dry-run por padrão, audita o que move",
   "prisma/backfill-cp3-necessidades.ts":

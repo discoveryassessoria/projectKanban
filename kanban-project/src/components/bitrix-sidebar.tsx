@@ -43,6 +43,18 @@ const menuItems = [
     permissao: "tarefas.ver",
   },
   {
+    // OPERAÇÃO — a superfície da Tarefa canônica: o que ainda não tem dono e o
+    // que é meu. Entra logo depois de "Tarefas e Projetos" porque substitui a
+    // função operacional dela; a antiga permanece enquanto a árvore legada de
+    // subtarefas não for aposentada.
+    title: "Operação",
+    url: "/operacao",
+    icon: CheckIcon,
+    textOffset: "",
+    iconOffset: "translate-y-[0.5px]",
+    permissao: "tarefas.ver",
+  },
+  {
     title: "Eventos",
     url: "/events",
     icon: CalendarIcon,

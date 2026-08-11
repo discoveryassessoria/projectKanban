@@ -37,6 +37,11 @@ export interface LinhaDeFila {
   aguardandoDependencia: boolean
   /** Perdeu a causa depois de iniciada e espera decisão humana. */
   requerDecisao: boolean
+  /** O que se está obtendo: o item do catálogo por trás da obrigação. */
+  servico: string | null
+  criadaEm: string | null
+  /** Quando a responsabilidade foi definida — nulo enquanto ninguém a assumiu. */
+  atribuidaEm: string | null
 }
 
 const SELECT = {
@@ -47,6 +52,8 @@ const SELECT = {
   // `pessoaId` é ref SOLTA a Pessoa (sem relation no modelo) — o nome é
   // resolvido em lote por quem projeta, nunca com uma consulta por linha.
   pessoaId: true,
+  createdAt: true, dataAtribuicao: true,
+  necessidade: { select: { itemCatalogo: { select: { name: true } } } },
   workflowStepInstance: { select: { stepKey: true, snapshot: true } },
   dependeDe: { select: { obrigatoria: true, dependeDe: { select: { statusTarefa: true } } } },
 } satisfies Prisma.TarefaSelect
@@ -79,6 +86,9 @@ function projetar(t: Bruta, agora: Date, nomes?: Map<number, string>): LinhaDeFi
       (d) => d.obrigatoria && !['CONCLUIDO_RECEBIDO', 'CONCLUIDO_NAO_POSSUI'].includes(d.dependeDe.statusTarefa),
     ),
     requerDecisao: t.causaRemovidaEm != null,
+    servico: t.necessidade?.itemCatalogo?.name ?? null,
+    criadaEm: t.createdAt?.toISOString() ?? null,
+    atribuidaEm: t.dataAtribuicao?.toISOString() ?? null,
   }
 }
 
@@ -104,7 +114,7 @@ export async function minhaFila(usuarioId: number, agora = new Date()): Promise<
     orderBy: [{ dataPrazo: { sort: 'asc', nulls: 'last' } }, { prioridade: 'desc' }, { id: 'asc' }],
   })
   const nomes = await nomesDasPessoas(linhas)
-  return linhas.map((t) => projetar(t, agora, nomes))
+  return ordenarFila(linhas.map((t) => projetar(t, agora, nomes)))
 }
 
 /**
@@ -120,7 +130,65 @@ export async function filaDaEquipe(equipeKey: string, agora = new Date()): Promi
     orderBy: [{ dataPrazo: { sort: 'asc', nulls: 'last' } }, { prioridade: 'desc' }, { id: 'asc' }],
   })
   const nomes = await nomesDasPessoas(linhas)
-  return linhas.map((t) => projetar(t, agora, nomes))
+  return ordenarFila(linhas.map((t) => projetar(t, agora, nomes)))
+}
+
+/**
+ * A ORDEM QUE A OPERAÇÃO OLHA — determinística, e não `createdAt`.
+ *
+ * Ordenar pela data de criação diz em que ordem o sistema criou o trabalho, o
+ * que não interessa a ninguém às sete da manhã. O que interessa é o que já
+ * estourou, o que é urgente e o que vence primeiro.
+ *
+ * Os degraus são excludentes e nesta ordem: atrasadas, urgentes, com prazo,
+ * sem prazo. Ausência de prazo NÃO é urgência — vai para o fim. Dentro do mesmo
+ * degrau, o prazo mais próximo primeiro; empate resolve pelo id, para que duas
+ * leituras seguidas nunca devolvam ordens diferentes.
+ */
+function degrau(l: LinhaDeFila): number {
+  if (l.atrasada) return 0
+  if (l.prioridade === 'URGENTE') return 1
+  if (l.dataPrazo != null) return 2
+  return 3
+}
+
+export function ordenarFila(linhas: LinhaDeFila[]): LinhaDeFila[] {
+  const peso: Record<string, number> = { URGENTE: 0, ALTA: 1, MEDIA: 2, BAIXA: 3 }
+  return [...linhas].sort((a, b) => {
+    const d = degrau(a) - degrau(b)
+    if (d !== 0) return d
+    const pa = a.dataPrazo ? Date.parse(a.dataPrazo) : Number.POSITIVE_INFINITY
+    const pb = b.dataPrazo ? Date.parse(b.dataPrazo) : Number.POSITIVE_INFINITY
+    if (pa !== pb) return pa - pb
+    const pr = (peso[a.prioridade] ?? 9) - (peso[b.prioridade] ?? 9)
+    if (pr !== 0) return pr
+    return a.taskId - b.taskId
+  })
+}
+
+/**
+ * SEM RESPONSÁVEL — o trabalho que existe e ainda não é de ninguém.
+ *
+ * É a tela de quem distribui. `responsavelId = null` é estado operacional
+ * NORMAL: a tarefa nasceu porque a obrigação virou executável, e espera uma
+ * decisão humana sobre quem a executa. Não é órfã, não é erro, e o motor não
+ * inventa um dono para ela.
+ *
+ * Diferente de `filaDaEquipe`, esta projeção NÃO exige `equipeKey`: enquanto
+ * não existir cadastro de equipe, exigir a chave esconderia da gestão
+ * exatamente as tarefas que ninguém reivindicou.
+ */
+export async function semResponsavel(agora = new Date(), filtro: { equipeKey?: string | null } = {}): Promise<LinhaDeFila[]> {
+  const linhas = await prisma.tarefa.findMany({
+    where: {
+      responsavelId: null,
+      statusTarefa: { in: STATUS_ATIVOS },
+      ...(filtro.equipeKey ? { equipeKey: filtro.equipeKey } : {}),
+    },
+    select: SELECT,
+  })
+  const nomes = await nomesDasPessoas(linhas)
+  return ordenarFila(linhas.map((t) => projetar(t, agora, nomes)))
 }
 
 /** Os recortes que a fila mostra separados — sem virar estados novos. */
