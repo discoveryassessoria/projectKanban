@@ -109,13 +109,24 @@ async function evento(
   await db.necessidadeDocumentalEvento.create({ data: { necessidadeId, tipo, dados: dados ?? undefined } })
 }
 
-/** Documento não localizado: preserva histórico, marca a necessidade. */
-export async function marcarNaoLocalizada(necessidadeId: number, db: DB = prisma) {
+/**
+ * Documento não localizado: preserva histórico, marca a necessidade.
+ *
+ * NÃO é dispensa e NÃO libera o gate. Uma necessidade OBRIGATÓRIA marcada como
+ * NAO_LOCALIZADA continua bloqueando a fase (`blocking-helpers`), com o hint de
+ * retorno controlado ao domínio genealógico. Dispensar é outra decisão, de
+ * outra pessoa, por outra porta.
+ *
+ * `motivo` entra no evento append-only: "não localizado" sem explicação obriga
+ * quem vier depois a adivinhar se o cartório não tem, se o cliente não tem, ou
+ * se ninguém procurou.
+ */
+export async function marcarNaoLocalizada(necessidadeId: number, db: DB = prisma, motivo?: string | null) {
   const n = await db.necessidadeDocumental.update({
     where: { id: necessidadeId },
     data: { status: "NAO_LOCALIZADA" },
   })
-  await evento(db, necessidadeId, "NAO_LOCALIZADA")
+  await evento(db, necessidadeId, "NAO_LOCALIZADA", motivo ? { motivo } : undefined)
   return n
 }
 

@@ -5,6 +5,7 @@ import { prisma } from "@/lib/prisma"
 import { hojeBrasil, hojeBrasilMaisDias } from "@/src/lib/date-utils"
 import { verificarPermissao } from '@/src/lib/verificar-permissao'
 import { negarSeNaoForDonoDaTarefa } from "@/src/lib/tarefa-acesso"
+import { marcarNaoLocalizada } from "@/src/services/necessidade-documental"
 
 async function iniciarProximaSubtarefa(tarefaConcluidaId: number, tarefaPaiId: number) {
   console.log("🔄 [COBRANCA] iniciarProximaSubtarefa chamada:", { tarefaConcluidaId, tarefaPaiId })
@@ -292,58 +293,58 @@ export async function POST(
         }
       }
 
+      // ═══════════════════════════════════════════════════════════════════════
+      // "NÃO POSSUI" É RESULTADO DOCUMENTAL — NÃO É CONCLUSÃO DE TAREFA.
+      //
+      // Esta ação escrevia `CONCLUIDO_NAO_POSSUI` na tarefa e na tarefa-pai, e
+      // propagava a conclusão para cima. O efeito colateral era grave: o motor
+      // conta essa conclusão como trabalho FEITO (`blocking-helpers`), então o
+      // gate liberava e a fase andava sobre um documento que ninguém obteve.
+      //
+      // O domínio já tinha o lugar certo: `NecessidadeDocumental.NAO_LOCALIZADA`,
+      // com evento append-only próprio. E, sendo obrigatória, ela CONTINUA
+      // bloqueando — que é exatamente o que "não possui" significa. Quem decidir
+      // que o requisito deixou de ser exigido usa a dispensa, que é outra porta
+      // e outra decisão.
+      //
+      // A tarefa segue o workflow: quem move o passo é o motor, não este botão.
+      // ═══════════════════════════════════════════════════════════════════════
       case "nao_possui": {
-        if (isCobranca) {
-          // Concluir subtarefa e tarefa pai como "não aplicável"
-          await prisma.$transaction([
-            prisma.tarefa.update({
-              where: { id },
-              data: {
-                concluida: true,
-                statusTarefa: "CONCLUIDO_NAO_POSSUI",
-                dataConclusao: hojeBrasil(),
-                observacoes: observacao || "Cliente não possui o documento"
-              }
-            }),
-            prisma.tarefa.update({
-              where: { id: tarefa.tarefaPaiId! },
-              data: {
-                concluida: true,
-                statusTarefa: "CONCLUIDO_NAO_POSSUI",
-                dataConclusao: hojeBrasil(),
-                observacoes: observacao || "Cliente não possui o documento"
-              }
-            })
-          ])
-        } else {
-          await prisma.tarefa.update({
-            where: { id },
-            data: {
-              concluida: true,
-              statusTarefa: "CONCLUIDO_NAO_POSSUI",
-              dataConclusao: hojeBrasil(),
-              observacoes: observacao || "Cliente não possui o documento"
-            }
-          })
+        // A necessidade pode estar na própria tarefa ou na cadeia acima dela —
+        // a subtarefa de cobrança não carrega o vínculo documental.
+        const necessidadeId =
+          tarefa.necessidadeId ?? tarefa.tarefaPai?.necessidadeId ?? tarefa.tarefaPai?.tarefaPai?.necessidadeId ?? null
+
+        if (necessidadeId == null) {
+          // Sem necessidade não há o que marcar como não localizado. Concluir a
+          // tarefa "para resolver" seria repetir o defeito que esta correção
+          // eliminou.
+          return NextResponse.json(
+            {
+              error: "Esta tarefa não está ligada a uma necessidade documental — não há registro a marcar como não localizado.",
+              codigo: "SEM_NECESSIDADE",
+            },
+            { status: 422 }
+          )
         }
 
-        // Propagar conclusão para cima
-        const paiIdNaoPossui = isCobranca ? tarefa.tarefaPai?.tarefaPaiId : tarefa.tarefaPaiId
-        if (paiIdNaoPossui) {
-          await verificarEConcluirTarefaPai(paiIdNaoPossui)
-        }
+        const motivo = observacao?.trim() || null
+        const necessidade = await marcarNaoLocalizada(necessidadeId, prisma, motivo)
 
         await prisma.tarefaHistorico.create({
           data: {
             tarefaId: tarefaIdHistorico,
-            acao: "CONCLUIDA",
-            descricao: `Cliente não possui o documento${observacao ? `: ${observacao}` : ""}`
+            acao: "REGISTRO_NAO_LOCALIZADO",
+            descricao: `Documento não localizado${motivo ? `: ${motivo}` : ""}. A necessidade continua em aberto.`
           }
         })
 
-        return NextResponse.json({ 
-          message: "Tarefa finalizada - cliente não possui",
-          tarefaConcluida: true
+        return NextResponse.json({
+          message: "Registrado como não localizado — a necessidade continua pendente.",
+          necessidadeId,
+          statusNecessidade: necessidade.status,
+          tarefaConcluida: false,
+          bloqueiaFase: necessidade.obrigatoriedade === "OBRIGATORIA",
         })
       }
 

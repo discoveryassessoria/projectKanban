@@ -172,6 +172,8 @@ const AUTORIZADOS_FORA_DO_RUNTIME: Record<string, string> = {
   "scripts/equivalencia-portas-etapa.test.ts":
     "equivalência das portas de conclusão de etapa: monta e derruba DUAS árvores idênticas " +
     "(marca EQUIV), só no banco de teste; a prova depende de os dois cenários serem gêmeos",
+  "scripts/fronteira-documento-operacao.test.ts":
+    "fronteira de documento-operacao: monta e derruba a PRÓPRIA operação por documento (marca FRONT), só no banco de teste — prova que a transição migrou para o motor sem perder metadata, necessidade nem ativação do próximo passo",
   "scripts/override-isolamento.test.ts":
     "isolamento do override entre processos: monta e derruba as próprias árvores (marca ISOLAMENTO), " +
     "só no banco de teste",

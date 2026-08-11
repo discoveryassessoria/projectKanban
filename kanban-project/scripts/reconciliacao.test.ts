@@ -52,7 +52,12 @@ const svc = src("src/services/documento-operacao.ts")
 ok(/phaseWorkflowStepInstance\.findMany\(\{[^]*?documentoId/.test(svc), "17. serviço lê passos V2 por documentoId")
 ok(/notIn:\s*INATIVOS/.test(svc) && /INATIVOS[^]*?"SUPERSEDIDO",\s*"CANCELADO"/.test(svc), "18. exclui passos SUPERSEDIDO/CANCELADO")
 ok(/evaluateWorkflowProgress/.test(svc) && /resolveStepCompletionState/.test(svc), "19. reusa o completion-engine (não recalcula regra)")
-ok(/mapLegacyStepStatus/.test(svc) && /phaseWorkflowStepInstance\.update/.test(svc), "20. sincronizarStatusPassoV2 espelha status legado→V2")
+// 20 descrevia o DUAL-WRITE legado (`sincronizarStatusPassoV2`, que espelhava o
+// status do passo legado no V2). O cutover para V2 tornou-o inalcançável: nenhum
+// chamador operacional restou, e a função foi removida. O que se prova agora no
+// lugar é o contrário — que ela não voltou e que a transição passa pelo motor.
+ok(!/sincronizarStatusPassoV2/.test(svc), "20. dual-write legado removido (sem espelhamento legado→V2)")
+ok(/transicionarPassoTx\(/.test(svc) && /reabrirPassoTx\(/.test(svc), "20b. a transição do passo é delegada ao motor único")
 const ce = src("src/services/completion-engine/index.ts")
 ok(/const v2 = await progressoOperacaoV2\(documentoId\)/.test(ce) && /return v2 \?\?/.test(ce) && !/prisma\.workflow\.findFirst/.test(ce), "21. completion-engine é V2-only (sem fallback legado)")
 const stepRoute = src("src/app/api/documentos/[id]/workflow/steps/[stepId]/route.ts")

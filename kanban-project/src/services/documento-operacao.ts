@@ -29,7 +29,9 @@ import { montarChavePasso } from "@/src/services/phase-workflow-helpers"
 import { evoluirNecessidadePorPasso, reabrirAtendimentoNecessidade } from "@/src/services/necessidade-documental"
 import { chaveEvento } from "@/src/services/task-step-sync-helpers"
 import { recalcularFaseDoProcesso } from "@/src/lib/process-stage/recalcular-fase"
+import { randomUUID } from "crypto"
 import { projetarTarefaDoPasso, assegurarCoerenciaPassoTarefa } from "@/src/services/passo-tarefa-projecao"
+import { transicionarPassoTx, reabrirPassoTx } from "@/src/services/task-step-sync"
 import { projetarCustosDocumentaisDoPasso } from "@/src/services/financeiro/projecao-documental"
 
 // Transição de estado do passo → evento operacional do motor. Fonte única desta
@@ -44,6 +46,26 @@ const EVENTO_POR_STATUS: Partial<Record<StepInstanceStatus, WorkflowEventoTipo>>
   CANCELADO: "PASSO_CANCELADO",
   FALHOU: "PASSO_FALHOU",
   PENDENTE: "PASSO_REABERTO",
+}
+
+/**
+ * A TRANSIÇÃO FOI RECUSADA PELO MOTOR.
+ *
+ * Antes, este serviço aplicava qualquer mudança de status que lhe pedissem: um
+ * `update` direto não tem opinião. Agora a precedência e o CAS valem também
+ * aqui, e uma transição impossível (ou uma corrida perdida) precisa DERRUBAR a
+ * transação — o documento, a necessidade e o protocolo não podem ser gravados
+ * como se o passo tivesse andado.
+ */
+export class TransicaoDePassoRecusada extends Error {
+  readonly code: string
+  readonly de: string
+  readonly para: string
+  constructor(code: string, de: string, para: string) {
+    super(`Transição de passo recusada pelo motor (${de} → ${para}): ${code}`)
+    this.name = "TransicaoDePassoRecusada"
+    this.code = code; this.de = de; this.para = para
+  }
 }
 
 // Passos que NÃO contam como operação ativa do documento.
@@ -421,7 +443,19 @@ export async function atualizarPassoV2(
   const p = carregado.passo
 
   const now = new Date()
-  const liberarProximo = await prisma.$transaction((tx) => aplicarTransicaoDoPassoTx(tx, p, patch, ctx, now))
+  // A RECUSA DO MOTOR VIRA 409, não 500. Uma transição impossível (o passo mudou
+  // de estado enquanto a tela estava aberta, ou o alvo não existe a partir do
+  // estado atual) é conflito de estado, e quem opera precisa ler isso e
+  // recarregar — não um erro interno genérico.
+  let liberarProximo: boolean
+  try {
+    liberarProximo = await prisma.$transaction((tx) => aplicarTransicaoDoPassoTx(tx, p, patch, ctx, now))
+  } catch (e) {
+    if (e instanceof TransicaoDePassoRecusada) {
+      return { ok: false, error: e.code === "CONFLITO" ? "CONCURRENT_UPDATE" : "STEP_TRANSITION_REJECTED", status: 409 }
+    }
+    throw e
+  }
 
   // CONCLUSÃO DA FASE E AVANÇO — automáticos, e no serviço, não na rota. Concluir a
   // última obrigação da fase é o que a conclui; quem concluiu por outro caminho (job,
@@ -517,20 +551,47 @@ export async function aplicarTransicaoDoPassoTx(
     opPatch.forcadoJustificativa = String(patch.justificativa ?? "").trim() || null
   }
 
-  const data: Prisma.PhaseWorkflowStepInstanceUpdateInput = {
-    status: novo,
+  // OS CAMPOS DOCUMENTAIS — o que é DESTE domínio e não da máquina de estados:
+  // o diário da operação, quem responde, o prazo combinado e o motivo do bloqueio.
+  // Eles viajam JUNTO com a transição, na mesma escrita, via `extra`.
+  const camposDocumentais: Record<string, unknown> = {
     metadata: { operacao: opPatch } as Prisma.InputJsonValue,
     ...(patch.assigneeId !== undefined ? { responsavelId: (patch.assigneeId as number | null) } : {}),
     ...(patch.dueAt !== undefined ? { prazo: patch.dueAt ? new Date(patch.dueAt as string) : null } : {}),
     ...(patch.motivoBloqueio !== undefined ? { motivo: patch.motivoBloqueio as string | null } : {}),
-    ...(novo === "EM_ANDAMENTO" ? { startedAt: now } : {}),
-    ...(liberarProximo ? { completedAt: now } : {}),
-    ...(vaiReabrir ? { completedAt: null } : {}),
   }
+  const correlationId = randomUUID()
+  const opts = { correlationId, operacao: "documento-operacao", ciclo: p.ciclo, processoId: p.processoId, workflowInstanceId: p.workflowInstanceId }
+
   // TRANSACIONAL (P3): passo + necessidade + passos-irmãos + documento na MESMA transação —
   // a reabertura NÃO deixa estados intermediários inconsistentes (progresso/bloqueio caem juntos).
   {
-    await tx.phaseWorkflowStepInstance.update({ where: { id: p.id }, data })
+    // A TRANSIÇÃO É DO MOTOR; A CARGA DOCUMENTAL É DAQUI.
+    //
+    // Este `update` direto era a terceira família de transições: sem validar
+    // precedência, sem CAS por lockVersion e emitindo o evento por conta
+    // própria mais abaixo. Concluir a mesma etapa pela Central e pela fila de
+    // tarefas passava por duas máquinas diferentes.
+    //
+    // Agora só o VERBO muda de dono. Metadata, protocolo, responsável, prazo e
+    // motivo continuam sendo decididos aqui e entram na MESMA escrita.
+    if (novo === p.status) {
+      // Sem mudança de estado não há transição — é atualização documental pura
+      // (trocar responsável, anotar o protocolo). Passar isso pelo motor
+      // inventaria um evento onde não houve fato.
+      await tx.phaseWorkflowStepInstance.update({ where: { id: p.id }, data: camposDocumentais })
+    } else if (vaiReabrir) {
+      // Retrabalho é a única descida permitida, e tem porta própria.
+      const r = await reabrirPassoTx(tx, p.id, novo as "PENDENTE" | "DISPONIVEL" | "EM_ANDAMENTO", { ...opts, extra: camposDocumentais })
+      if (!r.changed && r.code) throw new TransicaoDePassoRecusada(r.code, p.status, novo)
+    } else {
+      const r = await transicionarPassoTx(tx, p.id, novo, {
+        ...opts,
+        extra: camposDocumentais,
+        ...(EVENTO_POR_STATUS[novo] ? { tipoEvento: EVENTO_POR_STATUS[novo] } : {}),
+      })
+      if (!r.changed && r.code) throw new TransicaoDePassoRecusada(r.code, p.status, novo)
+    }
 
     // A TAREFA É PROJEÇÃO DO PASSO. Esta transação escrevia só o passo e deixava a
     // tarefa como estava: em produção o passo "Localizar registro da certidão" ficou
@@ -563,10 +624,11 @@ export async function aplicarTransicaoDoPassoTx(
           getStepDef(phaseKeyToFaseCode(p.faseMacroKey), proximo.stepKey)?.slaDays ??
           catStep?.slaDays ?? 1
         const due = new Date(now.getTime() + slaProximo * 86400000)
-        await tx.phaseWorkflowStepInstance.update({
-          where: { id: proximo.id },
-          data: { status: "EM_ANDAMENTO", startedAt: now, prazo: due, motivo: null },
-        })
+        // QUAL é o próximo continua sendo pergunta DOCUMENTAL: os passos desta
+        // fase pertencem a vários documentos, e `ativarProximoPassoTx` escopa
+        // pela instância do workflow — usá-lo aqui abriria a etapa de outro
+        // documento. A seleção fica; a transição vai para o motor.
+        await transicionarPassoTx(tx, proximo.id, "EM_ANDAMENTO", { ...opts, extra: { prazo: due, motivo: null } })
         passosTocados.push(proximo.id)
         await projetarTarefaDoPasso(tx, { stepInstanceId: proximo.id, statusPasso: "EM_ANDAMENTO", agora: now })
       }
@@ -577,11 +639,8 @@ export async function aplicarTransicaoDoPassoTx(
         where: { documentoId, faseMacroKey: p.faseMacroKey, ordem: { gt: p.ordem }, status: { in: ["EM_ANDAMENTO", "AGUARDANDO"] } },
         select: { id: true },
       })
-      await tx.phaseWorkflowStepInstance.updateMany({
-        where: { id: { in: posteriores.map((x) => x.id) } },
-        data: { status: "BLOQUEADO", startedAt: null, prazo: null, motivo: null },
-      })
       for (const posterior of posteriores) {
+        await transicionarPassoTx(tx, posterior.id, "BLOQUEADO", { ...opts, extra: { startedAt: null, prazo: null, motivo: null } })
         passosTocados.push(posterior.id)
         await projetarTarefaDoPasso(tx, { stepInstanceId: posterior.id, statusPasso: "BLOQUEADO", agora: now })
       }
@@ -595,26 +654,9 @@ export async function aplicarTransicaoDoPassoTx(
     // de tarefa. Mesma tabela, mesmo vocabulário e mesma chave de idempotência dos
     // demais emissores; dentro da MESMA transação, então rastro e estado não podem
     // divergir.
-    if (eventoDaTransicao) {
-      // createMany + skipDuplicates: a chave de idempotência é única, e repetir a MESMA
-      // transição no mesmo ciclo (reabrir → concluir de novo) não pode derrubar a
-      // transação inteira com violação de unicidade. O rastro da reabertura fica
-      // registrado pelo próprio evento PASSO_REABERTO, entre as duas conclusões.
-      await tx.workflowEvento.createMany({
-        skipDuplicates: true,
-        data: {
-          tipo: eventoDaTransicao,
-          entityType: "step_instance",
-          entityId: p.id,
-          processoId: p.processoId,
-          workflowInstanceId: p.workflowInstanceId,
-          stepInstanceId: p.id,
-          chaveIdempotencia: chaveEvento(eventoDaTransicao, "step_instance", p.id, novo, p.ciclo, p.lockVersion),
-          dados: { documentoId, necessidadeId: p.necessidadeId, stepKey: p.stepKey, de: p.status, para: novo },
-        },
-      })
-    }
-
+    // O EVENTO SAI DO MOTOR, não daqui. Este bloco emitia `WorkflowEvento` por
+    // conta própria — o que era necessário enquanto a transição também era
+    // local. Mantê-lo agora produziria o mesmo fato duas vezes no histórico.
     // AUDITORIA do ato administrativo, na MESMA transação do estado. "Forçar" só é
     // aceitável se ficar registrado quem forçou, com que motivo e com que justificativa.
     if (ctx && patch.forcar === true) {
@@ -757,16 +799,19 @@ export async function controlarOperacaoV2(
   if (passos.length === 0) return { ok: false, error: "Operação não encontrada", status: 404 }
   const now = new Date()
   const obs = (observacao ?? "").trim()
+  const correlationId = randomUUID()
   if (action === "cancelar" || action === "invalidar") {
     await prisma.$transaction(async (tx) => {
       const alvos = await tx.phaseWorkflowStepInstance.findMany({
         where: { documentoId, status: { notIn: ["CONCLUIDO", "SUPERSEDIDO", "CANCELADO"] } },
-        select: { id: true },
+        select: { id: true, ciclo: true, processoId: true, workflowInstanceId: true },
       })
-      await tx.phaseWorkflowStepInstance.updateMany({
-        where: { id: { in: alvos.map((x) => x.id) } },
-        data: { status: "CANCELADO", cancelledAt: now },
-      })
+      // Cancelar a operação de um documento cancela os passos dele — pelo motor,
+      // que registra PASSO_CANCELADO. Antes esta era a transição mais silenciosa
+      // do sistema: mudava o estado e não deixava rastro nenhum no workflow.
+      for (const alvo of alvos) {
+        await transicionarPassoTx(tx, alvo.id, "CANCELADO", { correlationId, operacao: "documento-controlar-cancelar", ciclo: alvo.ciclo, processoId: alvo.processoId, workflowInstanceId: alvo.workflowInstanceId, extra: { cancelledAt: now } })
+      }
       for (const alvo of alvos) await projetarTarefaDoPasso(tx, { stepInstanceId: alvo.id, statusPasso: "CANCELADO", agora: now })
       await assegurarCoerenciaPassoTarefa(tx, alvos.map((x) => x.id))
     })
@@ -778,11 +823,10 @@ export async function controlarOperacaoV2(
     })
   } else if (action === "pausar") {
     await prisma.$transaction(async (tx) => {
-      const alvos = await tx.phaseWorkflowStepInstance.findMany({ where: { documentoId, status: "EM_ANDAMENTO" }, select: { id: true } })
-      await tx.phaseWorkflowStepInstance.updateMany({
-        where: { id: { in: alvos.map((x) => x.id) } },
-        data: { status: "BLOQUEADO", motivo: obs ? `Operação pausada: ${obs}` : "Operação pausada" },
-      })
+      const alvos = await tx.phaseWorkflowStepInstance.findMany({ where: { documentoId, status: "EM_ANDAMENTO" }, select: { id: true, ciclo: true, processoId: true, workflowInstanceId: true } })
+      for (const alvo of alvos) {
+        await transicionarPassoTx(tx, alvo.id, "BLOQUEADO", { correlationId, operacao: "documento-controlar-pausar", ciclo: alvo.ciclo, processoId: alvo.processoId, workflowInstanceId: alvo.workflowInstanceId, extra: { motivo: obs ? `Operação pausada: ${obs}` : "Operação pausada" } })
+      }
       for (const alvo of alvos) await projetarTarefaDoPasso(tx, { stepInstanceId: alvo.id, statusPasso: "BLOQUEADO", agora: now })
       await assegurarCoerenciaPassoTarefa(tx, alvos.map((x) => x.id))
     })
@@ -791,7 +835,10 @@ export async function controlarOperacaoV2(
     const primeiro = passos.find((s) => s.status === "BLOQUEADO")
     if (primeiro) {
       await prisma.$transaction(async (tx) => {
-        await tx.phaseWorkflowStepInstance.update({ where: { id: primeiro.id }, data: { status: "EM_ANDAMENTO", motivo: null } })
+        // BLOQUEADO → EM_ANDAMENTO é descida de precedência, e o motor a permite
+        // explicitamente como restauração de bloqueio. Não é retrabalho.
+        const ref = await tx.phaseWorkflowStepInstance.findUniqueOrThrow({ where: { id: primeiro.id }, select: { ciclo: true, processoId: true, workflowInstanceId: true } })
+        await transicionarPassoTx(tx, primeiro.id, "EM_ANDAMENTO", { correlationId, operacao: "documento-controlar-retomar", ciclo: ref.ciclo, processoId: ref.processoId, workflowInstanceId: ref.workflowInstanceId, extra: { motivo: null } })
         await projetarTarefaDoPasso(tx, { stepInstanceId: primeiro.id, statusPasso: "EM_ANDAMENTO", agora: now })
         await assegurarCoerenciaPassoTarefa(tx, [primeiro.id])
       })
@@ -803,37 +850,3 @@ export async function controlarOperacaoV2(
   return { ok: true, workflow: await montarWorkflowV2(documentoId, ctx) }
 }
 
-/**
- * ESCRITA de compatibilidade: espelha no passo V2 por-documento a mudança de
- * status feita no passo legado (dual-write até o cutover). Best-effort — retorna
- * false se não houver passo V2 correspondente (documento ainda não migrado).
- * Resolve alias legado→publicado pela fonte única do catálogo. Não toca o legado.
- */
-export async function sincronizarStatusPassoV2(
-  documentoId: number,
-  legacyStepKey: string,
-  legacyStatus: string | null | undefined,
-): Promise<boolean> {
-  const passos = await prisma.phaseWorkflowStepInstance.findMany({
-    where: { documentoId, status: { notIn: INATIVOS } },
-    select: { id: true, stepKey: true, faseMacroKey: true },
-  })
-  const alvo = passos.find(
-    (p) => p.stepKey === legacyStepKey || resolveStepKeyCompat(p.faseMacroKey, legacyStepKey) === p.stepKey,
-  )
-  if (!alvo) return false
-  const novo = mapLegacyStepStatus(legacyStatus)
-  await prisma.$transaction(async (tx) => {
-    await tx.phaseWorkflowStepInstance.update({
-      where: { id: alvo.id },
-      data: {
-        status: novo,
-        ...(novo === "CONCLUIDO" ? { completedAt: new Date() } : {}),
-        ...(novo === "EM_ANDAMENTO" ? { startedAt: new Date() } : {}),
-      },
-    })
-    await projetarTarefaDoPasso(tx, { stepInstanceId: alvo.id, statusPasso: novo })
-    await assegurarCoerenciaPassoTarefa(tx, [alvo.id])
-  })
-  return true
-}

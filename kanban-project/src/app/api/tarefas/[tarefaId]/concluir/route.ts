@@ -47,12 +47,23 @@ export async function POST(
     const negado = await negarSeNaoForDonoDaTarefa(request, tarefaAtual.responsavelId)
     if (negado) return negado
 
-    // "Cliente não possui o documento" é uma conclusão de natureza DIFERENTE, e
-    // o motor canônico ainda não a distingue. Recusar é honesto; concluir como
-    // "recebido" registraria um documento que não existe.
+    // "NÃO POSSUI" NÃO É CONCLUSÃO — É RESULTADO DOCUMENTAL.
+    //
+    // Um documento que ninguém obteve não pode fechar o trabalho: o motor
+    // contaria a tarefa como feita e o gate liberaria a fase sobre um registro
+    // inexistente. O lugar disso é a NECESSIDADE, marcada como NÃO LOCALIZADA —
+    // que, sendo obrigatória, CONTINUA bloqueando.
+    //
+    // A mensagem anterior mandava "registrar a dispensa da etapa", e isso estava
+    // errado em duas frentes: dispensar o passo projeta a tarefa como CANCELADA
+    // (não concluída), e dispensa é a decisão de que o requisito deixou de ser
+    // exigido — o oposto de "procuramos e não achamos".
     if (status === "nao_possui") {
       return NextResponse.json(
-        { error: "Conclusão por 'não possui' ainda não existe no motor canônico — registre a dispensa da etapa.", codigo: "NAO_SUPORTADO" },
+        {
+          error: "Documento não obtido não conclui a tarefa. Registre o resultado na necessidade documental (não localizado) — ela continua pendente até ser atendida ou dispensada por decisão explícita.",
+          codigo: "RESULTADO_DOCUMENTAL",
+        },
         { status: 422 },
       )
     }

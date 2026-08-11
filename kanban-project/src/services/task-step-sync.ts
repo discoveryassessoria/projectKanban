@@ -279,12 +279,25 @@ export async function aplicarTarefaTx(
  * não afrouxando `podeAplicarPasso` — afrouxar ali abriria a descida para todo
  * o resto do sistema.
  */
+/** Para onde um passo pode VOLTAR. Fora daqui não é reabertura — é outra coisa. */
+const DESTINOS_DE_RETRABALHO = new Set<string>(["PENDENTE", "DISPONIVEL", "EM_ANDAMENTO"])
+
 export async function reabrirPassoTx(
   tx: TX,
   stepId: number,
-  alvo: "DISPONIVEL" | "PENDENTE",
+  alvo: "DISPONIVEL" | "PENDENTE" | "EM_ANDAMENTO",
   o: TransicaoPassoOpts,
 ): Promise<TransicaoPassoResultado> {
+  // O DESTINO É VALIDADO AQUI, não no tipo de quem chama.
+  //
+  // Esta é a única porta que desce na máquina de estados, então ela precisa
+  // policiar para ONDE se desce. Confiar na assinatura TypeScript deixou passar
+  // CONCLUIDO → BLOQUEADO num `as`: o passo "voltava" para um estado que não é
+  // retrabalho, sem passar por precedência nenhuma. Um passo concluído se
+  // reabre; bloquear vem depois, pela porta normal.
+  if (!DESTINOS_DE_RETRABALHO.has(alvo)) {
+    return { changed: false, anterior: "", atual: "", code: "TRANSICAO_INVALIDA" as H.FailureCodeD }
+  }
   const step = await tx.phaseWorkflowStepInstance.findUnique({ where: { id: stepId } })
   if (!step) return { changed: false, anterior: "", atual: "", code: "STEP_NAO_ENCONTRADO" as H.FailureCodeD }
   if (step.status === alvo) return { changed: false, anterior: step.status, atual: step.status }

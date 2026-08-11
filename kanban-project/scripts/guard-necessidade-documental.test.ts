@@ -74,6 +74,8 @@ const AUTORIZADOS_FORA_DO_RUNTIME: Record<string, string> = {
     "equivalência das portas de conclusão de etapa: monta DOIS cenários idênticos (marca EQUIV) " +
     "e derruba os dois — a prova exige que a única diferença entre eles seja a porta usada, " +
     "então o cenário tem de ser construído aqui, não herdado",
+  "scripts/fronteira-documento-operacao.test.ts":
+    "fronteira de documento-operacao: monta e derruba a PRÓPRIA operação por documento (marca FRONT), só no banco de teste — prova que a transição migrou para o motor sem perder metadata, necessidade nem ativação do próximo passo",
   "scripts/backfill-necessidade-duplicada-motor-legado.ts":
     "backfill: consolida duplicidades do motor legado; dry-run por padrão, audita o que move",
   "prisma/backfill-cp3-necessidades.ts":
