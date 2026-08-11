@@ -55,6 +55,9 @@ const DONO_RUNTIME = "src/services/necessidade-documental.ts"
  * há regra "tudo em scripts/ pode".
  */
 const AUTORIZADOS_FORA_DO_RUNTIME: Record<string, string> = {
+  "scripts/concluir-etapa.test.ts":
+    "porta de conclusão de etapa: monta e derruba os PRÓPRIOS processos (marca ETAPA) " +
+    "só no banco de teste",
   "scripts/portas-tarefa.test.ts":
     "portas canônicas da tarefa: monta e derruba os PRÓPRIOS processos (marca PORTAS) " +
     "só no banco de teste",

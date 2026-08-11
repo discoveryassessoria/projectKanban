@@ -29,7 +29,7 @@
  * prazos e sete responsáveis, e concluir "enviar ao cartório" fechava uma
  * tarefa sem que nada tivesse sido obtido.
  */
-import { readFileSync } from "node:fs"
+import { readFileSync, readdirSync, statSync } from "node:fs"
 import { fileURLToPath } from "node:url"
 import { dirname, join } from "node:path"
 
@@ -310,6 +310,49 @@ ok("a sincronização não recalcula estado terminal",
 ok("cancelar recusa tarefa já encerrada", /Tarefa já encerrada[\s\S]{0,120}reabra/.test(ciclo))
 ok("reabrir é o único caminho de volta", /export async function reabrirTarefa/.test(ciclo))
 ok("e a reabertura repõe a etapa corrente", /workflowStepInstanceId: etapaAtual/.test(ciclo))
+
+// ═══════════════════════════════════════════════════════════════════════════
+secao("14) Concluir etapa passa pela porta — nunca por escrita direta")
+// ═══════════════════════════════════════════════════════════════════════════
+// Sem esta porta, a tela concluiria etapa com `phaseWorkflowStepInstance.update`
+// — e o passo mudaria sozinho, sem ativar o próximo, sem recalcular a tarefa,
+// sem auditoria e, no último passo, sem concluir o trabalho. A tarefa ficaria
+// eternamente aberta com todas as etapas prontas.
+const etapa = ler("lib/operacional/tarefa-etapa.ts")
+ok("existe a porta de conclusão de etapa", /export async function concluirEtapa/.test(etapa))
+ok("e ela é exposta na rota de comandos", /case 'concluir_etapa'/.test(comando))
+ok("com permissão de quem EXECUTA", /concluir_etapa: 'tarefas\.iniciar_concluir'/.test(comando))
+
+// A CAMADA DE API não pode fechar etapa por conta própria. `responsavelId` na
+// rota de delegação é outra coisa — atribuir executor de passo não é concluir.
+const rotas: string[] = []
+;(function varrer(dir: string) {
+  for (const nome of readdirSync(dir)) {
+    const caminho = join(dir, nome)
+    if (statSync(caminho).isDirectory()) varrer(caminho)
+    else if (nome.endsWith(".ts")) rotas.push(caminho)
+  }
+})(join(RAIZ, "src/app/api"))
+
+const conclusoesDiretas = rotas.filter((f) => {
+  const src = semComentarios(readFileSync(f, "utf8"))
+  return /phaseWorkflowStepInstance\.(update|updateMany)\([\s\S]{0,300}status:\s*['"]CONCLUIDO['"]/.test(src)
+})
+ok("nenhuma rota conclui etapa escrevendo direto no passo",
+  conclusoesDiretas.length === 0,
+  conclusoesDiretas.map((f) => f.replace(RAIZ, "")).join(", ") || "—")
+
+// O serviço faz o que a escrita direta não faria.
+ok("a porta ativa a próxima etapa", /status: 'DISPONIVEL'/.test(etapa))
+ok("recalcula o estado da tarefa", /estadoDerivado\(depois/.test(etapa))
+ok("e conclui a tarefa só no terminal", /concluiuAgora/.test(etapa))
+ok("com CAS na própria etapa", /where: \{ id: alvo\.id, status: alvo\.status \}/.test(etapa),
+  "duas conclusões simultâneas: a segunda acerta zero linhas e sai como conflito")
+ok("retry devolve o estado sem repetir efeito", /jaEstavaConcluida: true/.test(etapa))
+ok("tarefa terminal recusa conclusão de etapa", /TAREFA_TERMINAL/.test(etapa))
+ok("bloqueio e espera barram, e só o admin força", /TAREFA_BLOQUEADA/.test(etapa) && /TAREFA_AGUARDANDO/.test(etapa) && /permiteForcar/.test(etapa))
+ok("as evidências exigidas são validadas no backend", /evidenciasFaltando\(/.test(etapa))
+ok("e a auditoria registra antes e depois", /etapaDe:/.test(etapa) && /tarefaPara:/.test(etapa))
 
 // ── Resultado ──────────────────────────────────────────────────────────────
 console.log(`\n${"═".repeat(70)}`)

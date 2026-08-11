@@ -22,12 +22,15 @@ import {
   cancelarTarefa, devolverAFila, alterarPrazo, alterarPrioridade,
   declararDependencia, removerDependencia,
 } from '@/lib/operacional/tarefa-ciclo'
+import { concluirEtapa } from '@/lib/operacional/tarefa-etapa'
 
 /** O código do domínio vira o status HTTP — um mapa só, nenhuma exceção local. */
 const HTTP: Record<string, number> = {
-  NAO_ENCONTRADA: 404,
+  NAO_ENCONTRADA: 404, TAREFA_NAO_ENCONTRADA: 404, ETAPA_NAO_ENCONTRADA: 404,
   TERMINAL: 409, NAO_TERMINAL: 409, CONFLITO: 409,
+  TAREFA_TERMINAL: 409, TAREFA_BLOQUEADA: 409, TAREFA_AGUARDANDO: 409, ETAPA_NAO_EXECUTAVEL: 409,
   SEM_MOTIVO: 422, INVALIDO: 422, SEM_RESPONSAVEL: 422, MESMO_RESPONSAVEL: 422,
+  DEPENDENCIA_PENDENTE: 422, EVIDENCIA_FALTANDO: 422, ETAPA_DE_OUTRA_TAREFA: 422,
 }
 
 /**
@@ -43,6 +46,8 @@ const PERMISSAO: Record<string, PermissaoChave> = {
   iniciar: 'tarefas.iniciar_concluir',
   aguardar_terceiro: 'tarefas.iniciar_concluir',
   retomar_espera: 'tarefas.iniciar_concluir',
+  // Concluir etapa é ato de QUEM EXECUTA — é o gesto central do trabalho.
+  concluir_etapa: 'tarefas.iniciar_concluir',
   bloquear: 'tarefas.bloquear',
   desbloquear: 'tarefas.bloquear',
 
@@ -100,6 +105,21 @@ export async function POST(request: NextRequest, ctx: { params: Promise<{ tarefa
       case 'iniciar':
         // Gestor pode destravar a fila iniciando por outro; o executor, só a sua.
         return iniciarTarefa({ tarefaId, autorId, permiteDeTerceiro: usuario.tipo === 'admin' })
+      case 'concluir_etapa': {
+        const r = await concluirEtapa({
+          tarefaId,
+          etapaId: Number.isInteger(body?.etapaId) ? body.etapaId : null,
+          autorId,
+          observacao: motivo || null,
+          // Forçar (bloqueada, aguardando, sem evidência) é privilégio
+          // administrativo — e a auditoria registra que foi forçada.
+          permiteForcar: usuario.tipo === 'admin' && body?.forcar === true,
+        })
+        // O resultado da etapa carrega mais do que `tarefaId`: a tela precisa
+        // saber qual é a próxima e se o trabalho acabou.
+        if (!r.ok) return { ok: false as const, codigo: r.codigo, mensagem: r.mensagem }
+        return { ok: true as const, tarefaId: r.tarefaId, extra: r }
+      }
       case 'aguardar_terceiro':
         return aguardarTerceiro({ tarefaId, autorId, motivo })
       case 'retomar_espera':
@@ -160,5 +180,6 @@ export async function POST(request: NextRequest, ctx: { params: Promise<{ tarefa
   if (!r.ok) {
     return NextResponse.json({ error: r.mensagem, codigo: r.codigo }, { status: HTTP[r.codigo] ?? 422 })
   }
-  return NextResponse.json({ tarefaId: r.tarefaId, acao })
+  const extra = 'extra' in r ? (r as { extra: Record<string, unknown> }).extra : null
+  return NextResponse.json({ tarefaId: r.tarefaId, acao, ...(extra ?? {}) })
 }
