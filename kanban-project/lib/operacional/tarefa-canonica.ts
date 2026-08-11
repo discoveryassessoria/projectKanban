@@ -250,6 +250,17 @@ export async function sincronizarTarefaComWorkflow(
     return { mudou: false, status: tarefa?.statusTarefa ?? 'NAO_INICIADA', stepAtualId: null }
   }
 
+  // ESTADO TERMINAL NÃO SE RECALCULA.
+  //
+  // Cancelar é decisão humana; concluir é fato. O estado derivado das etapas
+  // não pode desfazer nenhum dos dois — sem esta guarda, cancelar uma tarefa e
+  // rodar o reconciliador em seguida a devolvia para EM_ANDAMENTO, porque as
+  // etapas continuavam disponíveis. A decisão de quem cancelou desaparecia sem
+  // erro e sem aviso. Para retomar existe reabertura, que é explícita.
+  if (STATUS_TERMINAIS.includes(tarefa.statusTarefa)) {
+    return { mudou: false, status: tarefa.statusTarefa, stepAtualId: tarefa.workflowStepInstanceId }
+  }
+
   const steps = await tx.phaseWorkflowStepInstance.findMany({
     where: { workflowInstanceId: tarefa.workflowInstanceId },
     select: { id: true, status: true, obrigatorio: true, ordem: true, stepKey: true },

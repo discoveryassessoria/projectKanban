@@ -271,3 +271,71 @@ export async function avisarPrazosEAtrasos(opts: { diasDeAntecedencia?: number; 
   }
   return { avaliadas: candidatas.length, prazo, atraso }
 }
+
+// ═══════════════════════════════════════════════════════════════════════════
+// REDISTRIBUIÇÃO EM LOTE
+// ═══════════════════════════════════════════════════════════════════════════
+
+export interface ItemDaRedistribuicao {
+  tarefaId: number
+  ok: boolean
+  codigo?: string
+  mensagem?: string
+}
+
+/**
+ * REDISTRIBUI UM CONJUNTO DE TAREFAS — férias, afastamento, desligamento.
+ *
+ * ─── POR QUE NÃO É UMA TRANSAÇÃO ÚNICA ──────────────────────────────────────
+ * A tentação é embrulhar tudo num `$transaction` e "garantir atomicidade". Mas
+ * atomicidade aqui é a decisão ERRADA: se a tarefa 40 de 50 estiver encerrada
+ * ou tiver acabado de ser transferida por outra pessoa, o tudo-ou-nada
+ * derrubaria as 39 redistribuições legítimas por causa de uma que nunca
+ * poderia dar certo. Quem sai de férias amanhã ficaria com as 50 tarefas.
+ *
+ * Cada tarefa é o seu próprio ato transacional e auditado — o que a operação
+ * NÃO pode fazer é mentir sobre o que aconteceu. Por isso o retorno é
+ * item a item: a UI mostra exatamente quais passaram e quais não, com o motivo
+ * de cada uma.
+ *
+ * `novoResponsavelId: null` devolve o lote inteiro à fila da equipe.
+ */
+export async function redistribuirTarefas(args: {
+  tarefaIds: number[]
+  novoResponsavelId: number | null
+  autorId: number
+  motivo?: string | null
+}): Promise<{ total: number; sucesso: number; falha: number; itens: ItemDaRedistribuicao[] }> {
+  const itens: ItemDaRedistribuicao[] = []
+
+  for (const tarefaId of [...new Set(args.tarefaIds)]) {
+    if (args.novoResponsavelId == null) {
+      const { devolverAFila } = await import('./tarefa-ciclo')
+      const r = await devolverAFila({ tarefaId, autorId: args.autorId, motivo: args.motivo ?? 'redistribuição em lote' })
+      itens.push(r.ok ? { tarefaId, ok: true } : { tarefaId, ok: false, codigo: r.codigo, mensagem: r.mensagem })
+      continue
+    }
+    const r = await atribuirTarefa({
+      tarefaId, responsavelId: args.novoResponsavelId, autorId: args.autorId,
+      motivo: args.motivo ?? 'redistribuição em lote',
+    })
+    itens.push(r.ok ? { tarefaId, ok: true } : { tarefaId, ok: false, codigo: r.codigo, mensagem: r.mensagem })
+  }
+
+  const sucesso = itens.filter((i) => i.ok).length
+  await prisma.logAuditoria.create({
+    data: {
+      acao: 'TAREFAS_REDISTRIBUIDAS',
+      entidade: 'Tarefa',
+      entidadeId: 0,
+      usuarioId: args.autorId,
+      descricao:
+        `Redistribuição em lote: ${sucesso} de ${itens.length} tarefa(s) ` +
+        `${args.novoResponsavelId == null ? 'devolvidas à fila da equipe' : `passadas ao usuário ${args.novoResponsavelId}`}.` +
+        (args.motivo ? ` Motivo: ${args.motivo}` : ''),
+      detalhes: JSON.parse(JSON.stringify({ novoResponsavelId: args.novoResponsavelId, motivo: args.motivo ?? null, itens })),
+    },
+  })
+
+  return { total: itens.length, sucesso, falha: itens.length - sucesso, itens }
+}

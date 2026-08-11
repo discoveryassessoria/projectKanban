@@ -21,7 +21,7 @@
 // ============================================================================
 import { prisma } from '@/lib/prisma'
 import type { Prisma, StatusTarefa } from '@prisma/client'
-import { STATUS_TERMINAIS, calcularPrazo } from './tarefa-canonica'
+import { STATUS_TERMINAIS, calcularPrazo, etapaCorrente } from './tarefa-canonica'
 
 export type Falha =
   | 'NAO_ENCONTRADA' | 'TERMINAL' | 'NAO_TERMINAL' | 'CONFLITO' | 'SEM_MOTIVO' | 'INVALIDO'
@@ -192,12 +192,24 @@ export async function reabrirTarefa(args: {
     // As etapas voltam a ficar disponíveis. Não são recriadas: são as MESMAS,
     // com o histórico de quando foram concluídas da primeira vez.
     let etapasReabertas = 0
+    let etapaAtual: number | null = null
     if (t.workflowInstanceId) {
       const alvo = args.stepDestinoId
         ? { id: args.stepDestinoId }
         : { workflowInstanceId: t.workflowInstanceId, status: 'CONCLUIDO' as const, obrigatorio: true }
       const r = await tx.phaseWorkflowStepInstance.updateMany({ where: alvo, data: { status: 'DISPONIVEL', completedAt: null } })
       etapasReabertas = r.count
+
+      // A ETAPA CORRENTE VOLTA JUNTO. Sem isto a tarefa reaberta ficava
+      // apontando para etapa nenhuma: a fila mostrava o trabalho reaberto sem
+      // dizer por onde retomá-lo, e o dossiê não sabia responder "em que pé
+      // está".
+      const steps = await tx.phaseWorkflowStepInstance.findMany({
+        where: { workflowInstanceId: t.workflowInstanceId },
+        select: { id: true, status: true, ordem: true },
+        orderBy: { ordem: 'asc' },
+      })
+      etapaAtual = etapaCorrente(steps)?.id ?? null
     }
 
     await tx.tarefa.update({
@@ -206,6 +218,7 @@ export async function reabrirTarefa(args: {
         statusTarefa: 'EM_ANDAMENTO',
         concluida: false,
         dataConclusao: null,
+        workflowStepInstanceId: etapaAtual,
         motivoCodigo: 'REABERTURA',
         justificativa: args.motivo,
         lockVersion: { increment: 1 },
@@ -436,4 +449,155 @@ export async function podeExecutar(tarefaId: number): Promise<{ pode: boolean; b
     .filter((d) => !['CONCLUIDO_RECEBIDO', 'CONCLUIDO_NAO_POSSUI'].includes(d.dependeDe.statusTarefa))
     .map((d) => d.dependeDeId)
   return { pode: pendentes.length === 0, bloqueadaPor: pendentes }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// ESPERA EXTERNA
+// ═══════════════════════════════════════════════════════════════════════════
+
+/**
+ * A TAREFA PASSA A DEPENDER DE TERCEIRO — e continua sendo trabalho de alguém.
+ *
+ * Não é bloqueio: bloqueio é impedimento que ALGUÉM AQUI precisa resolver;
+ * espera externa é o curso normal de um pedido que foi feito e ainda não
+ * voltou. Misturar os dois faria a fila de impedimentos encher de cartório.
+ *
+ * A tarefa não some, não perde dono, não perde equipe. Ela muda de recorte.
+ */
+export async function aguardarTerceiro(args: {
+  tarefaId: number; autorId: number; motivo: string
+}): Promise<Resultado> {
+  if (!args.motivo?.trim()) return { ok: false, codigo: 'SEM_MOTIVO', mensagem: 'Informe do que a tarefa está esperando.' }
+  const agora = new Date()
+  return prisma.$transaction(async (tx) => {
+    const t = await tx.tarefa.findUnique({
+      where: { id: args.tarefaId },
+      select: { id: true, titulo: true, statusTarefa: true, workflowInstanceId: true },
+    })
+    if (!t) return { ok: false as const, codigo: 'NAO_ENCONTRADA' as const, mensagem: 'Tarefa não existe.' }
+    if (STATUS_TERMINAIS.includes(t.statusTarefa)) {
+      return { ok: false as const, codigo: 'TERMINAL' as const, mensagem: 'Tarefa encerrada não entra em espera.' }
+    }
+    if (t.statusTarefa === 'AGUARDANDO_TERCEIRO') {
+      // Repetir não é erro nem evento novo: a tarefa já está esperando, e
+      // registrar de novo criaria uma segunda pausa de SLA sobre a primeira.
+      return { ok: true as const, tarefaId: t.id }
+    }
+    const politica = await politicaDeSla(t.workflowInstanceId)
+    await tx.tarefa.update({
+      where: { id: t.id },
+      data: {
+        statusTarefa: 'AGUARDANDO_TERCEIRO',
+        blockedPreviousStatus: t.statusTarefa,
+        motivoCodigo: 'ESPERA_EXTERNA',
+        justificativa: args.motivo,
+        lockVersion: { increment: 1 },
+      },
+    })
+    if (politica.pausaEspera) await pausarSla(tx, t.id, agora)
+    await auditar(tx, 'TAREFA_AGUARDANDO_TERCEIRO', t.id, args.autorId,
+      `Tarefa "${t.titulo}" passou a aguardar terceiro (estava ${t.statusTarefa}). Motivo: ${args.motivo}` +
+      (politica.pausaEspera ? ' O prazo ficou pausado conforme a política do workflow.' : ' O prazo continua correndo.'),
+      { tarefaId: t.id, de: t.statusTarefa, motivo: args.motivo, slaPausado: politica.pausaEspera })
+    return { ok: true as const, tarefaId: t.id }
+  })
+}
+
+/** O terceiro respondeu — a MESMA tarefa volta ao ponto em que estava. */
+export async function retomarDeEspera(args: { tarefaId: number; autorId: number; motivo?: string | null }): Promise<Resultado> {
+  const agora = new Date()
+  return prisma.$transaction(async (tx) => {
+    const t = await tx.tarefa.findUnique({
+      where: { id: args.tarefaId },
+      select: { id: true, titulo: true, statusTarefa: true, blockedPreviousStatus: true },
+    })
+    if (!t) return { ok: false as const, codigo: 'NAO_ENCONTRADA' as const, mensagem: 'Tarefa não existe.' }
+    if (t.statusTarefa !== 'AGUARDANDO_TERCEIRO') {
+      return { ok: false as const, codigo: 'CONFLITO' as const, mensagem: 'A tarefa não está aguardando terceiro.' }
+    }
+    const minutos = await retomarSla(tx, t.id, agora)
+    const volta = (t.blockedPreviousStatus as StatusTarefa) ?? 'EM_ANDAMENTO'
+    await tx.tarefa.update({
+      where: { id: t.id },
+      data: { statusTarefa: volta, blockedPreviousStatus: null, motivoCodigo: null, lockVersion: { increment: 1 } },
+    })
+    await auditar(tx, 'TAREFA_RETOMADA_DE_ESPERA', t.id, args.autorId,
+      `Tarefa "${t.titulo}" retomada da espera e devolvida a ${volta}.` +
+      (minutos > 0 ? ` O prazo foi empurrado em ${minutos} minuto(s) de espera real.` : ''),
+      { tarefaId: t.id, para: volta, minutosPausados: minutos, motivo: args.motivo ?? null })
+    return { ok: true as const, tarefaId: t.id }
+  })
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// ENCERRAMENTO ADMINISTRATIVO
+// ═══════════════════════════════════════════════════════════════════════════
+
+/**
+ * CANCELAR — o trabalho não vai ser feito.
+ *
+ * ─── POR QUE NÃO EXISTE "INVALIDAR" SEPARADO ────────────────────────────────
+ * O domínio já tem `CANCELADA` e `SUPERSEDIDA`, e elas cobrem os dois sentidos
+ * reais: alguém decidiu que não se faz, e o motor substituiu por outra
+ * instância. "Invalidar" seria um terceiro nome para o primeiro caso — mesmo
+ * efeito, mesma consequência, mesma leitura em toda projeção.
+ *
+ * Um estado a mais que não muda nada obriga cada consulta futura a lembrar de
+ * incluí-lo, e a primeira que esquecer some com a tarefa da tela. O que
+ * distingue os motivos é `motivoCodigo`, que é texto de auditoria e não muda
+ * regra nenhuma.
+ */
+export async function cancelarTarefa(args: {
+  tarefaId: number; autorId: number; motivo: string; codigo?: string | null
+}): Promise<Resultado> {
+  if (!args.motivo?.trim()) return { ok: false, codigo: 'SEM_MOTIVO', mensagem: 'Informe o motivo do cancelamento.' }
+  const agora = new Date()
+  return prisma.$transaction(async (tx) => {
+    const t = await tx.tarefa.findUnique({
+      where: { id: args.tarefaId },
+      select: { id: true, titulo: true, statusTarefa: true, dataInicio: true },
+    })
+    if (!t) return { ok: false as const, codigo: 'NAO_ENCONTRADA' as const, mensagem: 'Tarefa não existe.' }
+    // Cancelar tarefa concluída apagaria um fato: o trabalho ACONTECEU. Para
+    // desfazer o resultado existe reabertura, que preserva o histórico.
+    if (STATUS_TERMINAIS.includes(t.statusTarefa)) {
+      return {
+        ok: false as const, codigo: 'TERMINAL' as const,
+        mensagem: `Tarefa já encerrada (${t.statusTarefa}). Para retomá-la, reabra; cancelar não apaga o que foi feito.`,
+      }
+    }
+    await tx.tarefa.update({
+      where: { id: t.id },
+      data: {
+        statusTarefa: 'CANCELADA',
+        concluida: false,
+        dataConclusao: agora,
+        motivoCodigo: (args.codigo ?? 'CANCELAMENTO').slice(0, 40),
+        justificativa: args.motivo,
+        lockVersion: { increment: 1 },
+      },
+    })
+    await auditar(tx, 'TAREFA_CANCELADA', t.id, args.autorId,
+      `Tarefa "${t.titulo}" cancelada (estava ${t.statusTarefa}${t.dataInicio ? ', com trabalho já iniciado' : ''}). Motivo: ${args.motivo}`,
+      { tarefaId: t.id, de: t.statusTarefa, motivo: args.motivo, codigo: args.codigo ?? 'CANCELAMENTO', jaIniciada: t.dataInicio != null })
+    return { ok: true as const, tarefaId: t.id }
+  })
+}
+
+/** Remove uma dependência declarada. Remover o que não existe não é erro. */
+export async function removerDependencia(args: { tarefaId: number; dependeDeId: number; autorId?: number | null }): Promise<Resultado> {
+  const r = await prisma.tarefaDependencia.deleteMany({
+    where: { tarefaId: args.tarefaId, dependeDeId: args.dependeDeId },
+  })
+  if (r.count > 0) {
+    await prisma.logAuditoria.create({
+      data: {
+        acao: 'TAREFA_DEPENDENCIA_REMOVIDA', entidade: 'Tarefa', entidadeId: args.tarefaId,
+        usuarioId: args.autorId ?? undefined,
+        descricao: `Dependência da tarefa ${args.tarefaId} em relação à ${args.dependeDeId} removida.`,
+        detalhes: { tarefaId: args.tarefaId, dependeDeId: args.dependeDeId },
+      },
+    })
+  }
+  return { ok: true, tarefaId: args.tarefaId }
 }

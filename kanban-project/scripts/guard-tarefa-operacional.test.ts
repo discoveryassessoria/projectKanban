@@ -252,6 +252,65 @@ ok("dependência tem entidade própria", /model TarefaDependencia \{/.test(schem
 ok("com par único", /@@unique\(\[tarefaId, dependeDeId\]\)/.test(schema))
 ok("ciclo direto é recusado", /criaria um ciclo/.test(ciclo))
 
+// ═══════════════════════════════════════════════════════════════════════════
+secao("12) A UI só pode operar pelas portas")
+// ═══════════════════════════════════════════════════════════════════════════
+// O objetivo é que nenhuma tela futura consiga alterar tarefa, etapa,
+// responsável ou prazo por fora do motor. Se uma rota escrever direto, ela
+// pula auditoria e notificação — e a pessoa nunca fica sabendo que recebeu o
+// trabalho.
+const comando = ler("src/app/api/tarefas/[tarefaId]/comando/route.ts")
+const manual = ler("src/app/api/tarefas/manual/route.ts")
+const lote = ler("src/app/api/tarefas/redistribuir/route.ts")
+const dossieRota = ler("src/app/api/tarefas/[tarefaId]/dossie/route.ts")
+
+for (const [rotulo, src] of [["comando", comando], ["manual", manual], ["lote", lote], ["dossiê", dossieRota]] as const) {
+  // Comentário citando `prisma.tarefa.update` para EXPLICAR por que ele não
+  // pode existir aqui é justamente o que evita que alguém o escreva.
+  ok(`a rota de ${rotulo} não fala com o Prisma`, !/prisma\./.test(semComentarios(src)),
+    "regra de negócio em rota é a segunda porta que sempre esquece a auditoria")
+  ok(`a rota de ${rotulo} valida permissão no backend`, /verificarPermissao\(request,/.test(src))
+}
+
+// Toda ação exposta precisa de permissão declarada — não existe ação "aberta".
+const acoes = [...comando.matchAll(/case '([a-z_]+)'/g)].map((m) => m[1])
+const declaradas = [...comando.matchAll(/^  ([a-z_]+): '/gm)].map((m) => m[1])
+for (const a of acoes) {
+  ok(`a ação "${a}" tem permissão declarada`, declaradas.includes(a))
+}
+ok("há ações expostas", acoes.length >= 12, `${acoes.length} ações`)
+
+// As operações que a futura UI precisa — todas com porta.
+for (const porta of [
+  "atribuir", "transferir", "devolver_a_fila", "iniciar", "aguardar_terceiro", "retomar_espera",
+  "bloquear", "desbloquear", "reabrir", "cancelar", "alterar_prazo", "alterar_prioridade",
+  "adicionar_dependencia", "remover_dependencia",
+]) {
+  ok(`porta exposta: ${porta}`, comando.includes(`case '${porta}'`))
+}
+ok("porta exposta: criar tarefa manual", /criarTarefaManual\(/.test(manual))
+ok("porta exposta: redistribuição em lote", /redistribuirTarefas\(/.test(lote))
+ok("porta exposta: dossiê", /dossieDaTarefa\(/.test(dossieRota))
+
+// O lote relata item a item — um "ok" global esconderia o que não passou.
+// O 207 sai do `falha > 0`: a rota devolve o resultado do serviço, que já traz
+// os itens — checar o literal "itens" aqui exigiria a rota reempacotar à mão.
+ok("o lote responde item a item", /r\.falha > 0 \? 207/.test(lote) && /redistribuirTarefas\(/.test(lote))
+// O aviso de duplicidade volta estruturado, para a UI poder oferecer reabrir.
+ok("o aviso de duplicidade traz a lista", /semelhantes/.test(manual) && /409/.test(manual))
+
+// ═══════════════════════════════════════════════════════════════════════════
+secao("13) Estado terminal é irreversível sem decisão explícita")
+// ═══════════════════════════════════════════════════════════════════════════
+// Cancelar é decisão humana; concluir é fato. Sem esta guarda, cancelar e
+// rodar o reconciliador devolvia a tarefa para EM_ANDAMENTO — a decisão de
+// quem cancelou sumia sem erro e sem aviso.
+ok("a sincronização não recalcula estado terminal",
+  /if \(STATUS_TERMINAIS\.includes\(tarefa\.statusTarefa\)\)/.test(canonica))
+ok("cancelar recusa tarefa já encerrada", /Tarefa já encerrada[\s\S]{0,120}reabra/.test(ciclo))
+ok("reabrir é o único caminho de volta", /export async function reabrirTarefa/.test(ciclo))
+ok("e a reabertura repõe a etapa corrente", /workflowStepInstanceId: etapaAtual/.test(ciclo))
+
 // ── Resultado ──────────────────────────────────────────────────────────────
 console.log(`\n${"═".repeat(70)}`)
 console.log(`Total: ${passou + falhou} | ✅ ${passou} | ❌ ${falhou}`)

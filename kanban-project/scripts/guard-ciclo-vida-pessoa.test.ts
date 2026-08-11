@@ -111,6 +111,9 @@ const ALVOS: Alvo[] = [
  * regra "tudo em scripts/ pode".
  */
 const AUTORIZADOS_FORA_DO_RUNTIME: Record<string, string> = {
+  "scripts/portas-tarefa.test.ts":
+    "portas canônicas da tarefa: monta e derruba os PRÓPRIOS processos (marca PORTAS) " +
+    "só no banco de teste",
   "scripts/motor-operacional-fases.test.ts":
     "motor operacional através das fases: monta e derruba os PRÓPRIOS processos " +
     "(marca MOTOR-FASE) só no banco de teste",
