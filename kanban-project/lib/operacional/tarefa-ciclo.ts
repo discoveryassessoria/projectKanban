@@ -21,7 +21,9 @@
 // ============================================================================
 import { prisma } from '@/lib/prisma'
 import type { Prisma, StatusTarefa } from '@prisma/client'
+import { randomUUID } from 'crypto'
 import { STATUS_TERMINAIS, calcularPrazo, etapaCorrente } from './tarefa-canonica'
+import { reabrirPassoTx } from '@/src/services/task-step-sync'
 
 export type Falha =
   | 'NAO_ENCONTRADA' | 'TERMINAL' | 'NAO_TERMINAL' | 'CONFLITO' | 'SEM_MOTIVO' | 'INVALIDO'
@@ -194,11 +196,29 @@ export async function reabrirTarefa(args: {
     let etapasReabertas = 0
     let etapaAtual: number | null = null
     if (t.workflowInstanceId) {
-      const alvo = args.stepDestinoId
-        ? { id: args.stepDestinoId }
-        : { workflowInstanceId: t.workflowInstanceId, status: 'CONCLUIDO' as const, obrigatorio: true }
-      const r = await tx.phaseWorkflowStepInstance.updateMany({ where: alvo, data: { status: 'DISPONIVEL', completedAt: null } })
-      etapasReabertas = r.count
+      // A REABERTURA DO PASSO PASSA PELO DONO DA MÁQUINA DE ESTADOS.
+      //
+      // É a única descida permitida (CONCLUIDO → DISPONIVEL) e por isso tem
+      // porta própria em `task-step-sync`: ela registra `PASSO_REABERTO` e
+      // publica no outbox. Um `updateMany` direto aqui — como esta porta fazia —
+      // devolvia o passo sem deixar rastro de que ele já tinha sido concluído.
+      const candidatos = await tx.phaseWorkflowStepInstance.findMany({
+        where: args.stepDestinoId
+          ? { id: args.stepDestinoId }
+          : { workflowInstanceId: t.workflowInstanceId, status: 'CONCLUIDO', obrigatorio: true },
+        select: { id: true, ciclo: true, processoId: true },
+      })
+      const correlationId = randomUUID()
+      for (const c of candidatos) {
+        const r = await reabrirPassoTx(tx, c.id, 'DISPONIVEL', {
+          correlationId,
+          operacao: 'tarefa-reabrir',
+          ciclo: c.ciclo,
+          processoId: c.processoId,
+          workflowInstanceId: t.workflowInstanceId,
+        })
+        if (r.changed) etapasReabertas += 1
+      }
 
       // A ETAPA CORRENTE VOLTA JUNTO. Sem isto a tarefa reaberta ficava
       // apontando para etapa nenhuma: a fila mostrava o trabalho reaberto sem

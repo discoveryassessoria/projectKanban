@@ -169,6 +169,9 @@ const AUTORIZADOS_FORA_DO_RUNTIME: Record<string, string> = {
   "scripts/tarefa-unidade-operacional.test.ts":
     "unidade operacional da Tarefa: monta e derruba as próprias árvores (marca TAREFA-OP), " +
     "só no banco de teste; prova que 7 etapas continuam sendo 1 tarefa",
+  "scripts/equivalencia-portas-etapa.test.ts":
+    "equivalência das portas de conclusão de etapa: monta e derruba DUAS árvores idênticas " +
+    "(marca EQUIV), só no banco de teste; a prova depende de os dois cenários serem gêmeos",
   "scripts/override-isolamento.test.ts":
     "isolamento do override entre processos: monta e derruba as próprias árvores (marca ISOLAMENTO), " +
     "só no banco de teste",

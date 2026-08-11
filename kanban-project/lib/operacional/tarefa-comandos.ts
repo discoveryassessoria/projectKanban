@@ -21,7 +21,9 @@
 // ============================================================================
 import { prisma } from '@/lib/prisma'
 import type { Prisma } from '@prisma/client'
+import { randomUUID } from 'crypto'
 import { STATUS_TERMINAIS } from './tarefa-canonica'
+import { transicionarPassoTx } from '@/src/services/task-step-sync'
 
 export type ResultadoComando =
   | { ok: true; tarefaId: number; notificacaoId: number | null }
@@ -200,7 +202,10 @@ export async function iniciarTarefa(args: {
   return prisma.$transaction(async (tx) => {
     const t = await tx.tarefa.findUnique({
       where: { id: args.tarefaId },
-      select: { id: true, titulo: true, responsavelId: true, statusTarefa: true, dataInicio: true, workflowInstanceId: true },
+      select: {
+        id: true, titulo: true, responsavelId: true, statusTarefa: true, dataInicio: true,
+        workflowInstanceId: true, workflowStepInstanceId: true,
+      },
     })
     if (!t) return { ok: false as const, codigo: 'NAO_ENCONTRADA' as const, mensagem: `Tarefa ${args.tarefaId} não existe.` }
     if (STATUS_TERMINAIS.includes(t.statusTarefa)) {
@@ -223,8 +228,32 @@ export async function iniciarTarefa(args: {
         lockVersion: { increment: 1 },
       },
     })
+    // A ETAPA CORRENTE COMEÇA JUNTO — pela porta de quem é dono dela.
+    //
+    // Iniciar a tarefa e deixar o passo em DISPONIVEL não é contradição, mas é
+    // uma meia-verdade: o histórico do workflow não registrava que o trabalho
+    // começou, e "iniciar" pela rota antiga emitia PASSO_INICIADO enquanto
+    // iniciar por aqui não emitia nada. O mesmo gesto com dois efeitos.
+    let etapaIniciada: number | null = null
+    if (t.workflowStepInstanceId != null) {
+      const step = await tx.phaseWorkflowStepInstance.findUnique({
+        where: { id: t.workflowStepInstanceId },
+        select: { id: true, ciclo: true, processoId: true },
+      })
+      if (step) {
+        const r = await transicionarPassoTx(tx, step.id, 'EM_ANDAMENTO', {
+          correlationId: randomUUID(),
+          operacao: 'tarefa-iniciar',
+          ciclo: step.ciclo,
+          processoId: step.processoId,
+          workflowInstanceId: t.workflowInstanceId,
+        })
+        if (r.changed) etapaIniciada = step.id
+      }
+    }
+
     await auditar(tx, 'TAREFA_INICIADA', t.id, args.autorId, `Tarefa "${t.titulo}" iniciada.`, {
-      tarefaId: t.id, workflowInstanceId: t.workflowInstanceId,
+      tarefaId: t.id, workflowInstanceId: t.workflowInstanceId, etapaIniciada,
     })
     return { ok: true as const, tarefaId: t.id, notificacaoId: null }
   })

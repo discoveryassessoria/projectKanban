@@ -14,8 +14,31 @@ import { resolveWorkflowRuntime } from "@/src/lib/workflow-runtime"
 import * as H from "@/src/services/task-step-sync-helpers"
 import { projetarTarefaDoPasso, assegurarCoerenciaPassoTarefa } from "@/src/services/passo-tarefa-projecao"
 import { processarOutbox } from "@/src/services/outbox-dispatcher"
+import { estadoDerivado, sincronizarTarefaComWorkflow } from "@/lib/operacional/tarefa-canonica"
 
 const TAREFA_CONCLUIDA_STATUS = "CONCLUIDO_RECEBIDO"
+const TAREFA_CONCLUIDA_SET = new Set<string>(["CONCLUIDO_RECEBIDO", "CONCLUIDO_NAO_POSSUI"])
+
+/**
+ * O QUE AS ETAPAS DIZEM SOBRE A TAREFA — uma conta só, importada.
+ *
+ * A regra ("a tarefa acabou quando todas as etapas obrigatórias acabaram") não
+ * é reescrita aqui: ela vive em `tarefa-canonica` e é a mesma que a Central, o
+ * reconciliador e as filas usam.
+ */
+async function statusDerivadoDaTarefa(tx: TX, tarefaId: number): Promise<string | null> {
+  const t = await tx.tarefa.findUnique({
+    where: { id: tarefaId },
+    select: { workflowInstanceId: true, dataInicio: true },
+  })
+  if (!t?.workflowInstanceId) return null
+  const steps = await tx.phaseWorkflowStepInstance.findMany({
+    where: { workflowInstanceId: t.workflowInstanceId },
+    select: { id: true, status: true, obrigatorio: true, ordem: true, stepKey: true },
+    orderBy: { ordem: "asc" },
+  })
+  return estadoDerivado(steps, { iniciada: t.dataInicio != null }).status
+}
 
 export interface SyncContexto {
   origem: H.Origem
@@ -79,7 +102,7 @@ async function aplicarPasso(tx: TX, stepId: number, alvo: string, tipoEvento: Wo
   })
   if (res.count === 0) return { changed: false, anterior: step.status, atual: step.status, code: "CONFLITO" as H.FailureCodeD }
 
-  const chaveEvt = H.chaveEvento(tipoEvento, "step_instance", stepId, alvo, o.ciclo)
+  const chaveEvt = H.chaveEvento(tipoEvento, "step_instance", stepId, alvo, o.ciclo, step.lockVersion)
   await tx.workflowEvento.create({
     data: {
       tipo: tipoEvento, entityType: "step_instance", entityId: stepId,
@@ -92,6 +115,206 @@ async function aplicarPasso(tx: TX, stepId: number, alvo: string, tipoEvento: Wo
       tipo: `step.${alvo.toLowerCase()}`, aggregateType: "PhaseWorkflowStepInstance", aggregateId: stepId,
       correlationId: o.correlationId, causationId: o.causationId, chaveIdempotencia: `outbox|${chaveEvt}`,
       payload: { stepId, alvo, ciclo: o.ciclo },
+    },
+  })
+  return { changed: true, anterior: step.status, atual: alvo }
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+// FRONTEIRA EXPLÍCITA — A ÚNICA MÁQUINA DE ESTADOS DE PASSO É ESTE MÓDULO.
+//
+// A camada de TAREFA (lib/operacional/*) é dona da unidade de trabalho: prazo,
+// responsável, equipe, dependências, SLA, notificações. Ela NÃO é dona do
+// passo. Quando uma porta de tarefa precisa mover um passo, ela entra por aqui.
+//
+// Por que isto existe: durante a reengenharia operacional nasceram duas
+// famílias de transição — esta, que valida pela precedência, emite
+// WorkflowEvento e publica no outbox; e a da camada de tarefa, que escrevia
+// `phaseWorkflowStepInstance.updateMany` direto. As duas concluíam passo com
+// regras diferentes. Concluir pela tela emitia evento; concluir pela porta de
+// tarefa, não. Um mesmo fato com duas derivações — a segunda sempre fica para
+// trás.
+//
+// `transicionarPassoTx` é a mesma função que as portas deste módulo usam
+// (`aplicarPasso`), exposta para quem já está dentro de uma transação e precisa
+// compor a transição do passo com a escrita da própria tarefa no MESMO commit.
+// ════════════════════════════════════════════════════════════════════════════
+
+/**
+ * O EVENTO QUE CADA ALVO PRODUZ — tabela única.
+ *
+ * Sem isto, cada chamador escolheria o tipo do evento na hora, e o mesmo alvo
+ * apareceria no histórico com dois nomes conforme a porta usada.
+ *
+ * Os alvos ausentes (AGUARDANDO, FALHOU) não têm evento próprio no enum: quem
+ * os aplica passa `tipoEvento` explicitamente e assume a escolha.
+ */
+export const EVENTO_PASSO_POR_ALVO: Partial<Record<string, WorkflowEventoTipo>> = {
+  PENDENTE: "PASSO_INSTANCIADO",
+  DISPONIVEL: "PASSO_DISPONIBILIZADO",
+  EM_ANDAMENTO: "PASSO_INICIADO",
+  BLOQUEADO: "PASSO_BLOQUEADO",
+  EXECUTADO: "PASSO_EXECUTADO",
+  AGUARDANDO_APROVACAO: "PASSO_AGUARDANDO_APROVACAO",
+  CONCLUIDO: "PASSO_CONCLUIDO",
+  DISPENSADO: "PASSO_DISPENSADO",
+  CANCELADO: "PASSO_CANCELADO",
+  SUPERSEDIDO: "PASSO_SUPERSEDIDO",
+}
+
+export interface TransicaoPassoOpts {
+  correlationId: string
+  /** Operação de origem — vira a chave determinística do comando. */
+  operacao: string
+  ciclo: number
+  processoId: number
+  workflowInstanceId?: number | null
+  /** Campos adicionais na MESMA escrita (ex.: `motivo` da conclusão). */
+  extra?: Record<string, unknown>
+  tipoEvento?: WorkflowEventoTipo
+}
+
+export type TransicaoPassoResultado = {
+  changed: boolean
+  anterior: string
+  atual: string
+  code?: H.FailureCodeD
+}
+
+/**
+ * MOVE UM PASSO DENTRO DA TRANSAÇÃO DE QUEM CHAMA.
+ *
+ * Faz exatamente o que as portas deste módulo fazem — valida a transição pela
+ * precedência, grava com CAS por (status + lockVersion), emite `WorkflowEvento`
+ * e publica no `DomainOutbox`. Não decide nada sobre a Tarefa: essa decisão é
+ * da camada de tarefa, e é justamente a fronteira que este desenho separa.
+ */
+export async function transicionarPassoTx(
+  tx: TX,
+  stepId: number,
+  alvo: string,
+  o: TransicaoPassoOpts,
+): Promise<TransicaoPassoResultado> {
+  const tipoEvento = o.tipoEvento ?? EVENTO_PASSO_POR_ALVO[alvo]
+  if (!tipoEvento) {
+    throw new Error(`transicionarPassoTx: alvo "${alvo}" não tem evento canônico — passe tipoEvento explicitamente.`)
+  }
+  const atual = await tx.phaseWorkflowStepInstance.findUnique({ where: { id: stepId }, select: { lockVersion: true } })
+  return aplicarPasso(tx, stepId, alvo, tipoEvento, {
+    correlationId: o.correlationId,
+    causationId: H.chaveComando(o.operacao, "step_instance", stepId, alvo, o.ciclo, atual?.lockVersion),
+    ciclo: o.ciclo,
+    processoId: o.processoId,
+    workflowInstanceId: o.workflowInstanceId,
+    extra: o.extra,
+  })
+}
+
+/**
+ * ATIVA A PRÓXIMA ETAPA EXECUTÁVEL — uma regra só, para as duas portas.
+ *
+ * Concluir um passo sem liberar o seguinte deixa o trabalho parado com tudo
+ * pronto e ninguém sabendo o que fazer. Era o que acontecia ao concluir pela
+ * porta de PASSO: `concluirPasso` fechava a etapa e o roteiro travava, porque a
+ * ativação estava escrita só do lado da porta de TAREFA.
+ *
+ * "A próxima" é a de MENOR ordem ainda PENDENTE depois da concluída — e essa
+ * definição não pode morar em dois lugares, senão as duas portas discordam
+ * sobre qual etapa vem agora.
+ */
+export async function ativarProximoPassoTx(
+  tx: TX,
+  args: { workflowInstanceId: number; ordemConcluida: number },
+  o: Omit<TransicaoPassoOpts, "ciclo" | "processoId" | "workflowInstanceId">,
+): Promise<number | null> {
+  const proxima = await tx.phaseWorkflowStepInstance.findFirst({
+    where: { workflowInstanceId: args.workflowInstanceId, status: "PENDENTE", ordem: { gt: args.ordemConcluida } },
+    select: { id: true, ciclo: true, processoId: true },
+    orderBy: { ordem: "asc" },
+  })
+  if (!proxima) return null
+  const r = await transicionarPassoTx(tx, proxima.id, "DISPONIVEL", {
+    ...o,
+    ciclo: proxima.ciclo,
+    processoId: proxima.processoId,
+    workflowInstanceId: args.workflowInstanceId,
+  })
+  return r.changed ? proxima.id : null
+}
+
+/**
+ * MOVE A TAREFA PELO MESMO APLICADOR QUE AS PORTAS DESTE MÓDULO USAM.
+ *
+ * Exposto pelo mesmo motivo que `transicionarPassoTx`: a camada de tarefa
+ * precisa compor a mudança de estado com as escritas que são só dela (ponteiro
+ * da etapa corrente, prazo, justificativa) dentro do MESMO commit — e, ao
+ * fazer isso, tem de produzir o mesmo `WorkflowEvento` e a mesma publicação no
+ * outbox que a Central produz. Sem isto, a mesma conclusão aparecia no
+ * histórico quando vinha da Central e sumia quando vinha da fila de tarefas.
+ */
+export async function aplicarTarefaTx(
+  tx: TX,
+  tarefaId: number,
+  alvo: string,
+  tipoEvento: WorkflowEventoTipo,
+  o: TransicaoPassoOpts & { extra?: Record<string, unknown> },
+) {
+  const t = await tx.tarefa.findUnique({ where: { id: tarefaId }, select: { lockVersion: true } })
+  return aplicarTarefa(tx, tarefaId, alvo, tipoEvento, {
+    correlationId: o.correlationId,
+    causationId: H.chaveComando(o.operacao, "tarefa", tarefaId, alvo, o.ciclo, t?.lockVersion),
+    ciclo: o.ciclo,
+    processoId: o.processoId,
+    workflowInstanceId: o.workflowInstanceId,
+    extra: o.extra,
+  })
+}
+
+/**
+ * REABRE UM PASSO — a única descida permitida na máquina de estados.
+ *
+ * A precedência existe para impedir que um estado antigo sobrescreva um novo
+ * por acidente. Reabertura não é acidente: é decisão humana registrada, com
+ * motivo, para refazer trabalho. Por isso ela passa por uma porta própria, e
+ * não afrouxando `podeAplicarPasso` — afrouxar ali abriria a descida para todo
+ * o resto do sistema.
+ */
+export async function reabrirPassoTx(
+  tx: TX,
+  stepId: number,
+  alvo: "DISPONIVEL" | "PENDENTE",
+  o: TransicaoPassoOpts,
+): Promise<TransicaoPassoResultado> {
+  const step = await tx.phaseWorkflowStepInstance.findUnique({ where: { id: stepId } })
+  if (!step) return { changed: false, anterior: "", atual: "", code: "STEP_NAO_ENCONTRADO" as H.FailureCodeD }
+  if (step.status === alvo) return { changed: false, anterior: step.status, atual: step.status }
+
+  const res = await tx.phaseWorkflowStepInstance.updateMany({
+    where: { id: stepId, status: step.status as Prisma.PhaseWorkflowStepInstanceWhereInput["status"], lockVersion: step.lockVersion },
+    data: {
+      status: alvo as Prisma.PhaseWorkflowStepInstanceUpdateManyMutationInput["status"],
+      lockVersion: { increment: 1 },
+      completedAt: null,
+      ...(o.extra as object),
+    },
+  })
+  if (res.count === 0) return { changed: false, anterior: step.status, atual: step.status, code: "CONFLITO" as H.FailureCodeD }
+
+  const causationId = H.chaveComando(o.operacao, "step_instance", stepId, alvo, o.ciclo, step.lockVersion)
+  const chaveEvt = H.chaveEvento("PASSO_REABERTO", "step_instance", stepId, alvo, o.ciclo, step.lockVersion)
+  await tx.workflowEvento.create({
+    data: {
+      tipo: "PASSO_REABERTO", entityType: "step_instance", entityId: stepId,
+      processoId: o.processoId, workflowInstanceId: o.workflowInstanceId ?? undefined, stepInstanceId: stepId,
+      correlationId: o.correlationId, causationId, chaveIdempotencia: chaveEvt,
+      dados: { de: step.status, para: alvo },
+    },
+  })
+  await tx.domainOutbox.create({
+    data: {
+      tipo: "step.reaberto", aggregateType: "PhaseWorkflowStepInstance", aggregateId: stepId,
+      correlationId: o.correlationId, causationId, chaveIdempotencia: `outbox|${chaveEvt}`,
+      payload: { stepId, alvo, de: step.status, ciclo: o.ciclo },
     },
   })
   return { changed: true, anterior: step.status, atual: alvo }
@@ -119,7 +342,7 @@ async function aplicarTarefa(tx: TX, tarefaId: number, alvo: string, tipoEvento:
   })
   if (res.count === 0) return { changed: false, anterior: t.statusTarefa, atual: t.statusTarefa, code: "CONFLITO" as H.FailureCodeD }
 
-  const chaveEvt = H.chaveEvento(tipoEvento, "tarefa", tarefaId, alvo, o.ciclo)
+  const chaveEvt = H.chaveEvento(tipoEvento, "tarefa", tarefaId, alvo, o.ciclo, t.lockVersion)
   await tx.workflowEvento.create({
     data: {
       tipo: tipoEvento, entityType: "tarefa", entityId: tarefaId,
@@ -371,19 +594,49 @@ export async function concluirPasso(stepInstanceId: number, ctx: SyncContexto): 
         const rc = await aplicarPasso(tx, stepInstanceId, "CONCLUIDO", "PASSO_CONCLUIDO", base); pAnt = rc.anterior; pAt = rc.atual
         if (rc.code) return ko(rc.code, correlationId)
         if (rc.changed) eventos.push("PASSO_CONCLUIDO")
+        // A PRÓXIMA ETAPA É LIBERADA AQUI TAMBÉM. Concluir pela Central e pela
+        // fila de tarefas tem de deixar o roteiro no mesmo lugar: sem isto, a
+        // conclusão vinda daqui fechava a etapa e o trabalho parava com todas
+        // as seguintes PENDENTES.
+        if (rc.changed && step.workflowInstanceId != null) {
+          const ativada = await ativarProximoPassoTx(tx, { workflowInstanceId: step.workflowInstanceId, ordemConcluida: step.ordem },
+            { correlationId, operacao: "step-complete-proximo" })
+          if (ativada != null) eventos.push("PASSO_DISPONIBILIZADO")
+        }
       }
-      // sincroniza Tarefa aberta (no-op se já concluída) — sem re-chamar concluirPasso
+      // O ESTADO DA TAREFA É DERIVADO, NÃO DECIDIDO AQUI.
+      //
+      // Antes, concluir um passo concluía a tarefa — o que estava certo quando
+      // passo e tarefa eram a mesma coisa. Hoje uma tarefa carrega N passos:
+      // concluir "enviar ao cartório" não encerra o pedido de certidão, encerra
+      // uma etapa dele. Quem sabe se o trabalho acabou é o conjunto das etapas
+      // OBRIGATÓRIAS, e essa conta vive num lugar só (`estadoDerivado`).
+      //
+      // Para a tarefa de passo único o resultado é idêntico ao anterior: o
+      // último passo concluído deriva CONCLUIDO_RECEBIDO e o evento
+      // TAREFA_CONCLUIDA continua saindo daqui.
       let tAnt: string | undefined, tAt: string | undefined
       if (tarefa) {
-        const rt = await aplicarTarefa(tx, tarefa.id, TAREFA_CONCLUIDA_STATUS, "TAREFA_CONCLUIDA", { ...base, extra: { executedById: ctx.usuarioId ?? tarefa.responsavelId } })
-        tAnt = rt.anterior; tAt = rt.atual
-        if (rt.changed) eventos.push("TAREFA_CONCLUIDA")
+        const derivado = await statusDerivadoDaTarefa(tx, tarefa.id)
+        if (derivado != null && TAREFA_CONCLUIDA_SET.has(derivado)) {
+          const rt = await aplicarTarefa(tx, tarefa.id, derivado, "TAREFA_CONCLUIDA", { ...base, extra: { executedById: ctx.usuarioId ?? tarefa.responsavelId } })
+          tAnt = rt.anterior; tAt = rt.atual
+          if (rt.changed) eventos.push("TAREFA_CONCLUIDA")
+        } else {
+          // Ainda há etapa a fazer: a tarefa continua aberta e o ponteiro anda
+          // para a próxima. Sem isto a trava de coerência derrubaria a
+          // transação — passo CONCLUIDO apontado por tarefa EM_ANDAMENTO é
+          // contradição.
+          const r = await sincronizarTarefaComWorkflow(tx, tarefa.id, new Date())
+          tAnt = tarefa.statusTarefa; tAt = r.status
+          if (r.mudou) eventos.push("TAREFA_SINCRONIZADA")
+        }
       }
       // TRAVA antes do commit: o par não pode terminar contraditório. Se o mapeamento
       // desta operação divergir do mapeamento OFICIAL, a transação cai aqui — o
       // desalinhamento aparece na hora, não meses depois num relatório.
       await assegurarCoerenciaPassoTarefa(tx, [stepInstanceId])
-      return ok(true, correlationId, { passo: pAnt, tarefa: tAnt }, { passo: pAt, tarefa: tAt }, eventos)
+      return ok(eventos.length > 0, correlationId, { passo: pAnt, tarefa: tAnt }, { passo: pAt, tarefa: tAt }, eventos)
     })
     // O `step.concluido` já foi emitido DENTRO da transação acima. Drenar aqui só
     // antecipa o efeito (projeção financeira documental) para o mesmo clique, em

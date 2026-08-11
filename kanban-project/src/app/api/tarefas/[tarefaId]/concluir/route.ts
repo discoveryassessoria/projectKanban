@@ -1,8 +1,19 @@
 // src/app/api/tarefas/[tarefaId]/concluir/route.ts
-
+// ============================================================================
+// CASCA FINA — conclui a tarefa pelo motor canônico e mais nada.
+//
+// Esta rota já teve um segundo caminho: quando o runtime v2 estava desligado
+// (ou a tarefa não tinha passo), ela escrevia `prisma.tarefa.update` direto,
+// concluía a tarefa e NÃO tocava no passo. Era a mesma conclusão com duas
+// regras — e a que não passava pelo motor não emitia WorkflowEvento, não
+// projetava o passo e não deixava rastro no outbox. O estado do passo e o da
+// tarefa passavam a discordar sobre a MESMA execução.
+//
+// Hoje há um caminho só: `concluirTarefa` (task-step-sync), dono das transições
+// e de seus efeitos. A rota valida quem pode e delega.
+// ============================================================================
 import { NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
-import { hojeBrasil } from "@/src/lib/date-utils"
 import { verificarPermissao } from '@/src/lib/verificar-permissao'
 import { negarSeNaoForDonoDaTarefa } from "@/src/lib/tarefa-acesso"
 import { concluirTarefa } from "@/src/services/task-step-sync"
@@ -18,17 +29,16 @@ export async function POST(
 
     const { tarefaId } = await params
     const id = parseInt(tarefaId)
-    
     if (isNaN(id)) {
       return NextResponse.json({ error: "ID inválido" }, { status: 400 })
     }
-    
+
     const { status, usuarioId } = await request.json()
 
     const tarefaAtual = await prisma.tarefa.findUnique({
-      where: { id }
+      where: { id },
+      select: { id: true, responsavelId: true, processoId: true, workflowStepInstanceId: true },
     })
-
     if (!tarefaAtual) {
       return NextResponse.json({ error: "Tarefa não encontrada" }, { status: 404 })
     }
@@ -37,67 +47,27 @@ export async function POST(
     const negado = await negarSeNaoForDonoDaTarefa(request, tarefaAtual.responsavelId)
     if (negado) return negado
 
-    // CP-4D — delegação ao runtime v2: se a Tarefa é de workflow v2
-    // (workflowStepInstanceId) e o Processo está em runtime v2, delega ao
-    // TaskStepSyncService (sincroniza o Passo, sem loop). Senão, fluxo legado intacto.
-    if (tarefaAtual.workflowStepInstanceId && tarefaAtual.processoId) {
-      const proc = await prisma.processo.findUnique({ where: { id: tarefaAtual.processoId }, select: { workflowRuntime: true } })
-      const cfg = await prisma.motorConfig.findUnique({ where: { id: 1 }, select: { runtimeV2Habilitado: true } })
-      if ((cfg?.runtimeV2Habilitado ?? false) && proc?.workflowRuntime === "v2") {
-        const r = await concluirTarefa(id, { origem: "USER", usuarioId })
-        // AUTO-AVANÇO: concluída a tarefa v2, se a fase ficou sem pendências o card vai sozinho.
-        if (r.success) await tentarAvancoAutomatico(tarefaAtual.processoId)
-        return NextResponse.json(r, { status: r.success ? 200 : 409 })
-      }
+    // "Cliente não possui o documento" é uma conclusão de natureza DIFERENTE, e
+    // o motor canônico ainda não a distingue. Recusar é honesto; concluir como
+    // "recebido" registraria um documento que não existe.
+    if (status === "nao_possui") {
+      return NextResponse.json(
+        { error: "Conclusão por 'não possui' ainda não existe no motor canônico — registre a dispensa da etapa.", codigo: "NAO_SUPORTADO" },
+        { status: 422 },
+      )
     }
 
-    let statusTarefa: any
-    let observacaoTexto: string
-    let motivoConclusao: string
-
-    if (status === "recebido") {
-      statusTarefa = "CONCLUIDO_RECEBIDO"
-      observacaoTexto = "✅ Documento recebido"
-      motivoConclusao = "recebido"
-    } else if (status === "nao_possui") {
-      statusTarefa = "CONCLUIDO_NAO_POSSUI"
-      observacaoTexto = "Cliente não possui o documento"
-      motivoConclusao = "nao_possui"
-    } else {
-      return NextResponse.json({ error: "Status inválido" }, { status: 400 })
+    if (!tarefaAtual.workflowStepInstanceId) {
+      return NextResponse.json(
+        { error: "Tarefa sem etapa vinculada não pode ser concluída por esta porta.", codigo: "SEM_ETAPA" },
+        { status: 409 },
+      )
     }
 
-    const tarefa = await prisma.tarefa.update({
-      where: { id },
-      data: {
-        statusTarefa,
-        concluida: true,
-        dataConclusao: hojeBrasil(),
-        motivoConclusao,
-        observacoes: tarefaAtual.observacoes 
-          ? `${tarefaAtual.observacoes}\n${observacaoTexto}` 
-          : observacaoTexto
-      }
-    })
-
-    // Registra no histórico
-    await prisma.tarefaHistorico.create({
-      data: {
-        tarefaId: id,
-        usuarioId: usuarioId || null,
-        acao: status === "recebido" ? "CONCLUIDA_RECEBIDO" : "CONCLUIDA_NAO_POSSUI",
-        descricao: observacaoTexto,
-        dados: {
-          statusAnterior: tarefaAtual.statusTarefa,
-          statusNovo: statusTarefa
-        }
-      }
-    })
-
-    // AUTO-AVANÇO (legado): tarefa concluída pode ter zerado as pendências da fase.
-    if (tarefaAtual.processoId) await tentarAvancoAutomatico(tarefaAtual.processoId)
-
-    return NextResponse.json({ tarefa })
+    const r = await concluirTarefa(id, { origem: "USER", usuarioId })
+    // AUTO-AVANÇO: concluída a tarefa, se a fase ficou sem pendências o card vai sozinho.
+    if (r.success) await tentarAvancoAutomatico(tarefaAtual.processoId)
+    return NextResponse.json(r, { status: r.success ? 200 : 409 })
   } catch (error) {
     console.error("Erro ao concluir tarefa:", error)
     return NextResponse.json({ error: "Erro ao concluir tarefa" }, { status: 500 })

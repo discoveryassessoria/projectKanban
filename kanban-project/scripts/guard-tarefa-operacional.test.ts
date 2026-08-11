@@ -174,8 +174,13 @@ ok("o retry não duplica", /findUnique\(\{\s*where: \{ chaveIdempotencia: ev\.ch
 ok("prazo e atraso são idempotentes POR DIA", /::\$\{dia\}`/.test(comandos),
   "sem o dia na chave, o aviso renasce a cada varredura e o sino vira ruído")
 ok("a varredura distingue criada de reencontrada", /if \(r\.criada\)/.test(comandos))
+// A notificação é da TAREFA. Avisar por etapa transformaria um pedido de
+// certidão em seis avisos e devolveria, pelo sino, o desenho "etapa é tarefa"
+// que o resto do guard proíbe.
+// (`transicionarPassoTx` aparece aqui porque iniciar a tarefa move a etapa
+// corrente — é delegação de transição, não tipo de notificação.)
 ok("nenhum tipo de notificação é de etapa",
-  !/'STEP|PASSO_|ETAPA_/.test(comandos))
+  !/tipo:\s*'(STEP|PASSO_|ETAPA_)/.test(comandos))
 ok("o link do aviso é o link canônico da tarefa", /link: linkDaTarefa\(ev\.tarefaId\)/.test(comandos))
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -342,12 +347,17 @@ ok("nenhuma rota conclui etapa escrevendo direto no passo",
   conclusoesDiretas.length === 0,
   conclusoesDiretas.map((f) => f.replace(RAIZ, "")).join(", ") || "—")
 
-// O serviço faz o que a escrita direta não faria.
-ok("a porta ativa a próxima etapa", /status: 'DISPONIVEL'/.test(etapa))
+// O serviço faz o que a escrita direta não faria. A TRANSIÇÃO em si é delegada
+// a `task-step-sync` — dono único da máquina de estados de passo — e é de lá que
+// vêm o CAS por (status + lockVersion), o WorkflowEvento e o outbox. O que se
+// exige aqui é que a porta CONTINUE fazendo a parte que é dela.
+ok("a porta ativa a próxima etapa", /ativarProximoPassoTx\(/.test(etapa),
+  "e por uma regra só: 'qual é a próxima' não pode ser respondida de dois jeitos")
 ok("recalcula o estado da tarefa", /estadoDerivado\(depois/.test(etapa))
 ok("e conclui a tarefa só no terminal", /concluiuAgora/.test(etapa))
-ok("com CAS na própria etapa", /where: \{ id: alvo\.id, status: alvo\.status \}/.test(etapa),
-  "duas conclusões simultâneas: a segunda acerta zero linhas e sai como conflito")
+ok("com CAS — delegado ao dono da máquina de estados",
+  /transicionarPassoTx\(tx, alvo\.id, 'CONCLUIDO'/.test(etapa) && /transicao\.code === 'TRANSICAO_INVALIDA'/.test(etapa),
+  "duas conclusões simultâneas: a segunda não casa o lockVersion lido e sai como conflito")
 ok("retry devolve o estado sem repetir efeito", /jaEstavaConcluida: true/.test(etapa))
 ok("tarefa terminal recusa conclusão de etapa", /TAREFA_TERMINAL/.test(etapa))
 ok("bloqueio e espera barram, e só o admin força", /TAREFA_BLOQUEADA/.test(etapa) && /TAREFA_AGUARDANDO/.test(etapa) && /permiteForcar/.test(etapa))

@@ -70,6 +70,10 @@ const AUTORIZADOS_FORA_DO_RUNTIME: Record<string, string> = {
   "scripts/tarefa-unidade-operacional.test.ts":
     "unidade operacional da Tarefa: cria e derruba as PRÓPRIAS necessidades (marca TAREFA-OP) " +
     "só no banco de teste — o cenário precisa de uma obrigação real para a tarefa ter causa",
+  "scripts/equivalencia-portas-etapa.test.ts":
+    "equivalência das portas de conclusão de etapa: monta DOIS cenários idênticos (marca EQUIV) " +
+    "e derruba os dois — a prova exige que a única diferença entre eles seja a porta usada, " +
+    "então o cenário tem de ser construído aqui, não herdado",
   "scripts/backfill-necessidade-duplicada-motor-legado.ts":
     "backfill: consolida duplicidades do motor legado; dry-run por padrão, audita o que move",
   "prisma/backfill-cp3-necessidades.ts":

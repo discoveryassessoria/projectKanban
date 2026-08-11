@@ -362,6 +362,9 @@ export type PassoParaTransicao = {
   ciclo: number
   metadata: unknown
   stepKey: string
+  /** Discrimina a TENTATIVA na chave do evento: reabrir e reconcluir o mesmo
+   *  passo, no mesmo ciclo, é outra passagem — não um evento repetido. */
+  lockVersion: number
 }
 
 const SELECT_PASSO_TRANSICAO = {
@@ -606,7 +609,7 @@ export async function aplicarTransicaoDoPassoTx(
           processoId: p.processoId,
           workflowInstanceId: p.workflowInstanceId,
           stepInstanceId: p.id,
-          chaveIdempotencia: chaveEvento(eventoDaTransicao, "step_instance", p.id, novo, p.ciclo),
+          chaveIdempotencia: chaveEvento(eventoDaTransicao, "step_instance", p.id, novo, p.ciclo, p.lockVersion),
           dados: { documentoId, necessidadeId: p.necessidadeId, stepKey: p.stepKey, de: p.status, para: novo },
         },
       })

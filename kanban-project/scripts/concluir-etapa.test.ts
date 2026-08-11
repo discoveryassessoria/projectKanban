@@ -37,6 +37,11 @@ async function limpar() {
   const ids = procs.map((p) => p.id)
   const ts = await prisma.tarefa.findMany({ where: { processoId: { in: ids } }, select: { id: true } })
   await prisma.notificacaoOperacional.deleteMany({ where: { tarefaId: { in: ts.map((t) => t.id) } } })
+  // O ID DA TAREFA É REUTILIZADO ENTRE EXECUÇÕES. Sem apagar a auditoria, a
+  // tarefa criada na próxima rodada nasce com o histórico da anterior colado
+  // nela — e asserções sobre "quantos TAREFA_CRIADA existem" passam a depender
+  // de quantas vezes o teste já rodou.
+  await prisma.logAuditoria.deleteMany({ where: { entidade: "Tarefa", entidadeId: { in: ts.map((t) => t.id) } } })
   await prisma.tarefa.deleteMany({ where: { processoId: { in: ids } } })
   await prisma.phaseWorkflowStepInstance.deleteMany({ where: { processoId: { in: ids } } })
   await prisma.phaseWorkflowInstance.deleteMany({ where: { processoId: { in: ids } } })

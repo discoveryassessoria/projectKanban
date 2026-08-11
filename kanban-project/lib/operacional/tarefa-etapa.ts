@@ -18,9 +18,14 @@
 // movem o trabalho adiante. Só a última encerra, e quem decide qual é a última
 // é o próprio workflow — o motor não tem lista de "etapas finais".
 // ============================================================================
+import { randomUUID } from 'crypto'
 import { prisma } from '@/lib/prisma'
 import type { Prisma } from '@prisma/client'
 import { STATUS_TERMINAIS, estadoDerivado, etapaCorrente } from './tarefa-canonica'
+import { transicionarPassoTx, ativarProximoPassoTx, aplicarTarefaTx } from '@/src/services/task-step-sync'
+import { assegurarCoerenciaPassoTarefa } from '@/src/services/passo-tarefa-projecao'
+import { processarOutbox } from '@/src/services/outbox-dispatcher'
+import { tentarAvancoAutomatico } from '@/src/lib/motor/auto-avanco'
 
 export type FalhaEtapa =
   | 'TAREFA_NAO_ENCONTRADA' | 'ETAPA_NAO_ENCONTRADA' | 'ETAPA_DE_OUTRA_TAREFA'
@@ -101,8 +106,13 @@ export async function concluirEtapa(args: {
   permiteForcar?: boolean
 }): Promise<ResultadoEtapa> {
   const agora = new Date()
+  // Correlaciona, num id só, tudo o que este clique produziu: a conclusão do
+  // passo, a ativação do seguinte, o evento de workflow e o avanço de fase.
+  const correlationId = randomUUID()
+  /** Preenchido dentro da transação; os efeitos pós-commit precisam dele. */
+  let processoAfetado: number | null = null
 
-  return prisma.$transaction(async (tx) => {
+  const resultado = await prisma.$transaction(async (tx) => {
     const tarefa = await tx.tarefa.findUnique({
       where: { id: args.tarefaId },
       select: {
@@ -146,7 +156,7 @@ export async function concluirEtapa(args: {
       where: { workflowInstanceId: tarefa.workflowInstanceId },
       select: {
         id: true, status: true, obrigatorio: true, ordem: true, stepKey: true,
-        documentoId: true, processoId: true, dependeDeStepKeys: true,
+        documentoId: true, processoId: true, dependeDeStepKeys: true, ciclo: true,
       },
       orderBy: { ordem: 'asc' },
     })
@@ -207,31 +217,46 @@ export async function concluirEtapa(args: {
       }
     }
 
-    // §9 — CAS NA PRÓPRIA ETAPA. Duas conclusões simultâneas: a primeira muda a
-    // linha, a segunda acerta zero e sai como conflito. Sem isto, as duas
-    // gravariam auditoria e a segunda ativaria o passo seguinte outra vez.
-    const escrito = await tx.phaseWorkflowStepInstance.updateMany({
-      where: { id: alvo.id, status: alvo.status },
-      data: { status: 'CONCLUIDO', completedAt: agora, ...(args.observacao ? { motivo: args.observacao.slice(0, 300) } : {}) },
+    // §9 — A TRANSIÇÃO DO PASSO É DELEGADA AO DONO DELA.
+    //
+    // `transicionarPassoTx` é a mesma função que as portas de `task-step-sync`
+    // usam: valida pela precedência, grava com CAS por (status + lockVersion),
+    // emite `WorkflowEvento` e publica no outbox. Escrever
+    // `phaseWorkflowStepInstance.updateMany` aqui — como esta porta fazia —
+    // criava uma segunda máquina de estados: concluir pela tela emitia evento,
+    // concluir por aqui não, e o histórico dependia do botão usado.
+    const transicao = await transicionarPassoTx(tx, alvo.id, 'CONCLUIDO', {
+      correlationId,
+      operacao: 'tarefa-concluir-etapa',
+      ciclo: alvo.ciclo,
+      processoId: alvo.processoId,
+      workflowInstanceId: tarefa.workflowInstanceId,
+      ...(args.observacao ? { extra: { motivo: args.observacao.slice(0, 300) } } : {}),
     })
-    if (escrito.count === 0) {
-      return {
-        ok: false as const, codigo: 'CONFLITO' as const,
-        mensagem: 'A etapa mudou de estado enquanto você a concluía — recarregue e tente de novo.',
-      }
+    if (!transicao.changed) {
+      return transicao.code === 'TRANSICAO_INVALIDA'
+        ? {
+            ok: false as const, codigo: 'ETAPA_NAO_EXECUTAVEL' as const,
+            mensagem: `A etapa está ${transicao.anterior} — não pode ser concluída neste estado.`,
+          }
+        : {
+            ok: false as const, codigo: 'CONFLITO' as const,
+            mensagem: 'A etapa mudou de estado enquanto você a concluía — recarregue e tente de novo.',
+          }
     }
 
-    // A PRÓXIMA ETAPA EXECUTÁVEL é ativada aqui, e só aqui. Se a tela fizesse
-    // isso, uma conclusão sem ativação deixaria o trabalho parado com todas as
-    // etapas pendentes e ninguém sabendo o que fazer em seguida.
+    // A PRÓXIMA ETAPA EXECUTÁVEL é ativada aqui, e só aqui — pela mesma porta.
+    // Se a tela fizesse isso, uma conclusão sem ativação deixaria o trabalho
+    // parado com todas as etapas pendentes e ninguém sabendo o que fazer em
+    // seguida.
     const depois = steps.map((s) => (s.id === alvo.id ? { ...s, status: 'CONCLUIDO' } : s))
-    const proxima = depois
-      .filter((s) => s.status === 'PENDENTE' && s.ordem > alvo.ordem)
-      .sort((a, b) => a.ordem - b.ordem)[0]
-    if (proxima) {
-      await tx.phaseWorkflowStepInstance.update({ where: { id: proxima.id }, data: { status: 'DISPONIVEL' } })
-      depois.find((s) => s.id === proxima.id)!.status = 'DISPONIVEL'
-    }
+    const ativadaId = await ativarProximoPassoTx(
+      tx,
+      { workflowInstanceId: tarefa.workflowInstanceId, ordemConcluida: alvo.ordem },
+      { correlationId, operacao: 'tarefa-ativar-proxima-etapa' },
+    )
+    const proxima = ativadaId != null ? depois.find((s) => s.id === ativadaId) : undefined
+    if (proxima) proxima.status = 'DISPONIVEL'
 
     // O ESTADO DA TAREFA é RECALCULADO, nunca decidido aqui. Quem sabe se o
     // trabalho acabou é o conjunto das etapas obrigatórias.
@@ -239,12 +264,28 @@ export async function concluirEtapa(args: {
     const corrente = etapaCorrente(depois)
     const concluiuAgora = STATUS_TERMINAIS.includes(status) && !STATUS_TERMINAIS.includes(tarefa.statusTarefa)
 
+    // A MUDANÇA DE ESTADO DA TAREFA PASSA PELO MESMO APLICADOR DA CENTRAL.
+    //
+    // É o que garante que a conclusão apareça no histórico do workflow venha de
+    // onde vier: antes, concluir pela Central emitia TAREFA_CONCLUIDA e concluir
+    // por aqui não emitia nada — a mesma tarefa, o mesmo fim, e o evento existia
+    // ou não conforme o botão.
+    if (status !== tarefa.statusTarefa) {
+      await aplicarTarefaTx(tx, tarefa.id, status, concluiuAgora ? 'TAREFA_CONCLUIDA' : 'TAREFA_SINCRONIZADA', {
+        correlationId,
+        operacao: 'tarefa-concluir-etapa',
+        ciclo: alvo.ciclo,
+        processoId: alvo.processoId,
+        workflowInstanceId: tarefa.workflowInstanceId,
+      })
+    }
+
+    // O que é SÓ da camada de tarefa — o ponteiro da etapa corrente e as datas
+    // do trabalho — continua sendo escrito aqui.
     await tx.tarefa.update({
       where: { id: tarefa.id },
       data: {
-        statusTarefa: status,
         workflowStepInstanceId: corrente?.id ?? null,
-        concluida: status === 'CONCLUIDO_RECEBIDO' || status === 'CONCLUIDO_NAO_POSSUI',
         ...(concluiuAgora && tarefa.dataConclusao == null ? { dataConclusao: agora } : {}),
         ...(tarefa.dataInicio == null ? { dataInicio: agora } : {}),
         lockVersion: { increment: 1 },
@@ -281,6 +322,14 @@ export async function concluirEtapa(args: {
       },
     })
 
+    // TRAVA ANTES DO COMMIT — a mesma que `task-step-sync` usa. Se o par
+    // (passo, tarefa) ficar contraditório, a transação inteira volta atrás. Um
+    // estado meio-atualizado é pior do que a operação recusada: ele fica no
+    // banco parecendo verdade.
+    await assegurarCoerenciaPassoTarefa(tx, [alvo.id, ...(proxima ? [proxima.id] : [])])
+
+    processoAfetado = alvo.processoId
+
     return {
       ok: true as const,
       tarefaId: tarefa.id,
@@ -291,4 +340,22 @@ export async function concluirEtapa(args: {
       statusTarefa: status,
     }
   })
+
+  // ─── EFEITOS PÓS-COMMIT ────────────────────────────────────────────────────
+  // Só depois do commit, e só quando a etapa realmente mudou agora. Os dois são
+  // best-effort de propósito: o evento já está gravado, então uma falha aqui
+  // atrasa o efeito, não o perde — o outbox reprocessa e o avanço é reavaliado
+  // na próxima conclusão.
+  if (resultado.ok && !resultado.jaEstavaConcluida) {
+    // Antecipa a projeção financeira documental para o mesmo clique, em vez de
+    // esperar o próximo ciclo da fila.
+    await processarOutbox({ tipos: ['step.concluido'], limite: 20 }).catch(() => {})
+    // AVANÇO AUTOMÁTICO DE FASE. Concluir a última etapa da última tarefa de
+    // uma fase é o que fecha a fase — e isso não pode depender de qual porta o
+    // operador usou. Antes desta consolidação, concluir pela rota antiga
+    // avançava a fase e concluir por esta porta não.
+    await tentarAvancoAutomatico(processoAfetado)
+  }
+
+  return resultado
 }
