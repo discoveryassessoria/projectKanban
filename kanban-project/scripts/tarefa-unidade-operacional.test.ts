@@ -254,7 +254,11 @@ async function main() {
   const rz = await reconciliarTarefas({ processoId: z.processoId })
   ok("a tarefa sem causa é encerrada", rz.tarefasEncerradasSemCausa === 1, `${rz.tarefasEncerradasSemCausa}`)
   const tzDepois = await prisma.tarefa.findUnique({ where: { id: tz!.id }, select: { statusTarefa: true, motivoCodigo: true } })
-  ok("com status CANCELADA e motivo", tzDepois?.statusTarefa === "CANCELADA" && tzDepois?.motivoCodigo === "CAUSA_ENCERRADA")
+  // `CAUSA_REMOVIDA` — o motivo passou a distinguir os três casos do §74, e
+  // este cenário é o da tarefa que NUNCA foi iniciada: cancelar não joga fora
+  // trabalho de ninguém.
+  ok("com status CANCELADA e motivo", tzDepois?.statusTarefa === "CANCELADA" && tzDepois?.motivoCodigo === "CAUSA_REMOVIDA",
+    `${tzDepois?.statusTarefa}/${tzDepois?.motivoCodigo}`)
   ok("mas NÃO apagada — o histórico é fato",
     (await prisma.tarefa.count({ where: { id: tz!.id } })) === 1)
 
