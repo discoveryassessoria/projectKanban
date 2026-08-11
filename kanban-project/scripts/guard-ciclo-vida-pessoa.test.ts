@@ -111,6 +111,9 @@ const ALVOS: Alvo[] = [
  * regra "tudo em scripts/ pode".
  */
 const AUTORIZADOS_FORA_DO_RUNTIME: Record<string, string> = {
+  "scripts/tarefa-atribuicao.test.ts":
+    "atribuição/transferência/notificação: cria e derruba o PRÓPRIO cenário (marca ATRIB-TEST) " +
+    "só no banco de teste",
   // ── Guard ────────────────────────────────────────────────────────────────
   // O backfill de resíduos NÃO entra aqui: ele não remove nenhum dos quatro
   // modelos protegidos (só Tarefa, Passo e Necessidade — esta pelo serviço dono).

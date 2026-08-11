@@ -5,7 +5,7 @@
 --   corpo        → gerado do prisma/schema.prisma
 --   bloco manual → prisma/baseline/bloco-manual.sql (edite LÁ)
 --
--- Gerado em : 2026-08-10
+-- Gerado em : 2026-08-11
 -- Prisma    : 6.19.3
 --
 -- PARA QUE SERVE: reconstruir o banco DO ZERO. O histórico de migrations NÃO
@@ -4132,6 +4132,23 @@ CREATE TABLE "PlanilhaCelulaOverride" (
 );
 
 -- CreateTable
+CREATE TABLE "NotificacaoOperacional" (
+    "id" SERIAL NOT NULL,
+    "tipo" VARCHAR(24) NOT NULL,
+    "destinatarioId" INTEGER NOT NULL,
+    "tarefaId" INTEGER NOT NULL,
+    "titulo" VARCHAR(200) NOT NULL,
+    "mensagem" TEXT,
+    "link" VARCHAR(300),
+    "autorId" INTEGER,
+    "chaveIdempotencia" VARCHAR(220) NOT NULL,
+    "lidaEm" TIMESTAMP(3),
+    "criadoEm" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT "NotificacaoOperacional_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
 CREATE TABLE "_ReciboPagamento" (
     "A" INTEGER NOT NULL,
     "B" INTEGER NOT NULL,
@@ -5834,6 +5851,15 @@ CREATE INDEX "PlanilhaCelulaOverride_processoId_idx" ON "PlanilhaCelulaOverride"
 CREATE UNIQUE INDEX "PlanilhaCelulaOverride_processoId_pessoaId_tipoDocumentoId__key" ON "PlanilhaCelulaOverride"("processoId", "pessoaId", "tipoDocumentoId", "colunaId");
 
 -- CreateIndex
+CREATE UNIQUE INDEX "NotificacaoOperacional_chaveIdempotencia_key" ON "NotificacaoOperacional"("chaveIdempotencia");
+
+-- CreateIndex
+CREATE INDEX "NotificacaoOperacional_destinatarioId_lidaEm_idx" ON "NotificacaoOperacional"("destinatarioId", "lidaEm");
+
+-- CreateIndex
+CREATE INDEX "NotificacaoOperacional_tarefaId_idx" ON "NotificacaoOperacional"("tarefaId");
+
+-- CreateIndex
 CREATE INDEX "_ReciboPagamento_B_index" ON "_ReciboPagamento"("B");
 
 -- CreateIndex
@@ -6720,6 +6746,12 @@ ALTER TABLE "PlanilhaCelulaOverride" ADD CONSTRAINT "PlanilhaCelulaOverride_colu
 
 -- AddForeignKey
 ALTER TABLE "PlanilhaCelulaOverride" ADD CONSTRAINT "PlanilhaCelulaOverride_autorId_fkey" FOREIGN KEY ("autorId") REFERENCES "Usuario"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "NotificacaoOperacional" ADD CONSTRAINT "NotificacaoOperacional_destinatarioId_fkey" FOREIGN KEY ("destinatarioId") REFERENCES "Usuario"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "NotificacaoOperacional" ADD CONSTRAINT "NotificacaoOperacional_tarefaId_fkey" FOREIGN KEY ("tarefaId") REFERENCES "Tarefa"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "_ReciboPagamento" ADD CONSTRAINT "_ReciboPagamento_A_fkey" FOREIGN KEY ("A") REFERENCES "PagamentoFatura"("id") ON DELETE CASCADE ON UPDATE CASCADE;

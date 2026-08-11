@@ -125,6 +125,59 @@ ok("e o encerramento é auditado", /acao: 'TAREFA_CANCELADA'/.test(reconciler))
 ok("o reconciliador não cria etapa nem avança fase",
   !/phaseWorkflowStepInstance\.(create|update)/.test(reconciler) && !/avancarFase|phase\.entered/.test(reconciler))
 
+// ═══════════════════════════════════════════════════════════════════════════
+secao("7) Uma projeção só — o mesmo taskId em todas as visões")
+// ═══════════════════════════════════════════════════════════════════════════
+// A Central montava a linha direto do StepInstance e a tela de Tarefas lia
+// Tarefa: duas telas, duas entidades, nenhuma identidade em comum. Não havia
+// como afirmar que a linha do Ademir aqui e a linha lá eram o MESMO trabalho.
+const central = ler("src/app/api/processos/[processoId]/central-operacional/route.ts")
+ok("a Central lê a Tarefa canônica", /prisma\.tarefa\.findMany/.test(central))
+ok("e devolve o taskId na linha", /taskId: tarefa\?\.id/.test(central))
+ok("o responsável exibido vem da TAREFA", /responsavelId: tarefa\?\.responsavelId/.test(central))
+ok("o prazo exibido vem da TAREFA", /tarefa\?\.dataPrazo \?\? s\?\.prazo/.test(central))
+ok("'sem dono' é da tarefa, não do passo", /noOwner: tarefa != null \? tarefa\.responsavelId == null/.test(central))
+
+// ═══════════════════════════════════════════════════════════════════════════
+secao("8) Uma porta só muda a responsabilidade")
+// ═══════════════════════════════════════════════════════════════════════════
+const comandos = ler("lib/operacional/tarefa-comandos.ts")
+ok("existem as portas canônicas",
+  /export async function atribuirTarefa/.test(comandos) &&
+  /export const transferirTarefa/.test(comandos) &&
+  /export async function iniciarTarefa/.test(comandos))
+ok("transferir REUTILIZA a porta de atribuir",
+  /transferirTarefa = \(args[\s\S]{0,200}atribuirTarefa\(args\)/.test(comandos),
+  "duas implementações da mesma regra deixariam uma delas para trás")
+ok("nenhum comando cria tarefa", !/tarefa\.create/.test(comandos))
+ok("nenhum comando cria workflow", !/phaseWorkflowInstance\.create/.test(comandos))
+ok("a concorrência usa CAS otimista", /lockVersion: t\.lockVersion/.test(comandos) && /updateMany/.test(comandos))
+ok("toda mudança de dono é auditada",
+  /TAREFA_ATRIBUIDA/.test(comandos) && /TAREFA_TRANSFERIDA/.test(comandos))
+ok("a auditoria registra de-para", /de: anterior, para: args\.responsavelId/.test(comandos))
+
+// A rota HTTP não pode ser dona de regra — e não pode existir uma segunda.
+const rotaAtrib = ler("src/app/api/tarefas/[tarefaId]/atribuir/route.ts")
+ok("a rota delega à porta canônica", /atribuirTarefa\(/.test(rotaAtrib) && !/prisma\./.test(rotaAtrib))
+ok("e valida permissão no backend", /verificarPermissao\(request, 'tarefas\./.test(rotaAtrib))
+
+// ═══════════════════════════════════════════════════════════════════════════
+secao("9) Notificação é marco da TAREFA — nunca da etapa")
+// ═══════════════════════════════════════════════════════════════════════════
+ok("a notificação tem entidade própria", /model NotificacaoOperacional \{/.test(schema))
+const modeloNotif = schema.slice(schema.indexOf("model NotificacaoOperacional {"))
+const corpoNotif = modeloNotif.slice(0, modeloNotif.indexOf("\n}"))
+ok("ela aponta para a TAREFA, não para o passo",
+  /tarefaId Int/.test(corpoNotif) && !/stepInstance/i.test(corpoNotif))
+ok("e tem chave de idempotência", /chaveIdempotencia String @unique/.test(corpoNotif))
+ok("o retry não duplica", /findUnique\(\{\s*where: \{ chaveIdempotencia: ev\.chave \}/.test(comandos))
+ok("prazo e atraso são idempotentes POR DIA", /::\$\{dia\}`/.test(comandos),
+  "sem o dia na chave, o aviso renasce a cada varredura e o sino vira ruído")
+ok("a varredura distingue criada de reencontrada", /if \(r\.criada\)/.test(comandos))
+ok("nenhum tipo de notificação é de etapa",
+  !/'STEP|PASSO_|ETAPA_/.test(comandos))
+ok("o link do aviso é o link canônico da tarefa", /link: linkDaTarefa\(ev\.tarefaId\)/.test(comandos))
+
 // ── Resultado ──────────────────────────────────────────────────────────────
 console.log(`\n${"═".repeat(70)}`)
 console.log(`Total: ${passou + falhou} | ✅ ${passou} | ❌ ${falhou}`)

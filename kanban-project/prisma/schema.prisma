@@ -63,6 +63,7 @@ model Usuario {
 
   @@index([perfilId])
   planilhaOverrides PlanilhaCelulaOverride[] @relation("OverridePlanilhaAutor")
+  notificacoesOperacionais NotificacaoOperacional[] @relation("NotificacaoDestinatario")
 }
 
 model Pessoa {
@@ -602,6 +603,7 @@ model Tarefa {
   @@index([workflowStepInstanceId])
   @@index([workflowInstanceId])
   @@index([necessidadeId])
+  notificacoes NotificacaoOperacional[]
 }
 
 model TarefaHistorico {
@@ -6657,4 +6659,49 @@ model PlanilhaCelulaOverride {
 
   @@unique([processoId, pessoaId, tipoDocumentoId, colunaId])
   @@index([processoId])
+}
+
+/// NOTIFICAÇÃO OPERACIONAL — marco da TAREFA, nunca da etapa.
+///
+/// O sino de hoje é derivado por consulta: ele olha `Tarefa.dataPrazo` e
+/// classifica em vencidas/hoje/próximos. Isso funciona para prazo, e não
+/// funciona para ATRIBUIÇÃO — "você recebeu esta tarefa" é um FATO que acontece
+/// num instante e precisa sobreviver a ele. Derivar não dá: não há de onde
+/// derivar "avisei" nem "ela já viu".
+///
+/// `chaveIdempotencia` é o que impede o retry de virar duas notificações — e
+/// impede também a notificação de prazo de renascer todo dia para a mesma
+/// tarefa, que é como um sino deixa de ser lido.
+///
+/// PROIBIDO notificar etapa. "Passo 3 concluído" é detalhe interno da mesma
+/// tarefa; quem recebe isso sete vezes por certidão para de olhar o sino.
+model NotificacaoOperacional {
+  id Int @id @default(autoincrement())
+
+  /// ATRIBUICAO | TRANSFERENCIA | PRAZO | ATRASO | BLOQUEIO
+  tipo String @db.VarChar(24)
+
+  destinatarioId Int
+  destinatario   Usuario @relation("NotificacaoDestinatario", fields: [destinatarioId], references: [id], onDelete: Cascade)
+
+  /// A tarefa a que o marco pertence. `Cascade`: tarefa apagada não deixa aviso
+  /// apontando para o vazio.
+  tarefaId Int
+  tarefa   Tarefa @relation(fields: [tarefaId], references: [id], onDelete: Cascade)
+
+  titulo   String  @db.VarChar(200)
+  mensagem String? @db.Text
+  link     String? @db.VarChar(300)
+
+  /// Quem provocou o marco (quem atribuiu, quem transferiu). Nulo quando o
+  /// marco é do relógio (prazo, atraso).
+  autorId Int?
+
+  chaveIdempotencia String @unique @db.VarChar(220)
+
+  lidaEm   DateTime?
+  criadoEm DateTime  @default(now())
+
+  @@index([destinatarioId, lidaEm])
+  @@index([tarefaId])
 }
