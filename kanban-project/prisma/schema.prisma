@@ -3392,7 +3392,9 @@ model PerfilOperacionalDocumento {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  tipos TipoDocumentoCadastro[]
+  tipos    TipoDocumentoCadastro[]
+  /// Quem está apto a executar esta unidade de trabalho.
+  aptidoes AptidaoOperacional[]
 
   @@index([workflowId])
   @@index([familiaDocumentalId])
@@ -6789,28 +6791,37 @@ model TarefaDependencia {
 // ═══════════════════════════════════════════════════════════════════════════
 
 /**
- * APTIDÃO — "esta pessoa faz este tipo de trabalho".
- * A dimensão é a FASE PUBLICADA (`phaseKey` do catálogo de fases): é a única
- * dimensão que TODA tarefa carrega (`Tarefa.faseMacroKey`) e é exatamente o
- * vocabulário do negócio — Genealogia, Emissão documental, Retificação de
- * registros, Tradução juramentada, Apostilamento. Não é string solta: o valor é
- * validado contra `src/lib/process-stage/fases-catalog.ts` na escrita.
- * Aptidão é OPT-IN por fase: enquanto ninguém for declarado apto para uma fase,
- * ela não restringe nada. A primeira declaração é que liga a regra — e a partir
- * daí só quem é apto entra.
+ * APTIDÃO — "esta pessoa executa este TIPO DE TRABALHO".
+ * A dimensão é o PERFIL OPERACIONAL (`PerfilOperacionalDocumento`), que o
+ * Cadastro Mestre já define como "qual workflow processa este documento": um
+ * perfil serve N tipos documentais — "Emissão de Certidão" atende nascimento,
+ * casamento e óbito, porque o processo operacional é o mesmo.
+ * ─── POR QUE NÃO A FASE MACRO ───────────────────────────────────────────────
+ * Era assim que esta tabela nascia, e estava errado. A fase diz ONDE O PROCESSO
+ * ESTÁ; a aptidão diz QUE TRABALHO A PESSOA SABE FAZER. Colapsar os dois produz
+ * absurdos que o cadastro expôs no primeiro uso: "apto para Finalizado",
+ * "apto para Aguardando protocolo" — posições do processo, não competências.
+ * ─── POR QUE NÃO O PASSO ────────────────────────────────────────────────────
+ * Solicitar, aguardar, receber, conferir e validar são passos da MESMA unidade
+ * de trabalho. Exigir cinco aptidões para uma certidão seria cadastrar a
+ * execução, não a competência. A granularidade é a unidade; se algum dia o
+ * domínio exigir especialização por passo, isso será outra decisão, explícita.
+ * ─── POR QUE NÃO UM CATÁLOGO NOVO ───────────────────────────────────────────
+ * Criar `Competencia { nome }` seria uma segunda fonte mestre para o que o
+ * Perfil Operacional já é — e as duas divergiriam no primeiro cadastro feito
+ * pelo lado errado.
  */
 model AptidaoOperacional {
-  id        Int      @id @default(autoincrement())
-  usuarioId Int
-  /**
-   * phaseKey do catálogo publicado de fases.
-   */
-  faseKey   String   @db.VarChar(60)
-  criadoEm  DateTime @default(now())
-  usuario   Usuario  @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
+  id                  Int                        @id @default(autoincrement())
+  usuarioId           Int
+  /// A UNIDADE DE TRABALHO que esta pessoa executa.
+  perfilOperacionalId Int
+  criadoEm            DateTime                   @default(now())
+  usuario             Usuario                    @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
+  perfilOperacional   PerfilOperacionalDocumento @relation(fields: [perfilOperacionalId], references: [id], onDelete: Cascade)
 
-  @@unique([usuarioId, faseKey])
-  @@index([faseKey])
+  @@unique([usuarioId, perfilOperacionalId])
+  @@index([perfilOperacionalId])
 }
 
 enum TipoIndisponibilidade {

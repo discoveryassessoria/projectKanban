@@ -35,6 +35,12 @@ interface FatoDoHistorico {
   em: string
   por: string | null
 }
+interface Unidade {
+  perfilOperacionalId: number
+  code: string
+  nome: string
+  familia: string | null
+}
 interface Linha {
   usuarioId: number
   nome: string
@@ -42,7 +48,10 @@ interface Linha {
   perfil: string
   podeExecutar: boolean
   equipes: Array<{ id: number; code: string | null; nome: string }>
-  aptidoes: string[]
+  /** Ids das unidades — o que o formulário marca. */
+  aptidoes: number[]
+  /** As mesmas, com nome e família — o que a tabela mostra. */
+  aptidoesDetalhadas: Unidade[]
   indisponivelPor: Indisponibilidade | null
   indisponibilidades: Indisponibilidade[]
   limiteExecutaveis: number | null
@@ -52,7 +61,7 @@ interface Linha {
 }
 interface Dados {
   linhas: Linha[]
-  fases: Array<{ faseKey: string; label: string }>
+  unidades: Unidade[]
   tipos: string[]
 }
 
@@ -188,7 +197,9 @@ export default function CapacidadeOperacionalTab() {
                   {l.equipes.length ? l.equipes.map((e) => e.nome).join(", ") : <span className="text-white/25">—</span>}
                 </td>
                 <td className="max-w-[220px] px-3 py-2 text-[11px] text-white/60">
-                  {l.aptidoes.length ? l.aptidoes.join(", ") : <span className="text-white/25">nenhuma declarada</span>}
+                  {l.aptidoesDetalhadas.length
+                    ? l.aptidoesDetalhadas.map((a) => a.nome).join(", ")
+                    : <span className="text-white/25">nenhuma declarada</span>}
                 </td>
                 <td className="px-3 py-2 text-[11px]">
                   {l.indisponivelPor ? (
@@ -226,7 +237,7 @@ export default function CapacidadeOperacionalTab() {
       {aberta != null && (
         <PainelConfiguracao
           linha={linhas.find((l) => l.usuarioId === aberta) ?? dados.linhas.find((l) => l.usuarioId === aberta)!}
-          fases={dados.fases}
+          unidades={dados.unidades}
           tipos={dados.tipos}
           ocupado={ocupado}
           aoSalvar={salvar}
@@ -238,20 +249,16 @@ export default function CapacidadeOperacionalTab() {
 }
 
 function PainelConfiguracao({
-  linha, fases, tipos, ocupado, aoSalvar, aoFechar,
+  linha, unidades, tipos, ocupado, aoSalvar, aoFechar,
 }: {
   linha: Linha
-  fases: Array<{ faseKey: string; label: string }>
+  unidades: Unidade[]
   tipos: string[]
   ocupado: boolean
   aoSalvar: (corpo: Record<string, unknown>) => Promise<boolean>
   aoFechar: () => void
 }) {
-  // A tela mostra o RÓTULO da fase; o que se grava é a chave publicada.
-  const chaveDe = (rotulo: string) => fases.find((f) => f.label === rotulo)?.faseKey
-  const [marcadas, setMarcadas] = useState<Set<string>>(
-    () => new Set(linha.aptidoes.map(chaveDe).filter((k): k is string => !!k)),
-  )
+  const [marcadas, setMarcadas] = useState<Set<number>>(() => new Set(linha.aptidoes))
   const [limite, setLimite] = useState(linha.limiteExecutaveis == null ? "" : String(linha.limiteExecutaveis))
   const [tipo, setTipo] = useState(tipos[0] ?? "FERIAS")
   const [inicio, setInicio] = useState(new Date().toISOString().slice(0, 10))
@@ -279,33 +286,48 @@ function PainelConfiguracao({
         </div>
 
         <div className="min-h-0 flex-1 space-y-4 overflow-y-auto px-4 py-3">
-          {/* ── APTIDÃO ── */}
+          {/* ── APTIDÕES OPERACIONAIS ── */}
           <section>
-            <h3 className="text-[10px] uppercase tracking-wide text-white/35">Aptidões</h3>
+            <h3 className="text-[10px] uppercase tracking-wide text-white/35">Aptidões operacionais</h3>
             <p className="mt-1 text-[10px] leading-4 text-white/40">
-              Para que fases esta pessoa está apta. Enquanto ninguém for declarado apto para uma fase, ela não restringe
-              ninguém — a primeira declaração é que liga a regra.
+              Quais <span className="text-white/65">tipos de trabalho</span> esta pessoa está apta a executar. Não é a
+              fase do processo: a fase diz onde o processo está, a aptidão diz o que a pessoa sabe fazer. Enquanto
+              ninguém for declarado apto para uma unidade, ela não restringe ninguém — a primeira declaração liga a regra.
             </p>
-            <div className="mt-2 grid grid-cols-2 gap-1">
-              {fases.map((f) => (
-                <label key={f.faseKey} className="flex cursor-pointer items-center gap-2 rounded px-1.5 py-1 text-[11px] text-white/70 hover:bg-white/[0.04]">
-                  <input
-                    type="checkbox"
-                    checked={marcadas.has(f.faseKey)}
-                    onChange={(e) => setMarcadas((s) => {
-                      const n = new Set(s)
-                      if (e.target.checked) n.add(f.faseKey); else n.delete(f.faseKey)
-                      return n
-                    })}
-                    className="h-3 w-3 accent-sky-400"
-                  />
-                  {f.label}
-                </label>
-              ))}
-            </div>
+            {unidades.length === 0 ? (
+              <p className="mt-2 rounded border border-amber-300/20 bg-amber-400/[0.06] px-2 py-1.5 text-[10px] leading-4 text-amber-200/80">
+                Nenhuma unidade de trabalho cadastrada. Elas vêm dos Perfis Operacionais do Cadastro Mestre —
+                cadastre-os em Gerenciamento › Documentos e Protocolos para que apareçam aqui.
+              </p>
+            ) : (
+              <div className="mt-2 space-y-1">
+                {unidades.map((u) => (
+                  <label
+                    key={u.perfilOperacionalId}
+                    className="flex cursor-pointer items-start gap-2 rounded px-1.5 py-1 hover:bg-white/[0.04]"
+                  >
+                    <input
+                      type="checkbox"
+                      checked={marcadas.has(u.perfilOperacionalId)}
+                      onChange={(e) => setMarcadas((s) => {
+                        const n = new Set(s)
+                        if (e.target.checked) n.add(u.perfilOperacionalId); else n.delete(u.perfilOperacionalId)
+                        return n
+                      })}
+                      className="mt-0.5 h-3 w-3 accent-sky-400"
+                    />
+                    <span>
+                      <span className="block text-[11px] text-white/80">{u.nome}</span>
+                      {/* Contexto secundário — família, não chave técnica. */}
+                      {u.familia && <span className="block text-[10px] text-white/35">{u.familia}</span>}
+                    </span>
+                  </label>
+                ))}
+              </div>
+            )}
             <button
-              disabled={ocupado}
-              onClick={() => aoSalvar({ acao: "aptidoes", usuarioId: linha.usuarioId, faseKeys: [...marcadas] })}
+              disabled={ocupado || unidades.length === 0}
+              onClick={() => aoSalvar({ acao: "aptidoes", usuarioId: linha.usuarioId, perfilOperacionalIds: [...marcadas] })}
               className="mt-2 rounded border border-white/15 bg-white/[0.06] px-3 py-1.5 text-[11px] text-white/85 disabled:opacity-40"
             >
               Salvar aptidões

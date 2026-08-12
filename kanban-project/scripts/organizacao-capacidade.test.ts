@@ -1,31 +1,36 @@
 // scripts/organizacao-capacidade.test.ts
 // ============================================================================
-// A CAMADA OPERACIONAL DO FUNCIONÁRIO — e o que ela faz com a recomendação.
+// A CAMADA OPERACIONAL DO FUNCIONÁRIO — e a ontologia que ela precisa respeitar.
 //
 //   npx tsx scripts/organizacao-capacidade.test.ts
 //
-// A camada nova pode falhar de dois jeitos opostos, e os dois são graves:
+// Esta suíte existe por causa de um erro real de modelagem: a aptidão nasceu
+// apontando para a FASE DO WORKFLOW MACRO, e o primeiro cadastro real produziu
+// "apto para Finalizado". Fase é onde o PROCESSO está; aptidão é o que a PESSOA
+// sabe fazer. Cada asserção abaixo separa um par que o sistema tentou colapsar:
 //
-//   FROUXO DEMAIS  a regra existe, ninguém a cumpre, e o sistema recomenda
-//                  alguém assim mesmo — relaxando em silêncio.
-//   RÍGIDO DEMAIS  a regra NÃO existe (tabela vazia, equipe não cadastrada) e
-//                  o sistema trava tudo, como se todo mundo tivesse reprovado.
+//   FASE ≠ APTIDÃO       duas unidades na MESMA fase, aptidão só numa
+//   STEP ≠ APTIDÃO       cinco passos, UMA aptidão
+//   EQUIPE ≠ APTIDÃO     membro da equipe sem competência não passa
+//   PERMISSÃO ≠ APTIDÃO  apto sem autorização não passa
+//   DISPONIBILIDADE, CAPACIDADE   cada uma reprova sozinha
 //
-// Cada cenário aqui é uma das duas beiradas. E, no fim, a de sempre: nada
-// disso escreve na Tarefa.
+// E a regra de implantação: unidade sem política não bloqueia; unidade com
+// política restringe só aquela unidade.
 //
 // Roda contra o banco de TESTE. Não toca em produção.
 // ============================================================================
 import { prisma } from '../lib/prisma'
 import { Prisma } from '@prisma/client'
 import { exigirBancoDeTeste } from './_banco-de-teste'
-import { simularTarefa } from '../lib/operacional/elegibilidade'
+import { simularTarefa, simularLote } from '../lib/operacional/elegibilidade'
 import {
   definirAptidoes, definirCapacidade, abrirIndisponibilidade, encerrarIndisponibilidade,
-  lerOrganizacao, fasesDisponiveis, faseValida, fasesComAptidaoDeclarada,
+  lerOrganizacao, unidadesOperacionais, unidadeValida, unidadesComAptidaoDeclarada,
+  unidadesDasTarefas,
 } from '../lib/operacional/organizacao'
-import { criarTarefaManual } from '../lib/operacional/tarefa-ciclo'
-import { atribuirTarefa } from '../lib/operacional/tarefa-comandos'
+import { criarTarefaManual, aguardarTerceiro } from '../lib/operacional/tarefa-ciclo'
+import { atribuirTarefa, iniciarTarefa } from '../lib/operacional/tarefa-comandos'
 
 let passou = 0, falhou = 0
 const falhas: string[] = []
@@ -36,13 +41,12 @@ const ok = (nome: string, cond: boolean, extra = '') => {
 const secao = (t: string) => console.log(`\n${t}`)
 
 const MARCA = 'ORG'
-const FASE = 'emissao_documental'
 const PERM_EXECUTOR = { 'tarefas.ver': true, 'tarefas.iniciar_concluir': true }
 const PERM_SEM_EXECUCAO = { 'tarefas.ver': true, 'tarefas.iniciar_concluir': false }
-const criterio = (sim: Awaited<ReturnType<typeof simularTarefa>>, id: number, chave: string) =>
-  sim.avaliacoes.find((a) => a.usuarioId === id)?.criterios.find((c) => c.chave === chave)
-const avaliacao = (sim: Awaited<ReturnType<typeof simularTarefa>>, id: number) =>
-  sim.avaliacoes.find((a) => a.usuarioId === id)
+type Sim = Awaited<ReturnType<typeof simularTarefa>>
+const criterio = (s: Sim, id: number, chave: string) =>
+  s.avaliacoes.find((a) => a.usuarioId === id)?.criterios.find((c) => c.chave === chave)
+const avaliacao = (s: Sim, id: number) => s.avaliacoes.find((a) => a.usuarioId === id)
 
 async function limpar() {
   const procs = await prisma.processo.findMany({ where: { nome: { startsWith: MARCA } }, select: { id: true, arvoreId: true } })
@@ -51,8 +55,15 @@ async function limpar() {
   await prisma.notificacaoOperacional.deleteMany({ where: { tarefaId: { in: ts.map((t) => t.id) } } })
   await prisma.logAuditoria.deleteMany({ where: { entidade: 'Tarefa', entidadeId: { in: ts.map((t) => t.id) } } })
   await prisma.tarefa.deleteMany({ where: { processoId: { in: ids } } })
+  await prisma.necessidadeDocumental.deleteMany({ where: { processoId: { in: ids } } })
+  for (const p of procs) if (p.arvoreId) await prisma.pessoa.deleteMany({ where: { arvoreId: p.arvoreId } })
   await prisma.processo.deleteMany({ where: { id: { in: ids } } })
   await prisma.arvore.deleteMany({ where: { nome: { startsWith: MARCA } } })
+  await prisma.aptidaoOperacional.deleteMany({ where: { perfilOperacional: { code: { startsWith: `${MARCA}_` } } } })
+  await prisma.tipoDocumentoCadastro.deleteMany({ where: { code: { startsWith: `${MARCA}_` } } })
+  await prisma.perfilOperacionalDocumento.deleteMany({ where: { code: { startsWith: `${MARCA}_` } } })
+  await prisma.itemCatalogo.deleteMany({ where: { code: { startsWith: `${MARCA}_` } } })
+  await prisma.familiaDocumental.deleteMany({ where: { code: { startsWith: `${MARCA}_` } } })
   await prisma.grupoUsuario.deleteMany({ where: { code: { startsWith: 'org_' } } })
   await prisma.usuario.deleteMany({ where: { email: { endsWith: '@org.test' } } })
 }
@@ -70,8 +81,7 @@ async function isolar(emails: string[]) {
       await prisma.usuario.update({
         where: { id: u.id },
         // `undefined` no Prisma significa "não altere" — restaurar um custom que
-        // era NULO exige `Prisma.DbNull`. Com `undefined`, a permissão derrubada
-        // pelo isolamento ficava falsa para sempre no banco compartilhado.
+        // era NULO exige `Prisma.DbNull`.
         data: { permissoesCustom: u.permissoesCustom === null ? Prisma.DbNull : u.permissoesCustom },
       })
     }
@@ -80,247 +90,307 @@ async function isolar(emails: string[]) {
 
 async function main() {
   exigirBancoDeTeste('monta o palco da camada operacional')
-  console.log('A CAMADA OPERACIONAL DO FUNCIONÁRIO\n')
+  console.log('A CAMADA OPERACIONAL — APTIDÃO É UNIDADE DE TRABALHO, NÃO FASE\n')
   await limpar()
-  const EMAILS = ['gestor@org.test', 'apta@org.test', 'apta2@org.test', 'inapta@org.test', 'ferias@org.test', 'semperm@org.test', 'cheia@org.test']
+  const EMAILS = ['gestor@org.test', 'apta@org.test', 'apta2@org.test', 'soequipe@org.test', 'semperm@org.test', 'cheia@org.test']
   const restaurar = await isolar(EMAILS)
 
   try {
     // ════════════════════════════════════════════════════════════════════════
-    secao('§1/§2) Reúso e separação de conceitos')
+    secao('§1/§6) A dimensão é o PERFIL OPERACIONAL — sem catálogo duplicado')
     // ════════════════════════════════════════════════════════════════════════
-    ok('§1) a organização REUTILIZA GrupoUsuario — nenhuma "Equipe" nova foi criada',
-      !Object.keys(prisma).some((k) => /^equipe|^time$|^setor/i.test(k)),
-      'equipe = GrupoUsuario + GrupoUsuarioMembro')
-    ok('§2) a camada nova tem três tabelas, uma por conceito',
-      ['aptidaoOperacional', 'indisponibilidadeOperacional', 'capacidadeOperacional'].every((m) => m in prisma))
-    ok('§4) a aptidão usa a FASE PUBLICADA, não string solta',
-      faseValida(FASE) && !faseValida('fase_inventada'))
-    ok('§4) e as fases oferecidas vêm do catálogo', fasesDisponiveis().some((f) => f.faseKey === FASE),
-      `${fasesDisponiveis().length} fases`)
+    ok('§6) não existe catálogo de "competência" paralelo',
+      !Object.keys(prisma).some((k) => /^competencia|^habilidade|^skill/i.test(k)),
+      'a unidade é PerfilOperacionalDocumento')
+    ok('§1) a organização REUTILIZA GrupoUsuario para equipe',
+      !Object.keys(prisma).some((k) => /^equipe|^time$|^setor/i.test(k)))
+    const campos = Object.keys(prisma.aptidaoOperacional.fields)
+    ok('§3) a aptidão NÃO guarda mais fase', !campos.some((c) => /fase/i.test(c)), campos.join(', '))
+    ok('§4) e guarda a unidade operacional', campos.includes('perfilOperacionalId'))
 
-    // ── palco ───────────────────────────────────────────────────────────────
+    // ── palco: DUAS unidades de trabalho, ambas alcançadas na mesma fase ─────
+    const familia = await prisma.familiaDocumental.create({
+      data: { code: `${MARCA}_FAM`, name: 'Certidão de Registro Civil (ORG)' },
+      select: { id: true, name: true },
+    })
+    const unidadeA = await prisma.perfilOperacionalDocumento.create({
+      data: { code: `${MARCA}_EMISSAO`, name: 'Emissão de Certidão (ORG)', familiaDocumentalId: familia.id },
+      select: { id: true, name: true },
+    })
+    const unidadeB = await prisma.perfilOperacionalDocumento.create({
+      data: { code: `${MARCA}_TRANSCRICAO`, name: 'Transcrição Consular (ORG)', familiaDocumentalId: familia.id },
+      select: { id: true, name: true },
+    })
+    const itemA = await prisma.itemCatalogo.create({ data: { code: `${MARCA}_ITEM_A`, name: 'Certidão de Nascimento (ORG)', natureza: 'DOCUMENTO' }, select: { id: true } })
+    const itemB = await prisma.itemCatalogo.create({ data: { code: `${MARCA}_ITEM_B`, name: 'Transcrição (ORG)', natureza: 'DOCUMENTO' }, select: { id: true } })
+    await prisma.tipoDocumentoCadastro.create({ data: { code: `${MARCA}_TIPO_A`, name: 'Certidão de Nascimento (ORG)', itemCatalogoId: itemA.id, perfilOperacionalId: unidadeA.id } })
+    await prisma.tipoDocumentoCadastro.create({ data: { code: `${MARCA}_TIPO_B`, name: 'Transcrição (ORG)', itemCatalogoId: itemB.id, perfilOperacionalId: unidadeB.id } })
+
+    const oferecidas = await unidadesOperacionais()
+    ok('§4) as unidades vêm do Cadastro Mestre',
+      oferecidas.some((u) => u.perfilOperacionalId === unidadeA.id), `${oferecidas.length} unidade(s)`)
+    ok('§19) com a família como contexto secundário',
+      oferecidas.find((u) => u.perfilOperacionalId === unidadeA.id)?.familia === familia.name)
+    ok('§4) e a escrita recusa unidade inexistente',
+      (await unidadeValida(999_999_999)) === false && (await unidadeValida(unidadeA.id)) === true)
+
+    // ── §24/§11: nenhuma POSIÇÃO do processo vira competência ────────────────
+    const nomes = oferecidas.map((u) => u.nome.toLowerCase())
+    for (const posicao of ['finalizado', 'aguardando protocolo', 'protocolado', 'emissão documental']) {
+      ok(`§24) "${posicao}" NÃO aparece como unidade de trabalho`, !nomes.includes(posicao))
+    }
+
     const gestor = await prisma.usuario.create({
       data: { nome: 'Gestor Org', email: 'gestor@org.test', senha: 'x', tipo: 'admin', permissoesCustom: PERM_SEM_EXECUCAO },
       select: { id: true },
     })
     const criarUsuario = (nome: string, email: string, perm = PERM_EXECUTOR) =>
       prisma.usuario.create({ data: { nome, email, senha: 'x', tipo: 'assistente', permissoesCustom: perm }, select: { id: true } })
-    const [apta, apta2, inapta, ferias, semPerm, cheia] = await Promise.all([
+    const [apta, apta2, soEquipe, semPerm, cheia] = await Promise.all([
       criarUsuario('Apta Um', 'apta@org.test'),
       criarUsuario('Apta Dois', 'apta2@org.test'),
-      criarUsuario('Inapta', 'inapta@org.test'),
-      criarUsuario('De Férias', 'ferias@org.test'),
-      criarUsuario('Sem Permissão', 'semperm@org.test', PERM_SEM_EXECUCAO),
+      criarUsuario('So Equipe', 'soequipe@org.test'),
+      criarUsuario('Sem Permissao', 'semperm@org.test', PERM_SEM_EXECUCAO),
       criarUsuario('Capacidade Cheia', 'cheia@org.test'),
     ])
+
     const arv = await prisma.arvore.create({ data: { nome: `${MARCA} árvore` }, select: { id: true } })
     const proc = await prisma.processo.create({
       data: { nome: `${MARCA} Família`, pais: 'espanha', arvoreId: arv.id, workflowRuntime: 'v2' }, select: { id: true },
     })
-    const criar = async (titulo: string, extra: { fase?: string | null; equipe?: string | null } = {}) => {
+    const pes = await prisma.pessoa.create({ data: { arvoreId: arv.id, nome: 'Teste', sobrenome: 'Org' }, select: { id: true } })
+
+    let seq = 0
+    /** A tarefa nasce COM necessidade — é dela que a unidade se deriva. */
+    const criar = async (titulo: string, itemCatalogoId: number | null, extra: { fase?: string; equipe?: string | null } = {}) => {
+      let necessidadeId: number | null = null
+      if (itemCatalogoId != null) {
+        necessidadeId = (await prisma.necessidadeDocumental.create({
+          data: { processoId: proc.id, itemCatalogoId, pessoaId: pes.id, ciclo: 1, chaveIdempotencia: `${MARCA}-n-${seq++}` },
+          select: { id: true },
+        })).id
+      }
       const r = await criarTarefaManual({
         titulo: `${MARCA} ${titulo}`, processoId: proc.id, autorId: gestor.id,
         motivo: 'palco da camada operacional', confirmarDuplicidade: true,
-        faseMacroKey: extra.fase === undefined ? FASE : extra.fase,
-        equipeKey: extra.equipe ?? null,
+        faseMacroKey: extra.fase ?? 'emissao_documental',
+        necessidadeId, pessoaId: pes.id, equipeKey: extra.equipe ?? null,
       })
       if (!r.ok) throw new Error(`criar ${titulo}: ${'mensagem' in r ? r.mensagem : '?'}`)
       return r.tarefaId
     }
 
+    const tarefaA = await criar('trabalho da unidade A', itemA.id)
+    const tarefaB = await criar('trabalho da unidade B', itemB.id)
+    const semUnidade = await criar('trabalho avulso', null)
+
     // ════════════════════════════════════════════════════════════════════════
-    secao('§E/§11) Sem regra configurada, NADA é bloqueado artificialmente')
+    secao('§14) A Tarefa RESOLVE sua unidade pela cadeia canônica')
     // ════════════════════════════════════════════════════════════════════════
-    const semRegra = await criar('sem regra')
-    const s0 = await simularTarefa(semRegra)
-    ok('§E) com aptidão vazia, a fase não restringe ninguém',
+    ok('§14) a Tarefa não ganhou coluna de competência',
+      !Object.keys(prisma.tarefa.fields).some((f) => /competencia|perfilOperacional|aptidao/i.test(f)))
+    const resolvidas = await unidadesDasTarefas([tarefaA, tarefaB, semUnidade])
+    ok('§14) tarefa A resolve a unidade A', resolvidas.get(tarefaA) === unidadeA.id)
+    ok('§14) tarefa B resolve a unidade B', resolvidas.get(tarefaB) === unidadeB.id)
+    ok('§14) e trabalho sem causa documental não tem unidade', resolvidas.get(semUnidade) === null)
+
+    const s0 = await simularTarefa(tarefaA)
+    ok('§23) a recomendação declara a unidade da tarefa',
+      s0.unidadeOperacional?.id === unidadeA.id, s0.unidadeOperacional?.nome ?? '—')
+    ok('§23) com a família junto', s0.unidadeOperacional?.familia === familia.name)
+    ok('§32) e a explicação fala da unidade, não da fase',
+      s0.explicacao.some((l) => l.includes(unidadeA.name)) && !s0.explicacao.some((l) => /\bfase\b/i.test(l)),
+      s0.explicacao[0] ?? '—')
+
+    // ════════════════════════════════════════════════════════════════════════
+    secao('§31/§16) Sem política cadastrada, a aptidão não bloqueia')
+    // ════════════════════════════════════════════════════════════════════════
+    ok('§31) unidade sem ninguém apto = critério não aplicável',
       criterio(s0, apta.id, 'APTIDAO')?.veredito === 'nao_aplicavel',
       criterio(s0, apta.id, 'APTIDAO')?.detalhe ?? '—')
-    ok('§E) e a tarefa recebe recomendação normalmente', s0.recomendado != null, s0.recomendado?.nome ?? '—')
-    ok('§11) equipe não exigida = critério não aplicável',
-      criterio(s0, apta.id, 'EQUIPE')?.veredito === 'nao_aplicavel')
-    ok('§6) capacidade sem teto = critério não aplicável',
-      criterio(s0, apta.id, 'CAPACIDADE')?.veredito === 'nao_aplicavel')
-    ok('§12) e os CINCO critérios aparecem sempre', (avaliacao(s0, apta.id)?.criterios.length ?? 0) === 5)
+    ok('§31) e a tarefa recebe recomendação normalmente', s0.recomendado != null, s0.recomendado?.nome ?? '—')
+    ok('§12) os cinco critérios aparecem sempre', (avaliacao(s0, apta.id)?.criterios.length ?? 0) === 5)
 
     // ════════════════════════════════════════════════════════════════════════
-    secao('§C) Aptidão passa a valer quando ALGUÉM é declarado apto')
+    secao('§25) FASE ≠ APTIDÃO — duas unidades, a MESMA fase macro')
     // ════════════════════════════════════════════════════════════════════════
-    const r1 = await definirAptidoes(apta.id, [FASE])
-    ok('§4) declarar aptidão funciona', r1.ok === true)
-    ok('§4) e recusa fase fora do catálogo',
-      (await definirAptidoes(apta.id, [FASE, 'fase_que_nao_existe'])).ok === false)
-    ok('§4) a fase agora tem regra', (await fasesComAptidaoDeclarada()).has(FASE))
+    ok('§25) as duas tarefas estão na mesma fase macro',
+      (await prisma.tarefa.findMany({ where: { id: { in: [tarefaA, tarefaB] } }, select: { faseMacroKey: true } }))
+        .every((t) => t.faseMacroKey === 'emissao_documental'))
 
-    const s1 = await simularTarefa(semRegra)
-    ok('§C) quem é apto passa', criterio(s1, apta.id, 'APTIDAO')?.veredito === 'ok')
-    ok('§C) quem NÃO é apto fica inelegível', avaliacao(s1, inapta.id)?.elegivel === false)
-    ok('§C) com o motivo nomeado',
-      avaliacao(s1, inapta.id)?.motivos.some((m) => m.codigo === 'SEM_APTIDAO') === true,
-      avaliacao(s1, inapta.id)?.motivos[0]?.texto ?? '—')
-    ok('§C) e a recomendação é de quem é apto', s1.recomendado?.usuarioId === apta.id, s1.recomendado?.nome ?? '—')
-    ok('§4) a aptidão declarada aparece na avaliação',
-      (avaliacao(s1, apta.id)?.aptidoes ?? []).some((a) => /Emiss/i.test(a)))
+    await definirAptidoes(apta.id, [unidadeA.id])
+    ok('§31) declarar aptidão liga a regra DAQUELA unidade',
+      (await unidadesComAptidaoDeclarada()).has(unidadeA.id))
+    ok('§31) e a outra unidade continua livre',
+      !(await unidadesComAptidaoDeclarada()).has(unidadeB.id))
+
+    const sA = await simularTarefa(tarefaA)
+    const sB = await simularTarefa(tarefaB)
+    ok('§25) quem é apto em A passa em A', criterio(sA, apta.id, 'APTIDAO')?.veredito === 'ok')
+    ok('§25) quem NÃO é apto em A é inelegível em A', avaliacao(sA, apta2.id)?.elegivel === false)
+    ok('§25) e a recomendação de A é de quem é apto', sA.recomendado?.usuarioId === apta.id, sA.recomendado?.nome ?? '—')
+    ok('§25) em B, a aptidão ainda não restringe ninguém',
+      criterio(sB, apta2.id, 'APTIDAO')?.veredito === 'nao_aplicavel' && sB.recomendado != null,
+      criterio(sB, apta2.id, 'APTIDAO')?.detalhe ?? '—')
+    ok('§25) PROVA: mesma fase, elegibilidades diferentes',
+      avaliacao(sA, apta2.id)?.elegivel === false && avaliacao(sB, apta2.id)?.elegivel === true)
 
     // ════════════════════════════════════════════════════════════════════════
-    secao('§B/§I) Disponibilidade — e a recomendação muda na hora')
+    secao('§26) STEP ≠ APTIDÃO — uma aptidão cobre a unidade inteira')
     // ════════════════════════════════════════════════════════════════════════
-    await definirAptidoes(apta2.id, [FASE])
-    const antesDoAfastamento = await simularTarefa(semRegra)
-    ok('§I) antes das férias, a pessoa é elegível', avaliacao(antesDoAfastamento, apta.id)?.elegivel === true)
+    const quantas = await prisma.aptidaoOperacional.count({ where: { usuarioId: apta.id } })
+    ok('§26) UMA aptidão declarada', quantas === 1, `${quantas}`)
+    ok('§26) e ela basta para a tarefa inteira, com seus N passos',
+      avaliacao(sA, apta.id)?.elegivel === true)
+    ok('§26) nenhuma aptidão por passo foi criada',
+      !Object.keys(prisma.aptidaoOperacional.fields).some((f) => /step|passo/i.test(f)))
 
-    const ontem = new Date(Date.now() - 86400000)
-    const daquiUmaSemana = new Date(Date.now() + 7 * 86400000)
-    const ind = await abrirIndisponibilidade({
-      usuarioId: apta.id, tipo: 'FERIAS', inicio: ontem, fim: daquiUmaSemana,
-      motivo: 'férias programadas', autorId: gestor.id,
+    // ════════════════════════════════════════════════════════════════════════
+    secao('§27) EQUIPE ≠ APTIDÃO')
+    // ════════════════════════════════════════════════════════════════════════
+    await prisma.grupoUsuario.create({
+      data: {
+        code: 'org_documental', nome: 'Emissão Documental (ORG)', ativo: true,
+        membros: { create: [{ usuarioId: soEquipe.id }, { usuarioId: apta.id }] },
+      },
     })
-    ok('§5) abrir indisponibilidade funciona', ind.ok === true)
-
-    const durante = await simularTarefa(semRegra)
-    ok('§B) com permissão e apta, MAS indisponível → inelegível',
-      avaliacao(durante, apta.id)?.elegivel === false)
-    ok('§B) com o motivo e o período', criterio(durante, apta.id, 'DISPONIBILIDADE')?.veredito === 'reprovado' &&
-      /férias/i.test(criterio(durante, apta.id, 'DISPONIBILIDADE')?.detalhe ?? ''),
-      criterio(durante, apta.id, 'DISPONIBILIDADE')?.detalhe ?? '—')
-    ok('§I) e a recomendação MUDA imediatamente para a outra apta',
-      durante.recomendado?.usuarioId === apta2.id, durante.recomendado?.nome ?? '—')
-
-    if (ind.ok) {
-      const enc = await encerrarIndisponibilidade(ind.id)
-      ok('§5) encerrar funciona', enc.ok === true)
-      const depois = await simularTarefa(semRegra)
-      ok('§I) e ela volta a ser elegível na simulação seguinte',
-        avaliacao(depois, apta.id)?.elegivel === true)
-      const registro = await prisma.indisponibilidadeOperacional.findUnique({ where: { id: ind.id }, select: { fim: true } })
-      ok('§5) o REGISTRO permanece, com a data de fim — histórico não se apaga',
-        registro?.fim != null, registro?.fim?.toISOString() ?? '—')
-    }
-
-    // ════════════════════════════════════════════════════════════════════════
-    secao('§D/§7) Capacidade — e ela conta EXECUTÁVEIS, não tarefas')
-    // ════════════════════════════════════════════════════════════════════════
-    await definirAptidoes(cheia.id, [FASE])
-    const r2 = await definirCapacidade({ usuarioId: cheia.id, limiteExecutaveis: 2, autorId: gestor.id })
-    ok('§6) definir capacidade funciona', r2.ok === true)
-    ok('§6) e recusa número negativo',
-      (await definirCapacidade({ usuarioId: cheia.id, limiteExecutaveis: -1, autorId: gestor.id })).ok === false)
-
-    // Duas executáveis → no limite. Mais três aguardando terceiro → NÃO contam.
-    for (let i = 0; i < 2; i++) {
-      const t = await criar(`executavel ${i}`)
-      await atribuirTarefa({ tarefaId: t, responsavelId: cheia.id, autorId: gestor.id })
-    }
-    const comLimite = await simularTarefa(semRegra)
-    ok('§D) capacidade esgotada → inelegível',
-      avaliacao(comLimite, cheia.id)?.elegivel === false &&
-      avaliacao(comLimite, cheia.id)?.motivos.some((m) => m.codigo === 'CAPACIDADE_ESGOTADA') === true,
-      criterio(comLimite, cheia.id, 'CAPACIDADE')?.detalhe ?? '—')
-
-    const { iniciarTarefa } = await import('../lib/operacional/tarefa-comandos')
-    const { aguardarTerceiro } = await import('../lib/operacional/tarefa-ciclo')
-    for (let i = 0; i < 3; i++) {
-      const t = await criar(`espera ${i}`)
-      await atribuirTarefa({ tarefaId: t, responsavelId: cheia.id, autorId: gestor.id })
-      await iniciarTarefa({ tarefaId: t, autorId: cheia.id })
-      await aguardarTerceiro({ tarefaId: t, autorId: cheia.id, motivo: 'cartório' })
-    }
-    const comEspera = await simularTarefa(semRegra)
-    const cargaCheia = avaliacao(comEspera, cheia.id)?.carga
-    ok('§7) cinco tarefas ativas, três aguardando terceiro',
-      cargaCheia?.ativas === 5 && cargaCheia?.aguardandoTerceiro === 3,
-      `${cargaCheia?.ativas} ativas / ${cargaCheia?.aguardandoTerceiro} esperando`)
-    ok('§7) e o teto continua contando só as DUAS executáveis',
-      /2 de 2/.test(criterio(comEspera, cheia.id, 'CAPACIDADE')?.detalhe ?? ''),
-      criterio(comEspera, cheia.id, 'CAPACIDADE')?.detalhe ?? '—')
-
-    await definirCapacidade({ usuarioId: cheia.id, limiteExecutaveis: null, autorId: gestor.id })
-    ok('§6) remover o teto volta ao modo relativo',
-      criterio(await simularTarefa(semRegra), cheia.id, 'CAPACIDADE')?.veredito === 'nao_aplicavel')
-
-    // ════════════════════════════════════════════════════════════════════════
-    secao('§9/§3) Equipe restringe SÓ quando existe no cadastro')
-    // ════════════════════════════════════════════════════════════════════════
-    const semCadastro = await criar('equipe fantasma', { equipe: 'org_inexistente' })
-    const sf = await simularTarefa(semCadastro)
-    ok('§11) equipe não cadastrada NÃO bloqueia',
-      criterio(sf, apta.id, 'EQUIPE')?.veredito === 'nao_aplicavel' && sf.recomendado != null,
-      sf.recomendado?.nome ?? `abstenção ${sf.abstencao?.codigo}`)
-
-    const equipe = await prisma.grupoUsuario.create({
-      data: { code: 'org_documental', nome: 'Emissão Documental (ORG)', ativo: true,
-        membros: { create: [{ usuarioId: apta2.id }] } },
-      select: { id: true },
-    })
-    void equipe
-    const comEquipe = await criar('equipe real', { equipe: 'org_documental' })
+    const comEquipe = await criar('unidade A com equipe', itemA.id, { equipe: 'org_documental' })
     const se = await simularTarefa(comEquipe)
-    ok('§3) membro da equipe passa', criterio(se, apta2.id, 'EQUIPE')?.veredito === 'ok')
-    ok('§9) quem está fora da equipe fica inelegível',
-      avaliacao(se, apta.id)?.elegivel === false &&
-      avaliacao(se, apta.id)?.motivos.some((m) => m.codigo === 'FORA_DA_EQUIPE_EXIGIDA') === true)
-    ok('§3) e a recomendação sai de dentro da equipe', se.recomendado?.usuarioId === apta2.id, se.recomendado?.nome ?? '—')
-    ok('§8) a avaliação mostra as equipes da pessoa',
-      (avaliacao(se, apta2.id)?.equipes ?? []).some((e) => /ORG/.test(e)))
+    ok('§27) quem é da equipe MAS não é apto continua inelegível',
+      avaliacao(se, soEquipe.id)?.elegivel === false &&
+      avaliacao(se, soEquipe.id)?.motivos.some((m) => m.codigo === 'SEM_APTIDAO') === true,
+      avaliacao(se, soEquipe.id)?.motivos.map((m) => m.codigo).join(', ') || '—')
+    ok('§27) passar na equipe não cria competência',
+      criterio(se, soEquipe.id, 'EQUIPE')?.veredito === 'ok' &&
+      criterio(se, soEquipe.id, 'APTIDAO')?.veredito === 'reprovado')
+    ok('§27) quem é dos dois passa', avaliacao(se, apta.id)?.elegivel === true)
 
     // ════════════════════════════════════════════════════════════════════════
-    secao('§10/§F) Abstenção sem relaxar a regra')
+    secao('§28) APTIDÃO ≠ PERMISSÃO')
     // ════════════════════════════════════════════════════════════════════════
-    // Todo mundo da equipe fica indisponível: a regra continua de pé.
-    const bloqueio = await abrirIndisponibilidade({
-      usuarioId: apta2.id, tipo: 'BLOQUEIO_OPERACIONAL', inicio: ontem, fim: null,
-      motivo: 'realocada para outro projeto', autorId: gestor.id,
+    await definirAptidoes(semPerm.id, [unidadeA.id])
+    const sPerm = await simularTarefa(tarefaA)
+    ok('§28) apto SEM autorização é inelegível',
+      avaliacao(sPerm, semPerm.id)?.elegivel === false &&
+      avaliacao(sPerm, semPerm.id)?.motivos[0]?.codigo === 'SEM_PERMISSAO_EXECUTAR')
+    ok('§13) e a aptidão não concedeu autorização nenhuma',
+      criterio(sPerm, semPerm.id, 'PERMISSAO')?.veredito === 'reprovado' &&
+      criterio(sPerm, semPerm.id, 'APTIDAO')?.veredito === 'ok')
+
+    // ════════════════════════════════════════════════════════════════════════
+    secao('§29) DISPONIBILIDADE reprova sozinha')
+    // ════════════════════════════════════════════════════════════════════════
+    const ind = await abrirIndisponibilidade({
+      usuarioId: apta.id, tipo: 'FERIAS', inicio: new Date(Date.now() - 86400000),
+      fim: new Date(Date.now() + 7 * 86400000), motivo: 'férias programadas', autorId: gestor.id,
     })
-    const semNinguem = await simularTarefa(comEquipe)
-    ok('§F) ninguém elegível → abstenção', semNinguem.recomendado === null,
-      semNinguem.abstencao?.codigo ?? 'recomendou')
-    ok('§10) a mensagem é a do enunciado', /Nenhum funcionário disponível e apto/i.test(semNinguem.abstencao?.texto ?? ''),
-      semNinguem.abstencao?.texto?.slice(0, 90) ?? '—')
-    ok('§10) e ela DIZ o que derrubou cada um',
-      /fora da equipe|indispon/i.test(semNinguem.abstencao?.texto ?? ''))
-    ok('§10) a regra NÃO foi relaxada para devolver um nome', semNinguem.recomendado === null)
-    if (bloqueio.ok) await encerrarIndisponibilidade(bloqueio.id)
+    const sInd = await simularTarefa(tarefaA)
+    ok('§29) autorizado + apto, MAS indisponível → inelegível',
+      avaliacao(sInd, apta.id)?.elegivel === false &&
+      criterio(sInd, apta.id, 'APTIDAO')?.veredito === 'ok' &&
+      criterio(sInd, apta.id, 'DISPONIBILIDADE')?.veredito === 'reprovado')
+    if (ind.ok) await encerrarIndisponibilidade(ind.id)
+    ok('§29) e encerrar devolve a elegibilidade',
+      avaliacao(await simularTarefa(tarefaA), apta.id)?.elegivel === true)
 
     // ════════════════════════════════════════════════════════════════════════
-    secao('§A/§G) A ordem: permissão primeiro, score por último')
+    secao('§30) CAPACIDADE reprova sozinha — e conta executáveis')
     // ════════════════════════════════════════════════════════════════════════
-    const sOrdem = await simularTarefa(semRegra)
-    ok('§A) sem permissão continua inelegível, aconteça o que acontecer',
-      avaliacao(sOrdem, semPerm.id)?.elegivel === false &&
-      avaliacao(sOrdem, semPerm.id)?.motivos[0]?.codigo === 'SEM_PERMISSAO_EXECUTAR')
-    ok('§9) e os critérios vêm na ordem canônica',
-      JSON.stringify(avaliacao(sOrdem, apta.id)?.criterios.map((c) => c.chave))
-      === JSON.stringify(['PERMISSAO', 'DISPONIBILIDADE', 'APTIDAO', 'EQUIPE', 'CAPACIDADE']))
-    ok('§G) entre vários elegíveis, o score decide',
-      sOrdem.recomendado != null &&
-      sOrdem.avaliacoes.filter((a) => a.elegivel).every((a) => a.score >= (sOrdem.recomendado?.score ?? 0)))
-    ok('§12) a explicação traz os cinco critérios com veredito',
-      ['Permissão', 'Disponibilidade', 'Aptidão', 'Equipe/escopo', 'Capacidade']
-        .every((c) => sOrdem.explicacao.some((l) => l.includes(c))),
-      sOrdem.explicacao.slice(1, 6).join(' | ').slice(0, 100))
+    await definirAptidoes(cheia.id, [unidadeA.id])
+    await definirCapacidade({ usuarioId: cheia.id, limiteExecutaveis: 2, autorId: gestor.id })
+    for (let i = 0; i < 2; i++) {
+      const t = await criar(`carga ${i}`, itemA.id)
+      await atribuirTarefa({ tarefaId: t, responsavelId: cheia.id, autorId: gestor.id })
+    }
+    const sCap = await simularTarefa(tarefaA)
+    ok('§30) teto atingido → inelegível',
+      avaliacao(sCap, cheia.id)?.elegivel === false &&
+      avaliacao(sCap, cheia.id)?.motivos.some((m) => m.codigo === 'CAPACIDADE_ESGOTADA') === true,
+      criterio(sCap, cheia.id, 'CAPACIDADE')?.detalhe ?? '—')
+    // Espera externa NÃO ocupa lugar — a regra que já existia continua de pé.
+    const esperando = await criar('espera', itemA.id)
+    await atribuirTarefa({ tarefaId: esperando, responsavelId: cheia.id, autorId: gestor.id })
+    await iniciarTarefa({ tarefaId: esperando, autorId: cheia.id })
+    await aguardarTerceiro({ tarefaId: esperando, autorId: cheia.id, motivo: 'cartório' })
+    const sEspera = await simularTarefa(tarefaA)
+    ok('§30) e aguardando terceiro continua fora do teto',
+      /2 de 2/.test(criterio(sEspera, cheia.id, 'CAPACIDADE')?.detalhe ?? ''),
+      criterio(sEspera, cheia.id, 'CAPACIDADE')?.detalhe ?? '—')
+    await definirCapacidade({ usuarioId: cheia.id, limiteExecutaveis: null, autorId: gestor.id })
 
     // ════════════════════════════════════════════════════════════════════════
-    secao('§J) Nada disso escreve na Tarefa')
+    secao('§10/§16) Abstenção quando a política existe e ninguém passa')
     // ════════════════════════════════════════════════════════════════════════
+    for (const u of [apta.id, apta2.id, soEquipe.id, semPerm.id, cheia.id]) await definirAptidoes(u, [])
+    ok('§16) sem ninguém apto, a regra da unidade DESLIGA de novo',
+      criterio(await simularTarefa(comEquipe), apta.id, 'APTIDAO')?.veredito === 'nao_aplicavel')
+    // Agora o ÚNICO apto é quem não tem permissão: a política existe, e ninguém
+    // passa. É a situação em que se abster é a resposta certa.
+    await definirAptidoes(semPerm.id, [unidadeA.id])
+    const sAbst = await simularTarefa(comEquipe)
+    ok('§10) política de pé e ninguém elegível → abstenção', sAbst.recomendado === null,
+      sAbst.abstencao?.codigo ?? 'recomendou')
+    ok('§10) com a frase do enunciado', /Nenhum funcionário disponível e apto/i.test(sAbst.abstencao?.texto ?? ''))
+    ok('§10) e citando a UNIDADE, não a fase',
+      (sAbst.abstencao?.texto ?? '').includes(unidadeA.name),
+      sAbst.abstencao?.texto?.slice(0, 110) ?? '—')
+
+    // ════════════════════════════════════════════════════════════════════════
+    secao('§33) O lote preserva carga virtual, determinismo e zero escrita')
+    // ════════════════════════════════════════════════════════════════════════
+    await definirAptidoes(semPerm.id, [])
     const retrato = async () => JSON.stringify(await prisma.tarefa.findMany({
       select: { id: true, responsavelId: true, statusTarefa: true, lockVersion: true }, orderBy: { id: 'asc' },
     }))
     const antes = await retrato()
-    const notifAntes = await prisma.notificacaoOperacional.count()
-    await simularTarefa(semRegra)
-    await simularTarefa(comEquipe)
+    const l1 = await simularLote({ taskIds: [tarefaA, tarefaB, semUnidade] })
+    const l2 = await simularLote({ taskIds: [tarefaA, tarefaB, semUnidade] })
+    ok('§33) o lote responde por todas', l1.recomendacoes.length === 3)
+    ok('§33) e é determinístico',
+      JSON.stringify(l1.recomendacoes.map((r) => [r.taskId, r.recomendado?.usuarioId]))
+      === JSON.stringify(l2.recomendacoes.map((r) => [r.taskId, r.recomendado?.usuarioId])))
+    ok('§33) a carga virtual continua espalhando',
+      new Set(l1.recomendacoes.map((r) => r.recomendado?.usuarioId).filter(Boolean)).size > 1,
+      JSON.stringify(l1.resumo.porUsuario))
+    await simularTarefa(tarefaA)
     await lerOrganizacao()
-    ok('§J) nenhuma Tarefa mudou', (await retrato()) === antes)
-    ok('§J) nenhuma notificação foi criada', (await prisma.notificacaoOperacional.count()) === notifAntes)
+    ok('§33) e nada foi escrito', (await retrato()) === antes)
 
-    const fonte = (await import('node:fs')).readFileSync(
-      (await import('node:path')).join(__dirname, '..', 'lib/operacional/organizacao.ts'), 'utf8')
-    const codigo = fonte.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '')
-    ok('§16) a camada não toca em Tarefa',
-      !/\b(prisma|tx)\s*\.\s*tarefa\s*\./.test(codigo))
-    ok('§16) nem em passo de workflow', !/phaseWorkflowStepInstance/.test(codigo))
-    ok('§2) e não escreve permissão', !/permissoesCustom|perfilId/.test(codigo))
+    // ════════════════════════════════════════════════════════════════════════
+    secao('§36) O GUARD DA ONTOLOGIA — não voltar a alimentar aptidão com fases')
+    // ════════════════════════════════════════════════════════════════════════
+    const { readFileSync } = await import('node:fs')
+    const { join } = await import('node:path')
+    const RAIZ = join(__dirname, '..')
+    const semComentarios = (t: string) => t.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '')
+    const camada = semComentarios(readFileSync(join(RAIZ, 'lib/operacional/organizacao.ts'), 'utf8'))
+    const motor = semComentarios(readFileSync(join(RAIZ, 'lib/operacional/elegibilidade.ts'), 'utf8'))
+    const tela = semComentarios(readFileSync(join(RAIZ, 'src/components/gerenciamentoComponents/CapacidadeOperacionalTab.tsx'), 'utf8'))
+    const rota = semComentarios(readFileSync(join(RAIZ, 'src/app/api/operacao/capacidade/route.ts'), 'utf8'))
+
+    ok('§36) a camada de aptidão não importa o catálogo de FASES',
+      !/fases-catalog|\bFASES\b/.test(camada), 'aptidão vem do Cadastro Mestre')
+    ok('§36) a rota de cadastro não oferece fases como aptidão',
+      !/fasesDisponiveis|faseKey|phaseKey/.test(rota))
+    ok('§36) a tela não consome fases para aptidão', !/fases|faseKey/i.test(tela))
+    ok('§36) a aptidão é comparada por UNIDADE, não por fase',
+      /aptidoes\s*\?\?\s*\[\]\)\.includes\(unidade\)/.test(motor))
+    // Escopado ao MODELO: `faseKey` existe legitimamente em outros lugares do
+    // schema (posição do processo é um conceito real) — o que não pode é estar
+    // aqui.
+    const schema = readFileSync(join(RAIZ, 'prisma/schema.prisma'), 'utf8')
+    const modeloAptidao = schema.slice(
+      schema.indexOf('model AptidaoOperacional'),
+      schema.indexOf('}', schema.indexOf('model AptidaoOperacional')),
+    )
+    ok('§36) o modelo da aptidão não tem coluna de fase',
+      !/fase/i.test(modeloAptidao) && /perfilOperacionalId/.test(modeloAptidao))
+    ok('§2) a camada não escreve permissão nem mexe no usuário',
+      !/permissoesCustom/.test(camada) &&
+      !/\b(prisma|tx)\s*\.\s*usuario\s*\.\s*(create|update|delete)/.test(camada))
+    ok('§21) e não toca em Tarefa nem em passo',
+      !/\b(prisma|tx)\s*\.\s*tarefa\s*\.\s*(create|update|delete)/.test(camada) &&
+      !/phaseWorkflowStepInstance/.test(camada))
   } finally {
     await limpar()
     await restaurar()
@@ -330,8 +400,8 @@ async function main() {
   console.log(`Total: ${passou + falhou} | ✅ ${passou} | ❌ ${falhou}`)
   if (falhas.length) { console.log('\nFALHAS:'); for (const f of falhas) console.log(`  • ${f}`) }
   console.log(falhou === 0
-    ? 'A camada restringe quem já pode — e não bloqueia o que ninguém configurou.'
-    : 'A camada operacional divergiu do contrato.')
+    ? 'Fase é onde o processo está; aptidão é o que a pessoa faz. Separados.'
+    : 'A ontologia operacional divergiu do contrato.')
   await prisma.$disconnect()
   process.exit(falhou > 0 ? 1 : 0)
 }

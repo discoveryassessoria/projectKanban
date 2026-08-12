@@ -31,7 +31,8 @@
 //
 //   1. PERMISSÃO       `tarefas.iniciar_concluir` — sem isto, nada mais importa
 //   2. DISPONIBILIDADE indisponibilidade vigente (férias, afastamento, bloqueio)
-//   3. APTIDÃO         quando a fase da tarefa tem aptidão DECLARADA por alguém
+//   3. APTIDÃO         quando a UNIDADE DE TRABALHO da tarefa tem aptidão
+//                      declarada por alguém
 //   4. EQUIPE/ESCOPO   quando a tarefa exige uma equipe que EXISTE no cadastro
 //   5. CAPACIDADE      quando há teto configurado e ele já está cheio
 //   6. então, e só então, o score de carga decide entre os que sobraram
@@ -45,9 +46,14 @@
 // tabela recém-criada de tornar toda a operação inelegível de um dia para o
 // outro.
 //
-//   APTIDÃO só restringe a fase em que ALGUÉM já foi declarado apto. Enquanto
-//   ninguém for, a fase não tem regra de aptidão — e não ter regra é diferente
-//   de reprovar todo mundo.
+//   APTIDÃO só restringe a UNIDADE em que ALGUÉM já foi declarado apto. Enquanto
+//   ninguém for, a unidade não tem regra — e não ter regra é diferente de
+//   reprovar todo mundo. A política é POR UNIDADE: implantar uma não trava as
+//   outras.
+//
+//   A unidade da tarefa é DERIVADA da cadeia canônica (necessidade/documento →
+//   tipo → perfil operacional). Fase macro não entra nesta conta: ela diz onde o
+//   processo está, não que trabalho é.
 //
 //   EQUIPE só restringe quando a tarefa nomeia um código que EXISTE como equipe
 //   ativa no cadastro. Um `equipeKey` que não resolve não é uma regra: é um
@@ -66,8 +72,8 @@ import type { StatusTarefa } from '@prisma/client'
 import { STATUS_ATIVOS } from './tarefa-canonica'
 import { calcularPermissoes, temPermissao, type MapaPermissoes } from '@/src/lib/permissoes'
 import {
-  lerOrganizacao, fasesComAptidaoDeclarada, rotuloDaFase,
-  type OrganizacaoDoUsuario,
+  lerOrganizacao, unidadesComAptidaoDeclarada, unidadesDasTarefas, rotulosDasUnidades,
+  type OrganizacaoDoUsuario, type UnidadeOperacional,
 } from './organizacao'
 
 /** Os tipos de indisponibilidade em português — a tela e o auditor leem isto. */
@@ -231,6 +237,8 @@ export interface Recomendacao {
   decididoNoDesempateTecnico: boolean
   avaliacoes: Avaliacao[]
   equipe: ContextoDaEquipe | null
+  /** A unidade de trabalho que a tarefa exige — o que a aptidão compara. */
+  unidadeOperacional: { id: number; nome: string; familia: string | null } | null
   criteriosAusentes: typeof CRITERIOS_AUSENTES
 }
 
@@ -245,8 +253,10 @@ interface Universo {
   equipesCadastradas: Set<string>
   /** Aptidão, disponibilidade e capacidade de cada pessoa. */
   organizacao: Map<number, OrganizacaoDoUsuario>
-  /** As fases em que ALGUÉM já foi declarado apto — é o que liga a regra. */
-  fasesComAptidao: Set<string>
+  /** As unidades em que ALGUÉM já foi declarado apto — é o que liga a regra. */
+  unidadesComAptidao: Set<number>
+  /** Nome e família de cada unidade, para a explicação. */
+  rotulos: Map<number, UnidadeOperacional>
 }
 
 /**
@@ -256,7 +266,7 @@ interface Universo {
  * São cinco consultas, independentemente do tamanho do lote.
  */
 async function lerUniverso(agora: Date): Promise<Universo> {
-  const [brutos, ativas, grupos, organizacao, fasesComAptidao] = await Promise.all([
+  const [brutos, ativas, grupos, organizacao, unidadesComAptidao, rotulos] = await Promise.all([
     prisma.usuario.findMany({
       select: { id: true, nome: true, tipo: true, permissoesCustom: true, perfil: { select: { permissoes: true } } },
       orderBy: { id: 'asc' },
@@ -270,7 +280,8 @@ async function lerUniverso(agora: Date): Promise<Universo> {
       select: { code: true, membros: { select: { usuarioId: true } } },
     }),
     lerOrganizacao(agora),
-    fasesComAptidaoDeclarada(),
+    unidadesComAptidaoDeclarada(),
+    rotulosDasUnidades(),
   ])
 
   const usuarios = brutos.map((u) => ({
@@ -315,7 +326,7 @@ async function lerUniverso(agora: Date): Promise<Universo> {
     equipes.set(chave, new Set(g.membros.map((m) => m.usuarioId)))
   }
 
-  return { usuarios, cargas, equipes, equipesCadastradas, organizacao, fasesComAptidao }
+  return { usuarios, cargas, equipes, equipesCadastradas, organizacao, unidadesComAptidao, rotulos }
 }
 
 // ─── A AVALIAÇÃO DE UMA TAREFA ──────────────────────────────────────────────
@@ -326,7 +337,10 @@ interface TarefaParaSimular {
   responsavelId: number | null
   statusTarefa: StatusTarefa
   equipeKey: string | null
+  /** Só para contexto/ordenação — NUNCA para aptidão. */
   faseMacroKey: string | null
+  /** A unidade de trabalho, derivada da cadeia canônica. */
+  unidadeOperacionalId: number | null
   prioridade: string
   dataPrazo: Date | null
   /** Do passo corrente: o workflow publicado pode exigir uma equipe. */
@@ -372,6 +386,7 @@ function avaliar(
     decididoNoDesempateTecnico: false,
     avaliacoes: [] as Avaliacao[],
     equipe: null as ContextoDaEquipe | null,
+    unidadeOperacional: null as Recomendacao['unidadeOperacional'],
     criteriosAusentes: CRITERIOS_AUSENTES,
   }
 
@@ -405,9 +420,13 @@ function avaliar(
       }
     : null
 
-  // APTIDÃO só é regra na fase em que alguém já foi declarado apto.
-  const fase = t.faseMacroKey?.trim().toLowerCase() ?? null
-  const aptidaoEhRegra = fase != null && u.fasesComAptidao.has(fase)
+  // APTIDÃO só é regra na UNIDADE em que alguém já foi declarado apto.
+  const unidade = t.unidadeOperacionalId
+  const unidadeNome = unidade != null ? u.rotulos.get(unidade)?.nome ?? `unidade #${unidade}` : null
+  const aptidaoEhRegra = unidade != null && u.unidadesComAptidao.has(unidade)
+  const unidadeOperacional = unidade != null
+    ? { id: unidade, nome: unidadeNome!, familia: u.rotulos.get(unidade)?.familia ?? null }
+    : null
 
   const avaliacoes: Avaliacao[] = u.usuarios.map((usr) => {
     const org = u.organizacao.get(usr.id)
@@ -447,17 +466,19 @@ function avaliar(
       })
     }
 
-    // 3 · APTIDÃO — só quando a fase tem aptidão declarada por alguém.
-    const apto = fase != null && (org?.aptidoes ?? []).includes(fase)
+    // 3 · APTIDÃO — só quando a UNIDADE DE TRABALHO tem aptidão declarada.
+    const apto = unidade != null && (org?.aptidoes ?? []).includes(unidade)
     criterios.push({
       chave: 'APTIDAO',
       veredito: !aptidaoEhRegra ? 'nao_aplicavel' : apto ? 'ok' : 'reprovado',
       detalhe: !aptidaoEhRegra
-        ? fase ? `ninguém foi declarado apto para "${rotuloDaFase(fase)}" — a fase ainda não tem regra de aptidão` : 'a tarefa não tem fase'
-        : apto ? `apto para "${rotuloDaFase(fase!)}"` : `não é apto para "${rotuloDaFase(fase!)}"`,
+        ? unidade == null
+          ? 'a tarefa não tem unidade de trabalho definida no cadastro'
+          : `ninguém foi declarado apto para "${unidadeNome}" — a unidade ainda não tem regra de aptidão`
+        : apto ? `apto para "${unidadeNome}"` : `não é apto para "${unidadeNome}"`,
     })
     if (aptidaoEhRegra && !apto) {
-      motivos.push({ codigo: 'SEM_APTIDAO', texto: `Não está declarado apto para "${rotuloDaFase(fase!)}".` })
+      motivos.push({ codigo: 'SEM_APTIDAO', texto: `Não está declarado apto para "${unidadeNome}".` })
     }
 
     // 4 · EQUIPE / ESCOPO — só quando a tarefa exige uma equipe que existe.
@@ -495,7 +516,7 @@ function avaliar(
       usuarioId: usr.id, nome: usr.nome, elegivel: motivos.length === 0, motivos, criterios,
       carga, score, parcelas,
       equipes: (org?.equipes ?? []).map((e) => e.nome),
-      aptidoes: (org?.aptidoes ?? []).map((f) => rotuloDaFase(f)),
+      aptidoes: (org?.aptidoesDetalhadas ?? []).map((a) => a.nome),
       limiteExecutaveis: limite,
     }
   })
@@ -523,7 +544,7 @@ function avaliar(
       }
     } else {
       const partes: string[] = []
-      if (porAptidao) partes.push(`${porAptidao} sem a aptidão exigida${fase ? ` ("${rotuloDaFase(fase)}")` : ''}`)
+      if (porAptidao) partes.push(`${porAptidao} sem a aptidão exigida${unidadeNome ? ` ("${unidadeNome}")` : ''}`)
       if (porEquipe) partes.push(`${porEquipe} fora da equipe "${exigida}"`)
       if (porDisponibilidade) partes.push(`${porDisponibilidade} indisponível(is)`)
       if (porCapacidade) partes.push(`${porCapacidade} com a capacidade esgotada`)
@@ -533,7 +554,7 @@ function avaliar(
           `A regra não foi relaxada — se ela estiver errada, corrija o cadastro (aptidão, equipe, disponibilidade ou capacidade).`,
       }
     }
-    return { ...base, abstencao, avaliacoes, equipe }
+    return { ...base, abstencao, avaliacoes, equipe, unidadeOperacional }
   }
 
   const ordenados = [...elegiveis].sort(comparar)
@@ -546,9 +567,10 @@ function avaliar(
     recomendado: { usuarioId: escolhido.usuarioId, nome: escolhido.nome, score: escolhido.score },
     abstencao: null,
     decididoNoDesempateTecnico: tecnico,
-    explicacao: explicar(escolhido, ordenados, tecnico, equipe),
+    explicacao: explicar(escolhido, ordenados, tecnico, equipe, unidadeOperacional),
     avaliacoes,
     equipe,
+    unidadeOperacional,
   }
 }
 
@@ -590,9 +612,16 @@ const NOME_DO_CRITERIO: Record<Criterio['chave'], string> = {
   EQUIPE: 'Equipe/escopo', CAPACIDADE: 'Capacidade',
 }
 
-function explicar(escolhido: Avaliacao, ordenados: Avaliacao[], tecnico: boolean, equipe: ContextoDaEquipe | null): string[] {
+function explicar(
+  escolhido: Avaliacao, ordenados: Avaliacao[], tecnico: boolean,
+  equipe: ContextoDaEquipe | null, unidade: Recomendacao['unidadeOperacional'],
+): string[] {
   const c = escolhido.carga
   const linhas = [
+    // A UNIDADE VEM PRIMEIRO: sem saber que trabalho é, o resto não se julga.
+    unidade
+      ? `Unidade operacional: ${unidade.nome}${unidade.familia ? ` · ${unidade.familia}` : ''}`
+      : 'Unidade operacional: não definida no cadastro para esta tarefa',
     `Recomendação: ${escolhido.nome} — porque:`,
     // Os cinco critérios, na ordem em que foram avaliados. "—" é diferente de
     // "✓": a regra não se aplica a esta tarefa, e dizer isso evita que o gestor
@@ -620,9 +649,12 @@ function explicar(escolhido: Avaliacao, ordenados: Avaliacao[], tecnico: boolean
 
 async function carregarTarefas(ids: number[]): Promise<TarefaParaSimular[]> {
   const brutas = await prisma.tarefa.findMany({ where: { id: { in: ids } }, select: SELECT_SIMULACAO })
+  // A unidade sai da cadeia canônica, em lote — a Tarefa não guarda cópia dela.
+  const unidades = await unidadesDasTarefas(brutas.map((t) => t.id))
   return brutas.map((t) => ({
     id: t.id, titulo: t.titulo, responsavelId: t.responsavelId, statusTarefa: t.statusTarefa,
     equipeKey: t.equipeKey, faseMacroKey: t.faseMacroKey, prioridade: t.prioridade, dataPrazo: t.dataPrazo,
+    unidadeOperacionalId: unidades.get(t.id) ?? null,
     papelDoPasso: t.workflowStepInstance?.papel ?? null,
     equipeDoPasso: t.workflowStepInstance?.equipe ?? null,
   }))
@@ -637,7 +669,7 @@ export async function simularTarefa(taskId: number, agora = new Date()): Promise
       taskId, titulo: '', recomendado: null,
       abstencao: { codigo: 'TAREFA_INEXISTENTE', texto: 'Tarefa não encontrada.' },
       explicacao: [], decididoNoDesempateTecnico: false, avaliacoes: [],
-      equipe: null, criteriosAusentes: CRITERIOS_AUSENTES,
+      equipe: null, unidadeOperacional: null, criteriosAusentes: CRITERIOS_AUSENTES,
     }
   }
   return avaliar(t, universo, universo.cargas)

@@ -24,8 +24,8 @@ import { prisma } from '@/lib/prisma'
 import { verificarPermissao, extrairUsuarioComPermissoes } from '@/src/lib/verificar-permissao'
 import { calcularPermissoes, temPermissao, type MapaPermissoes } from '@/src/lib/permissoes'
 import {
-  lerOrganizacao, fasesDisponiveis, definirAptidoes, definirCapacidade,
-  abrirIndisponibilidade, encerrarIndisponibilidade, rotuloDaFase,
+  lerOrganizacao, unidadesOperacionais, definirAptidoes, definirCapacidade,
+  abrirIndisponibilidade, encerrarIndisponibilidade,
 } from '@/lib/operacional/organizacao'
 import { inicioDoDiaOperacional } from '@/lib/operacional/tarefa-projecoes'
 import { registrarAuditoria } from '@/lib/gerenciamento/auditoria'
@@ -94,7 +94,10 @@ export async function GET(request: NextRequest) {
       /** Sem isto, nada mais importa — e a tela precisa dizer isso primeiro. */
       podeExecutar: temPermissao(permissoes, 'tarefas.iniciar_concluir'),
       equipes: org?.equipes ?? [],
+      /** Ids das unidades — é o que o formulário marca. */
       aptidoes: org?.aptidoes ?? [],
+      /** As mesmas, com nome e família — é o que a tabela mostra. */
+      aptidoesDetalhadas: org?.aptidoesDetalhadas ?? [],
       indisponivelPor: org?.indisponivelPor ?? null,
       indisponibilidades: org?.indisponibilidades ?? [],
       limiteExecutaveis: org?.limiteExecutaveis ?? null,
@@ -124,7 +127,9 @@ export async function GET(request: NextRequest) {
 
   return NextResponse.json({
     linhas: linhas.map((l) => ({ ...l, historico: porUsuario.get(l.usuarioId) ?? [] })),
-    fases: fasesDisponiveis(),
+    // AS UNIDADES DE TRABALHO — do Cadastro Mestre. Fases macro NÃO entram aqui:
+    // "Finalizado" é posição do processo, não competência de ninguém.
+    unidades: await unidadesOperacionais(),
     tipos: TIPOS,
   })
 }
@@ -146,14 +151,21 @@ export async function PATCH(request: NextRequest) {
 
   switch (String(b?.acao ?? '')) {
     case 'aptidoes': {
-      const antes = (await prisma.aptidaoOperacional.findMany({ where: { usuarioId }, select: { faseKey: true } })).map((a) => a.faseKey).sort()
-      const r = await definirAptidoes(usuarioId, Array.isArray(b?.faseKeys) ? b.faseKeys.map(String) : [])
+      const nomes = async () =>
+        (await prisma.aptidaoOperacional.findMany({
+          where: { usuarioId }, select: { perfilOperacional: { select: { name: true } } },
+        })).map((a) => a.perfilOperacional.name).sort()
+      const antes = await nomes()
+      const pedidas = Array.isArray(b?.perfilOperacionalIds)
+        ? (b.perfilOperacionalIds as unknown[]).map(Number)
+        : []
+      const r = await definirAptidoes(usuarioId, pedidas)
       if (!r.ok) return NextResponse.json({ error: r.erro }, { status: 422 })
-      const depois = (await prisma.aptidaoOperacional.findMany({ where: { usuarioId }, select: { faseKey: true } })).map((a) => a.faseKey).sort()
+      const depois = await nomes()
       await registrarAuditoria(request, {
         acao: 'EDITAR', entidade: ENTIDADE_AUDITADA, entidadeId: usuarioId,
-        descricao: `Aptidões de ${quem}: ${depois.length ? depois.map(rotuloDaFase).join(', ') : 'nenhuma'}` +
-          `${antes.join('|') === depois.join('|') ? ' (sem mudança)' : ` (antes: ${antes.length ? antes.map(rotuloDaFase).join(', ') : 'nenhuma'})`}`,
+        descricao: `Aptidões de ${quem}: ${depois.length ? depois.join(', ') : 'nenhuma'}` +
+          `${antes.join('|') === depois.join('|') ? ' (sem mudança)' : ` (antes: ${antes.length ? antes.join(', ') : 'nenhuma'})`}`,
         detalhes: { de: antes, para: depois },
       })
       return NextResponse.json({ ok: true })

@@ -4171,7 +4171,7 @@ CREATE TABLE "TarefaDependencia" (
 CREATE TABLE "AptidaoOperacional" (
     "id" SERIAL NOT NULL,
     "usuarioId" INTEGER NOT NULL,
-    "faseKey" VARCHAR(60) NOT NULL,
+    "perfilOperacionalId" INTEGER NOT NULL,
     "criadoEm" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
     CONSTRAINT "AptidaoOperacional_pkey" PRIMARY KEY ("id")
@@ -5915,10 +5915,10 @@ CREATE INDEX "TarefaDependencia_dependeDeId_idx" ON "TarefaDependencia"("depende
 CREATE UNIQUE INDEX "TarefaDependencia_tarefaId_dependeDeId_key" ON "TarefaDependencia"("tarefaId", "dependeDeId");
 
 -- CreateIndex
-CREATE INDEX "AptidaoOperacional_faseKey_idx" ON "AptidaoOperacional"("faseKey");
+CREATE INDEX "AptidaoOperacional_perfilOperacionalId_idx" ON "AptidaoOperacional"("perfilOperacionalId");
 
 -- CreateIndex
-CREATE UNIQUE INDEX "AptidaoOperacional_usuarioId_faseKey_key" ON "AptidaoOperacional"("usuarioId", "faseKey");
+CREATE UNIQUE INDEX "AptidaoOperacional_usuarioId_perfilOperacionalId_key" ON "AptidaoOperacional"("usuarioId", "perfilOperacionalId");
 
 -- CreateIndex
 CREATE INDEX "IndisponibilidadeOperacional_usuarioId_inicio_idx" ON "IndisponibilidadeOperacional"("usuarioId", "inicio");
@@ -6828,6 +6828,9 @@ ALTER TABLE "TarefaDependencia" ADD CONSTRAINT "TarefaDependencia_dependeDeId_fk
 
 -- AddForeignKey
 ALTER TABLE "AptidaoOperacional" ADD CONSTRAINT "AptidaoOperacional_usuarioId_fkey" FOREIGN KEY ("usuarioId") REFERENCES "Usuario"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "AptidaoOperacional" ADD CONSTRAINT "AptidaoOperacional_perfilOperacionalId_fkey" FOREIGN KEY ("perfilOperacionalId") REFERENCES "PerfilOperacionalDocumento"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "IndisponibilidadeOperacional" ADD CONSTRAINT "IndisponibilidadeOperacional_usuarioId_fkey" FOREIGN KEY ("usuarioId") REFERENCES "Usuario"("id") ON DELETE CASCADE ON UPDATE CASCADE;

@@ -126,14 +126,36 @@ const painel = await gestor.page.locator("body").innerText()
 ok("§3) o painel de configuração abre",
   /aptid[õo]es/i.test(painel) && /capacidade/i.test(painel) && /disponibilidade/i.test(painel))
 
-// APTIDÃO — marcar "Emissão documental" e salvar
-await gestor.page.locator("label").filter({ hasText: "Emissão documental" }).first().click()
-await gestor.page.getByRole("button", { name: /salvar aptidões/i }).click()
-await gestor.page.waitForTimeout(3000)
-const apos = await get(gestor, "/api/operacao/capacidade")
-const dani = (apos.body?.linhas ?? []).find((l) => l.usuarioId === DANI)
-ok("§3) a aptidão foi gravada pela tela", (dani?.aptidoes ?? []).some((a) => /Emiss/i.test(a)),
-  (dani?.aptidoes ?? []).join(", ") || "nenhuma")
+// APTIDÃO — as opções agora são UNIDADES DE TRABALHO, não fases macro.
+const dados = await get(gestor, "/api/operacao/capacidade")
+const unidades = dados.body?.unidades ?? []
+ok("§18) a tela oferece UNIDADES DE TRABALHO", unidades.length > 0, `${unidades.length} unidade(s)`)
+ok("§18) e o rótulo da seção mudou", /aptid[õo]es operacionais/i.test(painel))
+ok("§18) com a pergunta certa", /tipos de trabalho/i.test(painel))
+
+// §24 — a prova negativa: NENHUMA posição do processo virou competência.
+const nomesDasUnidades = unidades.map((u) => u.nome.toLowerCase())
+for (const posicao of ["finalizado", "aguardando protocolo", "protocolado", "emissão documental", "genealogia"]) {
+  ok(`§24) "${posicao}" não é oferecida como aptidão`, !nomesDasUnidades.includes(posicao))
+}
+ok("§24) e a tela não lista as 10 fases macro",
+  !/genealogia/i.test(painel) && !/finalizado/i.test(painel))
+
+const primeira = unidades[0]
+if (primeira) {
+  await gestor.page.locator("label").filter({ hasText: primeira.nome }).first().click()
+  await gestor.page.getByRole("button", { name: /salvar aptidões/i }).click()
+  await gestor.page.waitForTimeout(3000)
+  const apos = await get(gestor, "/api/operacao/capacidade")
+  const dani = (apos.body?.linhas ?? []).find((l) => l.usuarioId === DANI)
+  ok("§37) a aptidão foi gravada pela tela",
+    (dani?.aptidoes ?? []).includes(primeira.perfilOperacionalId),
+    (dani?.aptidoesDetalhadas ?? []).map((a) => a.nome).join(", ") || "nenhuma")
+  ok("§19) e a tela mostra o nome humano da unidade",
+    (dani?.aptidoesDetalhadas ?? []).some((a) => a.nome === primeira.nome))
+} else {
+  ok("§37) a aptidão foi gravada pela tela", false, "nenhuma unidade cadastrada no ambiente de teste")
+}
 
 // CAPACIDADE — definir teto pela tela
 await gestor.page.locator('input[type=number]').first().fill("3")
@@ -161,9 +183,11 @@ const avaliacao = (sim.body?.simulacao?.avaliacoes ?? []).find((a) => a.usuarioI
 ok("§9) quem está de férias ficou inelegível na hora", avaliacao?.elegivel === false)
 ok("§9) com o critério de disponibilidade reprovado",
   avaliacao?.criterios?.find((c) => c.chave === "DISPONIBILIDADE")?.veredito === "reprovado")
-ok("§9) e a aptidão declarada é reconhecida",
-  avaliacao?.criterios?.find((c) => c.chave === "APTIDAO")?.veredito !== "nao_aplicavel",
-  avaliacao?.criterios?.find((c) => c.chave === "APTIDAO")?.detalhe ?? "—")
+ok("§23) o recomendador declara a UNIDADE da tarefa, não a fase",
+  sim.body?.simulacao?.unidadeOperacional !== undefined,
+  sim.body?.simulacao?.unidadeOperacional?.nome ?? "tarefa sem unidade no cadastro")
+ok("§32) e a explicação não fala em fase",
+  !(sim.body?.simulacao?.explicacao ?? []).some((l) => /\bfase\b/i.test(l)))
 
 // encerrar as férias PELA TELA e ver voltar
 await gestor.page.getByRole("button", { name: /encerrar agora/i }).first().click()

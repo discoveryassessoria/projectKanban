@@ -81,6 +81,10 @@ async function limpar() {
   for (const p of procs) if (p.arvoreId) await prisma.pessoa.deleteMany({ where: { arvoreId: p.arvoreId } })
   await prisma.processo.deleteMany({ where: { id: { in: ids } } })
   await prisma.arvore.deleteMany({ where: { nome: { startsWith: MARCA } } })
+  await prisma.tipoDocumentoCadastro.deleteMany({ where: { code: { startsWith: MARCA } } })
+  await prisma.aptidaoOperacional.deleteMany({ where: { perfilOperacional: { code: { startsWith: MARCA } } } })
+  await prisma.perfilOperacionalDocumento.deleteMany({ where: { code: { startsWith: MARCA } } })
+  await prisma.familiaDocumental.deleteMany({ where: { code: { startsWith: MARCA } } })
   await prisma.itemCatalogo.deleteMany({ where: { code: { startsWith: MARCA } } })
 
   // A CAMADA OPERACIONAL DOS USUÁRIOS DO PALCO também é palco.
@@ -117,6 +121,23 @@ async function main() {
     update: { permissoesCustom: PERMISSOES_EXECUTOR }, select: { id: true },
   })
 
+  // A UNIDADE DE TRABALHO do palco.
+  //
+  // A tela de aptidões oferece PERFIS OPERACIONAIS do Cadastro Mestre — não
+  // fases. Sem um perfil cadastrado, a tela abre vazia e o E2E não teria o que
+  // clicar. Aqui existe UM, ligado aos tipos documentais que as cenas criam:
+  // é o mesmo caminho que produção percorre.
+  const familia = await prisma.familiaDocumental.upsert({
+    where: { code: `${MARCA}_FAM` },
+    create: { code: `${MARCA}_FAM`, name: 'Certidão de Registro Civil (palco)' },
+    update: {}, select: { id: true },
+  })
+  const perfil = await prisma.perfilOperacionalDocumento.upsert({
+    where: { code: `${MARCA}_EMISSAO` },
+    create: { code: `${MARCA}_EMISSAO`, name: 'Emissão de Certidão (palco)', familiaDocumentalId: familia.id },
+    update: { ativo: true }, select: { id: true },
+  })
+
   const criadas: Record<string, number> = {}
 
   for (const [i, c] of CENAS.entries()) {
@@ -147,6 +168,11 @@ async function main() {
         },
       })
     }
+    // O TIPO DOCUMENTAL liga o item à unidade de trabalho — é por esta cadeia
+    // que a Tarefa resolve a competência que exige.
+    await prisma.tipoDocumentoCadastro.create({
+      data: { code: `${MARCA}_TIPO_${i}`, name: c.item, itemCatalogoId: item.id, perfilOperacionalId: perfil.id },
+    })
     await reconciliarTarefas({ processoId: proc.id })
     const t = await prisma.tarefa.findFirstOrThrow({ where: { processoId: proc.id }, select: { id: true } })
     // Prioridade e prazo são atributos da tarefa, não estado: definir aqui não

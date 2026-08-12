@@ -80,6 +80,8 @@ const AUTORIZADOS_FORA_DO_RUNTIME: Record<string, string> = {
     "fluxo de distribuição: monta e derruba os PRÓPRIOS processos (marca DISTR), só no banco de teste — o cenário precisa de obrigação real para o motor criar a tarefa sozinho, que é justamente o que se prova",
   "scripts/palco-distribuicao.ts":
     "palco visual da Operação: monta e derruba os PRÓPRIOS processos (marca PALCO), só no banco de teste, para a captura de tela com dados realistas — não roda em produção",
+  "scripts/organizacao-capacidade.test.ts":
+    "ontologia operacional: monta e derruba as PRÓPRIAS unidades de trabalho, tipos, itens e necessidades (marca ORG), só no banco de teste — a prova de que fase ≠ aptidão exige DUAS unidades distintas alcançadas pela mesma fase macro, e a necessidade é o que liga a tarefa à sua unidade",
   "scripts/palco-gerencial.ts":
     "palco da visão gerencial global: monta e derruba os PRÓPRIOS processos (marca GERENCIAL), só no banco de teste — precisa de uma tarefa em CADA estado operacional para provar que o quadro coloca cada uma na sua coluna; os estados são alcançados pelas portas canônicas, só o cenário é montado aqui",
   "scripts/etapa-nao-e-tarefa.test.ts":
