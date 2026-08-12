@@ -25,6 +25,7 @@ import type { BlockingIssue } from "@/src/lib/motor/blocking-helpers"
 import { instanciarWorkflowDaFase, type OrigemInstanciaStr } from "@/src/services/phase-workflow"
 import { processarOutbox } from "@/src/services/outbox-dispatcher"
 import { materializarExecucaoDaFase, type FonteMaterializacao } from "@/src/services/materializar-fase"
+import { reconciliarTarefas } from "@/lib/operacional/reconciliar-tarefas"
 import {
   fotografarObrigacoes,
   compararObrigacoes,
@@ -107,6 +108,8 @@ export interface AdvanceOk {
   } | null
   /** Prova de que nenhuma obrigação de outra fase foi tocada. */
   obrigacoesPreservadas?: ResultadoInvariantes["resumo"] | null
+  /** O que a transição fez com as tarefas da fase que saiu. */
+  tarefasReconciliadas?: { encerradasSemCausa: number; aguardandoDecisao: number }
 }
 
 export interface AdvanceErr {
@@ -448,6 +451,36 @@ async function executarPlano(p: Plano): Promise<AdvanceResult> {
         }
       }
     }
+    // 4c) RECONCILIAÇÃO DA FASE DE ORIGEM — o outro lado da mesma transição.
+    //
+    // Mudar de fase SUPERSEDE a instância da fase anterior (passo 1). O que faltava
+    // era o efeito disso sobre as TAREFAS que projetavam aquela instância: elas
+    // continuavam na fila de alguém, com um passo de um workflow que o próprio motor
+    // acabara de declarar superado.
+    //
+    // Foi assim que o processo 523 do Ademir ficou com DUAS linhas do mesmo trabalho:
+    // a viva, da Emissão Documental, e a residual, da Genealogia supersedida. Não era
+    // duplicidade de identidade — era a fila sem saber que uma delas tinha acabado.
+    //
+    // O reconciliador já sabia o que fazer, e faz com cuidado: tarefa nunca iniciada é
+    // cancelada; tarefa em que ALGUÉM JÁ TRABALHOU não é cancelada por máquina — fica
+    // marcada como "causa removida" e espera decisão de quem pode tomá-la. Aqui só se
+    // liga a causa ao efeito.
+    //
+    // Best-effort e fora da transação, como a materialização: uma falha aqui não desfaz
+    // o avanço, e a reconciliação periódica completa depois.
+    if (out.success && out.changed) {
+      try {
+        const rec = await reconciliarTarefas({ processoId: p.processoId })
+        out.tarefasReconciliadas = {
+          encerradasSemCausa: rec.tarefasEncerradasSemCausa,
+          aguardandoDecisao: rec.tarefasAguardandoDecisao,
+        }
+      } catch (e) {
+        console.error(`[avanço de fase] reconciliação da fase de origem falhou (proc ${p.processoId}); a periódica completa:`, e)
+      }
+    }
+
     if (out.success) out.obrigacoesPreservadas = (invariantes as ResultadoInvariantes | null)?.resumo ?? null
 
     // Drena o phase.entered recém-emitido: os EFEITOS ADICIONAIS da nova fase (automações

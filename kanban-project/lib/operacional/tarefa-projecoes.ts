@@ -76,13 +76,17 @@ const SELECT = {
   pessoaId: true,
   createdAt: true, dataAtribuicao: true,
   necessidade: { select: { itemCatalogo: { select: { name: true } } } },
-  workflowStepInstance: { select: { stepKey: true, snapshot: true } },
+  workflowStepInstance: { select: { stepKey: true, snapshot: true, stepDefinitionId: true } },
   dependeDe: { select: { obrigatoria: true, dependeDe: { select: { statusTarefa: true } } } },
 } satisfies Prisma.TarefaSelect
 
 type Bruta = Prisma.TarefaGetPayload<{ select: typeof SELECT }>
 
-function projetar(t: Bruta, agora: Date, nomes?: Map<number, string>): LinhaDeFila {
+function projetar(
+  t: Bruta, agora: Date,
+  nomes?: Map<number, string>,
+  rotulosDePasso?: Map<number, string>,
+): LinhaDeFila {
   const snap = t.workflowStepInstance?.snapshot as { label?: string } | null
   const hoje = diaOperacional(agora)
   const diaDoPrazo = t.dataPrazo ? diaOperacional(t.dataPrazo) : null
@@ -97,7 +101,19 @@ function projetar(t: Bruta, agora: Date, nomes?: Map<number, string>): LinhaDeFi
     processoNome: t.processo?.nome ?? null,
     pessoaNome: t.pessoaId != null ? nomes?.get(t.pessoaId) ?? null : null,
     faseMacroKey: t.faseMacroKey,
-    etapaAtual: snap?.label ?? t.workflowStepInstance?.stepKey ?? null,
+    // O NOME DO PASSO, na ordem da fonte mais próxima do que foi publicado:
+    // o snapshot do momento da instanciação, depois a DEFINIÇÃO publicada, e a
+    // chave técnica só como último recurso. A instância da Emissão Documental
+    // nasceu sem label no snapshot, e por isso a fila mostrava
+    // "solicitar_certidao" para quem só queria ler "Solicitar certidão" — o
+    // nome existia o tempo todo, no passo publicado.
+    etapaAtual:
+      snap?.label
+      ?? (t.workflowStepInstance?.stepDefinitionId != null
+        ? rotulosDePasso?.get(t.workflowStepInstance.stepDefinitionId) ?? null
+        : null)
+      ?? t.workflowStepInstance?.stepKey
+      ?? null,
     statusTarefa: t.statusTarefa,
     equipeKey: t.equipeKey,
     responsavelId: t.responsavelId,
@@ -121,6 +137,23 @@ function projetar(t: Bruta, agora: Date, nomes?: Map<number, string>): LinhaDeFi
   }
 }
 
+/**
+ * OS NOMES PUBLICADOS DOS PASSOS — uma consulta, nunca uma por tarefa.
+ *
+ * `stepDefinitionId` é FK solta (sem relation no modelo), então o join não vem
+ * de graça no `select`: resolve-se em lote, como os nomes de pessoa.
+ */
+async function rotulosDosPassos(linhas: Bruta[]): Promise<Map<number, string>> {
+  const ids = [...new Set(
+    linhas.map((l) => l.workflowStepInstance?.stepDefinitionId).filter((x): x is number => x != null),
+  )]
+  if (ids.length === 0) return new Map()
+  const defs = await prisma.phaseInternalWorkflowStep.findMany({
+    where: { id: { in: ids } }, select: { id: true, label: true },
+  })
+  return new Map(defs.map((d) => [d.id, d.label]))
+}
+
 /** Os nomes das pessoas das linhas — UMA consulta, nunca uma por tarefa. */
 async function nomesDasPessoas(linhas: Array<{ pessoaId: number | null }>): Promise<Map<number, string>> {
   const ids = [...new Set(linhas.map((l) => l.pessoaId).filter((x): x is number => x != null))]
@@ -136,14 +169,18 @@ async function nomesDasPessoas(linhas: Array<{ pessoaId: number | null }>): Prom
  * próximo, depois prioridade. Tarefa sem prazo vai para o fim, não para o
  * começo: ausência de prazo não é urgência.
  */
-export async function minhaFila(usuarioId: number, agora = new Date()): Promise<LinhaDeFila[]> {
-  const linhas = await prisma.tarefa.findMany({
-    where: { responsavelId: usuarioId, statusTarefa: { in: STATUS_ATIVOS } },
-    select: SELECT,
-    orderBy: [{ dataPrazo: { sort: 'asc', nulls: 'last' } }, { prioridade: 'desc' }, { id: 'asc' }],
-  })
-  const nomes = await nomesDasPessoas(linhas)
-  return ordenarFila(linhas.map((t) => projetar(t, agora, nomes)))
+export async function minhaFila(usuarioId: number, agora = new Date()): Promise<LinhaGerencial[]> {
+  // UMA FONTE, DUAS TELAS.
+  //
+  // A Minha Fila lia uma projeção mais pobre que a da visão gerencial: sem
+  // "vence hoje", sem há-quanto-tempo-espera, sem motivo do bloqueio. O
+  // funcionário via menos do que o gestor sobre o próprio trabalho — e duas
+  // projeções do mesmo fato acabam divergindo.
+  //
+  // Agora é a MESMA consulta, com o recorte de quem executa.
+  const { linhas } = await visaoGerencial({ responsavelId: usuarioId, porPagina: 500 }, agora)
+  // Encerradas não são fila: o que já foi entregue não é trabalho de hoje.
+  return ordenarFila(linhas.filter((l) => l.coluna !== 'CONCLUIDA')) as LinhaGerencial[]
 }
 
 /**
@@ -158,8 +195,8 @@ export async function filaDaEquipe(equipeKey: string, agora = new Date()): Promi
     select: SELECT,
     orderBy: [{ dataPrazo: { sort: 'asc', nulls: 'last' } }, { prioridade: 'desc' }, { id: 'asc' }],
   })
-  const nomes = await nomesDasPessoas(linhas)
-  return ordenarFila(linhas.map((t) => projetar(t, agora, nomes)))
+  const [nomes, rotulos] = await Promise.all([nomesDasPessoas(linhas), rotulosDosPassos(linhas)])
+  return ordenarFila(linhas.map((t) => projetar(t, agora, nomes, rotulos)))
 }
 
 /**
@@ -216,8 +253,8 @@ export async function semResponsavel(agora = new Date(), filtro: { equipeKey?: s
     },
     select: SELECT,
   })
-  const nomes = await nomesDasPessoas(linhas)
-  return ordenarFila(linhas.map((t) => projetar(t, agora, nomes)))
+  const [nomes, rotulos] = await Promise.all([nomesDasPessoas(linhas), rotulosDosPassos(linhas)])
+  return ordenarFila(linhas.map((t) => projetar(t, agora, nomes, rotulos)))
 }
 
 /** Os recortes que a fila mostra separados — sem virar estados novos. */
@@ -289,7 +326,19 @@ export function montarTimeline(fontes: {
   // Os eventos do WORKFLOW dizem o que aconteceu com as ETAPAS, e ganham o
   // nome publicado do passo — "Etapa concluída: Solicitar certidão" responde
   // mais do que "PASSO_CONCLUIDO".
+  //
+  // ─── UM FATO, UMA LINHA ───────────────────────────────────────────────────
+  // Iniciar a tarefa deixa rastro nas DUAS fontes: a auditoria escreve
+  // "Tarefa iniciada" e o motor emite `TAREFA_INICIADA` no workflow, porque o
+  // passo começou junto. São o mesmo acontecimento visto de dois lugares — e a
+  // timeline mostrava os dois, o que fazia parecer que a tarefa tinha sido
+  // iniciada duas vezes.
+  //
+  // A auditoria vence: ela já está em português e é a fonte que narra a TAREFA.
+  // Os eventos que falam da tarefa (e não da etapa) saem daqui.
+  const EVENTOS_QUE_A_AUDITORIA_JA_CONTA = new Set(['TAREFA_INICIADA', 'TAREFA_CONCLUIDA'])
   for (const e of fontes.eventos) {
+    if (EVENTOS_QUE_A_AUDITORIA_JA_CONTA.has(e.tipo)) continue
     const base = FRASE_DO_EVENTO[e.tipo]
     if (!base) continue
     fatos.push({ em: e.criadoEm.toISOString(), tipo: 'etapa', texto: e.nomeDaEtapa ? `${base}: ${e.nomeDaEtapa}` : base, autor: null })
@@ -795,14 +844,14 @@ export async function visaoGerencial(
     }),
   ])
 
-  const nomes = await nomesDasPessoas(brutas)
+  const [nomes, rotulos] = await Promise.all([nomesDasPessoas(brutas), rotulosDosPassos(brutas)])
   const paradas = await contextoDeParada(
     brutas.filter((t) => t.statusTarefa === 'BLOQUEADA' || t.statusTarefa === 'AGUARDANDO_TERCEIRO').map((t) => t.id),
   )
   const hoje = diaOperacional(agora)
 
   const linhas = brutas.map((t): LinhaGerencial => {
-    const base = projetar(t, agora, nomes)
+    const base = projetar(t, agora, nomes, rotulos)
     const parada = paradas.get(t.id)
     const espera = parada?.esperandoDesde ?? null
     const esperando = t.statusTarefa === 'AGUARDANDO_TERCEIRO' || t.statusTarefa === 'AGUARDANDO_CLIENTE'

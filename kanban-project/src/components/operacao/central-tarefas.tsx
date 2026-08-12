@@ -31,6 +31,46 @@ import {
 
 export type { LinhaDeFila }
 
+/**
+ * A LINHA DA FILA, ENRIQUECIDA.
+ *
+ * A Minha Fila passou a ler a MESMA projeção da visão gerencial — antes ela
+ * mostrava menos sobre o próprio trabalho do que o gestor via. Estes campos
+ * derivados não são estados novos: `atrasada` e `venceHoje` saem do prazo,
+ * `esperandoHaDias` e `motivoBloqueio` saem do histórico canônico.
+ */
+export interface LinhaOperacional extends LinhaDeFila {
+  venceHoje: boolean
+  coluna: "SEM_RESPONSAVEL" | "A_FAZER" | "EM_ANDAMENTO" | "AGUARDANDO_TERCEIRO" | "BLOQUEADA" | "CONCLUIDA"
+  esperandoDe: "terceiro" | "cliente" | null
+  esperandoDesde: string | null
+  esperandoHaDias: number | null
+  motivoBloqueio: string | null
+  concluidaEm: string | null
+}
+
+/** O prazo em linguagem operacional — a data sozinha não diz o que fazer. */
+export function urgencia(l: LinhaOperacional): { texto: string; tom: "critico" | "alerta" | "neutro" } {
+  if (l.dataPrazo == null) return { texto: "Sem prazo", tom: "neutro" }
+  if (l.atrasada) {
+    const d = Math.abs(l.diasParaPrazo ?? 0)
+    return { texto: d <= 1 ? "Atrasada há 1 dia" : `Atrasada há ${d} dias`, tom: "critico" }
+  }
+  if (l.venceHoje) return { texto: "Vence hoje", tom: "alerta" }
+  const d = l.diasParaPrazo ?? 0
+  if (d === 1) return { texto: "Vence amanhã", tom: "alerta" }
+  return { texto: `Vence em ${d} dias`, tom: "neutro" }
+}
+
+/** A ação principal — UMA por cartão, decidida pelo estado. */
+export function acaoPrincipal(l: LinhaOperacional): { rotulo: string; comando: "iniciar" | null } {
+  if (l.coluna === "A_FAZER") return { rotulo: "Iniciar tarefa", comando: "iniciar" }
+  if (l.coluna === "BLOQUEADA") return { rotulo: "Ver bloqueio", comando: null }
+  if (l.coluna === "AGUARDANDO_TERCEIRO") return { rotulo: "Ver etapa", comando: null }
+  if (l.coluna === "CONCLUIDA") return { rotulo: "Ver histórico", comando: null }
+  return { rotulo: "Continuar", comando: null }
+}
+
 type Visao = "minha_fila" | "sem_responsavel"
 type Modo = "lista" | "calendario"
 
@@ -126,9 +166,116 @@ function agruparPorDia(linhas: LinhaDeFila[]): Array<{ dia: string; rotulo: stri
 }
 
 /** Os quatro estados obrigatórios de qualquer superfície do Discovery. */
+/**
+ * O CARTÃO DA MINHA FILA — o cockpit de quem executa.
+ *
+ * A pergunta que ele responde em um relance é "o que eu faço agora": o estado
+ * operacional, a etapa em nome de gente, quanto tempo falta (ou passou), e UMA
+ * ação principal. Prazo aqui não é data solta — é "vence em 3 dias", porque a
+ * data sozinha obriga cada pessoa a fazer a conta na cabeça.
+ *
+ * O que está parado diz POR QUE está parado, no próprio cartão: bloqueio com
+ * motivo, espera com há-quanto-tempo. Sem isso, descobrir o motivo custava
+ * abrir a tarefa e ler o histórico.
+ */
+function CartaoDaFila({
+  l, ocupado, aoAbrir, aoIniciar, acaoSecundaria,
+}: {
+  l: LinhaOperacional
+  ocupado: boolean
+  aoAbrir: () => void
+  aoIniciar: () => void
+  acaoSecundaria?: React.ReactNode
+}) {
+  const u = urgencia(l)
+  const acao = acaoPrincipal(l)
+  const contexto = [l.pessoaNome, l.processoNome].filter(Boolean).join(" · ")
+  const corDaBorda =
+    l.atrasada ? "border-l-red-400/70"
+    : l.venceHoje ? "border-l-amber-300/70"
+    : l.coluna === "BLOQUEADA" ? "border-l-red-300/40"
+    : l.coluna === "AGUARDANDO_TERCEIRO" ? "border-l-white/20"
+    : "border-l-transparent"
+
+  return (
+    <div className={`border-b border-l-2 border-white/[0.06] px-4 py-3 transition-colors last:border-b-0 hover:bg-white/[0.02] ${corDaBorda}`}>
+      <div className="flex items-start justify-between gap-4">
+        <button type="button" onClick={aoAbrir} className="min-w-0 flex-1 cursor-pointer text-left">
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="truncate text-[13px] font-medium text-white/90">{l.titulo}</span>
+            {l.prioridade === "URGENTE" && <Etiqueta tom="alerta">Urgente</Etiqueta>}
+            {l.requerDecisao && <Etiqueta tom="alerta">Requer decisão</Etiqueta>}
+            {l.aguardandoDependencia && <Etiqueta tom="neutro">Depende de outra</Etiqueta>}
+          </div>
+          {contexto && <div className="mt-0.5 truncate text-[11px] text-white/45">{contexto}</div>}
+
+          {/* ESTADO + ETAPA: as duas coisas que dizem onde o trabalho está. */}
+          <div className="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px]">
+            <span className="text-white/70">{ROTULO_STATUS[l.statusTarefa] ?? l.statusTarefa}</span>
+            {l.etapaAtual && (
+              <>
+                <span className="text-white/20">›</span>
+                <span className="text-white/60">{l.etapaAtual}</span>
+              </>
+            )}
+            {rotularFase(l.faseMacroKey) && (
+              <span className="text-white/25">· {rotularFase(l.faseMacroKey)}</span>
+            )}
+          </div>
+
+          {/* POR QUE ESTÁ PARADO — no cartão, não a três cliques de distância. */}
+          {l.coluna === "AGUARDANDO_TERCEIRO" && l.esperandoHaDias != null && (
+            <div className="mt-1 text-[11px] text-white/45">
+              Aguardando {l.esperandoDe === "cliente" ? "o cliente" : "terceiro"} há {l.esperandoHaDias} dia
+              {l.esperandoHaDias === 1 ? "" : "s"}
+            </div>
+          )}
+          {l.motivoBloqueio && (
+            <div className="mt-1 text-[11px] text-red-200/75">Bloqueio: {l.motivoBloqueio}</div>
+          )}
+        </button>
+
+        <div className="flex shrink-0 flex-col items-end gap-1.5">
+          {/* PRAZO OPERACIONAL: o que ele significa vem primeiro; a data, depois. */}
+          <div className="text-right">
+            <div className={`text-[11px] font-medium ${
+              u.tom === "critico" ? "text-red-300/90" : u.tom === "alerta" ? "text-amber-200/90" : "text-white/55"
+            }`}>
+              {u.texto}
+            </div>
+            {l.dataPrazo && <div className="text-[10px] tabular-nums text-white/30">{dataCurta(l.dataPrazo)}</div>}
+          </div>
+          <div className="flex items-center gap-1.5">
+            {acaoSecundaria}
+            <button
+              disabled={ocupado}
+              onClick={() => (acao.comando === "iniciar" ? aoIniciar() : aoAbrir())}
+              className="rounded border border-white/15 bg-white/[0.06] px-2.5 py-1 text-[11px] text-white/85 transition-colors hover:bg-white/[0.1] disabled:opacity-40"
+            >
+              {acao.rotulo}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+/** Os recortes da fila — derivados, nunca estados novos. */
+const FILTROS: Array<{ id: string; rotulo: string; aplica: (l: LinhaOperacional) => boolean }> = [
+  { id: "todas", rotulo: "Todas", aplica: () => true },
+  { id: "a_fazer", rotulo: "A fazer", aplica: (l) => l.coluna === "A_FAZER" },
+  { id: "em_andamento", rotulo: "Em andamento", aplica: (l) => l.coluna === "EM_ANDAMENTO" },
+  { id: "aguardando", rotulo: "Aguardando terceiro", aplica: (l) => l.coluna === "AGUARDANDO_TERCEIRO" },
+  { id: "bloqueadas", rotulo: "Bloqueadas", aplica: (l) => l.coluna === "BLOQUEADA" },
+  { id: "atrasadas", rotulo: "Atrasadas", aplica: (l) => l.atrasada },
+  { id: "vence_hoje", rotulo: "Vence hoje", aplica: (l) => l.venceHoje },
+]
+
 export function CentralTarefas({ podeDistribuir }: { podeDistribuir: boolean }) {
   const [visao, setVisao] = useState<Visao>(podeDistribuir ? "sem_responsavel" : "minha_fila")
-  const [resultado, setResultado] = useState<{ chave: string; lista: LinhaDeFila[] | null } | null>(null)
+  const [resultado, setResultado] = useState<{ chave: string; lista: LinhaOperacional[] | null } | null>(null)
+  const [filtro, setFiltro] = useState("todas")
   const [recarga, setRecarga] = useState(0)
   const [alvo, setAlvo] = useState<LinhaDeFila | null>(null)
   const [ocupado, setOcupado] = useState(false)
@@ -144,7 +291,7 @@ export function CentralTarefas({ podeDistribuir }: { podeDistribuir: boolean }) 
     let vivo = true
     fetch(`/api/operacao/tarefas?visao=${visao}`, { headers: auth() })
       .then((r) => (r.ok ? r.json() : Promise.reject(new Error(String(r.status)))))
-      .then((d: { linhas?: LinhaDeFila[] }) => { if (vivo) setResultado({ chave, lista: d.linhas ?? [] }) })
+      .then((d: { linhas?: LinhaOperacional[] }) => { if (vivo) setResultado({ chave, lista: d.linhas ?? [] }) })
       .catch(() => { if (vivo) setResultado({ chave, lista: null }) })
     return () => { vivo = false }
   }, [chave, visao])
@@ -239,6 +386,31 @@ export function CentralTarefas({ podeDistribuir }: { podeDistribuir: boolean }) 
         </div>
       </div>
 
+      {/* FILTROS DA FILA — recortes derivados, sem criar estado novo. Cada um
+          mostra a contagem, para o funcionário saber onde está o volume antes
+          de clicar. */}
+      {visao === "minha_fila" && linhas != null && linhas.length > 0 && (
+        <div className="mb-2 flex flex-wrap gap-1">
+          {FILTROS.map((f) => {
+            const n = linhas.filter(f.aplica).length
+            if (n === 0 && f.id !== "todas") return null
+            return (
+              <button
+                key={f.id}
+                onClick={() => setFiltro(f.id)}
+                className={`rounded border px-2 py-1 text-[11px] transition-colors ${
+                  filtro === f.id
+                    ? "border-white/25 bg-white/[0.08] text-white/85"
+                    : "border-white/10 text-white/45 hover:text-white/75"
+                }`}
+              >
+                {f.rotulo} <span className="tabular-nums text-white/35">{n}</span>
+              </button>
+            )
+          })}
+        </div>
+      )}
+
       {aviso && (
         <div className="mb-2 rounded border border-sky-300/20 bg-sky-400/[0.07] px-3 py-2 text-[11px] text-sky-100/85">
           {aviso}
@@ -270,7 +442,20 @@ export function CentralTarefas({ podeDistribuir }: { podeDistribuir: boolean }) 
             </div>
           ))}
 
-        {modo === "lista" && linhas?.map((l) => (
+        {/* MINHA FILA: cockpit. O cartão diz estado, etapa, prazo e a ação. */}
+        {modo === "lista" && visao === "minha_fila" && linhas?.filter(
+          (l) => FILTROS.find((f) => f.id === filtro)?.aplica(l) ?? true,
+        ).map((l) => (
+          <CartaoDaFila
+            key={l.taskId}
+            l={l}
+            ocupado={ocupado}
+            aoAbrir={() => setAberta(l.taskId)}
+            aoIniciar={() => void comandar(l.taskId, { acao: "iniciar" }, "Tarefa iniciada.").then((ok) => { if (ok) setAberta(l.taskId) })}
+          />
+        ))}
+
+        {modo === "lista" && visao === "sem_responsavel" && linhas?.map((l) => (
           <Linha
             key={l.taskId}
             l={l}

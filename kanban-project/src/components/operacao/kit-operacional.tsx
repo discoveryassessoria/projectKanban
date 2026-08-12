@@ -46,6 +46,7 @@ export interface LinhaDeFila {
 interface Funcionario {
   id: number
   nome: string
+  email?: string
   tarefasAtivas: number
   atrasadas: number
 }
@@ -192,7 +193,12 @@ export function SeletorResponsavel({
               onClick={() => aoEscolher(f.id)}
               className="flex w-full items-center justify-between border-b border-white/[0.05] px-4 py-2.5 text-left transition-colors last:border-b-0 hover:bg-white/[0.04] disabled:opacity-40"
             >
-              <span className="text-[12px] text-white/85">{f.nome}</span>
+              <span className="min-w-0">
+                <span className="block truncate text-[12px] text-white/85">{f.nome}</span>
+                {/* Discreto, mas presente: dois funcionários de mesmo nome eram
+                    duas linhas idênticas no seletor. */}
+                {f.email && <span className="block truncate text-[10px] text-white/30">{f.email}</span>}
+              </span>
               <span className="text-[10px] tabular-nums text-white/35">
                 {f.tarefasAtivas} ativa{f.tarefasAtivas === 1 ? "" : "s"}
                 {f.atrasadas > 0 && <span className="text-red-300/70"> · {f.atrasadas} atrasada{f.atrasadas === 1 ? "" : "s"}</span>}

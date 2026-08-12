@@ -26,7 +26,8 @@ import { STATUS_TERMINAIS } from './tarefa-canonica'
 import { transicionarPassoTx } from '@/src/services/task-step-sync'
 
 export type ResultadoComando =
-  | { ok: true; tarefaId: number; notificacaoId: number | null }
+  /** `jaEstavaIniciada` distingue "fiz agora" de "já estava feito" sem virar erro. */
+  | { ok: true; tarefaId: number; notificacaoId: number | null; jaEstavaIniciada?: boolean }
   | { ok: false; codigo: 'NAO_ENCONTRADA' | 'TERMINAL' | 'CONFLITO' | 'SEM_RESPONSAVEL' | 'MESMO_RESPONSAVEL'; mensagem: string }
 
 /** O link canônico da tarefa — um só, para todas as visões e avisos. */
@@ -222,14 +223,40 @@ export async function iniciarTarefa(args: {
       return { ok: false as const, codigo: 'CONFLITO' as const, mensagem: 'Só o responsável pode iniciar a tarefa.' }
     }
 
-    await tx.tarefa.update({
-      where: { id: t.id },
+    // ─── INICIAR É IDEMPOTENTE ────────────────────────────────────────────────
+    //
+    // Quem já começou não começa de novo. Sem esta guarda, cada nova chamada —
+    // um segundo clique, um retry, uma tela remontando — gravava outro
+    // "Tarefa iniciada" no histórico. Em produção isso rendeu QUATRO inícios
+    // para o mesmo trabalho, três deles em 65 segundos, e o histórico deixou de
+    // narrar o que aconteceu para narrar quantas vezes alguém clicou.
+    //
+    // `dataInicio` já era preservada; o que faltava era não registrar o fato
+    // duas vezes. A resposta é de SUCESSO: o estado desejado é o estado atual,
+    // e quem chamou não precisa tratar isso como erro.
+    if (t.statusTarefa === 'EM_ANDAMENTO' && t.dataInicio != null) {
+      return { ok: true as const, tarefaId: t.id, notificacaoId: null, jaEstavaIniciada: true }
+    }
+
+    // A GUARDA ACIMA NÃO BASTA SOZINHA — ela lê, e entre o ler e o escrever cabe
+    // outra chamada. Foi o que o teste flagrou: um clique na tela e um POST
+    // simultâneo passaram os dois pela leitura e gravaram DOIS inícios.
+    //
+    // Quem decide é o banco: a escrita só acontece se a tarefa ainda NÃO estiver
+    // em andamento. Perdeu a corrida, `count` volta 0 — e aí não há transição,
+    // logo não há evento. A guarda de cima continua valendo para o caso comum
+    // (evita a escrita inútil); esta fecha o caso concorrente.
+    const transicao = await tx.tarefa.updateMany({
+      where: { id: t.id, statusTarefa: { not: 'EM_ANDAMENTO' } },
       data: {
         statusTarefa: 'EM_ANDAMENTO',
         dataInicio: t.dataInicio ?? agora,
         lockVersion: { increment: 1 },
       },
     })
+    if (transicao.count === 0) {
+      return { ok: true as const, tarefaId: t.id, notificacaoId: null, jaEstavaIniciada: true }
+    }
     // A ETAPA CORRENTE COMEÇA JUNTO — pela porta de quem é dono dela.
     //
     // Iniciar a tarefa e deixar o passo em DISPONIVEL não é contradição, mas é

@@ -28,7 +28,7 @@ export async function GET(request: NextRequest) {
   if (erro) return erro
 
   const usuarios = await prisma.usuario.findMany({
-    select: { id: true, nome: true, tipo: true, permissoesCustom: true, perfil: { select: { permissoes: true } } },
+    select: { id: true, nome: true, email: true, tipo: true, permissoesCustom: true, perfil: { select: { permissoes: true } } },
     orderBy: { nome: 'asc' },
   })
 
@@ -44,6 +44,10 @@ export async function GET(request: NextRequest) {
     .map((u) => ({
       id: u.id,
       nome: u.nome,
+      // O E-MAIL desambigua homônimos. Escolher a pessoa errada para receber
+      // trabalho é erro silencioso: ninguém percebe até o trabalho ir parar na
+      // fila de quem não devia.
+      email: u.email,
       // Carga atual, sem juízo de valor: quantas tarefas ativas e quantas já
       // estouraram o prazo. Quem distribui olha e decide.
       tarefasAtivas: carga.get(u.id)?.tarefasAtivas ?? 0,
