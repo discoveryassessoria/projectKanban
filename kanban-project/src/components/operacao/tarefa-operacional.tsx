@@ -188,6 +188,14 @@ export function TarefaOperacional({ taskId, aoFechar, aoMudar }: { taskId: numbe
   const aguardando = t?.statusTarefa === "AGUARDANDO_TERCEIRO"
 
   return (
+    <>
+    {/* O FUNDO FECHA O PAINEL — mas só ele.
+        Este `onClick` já esteve no elemento que ENVOLVIA o executor, e engolia
+        os cliques dele: o executor é montado por `createPortal`, e no React o
+        evento sobe pela árvore de COMPONENTES, não pela do DOM. Resultado: o
+        operador marcava "Digital (PDF eletrônico)" dentro do modal e o painel
+        inteiro fechava por baixo dele. Agora o executor é IRMÃO deste overlay,
+        não filho. */}
     <div className="fixed inset-0 z-[70] flex justify-end bg-black/50" onClick={aoFechar}>
       <aside
         className="flex h-full w-full max-w-xl flex-col overflow-hidden border-l border-white/10 bg-[#0b0d10] shadow-2xl"
@@ -370,6 +378,7 @@ export function TarefaOperacional({ taskId, aoFechar, aoMudar }: { taskId: numbe
           </footer>
         )}
       </aside>
+    </div>
 
       {/* O EXECUTOR ESPECIALIZADO — o mesmo da Central, com contexto canônico.
           `stepId` É o stepInstanceId; o documento vem da etapa, não de estado
@@ -400,6 +409,6 @@ export function TarefaOperacional({ taskId, aoFechar, aoMudar }: { taskId: numbe
           }}
         />
       )}
-    </div>
+    </>
   )
 }

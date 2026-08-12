@@ -110,7 +110,11 @@ async function preencherPorPlaceholder(placeholder, valor) {
 }
 
 /** A ação terminal do MODAL é sempre a que fecha a etapa. */
-const acaoTerminal = () => page.locator("button").filter({ hasText: /concluir etapa/i }).first()
+// A ação terminal não tem um texto só: "Confirmar envio · concluir etapa",
+// "Confirmar recebimento · concluir etapa", "Confirmar decisão · FINALIZAR
+// etapa". Cada executor nomeia o próprio gesto — o que elas têm em comum é
+// fechar a etapa.
+const acaoTerminal = () => page.locator("button").filter({ hasText: /(concluir|finalizar) etapa/i }).first()
 const acaoTerminalHabilitada = async () =>
   (await acaoTerminal().count()) > 0 && (await acaoTerminal().isEnabled().catch(() => false))
 /** Motivo do bloqueio, quando houver — sem derrubar o teste se o botão sumiu. */
@@ -284,8 +288,10 @@ ok("o executor da etapa 4 abriu", await abrirEtapaAtual())
 await page.screenshot({ path: `${OUT}/e2e-4-conferir.png` })
 // EXIGÊNCIAS REAIS DA CONFERÊNCIA: o nome do titular COMO ESTÁ no documento
 // (é o que permite comparar com o cadastro) e o resultado da conferência.
-await preencherPrimeiroTextoVisivel("Eduardo Almeida")
-await page.locator("button").filter({ hasText: /^Aprovar/ }).first().click().catch(() => {})
+// O campo do titular tem o próprio placeholder. `primeiro campo visível`
+// pegava a BUSCA DO CABEÇALHO — fora do modal, e sem efeito nenhum aqui.
+await preencherPorPlaceholder("Eduardo Almeida", "Eduardo Almeida")
+await page.locator("button").filter({ hasText: /Aprovar/ }).first().click()
 await page.waitForTimeout(1200)
 await page.screenshot({ path: `${OUT}/e2e-4-conferir.png` })
 ok("4) a ação terminal liberou", await acaoTerminalHabilitada(), await impedimento())
@@ -303,7 +309,7 @@ ok("o executor da etapa 5 abriu", await abrirEtapaAtual())
 await page.screenshot({ path: `${OUT}/e2e-5-validar.png` })
 // EXIGÊNCIA REAL DA VALIDAÇÃO: a decisão jurídica. "Aprovado" dispensa
 // parecer; qualquer outra decisão exige o parecer escrito.
-await page.locator("button").filter({ hasText: /^Aprovado/ }).first().click().catch(() => {})
+await page.locator("button").filter({ hasText: /Aprovado/ }).first().click().catch(() => {})
 await page.waitForTimeout(1200)
 await page.screenshot({ path: `${OUT}/e2e-5-validar.png` })
 ok("5) a ação terminal liberou", await acaoTerminalHabilitada(), await impedimento())

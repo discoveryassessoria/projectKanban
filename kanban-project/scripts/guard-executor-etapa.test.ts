@@ -177,6 +177,34 @@ for (const arq of ["src/services/passo-tarefa.ts", "lib/operacional/reconciliar-
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
+secao("8) Selecionar dentro do executor NÃO fecha o painel")
+// ═══════════════════════════════════════════════════════════════════════════
+/**
+ * O BUG QUE ESTE BLOCO TRANCA.
+ *
+ * O executor é montado por `createPortal`. No React, o evento sobe pela árvore
+ * de COMPONENTES, não pela do DOM — então um clique dentro do modal chega aos
+ * handlers de quem o renderizou, mesmo o modal estando em `document.body`.
+ *
+ * Com o executor renderizado DENTRO do overlay do painel (que tem
+ * `onClick={aoFechar}`), marcar "Digital (PDF eletrônico)" fechava a tarefa
+ * inteira por baixo do operador. As etapas 3, 4 e 5 eram inconcluíveis pela
+ * tela — e o backend estava certo o tempo todo.
+ *
+ * A correção é estrutural: o executor é IRMÃO do overlay, não filho.
+ */
+const painelSrc = ler("src/components/operacao/tarefa-operacional.tsx")
+const posOverlay = painelSrc.indexOf('onClick={aoFechar}>')
+const posExecutor = painelSrc.indexOf("<StepEditorRouter")
+const fechaOverlayAntes = painelSrc.lastIndexOf("</div>", posExecutor)
+ok("o executor é montado FORA do overlay que fecha o painel",
+  posOverlay > 0 && posExecutor > 0 && fechaOverlayAntes > posOverlay,
+  "portal propaga evento pela árvore de componentes; dentro do overlay, todo clique fecharia a tarefa")
+ok("e o painel devolve um fragmento, não a div do overlay",
+  /return \(\s*<>/.test(semComentarios(painelSrc)),
+  "é o que permite o executor ser irmão do fundo clicável")
+
+// ═══════════════════════════════════════════════════════════════════════════
 console.log(`\n${"═".repeat(70)}`)
 console.log(`RESULTADO: ${passou} passaram, ${falhou} falharam`)
 if (falhou > 0) {
