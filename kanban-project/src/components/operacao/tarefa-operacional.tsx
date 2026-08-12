@@ -46,6 +46,20 @@ interface Etapa {
   documentoId: number | null
 }
 
+interface Anexo {
+  id: number
+  nome: string
+  url: string
+  classificacao: string | null
+  finalidade: string
+  autor: string | null
+  em: string
+  etapaId: number | null
+}
+interface ProtocoloItem { id: number; numero: string | null; tipo: string | null; em: string }
+interface ObservacaoItem { id: number; texto: string; autor: string | null; em: string }
+interface FatoDaTimeline { em: string; tipo: string; texto: string; autor: string | null }
+
 interface HistoricoItem {
   id: number
   acao: string
@@ -67,6 +81,11 @@ export interface TarefaDetalhe {
   dataPrazo: string | null
   atrasada: boolean
   etapas: Etapa[]
+  documentoId: number | null
+  anexos: Anexo[]
+  protocolos: ProtocoloItem[]
+  observacoes: ObservacaoItem[]
+  timeline: FatoDaTimeline[]
   historico: HistoricoItem[]
   tempos: { criadaEm: string | null; atribuidaEm: string | null; iniciadaEm: string | null; concluidaEm: string | null }
 }
@@ -94,6 +113,31 @@ const ROTULO_STATUS: Record<string, string> = {
 }
 const ROTULO_PRIORIDADE: Record<string, string> = { URGENTE: "Urgente", ALTA: "Alta", MEDIA: "Normal", BAIXA: "Baixa" }
 const CONCLUIDOS = ["CONCLUIDO", "DISPENSADO", "SUPERSEDIDO"]
+
+/**
+ * A FINALIDADE DO ARQUIVO EM PORTUGUÊS.
+ *
+ * Quando o cadastro mestre resolve a classificação, é ela que aparece — é a
+ * informação mais precisa ("Requerimento de inteiro teor"). Sem cadastro
+ * resolvido, cai na finalidade operacional; mas `REQUERIMENTO_ENVIADO` é
+ * vocabulário de banco, e a tela mostra gente.
+ */
+const ROTULO_FINALIDADE: Record<string, string> = {
+  REQUERIMENTO_ENVIADO: "Requerimento enviado",
+  COMPROVANTE_PROTOCOLO: "Comprovante de protocolo",
+  COMPROVANTE_CONTATO: "Comprovante de contato",
+  DOCUMENTO_RECEBIDO: "Documento recebido",
+  OUTRO: "Arquivo",
+}
+
+/** A cor separa a natureza do fato — quem varre a lista lê antes de ler. */
+const TOM_DO_FATO: Record<string, string> = {
+  tarefa: "text-white/30",
+  etapa: "text-sky-300/60",
+  observacao: "text-amber-300/50",
+  anexo: "text-emerald-300/50",
+  protocolo: "text-violet-300/50",
+}
 
 function Campo({ rotulo, children }: { rotulo: string; children: React.ReactNode }) {
   return (
@@ -142,6 +186,7 @@ export function TarefaOperacional({ taskId, aoFechar, aoMudar }: { taskId: numbe
   const [pedindoMotivo, setPedindoMotivo] = useState<null | "aguardar" | "retomar">(null)
   /** Etapa cujo executor especializado está montado. */
   const [executando, setExecutando] = useState<Etapa | null>(null)
+  const [novaObservacao, setNovaObservacao] = useState("")
 
   useEffect(() => {
     let vivo = true
@@ -181,6 +226,39 @@ export function TarefaOperacional({ taskId, aoFechar, aoMudar }: { taskId: numbe
     },
     [taskId, aoMudar],
   )
+
+  /**
+   * ANOTAR PASSA PELA PORTA DOCUMENTAL QUE JÁ EXISTE.
+   *
+   * `POST /api/documentos/{id}/observacoes` já valida permissão, escopo da
+   * etapa e idempotência, e grava em `DocumentoObservacao` com autor e hora.
+   * Uma rota de observação "da tarefa" seria a segunda fonte sobre o mesmo
+   * fato — e as duas discordariam no primeiro dia.
+   */
+  const anotar = useCallback(async () => {
+    const texto = novaObservacao.trim()
+    if (!texto || !t?.documentoId) return
+    setOcupado(true)
+    setErro(null)
+    try {
+      const r = await fetch(`/api/documentos/${t.documentoId}/observacoes`, {
+        method: "POST",
+        headers: auth(),
+        body: JSON.stringify({ texto, stepInstanceId: t.etapas.find((e) => e.atual)?.id ?? null }),
+      })
+      if (!r.ok) {
+        const d = await r.json().catch(() => ({}))
+        setErro(r.status === 403 ? "Você não tem permissão para anotar neste trabalho." : (d.error ?? "Não foi possível anotar."))
+        return
+      }
+      setNovaObservacao("")
+      setRecarga((n) => n + 1)
+    } catch {
+      setErro("Falha de rede. Tente novamente.")
+    } finally {
+      setOcupado(false)
+    }
+  }, [novaObservacao, t])
 
   const etapaAtual = t?.etapas.find((e) => e.atual) ?? t?.etapas.find((e) => !CONCLUIDOS.includes(e.status))
   const terminal = t ? ["CONCLUIDO_RECEBIDO", "CONCLUIDO_NAO_POSSUI", "CANCELADA", "SUPERSEDIDA"].includes(t.statusTarefa) : false
@@ -300,15 +378,108 @@ export function TarefaOperacional({ taskId, aoFechar, aoMudar }: { taskId: numbe
                 </div>
               </section>
 
-              {/* ─── HISTÓRICO: um só, da mesma tarefa ─────────────────── */}
+              {/* ─── O QUE ESTE TRABALHO PRODUZIU ──────────────────────────
+                  Anexo, protocolo e observação NÃO são guardados pela Tarefa:
+                  vivem em `DocumentoArquivo`, `Protocolo` e
+                  `DocumentoObservacao`, com autor, data e vínculos próprios.
+                  Aqui eles são LIDOS — a tarefa reúne num lugar o que hoje
+                  exigiria abrir a Central e caçar por documento. */}
+              {(t.anexos.length > 0 || t.protocolos.length > 0) && (
+                <section className="mt-6 grid grid-cols-2 gap-4">
+                  <div>
+                    <h3 className="mb-2 text-[10px] uppercase tracking-wide text-white/35">
+                      Anexos · {t.anexos.length}
+                    </h3>
+                    <div className="space-y-1">
+                      {t.anexos.length === 0 && <p className="text-[11px] text-white/30">Nenhum arquivo ainda.</p>}
+                      {t.anexos.map((a) => (
+                        <a
+                          key={a.id}
+                          href={a.url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="block rounded border border-white/[0.07] px-2.5 py-1.5 transition-colors hover:border-white/20 hover:bg-white/[0.03]"
+                        >
+                          <div className="truncate text-[11px] text-white/80">{a.nome}</div>
+                          <div className="mt-0.5 truncate text-[10px] text-white/35">
+                            {a.classificacao ?? ROTULO_FINALIDADE[a.finalidade] ?? "Arquivo"}
+                            {a.autor && ` · ${a.autor}`} · {dataHora(a.em)}
+                          </div>
+                        </a>
+                      ))}
+                    </div>
+                  </div>
+                  <div>
+                    <h3 className="mb-2 text-[10px] uppercase tracking-wide text-white/35">
+                      Protocolo{t.protocolos.length === 1 ? "" : "s"} · {t.protocolos.length}
+                    </h3>
+                    <div className="space-y-1">
+                      {t.protocolos.length === 0 && <p className="text-[11px] text-white/30">Sem protocolo registrado.</p>}
+                      {t.protocolos.map((p) => (
+                        <div key={p.id} className="rounded border border-white/[0.07] px-2.5 py-1.5">
+                          <div className="truncate font-mono text-[11px] text-white/85">{p.numero}</div>
+                          <div className="mt-0.5 text-[10px] text-white/35">{dataHora(p.em)}</div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </section>
+              )}
+
+              {/* ─── OBSERVAÇÕES ───────────────────────────────────────────
+                  Append-only: cada anotação é uma linha nova, com autor e hora.
+                  Nunca sobrescrever a anterior — o que alguém escreveu sobre o
+                  trabalho continua valendo mesmo quando outra pessoa discorda. */}
+              <section className="mt-6">
+                <h3 className="mb-2 text-[10px] uppercase tracking-wide text-white/35">
+                  Observações · {t.observacoes.length}
+                </h3>
+                {t.documentoId != null && dados?.podeExecutar && !terminal && (
+                  <div className="mb-2 flex items-center gap-2">
+                    <input
+                      value={novaObservacao}
+                      onChange={(e) => setNovaObservacao(e.target.value)}
+                      placeholder="Anotar algo sobre este trabalho…"
+                      className="min-w-0 flex-1 rounded border border-white/15 bg-white/[0.04] px-2.5 py-1.5 text-[12px] text-white/85 outline-none placeholder:text-white/25 focus:border-sky-300/40"
+                    />
+                    <button
+                      disabled={ocupado || !novaObservacao.trim()}
+                      onClick={() => void anotar()}
+                      className="rounded border border-white/15 px-3 py-1.5 text-[11px] text-white/80 transition-colors hover:bg-white/[0.06] disabled:opacity-40"
+                    >
+                      Anotar
+                    </button>
+                  </div>
+                )}
+                <div className="space-y-1.5">
+                  {t.observacoes.length === 0 && <p className="text-[11px] text-white/30">Nenhuma observação.</p>}
+                  {t.observacoes.map((o) => (
+                    <div key={o.id} className="rounded border border-white/[0.06] px-2.5 py-1.5">
+                      <div className="text-[11px] text-white/75">{o.texto}</div>
+                      <div className="mt-0.5 text-[10px] text-white/30">
+                        {o.autor ?? "—"} · {dataHora(o.em)}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </section>
+
+              {/* ─── A HISTÓRIA DO TRABALHO ────────────────────────────────
+                  Projeção de quatro fontes (auditoria da tarefa, eventos do
+                  workflow, observações e arquivos) numa ordem só. Não existe
+                  tabela de timeline — existiria a divergência de sempre. */}
               <section className="mt-6">
                 <h3 className="mb-2 text-[10px] uppercase tracking-wide text-white/35">Histórico</h3>
                 <div className="space-y-1.5">
-                  {t.historico.length === 0 && <p className="text-[11px] text-white/35">Sem registros ainda.</p>}
-                  {t.historico.map((h) => (
-                    <div key={h.id} className="flex gap-3 text-[11px]">
-                      <span className="shrink-0 tabular-nums text-white/30">{dataHora(h.criadoEm)}</span>
-                      <span className="min-w-0 text-white/55">{h.descricao ?? h.acao}</span>
+                  {t.timeline.length === 0 && <p className="text-[11px] text-white/35">Sem registros ainda.</p>}
+                  {t.timeline.map((f, i) => (
+                    <div key={`${f.em}-${i}`} className="flex gap-3 text-[11px]">
+                      <span className="shrink-0 tabular-nums text-white/30">{dataHora(f.em)}</span>
+                      <span className={`shrink-0 ${TOM_DO_FATO[f.tipo] ?? "text-white/30"}`}>●</span>
+                      <span className="min-w-0 text-white/55">
+                        {f.texto}
+                        {f.autor && <span className="text-white/30"> — {f.autor}</span>}
+                      </span>
                     </div>
                   ))}
                 </div>

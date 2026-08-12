@@ -204,6 +204,83 @@ export function agruparFila(linhas: LinhaDeFila[]) {
   }
 }
 
+/** Um fato da vida da tarefa, já em linguagem de gente. */
+export interface FatoDaTimeline {
+  em: string
+  tipo: 'tarefa' | 'etapa' | 'observacao' | 'anexo' | 'protocolo'
+  texto: string
+  autor: string | null
+}
+
+/** Os eventos do motor em português — o vocabulário técnico não vai para a tela. */
+/** Finalidade do arquivo em português — o enum é do banco, não da leitura. */
+const ROTULO_FINALIDADE: Record<string, string> = {
+  REQUERIMENTO_ENVIADO: 'Requerimento enviado',
+  COMPROVANTE_PROTOCOLO: 'Comprovante de protocolo',
+  COMPROVANTE_CONTATO: 'Comprovante de contato',
+  DOCUMENTO_RECEBIDO: 'Documento recebido',
+  OUTRO: 'Arquivo',
+}
+
+const FRASE_DO_EVENTO: Record<string, string> = {
+  PASSO_DISPONIBILIZADO: 'Etapa liberada',
+  PASSO_INICIADO: 'Etapa iniciada',
+  PASSO_CONCLUIDO: 'Etapa concluída',
+  PASSO_BLOQUEADO: 'Etapa bloqueada',
+  PASSO_REABERTO: 'Etapa reaberta',
+  PASSO_CANCELADO: 'Etapa cancelada',
+  PASSO_DISPENSADO: 'Etapa dispensada',
+  PASSO_EXECUTADO: 'Etapa executada, aguardando aprovação',
+  PASSO_APROVADO: 'Etapa aprovada',
+  TAREFA_CONCLUIDA: 'Trabalho concluído',
+  TAREFA_GERADA: 'Tarefa criada',
+  TAREFA_ATRIBUIDA: 'Tarefa atribuída',
+  TAREFA_INICIADA: 'Trabalho iniciado',
+  TAREFA_SINCRONIZADA: 'Estado da tarefa recalculado',
+}
+
+/**
+ * REÚNE OS FATOS DAS FONTES CANÔNICAS NUMA HISTÓRIA SÓ.
+ *
+ * Ordem decrescente: quem abre a tarefa quer saber o que aconteceu por último.
+ * Nenhum fato é inventado aqui — cada linha existe porque existe um registro.
+ */
+export function montarTimeline(fontes: {
+  historico: Array<{ id: number; acao: string; descricao: string | null; criadoEm: Date }>
+  eventos: Array<{ id: number; tipo: string; criadoEm: Date; nomeDaEtapa: string | null }>
+  observacoes: Array<{ id: number; texto: string; createdAt: Date; criadoPor: { nome: string } | null }>
+  anexos: Array<{ id: number; nome: string; tipo: string; createdAt: Date; criadoPor: { nome: string } | null; documentType: { name: string } | null }>
+  protocolos: Array<{ id: number; numeroProtocolo: string | null; createdAt: Date }>
+}): FatoDaTimeline[] {
+  const fatos: FatoDaTimeline[] = []
+
+  // A auditoria da TAREFA já escreve em português — é a fonte mais legível.
+  for (const h of fontes.historico) {
+    fatos.push({ em: h.criadoEm.toISOString(), tipo: 'tarefa', texto: h.descricao ?? h.acao, autor: null })
+  }
+  // Os eventos do WORKFLOW dizem o que aconteceu com as ETAPAS, e ganham o
+  // nome publicado do passo — "Etapa concluída: Solicitar certidão" responde
+  // mais do que "PASSO_CONCLUIDO".
+  for (const e of fontes.eventos) {
+    const base = FRASE_DO_EVENTO[e.tipo]
+    if (!base) continue
+    fatos.push({ em: e.criadoEm.toISOString(), tipo: 'etapa', texto: e.nomeDaEtapa ? `${base}: ${e.nomeDaEtapa}` : base, autor: null })
+  }
+  for (const o of fontes.observacoes) {
+    fatos.push({ em: o.createdAt.toISOString(), tipo: 'observacao', texto: o.texto, autor: o.criadoPor?.nome ?? null })
+  }
+  for (const a of fontes.anexos) {
+    const oque = a.documentType?.name ?? 'Arquivo'
+    fatos.push({ em: a.createdAt.toISOString(), tipo: 'anexo', texto: `${oque} anexado: ${a.nome}`, autor: a.criadoPor?.nome ?? null })
+  }
+  for (const p of fontes.protocolos) {
+    if (!p.numeroProtocolo) continue
+    fatos.push({ em: p.createdAt.toISOString(), tipo: 'protocolo', texto: `Protocolo registrado: ${p.numeroProtocolo}`, autor: null })
+  }
+
+  return fatos.sort((a, b) => Date.parse(b.em) - Date.parse(a.em))
+}
+
 /**
  * O DOSSIÊ DE UMA TAREFA — "por que eu existo?" respondido por completo.
  *
@@ -239,6 +316,76 @@ export async function dossieDaTarefa(tarefaId: number) {
     },
   })
   if (!t) return null
+
+  // ═══════════════════════════════════════════════════════════════════════
+  // O QUE A TAREFA MOSTRA — E DE ONDE VEM
+  // ═══════════════════════════════════════════════════════════════════════
+  //
+  // Nada aqui é armazenado pela Tarefa. Anexo é `DocumentoArquivo`, protocolo é
+  // `Protocolo`, observação é `DocumentoObservacao` — as três já existiam, com
+  // autor, data e vínculos próprios. A Tarefa PROJETA: mostra o que pertence ao
+  // trabalho dela e some quando o trabalho acaba.
+  //
+  // O recorte é o DOCUMENTO da tarefa. Sem documento não há o que projetar:
+  // uma tarefa administrativa de fase não tem anexo nem protocolo.
+  const anexos = t.documentoId != null
+    ? await prisma.documentoArquivo.findMany({
+        where: { documentoId: t.documentoId },
+        select: {
+          id: true, nome: true, url: true, tipo: true, tamanho: true, mimeType: true,
+          createdAt: true, stepInstanceId: true, protocoloId: true,
+          documentType: { select: { name: true } },
+          criadoPor: { select: { nome: true } },
+        },
+        orderBy: { createdAt: 'desc' },
+      })
+    : []
+
+  // O protocolo é do PROCESSO e alcança o documento pela junção oficial
+  // (`ProtocoloDocumento`) — não existe um `protocolo.documentoId`, e inventar
+  // um seria a segunda fonte que o cadastro evitou de propósito.
+  const protocolos = t.documentoId != null
+    ? await prisma.protocolo.findMany({
+        where: { numeroProtocolo: { not: null }, documentos: { some: { documentoId: t.documentoId } } },
+        select: { id: true, numeroProtocolo: true, tipoProtocolo: true, createdAt: true, solicitacaoId: true },
+        orderBy: { createdAt: 'desc' },
+      })
+    : []
+
+  const observacoes = t.documentoId != null
+    ? await prisma.documentoObservacao.findMany({
+        where: { documentoId: t.documentoId },
+        select: { id: true, texto: true, createdAt: true, stepInstanceId: true, criadoPor: { select: { nome: true } } },
+        orderBy: { createdAt: 'desc' },
+      })
+    : []
+
+  // Os eventos do WORKFLOW desta tarefa — as transições de etapa que a
+  // auditoria da tarefa não registra (ela fala da tarefa, não dos passos).
+  const eventosDoWorkflow = t.workflowInstanceId != null
+    ? await prisma.workflowEvento.findMany({
+        where: { workflowInstanceId: t.workflowInstanceId },
+        select: { id: true, tipo: true, criadoEm: true, stepInstanceId: true },
+        orderBy: { id: 'desc' },
+        take: 120,
+      })
+    : []
+
+  // `WorkflowEvento` guarda o id do passo, não uma relação — os nomes vêm numa
+  // consulta só, e o mesmo mapa filtra os eventos que são DESTA unidade de
+  // trabalho (a instância é da fase e carrega os passos de vários documentos).
+  const passosDaUnidade = new Map(
+    (t.workflowInstance?.steps ?? [])
+      .filter((st) =>
+        t.necessidadeId != null ? st.necessidadeId === t.necessidadeId
+        : t.documentoId != null ? st.documentoId === t.documentoId
+        : st.id === t.workflowStepInstanceId,
+      )
+      .map((st) => {
+        const snap = st.snapshot as { label?: string; titulo?: string } | null
+        return [st.id, snap?.label ?? snap?.titulo ?? st.stepKey]
+      }),
+  )
 
   const historico = await prisma.logAuditoria.findMany({
     where: { entidade: 'Tarefa', entidadeId: tarefaId },
@@ -314,6 +461,54 @@ export async function dossieDaTarefa(tarefaId: number) {
         atual: s.id === t.workflowStepInstanceId,
       })),
     causaRemovida: t.causaRemovidaEm ? { em: t.causaRemovidaEm, motivo: t.causaRemovidaMotivo } : null,
+    documentoId: t.documentoId,
+    // A LINHA DO TEMPO É PROJEÇÃO — não uma quinta tabela de histórico.
+    //
+    // Os fatos já existem em quatro lugares canônicos: a auditoria da tarefa,
+    // os eventos do workflow, as observações e os arquivos. Cada um responde a
+    // uma pergunta diferente e nenhum deles conta a história inteira; gravar um
+    // quinto registro "unificado" seria criar a divergência que este sistema
+    // passou meses eliminando. Aqui eles são LIDOS e ordenados juntos.
+    timeline: montarTimeline({
+      historico,
+      eventos: eventosDoWorkflow
+        .filter((e) => e.stepInstanceId == null || passosDaUnidade.has(e.stepInstanceId))
+        .map((e) => ({ ...e, nomeDaEtapa: e.stepInstanceId != null ? passosDaUnidade.get(e.stepInstanceId) ?? null : null })),
+      observacoes,
+      anexos,
+      protocolos,
+    }),
+    anexos: anexos.map((a) => ({
+      id: a.id,
+      nome: a.nome,
+      url: a.url,
+      // O que o arquivo É pelo cadastro mestre; o `tipo` é a finalidade dele
+      // dentro da operação. Os dois juntos respondem "que papel esse arquivo
+      // cumpre aqui" sem que ninguém precise abrir o PDF.
+      classificacao: a.documentType?.name ?? null,
+      finalidade: a.tipo,
+      tamanho: a.tamanho,
+      mimeType: a.mimeType,
+      autor: a.criadoPor?.nome ?? null,
+      em: a.createdAt.toISOString(),
+      /** Etapa em que o arquivo entrou — é o que liga o anexo ao momento. */
+      etapaId: a.stepInstanceId,
+      temProtocolo: a.protocoloId != null,
+    })),
+    protocolos: protocolos.map((p) => ({
+      id: p.id,
+      numero: p.numeroProtocolo,
+      tipo: p.tipoProtocolo,
+      em: p.createdAt.toISOString(),
+      solicitacaoId: p.solicitacaoId,
+    })),
+    observacoes: observacoes.map((o) => ({
+      id: o.id,
+      texto: o.texto,
+      autor: o.criadoPor?.nome ?? null,
+      em: o.createdAt.toISOString(),
+      etapaId: o.stepInstanceId,
+    })),
     historico,
   }
 }
