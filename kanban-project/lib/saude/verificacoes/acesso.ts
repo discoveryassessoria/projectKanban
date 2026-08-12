@@ -10,7 +10,7 @@ import type { Achado, ResultadoVerificacao } from '../tipos'
 
 const ROTA_USUARIOS = '/administrator?screen=users'
 const ROTA_PERFIS = '/administrator?screen=roles'
-const ROTA_TAREFAS = '/activities'
+const ROTA_TAREFAS = '/operacao'
 
 registrar({
   id: 'saude.usuarios.sem-perfil',

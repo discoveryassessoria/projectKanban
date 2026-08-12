@@ -56,6 +56,7 @@ interface Funcionario {
 }
 
 type Visao = "minha_fila" | "sem_responsavel"
+type Modo = "lista" | "calendario"
 
 const auth = () => ({
   "Content-Type": "application/json",
@@ -155,6 +156,37 @@ function Linha({
       </div>
     </div>
   )
+}
+
+/**
+ * O CALENDÁRIO É UMA LEITURA DA MESMA FILA — não uma tela de tarefas paralela.
+ *
+ * Era a única capacidade que a tela antiga de Atividades tinha e a operação
+ * canônica não: ver o trabalho distribuído no tempo. Ela volta aqui como MODO
+ * de exibição da projeção que já existe — mesma consulta, mesma tarefa, mesmo
+ * taskId. Sem prazo não há lugar no calendário; essas ficam num grupo próprio,
+ * porque some-las seria esconder trabalho.
+ */
+function agruparPorDia(linhas: LinhaDeFila[]): Array<{ dia: string; rotulo: string; linhas: LinhaDeFila[] }> {
+  const porDia = new Map<string, LinhaDeFila[]>()
+  for (const l of linhas) {
+    const dia = l.dataPrazo ? l.dataPrazo.slice(0, 10) : "sem-prazo"
+    const atual = porDia.get(dia)
+    if (atual) atual.push(l)
+    else porDia.set(dia, [l])
+  }
+  const hoje = new Date().toISOString().slice(0, 10)
+  return [...porDia.entries()]
+    .sort((a, b) => (a[0] === "sem-prazo" ? 1 : b[0] === "sem-prazo" ? -1 : a[0].localeCompare(b[0])))
+    .map(([dia, ls]) => ({
+      dia,
+      rotulo:
+        dia === "sem-prazo" ? "Sem prazo definido"
+        : dia === hoje ? `Hoje · ${dataCurta(dia)}`
+        : dia < hoje ? `Vencido · ${dataCurta(dia)}`
+        : dataCurta(dia),
+      linhas: ls,
+    }))
 }
 
 /** Os quatro estados obrigatórios de qualquer superfície do Discovery. */
@@ -275,6 +307,7 @@ export function CentralTarefas({ podeDistribuir }: { podeDistribuir: boolean }) 
   const [erroComando, setErroComando] = useState<string | null>(null)
   const [aviso, setAviso] = useState<string | null>(null)
   const [aberta, setAberta] = useState<number | null>(null)
+  const [modo, setModo] = useState<Modo>("lista")
 
   // Mesma disciplina do seletor: o pedido tem chave, o "carregando" é derivado
   // e a resposta atrasada de uma aba não pinta a lista da outra.
@@ -356,11 +389,26 @@ export function CentralTarefas({ podeDistribuir }: { podeDistribuir: boolean }) 
             </button>
           ))}
         </div>
-        {!carregando && linhas != null && (
-          <span className="pb-1.5 text-[11px] tabular-nums text-white/35">
-            {contagem} tarefa{contagem === 1 ? "" : "s"}
-          </span>
-        )}
+        <div className="flex items-center gap-3 pb-1.5">
+          {!carregando && linhas != null && (
+            <span className="text-[11px] tabular-nums text-white/35">
+              {contagem} tarefa{contagem === 1 ? "" : "s"}
+            </span>
+          )}
+          <div className="flex gap-1">
+            {(["lista", "calendario"] as const).map((m) => (
+              <button
+                key={m}
+                onClick={() => setModo(m)}
+                className={`rounded px-2 py-0.5 text-[10px] transition-colors ${
+                  modo === m ? "bg-white/[0.08] text-white/80" : "text-white/35 hover:text-white/60"
+                }`}
+              >
+                {m === "lista" ? "Lista" : "Calendário"}
+              </button>
+            ))}
+          </div>
+        </div>
       </div>
 
       {aviso && (
@@ -382,7 +430,19 @@ export function CentralTarefas({ podeDistribuir }: { podeDistribuir: boolean }) 
             }
           />
         )}
-        {linhas?.map((l) => (
+        {modo === "calendario" && linhas != null && linhas.length > 0 &&
+          agruparPorDia(linhas).map((grupo) => (
+            <div key={grupo.dia}>
+              <div className="sticky top-0 border-b border-white/[0.06] bg-[#0d0f13] px-4 py-1.5 text-[10px] uppercase tracking-wide text-white/40">
+                {grupo.rotulo} · {grupo.linhas.length}
+              </div>
+              {grupo.linhas.map((l) => (
+                <Linha key={l.taskId} l={l} aoAbrir={() => setAberta(l.taskId)} />
+              ))}
+            </div>
+          ))}
+
+        {modo === "lista" && linhas?.map((l) => (
           <Linha
             key={l.taskId}
             l={l}

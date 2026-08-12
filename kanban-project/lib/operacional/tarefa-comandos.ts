@@ -30,7 +30,9 @@ export type ResultadoComando =
   | { ok: false; codigo: 'NAO_ENCONTRADA' | 'TERMINAL' | 'CONFLITO' | 'SEM_RESPONSAVEL' | 'MESMO_RESPONSAVEL'; mensagem: string }
 
 /** O link canônico da tarefa — um só, para todas as visões e avisos. */
-export const linkDaTarefa = (tarefaId: number) => `/activities?taskId=${tarefaId}`
+// O link do aviso leva à OPERAÇÃO — `/activities` foi aposentada junto com a
+// árvore de subtarefas, e um aviso que abre 404 é pior do que aviso nenhum.
+export const linkDaTarefa = (tarefaId: number) => `/operacao?taskId=${tarefaId}`
 
 /**
  * O AVISO DE UM MARCO DA TAREFA.

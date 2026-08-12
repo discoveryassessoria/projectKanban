@@ -34,74 +34,18 @@ function getTipoDocumentoLabel(tipo: string): string {
 }
 
 // ✅ Helper para criar tarefas de documento
-async function criarTarefasDocumento(
-  statusNovo: string,
-  tipo: string,
-  nomePessoa: string,
-  processoId: number
-) {
-  // Só para certidões inteiro teor
-  const certidoesInteiroTeor = [
-    'CERTIDAO_NASCIMENTO_INTEIRO_TEOR',
-    'CERTIDAO_CASAMENTO_INTEIRO_TEOR',
-    'CERTIDAO_OBITO_INTEIRO_TEOR'
-  ]
-  if (!certidoesInteiroTeor.includes(tipo)) return
-
-  // Só dispara em EM_BUSCA ou SOLICITAR
-  if (statusNovo !== 'EM_BUSCA' && statusNovo !== 'SOLICITAR') return
-
-  const tipoLabel = getTipoDocumentoLabel(tipo)
-  const tituloTarefaPai = `${tipoLabel} - ${nomePessoa}`
-
-  // Só cria se não existir
-  const tarefaExistente = await prisma.tarefa.findFirst({
-    where: { processoId, titulo: tituloTarefaPai }
-  })
-  if (tarefaExistente) return
-
-  // Buscar tarefa pai "Emissão da Pasta Documental"
-  const tarefaEmissao = await prisma.tarefa.findFirst({
-    where: {
-      processoId,
-      tarefaPaiId: null,
-      titulo: { contains: 'Emissão', mode: 'insensitive' }
-    }
-  })
-
-  // Criar tarefa pai
-  const tarefaPai = await prisma.tarefa.create({
-    data: {
-      titulo: tituloTarefaPai,
-      descricao: `${tipoLabel} de ${nomePessoa}`,
-      processoId,
-      tarefaPaiId: tarefaEmissao?.id || null,
-      prioridade: "MEDIA",
-      concluida: false
-    }
-  })
-
-  // Criar 5 subtarefas
-  const subtarefas = [
-    'Buscar certidão em inteiro teor',
-    'Preencher e assinar requerimento da solicitação da certidão em inteiro teor',
-    'Enviar ao cartório requerimento da solicitação da certidão em inteiro teor',
-    'Enviar ao CRC requerimento da solicitação da certidão em inteiro teor',
-    'Receber certidão em inteiro teor',
-  ]
-
-  for (const titulo of subtarefas) {
-    await prisma.tarefa.create({
-      data: {
-        titulo,
-        processoId,
-        tarefaPaiId: tarefaPai.id,
-        prioridade: "MEDIA",
-        concluida: false
-      }
-    })
-  }
-}
+/**
+ * A ÁRVORE PAI/FILHO DE TAREFAS FOI REMOVIDA DAQUI.
+ *
+ * Este bloco criava uma tarefa "pai" para o documento e CINCO subtarefas com os
+ * nomes das etapas do workflow — "Buscar certidão", "Preencher requerimento",
+ * "Enviar ao cartório"... Era etapa fingindo ser tarefa: a mesma certidão virava
+ * seis linhas na fila, com seis prazos e nenhum workflow por trás.
+ *
+ * Hoje a tarefa nasce da OBRIGAÇÃO documental, uma por documento, e as etapas
+ * vivem dentro dela como passos do workflow publicado. Criar documento não cria
+ * tarefa: quem materializa é o motor, quando a obrigação vira executável.
+ */
 
 // GET - Buscar documento por ID
 export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
@@ -340,7 +284,6 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
 
       if (processoId) {
         const nomePessoa = `${documentoAtual.pessoa.nome} ${documentoAtual.pessoa.sobrenome || ""}`.trim()
-        await criarTarefasDocumento(body.status, documentoAtual.tipo ?? "", nomePessoa, processoId)
       }
     }
 
@@ -481,7 +424,6 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
 
     if (processoId) {
       const nomePessoa = `${documentoAtual.pessoa.nome} ${documentoAtual.pessoa.sobrenome || ""}`.trim()
-      await criarTarefasDocumento(body.status, documentoAtual.tipo ?? "", nomePessoa, processoId)
     }
 
     // GRANULARIDADE POR DOCUMENTO: mudança de status (ex.: cancelado/invalidado) muda a

@@ -433,7 +433,6 @@ export async function POST(request: Request) {
         dataPrazo: toUTCNoon(dataPrazo),
         statusId: statusId || null,
         pais: paisValido,
-        tarefaPaiId: tarefaPaiId || null,
         ordem: ordemFinal
       },
       include: {
@@ -469,30 +468,11 @@ export async function POST(request: Request) {
 
     await logTarefa.criar(tarefa.titulo, tarefa.id, processoNome)
 
-    if (tarefaPaiId) {
-      const tarefaPaiCheck = await prisma.tarefa.findUnique({
-        where: { id: tarefaPaiId },
-        select: { titulo: true }
-      })
-
-      if (tarefaPaiCheck?.titulo?.toLowerCase().includes("procuração administrativa")) {
-        const subtarefasProcuracao = [
-          { titulo: "Preparar procuração administrativa", ordem: 0 },
-          { titulo: "Conferir procuração administrativa", ordem: 1 },
-          { titulo: `Enviar a procuração administrativa ao cliente para assinar`, ordem: 2 },
-        ]
-
-        await prisma.tarefa.createMany({
-          data: subtarefasProcuracao.map(sub => ({
-            titulo: sub.titulo,
-            tarefaPaiId: tarefa.id,
-            processoId: tarefa.processoId,
-            prioridade: tarefa.prioridade,
-            ordem: sub.ordem,
-          }))
-        })
-      }
-    }
+    // A ÁRVORE PAI/FILHO FOI REMOVIDA DAQUI.
+    //
+    // Criar a tarefa da procuração criava três filhas — "Preparar", "Conferir",
+    // "Enviar ao cliente" —, que são ETAPAS do mesmo trabalho. Etapa vive no
+    // workflow interno da tarefa, não como tarefa filha.
 
     return NextResponse.json({ tarefa }, { status: 201 })
   } catch (error) {

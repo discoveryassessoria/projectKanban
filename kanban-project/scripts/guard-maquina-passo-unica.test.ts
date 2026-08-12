@@ -40,7 +40,7 @@
  * As exceções são NOMEADAS e CONTADAS abaixo. Uma exceção sem nome é uma
  * dívida que ninguém vê; uma exceção contada só pode diminuir.
  */
-import { readFileSync, readdirSync, statSync } from "node:fs"
+import { existsSync, readFileSync, readdirSync, statSync } from "node:fs"
 import { fileURLToPath } from "node:url"
 import { dirname, join, relative } from "node:path"
 
@@ -412,30 +412,30 @@ for (const arq of TODOS) {
  * Ela se aposenta junto com a rodada de UI operacional, não antes. Até lá, o
  * teto impede que cresça.
  */
+/**
+ * A ÁRVORE LEGADA DE SUBTAREFAS ACABOU.
+ *
+ * Esta lista já teve cinco arquivos e dezoito escritas diretas: `/cobranca`,
+ * `/toggle`, `/subtarefas`, `PUT/DELETE /tarefas/[id]` e a tela `/activities`
+ * que os consumia, com `tarefaPaiId`, COBRANCA e CONFERENCIA representando
+ * etapa como filho de tarefa. Tudo foi removido — a operação de tarefas é uma
+ * só, e etapa é etapa.
+ *
+ * Sobrou UM arquivo, e ele não é a árvore: `tarefa-transversal` é outra
+ * feature (Operação Antecipada / tarefa transversal), viva na Central, com
+ * zero linhas em produção. Fica nomeada e com teto até ser migrada às portas.
+ */
 const DIVIDA_TAREFA_LEGADA: Record<string, { teto: number; motivo: string }> = {
-  "src/app/api/tarefas/[tarefaId]/cobranca/route.ts": {
-    teto: 8,
-    motivo: "árvore legada de cobrança/conferência; `nao_possui` já migrou para o resultado documental",
-  },
-  "src/app/api/tarefas/[tarefaId]/route.ts": {
-    teto: 4,
-    motivo: "PUT/DELETE legados com propagação para a tarefa-pai",
-  },
-  "src/app/api/tarefas/[tarefaId]/subtarefas/route.ts": {
-    teto: 1,
-    motivo: "criação de subtarefa reabre a tarefa-pai",
-  },
-  "src/app/api/tarefas/[tarefaId]/toggle/route.ts": {
-    teto: 3,
-    motivo: "checkbox de conclusão da árvore legada (CustomStatusManager)",
-  },
   "prisma/backfill-cp4-workflow.ts": {
     teto: 1,
     motivo: "BACKFILL de uma vez só: alinha o estado da tarefa ao passo materializado",
   },
   "src/services/tarefa-transversal.ts": {
     teto: 2,
-    motivo: "Tarefa Transversal — substituída pela Operação Antecipada nativa do Workflow Engine",
+    motivo:
+      "NÃO é a árvore de subtarefas: é a tarefa transversal, consumida pela Central " +
+      "(TarefaTransversalModal) e pela Operação Antecipada. Escreve statusTarefa direto; " +
+      "migrar às portas canônicas é frente própria. Zero linhas em produção.",
   },
 }
 
@@ -461,6 +461,45 @@ ok("nenhuma rota legada conclui tarefa como CONCLUIDO_NAO_POSSUI",
 const donosMortos = Object.keys(DONOS_DA_TAREFA).filter((a) => !escritoresTarefa.includes(a))
 ok("a lista de donos da tarefa não guarda entradas mortas", donosMortos.length === 0,
   donosMortos.length ? `já não escrevem: ${donosMortos.join(", ")}` : "")
+
+/**
+ * ZERO TOLERÂNCIA: os endpoints da árvore legada não voltam.
+ *
+ * Não basta que hoje não existam — o guard falha se alguém os recriar, com
+ * qualquer nome. Eles eram a única forma de mudar responsabilidade e estado de
+ * tarefa por fora das portas, e a única forma de criar etapa como subtarefa.
+ */
+const ROTAS_EXTINTAS = [
+  "src/app/api/tarefas/[tarefaId]/cobranca/route.ts",
+  "src/app/api/tarefas/[tarefaId]/toggle/route.ts",
+  "src/app/api/tarefas/[tarefaId]/subtarefas/route.ts",
+  "src/app/api/tarefas/[tarefaId]/route.ts",
+  "src/app/activities/page.tsx",
+  "src/components/kanban/TarefaDetailModal.tsx",
+]
+for (const r of ROTAS_EXTINTAS) {
+  ok(`extinto e não voltou: ${r.split("/").slice(-2).join("/")}`, !existsSync(join(RAIZ, r)))
+}
+// `where: { tarefaPaiId: { not: null } }` é LEITURA — ainda existe código que
+// pergunta se uma tarefa tem pai (para não listá-la duas vezes). O que não pode
+// voltar é ESCREVER o vínculo: é isso que cria a árvore.
+const criamSubtarefa = TODOS.filter((a) => !a.includes("prisma/")).filter((arq) => {
+  const src = semComentarios(ler(arq))
+  const re = /\b(?:prisma|tx|db)\s*\.\s*tarefa\s*\.\s*(create|createMany|update|updateMany|upsert)\s*\(/g
+  let m: RegExpExecArray | null
+  while ((m = re.exec(src)) !== null) {
+    const arg = argumentoBalanceado(src, m.index + m[0].length - 1)
+    for (const g of arg.matchAll(/\b(?:data|create)\s*:\s*\{/g)) {
+      const bloco = objetoBalanceado(arg, arg.indexOf("{", g.index + g[0].length - 1))
+      if (/(^|[{,\s])tarefaPaiId\s*:\s*(?!null)/.test(bloco)) return true
+    }
+  }
+  return false
+})
+ok("nenhuma tela cria subtarefa (tarefaPaiId) na aplicação", criamSubtarefa.length === 0,
+  criamSubtarefa.join(", ") || "etapa é etapa; subtarefa era etapa fingindo ser tarefa")
+ok("nenhum consumidor de COBRANCA/CONFERENCIA como subtarefa",
+  !TODOS.some((a) => /tipoSubtarefa\s*===\s*["'](COBRANCA|CONFERENCIA)/.test(semComentarios(ler(a)))))
 
 ok("nenhuma rota HTTP move o estado operacional da tarefa fora da dívida nomeada",
   !escritoresTarefa.some((a) => a.includes("src/app/api") && !(a in DIVIDA_TAREFA_LEGADA)),
