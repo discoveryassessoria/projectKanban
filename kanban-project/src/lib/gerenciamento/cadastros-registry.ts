@@ -196,29 +196,6 @@ export const CADASTROS: Record<string, CadastroSpec> = {
     relacao: { prop: "membros", model: "grupoUsuarioMembro", campoPai: "grupoId", campoAlvo: "usuarioId", campoForm: "membros" },
   },
 
-  // ── Usuários e Acessos › Grupos › Cargos ───────────────────────────────────
-  cargos: {
-    entidade: "cargos",
-    model: "cargoCadastro",
-    titulo: "Cargos",
-    descricao:
-      "Papéis funcionais usados como responsável padrão em tarefas, workflows e automações. A autorização em si continua em Perfis e Permissões.",
-    novoLabel: "+ Novo cargo",
-    codeDe: "nome",
-    ordenarPor: [{ campo: "nome", direcao: "asc" }],
-    colunas: [
-      { key: "nome", label: "Cargo" },
-      { key: "code", label: "Chave" },
-      { key: "area", label: "Área" },
-      { key: "descricao", label: "Descrição" },
-    ],
-    campos: [
-      { key: "nome", label: "Nome do cargo", tipo: "text", obrigatorio: true, largura: "cheia" },
-      { key: "area", label: "Área", tipo: "text", largura: "meia" },
-      { key: "descricao", label: "Descrição", tipo: "textarea", largura: "cheia" },
-      ...CAMPOS_BASE,
-    ],
-  },
 
   // ── Sistema › Modelos ─────────────────────────────────────────────────────
   // O cadastro genérico de "modelos de texto" (ModeloDocumento, com o conteúdo

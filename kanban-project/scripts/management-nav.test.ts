@@ -99,7 +99,7 @@ const ARVORE_OFICIAL: Record<string, string[]> = {
     "Moedas", "Cobrança", "Crédito", "Fiscal", "Comissões", "Documentos Financeiros", "Governança",
   ],
   grp_orgaos: ["Organizações", "Categorias"],
-  grp_usuarios: ["Usuários", "Perfis", "Permissões", "Grupos", "Auditoria de Acessos"],
+  grp_usuarios: ["Usuários", "Perfis", "Permissões", "Organização operacional", "Controle"],
   // "Assistente de Parametrização" entrou em 06/08 como item VISÍVEL de Sistema:
   // é a condução transversal do cadastro (Documentos + Serviços + Financeiro) e
   // não pertence a nenhum módulo isolado. Ele orquestra as telas oficiais — não
@@ -137,7 +137,12 @@ ok(JSON.stringify(itensDaSecao("grp_financeiro", "Cobrança")) === JSON.stringif
 // cadastro viram coluna — decisão vizinha ao preço, e que não define preço.
 ok(JSON.stringify(itensDaSecao("grp_financeiro", "Tabela de Valores")) === JSON.stringify(["pricingtable", "discrules", "pricing", "planilhacolunas"]), "Financeiro › Tabela de Valores = Tabelas de Preços, Regras, Aplicabilidade, Planilha Documental")
 ok(JSON.stringify(itensDaSecao("grp_orgaos", "Organizações")) === JSON.stringify(["organs", "suppliers"]), "Órgãos › Organizações = Cartórios e Órgãos + Fornecedores")
-ok(JSON.stringify(itensDaSecao("grp_usuarios", "Grupos")) === JSON.stringify(["teams", "departments", "rolecat"]), "Usuários › Grupos = Equipes, Departamentos, Cargos")
+// A seção deixou de se chamar "Grupos": Capacidade Operacional não é um grupo
+// de pessoas. Departamentos e Cargos saíram — eram cadastros sem consumidor
+// (nenhuma FK, nenhuma regra, e ninguém podia ser associado a eles).
+ok(JSON.stringify(itensDaSecao("grp_usuarios", "Organização operacional")) === JSON.stringify(["teams", "opcapacity"]), "Usuários › Organização operacional = Equipes + Capacidade Operacional")
+ok(JSON.stringify(itensDaSecao("grp_usuarios", "Controle")) === JSON.stringify(["accaudit"]), "Usuários › Controle = Auditoria de Acessos")
+ok(itensDaSecao("grp_usuarios", "Grupos").length === 0, "a seção 'Grupos' não existe mais em Usuários e Acessos")
 
 // ═══════════════ 3) COMPORTAMENTO DA SIDEBAR (lista vertical + accordion) ═══════
 console.log("\n3) Sidebar em lista vertical, accordion e módulo direto")
@@ -163,7 +168,7 @@ const ANTES_ATIVAS = [
   "pricingtable", "discrules", "pricing", "accounts", "banks", "wallets",
   "currencies", "fx", "methods", "paycond", "fees", "taxes", "commrules",
   "organs", "mgmthealth", "diagnostics", "cfgdiagnosis",
-  "users", "teams", "departments", "rolecat", "roles",
+  "users", "teams", "opcapacity", "roles",
 ]
 // telas que existiam registradas (deep-link) e não podem sumir do mapa TELAS
 const ANTES_REGISTRADAS = [

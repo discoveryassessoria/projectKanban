@@ -62,7 +62,7 @@ import { encerrarSessao } from "@/src/lib/sessao/cliente"
 
 // Lote 6 — Cadastros do Motor + Saúde do Sistema (telas que faltavam)
 import {
-  ExecMatrixTab, SystemHealthTab, RoleCatalogTab,
+  ExecMatrixTab, SystemHealthTab,
   DocMatrixTab, ConfigVersionsTab, ConfigDiagnosisTab,
 } from "@/src/components/gerenciamentoComponents/GerenciamentoScaffolds6"
 import { useDadosHeaderBar } from "@/src/hooks/use-dados-headerbar"
@@ -106,7 +106,6 @@ const MacroKanbanTab = dynamic(() => import("@/src/components/gerenciamentoCompo
 // eliminada. Fonte de verdade é o Workflow Macro/Interno + config real por fase. Ver migração.
 const PhaseWorkflowsFasesTab = dynamic(() => import("@/src/components/gerenciamentoComponents/PhaseWorkflowsFasesTab"), { ssr: false, loading: () => <CarregandoTela /> })
 const PhaseAutomationsFasesTab = dynamic(() => import("@/src/components/gerenciamentoComponents/PhaseAutomationsFasesTab"), { ssr: false, loading: () => <CarregandoTela /> })
-const DepartamentosTab = dynamic(() => import("@/src/components/gerenciamentoComponents/DepartamentosTab"), { ssr: false, loading: () => <CarregandoTela /> })
 const TiposDocumentoTab = dynamic(() => import("@/src/components/gerenciamentoComponents/TiposDocumentoTab"), { ssr: false, loading: () => <CarregandoTela /> })
 const CategoriasDocumentaisTab = dynamic(() => import("@/src/components/gerenciamentoComponents/CategoriasDocumentaisTab"), { ssr: false, loading: () => <CarregandoTela /> })
 // REPOSITÓRIO OFICIAL DE MODELOS — substitui o CRUD genérico de textos (cad("modelos")),
@@ -197,7 +196,6 @@ const TELAS: Record<string, React.ComponentType> = {
   fees: TaxasPagamentoTab,
   organs: OrgaosProtocoloTab,
   suppliers: FornecedoresTab,
-  departments: DepartamentosTab,
   // Países e Regiões: era um scaffold de catálogo sem persistência; agora é a tela
   // real sobre a MESMA API que o modal "Gerenciar países" já usava. Key preservada.
   countrycatalog: PaisesRegioesTab,
@@ -274,8 +272,6 @@ const TELAS: Record<string, React.ComponentType> = {
   accaudit: function AuditoriaDeAcessos() { return <LogAuditoriaTab escopo="acessos" /> },
 
   // bespoke (lote 6) — Cadastros do Motor + Saúde
-  rolecat: cad("cargos"),
-  "rolecat-rascunho": RoleCatalogTab,
   permprofiles: RolesTab,
   // Usuários e Acessos → Permissões (perfis de permissão do motor).
   permmotor: PerfisPermissaoMotorTab,

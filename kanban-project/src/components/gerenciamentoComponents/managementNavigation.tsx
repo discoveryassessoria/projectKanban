@@ -310,23 +310,30 @@ export const MANAGEMENT_NAVIGATION: ManagementNavigationItem[] = [
   // ═══════════════════ 9. USUÁRIOS E ACESSOS ══════════════════════════════════
   {
     key: "grp_usuarios", label: "Usuários", fullLabel: "Usuários e Acessos", icon: Users2, order: 90, status: "active",
-    description: "Identidade de acesso, autorização, grupos e trilha de acesso.",
+    description: "Identidade de acesso, autorização, organização operacional e trilha de acesso.",
     children: [
+      // ─── quem entra e o que pode ───────────────────────────────────────────
       a(10, "users", "Usuários", ["usuario", "usuário", "user", "conta", "acesso", "login"]),
       a(20, "roles", "Perfis", ["perfil", "papel", "role", "permissao", "permissão", "acesso"]),
       a(30, "permmotor", "Permissões", ["permissao", "permissão", "autorizacao", "autorização", "perfil", "motor"]),
 
-      a(40, "teams", "Equipes", ["equipe", "time", "grupo"], "Grupos"),
-      a(45, "opcapacity", "Capacidade Operacional", ["capacidade", "aptidao", "aptidão", "disponibilidade", "ferias", "férias", "carga", "equipe"], "Grupos"),
-      a(50, "departments", "Departamentos", ["departamento", "setor", "grupo"], "Grupos"),
-      a(60, "rolecat", "Cargos", ["cargo", "funcao", "função", "papel"], "Grupos"),
+      // ─── COMO O TRABALHO SE ORGANIZA ───────────────────────────────────────
+      // A seção deixou de se chamar "Grupos": Capacidade Operacional não é um
+      // grupo de pessoas, é a condição de cada uma para receber trabalho.
+      // Departamentos e Cargos saíram daqui — eram cadastros sem consumidor:
+      // nenhuma FK apontava para eles, nenhuma regra os lia, e ninguém podia
+      // sequer ser associado a um deles.
+      a(40, "teams", "Equipes", ["equipe", "time", "grupo", "departamento", "setor"], "Organização operacional"),
+      a(45, "opcapacity", "Capacidade Operacional",
+        ["capacidade", "aptidao", "aptidão", "disponibilidade", "ferias", "férias", "carga", "equipe", "cargo", "funcao", "função"],
+        "Organização operacional"),
 
-      a(70, "accaudit", "Auditoria de Acessos", ["auditoria", "acesso", "sessao", "sessão", "login", "bloqueio"]),
+      // ─── rastro ────────────────────────────────────────────────────────────
+      a(70, "accaudit", "Auditoria de Acessos", ["auditoria", "acesso", "sessao", "sessão", "login", "bloqueio"], "Controle"),
 
       // alias histórico da mesma tela de perfis/permissões (deep-link preservado).
       h(900, "permprofiles", "Perfis de Permissão (alias)"),
       h(910, "teams-rascunho", "Equipes (rascunho do mockup)"),
-      h(920, "rolecat-rascunho", "Papéis e Responsáveis (rascunho do mockup)"),
     ],
   },
 
