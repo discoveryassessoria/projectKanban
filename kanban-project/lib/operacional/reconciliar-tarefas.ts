@@ -21,6 +21,7 @@
 // inventa responsável nem prazo. Só materializa e sincroniza a TAREFA.
 // ============================================================================
 import { prisma } from '@/lib/prisma'
+import { nomeDaTarefa } from './nome-da-tarefa'
 import {
   materializarTarefaOperacional, sincronizarTarefaComWorkflow, STATUS_TERMINAIS,
 } from './tarefa-canonica'
@@ -44,10 +45,9 @@ export interface ResultadoReconciliacao {
  * cadastro; sem eles a tarefa não nasce, porque uma linha de fila que não diz
  * o que fazer não serve para ninguém.
  */
-function titulo(item: string | null, pessoa: string | null): string | null {
-  if (!item) return null
-  return pessoa ? `${item} · ${pessoa}` : item
-}
+// A nomeação é UMA regra só, compartilhada com `garantirTarefaDePasso`. Duas
+// derivações do mesmo nome era como a tarefa acabava chamada "Solicitar
+// certidão" por um caminho e pela certidão pelo outro.
 
 /**
  * A EQUIPE do trabalho. Vem do `papel` declarado nas etapas — é lá que o
@@ -165,15 +165,30 @@ export async function reconciliarTarefas(
       ? await prisma.pessoa.findUnique({ where: { id: pessoaId }, select: { nome: true, sobrenome: true } })
       : null
 
-    const nome = titulo(
-      nec?.itemCatalogo?.name ?? null,
-      pessoa ? [pessoa.nome, pessoa.sobrenome].filter(Boolean).join(' ') : null,
-    )
-    if (!nome) {
+    // SEM CAUSA, A TAREFA NÃO NASCE.
+    //
+    // Antes isto era protegido por acidente: sem item de catálogo não havia
+    // título, e sem título o laço pulava. Com a nomeação agora TOTAL (o nome
+    // sempre existe, nem que seja genérico), a proteção precisa ser explícita —
+    // e ela é sobre PROVENIÊNCIA, não sobre texto. Uma tarefa que não sabe
+    // responder "por que eu existo" é uma linha na fila que ninguém consegue
+    // fechar.
+    if (necessidadeId == null && documentoId == null) {
       res.semTitulo++
-      res.detalhes.push({ instanciaId: inst.id, tarefaId: 0, acao: 'sem item de catálogo · título indefinido' })
+      res.detalhes.push({ instanciaId: inst.id, tarefaId: 0, acao: 'sem necessidade nem documento · trabalho sem causa' })
       continue
     }
+
+    const doc = documentoId != null
+      ? await prisma.documento.findUnique({ where: { id: documentoId }, select: { descricao: true, documentType: { select: { name: true } } } })
+      : null
+    const nome = nomeDaTarefa({
+      itemDaNecessidade: nec?.itemCatalogo?.name ?? null,
+      nomeDoDocumento: doc?.documentType?.name ?? doc?.descricao ?? null,
+      pessoa: pessoa ? [pessoa.nome, pessoa.sobrenome].filter(Boolean).join(' ') : null,
+      tituloDaEtapa: vivos[0]?.stepKey ?? null,
+      etapasDaUnidade: vivos.length,
+    })
 
     // O RESPONSÁVEL vem da etapa quando ela declara um; senão a tarefa nasce na
     // fila da equipe. `Documento.responsavelId` NÃO é consultado aqui: fonte

@@ -232,8 +232,12 @@ ok("nada conclui tarefa por mudança de fase",
 ok("o reconciliador não emite notificação", !/notificacaoOperacional\.create/.test(reconciler))
 
 // J — tarefa automática sem provenance não nasce.
+// A proteção era acidental: sem item de catálogo não havia título, e sem título
+// o laço pulava. Com a nomeação TOTAL, ela passou a ser explícita — e sobre o
+// que de fato importa, que é a PROVENIÊNCIA, não o texto.
 ok("tarefa sem causa não é materializada",
-  /if \(!nome\)/.test(reconciler) && /semTitulo\+\+/.test(reconciler))
+  /necessidadeId == null && documentoId == null/.test(reconciler) && /semTitulo\+\+/.test(reconciler),
+  "sem necessidade nem documento, o trabalho não sabe por que existe")
 ok("o dossiê responde 'por que eu existo'", /porQueExisto/.test(projecoes))
 
 // K — ativa sem responsável E sem equipe é o que a fila não consegue mostrar.

@@ -91,7 +91,9 @@ async function main() {
     const t = await prisma.tarefa.findFirstOrThrow({ where: { processoId: proc.id }, select: { id: true } })
     await prisma.tarefa.update({
       where: { id: t.id },
-      data: { titulo: `Localizar registro — ${c.item}`, prioridade: c.prio, dataPrazo: new Date(Date.now() + c.dias * 86400000) },
+      // O TÍTULO NÃO É ESCRITO AQUI. Quem nomeia é o motor, pela unidade de
+      // trabalho — é justamente isso que a captura precisa mostrar.
+      data: { prioridade: c.prio, dataPrazo: new Date(Date.now() + c.dias * 86400000) },
     })
     if (c.dono === "dani") await atribuirTarefa({ tarefaId: t.id, responsavelId: dani.id, autorId: gestor.id })
   }

@@ -68,6 +68,9 @@ export class TransicaoDePassoRecusada extends Error {
   }
 }
 
+/** Estados de tarefa que significam trabalho CONCLUÍDO (não cancelado). */
+const TAREFA_ENCERRADA_OK = new Set<string>(["CONCLUIDO_RECEBIDO", "CONCLUIDO_NAO_POSSUI"])
+
 // Passos que NÃO contam como operação ativa do documento.
 const INATIVOS: StepInstanceStatus[] = ["SUPERSEDIDO", "CANCELADO"]
 
@@ -598,7 +601,35 @@ export async function aplicarTransicaoDoPassoTx(
     // CONCLUIDO com a tarefa NAO_INICIADA. Projeção pelo mapeamento OFICIAL, na mesma
     // transação — os dois estados nascem e mudam juntos, ou nenhum muda.
     const passosTocados = [p.id]
-    await projetarTarefaDoPasso(tx, { stepInstanceId: p.id, statusPasso: novo })
+    const projecao = await projetarTarefaDoPasso(tx, { stepInstanceId: p.id, statusPasso: novo })
+
+    // A CONCLUSÃO DA TAREFA TAMBÉM É UM FATO DO WORKFLOW.
+    //
+    // A projeção move a tarefa mas não emite evento — é o contrato dela. O
+    // resultado é que concluir a ÚLTIMA etapa por aqui encerrava a tarefa em
+    // SILÊNCIO, enquanto encerrá-la pela porta de tarefa ou por `concluirPasso`
+    // gravava `TAREFA_CONCLUIDA`. O mesmo fato existia ou não no histórico
+    // conforme a porta usada — e o relatório de produtividade via um universo
+    // diferente do que a Central via.
+    //
+    // Mesma chave e mesmo vocabulário dos demais emissores; `skipDuplicates`
+    // porque reconcluir no mesmo ciclo não pode derrubar a transação.
+    if (projecao.changed && projecao.tarefaId != null && TAREFA_ENCERRADA_OK.has(projecao.para ?? "")) {
+      const t = await tx.tarefa.findUnique({ where: { id: projecao.tarefaId }, select: { lockVersion: true } })
+      await tx.workflowEvento.createMany({
+        skipDuplicates: true,
+        data: {
+          tipo: "TAREFA_CONCLUIDA",
+          entityType: "tarefa",
+          entityId: projecao.tarefaId,
+          processoId: p.processoId,
+          workflowInstanceId: p.workflowInstanceId,
+          tarefaId: projecao.tarefaId,
+          chaveIdempotencia: chaveEvento("TAREFA_CONCLUIDA", "tarefa", projecao.tarefaId, projecao.para ?? "", p.ciclo, t?.lockVersion),
+          dados: { documentoId, stepKey: p.stepKey, de: projecao.de, para: projecao.para },
+        },
+      })
+    }
 
     // CICLO DE VIDA DA NECESSIDADE (fluxo operacional oficial). Conclusão → ATENDIDA; início →
     // EM_ATENDIMENTO. REABERTURA → regride ATENDIDA/NAO_LOCALIZADA para EM_ATENDIMENTO (a

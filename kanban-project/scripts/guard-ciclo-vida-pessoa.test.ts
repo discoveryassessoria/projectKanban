@@ -180,6 +180,8 @@ const AUTORIZADOS_FORA_DO_RUNTIME: Record<string, string> = {
     "palco visual da Operação: monta e derruba os PRÓPRIOS processos (marca PALCO), só no banco de teste, para a captura de tela com dados realistas — não roda em produção",
   "scripts/etapa-nao-e-tarefa.test.ts":
     "etapa não é tarefa: monta e derruba os PRÓPRIOS processos (marca ETAPA5), só no banco de teste — prova que 5 passos publicados de um documento produzem 1 tarefa, e que 2 documentos produzem 2 tarefas e não 10",
+  "scripts/workflow-documental-completo.test.ts":
+    "workflow documental completo: monta e derruba os PRÓPRIOS processos (marca WFDOC), só no banco de teste — percorre os cinco executores pela mesma porta que os modais usam e prova que o taskId sobrevive do pedido à validação",
   "scripts/override-isolamento.test.ts":
     "isolamento do override entre processos: monta e derruba as próprias árvores (marca ISOLAMENTO), " +
     "só no banco de teste",

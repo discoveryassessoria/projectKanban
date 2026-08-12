@@ -27,6 +27,7 @@ import { useCallback, useEffect, useState } from "react"
 // "modal da fila": é o executor especializado, com os seus canais, evidências
 // condicionais e ação terminal. Duas entradas, uma implementação.
 import { StepEditorRouter } from "@/src/components/kanban/workflow/StepEditors"
+import { stepInstanceStatusToLegacy } from "@/src/lib/process-stage/legacy-status-map"
 
 interface Etapa {
   id: number
@@ -381,7 +382,15 @@ export function TarefaOperacional({ taskId, aoFechar, aoMudar }: { taskId: numbe
           stepTitle={executando.titulo}
           documentoId={executando.documentoId}
           stepId={executando.id}
-          stepStatus={executando.status}
+          // O EXECUTOR FALA O VOCABULÁRIO LEGADO DO PASSO.
+          //
+          // `stepStatus` é comparado lá dentro contra "concluida" para decidir
+          // modo leitura. Passar o status CANÔNICO ("CONCLUIDO") faria a
+          // comparação falhar sempre: uma etapa concluída abriria editável, e
+          // reenviar a solicitação seria um clique — exatamente o que a
+          // reabertura canônica existe para impedir. A conversão é a oficial,
+          // a mesma que a Central usa para servir esse contrato.
+          stepStatus={stepInstanceStatusToLegacy(executando.status as never)}
           isOpen
           onClose={() => setExecutando(null)}
           onSaved={() => {

@@ -300,6 +300,7 @@
     "test:fluxo-distribuicao": "tsx scripts/fluxo-distribuicao.test.ts",
     "test:etapa-nao-e-tarefa": "tsx scripts/etapa-nao-e-tarefa.test.ts",
     "test:guard-executor": "tsx scripts/guard-executor-etapa.test.ts",
+    "test:workflow-documental": "tsx scripts/workflow-documental-completo.test.ts",
     "test:guard-validade": "tsx scripts/guard-validade-por-estado.test.ts",
     "test:tabela-precos-projecao": "tsx scripts/tabela-precos-projecao.test.ts"
   },

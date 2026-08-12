@@ -152,6 +152,31 @@ ok("e leva o documento da etapa junto", /documentoId: s\.documentoId/.test(proj)
   "o executor é documental: sem documento não há o que operar")
 
 // ═══════════════════════════════════════════════════════════════════════════
+secao("7) A TAREFA se chama pelo TRABALHO — nunca pela primeira etapa")
+// ═══════════════════════════════════════════════════════════════════════════
+/**
+ * Em produção nasceu uma tarefa chamada "Solicitar certidão" — o nome do
+ * primeiro passo de um workflow de cinco. Na fila, ela sugeria que o modelo
+ * etapa-é-tarefa tinha voltado, logo depois de ser eliminado.
+ */
+const nomeador = semComentarios(ler("lib/operacional/nome-da-tarefa.ts"))
+ok("existe UMA regra de nomeação", /export function nomeDaTarefa/.test(nomeador))
+ok("a etapa só nomeia quando a unidade tem UMA etapa",
+  /o\.etapasDaUnidade <= 1/.test(nomeador),
+  "com duas ou mais, o nome do primeiro passo é sempre a resposta errada")
+ok("a obrigação tem precedência sobre o documento",
+  nomeador.indexOf("itemDaNecessidade") < nomeador.indexOf("nomeDoDocumento"))
+
+for (const arq of ["src/services/passo-tarefa.ts", "lib/operacional/reconciliar-tarefas.ts"]) {
+  const src = semComentarios(ler(arq))
+  const nome = arq.split("/").pop()
+  ok(`${nome} usa a regra compartilhada`, /nomeDaTarefa\(/.test(src))
+  ok(`${nome} não batiza a tarefa pelo snapshot do passo`,
+    !/titulo = String\(snap\?\.titulo/.test(src),
+    "era a assinatura do desenho em que a tarefa ERA o passo")
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
 console.log(`\n${"═".repeat(70)}`)
 console.log(`RESULTADO: ${passou} passaram, ${falhou} falharam`)
 if (falhou > 0) {

@@ -21,6 +21,7 @@ import {
   resolverResponsavel,
   passoGeraTarefa,
 } from "@/src/services/passo-tarefa-helpers"
+import { nomeDaTarefa } from "@/lib/operacional/nome-da-tarefa"
 
 /**
  * Pré-condições do processo, iguais para TODOS os passos de uma mesma rodada.
@@ -117,8 +118,48 @@ export async function garantirTarefaDePasso(
   const regra = passoGeraTarefa({ tipo: step.tipo, geraTarefa: step.geraTarefa, status: step.status, aplicavel })
   if (!regra.gera) return fail(regra.code!)
 
-  // campos derivados EXCLUSIVAMENTE do snapshot/instância
-  const titulo = String(snap?.titulo ?? `Passo ${step.stepKey}`).slice(0, 200)
+  // O NOME DA TAREFA É O DO TRABALHO, NÃO O DA ETAPA.
+  //
+  // Aqui se lia `snap?.titulo` — o título do PASSO. No desenho antigo isso
+  // estava certo, porque a tarefa era o passo. Depois que a identidade passou a
+  // ser a unidade de trabalho, sobrou uma tarefa chamada "Solicitar certidão"
+  // para um workflow de cinco etapas cujo trabalho é obter uma certidão.
+  //
+  // A regra agora é a mesma que o reconciliador usa: obrigação → documento →
+  // etapa (só se a unidade tiver uma), e a pessoa como qualificador.
+  const irmaos = await db.phaseWorkflowStepInstance.count({
+    where: {
+      workflowInstanceId: step.workflowInstanceId,
+      ...(step.necessidadeId != null
+        ? { necessidadeId: step.necessidadeId }
+        : step.documentoId != null
+          ? { documentoId: step.documentoId }
+          : { id: step.id }),
+    },
+  })
+  const necessidade = step.necessidadeId != null
+    ? await db.necessidadeDocumental.findUnique({
+        where: { id: step.necessidadeId },
+        select: { pessoaId: true, itemCatalogo: { select: { name: true } } },
+      })
+    : null
+  const documento = step.documentoId != null
+    ? await db.documento.findUnique({
+        where: { id: step.documentoId },
+        select: { descricao: true, pessoaId: true, documentType: { select: { name: true } } },
+      })
+    : null
+  const pessoaId = necessidade?.pessoaId ?? documento?.pessoaId ?? step.pessoaId ?? null
+  const pessoa = pessoaId != null
+    ? await db.pessoa.findUnique({ where: { id: pessoaId }, select: { nome: true, sobrenome: true } })
+    : null
+  const titulo = nomeDaTarefa({
+    itemDaNecessidade: necessidade?.itemCatalogo?.name ?? null,
+    nomeDoDocumento: documento?.documentType?.name ?? documento?.descricao ?? null,
+    pessoa: pessoa ? [pessoa.nome, pessoa.sobrenome].filter(Boolean).join(" ") : null,
+    tituloDaEtapa: (snap?.titulo as string | undefined) ?? null,
+    etapasDaUnidade: irmaos,
+  })
   const descricao = snap?.descricao ?? null
   const prioridade = mapearPrioridade(step.prioridade ?? snap?.prioridade)
   const sla = step.slaDays ?? snap?.sla ?? null
