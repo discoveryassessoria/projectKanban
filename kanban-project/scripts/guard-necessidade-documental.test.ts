@@ -80,6 +80,8 @@ const AUTORIZADOS_FORA_DO_RUNTIME: Record<string, string> = {
     "fluxo de distribuição: monta e derruba os PRÓPRIOS processos (marca DISTR), só no banco de teste — o cenário precisa de obrigação real para o motor criar a tarefa sozinho, que é justamente o que se prova",
   "scripts/palco-distribuicao.ts":
     "palco visual da Operação: monta e derruba os PRÓPRIOS processos (marca PALCO), só no banco de teste, para a captura de tela com dados realistas — não roda em produção",
+  "scripts/palco-gerencial.ts":
+    "palco da visão gerencial global: monta e derruba os PRÓPRIOS processos (marca GERENCIAL), só no banco de teste — precisa de uma tarefa em CADA estado operacional para provar que o quadro coloca cada uma na sua coluna; os estados são alcançados pelas portas canônicas, só o cenário é montado aqui",
   "scripts/etapa-nao-e-tarefa.test.ts":
     "etapa não é tarefa: monta e derruba os PRÓPRIOS processos (marca ETAPA5), só no banco de teste — prova que 5 passos publicados de um documento produzem 1 tarefa, e que 2 documentos produzem 2 tarefas e não 10",
   "scripts/workflow-documental-completo.test.ts":

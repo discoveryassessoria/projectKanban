@@ -247,7 +247,10 @@ ok("e Minha Fila é projeção, não entidade",
 
 // §19 — atraso é condição derivada, jamais um status.
 ok("atraso NÃO é status", !/'ATRASADA'/.test(schema) && !/ATRASADA/.test(canonica))
-ok("atraso é calculado na projeção", /atrasada: !terminal && t\.dataPrazo != null/.test(projecoes))
+// A régua é o DIA operacional, não o instante: um SLA de "5 dias" vence NO DIA.
+// Comparar instantes pintava de vermelho, desde a manhã, a tarefa que vence hoje.
+ok("atraso é calculado na projeção", /atrasada: !terminal && diaDoPrazo != null && diaDoPrazo < hoje/.test(projecoes))
+ok("e não existe coluna de atraso no banco", !/atrasad/i.test(schema.slice(schema.indexOf("model Tarefa "), schema.indexOf("}", schema.indexOf("model Tarefa ")))))
 
 // §66 — carga conta tarefas, nunca etapas.
 ok("a carga conta tarefas", /cargaPorResponsavel/.test(projecoes) &&

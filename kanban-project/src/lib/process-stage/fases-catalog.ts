@@ -274,3 +274,17 @@ export function getStepDef(
   const canonico = resolveStepKeyCompat(fase.phaseKey, stepKey)
   return fase.steps.find((c) => c.stepKey === canonico || c.stepKey === stepKey)
 }
+/**
+ * O RÓTULO DA FASE A PARTIR DA `phaseKey` — para quem só tem a chave gravada.
+ *
+ * A Tarefa guarda `faseMacroKey` (a chave), não o rótulo. Telas que precisavam
+ * mostrar a fase vinham desenrolando o underscore e capitalizando a primeira
+ * letra, o que devolve "Emissao documental" — sem acento, porque a chave nunca
+ * teve. O nome da fase existe, é publicado, e é este.
+ */
+export function labelDaFasePorPhaseKey(phaseKey: string | null | undefined): string | null {
+  if (!phaseKey) return null
+  const chave = phaseKey.toLowerCase()
+  const achada = Object.values(FASES).find((f) => f.phaseKey.toLowerCase() === chave)
+  return achada?.label ?? null
+}

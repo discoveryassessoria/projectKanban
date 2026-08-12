@@ -13,9 +13,30 @@
 // justamente no caso em que ele mais importa.
 // ============================================================================
 import { prisma } from '@/lib/prisma'
-import type { Prisma, StatusTarefa } from '@prisma/client'
+import type { Prisma, PrioridadeTarefa, StatusTarefa } from '@prisma/client'
 import { STATUS_ATIVOS } from './tarefa-canonica'
 import { resolveWorkflowStepEditor } from '@/src/lib/process-stage/step-editor-registry'
+
+/**
+ * O DIA EM QUE A OPERAÇÃO VIVE.
+ *
+ * O prazo é gravado com hora (o SLA soma dias sobre o instante em que a tarefa
+ * nasceu), mas ninguém opera em minutos: um SLA de "5 dias" vence NO DIA, não
+ * às 14h24 do quinto dia. Comparar instantes fazia uma tarefa que vence hoje
+ * aparecer atrasada desde a manhã — e tornava "vence hoje" impossível de
+ * mostrar, porque o vermelho de atraso chegava primeiro.
+ *
+ * A régua é o DIA no fuso da operação, não o do servidor.
+ */
+const FUSO_OPERACIONAL = 'America/Sao_Paulo'
+export function diaOperacional(d: Date): string {
+  return d.toLocaleDateString('en-CA', { timeZone: FUSO_OPERACIONAL })
+}
+
+/** Meia-noite do dia operacional de HOJE, em instante — para filtrar no banco. */
+export function inicioDoDiaOperacional(agora: Date): Date {
+  return new Date(`${diaOperacional(agora)}T00:00:00.000Z`)
+}
 
 export interface LinhaDeFila {
   taskId: number
@@ -63,7 +84,11 @@ type Bruta = Prisma.TarefaGetPayload<{ select: typeof SELECT }>
 
 function projetar(t: Bruta, agora: Date, nomes?: Map<number, string>): LinhaDeFila {
   const snap = t.workflowStepInstance?.snapshot as { label?: string } | null
-  const dias = t.dataPrazo ? Math.ceil((t.dataPrazo.getTime() - agora.getTime()) / 86400000) : null
+  const hoje = diaOperacional(agora)
+  const diaDoPrazo = t.dataPrazo ? diaOperacional(t.dataPrazo) : null
+  const dias =
+    diaDoPrazo == null ? null
+    : Math.round((Date.parse(`${diaDoPrazo}T00:00:00Z`) - Date.parse(`${hoje}T00:00:00Z`)) / 86400000)
   const terminal = !STATUS_ATIVOS.includes(t.statusTarefa)
   return {
     taskId: t.id,
@@ -81,7 +106,10 @@ function projetar(t: Bruta, agora: Date, nomes?: Map<number, string>): LinhaDeFi
     dataPrazo: t.dataPrazo?.toISOString() ?? null,
     // Só o que ainda é trabalho a fazer pode estar atrasado: tarefa concluída
     // ontem com prazo de anteontem não é uma pendência de hoje.
-    atrasada: !terminal && t.dataPrazo != null && t.dataPrazo < agora,
+    // Atrasada é o DIA do prazo já ter passado. Dentro do dia de vencimento a
+    // tarefa não está atrasada — está vencendo hoje, que é outra coisa e leva
+    // outra cor.
+    atrasada: !terminal && diaDoPrazo != null && diaDoPrazo < hoje,
     diasParaPrazo: dias,
     aguardandoDependencia: t.dependeDe.some(
       (d) => d.obrigatoria && !['CONCLUIDO_RECEBIDO', 'CONCLUIDO_NAO_POSSUI'].includes(d.dependeDe.statusTarefa),
@@ -528,7 +556,7 @@ export async function cargaPorResponsavel(agora = new Date()) {
   })
   const atrasadas = await prisma.tarefa.groupBy({
     by: ['responsavelId'],
-    where: { statusTarefa: { in: STATUS_ATIVOS }, responsavelId: { not: null }, dataPrazo: { lt: agora } },
+    where: { statusTarefa: { in: STATUS_ATIVOS }, responsavelId: { not: null }, dataPrazo: { lt: inicioDoDiaOperacional(agora) } },
     _count: { _all: true },
   })
   const mapaAtraso = new Map(atrasadas.map((a) => [a.responsavelId, a._count._all]))
@@ -537,4 +565,296 @@ export async function cargaPorResponsavel(agora = new Date()) {
     tarefasAtivas: l._count._all,
     atrasadas: mapaAtraso.get(l.responsavelId) ?? 0,
   }))
+}
+
+// ============================================================================
+// A VISÃO GERENCIAL — a operação inteira, numa consulta só.
+//
+// Minha Fila responde "o que EU faço agora". Sem responsável responde "o que
+// ainda não é de ninguém". Falta a pergunta do gestor, que é outra: "o que
+// existe, onde está, com quem, e o que já estourou".
+//
+// É a MESMA `Tarefa` das outras duas projeções, com o mesmo `taskId`. O que
+// muda é o recorte e o que se deriva por cima dele. Não existe tabela de
+// board, não existe cópia, não existe status paralelo: a coluna do Kanban é
+// função do `statusTarefa` canônico, calculada na leitura.
+//
+// ─── A COLUNA NÃO É UM ESTADO ───────────────────────────────────────────────
+// `coluna` é derivada, como `atrasada`. Se fosse persistida, existiriam duas
+// respostas para "em que pé está esta tarefa" — e a segunda ficaria para trás.
+// Por isso ela também NÃO se move: arrastar um card executa um COMANDO, e a
+// coluna muda porque o estado mudou. Nunca o contrário.
+// ============================================================================
+
+export type ColunaKanban =
+  | 'SEM_RESPONSAVEL' | 'A_FAZER' | 'EM_ANDAMENTO'
+  | 'AGUARDANDO_TERCEIRO' | 'BLOQUEADA' | 'CONCLUIDA'
+
+export const COLUNAS_KANBAN: ColunaKanban[] = [
+  'SEM_RESPONSAVEL', 'A_FAZER', 'EM_ANDAMENTO', 'AGUARDANDO_TERCEIRO', 'BLOQUEADA', 'CONCLUIDA',
+]
+
+/**
+ * DE ESTADO CANÔNICO PARA COLUNA — mapeamento visual, sem inventar estado.
+ *
+ * "Sem responsável" vem PRIMEIRO porque responde à pergunta mais urgente do
+ * gestor: uma tarefa sem dono não anda, esteja em que estado estiver.
+ *
+ * `AGUARDANDO_CLIENTE` e `AGUARDANDO_TERCEIRO` são estados DIFERENTES no
+ * domínio e continuam diferentes no banco. Dividem coluna porque a decisão do
+ * gestor é a mesma — cobrar quem está devendo —, e o card diz de quem se
+ * espera. Sétima coluna dividiria a atenção sem mudar a ação.
+ *
+ * `CANCELADA` e `SUPERSEDIDA` NÃO viram "Concluída": nada foi entregue. Ficam
+ * fora do quadro, e só aparecem se o filtro de status pedir explicitamente.
+ */
+export function colunaDaTarefa(l: { statusTarefa: StatusTarefa; responsavelId: number | null }): ColunaKanban | null {
+  if (l.statusTarefa === 'CONCLUIDO_RECEBIDO' || l.statusTarefa === 'CONCLUIDO_NAO_POSSUI') return 'CONCLUIDA'
+  if (l.statusTarefa === 'CANCELADA' || l.statusTarefa === 'SUPERSEDIDA') return null
+  if (l.responsavelId == null) return 'SEM_RESPONSAVEL'
+  if (l.statusTarefa === 'BLOQUEADA') return 'BLOQUEADA'
+  if (l.statusTarefa === 'AGUARDANDO_TERCEIRO' || l.statusTarefa === 'AGUARDANDO_CLIENTE') return 'AGUARDANDO_TERCEIRO'
+  if (l.statusTarefa === 'EM_ANDAMENTO') return 'EM_ANDAMENTO'
+  return 'A_FAZER'
+}
+
+export interface LinhaGerencial extends LinhaDeFila {
+  /** Derivado do prazo no fuso operacional — não é status. */
+  venceHoje: boolean
+  coluna: ColunaKanban
+  /** De quem se espera: o card precisa dizer, já que a coluna é uma só. */
+  esperandoDe: 'terceiro' | 'cliente' | null
+  /** Desde quando espera — vem da auditoria, não de coluna nova. */
+  esperandoDesde: string | null
+  esperandoHaDias: number | null
+  /** Por que parou. Bloqueio sem motivo visível obriga a abrir cinco telas. */
+  motivoBloqueio: string | null
+  concluidaEm: string | null
+}
+
+export interface FiltrosGerenciais {
+  responsavelId?: number | null
+  /** `true` recorta o que não é de ninguém — é filtro, não estado. */
+  semResponsavel?: boolean
+  faseMacroKey?: string | null
+  status?: StatusTarefa[]
+  coluna?: ColunaKanban | null
+  prioridade?: PrioridadeTarefa[]
+  atrasadas?: boolean
+  venceHoje?: boolean
+  processoId?: number | null
+  pessoaId?: number | null
+  /** Busca por tarefa, pessoa ou processo — uma caixa só, como se procura. */
+  busca?: string | null
+  /** Encerradas sem entrega (cancelada/supersedida) ficam fora por padrão. */
+  incluirEncerradas?: boolean
+  pagina?: number
+  porPagina?: number
+}
+
+const STATUS_CONCLUIDOS: StatusTarefa[] = ['CONCLUIDO_RECEBIDO', 'CONCLUIDO_NAO_POSSUI']
+const STATUS_NO_QUADRO: StatusTarefa[] = [...STATUS_ATIVOS, ...STATUS_CONCLUIDOS]
+
+/**
+ * O `where` do Prisma para os filtros gerenciais.
+ *
+ * Tudo que dá para filtrar no BANCO é filtrado no banco: paginar em cima de um
+ * array já carregado é buscar mil linhas para mostrar vinte. O que sobra em
+ * memória é só o que é DERIVADO (atrasada, vence hoje, coluna) — e mesmo esses
+ * viram condição de data no `where` quando dá.
+ */
+function whereGerencial(f: FiltrosGerenciais, agora: Date): Prisma.TarefaWhereInput {
+  const where: Prisma.TarefaWhereInput = {}
+  const e: Prisma.TarefaWhereInput[] = []
+
+  if (f.status?.length) where.statusTarefa = { in: f.status }
+  else if (f.incluirEncerradas) where.statusTarefa = { in: [...STATUS_NO_QUADRO, 'CANCELADA', 'SUPERSEDIDA'] }
+  else where.statusTarefa = { in: STATUS_NO_QUADRO }
+
+  if (f.semResponsavel) where.responsavelId = null
+  else if (f.responsavelId != null) where.responsavelId = f.responsavelId
+
+  if (f.faseMacroKey) where.faseMacroKey = f.faseMacroKey
+  if (f.prioridade?.length) where.prioridade = { in: f.prioridade }
+  if (f.processoId != null) where.processoId = f.processoId
+  if (f.pessoaId != null) where.pessoaId = f.pessoaId
+
+  // Atrasada é condição derivada, mas se traduz exatamente em SQL: prazo no
+  // passado e trabalho ainda por fazer.
+  if (f.atrasadas) e.push({ dataPrazo: { lt: inicioDoDiaOperacional(agora) }, statusTarefa: { in: STATUS_ATIVOS } })
+  if (f.venceHoje) {
+    const dia = diaOperacional(agora)
+    e.push({ dataPrazo: { gte: new Date(`${dia}T00:00:00.000Z`), lte: new Date(`${dia}T23:59:59.999Z`) } })
+  }
+
+  // A busca é uma caixa só porque é assim que se procura: o gestor lembra do
+  // nome da pessoa OU do processo OU do que é a tarefa, não de qual campo.
+  const q = f.busca?.trim()
+  if (q) e.push({ OR: [{ titulo: { contains: q, mode: 'insensitive' } }, { processo: { nome: { contains: q, mode: 'insensitive' } } }] })
+
+  if (e.length) where.AND = e
+  return where
+}
+
+/** Desde quando cada tarefa espera / por que bloqueou — UMA consulta, em lote. */
+async function contextoDeParada(ids: number[]): Promise<Map<number, { esperandoDesde?: Date; motivo?: string }>> {
+  const mapa = new Map<number, { esperandoDesde?: Date; motivo?: string }>()
+  if (ids.length === 0) return mapa
+  // Ordem crescente e sobrescrita: o último registro de cada tarefa vence, que
+  // é o que interessa — a espera ATUAL, não a primeira que já houve.
+  const logs = await prisma.logAuditoria.findMany({
+    where: { entidade: 'Tarefa', entidadeId: { in: ids }, acao: { in: ['TAREFA_AGUARDANDO_TERCEIRO', 'TAREFA_BLOQUEADA'] } },
+    select: { entidadeId: true, acao: true, criadoEm: true, detalhes: true },
+    orderBy: { criadoEm: 'asc' },
+  })
+  for (const l of logs) {
+    if (l.entidadeId == null) continue
+    const atual = mapa.get(l.entidadeId) ?? {}
+    const motivo = (l.detalhes as { motivo?: string } | null)?.motivo
+    if (l.acao === 'TAREFA_AGUARDANDO_TERCEIRO') atual.esperandoDesde = l.criadoEm
+    else atual.motivo = motivo ?? undefined
+    mapa.set(l.entidadeId, atual)
+  }
+  return mapa
+}
+
+/** O que o topo da tela mostra — contagens, não uma tela de BI. */
+export interface IndicadoresGerenciais {
+  total: number
+  semResponsavel: number
+  emAndamento: number
+  aguardandoTerceiro: number
+  bloqueadas: number
+  atrasadas: number
+  venceHoje: number
+  concluidas: number
+}
+
+/**
+ * OS INDICADORES SÃO CONTAGENS NO BANCO, não `linhas.filter(...)`.
+ *
+ * Contar em memória obrigaria a carregar a operação inteira para escrever seis
+ * números no topo — e o número passaria a depender da página aberta, que é
+ * pior do que não ter o número.
+ */
+export async function indicadoresGerenciais(f: FiltrosGerenciais = {}, agora = new Date()): Promise<IndicadoresGerenciais> {
+  const base = { ...f, atrasadas: false, venceHoje: false, coluna: null, status: undefined }
+  const w = (extra: Prisma.TarefaWhereInput) => ({ AND: [whereGerencial(base, agora), extra] })
+  const dia = diaOperacional(agora)
+  const [total, semResp, andamento, aguardando, bloqueadas, atrasadas, venceHoje, concluidas] = await Promise.all([
+    prisma.tarefa.count({ where: w({ statusTarefa: { in: STATUS_ATIVOS } }) }),
+    prisma.tarefa.count({ where: w({ statusTarefa: { in: STATUS_ATIVOS }, responsavelId: null }) }),
+    prisma.tarefa.count({ where: w({ statusTarefa: 'EM_ANDAMENTO' }) }),
+    prisma.tarefa.count({ where: w({ statusTarefa: { in: ['AGUARDANDO_TERCEIRO', 'AGUARDANDO_CLIENTE'] } }) }),
+    prisma.tarefa.count({ where: w({ statusTarefa: 'BLOQUEADA' }) }),
+    prisma.tarefa.count({ where: w({ statusTarefa: { in: STATUS_ATIVOS }, dataPrazo: { lt: inicioDoDiaOperacional(agora) } }) }),
+    prisma.tarefa.count({
+      where: w({
+        statusTarefa: { in: STATUS_ATIVOS },
+        dataPrazo: { gte: new Date(`${dia}T00:00:00.000Z`), lte: new Date(`${dia}T23:59:59.999Z`) },
+      }),
+    }),
+    prisma.tarefa.count({ where: w({ statusTarefa: { in: STATUS_CONCLUIDOS } }) }),
+  ])
+  return {
+    total, semResponsavel: semResp, emAndamento: andamento, aguardandoTerceiro: aguardando,
+    bloqueadas, atrasadas, venceHoje, concluidas,
+  }
+}
+
+const SELECT_GERENCIAL = {
+  ...SELECT,
+  dataConclusao: true,
+  justificativa: true,
+  motivoCodigo: true,
+} satisfies Prisma.TarefaSelect
+
+/**
+ * A VISÃO GLOBAL — Lista e Kanban leem ESTA função, e só ela.
+ *
+ * Duas telas, uma consulta: é o que garante que o card e a linha nunca discordem
+ * sobre a mesma tarefa. A troca Lista ↔ Kanban não busca nada diferente, não
+ * cria estado e não escreve — reagrupa o que já está na tela.
+ */
+export async function visaoGerencial(
+  f: FiltrosGerenciais = {},
+  agora = new Date(),
+): Promise<{ linhas: LinhaGerencial[]; total: number; pagina: number; porPagina: number }> {
+  const porPagina = Math.min(Math.max(f.porPagina ?? 200, 1), 500)
+  const pagina = Math.max(f.pagina ?? 1, 1)
+  const where = whereGerencial(f, agora)
+
+  const [total, brutas] = await Promise.all([
+    prisma.tarefa.count({ where }),
+    prisma.tarefa.findMany({
+      where,
+      select: SELECT_GERENCIAL,
+      orderBy: [{ dataPrazo: { sort: 'asc', nulls: 'last' } }, { prioridade: 'desc' }, { id: 'asc' }],
+      skip: (pagina - 1) * porPagina,
+      take: porPagina,
+    }),
+  ])
+
+  const nomes = await nomesDasPessoas(brutas)
+  const paradas = await contextoDeParada(
+    brutas.filter((t) => t.statusTarefa === 'BLOQUEADA' || t.statusTarefa === 'AGUARDANDO_TERCEIRO').map((t) => t.id),
+  )
+  const hoje = diaOperacional(agora)
+
+  const linhas = brutas.map((t): LinhaGerencial => {
+    const base = projetar(t, agora, nomes)
+    const parada = paradas.get(t.id)
+    const espera = parada?.esperandoDesde ?? null
+    const esperando = t.statusTarefa === 'AGUARDANDO_TERCEIRO' || t.statusTarefa === 'AGUARDANDO_CLIENTE'
+    return {
+      ...base,
+      // Vence hoje é o DIA no fuso operacional — não "menos de 24 horas".
+      venceHoje: t.dataPrazo != null && diaOperacional(t.dataPrazo) === hoje,
+      coluna: colunaDaTarefa(t) ?? 'CONCLUIDA',
+      esperandoDe: esperando ? (t.statusTarefa === 'AGUARDANDO_CLIENTE' ? 'cliente' : 'terceiro') : null,
+      esperandoDesde: esperando ? espera?.toISOString() ?? null : null,
+      esperandoHaDias: esperando && espera ? Math.floor((agora.getTime() - espera.getTime()) / 86400000) : null,
+      motivoBloqueio: t.statusTarefa === 'BLOQUEADA' ? t.justificativa ?? parada?.motivo ?? null : null,
+      concluidaEm: t.dataConclusao?.toISOString() ?? null,
+    }
+  })
+
+  // Filtros DERIVADOS que não existem como coluna no banco entram por último,
+  // sobre a página já lida. `coluna` é o único caso, e é o que o Kanban usa
+  // para recortar sem uma segunda consulta.
+  const recortadas = f.coluna ? linhas.filter((l) => l.coluna === f.coluna) : linhas
+  return { linhas: ordenarFila(recortadas) as LinhaGerencial[], total, pagina, porPagina }
+}
+
+/**
+ * AS OPÇÕES DOS FILTROS — vêm do que EXISTE, não de uma lista fixa.
+ *
+ * Oferecer uma fase que nenhuma tarefa tem produz filtro que devolve vazio e
+ * parece defeito. Aqui as opções são agregações da própria operação, com a
+ * contagem junto: o gestor escolhe sabendo quanto vai encontrar.
+ */
+export async function facetasGerenciais(agora = new Date()) {
+  const ativas = { statusTarefa: { in: STATUS_ATIVOS } }
+  const [porFase, porResponsavel, usuarios] = await Promise.all([
+    prisma.tarefa.groupBy({ by: ['faseMacroKey'], where: ativas, _count: { _all: true } }),
+    prisma.tarefa.groupBy({ by: ['responsavelId'], where: ativas, _count: { _all: true } }),
+    prisma.usuario.findMany({ select: { id: true, nome: true }, orderBy: { nome: 'asc' } }),
+  ])
+  const nomeDe = new Map(usuarios.map((u) => [u.id, u.nome]))
+  const carga = new Map((await cargaPorResponsavel(agora)).map((c) => [c.responsavelId, c]))
+  return {
+    fases: porFase
+      .filter((f) => f.faseMacroKey)
+      .map((f) => ({ faseMacroKey: f.faseMacroKey as string, tarefas: f._count._all }))
+      .sort((a, b) => b.tarefas - a.tarefas),
+    responsaveis: porResponsavel
+      .filter((r) => r.responsavelId != null)
+      .map((r) => ({
+        responsavelId: r.responsavelId as number,
+        nome: nomeDe.get(r.responsavelId as number) ?? `#${r.responsavelId}`,
+        tarefas: r._count._all,
+        atrasadas: carga.get(r.responsavelId as number)?.atrasadas ?? 0,
+      }))
+      .sort((a, b) => a.nome.localeCompare(b.nome)),
+  }
 }
