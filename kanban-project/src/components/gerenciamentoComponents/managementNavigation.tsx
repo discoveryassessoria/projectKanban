@@ -317,6 +317,7 @@ export const MANAGEMENT_NAVIGATION: ManagementNavigationItem[] = [
       a(30, "permmotor", "Permissões", ["permissao", "permissão", "autorizacao", "autorização", "perfil", "motor"]),
 
       a(40, "teams", "Equipes", ["equipe", "time", "grupo"], "Grupos"),
+      a(45, "opcapacity", "Capacidade Operacional", ["capacidade", "aptidao", "aptidão", "disponibilidade", "ferias", "férias", "carga", "equipe"], "Grupos"),
       a(50, "departments", "Departamentos", ["departamento", "setor", "grupo"], "Grupos"),
       a(60, "rolecat", "Cargos", ["cargo", "funcao", "função", "papel"], "Grupos"),
 

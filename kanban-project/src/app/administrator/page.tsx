@@ -71,6 +71,7 @@ import { useDadosHeaderBar } from "@/src/hooks/use-dados-headerbar"
 // MAPA DE TELAS (screen key → componente). Inalterado — só as views que o
 // envolvem foram reorganizadas. As keys são as mesmas do deep-link ?screen=.
 // ============================================================
+const CapacidadeOperacionalTab = dynamic(() => import("@/src/components/gerenciamentoComponents/CapacidadeOperacionalTab"), { ssr: false, loading: () => <CarregandoTela /> })
 const OverviewTab = dynamic(() => import("@/src/components/gerenciamentoComponents/OverviewTab"), {
   ssr: false, loading: () => <CarregandoTela />,
 })
@@ -208,6 +209,7 @@ const TELAS: Record<string, React.ComponentType> = {
   // Cadastros REAIS (motor genérico). Os rascunhos do mockup seguem acessíveis
   // por ?screen=<key>-rascunho.
   teams: cad("grupos"),
+  opcapacity: CapacidadeOperacionalTab,
   "teams-rascunho": TeamsTab,
   servcats: cad("categorias-servico"),
   orgcats: cad("categorias-organizacao"),

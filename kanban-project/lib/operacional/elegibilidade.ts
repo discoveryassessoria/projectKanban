@@ -26,35 +26,57 @@
 // lado, justamente para que discordar deles seja editar um número — e não
 // caçar uma heurística escondida no meio de um `sort`.
 //
-// ─── UMA REGRA SÓ, PORQUE SÓ UMA EXISTE ─────────────────────────────────────
-// A elegibilidade tem UM critério neste sistema: PERMISSÃO DE EXECUTAR
-// (`tarefas.iniciar_concluir`). Não é minimalismo — é o que há.
+// ─── A ORDEM DA ELEGIBILIDADE ───────────────────────────────────────────────
+// Os critérios são avaliados nesta ordem, e cada um só RESTRINGE:
 //
-// EQUIPE (`Tarefa.equipeKey`, `GrupoUsuario`) existe como dado e NÃO restringe:
-// o próprio cadastro de Equipes declara "Grupo NÃO concede permissão —
-// autorização continua em Perfis e Permissões", e nenhum ponto do sistema
-// valida o responsável contra a equipe da tarefa. Transformar equipe em filtro
-// aqui seria criar uma regra de autorização nova, escondida dentro de um
-// recomendador. Ela entra como CONTEXTO — o gestor vê que a tarefa nomeia uma
-// equipe e quem pertence a ela —, nunca como veto.
+//   1. PERMISSÃO       `tarefas.iniciar_concluir` — sem isto, nada mais importa
+//   2. DISPONIBILIDADE indisponibilidade vigente (férias, afastamento, bloqueio)
+//   3. APTIDÃO         quando a fase da tarefa tem aptidão DECLARADA por alguém
+//   4. EQUIPE/ESCOPO   quando a tarefa exige uma equipe que EXISTE no cadastro
+//   5. CAPACIDADE      quando há teto configurado e ele já está cheio
+//   6. então, e só então, o score de carga decide entre os que sobraram
 //
-// Os critérios abaixo são pedidos com frequência e NÃO EXISTEM no modelo. São
-// declarados em `CRITERIOS_AUSENTES` e devolvidos em toda simulação, para que
-// a ausência seja visível em vez de silenciosa:
+// Nenhum dos cinco concede elegibilidade a quem não tem permissão. A camada
+// operacional (`lib/operacional/organizacao.ts`) restringe; autorização
+// continua inteiramente em Perfil/permissoesCustom.
 //
-//   • usuário ativo/inativo   — `Usuario` não tem esse campo
-//   • férias / afastamento    — não existe entidade de ausência
-//   • capacidade cadastrada   — não existe limite por usuário (§12)
-//   • especialidade           — não existe cadastro de habilidade
-//   • escopo por processo/cliente — não existe vínculo de atuação
+// ─── QUANDO UMA REGRA NÃO SE APLICA ─────────────────────────────────────────
+// Aptidão e equipe são OPT-IN, e isso não é frouxidão: é o que impede uma
+// tabela recém-criada de tornar toda a operação inelegível de um dia para o
+// outro.
 //
-// Inventar qualquer um deles no código seria a pior saída possível: uma regra
-// de negócio que ninguém decidiu, aplicada como se tivesse sido.
+//   APTIDÃO só restringe a fase em que ALGUÉM já foi declarado apto. Enquanto
+//   ninguém for, a fase não tem regra de aptidão — e não ter regra é diferente
+//   de reprovar todo mundo.
+//
+//   EQUIPE só restringe quando a tarefa nomeia um código que EXISTE como equipe
+//   ativa no cadastro. Um `equipeKey` que não resolve não é uma regra: é um
+//   dado sem contraparte, e aparece como observação no auditor.
+//
+// Mas quando a regra EXISTE e ninguém passa, o resultado é ABSTENÇÃO — nunca
+// relaxar em silêncio para conseguir devolver um nome.
+//
+// ─── O QUE CONTINUA NÃO EXISTINDO ───────────────────────────────────────────
+// Declarado em `CRITERIOS_AUSENTES` e devolvido em toda simulação. Depois desta
+// camada, restam poucos: usuário ativo/inativo (`Usuario` não tem o campo) e
+// escopo por processo/cliente. Nenhum foi inventado.
 // ============================================================================
 import { prisma } from '@/lib/prisma'
 import type { StatusTarefa } from '@prisma/client'
 import { STATUS_ATIVOS } from './tarefa-canonica'
 import { calcularPermissoes, temPermissao, type MapaPermissoes } from '@/src/lib/permissoes'
+import {
+  lerOrganizacao, fasesComAptidaoDeclarada, rotuloDaFase,
+  type OrganizacaoDoUsuario,
+} from './organizacao'
+
+/** Os tipos de indisponibilidade em português — a tela e o auditor leem isto. */
+const ROTULO_INDISPONIBILIDADE: Record<string, string> = {
+  FERIAS: 'férias',
+  AFASTAMENTO: 'afastamento',
+  AUSENCIA: 'ausência',
+  BLOQUEIO_OPERACIONAL: 'bloqueio operacional',
+}
 
 /** A permissão sem a qual a tarefa nasce travada na fila de quem a recebeu. */
 const PERMISSAO_EXECUTAR = 'tarefas.iniciar_concluir'
@@ -140,7 +162,12 @@ export function pontuar(c: Carga): { score: number; parcelas: ParcelaDoScore[] }
 
 // ─── ELEGIBILIDADE ──────────────────────────────────────────────────────────
 
-export type CodigoInelegibilidade = 'SEM_PERMISSAO_EXECUTAR'
+export type CodigoInelegibilidade =
+  | 'SEM_PERMISSAO_EXECUTAR'
+  | 'INDISPONIVEL'
+  | 'SEM_APTIDAO'
+  | 'FORA_DA_EQUIPE_EXIGIDA'
+  | 'CAPACIDADE_ESGOTADA'
 
 /**
  * O QUE O SISTEMA NÃO SABE — devolvido em toda simulação.
@@ -149,28 +176,39 @@ export type CodigoInelegibilidade = 'SEM_PERMISSAO_EXECUTAR'
  * ele considerou tudo.
  */
 export const CRITERIOS_AUSENTES: Array<{ criterio: string; porque: string }> = [
-  { criterio: 'usuário ativo/inativo', porque: 'o cadastro de Usuário não tem esse campo — todo usuário cadastrado é considerado disponível' },
-  { criterio: 'férias e afastamentos', porque: 'não existe entidade de ausência no sistema' },
-  { criterio: 'capacidade máxima por pessoa', porque: 'não existe cadastro de capacidade; a recomendação é RELATIVA à carga real de cada um' },
-  { criterio: 'especialidade / habilidade', porque: 'não existe cadastro de especialidade — nenhuma foi inventada' },
-  { criterio: 'escopo por processo ou cliente', porque: 'não existe vínculo de atuação por processo ou cliente' },
-  { criterio: 'equipe como restrição', porque: 'equipe existe como dado, mas o cadastro declara que grupo NÃO concede permissão — entra como contexto, não como veto' },
+  { criterio: 'usuário ativo/inativo', porque: 'o cadastro de Usuário não tem esse campo; desligar alguém da distribuição se faz com uma indisponibilidade de BLOQUEIO_OPERACIONAL' },
+  { criterio: 'escopo por processo ou cliente', porque: 'não existe vínculo de atuação por processo ou cliente — nenhum foi inventado' },
 ]
+
+/** O veredito de UM critério — é isto que o modo auditor imprime linha a linha. */
+export interface Criterio {
+  chave: 'PERMISSAO' | 'DISPONIBILIDADE' | 'APTIDAO' | 'EQUIPE' | 'CAPACIDADE'
+  /** `nao_aplicavel` é diferente de `ok`: a regra não existe para esta tarefa. */
+  veredito: 'ok' | 'reprovado' | 'nao_aplicavel'
+  detalhe: string
+}
 
 export interface Avaliacao {
   usuarioId: number
   nome: string
   elegivel: boolean
   motivos: Array<{ codigo: CodigoInelegibilidade; texto: string }>
+  /** Os cinco critérios, sempre todos — inclusive os que não se aplicam. */
+  criterios: Criterio[]
   carga: Carga
   score: number
   parcelas: ParcelaDoScore[]
+  /** Organização da pessoa, para a tela: equipes, aptidões, teto. */
+  equipes: string[]
+  aptidoes: string[]
+  limiteExecutaveis: number | null
 }
 
 export type CodigoAbstencao =
   | 'JA_TEM_RESPONSAVEL'
   | 'TAREFA_ENCERRADA'
   | 'NENHUM_ELEGIVEL'
+  | 'NENHUM_DISPONIVEL_E_APTO'
   | 'TAREFA_INEXISTENTE'
 
 /** O que a tarefa diz sobre equipe — informação para o gestor, não filtro. */
@@ -205,6 +243,10 @@ interface Universo {
   equipes: Map<string, Set<number>>
   /** Todos os codes cadastrados, para distinguir "não é membro" de "não existe". */
   equipesCadastradas: Set<string>
+  /** Aptidão, disponibilidade e capacidade de cada pessoa. */
+  organizacao: Map<number, OrganizacaoDoUsuario>
+  /** As fases em que ALGUÉM já foi declarado apto — é o que liga a regra. */
+  fasesComAptidao: Set<string>
 }
 
 /**
@@ -214,7 +256,7 @@ interface Universo {
  * São cinco consultas, independentemente do tamanho do lote.
  */
 async function lerUniverso(agora: Date): Promise<Universo> {
-  const [brutos, ativas, grupos] = await Promise.all([
+  const [brutos, ativas, grupos, organizacao, fasesComAptidao] = await Promise.all([
     prisma.usuario.findMany({
       select: { id: true, nome: true, tipo: true, permissoesCustom: true, perfil: { select: { permissoes: true } } },
       orderBy: { id: 'asc' },
@@ -227,6 +269,8 @@ async function lerUniverso(agora: Date): Promise<Universo> {
       where: { ativo: true },
       select: { code: true, membros: { select: { usuarioId: true } } },
     }),
+    lerOrganizacao(agora),
+    fasesComAptidaoDeclarada(),
   ])
 
   const usuarios = brutos.map((u) => ({
@@ -271,7 +315,7 @@ async function lerUniverso(agora: Date): Promise<Universo> {
     equipes.set(chave, new Set(g.membros.map((m) => m.usuarioId)))
   }
 
-  return { usuarios, cargas, equipes, equipesCadastradas }
+  return { usuarios, cargas, equipes, equipesCadastradas, organizacao, fasesComAptidao }
 }
 
 // ─── A AVALIAÇÃO DE UMA TAREFA ──────────────────────────────────────────────
@@ -282,6 +326,7 @@ interface TarefaParaSimular {
   responsavelId: number | null
   statusTarefa: StatusTarefa
   equipeKey: string | null
+  faseMacroKey: string | null
   prioridade: string
   dataPrazo: Date | null
   /** Do passo corrente: o workflow publicado pode exigir uma equipe. */
@@ -291,7 +336,7 @@ interface TarefaParaSimular {
 
 const SELECT_SIMULACAO = {
   id: true, titulo: true, responsavelId: true, statusTarefa: true, equipeKey: true,
-  prioridade: true, dataPrazo: true,
+  faseMacroKey: true, prioridade: true, dataPrazo: true,
   workflowStepInstance: { select: { papel: true, equipe: true } },
 } as const
 
@@ -339,51 +384,156 @@ function avaliar(
     return { ...base, abstencao: { codigo: 'TAREFA_ENCERRADA', texto: `A tarefa está ${t.statusTarefa} — não há o que distribuir.` } }
   }
 
-  // EQUIPE É CONTEXTO, NÃO VETO.
+  // ─── AS DUAS REGRAS OPT-IN: quando elas EXISTEM para esta tarefa? ─────────
   //
-  // A tarefa pode nomear uma equipe, e o gestor merece ver isso. Mas o cadastro
-  // de Equipes declara que grupo NÃO concede permissão, e nenhum ponto do
-  // sistema valida o responsável contra a equipe da tarefa. Usar equipe como
-  // filtro aqui inventaria uma regra de autorização — e, pior, ela apareceria
-  // como "ninguém é elegível" num sistema onde ninguém cadastrou equipe.
+  // EQUIPE só é regra se o código nomeado pela tarefa existir como equipe ativa.
+  // Um `equipeKey` sem contraparte no cadastro não é restrição — é um dado sem
+  // dono, e tratá-lo como veto tornaria a tarefa impossível de distribuir por
+  // causa de um cadastro que ninguém fez.
   const exigida = equipeExigida(t)
-  const membrosDaEquipe = exigida ? u.equipes.get(exigida) ?? null : null
+  const equipeEhRegra = exigida != null && u.equipesCadastradas.has(exigida)
+  const membrosDaEquipe = equipeEhRegra ? u.equipes.get(exigida!) ?? new Set<number>() : null
   const equipe: ContextoDaEquipe | null = exigida
     ? {
         exigidaPelaTarefa: exigida,
-        cadastrada: u.equipesCadastradas.has(exigida),
+        cadastrada: equipeEhRegra,
         membros: membrosDaEquipe ? [...membrosDaEquipe].sort((a, b) => a - b) : [],
-        nota: u.equipesCadastradas.has(exigida)
-          ? `A tarefa é da equipe "${exigida}". Equipe organiza o trabalho e NÃO concede permissão — por isso não restringe a elegibilidade aqui.`
-          : `A tarefa nomeia a equipe "${exigida}", que não está cadastrada. Isso NÃO impede a recomendação: equipe não concede permissão neste sistema. ` +
-            `Se a intenção for restringir por equipe, cadastre-a em Gerenciamento › Usuários e Acessos › Equipes — e essa passa a ser uma decisão de produto, não do recomendador.`,
+        nota: equipeEhRegra
+          ? `A tarefa é da equipe "${exigida}", que existe no cadastro: só membros dela entram. Pertencer à equipe NÃO concede permissão — apenas restringe quem já tem.`
+          : `A tarefa nomeia a equipe "${exigida}", que não existe como equipe ativa no cadastro. Por isso ela não restringe ninguém aqui: ` +
+            `um código sem contraparte não é uma regra. Para que passe a valer, cadastre-a em Gerenciamento › Usuários e Acessos › Equipes.`,
       }
     : null
 
+  // APTIDÃO só é regra na fase em que alguém já foi declarado apto.
+  const fase = t.faseMacroKey?.trim().toLowerCase() ?? null
+  const aptidaoEhRegra = fase != null && u.fasesComAptidao.has(fase)
+
   const avaliacoes: Avaliacao[] = u.usuarios.map((usr) => {
+    const org = u.organizacao.get(usr.id)
+    const carga = cargasVirtuais.get(usr.id) ?? { ...CARGA_ZERO }
     const motivos: Avaliacao['motivos'] = []
-    if (!temPermissao(usr.permissoes, PERMISSAO_EXECUTAR)) {
+    const criterios: Criterio[] = []
+
+    // 1 · PERMISSÃO — a única que concede alguma coisa; as demais só tiram.
+    const podeExecutar = temPermissao(usr.permissoes, PERMISSAO_EXECUTAR)
+    criterios.push({
+      chave: 'PERMISSAO',
+      veredito: podeExecutar ? 'ok' : 'reprovado',
+      detalhe: podeExecutar ? 'tem permissão de executar tarefa' : 'não tem `tarefas.iniciar_concluir`',
+    })
+    if (!podeExecutar) {
       motivos.push({
         codigo: 'SEM_PERMISSAO_EXECUTAR',
         texto: 'Não tem permissão de executar tarefa — receberia trabalho que não conseguiria mover.',
       })
     }
-    const carga = cargasVirtuais.get(usr.id) ?? { ...CARGA_ZERO }
+
+    // 2 · DISPONIBILIDADE
+    const ind = org?.indisponivelPor ?? null
+    criterios.push({
+      chave: 'DISPONIBILIDADE',
+      veredito: ind ? 'reprovado' : 'ok',
+      detalhe: ind
+        ? `${ROTULO_INDISPONIBILIDADE[ind.tipo] ?? ind.tipo}${ind.motivo ? ` — ${ind.motivo}` : ''}` +
+          `${ind.fim ? ` (até ${ind.fim.slice(0, 10)})` : ' (sem data de retorno)'}`
+        : 'sem indisponibilidade vigente',
+    })
+    if (ind) {
+      motivos.push({
+        codigo: 'INDISPONIVEL',
+        texto: `Indisponível: ${ROTULO_INDISPONIBILIDADE[ind.tipo] ?? ind.tipo}` +
+          `${ind.motivo ? ` (${ind.motivo})` : ''}${ind.fim ? ` até ${ind.fim.slice(0, 10)}` : ', sem data de retorno'}.`,
+      })
+    }
+
+    // 3 · APTIDÃO — só quando a fase tem aptidão declarada por alguém.
+    const apto = fase != null && (org?.aptidoes ?? []).includes(fase)
+    criterios.push({
+      chave: 'APTIDAO',
+      veredito: !aptidaoEhRegra ? 'nao_aplicavel' : apto ? 'ok' : 'reprovado',
+      detalhe: !aptidaoEhRegra
+        ? fase ? `ninguém foi declarado apto para "${rotuloDaFase(fase)}" — a fase ainda não tem regra de aptidão` : 'a tarefa não tem fase'
+        : apto ? `apto para "${rotuloDaFase(fase!)}"` : `não é apto para "${rotuloDaFase(fase!)}"`,
+    })
+    if (aptidaoEhRegra && !apto) {
+      motivos.push({ codigo: 'SEM_APTIDAO', texto: `Não está declarado apto para "${rotuloDaFase(fase!)}".` })
+    }
+
+    // 4 · EQUIPE / ESCOPO — só quando a tarefa exige uma equipe que existe.
+    const naEquipe = membrosDaEquipe?.has(usr.id) ?? false
+    criterios.push({
+      chave: 'EQUIPE',
+      veredito: !equipeEhRegra ? 'nao_aplicavel' : naEquipe ? 'ok' : 'reprovado',
+      detalhe: !equipeEhRegra
+        ? exigida ? `a tarefa nomeia "${exigida}", que não existe como equipe ativa` : 'a tarefa não exige equipe'
+        : naEquipe ? `é membro de "${exigida}"` : `não é membro de "${exigida}"`,
+    })
+    if (equipeEhRegra && !naEquipe) {
+      motivos.push({ codigo: 'FORA_DA_EQUIPE_EXIGIDA', texto: `Não é membro da equipe "${exigida}", exigida por esta tarefa.` })
+    }
+
+    // 5 · CAPACIDADE — só quando há teto configurado.
+    const limite = org?.limiteExecutaveis ?? null
+    const cheio = limite != null && carga.executaveis >= limite
+    criterios.push({
+      chave: 'CAPACIDADE',
+      veredito: limite == null ? 'nao_aplicavel' : cheio ? 'reprovado' : 'ok',
+      detalhe: limite == null
+        ? 'sem teto configurado — a comparação é relativa à carga real'
+        : `${carga.executaveis} de ${limite} executáveis`,
+    })
+    if (cheio) {
+      motivos.push({
+        codigo: 'CAPACIDADE_ESGOTADA',
+        texto: `Capacidade esgotada: ${carga.executaveis} de ${limite} executáveis configurados.`,
+      })
+    }
+
     const { score, parcelas } = pontuar(carga)
-    return { usuarioId: usr.id, nome: usr.nome, elegivel: motivos.length === 0, motivos, carga, score, parcelas }
+    return {
+      usuarioId: usr.id, nome: usr.nome, elegivel: motivos.length === 0, motivos, criterios,
+      carga, score, parcelas,
+      equipes: (org?.equipes ?? []).map((e) => e.nome),
+      aptidoes: (org?.aptidoes ?? []).map((f) => rotuloDaFase(f)),
+      limiteExecutaveis: limite,
+    }
   })
 
   const elegiveis = avaliacoes.filter((a) => a.elegivel)
   if (elegiveis.length === 0) {
-    return {
-      ...base,
-      abstencao: {
+    // A ABSTENÇÃO PRECISA DIZER O QUE DERRUBOU TODO MUNDO.
+    //
+    // "Ninguém é elegível" manda o gestor caçar a causa em cinco telas. Aqui o
+    // motivo é o critério que reprovou MAIS gente entre quem tinha permissão —
+    // e, se ninguém tinha permissão, é a permissão mesmo.
+    const comPermissao = avaliacoes.filter((a) => a.criterios.find((c) => c.chave === 'PERMISSAO')?.veredito === 'ok')
+    const contar = (codigo: CodigoInelegibilidade) =>
+      comPermissao.filter((a) => a.motivos.some((m) => m.codigo === codigo)).length
+    const porAptidao = contar('SEM_APTIDAO')
+    const porEquipe = contar('FORA_DA_EQUIPE_EXIGIDA')
+    const porDisponibilidade = contar('INDISPONIVEL')
+    const porCapacidade = contar('CAPACIDADE_ESGOTADA')
+
+    let abstencao: { codigo: CodigoAbstencao; texto: string }
+    if (comPermissao.length === 0) {
+      abstencao = {
         codigo: 'NENHUM_ELEGIVEL',
         texto: 'Nenhum usuário tem permissão para executar esta tarefa. Conceda `tarefas.iniciar_concluir` a quem deve executá-la.',
-      },
-      avaliacoes,
-      equipe,
+      }
+    } else {
+      const partes: string[] = []
+      if (porAptidao) partes.push(`${porAptidao} sem a aptidão exigida${fase ? ` ("${rotuloDaFase(fase)}")` : ''}`)
+      if (porEquipe) partes.push(`${porEquipe} fora da equipe "${exigida}"`)
+      if (porDisponibilidade) partes.push(`${porDisponibilidade} indisponível(is)`)
+      if (porCapacidade) partes.push(`${porCapacidade} com a capacidade esgotada`)
+      abstencao = {
+        codigo: (porAptidao || porEquipe) ? 'NENHUM_DISPONIVEL_E_APTO' : 'NENHUM_ELEGIVEL',
+        texto: `Nenhum funcionário disponível e apto para esta tarefa. Entre os ${comPermissao.length} com permissão: ${partes.join('; ')}. ` +
+          `A regra não foi relaxada — se ela estiver errada, corrija o cadastro (aptidão, equipe, disponibilidade ou capacidade).`,
+      }
     }
+    return { ...base, abstencao, avaliacoes, equipe }
   }
 
   const ordenados = [...elegiveis].sort(comparar)
@@ -434,11 +584,20 @@ function empateAteOId(a: Avaliacao, b: Avaliacao): boolean {
 }
 
 /** A recomendação em português — é o que o gestor lê antes de confirmar. */
+const SIMBOLO: Record<Criterio['veredito'], string> = { ok: '✓', reprovado: '✗', nao_aplicavel: '—' }
+const NOME_DO_CRITERIO: Record<Criterio['chave'], string> = {
+  PERMISSAO: 'Permissão', DISPONIBILIDADE: 'Disponibilidade', APTIDAO: 'Aptidão',
+  EQUIPE: 'Equipe/escopo', CAPACIDADE: 'Capacidade',
+}
+
 function explicar(escolhido: Avaliacao, ordenados: Avaliacao[], tecnico: boolean, equipe: ContextoDaEquipe | null): string[] {
   const c = escolhido.carga
   const linhas = [
     `Recomendação: ${escolhido.nome} — porque:`,
-    '• tem permissão para executar esta tarefa',
+    // Os cinco critérios, na ordem em que foram avaliados. "—" é diferente de
+    // "✓": a regra não se aplica a esta tarefa, e dizer isso evita que o gestor
+    // suponha que ela foi verificada e passou.
+    ...escolhido.criterios.map((k) => `${SIMBOLO[k.veredito]} ${NOME_DO_CRITERIO[k.chave]}: ${k.detalhe}`),
     `• ${c.executaveis} tarefa(s) dependendo desta pessoa agora`,
     `• ${c.atrasadas} atrasada(s)`,
     `• ${c.urgentes} urgente(s)`,
@@ -463,7 +622,7 @@ async function carregarTarefas(ids: number[]): Promise<TarefaParaSimular[]> {
   const brutas = await prisma.tarefa.findMany({ where: { id: { in: ids } }, select: SELECT_SIMULACAO })
   return brutas.map((t) => ({
     id: t.id, titulo: t.titulo, responsavelId: t.responsavelId, statusTarefa: t.statusTarefa,
-    equipeKey: t.equipeKey, prioridade: t.prioridade, dataPrazo: t.dataPrazo,
+    equipeKey: t.equipeKey, faseMacroKey: t.faseMacroKey, prioridade: t.prioridade, dataPrazo: t.dataPrazo,
     papelDoPasso: t.workflowStepInstance?.papel ?? null,
     equipeDoPasso: t.workflowStepInstance?.equipe ?? null,
   }))

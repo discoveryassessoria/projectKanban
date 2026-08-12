@@ -246,6 +246,9 @@ CREATE TYPE "DocumentoGeradoStatus" AS ENUM ('VIGENTE', 'INVALIDADO');
 -- CreateEnum
 CREATE TYPE "DocumentoGeradoVersaoStatus" AS ENUM ('GERADA', 'VIGENTE', 'SUBSTITUIDA', 'INVALIDADA');
 
+-- CreateEnum
+CREATE TYPE "TipoIndisponibilidade" AS ENUM ('FERIAS', 'AFASTAMENTO', 'AUSENCIA', 'BLOQUEIO_OPERACIONAL');
+
 -- CreateTable
 CREATE TABLE "Usuario" (
     "publicCode" VARCHAR(20),
@@ -4165,6 +4168,42 @@ CREATE TABLE "TarefaDependencia" (
 );
 
 -- CreateTable
+CREATE TABLE "AptidaoOperacional" (
+    "id" SERIAL NOT NULL,
+    "usuarioId" INTEGER NOT NULL,
+    "faseKey" VARCHAR(60) NOT NULL,
+    "criadoEm" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT "AptidaoOperacional_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "IndisponibilidadeOperacional" (
+    "id" SERIAL NOT NULL,
+    "usuarioId" INTEGER NOT NULL,
+    "tipo" "TipoIndisponibilidade" NOT NULL,
+    "inicio" TIMESTAMP(3) NOT NULL,
+    "fim" TIMESTAMP(3),
+    "motivo" VARCHAR(300),
+    "criadoEm" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "criadoPorId" INTEGER,
+
+    CONSTRAINT "IndisponibilidadeOperacional_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "CapacidadeOperacional" (
+    "id" SERIAL NOT NULL,
+    "usuarioId" INTEGER NOT NULL,
+    "limiteExecutaveis" INTEGER,
+    "observacao" VARCHAR(300),
+    "atualizadoEm" TIMESTAMP(3) NOT NULL,
+    "atualizadoPorId" INTEGER,
+
+    CONSTRAINT "CapacidadeOperacional_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
 CREATE TABLE "_ReciboPagamento" (
     "A" INTEGER NOT NULL,
     "B" INTEGER NOT NULL,
@@ -5876,6 +5915,21 @@ CREATE INDEX "TarefaDependencia_dependeDeId_idx" ON "TarefaDependencia"("depende
 CREATE UNIQUE INDEX "TarefaDependencia_tarefaId_dependeDeId_key" ON "TarefaDependencia"("tarefaId", "dependeDeId");
 
 -- CreateIndex
+CREATE INDEX "AptidaoOperacional_faseKey_idx" ON "AptidaoOperacional"("faseKey");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "AptidaoOperacional_usuarioId_faseKey_key" ON "AptidaoOperacional"("usuarioId", "faseKey");
+
+-- CreateIndex
+CREATE INDEX "IndisponibilidadeOperacional_usuarioId_inicio_idx" ON "IndisponibilidadeOperacional"("usuarioId", "inicio");
+
+-- CreateIndex
+CREATE INDEX "IndisponibilidadeOperacional_fim_idx" ON "IndisponibilidadeOperacional"("fim");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "CapacidadeOperacional_usuarioId_key" ON "CapacidadeOperacional"("usuarioId");
+
+-- CreateIndex
 CREATE INDEX "_ReciboPagamento_B_index" ON "_ReciboPagamento"("B");
 
 -- CreateIndex
@@ -6771,6 +6825,21 @@ ALTER TABLE "TarefaDependencia" ADD CONSTRAINT "TarefaDependencia_tarefaId_fkey"
 
 -- AddForeignKey
 ALTER TABLE "TarefaDependencia" ADD CONSTRAINT "TarefaDependencia_dependeDeId_fkey" FOREIGN KEY ("dependeDeId") REFERENCES "Tarefa"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "AptidaoOperacional" ADD CONSTRAINT "AptidaoOperacional_usuarioId_fkey" FOREIGN KEY ("usuarioId") REFERENCES "Usuario"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "IndisponibilidadeOperacional" ADD CONSTRAINT "IndisponibilidadeOperacional_usuarioId_fkey" FOREIGN KEY ("usuarioId") REFERENCES "Usuario"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "IndisponibilidadeOperacional" ADD CONSTRAINT "IndisponibilidadeOperacional_criadoPorId_fkey" FOREIGN KEY ("criadoPorId") REFERENCES "Usuario"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "CapacidadeOperacional" ADD CONSTRAINT "CapacidadeOperacional_usuarioId_fkey" FOREIGN KEY ("usuarioId") REFERENCES "Usuario"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "CapacidadeOperacional" ADD CONSTRAINT "CapacidadeOperacional_atualizadoPorId_fkey" FOREIGN KEY ("atualizadoPorId") REFERENCES "Usuario"("id") ON DELETE SET NULL ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "_ReciboPagamento" ADD CONSTRAINT "_ReciboPagamento_A_fkey" FOREIGN KEY ("A") REFERENCES "PagamentoFatura"("id") ON DELETE CASCADE ON UPDATE CASCADE;

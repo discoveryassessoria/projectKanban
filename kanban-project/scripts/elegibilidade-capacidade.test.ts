@@ -19,6 +19,7 @@
 // Roda contra o banco de TESTE. Não toca em produção.
 // ============================================================================
 import { prisma } from '../lib/prisma'
+import { Prisma } from '@prisma/client'
 import { exigirBancoDeTeste } from './_banco-de-teste'
 import {
   simularTarefa, simularLote, pontuar, PESOS, CRITERIOS_AUSENTES,
@@ -78,7 +79,10 @@ async function isolar(emailsDoPalco: string[]) {
     for (const u of deFora) {
       await prisma.usuario.update({
         where: { id: u.id },
-        data: { permissoesCustom: u.permissoesCustom ?? undefined },
+        // `undefined` no Prisma significa "não altere" — restaurar um custom que
+        // era NULO exige `Prisma.DbNull`. Com `undefined`, a permissão derrubada
+        // pelo isolamento ficava falsa para sempre no banco compartilhado.
+        data: { permissoesCustom: u.permissoesCustom === null ? Prisma.DbNull : u.permissoesCustom },
       })
     }
   }
@@ -113,16 +117,26 @@ async function main() {
   // ══════════════════════════════════════════════════════════════════════════
   secao('§1/§12) Os critérios AUSENTES são declarados, não inventados')
   // ══════════════════════════════════════════════════════════════════════════
-  ok('§1) o motor declara o que NÃO sabe', CRITERIOS_AUSENTES.length >= 5, `${CRITERIOS_AUSENTES.length} critérios`)
-  for (const esperado of ['ativo/inativo', 'férias', 'capacidade', 'especialidade', 'equipe']) {
+  // Esta lista ENCOLHEU de propósito: aptidão, disponibilidade, capacidade e
+  // equipe eram ausências declaradas e passaram a existir como camada
+  // operacional (`lib/operacional/organizacao.ts`). O que sobra continua
+  // declarado — a lista serve para dizer a verdade, não para ficar grande.
+  ok('§1) o motor continua declarando o que NÃO sabe', CRITERIOS_AUSENTES.length >= 1, `${CRITERIOS_AUSENTES.length} critérios`)
+  for (const esperado of ['ativo/inativo', 'escopo por processo']) {
     ok(`§1) declara a ausência de "${esperado}"`,
       CRITERIOS_AUSENTES.some((c) => c.criterio.toLowerCase().includes(esperado.toLowerCase())))
   }
-  const fonte = (await import('node:fs')).readFileSync(
+  for (const preenchido of ['férias', 'capacidade', 'especialidade', 'equipe']) {
+    ok(`§1) e NÃO declara mais "${preenchido}" como ausente — a camada operacional a implementa`,
+      !CRITERIOS_AUSENTES.some((c) => c.criterio.toLowerCase().includes(preenchido)))
+  }
+  const CODIGOS_ESPERADOS = ['SEM_PERMISSAO_EXECUTAR', 'INDISPONIVEL', 'SEM_APTIDAO', 'FORA_DA_EQUIPE_EXIGIDA', 'CAPACIDADE_ESGOTADA']
+  const fonteMotor = (await import('node:fs')).readFileSync(
     (await import('node:path')).join(__dirname, '..', 'lib/operacional/elegibilidade.ts'), 'utf8')
-  ok('§12) nenhum limite artificial de tarefas no código',
-    !/(max|limite|teto)\s*(De)?\s*(Tarefas|Carga)\s*=\s*\d+/i.test(fonte))
-  ok('§1) nenhuma especialidade inventada', !/especialidade\s*[:=]\s*\[/i.test(fonte))
+  for (const c of CODIGOS_ESPERADOS) {
+    ok(`§9) o motor sabe reprovar por ${c}`, fonteMotor.includes(`'${c}'`))
+  }
+  ok('§1) nenhuma especialidade inventada', !/especialidade\s*[:=]\s*\[/i.test(fonteMotor))
 
   // ── palco: quatro pessoas, cargas diferentes ──────────────────────────────
   const gestor = await prisma.usuario.create({
@@ -232,7 +246,12 @@ async function main() {
     simEquipe.recomendado != null, simEquipe.recomendado?.nome ?? `abstenção ${simEquipe.abstencao?.codigo}`)
   ok('§1) e a equipe aparece como contexto', simEquipe.equipe?.exigidaPelaTarefa === 'equipe_que_nao_existe')
   ok('§1) dizendo que não está cadastrada', simEquipe.equipe?.cadastrada === false)
-  ok('§1) e por que isso não bloqueia', /não concede permissão/i.test(simEquipe.equipe?.nota ?? ''))
+  // O motivo mudou junto com a regra: antes equipe NUNCA restringia (grupo não
+  // concede permissão); agora ela restringe quando EXISTE no cadastro. Aqui não
+  // existe — e é isso que a nota tem de explicar.
+  ok('§1) e por que isso não bloqueia',
+    /não é uma regra|não existe como equipe ativa/i.test(simEquipe.equipe?.nota ?? ''),
+    simEquipe.equipe?.nota?.slice(0, 70) ?? '—')
   ok('§1) ninguém ficou inelegível por causa da equipe',
     !simEquipe.avaliacoes.some((a) => a.motivos.some((m) => /equipe/i.test(m.codigo))))
 
@@ -355,8 +374,8 @@ async function main() {
 
   // A prova estática fecha o cerco: nem hoje nem amanhã, por engano.
   ok('§I) o motor não contém escrita nenhuma',
-    !/\b(prisma|tx|db)\s*\.\s*\w+\s*\.\s*(create|createMany|update|updateMany|upsert|delete|deleteMany)\s*\(/.test(fonte))
-  const codigo = fonte.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '')
+    !/\b(prisma|tx|db)\s*\.\s*\w+\s*\.\s*(create|createMany|update|updateMany|upsert|delete|deleteMany)\s*\(/.test(fonteMotor))
+  const codigo = fonteMotor.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '')
   ok('§15) e não chama nenhuma porta de comando',
     !/atribuirTarefa|transferirTarefa|devolverAFila|iniciarTarefa|concluirEtapa/.test(codigo))
 
@@ -403,12 +422,12 @@ async function main() {
   // ══════════════════════════════════════════════════════════════════════════
   secao('§17) Sem N+1')
   // ══════════════════════════════════════════════════════════════════════════
-  const corpoLote = fonte.slice(fonte.indexOf('export async function simularLote'))
+  const corpoLote = fonteMotor.slice(fonteMotor.indexOf('export async function simularLote'))
   ok('§17) o lote não consulta dentro do laço',
     !/for\s*\([^)]*\)\s*\{[\s\S]{0,400}?await\s+prisma\./.test(corpoLote))
-  ok('§17) o universo é lido UMA vez', (fonte.match(/await lerUniverso\(/g) ?? []).length <= 2)
+  ok('§17) o universo é lido UMA vez', (fonteMotor.match(/await lerUniverso\(/g) ?? []).length <= 2)
   ok('§17) e a avaliação de cada tarefa é síncrona (sem I/O por usuário)',
-    /^function avaliar\(/m.test(fonte))
+    /^function avaliar\(/m.test(fonteMotor))
 
   await limpar()
   await restaurar()

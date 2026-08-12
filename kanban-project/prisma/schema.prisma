@@ -60,10 +60,18 @@ model Usuario {
   documentosGeradosCriados     DocumentoGerado[]        @relation("DocumentoGeradoAutor")
   documentosGeradosVersoes     DocumentoGeradoVersao[]  @relation("DocumentoGeradoVersaoAutor")
   documentosGeradosInvalidados DocumentoGeradoVersao[]  @relation("DocumentoGeradoVersaoInvalidador")
+  planilhaOverrides            PlanilhaCelulaOverride[] @relation("OverridePlanilhaAutor")
+  notificacoesOperacionais     NotificacaoOperacional[] @relation("NotificacaoDestinatario")
+
+  // CAMADA OPERACIONAL — organização, aptidão, disponibilidade e capacidade.
+  // Nenhuma delas concede permissão: autorização continua em Perfil/permissoesCustom.
+  aptidoes                      AptidaoOperacional[]
+  indisponibilidades            IndisponibilidadeOperacional[] @relation("IndisponibilidadeDoUsuario")
+  indisponibilidadesRegistradas IndisponibilidadeOperacional[] @relation("IndisponibilidadeAutor")
+  capacidadeOperacional         CapacidadeOperacional?
+  capacidadesDefinidas          CapacidadeOperacional[]        @relation("CapacidadeAutor")
 
   @@index([perfilId])
-  planilhaOverrides PlanilhaCelulaOverride[] @relation("OverridePlanilhaAutor")
-  notificacoesOperacionais NotificacaoOperacional[] @relation("NotificacaoDestinatario")
 }
 
 model Pessoa {
@@ -145,16 +153,16 @@ model Pessoa {
   /// SAIDA DA ARVORE ATIVA sem apagar a linha. Usado quando ha fato historico
   /// protegido apontando para esta Pessoa: apagar destruiria a evidencia. Toda
   /// leitura de arvore/roster ativo filtra `removidaEm: null`.
-  removidaEm    DateTime?
-  removidaPorId Int?
-  motivoRemocao String?   @db.VarChar(300)
+  removidaEm        DateTime?
+  removidaPorId     Int?
+  motivoRemocao     String?                  @db.VarChar(300)
+  planilhaOverrides PlanilhaCelulaOverride[]
 
   @@index([arvoreId])
   @@index([removidaEm])
   @@index([pais_nasc])
   @@index([maeId])
   @@index([paiId])
-  planilhaOverrides PlanilhaCelulaOverride[]
 }
 
 model Uniao {
@@ -476,14 +484,14 @@ model Processo {
   conflitosRegistrais ConflitoRegistral[]
 
   // MODELOS DOCUMENTAIS — documentos gerados vinculados a este processo.
-  documentosGerados DocumentoGerado[] @relation("DocumentoGeradoProcesso")
+  documentosGerados DocumentoGerado[]        @relation("DocumentoGeradoProcesso")
+  planilhaOverrides PlanilhaCelulaOverride[]
 
   @@index([pais])
   @@index([arvoreId])
   @@index([familiaId])
   @@index([tipoProcessoMotorId])
   @@index([enquadramentoLegalId])
-  planilhaOverrides PlanilhaCelulaOverride[]
 }
 
 model ProcessoContratante {
@@ -557,19 +565,19 @@ model Tarefa {
   // equipe vive como `papel` no passo ("equipe_documental"). Criar o cadastro é
   // decisão de negócio pendente; até lá a chave é a mesma que o passo declara,
   // e migrar para FK depois é trocar o tipo de UMA coluna.
-  equipeKey      String?   @db.VarChar(80)
-  dataAtribuicao DateTime?
-  atribuidoPorId Int?
+  equipeKey              String?                    @db.VarChar(80)
+  dataAtribuicao         DateTime?
+  atribuidoPorId         Int?
 
-  faseMacroKey           String?                    @db.VarChar(60)
-  origem                 String?                    @db.VarChar(20)
-  chaveIdempotencia      String?                    @unique @db.VarChar(200)
-  ciclo                  Int?
-  taskRole               String?                    @db.VarChar(40)
-  correlationId          String?                    @db.VarChar(60)
-  previousTarefaId       Int?
-  previousTarefa         Tarefa?                    @relation("TarefaSupersessao", fields: [previousTarefaId], references: [id], onDelete: SetNull)
-  supersededByTarefas    Tarefa[]                   @relation("TarefaSupersessao")
+  faseMacroKey        String?  @db.VarChar(60)
+  origem              String?  @db.VarChar(20)
+  chaveIdempotencia   String?  @unique @db.VarChar(200)
+  ciclo               Int?
+  taskRole            String?  @db.VarChar(40)
+  correlationId       String?  @db.VarChar(60)
+  previousTarefaId    Int?
+  previousTarefa      Tarefa?  @relation("TarefaSupersessao", fields: [previousTarefaId], references: [id], onDelete: SetNull)
+  supersededByTarefas Tarefa[] @relation("TarefaSupersessao")
 
   // CP-4D â sincronizaÃ§Ã£o TarefaâPasso (CAS otimista, executor, motivo, restauraÃ§Ã£o).
   lockVersion           Int     @default(0)
@@ -594,24 +602,25 @@ model Tarefa {
   causaRemovidaEm     DateTime?
   causaRemovidaMotivo String?   @db.VarChar(300)
 
-  dependeDe  TarefaDependencia[] @relation("TarefaDependente")
-  bloqueia   TarefaDependencia[] @relation("TarefaPreRequisito")
+  dependeDe TarefaDependencia[] @relation("TarefaDependente")
+  bloqueia  TarefaDependencia[] @relation("TarefaPreRequisito")
 
   // TAREFA TRANSVERSAL (aditivo) â aÃ§Ã£o antecipada de OUTRA fase p/ resolver uma necessidade
   // da fase ATUAL, sem avanÃ§ar o Macro. Refs "soltas" (padrÃ£o executedById): sem relation
   // p/ nÃ£o tocar outros models; os serviÃ§os resolvem os vÃ­nculos. necessidadeId/documentoId/
   // responsavelId/statusTarefa/dataPrazo/dataConclusao/createdAt/updatedAt jÃ¡ existem acima.
-  tipo                     TipoTarefa @default(NORMAL)
-  faseOrigemCode           String?    @db.VarChar(60) // fase ATIVA onde foi criada
-  faseReferenciaCode       String?    @db.VarChar(60) // fase Ã  qual a AÃÃO pertence
+  tipo                     TipoTarefa               @default(NORMAL)
+  faseOrigemCode           String?                  @db.VarChar(60) // fase ATIVA onde foi criada
+  faseReferenciaCode       String?                  @db.VarChar(60) // fase Ã  qual a AÃÃO pertence
   workflowInstanceOrigemId Int? // instÃ¢ncia da fase de ORIGEM (ativa) no momento da criaÃ§Ã£o
   pessoaId                 Int? // pessoa correspondente (solto â Pessoa)
   tipoDocumentoId          Int? // tipo documental correspondente (solto â TipoDocumentoCadastro)
-  acaoStepKey              String?    @db.VarChar(80) // aÃ§Ã£o de catÃ¡logo antecipada (stepKey da fase de referÃªncia)
-  motivo                   String?    @db.Text // motivo da antecipaÃ§Ã£o
-  resultadoEsperado        String?    @db.Text
-  resultadoObtido          String?    @db.Text
+  acaoStepKey              String?                  @db.VarChar(80) // aÃ§Ã£o de catÃ¡logo antecipada (stepKey da fase de referÃªncia)
+  motivo                   String?                  @db.Text // motivo da antecipaÃ§Ã£o
+  resultadoEsperado        String?                  @db.Text
+  resultadoObtido          String?                  @db.Text
   createdBy                Int?
+  notificacoes             NotificacaoOperacional[]
 
   @@index([tipo])
   @@index([pessoaId])
@@ -625,7 +634,6 @@ model Tarefa {
   @@index([workflowStepInstanceId])
   @@index([workflowInstanceId])
   @@index([necessidadeId])
-  notificacoes NotificacaoOperacional[]
 }
 
 model TarefaHistorico {
@@ -3029,26 +3037,26 @@ model PhaseInternalWorkflow {
   // vinha do catálogo em código — o cadastro não tinha como recusar um workflow
   // documental materializado sem documento.
   /// Natureza da execução: sobre processo, pessoa, necessidade ou documento.
-  escopoExecucao      EscopoExecucao?
+  escopoExecucao           EscopoExecucao?
   /// Perfis que apontam para este workflow (back-relation).
-  perfis              PerfilOperacionalDocumento[] @relation("PerfilWorkflow")
+  perfis                   PerfilOperacionalDocumento[] @relation("PerfilWorkflow")
   /// Família documental aceita (null = não é workflow documental, ou aceita qualquer).
-  familiaDocumentalId Int?
-  familiaDocumental   FamiliaDocumental?           @relation(fields: [familiaDocumentalId], references: [id], onDelete: SetNull)
+  familiaDocumentalId      Int?
+  familiaDocumental        FamiliaDocumental?           @relation(fields: [familiaDocumentalId], references: [id], onDelete: SetNull)
   /// Contrato de materialização: sem estes, a instância documental não nasce.
-  exigeDocumento      Boolean                      @default(false)
-  exigePessoa         Boolean                      @default(false)
-
-  @@index([phaseKey])
-  @@index([tipoProcessoId])
-  @@index([familiaDocumentalId])
+  exigeDocumento           Boolean                      @default(false)
+  exigePessoa              Boolean                      @default(false)
   /// POLÍTICA DE SLA NA ESPERA EXTERNA — decisão do workflow, não do código.
   /// `true`: o relógio para enquanto a tarefa aguarda terceiro (cartório que
   /// demora 40 dias não deve consumir um SLA de 5). `false`: o prazo corre
   /// mesmo assim (espera por resposta do cliente costuma contar).
-  pausarSlaEmEsperaExterna Boolean @default(false)
+  pausarSlaEmEsperaExterna Boolean                      @default(false)
   /// Mesma pergunta para bloqueio — e a resposta não é necessariamente a mesma.
-  pausarSlaEmBloqueio      Boolean @default(false)
+  pausarSlaEmBloqueio      Boolean                      @default(false)
+
+  @@index([phaseKey])
+  @@index([tipoProcessoId])
+  @@index([familiaDocumentalId])
 }
 
 model PhaseInternalWorkflowStep {
@@ -5032,7 +5040,7 @@ model CategoriaServico {
 
   // Fonte ÚNICA de categoria do catálogo. O vínculo vive no mestre
   // (ItemCatalogo) — serviço e item técnico compartilham o mesmo portador.
-  itens         ItemCatalogo[]
+  itens           ItemCatalogo[]
   colunasPlanilha PlanilhaDocumentalColuna[]
 }
 
@@ -6758,11 +6766,104 @@ model TarefaDependencia {
   dependeDe   Tarefa @relation("TarefaPreRequisito", fields: [dependeDeId], references: [id], onDelete: Cascade)
 
   /// Dependência informativa não impede execução; obrigatória impede.
-  obrigatoria Boolean @default(true)
-  motivo      String? @db.VarChar(200)
+  obrigatoria Boolean  @default(true)
+  motivo      String?  @db.VarChar(200)
   criadoEm    DateTime @default(now())
 
   /// Um par só existe uma vez — reconciliar N vezes não empilha dependências.
   @@unique([tarefaId, dependeDeId])
   @@index([dependeDeId])
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// A CAMADA OPERACIONAL DO FUNCIONÁRIO — três coisas distintas, três tabelas.
+//
+// AUTORIZAÇÃO continua em Perfil/permissoesCustom, e nada aqui a substitui:
+// ninguém fica elegível por ser apto, por estar disponível ou por ter capacidade
+// sobrando. O sentido é o inverso — estas estruturas só RESTRINGEM quem já tem
+// permissão.
+//
+// ORGANIZAÇÃO (equipe) já existe e não foi recriada: `GrupoUsuario` +
+// `GrupoUsuarioMembro`, com cadastro próprio em Gerenciamento › Usuários e
+// Acessos › Equipes.
+// ═══════════════════════════════════════════════════════════════════════════
+
+/**
+ * APTIDÃO — "esta pessoa faz este tipo de trabalho".
+ * A dimensão é a FASE PUBLICADA (`phaseKey` do catálogo de fases): é a única
+ * dimensão que TODA tarefa carrega (`Tarefa.faseMacroKey`) e é exatamente o
+ * vocabulário do negócio — Genealogia, Emissão documental, Retificação de
+ * registros, Tradução juramentada, Apostilamento. Não é string solta: o valor é
+ * validado contra `src/lib/process-stage/fases-catalog.ts` na escrita.
+ * Aptidão é OPT-IN por fase: enquanto ninguém for declarado apto para uma fase,
+ * ela não restringe nada. A primeira declaração é que liga a regra — e a partir
+ * daí só quem é apto entra.
+ */
+model AptidaoOperacional {
+  id        Int      @id @default(autoincrement())
+  usuarioId Int
+  /**
+   * phaseKey do catálogo publicado de fases.
+   */
+  faseKey   String   @db.VarChar(60)
+  criadoEm  DateTime @default(now())
+  usuario   Usuario  @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
+
+  @@unique([usuarioId, faseKey])
+  @@index([faseKey])
+}
+
+enum TipoIndisponibilidade {
+  FERIAS
+  AFASTAMENTO
+  AUSENCIA
+  BLOQUEIO_OPERACIONAL
+}
+
+/**
+ * INDISPONIBILIDADE — período em que a pessoa não deve receber trabalho novo.
+ * Não é RH: não há saldo de férias, não há aprovação, não há folha. É só o que a
+ * distribuição precisa saber. `fim` nulo significa indisponibilidade em aberto,
+ * que existe de verdade (afastamento sem data de retorno) e não pode ser
+ * modelada como uma data inventada.
+ * O registro é HISTÓRICO: encerrar uma indisponibilidade é preencher `fim`, não
+ * apagar a linha — senão a pergunta "por que ninguém foi recomendado na terça"
+ * fica sem resposta.
+ */
+model IndisponibilidadeOperacional {
+  id          Int                   @id @default(autoincrement())
+  usuarioId   Int
+  tipo        TipoIndisponibilidade
+  inicio      DateTime
+  fim         DateTime?
+  motivo      String?               @db.VarChar(300)
+  criadoEm    DateTime              @default(now())
+  criadoPorId Int?
+  usuario     Usuario               @relation("IndisponibilidadeDoUsuario", fields: [usuarioId], references: [id], onDelete: Cascade)
+  criadoPor   Usuario?              @relation("IndisponibilidadeAutor", fields: [criadoPorId], references: [id], onDelete: SetNull)
+
+  @@index([usuarioId, inicio])
+  @@index([fim])
+}
+
+/**
+ * CAPACIDADE — teto configurável de trabalho EXECUTÁVEL simultâneo.
+ * Nulo é o estado normal e significa "sem teto declarado": aí a recomendação
+ * segue relativa, comparando a carga real de cada um. Um número no código
+ * ("máximo 10 tarefas") seria política de negócio que ninguém decidiu.
+ * O teto conta EXECUTÁVEIS, não tarefas: dez tarefas com oito esperando cartório
+ * não ocupam dez lugares. É a mesma distinção que o recomendador já fazia.
+ */
+model CapacidadeOperacional {
+  id                Int      @id @default(autoincrement())
+  usuarioId         Int      @unique
+  /**
+   * Nulo = sem teto declarado.
+   */
+  limiteExecutaveis Int?
+  observacao        String?  @db.VarChar(300)
+  atualizadoEm      DateTime @updatedAt
+  atualizadoPorId   Int?
+  usuario           Usuario  @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
+  atualizadoPor     Usuario? @relation("CapacidadeAutor", fields: [atualizadoPorId], references: [id], onDelete: SetNull)
 }
