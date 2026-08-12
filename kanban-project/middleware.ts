@@ -1,13 +1,15 @@
 // middleware.ts (raiz do projeto)
 // CP-SEC — Guard central de autenticação.
 //
-// Duas responsabilidades:
+// Três responsabilidades:
 //  1) Páginas /dashboard e /administrator: redireciona para /login se o JWT
 //     interno for inválido (comportamento original preservado).
 //  2) TODA rota /api/* passa a exigir JWT interno válido (deny-by-default),
 //     exceto uma allowlist pública curada. Retorna 401 JSON quando ausente
 //     ou forjado. O token é lido do cookie `authToken` (enviado
 //     automaticamente pelo browser) OU do header Authorization.
+//  3) CORS das rotas /api/app/* (só elas), incluindo o preflight OPTIONS.
+//     Ver o bloco CORS mais abaixo para o porquê e o critério de origem.
 //
 // Isso fecha centralmente o acesso anônimo às rotas internas (financeiro,
 // fase, documentos, genealogia, clientes, logs, etc.) sem precisar editar o
@@ -68,8 +70,114 @@ function isApiPublica(pathname: string): boolean {
   )
 }
 
+// ============================================================================
+// CORS — exclusivo de /api/app/*
+//
+// O app mobile roda nativo em iOS/Android, onde CORS simplesmente não existe:
+// é regra de navegador. Este bloco existe por um motivo só — destravar o modo
+// web do Expo (`npx expo start`, localhost:8081) durante o desenvolvimento e
+// contra deploys de preview.
+//
+// Em PRODUÇÃO a allowlist fica vazia de propósito: nenhum navegador deve
+// chamar /api/app/*, e o app instalado não é afetado por isso.
+//
+// Não emitimos `Access-Control-Allow-Credentials`: o app autentica por
+// `Authorization: Bearer` e não manda cookie cross-origin.
+// ============================================================================
+
+/**
+ * Origens fixas liberadas, separadas por vírgula (ver APP_CORS_ORIGENS no
+ * .env.example). Deve ficar vazia em produção.
+ */
+const CORS_ORIGENS_FIXAS: string[] = (process.env.APP_CORS_ORIGENS ?? "")
+  .split(",")
+  .map((o) => o.trim())
+  .filter(Boolean)
+
+/**
+ * Ancorada nas duas pontas de propósito: sem o `^...$` isto casaria com
+ * `https://localhost.dominio-do-atacante.com`. A porta é livre porque o Expo
+ * escolhe outra sozinho quando a 8081 já está ocupada.
+ */
+const CORS_LOCALHOST = /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/
+
+/**
+ * VERCEL_ENV, e não NODE_ENV: na Vercel o NODE_ENV vale "production" também
+ * nos deploys de preview, o que fecharia o CORS justamente onde queremos
+ * testar. Rodando local, VERCEL_ENV é undefined e já cai no ramo de dev.
+ */
+function ehProducao(): boolean {
+  return process.env.VERCEL_ENV === "production"
+}
+
+function ehRotaDoApp(pathname: string): boolean {
+  return pathname.startsWith("/api/app/")
+}
+
+/**
+ * Devolve a origem a ecoar de volta, ou null se ela não for reconhecida.
+ * Nunca devolvemos "*": estas rotas servem PII e são autenticadas por Bearer.
+ * Origem desconhecida sai SEM header CORS (o navegador bloqueia) em vez de com
+ * erro — responder diferente viraria um jeito de sondar a allowlist.
+ */
+function origemPermitida(origem: string | null): string | null {
+  if (!origem) return null
+  if (CORS_ORIGENS_FIXAS.includes(origem)) return origem
+  if (!ehProducao() && CORS_LOCALHOST.test(origem)) return origem
+  return null
+}
+
+/**
+ * `Vary: Origin` vai SEMPRE, inclusive quando a origem foi recusada: sem ele
+ * a CDN pode guardar a resposta com o Allow-Origin de um site e entregá-la a
+ * outro. Preserva um Vary já existente em vez de sobrescrever.
+ */
+function aplicarCors(resposta: NextResponse, origem: string | null): NextResponse {
+  const varyAtual = resposta.headers.get("Vary")
+
+  if (!varyAtual) {
+    resposta.headers.set("Vary", "Origin")
+  } else if (
+    !varyAtual.split(",").some((v) => v.trim().toLowerCase() === "origin")
+  ) {
+    resposta.headers.set("Vary", `${varyAtual}, Origin`)
+  }
+
+  if (origem) {
+    resposta.headers.set("Access-Control-Allow-Origin", origem)
+  }
+
+  return resposta
+}
+
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl
+
+  // ===== 0) Preflight de CORS (/api/app/* apenas) =====
+  // Fica ANTES do gate de autenticação porque o navegador não manda o header
+  // Authorization no preflight — exigir token aqui quebraria toda chamada
+  // cross-origin. Hoje /api/app/ está em API_PUBLICA e passaria de qualquer
+  // forma, mas deixar este short-circuit primeiro mantém o preflight de pé
+  // caso essa entrada saia da allowlist um dia.
+  if (request.method === "OPTIONS" && ehRotaDoApp(pathname)) {
+    const origem = origemPermitida(request.headers.get("origin"))
+    const resposta = new NextResponse(null, { status: 204 })
+
+    if (origem) {
+      resposta.headers.set(
+        "Access-Control-Allow-Methods",
+        "GET, POST, PUT, PATCH, DELETE, OPTIONS"
+      )
+      resposta.headers.set(
+        "Access-Control-Allow-Headers",
+        "Content-Type, Authorization"
+      )
+      // 24h: evita um preflight a cada chamada durante o desenvolvimento.
+      resposta.headers.set("Access-Control-Max-Age", "86400")
+    }
+
+    return aplicarCors(resposta, origem)
+  }
 
   const token =
     request.cookies.get("authToken")?.value ||
@@ -78,7 +186,15 @@ export async function middleware(request: NextRequest) {
   // ===== 1) Gate de API (deny-by-default) =====
   if (pathname.startsWith("/api/")) {
     if (isApiPublica(pathname)) {
-      return NextResponse.next()
+      const resposta = NextResponse.next()
+
+      // Só /api/app/* ganha CORS. As demais rotas públicas (blog, câmbio,
+      // países, cron) seguem exatamente como antes.
+      if (ehRotaDoApp(pathname)) {
+        return aplicarCors(resposta, origemPermitida(request.headers.get("origin")))
+      }
+
+      return resposta
     }
 
     if (!token) {
