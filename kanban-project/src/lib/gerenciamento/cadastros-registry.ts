@@ -86,7 +86,10 @@ export interface CadastroSpec {
 export const FONTES: Record<string, { model: string; valor: string; label: string[]; where?: Record<string, unknown> }> = {
   tiposProcesso: { model: "tipoProcessoNacionalidade", valor: "id", label: ["name"], where: { arquivado: false } },
   fases: { model: "catalogoFase", valor: "phaseKey", label: ["label"], where: { ativo: true } },
-  usuarios: { model: "usuario", valor: "id", label: ["nome"] },
+  // NOME + E-MAIL: dois funcionários homônimos ficavam indistinguíveis no
+  // seletor, e escolher a pessoa errada para uma equipe é um erro silencioso —
+  // ninguém percebe até o trabalho ir para quem não devia.
+  usuarios: { model: "usuario", valor: "id", label: ["nome", "email"] },
   // MODELO DE MENSAGEM (e-mail/mensagem de notificação) — NÃO é modelo documental.
   // O repositório de modelos documentais (DOCX versionado) é outro domínio e vive
   // em ModeloDocumental. O nome distinto existe para que ninguém confunda os dois.

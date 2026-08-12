@@ -28,6 +28,13 @@ interface Indisponibilidade {
   fim: string | null
   motivo: string | null
 }
+interface FatoDoHistorico {
+  id: number
+  acao: string
+  descricao: string
+  em: string
+  por: string | null
+}
 interface Linha {
   usuarioId: number
   nome: string
@@ -41,6 +48,7 @@ interface Linha {
   limiteExecutaveis: number | null
   observacaoCapacidade: string | null
   carga: { ativas: number; executaveis: number; atrasadas: number; urgentes: number; aguardandoTerceiro: number; bloqueadas: number }
+  historico: FatoDoHistorico[]
 }
 interface Dados {
   linhas: Linha[]
@@ -131,6 +139,21 @@ export default function CapacidadeOperacionalTab() {
       </div>
 
       {erro && <div className="rounded border border-red-400/25 bg-red-500/10 px-3 py-2 text-[11px] text-red-200/90">{erro}</div>}
+
+      {/* A COMPOSIÇÃO DAS EQUIPES SE FAZ NO CADASTRO DE EQUIPES.
+          Duplicar aqui um editor de membros criaria dois lugares para a mesma
+          verdade. O caminho fica explícito para quem está configurando. */}
+      <div className="flex items-center gap-3 rounded border border-white/[0.07] bg-white/[0.02] px-3 py-2">
+        <span className="text-[11px] text-white/45">
+          Quem pertence a cada equipe se define no cadastro de Equipes.
+        </span>
+        <a
+          href="/administrator?screen=teams"
+          className="rounded border border-white/12 px-2 py-1 text-[10px] text-white/70 transition-colors hover:bg-white/[0.06] hover:text-white/95"
+        >
+          Abrir Equipes
+        </a>
+      </div>
 
       <input
         value={busca}
@@ -378,6 +401,26 @@ function PainelConfiguracao({
                 Registrar
               </button>
             </div>
+          </section>
+
+          {/* ── HISTÓRICO ── quem mudou o quê, e quando */}
+          <section className="border-t border-white/[0.06] pt-3">
+            <h3 className="text-[10px] uppercase tracking-wide text-white/35">Histórico desta configuração</h3>
+            {linha.historico.length === 0 ? (
+              <p className="mt-1 text-[10px] text-white/30">Nada foi alterado ainda.</p>
+            ) : (
+              <div className="mt-2 space-y-1">
+                {linha.historico.map((h) => (
+                  <div key={h.id} className="text-[10px] leading-4 text-white/45">
+                    <span className="tabular-nums text-white/30">
+                      {new Date(h.em).toLocaleString("pt-BR", { day: "2-digit", month: "2-digit", year: "2-digit", hour: "2-digit", minute: "2-digit" })}
+                    </span>{" "}
+                    {h.descricao}
+                    {h.por && <span className="text-white/25"> · por {h.por}</span>}
+                  </div>
+                ))}
+              </div>
+            )}
           </section>
         </div>
 

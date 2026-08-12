@@ -82,6 +82,24 @@ async function limpar() {
   await prisma.processo.deleteMany({ where: { id: { in: ids } } })
   await prisma.arvore.deleteMany({ where: { nome: { startsWith: MARCA } } })
   await prisma.itemCatalogo.deleteMany({ where: { code: { startsWith: MARCA } } })
+
+  // A CAMADA OPERACIONAL DOS USUÁRIOS DO PALCO também é palco.
+  //
+  // Os E2E de configuração declaram aptidão, marcam férias e definem teto. Sem
+  // desfazer, cada execução empilha registros e a tela do teste seguinte já
+  // nasce suja — e, pior, a recomendação passa a depender do que ficou de ontem.
+  const doPalco = await prisma.usuario.findMany({
+    where: { email: { in: ['gestor@gerencial.test', 'daniela@gerencial.test'] } },
+    select: { id: true },
+  })
+  const idsDoPalco = doPalco.map((u) => u.id)
+  if (idsDoPalco.length) {
+    await prisma.aptidaoOperacional.deleteMany({ where: { usuarioId: { in: idsDoPalco } } })
+    await prisma.indisponibilidadeOperacional.deleteMany({ where: { usuarioId: { in: idsDoPalco } } })
+    await prisma.capacidadeOperacional.deleteMany({ where: { usuarioId: { in: idsDoPalco } } })
+    await prisma.logAuditoria.deleteMany({ where: { entidade: 'CapacidadeOperacional', entidadeId: { in: idsDoPalco } } })
+  }
+  await prisma.grupoUsuario.deleteMany({ where: { nome: { startsWith: 'E2E ' } } })
 }
 
 async function main() {
