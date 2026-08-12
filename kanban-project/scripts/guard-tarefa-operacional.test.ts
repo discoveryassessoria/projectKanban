@@ -44,6 +44,10 @@ const ok = (nome: string, cond: boolean, extra = "") => {
 }
 const secao = (t: string) => console.log(`\n${t}`)
 
+/** Comentário não é código: a explicação da regra cita o padrão proibido. */
+const semComentarios = (s: string) =>
+  s.replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*\/\/[^\n]*$/gm, "").replace(/\/\/[^\n"']*$/gm, "")
+
 const schema = ler("prisma/schema.prisma")
 const canonica = ler("lib/operacional/tarefa-canonica.ts")
 const reconciler = ler("lib/operacional/reconciliar-tarefas.ts")
@@ -52,15 +56,37 @@ const genealogia = ler("src/services/genealogia/materializar-genealogia.ts")
 console.log("GUARD — A TAREFA É A UNIDADE OPERACIONAL\n")
 
 // ═══════════════════════════════════════════════════════════════════════════
-secao("1) A tarefa é dona do workflow — 1:1 no BANCO, não por convenção")
+secao("1) A identidade da tarefa é a UNIDADE DE TRABALHO, no BANCO")
 // ═══════════════════════════════════════════════════════════════════════════
 const modeloTarefa = schema.slice(schema.indexOf("model Tarefa {"))
 const corpoTarefa = modeloTarefa.slice(0, modeloTarefa.indexOf("\n}"))
-ok("workflowInstanceId é @unique", /workflowInstanceId\s+Int\?\s+@unique/.test(corpoTarefa),
-  "sem isto, N tarefas podem apontar para a mesma instância e 'etapa vira tarefa' volta")
-const modeloInst = schema.slice(schema.indexOf("model PhaseWorkflowInstance {"))
-ok("a instância tem UMA tarefa (back-relation singular)",
-  /\n\s+tarefa\s+Tarefa\?/.test(modeloInst.slice(0, modeloInst.indexOf("\n}"))))
+
+/**
+ * ESTE GUARD JÁ APONTOU PARA O ALVO ERRADO.
+ *
+ * Ele exigia `workflowInstanceId @unique`, com a intenção certa — impedir que
+ * sete passos virassem sete tarefas — e o alvo errado: a instância do workflow
+ * é da FASE, uma só por (processo, fase, ciclo), e guarda os passos de TODOS os
+ * documentos dela. Com o `@unique`, uma Emissão Documental com dois documentos
+ * era estruturalmente impossível: a segunda tarefa não conseguia nascer.
+ *
+ * O que garante "etapa não é tarefa" é a CHAVE da tarefa, derivada da
+ * obrigação (necessidade/documento/pessoa/ciclo): cinco passos da mesma
+ * certidão produzem a MESMA chave; dois documentos produzem duas.
+ */
+ok("chaveIdempotencia da tarefa é @unique",
+  /chaveIdempotencia\s+String\?\s+@unique/.test(corpoTarefa) || /chaveIdempotencia\s+String\s+@unique/.test(corpoTarefa),
+  "é ela que impede a mesma unidade de trabalho de virar duas tarefas")
+ok("workflowInstanceId NÃO é @unique",
+  !/workflowInstanceId\s+Int\?\s+@unique/.test(corpoTarefa),
+  "a instância é da FASE: N unidades de trabalho convivem nela")
+const helpers = ler("src/services/passo-tarefa-helpers.ts")
+ok("a chave é montada a partir da OBRIGAÇÃO, não do passo",
+  /necessidadeId != null \? `nec\$\{/.test(semComentarios(helpers)),
+  "era `stepinst{id}` — cada instância de passo ganhava a sua própria tarefa")
+ok("e o passo só vira identidade quando não há obrigação",
+  /: `stepinst\$\{i\.stepInstanceId\}`/.test(semComentarios(helpers)),
+  "passo administrativo de fase não pertence a documento nem a pessoa")
 ok("a etapa corrente NÃO é @unique (é projeção, não identidade)",
   !/workflowStepInstanceId\s+Int\?\s+@unique/.test(corpoTarefa))
 
@@ -69,8 +95,6 @@ secao("2) Nenhum materializador decide sozinho se gera tarefa")
 // ═══════════════════════════════════════════════════════════════════════════
 // O literal proibido. `geraTarefa` continua no modelo (descreve a ETAPA), mas
 // ninguém pode fixá-lo no código para decidir se o trabalho entra em fila.
-const semComentarios = (s: string) =>
-  s.replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*\/\/[^\n]*$/gm, "").replace(/\/\/[^\n"']*$/gm, "")
 ok("a genealogia não escreve mais geraTarefa: false",
   !/geraTarefa:\s*false/.test(semComentarios(genealogia)))
 ok("e converge a tarefa ao final da materialização",
@@ -81,8 +105,12 @@ secao("3) Uma porta só cria tarefa operacional")
 // ═══════════════════════════════════════════════════════════════════════════
 ok("existe o serviço canônico", /export async function materializarTarefaOperacional/.test(canonica))
 ok("ele é idempotente pela chave", /findUnique\(\{ where: \{ chaveIdempotencia: chave \}/.test(canonica))
-ok("e recusa uma segunda tarefa para a mesma instância",
-  /where: \{ workflowInstanceId: nova\.workflowInstanceId \}/.test(canonica))
+// A guarda "uma tarefa por instância" SAIU: ela recusava a segunda unidade de
+// trabalho da mesma fase (o segundo documento nunca chegava a ninguém). Quem
+// impede duplicidade é a chave da obrigação, verificada acima.
+ok("e a duplicidade é impedida pela CHAVE, não pela instância",
+  !/where: \{ workflowInstanceId: nova\.workflowInstanceId \}/.test(canonica),
+  "a instância é da fase e abriga N unidades de trabalho")
 ok("a identidade não usa o título", !/chaveDaTarefa[\s\S]{0,400}titulo/.test(canonica))
 ok("nem a etapa corrente", !/chaveDaTarefa[\s\S]{0,400}step/i.test(canonica))
 ok("a criação é auditada", /acao: 'TAREFA_CRIADA'/.test(canonica))

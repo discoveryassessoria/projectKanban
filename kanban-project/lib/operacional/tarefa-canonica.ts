@@ -112,14 +112,17 @@ export async function materializarTarefaOperacional(
   const existente = await tx.tarefa.findUnique({ where: { chaveIdempotencia: chave }, select: { id: true } })
   if (existente) return { tarefaId: existente.id, criada: false, motivo: 'já existia' }
 
-  // A instância só pode ter UMA tarefa. O `@unique` garante no banco; esta
-  // consulta existe para devolver a tarefa certa em vez de estourar P2002 num
-  // caminho concorrente legítimo (duas materializações da mesma fase).
-  const daInstancia = await tx.tarefa.findUnique({
-    where: { workflowInstanceId: nova.workflowInstanceId },
-    select: { id: true },
-  })
-  if (daInstancia) return { tarefaId: daInstancia.id, criada: false, motivo: 'a instância já tem tarefa' }
+  // ESTA CONSULTA JÁ FOI "a instância só pode ter UMA tarefa".
+  //
+  // Era verdade quando cada instância correspondia a um trabalho. Não é: a
+  // instância é da FASE e abriga uma tarefa por unidade de trabalho — quatro
+  // certidões de uma Emissão Documental são quatro tarefas dentro dela. A
+  // guarda por instância recusava a segunda tarefa dizendo que já existia uma,
+  // e o segundo documento nunca chegava a ninguém.
+  //
+  // O que identifica a tarefa é a CHAVE (verificada acima), derivada da
+  // obrigação. Duas materializações concorrentes da MESMA unidade colidem nela
+  // — que é exatamente onde a colisão deve acontecer.
 
   const prazo = calcularPrazo(nova.slaDays, agora)
 

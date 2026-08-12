@@ -66,13 +66,15 @@ async function main() {
     const pes = await prisma.pessoa.create({ data: { arvoreId: arv.id, nome: c.pessoa[0], sobrenome: c.pessoa[1] }, select: { id: true } })
     const nec = await prisma.necessidadeDocumental.create({ data: { processoId: proc.id, itemCatalogoId: item.id, pessoaId: pes.id, ciclo: 1, chaveIdempotencia: `${MARCA}-n-${i}` }, select: { id: true } })
     const inst = await prisma.phaseWorkflowInstance.create({ data: { processoId: proc.id, faseMacroKey: "genealogia", ciclo: 1, status: "ATIVO", chaveIdempotencia: `${MARCA}-i-${i}` }, select: { id: true } })
-    for (const [j, label] of [c.etapa, "Etapa seguinte", "Etapa final"].entries()) {
+    // O WORKFLOW INTERNO REAL da Emissão Documental: cinco etapas, uma tarefa.
+    const ETAPAS = ["Solicitar certidão", "Aguardar retorno do cartório", "Receber certidão", "Conferir certidão", "Validar certidão"]
+    for (const [j, label] of ETAPAS.entries()) {
       await prisma.phaseWorkflowStepInstance.create({
         data: {
           workflowInstanceId: inst.id, processoId: proc.id, faseMacroKey: "genealogia", stepKey: `p${i}_s${j}`,
           ordem: j + 1, tipo: "HUMANO", obrigatorio: true, status: j === 0 ? "DISPONIVEL" : "PENDENTE",
           necessidadeId: nec.id, pessoaId: pes.id, papel: "equipe_documental", slaDays: 5, ciclo: 1,
-          snapshot: { label } as never, chaveIdempotencia: `${MARCA}-s-${i}-${j}`,
+          snapshot: { label, titulo: `${c.item} — ${c.pessoa[0]} ${c.pessoa[1]}` } as never, chaveIdempotencia: `${MARCA}-s-${i}-${j}`,
         },
       })
     }

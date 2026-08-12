@@ -290,7 +290,7 @@ async function main() {
   const daCarga = carga.find((x) => x.responsavelId === dani)
   const tarefasAtivasDela = await prisma.tarefa.count({ where: { responsavelId: dani, statusTarefa: { in: ["NAO_INICIADA", "EM_ANDAMENTO", "AGUARDANDO_CLIENTE", "AGUARDANDO_TERCEIRO", "BLOQUEADA"] } } })
   ok("a carga conta TAREFAS, não etapas", daCarga?.tarefasAtivas === tarefasAtivasDela, `${daCarga?.tarefasAtivas} vs ${tarefasAtivasDela} tarefas`)
-  const etapasDela = await prisma.phaseWorkflowStepInstance.count({ where: { workflowInstance: { tarefa: { responsavelId: dani } } } })
+  const etapasDela = await prisma.phaseWorkflowStepInstance.count({ where: { workflowInstance: { tarefas: { some: { responsavelId: dani } } } } })
   ok("e o número é MENOR que o de etapas (a prova de que não conta step)",
     (daCarga?.tarefasAtivas ?? 0) < etapasDela, `${daCarga?.tarefasAtivas} tarefas para ${etapasDela} etapas`)
 

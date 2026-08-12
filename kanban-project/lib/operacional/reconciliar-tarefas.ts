@@ -86,7 +86,7 @@ export async function reconciliarTarefas(
     where: { status: 'ATIVO', ...(opts.processoId ? { processoId: opts.processoId } : {}) },
     select: {
       id: true, processoId: true, faseMacroKey: true, ciclo: true,
-      tarefa: { select: { id: true } },
+      tarefas: { select: { id: true, necessidadeId: true, documentoId: true } },
       steps: {
         select: {
           id: true, status: true, obrigatorio: true, ordem: true, stepKey: true, papel: true,
@@ -100,22 +100,53 @@ export async function reconciliarTarefas(
   for (const inst of instancias) {
     res.instanciasAvaliadas++
 
-    if (inst.tarefa) {
-      if (!dryRun) {
-        const r = await prisma.$transaction((tx) => sincronizarTarefaComWorkflow(tx, inst.tarefa!.id, agora))
-        if (r.mudou) res.tarefasSincronizadas++
-      }
-      res.detalhes.push({ instanciaId: inst.id, tarefaId: inst.tarefa.id, acao: 'já tinha tarefa · sincronizada' })
-      continue
-    }
-
     // Sem etapas vivas não há trabalho a fazer: instância exaurida não ganha
     // tarefa nova só porque continua marcada como ativa.
-    const vivos = inst.steps.filter((s) => !STATUS_TERMINAIS_STEP.includes(s.status))
-    if (vivos.length === 0) {
+    const vivosDaInstancia = inst.steps.filter((s) => !STATUS_TERMINAIS_STEP.includes(s.status))
+
+    // ── AS UNIDADES DE TRABALHO DENTRO DA INSTÂNCIA ────────────────────────
+    //
+    // A instância é da FASE. Numa Emissão Documental com quatro certidões, ela
+    // guarda os passos das quatro — e cada certidão é um trabalho distinto,
+    // com o seu prazo e o seu responsável.
+    //
+    // Este laço já tratou a instância inteira como uma unidade só, porque na
+    // Genealogia havia mesmo um trabalho por instância. Ao chegar uma fase com
+    // dois documentos, o segundo simplesmente não ganhava tarefa: a primeira já
+    // existia e o `continue` encerrava a instância.
+    //
+    // O agrupamento é pela OBRIGAÇÃO — a mesma identidade que a chave da tarefa
+    // usa —, então reconciliar e materializar concordam por construção.
+    const grupos = new Map<string, typeof vivosDaInstancia>()
+    for (const st of vivosDaInstancia) {
+      const chave = st.necessidadeId != null ? `nec${st.necessidadeId}`
+        : st.documentoId != null ? `doc${st.documentoId}`
+        : `step${st.id}`
+      const atual = grupos.get(chave)
+      if (atual) atual.push(st)
+      else grupos.set(chave, [st])
+    }
+
+    // Tarefas que JÁ existem nesta instância sincronizam; o resto vira unidade
+    // nova. A comparação é por obrigação, não por instância.
+    const jaTem = new Set(
+      inst.tarefas.map((t) => (t.necessidadeId != null ? `nec${t.necessidadeId}` : t.documentoId != null ? `doc${t.documentoId}` : '')),
+    )
+    for (const t of inst.tarefas) {
+      if (!dryRun) {
+        const r = await prisma.$transaction((tx) => sincronizarTarefaComWorkflow(tx, t.id, agora))
+        if (r.mudou) res.tarefasSincronizadas++
+      }
+      res.detalhes.push({ instanciaId: inst.id, tarefaId: t.id, acao: 'já tinha tarefa · sincronizada' })
+    }
+
+    if (grupos.size === 0) {
       res.detalhes.push({ instanciaId: inst.id, tarefaId: 0, acao: 'sem etapa viva · nada a fazer' })
       continue
     }
+
+    for (const [chaveGrupo, vivos] of grupos) {
+    if (jaTem.has(chaveGrupo)) continue
 
     // A CAUSA do trabalho — sem ela a tarefa seria órfã e ninguém saberia
     // responder "por que eu existo?".
@@ -177,6 +208,7 @@ export async function reconciliarTarefas(
 
     if (criada.criada) res.tarefasCriadas++
     res.detalhes.push({ instanciaId: inst.id, tarefaId: criada.tarefaId, acao: criada.criada ? `criada: ${nome}` : `reaproveitada (${criada.motivo})` })
+    }
   }
 
   // ── TAREFA QUE PERDEU A CAUSA ────────────────────────────────────────────

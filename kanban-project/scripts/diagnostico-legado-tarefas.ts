@@ -22,7 +22,7 @@ async function main() {
 
   console.log(`\nWORKFLOWS`)
   console.log(`  instâncias ATIVAS .................... ${await prisma.phaseWorkflowInstance.count({ where: { status: "ATIVO" } })}`)
-  console.log(`  ATIVAS sem tarefa (operação invisível) ${await prisma.phaseWorkflowInstance.count({ where: { status: "ATIVO", tarefa: null } })}`)
+  console.log(`  ATIVAS sem tarefa (operação invisível) ${await prisma.phaseWorkflowInstance.count({ where: { status: "ATIVO", tarefas: { none: {} } } })}`)
   console.log(`  etapas ............................... ${await prisma.phaseWorkflowStepInstance.count()}`)
   const semInst = await prisma.phaseWorkflowStepInstance.count({ where: { workflowInstance: { status: { in: ["CANCELADO", "SUPERSEDIDO"] } } } })
   console.log(`  etapas de workflow encerrado ......... ${semInst}`)

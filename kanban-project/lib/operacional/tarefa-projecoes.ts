@@ -217,6 +217,7 @@ export async function dossieDaTarefa(tarefaId: number) {
     select: {
       ...SELECT,
       origem: true, ciclo: true, chaveIdempotencia: true, justificativa: true, motivoCodigo: true,
+      necessidadeId: true, documentoId: true, workflowStepInstanceId: true, descricao: true,
       dataInicio: true, dataAtribuicao: true, dataConclusao: true, createdAt: true,
       slaPausadoEm: true, slaPausaAcumuladaMin: true, causaRemovidaMotivo: true,
       workflowInstanceId: true,
@@ -225,7 +226,13 @@ export async function dossieDaTarefa(tarefaId: number) {
       workflowInstance: {
         select: {
           id: true, faseMacroKey: true, status: true, workflowDefinitionId: true, workflowVersion: true,
-          steps: { select: { id: true, stepKey: true, ordem: true, status: true, obrigatorio: true, completedAt: true }, orderBy: { ordem: 'asc' } },
+          steps: {
+            select: {
+              id: true, stepKey: true, ordem: true, status: true, obrigatorio: true, completedAt: true,
+              snapshot: true, necessidadeId: true, documentoId: true, prazo: true, responsavelId: true,
+            },
+            orderBy: { ordem: 'asc' },
+          },
         },
       },
     },
@@ -265,7 +272,35 @@ export async function dossieDaTarefa(tarefaId: number) {
       slaPausadoDesde: t.slaPausadoEm?.toISOString() ?? null,
       minutosPausados: t.slaPausaAcumuladaMin,
     },
-    etapas: t.workflowInstance?.steps ?? [],
+    // AS ETAPAS DESTA TAREFA — não as da fase inteira.
+    //
+    // A instância do workflow é da FASE: numa Emissão Documental com quatro
+    // certidões, ela guarda os passos das quatro. Devolver todos aqui faria o
+    // funcionário ver, dentro da tarefa da certidão de nascimento, as etapas da
+    // certidão de casamento de outra pessoa.
+    //
+    // O recorte é a própria unidade de trabalho da tarefa. Sem obrigação
+    // identificada (passo administrativo de fase), o recorte é o passo corrente.
+    etapas: (t.workflowInstance?.steps ?? [])
+      .filter((s) =>
+        t.necessidadeId != null ? s.necessidadeId === t.necessidadeId
+        : t.documentoId != null ? s.documentoId === t.documentoId
+        : s.id === t.workflowStepInstanceId,
+      )
+      .map((s) => ({
+        id: s.id,
+        ordem: s.ordem,
+        // O rótulo publicado vem do snapshot; a chave técnica é o último recurso.
+        titulo: (s.snapshot as { label?: string; titulo?: string } | null)?.label
+          ?? (s.snapshot as { label?: string; titulo?: string } | null)?.titulo
+          ?? s.stepKey,
+        stepKey: s.stepKey,
+        status: s.status,
+        obrigatorio: s.obrigatorio,
+        concluidaEm: s.completedAt?.toISOString() ?? null,
+        prazo: s.prazo?.toISOString() ?? null,
+        atual: s.id === t.workflowStepInstanceId,
+      })),
     causaRemovida: t.causaRemovidaEm ? { em: t.causaRemovidaEm, motivo: t.causaRemovidaMotivo } : null,
     historico,
   }

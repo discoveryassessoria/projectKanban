@@ -126,7 +126,10 @@ export async function garantirTarefaDePasso(
   const resp = resolverResponsavel({ responsavelId: step.responsavelId, papel: step.papel, equipe: step.equipe, stepKey: step.stepKey })
   const warnings: TarefaGenIssue[] = resp.warning ? [resp.warning] : []
 
-  const chaveTarefa = montarChaveTarefa({ stepInstanceId: step.id, taskRole, ciclo: step.ciclo })
+  const chaveTarefa = montarChaveTarefa({
+    stepInstanceId: step.id, taskRole, ciclo: step.ciclo, processoId: step.processoId,
+    necessidadeId: step.necessidadeId, documentoId: step.documentoId, pessoaId: step.pessoaId,
+  })
   const causationId = input.causationId ?? step.chaveIdempotencia
   const origem = input.origem ?? "workflow"
 

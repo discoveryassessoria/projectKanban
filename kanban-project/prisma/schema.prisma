@@ -528,13 +528,21 @@ model Tarefa {
   historico           TarefaHistorico[]
 
   // CP-4A â vÃ­nculos aditivos (nullable) com o runtime de workflow v2.
-  // ── A TAREFA É DONA DO WORKFLOW ────────────────────────────────────────────
-  // UMA obrigação real = UMA Tarefa = UM workflow interno = N etapas.
+  // ── A TAREFA É DONA DO SEU TRABALHO, NÃO DA INSTÂNCIA DA FASE ─────────────
+  // UMA unidade de trabalho = UMA Tarefa = N etapas.
   //
-  // `@unique` é o que impede a arquitetura antiga de voltar: com uma instância
-  // por tarefa, não existe caminho em que sete passos virem sete tarefas. Etapa
-  // não é tarefa; ela é o "como" de uma tarefa que já existe.
-  workflowInstanceId     Int?                       @unique
+  // Este campo já foi `@unique`, com a intenção certa e o alvo errado: a ideia
+  // era impedir que sete passos virassem sete tarefas. Mas a instância do
+  // workflow é da FASE — uma só por (processo, fase, ciclo) —, e os passos de
+  // TODOS os documentos daquela fase vivem dentro dela. Com o `@unique`, uma
+  // Emissão Documental com dois documentos era estruturalmente impossível: a
+  // segunda tarefa não conseguia nascer.
+  //
+  // O que garante "etapa não é tarefa" é a IDENTIDADE da tarefa
+  // (`chaveIdempotencia @unique`, derivada da obrigação — necessidade/documento
+  // /pessoa/ciclo), não a exclusividade da instância. Dez passos de um
+  // documento convergem para uma chave; dois documentos são duas chaves.
+  workflowInstanceId     Int?
   workflowInstance       PhaseWorkflowInstance?     @relation(fields: [workflowInstanceId], references: [id], onDelete: SetNull)
   // A ETAPA CORRENTE é PROJEÇÃO, não identidade. Ela muda sete vezes durante a
   // vida da tarefa, e a tarefa continua a mesma. Nada pode ancorar aqui.
@@ -3936,9 +3944,11 @@ model PhaseWorkflowInstance {
 
   steps   PhaseWorkflowStepInstance[]
   // 1:1 — a instância pertence a UMA tarefa. É a contraparte do `@unique` em
-  // `Tarefa.workflowInstanceId`, e é o que faz "etapa não é tarefa" ser uma
-  // propriedade do modelo, não uma convenção que alguém precisa lembrar.
-  tarefa  Tarefa?
+  // `Tarefa.workflowInstanceId`. A relação é de UM para MUITOS: a instância é da
+  // FASE e abriga as unidades de trabalho dela — quatro certidões numa Emissão
+  // Documental são quatro tarefas dentro desta mesma instância. Quem impede
+  // "etapa vira tarefa" é a chave da tarefa, derivada da obrigação.
+  tarefas Tarefa[]
 
   @@index([processoId, faseMacroKey, status])
   @@index([chaveIdempotencia])

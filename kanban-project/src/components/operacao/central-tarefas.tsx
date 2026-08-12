@@ -23,6 +23,7 @@
 "use client"
 
 import { useCallback, useEffect, useMemo, useState } from "react"
+import { TarefaOperacional } from "./tarefa-operacional"
 
 export interface LinhaDeFila {
   taskId: number
@@ -106,14 +107,18 @@ function Etiqueta({ tom, children }: { tom: "neutro" | "alerta" | "critico" | "a
 function Linha({
   l,
   acao,
+  aoAbrir,
 }: {
   l: LinhaDeFila
   acao?: React.ReactNode
+  aoAbrir?: () => void
 }) {
   const contexto = [l.processoNome, l.pessoaNome, l.servico].filter(Boolean).join(" · ")
   return (
     <div className="group grid grid-cols-[1fr_auto] items-start gap-4 border-b border-white/[0.06] px-4 py-3 last:border-b-0 hover:bg-white/[0.02]">
-      <div className="min-w-0">
+      {/* Clicar na linha abre a TAREFA — é o gesto natural, e é por ele que o
+          funcionário chega ao workflow interno sem passar pelo processo. */}
+      <button type="button" onClick={aoAbrir} className="min-w-0 cursor-pointer text-left">
         <div className="flex items-center gap-2">
           <span className="truncate text-[13px] font-medium text-white/90">{l.titulo}</span>
           {l.atrasada && <Etiqueta tom="critico">Atrasada</Etiqueta>}
@@ -131,7 +136,7 @@ function Linha({
           {rotularFase(l.faseMacroKey) && <span className="text-white/35">{rotularFase(l.faseMacroKey)}</span>}
           {l.responsavelNome && <span className="text-white/35">{l.responsavelNome}</span>}
         </div>
-      </div>
+      </button>
 
       <div className="flex shrink-0 items-center gap-4">
         <div className="text-right">
@@ -265,6 +270,7 @@ export function CentralTarefas({ podeDistribuir }: { podeDistribuir: boolean }) 
   const [ocupado, setOcupado] = useState(false)
   const [erroComando, setErroComando] = useState<string | null>(null)
   const [aviso, setAviso] = useState<string | null>(null)
+  const [aberta, setAberta] = useState<number | null>(null)
 
   // Mesma disciplina do seletor: o pedido tem chave, o "carregando" é derivado
   // e a resposta atrasada de uma aba não pinta a lista da outra.
@@ -376,6 +382,7 @@ export function CentralTarefas({ podeDistribuir }: { podeDistribuir: boolean }) 
           <Linha
             key={l.taskId}
             l={l}
+            aoAbrir={() => setAberta(l.taskId)}
             acao={
               podeDistribuir ? (
                 <button
@@ -389,6 +396,10 @@ export function CentralTarefas({ podeDistribuir }: { podeDistribuir: boolean }) 
           />
         ))}
       </div>
+
+      {aberta != null && (
+        <TarefaOperacional taskId={aberta} aoFechar={() => setAberta(null)} aoMudar={carregar} />
+      )}
 
       {alvo && (
         <SeletorResponsavel
