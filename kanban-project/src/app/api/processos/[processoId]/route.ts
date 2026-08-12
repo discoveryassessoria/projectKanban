@@ -40,14 +40,7 @@ export async function GET(
         },
         tarefas: {
           include: {
-            responsavel: true,
-            subtarefas: {
-              select: {
-                id: true,
-                prioridade: true,
-                concluida: true
-              }
-            }
+            responsavel: true
           },
           orderBy: { createdAt: "desc" }
         },
@@ -205,14 +198,7 @@ export async function PUT(
         },
         tarefas: {
           include: {
-            responsavel: true,
-            subtarefas: {
-              select: {
-                id: true,
-                prioridade: true,
-                concluida: true
-              }
-            }
+            responsavel: true
           },
           orderBy: { createdAt: "desc" }
         }

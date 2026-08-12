@@ -6,9 +6,9 @@
 // hidratação e mesmo porteiro por PERMISSÃO. O conteúdo vive em
 // src/components/operacao/central-tarefas.tsx.
 //
-// Superfície NOVA: nasce sobre a Tarefa canônica e não toca a árvore legada de
-// subtarefas (`tarefaPaiId`, COBRANCA, CONFERENCIA) que a tela de Atividades
-// ainda usa.
+// Superfície NOVA: nasce sobre a Tarefa canônica. A árvore de subtarefas que
+// existia antes (`tarefaPaiId`) foi removida do schema — a execução se desdobra
+// nos PASSOS do workflow, não em tarefas-filhas.
 
 "use client"
 

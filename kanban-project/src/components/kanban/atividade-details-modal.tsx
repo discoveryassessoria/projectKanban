@@ -85,7 +85,6 @@ interface ProcessoDetailsModalProps {
   initialTab?: string
   initialPessoaId?: number
   initialSidebarTab?: string
-  initialTarefaPaiId?: number  // ← ADICIONAR
   initialAtividadeId?: number  // ← ADICIONAR
 }
 
@@ -131,7 +130,6 @@ function ConteudoModal({
   initialTab,
   initialPessoaId,
   initialSidebarTab,
-  initialTarefaPaiId,    // ← ADICIONAR ESTA LINHA
   initialAtividadeId,    // ← ADICIONAR ESTA LINHA
 }: ProcessoDetailsModalProps) {
   // ✅ ATUALIZADO: Adicionado "informacoes" como possível aba

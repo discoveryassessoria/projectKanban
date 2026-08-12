@@ -507,13 +507,11 @@ CREATE TABLE "Tarefa" (
     "prioridade" "PrioridadeTarefa" NOT NULL DEFAULT 'MEDIA',
     "dataPrazo" TIMESTAMP(3),
     "dataConclusao" TIMESTAMP(3),
-    "tarefaPaiId" INTEGER,
     "ordem" INTEGER NOT NULL DEFAULT 0,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" TIMESTAMP(3) NOT NULL,
     "dataInicio" TIMESTAMP(3),
     "observacoes" TEXT,
-    "tipoSubtarefa" VARCHAR(20),
     "prazoCobranca" INTEGER DEFAULT 5,
     "motivoConclusao" VARCHAR(50),
     "quantidadeCobrancas" INTEGER NOT NULL DEFAULT 0,
@@ -4309,9 +4307,6 @@ CREATE INDEX "Tarefa_concluida_idx" ON "Tarefa"("concluida");
 CREATE INDEX "Tarefa_statusTarefa_idx" ON "Tarefa"("statusTarefa");
 
 -- CreateIndex
-CREATE INDEX "Tarefa_tarefaPaiId_idx" ON "Tarefa"("tarefaPaiId");
-
--- CreateIndex
 CREATE INDEX "Tarefa_statusId_idx" ON "Tarefa"("statusId");
 
 -- CreateIndex
@@ -5951,9 +5946,6 @@ ALTER TABLE "Tarefa" ADD CONSTRAINT "Tarefa_responsavelId_fkey" FOREIGN KEY ("re
 
 -- AddForeignKey
 ALTER TABLE "Tarefa" ADD CONSTRAINT "Tarefa_statusId_fkey" FOREIGN KEY ("statusId") REFERENCES "Status"("id") ON DELETE SET NULL ON UPDATE CASCADE;
-
--- AddForeignKey
-ALTER TABLE "Tarefa" ADD CONSTRAINT "Tarefa_tarefaPaiId_fkey" FOREIGN KEY ("tarefaPaiId") REFERENCES "Tarefa"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "Tarefa" ADD CONSTRAINT "Tarefa_workflowInstanceId_fkey" FOREIGN KEY ("workflowInstanceId") REFERENCES "PhaseWorkflowInstance"("id") ON DELETE SET NULL ON UPDATE CASCADE;

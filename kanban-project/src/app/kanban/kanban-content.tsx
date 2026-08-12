@@ -129,7 +129,6 @@ export function KanbanContent() {
   const initialTab = linkConsumido ? null : searchParams.get("tab")
   const initialPessoaId = linkConsumido ? null : inteiroDaUrl(searchParams.get("pessoaId"))
   const initialSidebarTab = linkConsumido ? null : searchParams.get("sidebarTab")
-  const initialTarefaPaiId = linkConsumido ? null : inteiroDaUrl(searchParams.get("tarefaPaiId"))
   const initialAtividadeId = linkConsumido ? null : inteiroDaUrl(searchParams.get("atividadeId"))
 
   // Modal de processo na aba Clientes
@@ -163,7 +162,6 @@ export function KanbanContent() {
     newUrl.searchParams.delete("tab")
     newUrl.searchParams.delete("pessoaId")
     newUrl.searchParams.delete("sidebarTab")
-    newUrl.searchParams.delete("tarefaPaiId")
     newUrl.searchParams.delete("atividadeId")
     window.history.replaceState({}, "", newUrl.toString())
 
@@ -392,7 +390,6 @@ export function KanbanContent() {
                     initialPessoaId={initialPessoaId}
                     initialSidebarTab={initialSidebarTab}
                     onModalOpened={handleModalOpened}
-                    initialTarefaPaiId={initialTarefaPaiId}
                     initialAtividadeId={initialAtividadeId}
                   />
                 )

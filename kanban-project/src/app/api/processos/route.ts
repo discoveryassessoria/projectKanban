@@ -79,9 +79,7 @@ export async function GET(request: Request) {
         },
         _count: {
           select: {
-            tarefas: {
-              where: { tarefaPaiId: { not: null } }
-            },
+            tarefas: true,
             anexos: true
           }
         }

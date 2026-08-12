@@ -80,8 +80,6 @@ ok("distribuição sai antes da obrigação",
   pos(/distribuicaoEconomica\.deleteMany/) < pos(/out\.obrigacoesPrevistas/))
 ok("tarefa sai antes do passo (a tarefa é a projeção do passo)",
   pos(/out\.tarefas =/) < pos(/out\.passos =/))
-ok("subtarefa sai antes da tarefa",
-  pos(/tarefaPaiId: \{ in: ctx\.tarefaIds \}/) < pos(/out\.tarefas =/))
 ok("o vínculo com o processo sai antes da pessoa",
   pos(/processoRequerente\.deleteMany/) < pos(/pessoa\.delete\(/))
 ok("a pessoa é a ÚLTIMA a sair",

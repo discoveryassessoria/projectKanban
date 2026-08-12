@@ -233,8 +233,12 @@ async function main() {
   for (const esperada of ["TAREFA_ATRIBUIDA", "TAREFA_INICIADA", "TAREFA_ETAPA_CONCLUIDA", "TAREFA_AGUARDANDO_TERCEIRO", "TAREFA_REABERTA"]) {
     ok(`§23) registra ${esperada}`, [...acoes].some((a) => a.startsWith(esperada.slice(0, 18))), [...acoes].join(", ").slice(0, 90))
   }
-  ok("§23) e não existe histórico por subtarefa",
-    (await prisma.tarefa.count({ where: { processoId: p.processoId, NOT: { tarefaPaiId: null } } })) === 0)
+  // Só existe UMA tarefa no processo (provado acima). Logo, todo registro de
+  // auditoria de Tarefa aqui é DELA — não há histórico repartido entre pai e filha.
+  const histDoProcesso = await prisma.logAuditoria.count({
+    where: { entidade: "Tarefa", entidadeId: { in: (await tarefas(p.processoId)).map((t) => t.id) } },
+  })
+  ok("§23) e o histórico não se reparte entre tarefas", histDoProcesso === hist.length, `${histDoProcesso} registros`)
 
   // ═════════════════════════════════════════════════════════════════════════
   console.log(`\n${"═".repeat(70)}`)

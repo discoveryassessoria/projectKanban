@@ -16,9 +16,7 @@
 //
 // ─── ESTA TELA NÃO ESCREVE ──────────────────────────────────────────────────
 // Toda mudança sai por `POST /api/tarefas/{id}/comando`. Não existe aqui
-// nenhum caminho que toque em Tarefa ou em passo — nem a árvore legada de
-// subtarefas (tarefaPaiId / COBRANCA / CONFERENCIA), que esta superfície não
-// usa em lugar nenhum.
+// nenhum caminho que toque em Tarefa ou em passo.
 // ============================================================================
 "use client"
 

@@ -399,18 +399,21 @@ for (const arq of TODOS) {
   if (sitesOperacionaisDeTarefa(semComentarios(ler(arq))) > 0) escritoresTarefa.push(arq.split("\\").join("/"))
 }
 /**
- * A ÁRVORE LEGADA DE SUBTAREFAS — dívida NOMEADA e com TETO.
+ * A ÁRVORE DE SUBTAREFAS NÃO EXISTE MAIS — nem como coluna.
  *
- * Estes arquivos movem o estado da tarefa por fora das portas porque pertencem
- * a um desenho anterior: tarefa-pai/subtarefa (`tarefaPaiId`), com tipos
- * COBRANCA e CONFERENCIA e propagação de conclusão para cima. Não é uma escolha
- * que sobreviva à camada operacional nova — mas todos são alcançáveis pela UI
- * VIVA (`/activities`, `CustomStatusManager`, `TarefaDetailModal`), e desligá-los
- * sem redesenhar essas telas deixaria botão morto.
+ * Houve um desenho anterior em que o trabalho se desdobrava em tarefa-pai →
+ * tarefa-filha (`tarefaPaiId`, com tipos COBRANCA e CONFERENCIA e propagação de
+ * conclusão para cima). A arquitetura do motor é outra, e é uma só:
  *
- * Em produção a árvore legada tem ZERO linhas: 0 subtarefas, 0 tarefas com pai.
- * Ela se aposenta junto com a rodada de UI operacional, não antes. Até lá, o
- * teto impede que cresça.
+ *     TAREFA → WORKFLOW → PASSOS
+ *
+ * O desdobramento acontece nos PASSOS publicados do workflow. Uma tarefa nunca
+ * é subordinada a outra tarefa. A coluna, o índice e a FK auto-referente foram
+ * removidos do schema e de produção pela migration
+ * `20260812140000_remover_arvore_subtarefas` — com zero linhas afetadas.
+ *
+ * O que este guard protege não é o nome `tarefaPaiId`: é a FORMA. Qualquer
+ * relação auto-referente na Tarefa reintroduz a mesma dívida com outro nome.
  */
 /**
  * ZERO EXCEÇÕES OPERACIONAIS.
@@ -477,26 +480,57 @@ const ROTAS_EXTINTAS = [
 for (const r of ROTAS_EXTINTAS) {
   ok(`extinto e não voltou: ${r.split("/").slice(-2).join("/")}`, !existsSync(join(RAIZ, r)))
 }
-// `where: { tarefaPaiId: { not: null } }` é LEITURA — ainda existe código que
-// pergunta se uma tarefa tem pai (para não listá-la duas vezes). O que não pode
-// voltar é ESCREVER o vínculo: é isso que cria a árvore.
-const criamSubtarefa = TODOS.filter((a) => !a.includes("prisma/")).filter((arq) => {
-  const src = semComentarios(ler(arq))
-  const re = /\b(?:prisma|tx|db)\s*\.\s*tarefa\s*\.\s*(create|createMany|update|updateMany|upsert)\s*\(/g
-  let m: RegExpExecArray | null
-  while ((m = re.exec(src)) !== null) {
-    const arg = argumentoBalanceado(src, m.index + m[0].length - 1)
-    for (const g of arg.matchAll(/\b(?:data|create)\s*:\s*\{/g)) {
-      const bloco = objetoBalanceado(arg, arg.indexOf("{", g.index + g[0].length - 1))
-      if (/(^|[{,\s])tarefaPaiId\s*:\s*(?!null)/.test(bloco)) return true
-    }
-  }
-  return false
-})
-ok("nenhuma tela cria subtarefa (tarefaPaiId) na aplicação", criamSubtarefa.length === 0,
-  criamSubtarefa.join(", ") || "etapa é etapa; subtarefa era etapa fingindo ser tarefa")
-ok("nenhum consumidor de COBRANCA/CONFERENCIA como subtarefa",
-  !TODOS.some((a) => /tipoSubtarefa\s*===\s*["'](COBRANCA|CONFERENCIA)/.test(semComentarios(ler(a)))))
+// ─── A FORMA PROIBIDA, no schema ────────────────────────────────────────────
+// Não basta procurar o nome antigo. O que não pode voltar é a Tarefa apontar
+// para outra Tarefa: é isso que produz hierarquia operacional.
+const schema = ler("prisma/schema.prisma")
+const modeloTarefa = (() => {
+  const i = schema.search(/^model\s+Tarefa\s*\{/m)
+  if (i < 0) return ""
+  return schema.slice(i, schema.indexOf("\n}", i))
+})()
+ok("o modelo Tarefa existe no schema", modeloTarefa.length > 0)
+
+// Um campo cujo TIPO é Tarefa (ou Tarefa[]) dentro do próprio model Tarefa é
+// uma relação auto-referente. Nem toda auto-referência é a árvore: existe UMA
+// permitida, e ela é nomeada aqui com o motivo.
+//
+//   TarefaSupersessao — uma tarefa SUBSTITUI outra (a anterior fica SUPERSEDIDA,
+//   que não é o mesmo que cancelada). É uma linhagem de versões do MESMO
+//   trabalho, 1:1 para trás. Não decompõe trabalho: a tarefa superseder não é
+//   "parte de" nada, e ninguém executa pai e filha juntos.
+//
+// O que está proibido é a auto-referência que DECOMPÕE trabalho — pai que se
+// conclui quando as filhas concluem. Esse papel é do WORKFLOW e dos PASSOS.
+const AUTO_RELACAO_PERMITIDA = "TarefaSupersessao"
+const autoReferencias = modeloTarefa
+  .split("\n")
+  .slice(1)
+  .map((l) => l.trim())
+  .filter((l) => l && !l.startsWith("//") && !l.startsWith("@@"))
+  .filter((l) => /^\w+\s+Tarefa(\[\])?(\?)?(\s|$)/.test(l))
+const decomposicao = autoReferencias.filter((l) => !l.includes(`"${AUTO_RELACAO_PERMITIDA}"`))
+ok("§5) a Tarefa não se decompõe em Tarefas no schema", decomposicao.length === 0,
+  decomposicao.join(" | ") || "TAREFA → WORKFLOW → PASSOS; nunca TAREFA → SUBTAREFA")
+ok(`§5) a única auto-relação da Tarefa é ${AUTO_RELACAO_PERMITIDA}`,
+  autoReferencias.length === 2 && decomposicao.length === 0,
+  `${autoReferencias.length} campo(s) auto-referentes`)
+
+for (const proibido of ["tarefaPaiId", "tipoSubtarefa"]) {
+  ok(`§5) \`${proibido}\` não voltou ao schema`, !new RegExp(`\\b${proibido}\\b`).test(schema))
+}
+ok('§5) a relação "Subtarefas" não voltou ao schema', !/@relation\(\s*"Subtarefas"/.test(schema))
+
+// ─── E no código: agora qualquer menção é reintrodução, não leitura ─────────
+// Antes havia leitores legítimos (`where: { tarefaPaiId: { not: null } }`, para
+// não listar a mesma tarefa duas vezes). A coluna não existe mais: um leitor
+// hoje só pode significar que alguém a recriou.
+const mencionamArvore = TODOS.filter((a) => !a.includes("prisma/"))
+  .filter((arq) => /\btarefaPaiId\b|\btipoSubtarefa\b|subtarefas\s*:/.test(semComentarios(ler(arq))))
+  .map((a) => a.split("\\").join("/").replace(RAIZ.split("\\").join("/") + "/", ""))
+ok("§5) nenhum arquivo da aplicação menciona a árvore de subtarefas",
+  mencionamArvore.length === 0,
+  mencionamArvore.join(", ") || "etapa é etapa; subtarefa era etapa fingindo ser tarefa")
 
 ok("nenhuma rota HTTP move o estado operacional da tarefa fora da dívida nomeada",
   !escritoresTarefa.some((a) => a.includes("src/app/api") && !(a in DIVIDA_TAREFA_LEGADA)),

@@ -191,7 +191,13 @@ async function main() {
     (await prisma.tarefa.count({ where: { processoId: p.processoId } })) === 1)
   ok("§15) o título sobreviveu ao workflow inteiro", fim.titulo.startsWith("Certidão de Nascimento"))
   ok("§15) as 5 etapas estão concluídas", (await steps(p.instanciaId)).every((s) => s.status === "CONCLUIDO"))
-  ok("§16) zero subtarefas", (await prisma.tarefa.count({ where: { processoId: p.processoId, NOT: { tarefaPaiId: null } } })) === 0)
+  // A árvore de subtarefas não existe mais nem como coluna (migration
+  // 20260812140000). O que resta provar é a FORMA: cada Tarefa se desdobra em
+  // PASSOS, e nenhuma Tarefa é parte de outra.
+  ok("§16) o desdobramento é em passos, não em tarefas",
+    (await steps(p.instanciaId)).length > 1 &&
+    (await prisma.tarefa.count({ where: { processoId: p.processoId } })) === 1,
+    `${(await steps(p.instanciaId)).length} passos para 1 tarefa`)
 
   // ═════════════════════════════════════════════════════════════════════════
   secao("§20) A timeline separa tarefa de etapa")

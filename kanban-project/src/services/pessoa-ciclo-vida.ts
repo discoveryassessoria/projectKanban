@@ -657,7 +657,6 @@ async function executarHard(ctx: ContextoPessoa, tx: Prisma.TransactionClient): 
 
   // 2) Operacional — tarefa antes do passo (a tarefa é a projeção do passo).
   if (ctx.tarefaIds.length) {
-    await tx.tarefa.deleteMany({ where: { tarefaPaiId: { in: ctx.tarefaIds } } })
     out.tarefas = (await tx.tarefa.deleteMany({ where: { id: { in: ctx.tarefaIds } } })).count
   }
   if (ctx.passoIds.length) {

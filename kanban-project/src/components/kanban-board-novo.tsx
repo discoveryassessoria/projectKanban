@@ -55,7 +55,6 @@ interface KanbanBoardProps {
   initialTab?: string | null
   initialPessoaId?: number | null
   initialSidebarTab?: string | null
-  initialTarefaPaiId?: number | null
   initialAtividadeId?: number | null
   onModalOpened?: () => void
 }
@@ -89,7 +88,6 @@ export function KanbanBoard({
   initialPessoaId = null,
   initialSidebarTab = null,
   onModalOpened,
-  initialTarefaPaiId = null,
   initialAtividadeId = null,
 }: KanbanBoardProps) {
   // A lista local existe para o drag-and-drop responder na hora, antes de o servidor
@@ -109,7 +107,6 @@ export function KanbanBoard({
   const [modalInitialTab, setModalInitialTab] = useState<string | undefined>(undefined)
   const [modalInitialPessoaId, setModalInitialPessoaId] = useState<number | undefined>(undefined)
   const [modalInitialSidebarTab, setModalInitialSidebarTab] = useState<string | undefined>(undefined)
-  const [modalInitialTarefaPaiId, setModalInitialTarefaPaiId] = useState<number | undefined>(undefined)
   const [modalInitialAtividadeId, setModalInitialAtividadeId] = useState<number | undefined>(undefined)
   const { pode } = usePermissoes()
 
@@ -157,7 +154,6 @@ export function KanbanBoard({
   const abaInicialDoModal = aberturaPorLink ? (initialTab || undefined) : modalInitialTab
   const pessoaInicialDoModal = aberturaPorLink ? (initialPessoaId || undefined) : modalInitialPessoaId
   const sidebarInicialDoModal = aberturaPorLink ? (initialSidebarTab || undefined) : modalInitialSidebarTab
-  const tarefaPaiInicialDoModal = aberturaPorLink ? (initialTarefaPaiId || undefined) : modalInitialTarefaPaiId
   const atividadeInicialDoModal = aberturaPorLink ? (initialAtividadeId || undefined) : modalInitialAtividadeId
 
   // Avisar o pai que o modal abriu é EFEITO (é comunicação para fora), e continua
@@ -186,7 +182,6 @@ export function KanbanBoard({
     setModalInitialPessoaId(undefined)
     setModalInitialSidebarTab(undefined)
     setIsDetailsModalOpen(true)
-    setModalInitialTarefaPaiId(undefined)
     setModalInitialAtividadeId(undefined)
   }
 
@@ -200,7 +195,6 @@ export function KanbanBoard({
     setModalInitialTab(undefined)
     setModalInitialPessoaId(undefined)
     setModalInitialSidebarTab(undefined)
-    setModalInitialTarefaPaiId(undefined)
     setModalInitialAtividadeId(undefined)
     onRefresh()
   }
@@ -472,7 +466,6 @@ export function KanbanBoard({
         initialTab={abaInicialDoModal}
         initialPessoaId={pessoaInicialDoModal}
         initialSidebarTab={sidebarInicialDoModal}
-        initialTarefaPaiId={tarefaPaiInicialDoModal}
         initialAtividadeId={atividadeInicialDoModal}
       />
 

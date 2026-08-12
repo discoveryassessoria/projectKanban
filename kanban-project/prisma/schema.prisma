@@ -508,13 +508,11 @@ model Tarefa {
   prioridade          PrioridadeTarefa  @default(MEDIA)
   dataPrazo           DateTime?
   dataConclusao       DateTime?
-  tarefaPaiId         Int?
   ordem               Int               @default(0)
   createdAt           DateTime          @default(now())
   updatedAt           DateTime          @updatedAt
   dataInicio          DateTime?
   observacoes         String?
-  tipoSubtarefa       String?           @db.VarChar(20)
   prazoCobranca       Int?              @default(5)
   motivoConclusao     String?           @db.VarChar(50)
   quantidadeCobrancas Int               @default(0)
@@ -523,8 +521,6 @@ model Tarefa {
   processo            Processo?         @relation(fields: [processoId], references: [id], onDelete: Cascade)
   responsavel         Usuario?          @relation(fields: [responsavelId], references: [id])
   status              Status?           @relation(fields: [statusId], references: [id])
-  tarefaPai           Tarefa?           @relation("Subtarefas", fields: [tarefaPaiId], references: [id], onDelete: Cascade)
-  subtarefas          Tarefa[]          @relation("Subtarefas")
   historico           TarefaHistorico[]
 
   // CP-4A â vÃ­nculos aditivos (nullable) com o runtime de workflow v2.
@@ -623,7 +619,6 @@ model Tarefa {
   @@index([responsavelId])
   @@index([concluida])
   @@index([statusTarefa])
-  @@index([tarefaPaiId])
   @@index([statusId])
   @@index([pais])
   @@index([dataPrazo])

@@ -55,15 +55,24 @@ async function levantar() {
     },
     select: { id: true, processoId: true, titulo: true, statusTarefa: true },
   })
-  // Tarefa com subtarefa que já andou não é descartável: a subtarefa é o trabalho.
-  const comFilhaViva = new Set(
-    (await prisma.tarefa.findMany({
-      where: { tarefaPaiId: { in: orfas.map((t) => t.id) }, OR: [{ concluida: true }, { dataInicio: { not: null } }] },
-      select: { tarefaPaiId: true },
-    })).map((t) => t.tarefaPaiId!),
-  )
-  const descartaveis = orfas.filter((t) => !comFilhaViva.has(t.id))
-  const comHistorico = orfas.filter((t) => comFilhaViva.has(t.id))
+  // A proteção era: "tarefa cuja SUBTAREFA já andou não é descartável, porque o
+  // trabalho está na filha". A árvore de subtarefas não existe mais, e essas
+  // órfãs também não têm passo — não há para onde o trabalho ter ido. Mas a
+  // pergunta que a proteção fazia continua válida, e agora se responde na fonte
+  // certa: esta tarefa registra trabalho humano? Se registra, não se apaga.
+  const orfaIds = orfas.map((t) => t.id)
+  const comRastro = new Set<number>([
+    ...(await prisma.tarefaHistorico.findMany({
+      where: { tarefaId: { in: orfaIds } },
+      select: { tarefaId: true },
+    })).map((h) => h.tarefaId),
+    ...(await prisma.logAuditoria.findMany({
+      where: { entidade: "Tarefa", entidadeId: { in: orfaIds } },
+      select: { entidadeId: true },
+    })).flatMap((l) => (l.entidadeId == null ? [] : [l.entidadeId])),
+  ])
+  const descartaveis = orfas.filter((t) => !comRastro.has(t.id))
+  const comHistorico = orfas.filter((t) => comRastro.has(t.id))
 
   if (descartaveis.length) {
     achados.push({
@@ -76,10 +85,10 @@ async function levantar() {
   }
   if (comHistorico.length) {
     achados.push({
-      categoria: "Tarefa órfã COM subtarefa já trabalhada",
+      categoria: "Tarefa órfã COM histórico registrado",
       classe: "HISTORICO_PROTEGIDO",
       ids: comHistorico.map((t) => t.id),
-      detalhe: "a subtarefa registra trabalho real — a árvore de tarefas permanece",
+      detalhe: "há registro de trabalho humano nesta tarefa — não se apaga",
     })
   }
 

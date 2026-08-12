@@ -243,10 +243,10 @@ async function main() {
   // ═════════════════════════════════════════════════════════════════════════
   ok("§8) nenhuma tabela/entidade de fila foi criada",
     !Object.keys(prisma).some((k) => /minhaFila|filaTarefa/i.test(k)))
-  ok("§19) nenhuma tarefa da nova operação tem tarefaPaiId",
-    (await prisma.tarefa.count({ where: { processoId: p.processoId, NOT: { tarefaPaiId: null } } })) === 0)
-  ok("§19) nem tipo de subtarefa legado",
-    (await prisma.tarefa.count({ where: { processoId: p.processoId, NOT: { tipoSubtarefa: null } } })) === 0)
+  ok("§19) nenhuma tarefa da nova operação é parte de outra tarefa",
+    !Object.keys(prisma.tarefa.fields).some((f) => /tarefaPai|subtarefa/i.test(f)))
+  ok("§19) nem o discriminador de subtarefa legado",
+    !Object.keys(prisma.tarefa.fields).some((f) => /tipoSubtarefa/i.test(f)))
 
   // ═════════════════════════════════════════════════════════════════════════
   console.log(`\n${"═".repeat(70)}`)

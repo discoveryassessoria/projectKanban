@@ -47,14 +47,13 @@ export async function removerDocumentosPorId(
   const out = zero()
   if (documentoIds.length === 0) return out
 
-  // 1) Tarefas do documento — por vínculo de ID. Subtarefas primeiro.
+  // 1) Tarefas do documento — por vínculo de ID.
   const tarefas = await db.tarefa.findMany({
     where: { documentoId: { in: documentoIds } },
     select: { id: true },
   })
   const tarefaIds = tarefas.map((t) => t.id)
   if (tarefaIds.length) {
-    await db.tarefa.deleteMany({ where: { tarefaPaiId: { in: tarefaIds } } })
     out.tarefas = (await db.tarefa.deleteMany({ where: { id: { in: tarefaIds } } })).count
   }
 
