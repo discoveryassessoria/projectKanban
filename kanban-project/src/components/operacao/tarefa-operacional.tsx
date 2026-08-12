@@ -23,6 +23,10 @@
 "use client"
 
 import { useCallback, useEffect, useState } from "react"
+// O MESMO componente que a Central da Etapa monta. Não é uma cópia nem um
+// "modal da fila": é o executor especializado, com os seus canais, evidências
+// condicionais e ação terminal. Duas entradas, uma implementação.
+import { StepEditorRouter } from "@/src/components/kanban/workflow/StepEditors"
 
 interface Etapa {
   id: number
@@ -34,6 +38,11 @@ interface Etapa {
   concluidaEm: string | null
   prazo: string | null
   atual: boolean
+  /** Qual superfície operacional executa esta etapa — vem do registry. */
+  editorKind: string
+  /** false = etapa sem operação estruturada; a conclusão genérica basta. */
+  especializado: boolean
+  documentoId: number | null
 }
 
 interface HistoricoItem {
@@ -130,6 +139,8 @@ export function TarefaOperacional({ taskId, aoFechar, aoMudar }: { taskId: numbe
   const [erro, setErro] = useState<string | null>(null)
   const [motivo, setMotivo] = useState("")
   const [pedindoMotivo, setPedindoMotivo] = useState<null | "aguardar" | "retomar">(null)
+  /** Etapa cujo executor especializado está montado. */
+  const [executando, setExecutando] = useState<Etapa | null>(null)
 
   useEffect(() => {
     let vivo = true
@@ -236,14 +247,43 @@ export function TarefaOperacional({ taskId, aoFechar, aoMudar }: { taskId: numbe
                       key={e.id}
                       e={e}
                       acao={
-                        e.atual && dados?.podeExecutar && !terminal && !naoIniciada && !aguardando ? (
+                        // ETAPA CONCLUÍDA continua consultável — em modo leitura,
+                        // pelo mesmo executor. Reenviar a operação exige reabertura
+                        // canônica, não um segundo clique.
+                        CONCLUIDOS.includes(e.status) && e.especializado && e.documentoId != null ? (
                           <button
-                            disabled={ocupado}
-                            onClick={() => void comandar({ acao: "concluir_etapa", etapaId: e.id })}
-                            className="shrink-0 rounded border border-sky-300/30 bg-sky-400/10 px-2.5 py-1 text-[11px] text-sky-100/90 transition-colors hover:bg-sky-400/20 disabled:opacity-40"
+                            onClick={() => setExecutando(e)}
+                            className="shrink-0 rounded px-2 py-1 text-[11px] text-white/35 transition-colors hover:bg-white/[0.06] hover:text-white/70"
                           >
-                            Concluir etapa
+                            Ver
                           </button>
+                        ) : e.atual && dados?.podeExecutar && !terminal && !naoIniciada && !aguardando ? (
+                          e.especializado && e.documentoId != null ? (
+                            // O TRABALHO DA ETAPA NÃO CABE NUM BOTÃO DE CONCLUSÃO.
+                            //
+                            // "Solicitar certidão" é escolher canal, reunir as
+                            // evidências que aquele canal exige, anexar o
+                            // requerimento, registrar cartório, atendente, custo e
+                            // forma de pagamento. Oferecer "Concluir etapa" aqui
+                            // seria pedir que alguém declarasse feito um trabalho
+                            // que o sistema não viu acontecer.
+                            <button
+                              onClick={() => setExecutando(e)}
+                              className="shrink-0 rounded border border-sky-300/30 bg-sky-400/10 px-2.5 py-1 text-[11px] text-sky-100/90 transition-colors hover:bg-sky-400/20"
+                            >
+                              {e.status === "EM_ANDAMENTO" ? "Continuar etapa" : "Abrir etapa"}
+                            </button>
+                          ) : (
+                            // Etapa SIMPLES: sem operação estruturada a executar, a
+                            // conclusão direta é a ação honesta.
+                            <button
+                              disabled={ocupado}
+                              onClick={() => void comandar({ acao: "concluir_etapa", etapaId: e.id })}
+                              className="shrink-0 rounded border border-sky-300/30 bg-sky-400/10 px-2.5 py-1 text-[11px] text-sky-100/90 transition-colors hover:bg-sky-400/20 disabled:opacity-40"
+                            >
+                              Concluir etapa
+                            </button>
+                          )
                         ) : undefined
                       }
                     />
@@ -329,6 +369,28 @@ export function TarefaOperacional({ taskId, aoFechar, aoMudar }: { taskId: numbe
           </footer>
         )}
       </aside>
+
+      {/* O EXECUTOR ESPECIALIZADO — o mesmo da Central, com contexto canônico.
+          `stepId` É o stepInstanceId; o documento vem da etapa, não de estado
+          global. Ao salvar, quem concluiu o passo foi a porta canônica lá
+          dentro: aqui só recarregamos a tarefa e a fila. */}
+      {executando?.documentoId != null && (
+        <StepEditorRouter
+          stepKey={executando.stepKey}
+          editorKind={executando.editorKind as never}
+          stepTitle={executando.titulo}
+          documentoId={executando.documentoId}
+          stepId={executando.id}
+          stepStatus={executando.status}
+          isOpen
+          onClose={() => setExecutando(null)}
+          onSaved={() => {
+            setExecutando(null)
+            setRecarga((n) => n + 1)
+            aoMudar()
+          }}
+        />
+      )}
     </div>
   )
 }

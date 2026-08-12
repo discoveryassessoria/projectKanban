@@ -263,7 +263,7 @@
     "backfill:nec-duplicada": "npm run guard:escrita && tsx scripts/backfill-necessidade-duplicada-motor-legado.ts --execute",
     "backfill:nec-duplicada:dry": "tsx scripts/backfill-necessidade-duplicada-motor-legado.ts",
     "test:guard-necessidade": "tsx scripts/guard-necessidade-documental.test.ts",
-    "test:guards-arquitetura": "npm run test:guard-necessidade && npm run test:motor-unico && npm run test:obrigacao-unica && npm run test:pessoa-nome && npm run test:guard-pessoa && npm run test:guard-derivado && npm run test:guard-porta-requerente && npm run test:guard-cadastro-arvore && npm run test:guard-planilha && npm run test:guard-tarefa && npm run test:guard-passo && npm run test:guard-validade && npm run test:arvore-arquitetura && npm run test:arvore-layout",
+    "test:guards-arquitetura": "npm run test:guard-necessidade && npm run test:motor-unico && npm run test:obrigacao-unica && npm run test:pessoa-nome && npm run test:guard-pessoa && npm run test:guard-derivado && npm run test:guard-porta-requerente && npm run test:guard-cadastro-arvore && npm run test:guard-planilha && npm run test:guard-tarefa && npm run test:guard-passo && npm run test:guard-executor && npm run test:guard-validade && npm run test:arvore-arquitetura && npm run test:arvore-layout",
     "test:guard-pessoa": "tsx scripts/guard-ciclo-vida-pessoa.test.ts",
     "test:pessoa-ciclo-vida": "tsx scripts/pessoa-ciclo-vida.test.ts",
     "test:pessoa-tortura": "tsx scripts/pessoa-tortura.test.ts",
@@ -299,6 +299,7 @@
     "test:fronteira-documento": "tsx scripts/fronteira-documento-operacao.test.ts",
     "test:fluxo-distribuicao": "tsx scripts/fluxo-distribuicao.test.ts",
     "test:etapa-nao-e-tarefa": "tsx scripts/etapa-nao-e-tarefa.test.ts",
+    "test:guard-executor": "tsx scripts/guard-executor-etapa.test.ts",
     "test:guard-validade": "tsx scripts/guard-validade-por-estado.test.ts",
     "test:tabela-precos-projecao": "tsx scripts/tabela-precos-projecao.test.ts"
   },

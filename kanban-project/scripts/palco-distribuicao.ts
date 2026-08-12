@@ -62,18 +62,27 @@ async function main() {
   for (const [i, c] of CENAS.entries()) {
     const item = await prisma.itemCatalogo.create({ data: { code: `${MARCA}_${i}`, name: c.item, natureza: "DOCUMENTO" }, select: { id: true } })
     const arv = await prisma.arvore.create({ data: { nome: `${MARCA} ${i}` }, select: { id: true } })
-    const proc = await prisma.processo.create({ data: { nome: `${MARCA} ${c.nome}`, pais: "espanha", arvoreId: arv.id, workflowRuntime: "v2", faseAtualKey: "genealogia" }, select: { id: true } })
+    const proc = await prisma.processo.create({ data: { nome: `${MARCA} ${c.nome}`, pais: "espanha", arvoreId: arv.id, workflowRuntime: "v2", faseAtualKey: "emissao_documental" }, select: { id: true } })
     const pes = await prisma.pessoa.create({ data: { arvoreId: arv.id, nome: c.pessoa[0], sobrenome: c.pessoa[1] }, select: { id: true } })
+    const doc = await prisma.documento.create({ data: { pessoaId: pes.id, descricao: c.item, status: "SOLICITAR" }, select: { id: true } })
     const nec = await prisma.necessidadeDocumental.create({ data: { processoId: proc.id, itemCatalogoId: item.id, pessoaId: pes.id, ciclo: 1, chaveIdempotencia: `${MARCA}-n-${i}` }, select: { id: true } })
-    const inst = await prisma.phaseWorkflowInstance.create({ data: { processoId: proc.id, faseMacroKey: "genealogia", ciclo: 1, status: "ATIVO", chaveIdempotencia: `${MARCA}-i-${i}` }, select: { id: true } })
+    const inst = await prisma.phaseWorkflowInstance.create({ data: { processoId: proc.id, faseMacroKey: "emissao_documental", ciclo: 1, status: "ATIVO", chaveIdempotencia: `${MARCA}-i-${i}` }, select: { id: true } })
     // O WORKFLOW INTERNO REAL da Emissão Documental: cinco etapas, uma tarefa.
-    const ETAPAS = ["Solicitar certidão", "Aguardar retorno do cartório", "Receber certidão", "Conferir certidão", "Validar certidão"]
-    for (const [j, label] of ETAPAS.entries()) {
+    // As chaves PUBLICADAS importam: é por elas que o registry resolve qual
+    // executor especializado abre em cada etapa.
+    const ETAPAS: Array<[string, string]> = [
+      ["solicitar_certidao", "Solicitar certidão"],
+      ["aguardar_retorno_do_cartorio", "Aguardar retorno do cartório"],
+      ["receber_certidao", "Receber certidão"],
+      ["conferir_certidao", "Conferir certidão"],
+      ["validar_certidao", "Validar certidão"],
+    ]
+    for (const [j, [chave, label]] of ETAPAS.entries()) {
       await prisma.phaseWorkflowStepInstance.create({
         data: {
-          workflowInstanceId: inst.id, processoId: proc.id, faseMacroKey: "genealogia", stepKey: `p${i}_s${j}`,
+          workflowInstanceId: inst.id, processoId: proc.id, faseMacroKey: "emissao_documental", stepKey: chave,
           ordem: j + 1, tipo: "HUMANO", obrigatorio: true, status: j === 0 ? "DISPONIVEL" : "PENDENTE",
-          necessidadeId: nec.id, pessoaId: pes.id, papel: "equipe_documental", slaDays: 5, ciclo: 1,
+          necessidadeId: nec.id, documentoId: doc.id, pessoaId: pes.id, papel: "equipe_documental", slaDays: 5, ciclo: 1,
           snapshot: { label, titulo: `${c.item} — ${c.pessoa[0]} ${c.pessoa[1]}` } as never, chaveIdempotencia: `${MARCA}-s-${i}-${j}`,
         },
       })

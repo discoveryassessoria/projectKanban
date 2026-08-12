@@ -15,6 +15,7 @@
 import { prisma } from '@/lib/prisma'
 import type { Prisma, StatusTarefa } from '@prisma/client'
 import { STATUS_ATIVOS } from './tarefa-canonica'
+import { resolveWorkflowStepEditor } from '@/src/lib/process-stage/step-editor-registry'
 
 export interface LinhaDeFila {
   taskId: number
@@ -290,6 +291,17 @@ export async function dossieDaTarefa(tarefaId: number) {
       .map((s) => ({
         id: s.id,
         ordem: s.ordem,
+        // O EXECUTOR VEM DA CONFIGURAÇÃO, NUNCA DA FASE.
+        //
+        // `if (fase === "Emissão Documental") abrirModalSolicitar` amarraria a
+        // operação a uma fase e deixaria qualquer fase futura sem superfície. O
+        // binding é do REGISTRY, por stepKey publicado — o mesmo mapa que a
+        // Central da Etapa consulta, então as duas entradas montam o MESMO
+        // executor.
+        editorKind: resolveWorkflowStepEditor({ stepKey: s.stepKey, phaseKey: t.faseMacroKey }).kind,
+        especializado: resolveWorkflowStepEditor({ stepKey: s.stepKey, phaseKey: t.faseMacroKey }).especifico,
+        // O executor é documental: sem documento ele não tem o que operar.
+        documentoId: s.documentoId,
         // O rótulo publicado vem do snapshot; a chave técnica é o último recurso.
         titulo: (s.snapshot as { label?: string; titulo?: string } | null)?.label
           ?? (s.snapshot as { label?: string; titulo?: string } | null)?.titulo
