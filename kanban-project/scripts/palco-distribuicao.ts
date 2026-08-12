@@ -44,9 +44,31 @@ async function main() {
   // — e é assim que o sistema real funciona. Dar a ele o mesmo conjunto que a
   // operação de produção concede é o que faz a captura mostrar a tela que o
   // funcionário realmente vê, em vez de uma tela vazia por falta de acesso.
+  // O CONJUNTO REAL de uma assistente em produção — copiado do cadastro, não
+  // inventado. Com só as permissões de `tarefas.*`, o funcionário abria a
+  // tarefa e o executor da etapa, mas `POST /documentos/{id}/solicitacoes`
+  // respondia 403: a operação documental exige permissão documental.
   const PERMISSOES_EXECUTOR = {
+    "arvore.ver": true, "arvore.criar": true, "arvore.editar": true, "arvore.excluir": true,
+    "arvore.criar_documento": true, "arvore.editar_documento": true, "arvore.excluir_documento": true,
+    "clientes.ver": true, "clientes.criar": true, "clientes.editar": true, "clientes.excluir": true,
+    "eventos.ver": true, "eventos.criar": true, "eventos.editar": true, "eventos.excluir": true,
+    "processos.ver": true, "processos.criar": true, "processos.editar": true, "processos.excluir": true,
+    "processos.ver_paginas": true, "processos.editar_paginas": true,
+    "processos.criar_coluna": true, "processos.editar_coluna": true, "processos.excluir_coluna": true,
+    "processos.editar_status": true,
     "tarefas.ver": true, "tarefas.criar": true, "tarefas.editar": true,
     "tarefas.excluir": true, "tarefas.iniciar_concluir": true,
+    // AS PERMISSÕES DE WORKFLOW — que a Daniela de PRODUÇÃO não tem.
+    //
+    // Sem `workflow.concluirPasso` o funcionário abre a tarefa, abre o
+    // executor, preenche tudo e a ação terminal responde 403: ele consegue
+    // preparar o trabalho e não consegue registrá-lo. Aqui elas existem para
+    // que o teste percorra a operação inteira; em produção, conceder é decisão
+    // de cadastro.
+    "workflow.iniciarPasso": true, "workflow.concluirPasso": true,
+    "workflow.gerarTarefa": true, "workflow.dispensarPasso": true,
+    "tarefas.bloquear": true,
   }
   const dani = await prisma.usuario.upsert({
     where: { email: "daniela@palco.test" },

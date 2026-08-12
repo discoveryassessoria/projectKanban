@@ -32,6 +32,7 @@ import { recalcularFaseDoProcesso } from "@/src/lib/process-stage/recalcular-fas
 import { randomUUID } from "crypto"
 import { projetarTarefaDoPasso, assegurarCoerenciaPassoTarefa } from "@/src/services/passo-tarefa-projecao"
 import { transicionarPassoTx, reabrirPassoTx } from "@/src/services/task-step-sync"
+import { sincronizarTarefaComWorkflow } from "@/lib/operacional/tarefa-canonica"
 import { projetarCustosDocumentaisDoPasso } from "@/src/services/financeiro/projecao-documental"
 
 // Transição de estado do passo → evento operacional do motor. Fonte única desta
@@ -601,7 +602,31 @@ export async function aplicarTransicaoDoPassoTx(
     // CONCLUIDO com a tarefa NAO_INICIADA. Projeção pelo mapeamento OFICIAL, na mesma
     // transação — os dois estados nascem e mudam juntos, ou nenhum muda.
     const passosTocados = [p.id]
-    const projecao = await projetarTarefaDoPasso(tx, { stepInstanceId: p.id, statusPasso: novo })
+
+    // A TAREFA É DERIVADA DE TODAS AS SUAS ETAPAS — não desta.
+    //
+    // `projetarTarefaDoPasso` mapeia 1:1 (passo CONCLUIDO → tarefa
+    // CONCLUIDO_RECEBIDO), e isso estava certo quando a tarefa ERA o passo.
+    // Hoje uma tarefa carrega N etapas: concluir "Solicitar certidão" pela
+    // Central encerrava o pedido de certidão inteiro na primeira etapa — a
+    // tarefa sumia da fila com quatro etapas por fazer.
+    //
+    // A conta de "o trabalho acabou" é a mesma que a fila, o reconciliador e a
+    // porta de tarefa usam. Só quando ela dá terminal é que a projeção conclui.
+    const tarefaDoPasso = await tx.tarefa.findFirst({
+      where: { workflowStepInstanceId: p.id },
+      select: { id: true },
+    })
+    let projecao: { changed: boolean; tarefaId: number | null; de: string | null; para: string | null } =
+      { changed: false, tarefaId: null, de: null, para: null }
+    if (tarefaDoPasso) {
+      const r = await sincronizarTarefaComWorkflow(tx, tarefaDoPasso.id, now)
+      projecao = { changed: r.mudou, tarefaId: tarefaDoPasso.id, de: null, para: r.status }
+    } else {
+      // Passo sem tarefa vinculada: o mapeamento direto continua correto — não
+      // há workflow de tarefa a derivar.
+      projecao = await projetarTarefaDoPasso(tx, { stepInstanceId: p.id, statusPasso: novo })
+    }
 
     // A CONCLUSÃO DA TAREFA TAMBÉM É UM FATO DO WORKFLOW.
     //
