@@ -57,7 +57,11 @@ async function main() {
     "processos.ver_paginas": true, "processos.editar_paginas": true,
     "processos.criar_coluna": true, "processos.editar_coluna": true, "processos.excluir_coluna": true,
     "processos.editar_status": true,
-    "tarefas.ver": true, "tarefas.criar": true, "tarefas.editar": true,
+    "tarefas.ver": true, "tarefas.criar": true,
+    // `tarefas.editar` NÃO entra: é a permissão de atribuir, transferir e mexer
+    // no prazo alheio. O perfil operacional corrigido a nega, e o palco modela
+    // o perfil — não a exceção nominal que a assistente de produção herdou.
+    "tarefas.editar": false,
     "tarefas.excluir": true, "tarefas.iniciar_concluir": true,
     // AS PERMISSÕES DE WORKFLOW — que a Daniela de PRODUÇÃO não tem.
     //

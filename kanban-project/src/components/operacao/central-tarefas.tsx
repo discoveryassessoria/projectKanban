@@ -135,6 +135,10 @@ function Linha({
           )}
           {rotularFase(l.faseMacroKey) && <span className="text-white/35">{rotularFase(l.faseMacroKey)}</span>}
           {l.responsavelNome && <span className="text-white/35">{l.responsavelNome}</span>}
+          {/* HÁ QUANTO TEMPO ESTE TRABALHO ESPERA. Quem distribui precisa ver
+              o que está parado há mais tempo, não só o que vence antes — um
+              pedido de duas semanas sem dono não aparece na régua de prazo. */}
+          {l.criadaEm && <span className="text-white/30">Entrou em {dataCurta(l.criadaEm)}</span>}
         </div>
       </button>
 
@@ -385,12 +389,29 @@ export function CentralTarefas({ podeDistribuir }: { podeDistribuir: boolean }) 
             aoAbrir={() => setAberta(l.taskId)}
             acao={
               podeDistribuir ? (
-                <button
-                  onClick={() => { setErroComando(null); setAlvo(l) }}
-                  className="rounded border border-white/15 px-2.5 py-1 text-[11px] text-white/75 transition-colors hover:border-white/30 hover:bg-white/[0.06]"
-                >
-                  {l.responsavelId == null ? "Atribuir" : "Transferir"}
-                </button>
+                <div className="flex items-center gap-1.5">
+                  <button
+                    onClick={() => { setErroComando(null); setAlvo(l) }}
+                    className="rounded border border-white/15 px-2.5 py-1 text-[11px] text-white/75 transition-colors hover:border-white/30 hover:bg-white/[0.06]"
+                  >
+                    {l.responsavelId == null ? "Atribuir" : "Transferir"}
+                  </button>
+                  {/* RETIRAR fica NA LINHA, junto do trabalho a que se refere.
+                      Antes era uma barra flutuante que só aparecia com o
+                      seletor aberto — ou seja, para devolver a tarefa à
+                      distribuição era preciso primeiro fingir que ia
+                      transferi-la. */}
+                  {l.responsavelId != null && (
+                    <button
+                      disabled={ocupado}
+                      onClick={() => void comandar(l.taskId, { acao: "devolver_a_fila" }, "Tarefa devolvida para Sem responsável.")}
+                      className="rounded px-2 py-1 text-[11px] text-white/40 transition-colors hover:bg-white/[0.06] hover:text-white/75 disabled:opacity-40"
+                      title="Remover o responsável e devolver para distribuição"
+                    >
+                      Retirar
+                    </button>
+                  )}
+                </div>
               ) : undefined
             }
           />
@@ -420,17 +441,6 @@ export function CentralTarefas({ podeDistribuir }: { podeDistribuir: boolean }) 
         />
       )}
 
-      {alvo?.responsavelId != null && (
-        <div className="fixed inset-x-0 bottom-4 z-[61] flex justify-center">
-          <button
-            disabled={ocupado}
-            onClick={() => void comandar(alvo.taskId, { acao: "devolver_a_fila" }, "Tarefa devolvida para Sem responsável.")}
-            className="rounded border border-white/15 bg-[#0d0f13] px-3 py-1.5 text-[11px] text-white/70 shadow-lg transition-colors hover:bg-white/[0.06] disabled:opacity-40"
-          >
-            Remover responsável
-          </button>
-        </div>
-      )}
     </div>
   )
 }
