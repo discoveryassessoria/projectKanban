@@ -413,29 +413,26 @@ for (const arq of TODOS) {
  * teto impede que cresça.
  */
 /**
- * A ÁRVORE LEGADA DE SUBTAREFAS ACABOU.
+ * ZERO EXCEÇÕES OPERACIONAIS.
  *
- * Esta lista já teve cinco arquivos e dezoito escritas diretas: `/cobranca`,
- * `/toggle`, `/subtarefas`, `PUT/DELETE /tarefas/[id]` e a tela `/activities`
- * que os consumia, com `tarefaPaiId`, COBRANCA e CONFERENCIA representando
- * etapa como filho de tarefa. Tudo foi removido — a operação de tarefas é uma
- * só, e etapa é etapa.
+ * Esta lista já teve seis arquivos e vinte escritas diretas. A árvore de
+ * subtarefas foi removida inteira; a Tarefa Transversal — a última — passou a
+ * criar pela porta canônica, concluir por `concluirTarefaSemWorkflow` e
+ * cancelar por `cancelarTarefa`.
  *
- * Sobrou UM arquivo, e ele não é a árvore: `tarefa-transversal` é outra
- * feature (Operação Antecipada / tarefa transversal), viva na Central, com
- * zero linhas em produção. Fica nomeada e com teto até ser migrada às portas.
+ * Ela fica vazia de propósito. Qualquer writer operacional novo, em qualquer
+ * arquivo, reprova o build — não existe mais "dívida conhecida" para onde
+ * empurrar a próxima exceção.
+ *
+ * O que continua PERMITIDO e não passa por aqui: escrever dado de DOMÍNIO
+ * (vincular um documento, anotar metadata). O que a regra vigia é estado
+ * operacional: `statusTarefa`, `concluida`, `dataConclusao`,
+ * `workflowStepInstanceId`.
  */
 const DIVIDA_TAREFA_LEGADA: Record<string, { teto: number; motivo: string }> = {
   "prisma/backfill-cp4-workflow.ts": {
     teto: 1,
-    motivo: "BACKFILL de uma vez só: alinha o estado da tarefa ao passo materializado",
-  },
-  "src/services/tarefa-transversal.ts": {
-    teto: 2,
-    motivo:
-      "NÃO é a árvore de subtarefas: é a tarefa transversal, consumida pela Central " +
-      "(TarefaTransversalModal) e pela Operação Antecipada. Escreve statusTarefa direto; " +
-      "migrar às portas canônicas é frente própria. Zero linhas em produção.",
+    motivo: "BACKFILL de uma vez só, por comando e com guarda de escrita — não é caminho de runtime",
   },
 }
 
@@ -446,7 +443,7 @@ ok("nenhum escritor NOVO de estado operacional de tarefa", invasores.length === 
 const estourouTarefa = escritoresTarefa
   .filter((a) => a in DIVIDA_TAREFA_LEGADA)
   .filter((a) => sitesOperacionaisDeTarefa(semComentarios(ler(a))) > DIVIDA_TAREFA_LEGADA[a].teto)
-ok("a árvore legada de subtarefas não cresceu", estourouTarefa.length === 0, estourouTarefa.join(", "))
+ok("nenhum writer operacional excepcionado sobrou", estourouTarefa.length === 0, estourouTarefa.join(", "))
 
 const folgouTarefa = escritoresTarefa
   .filter((a) => a in DIVIDA_TAREFA_LEGADA)

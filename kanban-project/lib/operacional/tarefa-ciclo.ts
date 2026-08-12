@@ -61,6 +61,31 @@ export interface NovaTarefaManual {
   motivo: string
   /** O usuário viu o aviso de possível duplicidade e confirmou mesmo assim. */
   confirmarDuplicidade?: boolean
+  /**
+   * CAMPOS DE DOMÍNIO DE QUEM PEDIU A TAREFA — gravados na MESMA criação.
+   *
+   * A Tarefa Transversal, por exemplo, carrega fase de referência, ação do
+   * catálogo e resultado esperado: são dados DELA, não da mecânica da tarefa.
+   * Sem isto, quem tem colunas próprias precisaria de um `prisma.tarefa.create`
+   * paralelo — e a segunda porta de criação nasceria de novo.
+   *
+   * O que NÃO se passa por aqui: estado operacional. `statusTarefa`,
+   * `concluida`, `dataConclusao` e responsabilidade são da porta.
+   */
+  camposDeDominio?: Record<string, unknown>
+  /**
+   * ORIGEM DO TRABALHO — conjunto FECHADO.
+   *
+   * O padrão é MANUAL: alguém decidiu que este trabalho existe. A Operação
+   * Antecipada (transversal) é a outra origem humana legítima, e precisa ser
+   * distinguível: o reconciliador NUNCA cancela `MANUAL` por perda de causa, e
+   * tratar uma antecipação como manual esconderia o vínculo com a necessidade
+   * que a originou.
+   *
+   * Texto livre aqui permitiria disfarçar tarefa automática de manual — e a
+   * proteção do reconciliador viraria sorteio.
+   */
+  origem?: 'MANUAL' | 'TRANSVERSAL' 
 }
 
 export interface Semelhante { tarefaId: number; titulo: string; statusTarefa: StatusTarefa }
@@ -140,16 +165,21 @@ export async function criarTarefaManual(
         dataPrazo: prazo,
         prioridade: nova.prioridade ?? 'MEDIA',
         statusTarefa: 'NAO_INICIADA',
-        origem: 'MANUAL',
+        origem: nova.origem ?? 'MANUAL',
         justificativa: nova.motivo,
+        ...(nova.camposDeDominio ?? {}),
         // Sem workflow: trabalho que ninguém modelou ainda não tem etapas. A
         // tarefa existe assim mesmo — é melhor uma linha na fila sem roteiro do
         // que trabalho real invisível esperando alguém publicar um workflow.
       },
       select: { id: true },
     })
+    // A frase acompanha a ORIGEM: chamar de "manual" uma operação antecipada
+    // esconderia, no histórico, que ela nasceu de uma necessidade de fase
+    // futura — que é justamente o que explica por que ela existe.
+    const comoNasceu = nova.origem === 'TRANSVERSAL' ? 'Operação antecipada' : 'Tarefa manual'
     await auditar(tx, 'TAREFA_CRIADA_MANUAL', t.id, nova.autorId,
-      `Tarefa manual "${nova.titulo}" criada no processo ${nova.processoId}. Motivo: ${nova.motivo}`,
+      `${comoNasceu} "${nova.titulo}" criada no processo ${nova.processoId}. Motivo: ${nova.motivo}`,
       JSON.parse(JSON.stringify({ ...nova, semelhantes, confirmouDuplicidade: !!nova.confirmarDuplicidade })))
     return t
   })
@@ -567,6 +597,72 @@ export async function retomarDeEspera(args: { tarefaId: number; autorId: number;
  * distingue os motivos é `motivoCodigo`, que é texto de auditoria e não muda
  * regra nenhuma.
  */
+/**
+ * CONCLUIR UMA TAREFA QUE NÃO TEM WORKFLOW.
+ *
+ * A conclusão canônica de uma tarefa vem das ETAPAS: a última etapa obrigatória
+ * fecha o trabalho. Só que existe trabalho legítimo sem roteiro publicado — a
+ * Tarefa Transversal é isto por definição ("a Transversal NÃO possui workflow
+ * próprio"), e a tarefa manual pode ser.
+ *
+ * Faltava a porta para esse caso, e a ausência dela é que mantinha
+ * `tarefa-transversal` escrevendo `statusTarefa` direto. Aqui a conclusão tem o
+ * que toda transição tem: CAS, auditoria e recusa honesta.
+ *
+ * TAREFA COM WORKFLOW NÃO ENTRA AQUI. Concluí-la por fora deixaria as etapas
+ * abertas contradizendo a tarefa fechada — exatamente o estado que a trava de
+ * coerência existe para impedir.
+ */
+export async function concluirTarefaSemWorkflow(args: {
+  tarefaId: number
+  autorId: number
+  /** O que o trabalho produziu — fica no registro, não vira status. */
+  resultado?: string | null
+  /** CONCLUIDO_NAO_POSSUI quando o trabalho terminou sem obter o objeto. */
+  status?: 'CONCLUIDO_RECEBIDO' | 'CONCLUIDO_NAO_POSSUI'
+  lockVersion?: number
+}): Promise<Resultado> {
+  const agora = new Date()
+  return prisma.$transaction(async (tx) => {
+    const t = await tx.tarefa.findUnique({
+      where: { id: args.tarefaId },
+      select: { id: true, titulo: true, statusTarefa: true, workflowInstanceId: true, dataInicio: true, lockVersion: true },
+    })
+    if (!t) return { ok: false as const, codigo: 'NAO_ENCONTRADA' as const, mensagem: 'Tarefa não existe.' }
+    if (STATUS_TERMINAIS.includes(t.statusTarefa)) {
+      return { ok: false as const, codigo: 'TERMINAL' as const, mensagem: `Tarefa já encerrada (${t.statusTarefa}).` }
+    }
+    if (t.workflowInstanceId != null) {
+      return {
+        ok: false as const, codigo: 'CONFLITO' as const,
+        mensagem: 'Esta tarefa tem workflow — ela se conclui pela última etapa, não por fora dele.',
+      }
+    }
+
+    const alvo = args.status ?? 'CONCLUIDO_RECEBIDO'
+    const escrito = await tx.tarefa.updateMany({
+      where: { id: t.id, ...(args.lockVersion != null ? { lockVersion: args.lockVersion } : { statusTarefa: t.statusTarefa }) },
+      data: {
+        statusTarefa: alvo,
+        concluida: true,
+        dataConclusao: agora,
+        dataInicio: t.dataInicio ?? agora,
+        executedById: args.autorId,
+        ...(args.resultado != null ? { resultadoObtido: args.resultado } : {}),
+        lockVersion: { increment: 1 },
+      },
+    })
+    if (escrito.count === 0) {
+      return { ok: false as const, codigo: 'CONFLITO' as const, mensagem: 'A tarefa mudou enquanto você a concluía — recarregue e tente de novo.' }
+    }
+
+    await auditar(tx, 'TAREFA_CONCLUIDA', t.id, args.autorId,
+      `Tarefa "${t.titulo}" concluída${args.resultado ? `. Resultado: ${args.resultado}` : ''}.`,
+      { tarefaId: t.id, de: t.statusTarefa, para: alvo, resultado: args.resultado ?? null })
+    return { ok: true as const, tarefaId: t.id }
+  })
+}
+
 export async function cancelarTarefa(args: {
   tarefaId: number; autorId: number; motivo: string; codigo?: string | null
 }): Promise<Resultado> {

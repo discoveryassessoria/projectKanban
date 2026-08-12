@@ -262,7 +262,14 @@ const semCriarManual = ciclo.slice(ciclo.indexOf("// REABERTURA"))
 ok("reabrir não cria tarefa", !/tarefa\.create/.test(semCriarManual))
 ok("reabrir exige motivo", /codigo: 'SEM_MOTIVO'[\s\S]{0,200}reabertura/i.test(ciclo))
 ok("reabrir só funciona em tarefa encerrada", /NAO_TERMINAL/.test(ciclo))
-ok("a tarefa manual é marcada como MANUAL", /origem: 'MANUAL'/.test(ciclo))
+// A porta continua marcando MANUAL por padrão. O que mudou é que a Operação
+// Antecipada precisa ser DISTINGUÍVEL (o reconciliador nunca cancela manual, e
+// tratar antecipação como manual esconderia a necessidade que a originou) —
+// então a origem virou um conjunto FECHADO, não texto livre.
+ok("a tarefa manual é marcada como MANUAL", /origem: nova\.origem \?\? 'MANUAL'/.test(ciclo))
+ok("e a origem é um conjunto fechado, não texto livre",
+  /origem\?: 'MANUAL' \| 'TRANSVERSAL'/.test(ciclo),
+  "texto livre permitiria disfarçar tarefa automática de manual")
 ok("e o reconciliador NUNCA cancela tarefa manual", /origem: \{ not: 'MANUAL' \}/.test(reconciler))
 
 // §50 — trabalho iniciado que perde a causa não é cancelado por robô.
