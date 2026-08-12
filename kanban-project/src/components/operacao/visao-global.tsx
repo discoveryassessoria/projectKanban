@@ -74,6 +74,30 @@ interface Resposta {
   facetas: Facetas
 }
 
+interface Avaliacao {
+  usuarioId: number
+  nome: string
+  elegivel: boolean
+  motivos: Array<{ codigo: string; texto: string }>
+  carga: {
+    ativas: number; executaveis: number; emAndamento: number; naoIniciadas: number
+    aguardandoTerceiro: number; bloqueadas: number; atrasadas: number; urgentes: number
+  }
+  score: number
+  parcelas: Array<{ componente: string; quantidade: number; peso: number; subtotal: number; explicacao: string }>
+}
+interface Simulacao {
+  taskId: number
+  titulo: string
+  recomendado: { usuarioId: number; nome: string; score: number } | null
+  abstencao: { codigo: string; texto: string } | null
+  explicacao: string[]
+  decididoNoDesempateTecnico: boolean
+  avaliacoes: Avaliacao[]
+  equipe: { exigidaPelaTarefa: string | null; cadastrada: boolean; membros: number[]; nota: string } | null
+  criteriosAusentes: Array<{ criterio: string; porque: string }>
+}
+
 interface Filtros {
   responsavel: number | null
   semResponsavel: boolean
@@ -156,6 +180,8 @@ export function VisaoGlobal() {
   const [erroComando, setErroComando] = useState<string | null>(null)
   const [aviso, setAviso] = useState<string | null>(null)
   const [ordem, setOrdem] = useState<{ campo: keyof LinhaGerencial; asc: boolean }>({ campo: "dataPrazo", asc: true })
+  /** A tarefa cuja sugestão está aberta. `null` = nenhuma. */
+  const [sugerindo, setSugerindo] = useState<{ l: LinhaGerencial; s: Simulacao | null; erro: string | null } | null>(null)
 
   // A busca não pode disparar um pedido por tecla digitada.
   const [buscaDigitada, setBuscaDigitada] = useState("")
@@ -221,6 +247,28 @@ export function VisaoGlobal() {
   // Referência ESTÁVEL: `dados?.linhas ?? []` cria um array novo a cada render,
   // e os dois `useMemo` abaixo recalculariam sempre — inclusive a ordenação de
   // uma lista de centenas de linhas, a cada tecla digitada na busca.
+  /**
+   * SUGERIR RESPONSÁVEL — pergunta, não decide.
+   *
+   * É um GET. Não atribui, não altera `responsavelId`, não notifica ninguém: o
+   * gestor lê a recomendação e confirma pelo mesmo "Atribuir" de sempre, que
+   * continua sendo a única porta que escreve.
+   */
+  const sugerir = useCallback(async (l: LinhaGerencial) => {
+    setSugerindo({ l, s: null, erro: null })
+    try {
+      const r = await fetch(`/api/operacao/sugestao?taskId=${l.taskId}`, { headers: auth() })
+      if (!r.ok) {
+        setSugerindo({ l, s: null, erro: r.status === 403 ? "Você não tem permissão para ver a recomendação." : `Falha (HTTP ${r.status}).` })
+        return
+      }
+      const d = (await r.json()) as { simulacao: Simulacao }
+      setSugerindo({ l, s: d.simulacao, erro: null })
+    } catch {
+      setSugerindo({ l, s: null, erro: "Não foi possível falar com o servidor." })
+    }
+  }, [])
+
   const linhas = useMemo(() => dados?.linhas ?? [], [dados])
   const ordenadas = useMemo(() => {
     const { campo, asc } = ordem
@@ -388,16 +436,25 @@ export function VisaoGlobal() {
             aoOrdenar={(campo) => setOrdem((o) => ({ campo, asc: o.campo === campo ? !o.asc : true }))}
             aoAbrir={setAberta}
             aoDistribuir={setAlvo}
+            aoSugerir={sugerir}
           />
         )}
         {dados && linhas.length > 0 && modo === "kanban" && (
-          <Quadro porColuna={porColuna} aoAbrir={setAberta} aoDistribuir={setAlvo} aoComandar={comandar} ocupado={ocupado} />
+          <Quadro porColuna={porColuna} aoAbrir={setAberta} aoDistribuir={setAlvo} aoSugerir={sugerir} aoComandar={comandar} ocupado={ocupado} />
         )}
       </div>
 
       {/* Clicar abre a MESMA Tarefa Operacional canônica — não um modal daqui. */}
       {aberta != null && (
         <TarefaOperacional taskId={aberta} aoFechar={() => setAberta(null)} aoMudar={recarregar} />
+      )}
+
+      {sugerindo && (
+        <PainelSugestao
+          alvo={sugerindo}
+          aoFechar={() => setSugerindo(null)}
+          aoAtribuir={(l) => { setSugerindo(null); setAlvo(l) }}
+        />
       )}
 
       {alvo && (
@@ -470,13 +527,14 @@ function tempo(dias: number | null, atrasada: boolean): string {
 }
 
 function Lista({
-  linhas, ordem, aoOrdenar, aoAbrir, aoDistribuir,
+  linhas, ordem, aoOrdenar, aoAbrir, aoDistribuir, aoSugerir,
 }: {
   linhas: LinhaGerencial[]
   ordem: { campo: keyof LinhaGerencial; asc: boolean }
   aoOrdenar: (c: keyof LinhaGerencial) => void
   aoAbrir: (id: number) => void
   aoDistribuir: (l: LinhaGerencial) => void
+  aoSugerir: (l: LinhaGerencial) => void
 }) {
   return (
     <table className="w-full border-collapse text-left">
@@ -520,12 +578,24 @@ function Lista({
             </td>
             <td className="px-3 py-2 text-[11px] tabular-nums text-white/35">{dataCurta(l.criadaEm)}</td>
             <td className="px-3 py-2 text-right">
-              <button
-                onClick={() => aoDistribuir(l)}
-                className="rounded border border-white/12 px-2 py-1 text-[10px] text-white/60 opacity-0 transition-opacity hover:bg-white/[0.06] hover:text-white/90 group-hover:opacity-100"
-              >
-                {l.responsavelId == null ? "Atribuir" : "Transferir"}
-              </button>
+              <div className="flex items-center justify-end gap-1 opacity-0 transition-opacity group-hover:opacity-100">
+                {/* Só onde não há dono: sugerir para quem já tem responsável
+                    seria propor redistribuição, que é outro problema. */}
+                {l.responsavelId == null && (
+                  <button
+                    onClick={() => aoSugerir(l)}
+                    className="rounded border border-sky-300/25 px-2 py-1 text-[10px] text-sky-200/80 transition-colors hover:bg-sky-400/10 hover:text-sky-100"
+                  >
+                    Sugerir
+                  </button>
+                )}
+                <button
+                  onClick={() => aoDistribuir(l)}
+                  className="rounded border border-white/12 px-2 py-1 text-[10px] text-white/60 transition-colors hover:bg-white/[0.06] hover:text-white/90"
+                >
+                  {l.responsavelId == null ? "Atribuir" : "Transferir"}
+                </button>
+              </div>
             </td>
           </tr>
         ))}
@@ -564,11 +634,12 @@ const ARRASTOS: Record<string, { acao: string; rotulo: string; pedeMotivo?: bool
 const arrastoDe = (de: ColunaKanban, para: ColunaKanban) => ARRASTOS[`${de}→${para}`] ?? null
 
 function Quadro({
-  porColuna, aoAbrir, aoDistribuir, aoComandar, ocupado,
+  porColuna, aoAbrir, aoDistribuir, aoSugerir, aoComandar, ocupado,
 }: {
   porColuna: Map<ColunaKanban, LinhaGerencial[]>
   aoAbrir: (id: number) => void
   aoDistribuir: (l: LinhaGerencial) => void
+  aoSugerir: (l: LinhaGerencial) => void
   aoComandar: (id: number, corpo: Record<string, unknown>, ok: string) => Promise<boolean>
   ocupado: boolean
 }) {
@@ -621,6 +692,7 @@ function Quadro({
                   l={l}
                   aoAbrir={() => aoAbrir(l.taskId)}
                   aoDistribuir={() => aoDistribuir(l)}
+                  aoSugerir={() => aoSugerir(l)}
                   aoArrastar={(inicio) => setArrastando(inicio ? l : null)}
                 />
               ))}
@@ -664,11 +736,12 @@ function Quadro({
 }
 
 function Card({
-  l, aoAbrir, aoDistribuir, aoArrastar,
+  l, aoAbrir, aoDistribuir, aoSugerir, aoArrastar,
 }: {
   l: LinhaGerencial
   aoAbrir: () => void
   aoDistribuir: () => void
+  aoSugerir: () => void
   aoArrastar: (inicio: boolean) => void
 }) {
   const contexto = [l.pessoaNome, l.processoNome].filter(Boolean).join(" · ")
@@ -709,12 +782,205 @@ function Card({
               {dataCurta(l.dataPrazo)}
             </span>
           )}
+          {l.responsavelId == null && (
+            <button
+              onClick={aoSugerir}
+              className="rounded border border-sky-300/25 px-1.5 py-0.5 text-[10px] text-sky-200/80 transition-colors hover:bg-sky-400/10 hover:text-sky-100"
+            >
+              Sugerir
+            </button>
+          )}
           <button
             onClick={aoDistribuir}
             className="rounded border border-white/12 px-1.5 py-0.5 text-[10px] text-white/55 transition-colors hover:bg-white/[0.06] hover:text-white/90"
           >
             {l.responsavelId == null ? "Atribuir" : "Transferir"}
           </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+/**
+ * O PAINEL DA SUGESTÃO — o modo auditor, na tela.
+ *
+ * Uma recomendação que só diz um nome pede fé. Esta mostra a conta inteira:
+ * quem é elegível e quem não é (com o motivo), a carga de cada um, o score
+ * decomposto parcela a parcela, e — o que costuma faltar — o que o sistema NÃO
+ * sabe. O gestor decide com o mesmo botão de sempre; aqui não há nada que
+ * escreva.
+ */
+function PainelSugestao({
+  alvo,
+  aoFechar,
+  aoAtribuir,
+}: {
+  alvo: { l: LinhaGerencial; s: Simulacao | null; erro: string | null }
+  aoFechar: () => void
+  aoAtribuir: (l: LinhaGerencial) => void
+}) {
+  const { l, s, erro } = alvo
+  const elegiveis = (s?.avaliacoes ?? []).filter((a) => a.elegivel).sort((a, b) => a.score - b.score)
+  const inelegiveis = (s?.avaliacoes ?? []).filter((a) => !a.elegivel)
+  const [auditor, setAuditor] = useState(false)
+
+  return (
+    <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 p-4" onClick={aoFechar}>
+      <div
+        className="flex max-h-[85vh] w-full max-w-2xl flex-col overflow-hidden rounded-lg border border-white/10 bg-[#0d0f13] shadow-2xl"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="border-b border-white/[0.08] px-4 py-3">
+          <p className="text-[10px] uppercase tracking-wide text-white/35">Sugerir responsável</p>
+          <h2 className="mt-0.5 truncate text-[14px] font-medium text-white/95">{l.titulo}</h2>
+          <p className="mt-0.5 text-[11px] text-white/40">
+            {[l.pessoaNome, l.processoNome].filter(Boolean).join(" · ") || "—"}
+          </p>
+        </div>
+
+        <div className="min-h-0 flex-1 overflow-y-auto">
+          {erro && <div className="border-b border-red-400/20 bg-red-500/10 px-4 py-2.5 text-[11px] text-red-200/90">{erro}</div>}
+          {!s && !erro && <Estado tipo="carregando" mensagem="Calculando elegibilidade e carga…" />}
+
+          {s && (
+            <>
+              {/* ── A RESPOSTA ── */}
+              <div className="border-b border-white/[0.06] px-4 py-3.5">
+                {s.recomendado ? (
+                  <>
+                    <div className="flex items-baseline gap-2">
+                      <span className="grid h-7 w-7 shrink-0 place-items-center rounded-full bg-emerald-400/15 text-[10px] font-medium text-emerald-200/90">
+                        {iniciais(s.recomendado.nome)}
+                      </span>
+                      <span className="text-[15px] font-medium text-white/95">{s.recomendado.nome}</span>
+                      <span className="text-[11px] tabular-nums text-white/40">custo operacional {s.recomendado.score}</span>
+                    </div>
+                    <ul className="mt-2.5 space-y-1">
+                      {s.explicacao.map((linha, i) => (
+                        <li key={i} className={`text-[11px] leading-4 ${
+                          linha.startsWith("⚠") ? "text-amber-200/80" : linha.startsWith("ℹ") ? "text-white/45" : "text-white/65"
+                        }`}>
+                          {linha}
+                        </li>
+                      ))}
+                    </ul>
+                  </>
+                ) : (
+                  <>
+                    {/* A ABSTENÇÃO É UMA RESPOSTA — com motivo, nunca um nome inventado. */}
+                    <p className="text-[13px] font-medium text-amber-200/90">Sem recomendação automática</p>
+                    <p className="mt-1 text-[11px] leading-4 text-white/60">{s.abstencao?.texto}</p>
+                    <p className="mt-1.5 text-[10px] text-white/35">
+                      Código: {s.abstencao?.codigo}. A decisão continua sendo sua — atribuir manualmente segue disponível.
+                    </p>
+                  </>
+                )}
+              </div>
+
+              {/* ── QUEM PODE, E QUANTO CADA UM CARREGA ── */}
+              {elegiveis.length > 0 && (
+                <div className="border-b border-white/[0.06] px-4 py-3">
+                  <p className="text-[10px] uppercase tracking-wide text-white/35">
+                    Elegíveis · {elegiveis.length}
+                  </p>
+                  <div className="mt-2 space-y-1.5">
+                    {elegiveis.map((a) => (
+                      <div key={a.usuarioId} className="rounded border border-white/[0.07] px-2.5 py-2">
+                        <div className="flex items-baseline justify-between gap-2">
+                          <span className={`text-[12px] ${a.usuarioId === s.recomendado?.usuarioId ? "text-emerald-200/90" : "text-white/80"}`}>
+                            {a.nome}
+                          </span>
+                          <span className="text-[11px] tabular-nums text-white/50">custo {a.score}</span>
+                        </div>
+                        <div className="mt-1 flex flex-wrap gap-x-3 gap-y-0.5 text-[10px] text-white/40">
+                          <span><span className="tabular-nums text-white/65">{a.carga.executaveis}</span> executáveis</span>
+                          <span><span className="tabular-nums text-white/65">{a.carga.ativas}</span> ativas</span>
+                          <span className={a.carga.atrasadas > 0 ? "text-red-300/70" : ""}>
+                            <span className="tabular-nums">{a.carga.atrasadas}</span> atrasadas
+                          </span>
+                          <span><span className="tabular-nums text-white/65">{a.carga.urgentes}</span> urgentes</span>
+                          <span><span className="tabular-nums text-white/65">{a.carga.aguardandoTerceiro}</span> aguardando terceiro</span>
+                          <span><span className="tabular-nums text-white/65">{a.carga.bloqueadas}</span> bloqueadas</span>
+                        </div>
+                        {auditor && (
+                          <div className="mt-1.5 space-y-0.5 border-t border-white/[0.06] pt-1.5">
+                            {a.parcelas.map((p) => (
+                              <div key={p.componente} className="flex justify-between text-[10px] text-white/35">
+                                <span>{p.explicacao}</span>
+                                <span className="tabular-nums">{p.quantidade} × {p.peso} = {p.subtotal}</span>
+                              </div>
+                            ))}
+                            <div className="flex justify-between border-t border-white/[0.06] pt-1 text-[10px] text-white/60">
+                              <span>custo operacional</span>
+                              <span className="tabular-nums">{a.score}</span>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* ── QUEM NÃO PODE, E POR QUÊ ── */}
+              {inelegiveis.length > 0 && (
+                <div className="border-b border-white/[0.06] px-4 py-3">
+                  <p className="text-[10px] uppercase tracking-wide text-white/35">
+                    Inelegíveis · {inelegiveis.length}
+                  </p>
+                  <div className="mt-2 space-y-1">
+                    {inelegiveis.map((a) => (
+                      <div key={a.usuarioId} className="flex gap-2 text-[11px]">
+                        <span className="shrink-0 text-white/55">{a.nome}</span>
+                        <span className="text-white/35">{a.motivos.map((m) => m.texto).join(" ")}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* ── O QUE O SISTEMA NÃO SABE ── */}
+              <div className="px-4 py-3">
+                <button
+                  onClick={() => setAuditor((v) => !v)}
+                  className="text-[10px] uppercase tracking-wide text-white/35 transition-colors hover:text-white/70"
+                >
+                  {auditor ? "▾" : "▸"} Como esta conta foi feita
+                </button>
+                {auditor && (
+                  <div className="mt-2 space-y-1.5">
+                    <p className="text-[10px] leading-4 text-white/45">
+                      Elegibilidade tem um critério só neste sistema: permissão de executar tarefa. Os critérios abaixo
+                      são frequentemente esperados e <span className="text-white/70">não existem no cadastro</span> —
+                      nenhum foi inventado:
+                    </p>
+                    {s.criteriosAusentes.map((c) => (
+                      <div key={c.criterio} className="text-[10px] leading-4 text-white/35">
+                        <span className="text-white/55">{c.criterio}</span> — {c.porque}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </>
+          )}
+        </div>
+
+        <div className="flex items-center justify-between gap-2 border-t border-white/[0.08] px-4 py-2.5">
+          <span className="text-[10px] text-white/30">Nada foi alterado. A atribuição continua sendo sua.</span>
+          <div className="flex gap-2">
+            <button onClick={aoFechar} className="rounded px-3 py-1.5 text-[11px] text-white/50 transition-colors hover:text-white/80">
+              Fechar
+            </button>
+            {/* Confirmar abre o MESMO seletor de sempre — a porta que escreve é uma só. */}
+            <button
+              onClick={() => aoAtribuir(l)}
+              className="rounded border border-white/15 bg-white/[0.06] px-3 py-1.5 text-[11px] text-white/85 transition-colors hover:bg-white/[0.1]"
+            >
+              Atribuir…
+            </button>
+          </div>
         </div>
       </div>
     </div>
