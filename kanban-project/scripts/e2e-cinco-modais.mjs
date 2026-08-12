@@ -131,6 +131,17 @@ async function clicarAcaoTerminal() {
  * concluir — não substitui a operação, apenas atravessa as exigências de cada
  * executor sem precisar conhecê-las de antemão.
  */
+/** Preenche o primeiro campo de texto visível do modal. */
+async function preencherPrimeiroTextoVisivel(valor) {
+  const campos = page.locator('input[type="text"], input:not([type])')
+  const n = await campos.count()
+  for (let i = 0; i < n; i++) {
+    const c = campos.nth(i)
+    if (await c.isVisible().catch(() => false)) { await c.fill(valor).catch(() => {}); return true }
+  }
+  return false
+}
+
 async function satisfazerExigenciasVisiveis() {
   const opcoes = page.locator('[role="radio"], input[type="radio"]')
   const n = await opcoes.count()
@@ -247,9 +258,15 @@ const fileIn3 = page.locator('input[type="file"]')
 if (await fileIn3.count()) { await fileIn3.first().setInputFiles(pdfDeTeste(OUT, "certidao-recebida.pdf")); await page.waitForTimeout(4000) }
 // TIPO DE MÍDIA é exigência do recebimento: o cartório devolve papel, PDF
 // assinado ou os dois, e isso muda o que acontece com o documento depois.
-const digital = page.getByText("Digital (PDF eletrônico)").first()
-if (await digital.count()) { await digital.click(); await page.waitForTimeout(1200) }
+// EXIGÊNCIAS REAIS DO RECEBIMENTO: arquivo (já anexado acima) e TIPO DE MÍDIA
+// — o cartório devolve papel, PDF assinado ou os dois, e isso muda o que
+// acontece com o documento depois.
+// O alvo é o BOTÃO da opção — clicar pelo texto solto acertava o fundo do
+// drawer e fechava o modal.
+await page.locator("button").filter({ hasText: "Digital (PDF eletrônico)" }).first().click()
+await page.waitForTimeout(1200)
 await preencherPorPlaceholder("Recebido por correios em 28/05/2026, sem avarias...", "Recebido por e-mail, PDF assinado, sem avarias.")
+await page.waitForTimeout(800)
 await page.screenshot({ path: `${OUT}/e2e-3-receber.png` })
 ok("3) a ação terminal liberou com anexo + tipo de mídia", await acaoTerminalHabilitada(),
   await impedimento())
@@ -265,7 +282,11 @@ await fecharSobreposicoes()
 await abrirTarefaPelaFila()
 ok("o executor da etapa 4 abriu", await abrirEtapaAtual())
 await page.screenshot({ path: `${OUT}/e2e-4-conferir.png` })
-await satisfazerExigenciasVisiveis()
+// EXIGÊNCIAS REAIS DA CONFERÊNCIA: o nome do titular COMO ESTÁ no documento
+// (é o que permite comparar com o cadastro) e o resultado da conferência.
+await preencherPrimeiroTextoVisivel("Eduardo Almeida")
+await page.locator("button").filter({ hasText: /^Aprovar/ }).first().click().catch(() => {})
+await page.waitForTimeout(1200)
 await page.screenshot({ path: `${OUT}/e2e-4-conferir.png` })
 ok("4) a ação terminal liberou", await acaoTerminalHabilitada(), await impedimento())
 await clicarAcaoTerminal()
@@ -280,7 +301,10 @@ await fecharSobreposicoes()
 await abrirTarefaPelaFila()
 ok("o executor da etapa 5 abriu", await abrirEtapaAtual())
 await page.screenshot({ path: `${OUT}/e2e-5-validar.png` })
-await satisfazerExigenciasVisiveis()
+// EXIGÊNCIA REAL DA VALIDAÇÃO: a decisão jurídica. "Aprovado" dispensa
+// parecer; qualquer outra decisão exige o parecer escrito.
+await page.locator("button").filter({ hasText: /^Aprovado/ }).first().click().catch(() => {})
+await page.waitForTimeout(1200)
 await page.screenshot({ path: `${OUT}/e2e-5-validar.png` })
 ok("5) a ação terminal liberou", await acaoTerminalHabilitada(), await impedimento())
 await clicarAcaoTerminal()
