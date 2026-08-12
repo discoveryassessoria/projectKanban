@@ -9,7 +9,6 @@ import { prisma } from "@/lib/prisma"
 import type { Prisma } from "@prisma/client"
 import { montarChaveIdempotencia } from "@/src/services/necessidade-documental-helpers"
 import { codeDocumentoMestre } from "@/src/services/catalogo-helpers"
-import { analyzePessoa, DOCUMENT_RULES } from "@/src/lib/document-generator"
 
 export { montarChaveIdempotencia, sujeitoValido } from "@/src/services/necessidade-documental-helpers"
 
@@ -110,13 +109,24 @@ async function evento(
   await db.necessidadeDocumentalEvento.create({ data: { necessidadeId, tipo, dados: dados ?? undefined } })
 }
 
-/** Documento não localizado: preserva histórico, marca a necessidade. */
-export async function marcarNaoLocalizada(necessidadeId: number, db: DB = prisma) {
+/**
+ * Documento não localizado: preserva histórico, marca a necessidade.
+ *
+ * NÃO é dispensa e NÃO libera o gate. Uma necessidade OBRIGATÓRIA marcada como
+ * NAO_LOCALIZADA continua bloqueando a fase (`blocking-helpers`), com o hint de
+ * retorno controlado ao domínio genealógico. Dispensar é outra decisão, de
+ * outra pessoa, por outra porta.
+ *
+ * `motivo` entra no evento append-only: "não localizado" sem explicação obriga
+ * quem vier depois a adivinhar se o cartório não tem, se o cliente não tem, ou
+ * se ninguém procurou.
+ */
+export async function marcarNaoLocalizada(necessidadeId: number, db: DB = prisma, motivo?: string | null) {
   const n = await db.necessidadeDocumental.update({
     where: { id: necessidadeId },
     data: { status: "NAO_LOCALIZADA" },
   })
-  await evento(db, necessidadeId, "NAO_LOCALIZADA")
+  await evento(db, necessidadeId, "NAO_LOCALIZADA", motivo ? { motivo } : undefined)
   return n
 }
 
@@ -283,102 +293,41 @@ async function resolverUniaoUnica(pessoaId: number, db: DB): Promise<number | nu
   return unioes.length === 1 ? unioes[0].id : null
 }
 
-/** Gera necessidades a partir da ÁRVORE do processo (regras NASC/CAS/OBT). */
-export async function garantirNecessidadesArvoreDoProcesso(processoId: number, db: DB = prisma) {
-  const proc = await db.processo.findUnique({ where: { id: processoId }, select: { id: true, arvoreId: true } })
-  if (!proc?.arvoreId) return { criadas: 0, puladas: 0 }
+// MOTORES LEGADOS ELIMINADOS (não desativados).
+//
+// `garantirNecessidadesArvoreDoProcesso` (regras hardcoded em DOCUMENT_RULES) e
+// `garantirNecessidadesDaMatriz` (matriz sem filtro de PUBLICADA e sem avaliar
+// condição) criavam NecessidadeDocumental por fora do motor oficial, cada um com
+// seu `varianteKey`. Como a chave de idempotência inclui a variante, a mesma
+// obrigação nascia duas vezes — uma por motor — e aparecia duplicada na Central.
+//
+// Existe UM materializador: materializarExecucaoDaFase → materializarGenealogia,
+// sobre as Regras Documentais PUBLICADAS.
 
-  const pessoas = await db.pessoa.findMany({
-    where: { arvoreId: proc.arvoreId },
-    select: { id: true, nome: true, sobrenome: true, casado: true, vivo: true },
+
+/**
+ * Remove as necessidades de uma pessoa (e das uniões dela) ao EXCLUIR a pessoa.
+ *
+ * Não é materialização nem transição de estado: é a cascata da exclusão do
+ * sujeito. Vive aqui porque `NecessidadeDocumental` tem UM dono de escrita — se
+ * cada rota apagasse por conta própria, o guard arquitetural viraria letra morta
+ * e a próxima escrita direta entraria sem ninguém notar.
+ *
+ * Apaga os passos vinculados antes: a necessidade é reproduzível pela
+ * materialização, o passo órfão não.
+ */
+export async function removerNecessidadesDoSujeito(
+  args: { pessoaId: number; uniaoIds?: number[] },
+  db: DB = prisma,
+): Promise<{ necessidades: number; passos: number }> {
+  const uniaoIds = args.uniaoIds ?? []
+  const alvos = await db.necessidadeDocumental.findMany({
+    where: { OR: [{ pessoaId: args.pessoaId }, ...(uniaoIds.length ? [{ uniaoId: { in: uniaoIds } }] : [])] },
+    select: { id: true },
   })
-
-  let criadas = 0
-  let puladas = 0
-  for (const p of pessoas) {
-    const flags = analyzePessoa({ id: p.id, nome: p.nome, sobrenome: p.sobrenome, casado: p.casado, vivo: p.vivo })
-    for (const rule of DOCUMENT_RULES) {
-      if (!flags[rule.flag]) continue
-      const itemCatalogoId = await resolverItemCatalogoDeEnum(rule.tipo, db)
-      if (!itemCatalogoId) {
-        puladas++
-        continue
-      }
-      // Casamento -> sujeito UNIÃO; nascimento/óbito -> sujeito PESSOA.
-      let sujeito: { pessoaId?: number; uniaoId?: number }
-      if (rule.code === "CAS_IT") {
-        const uniaoId = await resolverUniaoUnica(p.id, db)
-        if (!uniaoId) {
-          puladas++ // sem união única — não inventar vínculo (Regra 11)
-          continue
-        }
-        sujeito = { uniaoId }
-      } else {
-        sujeito = { pessoaId: p.id }
-      }
-      const { criada } = await garantirNecessidade(
-        { processoId, itemCatalogoId, ...sujeito, origem: "ARVORE", ruleCode: rule.code, arvoreId: proc.arvoreId },
-        db
-      )
-      if (criada) criadas++
-    }
-  }
-  return { criadas, puladas }
-}
-
-/** Gera necessidades a partir da MATRIZ documental (snapshot da regra+versão). */
-export async function garantirNecessidadesDaMatriz(processoId: number, phaseKey: string | null = null, db: DB = prisma) {
-  const proc = await db.processo.findUnique({
-    where: { id: processoId },
-    select: { id: true, arvoreId: true, tipoProcessoMotorId: true },
-  })
-  if (!proc?.tipoProcessoMotorId) return { criadas: 0, puladas: 0 }
-
-  const regras = await db.matrizDocumental.findMany({
-    where: {
-      tipoProcessoId: proc.tipoProcessoMotorId,
-      arquivado: false,
-      ...(phaseKey ? { OR: [{ phaseKey }, { phaseKey: null }] } : {}),
-    },
-  })
-
-  const pessoas = proc.arvoreId
-    ? await db.pessoa.findMany({ where: { arvoreId: proc.arvoreId, linhaReta: true }, select: { id: true } })
-    : []
-
-  let criadas = 0
-  let puladas = 0
-  for (const r of regras) {
-    const itemCatalogoId = await resolverItemCatalogoDeCode(r.documentTypeCode, db)
-    if (!itemCatalogoId) {
-      puladas++
-      continue
-    }
-    const snapshot = {
-      matrizRegraId: r.id,
-      versao: r.versao,
-      target: r.target,
-      generationRule: r.generationRule,
-      condition: r.condition ?? null,
-    }
-    for (const p of pessoas) {
-      const { criada } = await garantirNecessidade(
-        {
-          processoId,
-          itemCatalogoId,
-          pessoaId: p.id,
-          origem: "MATRIZ",
-          obrigatoriedade: r.required ? "OBRIGATORIA" : "OPCIONAL",
-          matrizRegraId: r.id,
-          matrizRegraVersao: r.versao,
-          matrizSnapshot: snapshot,
-          motivoAplicabilidade: r.condition ?? null,
-          arvoreId: proc.arvoreId,
-        },
-        db
-      )
-      if (criada) criadas++
-    }
-  }
-  return { criadas, puladas }
+  if (alvos.length === 0) return { necessidades: 0, passos: 0 }
+  const ids = alvos.map((n) => n.id)
+  const passos = await db.phaseWorkflowStepInstance.deleteMany({ where: { necessidadeId: { in: ids } } })
+  const necessidades = await db.necessidadeDocumental.deleteMany({ where: { id: { in: ids } } })
+  return { necessidades: necessidades.count, passos: passos.count }
 }

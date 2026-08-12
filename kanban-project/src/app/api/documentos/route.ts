@@ -288,60 +288,18 @@ export async function POST(request: NextRequest) {
         'CERTIDAO_OBITO_INTEIRO_TEOR'
       ]
 
-      if (certidoesInteiroTeor.includes(tipo)) {
-        const tipoLabel = getTipoDocumentoLabel(tipo)
-        const nomePessoa = `${pessoa.nome} ${pessoa.sobrenome || ""}`.trim()
-        const tituloTarefaPai = `${tipoLabel} - ${nomePessoa}`
-
-        // Só cria se não existir
-        const tarefaExistente = await prisma.tarefa.findFirst({
-          where: { processoId, titulo: tituloTarefaPai }
-        })
-
-        if (!tarefaExistente) {
-          // Buscar tarefa pai "Emissão da Pasta Documental"
-          const tarefaEmissao = await prisma.tarefa.findFirst({
-            where: {
-              processoId,
-              tarefaPaiId: null,
-              titulo: { contains: 'Emissão', mode: 'insensitive' }
-            }
-          })
-
-          // Criar tarefa pai
-          const tarefaPai = await prisma.tarefa.create({
-            data: {
-              titulo: tituloTarefaPai,
-              descricao: `${tipoLabel} de ${nomePessoa}`,
-              processoId,
-              tarefaPaiId: tarefaEmissao?.id || null,
-              prioridade: "MEDIA",
-              concluida: false
-            }
-          })
-
-          // Criar 5 subtarefas
-          const subtarefas = [
-            'Buscar certidão em inteiro teor',
-            'Preencher e assinar requerimento da solicitação da certidão em inteiro teor',
-            'Enviar ao cartório requerimento da solicitação da certidão em inteiro teor',
-            'Enviar ao CRC requerimento da solicitação da certidão em inteiro teor',
-            'Receber certidão em inteiro teor',
-          ]
-
-          for (const titulo of subtarefas) {
-            await prisma.tarefa.create({
-              data: {
-                titulo,
-                processoId,
-                tarefaPaiId: tarefaPai.id,
-                prioridade: "MEDIA",
-                concluida: false
-              }
-            })
-          }
-        }
-      }
+      // A ÁRVORE PAI/FILHO FOI REMOVIDA DAQUI.
+      //
+      // Criar documento criava uma tarefa "pai" e CINCO subtarefas com os nomes
+      // das etapas do workflow ("Buscar certidão", "Preencher requerimento",
+      // "Enviar ao cartório"...). Era etapa fingindo ser tarefa: a mesma
+      // certidão virava seis linhas na fila, com seis prazos e nenhum workflow
+      // por trás.
+      //
+      // Hoje a tarefa nasce da OBRIGAÇÃO documental — uma por documento — e as
+      // etapas vivem dentro dela como passos do workflow publicado. Criar
+      // documento não cria tarefa: quem materializa é o motor, quando a
+      // obrigação vira executável.
     }
 
     // GRANULARIDADE POR DOCUMENTO: documento criado → o motor recalcula o econômico

@@ -24,6 +24,8 @@ import { createPortal } from "react-dom"
 import { useRef } from "react"
 import { emitirMutacaoFinanceira } from "@/src/lib/financeiro-bus"
 import { ContasAPagarDashboard } from "./ContasAPagarDashboard"
+import { PlanilhaDocumentalView } from "./PlanilhaDocumentalView"
+import { ehAutomatico, ehManual } from "@/lib/financeiro/dominio/origem-lancamento"
 import { MoreVertical, Pencil, Copy, Ban, Trash2, Archive, ThumbsDown } from "lucide-react"
 import { VisaoGeral } from "@/src/components/financeiro/subabas/VisaoGeral"
 import { FileText, FileMinus, CheckSquare, CalendarDays, AlertTriangle, Plus, Eye, ChevronLeft, ChevronRight, ChevronDown, ArrowDownRight, ArrowUpRight, RefreshCw, SlidersHorizontal, Download, Search, Wallet, BarChart3, Settings, RotateCcw } from "lucide-react"
@@ -95,6 +97,11 @@ interface ObrigacaoLista {
   vencimento?: string | null
   criadoEm?: string | null
   timeline?: unknown
+  // Vínculo documental — de quem e de quê é o lançamento (vem em coluna, por ID).
+  personId?: number | null
+  documentoId?: number | null
+  tipoServicoId?: number | null
+  origemLancamento?: string | null
 }
 const SEM_OBRIGACOES: ObrigacaoLista[] = []
 
@@ -179,13 +186,20 @@ function CustosTab({ processoId, fx, onAbrirDetalhe }: { processoId: number; fx:
   const [novo, setNovo] = useState(false)
   const [pagar, setPagar] = useState<any | null>(null)
   const [subEscolhido, setSub] = useState<"todos" | "pagos" | "apagar" | undefined>(undefined)
-  const [vista, setVista] = useState<"lista" | "painel">("lista")
+  // Três vistas do MESMO domínio: a lista (lançamentos), o painel (contas a pagar)
+  // e a planilha documental (a grade pessoa × documento × serviço). Nenhuma delas é
+  // fonte — as três projetam as mesmas obrigações.
+  const [vista, setVista] = useState<"lista" | "painel" | "planilha">("lista")
   // F5-UI.3 — lista rica (paridade com ReceitasTab): busca, filtros, ordenação, paginação,
   // persistência de filtros, RowMenu de ações (reuso dos modais compartilhados).
   const [buscaEscolhida, setBusca] = useState<string | undefined>(undefined)
   const [fFornecedor, setFFornecedor] = useState("")
   const [fMoedaEscolhida, setFMoeda] = useState<string | undefined>(undefined)
   const [fEstadoEscolhido, setFEstado] = useState<string | undefined>(undefined)
+  // ORIGEM — separa o custo derivado da cadeia documental da despesa
+  // extraordinária. "Não classificados" são as obrigações anteriores à declaração
+  // de origem: aparecem como tal, nunca somem nem viram "manual" por suposição.
+  const [fOrigem, setFOrigem] = useState<"todas" | "automaticos" | "manuais" | "naoclassificados">("todas")
   const [ordenarEscolhido, setOrdenar] = useState<"vencimento" | "valor" | "estado" | "descricao" | undefined>(undefined)
   const [ordemEscolhida, setOrdem] = useState<"asc" | "desc" | undefined>(undefined)
   const [page, setPage] = useState(1)
@@ -251,6 +265,9 @@ function CustosTab({ processoId, fx, onAbrirDetalhe }: { processoId: number; fx:
     if (sub === "apagar" && quitado(o)) return false
     if (fMoeda !== "Todas" && o.moeda !== fMoeda) return false
     if (fEstado !== "Todos" && (o.estadoCusto ?? "") !== fEstado) return false
+    if (fOrigem === "automaticos" && !ehAutomatico(o.origemLancamento)) return false
+    if (fOrigem === "manuais" && !ehManual(o.origemLancamento)) return false
+    if (fOrigem === "naoclassificados" && o.origemLancamento != null) return false
     if (fFornecedor && !(o.fornecedor ?? "").toLowerCase().includes(fFornecedor.toLowerCase())) return false
     if (busca.trim()) { const q = busca.toLowerCase(); const hay = [o.descricao, o.codigoOperacional, o.fornecedor].filter(Boolean).map(String).join(" ").toLowerCase(); if (!hay.includes(q)) return false }
     return true
@@ -268,7 +285,7 @@ function CustosTab({ processoId, fx, onAbrirDetalhe }: { processoId: number; fx:
   const lista = ordenados.slice((pageSafe - 1) * PAGE, pageSafe * PAGE)
   const estadosDistintos = [...new Set(obrs.map((o) => o.estadoCusto).filter(Boolean))] as string[]
   const moedasDistintas = [...new Set(obrs.map((o) => o.moeda).filter(Boolean))] as string[]
-  const limparFiltros = () => { setBusca(""); setFFornecedor(""); setFMoeda("Todas"); setFEstado("Todos"); setSub("todos"); setPage(1) }
+  const limparFiltros = () => { setBusca(""); setFFornecedor(""); setFMoeda("Todas"); setFEstado("Todos"); setFOrigem("todas"); setSub("todos"); setPage(1) }
   // F7.5 — exportação CSV da lista de custos: exporta o RESULTADO FILTRADO/ORDENADO (não a
   // página atual nem a base inteira), com os mesmos números que a tela mostra.
   const exportarCustosCsv = () => baixarCSV(`custos-processo-${processoId}`, ordenados.map((o) => ({
@@ -296,7 +313,7 @@ function CustosTab({ processoId, fx, onAbrirDetalhe }: { processoId: number; fx:
         <div><h2 className="text-lg font-semibold text-[var(--text-primary)]">Custos</h2><p className="text-sm text-[var(--text-muted)]">Despesas e custos do processo</p></div>
         <div className="flex items-center gap-2">
           <div className="inline-flex overflow-hidden rounded-[var(--radius-sm)] border border-[var(--border-strong)]">
-            {(["lista", "painel"] as const).map((v) => <button key={v} onClick={() => setVista(v)} className={`px-3.5 py-2 text-sm ${vista === v ? "bg-[var(--accent-primary)] text-[var(--accent-ink)]" : "text-[var(--text-secondary)] hover:bg-[var(--surface-hover)]"}`}>{v === "lista" ? "Lista" : "Painel"}</button>)}
+            {([["lista", "Lista"], ["painel", "Painel"], ["planilha", "Planilha documental"]] as const).map(([v, label]) => <button key={v} onClick={() => setVista(v)} className={`px-3.5 py-2 text-sm ${vista === v ? "bg-[var(--accent-primary)] text-[var(--accent-ink)]" : "text-[var(--text-secondary)] hover:bg-[var(--surface-hover)]"}`}>{label}</button>)}
           </div>
           <button onClick={() => setNovo(true)} disabled={!pode("criar")} title={pode("criar") ? undefined : "Você não tem permissão para criar custos"} className="inline-flex items-center gap-1.5 rounded-[var(--radius-sm)] bg-[var(--accent-primary)] px-3.5 py-2 text-sm font-medium text-[var(--accent-ink)] hover:bg-[var(--accent-hover)] disabled:cursor-not-allowed disabled:opacity-40"><Plus className="h-4 w-4" /> Novo Custo</button>
         </div>
@@ -304,6 +321,9 @@ function CustosTab({ processoId, fx, onAbrirDetalhe }: { processoId: number; fx:
 
       {/* F5-UI.4 — painel dedicado (dashboard/relatório de Contas a Pagar) */}
       {vista === "painel" && <div className="mt-4"><ContasAPagarDashboard processoId={processoId} onAbrirDetalhe={onAbrirDetalhe} /></div>}
+
+      {/* PLANILHA DOCUMENTAL — a visão restaurada. Somente leitura. */}
+      {vista === "planilha" && <PlanilhaDocumentalView processoId={processoId} />}
 
       {vista === "lista" && (<>
       {/* KPIs */}
@@ -328,6 +348,7 @@ function CustosTab({ processoId, fx, onAbrirDetalhe }: { processoId: number; fx:
           <input value={fFornecedor} onChange={(e) => { setFFornecedor(e.target.value); setPage(1) }} placeholder="Fornecedor" className="w-[150px] rounded-[var(--radius-sm)] border border-[var(--border-default)] bg-[var(--surface-input)] px-3 py-1.5 text-sm text-[var(--text-primary)] placeholder:text-[var(--text-muted)]" />
           <select value={fMoeda} onChange={(e) => { setFMoeda(e.target.value); setPage(1) }} className="rounded-[var(--radius-sm)] border border-[var(--border-default)] bg-[var(--surface-input)] px-2 py-1.5 text-sm text-[var(--text-secondary)]"><option value="Todas">Moeda</option>{moedasDistintas.map((m) => <option key={m} value={m}>{m}</option>)}</select>
           <select value={fEstado} onChange={(e) => { setFEstado(e.target.value); setPage(1) }} className="rounded-[var(--radius-sm)] border border-[var(--border-default)] bg-[var(--surface-input)] px-2 py-1.5 text-sm text-[var(--text-secondary)]"><option value="Todos">Estado</option>{estadosDistintos.map((s) => <option key={s} value={s}>{ROTULO_ESTADO_CUSTO[s as keyof typeof ROTULO_ESTADO_CUSTO] ?? s}</option>)}</select>
+          <select value={fOrigem} onChange={(e) => { setFOrigem(e.target.value as typeof fOrigem); setPage(1) }} className="rounded-[var(--radius-sm)] border border-[var(--border-default)] bg-[var(--surface-input)] px-2 py-1.5 text-sm text-[var(--text-secondary)]"><option value="todas">Origem</option><option value="automaticos">Automáticos</option><option value="manuais">Manuais</option><option value="naoclassificados">Não classificados</option></select>
           <select value={`${ordenar}:${ordem}`} onChange={(e) => { const [o, dd] = e.target.value.split(":"); setOrdenar(o as any); setOrdem(dd as any) }} className="rounded-[var(--radius-sm)] border border-[var(--border-default)] bg-[var(--surface-input)] px-2 py-1.5 text-sm text-[var(--text-secondary)]"><option value="vencimento:asc">Vencimento ↑</option><option value="vencimento:desc">Vencimento ↓</option><option value="valor:desc">Saldo ↓</option><option value="valor:asc">Saldo ↑</option><option value="estado:asc">Estado</option><option value="descricao:asc">Descrição</option></select>
           <button onClick={limparFiltros} className="inline-flex items-center gap-1.5 rounded-[var(--radius-sm)] border border-[var(--border-default)] px-3 py-1.5 text-sm text-[var(--text-secondary)] hover:bg-[var(--surface-hover)]"><RotateCcw className="h-3.5 w-3.5" /> Limpar</button>
           {/* F7.5 — exporta exatamente o que está FILTRADO/ORDENADO na tela (paridade com Receitas/Extrato). */}

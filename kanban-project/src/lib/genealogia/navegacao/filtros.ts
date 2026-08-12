@@ -25,6 +25,7 @@ export type ChaveFiltro =
   | "pendencia_documental"
   | "vivas"
   | "falecidas"
+  | "casadas"
 
 export interface EstadoFiltros {
   /** Filtros ligados. Vários somam (E lógico entre grupos distintos). */
@@ -129,6 +130,11 @@ export function aplicarFiltros(ctx: ContextoFiltro, f: EstadoFiltros): Set<numbe
     if (f.chaves.has("vivas") && falecida) continue
     if (f.chaves.has("falecidas") && !falecida) continue
 
+    // "Casada" é ter UNIÃO cadastrada, não o campo `casado` do cadastro: o campo
+    // é declaração, a união é o fato de onde nasce a exigência da certidão de
+    // casamento. Quem filtra por casadas está procurando essa exigência.
+    if (f.chaves.has("casadas") && grafo.unioesDe(p.id).length === 0) continue
+
     if (f.geracao != null && a?.geracao !== f.geracao) continue
     if (f.papel != null && a?.papel !== f.papel) continue
 
@@ -172,6 +178,7 @@ export const ROTULO_FILTRO: Record<ChaveFiltro, string> = {
   pendencia_documental: "Com pendência documental",
   vivas: "Vivas",
   falecidas: "Falecidas",
+  casadas: "Casadas",
 }
 
 /** Filtros que se anulam entre si — a UI desliga o oposto ao ligar um. */

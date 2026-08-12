@@ -90,7 +90,7 @@ export async function POST(request: NextRequest) {
 
     // Unicidade lógica: sem duas tabelas ativas iguais (forma×adq×bandeira×final×vigência).
     const colunas = paraColunasTaxa(b)
-    const dup = await acharDuplicata(ident, colunas.vigenciaInicio, undefined)
+    const dup = await acharDuplicata(ident, undefined)
     if (dup) return NextResponse.json({ error: `Já existe uma tabela ativa igual: "${dup.name}". Altere a vigência para criar uma nova versão.`, codigo: 'DUPLICADO', conflito: dup }, { status: 409 })
 
     const taxa = await prisma.$transaction(async (tx) => {

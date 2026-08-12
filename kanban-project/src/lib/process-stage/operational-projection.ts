@@ -15,6 +15,7 @@ import { prisma } from "@/lib/prisma"
 import { WorkflowInstanceStatus } from "@prisma/client"
 import { getFase, phaseKeyToFaseCode } from "./fases-catalog"
 import { itemCatalogosDeCertidao } from "@/src/lib/documentos/natureza-certidao"
+import { requerentesAtivosDaArvore, REQUERENTE_ATIVO } from "@/src/lib/genealogia/vinculo-ativo"
 import {
   buildOperationalProjection,
   type OperationalProjection,
@@ -142,7 +143,7 @@ async function resolveOperationalProjectionParaFase(
     // REQUERENTE da GENEALOGIA = Pessoa marcada como requerente na ÁRVORE ('maior'|'menor'),
     // NÃO o vínculo comercial ProcessoRequerente (que pode ser 0 e travava a fase em 99%).
     proc.arvoreId != null
-      ? prisma.pessoa.count({ where: { arvoreId: proc.arvoreId, requerente: { in: ['maior', 'menor'] } } })
+      ? prisma.pessoa.count({ where: requerentesAtivosDaArvore(proc.arvoreId) })
       : Promise.resolve(0),
   ])
 
@@ -247,7 +248,7 @@ export async function resolveOperationalProjectionBatch(
   // (6) Requerentes por processo = Pessoa marcada requerente ('maior'|'menor') na ÁRVORE
   //     (NÃO ProcessoRequerente — vínculo comercial que travava a genealogia em 99%).
   const reqAgg = arvoreIds.length > 0
-    ? await prisma.pessoa.groupBy({ by: ["arvoreId"], where: { arvoreId: { in: arvoreIds }, requerente: { in: ["maior", "menor"] } }, _count: { _all: true } })
+    ? await prisma.pessoa.groupBy({ by: ["arvoreId"], where: { ...REQUERENTE_ATIVO, arvoreId: { in: arvoreIds } }, _count: { _all: true } })
     : []
   const reqByArvore = new Map(reqAgg.map((r) => [r.arvoreId, r._count._all]))
 

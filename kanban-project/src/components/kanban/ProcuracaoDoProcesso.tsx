@@ -10,6 +10,7 @@
 // no cadastro do cliente o outorgante é óbvio (é o dono da ficha); aqui um
 // processo tem contratantes e requerentes, e quem outorga precisa ser dito.
 
+import { nomePessoa } from "@/src/lib/ui/pessoa-exibicao"
 import { useState } from "react"
 import { Stamp } from "lucide-react"
 import { DocumentosGeradosTab } from "@/src/components/contratantesComponents/DocumentosGeradosTab"
@@ -76,8 +77,7 @@ export function ProcuracaoDoProcesso({
               <option value="">Selecione quem concede a procuração…</option>
               {participantes.map((p) => (
                 <option key={`${p.papel}:${p.id}`} value={`${p.papel}:${p.id}`}>
-                  {p.nome} · {p.papel === "contratante" ? "contratante" : "requerente"}
-                  {p.publicCode ? ` (${p.publicCode})` : ""}
+                  {nomePessoa(p)} · {p.papel === "contratante" ? "contratante" : "requerente"}
                 </option>
               ))}
             </select>

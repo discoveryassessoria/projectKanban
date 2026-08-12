@@ -1,16 +1,23 @@
 // src/services/genealogia/emitir-evento-requerente.ts
 // ============================================================================
-// EVENTO DE DOMÍNIO oficial: REQUERENTE_ADICIONADO.
+// EVENTO DE DOMÍNIO oficial: REQUERENTE_ADICIONADO — PRIMITIVA DE ENFILEIRAMENTO.
 //
 // Enfileira na DomainOutbox (transacional, dedup por chaveIdempotencia @unique) UM
 // evento por processo da árvore quando uma Pessoa passa a ser requerente. Publicado
-// SEMPRE via Outbox — nunca um efeito financeiro direto na requisição HTTP. A
-// detecção da TRANSIÇÃO (não→requerente) é responsabilidade do caller (rota Pessoa),
-// via `houveTransicaoParaRequerente` (lib/genealogia/requerente-flag).
+// SEMPRE via Outbox — nunca um efeito financeiro direto na requisição HTTP.
+//
+// ─── QUEM PODE CHAMAR ───────────────────────────────────────────────────────
+// SÓ `lib/genealogia/vincular-requerente.ts`, o serviço canônico do domínio.
+//
+// Havia aqui um segundo export, `emitirEDrenarEventoRequerente`, que abria a sua
+// própria transação e drenava a fila — feito para as ROTAS chamarem depois de
+// gravar. Era a segunda porta: quem entrava pelo serviço criava o vínculo e não
+// emitia; quem entrava pela rota emitia. Dois estados finais para o mesmo ato.
+//
+// Ele foi REMOVIDO em vez de proibido. Porta que não existe não precisa de guard
+// — e o guard que existe (`test:guard-porta-requerente`) impede que ela volte.
 // ============================================================================
 import { Prisma } from '@prisma/client'
-import { prisma } from '@/lib/prisma'
-import { processarOutbox } from '@/src/services/outbox-dispatcher'
 
 /** Tipo canônico do evento na DomainOutbox. */
 export const TIPO_EVENTO_REQUERENTE = 'requerente.adicionado'
@@ -61,16 +68,9 @@ export async function enfileirarEventoRequerente(tx: Prisma.TransactionClient, p
   return enfileirados
 }
 
-/**
- * Atalho para as rotas: enfileira (na sua própria transação, se nenhuma for passada)
- * e DRENA a outbox (best-effort). A drenagem não deve derrubar a requisição — falhas
- * ficam PENDENTE na outbox e são reprocessadas.
- */
-export async function emitirEDrenarEventoRequerente(params: ParamsEventoRequerente): Promise<void> {
-  try {
-    const n = await prisma.$transaction((tx) => enfileirarEventoRequerente(tx, params))
-    if (n > 0) await processarOutbox({ tipos: [TIPO_EVENTO_REQUERENTE], limite: 20 }).catch(() => {})
-  } catch (e) {
-    console.error('[evento requerente] falha ao emitir/drenar:', e)
-  }
-}
+// A DRENAGEM não mora mais aqui. Ela é pós-commit por natureza — a transação que
+// enfileira precisa ter fechado antes de alguém consumir a fila — e por isso vive
+// em `efeitosDoVinculoPosCommit`, no serviço canônico, junto do outro efeito
+// pós-commit do mesmo ato (a reavaliação das Regras Documentais). Dois efeitos que
+// acontecem sempre juntos não devem ser duas chamadas que o caller pode esquecer
+// pela metade.

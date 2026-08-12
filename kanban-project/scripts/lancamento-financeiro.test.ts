@@ -147,7 +147,20 @@ const rotaItens = readFileSync(join(RAIZ, 'src/app/api/financeiro/v3/itens-catal
 chk(/ativo: true/.test(rotaItens), 'catálogo só devolve itens ATIVOS')
 chk(/limite/.test(rotaItens) && /take:/.test(rotaItens), 'catálogo é paginado (não carrega tudo)')
 const rotaConfig = readFileSync(join(RAIZ, 'src/app/api/financeiro/v3/item-config/route.ts'), 'utf8')
-chk(/contaContabilLabel/.test(rotaConfig), 'item-config expõe a conta contábil')
+// A asserção anterior exigia `contaContabilLabel` no item-config. Ela cobrava um
+// contrato que a arquitetura ELIMINOU: a classificação financeira intermediária
+// (categorias / plano de contas / centros de custo) saiu, e a conta contábil
+// passou a ser decidida pelo Ledger a partir do plano fixo (lib/financeiro/
+// ledger/plano-contas.ts), no instante em que ele registra a partida. Não há
+// cadastro que guarde conta por item — `contaContabil` só existe em LedgerEntry.
+// O guard ficava vermelho cobrando algo que ninguém deveria implementar, e a UI
+// exibia duas linhas ("Classificação financeira" e "Conta contábil") que jamais
+// podiam ter valor. Agora ele protege o que é verdade: o item-config resolve
+// preço pela Tabela e NÃO ressuscita a classificação.
+const modalLanc = readFileSync(join(RAIZ, 'src/components/financeiro/v3/lancamento/LancamentoFinanceiroModal.tsx'), 'utf8')
+chk(/resolverPrecoPorConfigDB/.test(rotaConfig), 'item-config resolve o preço pela Tabela de Preços')
+chk(!/contaContabilLabel|categoriaNome/.test(rotaConfig), 'item-config NÃO expõe classificação financeira (foi eliminada)')
+chk(!/contaContabilLabel|categoriaNome/.test(modalLanc), 'o modal não exibe campo que jamais pode ter valor')
 chk(/pendencias/.test(rotaConfig), 'item-config expõe as pendências da configuração')
 
 console.log(`\n${ok} passaram, ${fail} falharam`)

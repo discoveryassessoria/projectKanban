@@ -188,7 +188,9 @@ export function HeaderBar({
       const pais = tarefa.pais || 'PORTUGAL'
       router.push(`/kanban?pais=${pais}&processoId=${tarefa.processoId}&tab=tarefas&atividadeId=${tarefa.id}`)
     } else {
-      router.push('/activities')
+      // A operação de tarefas é uma só. `/activities` era a tela antiga, que
+      // abria o modal legado da árvore de subtarefas.
+      router.push('/operacao')
     }
     setShowNotifications(false)
   }

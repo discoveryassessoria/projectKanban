@@ -3,14 +3,24 @@
 "use client"
 
 import { useState, useEffect, useRef, useCallback, useMemo } from "react"
-import { useApi } from '@/src/lib/dados'
+import { useApi, invalidar } from '@/src/lib/dados'
 import { jsPDF } from "jspdf"
 import dagre from "dagre"
 import type { PessoaArvore, UniaoArvore, DocumentoArvore } from "./types"
+import { RemocaoPessoaModal, type PlanoRemocaoUI } from '@/src/components/arvore/remocao-pessoa-modal'
 import { PessoaSidebar } from "./pessoa-sidebar"
 import { PessoaDetailsPage } from "./pessoa-details-page"
 import { ReactFlowTree, ReactFlowTreeRef } from "./react-flow-tree"
 import { useAnaliseArvore, paisAlvoDe } from "./inteligencia/use-analise-arvore"
+import { useArvoreOperacional } from "./inteligencia/use-arvore-operacional"
+import { BarraLinhagem, EVENTO_FECHAR_CAMADA, MARCA_MENU_ABERTO } from "./inteligencia/barra-linhagem"
+import { PainelDiagnostico, SeloSaude } from "./inteligencia/painel-diagnostico"
+import {
+  PreviewImpactoModal,
+  type AlteracaoDescrita,
+  type PropostaImpacto,
+} from "./inteligencia/preview-impacto"
+import type { EstadoAtual } from "@/src/lib/genealogia/operacional/comparacao"
 import { PainelInteligencia } from "./inteligencia/painel-inteligencia"
 import { PaletaComandos } from "./inteligencia/paleta-comandos"
 import { ImportarArvoreModal } from "./importar-arvore-modal"
@@ -115,19 +125,27 @@ export function ArvoreGenealogicaView({
   const [painelAberto, setPainelAberto] = useState(false)
   const [importarAberto, setImportarAberto] = useState(false)
   const [paletaAberta, setPaletaAberta] = useState(false)
+  const [diagnosticoAberto, setDiagnosticoAberto] = useState(false)
 
-  // ⌘K / Ctrl+K abre a busca. Atalho global é assinatura de teclado — efeito é a
-  // ferramenta certa, e o cleanup impede listener órfão ao trocar de árvore.
-  useEffect(() => {
-    const atalho = (e: KeyboardEvent) => {
-      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") {
-        e.preventDefault()
-        setPaletaAberta((v) => !v)
-      }
-    }
-    document.addEventListener("keydown", atalho)
-    return () => document.removeEventListener("keydown", atalho)
-  }, [])
+  // ── OPERAÇÃO DA ÁRVORE ────────────────────────────────────────────────────
+  // Linhagens, foco, dossiê por pessoa e sinais do cartão saem daqui, numa
+  // leitura só. Como o `<ReactFlowTree>` recebe o foco DEPOIS do layout, nada
+  // disto recalcula posição: trocar de requerente é um Map novo, não um desenho
+  // novo. Ver `aplicarFoco` em react-flow-tree.tsx.
+  const operacional = useArvoreOperacional({ processoId, pessoas, unioes, analise })
+
+  // SEM BECO SEM SAÍDA: quantos requerentes do processo ainda NÃO estão na
+  // árvore. É lido AQUI, com a árvore, e não dentro do modal — porque a decisão
+  // de oferecer (ou não) a aba "Requerente do processo" precisa acontecer ANTES
+  // de o modal abrir. Abrir um formulário para o usuário descobrir lá dentro que
+  // não há nada a fazer é gastar dois cliques dele para dar uma má notícia.
+  const requerentesReq = useApi<{ requerentes?: Array<{ jaNaArvore: boolean }> }>(
+    `/api/processos/${processoId}/requerentes-disponiveis`,
+  )
+  const requerentesForaDaArvore = useMemo(
+    () => (requerentesReq.dados?.requerentes ?? []).filter((r) => !r.jaNaArvore).length,
+    [requerentesReq.dados],
+  )
 
   const nomeDePessoa = useCallback(
     (id: number) => {
@@ -137,12 +155,33 @@ export function ArvoreGenealogicaView({
     [pessoas],
   )
 
+  // Quem depende de uma pessoa — o motor de linhagem já sabe; a tela só nomeia.
+  // Usado pelo preview de impacto para dizer QUAIS requerentes a alteração toca.
+  const requerentesAfetadosPor = useCallback(
+    (pessoaId: number) =>
+      (operacional.mapa.compartilhadas.get(pessoaId) ?? []).map(nomeDePessoa),
+    [operacional.mapa, nomeDePessoa],
+  )
+
   // Ir até a pessoa no canvas: o próprio componente da árvore já expõe isso, então
-  // navegar não redesenha nada.
-  const irParaPessoa = useCallback((pessoaId: number) => {
-    reactFlowTreeRef.current?.centerOnPerson(pessoaId)
+  // navegar não redesenha nada. Sem zoom explícito o zoom atual é PRESERVADO —
+  // quem estava lendo de longe não é jogado para o detalhe, e vice-versa.
+  const irParaPessoa = useCallback((pessoaId: number, opcoes?: { zoom?: number }) => {
+    reactFlowTreeRef.current?.centerOnPerson(pessoaId, opcoes)
   }, [])
-  const fetchArvore = async () => { await arvoreReq.recarregar() }
+
+  // Estável entre renders: é dependência de callbacks (ex.: confirmar remoção).
+  //
+  // MOTOR OPERACIONAL: recarregar a árvore invalida junto os fatos operacionais
+  // do processo. Sem isto, mudar estado civil, óbito ou filiação atualizava o
+  // desenho e deixava exigência, tarefa e valor exibindo o número velho — duas
+  // verdades na mesma tela até alguém apertar F5.
+  const fetchArvore = useCallback(async () => {
+    await Promise.all([
+      arvoreReq.recarregar(),
+      invalidar(`/api/processos/${processoId}/genealogia/operacional`),
+    ])
+  }, [arvoreReq, processoId])
   // Onboarding aparece quando a árvore existe e está VAZIA — derivação, não um estado
   // que o carregador precisava ligar e desligar. Continua podendo ser aberto e fechado
   // à mão (botão "como começar" / concluir).
@@ -160,6 +199,19 @@ export function ArvoreGenealogicaView({
   const setSelectedPerson = useCallback(
     (p: PessoaArvore | null) => setSelectedPersonId(p?.id ?? null),
     [],
+  )
+
+  // BUSCA: localizar não é só centralizar. O pedido é localiza → centraliza →
+  // zoom → destaca → abre o painel, sem navegação manual. É o que esta função
+  // faz, e é o que a paleta (⌘K) chama ao escolher alguém.
+  const localizarPessoa = useCallback(
+    (pessoaId: number) => {
+      // Zoom de leitura: perto o bastante para ler o cartão, longe o bastante
+      // para os pais e filhos dele continuarem na tela.
+      irParaPessoa(pessoaId, { zoom: 1.1 })
+      setSelectedPersonId(pessoaId)
+    },
+    [irParaPessoa],
   )
   const [fullDetailsPerson, setFullDetailsPerson] = useState<PessoaArvore | null>(null)
   const [isFullscreen, setIsFullscreen] = useState(false)
@@ -360,23 +412,20 @@ export function ArvoreGenealogicaView({
     }
   }, [pessoas, pessoaPrincipal, nomeFamilia])
 
-  const handleDeleteDocumento = async (documento: DocumentoArvore) => {
-    try {
-      const response = await authFetch(`/api/documentos/${documento.id}`, {
-        method: 'DELETE'
-      })
+  const [pessoaParaRemover, setPessoaParaRemover] = useState<number | null>(null)
 
-      if (response.ok) {
-        await fetchArvore()
-      } else {
-        const error = await response.json()
-        alert(error.error || 'Erro ao excluir documento')
-      }
-    } catch (error) {
-      console.error('Erro ao excluir documento:', error)
-      alert('Erro ao excluir documento')
-    }
-  }
+  // FRONTEIRA (ADR — Árvore como camada de projeção): a exclusão de Documento
+  // saiu daqui.
+  //
+  // Ela era a ÚNICA escrita da árvore num domínio alheio: `DELETE
+  // /api/documentos/:id` apagava um DocumentoOperacional, cujo dono é o Sistema
+  // Documental. Sobreviveu à remoção de 28/07 porque ficou pendurada numa
+  // permissão (`arvore.excluir_documento`) que ninguém mais concede — invisível
+  // na tela, viva no código, e pronta para voltar assim que a permissão fosse
+  // recriada por engano.
+  //
+  // A árvore LÊ status documental e leva o operador até o documento. Excluir é
+  // ato do módulo dono, com o ciclo de vida e a auditoria dele.
 
   const handleEditPerson = (pessoa: PessoaArvore) => {
     setEditingPerson(pessoa)
@@ -384,24 +433,29 @@ export function ArvoreGenealogicaView({
     setSelectedPerson(null)
   }
 
-  const handleDeletePerson = async (pessoa: PessoaArvore) => {
-    try {
-      const response = await authFetch(`/api/pessoas/${pessoa.id}`, {
-        method: 'DELETE'
-      })
-
-      if (response.ok) {
-        await fetchArvore()
-        setSelectedPerson(null)
-      } else {
-        const error = await response.json()
-        alert(error.error || 'Erro ao excluir pessoa')
-      }
-    } catch (error) {
-      console.error('Erro ao excluir pessoa:', error)
-      alert('Erro ao excluir pessoa')
-    }
+  // O clique só ABRE o plano. Quem decide o que sai e o que fica é o domínio —
+  // e ele recalcula tudo de novo dentro da transação quando a ação é confirmada.
+  const handleDeletePerson = (pessoa: PessoaArvore) => {
+    setPessoaParaRemover(pessoa.id)
   }
+
+  const carregarPlanoRemocao = useCallback(async (id: number): Promise<PlanoRemocaoUI | null> => {
+    const r = await authFetch(`/api/pessoas/${id}/plano-remocao`)
+    if (!r.ok) return null
+    return (await r.json()) as PlanoRemocaoUI
+  }, [])
+
+  const confirmarRemocao = useCallback(async (modo: 'HARD' | 'DESATIVAR') => {
+    if (pessoaParaRemover == null) return
+    const r = await authFetch(`/api/pessoas/${pessoaParaRemover}?modo=${modo}`, { method: 'DELETE' })
+    if (!r.ok) {
+      const erro = await r.json().catch(() => ({}))
+      throw new Error(erro.error || 'Não foi possível remover a pessoa.')
+    }
+    setPessoaParaRemover(null)
+    setSelectedPerson(null)
+    await fetchArvore()
+  }, [pessoaParaRemover, fetchArvore, setSelectedPerson])
 
   const handleAddConjuge = (pessoa: PessoaArvore) => {
     setAddPersonType('conjuge')
@@ -525,6 +579,190 @@ export function ArvoreGenealogicaView({
       }, 50)
     }
   }, [pessoas, setSelectedPerson])
+
+  // ── ABERTURA CENTRADA ─────────────────────────────────────────────────────
+  // A árvore nunca abre perdida: o primeiro enquadramento é no requerente. Roda
+  // UMA vez por árvore carregada (a trava é o próprio id do requerente), então
+  // arrastar o canvas depois não é desfeito por um recentramento surpresa.
+  const requerenteEnquadradoRef = useRef<number | null>(null)
+  useEffect(() => {
+    const alvo = operacional.requerenteSelecionadoId
+    if (alvo == null || pessoas.length === 0) return
+    if (requerenteEnquadradoRef.current === alvo) return
+    requerenteEnquadradoRef.current = alvo
+    // O canvas monta o layout no mesmo tick; o quadro seguinte já tem posição.
+    const t = setTimeout(() => {
+      if (operacional.modo === "linhagem" && operacional.linhagem) {
+        reactFlowTreeRef.current?.enquadrar([...operacional.linhagem.visivel])
+      } else {
+        reactFlowTreeRef.current?.centerOnPerson(alvo, { zoom: 1 })
+      }
+    }, 120)
+    return () => clearTimeout(t)
+  }, [operacional.requerenteSelecionadoId, operacional.modo, operacional.linhagem, pessoas.length])
+
+  // Entrar no modo linhagem enquadra a linha. Sem isto o filtro tira a poluição
+  // da tela mas deixa o usuário olhando para o mesmo espaço vazio de antes.
+  const modoAnteriorRef = useRef(operacional.modo)
+  useEffect(() => {
+    if (modoAnteriorRef.current === operacional.modo) return
+    modoAnteriorRef.current = operacional.modo
+    if (operacional.modo === "linhagem" && operacional.linhagem) {
+      reactFlowTreeRef.current?.enquadrar([...operacional.linhagem.visivel])
+    } else {
+      reactFlowTreeRef.current?.enquadrar([])
+    }
+  }, [operacional.modo, operacional.linhagem])
+
+  // ── TECLADO ───────────────────────────────────────────────────────────────
+  // ESC fecha · ENTER abre · setas navegam pela FAMÍLIA (↑ pai/mãe, ↓ filho,
+  // ← → irmãos). Navegar por proximidade geométrica seria navegar pelo desenho;
+  // aqui se navega pelo parentesco, que é o que o operador tem na cabeça.
+  //
+  // O atalho só age quando o foco NÃO está num campo de texto — senão digitar
+  // uma data numa data seria interpretado como comando.
+  const teclaGlobal = useCallback(
+    (e: KeyboardEvent) => {
+      const alvo = e.target as HTMLElement | null
+      const digitando =
+        alvo != null &&
+        (alvo.tagName === "INPUT" ||
+          alvo.tagName === "TEXTAREA" ||
+          alvo.tagName === "SELECT" ||
+          alvo.isContentEditable)
+
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") {
+        e.preventDefault()
+        setPaletaAberta((v) => !v)
+        return
+      }
+      if (digitando) return
+
+      // Atalhos de LETRA. Só disparam sem modificador: Ctrl+D é favoritar no
+      // navegador e Cmd+L é a barra de endereço — sequestrar isso irrita mais do
+      // que o atalho ajuda.
+      if (!e.metaKey && !e.ctrlKey && !e.altKey) {
+        const tecla = e.key.toLowerCase()
+        if (tecla === "/") {
+          e.preventDefault()
+          setPaletaAberta(true)
+          return
+        }
+        if (tecla === "d") {
+          e.preventDefault()
+          setDiagnosticoAberto((v) => !v)
+          return
+        }
+        if (tecla === "l") {
+          e.preventDefault()
+          operacional.setModo(operacional.modo === "linhagem" ? "todos" : "linhagem")
+          return
+        }
+        if (tecla === "f") {
+          e.preventDefault()
+          // F foca o requerente em foco; com alguém selecionado, foca a pessoa.
+          const alvo = selectedPersonId ?? operacional.requerenteSelecionadoId
+          if (alvo != null) irParaPessoa(alvo, { zoom: 1.1 })
+          return
+        }
+      }
+
+      if (e.key === "Escape") {
+        // DONO ÚNICO DO ESCAPE, e só enquanto a árvore tem algo a fechar.
+        //
+        // A árvore abre dentro do modal do processo, que fecha no Escape por um
+        // listener próprio em `document`. Este handler roda em fase de CAPTURA
+        // (ver o addEventListener abaixo), então chega primeiro: quando ele
+        // CONSOME o Escape, o modal não o vê e o processo não se fecha às costas
+        // do usuário. Quando não há camada nenhuma aberta, ele deixa passar — e o
+        // Escape volta a fazer o que sempre fez, que é fechar o processo.
+        const consumir = () => {
+          e.preventDefault()
+          e.stopImmediatePropagation()
+        }
+        // Uma camada por ESC, da mais externa para a mais interna. Fechar tudo de
+        // uma vez faria o usuário perder contexto que não pediu para perder.
+        if (document.body.dataset[MARCA_MENU_ABERTO]) {
+          consumir()
+          document.dispatchEvent(new Event(EVENTO_FECHAR_CAMADA))
+          return
+        }
+        if (paletaAberta) { consumir(); setPaletaAberta(false); return }
+        if (diagnosticoAberto) { consumir(); setDiagnosticoAberto(false); return }
+        if (painelAberto) { consumir(); setPainelAberto(false); return }
+        if (fullDetailsPerson) { consumir(); setFullDetailsPerson(null); return }
+        if (selectedPersonId != null) {
+          consumir()
+          setSelectedPersonId(null)
+          setSidebarTabInicial(undefined)
+          return
+        }
+        // Última camada da árvore: sair do foco e devolver a árvore completa.
+        if (operacional.modo === "linhagem") { consumir(); operacional.setModo("todos") }
+        return
+      }
+
+      if (selectedPersonId == null) return
+      const atual = pessoas.find((p) => p.id === selectedPersonId)
+      if (!atual) return
+
+      if (e.key === "Enter") {
+        e.preventDefault()
+        setFullDetailsPerson(atual)
+        return
+      }
+
+      const irPara = (destino: number | null | undefined) => {
+        if (destino == null) return
+        e.preventDefault()
+        localizarPessoa(destino)
+      }
+
+      if (e.key === "ArrowUp") {
+        irPara(atual.paiId ?? atual.maeId)
+      } else if (e.key === "ArrowDown") {
+        const filhos = pessoas
+          .filter((p) => p.paiId === atual.id || p.maeId === atual.id)
+          .sort((a, b) => a.id - b.id)
+        irPara(filhos[0]?.id)
+      } else if (e.key === "ArrowLeft" || e.key === "ArrowRight") {
+        const irmaos = pessoas
+          .filter(
+            (p) =>
+              p.id !== atual.id &&
+              ((atual.paiId != null && p.paiId === atual.paiId) ||
+                (atual.maeId != null && p.maeId === atual.maeId)),
+          )
+          .sort((a, b) => a.id - b.id)
+        if (irmaos.length === 0) return
+        // A pessoa atual entra na lista para o "próximo" ser calculado em roda:
+        // do último irmão a seta volta ao primeiro, em vez de travar na ponta.
+        const roda = [...irmaos, atual].sort((a, b) => a.id - b.id)
+        const i = roda.findIndex((p) => p.id === atual.id)
+        const passo = e.key === "ArrowRight" ? 1 : -1
+        irPara(roda[(i + passo + roda.length) % roda.length]?.id)
+      }
+    },
+    [
+      pessoas,
+      selectedPersonId,
+      paletaAberta,
+      painelAberto,
+      diagnosticoAberto,
+      fullDetailsPerson,
+      localizarPessoa,
+      irParaPessoa,
+      operacional,
+    ],
+  )
+
+  // CAPTURA (`true`): este handler precisa ver o Escape ANTES do listener do
+  // modal do processo, que também fecha no Escape. É o que permite consumir o
+  // evento quando a árvore tem camada aberta — e só nesse caso.
+  useEffect(() => {
+    document.addEventListener("keydown", teclaGlobal, true)
+    return () => document.removeEventListener("keydown", teclaGlobal, true)
+  }, [teclaGlobal])
 
   const findConjuge = (pessoa: PessoaArvore): PessoaArvore | null => {
     const uniao = unioes.find(u => u.pessoa1Id === pessoa.id || u.pessoa2Id === pessoa.id)
@@ -807,8 +1045,64 @@ export function ArvoreGenealogicaView({
             onAddMae={pode('arvore.criar') ? handleAddMae : undefined}
             onAddFilho={pode('arvore.criar') ? handleAddFilho : undefined}
             onAddConjuge={pode('arvore.criar') ? handleAddConjugeById : undefined}
+            foco={operacional.foco.estados}
+            sinais={operacional.sinais}
+            gruposRecolhidos={operacional.foco.gruposAtivos}
+            onExpandirGrupo={operacional.expandirGrupo}
+            lacunas={operacional.lacunas}
+            saude={operacional.saude}
           />
         )}
+
+        {/* Barra de linhagem: `absolute` no canto oposto ao dos botões
+            Buscar/Importar/Análise, com a mesma casca deles. Sobreposta ao
+            canvas — o <ReactFlowTree> acima não sabe que ela existe. */}
+        {pessoas.length > 0 && (
+          <BarraLinhagem
+            mapa={operacional.mapa}
+            linhagem={operacional.linhagem}
+            requerenteSelecionadoId={operacional.requerenteSelecionadoId}
+            onSelecionarRequerente={operacional.selecionarRequerente}
+            modo={operacional.modo}
+            onModo={operacional.setModo}
+            estilo={operacional.estilo}
+            onEstilo={operacional.setEstilo}
+            filtros={operacional.filtros}
+            filtrosAtivos={operacional.filtrosAtivos}
+            onAlternarFiltro={operacional.alternar}
+            onLimparFiltros={operacional.limparFiltros}
+            resumo={operacional.resumo}
+            comparacao={operacional.comparacao}
+            trilha={operacional.trilha}
+            proximaAcao={operacional.proximaAcao}
+            relacionadosVisiveis={operacional.relacionadosVisiveis}
+            onAlternarRelacionados={operacional.alternarRelacionados}
+            totalRelacionados={operacional.totalRelacionados}
+            saudeLigada={operacional.saudeLigada}
+            onAlternarSaude={operacional.alternarSaude}
+            contagemSaude={operacional.contagemSaude}
+            contagemFiltros={operacional.contagemFiltros}
+            totalRecuado={operacional.foco.totalRecuado}
+            totalRecolhivel={operacional.totalRecolhivel}
+            onRecolherTudo={operacional.recolherTudo}
+            onIrParaPessoa={localizarPessoa}
+            carregando={operacional.carregando}
+          />
+        )}
+
+        <PainelDiagnostico
+          diagnostico={operacional.diagnostico}
+          proximaAcao={operacional.proximaAcao}
+          aberto={diagnosticoAberto}
+          onFechar={() => setDiagnosticoAberto(false)}
+          onIrParaPessoa={localizarPessoa}
+          escopo={
+            operacional.modo === "linhagem" && operacional.linhagem
+              ? `Linhagem de ${operacional.linhagem.nome}`
+              : "Árvore inteira"
+          }
+          auditor={operacional.auditor}
+        />
 
         {/* TELAS NOVAS — sobrepostas ao canvas, NUNCA dentro dele. Ficam em
             `absolute` no canto superior direito, longe dos controles que já
@@ -835,6 +1129,13 @@ export function ArvoreGenealogicaView({
             )}
             {botaoImportar}
             {pessoas.length > 0 && (
+              <SeloSaude
+                diagnostico={operacional.diagnostico}
+                ativo={diagnosticoAberto}
+                onAbrir={() => setDiagnosticoAberto((v) => !v)}
+              />
+            )}
+            {pessoas.length > 0 && (
             <button
               onClick={() => setPainelAberto(true)}
               title="Inteligência da árvore"
@@ -860,14 +1161,16 @@ export function ArvoreGenealogicaView({
           analise={analise}
           aberto={painelAberto}
           onFechar={() => setPainelAberto(false)}
-          onIrParaPessoa={irParaPessoa}
+          onIrParaPessoa={localizarPessoa}
           nomeDePessoa={nomeDePessoa}
+          perguntas={operacional.perguntas}
         />
         <PaletaComandos
           indice={indice}
           aberto={paletaAberta}
           onFechar={() => setPaletaAberta(false)}
-          onEscolher={irParaPessoa}
+          onEscolher={localizarPessoa}
+          contextoDe={operacional.contextoDe}
         />
       </div>
 
@@ -891,10 +1194,23 @@ export function ArvoreGenealogicaView({
         onAddConjuge={pode('arvore.criar') ? handleAddConjugeById : undefined}
         onAddDocumento={undefined}
         onEditDocumento={undefined}
-        onDeleteDocumento={pode('arvore.excluir_documento') ? handleDeleteDocumento : undefined}
         onSelectPerson={handleSelectPersonFromSidebar}
         initialTab={sidebarTabInicial}
+        dossie={selectedPersonId != null ? operacional.dossies.get(selectedPersonId) ?? null : null}
+        financeiroVisivel={operacional.financeiroVisivel}
+        nomeDeRequerente={nomeDePessoa}
+        eventos={selectedPersonId != null ? operacional.eventosDe(selectedPersonId) : undefined}
       />
+
+      {pessoaParaRemover != null && (
+        <RemocaoPessoaModal
+          key={pessoaParaRemover}
+          pessoaId={pessoaParaRemover}
+          onFechar={() => setPessoaParaRemover(null)}
+          onConfirmar={confirmarRemocao}
+          carregarPlano={carregarPlanoRemocao}
+        />
+      )}
 
       {/* Full Details Page */}
       {fullDetailsPerson && (
@@ -922,6 +1238,7 @@ export function ArvoreGenealogicaView({
           conjugeDePessoaId={addConjugeForPessoaId}
           pessoas={pessoas}
           unioes={unioes}
+          requerentesForaDaArvore={requerentesForaDaArvore}
           onClose={() => {
             setShowAddPersonModal(false)
             setAddPersonType(null)
@@ -944,6 +1261,9 @@ export function ArvoreGenealogicaView({
           pessoa={editingPerson}
           pessoas={pessoas}
           unioes={unioes}
+          processoId={processoId}
+          requerentesAfetadosPor={requerentesAfetadosPor}
+          estadoAtual={operacional.estadoAtual}
           onClose={() => {
             setShowEditPersonModal(false)
             setEditingPerson(null)
@@ -970,6 +1290,7 @@ function AddPersonModal({
   conjugeDePessoaId,
   pessoas,
   unioes,
+  requerentesForaDaArvore,
   onClose,
   onSuccess
 }: {
@@ -980,12 +1301,18 @@ function AddPersonModal({
   conjugeDePessoaId?: number | null
   pessoas: PessoaArvore[]
   unioes: UniaoArvore[]
+  /** Quantos requerentes do processo ainda não estão na árvore. */
+  requerentesForaDaArvore: number
   onClose: () => void
   onSuccess: () => void
 }) {
   // Modo de cadastro: pessoa comum (cria Pessoa) OU requerente do processo (REUSA a
   // Pessoa já existente — nunca duplica). O requerente NUNCA é criado por este form.
-  const [modo, setModo] = useState<'pessoa' | 'requerente'>('pessoa')
+  // Quando não há requerente fora da árvore, a aba nem é oferecida — e um modo
+  // 'requerente' herdado de um estado anterior é forçado de volta para 'pessoa'.
+  const semRequerenteDisponivel = requerentesForaDaArvore === 0
+  const [modoEscolhido, setModo] = useState<'pessoa' | 'requerente'>('pessoa')
+  const modo: 'pessoa' | 'requerente' = semRequerenteDisponivel ? 'pessoa' : modoEscolhido
   const [nome, setNome] = useState('')
   const [sobrenome, setSobrenome] = useState('')
   const [sexo, setSexo] = useState<string>('')
@@ -1205,13 +1532,23 @@ function AddPersonModal({
             <button
               type="button"
               onClick={() => setModo('requerente')}
-              className={`px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${modo === 'requerente' ? 'bg-white shadow-sm text-gray-900' : 'text-gray-500 hover:text-gray-700'}`}
+              disabled={semRequerenteDisponivel}
+              title={semRequerenteDisponivel ? 'Todos os requerentes deste processo já estão na árvore' : undefined}
+              className={`px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
+                semRequerenteDisponivel
+                  ? 'text-gray-300 cursor-not-allowed'
+                  : modo === 'requerente' ? 'bg-white shadow-sm text-gray-900' : 'text-gray-500 hover:text-gray-700'
+              }`}
             >
               Requerente do processo
             </button>
           </div>
+          {/* A explicação vem ANTES do clique, não depois. Botão morto com
+              tooltip honesto é melhor do que botão vivo que leva a um aviso. */}
           <p className="text-xs text-gray-400 mt-1.5">
-            Requerentes do processo são reaproveitados — a árvore não cria uma pessoa duplicada.
+            {semRequerenteDisponivel
+              ? 'Requerente do processo: indisponível — todos já estão na árvore. Siga em Pessoa da família.'
+              : 'Requerentes do processo são reaproveitados — a árvore não cria uma pessoa duplicada.'}
           </p>
         </div>
 
@@ -1390,12 +1727,20 @@ function EditPersonModal({
   pessoa,
   pessoas,
   unioes,
+  processoId,
+  requerentesAfetadosPor,
+  estadoAtual,
   onClose,
   onSuccess
 }: {
   pessoa: PessoaArvore
   pessoas: PessoaArvore[]
   unioes: UniaoArvore[]
+  processoId: number
+  /** Nomes dos requerentes cuja linha passa por esta pessoa. */
+  requerentesAfetadosPor: (pessoaId: number) => string[]
+  /** Números de hoje, para o preview montar a coluna ANTES. */
+  estadoAtual?: EstadoAtual
   onClose: () => void
   onSuccess: () => void
 }) {
@@ -1439,10 +1784,83 @@ function EditPersonModal({
     backgroundPosition: 'right 12px center'
   }
 
+  // ── PREVIEW DE IMPACTO ────────────────────────────────────────────────────
+  // Só entra em cena quando a alteração é RELEVANTE — isto é, quando ela muda
+  // algum atributo que as Regras Documentais leem (óbito, estado civil,
+  // filiação, requerente). Corrigir a grafia de um nome não abre modal nenhum:
+  // um preview que aparece sempre vira um "OK" automático e deixa de informar.
+  const conjugeSelecionadoId = isCasado && conjugeId ? Number(conjugeId) : null
+  const casamentoNasceu = !uniaoExistente && conjugeSelecionadoId != null
+  const casamentoAcabou = Boolean(uniaoExistente) && !isCasado
+  const obitoMudou = (pessoa.vivo === false || !!pessoa.data_obito) !== isFalecido
+  const requerenteMudou = (pessoa.requerente || 'nao') !== (requerente || 'nao')
+
+  const mudancaRelevante = obitoMudou || requerenteMudou || casamentoNasceu || casamentoAcabou
+
+  const descreverAlteracoes = (): AlteracaoDescrita[] => {
+    const lista: AlteracaoDescrita[] = []
+    if (obitoMudou) {
+      lista.push({
+        campo: 'Situação',
+        de: isFalecido ? 'Vivo' : 'Falecido',
+        para: isFalecido ? 'Falecido' : 'Vivo',
+      })
+    }
+    if (casamentoNasceu || casamentoAcabou) {
+      lista.push({
+        campo: 'Estado civil',
+        de: uniaoExistente ? 'Casado' : 'Solteiro',
+        para: isCasado ? 'Casado' : 'Solteiro',
+      })
+    }
+    if (requerenteMudou) {
+      lista.push({
+        campo: 'Requerente',
+        de: pessoa.requerente && pessoa.requerente !== 'nao' ? pessoa.requerente : 'não',
+        para: requerente && requerente !== 'nao' ? requerente : 'não',
+      })
+    }
+    return lista
+  }
+
+  const montarProposta = (): PropostaImpacto => ({
+    processoId,
+    pessoaId: pessoa.id,
+    mudancas: {
+      vivo: !isFalecido,
+      casado: isCasado,
+      requerente: requerente || 'nao',
+      linhaReta: isLinhaReta,
+      documentacao: precisaDocumentacao,
+      data_obito: isFalecido && dataObito ? new Date(dataObito).toISOString() : null,
+    },
+    // A união entra na simulação porque é dela que nasce a exigência de
+    // certidão de casamento — sem isso o preview diria "sem impacto" ao casar.
+    uniao: casamentoNasceu
+      ? { acao: 'criar', conjugeId: conjugeSelecionadoId! }
+      : casamentoAcabou && uniaoExistente
+        ? { acao: 'remover', uniaoId: uniaoExistente.id }
+        : undefined,
+    alteracoes: descreverAlteracoes(),
+    requerentesAfetados: requerentesAfetadosPor(pessoa.id),
+    estadoAtual,
+  })
+
+  const [proposta, setProposta] = useState<PropostaImpacto | null>(null)
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!nome.trim()) return
+    // Alteração relevante ainda não confirmada: mostra o impacto primeiro.
+    if (mudancaRelevante && !proposta) {
+      setProposta(montarProposta())
+      return
+    }
+    await persistir()
+  }
 
+  const persistir = async () => {
+    setProposta(null)
     setSaving(true)
     try {
       const response = await authFetch(`/api/pessoas/${pessoa.id}`, {
@@ -1531,8 +1949,32 @@ function EditPersonModal({
 
   const pessoasDisponiveis = pessoas.filter(p => p.id !== pessoa.id)
 
+  // "I" abre o preview quando já existe mudança relevante pendente no formulário.
+  useEffect(() => {
+    const atalho = (e: KeyboardEvent) => {
+      const alvo = e.target as HTMLElement | null
+      const digitando =
+        alvo != null &&
+        (alvo.tagName === 'INPUT' || alvo.tagName === 'TEXTAREA' || alvo.tagName === 'SELECT' || alvo.isContentEditable)
+      if (digitando || e.metaKey || e.ctrlKey || e.altKey) return
+      if (e.key.toLowerCase() !== 'i') return
+      if (!mudancaRelevante || proposta) return
+      e.preventDefault()
+      setProposta(montarProposta())
+    }
+    document.addEventListener('keydown', atalho)
+    return () => document.removeEventListener('keydown', atalho)
+  })
+
   return (
     <>
+      {proposta && (
+        <PreviewImpactoModal
+          proposta={proposta}
+          onCancelar={() => setProposta(null)}
+          onConfirmar={persistir}
+        />
+      )}
       <div className="fixed inset-0 bg-black/50 z-[10003]" onClick={onClose} />
       {/* `text-gray-900` na RAIZ do modal não é redundância com as classes dos
           campos: o modal é filho, na árvore DOM, do container de abas que ganha

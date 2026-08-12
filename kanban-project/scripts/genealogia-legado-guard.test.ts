@@ -5,8 +5,8 @@
  * Esta tarefa foi de DESATIVAÇÃO/LIMPEZA (sem substituto). A guarda impede a
  * reintrodução acidental do legado inconsistente:
  *   1. criar/editar Pessoa NÃO pode chamar reconcileDocsForPessoa (auto-geração);
- *   2. document-generator: reconcile* precisam do guard anti-reativação;
- *   3. endpoint /pessoas/[id]/reconcile precisa estar desativado (410, sem chamar gerador);
+ *   2. document-generator foi ELIMINADO (o arquivo não existe);
+ *   3. o endpoint /pessoas/[id]/reconcile foi ELIMINADO;
  *   4. central-operacional precisa neutralizar a Genealogia (flag + STATUS_VALIDADOS
  *      não usado como verdade da fase Genealogia);
  *   5. o avanço de fase continua gated por blocking-engine (NecessidadeDocumental/steps),
@@ -55,24 +55,19 @@ ok(!/from ["']@\/src\/lib\/document-generator["']/.test(pessoasPut), "PUT /api/p
 // --------------------------------------------------------------------------
 // 2) document-generator: guard anti-reativação nas funções que criam Documento
 // --------------------------------------------------------------------------
-console.log("\n2) document-generator — LEGADO_INATIVO com guard")
-const docGen = lerBruto("src/lib/document-generator.ts")
-ok(/LEGADO_INATIVO/.test(docGen), "document-generator marcado como LEGADO_INATIVO")
-ok(/__assertGeracaoDocumentalDesativada/.test(docGen), "guard __assertGeracaoDocumentalDesativada existe")
-// as duas funções que persistem Documento chamam o guard no corpo
-const reconcilePessoa = (docGen.match(/export async function reconcileDocsForPessoa[\s\S]*?\n\}/) || [""])[0]
-const reconcileArvore = (docGen.match(/export async function reconcileAllForArvore[\s\S]*?\n\}/) || [""])[0]
-ok(/__assertGeracaoDocumentalDesativada\(\)/.test(reconcilePessoa), "reconcileDocsForPessoa chama o guard")
-ok(/__assertGeracaoDocumentalDesativada\(\)/.test(reconcileArvore), "reconcileAllForArvore chama o guard")
+console.log("\n2) document-generator — ELIMINADO")
+// Guard mais forte que "desativado com aviso": o arquivo não existe. Enquanto
+// existia, bastava um import para religar um segundo motor documental.
+ok(!existsSync(join(ROOT, "src/lib/document-generator.ts")), "src/lib/document-generator.ts NÃO existe mais")
+const importaGerador = (rel: string) => /from ["'][^"']*document-generator["']/.test(lerSemComentarios(rel))
+ok(!importaGerador("src/services/necessidade-documental.ts"), "necessidade-documental NÃO importa o gerador legado")
+ok(!importaGerador("src/services/phase-workflow.ts"), "phase-workflow NÃO importa o gerador legado")
 
 // --------------------------------------------------------------------------
 // 3) endpoint /pessoas/[id]/reconcile desativado (410, sem chamar gerador)
 // --------------------------------------------------------------------------
-console.log("\n3) endpoint reconcile — desativado")
-const reconcileRoute = lerSemComentarios("src/app/api/pessoas/[id]/reconcile/route.ts")
-ok(/status:\s*410/.test(reconcileRoute), "reconcile/route responde 410")
-ok(!/reconcileDocsForPessoa\s*\(/.test(reconcileRoute) && !/dryRunReconcile\s*\(/.test(reconcileRoute),
-  "reconcile/route NÃO executa reconcile/dryRun")
+console.log("\n3) endpoint reconcile — ELIMINADO")
+ok(!existsSync(join(ROOT, "src/app/api/pessoas/[id]/reconcile/route.ts")), "a rota /pessoas/[id]/reconcile NÃO existe mais")
 
 // --------------------------------------------------------------------------
 // 4) central-operacional neutraliza a Genealogia

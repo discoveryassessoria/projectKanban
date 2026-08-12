@@ -111,8 +111,18 @@ export async function GET(request: NextRequest) {
           configuracaoFinanceiraItem: {
             select: {
               id: true, possuiCusto: true, possuiReceita: true,
-              tipoDocumento: { select: { name: true } }, honorario: { select: { name: true } },
-              tipoProcesso: { select: { name: true } }, itemCatalogo: { select: { name: true, natureza: true } },
+              tipoDocumento: { select: { name: true, publicCode: true } }, honorario: { select: { name: true } },
+              tipoProcesso: { select: { name: true } },
+              // CÓDIGO CANÔNICO DO MESTRE. Vem da entidade de origem — Cadastro
+              // Mestre Documental (DOCn) ou Catálogo de Serviços (SRV-n) —, nunca
+              // da Configuração Financeira, do preço ou do fornecedor.
+              itemCatalogo: {
+                select: {
+                  name: true, natureza: true,
+                  tiposDocumento: { select: { publicCode: true }, take: 1 },
+                  servicos: { select: { publicCode: true }, take: 1 },
+                },
+              },
             },
           },
         },
@@ -145,15 +155,25 @@ export async function POST(request: NextRequest) {
     // exigir um cadastro prévio que o operador não teria como adivinhar.
     let configId = toIntOrNull(b.configuracaoFinanceiraItemId)
     const itemCatalogoId = toIntOrNull(b.itemCatalogoId)
-    if (!configId && itemCatalogoId) {
+    // TIPO DE ITEM declarado pela tela — usado só para VALIDAR o vínculo (não é
+    // persistido). Se o tipo escolhido não bate com a natureza real do item, o
+    // pedido é recusado: nada de resolver por aproximação ou aceitar em silêncio.
+    const itemTipo = toStrOrNull(b.itemTipo)?.toUpperCase() ?? null
+    const tipoIncompativel = (natureza: string, tipo: string) =>
+      NextResponse.json({ error: `Item incompatível com o tipo selecionado: o item é de natureza ${natureza}, e o tipo escolhido foi ${tipo}.` }, { status: 400 })
+    if (itemCatalogoId) {
       const item = await prisma.itemCatalogo.findUnique({
         where: { id: itemCatalogoId },
         select: { id: true, name: true, ativo: true, natureza: true },
       })
+      // O vínculo é sempre por ID: item inexistente é erro, nunca busca por nome.
       if (!item) return NextResponse.json({ error: `Item do catálogo inexistente (#${itemCatalogoId}).` }, { status: 400 })
       if (!item.ativo) return NextResponse.json({ error: 'Item inativo não pode receber preço.' }, { status: 400 })
-      const criada = await garantirConfigFinanceiraDeItem(prisma, { itemCatalogoId: item.id, nome: item.name })
-      configId = criada.id
+      if (itemTipo && String(item.natureza) !== itemTipo) return tipoIncompativel(String(item.natureza), itemTipo)
+      if (!configId) {
+        const criada = await garantirConfigFinanceiraDeItem(prisma, { itemCatalogoId: item.id, nome: item.name })
+        configId = criada.id
+      }
     }
     if (!configId) return NextResponse.json({ error: 'Selecione o item.' }, { status: 400 })
 
@@ -166,30 +186,26 @@ export async function POST(request: NextRequest) {
       },
     })
     if (!cfg) return NextResponse.json({ error: 'Configuração Financeira não encontrada.' }, { status: 404 })
+    // Mesma guarda pelo caminho legado (config enviada sem itemCatalogoId).
+    if (itemTipo && !itemCatalogoId && cfg.itemCatalogo && String(cfg.itemCatalogo.natureza) !== itemTipo)
+      return tipoIncompativel(String(cfg.itemCatalogo.natureza), itemTipo)
 
     // §2 — o PREÇO define a natureza; deve ser compatível com a NaturezaFinanceira da
     // config. VENDA é a nomenclatura da Tabela de Preços (RECEITA legado ≡ VENDA).
     const natFin = deriveNaturezaFinanceira(cfg)
     const habil = [admiteCusto(natFin) ? 'CUSTO' : null, admiteVenda(natFin) ? 'VENDA' : null].filter(Boolean) as NaturezaPrecoRaw[]
 
-    // Vigência é COMPARTILHADA entre as linhas (custo/venda).
-    if (vigenciaInvalida(b.vigenciaInicio) || vigenciaInvalida(b.vigenciaFim))
-      return NextResponse.json({ error: 'Vigência deve estar no formato ISO YYYY-MM-DD.' }, { status: 400 })
+    // VALIDADE É ESTADO, NÃO DATA (09/08/2026). A rota deixa de aceitar e de exigir
+    // vigência: preço ativo vale por tempo indeterminado, até ser editado,
+    // inativado ou excluído. As colunas permanecem no schema (nullable) só para
+    // o histórico já gravado — nenhuma escrita nova as preenche.
 
     // Parâmetros COMPARTILHADOS (uma única vez para todas as linhas).
     const processoTipoId = toStrOrNull(b.processoTipoId)
     const modalidadeId = toIntOrNull(b.modalidadeId)
     const prioridade = toIntOrNull(b.prioridade) ?? 0
-    const vigenciaInicio = toStrOrNull(b.vigenciaInicio)
-    const vigenciaFim = toStrOrNull(b.vigenciaFim)
-    // "Válido a partir de" é OBRIGATÓRIO — define o início da validade comercial e garante
-    // que sempre exista uma tabela vigente determinável (sem escolha arbitrária).
-    if (!vigenciaInicio) {
-      return NextResponse.json({ error: 'Informe "Válido a partir de" (início da validade comercial).' }, { status: 400 })
-    }
-    if (vigenciaInicio && vigenciaFim && vigenciaInicio > vigenciaFim) {
-      return NextResponse.json({ error: '"Válido até" deve ser igual ou posterior a "Válido a partir de".' }, { status: 400 })
-    }
+    const vigenciaInicio: string | null = null
+    const vigenciaFim: string | null = null
     // ESTRATÉGIA de cálculo OBRIGATÓRIA (modoCalculo = código canônico da estratégia).
     const modoCalculo = toStrOrNull(b.modoCalculo) ?? ''
     if (!modoCalculoValido(modoCalculo)) return NextResponse.json({ error: 'Informe uma Estratégia de cálculo válida.' }, { status: 400 })

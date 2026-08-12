@@ -11,6 +11,10 @@ import { useState, useEffect, useMemo, useCallback } from 'react'
 import { useApi } from '@/src/lib/dados'
 import { usePermissoes } from '@/src/hooks/use-permissoes'
 import { ExclusaoDefinitivaModal } from './ExclusaoDefinitivaModal'
+import {
+  nomeExibidoDoMestre, combinaComBusca, mestreDaConfiguracao, mestreSelecionavel,
+  type MestreFinanceiro,
+} from '@/lib/gerenciamento/mestre-financeiro'
 
 type ComissaoRef = { id: number; name: string; ativo: boolean }
 type Produto = {
@@ -53,7 +57,10 @@ const ORIGENS: [string, string][] = [
 // de Valores). O rótulo continua em ORIGENS apenas para LER as configurações antigas
 // que ainda apontam para o mestre legado — o backend recusa novos vínculos.
 const ORIGENS_CRIAVEIS: [string, string][] = ORIGENS.filter(([k]) => k !== 'honorario')
-type MestreRef = { id: number; label: string; code: string | null }
+// O mestre chega em campos SEPARADOS (sourceId/sourceType/sourceCode/masterKey/
+// displayName) e a tela renderiza só `displayName`. Rótulo pré-concatenado não
+// existe aqui — era exatamente por onde "SRV-8 — Nome · CHAVE" vazava.
+type MestreRef = MestreFinanceiro
 type Mestres = { documento: MestreRef[]; servico: MestreRef[]; honorario: MestreRef[]; processo: MestreRef[] }
 type FornecedorRef = { id: number; nome: string; publicCode: string | null }
 const MESTRES_VAZIO: Mestres = { documento: [], servico: [], honorario: [], processo: [] }
@@ -148,10 +155,10 @@ export default function ProdutosTab() {
     const m = produtosReq.dados?.mestres
     if (!m) return MESTRES_VAZIO
     return {
-      documento: (m.tiposDocumento ?? []).map((d) => ({ id: d.id, label: d.name, code: d.code ?? null })),
-      servico: (m.servicos ?? []).map((x) => ({ id: x.id, label: x.publicCode ? `${x.publicCode} — ${x.name}` : x.name, code: x.code ?? null })),
-      honorario: (m.honorarios ?? []).map((h) => ({ id: h.id, label: h.name, code: h.code ?? null })),
-      processo: (m.tiposProcesso ?? []).map((p) => ({ id: p.id, label: p.name, code: null })),
+      documento: (m.tiposDocumento ?? []).map((d) => mestreSelecionavel('documento', d)),
+      servico: (m.servicos ?? []).map((x) => mestreSelecionavel('servico', x)),
+      honorario: (m.honorarios ?? []).map((h) => mestreSelecionavel('honorario', h)),
+      processo: (m.tiposProcesso ?? []).map((p) => mestreSelecionavel('processo', p)),
     }
   }, [produtosReq.dados])
   const fornecedores = useMemo<FornecedorRef[]>(
@@ -182,10 +189,10 @@ export default function ProdutosTab() {
     const base = mostrarInativos ? produtos : produtos.filter((p) => p.ativo)
     const q = busca.trim().toLowerCase()
     if (!q) return base
+    // Busca sobre os termos TÉCNICOS também (SRV-n, chave, origem) — o que a
+    // tela deixou de exibir continua encontrável.
     return base.filter((p) =>
-      (p.mestre?.nome ?? p.nome).toLowerCase().includes(q) ||
-      (p.mestre?.codigo ?? '').toLowerCase().includes(q) ||
-      (p.mestre?.origem ?? '').toLowerCase().includes(q) ||
+      combinaComBusca(mestreDaConfiguracao(p), q) ||
       origemLabel(p.mestre?.origem).toLowerCase().includes(q)
     )
   }, [produtos, busca, mostrarInativos])
@@ -196,18 +203,23 @@ export default function ProdutosTab() {
     const arr = mestres[form.origem as keyof Mestres] ?? []
     const q = masterBusca.trim().toLowerCase()
     if (!q) return arr.slice(0, 50)
-    return arr.filter((m) => m.label.toLowerCase().includes(q) || (m.code ?? '').toLowerCase().includes(q)).slice(0, 50)
+    return arr.filter((m) => combinaComBusca(m, q)).slice(0, 50)
   }, [mestres, form.origem, masterBusca])
   // Na EDIÇÃO o mestre já está travado: exibe o que a própria configuração guarda,
   // sem depender da lista de mestres selecionáveis (que só traz cadastros oficiais).
   const masterSelecionado =
-    (mestres[form.origem as keyof Mestres] ?? []).find((m) => String(m.id) === form.masterId)
-    ?? (editando && form.masterId ? { id: Number(form.masterId), label: form.nome, code: editando.mestre?.codigo ?? null } : null)
+    (mestres[form.origem as keyof Mestres] ?? []).find((m) => String(m.sourceId) === form.masterId)
+    ?? (editando && form.masterId
+      ? mestreDaConfiguracao({ id: Number(form.masterId), nome: form.nome, mestre: editando.mestre })
+      : null)
 
   // O nome/código de negócio vêm do MESTRE (não são montados aqui). Só guardamos o
   // vínculo (masterId) e o nome real do mestre para exibição; o código real é do mestre.
   function selecionarMaster(m: MestreRef) {
-    setForm((f) => ({ ...f, masterId: String(m.id), nome: m.label, codigo: '' }))
+    // `nome` recebe o displayName PURO. Com o rótulo concatenado, "SRV-8 —
+    // Apostilamento de Tradução" ia parar no corpo do POST — o vazamento
+    // chegava ao dado, não só à tela.
+    setForm((f) => ({ ...f, masterId: String(m.sourceId), nome: nomeExibidoDoMestre(m), codigo: '' }))
     setMasterBusca('')
   }
   function mudarOrigem(origem: string) {
@@ -279,7 +291,7 @@ export default function ProdutosTab() {
     if (podeExcluirDefinitivo) { setModalExcluir(p); return }
     // Usuário comum: regra geral inalterada — nunca apaga; no máximo inativa (o backend decide).
     const nome = p.mestre?.nome || p.nome
-    if (!confirm(`Excluir a Configuração Financeira de "${nome}"?\n\nSe nada estiver usando esta configuração (preço, regra ou vínculo de serviço), ela é apagada de vez. Caso contrário, é inativada para preservar o histórico.`)) return
+    if (!confirm(`Inativar a Configuração Financeira de "${nome}"?\n\nPreços, regras e histórico são preservados. Excluir definitivamente é restrito a administradores.`)) return
     try {
       const r: any = await jsonFetch(`/api/gerenciamento/produtos/${p.id}`, { method: 'DELETE' })
       await carregar()
@@ -352,8 +364,9 @@ export default function ProdutosTab() {
               {filtrados.map((p) => (
                 <tr key={p.id} className="border-b border-white/5 last:border-0 hover:bg-white/[0.03]">
                   <td className="px-4 py-2.5">
-                    <div className="font-medium text-white">{p.mestre?.publicCode ? <span className="font-mono text-[12px] text-white/60 mr-1">{p.mestre.publicCode} —</span> : null}{p.mestre?.nome || p.nome}</div>
-                    <div className="text-[11px] text-white/40">{p.mestre?.codigo ? `Chave: ${p.mestre.codigo}` : 'sem chave de mestre'}</div>
+                    {/* Só o nome legível. Código (SRV-n) e chave estrutural são do
+                        cadastro de ORIGEM — vivem no Catálogo de Serviços. */}
+                    <div className="font-medium text-white">{nomeExibidoDoMestre(mestreDaConfiguracao(p))}</div>
                   </td>
                   <td className="px-4 py-2.5">
                     <span className={`rounded px-2 py-0.5 text-[11px] font-medium ${p.mestre?.origem === 'servico' ? 'bg-sky-500/15 text-sky-300' : p.mestre?.origem === 'documento' ? 'bg-indigo-500/15 text-indigo-300' : 'bg-white/10 text-white/60'}`}>{origemLabel(p.mestre?.origem)}</span>
@@ -403,7 +416,7 @@ export default function ProdutosTab() {
                   <label className="mb-1 block text-xs text-white/60">{lbl(ORIGENS, form.origem)} (mestre existente)</label>
                   {masterSelecionado ? (
                     <div className="flex items-center justify-between rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm">
-                      <span className="text-white">{masterSelecionado.label}{masterSelecionado.code ? <span className="text-white/40"> · {masterSelecionado.code}</span> : null}</span>
+                      <span className="text-white">{nomeExibidoDoMestre(masterSelecionado)}</span>
                       {!editando && <button onClick={() => setForm((f) => ({ ...f, masterId: '', codigo: '', nome: '' }))} className="text-xs text-white/50 hover:text-white">trocar</button>}
                     </div>
                   ) : (
@@ -413,15 +426,15 @@ export default function ProdutosTab() {
                         <div className="mt-1 max-h-44 overflow-y-auto rounded-lg border border-white/10 bg-zinc-900">
                           {masterFiltrado.length === 0 && <div className="px-3 py-2 text-xs text-white/40">Nenhum cadastro encontrado.</div>}
                           {masterFiltrado.map((m) => (
-                            <button key={m.id} onClick={() => selecionarMaster(m)} className="block w-full px-3 py-1.5 text-left text-sm text-white/80 hover:bg-white/10">
-                              {m.label}{m.code ? <span className="text-white/40"> · {m.code}</span> : null}
+                            <button key={m.sourceId} onClick={() => selecionarMaster(m)} className="block w-full px-3 py-1.5 text-left text-sm text-white/80 hover:bg-white/10">
+                              {nomeExibidoDoMestre(m)}
                             </button>
                           ))}
                         </div>
                       )}
                     </>
                   )}
-                  <p className="mt-1 text-[11px] text-white/40">O nome e o código vêm do mestre — não é possível redigitá-los aqui.</p>
+                  <p className="mt-1 text-[11px] text-white/40">O nome vem do cadastro mestre — não é possível redigitá-lo aqui. O código e a chave ficam no cadastro de origem, no Catálogo de Serviços.</p>
                 </div>
               </Secao>
 

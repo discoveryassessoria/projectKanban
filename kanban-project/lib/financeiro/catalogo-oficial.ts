@@ -80,8 +80,7 @@ export function precoVigente(p: PrecoLike, natureza: LancamentoNatureza, hoje: s
   const canon = canonicalNaturezaPreco(p.natureza ?? null)
   if (canon == null) return false // natureza nula = linha legada/ambígua
   if (natureza === 'CUSTO' ? canon !== 'CUSTO' : canon !== 'VENDA') return false
-  if (p.vigenciaInicio && p.vigenciaInicio > hoje) return false
-  if (p.vigenciaFim && p.vigenciaFim < hoje) return false
+  // VALIDADE É ESTADO, NÃO DATA (09/08/2026): cadastro ativo vale sempre.
   return true
 }
 

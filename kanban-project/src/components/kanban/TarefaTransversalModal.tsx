@@ -9,6 +9,7 @@
 // Reutiliza as rotas oficiais: /api/tarefas-transversais/acoes e
 // /api/processos/[id]/tarefas-transversais (POST).
 
+import { nomePessoa } from "@/src/lib/ui/pessoa-exibicao"
 import { useState, useEffect, useCallback } from "react"
 import { Loader2, ArrowLeftRight, X } from "lucide-react"
 
@@ -149,7 +150,7 @@ export function TarefaTransversalModal({ processoId, necessidadeId, necessidadeL
               <span className="block text-[11.5px] font-semibold text-white/68 mb-1">Responsável (opcional)</span>
               <select value={responsavelId} onChange={(e) => setResponsavelId(e.target.value)} className="w-full text-[13px] rounded-lg border border-white/10 px-2.5 py-2 bg-[#1b2027] focus:outline-none focus:border-[#7dd3fc]/50 focus:ring-1 focus:ring-[#7dd3fc]/25">
                 <option value="">— sem responsável —</option>
-                {usuarios.map((u) => <option key={u.id} value={u.id}>{u.publicCode ? u.publicCode + " — " : ""}{u.nome}</option>)}
+                {usuarios.map((u) => <option key={u.id} value={u.id}>{nomePessoa(u)}</option>)}
               </select>
             </label>
           )}

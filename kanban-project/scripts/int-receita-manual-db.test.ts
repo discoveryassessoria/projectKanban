@@ -8,6 +8,11 @@ import { prisma } from '@/lib/prisma'
 import { criarReceitaManualCanonica } from '@/lib/financeiro/receitas/criar-receita-manual'
 import { listarReceitas } from '@/lib/financeiro/leitura/receitas-lista'
 
+import { exigirBancoDeTeste } from "./_banco-de-teste"
+
+// TRAVA DE AMBIENTE: este arquivo ESCREVE. Sem banco de teste local, não roda.
+exigirBancoDeTeste()
+
 let passed = 0, failed = 0
 const bugs: string[] = []
 function ok(cond: boolean, nome: string) { if (cond) { passed++; console.log(`  ✅ ${nome}`) } else { failed++; bugs.push(nome); console.log(`  ❌ ${nome}`) } }

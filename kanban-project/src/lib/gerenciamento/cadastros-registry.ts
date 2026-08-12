@@ -86,7 +86,10 @@ export interface CadastroSpec {
 export const FONTES: Record<string, { model: string; valor: string; label: string[]; where?: Record<string, unknown> }> = {
   tiposProcesso: { model: "tipoProcessoNacionalidade", valor: "id", label: ["name"], where: { arquivado: false } },
   fases: { model: "catalogoFase", valor: "phaseKey", label: ["label"], where: { ativo: true } },
-  usuarios: { model: "usuario", valor: "id", label: ["nome"] },
+  // NOME + E-MAIL: dois funcionários homônimos ficavam indistinguíveis no
+  // seletor, e escolher a pessoa errada para uma equipe é um erro silencioso —
+  // ninguém percebe até o trabalho ir para quem não devia.
+  usuarios: { model: "usuario", valor: "id", label: ["nome", "email"] },
   // MODELO DE MENSAGEM (e-mail/mensagem de notificação) — NÃO é modelo documental.
   // O repositório de modelos documentais (DOCX versionado) é outro domínio e vive
   // em ModeloDocumental. O nome distinto existe para que ninguém confunda os dois.
@@ -193,29 +196,6 @@ export const CADASTROS: Record<string, CadastroSpec> = {
     relacao: { prop: "membros", model: "grupoUsuarioMembro", campoPai: "grupoId", campoAlvo: "usuarioId", campoForm: "membros" },
   },
 
-  // ── Usuários e Acessos › Grupos › Cargos ───────────────────────────────────
-  cargos: {
-    entidade: "cargos",
-    model: "cargoCadastro",
-    titulo: "Cargos",
-    descricao:
-      "Papéis funcionais usados como responsável padrão em tarefas, workflows e automações. A autorização em si continua em Perfis e Permissões.",
-    novoLabel: "+ Novo cargo",
-    codeDe: "nome",
-    ordenarPor: [{ campo: "nome", direcao: "asc" }],
-    colunas: [
-      { key: "nome", label: "Cargo" },
-      { key: "code", label: "Chave" },
-      { key: "area", label: "Área" },
-      { key: "descricao", label: "Descrição" },
-    ],
-    campos: [
-      { key: "nome", label: "Nome do cargo", tipo: "text", obrigatorio: true, largura: "cheia" },
-      { key: "area", label: "Área", tipo: "text", largura: "meia" },
-      { key: "descricao", label: "Descrição", tipo: "textarea", largura: "cheia" },
-      ...CAMPOS_BASE,
-    ],
-  },
 
   // ── Sistema › Modelos ─────────────────────────────────────────────────────
   // O cadastro genérico de "modelos de texto" (ModeloDocumento, com o conteúdo

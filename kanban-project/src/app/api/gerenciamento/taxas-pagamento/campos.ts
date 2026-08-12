@@ -41,7 +41,6 @@ export function validarTaxa(b: Record<string, unknown>): ErroTaxa[] {
   const erros: ErroTaxa[] = []
   if (!b.name || !String(b.name).trim()) erros.push({ campo: 'name', mensagem: 'Informe o nome.' })
   const ini = dataOu(b.vigenciaInicio), fim = dataOu(b.vigenciaFim)
-  if (ini && fim && fim.getTime() < ini.getTime()) erros.push({ campo: 'vigenciaFim', mensagem: 'Fim da vigência anterior ao início.' })
   if (enumOu(b.aplicaParcela, APLICA_PARCELA) === 'FAIXA') {
     const de = int(b.installmentsFrom), ate = int(b.installmentsTo)
     if (de === null || ate === null) erros.push({ campo: 'installmentsFrom', mensagem: 'Faixa de parcelas exige início e fim.' })

@@ -1,5 +1,10 @@
 # Reestruturação do Gerenciamento — 25/07/2026
 
+> **Superado em 06/08/2026 neste ponto:** "Variação da Fase" (`PhaseInternalMode`) foi ELIMINADA. Não era conceito de domínio — nenhum
+> ponto do runtime a consumia. O comportamento é determinado por Fase, Workflow
+> Interno, Matriz Documental e Regras. Ver `prisma/migrations/20260806c_remover_variacao_fase`.
+> O texto abaixo é o registro do que valia em 25/07/2026 e não é reescrito.
+
 Reorganização **da camada de navegação** (menu, agrupamentos, rotas lógicas e breadcrumbs)
 para a arquitetura oficial de 11 módulos. Nenhuma tela foi reescrita, nenhuma API teve
 contrato alterado, nenhum dado foi migrado ou apagado.

@@ -16,6 +16,7 @@
 
 "use client"
 
+import { nomePessoa } from "@/src/lib/ui/pessoa-exibicao"
 import { Play, AlertCircle, CheckCircle2, ChevronRight, FileText, Paperclip, AlertTriangle, FileSignature, Inbox } from "lucide-react"
 
 // ============================================================
@@ -319,7 +320,7 @@ export function TabOperationCockpit({
               >
                 <option value="" className="bg-[#20262e]">Delegar…</option>
                 {usuarios.map((u) => (
-                  <option key={u.id} value={u.id} className="bg-[#20262e]">{u.publicCode ? u.publicCode + ' — ' : ''}{u.nome}</option>
+                  <option key={u.id} value={u.id} className="bg-[#20262e]">{nomePessoa(u)}</option>
                 ))}
               </select>
             ) : (

@@ -11,6 +11,7 @@
 // via projeção → PhaseAdvanceService via tentarAvancoAutomatico). Idempotente onde aplicável.
 
 import { prisma } from "@/lib/prisma"
+import { criarTarefaManual, concluirTarefaSemWorkflow, cancelarTarefa } from "@/lib/operacional/tarefa-ciclo"
 import { type FaseCode } from "@prisma/client"
 import { atenderNecessidade } from "@/src/services/necessidade-documental"
 import { tentarAvancoAutomatico } from "@/src/lib/motor/auto-avanco"
@@ -71,18 +72,41 @@ export async function criarTarefaTransversal(input: CriarTransversalInput) {
   const labelRef = FASES[faseRefCode]?.label ?? faseRefCode
   const titulo = (input.titulo ?? `Transversal · ${input.acaoStepKey} (${labelRef})`).slice(0, 200)
 
-  const t = await prisma.tarefa.create({
-    data: {
-      titulo, tipo: "TRANSVERSAL", processoId: input.processoId,
-      faseOrigemCode: (faseOrigemCode ?? faseOrigemKey) ?? null, faseReferenciaCode: faseRefCode,
-      workflowInstanceOrigemId: inst?.id ?? null, faseMacroKey: faseOrigemKey,
-      necessidadeId: input.necessidadeOrigemId, pessoaId: input.pessoaId ?? nec.pessoaId ?? null,
-      documentoId: input.documentoId ?? null, tipoDocumentoId: input.tipoDocumentoId ?? null,
-      acaoStepKey: input.acaoStepKey, motivo: input.motivo ?? null, resultadoEsperado: input.resultadoEsperado ?? null,
-      responsavelId: input.responsavelId ?? null, dataPrazo: input.prazo ?? null,
-      statusTarefa: "NAO_INICIADA", origem: "TRANSVERSAL", createdBy: input.usuarioId ?? null,
+  // A TAREFA NASCE PELA PORTA CANÔNICA.
+  //
+  // Aqui havia um `prisma.tarefa.create` próprio — a segunda origem de tarefa
+  // do sistema, com o seu próprio jeito de definir status inicial e
+  // responsabilidade. O que é DA TRANSVERSAL (fase de referência, ação do
+  // catálogo, resultado esperado) viaja como campos de domínio na MESMA
+  // criação; o que é da mecânica da tarefa é da porta.
+  const criada = await criarTarefaManual({
+    processoId: input.processoId,
+    titulo,
+    autorId: input.usuarioId ?? 0,
+    faseMacroKey: faseOrigemKey,
+    pessoaId: input.pessoaId ?? nec.pessoaId ?? null,
+    documentoId: input.documentoId ?? null,
+    necessidadeId: input.necessidadeOrigemId,
+    responsavelId: input.responsavelId ?? null,
+    dataPrazo: input.prazo ?? null,
+    motivo: input.motivo ?? `Operação antecipada: ${input.acaoStepKey} (${labelRef})`,
+    // A transversal é trabalho ANTECIPADO e deliberado: existir outra tarefa
+    // aberta para a mesma necessidade é o caso normal, não duplicidade.
+    confirmarDuplicidade: true,
+    origem: "TRANSVERSAL",
+    camposDeDominio: {
+      tipo: "TRANSVERSAL",
+      faseOrigemCode: (faseOrigemCode ?? faseOrigemKey) ?? null,
+      faseReferenciaCode: faseRefCode,
+      workflowInstanceOrigemId: inst?.id ?? null,
+      tipoDocumentoId: input.tipoDocumentoId ?? null,
+      acaoStepKey: input.acaoStepKey,
+      resultadoEsperado: input.resultadoEsperado ?? null,
+      createdBy: input.usuarioId ?? null,
     },
   })
+  if (!criada.ok) throw new Error(criada.mensagem)
+  const t = await prisma.tarefa.findUniqueOrThrow({ where: { id: criada.tarefaId } })
   // VÍNCULO com a OPERAÇÃO OFICIAL: a Transversal NÃO possui workflow próprio. Ela aponta para
   // a operação documental oficial da necessidade de origem (o mesmo Documento operado no drawer
   // padrão "Abrir operação", com seu workflow real). Se a necessidade ainda não materializou o
@@ -92,6 +116,8 @@ export async function criarTarefaTransversal(input: CriarTransversalInput) {
     const doc = await prisma.documento.findFirst({ where: { necessidadeId: input.necessidadeOrigemId }, orderBy: { id: "desc" }, select: { id: true } })
     documentoId = doc?.id ?? null
   }
+  // Vincular o Documento é dado de DOMÍNIO (a que operação esta transversal se
+  // refere), não transição de estado — por isso não passa pelas portas.
   if (documentoId != null) await prisma.tarefa.update({ where: { id: t.id }, data: { documentoId } })
   await audit("CRIADA", t.id, `Transversal "${titulo}" (ref ${faseRefCode}) p/ necessidade ${input.necessidadeOrigemId}${documentoId ? `; vínculo operação doc ${documentoId}` : " (operação sob demanda)"}`, input.usuarioId)
   return { ...t, documentoId }
@@ -106,10 +132,15 @@ export async function concluirTarefaTransversal(
   const t = await prisma.tarefa.findUnique({ where: { id: tarefaId } })
   if (!t || t.tipo !== "TRANSVERSAL") throw new Error("Tarefa transversal não encontrada")
 
-  await prisma.tarefa.update({
-    where: { id: tarefaId },
-    data: { statusTarefa: "CONCLUIDO_RECEBIDO", concluida: true, dataConclusao: new Date(), resultadoObtido: opts.resultadoObtido ?? null, executedById: opts.usuarioId ?? null },
+  // A CONCLUSÃO PASSA PELA PORTA. A transversal não tem workflow — é o caso
+  // exato para o qual `concluirTarefaSemWorkflow` existe. Escrever
+  // `statusTarefa` aqui era a última exceção operacional do sistema.
+  const r = await concluirTarefaSemWorkflow({
+    tarefaId,
+    autorId: opts.usuarioId ?? 0,
+    resultado: opts.resultadoObtido ?? null,
   })
+  if (!r.ok) throw new Error(r.mensagem)
   await audit("CONCLUIDA", tarefaId, `Concluída ${opts.resolveuNecessidade ? "COM" : "SEM"} resolução. Resultado: ${opts.resultadoObtido ?? "—"}`, opts.usuarioId)
 
   // A conclusão sozinha NÃO resolve a necessidade — o resultado precisa ser avaliado.
@@ -124,7 +155,13 @@ export async function concluirTarefaTransversal(
 export async function cancelarTarefaTransversal(tarefaId: number, opts: { motivo?: string | null; usuarioId?: number | null }) {
   const t = await prisma.tarefa.findUnique({ where: { id: tarefaId }, select: { id: true, tipo: true } })
   if (!t || t.tipo !== "TRANSVERSAL") throw new Error("Tarefa transversal não encontrada")
-  await prisma.tarefa.update({ where: { id: tarefaId }, data: { statusTarefa: "CANCELADA", motivo: opts.motivo ?? undefined } })
+  // Cancelar é ato humano com motivo — a porta canônica já o exige e o audita.
+  const rc = await cancelarTarefa({
+    tarefaId,
+    autorId: opts.usuarioId ?? 0,
+    motivo: opts.motivo?.trim() || "Operação antecipada cancelada",
+  })
+  if (!rc.ok) throw new Error(rc.mensagem)
   await audit("CANCELADA", tarefaId, `Cancelada. Motivo: ${opts.motivo ?? "—"}`, opts.usuarioId)
   return t
 }

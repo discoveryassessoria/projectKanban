@@ -62,13 +62,11 @@ interface Defaults {
   valorUnitario?: number | null
   moeda?: string | null
   unidade?: string | null
-  categoriaNome?: string | null
   fornecedorPadraoId?: number | null
   fornecedorPadraoNome?: string | null
   condicaoPagamentoId?: number | null
   formaCobranca?: string | null
   naturezaFin?: string | null
-  contaContabilLabel?: string | null
   repasse?: boolean
   reembolsavel?: boolean
   cobravelDoCliente?: boolean
@@ -475,13 +473,14 @@ export function LancamentoFinanceiroModal({
 
           {/* ── SEÇÃO 3 — Classificação e contexto ── */}
           <Secao titulo="Classificação e contexto">
+            {/* "Classificação financeira" e "Conta contábil" saíram daqui: a
+                classificação intermediária (categorias / plano de contas / centros
+                de custo) foi ELIMINADA, e a conta contábil passou a ser decidida
+                pelo Ledger a partir do plano fixo, no momento em que ele registra
+                a partida. Nenhum cadastro guarda esses dois valores — a API nunca
+                os enviou, e os campos só sabiam exibir "—". Campo que jamais pode
+                ter valor é a versão silenciosa do botão morto. */}
             <div className="grid gap-3 sm:grid-cols-2">
-              <Campo label="Classificação financeira">
-                {() => <ValorFixo origem={defaults?.categoriaNome ? "do cadastro" : undefined}>{defaults?.categoriaNome ?? "—"}</ValorFixo>}
-              </Campo>
-              <Campo label="Conta contábil">
-                {() => <ValorFixo origem={defaults?.contaContabilLabel ? "configuração financeira" : undefined}>{defaults?.contaContabilLabel ?? "—"}</ValorFixo>}
-              </Campo>
               <Campo label="Natureza financeira">
                 {() => <ValorFixo>{defaults?.naturezaFin ? String(defaults.naturezaFin).replaceAll("_", " ").toLowerCase() : "—"}</ValorFixo>}
               </Campo>
@@ -565,8 +564,6 @@ export function LancamentoFinanceiroModal({
               {custo && acr > 0 && <Linha rotulo="Acréscimos">+ {fmt(acr, moeda)}</Linha>}
               <Linha rotulo="Total">{fmt(total, moeda)}</Linha>
               {custo && <Linha rotulo="Parcelas">{parcelas.length > 1 ? `${parcelas.length}× — 1º em ${new Date(`${parcelas[0].vencimento}T12:00:00`).toLocaleDateString("pt-BR")}` : "à vista"}</Linha>}
-              <Linha rotulo="Classificação">{defaults?.categoriaNome ?? "—"}</Linha>
-              <Linha rotulo="Conta contábil">{defaults?.contaContabilLabel ?? "—"}</Linha>
             </dl>
 
             {distribuicao.length > 0 && (

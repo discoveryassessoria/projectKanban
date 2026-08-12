@@ -101,7 +101,61 @@ const MIGRATION = join(DIR_MIGRATIONS, '0000_baseline', 'migration.sql')
 // checksum anterior no WHERE, para nao acertar linha errada) -> `prisma migrate
 // status` = "Database schema is up to date". Nenhuma outra migration foi tocada;
 // nenhum dado de negocio foi lido ou alterado.
-const CHECKSUM_LEDGER = '62e887f885d8725aad4a7359ba857fff2e457deffa96d8624139c0ca1e8c0e94'
+// ATUALIZACAO 06/08/2026 (vinculo documental do custo) — migration ADITIVA
+// 20260806_custo_documental_vinculo: 17 colunas novas em ObrigacaoEconomica
+// (vinculo pessoa/documento/servico/fase + origem do lancamento + snapshot de
+// preco + chaveIdempotencia), 1 unique e 3 indices. Diff do baseline: 30 linhas
+// inseridas, ZERO removidas, ZERO DROP/TRUNCATE/DELETE (a unica linha alterada e
+// a data do cabecalho gerado). Nenhuma tabela existente foi tocada.
+//
+//   anterior : 62e887f885d8725aad4a7359ba857fff2e457deffa96d8624139c0ca1e8c0e94
+//   atual    : 597b1cd360c5871297e7475528074aa8f639ba3bbf00c1c8206254e37d775bb8
+//
+// Procedimento executado: backup do ledger em
+// ~/.discovery-backups/prisma-migrations-20260806-pre-checksum.json (9 linhas,
+// todas com finished_at) -> conferencia do diff do baseline por `git diff
+// --numstat` (30 insercoes / 1 alteracao de cabecalho / 0 remocoes) e por busca
+// de DROP|TRUNCATE|DELETE nas linhas adicionadas (nenhuma) -> UPDATE de UMA
+// coluna na linha 0000_baseline, com o checksum anterior no WHERE (1 linha
+// afetada, conferida) -> `prisma migrate status` = 10 migrations encontradas,
+// nenhuma acusada como modificada, apenas 20260806_custo_documental_vinculo
+// pendente de aplicacao. Nenhuma outra migration foi tocada; nenhum dado de
+// negocio foi lido ou alterado.
+// ATUALIZACAO 06/08/2026 (assistente de parametrizacao) — migration ADITIVA
+// 20260806b_assistente_parametrizacao: UMA tabela nova
+// (AssistenteParametrizacaoProgresso), que guarda so PROGRESSO do assistente —
+// escopo, etapa, usuario e datas. Nenhuma coluna de configuracao: a Matriz, o
+// preco e o fornecedor continuam nas suas entidades. Diff do baseline: 22 linhas
+// inseridas, ZERO removidas, ZERO DROP/TRUNCATE/DELETE.
+//
+//   anterior : 597b1cd360c5871297e7475528074aa8f639ba3bbf00c1c8206254e37d775bb8
+//   atual    : 384a83bff1a33778dbb0b3026463a3f348e7907c8c7f305aabed6a26834039ed
+//
+// Procedimento executado: pg_dump completo de producao
+// (~/.discovery-backups/prod-20260806b-pre-assistente/, sha256 7088c90975dc7ae3...)
+// + copia do ledger -> conferencia do diff (22 insercoes / 0 remocoes) -> UPDATE
+// de UMA coluna na linha 0000_baseline, com o checksum anterior no WHERE (1 linha
+// afetada) -> `prisma migrate status` consistente.
+// ATUALIZACAO 06/08/2026 (remocao da "Variacao da Fase") — migration DESTRUTIVA
+// APROVADA: 20260806c_remover_variacao_fase derruba a tabela PhaseInternalMode.
+// Ela era cadastro SEM CONSUMIDOR — varredura em src/services, src/lib/motor e
+// src/lib/process-stage nao encontrou nenhuma leitura pelo runtime. Tabela folha,
+// sem FK apontando para ela. As 20 linhas ficaram preservadas em
+// ~/.discovery-backups/prod-20260806d-pre-remocao-variacao-fase/ (JSON + dump
+// completo) e transcritas no cabecalho da propria migration.
+// Diff do baseline: 32 linhas REMOVIDAS (a tabela e seus indices), 0 inseridas.
+//
+//   anterior : 384a83bff1a33778dbb0b3026463a3f348e7907c8c7f305aabed6a26834039ed
+//   atual    : 7cd1f90827eef93f97a0fc35efe238d1d4e0a5dc45138c388ad53cc0f2fafb37
+// ATUALIZACAO 06/08/2026 (politica de natureza por fase) — migration ADITIVA
+// 20260806d_politica_natureza_por_fase: UMA tabela nova (FaseNaturezaPermitida),
+// que liga CatalogoFase a NaturezaOperacionalDocumento por ID. Substitui a
+// premissa "a Genealogia so materializa certidao", que vivia em codigo.
+// Diff do baseline: 24 linhas inseridas, ZERO removidas.
+//
+//   anterior : 7cd1f90827eef93f97a0fc35efe238d1d4e0a5dc45138c388ad53cc0f2fafb37
+//   atual    : dc38860b04bca0a0355e2eabd00c3bbe28659a9688e44b1f1cea7296cd7622b4
+const CHECKSUM_LEDGER = '8e66a6548e71c7aafceab85e705ef78fd0efa47b0ab6b64b0571ffb44291eb01'
 
 /**
  * Migrations criadas DEPOIS da consolidacao de 02/08/2026. Toda migration nova
@@ -117,6 +171,21 @@ const MIGRATIONS_POS_BASELINE: string[] = [
   '20260804b_requerimento_doc21_vinculo',
   '20260804c_contrato_documental',
   '20260805_modelos_documentais',
+  '20260806_custo_documental_vinculo',
+  '20260806b_assistente_parametrizacao',
+  '20260806c_remover_variacao_fase',
+  '20260806d_politica_natureza_por_fase',
+  '20260807_pessoa_ciclo_vida',
+  '20260809_planilha_documental_colunas',
+  '20260809210000_planilha_matriz_e_override',
+  '20260809220000_planilha_coluna_etapa_chk',
+  '20260810120000_tarefa_unidade_operacional',
+  '20260811100000_notificacao_operacional',
+  '20260811160000_motor_operacional_universal',
+  '20260812100000_tarefa_por_unidade_de_trabalho',
+  '20260812140000_remover_arvore_subtarefas',
+  '20260812180000_camada_operacional_funcionario',
+  '20260812200000_aptidao_por_unidade_operacional',
 ]
 
 const sha256 = (t: string) => createHash('sha256').update(t).digest('hex')

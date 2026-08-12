@@ -1,341 +1,99 @@
 // src/app/api/processos/[processoId]/custos/route.ts
-// ✅ ATUALIZADO: Custos por documento (tipoRegistro) ao invés de apenas por pessoa
-// ✅ PASSO 3 (E8): a Planilha agora MOSTRA o Custo do motor econômico (fonte oficial),
-//    com CustoPessoa como FALLBACK (adapter — não removido). Formato de resposta idêntico.
+//
+// PLANILHA DOCUMENTAL-FINANCEIRA DO PROCESSO — projeção, nunca fonte.
+//
+// O QUE MUDOU E POR QUÊ
+// ---------------------
+// Este endpoint lia `prisma.custo` (o model legado) e criava seis TipoServico de
+// nomes fixos dentro do GET. Em 28/07/2026, o motor passou a nascer V3-native
+// (commit 4fca632e) e deixou de escrever no `Custo` legado: o leitor continuou
+// apontado para uma tabela que ninguém mais alimenta, e a planilha zerou. Não foi
+// a geração que morreu — foi a leitura que ficou órfã.
+//
+// Agora a fonte é a mesma que a aba Custos usa: as ObrigacaoEconomica do processo,
+// com o vínculo documental (pessoa/documento/serviço) em coluna. As colunas de
+// serviço são DERIVADAS do cadastro, não escritas aqui. E ler deixou de escrever:
+// nenhuma linha é criada por um GET.
+//
+// A resposta preserva o formato legado (linhas/pessoas/servicos/totais) para não
+// quebrar quem já consome, e acrescenta `planilha` com a projeção rica (blocos por
+// pessoa, células por serviço, totais por linha/pessoa/processo).
 
 import { type NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import { verificarPermissao } from '@/src/lib/verificar-permissao'
+import { montarPlanilhaDocumental } from '@/lib/financeiro/leitura/planilha-documental'
 
-// Serviços padrão que serão criados automaticamente
-const SERVICOS_PADRAO = [
-  { nome: "Certidão Inteiro Teor", ordem: 0 },
-  { nome: "Desmaterialização", ordem: 1 },
-  { nome: "Apostilamento Certidão", ordem: 2 },
-  { nome: "Tradução Juramentada", ordem: 3 },
-  { nome: "Apostilamento Tradução", ordem: 4 },
-  { nome: "Retificação", ordem: 5 },
-]
 
-// Tipos de certidão que queremos mostrar
-// LOTE C · Fase 9 — participação na Planilha vem da CONFIG (TipoDocumentoCadastro
-// .participaPlanilha), não de lista fixa. Carregado por processo em runtime (abaixo).
-// (TIPOS_CERTIDAO removido; ver carregarTiposDaPlanilha)
-async function carregarTiposDaPlanilha(): Promise<string[]> {
-  const tipos = await prisma.tipoDocumentoCadastro.findMany({
-    where: { participaPlanilha: true, legacyEnumKey: { not: null } },
-    select: { legacyEnumKey: true },
-  })
-  return tipos.map((t) => t.legacyEnumKey as string)
-}
-
-// Helper para extrair tipo de registro
-function getTipoRegistro(tipoDocumento: string): 'Nascimento' | 'Casamento' | 'Óbito' | null {
-  if (tipoDocumento.includes('NASCIMENTO')) return 'Nascimento'
-  if (tipoDocumento.includes('CASAMENTO')) return 'Casamento'
-  if (tipoDocumento.includes('OBITO')) return 'Óbito'
-  return null
-}
-
-// Ordem para ordenação dos tipos de registro
-function getOrdemRegistro(tipo: string): number {
-  if (tipo === 'Nascimento') return 1
-  if (tipo === 'Casamento') return 2
-  if (tipo === 'Óbito') return 3
-  return 99
-}
-
-// GET - Listar todos os custos do processo com dados completos
+// GET — a planilha documental-financeira do processo (somente leitura).
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ processoId: string }> }
 ) {
   try {
+    // A planilha é financeira: ver custo do processo exige permissão, como a lista.
+    // O GET nunca teve gate — passava porque ninguém o alcançava pela tela morta.
+    const erro = await verificarPermissao(request, 'financeiro.ver')
+    if (erro) return erro
+
     const { processoId } = await params
     const id = parseInt(processoId)
+    if (isNaN(id)) return NextResponse.json({ error: "ID inválido" }, { status: 400 })
 
-    if (isNaN(id)) {
-      return NextResponse.json({ error: "ID inválido" }, { status: 400 })
-    }
+    const processoExiste = await prisma.processo.findUnique({ where: { id }, select: { id: true, nome: true } })
+    if (!processoExiste) return NextResponse.json({ error: "Processo não encontrado" }, { status: 404 })
 
-    // Verificar se processo existe
-    const processoExiste = await prisma.processo.findUnique({
-      where: { id },
-      select: { id: true }
-    })
+    // FONTE ÚNICA: a projeção. Tudo abaixo é formatação dela.
+    const planilha = await montarPlanilhaDocumental(id)
 
-    if (!processoExiste) {
-      return NextResponse.json({ error: "Processo não encontrado" }, { status: 404 })
-    }
-
-    // Fase 9: tipos que participam da Planilha vêm da CONFIG (não mais hardcoded)
-    const TIPOS_PLANILHA = await carregarTiposDaPlanilha()
-
-    // Buscar serviços existentes
-    let servicos = await prisma.tipoServico.findMany({
-      where: { processoId: id },
-      orderBy: { ordem: 'asc' }
-    })
-
-    // Se não existem tipos de serviço, criar os padrão
-    if (servicos.length === 0) {
-      servicos = await prisma.$transaction(async (tx) => {
-        const countExistente = await tx.tipoServico.count({
-          where: { processoId: id }
-        })
-
-        if (countExistente === 0) {
-          for (const s of SERVICOS_PADRAO) {
-            await tx.tipoServico.create({
-              data: {
-                processoId: id,
-                nome: s.nome,
-                ordem: s.ordem
-              }
-            })
-          }
-        }
-
-        return tx.tipoServico.findMany({
-          where: { processoId: id },
-          orderBy: { ordem: 'asc' }
-        })
-      })
-    }
-
-    // Buscar pessoas da árvore com TODOS os dados necessários
-    const processo = await prisma.processo.findUnique({
-      where: { id },
-      include: {
-        arvore: {
-          include: {
-            pessoas: {
-              include: {
-                // Pai e Mãe para genitores
-                pai: true,
-                mae: true,
-                // Uniões para cônjuge
-                unioesComoPessoa1: {
-                  include: {
-                    pessoa2: true
-                  }
-                },
-                unioesComoPessoa2: {
-                  include: {
-                    pessoa1: true
-                  }
-                },
-                // Documentos (certidões)
-                documentos: {
-                  where: {
-                    tipo: { in: TIPOS_PLANILHA as any }
-                  },
-                  orderBy: { tipo: 'asc' }
-                }
-              },
-              // ✅ ATUALIZADO: Ordenar por numeroLinhagem e ordemCusto
-              orderBy: [
-                { numeroLinhagem: 'asc' },
-                { ordemCusto: 'asc' },
-                { id: 'asc' }
-              ]
-            }
-          }
-        },
-        custosPessoa: true
-      }
-    })
-
-    const todasPessoas = processo?.arvore?.pessoas || []
-    const custos = processo?.custosPessoa || []
-
-    // ── FALLBACK (manual antigo): mapa de CustoPessoa ────────────────────────
-    // Chave: pessoaId-tipoRegistro-tipoServicoId
-    const custosMap: Record<string, { valor: number; observacao: string | null }> = {}
-    custos.forEach(c => {
-      const tipoReg = (c as any).tipoRegistro || ''
-      const key = `${c.pessoaId}-${tipoReg}-${c.tipoServicoId}`
-      custosMap[key] = {
-        valor: Number(c.valor),
-        observacao: c.observacao
-      }
-    })
-
-    // ── PASSO 3 (E8): FONTE OFICIAL = tabela Custo (motor econômico) ──────────
-    // A Planilha passa a MOSTRAR o Custo gerado pelo motor. O CustoPessoa acima
-    // vira FALLBACK: só é usado quando NÃO há Custo oficial para aquela célula.
-    // Casamento das chaves: cada linha da grade é UM documento (doc.id) e cada
-    // coluna é UM tipoServico (servico.id). O Custo grava os dois campos, então
-    // o join é direto por (documentoId + tipoServicoId) — sem adivinhar nada.
-    const custosOficiais = await prisma.custo.findMany({
-      where: {
-        processoId: id,
-        status: 'ATIVA',
-        documentoId: { not: null },
-        tipoServicoId: { not: null },
-      },
-      select: { documentoId: true, tipoServicoId: true, valor: true },
-    })
-    // Chave: documentoId-tipoServicoId → soma dos custos ativos daquela célula
-    // (soma cobre o caso raro de mais de um custo na mesma célula; hoje é 1).
-    const custosOficiaisMap: Record<string, number> = {}
-    custosOficiais.forEach(c => {
-      const key = `${c.documentoId}-${c.tipoServicoId}`
-      custosOficiaisMap[key] = (custosOficiaisMap[key] || 0) + Number(c.valor)
-    })
-
-    // Criar linhas da tabela (uma linha por documento/certidão)
-    const linhasTabela: any[] = []
-
-    todasPessoas.forEach(pessoa => {
-      const nomeCompleto = `${pessoa.nome} ${pessoa.sobrenome || ''}`.trim()
-      const numeroLinhagem = pessoa.numeroLinhagem || 999
-      const ordemCusto = (pessoa as any).ordemCusto || 0
-
-      // Genitores
-      const paiNome = pessoa.pai ? `${pessoa.pai.nome} ${pessoa.pai.sobrenome || ''}`.trim() : null
-      const maeNome = pessoa.mae ? `${pessoa.mae.nome} ${pessoa.mae.sobrenome || ''}`.trim() : null
-
-      // Cônjuges (pode ter múltiplos)
-      const conjuges: string[] = []
-      pessoa.unioesComoPessoa1?.forEach(u => {
-        if (u.pessoa2) {
-          conjuges.push(`${u.pessoa2.nome} ${u.pessoa2.sobrenome || ''}`.trim())
-        }
-      })
-      pessoa.unioesComoPessoa2?.forEach(u => {
-        if (u.pessoa1) {
-          conjuges.push(`${u.pessoa1.nome} ${u.pessoa1.sobrenome || ''}`.trim())
-        }
-      })
-
-      // Se a pessoa tem documentos, criar uma linha para cada
-      if (pessoa.documentos && pessoa.documentos.length > 0) {
-        pessoa.documentos.forEach((doc, idx) => {
-        if (!doc.tipo) return              // 🆕 doc de tipo novo (sem enum) — pula desta grade legada por ora
-        const tipoRegistro = getTipoRegistro(doc.tipo)
-        if (!tipoRegistro) return
-
-          // Pegar data do casamento da união (se tiver)
-          let dataCasamento: Date | null = null
-          if (tipoRegistro === 'Casamento') {
-            const primeiraUniao = pessoa.unioesComoPessoa1?.[0] || pessoa.unioesComoPessoa2?.[0]
-            dataCasamento = primeiraUniao?.data_inicio || null
-          }
-
-          // Puxar data da pessoa ao invés do documento
-          let dataRegistro: Date | string | null = null
-          if (tipoRegistro === 'Nascimento') {
-            dataRegistro = pessoa.data_nasc
-          } else if (tipoRegistro === 'Casamento') {
-            dataRegistro = dataCasamento
-          } else if (tipoRegistro === 'Óbito') {
-            dataRegistro = pessoa.data_obito
-          }
-
-          // ── VALOR DA CÉLULA: oficial (Custo do motor) com fallback (CustoPessoa) ──
-          const valoresPorServico: Record<number, number> = {}
-          let totalLinha = 0
-          servicos.forEach(servico => {
-            // 1º) FONTE OFICIAL: Custo do motor para este documento + serviço
-            const oficial = custosOficiaisMap[`${doc.id}-${servico.id}`]
-            // 2º) FALLBACK: CustoPessoa manual antigo (mesma chave de antes)
-            const legadoKey = `${pessoa.id}-${tipoRegistro}-${servico.id}`
-            const legado = custosMap[legadoKey]?.valor || 0
-            // Se existe custo oficial (mesmo que 0), ele manda; senão cai no manual.
-            const valor = oficial != null ? oficial : legado
-            valoresPorServico[servico.id] = valor
-            totalLinha += valor
-          })
-
-          linhasTabela.push({
-            pessoaId: pessoa.id,
-            numeroLinhagem,
-            ordemCusto,
-            nome: nomeCompleto,
-            tipoRegistro,
-            ordemRegistro: getOrdemRegistro(tipoRegistro),
-            data: dataRegistro,
-            local: doc.cidade_registro
-              ? `${doc.cidade_registro}${doc.estado_registro ? ' - ' + doc.estado_registro : ''}`
-              : doc.cartorio || '',
-            cartorio: doc.cartorio || '',
-            livro: doc.livro || '',
-            folha: doc.folha || '',
-            termo: doc.termo || '',
-            dadosRegistro: doc.livro || doc.folha || doc.termo
-              ? `Livro ${doc.livro || '-'} / Folhas ${doc.folha || '-'} / Termo ${doc.termo || '-'}`
-              : '',
-            // ✅ CORRIGIDO: Cônjuge em TODAS as linhas (não só na primeira)
-            conjuge: conjuges[0] || '',
-            paiNome,
-            maeNome,
-            observacao: doc.observacoes || '',
-            // Valores em CADA linha
-            valores: valoresPorServico,
-            total: totalLinha,
-            isPrimeiraLinha: idx === 0,
-            documentoId: doc.id
-          })
-        })
-      }
-    })
-
-    // Ordenar: 1º por numeroLinhagem, 2º por ordemCusto, 3º por tipo de registro
-    linhasTabela.sort((a, b) => {
-      // Primeiro por número de linhagem
-      if (a.numeroLinhagem !== b.numeroLinhagem) {
-        return a.numeroLinhagem - b.numeroLinhagem
-      }
-      // Se mesmo número de linhagem, ordenar por ordemCusto
-      if (a.ordemCusto !== b.ordemCusto) {
-        return a.ordemCusto - b.ordemCusto
-      }
-      // Se mesma ordem, ordenar por pessoaId (desempate)
-      if (a.pessoaId !== b.pessoaId) {
-        return a.pessoaId - b.pessoaId
-      }
-      // Se mesma pessoa, ordenar por tipo de registro
-      return a.ordemRegistro - b.ordemRegistro
-    })
-
-    // Calcular totais por serviço (soma de TODAS as linhas — já reflete o oficial)
-    const totaisPorServico: Record<number, number> = {}
-    servicos.forEach(servico => {
-      totaisPorServico[servico.id] = linhasTabela
-        .reduce((acc, l) => acc + (l.valores[servico.id] || 0), 0)
-    })
-
-    // Total geral
-    const totalGeral = Object.values(totaisPorServico).reduce((acc, val) => acc + val, 0)
-
-    // Lista de pessoas únicas para compatibilidade
-    const pessoasUnicas = [...new Map(linhasTabela.map(l => [l.pessoaId, {
-      id: l.pessoaId,
-      nome: l.nome.split(' ')[0],
-      sobrenome: l.nome.split(' ').slice(1).join(' '),
-      nomeCompleto: l.nome,
-      numeroLinhagem: l.numeroLinhagem
-    }])).values()]
+    // ── Formato legado (preservado) ──────────────────────────────────────────
+    // Uma linha por documento, com os valores por serviço num mapa. Derivado da
+    // MESMA projeção: nenhum número aqui é calculado por um segundo caminho.
+    const linhas = planilha.pessoas.flatMap((p) =>
+      p.linhas.map((l, idx) => ({
+        pessoaId: p.pessoaId,
+        numeroLinhagem: p.numeroLinhagem ?? 999,
+        nome: p.nome,
+        tipoRegistro: l.tipoRegistro,
+        data: l.dataRegistro,
+        local: l.local ?? l.cartorio ?? '',
+        cartorio: l.cartorio ?? '',
+        livro: l.livro ?? '',
+        folha: l.folha ?? '',
+        termo: l.termo ?? '',
+        dadosRegistro: l.livro || l.folha || l.termo
+          ? `Livro ${l.livro || '-'} / Folhas ${l.folha || '-'} / Termo ${l.termo || '-'}`
+          : '',
+        conjuge: p.conjuges[0] ?? '',
+        paiNome: p.paiNome,
+        maeNome: p.maeNome,
+        observacao: l.observacao ?? '',
+        valores: Object.fromEntries(l.celulas.map((c) => [c.tipoServicoId, c.valorBrl])),
+        total: l.totalBrl,
+        isPrimeiraLinha: idx === 0,
+        documentoId: l.documentoId,
+        localizado: l.localizado,
+      })),
+    )
 
     return NextResponse.json({
-      // Novo formato para tabela estilo Excel
-      linhas: linhasTabela,
-
-      // Formato antigo para compatibilidade
-      pessoas: pessoasUnicas,
-
-      servicos,
-      custosMap,
-      totaisPorServico,
-      totalGeral,
-
-      // 🔎 Só para conferência do Passo 3 (a tela ignora): quantas células vieram
-      // da fonte oficial (Custo do motor). Some >0 = motor aparecendo na Planilha.
-      custosOficiaisCount: custosOficiais.length,
+      linhas,
+      pessoas: planilha.pessoas.map((p) => ({
+        id: p.pessoaId,
+        nome: p.nome.split(' ')[0],
+        sobrenome: p.nome.split(' ').slice(1).join(' '),
+        nomeCompleto: p.nome,
+        numeroLinhagem: p.numeroLinhagem ?? 999,
+      })),
+      servicos: planilha.colunas.map((c) => ({ id: c.tipoServicoId, nome: c.nome, ordem: c.ordem })),
+      totaisPorServico: planilha.totaisPorServico,
+      totalGeral: planilha.totalGeralBrl,
+      // Projeção rica — o que a visão "Planilha documental" consome.
+      // O nome do processo entra aqui porque a faixa de título da planilha o exibe.
+      planilha: { ...planilha, nomeProcesso: processoExiste.nome },
     })
   } catch (error) {
-    console.error("Erro ao listar custos:", error)
+    console.error("Erro ao montar a planilha documental:", error)
     return NextResponse.json({ error: "Erro interno do servidor" }, { status: 500 })
   }
 }

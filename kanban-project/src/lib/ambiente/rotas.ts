@@ -9,7 +9,7 @@ export const ROTAS_NEUTRAS = [
   "/financeiro",
   "/administrator",
   "/dashboard",
-  "/activities",
+  "/operacao",
 ] as const
 
 export function rotaEhNeutra(pathname: string | null | undefined): boolean {

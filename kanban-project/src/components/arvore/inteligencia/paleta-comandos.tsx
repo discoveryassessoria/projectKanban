@@ -25,9 +25,15 @@ interface Props {
   aberto: boolean
   onFechar: () => void
   onEscolher: (pessoaId: number) => void
+  /**
+   * Contexto da pessoa em relação ao requerente em foco ("Bisavô · linhagem de
+   * Marco"). É o que distingue cinco "Maria Silva" numa árvore grande melhor do
+   * que qualquer código técnico — que, aliás, não aparece aqui de propósito.
+   */
+  contextoDe?: (pessoaId: number) => string | null
 }
 
-export function PaletaComandos({ indice, aberto, onFechar, onEscolher }: Props) {
+export function PaletaComandos({ indice, aberto, onFechar, onEscolher, contextoDe }: Props) {
   const [termo, setTermo] = useState("")
   const [ativo, setAtivo] = useState(0)
   const campoRef = useRef<HTMLInputElement>(null)
@@ -107,8 +113,7 @@ export function PaletaComandos({ indice, aberto, onFechar, onEscolher }: Props) 
               <span className="min-w-0">
                 <span className="block truncate text-sm font-medium text-gray-900">{r.nome}</span>
                 <span className="block truncate text-[12px] text-gray-500">
-                  {r.subtitulo}
-                  {r.motivo ? ` · ${r.motivo}` : ""}
+                  {[contextoDe?.(r.pessoaId), r.subtitulo, r.motivo].filter(Boolean).join(" · ")}
                 </span>
               </span>
               <span className="flex shrink-0 items-center gap-2">

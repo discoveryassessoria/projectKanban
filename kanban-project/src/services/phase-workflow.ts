@@ -28,7 +28,6 @@ import {
   type Cardinalidade,
 } from "@/src/services/phase-workflow-helpers"
 import { planejarMaterializacao, cardinalidadeEfetiva, type ContextoEscopo, type AlvoDePasso } from "@/src/services/phase-workflow-escopo"
-import { garantirNecessidadesArvoreDoProcesso } from "@/src/services/necessidade-documental"
 import { itemCatalogosDeCertidao } from "@/src/lib/documentos/natureza-certidao"
 
 export type OrigemInstanciaStr = "MOTOR" | "MANUAL" | "MIGRACAO" | "REABERTURA"
@@ -184,35 +183,21 @@ async function carregarContextoEscopo(
   }
 
   if (cards.has("NECESSIDADE")) {
-    // ALVOS DA FASE = os registros/certidões a localizar. Eles nascem da REGRA
-    // OFICIAL DA ÁRVORE que já existe (analyzePessoa/DOCUMENT_RULES via
-    // garantirNecessidadesArvoreDoProcesso): toda pessoa precisa de nascimento,
-    // casado precisa de casamento, falecido precisa de óbito. É idempotente e não
-    // cria Documento. Exigir uma Regra Documental publicada só para a fase ter alvo
-    // seria trocar a regra de negócio por uma dependência de cadastro que ela nunca
-    // teve. A Matriz Documental, quando publicada, ACRESCENTA exigências por cima —
-    // as duas origens convivem na mesma NecessidadeDocumental.
-    try {
-      const g = await garantirNecessidadesArvoreDoProcesso(processoId, db)
-      // `puladas` é a regra da árvore que se aplicava mas não achou o item no
-      // Documento Mestre. Descartar esse número é o que transformava um cadastro
-      // documental incompleto em "a fase não tem nada a fazer".
-      if (g.puladas > 0) {
-        diagnosticos.push({
-          code: "REGRA_ARVORE_SEM_ITEM_MESTRE",
-          message: `${g.puladas} exigência(s) da árvore não puderam ser criadas porque o tipo documental correspondente não está vinculado ao Documento Mestre (ou a pessoa não tem união única, no caso do casamento). Confira Gerenciamento › Documentos e Protocolos › Documentos.`,
-          entityType: "processo", entityId: processoId,
-        })
-      }
-    } catch (e) {
-      const msg = e instanceof Error ? e.message : String(e)
-      console.error(`[phase-workflow] geração de necessidades da árvore falhou (proc ${processoId}):`, e)
-      diagnosticos.push({
-        code: "NECESSIDADES_ARVORE_FALHOU",
-        message: `A geração das exigências documentais a partir da árvore falhou: ${msg}`,
-        entityType: "processo", entityId: processoId,
-      })
-    }
+    // ESTE BLOCO SÓ LÊ. Ele não cria obrigação documental.
+    //
+    // Antes, criava: chamava `garantirNecessidadesArvoreDoProcesso`
+    // (analyzePessoa/DOCUMENT_RULES, regras hardcoded) e o comentário original
+    // assumia que "as duas origens convivem na mesma NecessidadeDocumental".
+    // Não conviviam. Cada motor gravava um `varianteKey` diferente para a mesma
+    // exigência — "padrao" aqui, `rd:<regra>:v<versao>` no motor de Regras
+    // Documentais — e a chave de idempotência, que inclui a variante, tratava as
+    // duas como obrigações distintas. A mesma pessoa recebia a certidão duas
+    // vezes, uma por motor.
+    //
+    // Quem cria é `materializarExecucaoDaFase` → `materializarGenealogia`, a
+    // partir das Regras Documentais PUBLICADAS, ANTES da instanciação chegar
+    // aqui. Fase sem alvo agora significa uma coisa só, e verdadeira: não há
+    // regra publicada que se aplique.
     const certItens = await itemCatalogosDeCertidao(db)
     const necs = await db.necessidadeDocumental.findMany({
       where: { processoId, supersedePorId: null, status: { not: "DISPENSADA" } },

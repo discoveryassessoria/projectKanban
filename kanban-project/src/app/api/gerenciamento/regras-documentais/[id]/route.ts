@@ -7,6 +7,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { Prisma } from "@prisma/client"
 import { prisma } from "@/lib/prisma"
 import { verificarPermissao } from "@/src/lib/verificar-permissao"
+import { podePublicarRegraDocumental } from "@/src/services/financeiro/pendencias-parametrizacao"
 import { matrizParaRegra, regraInputParaData } from "@/src/lib/documentos/regras-documentais/mapear"
 import {
   validarRegraInput, normalizarInput, auditar, usuarioIdDe, novoCodigoRegra,
@@ -125,6 +126,17 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       }
       case "publicar": {
         if (!atual.nome || !atual.documentTypeCode) return NextResponse.json({ error: "Regra incompleta: defina nome e documento antes de publicar." }, { status: 400 })
+        // GUARD ECONÔMICO — publicar é autorizar o motor a lançar dinheiro. Uma
+        // regra que declara gerar custo/receita sem preço vigente não lançaria
+        // nada: registraria pendência, em silêncio, processo a processo. Recusar
+        // aqui troca esse erro tardio por uma recusa imediata que diz o que falta.
+        const { pode, impedimentos } = await podePublicarRegraDocumental(atual.id)
+        if (!pode) {
+          return NextResponse.json({
+            error: "Regra não pode ser publicada: a parametrização econômica está incompleta.",
+            impedimentos: impedimentos.map((i) => ({ mensagem: i.mensagem, onde: i.onde })),
+          }, { status: 422 })
+        }
         const row = await prisma.$transaction(async (tx) => {
           // versão anterior publicada do mesmo código passa a INATIVA (histórico consultável)
           if (atual.codigo) {

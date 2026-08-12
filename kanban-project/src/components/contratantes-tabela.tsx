@@ -388,6 +388,8 @@ interface ContratanteModalProps {
   editingId: number | null
   editingTipo: string
   codigoPublico?: string | null
+  /** true = ficha de cliente JÁ salvo; muda o significado da ausência de código */
+  clienteExistente?: boolean
   formData: typeof initialFormData
   setFormData: (data: typeof initialFormData) => void
   onSave: () => void
@@ -417,6 +419,7 @@ function ConteudoModal({
   editingId,
   editingTipo,
   codigoPublico,
+  clienteExistente = false,
   formData,
   setFormData,
   onSave,
@@ -1140,11 +1143,21 @@ const removerDocumentoObrigatorio = async (categoria: string) => {
             {/* Tab Dados Pessoais */}
             {activeTab === "dados" && (
               <div className="space-y-6">
-                {/* Código público (somente leitura, automático) */}
+                {/* CÓDIGO PÚBLICO — somente leitura, gerado no backend.
+                    Três estados, e não dois: cliente NOVO ainda não tem código e
+                    vai ganhar um ao salvar; cliente EXISTENTE tem o código e o
+                    mostra; cliente existente SEM código é anomalia administrativa
+                    — dizer "será gerado ao salvar" ali seria mentira, porque
+                    salvar não gera código para quem já existe. */}
                 <div className="bg-white rounded-xl px-6 py-4 shadow-sm border border-gray-200">
                   <label className="block text-xs font-medium text-gray-500 mb-1">Código</label>
                   {codigoPublico ? (
                     <div className="font-mono text-sm font-bold text-gray-900">{codigoPublico}</div>
+                  ) : clienteExistente ? (
+                    <div className="text-sm font-medium text-amber-600">
+                      Código não atribuído
+                      <span className="ml-2 font-normal text-gray-400">— exige correção administrativa</span>
+                    </div>
                   ) : (
                     <div className="text-sm italic text-gray-400">Será gerado automaticamente ao salvar.</div>
                   )}
@@ -2452,6 +2465,7 @@ export function ContratantesTabela({ contratantes, onRefresh, onOpenProcesso }: 
         editingId={editingId}
         editingTipo={editingTipo}
         codigoPublico={editingCodigo}
+        clienteExistente={editingId !== null}
         formData={formData}
         setFormData={setFormData}
         onSave={handleSave}

@@ -17,6 +17,11 @@ import {
   type LinhaPreco,
 } from '../src/lib/motor/resolver-preco-financeiro'
 
+import { exigirBancoDeTeste } from "./_banco-de-teste"
+
+// TRAVA DE AMBIENTE: este arquivo ESCREVE. Sem banco de teste local, não roda.
+exigirBancoDeTeste()
+
 const prisma = new PrismaClient()
 const ROLLBACK = 'ROLLBACK_SENTINELA'
 

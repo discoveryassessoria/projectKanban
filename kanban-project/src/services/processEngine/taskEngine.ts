@@ -36,7 +36,6 @@ export interface TarefaSpec {
   pais?: Pais | null
   /** Dependência = encaixa como subtarefa desta tarefa pai (usa a régua de
    *  ordem existente: só a próxima não-iniciada fica acionável). */
-  tarefaPaiId?: number | null
   /** Se ausente, calcula a próxima ordem na sequência (igual à rota). */
   ordem?: number | null
   observacoes?: string | null
@@ -66,9 +65,9 @@ export async function criarTarefaDeSpec(spec: TarefaSpec) {
   let ordem = spec.ordem
   if (ordem === undefined || ordem === null) {
     const ultima = await prisma.tarefa.findFirst({
-      where: spec.tarefaPaiId
-        ? { tarefaPaiId: spec.tarefaPaiId }
-        : { tarefaPaiId: null, processoId: spec.processoId ?? undefined },
+      // A ordem conta no PROCESSO. A variante "entre as irmãs" existia porque
+      // este motor criava subtarefas; ele não cria mais.
+      where: { processoId: spec.processoId ?? undefined },
       orderBy: { ordem: "desc" },
       select: { ordem: true },
     })
@@ -86,7 +85,6 @@ export async function criarTarefaDeSpec(spec: TarefaSpec) {
       dataPrazo,
       statusId: spec.statusId ?? null,
       pais: spec.pais ?? null,
-      tarefaPaiId: spec.tarefaPaiId ?? null,
       ordem,
       observacoes: spec.observacoes ?? null,
       ...(spec.followUp?.prazoCobranca != null

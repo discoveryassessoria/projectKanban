@@ -2,7 +2,7 @@
 
 "use client"
 
-import { useState, useEffect, useCallback, useRef, forwardRef, useImperativeHandle } from "react"
+import { useState, useEffect, useCallback, useMemo, useRef, forwardRef, useImperativeHandle } from "react"
 import ReactFlow, {
   Node,
   Edge,
@@ -22,6 +22,8 @@ import ReactFlow, {
 import dagre from "dagre"
 import "reactflow/dist/style.css"
 import type { PessoaArvore, UniaoArvore } from "./types"
+import { opacidadeDe, type EstadoFoco, type GrupoRecolhivel } from "@/src/lib/genealogia/navegacao/foco"
+import { COR_NIVEL, ROTULO_NIVEL, type SaudePessoa } from "@/src/lib/genealogia/operacional/saude"
 
 // Cores estilo FamilySearch
 const colors = {
@@ -174,17 +176,56 @@ function formatDate(dateStr: string | Date | null | undefined): string | null {
 // ========================================
 // CUSTOM NODE: Pessoa Individual (SIMPLIFICADO)
 // ========================================
+/**
+ * SINAIS DISCRETOS do cartão — acrescentam o que o cartão ainda não dizia.
+ *
+ * Deliberadamente NÃO incluem estado documental: o cartão já tem os indicadores
+ * N/C/O, e um segundo sinal documental na mesma superfície seria uma segunda
+ * verdade sobre a mesma coisa. Aqui entram só duas marcas, ambas de 6px, ambas
+ * no canto superior direito, ambas ausentes quando não há o que sinalizar:
+ * contradição de dado (motor genealógico) e tarefa aberta (Tarefa do processo).
+ */
+export interface SinaisPessoa {
+  /** Há divergência crítica/alta apurada pelo motor. */
+  divergencia?: boolean
+  /** Há tarefa aberta ligada a esta pessoa. */
+  tarefaAberta?: boolean
+}
+
+function MarcasDiscretas({ sinais }: { sinais?: SinaisPessoa }) {
+  if (!sinais?.divergencia && !sinais?.tarefaAberta) return null
+  return (
+    <div className="absolute right-1 top-1 z-10 flex items-center gap-0.5">
+      {sinais.divergencia && (
+        <span
+          title="Divergência de dados nesta pessoa"
+          className="block h-1.5 w-1.5 rounded-full"
+          style={{ backgroundColor: '#dc2626' }}
+        />
+      )}
+      {sinais.tarefaAberta && (
+        <span
+          title="Tarefa aberta para esta pessoa"
+          className="block h-1.5 w-1.5 rounded-full"
+          style={{ backgroundColor: '#2563eb' }}
+        />
+      )}
+    </div>
+  )
+}
+
 interface PersonNodeData {
   pessoa: PessoaArvore
   isMain?: boolean
   isSpouse?: boolean
   mode: ViewMode
   unioes?: UniaoArvore[]
+  sinais?: SinaisPessoa
   onPersonClick?: (pessoa: PessoaArvore) => void
 }
 
 function PersonNode({ data }: NodeProps<PersonNodeData>) {
-  const { pessoa, isMain, isSpouse, mode, unioes = [], onPersonClick } = data
+  const { pessoa, isMain, isSpouse, mode, unioes = [], sinais, onPersonClick } = data
   const genderColors = getGenderColors(pessoa.sexo)
   const nomeCompleto = pessoa.sobrenome ? `${pessoa.nome} ${pessoa.sobrenome}` : pessoa.nome
   
@@ -263,6 +304,8 @@ function PersonNode({ data }: NodeProps<PersonNodeData>) {
           id="marriage-in"
           className="!opacity-0 !w-1 !h-1"
         />
+
+        <MarcasDiscretas sinais={sinais} />
 
         {/* ✅ Indicadores de documentos - EMBAIXO do card (metade dentro/metade fora) */}
         {temIndicadores && (
@@ -382,6 +425,8 @@ function PersonNode({ data }: NodeProps<PersonNodeData>) {
         className="!opacity-0 !w-1 !h-1"
       />
 
+      <MarcasDiscretas sinais={sinais} />
+
       {/* ✅ Indicadores de documentos - LATERAL ESQUERDA (metade dentro/metade fora) */}
       {temIndicadores && (
         <div className="absolute -left-2 top-1/2 -translate-y-1/2 flex flex-col gap-0.5 z-10">
@@ -471,10 +516,15 @@ interface AddPersonNodeData {
   type: 'pai' | 'mae' | 'filho' | 'conjuge'
   mode: ViewMode
   onClick?: () => void
+  /**
+   * O que a ausência significa, apurado pelo grafo (`navegacao/lacunas.ts`).
+   * Ausente = o placeholder se comporta exatamente como antes.
+   */
+  contexto?: { titulo: string; explicacao: string; relevancia: string }
 }
 
 function AddPersonNode({ data }: NodeProps<AddPersonNodeData>) {
-  const { type, mode, onClick } = data
+  const { type, mode, onClick, contexto } = data
 
   const config = {
     pai: { label: 'Adicionar Pai', color: colors.neutral },
@@ -484,12 +534,25 @@ function AddPersonNode({ data }: NodeProps<AddPersonNodeData>) {
   }
   const { label, color } = config[type]
 
+  // O CONTEXTO VAI NO `title`, não em texto novo dentro do card.
+  //
+  // A caixa tracejada é parte do desenho aprovado e tem dimensão fixa: enfiar
+  // duas linhas de explicação dentro dela mudaria o layout. O tooltip nativo
+  // entrega a mesma informação sem tocar num pixel — e some quando não há o que
+  // dizer, em vez de repetir uma frase genérica.
+  const dica = contexto ? `${contexto.titulo}. ${contexto.explicacao}` : undefined
+  // Único sinal visual: quem CONTINUA a linha ganha a borda um tom mais firme.
+  // Mesma cor da paleta, mesma espessura — só deixa de ser cinza-claro.
+  const bordaContexto =
+    contexto?.relevancia === 'continua_linha' ? 'border-gray-400' : 'border-gray-300'
+
   if (mode === 'paisagem') {
     return (
       <div
-        className="relative bg-white rounded-lg border-2 border-dashed border-gray-300 cursor-pointer hover:border-gray-400 hover:bg-gray-50 transition-all"
+        className={`relative bg-white rounded-lg border-2 border-dashed ${bordaContexto} cursor-pointer hover:border-gray-400 hover:bg-gray-50 transition-all`}
         style={{ width: NODE_SIZES.paisagem.width, height: NODE_SIZES.paisagem.height }}
         onClick={onClick}
+        title={dica}
       >
         <Handle type="source" position={Position.Right} className="!bg-gray-300 !w-2 !h-2" />
         <Handle type="target" position={Position.Left} className="!bg-gray-300 !w-2 !h-2" />
@@ -506,9 +569,10 @@ function AddPersonNode({ data }: NodeProps<AddPersonNodeData>) {
   // RETRATO
   return (
     <div
-      className="relative bg-white rounded-lg border-2 border-dashed border-gray-300 cursor-pointer hover:border-gray-400 hover:bg-gray-50 transition-all"
+      className={`relative bg-white rounded-lg border-2 border-dashed ${bordaContexto} cursor-pointer hover:border-gray-400 hover:bg-gray-50 transition-all`}
       style={{ width: NODE_SIZES.retrato.width, height: NODE_SIZES.retrato.height }}
       onClick={onClick}
+      title={dica}
     >
       <Handle type="source" position={Position.Top} className="!bg-gray-300 !w-2 !h-2" />
       <Handle type="target" position={Position.Bottom} className="!bg-gray-300 !w-2 !h-2" />
@@ -522,10 +586,53 @@ function AddPersonNode({ data }: NodeProps<AddPersonNodeData>) {
   )
 }
 
+// ========================================
+// CUSTOM NODE: Ramo recolhido ("+18 irmãos")
+// ========================================
+// Reusa EXATAMENTE a gramática do placeholder que já existia no canvas — mesma
+// caixa branca, mesma borda tracejada cinza, mesma dimensão de card, mesmo hover.
+// Não é um elemento visual novo: é o mesmo elemento com outro rótulo. Recolher
+// ramo grande foi pedido; inventar um estilo para isso, não.
+interface GrupoNodeData {
+  rotulo: string
+  mode: ViewMode
+  onClick?: () => void
+}
+
+function GrupoRecolhidoNode({ data }: NodeProps<GrupoNodeData>) {
+  const { rotulo, mode, onClick } = data
+  const tamanho = NODE_SIZES[mode]
+  return (
+    <div
+      className="relative bg-white rounded-lg border-2 border-dashed border-gray-300 cursor-pointer hover:border-gray-400 hover:bg-gray-50 transition-all"
+      style={{ width: tamanho.width, height: tamanho.height }}
+      onClick={onClick}
+      title="Expandir este ramo"
+    >
+      <Handle
+        type="source"
+        position={mode === 'paisagem' ? Position.Right : Position.Top}
+        className="!bg-gray-300 !w-2 !h-2"
+      />
+      <Handle
+        type="target"
+        position={mode === 'paisagem' ? Position.Left : Position.Bottom}
+        className="!bg-gray-300 !w-2 !h-2"
+      />
+      <div className="h-full flex items-center justify-center text-center px-2">
+        <span className="text-xs font-medium" style={{ color: colors.neutral }}>
+          {rotulo}
+        </span>
+      </div>
+    </div>
+  )
+}
+
 // Tipos de nós customizados
 const nodeTypes = {
   person: PersonNode,
   addPerson: AddPersonNode,
+  grupoRecolhido: GrupoRecolhidoNode,
 }
 
 // ========================================
@@ -1253,10 +1360,19 @@ function buildTreeNodesAndEdges(options: BuildTreeOptions): { nodes: Node[]; edg
 
   addAllDescendants(pessoaPrincipal)
 
+  // ADOÇÃO — puxa para o desenho quem a caminhada recursiva não alcançou.
+  //
+  // Este laço já existia e revela a intenção: o desenho deve conter TODOS os
+  // membros da árvore, não só os que a caminhada a partir da pessoa principal
+  // encontrou. Ele estava incompleto — só adotava quem tivesse pai ou mãe JÁ
+  // desenhado. Quem entrasse na árvore sem nenhum vínculo ficava de fora, e o
+  // resultado é o pior tipo de defeito: a pessoa existe no banco, aparece na
+  // busca, no diagnóstico e no painel, e não está na tela. Ver o bloco logo
+  // abaixo, que fecha a lacuna.
   let changed = true
   let iterations = 0
   const maxIterations = 100
-  
+
   while (changed && iterations < maxIterations) {
     changed = false
     iterations++
@@ -1287,14 +1403,200 @@ function buildTreeNodesAndEdges(options: BuildTreeOptions): { nodes: Node[]; edg
     })
   }
 
+  // CONTRATO: todo MEMBRO ATIVO da árvore é desenhado.
+  //
+  // Quem alimenta este canvas é `GET /api/arvore/:id`, que devolve as pessoas
+  // filtradas por `PESSOA_ATIVA` — "nó da árvore que ainda participa da
+  // operação" (`vinculo-ativo.ts`). É o mesmo recorte que o materializador, o
+  // roster da Central e o motor financeiro usam. O canvas era o ÚNICO consumidor
+  // que estreitava esse recorte por conta própria, para a componente conexa da
+  // pessoa principal — e isso nunca foi decisão documentada em lugar nenhum:
+  // não está no guard de layout congelado, nem no ADR, nem em commit.
+  //
+  // Pessoa sem vínculo é cadastro em andamento, não pessoa inexistente. Ela entra
+  // como nó solto, exatamente com o mesmo cartão — o dagre a posiciona num
+  // componente próprio, sem tocar nas coordenadas de quem já estava conectado.
+  for (const pessoa of pessoas) {
+    if (processedIds.has(pessoa.id)) continue
+    addPersonNode(pessoa, false, false)
+    // Cônjuge de quem acabou de entrar também entra: senão o casal aparece pela
+    // metade, que é uma forma diferente do mesmo defeito.
+    for (const conjuge of findConjuges(pessoa)) {
+      addPersonNode(conjuge, false, false)
+      addMarriageEdge(pessoa.id, conjuge.id)
+    }
+  }
+
   return { nodes, edges }
+}
+
+// ========================================
+// CAMADA DE FOCO — aplicada DEPOIS do layout, nunca dentro dele
+// ========================================
+//
+// Esta é a decisão central da evolução da árvore: o foco NÃO recalcula posição.
+// O dagre roda sobre a árvore inteira, como sempre rodou, e produz exatamente as
+// mesmas coordenadas de antes. O que esta função faz é decidir, por nó já
+// posicionado, se ele aparece inteiro, apagado, ou não aparece.
+//
+// Consequências que valem por si:
+//   • entrar e sair do modo linhagem não move um único card — a referência
+//     espacial que o operador construiu sobrevive ao filtro;
+//   • trocar de requerente é instantâneo: é um Map novo, não um layout novo;
+//   • as posições que o usuário arrastou continuam valendo, porque ninguém
+//     recalculou nada.
+//
+// Puro: mesmas entradas → mesmas saídas. Não lê estado, não escreve estado.
+interface OpcoesFoco {
+  foco?: ReadonlyMap<number, EstadoFoco>
+  sinais?: ReadonlyMap<number, SinaisPessoa>
+  grupos?: readonly GrupoRecolhivel[]
+  /** Contexto dos slots "+pai/+mãe", por chave `pai-<id>` / `mae-<id>`. */
+  lacunas?: ReadonlyMap<string, { titulo: string; explicacao: string; relevancia: string }>
+  /** Heatmap. Ausente = nenhum anel; o cartão fica exatamente como sempre foi. */
+  saude?: ReadonlyMap<number, SaudePessoa>
+  mode: ViewMode
+  onExpandirGrupo?: (chave: string) => void
+}
+
+function idPessoaDoNode(nodeId: string): number | null {
+  const m = nodeId.match(/^person-(\d+)$/)
+  if (m) return Number(m[1])
+  // Os placeholders "Adicionar Pai/Mãe" pertencem à pessoa que os ancora: se ela
+  // recuou, o convite para adicionar pai dela recua junto. Deixá-lo em pleno ao
+  // lado de um card apagado é oferecer ação sobre alguém que saiu de foco.
+  const a = nodeId.match(/^add-(?:pai|mae|filho|conjuge)-(\d+)$/)
+  return a ? Number(a[1]) : null
+}
+
+function aplicarFoco(
+  nodes: Node[],
+  edges: Edge[],
+  opcoes: OpcoesFoco,
+): { nodes: Node[]; edges: Edge[] } {
+  const { foco, sinais, grupos, lacunas, saude, mode, onExpandirGrupo } = opcoes
+  const temFoco = Boolean(foco && foco.size)
+  const temSinais = Boolean(sinais && sinais.size)
+  const temGrupos = Boolean(grupos && grupos.length)
+  const temLacunas = Boolean(lacunas && lacunas.size)
+  const temSaude = Boolean(saude && saude.size)
+
+  // Caminho de custo zero: sem foco, sem sinais e sem grupos a árvore é a de
+  // antes, referência por referência. Nenhum objeto novo, nenhum re-render.
+  if (!temFoco && !temSinais && !temGrupos && !temLacunas && !temSaude) return { nodes, edges }
+
+  const estadoDe = (nodeId: string): EstadoFoco => {
+    const pessoaId = idPessoaDoNode(nodeId)
+    if (pessoaId == null) return 'pleno'
+    return foco?.get(pessoaId) ?? 'pleno'
+  }
+
+  const posicaoPorPessoa = new Map<number, { x: number; y: number }>()
+  for (const n of nodes) {
+    const id = n.id.match(/^person-(\d+)$/)
+    if (id) posicaoPorPessoa.set(Number(id[1]), n.position)
+  }
+
+  const nodesFinais: Node[] = nodes.map((n) => {
+    const estado = estadoDe(n.id)
+    const pessoaId = idPessoaDoNode(n.id)
+    const marcas = pessoaId != null ? sinais?.get(pessoaId) : undefined
+    const precisaData = n.type === 'person' && marcas !== (n.data as PersonNodeData)?.sinais
+
+    // Slot "+pai/+mãe": recebe o contexto apurado pelo grafo, quando existe.
+    if (n.type === 'addPerson' && lacunas) {
+      const chave = n.id.replace(/^add-/, '').replace(/-(\d+)$/, '-$1')
+      const contexto = lacunas.get(chave)
+      if (contexto) {
+        return {
+          ...n,
+          hidden: estado === 'oculto',
+          style: { ...n.style, opacity: opacidadeDe(estado) },
+          data: { ...(n.data as AddPersonNodeData), contexto },
+        }
+      }
+    }
+
+    // HEATMAP NO WRAPPER — o cartão continua intocado.
+    //
+    // O anel é um `box-shadow` no `.react-flow__node`, que é o div que o
+    // reactflow desenha EM VOLTA do componente. `PersonNode` não sabe que o modo
+    // Saúde existe, não recebe prop nova e não muda um pixel: desligar o modo
+    // devolve exatamente o cartão de sempre. Sombra não ocupa espaço no layout,
+    // então nenhum nó se desloca por causa dela.
+    const nivel = pessoaId != null ? saude?.get(pessoaId) : undefined
+    const anel = nivel
+      ? { boxShadow: `0 0 0 2px ${COR_NIVEL[nivel.nivel]}`, borderRadius: 8 }
+      : undefined
+
+    return {
+      ...n,
+      hidden: estado === 'oculto',
+      // Só a OPACIDADE muda (e o anel do heatmap, quando ligado). Nem dimensão,
+      // nem cor do cartão, nem borda dele, nem posição — o guarda de layout
+      // congelado continua verdadeiro depois desta linha.
+      style: { ...n.style, opacity: opacidadeDe(estado), ...anel },
+      // Quem recuou CONTINUA clicável de propósito. Esmaecer é tirar do primeiro
+      // plano, não desativar: o operador que vê um nome apagado e quer conferi-lo
+      // não deveria ter de sair do modo linhagem para isso.
+      data: precisaData ? { ...(n.data as PersonNodeData), sinais: marcas } : n.data,
+      // O motivo do nível vira tooltip do wrapper — texto nenhum entra no cartão.
+      title: nivel ? `${ROTULO_NIVEL[nivel.nivel]}: ${nivel.motivo}` : undefined,
+    }
+  })
+
+  // Nó "+N irmãos": ocupa o lugar do primeiro membro recolhido, para o ramo não
+  // deixar um buraco onde estava. Só entra quando o membro de fato saiu da tela.
+  if (temGrupos) {
+    for (const grupo of grupos!) {
+      const primeiro = grupo.membros.find((id) => foco?.get(id) === 'oculto')
+      if (primeiro == null) continue
+      const posicao = posicaoPorPessoa.get(primeiro)
+      if (!posicao) continue
+      nodesFinais.push({
+        id: `grupo-${grupo.chave}`,
+        type: 'grupoRecolhido',
+        position: posicao,
+        draggable: false,
+        data: { rotulo: grupo.rotulo, mode, onClick: () => onExpandirGrupo?.(grupo.chave) },
+      })
+      const ancora = posicaoPorPessoa.get(grupo.ancoraId)
+      if (ancora) {
+        edges = [
+          ...edges,
+          {
+            id: `edge-grupo-${grupo.chave}`,
+            source: `grupo-${grupo.chave}`,
+            target: `person-${grupo.ancoraId}`,
+            type: 'smoothstep',
+            style: { stroke: colors.neutral, strokeWidth: 2, strokeDasharray: '5,5' },
+          },
+        ]
+      }
+    }
+  }
+
+  const estadoNode = new Map(nodesFinais.map((n) => [n.id, estadoDe(n.id)]))
+  const edgesFinais: Edge[] = edges.map((e) => {
+    if (e.id.startsWith('edge-grupo-')) return e
+    const a = estadoNode.get(e.source) ?? 'pleno'
+    const b = estadoNode.get(e.target) ?? 'pleno'
+    if (a === 'oculto' || b === 'oculto') return { ...e, hidden: true }
+    const opacidade = Math.min(opacidadeDe(a), opacidadeDe(b))
+    return { ...e, hidden: false, style: { ...e.style, opacity: opacidade } }
+  })
+
+  return { nodes: nodesFinais, edges: edgesFinais }
 }
 
 // ========================================
 // TIPOS EXPORTADOS PARA REF
 // ========================================
 export interface ReactFlowTreeRef {
-  centerOnPerson: (pessoaId: number) => void
+  /** Centraliza numa pessoa. `zoom` opcional — sem ele preserva o zoom atual. */
+  centerOnPerson: (pessoaId: number, opcoes?: { zoom?: number }) => void
+  /** Enquadra um conjunto de pessoas (ex.: a linhagem em foco). */
+  enquadrar: (pessoaIds: number[]) => void
 }
 
 // ========================================
@@ -1312,6 +1614,17 @@ interface ReactFlowTreeProps {
   onAddMae?: (pessoaId: number) => void
   onAddFilho?: (pessoaId: number) => void
   onAddConjuge?: (pessoaId: number) => void
+  /** Estado de foco por pessoa. Ausente = árvore inteira em pleno, como sempre. */
+  foco?: ReadonlyMap<number, EstadoFoco>
+  /** Marcas discretas por pessoa (divergência, tarefa). */
+  sinais?: ReadonlyMap<number, SinaisPessoa>
+  /** Ramos recolhidos a exibir como "+N irmãos". */
+  gruposRecolhidos?: readonly GrupoRecolhivel[]
+  onExpandirGrupo?: (chave: string) => void
+  /** Contexto dos slots "+pai/+mãe" (`navegacao/lacunas.ts`). */
+  lacunas?: ReadonlyMap<string, { titulo: string; explicacao: string; relevancia: string }>
+  /** Heatmap por pessoa. Ausente = modo Saúde desligado. */
+  saude?: ReadonlyMap<number, SaudePessoa>
 }
 
 const ReactFlowTreeInner = forwardRef<ReactFlowTreeRef, ReactFlowTreeProps>(({
@@ -1326,12 +1639,18 @@ const ReactFlowTreeInner = forwardRef<ReactFlowTreeRef, ReactFlowTreeProps>(({
   onAddMae,
   onAddFilho,
   onAddConjuge,
+  foco,
+  sinais,
+  gruposRecolhidos,
+  onExpandirGrupo,
+  lacunas,
+  saude,
 }, ref) => {
   const [nodes, setNodes, onNodesChange] = useNodesState([])
   const [edges, setEdges, onEdgesChange] = useEdgesState([])
   const [isLocked, setIsLocked] = useState(false)
-  
-  const { zoomIn, zoomOut, fitView, setCenter, getNodes } = useReactFlow()
+
+  const { zoomIn, zoomOut, fitView, setCenter, getZoom, getNodes } = useReactFlow()
 
   const savedPositionsRef = useRef(savedPositions)
   const onSavePositionsRef = useRef(onSavePositions)
@@ -1432,24 +1751,48 @@ const ReactFlowTreeInner = forwardRef<ReactFlowTreeRef, ReactFlowTreeProps>(({
   }, [mode, getNodes])
 
   useImperativeHandle(ref, () => ({
-    centerOnPerson: (pessoaId: number) => {
+    centerOnPerson: (pessoaId: number, opcoes?: { zoom?: number }) => {
       const currentNodes = getNodes()
       const targetNode = currentNodes.find(n => n.id === `person-${pessoaId}`)
-      
+
       if (targetNode) {
         const nodeSize = NODE_SIZES[mode]
         const x = targetNode.position.x + nodeSize.width / 2
         const y = targetNode.position.y + nodeSize.height / 2
-        
-        setCenter(x, y, { zoom: 1, duration: 500 })
+
+        // Sem zoom pedido, PRESERVA o zoom atual. Forçar 1 a cada busca era
+        // "perder o contexto": quem estava olhando a árvore de longe voltava ao
+        // detalhe, e quem estava no detalhe era jogado para longe.
+        const zoom = opcoes?.zoom ?? getZoom()
+        setCenter(x, y, { zoom, duration: 500 })
       }
-    }
-  }), [getNodes, setCenter, mode])
+    },
+    enquadrar: (pessoaIds: number[]) => {
+      if (pessoaIds.length === 0) {
+        fitView({ padding: 0.2, duration: 500 })
+        return
+      }
+      const alvos = new Set(pessoaIds.map((id) => `person-${id}`))
+      const nos = getNodes().filter((n) => alvos.has(n.id) && !n.hidden)
+      if (nos.length === 0) {
+        fitView({ padding: 0.2, duration: 500 })
+        return
+      }
+      fitView({ padding: 0.25, duration: 500, maxZoom: 1.2, nodes: nos.map((n) => ({ id: n.id })) })
+    },
+  }), [getNodes, setCenter, getZoom, fitView, mode])
+
+  // Foco aplicado sobre o layout já calculado. Ver `aplicarFoco`: nada aqui
+  // recalcula dagre, então trocar de linhagem não move card nenhum.
+  const { nodes: nodesEmTela, edges: edgesEmTela } = useMemo(
+    () => aplicarFoco(nodes, edges, { foco, sinais, grupos: gruposRecolhidos, lacunas, saude, mode, onExpandirGrupo }),
+    [nodes, edges, foco, sinais, gruposRecolhidos, lacunas, saude, mode, onExpandirGrupo],
+  )
 
   return (
     <ReactFlow
-      nodes={nodes}
-      edges={edges}
+      nodes={nodesEmTela}
+      edges={edgesEmTela}
       onNodesChange={onNodesChange}
       onEdgesChange={onEdgesChange}
       onNodeDragStop={handleNodeDragStop}

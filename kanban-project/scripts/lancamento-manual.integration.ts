@@ -11,6 +11,11 @@ import { carregarPosicaoProcesso } from '@/lib/financeiro/leitura/posicao-proces
 import { resolverPrecoPorConfigDB } from '@/src/lib/motor/resolver-preco-financeiro.prisma'
 import { cancelarObrigacao } from '@/lib/financeiro/extras/cancelar-lancamento'
 
+import { exigirBancoDeTeste } from "./_banco-de-teste"
+
+// TRAVA DE AMBIENTE: este arquivo ESCREVE. Sem banco de teste local, não roda.
+exigirBancoDeTeste()
+
 let passou = 0, falhou = 0
 const ok = (n: string, c: boolean, extra = '') => { if (c) { passou++; console.log(`  ✓ ${n}`) } else { falhou++; console.log(`  ✗ ${n} ${extra}`) } }
 const round2 = (v: number) => Math.round(v * 100) / 100

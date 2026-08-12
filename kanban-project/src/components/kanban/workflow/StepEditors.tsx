@@ -2025,6 +2025,7 @@ function FormReceberCertidao({
   )
   const [observacao, setObservacao] = useState(() => texto(etapa?.stepObservation))
   const [saving, setSaving] = useState(false)
+  const [erroServidor, setErroServidor] = useState<string | null>(null)
 
   const readOnly = stepStatus === "concluida"
 
@@ -2048,6 +2049,7 @@ function FormReceberCertidao({
     void celebrar()
 
     setSaving(true)
+    setErroServidor(null)
     try {
       // 1. Persiste no documento
       const okDoc = await putDocumento(documentoId, {
@@ -2061,24 +2063,45 @@ function FormReceberCertidao({
       if (!okDoc) throw new Error("PUT doc falhou")
 
       // 2. Persiste no step + conclui
-      const okStep = await patchStep(documentoId, stepId, {
+      const r = await patchStepComErro(documentoId, stepId, {
         status: "concluida",
         completedById: getUserId(),
         documentMedium: medium,
         physicalLocation: showPhysicalLocation ? (physicalLocation.trim() || null) : null,
         stepObservation: observacao.trim() || null,
       })
-      if (!okStep) console.warn("[EditorReceberCertidao] step não concluiu")
+      if (!r.ok) {
+        // A etapa NÃO concluiu: o modal fica aberto, com o motivo, e o
+        // trabalho preenchido continua ali para uma nova tentativa.
+        setErroServidor(mensagemDoErro(r.codigo))
+        return
+      }
 
       onSaved?.()
     } catch (e) {
       console.error("[EditorReceberCertidao] salvar:", e)
-      alert("A etapa foi marcada, mas houve erro ao salvar no servidor. Atualize a página e confira. (console)")
-      onSaved?.()
+      // "A etapa foi marcada, mas houve erro" era falso nas duas metades: a
+      // etapa NÃO foi marcada, e fechar o modal em seguida fazia a fila
+      // recarregar como se tivesse dado certo.
+      setErroServidor(mensagemDoErro("INTERNAL_ERROR"))
     } finally {
       setSaving(false)
     }
   }
+
+  /**
+   * O ERRO DO SERVIDOR PRECISA APARECER.
+   *
+   * Aqui a falha era `console.warn` seguido de `onSaved?.()`: o modal fechava,
+   * a fila recarregava e o operador via sucesso. Um 403 de permissão, um 409 de
+   * conflito ou um 422 de regra sumiam — e a etapa continuava aberta sem que
+   * ninguém soubesse. Falso sucesso é pior que silêncio.
+   */
+  const bannerErro = erroServidor ? (
+    <div className="mb-4 rounded-md border border-[#f87171]/30 bg-[#f87171]/10 px-3 py-2 text-[12px] text-[#f87171]">
+      {erroServidor}
+    </div>
+  ) : null
 
   return (
     <EditorShell
@@ -2107,6 +2130,7 @@ function FormReceberCertidao({
       }
     >
       <ReadOnlyBanner stepStatus={stepStatus} />
+      {bannerErro}
 
       {loading ? (
         <div className="py-12 flex justify-center">
@@ -2398,6 +2422,7 @@ function FormConferirCertidao({
   const [observacao, setObservacao] = useState(() => texto(etapa?.stepObservation))
 
   const [saving, setSaving] = useState(false)
+  const [erroServidor, setErroServidor] = useState<string | null>(null)
 
   const readOnly = stepStatus === "concluida"
 
@@ -2420,6 +2445,7 @@ function FormConferirCertidao({
     void celebrar()
 
     setSaving(true)
+    setErroServidor(null)
     try {
       // 1. Persiste dados literais no documento + status
       let docStatus: string | null = null
@@ -2439,20 +2465,27 @@ function FormConferirCertidao({
       if (!okDoc) throw new Error("PUT doc falhou")
 
       // 2. Persiste checklist + resultado no step + conclui
-      const okStep = await patchStep(documentoId, stepId, {
+      const r = await patchStepComErro(documentoId, stepId, {
         status: "concluida",
         completedById: getUserId(),
         reviewResult: resultado,
         reviewChecklist: checklist,
         stepObservation: observacao.trim() || null,
       })
-      if (!okStep) console.warn("[EditorConferirCertidao] step não concluiu")
+      if (!r.ok) {
+        // A etapa NÃO concluiu: o modal fica aberto, com o motivo, e o
+        // trabalho preenchido continua ali para uma nova tentativa.
+        setErroServidor(mensagemDoErro(r.codigo))
+        return
+      }
 
       onSaved?.()
     } catch (e) {
       console.error("[EditorConferirCertidao] salvar:", e)
-      alert("A etapa foi marcada, mas houve erro ao salvar no servidor. Atualize a página e confira. (console)")
-      onSaved?.()
+      // "A etapa foi marcada, mas houve erro" era falso nas duas metades: a
+      // etapa NÃO foi marcada, e fechar o modal em seguida fazia a fila
+      // recarregar como se tivesse dado certo.
+      setErroServidor(mensagemDoErro("INTERNAL_ERROR"))
     } finally {
       setSaving(false)
     }
@@ -2464,6 +2497,20 @@ function FormConferirCertidao({
       {pessoa.pai && <span> · pai: <span className="text-white/80">{fullName(pessoa.pai)}</span></span>}
       {pessoa.mae && <span> · mãe: <span className="text-white/80">{fullName(pessoa.mae)}</span></span>}
     </>
+  ) : null
+
+  /**
+   * O ERRO DO SERVIDOR PRECISA APARECER.
+   *
+   * Aqui a falha era `console.warn` seguido de `onSaved?.()`: o modal fechava,
+   * a fila recarregava e o operador via sucesso. Um 403 de permissão, um 409 de
+   * conflito ou um 422 de regra sumiam — e a etapa continuava aberta sem que
+   * ninguém soubesse. Falso sucesso é pior que silêncio.
+   */
+  const bannerErro = erroServidor ? (
+    <div className="mb-4 rounded-md border border-[#f87171]/30 bg-[#f87171]/10 px-3 py-2 text-[12px] text-[#f87171]">
+      {erroServidor}
+    </div>
   ) : null
 
   return (
@@ -2501,6 +2548,7 @@ function FormConferirCertidao({
       }
     >
       <ReadOnlyBanner stepStatus={stepStatus} />
+      {bannerErro}
 
       {loading ? (
         <div className="py-12 flex justify-center">
@@ -2912,6 +2960,7 @@ function FormValidarCertidao({
   })
   const [parecer, setParecer] = useState(() => texto(etapa?.legalOpinion))
   const [saving, setSaving] = useState(false)
+  const [erroServidor, setErroServidor] = useState<string | null>(null)
 
   const readOnly = stepStatus === "concluida"
 
@@ -2935,6 +2984,7 @@ function FormValidarCertidao({
     void celebrar()
 
     setSaving(true)
+    setErroServidor(null)
     try {
       // 1. Atualiza status do documento conforme a decisão
       let docStatus: string | null = null
@@ -2947,19 +2997,26 @@ function FormValidarCertidao({
       }
 
       // 2. Persiste decisão + parecer no step + conclui
-      const okStep = await patchStep(documentoId, stepId, {
+      const r = await patchStepComErro(documentoId, stepId, {
         status: "concluida",
         completedById: getUserId(),
         validationResult: decisao,
         legalOpinion: parecer.trim() || null,
       })
-      if (!okStep) console.warn("[EditorValidarCertidao] step não concluiu")
+      if (!r.ok) {
+        // A etapa NÃO concluiu: o modal fica aberto, com o motivo, e o
+        // trabalho preenchido continua ali para uma nova tentativa.
+        setErroServidor(mensagemDoErro(r.codigo))
+        return
+      }
 
       onSaved?.()
     } catch (e) {
       console.error("[EditorValidarCertidao] salvar:", e)
-      alert("A etapa foi marcada, mas houve erro ao salvar no servidor. Atualize a página e confira. (console)")
-      onSaved?.()
+      // "A etapa foi marcada, mas houve erro" era falso nas duas metades: a
+      // etapa NÃO foi marcada, e fechar o modal em seguida fazia a fila
+      // recarregar como se tivesse dado certo.
+      setErroServidor(mensagemDoErro("INTERNAL_ERROR"))
     } finally {
       setSaving(false)
     }
@@ -2988,6 +3045,20 @@ function FormValidarCertidao({
     if (r === "nova_via") return "↻ Nova via solicitada"
     return r
   }
+
+  /**
+   * O ERRO DO SERVIDOR PRECISA APARECER.
+   *
+   * Aqui a falha era `console.warn` seguido de `onSaved?.()`: o modal fechava,
+   * a fila recarregava e o operador via sucesso. Um 403 de permissão, um 409 de
+   * conflito ou um 422 de regra sumiam — e a etapa continuava aberta sem que
+   * ninguém soubesse. Falso sucesso é pior que silêncio.
+   */
+  const bannerErro = erroServidor ? (
+    <div className="mb-4 rounded-md border border-[#f87171]/30 bg-[#f87171]/10 px-3 py-2 text-[12px] text-[#f87171]">
+      {erroServidor}
+    </div>
+  ) : null
 
   return (
     <EditorShell
@@ -3027,6 +3098,7 @@ function FormValidarCertidao({
       }
     >
       <ReadOnlyBanner stepStatus={stepStatus} />
+      {bannerErro}
 
       {loading ? (
         <div className="py-12 flex justify-center">

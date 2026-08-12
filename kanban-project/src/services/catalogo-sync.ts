@@ -10,6 +10,7 @@
 
 import { Prisma, NaturezaItem } from '@prisma/client'
 import { codeServicoMestre, codeProdutoMestre } from './catalogo-helpers'
+import { slugTecnico, gerarChaveUnica } from '@/src/lib/catalogo/chave-tecnica-interna'
 
 /**
  * Garante o ItemCatalogo (natureza SERVICO) espelho de um ServicoProduto e retorna
@@ -41,6 +42,83 @@ export async function sincronizarItemDeServico(
     select: { id: true },
   })
   return item.id
+}
+
+/** Chave técnica do ServicoProduto derivada do code do mestre ("SRV_X" → "X"). */
+export function codeServicoDeMestre(codeItem: string): string {
+  const c = String(codeItem).trim().toUpperCase()
+  return c.startsWith('SRV_') ? c.slice(4) : c
+}
+
+export interface ServicoGarantido {
+  servicoId: number
+  publicCode: string | null
+  criado: boolean
+}
+
+/**
+ * DIREÇÃO INVERSA de `sincronizarItemDeServico`: garante o ServicoProduto de um
+ * ItemCatalogo de natureza SERVICO.
+ *
+ * POR QUE EXISTE
+ * --------------
+ * O código canônico do serviço (SRV-n) é `ServicoProduto.publicCode` — gerado
+ * pelo CodeGeneratorService via extensão do Prisma Client. Um serviço que existe
+ * SÓ como item do mestre não tem onde carregar esse código: ele aparece no
+ * Catálogo com "—" não porque a geração falhou, mas porque nasceu do lado que não
+ * é portador do código. Foi exatamente assim que seis serviços do pré-cadastro
+ * estrutural ficaram sem SRV-n.
+ *
+ * A correção é promover o item ao cadastro canônico, não dar um segundo portador
+ * de código ao mestre — dois portadores seriam duas fontes da verdade para o
+ * mesmo identificador.
+ *
+ * IDEMPOTENTE: item que já tem serviço devolve o existente, sem tocar em nada e
+ * sem consumir número da sequência. A chave técnica é derivada do code do mestre
+ * (mesma convenção do caminho de criação, invertida) e desambiguada se colidir.
+ * O item permanece intacto — nada é apagado, renomeado ou renumerado.
+ */
+export async function garantirServicoDoItem(
+  tx: Prisma.TransactionClient,
+  itemId: number,
+): Promise<ServicoGarantido> {
+  const item = await tx.itemCatalogo.findUnique({
+    where: { id: itemId },
+    select: { id: true, code: true, name: true, descricao: true, natureza: true, unidade: true, ativo: true },
+  })
+  if (!item) throw new Error(`ItemCatalogo ${itemId} não encontrado`)
+  if (item.natureza !== NaturezaItem.SERVICO) {
+    throw new Error(`ItemCatalogo ${itemId} ("${item.name}") tem natureza ${item.natureza} — só natureza SERVICO vira ServicoProduto`)
+  }
+
+  const existente = await tx.servicoProduto.findFirst({
+    where: { itemCatalogoId: itemId },
+    select: { id: true, publicCode: true },
+    orderBy: { id: 'asc' },
+  })
+  if (existente) return { servicoId: existente.id, publicCode: existente.publicCode, criado: false }
+
+  const base = slugTecnico(codeServicoDeMestre(item.code), 'SERVICO')
+  const code = await gerarChaveUnica(base, async (c) =>
+    !!(await tx.servicoProduto.findUnique({ where: { code: c }, select: { id: true } })),
+  )
+  const s = await tx.servicoProduto.create({
+    data: {
+      code,
+      name: item.name,
+      descricao: item.descricao,
+      unidadePadrao: item.unidade,
+      ativo: item.ativo,
+      itemCatalogoId: itemId,
+    },
+    select: { id: true, publicCode: true },
+  })
+  // O código é OBRIGATÓRIO. Se a extensão não gravou, o serviço nasceria com o
+  // mesmo defeito que este caminho existe para corrigir — a transação cai.
+  if (!s.publicCode) {
+    throw new Error(`ServicoProduto ${s.id} criado sem publicCode — geração de código falhou, transação abortada`)
+  }
+  return { servicoId: s.id, publicCode: s.publicCode, criado: true }
 }
 
 /**

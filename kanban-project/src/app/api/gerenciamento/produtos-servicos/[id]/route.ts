@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import { verificarPermissao } from '@/src/lib/verificar-permissao'
+import { verificarPermissao, exigirPermissao } from '@/src/lib/verificar-permissao'
+import { deactivateService } from '@/src/services/exclusao-definitiva'
 import { sincronizarItemDeServico } from '@/src/services/catalogo-sync'
 import { garantirConfigFinanceiraDeItem, refletirEstadoNaConfigDeServico } from '@/src/services/config-financeira-auto'
 import { resolverAplicacaoTerritorial, gravarAplicacaoTerritorial, selecaoDoRegistro } from '@/src/services/aplicacao-territorial-servico'
@@ -82,38 +83,31 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
   }
 }
 
-// DELETE - Excluir serviço (os vínculos M2M somem junto)
+// DELETE - INATIVAÇÃO do serviço (histórico integralmente preservado).
+//
+// Esta rota NÃO exclui fisicamente. A exclusão definitiva é ato administrativo e vive
+// exclusivamente no motor canônico, atrás da permissão sistema.exclusaoDefinitiva, em
+// /produtos-servicos/[id]/exclusao-definitiva. Manter aqui um segundo caminho de delete
+// era ter dois motores decidindo a mesma coisa por critérios diferentes.
 export async function DELETE(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
-    const erro = await verificarPermissao(request, 'usuarios.gerenciar')
+    const { usuario, erro } = await exigirPermissao(request, 'usuarios.gerenciar')
     if (erro) return erro
 
     const { id: idStr } = await params
     const id = Number(idStr)
-    const svc = await prisma.servicoProduto.findUnique({ where: { id }, select: { itemCatalogoId: true } })
+    const svc = await prisma.servicoProduto.findUnique({ where: { id }, select: { id: true } })
     if (!svc) return NextResponse.json({ error: 'Serviço não encontrado' }, { status: 404 })
 
-    // NÃO apaga se houver Config Financeira / preços / automações ligados ao item (órfãos +
-    // perda de histórico financeiro). Preserva: inativa o serviço e sua config.
-    if (svc.itemCatalogoId != null) {
-      const config = await prisma.produtoFinanceiro.findUnique({ where: { itemCatalogoId: svc.itemCatalogoId }, select: { id: true } })
-      const [precos, autos] = await Promise.all([
-        prisma.tabelaValor.count({ where: { itemCatalogoId: svc.itemCatalogoId, arquivado: false } }),
-        config ? prisma.phaseAutomationRule.count({ where: { arquivado: false, configItemId: config.id } }) : Promise.resolve(0),
-      ])
-      if (config || precos > 0 || autos > 0) {
-        await prisma.$transaction([
-          prisma.servicoProduto.update({ where: { id }, data: { ativo: false } }),
-          ...(config ? [prisma.produtoFinanceiro.update({ where: { id: config.id }, data: { ativo: false } })] : []),
-        ])
-        return NextResponse.json({ ok: true, inativado: true, motivo: 'Serviço tem Configuração Financeira/preços/automações — foi inativado (não excluído) para preservar o histórico financeiro.' })
-      }
-    }
-    await prisma.servicoProduto.delete({ where: { id } })
-
-    return NextResponse.json({ ok: true, excluido: true })
+    const body = await request.json().catch(() => ({} as Record<string, unknown>))
+    const r = await deactivateService(id, { usuarioId: usuario.userId, motivo: typeof body?.motivo === 'string' ? body.motivo : null })
+    return NextResponse.json({
+      ok: true,
+      ...r,
+      motivo: 'O serviço foi inativado; nada do histórico foi apagado. A exclusão definitiva é restrita a administradores.',
+    })
   } catch (error) {
-    console.error('Erro ao excluir produto/serviço:', error)
+    console.error('Erro ao inativar produto/serviço:', error)
     return NextResponse.json({ error: 'Erro interno' }, { status: 500 })
   }
 }

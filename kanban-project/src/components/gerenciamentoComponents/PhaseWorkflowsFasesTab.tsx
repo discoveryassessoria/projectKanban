@@ -4,6 +4,26 @@ import { useEffect, useState, useCallback } from "react"
 
 // Rótulo da CARDINALIDADE do passo (quantas instâncias, presas a qual entidade).
 // Nada a ver com "global (compartilhado)", que é o compartilhamento do WORKFLOW.
+/**
+ * QUEM MULTIPLICA TAREFA É A UNIDADE DE TRABALHO.
+ *
+ * A cardinalidade dos passos diz sobre QUANTAS coisas o workflow se repete: por
+ * documento, por pessoa, por necessidade, ou uma vez só na fase. Cinco etapas
+ * com cardinalidade "por documento" são cinco etapas de UMA tarefa por
+ * documento — e não cinco tarefas.
+ */
+const UNIDADE_LABEL: Record<string, string> = {
+  POR_DOCUMENTO: "documento",
+  POR_NECESSIDADE: "registro/certidão",
+  POR_PESSOA: "pessoa",
+  UNICO: "processo",
+  "": "unidade de trabalho",
+}
+function unidadeDoWorkflow(passos: Array<{ cardinalidade?: string | null }>): string {
+  const usadas = [...new Set(passos.map((p) => p.cardinalidade || "").filter(Boolean))]
+  return usadas.length === 1 ? usadas[0] : ""
+}
+
 const CARDINALIDADE_LABEL: Record<string, string> = {
   "": "conforme a fase",
   PROCESSO: "1 por fase",
@@ -343,8 +363,15 @@ export default function PhaseWorkflowsFasesTab() {
                     <span className="text-[10px] text-white/40">· salvando…</span>
                   )}
                 </div>
+                {/* O RESUMO DIZIA "5 passo(s) · 5 gera(m) tarefa", e isso descrevia
+                    uma arquitetura que não existe mais: cinco etapas do mesmo
+                    documento são UMA tarefa, não cinco. Quem multiplica tarefas é a
+                    UNIDADE DE TRABALHO (a cardinalidade — por documento, por pessoa,
+                    por processo), nunca a quantidade de passos. */}
                 {wf
-                  ? <div className="mt-0.5 text-xs text-green-300/80">{wf.passos.length} passo(s) · {wf.passos.filter(s => s.createsTask).length} gera(m) tarefa</div>
+                  ? <div className="mt-0.5 text-xs text-green-300/80">
+                      {wf.passos.length} etapa(s) · 1 tarefa por {UNIDADE_LABEL[unidadeDoWorkflow(wf.passos)] ?? "unidade de trabalho"}
+                    </div>
                   : <div className="mt-0.5 text-xs text-white/40">Sem workflow interno configurado.</div>}
 
                 {/* CONTRATO DE EXECUÇÃO — herdado pelo workflow inteiro, por isso
@@ -392,7 +419,12 @@ export default function PhaseWorkflowsFasesTab() {
                     <div className="min-w-0">
                       <div className="truncate text-sm text-white">{idx + 1}. {st.label}</div>
                       <div className="mt-0.5 flex flex-wrap items-center gap-1.5 text-[10px]">
-                        {st.createsTask && <span className="rounded bg-green-500/15 px-1.5 py-0.5 text-green-300">gera tarefa</span>}
+                        {/* O badge dizia "gera tarefa" em cada passo — leitura do
+                            modelo antigo step→tarefa. O passo não gera tarefa: ele
+                            é uma ETAPA da tarefa da unidade de trabalho. O que a
+                            flag realmente diz é que a etapa é trabalho humano que
+                            entra no roteiro de execução. */}
+                        {st.createsTask && <span className="rounded bg-green-500/15 px-1.5 py-0.5 text-green-300">etapa executável</span>}
                         {st.required && <span className="rounded bg-amber-500/15 px-1.5 py-0.5 text-amber-300">obrigatório</span>}
                         <span className="rounded bg-sky-500/15 px-1.5 py-0.5 text-sky-300">{CARDINALIDADE_LABEL[st.cardinalidade || ""] ?? st.cardinalidade}</span>
                         {st.owner && <span className="rounded bg-white/10 px-1.5 py-0.5 text-white/60">{st.owner}</span>}
@@ -475,7 +507,7 @@ export default function PhaseWorkflowsFasesTab() {
                 <input value={stepForm.label} onChange={e => setStepForm(f => ({ ...f, label: e.target.value }))} className={inputCls} placeholder="Ex.: Conferir certidão" />
               </div>
               <div>
-                <label className={labelCls}>Gera tarefa</label>
+                <label className={labelCls}>Etapa executável</label>
                 <select value={stepForm.createsTask ? "1" : "0"} onChange={e => setStepForm(f => ({ ...f, createsTask: e.target.value === "1" }))} className={inputCls}>
                   <option value="1" className="bg-zinc-900">Sim</option>
                   <option value="0" className="bg-zinc-900">Não</option>

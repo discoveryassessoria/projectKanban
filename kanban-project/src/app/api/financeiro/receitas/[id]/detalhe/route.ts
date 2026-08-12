@@ -12,6 +12,7 @@ import { withRetry } from '@/lib/db-retry'
 import { origemOperacionalDoLancamento } from '@/lib/financeiro/supressao-motor'
 import { rotularPhaseKey } from '@/lib/financeiro/apresentacao-lancamento'
 import { verificarPermissao } from '@/src/lib/verificar-permissao'
+import { requerentesAtivosDaArvore } from "@/src/lib/genealogia/vinculo-ativo"
 
 type RouteContext = { params: Promise<{ id: string }> }
 
@@ -137,7 +138,7 @@ export async function GET(req: NextRequest, ctx: RouteContext) {
     }))
     if (requerentesConsiderados.length === 0 && receita.processo?.arvoreId) {
       const pessoas = await prisma.pessoa.findMany({
-        where: { arvoreId: receita.processo.arvoreId, requerente: { in: ['maior', 'menor'] } },
+        where: requerentesAtivosDaArvore(receita.processo.arvoreId),
         select: { id: true, nome: true, sobrenome: true, requerente: true },
         orderBy: { id: 'asc' },
       })

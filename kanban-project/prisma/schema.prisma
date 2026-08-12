@@ -60,6 +60,16 @@ model Usuario {
   documentosGeradosCriados     DocumentoGerado[]        @relation("DocumentoGeradoAutor")
   documentosGeradosVersoes     DocumentoGeradoVersao[]  @relation("DocumentoGeradoVersaoAutor")
   documentosGeradosInvalidados DocumentoGeradoVersao[]  @relation("DocumentoGeradoVersaoInvalidador")
+  planilhaOverrides            PlanilhaCelulaOverride[] @relation("OverridePlanilhaAutor")
+  notificacoesOperacionais     NotificacaoOperacional[] @relation("NotificacaoDestinatario")
+
+  // CAMADA OPERACIONAL — organização, aptidão, disponibilidade e capacidade.
+  // Nenhuma delas concede permissão: autorização continua em Perfil/permissoesCustom.
+  aptidoes                      AptidaoOperacional[]
+  indisponibilidades            IndisponibilidadeOperacional[] @relation("IndisponibilidadeDoUsuario")
+  indisponibilidadesRegistradas IndisponibilidadeOperacional[] @relation("IndisponibilidadeAutor")
+  capacidadeOperacional         CapacidadeOperacional?
+  capacidadesDefinidas          CapacidadeOperacional[]        @relation("CapacidadeAutor")
 
   @@index([perfilId])
 }
@@ -140,7 +150,16 @@ model Pessoa {
   // MODELOS DOCUMENTAIS — documentos gerados sobre esta identidade.
   documentosGerados DocumentoGerado[] @relation("DocumentoGeradoPessoa")
 
+  /// SAIDA DA ARVORE ATIVA sem apagar a linha. Usado quando ha fato historico
+  /// protegido apontando para esta Pessoa: apagar destruiria a evidencia. Toda
+  /// leitura de arvore/roster ativo filtra `removidaEm: null`.
+  removidaEm        DateTime?
+  removidaPorId     Int?
+  motivoRemocao     String?                  @db.VarChar(300)
+  planilhaOverrides PlanilhaCelulaOverride[]
+
   @@index([arvoreId])
+  @@index([removidaEm])
   @@index([pais_nasc])
   @@index([maeId])
   @@index([paiId])
@@ -465,7 +484,8 @@ model Processo {
   conflitosRegistrais ConflitoRegistral[]
 
   // MODELOS DOCUMENTAIS — documentos gerados vinculados a este processo.
-  documentosGerados DocumentoGerado[] @relation("DocumentoGeradoProcesso")
+  documentosGerados DocumentoGerado[]        @relation("DocumentoGeradoProcesso")
+  planilhaOverrides PlanilhaCelulaOverride[]
 
   @@index([pais])
   @@index([arvoreId])
@@ -496,13 +516,11 @@ model Tarefa {
   prioridade          PrioridadeTarefa  @default(MEDIA)
   dataPrazo           DateTime?
   dataConclusao       DateTime?
-  tarefaPaiId         Int?
   ordem               Int               @default(0)
   createdAt           DateTime          @default(now())
   updatedAt           DateTime          @updatedAt
   dataInicio          DateTime?
   observacoes         String?
-  tipoSubtarefa       String?           @db.VarChar(20)
   prazoCobranca       Int?              @default(5)
   motivoConclusao     String?           @db.VarChar(50)
   quantidadeCobrancas Int               @default(0)
@@ -511,28 +529,55 @@ model Tarefa {
   processo            Processo?         @relation(fields: [processoId], references: [id], onDelete: Cascade)
   responsavel         Usuario?          @relation(fields: [responsavelId], references: [id])
   status              Status?           @relation(fields: [statusId], references: [id])
-  tarefaPai           Tarefa?           @relation("Subtarefas", fields: [tarefaPaiId], references: [id], onDelete: Cascade)
-  subtarefas          Tarefa[]          @relation("Subtarefas")
   historico           TarefaHistorico[]
 
   // CP-4A â vÃ­nculos aditivos (nullable) com o runtime de workflow v2.
+  // ── A TAREFA É DONA DO SEU TRABALHO, NÃO DA INSTÂNCIA DA FASE ─────────────
+  // UMA unidade de trabalho = UMA Tarefa = N etapas.
+  //
+  // Este campo já foi `@unique`, com a intenção certa e o alvo errado: a ideia
+  // era impedir que sete passos virassem sete tarefas. Mas a instância do
+  // workflow é da FASE — uma só por (processo, fase, ciclo) —, e os passos de
+  // TODOS os documentos daquela fase vivem dentro dela. Com o `@unique`, uma
+  // Emissão Documental com dois documentos era estruturalmente impossível: a
+  // segunda tarefa não conseguia nascer.
+  //
+  // O que garante "etapa não é tarefa" é a IDENTIDADE da tarefa
+  // (`chaveIdempotencia @unique`, derivada da obrigação — necessidade/documento
+  // /pessoa/ciclo), não a exclusividade da instância. Dez passos de um
+  // documento convergem para uma chave; dois documentos são duas chaves.
   workflowInstanceId     Int?
   workflowInstance       PhaseWorkflowInstance?     @relation(fields: [workflowInstanceId], references: [id], onDelete: SetNull)
+  // A ETAPA CORRENTE é PROJEÇÃO, não identidade. Ela muda sete vezes durante a
+  // vida da tarefa, e a tarefa continua a mesma. Nada pode ancorar aqui.
   workflowStepInstanceId Int?
   workflowStepInstance   PhaseWorkflowStepInstance? @relation(fields: [workflowStepInstanceId], references: [id], onDelete: SetNull)
   necessidadeId          Int?
   necessidade            NecessidadeDocumental?     @relation("TarefaNecessidade", fields: [necessidadeId], references: [id], onDelete: SetNull)
   documentoId            Int?
   documento              Documento?                 @relation("TarefaDocumento", fields: [documentoId], references: [id], onDelete: SetNull)
-  faseMacroKey           String?                    @db.VarChar(60)
-  origem                 String?                    @db.VarChar(20)
-  chaveIdempotencia      String?                    @unique @db.VarChar(200)
-  ciclo                  Int?
-  taskRole               String?                    @db.VarChar(40)
-  correlationId          String?                    @db.VarChar(60)
-  previousTarefaId       Int?
-  previousTarefa         Tarefa?                    @relation("TarefaSupersessao", fields: [previousTarefaId], references: [id], onDelete: SetNull)
-  supersededByTarefas    Tarefa[]                   @relation("TarefaSupersessao")
+  // ── FILA E ATRIBUIÇÃO ──────────────────────────────────────────────────────
+  // EQUIPE responde pela fila e pela capacidade; RESPONSÁVEL é quem executa.
+  // Uma tarefa pode nascer só com equipe (`responsavelId` nulo) e esperar
+  // distribuição — é o estado "na fila", e ele não é uma tarefa diferente.
+  //
+  // `equipeKey` é texto porque NÃO EXISTE cadastro de Equipe no sistema: hoje a
+  // equipe vive como `papel` no passo ("equipe_documental"). Criar o cadastro é
+  // decisão de negócio pendente; até lá a chave é a mesma que o passo declara,
+  // e migrar para FK depois é trocar o tipo de UMA coluna.
+  equipeKey              String?                    @db.VarChar(80)
+  dataAtribuicao         DateTime?
+  atribuidoPorId         Int?
+
+  faseMacroKey        String?  @db.VarChar(60)
+  origem              String?  @db.VarChar(20)
+  chaveIdempotencia   String?  @unique @db.VarChar(200)
+  ciclo               Int?
+  taskRole            String?  @db.VarChar(40)
+  correlationId       String?  @db.VarChar(60)
+  previousTarefaId    Int?
+  previousTarefa      Tarefa?  @relation("TarefaSupersessao", fields: [previousTarefaId], references: [id], onDelete: SetNull)
+  supersededByTarefas Tarefa[] @relation("TarefaSupersessao")
 
   // CP-4D â sincronizaÃ§Ã£o TarefaâPasso (CAS otimista, executor, motivo, restauraÃ§Ã£o).
   lockVersion           Int     @default(0)
@@ -541,21 +586,41 @@ model Tarefa {
   motivoCodigo          String? @db.VarChar(40)
   justificativa         String? @db.Text
 
+  // ── ESPERA EXTERNA E O RELÓGIO DO SLA ──────────────────────────────────────
+  // Nem toda espera pausa o prazo, e presumir qualquer um dos dois lados
+  // globalmente seria inventar política de negócio: um cartório que demora 40
+  // dias não pode consumir um SLA de 5, e uma espera por resposta do cliente
+  // frequentemente DEVE contar. Quem decide é o workflow publicado
+  // (`pausarSlaEmEsperaExterna`); estes campos só guardam o que já aconteceu.
+  slaPausadoEm         DateTime?
+  slaPausaAcumuladaMin Int       @default(0)
+
+  // ── CAUSA REMOVIDA ─────────────────────────────────────────────────────────
+  // A obrigação que originou o trabalho deixou de existir DEPOIS que alguém já
+  // trabalhou nela. Cancelar sozinho jogaria fora trabalho feito; ignorar
+  // deixaria a fila mentindo. Fica marcado e espera decisão de quem pode tomá-la.
+  causaRemovidaEm     DateTime?
+  causaRemovidaMotivo String?   @db.VarChar(300)
+
+  dependeDe TarefaDependencia[] @relation("TarefaDependente")
+  bloqueia  TarefaDependencia[] @relation("TarefaPreRequisito")
+
   // TAREFA TRANSVERSAL (aditivo) â aÃ§Ã£o antecipada de OUTRA fase p/ resolver uma necessidade
   // da fase ATUAL, sem avanÃ§ar o Macro. Refs "soltas" (padrÃ£o executedById): sem relation
   // p/ nÃ£o tocar outros models; os serviÃ§os resolvem os vÃ­nculos. necessidadeId/documentoId/
   // responsavelId/statusTarefa/dataPrazo/dataConclusao/createdAt/updatedAt jÃ¡ existem acima.
-  tipo                     TipoTarefa @default(NORMAL)
-  faseOrigemCode           String?    @db.VarChar(60) // fase ATIVA onde foi criada
-  faseReferenciaCode       String?    @db.VarChar(60) // fase Ã  qual a AÃÃO pertence
+  tipo                     TipoTarefa               @default(NORMAL)
+  faseOrigemCode           String?                  @db.VarChar(60) // fase ATIVA onde foi criada
+  faseReferenciaCode       String?                  @db.VarChar(60) // fase Ã  qual a AÃÃO pertence
   workflowInstanceOrigemId Int? // instÃ¢ncia da fase de ORIGEM (ativa) no momento da criaÃ§Ã£o
   pessoaId                 Int? // pessoa correspondente (solto â Pessoa)
   tipoDocumentoId          Int? // tipo documental correspondente (solto â TipoDocumentoCadastro)
-  acaoStepKey              String?    @db.VarChar(80) // aÃ§Ã£o de catÃ¡logo antecipada (stepKey da fase de referÃªncia)
-  motivo                   String?    @db.Text // motivo da antecipaÃ§Ã£o
-  resultadoEsperado        String?    @db.Text
-  resultadoObtido          String?    @db.Text
+  acaoStepKey              String?                  @db.VarChar(80) // aÃ§Ã£o de catÃ¡logo antecipada (stepKey da fase de referÃªncia)
+  motivo                   String?                  @db.Text // motivo da antecipaÃ§Ã£o
+  resultadoEsperado        String?                  @db.Text
+  resultadoObtido          String?                  @db.Text
   createdBy                Int?
+  notificacoes             NotificacaoOperacional[]
 
   @@index([tipo])
   @@index([pessoaId])
@@ -563,7 +628,6 @@ model Tarefa {
   @@index([responsavelId])
   @@index([concluida])
   @@index([statusTarefa])
-  @@index([tarefaPaiId])
   @@index([statusId])
   @@index([pais])
   @@index([dataPrazo])
@@ -594,7 +658,16 @@ model ProcessoRequerente {
   processo     Processo   @relation(fields: [processoId], references: [id], onDelete: Cascade)
   requerente   Requerente @relation(fields: [requerenteId], references: [id], onDelete: Cascade)
 
+  /// REMOCAO COM PRESERVACAO DE HISTORICO. Quando ha fato protegido (pagamento,
+  /// fatura, protocolo, arquivo oficial), o vinculo NAO e apagado: e marcado como
+  /// removido. O fato continua amarrado ao processo; a pessoa sai da operacao ativa.
+  /// Leitura de "requerentes do processo" filtra `removidoEm: null`.
+  removidoEm    DateTime?
+  removidoPorId Int?
+  motivoRemocao String?   @db.VarChar(300)
+
   @@id([processoId, requerenteId])
+  @@index([removidoEm])
 }
 
 model Contratante {
@@ -673,13 +746,14 @@ model Requerente {
   recibosPagos         Recibo[]                @relation("ReciboRequerente")
 
   // CP-1 â vÃ­nculo com a identidade humana Ãºnica (Pessoa). Papel = contexto.
-  personId Int?
+  /// IDENTIDADE CANONICA: uma Pessoa (no da arvore) tem no maximo UM Requerente.
+  /// O indice unico e PARCIAL (so quando personId nao e nulo) — a maioria do
+  /// cadastro de clientes nao tem no na arvore e nao compete entre si.
+  personId Int?    @unique
   pessoa   Pessoa? @relation("RequerentePessoa", fields: [personId], references: [id], onDelete: SetNull)
 
   // MODELOS DOCUMENTAIS — documentos gerados em que este cliente é OUTORGANTE.
   documentosGerados DocumentoGerado[]
-
-  @@index([personId])
 }
 
 /// PROTOCOLIZAÇÃO — ocorrência operacional realizada DENTRO do processo.
@@ -1683,6 +1757,9 @@ model ReceitaRequerente {
   requerente     Requerente? @relation("ReceitaRequerentes", fields: [requerenteId], references: [id])
 
   @@unique([receitaId, idx])
+  /// Um requerente participa UMA vez de cada receita. A unicidade por `idx` e
+  /// posicao na lista: dois idx diferentes para o mesmo requerente passavam.
+  @@unique([receitaId, requerenteId])
   @@index([receitaId])
   @@index([requerenteId])
 }
@@ -2044,50 +2121,51 @@ model CarteiraRecebimento {
 }
 
 model ProdutoFinanceiro {
-  publicCode         String?             @unique @db.VarChar(20) // CodeGeneratorService central â aditivo, Ãºnico, nÃ£o editÃ¡vel
-  id                 Int                 @id @default(autoincrement())
-  codigo             String              @db.VarChar(30)
-  nome               String              @db.VarChar(200)
-  especie            String?             @db.VarChar(20) // kind
-  tipoFinanceiro     String?             @db.VarChar(20) // financialType
-  moedaPadrao        Moeda               @default(BRL)
-  valorPadrao        Decimal?            @db.Decimal(12, 2) // LEGADO: fallback Ãºnico (prÃ©-unificaÃ§Ã£o). NÃO Ã© preÃ§o â migrar p/ TabelaValor.
+  publicCode         String?                   @unique @db.VarChar(20) // CodeGeneratorService central â aditivo, Ãºnico, nÃ£o editÃ¡vel
+  id                 Int                       @id @default(autoincrement())
+  codigo             String                    @db.VarChar(30)
+  nome               String                    @db.VarChar(200)
+  especie            String?                   @db.VarChar(20) // kind
+  tipoFinanceiro     String?                   @db.VarChar(20) // financialType
+  moedaPadrao        Moeda                     @default(BRL)
+  valorPadrao        Decimal?                  @db.Decimal(12, 2) // LEGADO: fallback Ãºnico (prÃ©-unificaÃ§Ã£o). NÃO Ã© preÃ§o â migrar p/ TabelaValor.
   // M-UNIFICA â UMA config por mestre. possuiCusto/possuiReceita seguem sendo a
   // fonte de "o QUE o item pode gerar" (derivam naturezaFin abaixo).
-  possuiCusto        Boolean             @default(false)
-  possuiReceita      Boolean             @default(false)
+  possuiCusto        Boolean                   @default(false)
+  possuiReceita      Boolean                   @default(false)
   // PREÃO-FONTE-ÃNICA (aditivo): a ConfiguraÃ§Ã£o Financeira NÃO guarda mais preÃ§o.
   // Estes campos viram LEGADO â migrados p/ TabelaValor (CUSTO/VENDA) pelo backfill
   // `backfill-precos-legado-tabelavalor.ts`. Preservados atÃ© a migration de remoÃ§Ã£o.
-  valorCustoPadrao   Decimal?            @db.Decimal(12, 2) // LEGADO â TabelaValor(natureza=CUSTO)
-  valorReceitaPadrao Decimal?            @db.Decimal(12, 2) // LEGADO â TabelaValor(natureza=VENDA)
+  valorCustoPadrao   Decimal?                  @db.Decimal(12, 2) // LEGADO â TabelaValor(natureza=CUSTO)
+  valorReceitaPadrao Decimal?                  @db.Decimal(12, 2) // LEGADO â TabelaValor(natureza=VENDA)
   // Natureza financeira canÃ´nica (o QUE Ã© o item). Nullable durante a transiÃ§Ã£o;
   // deriva de possuiCusto/possuiReceita quando ausente (deriveNaturezaFinanceira).
   naturezaFin        NaturezaFinanceira?
-  aplicaA            String?             @db.VarChar(20) // appliesTo
-  cobravelDoCliente  Boolean             @default(false)
+  aplicaA            String?                   @db.VarChar(20) // appliesTo
+  cobravelDoCliente  Boolean                   @default(false)
   /// COMISSÃO (quando aplicável) — regra que remunera quem vendeu/executou o item.
   /// Nullable: a maioria dos itens não comissiona.
   regraComissaoId    Int?
-  regraComissao      RegraComissao?      @relation("ConfigFinComissao", fields: [regraComissaoId], references: [id])
-  ativo              Boolean             @default(true)
-  criadoEm           DateTime            @default(now())
-  atualizadoEm       DateTime            @updatedAt
-  naturezaFinanceira String?             @default("revenue") @db.VarChar(20)
+  regraComissao      RegraComissao?            @relation("ConfigFinComissao", fields: [regraComissaoId], references: [id])
+  ativo              Boolean                   @default(true)
+  criadoEm           DateTime                  @default(now())
+  atualizadoEm       DateTime                  @updatedAt
+  naturezaFinanceira String?                   @default("revenue") @db.VarChar(20)
   // DEPRECIADO (redundante com naturezaFin): apenas indicava que o item gera custo â
   // o que jÃ¡ Ã© determinado pela Natureza Financeira (SOMENTE_CUSTO/CUSTO_E_RECEITA).
   // Removido da UI. Coluna preservada (sem DROP) sÃ³ por compatibilidade de dados.
-  custoInterno       Boolean             @default(false)
+  custoInterno       Boolean                   @default(false)
   // REPASSE â conceito ÃNICO: item Ã© um valor de TERCEIROS repassado ao cliente
   // (pass-through, sem margem/serviÃ§o prÃ³prio do escritÃ³rio). NÃO confundir com
   // TabelaValor/valorRealRepasse (repasse de VALOR em template) nem com cobravelDoCliente.
-  repasse            Boolean             @default(false)
+  repasse            Boolean                   @default(false)
   // REEMBOLSÃVEL â significado EXCLUSIVO: os CUSTOS gerados por este item podem ser
   // reembolsados pelo cliente. SÃ³ faz sentido quando o item gera custo (validado na API).
-  reembolsavel       Boolean             @default(false)
-  servicos           ServicoProduto[]    @relation("ServicoProdutoItens")
+  reembolsavel       Boolean                   @default(false)
+  servicos           ServicoProduto[]          @relation("ServicoProdutoItens")
   itemCatalogoId     Int?
-  itemCatalogo       ItemCatalogo?       @relation(fields: [itemCatalogoId], references: [id])
+  itemCatalogo       ItemCatalogo?             @relation(fields: [itemCatalogoId], references: [id])
+  colunaPlanilha     PlanilhaDocumentalColuna? @relation("ColunaPlanilhaConfig")
 
   // F1 â ConfiguraÃ§Ã£o Financeira canÃ´nica: FKs DIRETAS aos mestres reais.
   // itemCatalogoId Ã© o pivÃ´ (spine) e alvo de preÃ§o (TabelaValor/resolverPreco).
@@ -2862,6 +2940,27 @@ model ModalidadePais {
 }
 
 // CatÃ¡logo das fases (building blocks do workflow)
+/// POLÍTICA DOCUMENTAL DA FASE — quais NATUREZAS a fase materializa.
+///
+/// Substitui a premissa histórica "Genealogia só aceita certidão", que vivia em
+/// código. Qual documento entra numa fase deixa de ser decidido por natureza
+/// escrita no motor e passa a ser CADASTRO: a fase declara as naturezas que
+/// aceita, o Tipo de Documento declara a sua, e a materialização compara IDs.
+/// Nenhum código DOC, nenhum nome, nenhum substring.
+model FaseNaturezaPermitida {
+  id                    Int                          @id @default(autoincrement())
+  catalogoFaseId        Int
+  catalogoFase          CatalogoFase                 @relation(fields: [catalogoFaseId], references: [id], onDelete: Cascade)
+  naturezaOperacionalId Int
+  naturezaOperacional   NaturezaOperacionalDocumento @relation(fields: [naturezaOperacionalId], references: [id], onDelete: Restrict)
+  ativo                 Boolean                      @default(true)
+  criadoEm              DateTime                     @default(now())
+  atualizadoEm          DateTime                     @updatedAt
+
+  @@unique([catalogoFaseId, naturezaOperacionalId])
+  @@index([catalogoFaseId])
+}
+
 model CatalogoFase {
   id                Int      @id @default(autoincrement())
   phaseKey          String   @unique @db.VarChar(60)
@@ -2873,6 +2972,8 @@ model CatalogoFase {
   ativo             Boolean  @default(true)
   criadoEm          DateTime @default(now())
   atualizadoEm      DateTime @updatedAt
+
+  naturezasPermitidas FaseNaturezaPermitida[]
 }
 
 // Workflow Macro â 1:1 com o tipo de processo
@@ -2910,29 +3011,6 @@ model FaseMacro {
   @@index([macroWorkflowId])
 }
 
-model PhaseInternalMode {
-  id                Int      @id @default(autoincrement())
-  modeUid           String   @unique @db.VarChar(140) // {tipoProcessoId|'all'}::{phaseKey}::{key}
-  templateId        Int? // â ModeloInternoFase (solto; null = ad-hoc/seed)
-  tipoProcessoId    Int? // â TipoProcessoNacionalidade (solto; null = todos os processos)
-  phaseKey          String   @db.VarChar(40)
-  key               String   @db.VarChar(60) // chave do modo (slug, Ãºnico dentro de processo+fase)
-  label             String   @db.VarChar(200)
-  description       String?  @db.Text
-  condition         String?  @db.Text // condiÃ§Ã£o de uso (vem de conditionOfUse do modelo)
-  impactOperational String?  @db.Text
-  impactDocument    String?  @db.Text
-  impactFinancial   String?  @db.Text
-  impactProtocol    String?  @db.Text
-  active            Boolean  @default(true)
-  arquivado         Boolean  @default(false)
-  criadoEm          DateTime @default(now())
-  atualizadoEm      DateTime @updatedAt
-
-  @@index([phaseKey])
-  @@index([tipoProcessoId])
-}
-
 model PhaseInternalWorkflow {
   id             Int      @id @default(autoincrement())
   // {tipoProcessoId|'all'}::{phaseKey} para o workflow PRIMÃRIO de uma fase.
@@ -2959,15 +3037,22 @@ model PhaseInternalWorkflow {
   // vinha do catálogo em código — o cadastro não tinha como recusar um workflow
   // documental materializado sem documento.
   /// Natureza da execução: sobre processo, pessoa, necessidade ou documento.
-  escopoExecucao      EscopoExecucao?
+  escopoExecucao           EscopoExecucao?
   /// Perfis que apontam para este workflow (back-relation).
-  perfis              PerfilOperacionalDocumento[] @relation("PerfilWorkflow")
+  perfis                   PerfilOperacionalDocumento[] @relation("PerfilWorkflow")
   /// Família documental aceita (null = não é workflow documental, ou aceita qualquer).
-  familiaDocumentalId Int?
-  familiaDocumental   FamiliaDocumental?           @relation(fields: [familiaDocumentalId], references: [id], onDelete: SetNull)
+  familiaDocumentalId      Int?
+  familiaDocumental        FamiliaDocumental?           @relation(fields: [familiaDocumentalId], references: [id], onDelete: SetNull)
   /// Contrato de materialização: sem estes, a instância documental não nasce.
-  exigeDocumento      Boolean                      @default(false)
-  exigePessoa         Boolean                      @default(false)
+  exigeDocumento           Boolean                      @default(false)
+  exigePessoa              Boolean                      @default(false)
+  /// POLÍTICA DE SLA NA ESPERA EXTERNA — decisão do workflow, não do código.
+  /// `true`: o relógio para enquanto a tarefa aguarda terceiro (cartório que
+  /// demora 40 dias não deve consumir um SLA de 5). `false`: o prazo corre
+  /// mesmo assim (espera por resposta do cliente costuma contar).
+  pausarSlaEmEsperaExterna Boolean                      @default(false)
+  /// Mesma pergunta para bloqueio — e a resposta não é necessariamente a mesma.
+  pausarSlaEmBloqueio      Boolean                      @default(false)
 
   @@index([phaseKey])
   @@index([tipoProcessoId])
@@ -3170,6 +3255,8 @@ model TipoDocumentoCadastro {
   configFinanceiras       ProdutoFinanceiro[]       @relation("ConfigFinTipoDocumento")
   econRules               PhaseEconomicRule[]       @relation("EconTipoDocumento")
   participaPlanilha       Boolean                   @default(false)
+  colunaPlanilha          PlanilhaDocumentalColuna? @relation("ColunaPlanilhaTipoDoc")
+  overridesPlanilha       PlanilhaCelulaOverride[]  @relation("OverrideTipoDoc")
   // LOTE A â categoriaDocumentalId Ã© a CLASSIFICAÃÃO CANÃNICA (consumida por ID).
   // FK nullable p/ backfill seguro. A coluna `category` (String) permanece SÃ como
   // compatibilidade transitÃ³ria (dual-read/dual-write). NÃ£o remover neste lote.
@@ -3270,7 +3357,8 @@ model NaturezaOperacionalDocumento {
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
 
-  tipos TipoDocumentoCadastro[]
+  tipos           TipoDocumentoCadastro[]
+  fasesQueAceitam FaseNaturezaPermitida[]
 }
 
 /// PERFIL OPERACIONAL — a ponte entre o Cadastro Mestre e o Workflow publicado.
@@ -3304,7 +3392,9 @@ model PerfilOperacionalDocumento {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  tipos TipoDocumentoCadastro[]
+  tipos    TipoDocumentoCadastro[]
+  /// Quem está apto a executar esta unidade de trabalho.
+  aptidoes AptidaoOperacional[]
 
   @@index([workflowId])
   @@index([familiaDocumentalId])
@@ -3858,6 +3948,11 @@ model PhaseWorkflowInstance {
   criadoPor            Usuario?  @relation("FaseCriadaPor", fields: [criadoPorId], references: [id], onDelete: SetNull)
 
   steps   PhaseWorkflowStepInstance[]
+  // 1:1 — a instância pertence a UMA tarefa. É a contraparte do `@unique` em
+  // `Tarefa.workflowInstanceId`. A relação é de UM para MUITOS: a instância é da
+  // FASE e abriga as unidades de trabalho dela — quatro certidões numa Emissão
+  // Documental são quatro tarefas dentro desta mesma instância. Quem impede
+  // "etapa vira tarefa" é a chave da tarefa, derivada da obrigação.
   tarefas Tarefa[]
 
   @@index([processoId, faseMacroKey, status])
@@ -4437,6 +4532,46 @@ model ObrigacaoEconomica {
   criadoEm          DateTime  @default(now())
   atualizadoEm      DateTime  @updatedAt
 
+  // ── VÍNCULO DOCUMENTAL ────────────────────────────────────────────────────
+  // O model Custo legado carregava personId/documentoId/tipoServicoId/phaseKey e
+  // era por eles que a Planilha Documental montava a grade (linha = documento,
+  // coluna = serviço). Quando o motor passou a nascer V3-native (F3.5), o custo
+  // deixou de gravar o Custo legado e o vínculo virou TEXTO em `observacoes` —
+  // o financeiro passou a saber QUANTO sem saber DE QUEM e DE QUÊ. Estas colunas
+  // devolvem o vínculo à obrigação, por ID. Elas NÃO duplicam o Ledger (que
+  // continua sendo a única verdade do movimento): dizem a que fato operacional a
+  // obrigação pertence. Simétricas às que a Receita já possui.
+  personId           Int?
+  documentoId        Int?
+  tipoServicoId      Int?
+  phaseKey           String? @db.VarChar(60)
+  phaseCycle         Int?
+  /// ProdutoFinanceiro (Configuração Financeira) que originou o lançamento.
+  configFinanceiraId Int?
+
+  /// COMO o lançamento nasceu. AUTOMATICO_DOCUMENTAL = projetado pela cadeia
+  /// documental (registro localizado); BACKFILL_DOCUMENTAL = reparo determinístico
+  /// da mesma cadeia; MANUAL = despesa extraordinária lançada por pessoa. Null =
+  /// anterior à classificação (nunca inferido por heurística — a reconciliação
+  /// apenas RELATA os não classificados).
+  origemLancamento String? @db.VarChar(28)
+  /// Evento de domínio que causou o lançamento (ex.: PhaseWorkflowStepInstance).
+  eventoOrigemTipo String? @db.VarChar(40)
+  eventoOrigemId   Int?
+
+  // ── SNAPSHOT DE PREÇO (§7) — imutável no instante do lançamento ────────────
+  // Mudar a Tabela de Preços não pode reescrever história: o que foi lançado
+  // guarda a regra, o unitário, a quantidade e o contexto que o produziram.
+  pricingRuleId       Int?
+  valorUnitario       Decimal?  @db.Decimal(14, 2)
+  quantidade          Int?
+  modoCalculoAplicado String?   @db.VarChar(30)
+  naturezaPreco       String?   @db.VarChar(10)
+  contextoAplicado    Json?
+  dataReferencia      DateTime?
+  /// Chave idempotente do lançamento documental (mesma automaticKey do MotorArtefato).
+  chaveIdempotencia   String?   @unique @db.VarChar(200)
+
   ledger           LedgerFinanceiro?
   ledgerEntries    LedgerEntry[] // LedgerEntry.obrigacaoId é denormalizado (o caminho canônico é ledger→obrigacao); a relação existe para a FK proteger o valor
   saldoProjecao    SaldoProjecao? // 1-1: SaldoProjecao.obrigacaoId é @unique
@@ -4452,6 +4587,39 @@ model ObrigacaoEconomica {
   @@index([natureza])
   @@index([codigoOperacional])
   @@index([itemCatalogoId]) // criado em 20260814000000_obrigacao_item_catalogo; faltava aqui
+  @@index([documentoId])
+  @@index([personId])
+  @@index([processoId, documentoId, tipoServicoId]) // grade da Planilha Documental
+}
+
+/// ASSISTENTE DE PARAMETRIZAÇÃO — guarda PROGRESSO, nunca configuração.
+///
+/// O assistente é camada de orquestração: a Matriz vive em MatrizDocumental, o
+/// preço em TabelaValor, o fornecedor em Fornecedor. Se ele guardasse cópia
+/// desses dados, existiriam duas verdades e a tela administrativa e o assistente
+/// divergiriam no primeiro cadastro feito fora dele. O que ele guarda é só onde
+/// o administrador parou: escopo, etapa e quem mexeu.
+model AssistenteParametrizacaoProgresso {
+  id Int @id @default(autoincrement())
+
+  /// ESCOPO — por tipo de processo (o país vem do próprio tipo).
+  tipoProcessoId Int
+  /// Fase específica, quando o administrador escolheu recortar; null = todas.
+  phaseKey       String? @db.VarChar(60)
+
+  /// Etapa em que parou (chave estrutural da etapa, não rótulo de tela).
+  etapaAtual       String @db.VarChar(40)
+  /// Etapas já percorridas — só chaves, nunca conteúdo de configuração.
+  etapasConcluidas Json?
+
+  usuarioId    Int?
+  criadoEm     DateTime  @default(now())
+  atualizadoEm DateTime  @updatedAt
+  publicadoEm  DateTime?
+  publicadoPor Int?
+
+  @@unique([tipoProcessoId, phaseKey])
+  @@index([tipoProcessoId])
 }
 
 // F5 — CRONOGRAMA de vencimentos de PAGÁVEIS (Contas a Pagar). Componente OFICIAL e
@@ -4874,7 +5042,8 @@ model CategoriaServico {
 
   // Fonte ÚNICA de categoria do catálogo. O vínculo vive no mestre
   // (ItemCatalogo) — serviço e item técnico compartilham o mesmo portador.
-  itens ItemCatalogo[]
+  itens           ItemCatalogo[]
+  colunasPlanilha PlanilhaDocumentalColuna[]
 }
 
 /// Categorias das organizações (cartório, consulado, tribunal, banco, tradutor…).
@@ -6402,4 +6571,310 @@ model DocumentoGeradoVersao {
   @@unique([documentoGeradoId, numero])
   @@index([modeloVersaoId])
   @@index([status])
+}
+
+// ============================================================================
+// PLANILHA DOCUMENTAL — CONFIGURAÇÃO DAS COLUNAS ECONÔMICAS.
+//
+// A Planilha é PROJEÇÃO: não guarda preço, não guarda serviço, não guarda
+// documento. Esta tabela guarda a única coisa que é dela — QUAIS itens do
+// cadastro canônico aparecem como coluna, em que ordem, e se estão ativos.
+//
+// O que NÃO está aqui, de propósito: valor, moeda, fornecedor, vigência. Preço
+// vive só em TabelaValor, resolvido em tempo de leitura. Uma coluna que
+// guardasse valor seria a segunda fonte da verdade que este desenho existe para
+// impedir.
+//
+// A ANCORAGEM É POR ID, NUNCA POR NOME. A versão anterior casava
+// `PhaseEconomicRule.componentName` com `TipoServico.nome` por igualdade de
+// texto: renomear o serviço no cadastro fazia a coluna sumir da planilha sem
+// nenhum erro.
+// ============================================================================
+/// UMA COLUNA DA PLANILHA É UMA ETAPA/SERVIÇO DOCUMENTAL — nunca um documento.
+///
+/// A planilha é uma MATRIZ: a LINHA é o registro civil (nascimento, casamento,
+/// óbito) e a COLUNA é a etapa que incide sobre ele (certidão inteiro teor,
+/// apostilamento, tradução). A célula é a interseção.
+///
+/// O modelo anterior amarrava `configId` a UM item do Cadastro Mestre, e isso
+/// obrigava "Certidão de Nascimento - Inteiro Teor" e "Certidão de Casamento -
+/// Inteiro Teor" a virarem DUAS COLUNAS — misturando as duas dimensões. São o
+/// mesmo serviço sobre registros diferentes: uma coluna, três linhas.
+///
+/// Daí as duas estratégias de resolução, ambas por ID:
+///
+///   SERVICO_FIXO      a coluna aponta para UMA Configuração Financeira, igual
+///                     em toda linha (tradução, apostilamento). `configId`.
+///
+///   ITEM_DO_REGISTRO  o item varia com a linha. A coluna aponta para a
+///                     CATEGORIA do catálogo (`categoriaItemId`), e a célula
+///                     resolve a Configuração Financeira do item que o tipo
+///                     documental daquela linha já declara em
+///                     `TipoDocumentoCadastro.itemCatalogoId`.
+model PlanilhaDocumentalColuna {
+  id Int @id @default(autoincrement())
+
+  /// SERVICO (ProdutoFinanceiro) | DOCUMENTO (TipoDocumentoCadastro).
+  origem String @db.VarChar(20)
+
+  /// SERVICO_FIXO | ITEM_DO_REGISTRO — como a célula descobre o item canônico.
+  estrategia String @default("SERVICO_FIXO") @db.VarChar(24)
+
+  /// Categoria do catálogo que delimita os itens de uma coluna ITEM_DO_REGISTRO.
+  /// É o que impede a coluna "Certidão Inteiro Teor" de resolver um item de
+  /// tradução só porque o tipo documental da linha aponta para ele.
+  categoriaItemId Int?
+  categoriaItem   CategoriaServico? @relation(fields: [categoriaItemId], references: [id], onDelete: Restrict)
+
+  /// Configuração Financeira do serviço — é ela que o resolvedor de preço recebe.
+  /// `@unique` (parcial no Postgres, nulos não competem): um item, uma coluna.
+  /// Só em SERVICO_FIXO; em ITEM_DO_REGISTRO é nulo e quem manda é a categoria.
+  configId Int?               @unique
+  config   ProdutoFinanceiro? @relation("ColunaPlanilhaConfig", fields: [configId], references: [id], onDelete: Cascade)
+
+  /// Tipo documental do Cadastro Mestre, quando a coluna é um DOCUMENTO.
+  tipoDocumentoId Int?                   @unique
+  tipoDocumento   TipoDocumentoCadastro? @relation("ColunaPlanilhaTipoDoc", fields: [tipoDocumentoId], references: [id], onDelete: Cascade)
+
+  /// Ordem de exibição. Chave de ordenação é POSIÇÃO, nunca nome.
+  posicao Int @default(0)
+
+  /// Inativar ESCONDE a coluna. Não apaga serviço, preço nem custo histórico —
+  /// reativar traz tudo de volta.
+  ativa Boolean @default(true)
+
+  /// Nome curto só para a tela (ex.: "Apostilamento Certidão"). Não altera o
+  /// cadastro mestre; ausente, a planilha usa o nome canônico.
+  rotuloOverride String? @db.VarChar(60)
+
+  criadoEm     DateTime @default(now())
+  atualizadoEm DateTime @updatedAt
+
+  overrides PlanilhaCelulaOverride[]
+
+  @@index([ativa, posicao])
+  @@index([estrategia])
+}
+
+/// VALOR DA CÉLULA COMBINADO PARA ESTE PROCESSO — e só para ele.
+///
+/// A Tabela de Preços continua sendo a fonte canônica do valor padrão. O
+/// override não a corrige nem a substitui: ele diz "neste processo, nesta
+/// pessoa, neste registro, nesta etapa, o combinado foi outro". Por isso a
+/// identidade é a interseção inteira, por IDs — trocar qualquer um dos quatro
+/// é outra célula.
+///
+/// O valor efetivo é `override ?? preço resolvido`. A origem nunca é
+/// substituída em silêncio: a célula continua sabendo (e mostrando) o preço
+/// base que deixou de valer.
+model PlanilhaCelulaOverride {
+  id Int @id @default(autoincrement())
+
+  processoId Int
+  processo   Processo @relation(fields: [processoId], references: [id], onDelete: Cascade)
+
+  /// A pessoa da árvore. `onDelete: Cascade` — pessoa removida não deixa
+  /// override órfão somando no total.
+  pessoaId Int
+  pessoa   Pessoa @relation(fields: [pessoaId], references: [id], onDelete: Cascade)
+
+  /// O REGISTRO da linha (o tipo documental), não o documento concreto: o
+  /// combinado vale para a certidão de nascimento daquela pessoa, tenha ela
+  /// sido localizada ou não.
+  tipoDocumentoId Int
+  tipoDocumento   TipoDocumentoCadastro @relation("OverrideTipoDoc", fields: [tipoDocumentoId], references: [id], onDelete: Cascade)
+
+  colunaId Int
+  coluna   PlanilhaDocumentalColuna @relation(fields: [colunaId], references: [id], onDelete: Cascade)
+
+  valor Decimal @db.Decimal(14, 2)
+  moeda String  @default("BRL") @db.VarChar(3)
+
+  /// Quem combinou e por quê — a auditoria completa vive em LogAuditoria.
+  autorId Int?
+  autor   Usuario? @relation("OverridePlanilhaAutor", fields: [autorId], references: [id], onDelete: SetNull)
+  motivo  String?  @db.VarChar(300)
+
+  criadoEm     DateTime @default(now())
+  atualizadoEm DateTime @updatedAt
+
+  @@unique([processoId, pessoaId, tipoDocumentoId, colunaId])
+  @@index([processoId])
+}
+
+/// NOTIFICAÇÃO OPERACIONAL — marco da TAREFA, nunca da etapa.
+///
+/// O sino de hoje é derivado por consulta: ele olha `Tarefa.dataPrazo` e
+/// classifica em vencidas/hoje/próximos. Isso funciona para prazo, e não
+/// funciona para ATRIBUIÇÃO — "você recebeu esta tarefa" é um FATO que acontece
+/// num instante e precisa sobreviver a ele. Derivar não dá: não há de onde
+/// derivar "avisei" nem "ela já viu".
+///
+/// `chaveIdempotencia` é o que impede o retry de virar duas notificações — e
+/// impede também a notificação de prazo de renascer todo dia para a mesma
+/// tarefa, que é como um sino deixa de ser lido.
+///
+/// PROIBIDO notificar etapa. "Passo 3 concluído" é detalhe interno da mesma
+/// tarefa; quem recebe isso sete vezes por certidão para de olhar o sino.
+model NotificacaoOperacional {
+  id Int @id @default(autoincrement())
+
+  /// ATRIBUICAO | TRANSFERENCIA | PRAZO | ATRASO | BLOQUEIO
+  tipo String @db.VarChar(24)
+
+  destinatarioId Int
+  destinatario   Usuario @relation("NotificacaoDestinatario", fields: [destinatarioId], references: [id], onDelete: Cascade)
+
+  /// A tarefa a que o marco pertence. `Cascade`: tarefa apagada não deixa aviso
+  /// apontando para o vazio.
+  tarefaId Int
+  tarefa   Tarefa @relation(fields: [tarefaId], references: [id], onDelete: Cascade)
+
+  titulo   String  @db.VarChar(200)
+  mensagem String? @db.Text
+  link     String? @db.VarChar(300)
+
+  /// Quem provocou o marco (quem atribuiu, quem transferiu). Nulo quando o
+  /// marco é do relógio (prazo, atraso).
+  autorId Int?
+
+  chaveIdempotencia String @unique @db.VarChar(220)
+
+  lidaEm   DateTime?
+  criadoEm DateTime  @default(now())
+
+  @@index([destinatarioId, lidaEm])
+  @@index([tarefaId])
+}
+
+/// DEPENDÊNCIA ENTRE TAREFAS — duas obrigações distintas, uma esperando a outra.
+///
+/// Isto NÃO é etapa. "Traduzir a certidão" depende de "obter a certidão", e são
+/// dois trabalhos: têm responsáveis diferentes, prazos diferentes, podem estar
+/// em equipes diferentes. Modelar a segunda como passo da primeira faria a
+/// tradução herdar o dono da emissão e sumir da fila de quem traduz.
+///
+/// A dependência é entre IDs canônicos e não carrega regra: quem interpreta
+/// "posso executar?" é o motor, lendo se as pré-requisitos estão concluídas.
+model TarefaDependencia {
+  id Int @id @default(autoincrement())
+
+  /// A tarefa que ESPERA.
+  tarefaId Int
+  tarefa   Tarefa @relation("TarefaDependente", fields: [tarefaId], references: [id], onDelete: Cascade)
+
+  /// A tarefa que precisa terminar antes.
+  dependeDeId Int
+  dependeDe   Tarefa @relation("TarefaPreRequisito", fields: [dependeDeId], references: [id], onDelete: Cascade)
+
+  /// Dependência informativa não impede execução; obrigatória impede.
+  obrigatoria Boolean  @default(true)
+  motivo      String?  @db.VarChar(200)
+  criadoEm    DateTime @default(now())
+
+  /// Um par só existe uma vez — reconciliar N vezes não empilha dependências.
+  @@unique([tarefaId, dependeDeId])
+  @@index([dependeDeId])
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// A CAMADA OPERACIONAL DO FUNCIONÁRIO — três coisas distintas, três tabelas.
+//
+// AUTORIZAÇÃO continua em Perfil/permissoesCustom, e nada aqui a substitui:
+// ninguém fica elegível por ser apto, por estar disponível ou por ter capacidade
+// sobrando. O sentido é o inverso — estas estruturas só RESTRINGEM quem já tem
+// permissão.
+//
+// ORGANIZAÇÃO (equipe) já existe e não foi recriada: `GrupoUsuario` +
+// `GrupoUsuarioMembro`, com cadastro próprio em Gerenciamento › Usuários e
+// Acessos › Equipes.
+// ═══════════════════════════════════════════════════════════════════════════
+
+/**
+ * APTIDÃO — "esta pessoa executa este TIPO DE TRABALHO".
+ * A dimensão é o PERFIL OPERACIONAL (`PerfilOperacionalDocumento`), que o
+ * Cadastro Mestre já define como "qual workflow processa este documento": um
+ * perfil serve N tipos documentais — "Emissão de Certidão" atende nascimento,
+ * casamento e óbito, porque o processo operacional é o mesmo.
+ * ─── POR QUE NÃO A FASE MACRO ───────────────────────────────────────────────
+ * Era assim que esta tabela nascia, e estava errado. A fase diz ONDE O PROCESSO
+ * ESTÁ; a aptidão diz QUE TRABALHO A PESSOA SABE FAZER. Colapsar os dois produz
+ * absurdos que o cadastro expôs no primeiro uso: "apto para Finalizado",
+ * "apto para Aguardando protocolo" — posições do processo, não competências.
+ * ─── POR QUE NÃO O PASSO ────────────────────────────────────────────────────
+ * Solicitar, aguardar, receber, conferir e validar são passos da MESMA unidade
+ * de trabalho. Exigir cinco aptidões para uma certidão seria cadastrar a
+ * execução, não a competência. A granularidade é a unidade; se algum dia o
+ * domínio exigir especialização por passo, isso será outra decisão, explícita.
+ * ─── POR QUE NÃO UM CATÁLOGO NOVO ───────────────────────────────────────────
+ * Criar `Competencia { nome }` seria uma segunda fonte mestre para o que o
+ * Perfil Operacional já é — e as duas divergiriam no primeiro cadastro feito
+ * pelo lado errado.
+ */
+model AptidaoOperacional {
+  id                  Int                        @id @default(autoincrement())
+  usuarioId           Int
+  /// A UNIDADE DE TRABALHO que esta pessoa executa.
+  perfilOperacionalId Int
+  criadoEm            DateTime                   @default(now())
+  usuario             Usuario                    @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
+  perfilOperacional   PerfilOperacionalDocumento @relation(fields: [perfilOperacionalId], references: [id], onDelete: Cascade)
+
+  @@unique([usuarioId, perfilOperacionalId])
+  @@index([perfilOperacionalId])
+}
+
+enum TipoIndisponibilidade {
+  FERIAS
+  AFASTAMENTO
+  AUSENCIA
+  BLOQUEIO_OPERACIONAL
+}
+
+/**
+ * INDISPONIBILIDADE — período em que a pessoa não deve receber trabalho novo.
+ * Não é RH: não há saldo de férias, não há aprovação, não há folha. É só o que a
+ * distribuição precisa saber. `fim` nulo significa indisponibilidade em aberto,
+ * que existe de verdade (afastamento sem data de retorno) e não pode ser
+ * modelada como uma data inventada.
+ * O registro é HISTÓRICO: encerrar uma indisponibilidade é preencher `fim`, não
+ * apagar a linha — senão a pergunta "por que ninguém foi recomendado na terça"
+ * fica sem resposta.
+ */
+model IndisponibilidadeOperacional {
+  id          Int                   @id @default(autoincrement())
+  usuarioId   Int
+  tipo        TipoIndisponibilidade
+  inicio      DateTime
+  fim         DateTime?
+  motivo      String?               @db.VarChar(300)
+  criadoEm    DateTime              @default(now())
+  criadoPorId Int?
+  usuario     Usuario               @relation("IndisponibilidadeDoUsuario", fields: [usuarioId], references: [id], onDelete: Cascade)
+  criadoPor   Usuario?              @relation("IndisponibilidadeAutor", fields: [criadoPorId], references: [id], onDelete: SetNull)
+
+  @@index([usuarioId, inicio])
+  @@index([fim])
+}
+
+/**
+ * CAPACIDADE — teto configurável de trabalho EXECUTÁVEL simultâneo.
+ * Nulo é o estado normal e significa "sem teto declarado": aí a recomendação
+ * segue relativa, comparando a carga real de cada um. Um número no código
+ * ("máximo 10 tarefas") seria política de negócio que ninguém decidiu.
+ * O teto conta EXECUTÁVEIS, não tarefas: dez tarefas com oito esperando cartório
+ * não ocupam dez lugares. É a mesma distinção que o recomendador já fazia.
+ */
+model CapacidadeOperacional {
+  id                Int      @id @default(autoincrement())
+  usuarioId         Int      @unique
+  /**
+   * Nulo = sem teto declarado.
+   */
+  limiteExecutaveis Int?
+  observacao        String?  @db.VarChar(300)
+  atualizadoEm      DateTime @updatedAt
+  atualizadoPorId   Int?
+  usuario           Usuario  @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
+  atualizadoPor     Usuario? @relation("CapacidadeAutor", fields: [atualizadoPorId], references: [id], onDelete: SetNull)
 }

@@ -89,17 +89,10 @@ export function calcularValidade(regra: RegraDocumental, s: SujeitoContexto, dat
 
 // ---- vigência / status ----
 
-function regraVigenteEStatus(regra: RegraDocumental, dataReferenciaISO: string): { ok: boolean; motivo: string | null } {
+// VALIDADE É ESTADO, NÃO DATA (09/08/2026): a regra vale enquanto PUBLICADA.
+// Rascunho e arquivada não avaliam; publicada avalia — sem janela temporal.
+function regraVigenteEStatus(regra: RegraDocumental): { ok: boolean; motivo: string | null } {
   if (regra.status !== "PUBLICADA") return { ok: false, motivo: `regra ${regra.status.toLowerCase()} (não avaliada)` }
-  const ref = new Date(dataReferenciaISO).getTime()
-  if (regra.vigenciaInicio) {
-    const ini = new Date(regra.vigenciaInicio).getTime()
-    if (!isNaN(ini) && ref < ini) return { ok: false, motivo: "regra ainda não vigente" }
-  }
-  if (regra.vigenciaFim) {
-    const fim = new Date(regra.vigenciaFim).getTime()
-    if (!isNaN(fim) && ref > fim) return { ok: false, motivo: "regra fora de vigência" }
-  }
   return { ok: true, motivo: null }
 }
 
@@ -137,7 +130,7 @@ export function avaliarRegra(regra: RegraDocumental, ctx: ContextoAvaliacao): Re
   }
 
   // 1) status + vigência
-  const vig = regraVigenteEStatus(regra, ctx.dataReferencia)
+  const vig = regraVigenteEStatus(regra)
   if (!vig.ok) {
     return { ...base, aplicavel: false, motivoNaoAplicavel: vig.motivo, justificativa: "", condicoesSatisfeitas: [], condicoesNaoSatisfeitas: [] }
   }

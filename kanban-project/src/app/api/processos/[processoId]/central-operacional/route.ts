@@ -3,9 +3,11 @@
 import { randomUUID } from "crypto"
 import { NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
+import { pessoasAtivasDaArvore } from "@/src/lib/genealogia/vinculo-ativo"
 import { verificarPermissao } from "@/src/lib/verificar-permissao"
 import { getOrdemFase, getStepsForFase, getFase, phaseKeyToFaseCode, faseCodeToPhaseKey } from "@/src/lib/process-stage/fases-catalog"
 import { itemCatalogosDeCertidao } from "@/src/lib/documentos/natureza-certidao"
+import { nomeCanonicoDaObrigacao } from "@/src/lib/documentos/nome-canonico-obrigacao"
 import { resolveProgressoFaseDocumento } from "@/src/lib/process-stage/resolve-fase-progresso"
 import { resolveOperationalProjection, type OperationalProjection } from "@/src/lib/process-stage/operational-projection"
 import {
@@ -355,7 +357,7 @@ export async function GET(
     const [pessoas, unioes, docsRaw] = await Promise.all([
       processo.arvoreId
         ? prisma.pessoa.findMany({
-            where: { arvoreId: processo.arvoreId },
+            where: pessoasAtivasDaArvore(processo.arvoreId),
             select: {
               id: true,
               nome: true,
@@ -793,6 +795,25 @@ export async function GET(
         orderBy: [{ ciclo: "desc" }, { updatedAt: "desc" }],
         select: { id: true, necessidadeId: true, status: true, obrigatorio: true, documentoId: true, prazo: true, responsavelId: true, updatedAt: true, motivo: true },
       })
+      // ── A TAREFA CANÔNICA É A RAIZ DA VISÃO OPERACIONAL ──────────────────
+      // A Central montava a linha direto do StepInstance, e a tela de Tarefas
+      // lia Tarefa: duas telas, duas entidades, nenhuma identidade em comum —
+      // não havia como dizer que a linha do Ademir aqui e a linha lá eram o
+      // MESMO trabalho. A etapa continua sendo exibida; ela só deixou de ser a
+      // raiz. Uma consulta, indexada pela necessidade que originou o trabalho.
+      const tarefasDoProcesso = await prisma.tarefa.findMany({
+        where: { processoId: id, necessidadeId: { in: necs.map((n) => n.id) } },
+        select: {
+          id: true, necessidadeId: true, statusTarefa: true, responsavelId: true, equipeKey: true,
+          dataPrazo: true, prioridade: true, workflowInstanceId: true, workflowStepInstanceId: true,
+          updatedAt: true, concluida: true,
+          responsavel: { select: { nome: true } },
+        },
+      })
+      const tarefaPorNecessidade = new Map(
+        tarefasDoProcesso.filter((t) => t.necessidadeId != null).map((t) => [t.necessidadeId as number, t]),
+      )
+
       // responsavelId é ref solta a Usuario (sem relation) → resolve o nome em lote
       const respIds = [...new Set(stepsLR.map((s) => s.responsavelId).filter((x): x is number => x != null))]
       const respNomes = respIds.length
@@ -802,7 +823,25 @@ export async function GET(
       for (const s of stepsLR) if (s.necessidadeId != null && !stepByNec.has(s.necessidadeId)) stepByNec.set(s.necessidadeId, s)
       const CONCLUIDO = new Set(["CONCLUIDO", "DISPENSADO", "SUPERSEDIDO"])
       const localizado = (necId: number) => { const s = stepByNec.get(necId); return !!s && CONCLUIDO.has(s.status) }
-      const requisitoDe = (snap: unknown) => (snap && typeof snap === "object" && "requisito" in snap ? String((snap as { requisito: unknown }).requisito) : "Certidão")
+      // NOME DA OBRIGAÇÃO pelo Cadastro Mestre. `requisito` é o texto da regra e
+      // não nomeia documento — usá-lo aqui fazia a mesma exigência aparecer com
+      // dois nomes ("Certidão de Nascimento" × "Certidão de nascimento - Inteiro
+      // Teor") e ser lida como duas obrigações.
+      const tiposCad = await prisma.tipoDocumentoCadastro.findMany({ select: { code: true, name: true } })
+      const nomeTipoPorCode = new Map(tiposCad.filter((t) => t.code).map((t) => [t.code as string, t.name]))
+      const itemNomePorId = new Map(
+        (await prisma.itemCatalogo.findMany({ where: { id: { in: [...new Set(necsRaw.map((n) => n.itemCatalogoId))] } }, select: { id: true, name: true } }))
+          .map((i) => [i.id, i.name]),
+      )
+      const requisitoDe = (n: { matrizSnapshot: unknown; itemCatalogoId: number }) => {
+        const snap = (n.matrizSnapshot ?? null) as { requisito?: unknown; documentosAceitos?: unknown } | null
+        return nomeCanonicoDaObrigacao({
+          documentosAceitos: snap?.documentosAceitos,
+          requisitoNome: typeof snap?.requisito === "string" ? snap.requisito : null,
+          itemCatalogoNome: itemNomePorId.get(n.itemCatalogoId) ?? null,
+          nomePorCode: (code) => nomeTipoPorCode.get(code) ?? null,
+        }) ?? "Certidão"
+      }
 
       // progresso = passos OBRIGATÓRIOS localizar_registro concluídos / aplicáveis
       const obrig = necs.filter((n) => n.obrigatoriedade === "OBRIGATORIA")
@@ -827,25 +866,42 @@ export async function GET(
         const s = stepByNec.get(n.id)
         const ok = localizado(n.id)
         const pessoa = n.pessoaId != null ? pessoasMap.get(n.pessoaId) : undefined
-        const dias = s?.prazo ? diffDays(s.prazo, now) : null
+        // O que a linha mostra vem da TAREFA quando ela existe; a etapa entra
+        // como conteúdo interno. Responsável e prazo NUNCA saem do documento:
+        // era essa fonte concorrente que fazia "Daniela" numa tela e "Equipe
+        // Documental" na outra descreverem a mesma linha sem se encontrarem.
+        const tarefa = n.id != null ? tarefaPorNecessidade.get(n.id) ?? null : null
+        const prazoEfetivo = tarefa?.dataPrazo ?? s?.prazo ?? null
+        const dias = prazoEfetivo ? diffDays(prazoEfetivo, now) : null
         return {
+          // A IDENTIDADE COMPARTILHADA: é por este número que a Central e a
+          // tela de Tarefas falam da mesma coisa.
+          taskId: tarefa?.id ?? null,
+          statusTarefa: tarefa?.statusTarefa ?? null,
+          equipeKey: tarefa?.equipeKey ?? null,
+          prioridade: tarefa?.prioridade ?? null,
+          workflowInstanceId: tarefa?.workflowInstanceId ?? null,
+          stepAtualId: tarefa?.workflowStepInstanceId ?? s?.id ?? null,
           docId: s?.documentoId ?? 0,
           pessoaId: n.pessoaId ?? 0,
           pessoaNome: pessoa ? nomeCompleto(pessoa) : "—",
-          docType: requisitoDe(n.matrizSnapshot),
-          docTypeLabel: requisitoDe(n.matrizSnapshot),
+          docType: requisitoDe(n),
+          docTypeLabel: requisitoDe(n),
           status: ok ? "Registro localizado" : "A localizar",
           statusRaw: ok ? "LOCALIZADO" : "A_LOCALIZAR",
-          responsavelNome: s?.responsavelId != null ? respNomes.get(s.responsavelId) ?? null : null,
-          responsavelId: s?.responsavelId ?? null,
-          prazo: s?.prazo?.toISOString() ?? null,
+          responsavelNome: tarefa?.responsavel?.nome
+            ?? (s?.responsavelId != null ? respNomes.get(s.responsavelId) ?? null : null),
+          responsavelId: tarefa?.responsavelId ?? s?.responsavelId ?? null,
+          prazo: prazoEfetivo?.toISOString() ?? null,
           diasParaPrazo: dias,
           motivoBloqueio: null,
-          ultimaMovimentacao: s?.updatedAt?.toISOString() ?? null,
+          ultimaMovimentacao: (tarefa?.updatedAt ?? s?.updatedAt)?.toISOString() ?? null,
           isCritical: false,
           isOverdue: !ok && dias != null && dias < 0,
           isBlocked: false,
-          noOwner: !s?.responsavelId,
+          // "sem dono" é da TAREFA: ela pode estar na fila da equipe, que é um
+          // estado legítimo e não um cadastro incompleto.
+          noOwner: tarefa != null ? tarefa.responsavelId == null : !s?.responsavelId,
           // NÃO usar "normal" (o front mapeia "normal"→"Solicitar certidão", que é ação da
           // Emissão). Na Genealogia a ação é localizar; localizado → "Concluído".
           proximoPasso: ok ? "Concluído" : "Localizar registro",

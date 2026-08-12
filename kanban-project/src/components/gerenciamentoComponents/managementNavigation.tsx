@@ -165,7 +165,6 @@ export const MANAGEMENT_NAVIGATION: ManagementNavigationItem[] = [
 
       // ESTRUTURA — o catálogo de fases é a fonte única das fases do sistema.
       a(40, "fases", "Fases", ["fase", "fases", "catalogo", "catálogo", "etapa", "phase"], "Estrutura"),
-      a(50, "phasemodes", "Variações da Fase", ["variacao", "variação", "modo", "interno", "fase"], "Estrutura"),
 
       // CONFIGURAÇÕES
       a(70, "sla", "SLA", ["sla", "prazo", "vencimento", "alerta"], "Configurações"),
@@ -263,6 +262,9 @@ export const MANAGEMENT_NAVIGATION: ManagementNavigationItem[] = [
       a(50, "pricingtable", "Tabelas de Preços", ["preco", "preço", "tabela", "valor", "vigencia", "vigência"], "Tabela de Valores"),
       a(60, "discrules", "Regras de Precificação", ["preco", "preço", "regra", "desconto", "economica"], "Tabela de Valores"),
       a(70, "pricing", "Aplicabilidade Econômica", ["preco", "preço", "aplicabilidade", "economica", "econômica"], "Tabela de Valores"),
+      // A Planilha Documental é PROJEÇÃO: aqui se escolhe QUAIS itens do cadastro
+      // viram coluna. Preço continua só na Tabela de Preços.
+      a(75, "planilhacolunas", "Planilha Documental", ["planilha", "coluna", "documental", "custo", "projecao", "projeção"], "Tabela de Valores"),
 
       a(80, "accounts", "Contas Bancárias", ["conta", "banco", "bancaria", "tesouraria"], "Tesouraria"),
       a(90, "banks", "Bancos", ["banco", "tesouraria"], "Tesouraria"),
@@ -308,22 +310,30 @@ export const MANAGEMENT_NAVIGATION: ManagementNavigationItem[] = [
   // ═══════════════════ 9. USUÁRIOS E ACESSOS ══════════════════════════════════
   {
     key: "grp_usuarios", label: "Usuários", fullLabel: "Usuários e Acessos", icon: Users2, order: 90, status: "active",
-    description: "Identidade de acesso, autorização, grupos e trilha de acesso.",
+    description: "Identidade de acesso, autorização, organização operacional e trilha de acesso.",
     children: [
+      // ─── quem entra e o que pode ───────────────────────────────────────────
       a(10, "users", "Usuários", ["usuario", "usuário", "user", "conta", "acesso", "login"]),
       a(20, "roles", "Perfis", ["perfil", "papel", "role", "permissao", "permissão", "acesso"]),
       a(30, "permmotor", "Permissões", ["permissao", "permissão", "autorizacao", "autorização", "perfil", "motor"]),
 
-      a(40, "teams", "Equipes", ["equipe", "time", "grupo"], "Grupos"),
-      a(50, "departments", "Departamentos", ["departamento", "setor", "grupo"], "Grupos"),
-      a(60, "rolecat", "Cargos", ["cargo", "funcao", "função", "papel"], "Grupos"),
+      // ─── COMO O TRABALHO SE ORGANIZA ───────────────────────────────────────
+      // A seção deixou de se chamar "Grupos": Capacidade Operacional não é um
+      // grupo de pessoas, é a condição de cada uma para receber trabalho.
+      // Departamentos e Cargos saíram daqui — eram cadastros sem consumidor:
+      // nenhuma FK apontava para eles, nenhuma regra os lia, e ninguém podia
+      // sequer ser associado a um deles.
+      a(40, "teams", "Equipes", ["equipe", "time", "grupo", "departamento", "setor"], "Organização operacional"),
+      a(45, "opcapacity", "Capacidade Operacional",
+        ["capacidade", "aptidao", "aptidão", "disponibilidade", "ferias", "férias", "carga", "equipe", "cargo", "funcao", "função"],
+        "Organização operacional"),
 
-      a(70, "accaudit", "Auditoria de Acessos", ["auditoria", "acesso", "sessao", "sessão", "login", "bloqueio"]),
+      // ─── rastro ────────────────────────────────────────────────────────────
+      a(70, "accaudit", "Auditoria de Acessos", ["auditoria", "acesso", "sessao", "sessão", "login", "bloqueio"], "Controle"),
 
       // alias histórico da mesma tela de perfis/permissões (deep-link preservado).
       h(900, "permprofiles", "Perfis de Permissão (alias)"),
       h(910, "teams-rascunho", "Equipes (rascunho do mockup)"),
-      h(920, "rolecat-rascunho", "Papéis e Responsáveis (rascunho do mockup)"),
     ],
   },
 
@@ -335,6 +345,14 @@ export const MANAGEMENT_NAVIGATION: ManagementNavigationItem[] = [
     description: "Configurações globais, cadastros transversais e trilha técnica.",
     children: [
       a(10, "settings", "Configurações Gerais", ["configuracao", "configuração", "geral", "empresa", "moeda", "fuso"]),
+
+      // ASSISTENTE DE PARAMETRIZAÇÃO — camada de CONDUÇÃO sobre as telas que já
+      // existem (Regras Documentais, Serviços, Fornecedores, Aplicabilidade
+      // Econômica, Tabela de Valores, Moedas). Ele não cadastra nada por conta
+      // própria: embute a tela oficial de cada etapa. Fica em Sistema porque é
+      // transversal — atravessa Documentos, Serviços e Financeiro.
+      a(20, "paramwizard", "Assistente de Parametrização",
+        ["assistente", "parametrizacao", "parametrização", "configuracao inicial", "configuração inicial", "wizard", "onboarding", "matriz", "preco", "preço"]),
 
       // "Catálogo Mestre" SAIU do menu: o cadastro mestre (ItemCatalogo) é
       // ESTRUTURA TÉCNICA INTERNA — todos os registros, ids e vínculos seguem

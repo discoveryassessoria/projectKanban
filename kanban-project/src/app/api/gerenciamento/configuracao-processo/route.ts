@@ -3,7 +3,7 @@
 // READ-MODEL ÚNICO da configuração por Tipo de Processo. SOMENTE LEITURA —
 // não escreve, não aplica regra, não duplica fonte de verdade: apenas projeta o
 // que já existe (MacroWorkflow/FaseMacro, PhaseInternalWorkflow/Step,
-// PhaseAutomationRule, PhaseInternalMode, MatrizDocumental, ProdutoFinanceiro).
+// PhaseAutomationRule, MatrizDocumental, ProdutoFinanceiro).
 //
 // Alimenta 4 telas do Gerenciamento que antes eram scaffolds ou não existiam:
 //   • Processos › Configurações › SLA            (prazos de fase e de passo)
@@ -23,7 +23,7 @@ export async function GET(request: NextRequest) {
   const erro = await verificarPermissao(request, 'usuarios.gerenciar')
   if (erro) return erro
   try {
-    const [tipos, internos, automacoes, variacoes, matriz, configsFin, catalogoFases] = await Promise.all([
+    const [tipos, internos, automacoes, matriz, configsFin, catalogoFases] = await Promise.all([
       prisma.tipoProcessoNacionalidade.findMany({
         orderBy: [{ countryLabel: 'asc' }, { name: 'asc' }],
         include: { macroWorkflow: { include: { fases: { orderBy: { ordem: 'asc' } } } } },
@@ -34,11 +34,6 @@ export async function GET(request: NextRequest) {
       }),
       prisma.phaseAutomationRule.groupBy({
         by: ['tipoProcessoId', 'kind'],
-        where: { arquivado: false, active: true },
-        _count: { _all: true },
-      }),
-      prisma.phaseInternalMode.groupBy({
-        by: ['tipoProcessoId'],
         where: { arquivado: false, active: true },
         _count: { _all: true },
       }),
@@ -74,7 +69,6 @@ export async function GET(request: NextRequest) {
       for (const r of rows) m.set(r.tipoProcessoId, (m.get(r.tipoProcessoId) ?? 0) + r._count._all)
       return m
     }
-    const variacoesPor = contaPor(variacoes)
     const matrizPor = contaPor(matriz)
     const configFinPor = contaPor(configsFin)
 
@@ -132,7 +126,6 @@ export async function GET(request: NextRequest) {
           automacoesFinanceiras: auto.financial ?? 0,
           automacoesEvento: auto.event ?? 0,
           automacoesProtocolo: auto.protocol ?? 0,
-          variacoes: variacoesPor.get(t.id) ?? 0,
           regrasDocumentais: matrizPor.get(t.id) ?? 0,
           configsFinanceiras: configFinPor.get(t.id) ?? 0,
         },

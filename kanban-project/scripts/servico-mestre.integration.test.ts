@@ -8,6 +8,11 @@
 import { PrismaClient } from '@prisma/client'
 import { sincronizarItemDeServico } from '../src/services/catalogo-sync'
 
+import { exigirBancoDeTeste } from "./_banco-de-teste"
+
+// TRAVA DE AMBIENTE: este arquivo ESCREVE. Sem banco de teste local, não roda.
+exigirBancoDeTeste()
+
 const prisma = new PrismaClient()
 const ROLLBACK = 'ROLLBACK_SENTINELA'
 let passed = 0, failed = 0

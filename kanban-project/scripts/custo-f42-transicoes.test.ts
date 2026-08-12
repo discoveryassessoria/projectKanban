@@ -8,6 +8,11 @@ import { executarCancelamento } from '@/lib/financeiro/acoes/cancelamento-avanca
 import { aplicarTransicaoEstadoCustoTx } from '@/lib/financeiro/acoes/estado-custo-service'
 import { listarObrigacoes } from '@/lib/financeiro/leitura/consultas'
 
+import { exigirBancoDeTeste } from "./_banco-de-teste"
+
+// TRAVA DE AMBIENTE: este arquivo ESCREVE. Sem banco de teste local, não roda.
+exigirBancoDeTeste()
+
 let ok = 0, fail = 0
 const chk = (c: boolean, m: string) => { if (c) { ok++; console.log('  ✅', m) } else { fail++; console.log('  ❌', m) } }
 const TS = Date.now()

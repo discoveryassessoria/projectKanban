@@ -125,10 +125,12 @@ console.log('resolverPrecoFinanceiro — especificidade\n')
   ok(r.ok && r.conflito == null && r.valor === 50, '8b) empate com valores idênticos não é conflito')
 }
 
-// 9) fora de vigência → descartada
+// 9) VALIDADE É ESTADO, NÃO DATA (09/08/2026): uma linha com vigência antiga
+//    herdada continua valendo — quem decide validade é o status do cadastro.
+//    Antes, esta mesma linha era descartada por 'fora_de_vigencia'.
 {
   const r = resolverPrecoCore([linha({ id: 1, valor: 90, vigenciaFim: '2020-01-01' })], ctx())
-  ok(!r.ok && r.alternativasDescartadas.some((d) => d.motivo === 'fora_de_vigencia'), '9) fora de vigência descartada')
+  ok(r.ok && r.valor === 90, '9) vigência antiga herdada não invalida o preço')
 }
 
 // 10) natureza divergente ignorada (CUSTO x pedido de VENDA/RECEITA)

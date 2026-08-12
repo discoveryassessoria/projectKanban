@@ -39,7 +39,6 @@ const FONTES: Fonte[] = [
   { chave: "fornecedores", nome: "Fornecedores", modulo: "Órgãos", url: "/api/gerenciamento/fornecedores", raiz: "fornecedores" },
   { chave: "departamentos", nome: "Departamentos", modulo: "Usuários", url: "/api/gerenciamento/departamentos", raiz: "departamentos" },
   { chave: "grupos", nome: "Equipes", modulo: "Usuários", url: "/api/gerenciamento/cadastros/grupos", raiz: "registros" },
-  { chave: "cargos", nome: "Cargos", modulo: "Usuários", url: "/api/gerenciamento/cadastros/cargos", raiz: "registros" },
   { chave: "auditoria", nome: "Trilha de Auditoria", modulo: "Sistema", url: "/api/gerenciamento/auditoria?take=1000", raiz: "logs" },
 ]
 

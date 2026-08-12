@@ -68,13 +68,33 @@ export function podeAplicarTarefa(atual: string, alvo: string): boolean {
   return (PRECEDENCIA_TAREFA[alvo] ?? -1) > (PRECEDENCIA_TAREFA[atual] ?? -1)
 }
 
+/**
+ * A TENTATIVA FAZ PARTE DA IDENTIDADE DA TRANSIÇÃO.
+ *
+ * `ciclo` distingue execuções diferentes da mesma fase, mas NÃO distingue duas
+ * passagens pelo mesmo passo dentro do mesmo ciclo — e é exatamente isso que a
+ * REABERTURA cria: o cartório manda o documento errado, a etapa volta, o
+ * operador refaz e conclui de novo. Sem discriminador, a segunda conclusão
+ * produzia a mesma `chaveIdempotencia` da primeira e a transação inteira caía
+ * com P2002. O trabalho estava certo; a chave é que descrevia mal o fato.
+ *
+ * O `lockVersion` da linha no momento da leitura é o discriminador natural:
+ * ele muda a cada transição aplicada, então cada passagem tem identidade
+ * própria. E ele não enfraquece a idempotência — um reenvio do MESMO comando
+ * para em `status === alvo` antes de chegar aqui, e duas gravações concorrentes
+ * já são resolvidas pelo CAS, onde só uma casa o lockVersion lido.
+ */
+function sufixoTentativa(tentativa?: number): string {
+  return tentativa === undefined ? "" : `|t${tentativa}`
+}
+
 /** Chave idempotente do comando (determinística). */
-export function chaveComando(op: string, entityType: string, entityId: number, alvo: string, ciclo: number): string {
-  return `${op}|${entityType}${entityId}|${alvo}|c${ciclo}`
+export function chaveComando(op: string, entityType: string, entityId: number, alvo: string, ciclo: number, tentativa?: number): string {
+  return `${op}|${entityType}${entityId}|${alvo}|c${ciclo}${sufixoTentativa(tentativa)}`
 }
 /** Chave única do evento derivada do comando. */
-export function chaveEvento(tipo: string, entityType: string, entityId: number, alvo: string, ciclo: number): string {
-  return `evt|${tipo}|${entityType}${entityId}|${alvo}|c${ciclo}`
+export function chaveEvento(tipo: string, entityType: string, entityId: number, alvo: string, ciclo: number, tentativa?: number): string {
+  return `evt|${tipo}|${entityType}${entityId}|${alvo}|c${ciclo}${sufixoTentativa(tentativa)}`
 }
 
 // ---- Restauração de bloqueio (decisão 6) ----

@@ -47,12 +47,17 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
     if (b.valor !== undefined && toAmount(b.valor) <= 0) {
       return NextResponse.json({ error: 'Valor deve ser maior que zero.' }, { status: 400 })
     }
-    if (vigenciaInvalida(b.vigenciaInicio) || vigenciaInvalida(b.vigenciaFim)) {
-      return NextResponse.json({ error: 'Vigência deve estar no formato ISO YYYY-MM-DD.' }, { status: 400 })
-    }
+    // VALIDADE É ESTADO, NÃO DATA (09/08/2026). A rota deixa de aceitar e de exigir
+    // vigência: preço ativo vale por tempo indeterminado, até ser editado,
+    // inativado ou excluído. As colunas permanecem no schema (nullable) só para
+    // o histórico já gravado — nenhuma escrita nova as preenche.
     // R20 — a config (mestre) é imutável na edição: uma tentativa de trocá-la é criação de novo registro.
     if (b.configuracaoFinanceiraItemId !== undefined && Number(b.configuracaoFinanceiraItemId) !== atual.configuracaoFinanceiraItemId) {
       return NextResponse.json({ error: 'Não é permitido trocar a Configuração Financeira de um preço existente. Crie um novo preço e arquive este.' }, { status: 400 })
+    }
+    // Mesma regra pelo vínculo canônico do item (é o que a tela envia hoje).
+    if (b.itemCatalogoId !== undefined && atual.itemCatalogoId != null && Number(b.itemCatalogoId) !== atual.itemCatalogoId) {
+      return NextResponse.json({ error: 'Não é permitido trocar o item de um preço existente. Crie um novo preço e arquive este.' }, { status: 400 })
     }
     // ESTRATÉGIA efetiva (modoCalculo canônico). A UNIDADE é escolhida pelo usuário
     // (enum UnidadeItem) — NÃO é mais derivada do modo.
@@ -81,13 +86,11 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
     // min/max só em estratégia de FAIXA (nenhuma atual) → normaliza para null.
     const qMinEff = modoConhecido ? (usaFaixa ? (b.quantidadeMinima !== undefined ? parseQtd(b.quantidadeMinima) : atual.quantidadeMinima) : null) : atual.quantidadeMinima
     const qMaxEff = modoConhecido ? (usaFaixa ? (b.quantidadeMaxima !== undefined ? parseQtd(b.quantidadeMaxima) : atual.quantidadeMaxima) : null) : atual.quantidadeMaxima
-    const vigIniEff = b.vigenciaInicio !== undefined ? (b.vigenciaInicio ? String(b.vigenciaInicio) : null) : atual.vigenciaInicio
-    const vigFimEff = b.vigenciaFim !== undefined ? (b.vigenciaFim ? String(b.vigenciaFim) : null) : atual.vigenciaFim
+    // Editar um preço NORMALIZA a vigência herdada: o registro passa a valer por
+    // tempo indeterminado, como todo cadastro.
+    const vigIniEff: string | null = null
+    const vigFimEff: string | null = null
     const prioEff = b.prioridade !== undefined ? (Number(b.prioridade) || 0) : atual.prioridade
-    // "Válido a partir de" obrigatório (não pode ficar vazio numa edição).
-    if (!vigIniEff) {
-      return NextResponse.json({ error: 'Informe "Válido a partir de" (início da validade comercial).' }, { status: 400 })
-    }
     if (vigIniEff && vigFimEff && vigIniEff > vigFimEff) {
       return NextResponse.json({ error: '"Válido até" deve ser igual ou posterior a "Válido a partir de".' }, { status: 400 })
     }

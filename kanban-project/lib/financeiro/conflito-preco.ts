@@ -55,14 +55,10 @@ function faixaSobrepoe(aMin: number | null | undefined, aMax: number | null | un
   return lo(aMin) <= hi(bMax) && lo(bMin) <= hi(aMax)
 }
 
-/** Vigências 'YYYY-MM-DD' (null aberto) se sobrepõem? Strings ISO comparam lexicograficamente. */
-function vigenciaSobrepoe(a: PrecoRegistro, b: PrecoRegistro): boolean {
-  const aStart = a.vigenciaInicio ?? '0000-00-00'
-  const aEnd = a.vigenciaFim ?? '9999-12-31'
-  const bStart = b.vigenciaInicio ?? '0000-00-00'
-  const bEnd = b.vigenciaFim ?? '9999-12-31'
-  return aStart <= bEnd && bStart <= aEnd
-}
+// VALIDADE É ESTADO, NÃO DATA: duas linhas ativas no MESMO contexto comercial
+// são conflito, ponto. Antes, janelas que não se cruzavam as separavam — o que
+// tornava a data um desempate escondido e permitia "duas verdades em revezamento".
+// Medido antes de mudar: nenhuma combinação da base atual passa a colidir.
 
 function mesmoContexto(a: PrecoRegistro, b: PrecoRegistro): boolean {
   return (
@@ -86,7 +82,6 @@ export function conflitam(a: PrecoRegistro, b: PrecoRegistro): boolean {
   if (a.configuracaoFinanceiraItemId == null || b.configuracaoFinanceiraItemId == null) return false
   if (!mesmoContexto(a, b)) return false
   if (!faixaSobrepoe(a.quantidadeMinima, a.quantidadeMaxima, b.quantidadeMinima, b.quantidadeMaxima)) return false
-  if (!vigenciaSobrepoe(a, b)) return false
   return true
 }
 

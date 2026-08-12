@@ -8,6 +8,7 @@
 
 "use client"
 
+import { nomePessoa } from "@/src/lib/ui/pessoa-exibicao"
 import { useState } from "react"
 import { buscar, useApi, useConsulta } from "@/src/lib/dados"
 import { Button } from "@/components/ui/button"
@@ -417,7 +418,7 @@ export function ProcessoProtocolos({
   const getNomePessoa = (protocolo: Protocolo) => {
     const c = protocolo.contratante ?? protocolo.requerente
     if (!c) return null
-    const rotulo = c.publicCode ? `${c.publicCode} — ${c.nome}` : c.nome
+    const rotulo = nomePessoa(c)
     return `${rotulo}${protocolo.contratanteId ? " (Contratante)" : " (Requerente)"}`
   }
 
@@ -612,7 +613,7 @@ export function ProcessoProtocolos({
                       <optgroup label="Contratantes">
                         {contratantes.map(c => (
                           <option key={`c-${c.id}`} value={`contratante-${c.id}`}>
-                            {c.publicCode ? c.publicCode + ' — ' : ''}{c.nome}
+                            {nomePessoa(c)}
                           </option>
                         ))}
                       </optgroup>
@@ -621,7 +622,7 @@ export function ProcessoProtocolos({
                       <optgroup label="Requerentes">
                         {requerentes.map(r => (
                           <option key={`r-${r.id}`} value={`requerente-${r.id}`}>
-                            {r.publicCode ? r.publicCode + ' — ' : ''}{r.nome}
+                            {nomePessoa(r)}
                           </option>
                         ))}
                       </optgroup>

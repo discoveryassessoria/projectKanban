@@ -5,7 +5,7 @@
 --   corpo        → gerado do prisma/schema.prisma
 --   bloco manual → prisma/baseline/bloco-manual.sql (edite LÁ)
 --
--- Gerado em : 2026-08-05
+-- Gerado em : 2026-08-12
 -- Prisma    : 6.19.3
 --
 -- PARA QUE SERVE: reconstruir o banco DO ZERO. O histórico de migrations NÃO
@@ -246,6 +246,9 @@ CREATE TYPE "DocumentoGeradoStatus" AS ENUM ('VIGENTE', 'INVALIDADO');
 -- CreateEnum
 CREATE TYPE "DocumentoGeradoVersaoStatus" AS ENUM ('GERADA', 'VIGENTE', 'SUBSTITUIDA', 'INVALIDADA');
 
+-- CreateEnum
+CREATE TYPE "TipoIndisponibilidade" AS ENUM ('FERIAS', 'AFASTAMENTO', 'AUSENCIA', 'BLOQUEIO_OPERACIONAL');
+
 -- CreateTable
 CREATE TABLE "Usuario" (
     "publicCode" VARCHAR(20),
@@ -304,6 +307,9 @@ CREATE TABLE "Pessoa" (
     "documentacao" BOOLEAN NOT NULL DEFAULT true,
     "casado" BOOLEAN NOT NULL DEFAULT false,
     "linhaReta" BOOLEAN NOT NULL DEFAULT true,
+    "removidaEm" TIMESTAMP(3),
+    "removidaPorId" INTEGER,
+    "motivoRemocao" VARCHAR(300),
 
     CONSTRAINT "Pessoa_pkey" PRIMARY KEY ("id")
 );
@@ -504,13 +510,11 @@ CREATE TABLE "Tarefa" (
     "prioridade" "PrioridadeTarefa" NOT NULL DEFAULT 'MEDIA',
     "dataPrazo" TIMESTAMP(3),
     "dataConclusao" TIMESTAMP(3),
-    "tarefaPaiId" INTEGER,
     "ordem" INTEGER NOT NULL DEFAULT 0,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" TIMESTAMP(3) NOT NULL,
     "dataInicio" TIMESTAMP(3),
     "observacoes" TEXT,
-    "tipoSubtarefa" VARCHAR(20),
     "prazoCobranca" INTEGER DEFAULT 5,
     "motivoConclusao" VARCHAR(50),
     "quantidadeCobrancas" INTEGER NOT NULL DEFAULT 0,
@@ -520,6 +524,9 @@ CREATE TABLE "Tarefa" (
     "workflowStepInstanceId" INTEGER,
     "necessidadeId" INTEGER,
     "documentoId" INTEGER,
+    "equipeKey" VARCHAR(80),
+    "dataAtribuicao" TIMESTAMP(3),
+    "atribuidoPorId" INTEGER,
     "faseMacroKey" VARCHAR(60),
     "origem" VARCHAR(20),
     "chaveIdempotencia" VARCHAR(200),
@@ -532,6 +539,10 @@ CREATE TABLE "Tarefa" (
     "blockedPreviousStatus" VARCHAR(30),
     "motivoCodigo" VARCHAR(40),
     "justificativa" TEXT,
+    "slaPausadoEm" TIMESTAMP(3),
+    "slaPausaAcumuladaMin" INTEGER NOT NULL DEFAULT 0,
+    "causaRemovidaEm" TIMESTAMP(3),
+    "causaRemovidaMotivo" VARCHAR(300),
     "tipo" "TipoTarefa" NOT NULL DEFAULT 'NORMAL',
     "faseOrigemCode" VARCHAR(60),
     "faseReferenciaCode" VARCHAR(60),
@@ -564,6 +575,9 @@ CREATE TABLE "TarefaHistorico" (
 CREATE TABLE "ProcessoRequerente" (
     "processoId" INTEGER NOT NULL,
     "requerenteId" INTEGER NOT NULL,
+    "removidoEm" TIMESTAMP(3),
+    "removidoPorId" INTEGER,
+    "motivoRemocao" VARCHAR(300),
 
     CONSTRAINT "ProcessoRequerente_pkey" PRIMARY KEY ("processoId","requerenteId")
 );
@@ -2258,6 +2272,18 @@ CREATE TABLE "ModalidadePais" (
 );
 
 -- CreateTable
+CREATE TABLE "FaseNaturezaPermitida" (
+    "id" SERIAL NOT NULL,
+    "catalogoFaseId" INTEGER NOT NULL,
+    "naturezaOperacionalId" INTEGER NOT NULL,
+    "ativo" BOOLEAN NOT NULL DEFAULT true,
+    "criadoEm" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "atualizadoEm" TIMESTAMP(3) NOT NULL,
+
+    CONSTRAINT "FaseNaturezaPermitida_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
 CREATE TABLE "CatalogoFase" (
     "id" SERIAL NOT NULL,
     "phaseKey" VARCHAR(60) NOT NULL,
@@ -2307,29 +2333,6 @@ CREATE TABLE "FaseMacro" (
 );
 
 -- CreateTable
-CREATE TABLE "PhaseInternalMode" (
-    "id" SERIAL NOT NULL,
-    "modeUid" VARCHAR(140) NOT NULL,
-    "templateId" INTEGER,
-    "tipoProcessoId" INTEGER,
-    "phaseKey" VARCHAR(40) NOT NULL,
-    "key" VARCHAR(60) NOT NULL,
-    "label" VARCHAR(200) NOT NULL,
-    "description" TEXT,
-    "condition" TEXT,
-    "impactOperational" TEXT,
-    "impactDocument" TEXT,
-    "impactFinancial" TEXT,
-    "impactProtocol" TEXT,
-    "active" BOOLEAN NOT NULL DEFAULT true,
-    "arquivado" BOOLEAN NOT NULL DEFAULT false,
-    "criadoEm" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    "atualizadoEm" TIMESTAMP(3) NOT NULL,
-
-    CONSTRAINT "PhaseInternalMode_pkey" PRIMARY KEY ("id")
-);
-
--- CreateTable
 CREATE TABLE "PhaseInternalWorkflow" (
     "id" SERIAL NOT NULL,
     "wfUid" VARCHAR(140) NOT NULL,
@@ -2347,6 +2350,8 @@ CREATE TABLE "PhaseInternalWorkflow" (
     "familiaDocumentalId" INTEGER,
     "exigeDocumento" BOOLEAN NOT NULL DEFAULT false,
     "exigePessoa" BOOLEAN NOT NULL DEFAULT false,
+    "pausarSlaEmEsperaExterna" BOOLEAN NOT NULL DEFAULT false,
+    "pausarSlaEmBloqueio" BOOLEAN NOT NULL DEFAULT false,
 
     CONSTRAINT "PhaseInternalWorkflow_pkey" PRIMARY KEY ("id")
 );
@@ -2980,8 +2985,41 @@ CREATE TABLE "ObrigacaoEconomica" (
     "criadoPorId" INTEGER,
     "criadoEm" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "atualizadoEm" TIMESTAMP(3) NOT NULL,
+    "personId" INTEGER,
+    "documentoId" INTEGER,
+    "tipoServicoId" INTEGER,
+    "phaseKey" VARCHAR(60),
+    "phaseCycle" INTEGER,
+    "configFinanceiraId" INTEGER,
+    "origemLancamento" VARCHAR(28),
+    "eventoOrigemTipo" VARCHAR(40),
+    "eventoOrigemId" INTEGER,
+    "pricingRuleId" INTEGER,
+    "valorUnitario" DECIMAL(14,2),
+    "quantidade" INTEGER,
+    "modoCalculoAplicado" VARCHAR(30),
+    "naturezaPreco" VARCHAR(10),
+    "contextoAplicado" JSONB,
+    "dataReferencia" TIMESTAMP(3),
+    "chaveIdempotencia" VARCHAR(200),
 
     CONSTRAINT "ObrigacaoEconomica_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "AssistenteParametrizacaoProgresso" (
+    "id" SERIAL NOT NULL,
+    "tipoProcessoId" INTEGER NOT NULL,
+    "phaseKey" VARCHAR(60),
+    "etapaAtual" VARCHAR(40) NOT NULL,
+    "etapasConcluidas" JSONB,
+    "usuarioId" INTEGER,
+    "criadoEm" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "atualizadoEm" TIMESTAMP(3) NOT NULL,
+    "publicadoEm" TIMESTAMP(3),
+    "publicadoPor" INTEGER,
+
+    CONSTRAINT "AssistenteParametrizacaoProgresso_pkey" PRIMARY KEY ("id")
 );
 
 -- CreateTable
@@ -4067,6 +4105,105 @@ CREATE TABLE "DocumentoGeradoVersao" (
 );
 
 -- CreateTable
+CREATE TABLE "PlanilhaDocumentalColuna" (
+    "id" SERIAL NOT NULL,
+    "origem" VARCHAR(20) NOT NULL,
+    "estrategia" VARCHAR(24) NOT NULL DEFAULT 'SERVICO_FIXO',
+    "categoriaItemId" INTEGER,
+    "configId" INTEGER,
+    "tipoDocumentoId" INTEGER,
+    "posicao" INTEGER NOT NULL DEFAULT 0,
+    "ativa" BOOLEAN NOT NULL DEFAULT true,
+    "rotuloOverride" VARCHAR(60),
+    "criadoEm" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "atualizadoEm" TIMESTAMP(3) NOT NULL,
+
+    CONSTRAINT "PlanilhaDocumentalColuna_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "PlanilhaCelulaOverride" (
+    "id" SERIAL NOT NULL,
+    "processoId" INTEGER NOT NULL,
+    "pessoaId" INTEGER NOT NULL,
+    "tipoDocumentoId" INTEGER NOT NULL,
+    "colunaId" INTEGER NOT NULL,
+    "valor" DECIMAL(14,2) NOT NULL,
+    "moeda" VARCHAR(3) NOT NULL DEFAULT 'BRL',
+    "autorId" INTEGER,
+    "motivo" VARCHAR(300),
+    "criadoEm" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "atualizadoEm" TIMESTAMP(3) NOT NULL,
+
+    CONSTRAINT "PlanilhaCelulaOverride_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "NotificacaoOperacional" (
+    "id" SERIAL NOT NULL,
+    "tipo" VARCHAR(24) NOT NULL,
+    "destinatarioId" INTEGER NOT NULL,
+    "tarefaId" INTEGER NOT NULL,
+    "titulo" VARCHAR(200) NOT NULL,
+    "mensagem" TEXT,
+    "link" VARCHAR(300),
+    "autorId" INTEGER,
+    "chaveIdempotencia" VARCHAR(220) NOT NULL,
+    "lidaEm" TIMESTAMP(3),
+    "criadoEm" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT "NotificacaoOperacional_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "TarefaDependencia" (
+    "id" SERIAL NOT NULL,
+    "tarefaId" INTEGER NOT NULL,
+    "dependeDeId" INTEGER NOT NULL,
+    "obrigatoria" BOOLEAN NOT NULL DEFAULT true,
+    "motivo" VARCHAR(200),
+    "criadoEm" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT "TarefaDependencia_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "AptidaoOperacional" (
+    "id" SERIAL NOT NULL,
+    "usuarioId" INTEGER NOT NULL,
+    "perfilOperacionalId" INTEGER NOT NULL,
+    "criadoEm" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT "AptidaoOperacional_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "IndisponibilidadeOperacional" (
+    "id" SERIAL NOT NULL,
+    "usuarioId" INTEGER NOT NULL,
+    "tipo" "TipoIndisponibilidade" NOT NULL,
+    "inicio" TIMESTAMP(3) NOT NULL,
+    "fim" TIMESTAMP(3),
+    "motivo" VARCHAR(300),
+    "criadoEm" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "criadoPorId" INTEGER,
+
+    CONSTRAINT "IndisponibilidadeOperacional_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "CapacidadeOperacional" (
+    "id" SERIAL NOT NULL,
+    "usuarioId" INTEGER NOT NULL,
+    "limiteExecutaveis" INTEGER,
+    "observacao" VARCHAR(300),
+    "atualizadoEm" TIMESTAMP(3) NOT NULL,
+    "atualizadoPorId" INTEGER,
+
+    CONSTRAINT "CapacidadeOperacional_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
 CREATE TABLE "_ReciboPagamento" (
     "A" INTEGER NOT NULL,
     "B" INTEGER NOT NULL,
@@ -4096,6 +4233,9 @@ CREATE UNIQUE INDEX "Pessoa_publicCode_key" ON "Pessoa"("publicCode");
 
 -- CreateIndex
 CREATE INDEX "Pessoa_arvoreId_idx" ON "Pessoa"("arvoreId");
+
+-- CreateIndex
+CREATE INDEX "Pessoa_removidaEm_idx" ON "Pessoa"("removidaEm");
 
 -- CreateIndex
 CREATE INDEX "Pessoa_pais_nasc_idx" ON "Pessoa"("pais_nasc");
@@ -4206,9 +4346,6 @@ CREATE INDEX "Tarefa_concluida_idx" ON "Tarefa"("concluida");
 CREATE INDEX "Tarefa_statusTarefa_idx" ON "Tarefa"("statusTarefa");
 
 -- CreateIndex
-CREATE INDEX "Tarefa_tarefaPaiId_idx" ON "Tarefa"("tarefaPaiId");
-
--- CreateIndex
 CREATE INDEX "Tarefa_statusId_idx" ON "Tarefa"("statusId");
 
 -- CreateIndex
@@ -4236,6 +4373,9 @@ CREATE INDEX "TarefaHistorico_usuarioId_idx" ON "TarefaHistorico"("usuarioId");
 CREATE INDEX "TarefaHistorico_createdAt_idx" ON "TarefaHistorico"("createdAt");
 
 -- CreateIndex
+CREATE INDEX "ProcessoRequerente_removidoEm_idx" ON "ProcessoRequerente"("removidoEm");
+
+-- CreateIndex
 CREATE UNIQUE INDEX "Contratante_publicCode_key" ON "Contratante"("publicCode");
 
 -- CreateIndex
@@ -4245,7 +4385,7 @@ CREATE INDEX "Contratante_personId_idx" ON "Contratante"("personId");
 CREATE UNIQUE INDEX "Requerente_publicCode_key" ON "Requerente"("publicCode");
 
 -- CreateIndex
-CREATE INDEX "Requerente_personId_idx" ON "Requerente"("personId");
+CREATE UNIQUE INDEX "Requerente_personId_key" ON "Requerente"("personId");
 
 -- CreateIndex
 CREATE UNIQUE INDEX "Protocolo_publicCode_key" ON "Protocolo"("publicCode");
@@ -4632,6 +4772,9 @@ CREATE INDEX "ReceitaRequerente_requerenteId_idx" ON "ReceitaRequerente"("requer
 CREATE UNIQUE INDEX "ReceitaRequerente_receitaId_idx_key" ON "ReceitaRequerente"("receitaId", "idx");
 
 -- CreateIndex
+CREATE UNIQUE INDEX "ReceitaRequerente_receitaId_requerenteId_key" ON "ReceitaRequerente"("receitaId", "requerenteId");
+
+-- CreateIndex
 CREATE INDEX "ReceitaDocumento_receitaId_idx" ON "ReceitaDocumento"("receitaId");
 
 -- CreateIndex
@@ -4917,6 +5060,12 @@ CREATE INDEX "ModalidadePais_countryKey_idx" ON "ModalidadePais"("countryKey");
 CREATE UNIQUE INDEX "ModalidadePais_countryKey_modalityKey_key" ON "ModalidadePais"("countryKey", "modalityKey");
 
 -- CreateIndex
+CREATE INDEX "FaseNaturezaPermitida_catalogoFaseId_idx" ON "FaseNaturezaPermitida"("catalogoFaseId");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "FaseNaturezaPermitida_catalogoFaseId_naturezaOperacionalId_key" ON "FaseNaturezaPermitida"("catalogoFaseId", "naturezaOperacionalId");
+
+-- CreateIndex
 CREATE UNIQUE INDEX "CatalogoFase_phaseKey_key" ON "CatalogoFase"("phaseKey");
 
 -- CreateIndex
@@ -4927,15 +5076,6 @@ CREATE INDEX "FaseMacro_macroWorkflowId_idx" ON "FaseMacro"("macroWorkflowId");
 
 -- CreateIndex
 CREATE UNIQUE INDEX "FaseMacro_macroWorkflowId_phaseKey_key" ON "FaseMacro"("macroWorkflowId", "phaseKey");
-
--- CreateIndex
-CREATE UNIQUE INDEX "PhaseInternalMode_modeUid_key" ON "PhaseInternalMode"("modeUid");
-
--- CreateIndex
-CREATE INDEX "PhaseInternalMode_phaseKey_idx" ON "PhaseInternalMode"("phaseKey");
-
--- CreateIndex
-CREATE INDEX "PhaseInternalMode_tipoProcessoId_idx" ON "PhaseInternalMode"("tipoProcessoId");
 
 -- CreateIndex
 CREATE UNIQUE INDEX "PhaseInternalWorkflow_wfUid_key" ON "PhaseInternalWorkflow"("wfUid");
@@ -5220,6 +5360,9 @@ CREATE INDEX "OperacaoAntecipada_status_idx" ON "OperacaoAntecipada"("status");
 CREATE UNIQUE INDEX "OperacaoAntecipada_processoId_necessidadeId_targetOperation_key" ON "OperacaoAntecipada"("processoId", "necessidadeId", "targetOperationType", "targetTipoDocumentoId");
 
 -- CreateIndex
+CREATE UNIQUE INDEX "ObrigacaoEconomica_chaveIdempotencia_key" ON "ObrigacaoEconomica"("chaveIdempotencia");
+
+-- CreateIndex
 CREATE INDEX "ObrigacaoEconomica_processoId_idx" ON "ObrigacaoEconomica"("processoId");
 
 -- CreateIndex
@@ -5235,7 +5378,22 @@ CREATE INDEX "ObrigacaoEconomica_codigoOperacional_idx" ON "ObrigacaoEconomica"(
 CREATE INDEX "ObrigacaoEconomica_itemCatalogoId_idx" ON "ObrigacaoEconomica"("itemCatalogoId");
 
 -- CreateIndex
+CREATE INDEX "ObrigacaoEconomica_documentoId_idx" ON "ObrigacaoEconomica"("documentoId");
+
+-- CreateIndex
+CREATE INDEX "ObrigacaoEconomica_personId_idx" ON "ObrigacaoEconomica"("personId");
+
+-- CreateIndex
+CREATE INDEX "ObrigacaoEconomica_processoId_documentoId_tipoServicoId_idx" ON "ObrigacaoEconomica"("processoId", "documentoId", "tipoServicoId");
+
+-- CreateIndex
 CREATE UNIQUE INDEX "ObrigacaoEconomica_origemTipo_origemId_key" ON "ObrigacaoEconomica"("origemTipo", "origemId");
+
+-- CreateIndex
+CREATE INDEX "AssistenteParametrizacaoProgresso_tipoProcessoId_idx" ON "AssistenteParametrizacaoProgresso"("tipoProcessoId");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "AssistenteParametrizacaoProgresso_tipoProcessoId_phaseKey_key" ON "AssistenteParametrizacaoProgresso"("tipoProcessoId", "phaseKey");
 
 -- CreateIndex
 CREATE INDEX "ParcelaPagavel_obrigacaoId_idx" ON "ParcelaPagavel"("obrigacaoId");
@@ -5724,6 +5882,54 @@ CREATE INDEX "DocumentoGeradoVersao_status_idx" ON "DocumentoGeradoVersao"("stat
 CREATE UNIQUE INDEX "DocumentoGeradoVersao_documentoGeradoId_numero_key" ON "DocumentoGeradoVersao"("documentoGeradoId", "numero");
 
 -- CreateIndex
+CREATE UNIQUE INDEX "PlanilhaDocumentalColuna_configId_key" ON "PlanilhaDocumentalColuna"("configId");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "PlanilhaDocumentalColuna_tipoDocumentoId_key" ON "PlanilhaDocumentalColuna"("tipoDocumentoId");
+
+-- CreateIndex
+CREATE INDEX "PlanilhaDocumentalColuna_ativa_posicao_idx" ON "PlanilhaDocumentalColuna"("ativa", "posicao");
+
+-- CreateIndex
+CREATE INDEX "PlanilhaDocumentalColuna_estrategia_idx" ON "PlanilhaDocumentalColuna"("estrategia");
+
+-- CreateIndex
+CREATE INDEX "PlanilhaCelulaOverride_processoId_idx" ON "PlanilhaCelulaOverride"("processoId");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "PlanilhaCelulaOverride_processoId_pessoaId_tipoDocumentoId__key" ON "PlanilhaCelulaOverride"("processoId", "pessoaId", "tipoDocumentoId", "colunaId");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "NotificacaoOperacional_chaveIdempotencia_key" ON "NotificacaoOperacional"("chaveIdempotencia");
+
+-- CreateIndex
+CREATE INDEX "NotificacaoOperacional_destinatarioId_lidaEm_idx" ON "NotificacaoOperacional"("destinatarioId", "lidaEm");
+
+-- CreateIndex
+CREATE INDEX "NotificacaoOperacional_tarefaId_idx" ON "NotificacaoOperacional"("tarefaId");
+
+-- CreateIndex
+CREATE INDEX "TarefaDependencia_dependeDeId_idx" ON "TarefaDependencia"("dependeDeId");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "TarefaDependencia_tarefaId_dependeDeId_key" ON "TarefaDependencia"("tarefaId", "dependeDeId");
+
+-- CreateIndex
+CREATE INDEX "AptidaoOperacional_perfilOperacionalId_idx" ON "AptidaoOperacional"("perfilOperacionalId");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "AptidaoOperacional_usuarioId_perfilOperacionalId_key" ON "AptidaoOperacional"("usuarioId", "perfilOperacionalId");
+
+-- CreateIndex
+CREATE INDEX "IndisponibilidadeOperacional_usuarioId_inicio_idx" ON "IndisponibilidadeOperacional"("usuarioId", "inicio");
+
+-- CreateIndex
+CREATE INDEX "IndisponibilidadeOperacional_fim_idx" ON "IndisponibilidadeOperacional"("fim");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "CapacidadeOperacional_usuarioId_key" ON "CapacidadeOperacional"("usuarioId");
+
+-- CreateIndex
 CREATE INDEX "_ReciboPagamento_B_index" ON "_ReciboPagamento"("B");
 
 -- CreateIndex
@@ -5794,9 +6000,6 @@ ALTER TABLE "Tarefa" ADD CONSTRAINT "Tarefa_responsavelId_fkey" FOREIGN KEY ("re
 
 -- AddForeignKey
 ALTER TABLE "Tarefa" ADD CONSTRAINT "Tarefa_statusId_fkey" FOREIGN KEY ("statusId") REFERENCES "Status"("id") ON DELETE SET NULL ON UPDATE CASCADE;
-
--- AddForeignKey
-ALTER TABLE "Tarefa" ADD CONSTRAINT "Tarefa_tarefaPaiId_fkey" FOREIGN KEY ("tarefaPaiId") REFERENCES "Tarefa"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "Tarefa" ADD CONSTRAINT "Tarefa_workflowInstanceId_fkey" FOREIGN KEY ("workflowInstanceId") REFERENCES "PhaseWorkflowInstance"("id") ON DELETE SET NULL ON UPDATE CASCADE;
@@ -6175,6 +6378,12 @@ ALTER TABLE "TaxaPagamentoPais" ADD CONSTRAINT "TaxaPagamentoPais_taxaId_fkey" F
 
 -- AddForeignKey
 ALTER TABLE "TaxaPagamentoPais" ADD CONSTRAINT "TaxaPagamentoPais_paisId_fkey" FOREIGN KEY ("paisId") REFERENCES "CatalogoPais"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "FaseNaturezaPermitida" ADD CONSTRAINT "FaseNaturezaPermitida_catalogoFaseId_fkey" FOREIGN KEY ("catalogoFaseId") REFERENCES "CatalogoFase"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "FaseNaturezaPermitida" ADD CONSTRAINT "FaseNaturezaPermitida_naturezaOperacionalId_fkey" FOREIGN KEY ("naturezaOperacionalId") REFERENCES "NaturezaOperacionalDocumento"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "MacroWorkflow" ADD CONSTRAINT "MacroWorkflow_tipoProcessoId_fkey" FOREIGN KEY ("tipoProcessoId") REFERENCES "TipoProcessoNacionalidade"("id") ON DELETE CASCADE ON UPDATE CASCADE;
@@ -6580,6 +6789,60 @@ ALTER TABLE "DocumentoGeradoVersao" ADD CONSTRAINT "DocumentoGeradoVersao_substi
 
 -- AddForeignKey
 ALTER TABLE "DocumentoGeradoVersao" ADD CONSTRAINT "DocumentoGeradoVersao_invalidadaPorId_fkey" FOREIGN KEY ("invalidadaPorId") REFERENCES "Usuario"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "PlanilhaDocumentalColuna" ADD CONSTRAINT "PlanilhaDocumentalColuna_categoriaItemId_fkey" FOREIGN KEY ("categoriaItemId") REFERENCES "CategoriaServico"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "PlanilhaDocumentalColuna" ADD CONSTRAINT "PlanilhaDocumentalColuna_configId_fkey" FOREIGN KEY ("configId") REFERENCES "ProdutoFinanceiro"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "PlanilhaDocumentalColuna" ADD CONSTRAINT "PlanilhaDocumentalColuna_tipoDocumentoId_fkey" FOREIGN KEY ("tipoDocumentoId") REFERENCES "TipoDocumentoCadastro"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "PlanilhaCelulaOverride" ADD CONSTRAINT "PlanilhaCelulaOverride_processoId_fkey" FOREIGN KEY ("processoId") REFERENCES "Processo"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "PlanilhaCelulaOverride" ADD CONSTRAINT "PlanilhaCelulaOverride_pessoaId_fkey" FOREIGN KEY ("pessoaId") REFERENCES "Pessoa"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "PlanilhaCelulaOverride" ADD CONSTRAINT "PlanilhaCelulaOverride_tipoDocumentoId_fkey" FOREIGN KEY ("tipoDocumentoId") REFERENCES "TipoDocumentoCadastro"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "PlanilhaCelulaOverride" ADD CONSTRAINT "PlanilhaCelulaOverride_colunaId_fkey" FOREIGN KEY ("colunaId") REFERENCES "PlanilhaDocumentalColuna"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "PlanilhaCelulaOverride" ADD CONSTRAINT "PlanilhaCelulaOverride_autorId_fkey" FOREIGN KEY ("autorId") REFERENCES "Usuario"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "NotificacaoOperacional" ADD CONSTRAINT "NotificacaoOperacional_destinatarioId_fkey" FOREIGN KEY ("destinatarioId") REFERENCES "Usuario"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "NotificacaoOperacional" ADD CONSTRAINT "NotificacaoOperacional_tarefaId_fkey" FOREIGN KEY ("tarefaId") REFERENCES "Tarefa"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "TarefaDependencia" ADD CONSTRAINT "TarefaDependencia_tarefaId_fkey" FOREIGN KEY ("tarefaId") REFERENCES "Tarefa"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "TarefaDependencia" ADD CONSTRAINT "TarefaDependencia_dependeDeId_fkey" FOREIGN KEY ("dependeDeId") REFERENCES "Tarefa"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "AptidaoOperacional" ADD CONSTRAINT "AptidaoOperacional_usuarioId_fkey" FOREIGN KEY ("usuarioId") REFERENCES "Usuario"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "AptidaoOperacional" ADD CONSTRAINT "AptidaoOperacional_perfilOperacionalId_fkey" FOREIGN KEY ("perfilOperacionalId") REFERENCES "PerfilOperacionalDocumento"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "IndisponibilidadeOperacional" ADD CONSTRAINT "IndisponibilidadeOperacional_usuarioId_fkey" FOREIGN KEY ("usuarioId") REFERENCES "Usuario"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "IndisponibilidadeOperacional" ADD CONSTRAINT "IndisponibilidadeOperacional_criadoPorId_fkey" FOREIGN KEY ("criadoPorId") REFERENCES "Usuario"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "CapacidadeOperacional" ADD CONSTRAINT "CapacidadeOperacional_usuarioId_fkey" FOREIGN KEY ("usuarioId") REFERENCES "Usuario"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "CapacidadeOperacional" ADD CONSTRAINT "CapacidadeOperacional_atualizadoPorId_fkey" FOREIGN KEY ("atualizadoPorId") REFERENCES "Usuario"("id") ON DELETE SET NULL ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "_ReciboPagamento" ADD CONSTRAINT "_ReciboPagamento_A_fkey" FOREIGN KEY ("A") REFERENCES "PagamentoFatura"("id") ON DELETE CASCADE ON UPDATE CASCADE;

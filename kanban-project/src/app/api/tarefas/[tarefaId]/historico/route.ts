@@ -27,20 +27,16 @@ export async function GET(
     const negado = await negarSeNaoForDonoDaTarefa(request, tarefa.responsavelId)
     if (negado) return negado
 
-    // Buscar histórico da tarefa E de todas as subtarefas
+    // O histórico é o da própria Tarefa. A execução se desdobra nos PASSOS do
+    // workflow, não em tarefas-filhas — não há árvore a percorrer.
     const historico = await prisma.tarefaHistorico.findMany({
-      where: {
-        OR: [
-          { tarefaId },
-          { tarefa: { tarefaPaiId: tarefaId } }
-        ]
-      },
+      where: { tarefaId },
       include: {
         usuario: {
           select: { id: true, nome: true, email: true }
         },
         tarefa: {
-          select: { id: true, titulo: true, tarefaPaiId: true }
+          select: { id: true, titulo: true }
         }
       },
       orderBy: { createdAt: "desc" }

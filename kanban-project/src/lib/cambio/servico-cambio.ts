@@ -9,6 +9,7 @@
 // NUNCA apaga histórico, nunca grava zero, nunca troca de fonte silenciosamente.
 // ============================================================================
 import { prisma } from '@/lib/prisma'
+import { PESSOA_ATIVA } from '@/src/lib/genealogia/vinculo-ativo'
 import { Moeda } from '@prisma/client'
 import { providerOficial, ORIGEM_AUTOMATICA, MODALIDADE_OFICIAL, FONTE_NOME, type MoedaEstrangeira, type CotacaoProviderResult } from '@/lib/cambio/confidence-provider'
 import { reprocessarPendenciasFinanceiras, processarRequerenteAdicionado } from '@/src/lib/motor/executor'
@@ -119,7 +120,7 @@ async function reprocessarSemCambio(): Promise<{ processos: number; receitasCria
     if (!proc?.tipoProcessoMotorId || !proc.arvoreId) continue
     const rule = await prisma.phaseAutomationRule.findFirst({ where: { kind: 'financial', trigger: 'person_added', active: true, arquivado: false, tipoProcessoId: proc.tipoProcessoMotorId, ...(proc.faseAtualKey ? { phaseKey: proc.faseAtualKey } : {}) }, select: { id: true } })
     if (!rule) continue
-    const reqs = await prisma.pessoa.findMany({ where: { arvoreId: proc.arvoreId, requerente: { in: ['sim', 'maior', 'menor'] } }, select: { id: true } })
+    const reqs = await prisma.pessoa.findMany({ where: { arvoreId: proc.arvoreId, requerente: { in: ['sim', 'maior', 'menor'] }, ...PESSOA_ATIVA }, select: { id: true } })
     for (const rq of reqs) { const res = await processarRequerenteAdicionado({ processoId: pid, pessoaId: rq.id }); receitasCriadas += res.criados }
   }
   return { processos: procIds.length, receitasCriadas }

@@ -9,6 +9,11 @@ import { criarObrigacaoEconomicaComLedger } from '@/lib/financeiro/ledger/ledger
 import { editarReceita } from '@/lib/financeiro/acoes/editar-receita'
 import { listarReceitas } from '@/lib/financeiro/leitura/receitas-lista'
 
+import { exigirBancoDeTeste } from "./_banco-de-teste"
+
+// TRAVA DE AMBIENTE: este arquivo ESCREVE. Sem banco de teste local, não roda.
+exigirBancoDeTeste()
+
 // espelho do mapa da ReceitasTab (statusConsolidado -> aba)
 const ABA_DE: Record<string, string> = { 'A VENCER': 'avencer', PARCIAL: 'avencer', VENCIDO: 'vencidas', QUITADO: 'pagas', CANCELADO: 'canceladas' }
 // espelho do predicado movidaForaDoFiltro da ReceitasTab

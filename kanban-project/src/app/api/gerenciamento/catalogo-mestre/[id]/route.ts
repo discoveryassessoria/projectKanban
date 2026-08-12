@@ -1,8 +1,9 @@
 // src/app/api/gerenciamento/catalogo-mestre/[id]/route.ts
-// LOTE D — Catálogo Mestre: PUT (editar) e DELETE (só se não estiver em uso).
+// LOTE D — Catálogo Mestre: PUT (editar) e DELETE (inativa; hard delete só no motor canônico).
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import { verificarPermissao } from '@/src/lib/verificar-permissao'
+import { verificarPermissao, exigirPermissao } from '@/src/lib/verificar-permissao'
+import { deactivateItemCatalogo } from '@/src/services/exclusao-definitiva'
 import { registrarAuditoria } from '@/lib/gerenciamento/auditoria'
 import { NaturezaItem, UnidadeItem } from '@prisma/client'
 import { NATUREZAS_ITEM_OFICIAIS } from '@/lib/financeiro/catalogo-oficial'
@@ -36,6 +37,17 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
       if (!NATUREZAS.includes(b.natureza)) {
         return NextResponse.json({ error: `Natureza "${b.natureza}" não existe mais no Cadastro Mestre. Use uma das oficiais: ${NATUREZAS.join(', ')}.` }, { status: 400 })
       }
+      // Virar SERVIÇO por aqui produziria um serviço sem portador de SRV-n (o
+      // código vive em ServicoProduto.publicCode). Item que JÁ é o espelho de um
+      // serviço passa — nesse caso a natureza só está sendo reafirmada.
+      if (b.natureza === NaturezaItem.SERVICO) {
+        const temServico = await prisma.servicoProduto.count({ where: { itemCatalogoId: parseInt(id) } })
+        if (temServico === 0) {
+          return NextResponse.json({
+            error: 'Um item do mestre não vira serviço por edição — o serviço nasce no Catálogo de Serviços, que gera o código SRV-n.',
+          }, { status: 400 })
+        }
+      }
       data.natureza = b.natureza
     }
     if (b.unidade !== undefined && UNIDADES.includes(b.unidade)) data.unidade = b.unidade
@@ -49,27 +61,28 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
   }
 }
 
+// DELETE - INATIVAÇÃO do item mestre. A exclusão física vive SÓ no motor canônico, atrás de
+// sistema.exclusaoDefinitiva (/catalogo-mestre/[id]/exclusao-definitiva). Contar vínculo de
+// CONFIGURAÇÃO como impedimento era exatamente o defeito que travava a exclusão.
 export async function DELETE(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
-    const erro = await verificarPermissao(request, 'usuarios.gerenciar')
+    const { usuario, erro } = await exigirPermissao(request, 'usuarios.gerenciar')
     if (erro) return erro
     const { id } = await params
     const itemId = parseInt(id)
-    // não deixa apagar item EM USO (protege as ligações do Bloco 1)
-    const usos = await prisma.itemCatalogo.findUnique({
-      where: { id: itemId },
-      include: { _count: { select: { tiposDocumento: true, produtos: true, servicos: true, precos: true } } },
+    const existe = await prisma.itemCatalogo.findUnique({ where: { id: itemId }, select: { id: true } })
+    if (!existe) return NextResponse.json({ error: 'Item não encontrado.' }, { status: 404 })
+
+    const body = await request.json().catch(() => ({} as Record<string, unknown>))
+    // A auditoria da inativação é gravada pelo próprio motor canônico (com correlationId).
+    const r = await deactivateItemCatalogo(itemId, { usuarioId: usuario.userId, motivo: typeof body?.motivo === 'string' ? body.motivo : null })
+    return NextResponse.json({
+      ok: true,
+      ...r,
+      motivo: 'O item foi inativado; nada do histórico foi apagado. A exclusão definitiva é restrita a administradores.',
     })
-    if (!usos) return NextResponse.json({ error: 'Item não encontrado.' }, { status: 404 })
-    const total = usos._count.tiposDocumento + usos._count.produtos + usos._count.servicos + usos._count.precos
-    if (total > 0) {
-      return NextResponse.json({ error: `Item em uso (${total} vínculo(s)). Desative em vez de excluir.` }, { status: 400 })
-    }
-    await prisma.itemCatalogo.delete({ where: { id: itemId } })
-    await registrarAuditoria(request, { acao: 'EXCLUIR', entidade: 'ItemCatalogo', entidadeId: itemId, descricao: `Item mestre excluído (#${itemId})` })
-    return NextResponse.json({ ok: true })
   } catch (error) {
-    console.error('Erro ao excluir item do catálogo:', error)
+    console.error('Erro ao inativar item do catálogo:', error)
     return NextResponse.json({ error: 'Erro interno' }, { status: 500 })
   }
 }

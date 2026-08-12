@@ -60,8 +60,10 @@ sec('4 — unicidade lógica (bloqueio de duplicidade)')
   const master = { ...visa, bandeiraId: 2 }
   ok('Visa e Mastercard têm chaves diferentes', chaveUnicidade(visa) !== chaveUnicidade(master))
   ok('mesma combinação → mesma chave (duplicata)', chaveUnicidade(visa) === chaveUnicidade({ ...visa }))
-  ok('vigência diferente → nova versão (chave nova)', chaveUnicidade(visa) !== chaveUnicidade({ ...visa, vigenciaInicio: '2026-08-01' }))
-  const emiss = { formaId: 40, adquirenteId: null, bandeiraId: null, finalidade: 'EMISSAO', vigenciaInicio: null }
+  // VALIDADE É ESTADO, NÃO DATA: a mesma combinação é a MESMA taxa, sem "nova
+  // versão por data de início". Antes, duas taxas idênticas conviviam como
+  // duplicata legítima só por começarem em dias diferentes.
+  const emiss = { formaId: 40, adquirenteId: null, bandeiraId: null, finalidade: 'EMISSAO' }
   const pagto = { ...emiss, finalidade: 'PAGAMENTO' }
   ok('boleto emissão ≠ pagamento (encargos separados)', chaveUnicidade(emiss) !== chaveUnicidade(pagto))
 }

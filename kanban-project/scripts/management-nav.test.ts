@@ -99,10 +99,14 @@ const ARVORE_OFICIAL: Record<string, string[]> = {
     "Moedas", "Cobrança", "Crédito", "Fiscal", "Comissões", "Documentos Financeiros", "Governança",
   ],
   grp_orgaos: ["Organizações", "Categorias"],
-  grp_usuarios: ["Usuários", "Perfis", "Permissões", "Grupos", "Auditoria de Acessos"],
+  grp_usuarios: ["Usuários", "Perfis", "Permissões", "Organização operacional", "Controle"],
+  // "Assistente de Parametrização" entrou em 06/08 como item VISÍVEL de Sistema:
+  // é a condução transversal do cadastro (Documentos + Serviços + Financeiro) e
+  // não pertence a nenhum módulo isolado. Ele orquestra as telas oficiais — não
+  // cria cadastro paralelo, por isso não abre módulo novo nem duplica item.
   grp_sistema: [
-    "Configurações Gerais", "Cadastros Auxiliares", "Identidade Visual",
-    "Comunicações", "Integrações", "Auditoria e Logs",
+    "Configurações Gerais", "Assistente de Parametrização", "Cadastros Auxiliares",
+    "Identidade Visual", "Comunicações", "Integrações", "Auditoria e Logs",
   ],
   grp_relatorios: ["Relatórios", "Indicadores", "Dashboards", "Exportações"],
 }
@@ -116,7 +120,10 @@ for (const [k, esperado] of Object.entries(ARVORE_OFICIAL)) {
 const itensDaSecao = (gk: string, secao: string) =>
   (gDe(gk)?.children ?? []).filter((c) => c.section === secao && c.status !== "hidden").map((c) => c.key)
 ok(JSON.stringify(itensDaSecao("grp_processos", "Cadastros")) === JSON.stringify(["proctypes", "modalidades", "countrycatalog"]), "Processos › Cadastros = Tipos de Processo, Modalidades, Países e Regiões")
-ok(JSON.stringify(itensDaSecao("grp_processos", "Estrutura")) === JSON.stringify(["fases", "phasemodes"]), "Processos › Estrutura = Fases, Variações da Fase")
+// "Variações da Fase" (PhaseInternalMode) foi ELIMINADA em 06/08: não era conceito
+// de domínio — o comportamento já é determinado por Fase, Workflow Interno, Matriz
+// e Regras. Nenhum runtime a consumia; era cadastro sem consumidor.
+ok(JSON.stringify(itensDaSecao("grp_processos", "Estrutura")) === JSON.stringify(["fases"]), "Processos › Estrutura = Fases")
 ok(JSON.stringify(itensDaSecao("grp_processos", "Configurações")) === JSON.stringify(["sla", "cfgversions", "proccfg"]), "Processos › Configurações = SLA, Versões, Configurações Gerais")
 ok(JSON.stringify(itensDaSecao("grp_workflow", "Fluxos")) === JSON.stringify(["macrokanban", "phaseiwf"]), "Workflow › Fluxos = Workflow Macro + Workflow Interno")
 // Classificação financeira ELIMINADA (02/08/2026): o comportamento financeiro vive na
@@ -126,9 +133,16 @@ ok(itensDaSecao("grp_financeiro", "Classificação").length === 0, 'Financeiro n
 
 ok(JSON.stringify(itensDaSecao("grp_financeiro", "Tesouraria")) === JSON.stringify(["accounts", "banks", "wallets"]), "Financeiro › Tesouraria = Contas, Bancos, Carteiras")
 ok(JSON.stringify(itensDaSecao("grp_financeiro", "Cobrança")) === JSON.stringify(["methods", "paycond", "fees"]), "Financeiro › Cobrança = Formas, Condições, Taxas")
-ok(JSON.stringify(itensDaSecao("grp_financeiro", "Tabela de Valores")) === JSON.stringify(["pricingtable", "discrules", "pricing"]), "Financeiro › Tabela de Valores = Tabelas de Preços, Regras de Precificação, Aplicabilidade")
+// A Planilha Documental entra aqui porque é onde se escolhe QUAIS itens do
+// cadastro viram coluna — decisão vizinha ao preço, e que não define preço.
+ok(JSON.stringify(itensDaSecao("grp_financeiro", "Tabela de Valores")) === JSON.stringify(["pricingtable", "discrules", "pricing", "planilhacolunas"]), "Financeiro › Tabela de Valores = Tabelas de Preços, Regras, Aplicabilidade, Planilha Documental")
 ok(JSON.stringify(itensDaSecao("grp_orgaos", "Organizações")) === JSON.stringify(["organs", "suppliers"]), "Órgãos › Organizações = Cartórios e Órgãos + Fornecedores")
-ok(JSON.stringify(itensDaSecao("grp_usuarios", "Grupos")) === JSON.stringify(["teams", "departments", "rolecat"]), "Usuários › Grupos = Equipes, Departamentos, Cargos")
+// A seção deixou de se chamar "Grupos": Capacidade Operacional não é um grupo
+// de pessoas. Departamentos e Cargos saíram — eram cadastros sem consumidor
+// (nenhuma FK, nenhuma regra, e ninguém podia ser associado a eles).
+ok(JSON.stringify(itensDaSecao("grp_usuarios", "Organização operacional")) === JSON.stringify(["teams", "opcapacity"]), "Usuários › Organização operacional = Equipes + Capacidade Operacional")
+ok(JSON.stringify(itensDaSecao("grp_usuarios", "Controle")) === JSON.stringify(["accaudit"]), "Usuários › Controle = Auditoria de Acessos")
+ok(itensDaSecao("grp_usuarios", "Grupos").length === 0, "a seção 'Grupos' não existe mais em Usuários e Acessos")
 
 // ═══════════════ 3) COMPORTAMENTO DA SIDEBAR (lista vertical + accordion) ═══════
 console.log("\n3) Sidebar em lista vertical, accordion e módulo direto")
@@ -148,13 +162,13 @@ console.log("\n4) Inventário: nenhuma tela antiga ficou órfã")
 // telas que estavam ATIVAS no menu antes da reestruturação
 const ANTES_ATIVAS = [
   "overview", "proctypes", "countrycatalog", "cfgversions",
-  "macrokanban", "phaseiwf", "phasemodes", "opauto", "simfase", "execmatrix",
+  "macrokanban", "phaseiwf", "opauto", "simfase", "execmatrix",
   "doctypes", "doccats", "docrules", "prottypes", "products",
   "catalog", "categories", "coa", "costcenters", "suppliers",
   "pricingtable", "discrules", "pricing", "accounts", "banks", "wallets",
   "currencies", "fx", "methods", "paycond", "fees", "taxes", "commrules",
   "organs", "mgmthealth", "diagnostics", "cfgdiagnosis",
-  "users", "teams", "departments", "rolecat", "roles",
+  "users", "teams", "opcapacity", "roles",
 ]
 // telas que existiam registradas (deep-link) e não podem sumir do mapa TELAS
 const ANTES_REGISTRADAS = [

@@ -33,7 +33,7 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
     const vig = b.vigenciaInicio !== undefined ? (b.vigenciaInicio ? new Date(String(b.vigenciaInicio)) : null) : (atual.vigenciaInicio ?? null)
     const ativo = b.ativo !== undefined ? !!b.ativo : atual.ativo
     if (ativo) {
-      const dup = await acharDuplicata(ident, vig, id)
+      const dup = await acharDuplicata(ident, id)
       if (dup) return NextResponse.json({ error: `Já existe uma tabela ativa igual: "${dup.name}". Altere a vigência para criar uma nova versão.`, codigo: 'DUPLICADO', conflito: dup }, { status: 409 })
     }
 

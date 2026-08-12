@@ -14,6 +14,7 @@
 //     filiação daquela pessoa.
 
 import { prisma } from "@/lib/prisma"
+import { VINCULO_PROCESSO_ATIVO, PESSOA_ATIVA } from "@/src/lib/genealogia/vinculo-ativo"
 import type { Prisma } from "@prisma/client"
 import type { PessoaEntrada, UniaoEntrada, PaisAlvo } from "@/src/lib/genealogia/motor/tipos"
 import type { CampoRegistral } from "@/src/lib/genealogia/registral/tipos"
@@ -51,7 +52,7 @@ export async function carregarContexto(db: DB, processoId: number): Promise<Cont
       arvoreId: true,
       pais: true,
       arvore: { select: { id: true, pessoaPrincipalId: true } },
-      requerentes: { select: { requerente: { select: { personId: true } } } },
+      requerentes: { where: VINCULO_PROCESSO_ATIVO, select: { requerente: { select: { personId: true } } } },
     },
   })
   if (!proc) return null

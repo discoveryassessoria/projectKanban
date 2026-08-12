@@ -6,6 +6,7 @@
 
 "use client"
 
+import { nomePessoa } from "@/src/lib/ui/pessoa-exibicao"
 import type React from "react"
 import { useSortable } from "@dnd-kit/sortable"
 import { CSS } from "@dnd-kit/utilities"
@@ -133,7 +134,7 @@ export function KanbanCard({ processo, onClick, isDragging: isDraggingProp, pode
           {/* Contratante */}
           {contratante && (
             <p className="text-xs text-gray-500 mb-2 truncate">
-              {contratante.publicCode ? contratante.publicCode + ' — ' : ''}{contratante.nome}
+              {nomePessoa(contratante)}
             </p>
           )}
 

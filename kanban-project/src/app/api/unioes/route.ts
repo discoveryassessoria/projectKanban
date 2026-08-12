@@ -1,6 +1,7 @@
 import { type NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import { verificarPermissao } from '@/src/lib/verificar-permissao'
+import { dispararMaterializacaoPorArvore } from "@/src/services/genealogia/materializar-genealogia"
 
 // GET - Listar todas as uniões
 export async function GET(request: NextRequest) {
@@ -144,6 +145,22 @@ export async function POST(request: NextRequest) {
         },
       },
     })
+
+    // ELO CAUSAL QUE FALTAVA — casar É mudança de estado civil.
+    //
+    // Editar Pessoa já convergia a fase e reavaliava as Regras Documentais
+    // (`dispararMaterializacaoPorArvore` em /api/pessoas). Criar, editar ou
+    // excluir UNIÃO não disparava nada — e é a união que produz a exigência de
+    // certidão de casamento. Resultado: casar alguém na árvore deixava a
+    // exigência sem nascer até que outra edição qualquer disparasse o motor.
+    //
+    // A correção é AQUI, no domínio da união, e reusa o materializador ÚNICO.
+    // Fazer isto dentro da árvore seria criar o segundo materializador que a
+    // Constituição proíbe.
+    //
+    // Best-effort e idempotente, como nos demais gatilhos: falha do motor
+    // documental não pode impedir o registro do casamento.
+    await dispararMaterializacaoPorArvore(novaUniao.pessoa1?.arvoreId ?? novaUniao.pessoa2?.arvoreId)
 
     return NextResponse.json(novaUniao, { status: 201 })
   } catch (error) {

@@ -39,13 +39,6 @@ export async function GET(request: NextRequest) {
                 { dataPrazo: { lte: em3Dias } },
                 { createdAt: { gte: umDiaAtras } }
             ]
-            },
-            // Excluir estruturais (mesma lógica do endpoint legado)
-            {
-            OR: [
-                { tarefaPaiId: { not: null } },
-                { processoId: null }
-            ]
             }
         ]
       },

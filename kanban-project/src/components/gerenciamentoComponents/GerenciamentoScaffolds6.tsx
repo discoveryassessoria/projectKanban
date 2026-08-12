@@ -2,7 +2,7 @@
 
 // src/components/gerenciamentoComponents/GerenciamentoScaffolds6.tsx
 // Lote 6 — telas que faltavam vs mockup v4 (tema escuro):
-//   Cadastros do Motor: RoleCatalogTab(rolecat), PermProfilesTab(permprofiles),
+//   Cadastros do Motor: PermProfilesTab(permprofiles),
 //     PricingTableTab(pricingtable), DocMatrixTab(docmatrix),
 //     ConfigVersionsTab(cfgversions), ConfigDiagnosisTab(cfgdiagnosis)
 //   Saúde do Sistema: ExecMatrixTab(execmatrix), SystemHealthTab(syshealth)
@@ -137,28 +137,6 @@ export function PricingTableTab() {
   )
 }
 
-/* -------- Papéis e Responsáveis (rolecat) -------- */
-export function RoleCatalogTab() {
-  const [q, setQ] = useState('')
-  return (
-    <div>
-      <AvisoRascunho />
-      <div className="mb-1.5 text-xs text-white/50">
-        Papéis operacionais usados em tarefas, workflows, automações, SLAs e notificações. As automações de
-        tarefa puxam o responsável daqui.
-      </div>
-      <Section title="Papéis e Responsáveis" action={<button disabled title={TITULO_RASCUNHO} className={BTN_RASCUNHO}>+ Novo papel</button>} />
-      <div className="mb-2.5 flex flex-wrap items-center gap-1.5">
-        <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Buscar papel..." className={`${INPUT} min-w-[160px]`} />
-        <select className={SELECT}><option className="bg-zinc-900">Todos</option></select>
-      </div>
-      <Table
-        headers={['Papel', 'Chave', 'Área', 'Status', 'Usado em', 'Ações']}
-        empty={'Nenhum papel. Clique em “+ Novo papel”.'}
-      />
-    </div>
-  )
-}
 
 /* -------- Usuários e Permissões (permprofiles) -------- */
 export function PermProfilesTab() {

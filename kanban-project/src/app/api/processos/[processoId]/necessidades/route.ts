@@ -3,11 +3,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import { verificarPermissao } from "@/src/lib/verificar-permissao"
-import {
-  garantirNecessidadesArvoreDoProcesso,
-  garantirNecessidadesDaMatriz,
-  garantirNecessidade,
-} from "@/src/services/necessidade-documental"
+import { garantirNecessidade } from "@/src/services/necessidade-documental"
 
 // GET - listar necessidades do processo (dual-read via campos novos)
 export async function GET(
@@ -51,13 +47,15 @@ export async function POST(
     const body = await request.json().catch(() => ({}))
     const acao = body.acao as string
 
-    if (acao === "gerar_arvore") {
-      const r = await garantirNecessidadesArvoreDoProcesso(processoId)
-      return NextResponse.json({ acao, ...r })
-    }
-    if (acao === "gerar_matriz") {
-      const r = await garantirNecessidadesDaMatriz(processoId, body.phaseKey ?? null)
-      return NextResponse.json({ acao, ...r })
+    // MOTOR ÚNICO. "gerar_arvore" e "gerar_matriz" eram dois materializadores
+    // paralelos: geravam necessidade com `varianteKey` próprio, fora das Regras
+    // Documentais publicadas e sem avaliar condição, duplicando a obrigação que o
+    // motor oficial já havia criado. Não foram desativados — foram eliminados.
+    if (acao === "gerar_arvore" || acao === "gerar_matriz") {
+      return NextResponse.json({
+        error: "Ação eliminada. As obrigações documentais são criadas exclusivamente por materializarExecucaoDaFase → materializarGenealogia, a partir das Regras Documentais publicadas.",
+        code: "MATERIALIZADOR_LEGADO_ELIMINADO",
+      }, { status: 410 })
     }
     if (acao === "criar_manual") {
       if (!body.itemCatalogoId) return NextResponse.json({ error: "itemCatalogoId é obrigatório" }, { status: 400 })
@@ -77,7 +75,7 @@ export async function POST(
       }
     }
 
-    return NextResponse.json({ error: "Ação inválida (gerar_arvore|gerar_matriz|criar_manual)" }, { status: 400 })
+    return NextResponse.json({ error: "Ação inválida (criar_manual)" }, { status: 400 })
   } catch (error) {
     console.error("Erro ao gerar necessidades:", error)
     return NextResponse.json({ error: "Erro interno" }, { status: 500 })

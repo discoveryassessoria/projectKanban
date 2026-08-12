@@ -66,6 +66,15 @@ export async function POST(request: NextRequest) {
     if (b.natureza !== undefined && b.natureza !== null && !NATUREZAS.includes(b.natureza)) {
       return NextResponse.json({ error: `Natureza "${b.natureza}" não existe mais no Cadastro Mestre. Use uma das oficiais: ${NATUREZAS.join(', ')}.` }, { status: 400 })
     }
+    // SERVIÇO NÃO NASCE AQUI. O portador do código canônico SRV-n é
+    // ServicoProduto.publicCode; item de mestre não tem onde carregá-lo e
+    // apareceria no Catálogo sem código. Quem cadastra serviço é a rota do
+    // Catálogo de Serviços, que cria o par (serviço + item) na mesma transação.
+    if (b.natureza === NaturezaItem.SERVICO) {
+      return NextResponse.json({
+        error: 'Serviço não é cadastrado como item do mestre — ele nasce no Catálogo de Serviços, que gera o código SRV-n. Use POST /api/gerenciamento/produtos-servicos.',
+      }, { status: 400 })
+    }
     // CATEGORIA — referência estrutural: id oficial, conferido no cadastro.
     const categoria = await resolverCategoriaServico(b)
     if (categoria.erros.length) {

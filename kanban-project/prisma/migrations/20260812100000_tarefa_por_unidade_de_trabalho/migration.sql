@@ -1,0 +1,14 @@
+-- A TAREFA É DA UNIDADE DE TRABALHO, NÃO DA INSTÂNCIA DA FASE.
+--
+-- `Tarefa.workflowInstanceId` era UNIQUE para impedir que N passos virassem N
+-- tarefas. O alvo estava errado: a instância do workflow é da FASE (uma por
+-- processo/fase/ciclo) e guarda os passos de TODOS os documentos dela. Com o
+-- índice único, uma Emissão Documental com dois documentos era impossível — a
+-- segunda tarefa não nascia.
+--
+-- Quem garante "etapa não é tarefa" é `Tarefa.chaveIdempotencia` (UNIQUE),
+-- derivada da obrigação: cinco passos da mesma certidão têm a MESMA chave.
+--
+-- Aditivo e reversível: remove um índice, não toca em dado nenhum. O índice
+-- não-único de consulta permanece.
+DROP INDEX IF EXISTS "Tarefa_workflowInstanceId_key";

@@ -52,7 +52,7 @@ import {
 import { HealthTab } from "@/src/components/gerenciamentoComponents/GerenciamentoScaffolds2"
 
 // Lote 3 — Centro do Processo (fases): telas substituídas pelas versões reais
-// (PhaseWorkflowsFasesTab / ModosInternosFasesTab) — nada a importar aqui.
+// (PhaseWorkflowsFasesTab) — nada a importar aqui.
 
 // Lote 4 — Diagnóstico do Sistema
 import { DiagnosticsTab } from "@/src/components/gerenciamentoComponents/GerenciamentoScaffolds4"
@@ -62,7 +62,7 @@ import { encerrarSessao } from "@/src/lib/sessao/cliente"
 
 // Lote 6 — Cadastros do Motor + Saúde do Sistema (telas que faltavam)
 import {
-  ExecMatrixTab, SystemHealthTab, RoleCatalogTab,
+  ExecMatrixTab, SystemHealthTab,
   DocMatrixTab, ConfigVersionsTab, ConfigDiagnosisTab,
 } from "@/src/components/gerenciamentoComponents/GerenciamentoScaffolds6"
 import { useDadosHeaderBar } from "@/src/hooks/use-dados-headerbar"
@@ -71,6 +71,7 @@ import { useDadosHeaderBar } from "@/src/hooks/use-dados-headerbar"
 // MAPA DE TELAS (screen key → componente). Inalterado — só as views que o
 // envolvem foram reorganizadas. As keys são as mesmas do deep-link ?screen=.
 // ============================================================
+const CapacidadeOperacionalTab = dynamic(() => import("@/src/components/gerenciamentoComponents/CapacidadeOperacionalTab"), { ssr: false, loading: () => <CarregandoTela /> })
 const OverviewTab = dynamic(() => import("@/src/components/gerenciamentoComponents/OverviewTab"), {
   ssr: false, loading: () => <CarregandoTela />,
 })
@@ -91,6 +92,7 @@ const ImpostosTab = dynamic(() => import("@/src/components/gerenciamentoComponen
 const CarteirasTab = dynamic(() => import("@/src/components/gerenciamentoComponents/CarteirasTab"), { ssr: false, loading: () => <CarregandoTela /> })
 const ProdutosTab = dynamic(() => import("@/src/components/gerenciamentoComponents/ProdutosTab"), { ssr: false, loading: () => <CarregandoTela /> })
 const TabelaValoresTab = dynamic(() => import("@/src/components/gerenciamentoComponents/TabelaValoresTab"), { ssr: false, loading: () => <CarregandoTela /> })
+const ConfiguracaoPlanilhaDocumental = dynamic(() => import("@/src/components/financeiro/v3/ConfiguracaoPlanilhaDocumental"), { ssr: false, loading: () => <CarregandoTela /> })
 const CondicoesPagamentoTab = dynamic(() => import("@/src/components/gerenciamentoComponents/CondicoesPagamentoTab"), { ssr: false, loading: () => <CarregandoTela /> })
 const RegrasComissaoTab = dynamic(() => import("@/src/components/gerenciamentoComponents/RegrasComissaoTab"), { ssr: false, loading: () => <CarregandoTela /> })
 const RegrasDescontoTab = dynamic(() => import("@/src/components/gerenciamentoComponents/RegrasDescontoTab"), { ssr: false, loading: () => <CarregandoTela /> })
@@ -102,10 +104,8 @@ const TipoProcessoTab = dynamic(() => import("@/src/components/gerenciamentoComp
 const MacroKanbanTab = dynamic(() => import("@/src/components/gerenciamentoComponents/MacroKanbanTab"), { ssr: false, loading: () => <CarregandoTela /> })
 // LEGADO REMOVIDO — Biblioteca de Modelos (Workflow Interno / Variações da Fase / Automação)
 // eliminada. Fonte de verdade é o Workflow Macro/Interno + config real por fase. Ver migração.
-const ModosInternosFasesTab = dynamic(() => import("@/src/components/gerenciamentoComponents/ModosInternosFasesTab"), { ssr: false, loading: () => <CarregandoTela /> })
 const PhaseWorkflowsFasesTab = dynamic(() => import("@/src/components/gerenciamentoComponents/PhaseWorkflowsFasesTab"), { ssr: false, loading: () => <CarregandoTela /> })
 const PhaseAutomationsFasesTab = dynamic(() => import("@/src/components/gerenciamentoComponents/PhaseAutomationsFasesTab"), { ssr: false, loading: () => <CarregandoTela /> })
-const DepartamentosTab = dynamic(() => import("@/src/components/gerenciamentoComponents/DepartamentosTab"), { ssr: false, loading: () => <CarregandoTela /> })
 const TiposDocumentoTab = dynamic(() => import("@/src/components/gerenciamentoComponents/TiposDocumentoTab"), { ssr: false, loading: () => <CarregandoTela /> })
 const CategoriasDocumentaisTab = dynamic(() => import("@/src/components/gerenciamentoComponents/CategoriasDocumentaisTab"), { ssr: false, loading: () => <CarregandoTela /> })
 // REPOSITÓRIO OFICIAL DE MODELOS — substitui o CRUD genérico de textos (cad("modelos")),
@@ -114,6 +114,7 @@ const CategoriasDocumentaisTab = dynamic(() => import("@/src/components/gerencia
 const ModelosDocumentaisTab = dynamic(() => import("@/src/components/gerenciamentoComponents/ModelosDocumentaisTab"), { ssr: false, loading: () => <CarregandoTela /> })
 const RuntimeWorkflowDiagnostics = dynamic(() => import("@/src/components/gerenciamentoComponents/RuntimeWorkflowDiagnostics"), { ssr: false, loading: () => <CarregandoTela /> })
 const OrgaosProtocoloTab = dynamic(() => import("@/src/components/gerenciamentoComponents/OrgaosProtocoloTab"), { ssr: false, loading: () => <CarregandoTela /> })
+const AssistenteParametrizacaoTab = dynamic(() => import("@/src/components/gerenciamentoComponents/AssistenteParametrizacaoTab"), { ssr: false, loading: () => <CarregandoTela /> })
 const MatrizDocumentalTab = dynamic(() => import("@/src/components/gerenciamentoComponents/MatrizDocumentalTab"), { ssr: false, loading: () => <CarregandoTela /> })
 const RegrasDocumentaisTab = dynamic(() => import("@/src/components/gerenciamentoComponents/RegrasDocumentaisTab"), { ssr: false, loading: () => <CarregandoTela /> })
 const LogAuditoriaTab = dynamic(() => import("@/src/components/gerenciamentoComponents/LogAuditoriaTab"), { ssr: false, loading: () => <CarregandoTela /> })
@@ -195,7 +196,6 @@ const TELAS: Record<string, React.ComponentType> = {
   fees: TaxasPagamentoTab,
   organs: OrgaosProtocoloTab,
   suppliers: FornecedoresTab,
-  departments: DepartamentosTab,
   // Países e Regiões: era um scaffold de catálogo sem persistência; agora é a tela
   // real sobre a MESMA API que o modal "Gerenciar países" já usava. Key preservada.
   countrycatalog: PaisesRegioesTab,
@@ -207,6 +207,7 @@ const TELAS: Record<string, React.ComponentType> = {
   // Cadastros REAIS (motor genérico). Os rascunhos do mockup seguem acessíveis
   // por ?screen=<key>-rascunho.
   teams: cad("grupos"),
+  opcapacity: CapacidadeOperacionalTab,
   "teams-rascunho": TeamsTab,
   servcats: cad("categorias-servico"),
   orgcats: cad("categorias-organizacao"),
@@ -243,7 +244,6 @@ const TELAS: Record<string, React.ComponentType> = {
 
   // bespoke (lote 3)
   phaseiwf: PhaseWorkflowsFasesTab,
-  phasemodes: ModosInternosFasesTab,
 
   // bespoke (lote 4)
   catalog: ProdutosTab,
@@ -272,13 +272,14 @@ const TELAS: Record<string, React.ComponentType> = {
   accaudit: function AuditoriaDeAcessos() { return <LogAuditoriaTab escopo="acessos" /> },
 
   // bespoke (lote 6) — Cadastros do Motor + Saúde
-  rolecat: cad("cargos"),
-  "rolecat-rascunho": RoleCatalogTab,
   permprofiles: RolesTab,
   // Usuários e Acessos → Permissões (perfis de permissão do motor).
   permmotor: PerfisPermissaoMotorTab,
   pricingtable: TabelaValoresTab,
+  planilhacolunas: ConfiguracaoPlanilhaDocumental,
   docmatrix: MatrizDocumentalTab,
+  // Assistente de Parametrização — orquestra as telas oficiais; não as substitui.
+  paramwizard: AssistenteParametrizacaoTab,
   // Versões e Diagnóstico de Configuração passam a ser telas REAIS sobre o
   // read-model; os rascunhos seguem acessíveis por ?screen=<key>-rascunho.
   cfgversions: VersoesConfiguracaoTab,

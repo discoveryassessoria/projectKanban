@@ -43,7 +43,7 @@ const VAZIO = () => ({
   // `formaPadraoId` é a FORMA PADRÃO (persistida na coluna legada
   // formaSugeridaId). Só sugestão inicial da cobrança — nunca uma restrição.
   name: '', codigo: '', descricao: '', ativo: true, carteiraId: null as number | null, formaPadraoId: null as number | null,
-  aplicaA: 'AMBOS', vigenciaInicio: '', vigenciaFim: '',
+  aplicaA: 'AMBOS',
   // Aplicabilidade por ID de cadastro real (nada de texto livre). Vazio = sem restrição.
   moedasIds: [] as number[], paisesIds: [] as number[], modalidadesIds: [] as number[], servicosIds: [] as number[],
   tiposProcesso: [] as string[],
@@ -268,11 +268,12 @@ function CondicaoWizard({ editando, carteiras, formas, taxas, servicos, moedas, 
           */}
           {step === 3 && (
             <div className="space-y-4">
-              <Secao icon={ArrowRight} titulo="Direção e vigência" dica="Ambas as datas são opcionais: sem início vale imediatamente; sem fim, vigência indeterminada.">
+              {/* VALIDADE É ESTADO, NÃO DATA (09/08/2026): condição ativa vale por
+                  tempo indeterminado. Os campos de vigência saíram. */}
+              <Secao icon={ArrowRight} titulo="Direção" dica="A condição vale enquanto estiver ativa.">
                 <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
                   <Campo label="Aplica a"><Select value={f.aplicaA} onChange={(v) => set('aplicaA', v)} options={APLICA_A.map((a) => [a, APLICA_A_LABEL[a]] as [string, string])} /></Campo>
-                  <Campo label="Válida a partir de"><input type="date" className={INPUT} value={f.vigenciaInicio?.slice(0, 10) || ''} onChange={(e) => set('vigenciaInicio', e.target.value)} /></Campo>
-                  <Campo label="Válida até"><input type="date" className={INPUT} value={f.vigenciaFim?.slice(0, 10) || ''} onChange={(e) => set('vigenciaFim', e.target.value)} /></Campo>
+                  
                 </div>
               </Secao>
 
@@ -500,7 +501,7 @@ function mapear(c: any): Form {
     name: c.name || '', codigo: c.codigo || '', descricao: c.descricao || '', ativo: c.ativo ?? true,
     // Forma padrão: persistida na coluna legada `formaSugeridaId`.
     carteiraId: c.carteiraId ?? null, formaPadraoId: c.formaPadraoId ?? c.formaSugeridaId ?? null,
-    aplicaA: c.aplicaA || 'AMBOS', vigenciaInicio: c.vigenciaInicio || '', vigenciaFim: c.vigenciaFim || '',
+    aplicaA: c.aplicaA || 'AMBOS',
     // Aplicabilidade vem SEMPRE dos vínculos reais (nunca dos arrays legados).
     moedasIds: (c.moedasVinculadas || []).map((x: any) => x.moedaId),
     paisesIds: (c.paisesPermitidos || []).map((x: any) => x.paisId),

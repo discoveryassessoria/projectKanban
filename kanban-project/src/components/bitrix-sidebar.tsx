@@ -9,6 +9,7 @@ import {
 
 import { HouseIcon } from "@/src/components/icons/house-icon"
 import { GridIcon } from "@/src/components/icons/grid-icon"
+import { BoardIcon } from "@/src/components/icons/board-icon"
 import { CheckIcon } from "@/src/components/icons/check-icon"
 import { TreeIcon } from "@/src/components/icons/tree-icon"
 import { ShieldIcon } from "@/src/components/icons/shield-icon"
@@ -35,12 +36,26 @@ const menuItems = [
     iconOffset: "",
   },
   {
-    title: "Tarefas e Projetos",
-    url: "/activities",
+    // OPERAÇÃO — a superfície de QUEM EXECUTA: o que ainda não tem dono e o que
+    // é meu. É a tela do dia de trabalho.
+    title: "Operação",
+    url: "/operacao",
     icon: CheckIcon,
     textOffset: "",
     iconOffset: "translate-y-[0.5px]",
     permissao: "tarefas.ver",
+  },
+  {
+    // TAREFAS E PROJETOS — a MESMA Tarefa canônica, vista por quem responde
+    // pela operação inteira. Entra logo depois de Operação porque é a mesma
+    // matéria com outro alcance: lá se executa, aqui se enxerga e se distribui.
+    // Exige `tarefas.editar` porque ver a fila alheia é ato de gestão.
+    title: "Tarefas e Projetos",
+    url: "/tarefas",
+    icon: BoardIcon,
+    textOffset: "",
+    iconOffset: "",
+    permissao: "tarefas.editar",
   },
   {
     title: "Eventos",
@@ -124,7 +139,7 @@ export function BitrixSidebar() {
   }
 
   // Função para renderizar o ícone corretamente
-  const renderIcon = (Icon: typeof HouseIcon | typeof GridIcon | typeof CheckIcon | typeof TreeIcon | typeof ShieldIcon | typeof CalendarIcon | typeof DollarIcon, isActive: boolean, iconOffset: string = "") => {
+  const renderIcon = (Icon: typeof HouseIcon | typeof GridIcon | typeof BoardIcon | typeof CheckIcon | typeof TreeIcon | typeof ShieldIcon | typeof CalendarIcon | typeof DollarIcon, isActive: boolean, iconOffset: string = "") => {
   // Todos os ícones são customizados agora, passa a prop filled
     return <Icon className={`h-5 w-5 flex-shrink-0 text-white ${iconOffset}`} filled={isActive} />
   }

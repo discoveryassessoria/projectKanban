@@ -9,6 +9,7 @@ import { cotacoesVivas, computeCambioAging, labelServico } from './cambio-aging'
 import { ratearBrlPorBase } from '@/lib/financeiro/dominio/cambio'
 import { parcelasPagaveisComStatus } from '@/lib/financeiro/pagavel/cronograma-pagavel'
 import { repassesDoCusto } from '@/lib/financeiro/pagavel/repasse'
+import { nomesDeParticipantes, rotuloParticipante, PARTICIPANTE_SEM_IDENTIDADE } from './participante-identidade'
 
 const cent = (v: number) => Math.round((Number(v) || 0) * 100) / 100
 
@@ -251,7 +252,11 @@ export async function carregarReceitaDetalhe(ref: string): Promise<ReceitaDetalh
   // ── Parcelas (aba Cobranças) — detalhe por parcela + resumo ──
   const agoraP = Date.now()
   const cotP = ca.cotacaoAplicada
-  const reqNomeP = reqNomeLegado || (parts[0] ? nome(parts[0].pessoaId) : 'Requerente não identificado')
+  // Participante da distribuição: o id guardado é `Requerente.id` (ver
+  // participante-identidade). Resolver contra `Pessoa`, como se fazia aqui,
+  // devolvia "não identificado" para participante vivo.
+  const nomesParticipante = await nomesDeParticipantes(parts.map((p) => p.pessoaId))
+  const reqNomeP = reqNomeLegado || (parts[0] ? rotuloParticipante(parts[0].pessoaId, nomesParticipante) : PARTICIPANTE_SEM_IDENTIDADE)
   const FORMA_P: Record<string, string> = { PIX: 'PIX', CARTAO_CREDITO: 'Cartão de crédito', CARTAO_DEBITO: 'Cartão de débito', BOLETO: 'Boleto', TRANSFERENCIA: 'Transferência', DINHEIRO: 'Dinheiro', CHEQUE: 'Cheque', WISE: 'Wise' }
   const parcelasDetalhe = parcelasAll.map((p) => {
     const vBrl = p.valorBrl != null ? Number(p.valorBrl) : (p.cambioAplicado ? Number(p.valor) * Number(p.cambioAplicado) : (cotP ? Number(p.valor) * cotP : Number(p.valor)))

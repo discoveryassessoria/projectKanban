@@ -110,7 +110,14 @@ const opa = read("src/components/kanban/workflow/OperacaoAntecipadaPainel.tsx")
 
 check("rota devolve o roster oficial de pessoas", /pessoas:\s*pessoasDoProcesso/.test(rota))
 check("rota devolve o ÍNDICE da fase (pessoa → documento)", /^\s*indice,\s*$/m.test(rota))
-check("pessoas vêm do vínculo com a árvore (Pessoa.arvoreId)", /prisma\.pessoa\.findMany\(\{\s*\n?\s*where:\s*\{\s*arvoreId:\s*processo\.arvoreId\s*\}/.test(rota))
+// O roster continua vindo do vínculo com a árvore — agora pelo recorte canônico
+// `pessoasAtivasDaArvore`, que também exclui quem foi removido com histórico
+// preservado. Antes o filtro era literal aqui; a definição de "ativo" passou a
+// ter fonte única (src/lib/genealogia/vinculo-ativo.ts).
+check("pessoas vêm do vínculo com a árvore (Pessoa.arvoreId)",
+  /prisma\.pessoa\.findMany\(\{\s*\n?\s*where:\s*pessoasAtivasDaArvore\(processo\.arvoreId\)/.test(rota))
+check("o roster respeita o recorte ATIVO (pessoa removida não volta à Central)",
+  rota.includes("vinculo-ativo"))
 check("roster é montado pelo núcleo puro (fonte única)", rota.includes("montarPessoasDoProcesso(pessoas, unioes)"))
 check("o trabalho vem de PhaseWorkflowStepInstance da fase", consulta.includes("phaseWorkflowStepInstance.findMany") && consulta.includes("faseMacroKey: ctx.faseMacroKey"))
 check("a régua única de balde continua sendo a mesma", nucleo.includes("baldeDoPasso"))

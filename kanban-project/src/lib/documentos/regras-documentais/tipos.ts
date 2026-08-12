@@ -84,6 +84,8 @@ export const CAMPOS_CONDICAO = [
   "contratante",
   "linhaReta",
   "casado",
+  "idade",
+  "maiorDeIdade",
   "falecido",
   "vivo",
   "possuiConjuge",
@@ -100,6 +102,8 @@ export const CAMPO_CONDICAO_LABEL: Record<CampoCondicao, string> = {
   contratante: "É contratante",
   linhaReta: "É da linha reta",
   casado: "É casado",
+  idade: "Idade (anos completos)",
+  maiorDeIdade: "É maior de idade",
   falecido: "É falecido",
   vivo: "Está vivo",
   possuiConjuge: "Possui cônjuge",
@@ -181,6 +185,12 @@ export interface SujeitoContexto {
   linhaReta?: boolean
   precisaDeDocumentacao?: boolean
   casado?: boolean
+  /** idade em anos COMPLETOS na data de referência (null = sem data de nascimento) */
+  idade?: number | null
+  /** atingiu a maioridade na data de referência (null = desconhecido) */
+  maiorDeIdade?: boolean | null
+  /** data de nascimento, para quem precisar recalcular com outra referência */
+  dataNascimento?: string | null
   vivo?: boolean
   falecido?: boolean
   possuiConjuge?: boolean

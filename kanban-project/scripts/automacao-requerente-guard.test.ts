@@ -112,19 +112,34 @@ console.log('\nGuardas estruturais (arquitetura)')
   // `const tipos = opts?.tipos ?? [` — o guard acusava um defeito que não existia.
   // Guard que mente sobre código correto é pior que guard nenhum: ensina a ignorar
   // a suíte. O que importa é o tipo estar na lista DEFAULT, não a sintaxe dela.
-  const listaDefault = disp.slice(disp.indexOf('opts?.tipos ??'), disp.indexOf(']', disp.indexOf('opts?.tipos ??')))
-  ok('requerente.adicionado nos tipos default drenados', listaDefault.includes('"requerente.adicionado"'))
+  //
+  // 06/08/2026 — o guard voltou a mentir pelo MESMO motivo: a default deixou de
+  // ser um literal e passou a ser `[...TIPOS_DRENADOS]`, então recortar até o
+  // primeiro `]` devolvia o spread, nunca os tipos. A asserção agora verifica os
+  // dois fatos que de fato importam, cada um onde ele mora: o tipo está declarado
+  // em TIPOS_DRENADOS, e TIPOS_DRENADOS é a lista usada por padrão.
+  const declarados = disp.slice(disp.indexOf('export const TIPOS_DRENADOS'), disp.indexOf('as const', disp.indexOf('export const TIPOS_DRENADOS')))
+  ok('requerente.adicionado declarado em TIPOS_DRENADOS', declarados.includes('"requerente.adicionado"'))
+  ok('TIPOS_DRENADOS é a lista drenada por padrão', /opts\?\.tipos \?\? \[\.\.\.TIPOS_DRENADOS\]/.test(disp))
 
   const emit = src('src/services/genealogia/emitir-evento-requerente.ts')
   ok('evento publicado via DomainOutbox (não HTTP direto)', emit.includes('domainOutbox.create') && emit.includes("tipo: TIPO_EVENTO_REQUERENTE"))
   ok('payload com campos do domínio', /processoId[\s\S]*pessoaId[\s\S]*servicoId[\s\S]*faseId[\s\S]*nacionalidade[\s\S]*actorId/.test(emit))
   ok('dedup por chaveIdempotencia', emit.includes('chaveIdempotencia: chave'))
 
+  // A EMISSÃO SAIU DAS ROTAS (09/08/2026). Elas eram donas de um efeito de negócio,
+  // e por isso entrar pela tela e entrar pelo serviço davam estados finais diferentes.
+  // O que se exige aqui agora é o oposto do que se exigia antes: que a rota NÃO emita
+  // e delegue ao serviço canônico. Ver `test:guard-porta-requerente`.
   const put = src('src/app/api/pessoas/[id]/route.ts')
-  ok('PUT emite só na transição', put.includes('houveTransicaoParaRequerente') && /houveTransicao[\s\S]*enfileirarEventoRequerente/.test(put))
-  ok('PUT enfileira na MESMA transação da atualização', /\$transaction[\s\S]*pessoa\.update[\s\S]*enfileirarEventoRequerente/.test(put))
+  ok('PUT age só na transição', put.includes('houveTransicaoParaRequerente') && /houveTransicao[\s\S]*registrarTransicaoParaRequerenteTx/.test(put))
+  ok('PUT registra na MESMA transação da atualização', /\$transaction[\s\S]*pessoa\.update[\s\S]*registrarTransicaoParaRequerenteTx/.test(put))
+  ok('PUT não conhece a DomainOutbox', !put.includes('enfileirarEventoRequerente') && !put.includes('processarOutbox'))
   const post = src('src/app/api/pessoas/route.ts')
-  ok('POST emite quando nasce requerente', post.includes('ehRequerente(pessoa.requerente)') && post.includes('emitirEDrenarEventoRequerente'))
+  ok('POST não emite — a Pessoa nunca nasce requerente por lá', !post.includes('emitirEDrenar') && !post.includes('enfileirarEventoRequerente'))
+
+  const vinc = src('lib/genealogia/vincular-requerente.ts')
+  ok('o serviço canônico é o dono da emissão', /enfileirarEventoRequerente\(tx,/.test(vinc))
 }
 
 console.log(`\n${'='.repeat(60)}`)

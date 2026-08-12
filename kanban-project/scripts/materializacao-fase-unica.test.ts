@@ -215,8 +215,12 @@ check("a Central envia a instância vigente ao índice", rotaCentral.includes("i
 console.log("\n(C4) Sem fallback silencioso")
 check("a Central converge a fase ativa não materializada", rotaCentral.includes("materializarExecucaoDaFase") && rotaCentral.includes("fonte: \"RECONCILIACAO\""))
 check("a Central devolve o estado da materialização", rotaCentral.includes("materializacao,"))
+// `NECESSIDADES_ARVORE_FALHOU` e `REGRA_ARVORE_SEM_ITEM_MESTRE` eram códigos do
+// SEGUNDO materializador (garantirNecessidadesArvoreDoProcesso), eliminado em
+// f8c6069c. Sobrou o que ainda existe: processo sem árvore continua sendo motivo
+// NOMEADO, não console.error.
 check("o motivo do escopo deixou de ser só console.error",
-  phaseWorkflow.includes("NECESSIDADES_ARVORE_FALHOU") && phaseWorkflow.includes("REGRA_ARVORE_SEM_ITEM_MESTRE") && phaseWorkflow.includes("PROCESSO_SEM_ARVORE"))
+  phaseWorkflow.includes("PROCESSO_SEM_ARVORE"))
 check("os avisos do plano chegam a quem cria a instância",
   /created: true, workflowInstance: instancia, stepInstances, warnings: avisos/.test(phaseWorkflow))
 check("a tela usa a explicação do servidor quando existe",

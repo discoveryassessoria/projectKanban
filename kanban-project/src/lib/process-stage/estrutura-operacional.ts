@@ -24,6 +24,7 @@ import {
   nomeCompletoPessoa,
   type PessoaDoProcesso,
 } from "./central-operacional-core"
+import { nomeCanonicoDaObrigacao, codigosAceitos } from "@/src/lib/documentos/nome-canonico-obrigacao"
 import {
   montarEstruturaOperacional,
   montarIndiceOperacional,
@@ -261,7 +262,10 @@ export async function getPhaseOperationalStructure(
     docIds.length
       ? db.documento.findMany({
           where: { id: { in: docIds } },
-          select: { id: true, pessoaId: true, tipo: true, status: true, necessidadeId: true },
+          // `documentTypeId` é o que permite casar Documento com Necessidade por
+          // ID quando a FK `necessidadeId` não foi gravada — sem ele, a mesma
+          // obrigação virava duas linhas.
+          select: { id: true, pessoaId: true, tipo: true, status: true, necessidadeId: true, documentTypeId: true },
         })
       : Promise.resolve([]),
     respIds.length
@@ -288,11 +292,49 @@ export async function getPhaseOperationalStructure(
   const docMap = new Map(documentos.map((d) => [d.id, d]))
   const respMap = new Map(responsaveis.map((u) => [u.id, u.nome]))
 
+  // CADASTRO MESTRE dos tipos documentais: code → nome e code → id. É a fonte do
+  // nome exibido da obrigação e do casamento por ID entre Documento e Necessidade.
+  const tiposCadastro = await db.tipoDocumentoCadastro.findMany({ select: { id: true, code: true, name: true } })
+  const nomeTipoPorCode = new Map<string, string>()
+  const idTipoPorCode = new Map<string, number>()
+  for (const t of tiposCadastro) {
+    if (!t.code) continue
+    nomeTipoPorCode.set(t.code, t.name)
+    idTipoPorCode.set(t.code, t.id)
+  }
+
   // VÍNCULO OFICIAL documento → necessidade. Une, num único alvo, o passo escopado
   // por NECESSIDADE e o escopado pelo DOCUMENTO que a atende.
   const necessidadePorDocumento = new Map<number, number>()
   for (const d of documentos) if (d.necessidadeId != null) necessidadePorDocumento.set(d.id, d.necessidadeId)
   for (const n of necessidades) for (const d of n.documentos) necessidadePorDocumento.set(d.id, n.id)
+
+  // RECONCILIAÇÃO POR ID quando a FK não existe. Documento materializado fora do
+  // caminho canônico fica com `necessidadeId` nulo; sem esta ponte, o passo dele
+  // vira um alvo `documento:N` que convive com o alvo `necessidade:M` da MESMA
+  // obrigação — duas linhas para a mesma exigência, cada uma com um nome.
+  // O casamento é por (pessoa, tipo documental aceito). Nunca por nome.
+  const tiposAceitosDaNecessidade = (n: { matrizSnapshot: unknown }): number[] => {
+    const snap = (n.matrizSnapshot ?? null) as { documentosAceitos?: unknown } | null
+    return codigosAceitos(snap?.documentosAceitos)
+      .map((c) => idTipoPorCode.get(c))
+      .filter((x): x is number => x != null)
+  }
+  const necPorPessoaETipo = new Map<string, number>()
+  for (const n of necessidades) {
+    const pid = n.pessoaId ?? n.uniao?.pessoa1Id ?? null
+    if (pid == null) continue
+    for (const tipoId of tiposAceitosDaNecessidade(n)) {
+      const k = `${pid}:${tipoId}`
+      if (!necPorPessoaETipo.has(k)) necPorPessoaETipo.set(k, n.id)
+    }
+  }
+  for (const d of documentos) {
+    if (necessidadePorDocumento.has(d.id)) continue
+    if (d.pessoaId == null || d.documentTypeId == null) continue
+    const nec = necPorPessoaETipo.get(`${d.pessoaId}:${d.documentTypeId}`)
+    if (nec != null) necessidadePorDocumento.set(d.id, nec)
+  }
 
   // TITULAR de cada necessidade a partir dos documentos que a atendem — o vínculo
   // Documento.pessoaId é oficial e resolve o caso em que a própria necessidade tem
@@ -321,16 +363,22 @@ export async function getPhaseOperationalStructure(
     return catalogo.find((c) => c.stepKey === stepKey)?.title ?? stepKey
   }
 
+  // NOME DA OBRIGAÇÃO — do Cadastro Mestre quando a regra aponta para um único
+  // documento aceito. `matrizSnapshot.requisito` é texto administrativo da regra
+  // e não pode nomear documento: era ele que fazia "Certidão de Nascimento"
+  // aparecer ao lado de "Certidão de nascimento - Inteiro Teor" como se fossem
+  // duas obrigações da mesma pessoa.
   const requisitoDaNecessidade = (n: {
     matrizSnapshot: unknown
     itemCatalogo: { name: string } | null
   }): string | null => {
-    const snap = n.matrizSnapshot
-    if (snap && typeof snap === "object" && "requisito" in snap) {
-      const r = (snap as { requisito: unknown }).requisito
-      if (typeof r === "string" && r.trim()) return r
-    }
-    return n.itemCatalogo?.name ?? null
+    const snap = (n.matrizSnapshot ?? null) as { requisito?: unknown; documentosAceitos?: unknown } | null
+    return nomeCanonicoDaObrigacao({
+      documentosAceitos: snap?.documentosAceitos,
+      requisitoNome: typeof snap?.requisito === "string" ? snap.requisito : null,
+      itemCatalogoNome: n.itemCatalogo?.name ?? null,
+      nomePorCode: (code) => nomeTipoPorCode.get(code) ?? null,
+    })
   }
 
   const paisDaNecessidade = (n: { matrizSnapshot: unknown }): string | null => {

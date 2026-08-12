@@ -413,6 +413,41 @@ export const PERFIS_PADRAO = [
       'registral.alterar_filiacao': false,
       'registral.reverter': false,
       'registral.administrar_regras': false,
+      // ── MATRIZ OPERACIONAL DO WORKFLOW ────────────────────────────────
+      // O Assistente EXECUTA o trabalho; ele não conduz o processo.
+      //
+      // Este perfil nascia de `TODAS_PERMISSOES` e por isso concedia o bloco
+      // `workflow.*` inteiro — inclusive avançar e forçar avanço de fase,
+      // reabrir ciclo e ativar runtime. Ao mesmo tempo, na prática, quem opera
+      // não tinha o que precisa: a assistente de produção abria a tarefa,
+      // abria o executor da etapa, preenchia tudo e a ação terminal respondia
+      // 403 por falta de `workflow.concluirPasso`. Sobrava poder que ela não
+      // deve ter e faltava o que ela precisa para trabalhar.
+      //
+      // EXECUTAR a etapa: sim. É o trabalho dela.
+      'workflow.iniciarPasso': true,
+      'workflow.concluirPasso': true,
+      // DECIDIR sobre a etapa: não. Aprovar é de outra pessoa por definição;
+      // dispensar é decidir que o requisito deixou de ser exigido; cancelar e
+      // superseder descartam trabalho.
+      'workflow.aprovarPasso': false,
+      'workflow.dispensarPasso': false,
+      'workflow.cancelarPasso': false,
+      'workflow.supersederPasso': false,
+      // CONDUZIR o processo: não. Mover fase macro, forçar avanço, reabrir
+      // ciclo, retornar fase e ativar runtime são atos de gestão.
+      'workflow.avancar': false,
+      'workflow.forcarAvanco': false,
+      'workflow.reabrirFase': false,
+      'workflow.retornarFase': false,
+      'workflow.ativarV2': false,
+      // DISTRIBUIR trabalho: não. `workflow.gerarTarefa` é a permissão que
+      // autoriza transferir a etapa de outra pessoa; `tarefas.editar` é a que
+      // autoriza atribuir, transferir e mexer no prazo alheio. Quem executa
+      // move a PRÓPRIA tarefa (`tarefas.iniciar_concluir`), não a dos outros.
+      'workflow.gerarTarefa': false,
+      'tarefas.editar': false,
+
       // Sem admin
       'usuarios.gerenciar': false,
     },

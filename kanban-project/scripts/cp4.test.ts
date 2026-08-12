@@ -179,10 +179,16 @@ async function run() {
 
   // 14) Chave da Tarefa + prioridade
   console.log("14) Chave e prioridade:")
-  const bt = { stepInstanceId: 10, taskRole: "principal", ciclo: 1 }
+  // A chave identifica a UNIDADE DE TRABALHO (a obrigação), não o passo: cinco
+  // passos da mesma certidão convergem para a MESMA tarefa.
+  const bt = { stepInstanceId: 10, taskRole: "principal", ciclo: 1, processoId: 7, necessidadeId: 55, pessoaId: 3 }
   ok(montarChaveTarefa(bt) === montarChaveTarefa({ ...bt }), "chave Tarefa determinística")
   ok(montarChaveTarefa(bt) !== montarChaveTarefa({ ...bt, ciclo: 2 }), "ciclo distinto => chave distinta")
   ok(montarChaveTarefa(bt) !== montarChaveTarefa({ ...bt, taskRole: "revisor" }), "role distinto => chave distinta")
+  ok(montarChaveTarefa(bt) === montarChaveTarefa({ ...bt, stepInstanceId: 11 }), "passo distinto, MESMA obrigação => MESMA tarefa")
+  ok(montarChaveTarefa(bt) !== montarChaveTarefa({ ...bt, necessidadeId: 56 }), "obrigação distinta => tarefa distinta")
+  ok(montarChaveTarefa({ ...bt, necessidadeId: null }) !== montarChaveTarefa({ ...bt, necessidadeId: null, stepInstanceId: 11 }),
+    "sem obrigação (passo administrativo) a identidade volta a ser o passo")
   ok(mapearPrioridade("low") === "BAIXA" && mapearPrioridade("medium") === "MEDIA" && mapearPrioridade("high") === "ALTA", "prioridade low/medium/high")
   ok(mapearPrioridade(undefined) === "MEDIA" && mapearPrioridade("xyz") === "MEDIA", "prioridade default MEDIA")
 
@@ -280,7 +286,13 @@ async function run() {
   // 24) Delegação nas rotas legadas (só v2 + step instance)
   console.log("\n24) Delegação legada:")
   const rotaConcluir = readFileSync(join(ROOT, "src/app/api/tarefas/[tarefaId]/concluir/route.ts"), "utf8")
-  ok(/workflowStepInstanceId && tarefaAtual\.processoId/.test(rotaConcluir) && /workflowRuntime === "v2"/.test(rotaConcluir) && /concluirTarefa\(/.test(rotaConcluir), "concluir delega ao sync só se v2 + step instance")
+  // A condicional `workflowRuntime === "v2"` SAIU: ela existia para escolher
+  // entre delegar ao motor e concluir a tarefa por fora dele. Hoje existe um
+  // caminho só — a rota é casca fina e delega sempre; sem etapa vinculada, ela
+  // recusa em vez de inventar uma segunda conclusão.
+  ok(/concluirTarefa\(/.test(rotaConcluir) && !/workflowRuntime === "v2"/.test(rotaConcluir),
+    "concluir é casca fina: delega ao sync, sem ramo alternativo")
+  ok(/SEM_ETAPA/.test(rotaConcluir), "sem step instance a rota recusa, não conclui por fora")
 
   // 25) Migration CP-4D aditiva
   console.log("\n25) Migration CP-4D:")

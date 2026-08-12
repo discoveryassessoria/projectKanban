@@ -18,6 +18,11 @@ import {
 import { lerObjetoPrivado, removerObjetoPrivado } from "../src/lib/documentos/modelos/storage-privado"
 import { abrirDocx, estruturaDoDocx, textoDoDocx } from "../src/lib/documentos/modelos/docx"
 
+import { exigirBancoDeTeste } from "./_banco-de-teste"
+
+// TRAVA DE AMBIENTE: este arquivo ESCREVE. Sem banco de teste local, não roda.
+exigirBancoDeTeste()
+
 /** `w:pPr` de cada parágrafo, na ordem — para comparar template × gerado. */
 async function pPrDoCorpo(buffer: Buffer | Uint8Array): Promise<string[]> {
   const zip = await abrirDocx(buffer)

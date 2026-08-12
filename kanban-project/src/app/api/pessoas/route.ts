@@ -9,8 +9,6 @@ import { type NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import { dispararMaterializacaoPorArvore } from "@/src/services/genealogia/materializar-genealogia"
 import { ehRequerente } from "@/lib/genealogia/requerente-flag"
-import { emitirEDrenarEventoRequerente } from "@/src/services/genealogia/emitir-evento-requerente"
-import { extrairUsuarioComPermissoes } from "@/src/lib/verificar-permissao"
 import { verificarPermissao } from "@/src/lib/verificar-permissao"
 // LEGADO_INATIVO (desativação Genealogia): a auto-geração de Documento ao criar
 // Pessoa foi DESLIGADA. Criar Pessoa NÃO gera mais Documento silenciosamente.
@@ -273,12 +271,12 @@ export async function POST(request: NextRequest) {
       }
     })
 
-    // TRANSIÇÃO: pessoa NASCE requerente → emite REQUERENTE_ADICIONADO (via Outbox).
-    // Idempotente (chave por processo+pessoa); nunca um efeito financeiro direto aqui.
-    if (ehRequerente(pessoa.requerente) && pessoa.arvoreId) {
-      const actorId = (await extrairUsuarioComPermissoes(request))?.userId ?? null
-      await emitirEDrenarEventoRequerente({ pessoaId: pessoa.id, arvoreId: pessoa.arvoreId, actorId })
-    }
+    // NÃO HÁ TRANSIÇÃO A EMITIR AQUI, e não é omissão: o `create` acima normaliza
+    // qualquer tentativa de nascer requerente para 'nao' (invariante de dedup —
+    // requerente é definido pelo vínculo com o Processo, não por este endpoint
+    // genérico). Existia neste ponto um bloco `if (ehRequerente(...)) emitir…` cuja
+    // condição era, por construção, sempre falsa: uma terceira porta que nunca
+    // abriu. Saiu com o import.
 
     // Se está adicionando como pai ou mãe de um filho existente
     if (filhoId && tipoPai) {

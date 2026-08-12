@@ -487,7 +487,7 @@ export async function listarFila(
         pais: pr?.pais ?? null,
         prazo: t.dataPrazo ? t.dataPrazo.toISOString() : null,
         atrasado: estaAtrasado(t.dataPrazo, ctx.agora),
-        href: pr ? hrefProcesso(pr, `&tab=tarefas&atividadeId=${t.id}`) : "/activities",
+        href: pr ? hrefProcesso(pr, `&tab=tarefas&atividadeId=${t.id}`) : "/operacao",
       }
     }
     if (m.tipo === "processo-sla") {

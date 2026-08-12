@@ -1,371 +1,677 @@
 // src/services/exclusao-definitiva.ts
 //
-// EXCLUSÃO DEFINITIVA (dados de teste) — requer permissão sistema.exclusaoDefinitiva. Apaga
-// fisicamente Config Financeira (ProdutoFinanceiro) + TODOS os preços (ativos+históricos) + os
-// LANÇAMENTOS financeiros EXCLUSIVAMENTE DE TESTE (cascata controlada). BLOQUEIA se houver uso
-// real: lançamento pago/recebido/baixado/com comprovante/movimentação bancária/estorno, regra
-// econômica, automação de fase ou vínculo de serviço. Tudo em transação + rechecagem + rollback +
-// auditoria. A regra geral (inativar, nunca apagar) para usuários sem permissão permanece intacta.
+// MOTOR CANÔNICO ÚNICO DE EXCLUSÃO DEFINITIVA (Serviço · Configuração Financeira · Item Mestre).
+//
+// DECISÃO ARQUITETURAL (única, sem outro comportamento aceito):
+//
+//   • SEM nenhum fato histórico real  → EXCLUI definitivamente: o cadastro sai, as dependências
+//     CONFIGURACIONAIS exclusivas caem em cascata, as COMPARTILHADAS são apenas desvinculadas,
+//     e não sobra órfão.
+//   • COM qualquer fato histórico real → NÃO exclui: INATIVA e preserva o histórico integralmente.
+//
+// A classificação do que é CONFIGURAÇÃO e do que é FATO HISTÓRICO vive numa fonte única e pura:
+// lib/gerenciamento/classificacao-exclusao.ts. Configuração (Regra de Aplicabilidade Econômica,
+// Configuração Financeira, Regra de Preço, vínculos…) NUNCA bloqueia exclusão — era exatamente
+// esse o defeito que impedia excluir "Localização de Registro" tendo zero movimento financeiro.
+//
+// A regra final é literal e não é reescrita aqui:  deletionAllowed = historicalFacts.total === 0
+//
+// Prévia e execução usam ESTE MESMO analisador; a execução ainda o re-roda DENTRO da transação
+// (guarda de corrida) e aborta com rollback total se qualquer fato histórico surgir no meio.
 
 import { prisma } from "@/lib/prisma"
 import { Prisma } from "@prisma/client"
+import {
+  dependencia,
+  fato,
+  totalizar,
+  permiteExclusaoDefinitiva,
+  exigeInativacao,
+  type DependenciaConfiguracional,
+  type FatoHistoricoDetectado,
+} from "@/lib/gerenciamento/classificacao-exclusao"
 
 export const FRASE_CONFIRMACAO = "EXCLUIR DEFINITIVAMENTE"
 
-export interface PrecoResumo { id: number; natureza: string; arquivado: boolean; legadoPendente: boolean; valor: string | null }
-export interface LancamentoResumo {
-  id: number
-  tipo: "RECEITA" | "CUSTO"
-  descricao: string
-  valor: string | null
-  natureza: string
-  status: string
-  deletavel: boolean          // true = exclusivamente de teste (sem uso financeiro real)
-  motivoBloqueio: string | null
-}
-export interface BlockersConfig {
-  regrasEconomicas: number
-  automacoesFase: number
-  vinculosServico: number
-  lancamentosReais: number    // lançamentos com uso financeiro real (bloqueiam)
-  total: number
-}
+type DB = Prisma.TransactionClient | typeof prisma
 
-/** where p/ Receita/Custo que referenciam a config OU um de seus preços (snapshot congelado). */
-function whereLancamento(configId: number, priceIds: number[]): Prisma.ReceitaWhereInput {
-  const ors: Prisma.ReceitaWhereInput[] = [{ configFinanceiraId: configId }]
-  if (priceIds.length) ors.push({ pricingRuleId: { in: priceIds } })
-  return { OR: ors }
+// A execução re-roda a análise INTEIRA dentro da transação (guarda de corrida). São dezenas de
+// idas ao banco sob uma conexão remota: os 5s padrão do Prisma estouram e a transação morre no
+// meio. O limite é generoso de propósito — abortar por relógio seria perder a guarda, não ganhar
+// segurança (a trava FOR UPDATE é que protege a linha).
+const TX_OPTS = { timeout: 60_000, maxWait: 20_000 } as const
+
+export interface AnaliseExclusao {
+  /** Identidade do cadastro analisado (o que a tela mostra no cabeçalho). */
+  alvo: { tipo: "SERVICO" | "CONFIG_FINANCEIRA" | "ITEM_CATALOGO"; id: number; nome: string; codigo: string | null; ativo: boolean }
+  /** Parametrizações. Somem em cascata (EXCLUIR) ou só perdem o vínculo (DESVINCULAR). Nunca bloqueiam. */
+  configDependencies: { itens: DependenciaConfiguracional[]; total: number }
+  /** Provas de que algo aconteceu. Nunca são apagadas. A existência de UMA já proíbe o hard delete. */
+  historicalFacts: { itens: FatoHistoricoDetectado[]; total: number }
+  deletionAllowed: boolean
+  deactivationRequired: boolean
+  fraseConfirmacao: string
 }
 
-const SELECT_LANC = {
-  id: true, descricao: true, valor: true, categoria: true, status: true,
-  estornadoEm: true, estornoDeId: true, naturezaLancamento: true,
-  parcelas: { select: { status: true, dataPagamento: true, banco: true, comprovanteUrl: true } },
-  _count: { select: { estornos: true } },
-} as const
+// ─────────────────────────────────────────────────────────────────────────────
+// COLETA — cada função devolve dependências JÁ classificadas. Nenhuma decide nada.
+// ─────────────────────────────────────────────────────────────────────────────
 
-type LancRow = {
-  id: number; descricao: string; valor: unknown; categoria: unknown; status: unknown
-  estornadoEm: Date | null; estornoDeId: number | null; naturezaLancamento: string
-  parcelas: { status: unknown; dataPagamento: Date | null; banco: string | null; comprovanteUrl: string | null }[]
-  _count: { estornos: number }
+/** Fatos históricos amarrados a uma Configuração Financeira (e aos preços que ela congelou). */
+async function fatosDaConfig(db: DB, configId: number, priceIds: number[]): Promise<FatoHistoricoDetectado[]> {
+  const orLanc: Prisma.ReceitaWhereInput[] = [{ configFinanceiraId: configId }]
+  if (priceIds.length) orLanc.push({ pricingRuleId: { in: priceIds } })
+  const where = { OR: orLanc }
+  const [receitas, custos, obrigacoes, pendencias] = await Promise.all([
+    db.receita.count({ where }),
+    db.custo.count({ where: where as unknown as Prisma.CustoWhereInput }),
+    db.obrigacaoEconomica.count({ where: { configFinanceiraId: configId } }),
+    db.pendenciaFinanceira.count({ where: { configFinanceiraId: configId } }),
+  ])
+  return [
+    fato("Receita", receitas),
+    fato("Custo", custos),
+    fato("ObrigacaoEconomica", obrigacoes),
+    fato("PendenciaFinanceira", pendencias),
+  ].filter((f) => f.quantidade > 0)
+}
+
+/** Dependências CONFIGURACIONAIS de uma Configuração Financeira. */
+async function configsDaConfig(db: DB, configId: number, priceIds: number[]): Promise<DependenciaConfiguracional[]> {
+  const [regras, autos, servicos] = await Promise.all([
+    db.phaseEconomicRule.findMany({ where: { OR: [{ custoConfigId: configId }, { receitaConfigId: configId }] }, select: { id: true } }),
+    db.phaseAutomationRule.findMany({ where: { configItemId: configId }, select: { id: true } }),
+    db.servicoProduto.findMany({ where: { itensFinanceiros: { some: { id: configId } } }, select: { id: true } }),
+  ])
+  return [
+    dependencia("RegraDePreco", priceIds.length, "EXCLUIR", priceIds),
+    dependencia("RegraAplicabilidadeEconomica", regras.length, "EXCLUIR", regras.map((r) => r.id)),
+    dependencia("AutomacaoFinanceiraDeFase", autos.length, "EXCLUIR", autos.map((a) => a.id)),
+    dependencia("VinculoConfigFinanceiraServico", servicos.length, "DESVINCULAR", servicos.map((s) => s.id)),
+  ].filter((d) => d.quantidade > 0)
+}
+
+/** Fatos históricos amarrados a um Item do Cadastro Mestre (o "pivô" documental). */
+async function fatosDoItem(db: DB, itemId: number): Promise<FatoHistoricoDetectado[]> {
+  const [necessidades, evidencias, obrigacoes] = await Promise.all([
+    db.necessidadeDocumental.count({ where: { itemCatalogoId: itemId } }),
+    db.evidenciaRegistral.count({ where: { itemCatalogoId: itemId } }),
+    db.obrigacaoEconomica.count({ where: { itemCatalogoId: itemId } }),
+  ])
+  return [
+    fato("NecessidadeDocumental", necessidades),
+    fato("EvidenciaRegistral", evidencias),
+    fato("ObrigacaoEconomica", obrigacoes),
+  ].filter((f) => f.quantidade > 0)
+}
+
+/** Fatos históricos amarrados diretamente ao Serviço (fora do caminho da config). */
+async function fatosDoServico(db: DB, servicoId: number): Promise<FatoHistoricoDetectado[]> {
+  const [receitas, custos, docs] = await Promise.all([
+    db.receita.count({ where: { productServiceId: servicoId } }),
+    db.custo.count({ where: { productServiceId: servicoId } }),
+    db.documentoGerado.count({ where: { servicoId } }),
+  ])
+  return [fato("Receita", receitas), fato("Custo", custos), fato("DocumentoGerado", docs)].filter((f) => f.quantidade > 0)
+}
+
+/** Soma fatos de mesma entidade vindos de caminhos diferentes (config + serviço + item). */
+function consolidarFatos(...listas: FatoHistoricoDetectado[][]): { itens: FatoHistoricoDetectado[]; total: number } {
+  const acc = new Map<string, FatoHistoricoDetectado>()
+  for (const f of listas.flat()) {
+    const atual = acc.get(f.entidade)
+    if (atual) atual.quantidade += f.quantidade
+    else acc.set(f.entidade, { ...f })
+  }
+  const itens = [...acc.values()].filter((f) => f.quantidade > 0)
+  return { itens, total: totalizar(itens) }
+}
+
+function consolidarConfigs(...listas: DependenciaConfiguracional[][]): { itens: DependenciaConfiguracional[]; total: number } {
+  const acc = new Map<string, DependenciaConfiguracional>()
+  for (const d of listas.flat()) {
+    const atual = acc.get(d.entidade)
+    if (atual) {
+      atual.quantidade += d.quantidade
+      atual.ids = [...new Set([...atual.ids, ...d.ids])]
+    } else acc.set(d.entidade, { ...d, ids: [...d.ids] })
+  }
+  const itens = [...acc.values()].filter((d) => d.quantidade > 0)
+  return { itens, total: totalizar(itens) }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// TOPOLOGIA DO SERVIÇO — o que é EXCLUSIVO deste serviço e o que é COMPARTILHADO.
+// ─────────────────────────────────────────────────────────────────────────────
+
+interface TopologiaServico {
+  servicoId: number
+  itemCatalogoId: number | null
+  configId: number | null
+  priceIds: number[]
+  /** O Item Mestre existe só para projetar ESTE serviço (nenhum outro consumidor estrutural). */
+  itemExclusivo: boolean
+  /** Consumidores COMPARTILHADOS do item — preservados, apenas desvinculados. */
+  tiposDocumentoIds: number[]
+  tiposServicoIds: number[]
+  outrosServicosIds: number[]
+  paisesIds: number[]
+  condicoesVinculadasIds: number[]
+}
+
+async function topologiaDoServico(db: DB, servicoId: number, itemCatalogoId: number | null): Promise<TopologiaServico> {
+  const config = itemCatalogoId != null
+    ? await db.produtoFinanceiro.findUnique({ where: { itemCatalogoId }, select: { id: true } })
+    : null
+  const configId = config?.id ?? null
+
+  const priceIds = (await db.tabelaValor.findMany({
+    where: {
+      OR: [
+        ...(configId != null ? [{ configuracaoFinanceiraItemId: configId }] : []),
+        ...(itemCatalogoId != null ? [{ itemCatalogoId }] : []),
+      ],
+    },
+    select: { id: true },
+  })).map((p) => p.id)
+
+  const [tiposDoc, tiposSvc, outrosSvc, paises, condicoes] = await Promise.all([
+    itemCatalogoId != null ? db.tipoDocumentoCadastro.findMany({ where: { itemCatalogoId }, select: { id: true } }) : Promise.resolve([]),
+    itemCatalogoId != null ? db.tipoServico.findMany({ where: { itemCatalogoId }, select: { id: true } }) : Promise.resolve([]),
+    itemCatalogoId != null ? db.servicoProduto.findMany({ where: { itemCatalogoId, id: { not: servicoId } }, select: { id: true } }) : Promise.resolve([]),
+    db.servicoProdutoPais.findMany({ where: { servicoId }, select: { id: true } }),
+    db.condicaoPagamentoServico.findMany({ where: { servicoId }, select: { id: true, condicaoId: true } }),
+  ])
+
+  return {
+    servicoId,
+    itemCatalogoId,
+    configId,
+    priceIds,
+    itemExclusivo: itemCatalogoId != null && tiposDoc.length === 0 && tiposSvc.length === 0 && outrosSvc.length === 0,
+    tiposDocumentoIds: tiposDoc.map((t) => t.id),
+    tiposServicoIds: tiposSvc.map((t) => t.id),
+    outrosServicosIds: outrosSvc.map((s) => s.id),
+    paisesIds: paises.map((p) => p.id),
+    condicoesVinculadasIds: condicoes.map((c) => c.id),
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// ANÁLISE DE SERVIÇO — o analisador canônico. Prévia e exclusão chamam ESTE.
+// ─────────────────────────────────────────────────────────────────────────────
+
+export async function analyzeServiceDeletion(servicoId: number, db: DB = prisma): Promise<AnaliseExclusao | null> {
+  const svc = await db.servicoProduto.findUnique({
+    where: { id: servicoId },
+    select: { id: true, name: true, code: true, ativo: true, itemCatalogoId: true },
+  })
+  if (!svc) return null
+
+  const topo = await topologiaDoServico(db, servicoId, svc.itemCatalogoId)
+
+  const [fatosCfg, fatosSvc, fatosItm, cfgsDaConfig] = await Promise.all([
+    topo.configId != null ? fatosDaConfig(db, topo.configId, topo.priceIds) : Promise.resolve([] as FatoHistoricoDetectado[]),
+    fatosDoServico(db, servicoId),
+    topo.itemCatalogoId != null ? fatosDoItem(db, topo.itemCatalogoId) : Promise.resolve([] as FatoHistoricoDetectado[]),
+    topo.configId != null ? configsDaConfig(db, topo.configId, topo.priceIds) : Promise.resolve([] as DependenciaConfiguracional[]),
+  ])
+
+  // O auto-vínculo Serviço↔Config NÃO é dependência externa: é o próprio serviço.
+  const cfgsExternas = cfgsDaConfig
+    .map((d) =>
+      d.entidade === "VinculoConfigFinanceiraServico"
+        ? { ...d, ids: d.ids.filter((id) => id !== servicoId), quantidade: d.ids.filter((id) => id !== servicoId).length }
+        : d,
+    )
+    .filter((d) => d.quantidade > 0)
+
+  // A Configuração Financeira, os preços, a aplicabilidade econômica e a automação pertencem ao
+  // ITEM MESTRE, não ao serviço. Só caem junto quando o item existe unicamente para projetar
+  // ESTE serviço. Se o mestre é compartilhado (um Tipo de Documento, um Tipo de Serviço ou outro
+  // Serviço também aponta para ele), essa parametrização é de terceiros: fica intacta e o serviço
+  // apenas se desliga dela.
+  const parametrizacaoDoMestre: DependenciaConfiguracional[] = topo.itemExclusivo
+    ? [
+        ...cfgsExternas,
+        ...(topo.configId == null && topo.priceIds.length
+          ? [dependencia("RegraDePreco", topo.priceIds.length, "EXCLUIR", topo.priceIds)]
+          : []),
+        ...(topo.configId != null ? [dependencia("ConfiguracaoFinanceira", 1, "EXCLUIR", [topo.configId])] : []),
+      ]
+    : [
+        // Compartilhado: nada da parametrização do mestre é tocado.
+        ...cfgsExternas.filter((d) => d.entidade === "VinculoConfigFinanceiraServico"),
+        ...(topo.configId != null ? [dependencia("ConfiguracaoFinanceira", 1, "DESVINCULAR", [topo.configId])] : []),
+      ]
+
+  const configDependencies = consolidarConfigs(parametrizacaoDoMestre, [
+    ...(topo.paisesIds.length ? [dependencia("AplicacaoTerritorial", topo.paisesIds.length, "EXCLUIR", topo.paisesIds)] : []),
+    ...(topo.condicoesVinculadasIds.length ? [dependencia("VinculoCondicaoPagamento", topo.condicoesVinculadasIds.length, "DESVINCULAR", topo.condicoesVinculadasIds)] : []),
+    ...(topo.tiposDocumentoIds.length ? [dependencia("VinculoTipoDocumento", topo.tiposDocumentoIds.length, "DESVINCULAR", topo.tiposDocumentoIds)] : []),
+    ...(topo.tiposServicoIds.length ? [dependencia("VinculoTipoServico", topo.tiposServicoIds.length, "DESVINCULAR", topo.tiposServicoIds)] : []),
+    ...(topo.itemCatalogoId != null
+      ? [dependencia("ItemCatalogoMestre", 1, topo.itemExclusivo ? "EXCLUIR" : "DESVINCULAR", [topo.itemCatalogoId])]
+      : []),
+  ])
+
+  const historicalFacts = consolidarFatos(fatosCfg, fatosSvc, fatosItm)
+
+  return {
+    alvo: { tipo: "SERVICO", id: svc.id, nome: svc.name, codigo: svc.code, ativo: svc.ativo },
+    configDependencies,
+    historicalFacts,
+    deletionAllowed: permiteExclusaoDefinitiva(historicalFacts),
+    deactivationRequired: exigeInativacao(historicalFacts),
+    fraseConfirmacao: FRASE_CONFIRMACAO,
+  }
+}
+
+/** Nome histórico mantido para o restante do código; é o MESMO analisador. */
+export const analisarExclusaoServico = analyzeServiceDeletion
+
+// ─────────────────────────────────────────────────────────────────────────────
+// EXECUÇÃO — transacional, com re-análise dentro da transação e rollback total.
+// ─────────────────────────────────────────────────────────────────────────────
+
+export interface ResultadoExclusaoServico {
+  servicoId: number
+  nome: string
+  configDependenciesRemoved: DependenciaConfiguracional[]
+  sharedLinksDetached: DependenciaConfiguracional[]
+  historicalFactsFound: FatoHistoricoDetectado[]
+  deletionMode: "HARD_DELETE"
+  correlationId: string
+}
+
+function correlacao(prefixo: string, id: number, agora: Date): string {
+  return `${prefixo}-${id}-${agora.toISOString().replace(/[-:.TZ]/g, "").slice(0, 14)}`
+}
+
+function erroUsoReal(analise: AnaliseExclusao, race: boolean) {
+  const motivos = analise.historicalFacts.itens.map((f) => `${f.quantidade} ${f.rotulo}`).join(", ")
+  return Object.assign(
+    new Error(
+      race
+        ? `Fato histórico real detectado durante a exclusão (${motivos}) — operação abortada.`
+        : `Não é possível excluir definitivamente: existe fato histórico real (${motivos}). O cadastro deve ser inativado.`,
+    ),
+    { code: race ? "FATO_HISTORICO_RACE" : "FATO_HISTORICO", historicalFacts: analise.historicalFacts },
+  )
 }
 
 /**
- * Classifica um lançamento: pode ser apagado em cascata SOMENTE se for exclusivamente de teste —
- * nada pago/recebido, sem baixa (data de pagamento), sem comprovante, sem movimentação bancária e
- * sem estorno. Qualquer uso financeiro real ⇒ bloqueia (retorna o motivo exato).
+ * Exclusão definitiva de um Serviço. Só roda quando historicalFacts.total === 0.
+ * Ordem: aplicabilidade econômica → automação → preços → vínculos → config → mestres
+ * compartilhados (só desvínculo) → serviço → item mestre órfão → auditoria.
  */
-function motivoUsoRealLancamento(r: LancRow): string | null {
-  if (r.parcelas.some((p) => p.status === "PAGA" || p.status === "RECEBIDA")) return "possui parcela paga/recebida"
-  if (r.parcelas.some((p) => p.dataPagamento != null)) return "possui baixa (pagamento registrado)"
-  if (r.parcelas.some((p) => p.comprovanteUrl != null && String(p.comprovanteUrl).trim() !== "")) return "possui comprovante anexado"
-  if (r.parcelas.some((p) => p.banco != null && String(p.banco).trim() !== "")) return "possui movimentação bancária"
-  if (r.estornadoEm != null || r.estornoDeId != null || (r._count?.estornos ?? 0) > 0) return "possui estorno vinculado"
-  return null
-}
+export async function deleteService(
+  servicoId: number,
+  opts: { usuarioId: number; motivo?: string | null },
+): Promise<ResultadoExclusaoServico> {
+  const previa = await analyzeServiceDeletion(servicoId)
+  if (!previa) throw Object.assign(new Error("Serviço não encontrado"), { code: "NAO_ENCONTRADA" })
+  if (!previa.deletionAllowed) throw erroUsoReal(previa, false)
 
-function mapLanc(rows: LancRow[], tipo: "RECEITA" | "CUSTO"): LancamentoResumo[] {
-  return rows.map((r) => {
-    const motivo = motivoUsoRealLancamento(r)
-    return {
-      id: r.id, tipo, descricao: r.descricao, valor: r.valor != null ? String(r.valor) : null,
-      natureza: String(r.naturezaLancamento ?? tipo), status: String(r.status),
-      deletavel: motivo == null, motivoBloqueio: motivo,
+  const correlationId = correlacao("EXCL-SVC", servicoId, new Date())
+
+  return prisma.$transaction(async (tx) => {
+    // 1) TRAVA da linha do Serviço — nada nasce sob ela enquanto a transação corre.
+    const travado = await tx.$queryRaw<{ id: number }[]>`SELECT id FROM "ServicoProduto" WHERE id = ${servicoId} FOR UPDATE`
+    if (travado.length === 0) throw Object.assign(new Error("Serviço não encontrado"), { code: "NAO_ENCONTRADA" })
+
+    // 2) RE-ANÁLISE dentro da transação — o MESMO analisador, agora sob a trava.
+    const analise = await analyzeServiceDeletion(servicoId, tx)
+    if (!analise) throw Object.assign(new Error("Serviço não encontrado"), { code: "NAO_ENCONTRADA" })
+    // 3) Se surgiu fato histórico entre a prévia e agora: ABORTA (rollback total).
+    if (!analise.deletionAllowed) throw erroUsoReal(analise, true)
+
+    const svc = await tx.servicoProduto.findUnique({ where: { id: servicoId }, select: { itemCatalogoId: true } })
+    const topo = await topologiaDoServico(tx, servicoId, svc?.itemCatalogoId ?? null)
+
+    // A parametrização abaixo pertence ao ITEM MESTRE. Só cai junto quando o mestre existe
+    // exclusivamente para projetar este serviço; se for compartilhado, é de terceiros.
+    if (topo.itemExclusivo && topo.configId != null) {
+      // 4) Regra de Aplicabilidade Econômica (CONFIGURAÇÃO — nunca histórico).
+      await tx.phaseEconomicRule.deleteMany({ where: { OR: [{ custoConfigId: topo.configId }, { receitaConfigId: topo.configId }] } })
+      // 5) Automação financeira de fase (CONFIGURAÇÃO).
+      await tx.phaseAutomationRule.deleteMany({ where: { configItemId: topo.configId } })
     }
-  })
+
+    // 6) Regras de preço / vínculos de Tabela de Preços (CONFIGURAÇÃO do mestre exclusivo).
+    if (topo.itemExclusivo && topo.priceIds.length) await tx.tabelaValor.deleteMany({ where: { id: { in: topo.priceIds } } })
+
+    // 7) Vínculos com cadastros mestres COMPARTILHADOS — só o vínculo cai.
+    if (topo.condicoesVinculadasIds.length) {
+      await tx.condicaoPagamentoServico.deleteMany({ where: { servicoId } })
+      // Projeção derivada (CondicaoPagamento.servicos Int[]) — sem isto sobra id órfão no array.
+      await tx.$executeRaw`UPDATE "CondicaoPagamento" SET "servicos" = array_remove("servicos", ${servicoId}) WHERE ${servicoId} = ANY("servicos")`
+    }
+    if (topo.paisesIds.length) await tx.servicoProdutoPais.deleteMany({ where: { servicoId } })
+    // Desvincula (nunca apaga) o Serviço da Configuração Financeira compartilhada.
+    await tx.servicoProduto.update({ where: { id: servicoId }, data: { itensFinanceiros: { set: [] } } })
+
+    // 8) Configuração Financeira — só quando é EXCLUSIVA deste serviço.
+    if (topo.configId != null && topo.itemExclusivo) {
+      await tx.tabelaValor.deleteMany({ where: { configuracaoFinanceiraItemId: topo.configId } })
+      await tx.produtoFinanceiro.delete({ where: { id: topo.configId } })
+    } else if (topo.configId != null && topo.itemCatalogoId != null) {
+      // Item compartilhado: a config pertence ao mestre, não a este serviço. Preservada.
+      await tx.produtoFinanceiro.update({ where: { id: topo.configId }, data: { servicos: { disconnect: { id: servicoId } } } })
+    }
+
+    // 9) O Serviço.
+    await tx.servicoProduto.delete({ where: { id: servicoId } })
+
+    // 10) Item Mestre — apagado APENAS se ficou órfão; se compartilhado, preservado intacto.
+    let itemRemovido: number | null = null
+    if (topo.itemCatalogoId != null) {
+      const it = await tx.itemCatalogo.findUnique({
+        where: { id: topo.itemCatalogoId },
+        select: { _count: { select: { tiposDocumento: true, produtos: true, servicos: true, necessidades: true, precos: true, tiposServico: true, evidenciasRegistrais: true } } },
+      })
+      const c = it?._count
+      if (c && c.tiposDocumento + c.produtos + c.servicos + c.necessidades + c.precos + c.tiposServico + c.evidenciasRegistrais === 0) {
+        await tx.itemCatalogo.delete({ where: { id: topo.itemCatalogoId } })
+        itemRemovido = topo.itemCatalogoId
+      }
+    }
+
+    const removidas = analise.configDependencies.itens.filter((d) => d.acao === "EXCLUIR")
+    const desvinculadas = analise.configDependencies.itens.filter((d) => d.acao === "DESVINCULAR")
+
+    // 11) Auditoria (§12) — quem, o quê, quando, o que caiu, o que só se desvinculou.
+    await tx.logAuditoria.create({
+      data: {
+        acao: "EXCLUSAO_DEFINITIVA",
+        entidade: "SERVICO",
+        entidadeId: servicoId,
+        usuarioId: opts.usuarioId,
+        descricao: `Exclusão definitiva do serviço "${analise.alvo.nome}" (${analise.alvo.codigo ?? "—"}) por usuário ${opts.usuarioId}. Sem fato histórico. Motivo: ${opts.motivo ?? "—"}. correlationId=${correlationId}`.slice(0, 500),
+        detalhes: {
+          correlationId,
+          serviceId: servicoId,
+          serviceCode: analise.alvo.codigo,
+          serviceName: analise.alvo.nome,
+          actorUserId: opts.usuarioId,
+          deletionMode: "HARD_DELETE",
+          configDependenciesRemoved: removidas.map((d) => ({ entidade: d.entidade, quantidade: d.quantidade, ids: d.ids })),
+          sharedLinksDetached: desvinculadas.map((d) => ({ entidade: d.entidade, quantidade: d.quantidade, ids: d.ids })),
+          historicalFactsFound: [],
+          itemCatalogoRemovido: itemRemovido,
+          motivo: opts.motivo ?? null,
+        } as Prisma.InputJsonValue,
+      },
+    })
+
+    return {
+      servicoId,
+      nome: analise.alvo.nome,
+      configDependenciesRemoved: removidas,
+      sharedLinksDetached: desvinculadas,
+      historicalFactsFound: [],
+      deletionMode: "HARD_DELETE" as const,
+      correlationId,
+    }
+  }, TX_OPTS)
 }
 
-async function carregarLancamentos(db: Prisma.TransactionClient | typeof prisma, configId: number, priceIds: number[]): Promise<LancamentoResumo[]> {
-  const [receitas, custos] = await Promise.all([
-    db.receita.findMany({ where: whereLancamento(configId, priceIds), select: SELECT_LANC }),
-    db.custo.findMany({ where: whereLancamento(configId, priceIds) as unknown as Prisma.CustoWhereInput, select: SELECT_LANC }),
-  ])
-  return [...mapLanc(receitas as unknown as LancRow[], "RECEITA"), ...mapLanc(custos as unknown as LancRow[], "CUSTO")]
+/** Nome histórico mantido; é o MESMO motor. */
+export const excluirServicoDefinitivo = deleteService
+
+/**
+ * INATIVAÇÃO — o caminho obrigatório quando existe fato histórico. Preserva tudo:
+ * custos, receitas, obrigações, processos, snapshots. Só tira o cadastro de circulação.
+ * É também o ÚNICO caminho de "excluir" disponível a quem não tem exclusão definitiva.
+ */
+export async function deactivateService(
+  servicoId: number,
+  opts: { usuarioId: number; motivo?: string | null },
+): Promise<{ servicoId: number; nome: string; inativado: true; historicalFactsFound: FatoHistoricoDetectado[]; correlationId: string }> {
+  const analise = await analyzeServiceDeletion(servicoId)
+  if (!analise) throw Object.assign(new Error("Serviço não encontrado"), { code: "NAO_ENCONTRADA" })
+  const correlationId = correlacao("INAT-SVC", servicoId, new Date())
+
+  return prisma.$transaction(async (tx) => {
+    await tx.servicoProduto.update({ where: { id: servicoId }, data: { ativo: false } })
+    const svc = await tx.servicoProduto.findUnique({ where: { id: servicoId }, select: { itemCatalogoId: true } })
+    if (svc?.itemCatalogoId != null) {
+      // A Configuração Financeira do mesmo mestre acompanha o estado — sem apagar preço nem histórico.
+      await tx.produtoFinanceiro.updateMany({ where: { itemCatalogoId: svc.itemCatalogoId }, data: { ativo: false } })
+      await tx.itemCatalogo.update({ where: { id: svc.itemCatalogoId }, data: { ativo: false } })
+    }
+    await tx.logAuditoria.create({
+      data: {
+        acao: "INATIVACAO", entidade: "SERVICO", entidadeId: servicoId, usuarioId: opts.usuarioId,
+        descricao: `Serviço "${analise.alvo.nome}" inativado (histórico preservado) por usuário ${opts.usuarioId}. Motivo: ${opts.motivo ?? "—"}. correlationId=${correlationId}`.slice(0, 500),
+        detalhes: {
+          correlationId, serviceId: servicoId, serviceCode: analise.alvo.codigo, serviceName: analise.alvo.nome,
+          actorUserId: opts.usuarioId, deletionMode: "DEACTIVATION",
+          configDependenciesRemoved: [], sharedLinksDetached: [],
+          historicalFactsFound: analise.historicalFacts.itens.map((f) => ({ entidade: f.entidade, quantidade: f.quantidade })),
+          motivo: opts.motivo ?? null,
+        } as Prisma.InputJsonValue,
+      },
+    })
+    return { servicoId, nome: analise.alvo.nome, inativado: true as const, historicalFactsFound: analise.historicalFacts.itens, correlationId }
+  }, TX_OPTS)
 }
 
-/** Analisa a exclusão definitiva de uma Config Financeira: preços + lançamentos classificados + blockers. */
-export async function analisarExclusaoConfig(configId: number) {
-  const config = await prisma.produtoFinanceiro.findUnique({
+// ─────────────────────────────────────────────────────────────────────────────
+// CONFIGURAÇÃO FINANCEIRA — mesma classificação, mesmo contrato de análise.
+// ─────────────────────────────────────────────────────────────────────────────
+
+export async function analisarExclusaoConfig(configId: number, db: DB = prisma): Promise<AnaliseExclusao | null> {
+  const config = await db.produtoFinanceiro.findUnique({
     where: { id: configId },
     select: { id: true, codigo: true, ativo: true, tipoDocumento: { select: { name: true } }, itemCatalogo: { select: { name: true } }, honorario: { select: { name: true } } },
   })
   if (!config) return null
 
-  const precos: PrecoResumo[] = (await prisma.tabelaValor.findMany({
-    where: { configuracaoFinanceiraItemId: configId },
-    orderBy: { id: "asc" },
-    select: { id: true, natureza: true, arquivado: true, legadoPendente: true, valor: true },
-  })).map((p) => ({ id: p.id, natureza: String(p.natureza), arquivado: p.arquivado, legadoPendente: p.legadoPendente, valor: p.valor != null ? String(p.valor) : null }))
-  const priceIds = precos.map((p) => p.id)
+  const priceIds = (await db.tabelaValor.findMany({ where: { configuracaoFinanceiraItemId: configId }, select: { id: true } })).map((p) => p.id)
+  const [fatos, cfgs] = await Promise.all([fatosDaConfig(db, configId, priceIds), configsDaConfig(db, configId, priceIds)])
+  const historicalFacts = consolidarFatos(fatos)
+  const nome = config.tipoDocumento?.name ?? config.itemCatalogo?.name ?? config.honorario?.name ?? config.codigo ?? `#${config.id}`
 
-  const [lancamentos, regras, autos, servicos] = await Promise.all([
-    carregarLancamentos(prisma, configId, priceIds),
-    prisma.phaseEconomicRule.count({ where: { OR: [{ custoConfigId: configId }, { receitaConfigId: configId }] } }),
-    prisma.phaseAutomationRule.count({ where: { configItemId: configId } }),
-    prisma.servicoProduto.count({ where: { itensFinanceiros: { some: { id: configId } } } }),
-  ])
-  const lancamentosReais = lancamentos.filter((l) => !l.deletavel).length
-  const blockers: BlockersConfig = {
-    regrasEconomicas: regras, automacoesFase: autos, vinculosServico: servicos, lancamentosReais,
-    total: regras + autos + servicos + lancamentosReais,
+  return {
+    alvo: { tipo: "CONFIG_FINANCEIRA", id: config.id, nome, codigo: config.codigo, ativo: config.ativo },
+    configDependencies: consolidarConfigs(cfgs),
+    historicalFacts,
+    deletionAllowed: permiteExclusaoDefinitiva(historicalFacts),
+    deactivationRequired: exigeInativacao(historicalFacts),
+    fraseConfirmacao: FRASE_CONFIRMACAO,
   }
-  const mestre = config.tipoDocumento?.name ?? config.itemCatalogo?.name ?? config.honorario?.name ?? config.codigo ?? `#${config.id}`
-  return { config: { id: config.id, ativo: config.ativo, mestre }, precos, lancamentos, blockers, podeExcluir: blockers.total === 0 }
 }
 
-function motivoBlockers(b: BlockersConfig, lanc: LancamentoResumo[]): string[] {
-  const m: string[] = []
-  for (const l of lanc.filter((x) => !x.deletavel)) m.push(`${l.tipo} #${l.id} (${l.motivoBloqueio})`)
-  if (b.regrasEconomicas > 0) m.push(`${b.regrasEconomicas} regra(s) de aplicabilidade econômica`)
-  if (b.automacoesFase > 0) m.push(`${b.automacoesFase} automação(ões) financeira(s) de fase`)
-  if (b.vinculosServico > 0) m.push(`${b.vinculosServico} vínculo(s) de serviço`)
-  return m
-}
-
-/**
- * Executa a exclusão definitiva EM TRANSAÇÃO. Re-classifica os lançamentos e re-verifica os
- * blockers estruturais DENTRO da transação (guarda contra corrida) e ABORTA (rollback) se surgir
- * qualquer uso real. Apaga em cascata: lançamentos de teste (parcelas/eventos/requerentes caem por
- * FK Cascade das PRÓPRIAS entidades), preços (ativos + históricos) e a Config. Auditoria completa.
- */
 export async function excluirConfigDefinitivo(configId: number, opts: { usuarioId: number; motivo?: string | null }) {
-  const analise = await analisarExclusaoConfig(configId)
-  if (!analise) throw Object.assign(new Error("Configuração financeira não encontrada"), { code: "NAO_ENCONTRADA" })
-  if (!analise.podeExcluir) {
-    throw Object.assign(new Error(`Não é possível excluir: existe uso operacional real (${motivoBlockers(analise.blockers, analise.lancamentos).join(", ")}).`), { code: "USO_REAL", blockers: analise.blockers, lancamentos: analise.lancamentos })
-  }
+  const previa = await analisarExclusaoConfig(configId)
+  if (!previa) throw Object.assign(new Error("Configuração financeira não encontrada"), { code: "NAO_ENCONTRADA" })
+  if (!previa.deletionAllowed) throw erroUsoReal(previa, false)
+  const correlationId = correlacao("EXCL-CFG", configId, new Date())
 
   return prisma.$transaction(async (tx) => {
-    const precos = await tx.tabelaValor.findMany({ where: { configuracaoFinanceiraItemId: configId }, select: { id: true } })
-    const priceIds = precos.map((p) => p.id)
-    // RE-CLASSIFICAÇÃO/RE-VERIFICAÇÃO transacional — aborta se surgiu uso real desde a análise.
-    const [lancamentos, reg, au, sv] = await Promise.all([
-      carregarLancamentos(tx, configId, priceIds),
-      tx.phaseEconomicRule.count({ where: { OR: [{ custoConfigId: configId }, { receitaConfigId: configId }] } }),
-      tx.phaseAutomationRule.count({ where: { configItemId: configId } }),
-      tx.servicoProduto.count({ where: { itensFinanceiros: { some: { id: configId } } } }),
-    ])
-    const reais = lancamentos.filter((l) => !l.deletavel)
-    if (reais.length + reg + au + sv > 0) {
-      throw Object.assign(new Error("Uso operacional/financeiro real detectado durante a exclusão — operação abortada."), { code: "USO_REAL_RACE" })
-    }
+    const travado = await tx.$queryRaw<{ id: number }[]>`SELECT id FROM "ProdutoFinanceiro" WHERE id = ${configId} FOR UPDATE`
+    if (travado.length === 0) throw Object.assign(new Error("Configuração financeira não encontrada"), { code: "NAO_ENCONTRADA" })
+    const analise = await analisarExclusaoConfig(configId, tx)
+    if (!analise) throw Object.assign(new Error("Configuração financeira não encontrada"), { code: "NAO_ENCONTRADA" })
+    if (!analise.deletionAllowed) throw erroUsoReal(analise, true)
 
-    // 1) lançamentos de teste (parcelas/eventos/requerentes caem por Cascade da própria Receita/Custo)
-    const receitaIds = lancamentos.filter((l) => l.tipo === "RECEITA").map((l) => l.id)
-    const custoIds = lancamentos.filter((l) => l.tipo === "CUSTO").map((l) => l.id)
-    if (receitaIds.length) await tx.receita.deleteMany({ where: { id: { in: receitaIds } } })
-    if (custoIds.length) await tx.custo.deleteMany({ where: { id: { in: custoIds } } })
-    // 2) preços (ativos + históricos)  3) a Config
+    await tx.phaseEconomicRule.deleteMany({ where: { OR: [{ custoConfigId: configId }, { receitaConfigId: configId }] } })
+    await tx.phaseAutomationRule.deleteMany({ where: { configItemId: configId } })
+    await tx.produtoFinanceiro.update({ where: { id: configId }, data: { servicos: { set: [] } } })
+    const priceIds = (await tx.tabelaValor.findMany({ where: { configuracaoFinanceiraItemId: configId }, select: { id: true } })).map((p) => p.id)
     await tx.tabelaValor.deleteMany({ where: { configuracaoFinanceiraItemId: configId } })
     await tx.produtoFinanceiro.delete({ where: { id: configId } })
 
-    const detalheLanc = lancamentos.map((l) => `${l.tipo}#${l.id}=${l.valor ?? "?"}(${l.natureza})`).join("; ")
+    const removidas = analise.configDependencies.itens.filter((d) => d.acao === "EXCLUIR")
+    const desvinculadas = analise.configDependencies.itens.filter((d) => d.acao === "DESVINCULAR")
     await tx.logAuditoria.create({
       data: {
         acao: "EXCLUSAO_DEFINITIVA", entidade: "CONFIG_FINANCEIRA", entidadeId: configId, usuarioId: opts.usuarioId,
-        descricao: `Exclusão definitiva (dados de teste) por usuário ${opts.usuarioId}. Config "${analise.config.mestre}". Motivo: ${opts.motivo ?? "—"}. Preços: [${priceIds.join(", ")}]. Lançamentos: [${detalheLanc}].`.slice(0, 500),
+        descricao: `Exclusão definitiva da configuração financeira "${analise.alvo.nome}" por usuário ${opts.usuarioId}. Sem fato histórico. Motivo: ${opts.motivo ?? "—"}. correlationId=${correlationId}`.slice(0, 500),
+        detalhes: {
+          correlationId, configId, configCode: analise.alvo.codigo, configName: analise.alvo.nome, actorUserId: opts.usuarioId,
+          deletionMode: "HARD_DELETE",
+          configDependenciesRemoved: removidas.map((d) => ({ entidade: d.entidade, quantidade: d.quantidade, ids: d.ids })),
+          sharedLinksDetached: desvinculadas.map((d) => ({ entidade: d.entidade, quantidade: d.quantidade, ids: d.ids })),
+          historicalFactsFound: [], precosApagados: priceIds, motivo: opts.motivo ?? null,
+        } as Prisma.InputJsonValue,
       },
     })
-    return { configId, precosApagados: priceIds, receitasApagadas: receitaIds, custosApagados: custoIds, mestre: analise.config.mestre }
-  })
+    return { configId, nome: analise.alvo.nome, precosApagados: priceIds, configDependenciesRemoved: removidas, sharedLinksDetached: desvinculadas, deletionMode: "HARD_DELETE" as const, correlationId }
+  }, TX_OPTS)
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// CATÁLOGO DE SERVIÇOS (ServicoProduto) — mesmo padrão. O serviço arrasta a sua Configuração
-// Financeira (por itemCatalogoId), preços (ativos+históricos) e lançamentos EXCLUSIVAMENTE DE
-// TESTE. BLOQUEIA se houver uso operacional real: necessidade documental (item usado em processo),
-// lançamento com uso financeiro real, regra econômica ou automação de fase. O auto-vínculo do
-// próprio serviço à config NÃO conta como bloqueio.
-
-export interface BlockersServico {
-  configId: number | null
-  regrasEconomicas: number
-  automacoesFase: number
-  necessidades: number
-  lancamentosReais: number
-  total: number
-}
-
-/** Lançamentos ligados ao serviço via productServiceId (fora do vínculo pela config). */
-async function carregarLancamentosPorServico(db: Prisma.TransactionClient | typeof prisma, servicoId: number): Promise<LancamentoResumo[]> {
-  const [receitas, custos] = await Promise.all([
-    db.receita.findMany({ where: { productServiceId: servicoId }, select: SELECT_LANC }),
-    db.custo.findMany({ where: { productServiceId: servicoId }, select: SELECT_LANC }),
-  ])
-  return [...mapLanc(receitas as unknown as LancRow[], "RECEITA"), ...mapLanc(custos as unknown as LancRow[], "CUSTO")]
-}
-
-function dedupLanc(lancs: LancamentoResumo[]): LancamentoResumo[] {
-  const seen = new Set<string>(); const out: LancamentoResumo[] = []
-  for (const l of lancs) { const k = `${l.tipo}#${l.id}`; if (!seen.has(k)) { seen.add(k); out.push(l) } }
-  return out
-}
-
-export async function analisarExclusaoServico(servicoId: number) {
-  const svc = await prisma.servicoProduto.findUnique({ where: { id: servicoId }, select: { id: true, name: true, code: true, itemCatalogoId: true, ativo: true } })
-  if (!svc) return null
-  const itemId = svc.itemCatalogoId
-  const config = itemId != null ? await prisma.produtoFinanceiro.findUnique({ where: { itemCatalogoId: itemId }, select: { id: true } }) : null
-  const analiseConfig = config ? await analisarExclusaoConfig(config.id) : null
-
-  const [necessidades, lancServico] = await Promise.all([
-    itemId != null ? prisma.necessidadeDocumental.count({ where: { itemCatalogoId: itemId } }) : Promise.resolve(0),
-    carregarLancamentosPorServico(prisma, servicoId),
-  ])
-  // Lançamentos = os da config (configFinanceiraId/pricingRuleId) + os do serviço (productServiceId), deduplicados.
-  const lancamentos = dedupLanc([...(analiseConfig?.lancamentos ?? []), ...lancServico])
-  const lancamentosReais = lancamentos.filter((l) => !l.deletavel).length
-  // vínculosServico da config é IGNORADO (é o auto-vínculo deste serviço).
-  const regras = analiseConfig?.blockers.regrasEconomicas ?? 0
-  const autos = analiseConfig?.blockers.automacoesFase ?? 0
-  const blockers: BlockersServico = {
-    configId: config?.id ?? null, regrasEconomicas: regras, automacoesFase: autos, necessidades, lancamentosReais,
-    total: regras + autos + necessidades + lancamentosReais,
-  }
-  return {
-    servico: { id: svc.id, name: svc.name, ativo: svc.ativo, itemCatalogoId: itemId, configId: config?.id ?? null },
-    precos: analiseConfig?.precos ?? [], lancamentos, blockers, podeExcluir: blockers.total === 0,
-  }
-}
-
-function motivoBlockersServico(b: BlockersServico, lanc: LancamentoResumo[]): string[] {
-  const m: string[] = []
-  for (const l of lanc.filter((x) => !x.deletavel)) m.push(`${l.tipo} #${l.id} (${l.motivoBloqueio})`)
-  if (b.necessidades > 0) m.push(`${b.necessidades} necessidade(s) documental(is) em processos`)
-  if (b.regrasEconomicas > 0) m.push(`${b.regrasEconomicas} regra(s) de aplicabilidade econômica`)
-  if (b.automacoesFase > 0) m.push(`${b.automacoesFase} automação(ões) financeira(s) de fase`)
-  return m
-}
-
-/** Exclusão definitiva de um Serviço: cascata controlada (config+preços+lançamentos de teste+serviço)
- *  em transação, com rechecagem e rollback. Remove o ItemCatalogo somente se ficar órfão. */
-export async function excluirServicoDefinitivo(servicoId: number, opts: { usuarioId: number; motivo?: string | null }) {
-  const analise = await analisarExclusaoServico(servicoId)
-  if (!analise) throw Object.assign(new Error("Serviço não encontrado"), { code: "NAO_ENCONTRADA" })
-  if (!analise.podeExcluir) {
-    throw Object.assign(new Error(`Não é possível excluir: existe uso operacional real (${motivoBlockersServico(analise.blockers, analise.lancamentos).join(", ")}).`), { code: "USO_REAL", blockers: analise.blockers, lancamentos: analise.lancamentos })
-  }
-  const { itemCatalogoId, configId } = analise.servico
-
+/** Inativação da Configuração Financeira — preserva preços, lançamentos e histórico. */
+export async function deactivateConfig(configId: number, opts: { usuarioId: number; motivo?: string | null }) {
+  const analise = await analisarExclusaoConfig(configId)
+  if (!analise) throw Object.assign(new Error("Configuração financeira não encontrada"), { code: "NAO_ENCONTRADA" })
+  const correlationId = correlacao("INAT-CFG", configId, new Date())
   return prisma.$transaction(async (tx) => {
-    // RE-VERIFICAÇÃO transacional (guarda contra corrida).
-    const priceIds = configId != null
-      ? (await tx.tabelaValor.findMany({ where: { configuracaoFinanceiraItemId: configId }, select: { id: true } })).map((p) => p.id)
-      : []
-    const [lancCfg, lancSvc, necess, reg, au] = await Promise.all([
-      configId != null ? carregarLancamentos(tx, configId, priceIds) : Promise.resolve([] as LancamentoResumo[]),
-      carregarLancamentosPorServico(tx, servicoId),
-      itemCatalogoId != null ? tx.necessidadeDocumental.count({ where: { itemCatalogoId } }) : Promise.resolve(0),
-      configId != null ? tx.phaseEconomicRule.count({ where: { OR: [{ custoConfigId: configId }, { receitaConfigId: configId }] } }) : Promise.resolve(0),
-      configId != null ? tx.phaseAutomationRule.count({ where: { configItemId: configId } }) : Promise.resolve(0),
-    ])
-    const lancamentos = dedupLanc([...lancCfg, ...lancSvc])
-    if (lancamentos.some((l) => !l.deletavel) || necess + reg + au > 0) {
-      throw Object.assign(new Error("Uso operacional/financeiro real detectado durante a exclusão — operação abortada."), { code: "USO_REAL_RACE" })
-    }
-
-    // 1) lançamentos de teste (parcelas/eventos/requerentes caem por Cascade das próprias entidades)
-    const receitaIds = lancamentos.filter((l) => l.tipo === "RECEITA").map((l) => l.id)
-    const custoIds = lancamentos.filter((l) => l.tipo === "CUSTO").map((l) => l.id)
-    if (receitaIds.length) await tx.receita.deleteMany({ where: { id: { in: receitaIds } } })
-    if (custoIds.length) await tx.custo.deleteMany({ where: { id: { in: custoIds } } })
-    // 2) preços + 3) config
-    if (configId != null) {
-      await tx.tabelaValor.deleteMany({ where: { OR: [{ configuracaoFinanceiraItemId: configId }, ...(itemCatalogoId != null ? [{ itemCatalogoId }] : [])] } })
-      await tx.produtoFinanceiro.delete({ where: { id: configId } })
-    } else if (itemCatalogoId != null) {
-      await tx.tabelaValor.deleteMany({ where: { itemCatalogoId } })
-    }
-    // 4) o serviço
-    await tx.servicoProduto.delete({ where: { id: servicoId } })
-    // 5) ItemCatalogo mestre — só se ficar ÓRFÃO (sem outros consumidores). Evita registro órfão.
-    let itemRemovido: number | null = null
-    if (itemCatalogoId != null) {
-      const it = await tx.itemCatalogo.findUnique({ where: { id: itemCatalogoId }, select: { _count: { select: { tiposDocumento: true, produtos: true, servicos: true, necessidades: true, precos: true } } } })
-      const c = it?._count
-      if (c && c.tiposDocumento + c.produtos + c.servicos + c.necessidades + c.precos === 0) {
-        await tx.itemCatalogo.delete({ where: { id: itemCatalogoId } })
-        itemRemovido = itemCatalogoId
-      }
-    }
-
-    const detalheLanc = lancamentos.map((l) => `${l.tipo}#${l.id}=${l.valor ?? "?"}`).join("; ")
+    await tx.produtoFinanceiro.update({ where: { id: configId }, data: { ativo: false } })
     await tx.logAuditoria.create({
       data: {
-        acao: "EXCLUSAO_DEFINITIVA", entidade: "SERVICO", entidadeId: servicoId, usuarioId: opts.usuarioId,
-        descricao: `Exclusão definitiva (dados de teste) por usuário ${opts.usuarioId}. Serviço "${analise.servico.name}". Motivo: ${opts.motivo ?? "—"}. Config: ${configId ?? "—"}. Preços: [${priceIds.join(", ")}]. Lançamentos: [${detalheLanc}]. Item mestre removido: ${itemRemovido ?? "não (compartilhado)"}.`.slice(0, 500),
+        acao: "INATIVACAO", entidade: "CONFIG_FINANCEIRA", entidadeId: configId, usuarioId: opts.usuarioId,
+        descricao: `Configuração financeira "${analise.alvo.nome}" inativada (histórico preservado) por usuário ${opts.usuarioId}. Motivo: ${opts.motivo ?? "—"}. correlationId=${correlationId}`.slice(0, 500),
+        detalhes: {
+          correlationId, configId, configName: analise.alvo.nome, actorUserId: opts.usuarioId, deletionMode: "DEACTIVATION",
+          historicalFactsFound: analise.historicalFacts.itens.map((f) => ({ entidade: f.entidade, quantidade: f.quantidade })),
+          motivo: opts.motivo ?? null,
+        } as Prisma.InputJsonValue,
       },
     })
-    return { servicoId, configId, precosApagados: priceIds, receitasApagadas: receitaIds, custosApagados: custoIds, itemRemovido, nome: analise.servico.name }
-  })
+    return { configId, nome: analise.alvo.nome, inativado: true as const, historicalFactsFound: analise.historicalFacts.itens, correlationId }
+  }, TX_OPTS)
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// CATÁLOGO MESTRE (ItemCatalogo) — mesmo padrão (admin + confirmação + auditoria). Só permite
-// apagar um item de TESTE realmente órfão: bloqueia se houver QUALQUER dependente real
-// (tipos de documento, configs financeiras, serviços, necessidades usadas em processos). Apaga
-// apenas os PREÇOS soltos do item + o próprio item. Nunca cascateia dados reais silenciosamente.
+// ITEM DO CADASTRO MESTRE — idem. Serviços projetados no item entram na mesma análise.
+// ─────────────────────────────────────────────────────────────────────────────
 
-export interface BlockersItem {
-  tiposDocumento: number
-  configsFinanceiras: number
-  vinculosServico: number
-  necessidades: number
-  total: number
-}
-
-export async function analisarExclusaoItemCatalogo(itemId: number) {
-  const item = await prisma.itemCatalogo.findUnique({
+export async function analisarExclusaoItemCatalogo(itemId: number, db: DB = prisma): Promise<AnaliseExclusao | null> {
+  const item = await db.itemCatalogo.findUnique({
     where: { id: itemId },
-    select: { id: true, code: true, name: true, _count: { select: { tiposDocumento: true, produtos: true, servicos: true, precos: true, necessidades: true } } },
+    select: { id: true, code: true, name: true, ativo: true },
   })
   if (!item) return null
-  const c = item._count
-  const blockers: BlockersItem = {
-    tiposDocumento: c.tiposDocumento, configsFinanceiras: c.produtos, vinculosServico: c.servicos, necessidades: c.necessidades,
-    total: c.tiposDocumento + c.produtos + c.servicos + c.necessidades,
-  }
-  const precos: PrecoResumo[] = (await prisma.tabelaValor.findMany({
-    where: { itemCatalogoId: itemId }, orderBy: { id: "asc" },
-    select: { id: true, natureza: true, arquivado: true, legadoPendente: true, valor: true },
-  })).map((p) => ({ id: p.id, natureza: String(p.natureza), arquivado: p.arquivado, legadoPendente: p.legadoPendente, valor: p.valor != null ? String(p.valor) : null }))
-  return { item: { id: item.id, code: item.code, name: item.name }, precos, blockers, podeExcluir: blockers.total === 0 }
-}
 
-function motivoBlockersItem(b: BlockersItem): string[] {
-  const m: string[] = []
-  if (b.necessidades > 0) m.push(`${b.necessidades} necessidade(s) em processos`)
-  if (b.tiposDocumento > 0) m.push(`${b.tiposDocumento} tipo(s) de documento`)
-  if (b.configsFinanceiras > 0) m.push(`${b.configsFinanceiras} configuração(ões) financeira(s)`)
-  if (b.vinculosServico > 0) m.push(`${b.vinculosServico} vínculo(s) de serviço`)
-  return m
+  const [servicos, tiposDoc, tiposSvc, config] = await Promise.all([
+    db.servicoProduto.findMany({ where: { itemCatalogoId: itemId }, select: { id: true } }),
+    db.tipoDocumentoCadastro.findMany({ where: { itemCatalogoId: itemId }, select: { id: true } }),
+    db.tipoServico.findMany({ where: { itemCatalogoId: itemId }, select: { id: true } }),
+    db.produtoFinanceiro.findUnique({ where: { itemCatalogoId: itemId }, select: { id: true } }),
+  ])
+  const priceIds = (await db.tabelaValor.findMany({
+    where: { OR: [{ itemCatalogoId: itemId }, ...(config ? [{ configuracaoFinanceiraItemId: config.id }] : [])] },
+    select: { id: true },
+  })).map((p) => p.id)
+
+  // Um serviço projetado neste item traz consigo os PRÓPRIOS fatos históricos.
+  const fatosDosServicos = await Promise.all(servicos.map((s) => fatosDoServico(db, s.id)))
+  const [fatosItem, fatosConfig, cfgsConfig] = await Promise.all([
+    fatosDoItem(db, itemId),
+    config ? fatosDaConfig(db, config.id, priceIds) : Promise.resolve([] as FatoHistoricoDetectado[]),
+    config ? configsDaConfig(db, config.id, priceIds) : Promise.resolve([] as DependenciaConfiguracional[]),
+  ])
+  const historicalFacts = consolidarFatos(fatosItem, fatosConfig, ...fatosDosServicos)
+
+  const configDependencies = consolidarConfigs(cfgsConfig, [
+    ...(config == null && priceIds.length ? [dependencia("RegraDePreco", priceIds.length, "EXCLUIR", priceIds)] : []),
+    ...(config ? [dependencia("ConfiguracaoFinanceira", 1, "EXCLUIR", [config.id])] : []),
+    ...(servicos.length ? [dependencia("ProjecaoServicoServico", servicos.length, "EXCLUIR", servicos.map((s) => s.id))] : []),
+    ...(tiposDoc.length ? [dependencia("VinculoTipoDocumento", tiposDoc.length, "DESVINCULAR", tiposDoc.map((t) => t.id))] : []),
+    ...(tiposSvc.length ? [dependencia("VinculoTipoServico", tiposSvc.length, "DESVINCULAR", tiposSvc.map((t) => t.id))] : []),
+  ])
+
+  return {
+    alvo: { tipo: "ITEM_CATALOGO", id: item.id, nome: item.name, codigo: item.code, ativo: item.ativo },
+    configDependencies,
+    historicalFacts,
+    deletionAllowed: permiteExclusaoDefinitiva(historicalFacts),
+    deactivationRequired: exigeInativacao(historicalFacts),
+    fraseConfirmacao: FRASE_CONFIRMACAO,
+  }
 }
 
 export async function excluirItemCatalogoDefinitivo(itemId: number, opts: { usuarioId: number; motivo?: string | null }) {
-  const analise = await analisarExclusaoItemCatalogo(itemId)
-  if (!analise) throw Object.assign(new Error("Item de catálogo não encontrado"), { code: "NAO_ENCONTRADA" })
-  if (!analise.podeExcluir) {
-    throw Object.assign(new Error(`Não é possível excluir: o item tem dependentes reais (${motivoBlockersItem(analise.blockers).join(", ")}).`), { code: "USO_REAL", blockers: analise.blockers })
-  }
-  return prisma.$transaction(async (tx) => {
-    // RE-VERIFICAÇÃO transacional (guarda contra corrida).
-    const it = await tx.itemCatalogo.findUnique({ where: { id: itemId }, select: { _count: { select: { tiposDocumento: true, produtos: true, servicos: true, necessidades: true } } } })
-    const cc = it?._count
-    if (!cc) throw Object.assign(new Error("Item de catálogo não encontrado"), { code: "NAO_ENCONTRADA" })
-    if (cc.tiposDocumento + cc.produtos + cc.servicos + cc.necessidades > 0) throw Object.assign(new Error("Dependente real detectado durante a exclusão — operação abortada."), { code: "USO_REAL_RACE" })
+  const previa = await analisarExclusaoItemCatalogo(itemId)
+  if (!previa) throw Object.assign(new Error("Item de catálogo não encontrado"), { code: "NAO_ENCONTRADA" })
+  if (!previa.deletionAllowed) throw erroUsoReal(previa, false)
+  const correlationId = correlacao("EXCL-ITM", itemId, new Date())
 
-    const precos = await tx.tabelaValor.findMany({ where: { itemCatalogoId: itemId }, select: { id: true } })
-    const priceIds = precos.map((p) => p.id)
-    await tx.tabelaValor.deleteMany({ where: { itemCatalogoId: itemId } })
+  // Os serviços projetados caem pelo MOTOR CANÔNICO de serviço (nada de delete paralelo).
+  const servicos = await prisma.servicoProduto.findMany({ where: { itemCatalogoId: itemId }, select: { id: true } })
+  for (const s of servicos) await deleteService(s.id, { usuarioId: opts.usuarioId, motivo: `cascata do item mestre #${itemId}` })
+
+  const aindaExiste = await prisma.itemCatalogo.findUnique({ where: { id: itemId }, select: { id: true } })
+  if (!aindaExiste) {
+    return { itemId, nome: previa.alvo.nome, precosApagados: [] as number[], deletionMode: "HARD_DELETE" as const, correlationId, viaCascataDeServico: true }
+  }
+
+  return prisma.$transaction(async (tx) => {
+    const travado = await tx.$queryRaw<{ id: number }[]>`SELECT id FROM "ItemCatalogo" WHERE id = ${itemId} FOR UPDATE`
+    if (travado.length === 0) throw Object.assign(new Error("Item de catálogo não encontrado"), { code: "NAO_ENCONTRADA" })
+    const analise = await analisarExclusaoItemCatalogo(itemId, tx)
+    if (!analise) throw Object.assign(new Error("Item de catálogo não encontrado"), { code: "NAO_ENCONTRADA" })
+    if (!analise.deletionAllowed) throw erroUsoReal(analise, true)
+
+    const config = await tx.produtoFinanceiro.findUnique({ where: { itemCatalogoId: itemId }, select: { id: true } })
+    if (config) {
+      await tx.phaseEconomicRule.deleteMany({ where: { OR: [{ custoConfigId: config.id }, { receitaConfigId: config.id }] } })
+      await tx.phaseAutomationRule.deleteMany({ where: { configItemId: config.id } })
+      await tx.produtoFinanceiro.update({ where: { id: config.id }, data: { servicos: { set: [] } } })
+    }
+    // Mestres COMPARTILHADOS: só perdem o vínculo.
+    await tx.tipoDocumentoCadastro.updateMany({ where: { itemCatalogoId: itemId }, data: { itemCatalogoId: null } })
+    await tx.tipoServico.updateMany({ where: { itemCatalogoId: itemId }, data: { itemCatalogoId: null } })
+
+    const priceIds = (await tx.tabelaValor.findMany({
+      where: { OR: [{ itemCatalogoId: itemId }, ...(config ? [{ configuracaoFinanceiraItemId: config.id }] : [])] }, select: { id: true },
+    })).map((p) => p.id)
+    if (priceIds.length) await tx.tabelaValor.deleteMany({ where: { id: { in: priceIds } } })
+    if (config) await tx.produtoFinanceiro.delete({ where: { id: config.id } })
     await tx.itemCatalogo.delete({ where: { id: itemId } })
+
+    const removidas = analise.configDependencies.itens.filter((d) => d.acao === "EXCLUIR")
+    const desvinculadas = analise.configDependencies.itens.filter((d) => d.acao === "DESVINCULAR")
     await tx.logAuditoria.create({
       data: {
         acao: "EXCLUSAO_DEFINITIVA", entidade: "ITEM_CATALOGO", entidadeId: itemId, usuarioId: opts.usuarioId,
-        descricao: `Exclusão definitiva (dados de teste) por admin ${opts.usuarioId}. Item "${analise.item.name}" (${analise.item.code}). Motivo: ${opts.motivo ?? "—"}. Preços apagados: [${priceIds.join(", ")}].`.slice(0, 500),
+        descricao: `Exclusão definitiva do item mestre "${analise.alvo.nome}" (${analise.alvo.codigo}) por usuário ${opts.usuarioId}. Sem fato histórico. Motivo: ${opts.motivo ?? "—"}. correlationId=${correlationId}`.slice(0, 500),
+        detalhes: {
+          correlationId, itemId, itemCode: analise.alvo.codigo, itemName: analise.alvo.nome, actorUserId: opts.usuarioId,
+          deletionMode: "HARD_DELETE",
+          configDependenciesRemoved: removidas.map((d) => ({ entidade: d.entidade, quantidade: d.quantidade, ids: d.ids })),
+          sharedLinksDetached: desvinculadas.map((d) => ({ entidade: d.entidade, quantidade: d.quantidade, ids: d.ids })),
+          historicalFactsFound: [], precosApagados: priceIds, motivo: opts.motivo ?? null,
+        } as Prisma.InputJsonValue,
       },
     })
-    return { itemId, precosApagados: priceIds, nome: analise.item.name }
-  })
+    return { itemId, nome: analise.alvo.nome, precosApagados: priceIds, deletionMode: "HARD_DELETE" as const, correlationId, viaCascataDeServico: false }
+  }, TX_OPTS)
+}
+
+/** Inativação do Item do Cadastro Mestre — o mestre sai de circulação; nada é apagado. */
+export async function deactivateItemCatalogo(itemId: number, opts: { usuarioId: number; motivo?: string | null }) {
+  const analise = await analisarExclusaoItemCatalogo(itemId)
+  if (!analise) throw Object.assign(new Error("Item de catálogo não encontrado"), { code: "NAO_ENCONTRADA" })
+  const correlationId = correlacao("INAT-ITM", itemId, new Date())
+  return prisma.$transaction(async (tx) => {
+    await tx.itemCatalogo.update({ where: { id: itemId }, data: { ativo: false } })
+    await tx.produtoFinanceiro.updateMany({ where: { itemCatalogoId: itemId }, data: { ativo: false } })
+    await tx.servicoProduto.updateMany({ where: { itemCatalogoId: itemId }, data: { ativo: false } })
+    await tx.logAuditoria.create({
+      data: {
+        acao: "INATIVACAO", entidade: "ITEM_CATALOGO", entidadeId: itemId, usuarioId: opts.usuarioId,
+        descricao: `Item mestre "${analise.alvo.nome}" (${analise.alvo.codigo}) inativado (histórico preservado) por usuário ${opts.usuarioId}. Motivo: ${opts.motivo ?? "—"}. correlationId=${correlationId}`.slice(0, 500),
+        detalhes: {
+          correlationId, itemId, itemCode: analise.alvo.codigo, itemName: analise.alvo.nome, actorUserId: opts.usuarioId,
+          deletionMode: "DEACTIVATION",
+          historicalFactsFound: analise.historicalFacts.itens.map((f) => ({ entidade: f.entidade, quantidade: f.quantidade })),
+          motivo: opts.motivo ?? null,
+        } as Prisma.InputJsonValue,
+      },
+    })
+    return { itemId, nome: analise.alvo.nome, inativado: true as const, historicalFactsFound: analise.historicalFacts.itens, correlationId }
+  }, TX_OPTS)
 }

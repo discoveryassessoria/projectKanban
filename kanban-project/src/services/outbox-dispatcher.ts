@@ -20,6 +20,8 @@ import { reconciliarOperacoesAntecipadas } from "@/src/services/operacao-antecip
 // MRG — reconciliação contínua do motor registral (evento registral.reconciliar.processo).
 import { reconciliarDocumentalDoProcesso } from "@/src/services/registral/reconciliacao-documental"
 import { recalcularLinhagem, registrarRecalculo } from "@/src/services/registral/consultas"
+// Projeção financeira documental — registro localizado vira custo previsto.
+import { projetarCustosDocumentaisDoPasso } from "@/src/services/financeiro/projecao-documental"
 
 const MAX_TENTATIVAS = 5
 // Reserva "presa" há mais que isto (worker morreu no meio) volta a ser reivindicável.
@@ -46,6 +48,12 @@ export const TIPOS_DRENADOS = [
   // MRG — reconciliação contínua: nova certidão / necessidade transicionada /
   // árvore alterada disparam revalidação fora do caminho crítico do upload.
   "registral.reconciliar.processo",
+  // PROJEÇÃO FINANCEIRA DOCUMENTAL — a conclusão de um passo é o gatilho de
+  // domínio já emitido transacionalmente por task-step-sync. O evento existia e
+  // NINGUÉM o drenava: os `step.concluido` ficavam PENDENTE para sempre e o custo
+  // do documento nunca era projetado. O filtro de "qual passo importa" é do
+  // consumidor (identidade estrutural do passo), não da fila.
+  "step.concluido",
 ] as const
 
 export interface OutboxProcessResumo {
@@ -176,6 +184,18 @@ export async function processarOutbox(opts?: {
               `${linhagem.elegibilidade.resultado} · ${linhagem.inconsistencias.length} inconsistência(s) · ${docs.necessidadesAtendidas} necessidade(s) atendida(s) · motivo=${p.motivo ?? "-"}`,
             )
           }
+        }
+      } else if (evt.tipo === "step.concluido") {
+        // EFEITO: projetar os custos documentais previstos do documento cujo
+        // registro acabou de ser localizado. O serviço decide sozinho se ESTE
+        // passo autoriza projeção (identidade estrutural do passo + régua oficial
+        // de "localizado"); passo que não é registral sai como no-op silencioso —
+        // e o evento é arquivado como ENVIADO, sem represar a fila.
+        // Falha transitória PROPAGA → evento volta a PENDENTE e reprocessa
+        // (idempotente pela chave única da obrigação).
+        const p = (evt.payload ?? {}) as { stepId?: number }
+        if (p.stepId) {
+          await projetarCustosDocumentaisDoPasso(p.stepId, { correlationId: evt.correlationId })
         }
       } else if (!TIPOS_SEM_EFEITO.has(evt.tipo)) {
         // tipo conhecido sem efeito conectado ainda: no-op (será marcado ENVIADO/arquivado).

@@ -219,3 +219,14 @@ reconciliado no ledger com backup e sem tocar schema ou dados.
 
 Nada de schema ou de dado foi alterado nessa reconciliação: `started_at`,
 `finished_at` e `applied_steps_count` seguem os originais de 02/08/2026.
+
+Em 12/08/2026, `Tarefa.workflowInstanceId` deixou de ser `@unique`
+(`20260812100000_tarefa_por_unidade_de_trabalho`). O índice existia para impedir
+que N passos virassem N tarefas, mas mirava no alvo errado: a instância do
+workflow é da FASE e abriga uma tarefa por unidade de trabalho — com o índice,
+uma Emissão Documental com dois documentos era estruturalmente impossível, pois
+a segunda tarefa não conseguia nascer. Quem garante "etapa não é tarefa" é
+`Tarefa.chaveIdempotencia`, derivada da obrigação. Checksum do baseline passou
+de `34976e69df86f7d3970db180943eb374da1b28658917c6e4c50636bd1b3db2ad` para
+`4851fb0b39535fcbd3cee99740c48a11895e5458d80d3f1b95bfa9d2070db0b6`,
+reconciliado no ledger com backup da linha e sem tocar em schema nem em dados.

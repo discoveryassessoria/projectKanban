@@ -8,6 +8,11 @@ import { registrarPagamentoComposto } from '@/lib/financeiro/pagamentos/registra
 import { registrarOcorrencia } from '@/lib/financeiro/ocorrencias/ocorrencia-service'
 import { redistribuir } from '@/lib/financeiro/distribuicao/redistribuir-service'
 
+import { exigirBancoDeTeste } from "./_banco-de-teste"
+
+// TRAVA DE AMBIENTE: este arquivo ESCREVE. Sem banco de teste local, não roda.
+exigirBancoDeTeste()
+
 let passed = 0, failed = 0
 const bugs: string[] = []
 function ok(cond: boolean, nome: string) { if (cond) { passed++; console.log(`  ✅ ${nome}`) } else { failed++; bugs.push(nome); console.log(`  ❌ BUG: ${nome}`) } }

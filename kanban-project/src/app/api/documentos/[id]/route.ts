@@ -9,6 +9,7 @@ import { Prisma, TipoDocumento, StatusDocumento } from "@prisma/client"
 import { verificarPermissao } from '@/src/lib/verificar-permissao'
 import { reconciliarEconomicoDoProcesso } from '@/src/lib/motor/matriz-economica'
 import { notificarDocumentoAlterado } from '@/src/services/registral/gancho-documental'
+import { removerDocumento } from '@/src/services/documento-operacional'
 
 // Helper para obter label do tipo de documento
 function getTipoDocumentoLabel(tipo: string): string {
@@ -33,74 +34,18 @@ function getTipoDocumentoLabel(tipo: string): string {
 }
 
 // ✅ Helper para criar tarefas de documento
-async function criarTarefasDocumento(
-  statusNovo: string,
-  tipo: string,
-  nomePessoa: string,
-  processoId: number
-) {
-  // Só para certidões inteiro teor
-  const certidoesInteiroTeor = [
-    'CERTIDAO_NASCIMENTO_INTEIRO_TEOR',
-    'CERTIDAO_CASAMENTO_INTEIRO_TEOR',
-    'CERTIDAO_OBITO_INTEIRO_TEOR'
-  ]
-  if (!certidoesInteiroTeor.includes(tipo)) return
-
-  // Só dispara em EM_BUSCA ou SOLICITAR
-  if (statusNovo !== 'EM_BUSCA' && statusNovo !== 'SOLICITAR') return
-
-  const tipoLabel = getTipoDocumentoLabel(tipo)
-  const tituloTarefaPai = `${tipoLabel} - ${nomePessoa}`
-
-  // Só cria se não existir
-  const tarefaExistente = await prisma.tarefa.findFirst({
-    where: { processoId, titulo: tituloTarefaPai }
-  })
-  if (tarefaExistente) return
-
-  // Buscar tarefa pai "Emissão da Pasta Documental"
-  const tarefaEmissao = await prisma.tarefa.findFirst({
-    where: {
-      processoId,
-      tarefaPaiId: null,
-      titulo: { contains: 'Emissão', mode: 'insensitive' }
-    }
-  })
-
-  // Criar tarefa pai
-  const tarefaPai = await prisma.tarefa.create({
-    data: {
-      titulo: tituloTarefaPai,
-      descricao: `${tipoLabel} de ${nomePessoa}`,
-      processoId,
-      tarefaPaiId: tarefaEmissao?.id || null,
-      prioridade: "MEDIA",
-      concluida: false
-    }
-  })
-
-  // Criar 5 subtarefas
-  const subtarefas = [
-    'Buscar certidão em inteiro teor',
-    'Preencher e assinar requerimento da solicitação da certidão em inteiro teor',
-    'Enviar ao cartório requerimento da solicitação da certidão em inteiro teor',
-    'Enviar ao CRC requerimento da solicitação da certidão em inteiro teor',
-    'Receber certidão em inteiro teor',
-  ]
-
-  for (const titulo of subtarefas) {
-    await prisma.tarefa.create({
-      data: {
-        titulo,
-        processoId,
-        tarefaPaiId: tarefaPai.id,
-        prioridade: "MEDIA",
-        concluida: false
-      }
-    })
-  }
-}
+/**
+ * A ÁRVORE PAI/FILHO DE TAREFAS FOI REMOVIDA DAQUI.
+ *
+ * Este bloco criava uma tarefa "pai" para o documento e CINCO subtarefas com os
+ * nomes das etapas do workflow — "Buscar certidão", "Preencher requerimento",
+ * "Enviar ao cartório"... Era etapa fingindo ser tarefa: a mesma certidão virava
+ * seis linhas na fila, com seis prazos e nenhum workflow por trás.
+ *
+ * Hoje a tarefa nasce da OBRIGAÇÃO documental, uma por documento, e as etapas
+ * vivem dentro dela como passos do workflow publicado. Criar documento não cria
+ * tarefa: quem materializa é o motor, quando a obrigação vira executável.
+ */
 
 // GET - Buscar documento por ID
 export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
@@ -339,7 +284,6 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
 
       if (processoId) {
         const nomePessoa = `${documentoAtual.pessoa.nome} ${documentoAtual.pessoa.sobrenome || ""}`.trim()
-        await criarTarefasDocumento(body.status, documentoAtual.tipo ?? "", nomePessoa, processoId)
       }
     }
 
@@ -377,79 +321,29 @@ export async function DELETE(request: NextRequest, { params }: { params: Promise
       return NextResponse.json({ error: "ID inválido" }, { status: 400 })
     }
 
-    // Buscar documento COM pessoa para encontrar as tarefas relacionadas
+    // O processo vem pela ÁRVORE da pessoa — é o vínculo que existe por ID.
     const documento = await prisma.documento.findUnique({
       where: { id },
-      include: {
-        pessoa: {
-          select: {
-            nome: true,
-            sobrenome: true,
-            arvore: {
-              select: {
-                processos: {
-                  select: { id: true },
-                  take: 1
-                }
-              }
-            }
-          }
-        }
-      }
+      select: { id: true, pessoa: { select: { arvore: { select: { processos: { select: { id: true }, take: 1 } } } } } },
     })
 
     if (!documento) {
       return NextResponse.json({ error: "Documento não encontrado" }, { status: 404 })
     }
 
-    // Tentar excluir as tarefas relacionadas (se existirem)
     const processoId = documento.pessoa.arvore?.processos[0]?.id
-    if (processoId) {
-      const tipoLabel = getTipoDocumentoLabel(documento.tipo ?? "")
-      const nomePessoa = `${documento.pessoa.nome} ${documento.pessoa.sobrenome || ""}`.trim()
 
-      // Buscar tarefa de busca
-      const tarefaBusca = await prisma.tarefa.findFirst({
-        where: {
-          processoId,
-          titulo: `${tipoLabel} - ${nomePessoa}`
-        }
-      })
-
-      if (tarefaBusca) {
-        // Primeiro excluir subtarefas (solicitar)
-        await prisma.tarefa.deleteMany({
-          where: {
-            processoId,
-            tarefaPaiId: tarefaBusca.id
-          }
-        })
-
-        // Depois excluir a tarefa de busca
-        await prisma.tarefa.delete({
-          where: { id: tarefaBusca.id }
-        })
-      }
-
-      // Fallback: excluir tarefas antigas com título "Solicitar..." (caso existam)
-      await prisma.tarefa.deleteMany({
-        where: {
-          processoId,
-          titulo: `Solicitar ${tipoLabel} - ${nomePessoa}`
-        }
-      })
-    }
-
-    // Excluir o documento
-    await prisma.documento.delete({
-      where: { id }
-    })
+    // A remoção — documento, tarefas, passos e vínculo financeiro — vive no
+    // serviço canônico, POR ID. A versão anterior desta rota procurava a tarefa
+    // por igualdade de TÍTULO (`"${tipoLabel} - ${nomePessoa}"`): rótulo mudado
+    // ou nome editado e a tarefa ficava órfã na fila ativa.
+    const removido = await prisma.$transaction((tx) => removerDocumento(id, tx))
 
     // GRANULARIDADE POR DOCUMENTO: documento removido → o motor remove os lançamentos
     // que dependiam dele (reconcile). Best-effort, não bloqueia a resposta.
     if (processoId) reconciliarEconomicoDoProcesso(processoId).catch((e) => console.error('[doc removido → reconcile econômico]', e))
 
-    return NextResponse.json({ message: "Documento e tarefas excluídos com sucesso", id })
+    return NextResponse.json({ message: "Documento e tarefas excluídos com sucesso", id, removidos: removido })
   } catch (error) {
     console.error("Erro ao excluir documento:", error)
 
@@ -530,7 +424,6 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
 
     if (processoId) {
       const nomePessoa = `${documentoAtual.pessoa.nome} ${documentoAtual.pessoa.sobrenome || ""}`.trim()
-      await criarTarefasDocumento(body.status, documentoAtual.tipo ?? "", nomePessoa, processoId)
     }
 
     // GRANULARIDADE POR DOCUMENTO: mudança de status (ex.: cancelado/invalidado) muda a

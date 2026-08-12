@@ -200,13 +200,17 @@ secao('Restrições de uso')
   ok('motivo é explicado', /moeda/i.test(condicaoAplicavel({ moedasPermitidas: ['BRL'] }, ctx).motivo ?? ''))
 }
 
-// ── 10 · vigência e versionamento ───────────────────────────────────────────
-secao('Vigência e versionamento')
+// ── 10 · validade e versionamento ───────────────────────────────────────────
+// VALIDADE É ESTADO, NÃO DATA (09/08/2026): a condição vale enquanto ATIVA. As
+// três asserções anteriores provavam o oposto — que uma janela herdada podia
+// bloquear uma condição ativa — e por isso foram substituídas pelas de baixo.
+secao('Validade e versionamento')
 {
   const ctx = { natureza: 'RECEITA' as const, moeda: 'EUR', total: 1000, emDatas: BASE }
-  ok('dentro da vigência', condicaoAplicavel({ vigenciaInicio: '2026-01-01', vigenciaFim: '2026-12-31' }, ctx).aplicavel)
-  ok('antes do início bloqueia', !condicaoAplicavel({ vigenciaInicio: '2027-01-01' }, ctx).aplicavel)
-  ok('depois do fim bloqueia', !condicaoAplicavel({ vigenciaFim: '2026-01-01' }, ctx).aplicavel)
+  ok('condição ativa é aplicável', condicaoAplicavel({ ativo: true }, ctx).aplicavel)
+  ok('vigência futura herdada NÃO bloqueia', condicaoAplicavel({ vigenciaInicio: '2027-01-01' }, ctx).aplicavel)
+  ok('vigência vencida herdada NÃO bloqueia', condicaoAplicavel({ vigenciaFim: '2026-01-01' }, ctx).aplicavel)
+  ok('condição inativa é o que bloqueia', !condicaoAplicavel({ ativo: false }, ctx).aplicavel)
 
   const v1: CondicaoPagamentoView = { id: 7, codigo: 'COND-PADRAO', versao: 1, parcelasPadrao: 3, ativo: true }
   const v2 = proximaVersao(v1, { parcelasPadrao: 6 })

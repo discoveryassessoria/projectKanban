@@ -8,6 +8,11 @@ import { criarObrigacaoEconomicaComLedger } from '@/lib/financeiro/ledger/ledger
 import { registrarPagamentoGeral } from '@/lib/financeiro/pagamentos/registrar-pagamento-geral'
 import { arquivarReceita } from '@/lib/financeiro/acoes/arquivar'
 
+import { exigirBancoDeTeste } from "./_banco-de-teste"
+
+// TRAVA DE AMBIENTE: este arquivo ESCREVE. Sem banco de teste local, não roda.
+exigirBancoDeTeste()
+
 let passed = 0, failed = 0
 const falhas: string[] = []
 function ok(cond: boolean, nome: string) { if (cond) { passed++; console.log(`  ✅ ${nome}`) } else { failed++; falhas.push(nome); console.log(`  ❌ ${nome}`) } }

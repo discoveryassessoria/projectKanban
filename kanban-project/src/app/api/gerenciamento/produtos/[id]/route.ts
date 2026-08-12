@@ -3,12 +3,12 @@
 // DELETE - Excluir produto financeiro
 //
 // ✅ Next 15: params é Promise → await params.
-// DELETE: hard-delete quando a config não tem NENHUMA referência (preço, regra
-// econômica, automação de fase, vínculo de serviço); caso contrário arquiva (R19).
+// DELETE: INATIVA (motor canônico). Hard delete só em /produtos/[id]/exclusao-definitiva.
 
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import { verificarPermissao } from '@/src/lib/verificar-permissao'
+import { verificarPermissao, exigirPermissao } from '@/src/lib/verificar-permissao'
+import { deactivateConfig } from '@/src/services/exclusao-definitiva'
 
 const MOEDAS = ['BRL', 'EUR', 'USD']
 const s = (v: unknown) => (typeof v === 'string' && v.trim() ? v.trim() : null)
@@ -111,73 +111,30 @@ export async function PUT(
   }
 }
 
-// DELETE - Excluir
+// DELETE - INATIVAÇÃO da Configuração Financeira. A exclusão física vive SÓ no motor canônico,
+// atrás de sistema.exclusaoDefinitiva (/produtos/[id]/exclusao-definitiva). O critério antigo
+// contava preço/regra econômica/automação/vínculo — CONFIGURAÇÃO — como impedimento de exclusão.
 export async function DELETE(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const erro = await verificarPermissao(request, 'usuarios.gerenciar')
+    const { usuario, erro } = await exigirPermissao(request, 'usuarios.gerenciar')
     if (erro) return erro
+    const { id: idStr } = await params
+    const id = Number(idStr)
+    const existe = await prisma.produtoFinanceiro.findUnique({ where: { id }, select: { id: true } })
+    if (!existe) return NextResponse.json({ error: 'Produto não encontrado' }, { status: 404 })
 
-    const { id: idParam } = await params
-    const id = Number(idParam)
-    if (!id || Number.isNaN(id)) {
-      return NextResponse.json({ error: 'ID inválido' }, { status: 400 })
-    }
-
-    // Conta as referências reais à config antes de decidir apagar.
-    const atual = await prisma.produtoFinanceiro.findUnique({
-      where: { id },
-      select: {
-        id: true,
-        _count: {
-          select: {
-            econRulesCusto: true,    // PhaseEconomicRule (custo) — @relation("EconCustoConfig")
-            econRulesReceita: true,  // PhaseEconomicRule (receita) — @relation("EconReceitaConfig")
-            servicos: true,          // ServicoProduto (m2n) — @relation("ServicoProdutoItens")
-          },
-        },
-      },
+    const body = await request.json().catch(() => ({} as Record<string, unknown>))
+    const r = await deactivateConfig(id, { usuarioId: usuario.userId, motivo: typeof body?.motivo === 'string' ? body.motivo : null })
+    return NextResponse.json({
+      ok: true,
+      ...r,
+      motivo: 'A configuração foi inativada; preços e histórico foram preservados. A exclusão definitiva é restrita a administradores.',
     })
-    if (!atual) {
-      return NextResponse.json({ error: 'Produto não encontrado' }, { status: 404 })
-    }
-
-    // PREÇOS que realmente BLOQUEIAM a exclusão = os ATIVOS (mesmo filtro da Tabela de Preços:
-    // arquivado=false, legadoPendente=false). NÃO contar preços arquivados/legado (históricos):
-    // eles nem aparecem na Tabela, então o usuário não teria como removê-los — e não bloqueiam.
-    // Antes usava _count.precosConfig (relação SEM filtro), inflando a contagem (ex.: 4 vs 2).
-    const precosAtivos = await prisma.tabelaValor.count({ where: { configuracaoFinanceiraItemId: id, arquivado: false, legadoPendente: false } })
-    // Preços HISTÓRICOS (arquivados/legado): não bloqueiam nem aparecem na Tabela, mas impedem a
-    // exclusão FÍSICA (a relação PrecoConfig é SetNull → apagar orfanaria o histórico financeiro).
-    const precosHistoricos = await prisma.tabelaValor.count({ where: { configuracaoFinanceiraItemId: id, OR: [{ arquivado: true }, { legadoPendente: true }] } })
-    // PhaseAutomationRule.configItemId é escalar solto (sem relation) → contar à parte.
-    const autoFin = await prisma.phaseAutomationRule.count({ where: { configItemId: id, arquivado: false } })
-    const c = atual._count
-    const vinculos: string[] = []
-    if (precosAtivos > 0) vinculos.push(`${precosAtivos} preço(s) na Tabela de Preços`)
-    if (c.econRulesCusto + c.econRulesReceita > 0) vinculos.push(`${c.econRulesCusto + c.econRulesReceita} regra(s) de aplicabilidade econômica`)
-    if (autoFin > 0) vinculos.push(`${autoFin} automação(ões) financeira(s) de fase`)
-    if (c.servicos > 0) vinculos.push(`${c.servicos} vínculo(s) de serviço`)
-
-    // Sem NENHUM vínculo ativo E sem histórico → exclusão física de verdade.
-    if (vinculos.length === 0 && precosHistoricos === 0) {
-      await prisma.produtoFinanceiro.delete({ where: { id } })
-      return NextResponse.json({ ok: true, excluido: true })
-    }
-
-    // R19 — com uso/histórico: arquiva (não apaga) pra preservar histórico e evitar órfãos por
-    // SetNull. A mensagem informa EXATAMENTE os vínculos ATIVOS que impedem a exclusão (os que o
-    // usuário pode remover na UI). Preços históricos/arquivados são preservados, mas NÃO são
-    // apresentados como algo a remover (nem aparecem na Tabela de Preços).
-    await prisma.produtoFinanceiro.update({ where: { id }, data: { ativo: false } })
-    const motivo = vinculos.length > 0
-      ? `Esta configuração não pode ser excluída porque tem ${vinculos.join(', ')} vinculado(s). Remova esse(s) vínculo(s) para excluí-la definitivamente. Por ora foi inativada para preservar o histórico.`
-      : `Esta configuração não tem vínculos ativos, mas possui ${precosHistoricos} preço(s) histórico(s)/arquivado(s) que não podem ser descartados. Foi inativada para preservar o histórico financeiro.`
-    return NextResponse.json({ ok: true, inativado: true, vinculosAtivos: precosAtivos, precosHistoricos, motivo })
   } catch (error) {
-    console.error('Erro ao excluir produto:', error)
+    console.error('Erro ao inativar produto:', error)
     return NextResponse.json({ error: 'Erro interno' }, { status: 500 })
   }
 }

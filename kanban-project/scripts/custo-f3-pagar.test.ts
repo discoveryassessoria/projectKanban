@@ -6,6 +6,11 @@ import { prisma } from '@/lib/prisma'
 import { espelharCustoComoObrigacao } from '@/lib/financeiro/dual-write'
 import { listarObrigacoes } from '@/lib/financeiro/leitura/consultas'
 
+import { exigirBancoDeTeste } from "./_banco-de-teste"
+
+// TRAVA DE AMBIENTE: este arquivo ESCREVE. Sem banco de teste local, não roda.
+exigirBancoDeTeste()
+
 let ok = 0, fail = 0
 const chk = (c: boolean, m: string) => { if (c) { ok++; console.log('  ✅', m) } else { fail++; console.log('  ❌', m) } }
 const mk = (n: string) => ({ codigo: `CUS-${n}-${Date.now().toString().slice(-7)}`, processoId: 16, tipo: 'SERVICO' as const, categoria: 'OUTROS' as const, descricao: `Custo ${n}`, moeda: 'BRL' as const, valor: 200, fxEstimado: 1, fxRule: 'VARIAVEL' as const, nParcelas: 1, vencimento: new Date('2026-09-01'), status: 'ATIVA' as const, custoOperacional: false, origem: 'motor' })
