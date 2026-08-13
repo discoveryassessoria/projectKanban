@@ -51,16 +51,18 @@ export interface LinhaOperacional extends LinhaDeFila {
 }
 
 /** O prazo em linguagem operacional — a data sozinha não diz o que fazer. */
+/**
+ * A URGÊNCIA DO CARTÃO — frase do SERVIDOR, cor da tela.
+ *
+ * A frase era montada aqui, e a Central montava a dela, e o Kanban a dele. Três
+ * lugares escrevendo "Vence em 1 dias" de jeitos diferentes é o sintoma; o
+ * problema é que por trás das três frases havia réguas diferentes de dia. A
+ * frase agora chega pronta e única; o que a tela decide é só a cor.
+ */
 export function urgencia(l: LinhaOperacional): { texto: string; tom: "critico" | "alerta" | "neutro" } {
-  if (l.dataPrazo == null) return { texto: "Sem prazo", tom: "neutro" }
-  if (l.atrasada) {
-    const d = Math.abs(l.diasParaPrazo ?? 0)
-    return { texto: d <= 1 ? "Atrasada há 1 dia" : `Atrasada há ${d} dias`, tom: "critico" }
-  }
-  if (l.venceHoje) return { texto: "Vence hoje", tom: "alerta" }
-  const d = l.diasParaPrazo ?? 0
-  if (d === 1) return { texto: "Vence amanhã", tom: "alerta" }
-  return { texto: `Vence em ${d} dias`, tom: "neutro" }
+  const tom: "critico" | "alerta" | "neutro" =
+    l.atrasada ? "critico" : l.venceHoje || l.diasParaPrazo === 1 ? "alerta" : "neutro"
+  return { texto: l.rotuloDoPrazo, tom }
 }
 
 /**

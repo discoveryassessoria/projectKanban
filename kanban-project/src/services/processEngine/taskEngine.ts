@@ -14,6 +14,7 @@
 // ⚠ INVARIANTE (apostila): criar/concluir uma TAREFA não conclui um PASSO
 //    do workflow. São coisas separadas. Esta peça só cria a tarefa.
 
+import { prazoOperacional } from "@/lib/operacional/tempo-operacional"
 import { prisma } from "@/lib/prisma"
 import { PrioridadeTarefa } from "@prisma/client"
 import type { Pais } from "@prisma/client"
@@ -54,11 +55,12 @@ export async function criarTarefaDeSpec(spec: TarefaSpec) {
       ? spec.prioridade
       : PrioridadeTarefa.MEDIA
 
-  // -- prazo: data explícita OU calculada do SLA
-  let dataPrazo: Date | null = spec.dataPrazo ?? null
-  if (!dataPrazo && spec.slaDays && spec.slaDays > 0) {
-    dataPrazo = new Date(Date.now() + spec.slaDays * 86400000)
-  }
+  // -- prazo: data explícita OU calculada do SLA pela conta CANÔNICA.
+  //
+  // Aqui havia uma TERCEIRA implementação (`Date.now() + slaDays*86400000`):
+  // dias corridos em milissegundos, enquanto a materialização de passos contava
+  // dias úteis. Três contas para a mesma pergunta é garantia de três respostas.
+  const dataPrazo: Date | null = spec.dataPrazo ?? prazoOperacional(spec.slaDays, new Date())
 
   // -- ordem: se não veio, próxima na sequência (mesma regra da rota)
   //    subtarefa → conta entre as irmãs; raiz → conta no processo

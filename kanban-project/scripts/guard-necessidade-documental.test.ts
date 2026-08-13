@@ -79,6 +79,9 @@ const AUTORIZADOS_FORA_DO_RUNTIME: Record<string, string> = {
   "scripts/palco-central-500.ts":
     "palco visual de escala: monta 500 obrigações PRÓPRIAS (marca ESCALA500) só no banco de teste — " +
     "a validação visual precisa de uma tela de pé, e o teste de escala derruba a dele",
+  "scripts/distribuicao-500-tarefas.test.ts":
+    "escala da distribuição: cria as PRÓPRIAS tarefas (marca DIST500) só no banco de teste — " +
+    "quinhentas tarefas para provar lote, concorrência e recomendação sob volume",
   "scripts/central-fase-500-docs.test.ts":
     "escala da Central: cria as PRÓPRIAS obrigações (marca ESCALA500) só no banco de teste — " +
     "quinhentas certidões para contar quantas consultas a tabela da fase custa",

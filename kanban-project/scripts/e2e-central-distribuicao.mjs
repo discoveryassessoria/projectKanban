@@ -18,6 +18,9 @@ import { chromium } from "playwright"
 import { readFileSync, mkdirSync } from "node:fs"
 
 const [BASE, OUT, TOK_GESTOR, TOK_FUNC] = process.argv.slice(2)
+// O palco publica quem é quem numa linha JSON — os ids vêm dele, não de
+// variáveis de ambiente que ninguém define.
+const CTX = JSON.parse(process.env.CTX_GERENCIAL ?? "{}")
 mkdirSync(OUT, { recursive: true })
 
 let passou = 0, falhou = 0
@@ -73,7 +76,13 @@ secao("§13 · O trabalho nasce sem dono e aparece para a gestão")
 await irPara(gestor, "Sem responsável")
 const semDono = await projecao(gestor, "sem_responsavel")
 ok("o gestor enxerga a distribuição", semDono.status === 200, `${semDono.linhas.length} tarefa(s)`)
-const alvo = semDono.linhas.find((l) => l.titulo.includes("Certidão de Casamento"))
+// O ALVO É A TAREFA SEM DONO DO PALCO, seja qual for o título dela.
+//
+// O teste procurava "Certidão de Casamento", e a única tarefa sem responsável
+// do palco é uma certidão de NASCIMENTO: procurar pelo texto do documento
+// amarrava o teste a um detalhe do cenário, e ele quebrava quando o palco
+// mudava de exemplo — sem que nada do produto tivesse mudado.
+const alvo = semDono.linhas[0]
 ok("a tarefa de teste está lá, sem responsável", !!alvo && alvo.responsavelId === null, alvo?.titulo ?? "—")
 const TASK_ID = alvo?.taskId
 ok("§2) a linha traz pessoa, processo, etapa e prazo",
@@ -95,7 +104,7 @@ ok("§9) e a aba Sem responsável nem aparece para ele", !abasFunc.includes("Sem
 // ═══════════════════════════════════════════════════════════════════════════
 secao("§3-§5 · O gestor atribui em poucos cliques")
 // ═══════════════════════════════════════════════════════════════════════════
-await linhaDe(gestor, "Certidão de Casamento").getByRole("button", { name: "Atribuir" }).click()
+await linhaDe(gestor, alvo.titulo).getByRole("button", { name: "Atribuir" }).click()
 await gestor.page.waitForTimeout(2500)
 await gestor.page.screenshot({ path: `${OUT}/dist-2-seletor.png` })
 const seletor = await gestor.page.locator("body").innerText()
@@ -122,13 +131,24 @@ ok("§5) o funcionário vê o trabalho na tela dele", textoFunc.includes("Certid
 // ═══════════════════════════════════════════════════════════════════════════
 secao("§12 · A execução validada continua intacta")
 // ═══════════════════════════════════════════════════════════════════════════
-await func.page.locator("button.cursor-pointer").filter({ hasText: "Certidão de Casamento" }).first().click()
-await func.page.waitForTimeout(3000)
-const painel = await func.page.locator("aside").last().innerText()
-ok("§12) abre a Tarefa Operacional com o workflow interno", /WORKFLOW INTERNO/i.test(painel))
-ok("§12) com as 5 etapas e a corrente destacada", /Etapa atual/i.test(painel) && /Solicitar certidão/.test(painel))
+// A MINHA FILA NÃO EXECUTA MAIS — ela LEVA ao lugar da execução.
+//
+// Este trecho abria um painel local com o workflow interno por cima da fila.
+// Esse painel foi removido: existiam dois lugares para executar a mesma etapa,
+// e um deles envelhecia calado. Clicar agora navega para a Central Operacional
+// do processo, que é onde o executor especializado vive.
+await func.page.locator("button.cursor-pointer").filter({ hasText: alvo.titulo }).first().click()
+await func.page.waitForTimeout(5000)
+const urlDepoisDoClique = func.page.url()
+ok("§12) clicar leva à Central do processo, não a um painel local",
+  /\/kanban\?/.test(urlDepoisDoClique) && /taskId=\d+/.test(urlDepoisDoClique),
+  urlDepoisDoClique.replace(BASE, ""))
+const naCentral = await func.page.locator("body").innerText()
+ok("§12) e o workflow do documento está à vista",
+  /Solicitar certidão|Workflow/i.test(naCentral))
 await func.page.screenshot({ path: `${OUT}/dist-4-execucao-intacta.png` })
-await func.page.getByRole("button", { name: /^Fechar$/ }).first().click().catch(() => {})
+await func.page.goto(`${BASE}/operacao`, { waitUntil: "domcontentloaded" })
+await func.page.waitForTimeout(2500)
 
 // ═══════════════════════════════════════════════════════════════════════════
 secao("§14 · Transferência preserva o trabalho")
@@ -139,7 +159,10 @@ await irPara(gestor, "Minha fila")
 const antesTransf = (await projecao(func, "minha_fila")).linhas.find((l) => l.taskId === TASK_ID)
 const r = await gestor.page.request.post(`${BASE}/api/tarefas/${TASK_ID}/comando`, {
   headers: { Authorization: `Bearer ${gestor.token}`, "Content-Type": "application/json" },
-  data: { acao: "transferir", responsavelId: Number(process.env.MARIA_ID), motivo: "redistribuição" },
+  // O DESTINATÁRIO VEM DO PALCO. Era `process.env.MARIA_ID`, que ninguém
+  // definia: o corpo ia com `NaN` e a rota respondia 422 — o teste acusava a
+  // transferência de não funcionar quando quem estava errado era ele.
+  data: { acao: "transferir", responsavelId: CTX.gestor.id, motivo: "redistribuição" },
 })
 ok("§14) o gestor transfere pela porta canônica", r.ok(), `HTTP ${r.status()}`)
 const depoisTransf = await projecao(func, "minha_fila")
@@ -178,12 +201,12 @@ const atual = voltou.linhas.find((l) => l.taskId === TASK_ID)
 const lvAntigo = 0
 const primeiro = await gestor.page.request.post(`${BASE}/api/tarefas/${TASK_ID}/comando`, {
   headers: { Authorization: `Bearer ${gestor.token}`, "Content-Type": "application/json" },
-  data: { acao: "atribuir", responsavelId: Number(process.env.DANI_ID) },
+  data: { acao: "atribuir", responsavelId: CTX.dani.id },
 })
 ok("§16) o primeiro vence", primeiro.ok(), `HTTP ${primeiro.status()}`)
 const segundo = await gestor.page.request.post(`${BASE}/api/tarefas/${TASK_ID}/comando`, {
   headers: { Authorization: `Bearer ${gestor.token}`, "Content-Type": "application/json" },
-  data: { acao: "atribuir", responsavelId: Number(process.env.MARIA_ID), lockVersion: lvAntigo },
+  data: { acao: "atribuir", responsavelId: CTX.gestor.id, lockVersion: lvAntigo },
 })
 ok("§16) o segundo recebe conflito, não sobrescreve", segundo.status() === 409, `HTTP ${segundo.status()}`)
 const final = await gestor.page.request.get(`${BASE}/api/operacao/tarefas/${TASK_ID}`, {

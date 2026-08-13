@@ -282,7 +282,9 @@ async function main() {
   // porque o terceiro prometeu, ou "atrasada" porque ele demorou.
   const fonteDaFila = semComentarios(ler('lib/operacional/tarefa-projecoes.ts'))
   ok('§12) a fila deriva o atraso do PRAZO DA TAREFA',
-    /atrasada: !terminal && diaDoPrazo != null && diaDoPrazo < hoje/.test(fonteDaFila))
+    /atrasada: tempo\.atrasado/.test(fonteDaFila)
+    && /dataPrazo: t\.dataPrazo/.test(fonteDaFila),
+    'a régua mudou de casa (tempo-operacional), a fonte continua sendo o prazo da tarefa')
   ok('§12) e não conhece a previsão do terceiro',
     !/previsaoRetorno/.test(fonteDaFila),
     'a estimativa do cartório vive no andamento da etapa, não no prazo da tarefa')

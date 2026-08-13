@@ -987,14 +987,11 @@ const CLS_ESTADO: Record<EstadoOperacionalDaLinha, string> = {
  */
 function CelulaPrazo({ f }: { f: DocumentoDoIndice["naFase"] }) {
   if (f.estado === "CONCLUIDA") return <span className="text-[11px] text-white/25">—</span>
-  if (f.prazo == null) return <span className="text-[11px] text-white/35">Sem prazo</span>
-  const d = f.diasParaPrazo
-  const texto =
-    f.atrasado ? `Atrasada há ${Math.abs(d ?? 0)} dia${Math.abs(d ?? 0) === 1 ? "" : "s"}`
-    : f.venceHoje ? "Vence hoje"
-    : d === 1 ? "Vence amanhã"
-    : d != null ? `Vence em ${d} dias`
-    : "Com prazo"
+  if (f.prazo == null) return <span className="text-[11px] text-white/35">{f.rotuloDoPrazo}</span>
+  // A FRASE VEM DO SERVIDOR. Cada tela montando a sua produzia "Vence em 1
+  // dias", "Vence amanhã" e "1 dia restante" para o mesmo prazo — e, pior, réguas
+  // diferentes por trás das frases.
+  const texto = f.rotuloDoPrazo
   const cor = f.atrasado ? "text-[#f87171]" : f.venceHoje ? "text-[#d2a948]" : "text-white/68"
   return (
     <div>

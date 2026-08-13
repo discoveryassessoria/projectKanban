@@ -12,6 +12,7 @@
 //
 // ESCREVE NO BANCO — só roda no banco de teste local.
 // ============================================================================
+import { prazoOperacional } from '../lib/operacional/tempo-operacional'
 import { prisma } from "@/lib/prisma"
 import { exigirBancoDeTeste } from "./_banco-de-teste"
 import {
@@ -132,8 +133,18 @@ async function main() {
   ok("nasce sem responsável — na fila da equipe", t?.responsavelId === null)
   // SLA do trabalho = a etapa mais demorada (15d de "aguardar cartório"), não a
   // soma nem a menor: o prazo é para ter a certidão na mão.
-  const dias = t?.dataPrazo ? Math.round((t.dataPrazo.getTime() - Date.now()) / 86400000) : null
-  ok("o prazo é do trabalho, derivado do maior SLA obrigatório (15d)", dias === 15, `${dias}d`)
+  //
+  // E os 15 dias são ÚTEIS. A conta virou uma só (`prazoOperacional`), a mesma
+  // que o materializador de passos já usava em produção: um SLA que vence no
+  // domingo nunca foi um compromisso que alguém pudesse cumprir. Por isso a
+  // asserção compara com a CONTA canônica, não com um número de dias corridos.
+  const agoraDoPalco = new Date()
+  const esperado = prazoOperacional(15, agoraDoPalco)
+  const diasCorridos = t?.dataPrazo ? Math.round((t.dataPrazo.getTime() - agoraDoPalco.getTime()) / 86400000) : null
+  ok("o prazo é do trabalho, derivado do maior SLA obrigatório (15 dias ÚTEIS)",
+    t?.dataPrazo != null && esperado != null
+    && Math.abs(t.dataPrazo.getTime() - esperado.getTime()) < 60_000,
+    `${diasCorridos}d corridos = 15 úteis`)
 
   // ═════════════════════════════════════════════════════════════════════════
   secao("B) Workflow com 7 etapas continua UMA tarefa")

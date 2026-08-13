@@ -33,6 +33,7 @@
 import { prisma } from '@/lib/prisma'
 import type { Prisma, StatusTarefa } from '@prisma/client'
 import { chaveDaUnidade, identidadeDaUnidade, tarefaVivaDaUnidade } from '@/lib/operacional/identidade-da-tarefa'
+import { prazoOperacional } from '@/lib/operacional/tempo-operacional'
 
 /** O trabalho que a tarefa representa. Sem isto ela seria órfã. */
 export interface OrigemDoTrabalho {
@@ -149,15 +150,13 @@ export async function reancorarTarefaNaUnidade(
  * O PRAZO É DA TAREFA — do trabalho inteiro, não de cada microetapa.
  *
  * "Obter a certidão" tem um prazo; "enviar o pedido" não é uma promessa que se
- * faça a ninguém. Sem SLA declarado o prazo fica nulo e a tarefa simplesmente
- * não entra na régua de atraso — melhor do que uma data inventada.
+ * faça a ninguém.
+ *
+ * A CONTA MORA EM `tempo-operacional`. Esta função contava dias CORRIDOS
+ * enquanto o materializador de passos contava dias ÚTEIS — a mesma certidão
+ * nascia com prazos diferentes conforme quem a criasse.
  */
-export function calcularPrazo(slaDays: number | null | undefined, inicio: Date): Date | null {
-  if (slaDays == null || !Number.isFinite(slaDays) || slaDays <= 0) return null
-  const d = new Date(inicio)
-  d.setDate(d.getDate() + slaDays)
-  return d
-}
+export const calcularPrazo = prazoOperacional
 
 export interface ResultadoMaterializacao {
   tarefaId: number

@@ -37,6 +37,7 @@
 
 import type { PessoaDoProcesso } from "./central-operacional-core"
 import { baldeDoPasso, rotuloStatusPasso, type BaldeTarefa } from "./central-operacional-core"
+import { estadoTemporal } from "@/lib/operacional/tempo-operacional"
 
 // ============================================================
 // ENTRADA — o que a camada de I/O carrega e entrega já resolvido
@@ -293,6 +294,8 @@ export interface EstadoNaFase {
   venceHoje: boolean
   estado: EstadoOperacionalDaLinha
   estadoLabel: string
+  /** A frase única do prazo — a MESMA da Minha Fila e das notificações. */
+  rotuloDoPrazo: string
   /** Por que está parado, quando está. */
   motivoBloqueio: string | null
 }
@@ -680,6 +683,13 @@ function estadoNaFase(alvo: AlvoDaEstrutura): EstadoNaFase {
   // O prazo é o do passo corrente; concluído não tem prazo a vencer.
   const prazo = concluido ? null : corrente!.prazo
   const dias = concluido ? null : corrente!.diasParaPrazo
+  // A FRASE vem da régua canônica, para a tabela da fase dizer exatamente o que
+  // a Minha Fila diz sobre a mesma tarefa.
+  const tempo = estadoTemporal({
+    dataPrazo: prazo,
+    statusTarefa: concluido ? 'CONCLUIDO_RECEBIDO' : null,
+    aguardandoTerceiro: estado === 'AGUARDANDO_TERCEIRO',
+  })
 
   return {
     progresso: alvo.progresso,
@@ -693,6 +703,7 @@ function estadoNaFase(alvo: AlvoDaEstrutura): EstadoNaFase {
     venceHoje: !concluido && dias === 0,
     estado,
     estadoLabel: ROTULO_ESTADO_LINHA[estado],
+    rotuloDoPrazo: tempo.rotulo,
     motivoBloqueio: concluido ? null : corrente!.motivoBloqueio,
   }
 }

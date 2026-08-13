@@ -27,7 +27,7 @@ import {
   lerOrganizacao, unidadesOperacionais, definirAptidoes, definirCapacidade,
   abrirIndisponibilidade, encerrarIndisponibilidade,
 } from '@/lib/operacional/organizacao'
-import { inicioDoDiaOperacional } from '@/lib/operacional/tarefa-projecoes'
+import { classificarCarga } from '@/lib/operacional/elegibilidade'
 import { registrarAuditoria } from '@/lib/gerenciamento/auditoria'
 import { STATUS_ATIVOS } from '@/lib/operacional/tarefa-canonica'
 
@@ -52,7 +52,6 @@ export async function GET(request: NextRequest) {
   if (erro) return erro
 
   const agora = new Date()
-  const corte = inicioDoDiaOperacional(agora)
 
   // A carga detalhada por pessoa, em DUAS consultas agregadas — nunca uma por
   // funcionário, que é como esta tela ficaria lenta com a equipe crescendo.
@@ -68,18 +67,13 @@ export async function GET(request: NextRequest) {
     }),
   ])
 
-  const carga = new Map<number, { ativas: number; executaveis: number; atrasadas: number; urgentes: number; aguardandoTerceiro: number; bloqueadas: number }>()
-  for (const u of usuarios) carga.set(u.id, { ativas: 0, executaveis: 0, atrasadas: 0, urgentes: 0, aguardandoTerceiro: 0, bloqueadas: 0 })
-  for (const t of ativas) {
-    const c = carga.get(t.responsavelId!)
-    if (!c) continue
-    c.ativas++
-    if (t.statusTarefa === 'AGUARDANDO_TERCEIRO' || t.statusTarefa === 'AGUARDANDO_CLIENTE') c.aguardandoTerceiro++
-    else if (t.statusTarefa === 'BLOQUEADA') c.bloqueadas++
-    else c.executaveis++
-    if (t.dataPrazo != null && t.dataPrazo < corte) c.atrasadas++
-    if (t.prioridade === 'URGENTE') c.urgentes++
-  }
+  // A CARGA VEM DA MESMA FUNÇÃO QUE O RECOMENDADOR USA.
+  //
+  // Esta rota refazia a contagem por conta própria. Enquanto as duas versões
+  // concordavam, ninguém notava; bastou uma delas mudar de régua de atraso para
+  // o gestor ver um número aqui e outro na recomendação, sobre as MESMAS
+  // tarefas. Quem define o que é carga é quem define o que é elegibilidade.
+  const carga = classificarCarga(usuarios.map((u) => u.id), ativas, agora)
 
   const linhas = usuarios.map((u) => {
     const permissoes = calcularPermissoes(

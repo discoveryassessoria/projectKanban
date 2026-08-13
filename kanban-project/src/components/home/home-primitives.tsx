@@ -1,5 +1,7 @@
 "use client"
 
+import { estadoTemporal, FUSO_OPERACIONAL } from "@/lib/operacional/tempo-operacional"
+
 // ============================================================================
 // PRIMITIVAS VISUAIS DO CENTRO OPERACIONAL
 // ----------------------------------------------------------------------------
@@ -136,17 +138,23 @@ export function formatarHorario(iso: string | null): string {
   return d.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })
 }
 
+/**
+ * O PRAZO NA HOME — mesma régua, texto curto.
+ *
+ * O corte era `setHours(0,0,0,0)`, isto é, meia-noite NO FUSO DO NAVEGADOR: um
+ * gestor em Lisboa via "vence hoje" enquanto a operação em São Paulo ainda
+ * estava em ontem. A régua da operação não pode depender de onde o navegador
+ * está aberto.
+ */
 export function formatarPrazo(iso: string | null): string {
   if (!iso) return "sem prazo"
   const d = new Date(iso)
   if (isNaN(d.getTime())) return "sem prazo"
-  const dias = Math.round(
-    (new Date(d).setHours(0, 0, 0, 0) - new Date().setHours(0, 0, 0, 0)) / 86_400_000,
-  )
-  if (dias < 0) return `${Math.abs(dias)}d em atraso`
-  if (dias === 0) return "vence hoje"
-  if (dias === 1) return "vence amanhã"
-  return d.toLocaleDateString("pt-BR", { day: "2-digit", month: "short" })
+  const t = estadoTemporal({ dataPrazo: d })
+  if (t.atrasado) return `${t.atrasadoHaDias}d em atraso`
+  if (t.venceHoje) return "vence hoje"
+  if (t.venceAmanha) return "vence amanhã"
+  return d.toLocaleDateString("pt-BR", { day: "2-digit", month: "short", timeZone: FUSO_OPERACIONAL })
 }
 
 export function saudacao(agora = new Date()): string {

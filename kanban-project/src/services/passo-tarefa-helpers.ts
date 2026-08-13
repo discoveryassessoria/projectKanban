@@ -2,6 +2,7 @@
 // CP-4C — helpers PUROS (sem prisma/sem alias @/): chave, prioridade, prazo,
 // resolução de responsável e a regra normativa de geração de Tarefa.
 
+import { prazoOperacional } from "@/lib/operacional/tempo-operacional"
 import { isDiaUtil } from "../lib/diasUteis"
 
 export type PrioridadeTarefaStr = "BAIXA" | "MEDIA" | "ALTA" | "URGENTE"
@@ -47,10 +48,15 @@ export function addDiasUteis(base: Date, n: number): Date {
   return d
 }
 
-/** Prazo a partir do SLA (dias úteis). Sem SLA (null/<=0) → null. */
+/**
+ * Prazo a partir do SLA — DELEGA para a conta canônica.
+ *
+ * Existiam duas `calcularPrazo` com os argumentos trocados e dias diferentes
+ * (úteis aqui, corridos em `tarefa-canonica`). A assinatura desta permanece
+ * porque os chamadores a usam assim; a CONTA passou a ser uma só.
+ */
 export function calcularPrazo(base: Date, sla: number | null | undefined): Date | null {
-  if (sla == null || sla <= 0) return null
-  return addDiasUteis(base, sla)
+  return prazoOperacional(sla, base)
 }
 
 /**

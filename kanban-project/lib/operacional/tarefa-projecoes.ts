@@ -13,55 +13,22 @@
 // justamente no caso em que ele mais importa.
 // ============================================================================
 import { prisma } from '@/lib/prisma'
+import {
+  diaOperacional,
+  janelaDoDiaOperacional,
+  inicioDoDiaOperacional,
+  estadoTemporal,
+} from '@/lib/operacional/tempo-operacional'
 import type { Prisma, PrioridadeTarefa, StatusTarefa } from '@prisma/client'
 import { STATUS_ATIVOS } from './tarefa-canonica'
 import { resolveWorkflowStepEditor } from '@/src/lib/process-stage/step-editor-registry'
 
-/**
- * O DIA EM QUE A OPERAÇÃO VIVE.
- *
- * O prazo é gravado com hora (o SLA soma dias sobre o instante em que a tarefa
- * nasceu), mas ninguém opera em minutos: um SLA de "5 dias" vence NO DIA, não
- * às 14h24 do quinto dia. Comparar instantes fazia uma tarefa que vence hoje
- * aparecer atrasada desde a manhã — e tornava "vence hoje" impossível de
- * mostrar, porque o vermelho de atraso chegava primeiro.
- *
- * A régua é o DIA no fuso da operação, não o do servidor.
- */
-const FUSO_OPERACIONAL = 'America/Sao_Paulo'
-export function diaOperacional(d: Date): string {
-  return d.toLocaleDateString('en-CA', { timeZone: FUSO_OPERACIONAL })
-}
-
-/**
- * A JANELA DO DIA OPERACIONAL, em instantes UTC.
- *
- * Meia-noite EM SÃO PAULO, não meia-noite UTC. A diferença parece pedante e não
- * é: entre 21h e meia-noite (00:00–03:00 UTC), a derivação em memória dizia
- * "atrasada" e o filtro no banco dizia que não, porque comparavam com cortes
- * diferentes. O mesmo prazo, duas respostas, e a fila deixando de mostrar o que
- * já estourou justamente no fim do expediente.
- *
- * O deslocamento é medido no próprio instante — assim o horário de verão, se
- * voltar, entra sozinho na conta.
- */
-function deslocamentoDoFuso(d: Date): number {
-  const comoUtc = new Date(d.toLocaleString('en-US', { timeZone: 'UTC' }))
-  const noFuso = new Date(d.toLocaleString('en-US', { timeZone: FUSO_OPERACIONAL }))
-  return comoUtc.getTime() - noFuso.getTime()
-}
-
-export function janelaDoDiaOperacional(agora: Date): { inicio: Date; fim: Date } {
-  const meiaNoiteNominal = new Date(`${diaOperacional(agora)}T00:00:00.000Z`)
-  const inicio = new Date(meiaNoiteNominal.getTime() + deslocamentoDoFuso(agora))
-  return { inicio, fim: new Date(inicio.getTime() + 86400000 - 1) }
-}
-
-/** Meia-noite do dia operacional de HOJE, em instante — para filtrar no banco. */
-export function inicioDoDiaOperacional(agora: Date): Date {
-  return janelaDoDiaOperacional(agora).inicio
-}
-
+// O TEMPO VEM DE UM LUGAR SÓ.
+//
+// Estas funções moravam aqui, e a Central Operacional tinha as suas: uma
+// comparava o DIA no fuso da operação, a outra comparava blocos de 24 horas a
+// partir do instante. Às 23h, a mesma tarefa "vencia amanhã" numa tela e
+// "vencia hoje" na outra. Agora as duas telas importam a MESMA régua.
 export interface LinhaDeFila {
   taskId: number
   titulo: string
@@ -78,6 +45,8 @@ export interface LinhaDeFila {
   dataPrazo: string | null
   /** Condição derivada, não estado: convive com bloqueada, aguardando etc. */
   atrasada: boolean
+  /** A frase única do prazo — a MESMA que a Central e o Kanban mostram. */
+  rotuloDoPrazo: string
   diasParaPrazo: number | null
   /** Dependência obrigatória ainda aberta — a tarefa existe, mas não pode andar. */
   aguardandoDependencia: boolean
@@ -93,6 +62,9 @@ export interface LinhaDeFila {
 const SELECT = {
   id: true, titulo: true, processoId: true, faseMacroKey: true, statusTarefa: true,
   equipeKey: true, responsavelId: true, prioridade: true, dataPrazo: true, causaRemovidaEm: true,
+  // O ESTADO TEMPORAL precisa destes: conclusão congela o atraso, e a pausa de
+  // SLA é o que separa "parado esperando o cartório" de "parado devendo".
+  dataConclusao: true, slaPausadoEm: true, slaPausaAcumuladaMin: true,
   processo: { select: { nome: true } },
   responsavel: { select: { nome: true } },
   // `pessoaId` é ref SOLTA a Pessoa (sem relation no modelo) — o nome é
@@ -112,12 +84,17 @@ function projetar(
   rotulosDePasso?: Map<number, string>,
 ): LinhaDeFila {
   const snap = t.workflowStepInstance?.snapshot as { label?: string } | null
-  const hoje = diaOperacional(agora)
-  const diaDoPrazo = t.dataPrazo ? diaOperacional(t.dataPrazo) : null
-  const dias =
-    diaDoPrazo == null ? null
-    : Math.round((Date.parse(`${diaDoPrazo}T00:00:00Z`) - Date.parse(`${hoje}T00:00:00Z`)) / 86400000)
-  const terminal = !STATUS_ATIVOS.includes(t.statusTarefa)
+  // A RÉGUA CANÔNICA — a mesma da Central, do Kanban e da notificação.
+  const tempo = estadoTemporal({
+    dataPrazo: t.dataPrazo,
+    dataConclusao: t.dataConclusao,
+    statusTarefa: t.statusTarefa,
+    aguardandoTerceiro: t.statusTarefa === 'AGUARDANDO_TERCEIRO',
+    slaPausadoEm: t.slaPausadoEm,
+    slaPausaAcumuladaMin: t.slaPausaAcumuladaMin,
+    criadaEm: t.createdAt,
+    agora,
+  })
   return {
     taskId: t.id,
     titulo: t.titulo,
@@ -144,13 +121,13 @@ function projetar(
     responsavelNome: t.responsavel?.nome ?? null,
     prioridade: t.prioridade,
     dataPrazo: t.dataPrazo?.toISOString() ?? null,
-    // Só o que ainda é trabalho a fazer pode estar atrasado: tarefa concluída
-    // ontem com prazo de anteontem não é uma pendência de hoje.
-    // Atrasada é o DIA do prazo já ter passado. Dentro do dia de vencimento a
-    // tarefa não está atrasada — está vencendo hoje, que é outra coisa e leva
-    // outra cor.
-    atrasada: !terminal && diaDoPrazo != null && diaDoPrazo < hoje,
-    diasParaPrazo: dias,
+    // Atrasada, vence hoje e dias restantes são do estado temporal canônico:
+    // uma tarefa concluída ontem com prazo de anteontem não é pendência de
+    // hoje, e dentro do dia de vencimento ela não está atrasada — está vencendo
+    // hoje, que é outra coisa e leva outra cor.
+    atrasada: tempo.atrasado,
+    diasParaPrazo: tempo.diasParaPrazo,
+    rotuloDoPrazo: tempo.rotulo,
     aguardandoDependencia: t.dependeDe.some(
       (d) => d.obrigatoria && !['CONCLUIDO_RECEBIDO', 'CONCLUIDO_NAO_POSSUI'].includes(d.dependeDe.statusTarefa),
     ),

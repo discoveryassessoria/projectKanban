@@ -2,6 +2,8 @@
 
 "use client"
 
+import { diasEntreDiasOperacionais } from "@/lib/operacional/tempo-operacional"
+
 import { useState, useEffect, useCallback, useMemo } from "react"
 import { useApi } from "@/src/lib/dados"
 import { createPortal } from "react-dom"
@@ -228,11 +230,14 @@ function ConteudoDrawer({
   const pendentes = docs.filter((d) => d.status === "PENDENTE").length
   const progresso = total > 0 ? Math.round((recebidos / total) * 100) : 0
 
-  // SLA crítico: algum doc tem prazo vencido em mais de 5 dias?
+  // SLA crítico: algum documento com prazo vencido em mais de cinco dias?
+  //
+  // A conta dos dias vem da régua canônica — comparar blocos de 24h a partir do
+  // instante fazia esta tela discordar da fila justamente nas viradas de dia.
+  // A FAIXA (cinco dias) continua sendo desta tela: é o corte que ela declara.
   const slaCritico = docs.some((d) => {
     if (!d.dataPrazoOperacao) return false
-    const dias = Math.floor((new Date(d.dataPrazoOperacao).getTime() - agoraMs) / 86400000)
-    return dias < -5
+    return diasEntreDiasOperacionais(new Date(d.dataPrazoOperacao), new Date(agoraMs)) < -5
   })
 
   const tabs: Array<{ id: TabId; label: string; count?: number }> = [

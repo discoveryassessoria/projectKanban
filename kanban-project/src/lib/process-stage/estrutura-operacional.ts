@@ -38,6 +38,7 @@ import {
   type StatusResumo,
 } from "./estrutura-operacional-core"
 import { getStepsForFase, getStepDef, phaseKeyToFaseCode } from "./fases-catalog"
+import { diasEntreDiasOperacionais } from "@/lib/operacional/tempo-operacional"
 import { resolverInstanciaVigente } from "./instancia-vigente-da-fase"
 
 // ============================================================
@@ -392,8 +393,13 @@ export async function getPhaseOperationalStructure(
     return null
   }
 
-  const diffDias = (alvo: Date, base: Date) =>
-    Math.floor((alvo.getTime() - base.getTime()) / 86400000)
+  // A RÉGUA DO PRAZO É A CANÔNICA — a mesma da Minha Fila e das notificações.
+  //
+  // Aqui havia um `Math.floor((alvo - base)/86400000)`: blocos de 24 HORAS a
+  // partir do instante. Às 23h de 14/08, com prazo em 15/08 às 09h, esta tela
+  // dizia "vence hoje" e a fila dizia "vence amanhã" — a mesma tarefa, duas
+  // respostas, e o operador sem saber em qual acreditar.
+  const diffDias = (alvo: Date, base: Date) => diasEntreDiasOperacionais(alvo, base)
 
   // ------------------------------------------------------------
   // 5) INSTÂNCIAS → PassoBruto (rótulos resolvidos, alvo intacto).

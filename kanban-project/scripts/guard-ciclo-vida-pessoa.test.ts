@@ -176,6 +176,8 @@ const AUTORIZADOS_FORA_DO_RUNTIME: Record<string, string> = {
     "fronteira de documento-operacao: monta e derruba a PRÓPRIA operação por documento (marca FRONT), só no banco de teste — prova que a transição migrou para o motor sem perder metadata, necessidade nem ativação do próximo passo",
   "scripts/palco-central-500.ts":
     "palco visual de escala: monta e derrubа a PRÓPRIA árvore (marca ESCALA500), só no banco de teste",
+  "scripts/distribuicao-500-tarefas.test.ts":
+    "escala da distribuição: monta e derruba a PRÓPRIA árvore (marca DIST500), só no banco de teste",
   "scripts/central-fase-500-docs.test.ts":
     "escala da Central: monta e derruba a PRÓPRIA árvore (marca ESCALA500), só no banco de teste — " +
     "vinte e cinco pessoas com quinhentas certidões entre elas",

@@ -36,6 +36,8 @@ export interface LinhaDeFila {
   dataPrazo: string | null
   atrasada: boolean
   diasParaPrazo: number | null
+  /** A frase única do prazo, montada no servidor — a tela só escolhe a cor. */
+  rotuloDoPrazo: string
   aguardandoDependencia: boolean
   requerDecisao: boolean
   servico: string | null

@@ -2,6 +2,8 @@
 
 "use client"
 
+import { estadoTemporal } from "@/lib/operacional/tempo-operacional"
+
 import { useState, useEffect, useCallback, useMemo, useRef } from "react"
 import { useApi } from "@/src/lib/dados"
 import type { WorkflowShape } from "./TabOperationCockpit"
@@ -227,17 +229,23 @@ const fmtDateTime = (s: string | null): string => {
   } catch { return "—" }
 }
 
-const diffDays = (a: Date, b: Date) =>
-  Math.floor((a.getTime() - b.getTime()) / 86400000)
-
+/**
+ * O PRAZO, DITO COMO O RESTO DO SISTEMA DIZ.
+ *
+ * Este drawer tinha a própria régua: blocos de 24h a partir do instante, com
+ * uma faixa "crítico" acima de cinco dias que não existia em lugar nenhum. Para
+ * o mesmo prazo, esta tela dizia "3d atrasado", a fila dizia "Atrasada há 3
+ * dias" e a Central dizia outra coisa ainda.
+ *
+ * A conta e a frase vêm da régua canônica; aqui fica só a cor.
+ */
 const computeSla = (prazo: string | null): { text: string; cls: string } => {
   if (!prazo) return { text: "—", cls: "" }
-  const d = new Date(prazo), now = new Date()
-  const dias = diffDays(d, now)
-  if (dias < -5) return { text: `${Math.abs(dias)}d crítico`, cls: "text-[#f87171]" }
-  if (dias < 0) return { text: `${Math.abs(dias)}d atrasado`, cls: "text-[#f87171]" }
-  if (dias < 1) return { text: "vence hoje", cls: "text-[#d2a948]" }
-  return { text: `${dias} dia(s) restantes`, cls: "text-[#4ade80]" }
+  const t = estadoTemporal({ dataPrazo: prazo })
+  return {
+    text: t.rotulo,
+    cls: t.tom === "critico" ? "text-[#f87171]" : t.tom === "alerta" ? "text-[#d2a948]" : "text-[#4ade80]",
+  }
 }
 
 // Relativo "há Xmin/Xh/N dias" para a última movimentação.

@@ -154,7 +154,13 @@ ok("o responsável vem da etapa ou fica na fila da equipe",
   /vivos\.find\(\(s\) => s\.responsavelId != null\)/.test(reconciler))
 ok("o SLA do trabalho é o maior das obrigatórias, não a soma",
   /Math\.max\(\.\.\.dias\)/.test(reconciler))
-ok("sem SLA não se inventa prazo", /if \(slaDays == null[\s\S]{0,80}return null/.test(canonica))
+// A CONTA MORA EM `tempo-operacional` — `tarefa-canonica` delega. Havia duas
+// funções `calcularPrazo` com argumentos invertidos e dias diferentes (corridos
+// aqui, úteis no materializador de passos): a mesma certidão nascia com prazos
+// diferentes conforme quem a criasse.
+ok("a conta do prazo é a canônica", /calcularPrazo = prazoOperacional/.test(canonica))
+ok("sem SLA não se inventa prazo",
+  /if \(slaDays == null[\s\S]{0,120}return null/.test(ler("lib/operacional/tempo-operacional.ts")))
 
 // ═══════════════════════════════════════════════════════════════════════════
 secao("6) Reconciliação é convergente e não deixa órfã")
@@ -266,7 +272,11 @@ ok("e Minha Fila é projeção, não entidade",
 ok("atraso NÃO é status", !/'ATRASADA'/.test(schema) && !/ATRASADA/.test(canonica))
 // A régua é o DIA operacional, não o instante: um SLA de "5 dias" vence NO DIA.
 // Comparar instantes pintava de vermelho, desde a manhã, a tarefa que vence hoje.
-ok("atraso é calculado na projeção", /atrasada: !terminal && diaDoPrazo != null && diaDoPrazo < hoje/.test(projecoes))
+// A régua vive em `tempo-operacional` e a projeção CONSOME: a Central tinha a
+// dela (blocos de 24h) e as duas telas discordavam perto da meia-noite.
+ok("atraso é calculado pela régua canônica",
+  /atrasada: tempo\.atrasado/.test(projecoes)
+  && /const atrasado = dias < 0/.test(ler("lib/operacional/tempo-operacional.ts")))
 ok("e não existe coluna de atraso no banco", !/atrasad/i.test(schema.slice(schema.indexOf("model Tarefa "), schema.indexOf("}", schema.indexOf("model Tarefa ")))))
 
 // §66 — carga conta tarefas, nunca etapas.

@@ -6,6 +6,7 @@
 // leem/escrevem AQUI — não falam com o legado direto. Reusa o completion-engine
 // (não recalcula regra — regras 9/10).
 
+import { prazoOperacional } from "@/lib/operacional/tempo-operacional"
 import { prisma } from "@/lib/prisma"
 import type { StepInstanceStatus, FaseCode, Prisma, WorkflowEventoTipo } from "@prisma/client"
 import {
@@ -283,7 +284,10 @@ export async function iniciarOperacaoDocumentoV2(
   if (!inst) return { ok: false, error: "Instância V2 da fase não encontrada (processo não migrado)", status: 422 }
   const catSteps = getFase(faseCode).steps
   const now = new Date()
-  const firstDue = opts.dataPrazoInicial ?? new Date(now.getTime() + catSteps[0].slaDays * 86400000)
+  // O prazo nasce da conta CANÔNICA (dias úteis), não de uma soma em
+  // milissegundos: era ela que dava a este caminho um prazo diferente do que a
+  // materialização de passos daria para o mesmo SLA.
+  const firstDue = opts.dataPrazoInicial ?? prazoOperacional(catSteps[0].slaDays, now)
   const defId = inst.workflowDefinitionId ?? 0
   await prisma.$transaction(async (tx) => {
     for (let i = 0; i < catSteps.length; i++) {
@@ -679,7 +683,7 @@ export async function aplicarTransicaoDoPassoTx(
         const slaProximo =
           getStepDef(phaseKeyToFaseCode(p.faseMacroKey), proximo.stepKey)?.slaDays ??
           catStep?.slaDays ?? 1
-        const due = new Date(now.getTime() + slaProximo * 86400000)
+        const due = prazoOperacional(slaProximo, now)
         // QUAL é o próximo continua sendo pergunta DOCUMENTAL: os passos desta
         // fase pertencem a vários documentos, e `ativarProximoPassoTx` escopa
         // pela instância do workflow — usá-lo aqui abriria a etapa de outro

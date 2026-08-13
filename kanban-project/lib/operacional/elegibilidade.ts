@@ -68,6 +68,7 @@
 // escopo por processo/cliente. Nenhum foi inventado.
 // ============================================================================
 import { prisma } from '@/lib/prisma'
+import { inicioDoDiaOperacional } from '@/lib/operacional/tempo-operacional'
 import type { StatusTarefa } from '@prisma/client'
 import { STATUS_ATIVOS } from './tarefa-canonica'
 import { calcularPermissoes, temPermissao, type MapaPermissoes } from '@/src/lib/permissoes'
@@ -259,6 +260,59 @@ interface Universo {
   rotulos: Map<number, UnidadeOperacional>
 }
 
+/** O que a leitura de carga precisa saber de cada tarefa ativa. */
+export interface TarefaParaCarga {
+  responsavelId: number | null
+  statusTarefa: string
+  dataPrazo: Date | null
+  prioridade: string
+  dataAtribuicao?: Date | null
+}
+
+/**
+ * A CARGA DE UMA PESSOA — uma definição só, para quem recomenda e para quem
+ * mostra o quadro.
+ *
+ * A tela de capacidade refazia esta contagem por conta própria. Enquanto as
+ * duas concordavam, ninguém percebia; bastava uma delas mudar de régua de
+ * atraso — e uma delas mudou — para o gestor ver "3 atrasadas" num lugar e "5"
+ * no outro, sobre as mesmas tarefas.
+ *
+ * O QUE CONTA COMO CARGA EXECUTÁVEL: o que depende DESTA PESSOA agora. Tarefa
+ * esperando o cartório não ocupa a execução de ninguém — está parada por fora,
+ * e cobrar capacidade por ela puniria quem já fez a parte dele. Bloqueada
+ * também não: ela espera uma decisão, não trabalho.
+ */
+export function classificarCarga(
+  usuarioIds: number[],
+  ativas: TarefaParaCarga[],
+  agora: Date,
+): Map<number, Carga> {
+  const cargas = new Map<number, Carga>()
+  for (const id of usuarioIds) cargas.set(id, { ...CARGA_ZERO })
+  // Mesma régua de atraso da operação: o DIA no fuso operacional, não o instante.
+  const corteDoAtraso = inicioDoDiaOperacional(agora)
+  for (const t of ativas) {
+    if (t.responsavelId == null) continue
+    const c = cargas.get(t.responsavelId)
+    if (!c) continue
+    c.ativas++
+    if (t.statusTarefa === 'AGUARDANDO_TERCEIRO' || t.statusTarefa === 'AGUARDANDO_CLIENTE') c.aguardandoTerceiro++
+    else if (t.statusTarefa === 'BLOQUEADA') c.bloqueadas++
+    else {
+      c.executaveis++
+      if (t.statusTarefa === 'EM_ANDAMENTO') c.emAndamento++
+      else c.naoIniciadas++
+    }
+    if (t.dataPrazo != null && t.dataPrazo < corteDoAtraso) c.atrasadas++
+    if (t.prioridade === 'URGENTE') c.urgentes++
+    if (t.dataAtribuicao != null && (c.ultimaAtribuicaoEm == null || t.dataAtribuicao > c.ultimaAtribuicaoEm)) {
+      c.ultimaAtribuicaoEm = t.dataAtribuicao
+    }
+  }
+  return cargas
+}
+
 /**
  * TUDO DE UMA VEZ — usuários, permissões, cargas e equipes.
  *
@@ -294,28 +348,7 @@ async function lerUniverso(agora: Date): Promise<Universo> {
     ),
   }))
 
-  const cargas = new Map<number, Carga>()
-  for (const u of usuarios) cargas.set(u.id, { ...CARGA_ZERO })
-  // Mesma régua de atraso da operação: o DIA no fuso operacional, não o instante.
-  const { inicioDoDiaOperacional } = await import('./tarefa-projecoes')
-  const corteDoAtraso = inicioDoDiaOperacional(agora)
-  for (const t of ativas) {
-    const c = cargas.get(t.responsavelId!)
-    if (!c) continue
-    c.ativas++
-    if (t.statusTarefa === 'AGUARDANDO_TERCEIRO' || t.statusTarefa === 'AGUARDANDO_CLIENTE') c.aguardandoTerceiro++
-    else if (t.statusTarefa === 'BLOQUEADA') c.bloqueadas++
-    else {
-      c.executaveis++
-      if (t.statusTarefa === 'EM_ANDAMENTO') c.emAndamento++
-      else c.naoIniciadas++
-    }
-    if (t.dataPrazo != null && t.dataPrazo < corteDoAtraso) c.atrasadas++
-    if (t.prioridade === 'URGENTE') c.urgentes++
-    if (t.dataAtribuicao != null && (c.ultimaAtribuicaoEm == null || t.dataAtribuicao > c.ultimaAtribuicaoEm)) {
-      c.ultimaAtribuicaoEm = t.dataAtribuicao
-    }
-  }
+  const cargas = classificarCarga(usuarios.map((u) => u.id), ativas, agora)
 
   const equipes = new Map<string, Set<number>>()
   const equipesCadastradas = new Set<string>()
@@ -721,7 +754,7 @@ export async function simularLote(
         })).map((t) => t.id),
       )
 
-  const { inicioDoDiaOperacional } = await import('./tarefa-projecoes')
+  const { inicioDoDiaOperacional } = await import('./tempo-operacional')
   const corte = inicioDoDiaOperacional(agora)
   const fila = [...alvos].sort((a, b) => ordemDoLote(a, b, corte))
 
