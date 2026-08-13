@@ -195,6 +195,77 @@ async function main() {
   ok('§12) a Minha Fila não virou executor: "Continuar" navega',
     /router\.push\(urlOperacionalDaTarefa/.test(tela))
 
+  // ══════════════════════════════════════════════════════════════════════════
+  secao('§1/§18/§22) NÃO EXISTEM DOIS LUGARES PARA EXECUTAR O MESMO TRABALHO')
+  // ══════════════════════════════════════════════════════════════════════════
+  const { existsSync } = await import('node:fs')
+  ok('§18) o painel local da Minha Fila não existe mais',
+    !existsSync(join(RAIZ, 'src/components/operacao/tarefa-operacional.tsx')),
+    'era um segundo lugar para executar a mesma etapa')
+  ok('§1) a Minha Fila não monta executor de etapa', !/StepEditorRouter/.test(tela))
+  const global = semComentarios(ler('src/components/operacao/visao-global.tsx'))
+  ok('§17) a visão global também não', !/StepEditorRouter/.test(global))
+
+  // O executor vive num lugar só.
+  const varrer = (dir: string, acc: string[] = []): string[] => {
+    for (const e of require('node:fs').readdirSync(join(RAIZ, dir))) {
+      const rel = `${dir}/${e}`
+      if (require('node:fs').statSync(join(RAIZ, rel)).isDirectory()) varrer(rel, acc)
+      else if (/\.tsx$/.test(rel)) acc.push(rel)
+    }
+    return acc
+  }
+  const montam = varrer('src').filter((f) => /<StepEditorRouter/.test(semComentarios(ler(f))))
+  ok('§2) UM único lugar monta o executor', montam.length === 1, montam.join(', ') || 'nenhum')
+  ok('§4) e é a Central, dentro do processo', montam[0]?.includes('kanban/workflow'), montam[0] ?? '—')
+
+  // §6/§8 — chegar pela fila abre o Workflow, não a visão geral do documento.
+  ok('§8) o drawer do documento aceita a aba inicial',
+    /abaInicial/.test(semComentarios(ler('src/components/kanban/DocumentoOperationalDrawer.tsx'))))
+  ok('§8) e a Central pede WORKFLOW quando veio por deep-link',
+    /abaInicial=\{alvo\?\.documentoId != null && alvo\.documentoId === drawerDocId \? "workflow"/.test(central))
+
+  // ══════════════════════════════════════════════════════════════════════════
+  secao('§15) O LINK SOBREVIVE — refresh, cópia, e o país certo')
+  // ══════════════════════════════════════════════════════════════════════════
+  const kanban = semComentarios(ler('src/app/kanban/kanban-content.tsx'))
+  // Abrir NÃO pode limpar a URL: quem limpa é fechar. Enquanto o contexto está
+  // à vista, o endereço tem de descrevê-lo — senão F5 perde tudo e o link não
+  // pode ser passado adiante.
+  ok('§15) abrir o processo não apaga o deep-link da barra de endereços',
+    !/onModalOpened/.test(kanban),
+    'a limpeza no OPEN fazia o refresh cair em /kanban puro')
+  ok('§15) fechar é que consome o link', /onModalClosed=\{handleModalClosed\}/.test(kanban))
+  ok('§15) e é só aí que a URL é reescrita',
+    /handleModalClosed[\s\S]{0,400}?replaceState/.test(kanban))
+  // O quadro mostra UM país e UM tipo por vez: chegar pelo link exige posicionar.
+  ok('§5) o quadro se posiciona no país/tipo do processo alvo',
+    /\/api\/processos\/\$\{initialProcessoId\}\/localizacao/.test(kanban)
+    && /setPaisSelecionado\(loc\.pais\)/.test(kanban),
+    'sem isso, link de processo espanhol aberto por quem está na Itália não acha nada')
+  ok('§5) posicionar é LEITURA — o endpoint só responde onde o processo mora',
+    !/\bprisma\.\w+\.(update|create|delete|upsert)/.test(
+      semComentarios(ler('src/app/api/processos/[processoId]/localizacao/route.ts'))))
+
+  // ══════════════════════════════════════════════════════════════════════════
+  secao('§13/§14) TODA superfície usa o MESMO construtor de URL')
+  // ══════════════════════════════════════════════════════════════════════════
+  const superficies = [
+    ['Minha Fila / cockpit', 'src/components/operacao/central-tarefas.tsx'],
+    ['Visão global (Tarefas e Projetos)', 'src/components/operacao/visao-global.tsx'],
+  ] as const
+  for (const [nome, arq] of superficies) {
+    const src = semComentarios(ler(arq))
+    ok(`§13) ${nome} navega pelo construtor único`, /urlOperacionalDaTarefa/.test(src))
+    ok(`§13) ${nome} não monta \`/kanban?\` na unha`, !/["'`]\/kanban\?/.test(src), arq)
+  }
+  // A notificação carrega o link JÁ PRONTO — e ele vem do mesmo lugar.
+  const comandos = semComentarios(ler('lib/operacional/tarefa-comandos.ts'))
+  ok('§14) a notificação usa o mesmo construtor',
+    /linkDaTarefa[\s\S]{0,300}?urlOperacionalDaTarefa/.test(comandos))
+  ok('§14) e ninguém mais escreve o caminho à mão',
+    !/["'`]\/kanban\?processoId=/.test(comandos))
+
   await limpar()
   console.log(`\n${'═'.repeat(70)}`)
   console.log(`Total: ${passou + falhou} | ✅ ${passou} | ❌ ${falhou}`)

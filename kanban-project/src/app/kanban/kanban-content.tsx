@@ -9,7 +9,7 @@
 
 "use client"
 
-import { useEffect, useState, useCallback, useMemo } from "react"
+import { useEffect, useState, useCallback, useMemo, useRef } from "react"
 import { useApi } from "@/src/lib/dados"
 import { useIsClient, useJsonLocalStorage, useLocalStorage } from "@/src/lib/cliente"
 import { useRouter, useSearchParams } from "next/navigation"
@@ -133,6 +133,36 @@ export function KanbanContent() {
   // DEEP-LINK OPERACIONAL: a tarefa que a Central deve localizar lá dentro.
   const initialTaskId = linkConsumido ? null : inteiroDaUrl(searchParams.get("taskId"))
 
+  // DEEP-LINK: o quadro precisa estar no país e no tipo DO PROCESSO ALVO.
+  // Sem isto, um link para um processo espanhol aberto por quem estava na Itália
+  // renderiza o quadro italiano — o processo não está na lista, o modal nunca
+  // monta, e o link falha calado. Quem manda é o processo, não a última escolha
+  // de quem clicou; depois de posicionado, a escolha do usuário volta a valer.
+  const posicionadoPara = useRef<number | null>(null)
+  useEffect(() => {
+    if (initialProcessoId == null) return
+    if (posicionadoPara.current === initialProcessoId) return
+    let vivo = true
+    void (async () => {
+      try {
+        const r = await fetch(`/api/processos/${initialProcessoId}/localizacao`, {
+          headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+        })
+        if (!r.ok || !vivo) return
+        const loc = (await r.json()) as { pais?: string | null; tipoProcessoMotorId?: number | null }
+        if (!vivo || !loc?.pais) return
+        posicionadoPara.current = initialProcessoId
+        setPaisSelecionado(loc.pais)
+        if (loc.tipoProcessoMotorId != null) {
+          setTipoEscolhido({ pais: loc.pais, id: loc.tipoProcessoMotorId })
+        }
+      } catch {
+        // Posicionamento é conveniência: se falhar, o quadro segue onde estava.
+      }
+    })()
+    return () => { vivo = false }
+  }, [initialProcessoId, token])
+
   // Modal de processo na aba Clientes
   const [clientesProcessoModal, setClientesProcessoModal] = useState<Processo | null>(null)
   const [isClientesProcessoModalOpen, setIsClientesProcessoModalOpen] = useState(false)
@@ -157,17 +187,21 @@ export function KanbanContent() {
     [processos, tipoSelecionado]
   )
 
-  // Callback para limpar URL params depois que o modal abriu
-  const handleModalOpened = useCallback(() => {
+  // A URL É O CONTEXTO ENQUANTO O CONTEXTO EXISTE.
+  //
+  // Antes, abrir o modal limpava `processoId/tab/taskId` da barra de endereços.
+  // O efeito colateral era grave para um deep-link operacional: dar F5 na tela
+  // aberta perdia o processo, a tarefa e o documento, e o link deixava de poder
+  // ser copiado para outra pessoa — o endereço passava a ser só `/kanban`.
+  //
+  // Abrir NÃO consome mais o link. Quem consome é FECHAR: aí o contexto
+  // realmente terminou, e a URL volta a descrever a tela que ficou à vista.
+  const handleModalClosed = useCallback(() => {
     const newUrl = new URL(window.location.href)
-    newUrl.searchParams.delete("processoId")
-    newUrl.searchParams.delete("tab")
-    newUrl.searchParams.delete("pessoaId")
-    newUrl.searchParams.delete("sidebarTab")
-    newUrl.searchParams.delete("atividadeId")
-    newUrl.searchParams.delete("taskId")
+    for (const p of ["processoId", "tab", "pessoaId", "sidebarTab", "atividadeId", "taskId"]) {
+      newUrl.searchParams.delete(p)
+    }
     window.history.replaceState({}, "", newUrl.toString())
-
     setLinkConsumido(true)
   }, [])
 
@@ -392,7 +426,7 @@ export function KanbanContent() {
                     initialTab={initialTab}
                     initialPessoaId={initialPessoaId}
                     initialSidebarTab={initialSidebarTab}
-                    onModalOpened={handleModalOpened}
+                    onModalClosed={handleModalClosed}
                     initialAtividadeId={initialAtividadeId}
                     initialTaskId={initialTaskId}
                   />

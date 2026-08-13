@@ -121,6 +121,19 @@ async function main() {
     update: { permissoesCustom: PERMISSOES_EXECUTOR }, select: { id: true },
   })
 
+  // O PAÍS NO CATÁLOGO — sem ele o Kanban não lista processo nenhum, e o
+  // deep-link chega a uma tela vazia. Não é detalhe de teste: é a mesma
+  // dependência que produção tem.
+  await prisma.catalogoPais.upsert({
+    where: { countryKey: 'espanha' },
+    create: {
+      countryKey: 'espanha', countryLabel: 'Espanha',
+      nationalityKey: 'espanhola', nationalityLabel: 'Espanhola',
+      flag: '🇪🇸', language: 'es', defaultCurrency: 'EUR', ativo: true,
+    },
+    update: { ativo: true },
+  })
+
   // A UNIDADE DE TRABALHO do palco.
   //
   // A tela de aptidões oferece PERFIS OPERACIONAIS do Cadastro Mestre — não
@@ -138,13 +151,27 @@ async function main() {
     update: { ativo: true }, select: { id: true },
   })
 
+  // O TIPO DE PROCESSO — o Kanban filtra por país E por tipo, e só mostra
+  // processo com `tipoProcessoMotorId`. Sem isto o quadro fica vazio e o
+  // deep-link chega a lugar nenhum, exatamente como em produção.
+  const tipo = await prisma.tipoProcessoNacionalidade.upsert({
+    where: { code: `${MARCA}_ESP_ADM` },
+    create: {
+      code: `${MARCA}_ESP_ADM`, name: 'Espanha — Administrativa (palco)',
+      countryKey: 'espanha', countryLabel: 'Espanha',
+      nationalityKey: 'espanhola', nationalityLabel: 'Espanhola',
+      modalityKey: 'administrativa', modalityLabel: 'Administrativa',
+    },
+    update: { ativo: true, arquivado: false }, select: { id: true },
+  })
+
   const criadas: Record<string, number> = {}
 
   for (const [i, c] of CENAS.entries()) {
     const item = await prisma.itemCatalogo.create({ data: { code: `${MARCA}_${i}`, name: c.item, natureza: 'DOCUMENTO' }, select: { id: true } })
     const arv = await prisma.arvore.create({ data: { nome: `${MARCA} ${i}` }, select: { id: true } })
     const proc = await prisma.processo.create({
-      data: { nome: `${MARCA} ${c.familia}`, pais: 'espanha', arvoreId: arv.id, workflowRuntime: 'v2', faseAtualKey: c.fase },
+      data: { nome: `${MARCA} ${c.familia}`, pais: 'espanha', arvoreId: arv.id, workflowRuntime: 'v2', faseAtualKey: c.fase, tipoProcessoMotorId: tipo.id },
       select: { id: true },
     })
     const pes = await prisma.pessoa.create({ data: { arvoreId: arv.id, nome: c.pessoa[0], sobrenome: c.pessoa[1] }, select: { id: true } })

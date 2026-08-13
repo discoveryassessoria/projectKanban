@@ -57,7 +57,8 @@ interface KanbanBoardProps {
   initialSidebarTab?: string | null
   initialAtividadeId?: number | null
   initialTaskId?: number | null
-  onModalOpened?: () => void
+  /** O contexto do deep-link acabou — a URL pode voltar a ser só `/kanban`. */
+  onModalClosed?: () => void
 }
 
 // Helper para extrair ID numérico de IDs prefixados ("card-12" -> 12)
@@ -88,7 +89,7 @@ export function KanbanBoard({
   initialTab = null,
   initialPessoaId = null,
   initialSidebarTab = null,
-  onModalOpened,
+  onModalClosed,
   initialAtividadeId = null,
   initialTaskId = null,
 }: KanbanBoardProps) {
@@ -159,12 +160,6 @@ export function KanbanBoard({
   const atividadeInicialDoModal = aberturaPorLink ? (initialAtividadeId || undefined) : modalInitialAtividadeId
   const taskInicialDoModal = aberturaPorLink ? (initialTaskId || undefined) : undefined
 
-  // Avisar o pai que o modal abriu é EFEITO (é comunicação para fora), e continua
-  // sendo — só não carrega mais estado nenhum junto.
-  useEffect(() => {
-    if (aberturaPorLink) onModalOpened?.()
-  }, [aberturaPorLink, onModalOpened])
-
   // Processos agrupados por fase (A-Z dentro da fase)
   const processosByFase = useMemo(() => {
     const map = new Map<string, Processo[]>()
@@ -193,7 +188,7 @@ export function KanbanBoard({
   const handleModalClose = () => {
     // Fechar também DISPENSA o deep-link: sem isso, o link reabriria o modal no render
     // seguinte, que é exatamente o que o flag `initialParamsProcessed` evitava antes.
-    if (linkDeepId !== null) setLinkDispensado(linkDeepId)
+    if (linkDeepId !== null) { setLinkDispensado(linkDeepId); onModalClosed?.() }
     setIsDetailsModalOpen(false)
     setModalInitialTab(undefined)
     setModalInitialPessoaId(undefined)
