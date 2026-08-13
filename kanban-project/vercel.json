@@ -11,6 +11,10 @@
     {
       "path": "/api/cron/saude",
       "schedule": "0 * * * *"
+    },
+    {
+      "path": "/api/cron/avisos-prazo",
+      "schedule": "0 * * * *"
     }
   ]
 }

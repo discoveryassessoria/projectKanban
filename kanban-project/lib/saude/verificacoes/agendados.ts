@@ -133,3 +133,87 @@ registrar({
     }
   },
 })
+
+registrar({
+  id: 'saude.cron.avisos-de-prazo',
+  codigo: 'PRZ-001',
+  nome: 'A varredura de prazos está avisando',
+  descricao: 'O cron horário /api/cron/avisos-prazo avisa o responsável quando o prazo vence. Tarefa vencida SEM o aviso dela é prova de que a varredura não está rodando.',
+  dominio: 'OBSERVABILIDADE',
+  modulo: 'Plataforma / Jobs agendados',
+  severidadePadrao: 'ERRO',
+  obrigatoria: true,
+  modos: ['RAPIDO', 'COMPLETO', 'PROFUNDO'],
+  introduzidaEm: '2.0.0',
+  timeoutMs: 20_000,
+  orientacao: 'Confira o cron /api/cron/avisos-prazo na Vercel; rode /api/cron/avisos-prazo?ensaio=1 para ver o que seria enviado.',
+  rotaCorrecao: '/operacao',
+  responsavel: 'Plataforma',
+  ativo: true,
+  executar: async (): Promise<ResultadoVerificacao> => {
+    // A EVIDÊNCIA É O EFEITO, não um registro de execução.
+    //
+    // A varredura não grava nada quando não há marco — e é assim que deve ser.
+    // Então o que se mede é o buraco: tarefa VENCIDA, com responsável, sem o
+    // aviso de atraso correspondente. Sem tarefa vencida, não há buraco, e um
+    // sistema em dia não vira alarme.
+    //
+    // A folga de duas horas existe porque o cron é horário: cobrar o aviso no
+    // minuto seguinte ao vencimento acusaria atraso do relógio, não do job.
+    const agora = new Date()
+    const corte = new Date(agora.getTime() - 2 * HORA)
+    const vencidas = await prisma.tarefa.findMany({
+      where: {
+        statusTarefa: { notIn: ['CONCLUIDO_RECEBIDO', 'CONCLUIDO_NAO_POSSUI', 'CANCELADA', 'SUPERSEDIDA'] },
+        responsavelId: { not: null },
+        dataPrazo: { not: null, lt: corte },
+      },
+      select: { id: true, titulo: true, dataPrazo: true, responsavelId: true },
+      orderBy: { dataPrazo: 'asc' },
+      take: 200,
+    })
+
+    const semAviso: typeof vencidas = []
+    if (vencidas.length) {
+      const avisos = await prisma.notificacaoOperacional.findMany({
+        where: { tipo: 'ATRASO', tarefaId: { in: vencidas.map((t) => t.id) } },
+        select: { tarefaId: true, chaveIdempotencia: true },
+      })
+      const avisadas = new Set(avisos.map((a) => a.chaveIdempotencia))
+      for (const t of vencidas) {
+        // A chave carrega o PRAZO: remarcar a tarefa cria um marco novo, e a
+        // ausência do aviso do prazo NOVO é um buraco legítimo.
+        const dia = t.dataPrazo!.toLocaleDateString('en-CA', { timeZone: 'America/Sao_Paulo' })
+        if (!avisadas.has(`notif::atraso::t${t.id}::${dia}`)) semAviso.push(t)
+      }
+    }
+
+    const achados: Achado[] = []
+    if (semAviso.length) {
+      const maisAntiga = semAviso[0]
+      const horas = Math.round((agora.getTime() - maisAntiga.dataPrazo!.getTime()) / HORA)
+      achados.push({
+        chave: 'avisos-de-prazo-parados',
+        severidade: horas > 24 ? 'ERRO' : 'ALERTA',
+        titulo: `${semAviso.length} tarefa(s) vencida(s) sem aviso de atraso`,
+        descricao: `A mais antiga venceu há ${horas}h (tarefa ${maisAntiga.id} — ${maisAntiga.titulo}).`,
+        explicacao: 'O cron /api/cron/avisos-prazo roda de hora em hora e cria um aviso por marco. Tarefa vencida sem o aviso dela significa que ele não está passando.',
+        impacto: 'O prazo vence e o responsável não fica sabendo — a fila continua correta e ninguém é avisado.',
+        entidade: 'Tarefa',
+        registroId: String(maisAntiga.id),
+        quantidade: semAviso.length,
+        link: '/operacao',
+        recomendacao: 'Verifique o cron na Vercel e rode /api/cron/avisos-prazo?ensaio=1 para conferir o que seria enviado.',
+        evidencia: { total: semAviso.length, amostra: semAviso.slice(0, 10).map((t) => ({ id: t.id, prazo: t.dataPrazo })) },
+      })
+    }
+
+    return {
+      achados,
+      metricas: { vencidas: vencidas.length, semAviso: semAviso.length },
+      resumo: vencidas.length
+        ? `${vencidas.length} tarefa(s) vencida(s), ${semAviso.length} sem aviso.`
+        : 'Nenhuma tarefa vencida — nada a avisar.',
+    }
+  },
+})

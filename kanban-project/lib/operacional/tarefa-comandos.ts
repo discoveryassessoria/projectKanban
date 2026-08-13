@@ -21,6 +21,7 @@
 // ============================================================================
 import { prisma } from '@/lib/prisma'
 import { urlOperacionalDaTarefa } from './navegacao'
+import { estadoTemporal, diaOperacional, janelaDoDiaOperacional, FUSO_OPERACIONAL } from './tempo-operacional'
 import type { Prisma } from '@prisma/client'
 import { randomUUID } from 'crypto'
 import { STATUS_TERMINAIS } from './tarefa-canonica'
@@ -46,9 +47,9 @@ export const linkDaTarefa = (tarefaId: number, processoId: number | null = null)
  * O AVISO DE UM MARCO DA TAREFA.
  *
  * `chaveIdempotencia` inclui o que torna o marco único: para atribuição, o
- * responsável e o instante do ato; para prazo e atraso, o DIA. Sem o dia, o
- * aviso de prazo renasceria a cada varredura e o sino viraria ruído; com ele,
- * é um por tarefa por dia.
+ * responsável e o instante do ato; para prazo e atraso, o PRAZO de referência
+ * (ver `marcoDoPrazo`). Sem isso o aviso renasceria a cada varredura e o sino
+ * viraria ruído.
  */
 async function notificar(
   tx: Prisma.TransactionClient,
@@ -75,20 +76,35 @@ async function notificar(
   // home da operação. Uma consulta, e só quando o aviso é realmente criado.
   const daTarefa = await tx.tarefa.findUnique({ where: { id: ev.tarefaId }, select: { processoId: true } })
 
-  const criada = await tx.notificacaoOperacional.create({
-    data: {
-      tipo: ev.tipo,
-      destinatarioId: ev.destinatarioId,
-      tarefaId: ev.tarefaId,
-      titulo: ev.titulo.slice(0, 200),
-      mensagem: ev.mensagem ?? null,
-      link: linkDaTarefa(ev.tarefaId, daTarefa?.processoId ?? null),
-      autorId: ev.autorId ?? null,
-      chaveIdempotencia: ev.chave,
-    },
-    select: { id: true },
-  })
-  return { id: criada.id, criada: true }
+  // A IDEMPOTÊNCIA É DO BANCO, não da consulta acima.
+  //
+  // Ler-e-então-criar tem uma janela: duas varreduras simultâneas leem "não
+  // existe" e as duas criam. `chaveIdempotencia` é `@unique`, então a segunda
+  // colide — e colidir é a resposta CERTA, desde que ela seja lida como "já
+  // avisado" em vez de virar erro. A verificação acima continua valendo por
+  // ser mais barata no caso comum; esta é a que garante.
+  try {
+    const criada = await tx.notificacaoOperacional.create({
+      data: {
+        tipo: ev.tipo,
+        destinatarioId: ev.destinatarioId,
+        tarefaId: ev.tarefaId,
+        titulo: ev.titulo.slice(0, 200),
+        mensagem: ev.mensagem ?? null,
+        link: linkDaTarefa(ev.tarefaId, daTarefa?.processoId ?? null),
+        autorId: ev.autorId ?? null,
+        chaveIdempotencia: ev.chave,
+      },
+      select: { id: true },
+    })
+    return { id: criada.id, criada: true }
+  } catch (e) {
+    if ((e as { code?: string })?.code !== 'P2002') throw e
+    const existente = await tx.notificacaoOperacional.findUnique({
+      where: { chaveIdempotencia: ev.chave }, select: { id: true },
+    })
+    return { id: existente?.id ?? 0, criada: false }
+  }
 }
 
 const auditar = (
@@ -300,45 +316,144 @@ export async function iniciarTarefa(args: {
 }
 
 /**
+ * O MARCO DO RELÓGIO — a identidade de um aviso de prazo.
+ *
+ * `tarefa + tipo + PRAZO DE REFERÊNCIA`. O prazo entra na chave porque é ele
+ * que define o marco: se o gestor move o prazo de 15/08 para 20/08, o aviso do
+ * dia 20 é um marco NOVO, e o do dia 15 não deve nascer depois do override.
+ *
+ * A chave NÃO carrega o dia da varredura. Carregava — e por isso o aviso de
+ * atraso renascia todo dia, transformando uma informação em ruído diário até
+ * alguém desligar o sino. Um prazo vencido é UM fato, não um fato por manhã.
+ */
+export function marcoDoPrazo(tipo: 'PRAZO' | 'ATRASO', tarefaId: number, prazo: Date): string {
+  return `notif::${tipo.toLowerCase()}::t${tarefaId}::${diaOperacional(prazo)}`
+}
+
+export interface RelatorioDaVarredura {
+  inicio: string
+  fim: string
+  avaliadas: number
+  prazo: number
+  atraso: number
+  /** Marcos que já existiam — a prova de que rodar de novo não avisa de novo. */
+  deduplicados: number
+  /** Tarefas sem responsável: não se inventa destinatário. */
+  semDestinatario: number
+  erros: number
+  ensaio: boolean
+  /** No ensaio, o que SERIA enviado — para conferir antes de ligar. */
+  previa: Array<{ tarefaId: number; tipo: 'PRAZO' | 'ATRASO'; destinatarioId: number; titulo: string; prazo: string }>
+}
+
+/**
  * OS AVISOS DO RELÓGIO — prazo próximo e atraso, da TAREFA.
  *
- * Varredura idempotente por DIA: rodar de hora em hora não multiplica o aviso.
- * Nenhum deles cria tarefa, muda workflow ou toca em etapa — atraso é uma
- * leitura do relógio contra `dataPrazo`, não um evento de negócio novo.
+ * ─── O QUE ELA FAZ, E SÓ ────────────────────────────────────────────────────
+ * Lê o estado temporal canônico e cria notificação quando um MARCO novo
+ * acontece. Não altera prazo, status, workflow, etapa, responsável nem SLA:
+ * atraso é uma leitura do relógio contra `dataPrazo`, não um evento de negócio.
+ *
+ * ─── DOIS MARCOS, UM DE CADA ────────────────────────────────────────────────
+ * PRAZO PRÓXIMO no dia anterior ao vencimento, e ATRASO quando ele passa. Um
+ * único aviso por marco, para sempre — não um por dia, não um por varredura.
+ * Uma escada de avisos (7d/5d/3d/1d) treina as pessoas a ignorar o sino.
+ *
+ * ─── QUEM RECEBE ────────────────────────────────────────────────────────────
+ * O responsável ATUAL, lido no momento da varredura. Se a tarefa mudou de mão
+ * ontem, o aviso é de quem a tem hoje — mandar para o dono histórico avisaria
+ * exatamente quem não pode fazer nada a respeito.
+ *
+ * Tarefa sem responsável não gera aviso individual: não há a quem avisar, e
+ * inventar um destinatário seria pior do que o silêncio. Ela aparece na fila
+ * "Sem responsável", que é onde essa pendência se resolve.
  */
-export async function avisarPrazosEAtrasos(opts: { diasDeAntecedencia?: number; agora?: Date } = {}) {
+export async function avisarPrazosEAtrasos(
+  opts: { agora?: Date; ensaio?: boolean } = {},
+): Promise<RelatorioDaVarredura> {
   const agora = opts.agora ?? new Date()
-  const antecedencia = opts.diasDeAntecedencia ?? 3
-  const limite = new Date(agora)
-  limite.setDate(limite.getDate() + antecedencia)
-  const dia = agora.toISOString().slice(0, 10)
+  const ensaio = opts.ensaio === true
+  const inicio = new Date()
+
+  // A JANELA: do vencido até o fim do dia de amanhã. Nada além disso é marco.
+  const fimDeAmanha = new Date(janelaDoDiaOperacional(agora).fim.getTime() + 86400000)
 
   const candidatas = await prisma.tarefa.findMany({
     where: {
       statusTarefa: { notIn: STATUS_TERMINAIS },
-      responsavelId: { not: null },
-      dataPrazo: { not: null, lte: limite },
+      dataPrazo: { not: null, lte: fimDeAmanha },
     },
-    select: { id: true, titulo: true, responsavelId: true, dataPrazo: true },
+    select: {
+      id: true, titulo: true, responsavelId: true, dataPrazo: true,
+      dataConclusao: true, statusTarefa: true,
+    },
   })
 
-  let prazo = 0, atraso = 0
-  for (const t of candidatas) {
-    const atrasada = t.dataPrazo! < agora
-    const r = await prisma.$transaction((tx) =>
-      notificar(tx, {
-        tipo: atrasada ? 'ATRASO' : 'PRAZO',
-        destinatarioId: t.responsavelId!,
-        tarefaId: t.id,
-        titulo: atrasada ? 'Tarefa em atraso' : 'Prazo se aproximando',
-        mensagem: `${t.titulo} — prazo ${t.dataPrazo!.toLocaleDateString('pt-BR', { timeZone: 'UTC' })}.`,
-        // O DIA na chave: um aviso por tarefa por dia, não um por varredura.
-        chave: `notif::${atrasada ? 'atraso' : 'prazo'}::t${t.id}::${dia}`,
-      }),
-    )
-    if (r.criada) atrasada ? atraso++ : prazo++
+  const r: RelatorioDaVarredura = {
+    inicio: inicio.toISOString(), fim: inicio.toISOString(),
+    avaliadas: candidatas.length, prazo: 0, atraso: 0,
+    deduplicados: 0, semDestinatario: 0, erros: 0, ensaio, previa: [],
   }
-  return { avaliadas: candidatas.length, prazo, atraso }
+
+  for (const t of candidatas) {
+    // O ESTADO TEMPORAL VEM DO MOTOR CANÔNICO. A varredura não decide se o SLA
+    // pausou, nem conta dias por conta própria: `dataPrazo` já é o prazo
+    // EFETIVO — `retomarSla` empurra a data quando a política manda pausar.
+    const tempo = estadoTemporal({
+      dataPrazo: t.dataPrazo,
+      dataConclusao: t.dataConclusao,
+      statusTarefa: t.statusTarefa,
+      agora,
+    })
+    const tipo: 'PRAZO' | 'ATRASO' | null =
+      tempo.atrasado ? 'ATRASO' : tempo.venceAmanha ? 'PRAZO' : null
+    if (tipo == null) continue
+
+    if (t.responsavelId == null) { r.semDestinatario++; continue }
+
+    if (ensaio) {
+      // No ensaio a idempotência também é conferida: o número que o gestor lê
+      // antes de ligar precisa ser o que REALMENTE seria enviado.
+      const chave = marcoDoPrazo(tipo, t.id, t.dataPrazo!)
+      const ja = await prisma.notificacaoOperacional.findUnique({
+        where: { chaveIdempotencia: chave }, select: { id: true },
+      })
+      if (ja) { r.deduplicados++; continue }
+      r.previa.push({
+        tarefaId: t.id, tipo, destinatarioId: t.responsavelId,
+        titulo: t.titulo, prazo: diaOperacional(t.dataPrazo!),
+      })
+      tipo === 'ATRASO' ? r.atraso++ : r.prazo++
+      continue
+    }
+
+    try {
+      const data = t.dataPrazo!.toLocaleDateString('pt-BR', { timeZone: FUSO_OPERACIONAL })
+      const criada = await prisma.$transaction((tx) =>
+        notificar(tx, {
+          tipo,
+          destinatarioId: t.responsavelId!,
+          tarefaId: t.id,
+          titulo: tipo === 'ATRASO' ? 'Prazo vencido' : 'Prazo próximo',
+          mensagem: tipo === 'ATRASO'
+            ? `${t.titulo} — o prazo de conclusão era ${data}.`
+            : `${t.titulo} — conclusão esperada até ${data}.`,
+          chave: marcoDoPrazo(tipo, t.id, t.dataPrazo!),
+        }),
+      )
+      if (criada.criada) { tipo === 'ATRASO' ? r.atraso++ : r.prazo++ }
+      else r.deduplicados++
+    } catch (e) {
+      // UMA TAREFA QUE FALHA NÃO DERRUBA A VARREDURA. O marco dela continua
+      // sem aviso, e a próxima execução o recupera — é para isso que a
+      // identidade do marco não depende do dia da varredura.
+      r.erros++
+      console.error(`[avisos] falha ao avisar tarefa ${t.id}:`, e)
+    }
+  }
+
+  r.fim = new Date().toISOString()
+  return r
 }
 
 // ═══════════════════════════════════════════════════════════════════════════

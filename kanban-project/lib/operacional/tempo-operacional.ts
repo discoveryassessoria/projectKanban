@@ -201,7 +201,17 @@ export function estadoTemporal(e: EntradaTemporal): EstadoTemporal {
   const agora = e.agora ?? new Date()
   const prazo = paraData(e.dataPrazo)
   const concluida = paraData(e.dataConclusao)
-  const encerrada = concluida != null || (e.statusTarefa != null && ENCERRADOS.has(e.statusTarefa))
+  // QUEM DIZ QUE ACABOU É O STATUS, não a data de conclusão.
+  //
+  // `dataConclusao` é HISTÓRIA e sobrevive à reabertura de propósito: apagar a
+  // data em que o trabalho foi dado por pronto na primeira vez seria reescrever
+  // o passado. Tratá-la como "acabou" fazia a tarefa REABERTA nunca mais
+  // aparecer em aviso nenhum — encerrada para o relógio, aberta para as pessoas.
+  //
+  // Sem status informado (chamadas que só têm a data), a data volta a valer.
+  const encerrada = e.statusTarefa != null
+    ? ENCERRADOS.has(e.statusTarefa)
+    : concluida != null
   const previsao = paraData(e.previsaoExterna)
   const criada = paraData(e.criadaEm)
 

@@ -219,9 +219,19 @@ ok("ela aponta para a TAREFA, não para o passo",
   /tarefaId Int/.test(corpoNotif) && !/stepInstance/i.test(corpoNotif))
 ok("e tem chave de idempotência", /chaveIdempotencia String @unique/.test(corpoNotif))
 ok("o retry não duplica", /findUnique\(\{\s*where: \{ chaveIdempotencia: ev\.chave \}/.test(comandos))
-ok("prazo e atraso são idempotentes POR DIA", /::\$\{dia\}`/.test(comandos),
-  "sem o dia na chave, o aviso renasce a cada varredura e o sino vira ruído")
-ok("a varredura distingue criada de reencontrada", /if \(r\.criada\)/.test(comandos))
+// A IDENTIDADE DO MARCO É O PRAZO, não o dia da varredura.
+//
+// Com o dia na chave, o aviso de atraso renascia toda manhã: um prazo vencido
+// virava um alerta por dia até alguém desligar o sino. E, quando o gestor movia
+// o prazo, o marco antigo continuava valendo — a tarefa remarcada recebia
+// "atrasada" pelo prazo que já não existia.
+ok("o marco é tarefa + tipo + PRAZO de referência",
+  /diaOperacional\(prazo\)/.test(comandos) && /export function marcoDoPrazo/.test(comandos),
+  "um prazo vencido é um fato, não um fato por manhã")
+ok("a varredura distingue criada de reencontrada", /criada\.criada/.test(comandos))
+ok("e a idempotência é garantida pelo BANCO, não só pela leitura",
+  /code !== 'P2002'/.test(comandos),
+  "duas varreduras simultâneas leem 'não existe' ao mesmo tempo")
 // A notificação é da TAREFA. Avisar por etapa transformaria um pedido de
 // certidão em seis avisos e devolveria, pelo sino, o desenho "etapa é tarefa"
 // que o resto do guard proíbe.
