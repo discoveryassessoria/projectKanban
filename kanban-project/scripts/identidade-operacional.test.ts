@@ -272,6 +272,32 @@ async function main() {
     ok(`§31) ${rota.split('/').slice(-2).join('/')} é leitura pura`, temGet && !escreve)
   }
 
+  // ══════════════════════════════════════════════════════════════════════════
+  secao('§11/§12) PRAZO DA TAREFA ≠ PREVISÃO DE TERCEIRO')
+  // ══════════════════════════════════════════════════════════════════════════
+  // Um cartório que demora quarenta dias não pode apagar um SLA de cinco. São
+  // duas datas com donos diferentes: `Tarefa.dataPrazo` é a promessa do
+  // escritório; `previsaoRetorno` é a estimativa de quem não trabalha aqui.
+  // Misturá-las faria a fila mentir nos dois sentidos — tarefa "no prazo"
+  // porque o terceiro prometeu, ou "atrasada" porque ele demorou.
+  const fonteDaFila = semComentarios(ler('lib/operacional/tarefa-projecoes.ts'))
+  ok('§12) a fila deriva o atraso do PRAZO DA TAREFA',
+    /atrasada: !terminal && diaDoPrazo != null && diaDoPrazo < hoje/.test(fonteDaFila))
+  ok('§12) e não conhece a previsão do terceiro',
+    !/previsaoRetorno/.test(fonteDaFila),
+    'a estimativa do cartório vive no andamento da etapa, não no prazo da tarefa')
+  const andamento = semComentarios(ler('src/lib/process-stage/andamento-etapa.ts'))
+  ok('§12) a previsão do terceiro tem casa própria', /previsaoRetorno/.test(andamento))
+  ok('§12) e ela não escreve prazo de tarefa',
+    !/dataPrazo/.test(andamento))
+  // A espera EXTERNA pausa (ou não) o SLA conforme o workflow publicado —
+  // nunca por regra fixa no código.
+  const ciclo = semComentarios(ler('lib/operacional/tarefa-ciclo.ts'))
+  ok('§13) a política de pausa vem do workflow publicado',
+    /export async function politicaDeSla/.test(ciclo) && /pausarSlaEmEsperaExterna/.test(ler('lib/operacional/tarefa-ciclo.ts')))
+  ok('§13) e existe porta para esperar e para retomar',
+    /export async function aguardarTerceiro/.test(ciclo) && /export async function retomarDeEspera/.test(ciclo))
+
   await limpar()
   console.log(`\n${'═'.repeat(70)}`)
   console.log(`Total: ${passou + falhou} | ✅ ${passou} | ❌ ${falhou}`)
