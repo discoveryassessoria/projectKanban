@@ -244,7 +244,26 @@ export async function reconciliarTarefas(
       workflowInstanceId: { not: null },
       statusTarefa: { notIn: STATUS_TERMINAIS },
       origem: { not: 'MANUAL' },
+      // DECISÃO TOMADA É DECISÃO RESPEITADA. Quem decidiu MANTER apagou a
+      // marca; sem esta condição, o reconciliador — que olha o workflow
+      // encerrado, não a marca — remarcaria a tarefa na passada seguinte e
+      // pediria de novo uma decisão já tomada.
+      causaDecididaEm: null,
       workflowInstance: { status: { in: ['CANCELADO', 'SUPERSEDIDO'] } },
+      // A CAUSA É A OBRIGAÇÃO — não a instância de workflow.
+      //
+      // Instância SUPERSEDIDA não é obrigação cancelada: mover o processo de
+      // fase supersede o roteiro da fase anterior, e a certidão que faltava
+      // continua faltando. Sem esta condição, mudar de fase CANCELAVA as
+      // certidões pendentes que ainda não tinham sido iniciadas — trabalho real
+      // sumindo da fila porque o processo andou.
+      //
+      // Só é "sem causa" quem perdeu a obrigação de verdade: a necessidade foi
+      // dispensada, supersedida por outra, ou nunca existiu.
+      OR: [
+        { necessidadeId: null },
+        { necessidade: { OR: [{ status: 'DISPENSADA' }, { supersedePorId: { not: null } }] } },
+      ],
       ...(opts.processoId ? { processoId: opts.processoId } : {}),
     },
     select: { id: true, workflowInstanceId: true, titulo: true, dataInicio: true, statusTarefa: true, causaRemovidaEm: true },

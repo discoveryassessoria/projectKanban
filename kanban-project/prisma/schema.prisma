@@ -601,6 +601,14 @@ model Tarefa {
   // deixaria a fila mentindo. Fica marcado e espera decisão de quem pode tomá-la.
   causaRemovidaEm     DateTime?
   causaRemovidaMotivo String?   @db.VarChar(300)
+  // E A DECISÃO, quando alguém a toma. Sem isto a marca "requer decisão" não
+  // tem saída: manter o trabalho zeraria `causaRemovidaEm`, e o reconciliador
+  // — que só olha o workflow encerrado — marcaria tudo de novo na passada
+  // seguinte. A decisão precisa ficar registrada para ser respeitada.
+  causaDecididaEm       DateTime?
+  causaDecisao          String?   @db.VarChar(20) // MANTER | ENCERRAR
+  causaDecisaoAutorId   Int?
+  causaDecisaoMotivo    String?   @db.VarChar(300)
 
   dependeDe TarefaDependencia[] @relation("TarefaDependente")
   bloqueia  TarefaDependencia[] @relation("TarefaPreRequisito")

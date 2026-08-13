@@ -15,12 +15,13 @@ import {
   type FailureCodeC,
   type TarefaGenIssue,
   TASK_ROLE_PADRAO,
-  montarChaveTarefa,
   mapearPrioridade,
   calcularPrazo,
   resolverResponsavel,
   passoGeraTarefa,
 } from "@/src/services/passo-tarefa-helpers"
+import { identidadeDaUnidade, tarefaVivaDaUnidade, TERMINAIS_DA_UNIDADE } from "@/lib/operacional/identidade-da-tarefa"
+import { reancorarTarefaNaUnidade } from "@/lib/operacional/tarefa-canonica"
 import { nomeDaTarefa } from "@/lib/operacional/nome-da-tarefa"
 
 /**
@@ -167,17 +168,79 @@ export async function garantirTarefaDePasso(
   const resp = resolverResponsavel({ responsavelId: step.responsavelId, papel: step.papel, equipe: step.equipe, stepKey: step.stepKey })
   const warnings: TarefaGenIssue[] = resp.warning ? [resp.warning] : []
 
-  const chaveTarefa = montarChaveTarefa({
-    stepInstanceId: step.id, taskRole, ciclo: step.ciclo, processoId: step.processoId,
-    necessidadeId: step.necessidadeId, documentoId: step.documentoId, pessoaId: step.pessoaId,
+  // A IDENTIDADE DA UNIDADE — normalizada, e a mesma que o reconciliador usa.
+  // O passo conhece o trabalho pelo lado dele (às vezes só o documento, às
+  // vezes só a necessidade); a normalização resolve o outro lado, para que dois
+  // escritores que olham a mesma certidão cheguem à mesma chave.
+  // O leitor é o `tx` do chamador quando existe: dentro de uma transação
+  // aberta, o cliente global lê fora dela — e o que ele não enxerga vira a
+  // segunda tarefa.
+  const { chave: chaveTarefa, unidade } = await identidadeDaUnidade(db, {
+    processoId: step.processoId, necessidadeId: step.necessidadeId,
+    documentoId: step.documentoId, pessoaId: step.pessoaId,
+    ciclo: step.ciclo, stepInstanceId: step.id,
   })
   const causationId = input.causationId ?? step.chaveIdempotencia
   const origem = input.origem ?? "workflow"
 
   // txExterno: compõe DENTRO de uma transação já aberta (ex.: PhaseAdvanceService).
   const corpo = async (tx: Prisma.TransactionClient): Promise<GarantirTarefaResultado> => {
-      const existente = await tx.tarefa.findFirst({ where: { chaveIdempotencia: chaveTarefa } })
-      if (existente) return { success: true, created: false, tarefa: existente, warnings, correlationId }
+      // A MESMA UNIDADE PODE JÁ TER TAREFA — nesta instância ou em outra.
+      //
+      // Mudar de fase MOVE o trabalho, não o multiplica: a certidão do Ademir
+      // continua sendo a certidão do Ademir depois que a Genealogia foi
+      // supersedida pela Emissão Documental. Criar outra aqui foi o que produziu
+      // duas tarefas vivas para o documento 2111, ambas com a Daniela.
+      //
+      // A chave não carrega a fase, de propósito — então ela encontra a tarefa
+      // da fase anterior, e o que falta não é criar: é reancorar.
+      const porChave = await tx.tarefa.findFirst({ where: { chaveIdempotencia: chaveTarefa } })
+      // TAREFA ENCERRADA NÃO RESSUSCITA — e também não bloqueia trabalho novo.
+      //
+      // Reabrir a fase sobre uma obrigação já cumprida é pedir o trabalho DE
+      // NOVO: a certidão foi obtida e agora precisa ser obtida outra vez. Nem
+      // reabrir a tarefa fechada (isso apagaria o fato de que ela foi
+      // concluída), nem devolver a fechada como se fosse a pendência (o passo
+      // novo ficaria sem tarefa, invisível para a fila e para o prazo).
+      //
+      // Nasce outra, com identidade própria: a mesma unidade, executada sob
+      // outro roteiro. O sufixo é determinístico, então repetir a
+      // materialização continua não duplicando.
+      const jaEncerrada =
+        porChave != null
+        && TERMINAIS_DA_UNIDADE.includes(porChave.statusTarefa as (typeof TERMINAIS_DA_UNIDADE)[number])
+      if (jaEncerrada && porChave!.workflowInstanceId === step.workflowInstanceId) {
+        // Mesmo roteiro: é a mesma execução, e ela terminou.
+        return { success: true, created: false, tarefa: porChave!, warnings, correlationId }
+      }
+      const chaveDaExecucao = jaEncerrada
+        ? `${chaveTarefa}|reexec${step.workflowInstanceId}`
+        : chaveTarefa
+      if (jaEncerrada) {
+        const jaRefeita = await tx.tarefa.findFirst({ where: { chaveIdempotencia: chaveDaExecucao } })
+        if (jaRefeita) return { success: true, created: false, tarefa: jaRefeita, warnings, correlationId }
+      }
+      const daUnidade = jaEncerrada ? null : porChave ?? await tarefaVivaDaUnidade(tx, unidade)
+      if (daUnidade) {
+        // Já ancorada neste passo: nada a fazer, e nada a auditar.
+        if (daUnidade.workflowStepInstanceId === step.id) {
+          const inteira = porChave ?? await tx.tarefa.findUniqueOrThrow({ where: { id: daUnidade.id } })
+          return { success: true, created: false, tarefa: inteira, warnings, correlationId }
+        }
+        const reancorada = await reancorarTarefaNaUnidade(tx, {
+          tarefaId: daUnidade.id,
+          workflowInstanceId: step.workflowInstanceId,
+          workflowStepInstanceId: step.id,
+          faseMacroKey: step.faseMacroKey,
+          chaveIdempotencia: chaveTarefa,
+          necessidadeId: unidade.necessidadeId,
+          documentoId: unidade.documentoId,
+          pessoaId: unidade.pessoaId,
+          deInstanciaId: daUnidade.workflowInstanceId,
+          chaveAnterior: daUnidade.chaveIdempotencia,
+        })
+        return { success: true, created: false, tarefa: reancorada, warnings, correlationId }
+      }
 
       const tarefa = await tx.tarefa.create({
         data: {
@@ -199,26 +262,35 @@ export async function garantirTarefaDePasso(
           taskRole,
           origem,
           correlationId,
-          chaveIdempotencia: chaveTarefa,
+          chaveIdempotencia: chaveDaExecucao,
         },
       })
 
-      await tx.workflowEvento.create({
-        data: {
+      // O EVENTO E O OUTBOX SÃO IDEMPOTENTES PELA CHAVE — e agora respeitam isso.
+      //
+      // Ambos já declaravam `chaveIdempotencia @unique`, mas escreviam com
+      // `create`: a segunda escrita da mesma chave não era ignorada, era um
+      // P2002 que derrubava a transação inteira e levava junto a criação da
+      // tarefa. Declarar a chave e depois quebrar quando ela repete é ter a
+      // idempotência no schema e não no comportamento.
+      await tx.workflowEvento.createMany({
+        data: [{
           tipo: "TAREFA_GERADA", entityType: "tarefa", entityId: tarefa.id,
           processoId: step.processoId, workflowInstanceId: step.workflowInstanceId,
           stepInstanceId: step.id, tarefaId: tarefa.id,
           correlationId, causationId,
-          chaveIdempotencia: `evt|TAREFA_GERADA|${chaveTarefa}`,
+          chaveIdempotencia: `evt|TAREFA_GERADA|${chaveDaExecucao}`,
           dados: { stepKey: step.stepKey, taskRole, ciclo: step.ciclo, prioridade, temResponsavel: resp.responsavelId != null },
-        },
+        }],
+        skipDuplicates: true,
       })
-      await tx.domainOutbox.create({
-        data: {
+      await tx.domainOutbox.createMany({
+        data: [{
           tipo: "tarefa.generated", aggregateType: "Tarefa", aggregateId: tarefa.id,
-          correlationId, causationId, chaveIdempotencia: `outbox|tarefa|${chaveTarefa}`,
+          correlationId, causationId, chaveIdempotencia: `outbox|tarefa|${chaveDaExecucao}`,
           payload: { processoId: step.processoId, stepInstanceId: step.id, taskRole, ciclo: step.ciclo, tarefaId: tarefa.id },
-        },
+        }],
+        skipDuplicates: true,
       })
 
       return { success: true, created: true, tarefa, warnings, correlationId }

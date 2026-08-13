@@ -27,6 +27,7 @@ import { reabrirPassoTx } from '@/src/services/task-step-sync'
 
 export type Falha =
   | 'NAO_ENCONTRADA' | 'TERMINAL' | 'NAO_TERMINAL' | 'CONFLITO' | 'SEM_MOTIVO' | 'INVALIDO'
+  | 'SEM_PENDENCIA' | 'JA_DECIDIDA'
 
 export type Resultado<T = { tarefaId: number }> =
   | ({ ok: true } & T)
@@ -696,6 +697,109 @@ export async function cancelarTarefa(args: {
     await auditar(tx, 'TAREFA_CANCELADA', t.id, args.autorId,
       `Tarefa "${t.titulo}" cancelada (estava ${t.statusTarefa}${t.dataInicio ? ', com trabalho já iniciado' : ''}). Motivo: ${args.motivo}`,
       { tarefaId: t.id, de: t.statusTarefa, motivo: args.motivo, codigo: args.codigo ?? 'CANCELAMENTO', jaIniciada: t.dataInicio != null })
+    return { ok: true as const, tarefaId: t.id }
+  })
+}
+
+/**
+ * DECIDIR SOBRE UMA TAREFA QUE PERDEU A CAUSA.
+ *
+ * O reconciliador marca e para. Ele para de propósito: alguém já trabalhou
+ * nessa tarefa, e jogar trabalho fora não é decisão de motor. Só que marcar sem
+ * oferecer saída deixou a fila com um cartão que pede decisão e não aceita
+ * nenhuma — o operador via "Requer decisão" e não tinha o que clicar.
+ *
+ * As respostas legítimas são exatamente duas, e nenhuma delas é nova:
+ *
+ *   ENCERRAR — o trabalho perdeu o propósito junto com a obrigação. É
+ *              cancelamento, com o motivo real, pela porta canônica.
+ *   MANTER   — a obrigação sumiu, o trabalho continua valendo (a certidão já
+ *              foi pedida ao cartório, o documento segue necessário). A tarefa
+ *              volta à fila como trabalho que uma PESSOA decidiu que existe.
+ *
+ * A decisão fica registrada. Sem esse registro, MANTER só poderia ser expresso
+ * apagando `causaRemovidaEm`, e o reconciliador — que decide olhando o workflow
+ * encerrado, não a marca — remarcaria a tarefa na passada seguinte, pedindo de
+ * novo uma decisão já tomada.
+ *
+ * Decidir NÃO inicia a tarefa e NÃO conclui a tarefa: é sobre a causa, não
+ * sobre a execução.
+ */
+export async function decidirSobreCausaRemovida(args: {
+  tarefaId: number
+  autorId: number
+  decisao: 'MANTER' | 'ENCERRAR'
+  /** Por quê. O registro sem o porquê não explica nada a quem ler depois. */
+  motivo: string
+}): Promise<Resultado> {
+  if (!args.motivo?.trim()) {
+    return { ok: false, codigo: 'SEM_MOTIVO', mensagem: 'Explique a decisão: ela fica no histórico da tarefa.' }
+  }
+  const agora = new Date()
+  const t = await prisma.tarefa.findUnique({
+    where: { id: args.tarefaId },
+    select: { id: true, titulo: true, statusTarefa: true, causaRemovidaEm: true, causaDecididaEm: true, causaDecisao: true },
+  })
+  if (!t) return { ok: false, codigo: 'NAO_ENCONTRADA', mensagem: 'Tarefa não existe.' }
+  // A DECISÃO JÁ TOMADA RESPONDE ANTES DA PENDÊNCIA. Manter o trabalho apaga
+  // `causaRemovidaEm` — é esse o efeito. Perguntar pela pendência primeiro faria
+  // o segundo clique responder "não há o que decidir", que é verdade sobre o
+  // estado e mentira sobre o que a pessoa perguntou.
+  //
+  // Idempotente na MESMA decisão: dois cliques, um efeito. Decisão DIFERENTE
+  // depois de decidida é troca de rumo, e troca de rumo tem porta própria
+  // (reabrir, cancelar) — não se faz reescrevendo a decisão anterior.
+  if (t.causaDecididaEm != null) {
+    return t.causaDecisao === args.decisao
+      ? { ok: true, tarefaId: t.id }
+      : {
+          ok: false, codigo: 'JA_DECIDIDA',
+          mensagem: `Esta tarefa já foi decidida como ${t.causaDecisao}. Para mudar, use a porta do estado atual (reabrir ou cancelar).`,
+        }
+  }
+  if (t.causaRemovidaEm == null) {
+    return { ok: false, codigo: 'SEM_PENDENCIA', mensagem: 'Esta tarefa não perdeu a causa — não há o que decidir.' }
+  }
+
+  if (args.decisao === 'ENCERRAR') {
+    // Cancelar é a porta canônica — inclusive a recusa dela (tarefa terminal)
+    // vale aqui. O registro da decisão acompanha, para o reconciliador parar.
+    const r = await cancelarTarefa({
+      tarefaId: t.id, autorId: args.autorId, motivo: args.motivo, codigo: 'CAUSA_REMOVIDA',
+    })
+    if (!r.ok) return r
+    await prisma.tarefa.update({
+      where: { id: t.id },
+      data: {
+        causaDecididaEm: agora, causaDecisao: 'ENCERRAR',
+        causaDecisaoAutorId: args.autorId, causaDecisaoMotivo: args.motivo.slice(0, 300),
+      },
+    })
+    await prisma.logAuditoria.create({
+      data: {
+        acao: 'TAREFA_CAUSA_DECIDIDA', entidade: 'Tarefa', entidadeId: t.id, usuarioId: args.autorId,
+        descricao: `Decisão sobre "${t.titulo}": ENCERRAR. ${args.motivo}`,
+        detalhes: { tarefaId: t.id, decisao: 'ENCERRAR', motivo: args.motivo },
+      },
+    })
+    return { ok: true, tarefaId: t.id }
+  }
+
+  return prisma.$transaction(async (tx) => {
+    await tx.tarefa.update({
+      where: { id: t.id },
+      data: {
+        // A marca sai da fila; o FATO de que a causa foi removida continua
+        // registrado em `causaDecisaoMotivo` e na auditoria.
+        causaRemovidaEm: null, causaRemovidaMotivo: null,
+        causaDecididaEm: agora, causaDecisao: 'MANTER',
+        causaDecisaoAutorId: args.autorId, causaDecisaoMotivo: args.motivo.slice(0, 300),
+        lockVersion: { increment: 1 },
+      },
+    })
+    await auditar(tx, 'TAREFA_CAUSA_DECIDIDA', t.id, args.autorId,
+      `Decisão sobre "${t.titulo}": MANTER o trabalho mesmo sem a obrigação que o originou. ${args.motivo}`,
+      { tarefaId: t.id, decisao: 'MANTER', motivo: args.motivo, statusTarefa: t.statusTarefa })
     return { ok: true as const, tarefaId: t.id }
   })
 }

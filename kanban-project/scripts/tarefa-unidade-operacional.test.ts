@@ -250,6 +250,15 @@ async function main() {
   const z = await montarPalco("Z")
   await reconciliarTarefas({ processoId: z.processoId })
   const tz = await tarefaDo(z.processoId)
+  // A CAUSA É A OBRIGAÇÃO. Encerrar o roteiro da fase não encerra a exigência:
+  // enquanto a necessidade estiver viva, a certidão continua sendo devida, e a
+  // tarefa não pode sair da fila por causa de uma mudança de fase.
+  await prisma.phaseWorkflowInstance.update({ where: { id: z.instanciaId }, data: { status: "SUPERSEDIDO" } })
+  const rzViva = await reconciliarTarefas({ processoId: z.processoId })
+  ok("obrigação viva NÃO é encerrada por mudança de roteiro",
+    rzViva.tarefasEncerradasSemCausa === 0 && rzViva.tarefasAguardandoDecisao === 0)
+  // Agora a exigência em si é dispensada — aí sim o trabalho perdeu a razão.
+  await prisma.necessidadeDocumental.update({ where: { id: z.necessidadeId }, data: { status: "DISPENSADA" } })
   await prisma.phaseWorkflowInstance.update({ where: { id: z.instanciaId }, data: { status: "CANCELADO" } })
   const rz = await reconciliarTarefas({ processoId: z.processoId })
   ok("a tarefa sem causa é encerrada", rz.tarefasEncerradasSemCausa === 1, `${rz.tarefasEncerradasSemCausa}`)

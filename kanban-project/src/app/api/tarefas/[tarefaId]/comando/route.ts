@@ -20,7 +20,7 @@ import { atribuirTarefa, iniciarTarefa } from '@/lib/operacional/tarefa-comandos
 import {
   reabrirTarefa, bloquearTarefa, desbloquearTarefa, aguardarTerceiro, retomarDeEspera,
   cancelarTarefa, devolverAFila, alterarPrazo, alterarPrioridade,
-  declararDependencia, removerDependencia,
+  declararDependencia, removerDependencia, decidirSobreCausaRemovida,
 } from '@/lib/operacional/tarefa-ciclo'
 import { concluirEtapa } from '@/lib/operacional/tarefa-etapa'
 
@@ -30,6 +30,7 @@ const HTTP: Record<string, number> = {
   TERMINAL: 409, NAO_TERMINAL: 409, CONFLITO: 409,
   TAREFA_TERMINAL: 409, TAREFA_BLOQUEADA: 409, TAREFA_AGUARDANDO: 409, ETAPA_NAO_EXECUTAVEL: 409,
   SEM_MOTIVO: 422, INVALIDO: 422, SEM_RESPONSAVEL: 422, MESMO_RESPONSAVEL: 422,
+  SEM_PENDENCIA: 409, JA_DECIDIDA: 409,
   DEPENDENCIA_PENDENTE: 422, EVIDENCIA_FALTANDO: 422, ETAPA_DE_OUTRA_TAREFA: 422,
 }
 
@@ -61,6 +62,10 @@ const PERMISSAO: Record<string, PermissaoChave> = {
   remover_dependencia: 'tarefas.editar',
 
   cancelar: 'tarefas.excluir',
+  // Decidir sobre uma tarefa que perdeu a causa é decisão de GESTÃO: uma das
+  // saídas encerra trabalho já feito, e quem executa não decide se o próprio
+  // trabalho deixa de valer.
+  decidir_causa: 'tarefas.excluir',
 }
 
 export async function POST(request: NextRequest, ctx: { params: Promise<{ tarefaId: string }> }) {
@@ -135,6 +140,13 @@ export async function POST(request: NextRequest, ctx: { params: Promise<{ tarefa
         })
       case 'cancelar':
         return cancelarTarefa({ tarefaId, autorId, motivo, codigo: body?.codigo ?? null })
+      case 'decidir_causa': {
+        const d = String(body?.decisao ?? '')
+        if (d !== 'MANTER' && d !== 'ENCERRAR') {
+          return { ok: false as const, codigo: 'INVALIDO', mensagem: 'decisao deve ser MANTER ou ENCERRAR' }
+        }
+        return decidirSobreCausaRemovida({ tarefaId, autorId, decisao: d, motivo })
+      }
       case 'alterar_prazo': {
         // `null` explícito remove o prazo; ausente é erro, não "sem prazo".
         if (!('novoPrazo' in body)) {

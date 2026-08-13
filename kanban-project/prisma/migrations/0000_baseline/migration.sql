@@ -5,7 +5,7 @@
 --   corpo        → gerado do prisma/schema.prisma
 --   bloco manual → prisma/baseline/bloco-manual.sql (edite LÁ)
 --
--- Gerado em : 2026-08-12
+-- Gerado em : 2026-08-13
 -- Prisma    : 6.19.3
 --
 -- PARA QUE SERVE: reconstruir o banco DO ZERO. O histórico de migrations NÃO
@@ -543,6 +543,10 @@ CREATE TABLE "Tarefa" (
     "slaPausaAcumuladaMin" INTEGER NOT NULL DEFAULT 0,
     "causaRemovidaEm" TIMESTAMP(3),
     "causaRemovidaMotivo" VARCHAR(300),
+    "causaDecididaEm" TIMESTAMP(3),
+    "causaDecisao" VARCHAR(20),
+    "causaDecisaoAutorId" INTEGER,
+    "causaDecisaoMotivo" VARCHAR(300),
     "tipo" "TipoTarefa" NOT NULL DEFAULT 'NORMAL',
     "faseOrigemCode" VARCHAR(60),
     "faseReferenciaCode" VARCHAR(60),

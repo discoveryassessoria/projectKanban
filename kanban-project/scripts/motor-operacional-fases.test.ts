@@ -319,11 +319,30 @@ async function main() {
   // ═════════════════════════════════════════════════════════════════════════
   secao("74) Perder a causa — o que acontece depende do trabalho já feito")
   // ═════════════════════════════════════════════════════════════════════════
-  // (a) nunca iniciada → cancela.
+  // (a0) A CAUSA É A OBRIGAÇÃO, NÃO O ROTEIRO.
+  //
+  // Supersedir a instância da fase é o que acontece toda vez que o processo
+  // anda: a certidão que faltava continua faltando. Enquanto a obrigação
+  // estiver viva, a tarefa não perde a causa — e cancelá-la retiraria trabalho
+  // real da fila só porque o processo mudou de fase.
+  const c1b = await processo()
+  const o1b = await obrigacao(c1b, "genealogia", "VIVA")
+  await reconciliarTarefas({ processoId: c1b.processoId })
+  const tViva = (await tarefas(c1b.processoId))[0].id
+  await prisma.phaseWorkflowInstance.update({ where: { id: o1b.instanciaId }, data: { status: "SUPERSEDIDO" } })
+  const r1b = await reconciliarTarefas({ processoId: c1b.processoId })
+  ok("fase supersedida NÃO cancela obrigação viva",
+    r1b.tarefasEncerradasSemCausa === 0 && r1b.tarefasAguardandoDecisao === 0,
+    JSON.stringify({ e: r1b.tarefasEncerradasSemCausa, d: r1b.tarefasAguardandoDecisao }))
+  ok("e a tarefa segue pendente",
+    (await prisma.tarefa.findUniqueOrThrow({ where: { id: tViva }, select: { statusTarefa: true } })).statusTarefa === "NAO_INICIADA")
+
+  // (a) nunca iniciada E OBRIGAÇÃO DISPENSADA → cancela.
   const c2 = await processo()
   const o2 = await obrigacao(c2, "genealogia", "NUNCA")
   await reconciliarTarefas({ processoId: c2.processoId })
   const tNunca = (await tarefas(c2.processoId))[0].id
+  await prisma.necessidadeDocumental.update({ where: { id: o2.necessidadeId }, data: { status: "DISPENSADA" } })
   await prisma.phaseWorkflowInstance.update({ where: { id: o2.instanciaId }, data: { status: "CANCELADO" } })
   const r2 = await reconciliarTarefas({ processoId: c2.processoId })
   ok("nunca iniciada → cancelada pelo reconciliador", r2.tarefasEncerradasSemCausa === 1, JSON.stringify({ e: r2.tarefasEncerradasSemCausa, d: r2.tarefasAguardandoDecisao }))
@@ -338,6 +357,7 @@ async function main() {
   const tIni = (await tarefas(c3.processoId))[0].id
   await atribuirTarefa({ tarefaId: tIni, responsavelId: dani, autorId: dani })
   await iniciarTarefa({ tarefaId: tIni, autorId: dani })
+  await prisma.necessidadeDocumental.update({ where: { id: o3.necessidadeId }, data: { status: "DISPENSADA" } })
   await prisma.phaseWorkflowInstance.update({ where: { id: o3.instanciaId }, data: { status: "CANCELADO" } })
   const r3 = await reconciliarTarefas({ processoId: c3.processoId })
   ok("já iniciada → NÃO é cancelada automaticamente", r3.tarefasEncerradasSemCausa === 0, `${r3.tarefasEncerradasSemCausa}`)

@@ -277,7 +277,7 @@
     "smoke:ui-exclusao:limpar": "tsx scripts/smoke-ui-setup.ts --limpar",
     "reconcile:requerente": "tsx scripts/reconciliar-derivados-requerente.ts",
     "test:guard-derivado": "tsx scripts/guard-estado-derivado.test.ts",
-    "test:reconciliacao-derivada": "tsx scripts/reconciliacao-derivada-requerente.test.ts",
+    "test:reconciliacao-derivada": "FINANCEIRO_DUAL_WRITE=1 tsx scripts/reconciliacao-derivada-requerente.test.ts",
     "test:guard-porta-requerente": "tsx scripts/guard-porta-unica-requerente.test.ts",
     "test:porta-requerente": "tsx scripts/porta-unica-requerente.test.ts",
     "test:guard-cadastro-arvore": "tsx scripts/guard-cadastro-nao-e-arvore.test.ts",

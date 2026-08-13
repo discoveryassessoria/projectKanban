@@ -22,7 +22,6 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react"
 import { useRouter } from "next/navigation"
-import { TarefaOperacional } from "./tarefa-operacional"
 import { urlOperacionalDaTarefa } from "@/lib/operacional/navegacao"
 // O vocabulário visual e o seletor de responsável são COMPARTILHADOS com a
 // visão gerencial global — mesma implementação, não uma cópia parecida.
@@ -152,8 +151,8 @@ function Linha({
  * taskId. Sem prazo não há lugar no calendário; essas ficam num grupo próprio,
  * porque some-las seria esconder trabalho.
  */
-function agruparPorDia(linhas: LinhaDeFila[]): Array<{ dia: string; rotulo: string; linhas: LinhaDeFila[] }> {
-  const porDia = new Map<string, LinhaDeFila[]>()
+function agruparPorDia(linhas: LinhaOperacional[]): Array<{ dia: string; rotulo: string; linhas: LinhaOperacional[] }> {
+  const porDia = new Map<string, LinhaOperacional[]>()
   for (const l of linhas) {
     const dia = l.dataPrazo ? l.dataPrazo.slice(0, 10) : "sem-prazo"
     const atual = porDia.get(dia)
@@ -192,9 +191,10 @@ function CartaoDaFila({
 }: {
   l: LinhaOperacional
   ocupado: boolean
-  /** Leitura rápida: o painel da tarefa, sem sair da fila. */
+  /** O único destino: a Central Operacional do processo, no documento certo. */
+  /** Só navega. Nunca comanda. */
   aoAbrir: () => void
-  /** A ação principal: inicia se precisar e leva à Central Operacional. */
+  /** A ação principal do cartão: comanda (quando há o que comandar) e navega. */
   aoExecutar: () => void
   acaoSecundaria?: React.ReactNode
 }) {
@@ -211,6 +211,13 @@ function CartaoDaFila({
   return (
     <div className={`border-b border-l-2 border-white/[0.06] px-4 py-3 transition-colors last:border-b-0 hover:bg-white/[0.02] ${corDaBorda}`}>
       <div className="flex items-start justify-between gap-4">
+        {/* O CARTÃO LEVA AO TRABALHO — E SÓ LEVA.
+            Clicar no cartão e clicar no botão chegam ao MESMO lugar (a Central
+            Operacional do processo, no documento certo), mas não fazem a mesma
+            coisa: ABRIR é olhar, INICIAR é assumir. O cartão inteiro chamando o
+            comando fazia passar os olhos numa tarefa marcá-la como começada —
+            com data de início, evento e prazo correndo — sem ninguém ter
+            decidido nada. */}
         <button type="button" onClick={aoAbrir} className="min-w-0 flex-1 cursor-pointer text-left">
           <div className="flex flex-wrap items-center gap-2">
             <span className="truncate text-[13px] font-medium text-white/90">{l.titulo}</span>
@@ -293,7 +300,6 @@ export function CentralTarefas({ podeDistribuir }: { podeDistribuir: boolean }) 
   const [ocupado, setOcupado] = useState(false)
   const [erroComando, setErroComando] = useState<string | null>(null)
   const [aviso, setAviso] = useState<string | null>(null)
-  const [aberta, setAberta] = useState<number | null>(null)
   const [modo, setModo] = useState<Modo>("lista")
 
   // Mesma disciplina do seletor: o pedido tem chave, o "carregando" é derivado
@@ -362,14 +368,18 @@ export function CentralTarefas({ podeDistribuir }: { podeDistribuir: boolean }) 
    * Tarefa que perdeu a causa não é iniciada: ela precisa de decisão, e abrir o
    * executor para ela seria tratá-la como trabalho normal.
    */
+  const abrirOTrabalho = useCallback((l: LinhaOperacional) => {
+    router.push(urlOperacionalDaTarefa({ taskId: l.taskId, processoId: l.processoId }))
+  }, [router])
+
   const irParaOTrabalho = useCallback(async (l: LinhaOperacional) => {
     const acao = acaoPrincipal(l)
     if (acao.comando === "iniciar") {
       const ok = await comandar(l.taskId, { acao: "iniciar" }, "Tarefa iniciada.")
       if (!ok) return
     }
-    router.push(urlOperacionalDaTarefa({ taskId: l.taskId, processoId: l.processoId }))
-  }, [comandar, router])
+    abrirOTrabalho(l)
+  }, [comandar, abrirOTrabalho])
 
   const contagem = useMemo(() => linhas?.length ?? 0, [linhas])
 
@@ -469,7 +479,7 @@ export function CentralTarefas({ podeDistribuir }: { podeDistribuir: boolean }) 
                 {grupo.rotulo} · {grupo.linhas.length}
               </div>
               {grupo.linhas.map((l) => (
-                <Linha key={l.taskId} l={l} aoAbrir={() => setAberta(l.taskId)} />
+                <Linha key={l.taskId} l={l} aoAbrir={() => abrirOTrabalho(l)} />
               ))}
             </div>
           ))}
@@ -482,7 +492,7 @@ export function CentralTarefas({ podeDistribuir }: { podeDistribuir: boolean }) 
             key={l.taskId}
             l={l}
             ocupado={ocupado}
-            aoAbrir={() => setAberta(l.taskId)}
+            aoAbrir={() => abrirOTrabalho(l)}
             aoExecutar={() => void irParaOTrabalho(l)}
           />
         ))}
@@ -491,7 +501,7 @@ export function CentralTarefas({ podeDistribuir }: { podeDistribuir: boolean }) 
           <Linha
             key={l.taskId}
             l={l}
-            aoAbrir={() => setAberta(l.taskId)}
+            aoAbrir={() => abrirOTrabalho(l)}
             acao={
               podeDistribuir ? (
                 <div className="flex items-center gap-1.5">
@@ -522,10 +532,6 @@ export function CentralTarefas({ podeDistribuir }: { podeDistribuir: boolean }) 
           />
         ))}
       </div>
-
-      {aberta != null && (
-        <TarefaOperacional taskId={aberta} aoFechar={() => setAberta(null)} aoMudar={carregar} />
-      )}
 
       {alvo && (
         <SeletorResponsavel

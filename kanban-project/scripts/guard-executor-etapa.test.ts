@@ -85,8 +85,10 @@ secao("2) A fase NÃO decide o executor")
  * a uma fase e deixaria qualquer fase futura sem superfície. O binding é do
  * registry, por stepKey.
  */
+// UMA ENTRADA, e é a canônica: o executor é alcançado pela Central Operacional
+// do processo. O painel que a Minha Fila montava saiu — era um segundo lugar
+// para executar a mesma etapa, e dois lugares divergem.
 const CONSUMIDORES = [
-  "src/components/operacao/tarefa-operacional.tsx",
   "src/components/kanban/workflow/CentralDaEtapaDrawer.tsx",
 ]
 for (const arq of CONSUMIDORES) {
@@ -106,28 +108,25 @@ const definemEditor = TODOS.filter((a) => /export function Editor(Solicitar|Agua
 ok("os editores estão definidos num lugar só", definemEditor.length === 1,
   definemEditor.join(", ") || "nenhum")
 const montamRouter = TODOS.filter((a) => /<StepEditorRouter/.test(semComentarios(ler(a))))
-ok("Minha Fila e Central montam o MESMO router", montamRouter.length === 2,
-  montamRouter.map((a) => a.split("/").pop()).join(" + "))
+ok("existe UM lugar que monta o router — a Central", montamRouter.length === 1,
+  montamRouter.map((a) => a.split("/").pop()).join(" + ") || "nenhum")
+ok("e a Minha Fila NÃO monta executor",
+  !montamRouter.some((a) => a.includes("/operacao/")),
+  "priorizar não é executar")
 
 // ═══════════════════════════════════════════════════════════════════════════
 secao("4) Conclusão genérica NÃO substitui operação especializada")
 // ═══════════════════════════════════════════════════════════════════════════
-const painel = semComentarios(ler("src/components/operacao/tarefa-operacional.tsx"))
-ok("a tarefa operacional distingue etapa especializada de simples",
-  /e\.especializado/.test(painel),
+// A etapa especializada abre o executor pela Central da Etapa — a mesma porta
+// de sempre, agora a ÚNICA.
+const central = semComentarios(ler("src/components/kanban/workflow/CentralDaEtapaDrawer.tsx"))
+// Ela distingue pelo REGISTRY (kind do editor), que é o binding canônico —
+// não por nome de fase nem por texto do passo.
+ok("a Central da Etapa distingue etapa especializada de simples",
+  /resolveWorkflowStepEditor/.test(central) && /StepEditorKind/.test(central),
   "sem isso, a superfície especializada some atrás de um botão")
-ok("etapa especializada abre o EXECUTOR",
-  /e\.especializado[\s\S]{0,400}setExecutando\(e\)/.test(painel))
-ok("a ação não se chama 'Concluir etapa' quando há executor",
-  /Continuar etapa[\s\S]{0,80}Abrir etapa|Abrir etapa/.test(painel),
-  "o CTA descreve o trabalho, não o desfecho")
-// A ordem importa e é o que se verifica: dentro do ramo `especializado` vem o
-// executor; a conclusão direta só aparece DEPOIS, no ramo alternativo.
-ok("a conclusão genérica só existe no ramo NÃO especializado",
-  /e\.especializado[\s\S]{0,600}setExecutando\(e\)[\s\S]{0,600}concluir_etapa/.test(painel),
-  "etapa sem operação estruturada conclui direto — e é honesto")
 ok("o executor recebe stepId e documentoId canônicos",
-  /stepId=\{executando\.id\}/.test(painel) && /documentoId=\{executando\.documentoId\}/.test(painel),
+  /stepId=\{/.test(central) && /documentoId=\{/.test(central),
   "nada de inferir por título ou estado global")
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -193,16 +192,15 @@ secao("8) Selecionar dentro do executor NÃO fecha o painel")
  *
  * A correção é estrutural: o executor é IRMÃO do overlay, não filho.
  */
-const painelSrc = ler("src/components/operacao/tarefa-operacional.tsx")
-const posOverlay = painelSrc.indexOf('onClick={aoFechar}>')
-const posExecutor = painelSrc.indexOf("<StepEditorRouter")
-const fechaOverlayAntes = painelSrc.lastIndexOf("</div>", posExecutor)
-ok("o executor é montado FORA do overlay que fecha o painel",
-  posOverlay > 0 && posExecutor > 0 && fechaOverlayAntes > posOverlay,
-  "portal propaga evento pela árvore de componentes; dentro do overlay, todo clique fecharia a tarefa")
-ok("e o painel devolve um fragmento, não a div do overlay",
-  /return \(\s*<>/.test(semComentarios(painelSrc)),
-  "é o que permite o executor ser irmão do fundo clicável")
+// A lição vale para quem MONTA o executor hoje: a Central da Etapa. O executor
+// não pode ser filho do fundo clicável que fecha a superfície — foi assim que,
+// em produção, clicar numa opção obrigatória fechava a etapa inteira.
+const centralSrc = ler("src/components/kanban/workflow/CentralDaEtapaDrawer.tsx")
+const posExecutorCentral = centralSrc.indexOf("<StepEditorRouter")
+ok("quem monta o executor hoje é a Central da Etapa", posExecutorCentral > 0)
+ok("e ela não fecha a superfície ao clicar dentro do executor",
+  !/onClick=\{[^}]*fechar[^}]*\}[\s\S]{0,200}<StepEditorRouter/.test(centralSrc),
+  "portal propaga evento pela árvore de COMPONENTES, não pela do DOM")
 
 // ═══════════════════════════════════════════════════════════════════════════
 console.log(`\n${"═".repeat(70)}`)

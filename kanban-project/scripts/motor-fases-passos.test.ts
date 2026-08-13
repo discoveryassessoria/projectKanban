@@ -62,6 +62,13 @@ async function semear() {
   // CATÁLOGO DE CERTIDÕES — espelha produção: TipoDocumentoCadastro com
   // legacyEnumKey (é por ele que a regra da árvore resolve o item mestre) e natureza
   // "certidao" (é o que torna a necessidade um alvo de localização registral).
+  // A NATUREZA OPERACIONAL é obrigatória: sem ela o tipo documental não passa
+  // pela política da fase, e a Genealogia recusa materializar dizendo
+  // exatamente isso. Era um cadastro que este palco não tinha.
+  const natureza = await prisma.naturezaOperacionalDocumento.upsert({
+    where: { code: "MFP_CERTIDAO" }, update: {},
+    create: { code: "MFP_CERTIDAO", name: "Certidão (palco)", exigeWorkflow: false },
+  })
   for (const c of [
     { code: "IT - NAS", name: "Certidão de nascimento - Inteiro Teor", enumKey: "CERTIDAO_NASCIMENTO_INTEIRO_TEOR" },
     { code: "IT - CAS", name: "Certidão de casamento - Inteiro Teor", enumKey: "CERTIDAO_CASAMENTO_INTEIRO_TEOR" },
@@ -69,9 +76,43 @@ async function semear() {
   ]) {
     const item = await prisma.itemCatalogo.create({ data: { code: c.code, name: c.name, natureza: "DOCUMENTO" } })
     await prisma.tipoDocumentoCadastro.create({
-      data: { code: c.code, name: c.name, nature: "certidao", legacyEnumKey: c.enumKey, itemCatalogoId: item.id },
+      data: {
+        code: c.code, name: c.name, nature: "certidao", legacyEnumKey: c.enumKey,
+        itemCatalogoId: item.id, naturezaOperacionalId: natureza.id,
+      },
     })
   }
+
+  // A POLÍTICA DA FASE — quais naturezas a Genealogia materializa. Fase sem
+  // política declarada não materializa nada, de propósito: esquecimento de
+  // cadastro não pode virar materialização indevida.
+  const faseCatalogo = await prisma.catalogoFase.upsert({
+    where: { phaseKey: "genealogia" }, update: {},
+    create: { phaseKey: "genealogia", label: "Genealogia" },
+  })
+  await prisma.faseNaturezaPermitida.upsert({
+    where: { catalogoFaseId_naturezaOperacionalId: { catalogoFaseId: faseCatalogo.id, naturezaOperacionalId: natureza.id } },
+    update: { ativo: true },
+    create: { catalogoFaseId: faseCatalogo.id, naturezaOperacionalId: natureza.id, ativo: true },
+  })
+
+  // A REGRA DOCUMENTAL PUBLICADA — é ela que cria a obrigação.
+  //
+  // Este palco assumia a "regra da árvore" (DOCUMENT_RULES, hardcoded), que foi
+  // DESLIGADA: quem cria necessidade hoje é a Matriz Documental publicada, e a
+  // instanciação da fase só LÊ. Sem publicar nada, a Genealogia passou a
+  // responder SEM_ALVO_APLICAVEL — corretamente, e o palco é que envelheceu.
+  await prisma.matrizDocumental.create({
+    data: {
+      tipoProcessoId: 0, aplicaTodosProcessos: true,
+      documentTypeCode: "IT - NAS", documentosAceitos: ["IT - NAS"],
+      codigo: "NASC_IT", nome: "Certidão de nascimento de cada pessoa da árvore",
+      requisitoNome: "Certidão de nascimento - Inteiro Teor",
+      status: "PUBLICADA", arquivado: false,
+      faseExigencia: "genealogia", obrigatoriedade: "OBRIGATORIA",
+      publicoAlvo: "TODAS_AS_PESSOAS_DA_ARVORE",
+    },
+  })
 
   // Macro do processo: uma FaseMacro por fase do cadastro.
   const macro = await prisma.macroWorkflow.create({
@@ -142,8 +183,8 @@ async function main() {
     const esperados = f.passos.map(slug)
     const ordemVista = [...new Set(passos.map((s) => s.stepKey))]
     check(`${f.phaseKey}: ordem oficial preservada`, ordemVista.join(",") === esperados.join(","), ordemVista.join(","))
-    check(`${f.phaseKey}: SEM Regra Documental publicada e SEM documento materializado`,
-      (await prisma.matrizDocumental.count()) === 0 &&
+    check(`${f.phaseKey}: a obrigação vem da REGRA PUBLICADA, sem documento materializado`,
+      (await prisma.matrizDocumental.count({ where: { status: "PUBLICADA" } })) === 1 &&
       (await prisma.documento.count({ where: { pessoa: { arvoreId: (await prisma.processo.findUnique({ where: { id: p.id }, select: { arvoreId: true } }))!.arvoreId! } } })) === 0)
     check(`${f.phaseKey}: config preservada (obrigatório + gera tarefa + SLA + equipe)`,
       passos.every((s) => s.obrigatorio && s.geraTarefa && s.slaDays === 5 && s.papel === "equipe_documental"))
@@ -153,13 +194,17 @@ async function main() {
         : passos.every((s) => s.pessoaId === null && s.necessidadeId === null && s.documentoId === null))
   }
 
-  console.log("\n(1b) Genealogia: um alvo por pessoa/registro, sem Regra Documental publicada")
+  console.log("\n(1b) Genealogia: um alvo por pessoa/registro, a partir da Regra publicada")
   {
     const pg = processos["genealogia"]
     const necs = await prisma.necessidadeDocumental.findMany({
       where: { processoId: pg }, select: { id: true, pessoaId: true, origem: true, ruleCode: true, itemCatalogoId: true },
     })
-    check("necessidades vieram da REGRA DA ÁRVORE (origem ARVORE)", necs.length > 0 && necs.every((n) => n.origem === "ARVORE"), JSON.stringify(necs.map((n) => n.origem)))
+    // A origem mudou de dono, e é isto que se protege: a obrigação nasce da
+    // Matriz PUBLICADA, não de regra escrita em código.
+    check("necessidades vieram da REGRA DOCUMENTAL publicada",
+      necs.length > 0 && necs.every((n) => n.ruleCode === "NASC_IT"),
+      JSON.stringify(necs.map((n) => `${n.origem}/${n.ruleCode}`)))
     check("uma certidão de nascimento por pessoa da árvore", necs.filter((n) => n.ruleCode === "NASC_IT").length === 2, String(necs.length))
     const passos = await passosDa(pg)
     check("cada passo preserva o vínculo com o registro", passos.every((s) => s.necessidadeId != null))

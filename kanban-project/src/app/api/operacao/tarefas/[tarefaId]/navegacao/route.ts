@@ -34,7 +34,7 @@ export async function GET(request: NextRequest, ctx: { params: Promise<{ tarefaI
     select: {
       id: true, titulo: true, processoId: true, pessoaId: true, documentoId: true,
       necessidadeId: true, workflowInstanceId: true, workflowStepInstanceId: true,
-      statusTarefa: true, causaRemovidaEm: true, responsavelId: true,
+      statusTarefa: true, causaRemovidaEm: true, causaRemovidaMotivo: true, responsavelId: true,
       workflowStepInstance: { select: { pessoaId: true, documentoId: true } },
     },
   })
@@ -58,6 +58,8 @@ export async function GET(request: NextRequest, ctx: { params: Promise<{ tarefaI
     stepInstanceId: t.workflowStepInstanceId,
     statusTarefa: t.statusTarefa,
     requerDecisao: t.causaRemovidaEm != null,
+    // Pedir uma decisão sem dizer o que aconteceu é pedir um chute.
+    causaRemovidaMotivo: t.causaRemovidaMotivo,
     titulo: t.titulo,
   }
   return NextResponse.json({ alvo })

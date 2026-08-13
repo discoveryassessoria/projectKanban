@@ -298,7 +298,15 @@ async function main() {
     })
   }
 
-  // Documento Mestre com as certidões da regra da árvore (NASC/CAS/OBT inteiro teor).
+  // CADASTRO DOCUMENTAL COMPLETO — Natureza → Item → Tipo → política da fase →
+  // Regra PUBLICADA. Este palco descrevia a "regra da árvore" (DOCUMENT_RULES,
+  // hardcoded), que foi desligada: hoje quem cria obrigação é a Matriz
+  // Documental publicada, e sem esse cadastro a Genealogia responde
+  // SEM_ALVO_APLICAVEL — corretamente.
+  const natureza = await prisma.naturezaOperacionalDocumento.upsert({
+    where: { code: "MAT_CERTIDAO" }, update: {},
+    create: { code: "MAT_CERTIDAO", name: "Certidão (palco materialização)", exigeWorkflow: false },
+  })
   for (const [code, enumKey] of [
     ["IT - NAS", "CERTIDAO_NASCIMENTO_INTEIRO_TEOR"],
     ["IT - CAS", "CERTIDAO_CASAMENTO_INTEIRO_TEOR"],
@@ -308,9 +316,31 @@ async function main() {
       data: { code: `CERT_${code.replace(/\W+/g, "_")}`, name: code, natureza: "DOCUMENTO" },
     })
     await prisma.tipoDocumentoCadastro.create({
-      data: { code, name: code, legacyEnumKey: enumKey, itemCatalogoId: item.id, nature: "certidao" },
+      data: {
+        code, name: code, legacyEnumKey: enumKey, itemCatalogoId: item.id, nature: "certidao",
+        naturezaOperacionalId: natureza.id,
+      },
     })
   }
+  const faseCatalogo = await prisma.catalogoFase.upsert({
+    where: { phaseKey: "genealogia" }, update: {},
+    create: { phaseKey: "genealogia", label: "Genealogia" },
+  })
+  await prisma.faseNaturezaPermitida.upsert({
+    where: { catalogoFaseId_naturezaOperacionalId: { catalogoFaseId: faseCatalogo.id, naturezaOperacionalId: natureza.id } },
+    update: { ativo: true },
+    create: { catalogoFaseId: faseCatalogo.id, naturezaOperacionalId: natureza.id, ativo: true },
+  })
+  await prisma.matrizDocumental.create({
+    data: {
+      tipoProcessoId: 0, aplicaTodosProcessos: true,
+      documentTypeCode: "IT - NAS", documentosAceitos: ["IT - NAS"],
+      codigo: "NASC_IT", nome: "Certidão de nascimento de cada pessoa da árvore",
+      requisitoNome: "IT - NAS", status: "PUBLICADA", arquivado: false,
+      faseExigencia: "genealogia", obrigatoriedade: "OBRIGATORIA",
+      publicoAlvo: "TODAS_AS_PESSOAS_DA_ARVORE",
+    },
+  })
 
   const usuario = await prisma.usuario.upsert({
     where: { email: "master@materializacao.local" }, update: {},
@@ -387,12 +417,33 @@ async function main() {
       porFase: passos.reduce<Record<string, number>>((a, p) => { a[`${p.faseMacroKey}#${p.ciclo}`] = (a[`${p.faseMacroKey}#${p.ciclo}`] ?? 0) + 1; return a }, {}),
     }
   }
+  // O QUE A INVARIANTE PROTEGE É A OBRIGAÇÃO.
+  //
+  // "Mudar de fase não altera obrigação alheia" fala de trabalho ligado a uma
+  // exigência real — uma certidão de alguém. A certidão que faltava continua
+  // faltando quando o processo anda, e nada pode encerrá-la por tabela.
+  //
+  // O passo ADMINISTRATIVO da fase abandonada é outra coisa: a causa dele é o
+  // próprio ciclo da fase, e o ciclo foi supersedido. Ele é encerrado com
+  // motivo e auditoria — nada é apagado —, e por isso não entra nesta conta.
+  const semObrigacao = new Set<number>()
+  const marcarSemObrigacao = async () => {
+    const ts = await prisma.tarefa.findMany({
+      where: { processoId: processo.id, necessidadeId: null, documentoId: null },
+      select: { id: true },
+    })
+    for (const t of ts) semObrigacao.add(t.id)
+  }
   const alheiasIntactas = (antes: Awaited<ReturnType<typeof fotografar>>, depois: Awaited<ReturnType<typeof fotografar>>) => {
     for (const [id, v] of antes.passos) if (depois.passos.get(id) !== v) return `passo ${id}: ${v} → ${depois.passos.get(id)}`
-    for (const [id, v] of antes.tarefas) if (depois.tarefas.get(id) !== v) return `tarefa ${id}: ${v} → ${depois.tarefas.get(id)}`
+    for (const [id, v] of antes.tarefas) {
+      if (semObrigacao.has(id)) continue
+      if (depois.tarefas.get(id) !== v) return `tarefa ${id}: ${v} → ${depois.tarefas.get(id)}`
+    }
     return null
   }
 
+  await marcarSemObrigacao()
   const antesMove = await fotografar()
   const mv1 = await movePhaseManual(processo.id, {
     faseAlvo: "traducao", justificativa: "Processo já estava em tradução no fornecedor.",
@@ -428,6 +479,7 @@ async function main() {
   const passosCiclo1Antes = await prisma.phaseWorkflowStepInstance.findMany({
     where: { workflowInstanceId: cicloAntigo!.id }, select: { id: true, status: true }, orderBy: { id: "asc" },
   })
+  await marcarSemObrigacao()
   const antesVolta = await fotografar()
 
   const mv2 = await movePhaseManual(processo.id, {
@@ -452,6 +504,18 @@ async function main() {
   check("o ciclo 2 tem tarefas próprias de busca", tarefasCiclo2 > 0, String(tarefasCiclo2))
   const depoisVolta = await fotografar()
   check("voltar não alterou obrigação nenhuma preexistente", alheiasIntactas(antesVolta, depoisVolta) === null, alheiasIntactas(antesVolta, depoisVolta) ?? "")
+  // E o encerramento do passo administrativo abandonado é registrado, não silencioso.
+  const encerradasSemCausa = await prisma.tarefa.findMany({
+    where: { processoId: processo.id, motivoCodigo: "CAUSA_REMOVIDA" },
+    select: { id: true, necessidadeId: true, documentoId: true },
+  })
+  check("só trabalho SEM obrigação foi encerrado por causa removida",
+    encerradasSemCausa.every((t) => t.necessidadeId == null && t.documentoId == null),
+    JSON.stringify(encerradasSemCausa))
+  for (const t of encerradasSemCausa) {
+    check(`o encerramento da tarefa ${t.id} está auditado`,
+      (await prisma.logAuditoria.count({ where: { entidade: "Tarefa", entidadeId: t.id, acao: "TAREFA_CANCELADA" } })) > 0)
+  }
   check("as tarefas da Tradução continuam preservadas",
     (await prisma.phaseWorkflowStepInstance.count({ where: { processoId: processo.id, faseMacroKey: "traducao" } })) > 0)
 

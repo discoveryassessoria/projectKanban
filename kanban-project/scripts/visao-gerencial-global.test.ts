@@ -127,7 +127,10 @@ async function main() {
   secao('§10/§9) Reúso, não reimplementação')
   // ══════════════════════════════════════════════════════════════════════════
   ok('§10) usa o MESMO seletor de responsável da Central', /SeletorResponsavel/.test(tela) && /from "\.\/kit-operacional"/.test(tela))
-  ok('§9) clicar abre a MESMA Tarefa Operacional canônica', /<TarefaOperacional/.test(tela))
+  // Clicar leva ao lugar canônico do trabalho — a Central Operacional do
+  // processo. O painel local saiu: supervisionar não é executar.
+  ok('§9) clicar leva à Central Operacional do processo', /urlOperacionalDaTarefa/.test(tela))
+  ok('§9) e a visão global não monta executor', !/StepEditorRouter/.test(tela))
   ok('§9) e não existe um segundo modal de tarefa aqui',
     !/function\s+\w*Modal(Tarefa|Detalhe)/.test(codigoTela))
   const central = ler('src/components/operacao/central-tarefas.tsx')

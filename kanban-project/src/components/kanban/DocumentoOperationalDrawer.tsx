@@ -154,6 +154,14 @@ interface DocumentoOperationalDrawerProps {
    * só encaminha, sem resolver nada por texto.
    */
   contextoAntecipada?: ContextoAntecipada
+  /**
+   * A ABA EM QUE O DRAWER ABRE.
+   *
+   * Quem chega pela fila vem para EXECUTAR: abrir em "Operação" e obrigar mais
+   * um clique até "Workflow" desfaz metade do que o deep-link resolveu. Quem
+   * abre pela listagem continua caindo na visão geral do documento.
+   */
+  abaInicial?: "operation" | "workflow"
 }
 
 import {
@@ -276,10 +284,11 @@ function ConteudoDrawer({
   backLabel,
   bannerAntecipada,
   contextoAntecipada,
+  abaInicial,
 }: DocumentoOperationalDrawerProps) {
   const { pode } = usePermissoes()
   const [delegandoResp, setDelegandoResp] = useState(false)
-  const [activeTab, setActiveTab] = useState<TabId>("operation")
+  const [activeTab, setActiveTab] = useState<TabId>(abaInicial ?? "operation")
   const [salvando, setSalvando] = useState(false)
   const [initModalOpen, setInitModalOpen] = useState(false)
 

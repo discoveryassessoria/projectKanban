@@ -208,6 +208,102 @@ const authHeaders = (): Record<string, string> => ({
   Authorization: `Bearer ${typeof window !== "undefined" ? localStorage.getItem("authToken") ?? "" : ""}`,
 })
 
+/**
+ * A TAREFA PERDEU A CAUSA — e alguém precisa decidir o que fazer com ela.
+ *
+ * O reconciliador marca e para, porque cancelar trabalho já feito não é decisão
+ * de motor. Só que marcar sem oferecer saída deixava a fila pedindo uma decisão
+ * que nenhuma tela aceitava: o cartão dizia "Requer decisão" e não havia o que
+ * clicar.
+ *
+ * As duas saídas são as do domínio, e nenhuma é nova: ENCERRAR (a obrigação
+ * sumiu e o trabalho sumiu com ela) ou MANTER (a obrigação sumiu, o trabalho
+ * continua valendo). A justificativa é obrigatória nas duas: quem ler o
+ * histórico daqui a seis meses precisa entender por quê.
+ */
+function DecisaoSobreCausa({
+  taskId, titulo, motivo, podeDecidir, aoDecidir,
+}: {
+  taskId: number
+  titulo: string
+  motivo: string | null
+  podeDecidir: boolean
+  aoDecidir: (decisao: "MANTER" | "ENCERRAR") => void
+}) {
+  const [justificativa, setJustificativa] = useState("")
+  const [enviando, setEnviando] = useState<"MANTER" | "ENCERRAR" | null>(null)
+  const [erro, setErro] = useState<string | null>(null)
+
+  const decidir = async (decisao: "MANTER" | "ENCERRAR") => {
+    if (!justificativa.trim()) { setErro("Explique a decisão — ela fica no histórico da tarefa."); return }
+    setEnviando(decisao)
+    setErro(null)
+    try {
+      const r = await fetch(`/api/tarefas/${taskId}/comando`, {
+        method: "POST",
+        headers: { ...authHeaders(), "Content-Type": "application/json" },
+        body: JSON.stringify({ acao: "decidir_causa", decisao, motivo: justificativa.trim() }),
+      })
+      const d = await r.json().catch(() => ({}))
+      if (!r.ok) { setErro(d?.mensagem || d?.error || "Não foi possível registrar a decisão."); return }
+      aoDecidir(decisao)
+    } catch {
+      setErro("Não foi possível registrar a decisão.")
+    } finally {
+      setEnviando(null)
+    }
+  }
+
+  return (
+    <div className="mb-4 rounded-lg border border-[#d2a948]/30 bg-[#d2a948]/10 p-4">
+      <div className="text-sm font-semibold text-[#d2a948]">Esta tarefa perdeu a causa · requer decisão</div>
+      <p className="mt-1 text-xs text-white/70">
+        <span className="text-white/90">{titulo}</span>
+        {motivo ? ` — ${motivo}` : ""}
+      </p>
+      <p className="mt-1 text-xs text-white/55">
+        O trabalho já iniciado foi preservado: nada foi cancelado automaticamente.
+        Encerrar retira a tarefa da fila; manter devolve o trabalho a quem o executa.
+      </p>
+      {podeDecidir ? (
+        <>
+          <textarea
+            value={justificativa}
+            onChange={(e) => { setJustificativa(e.target.value); setErro(null) }}
+            rows={2}
+            maxLength={300}
+            placeholder="Por quê? (obrigatório — fica no histórico)"
+            className="mt-3 w-full resize-none rounded-md border border-white/15 bg-black/30 px-3 py-2 text-xs text-white/85 placeholder:text-white/30 focus:border-white/30 focus:outline-none"
+          />
+          <div className="mt-2 flex flex-wrap items-center gap-2">
+            <button
+              type="button"
+              onClick={() => decidir("MANTER")}
+              disabled={enviando !== null}
+              className="rounded-md border border-white/15 bg-white/10 px-3 py-1.5 text-xs font-medium text-white/85 hover:bg-white/15 disabled:opacity-50"
+            >
+              {enviando === "MANTER" ? "Registrando…" : "Manter o trabalho"}
+            </button>
+            <button
+              type="button"
+              onClick={() => decidir("ENCERRAR")}
+              disabled={enviando !== null}
+              className="rounded-md border border-red-400/30 bg-red-500/15 px-3 py-1.5 text-xs font-medium text-red-200 hover:bg-red-500/25 disabled:opacity-50"
+            >
+              {enviando === "ENCERRAR" ? "Encerrando…" : "Encerrar a tarefa"}
+            </button>
+          </div>
+        </>
+      ) : (
+        <p className="mt-3 text-xs text-white/45">
+          Você não tem permissão para decidir sobre esta tarefa. Procure quem responde pela fila.
+        </p>
+      )}
+      {erro && <p className="mt-2 text-xs text-red-300">{erro}</p>}
+    </div>
+  )
+}
+
 interface ProcessoCentralOperacionalProps {
   processo: ProcessoWithStatus | Processo
   /**
@@ -412,7 +508,10 @@ export function ProcessoCentralOperacional({
   // O resultado carrega a CHAVE do pedido que o produziu: assim "ainda não
   // resolvi" é derivação, não um `setState(null)` no corpo do efeito — e a
   // resposta de um link antigo não se passa pela do atual.
-  type AlvoDaTela = { taskId: number; documentoId: number | null; requerDecisao: boolean; titulo: string }
+  type AlvoDaTela = {
+    taskId: number; documentoId: number | null; requerDecisao: boolean; titulo: string
+    causaRemovidaMotivo: string | null
+  }
   const [resolvido, setResolvido] = useState<{ chave: number; alvo: AlvoDaTela | null } | null>(null)
   useEffect(() => {
     if (taskIdAlvo == null) return
@@ -893,6 +992,29 @@ export function ProcessoCentralOperacional({
           </p>
         </div>
 
+        {/* A DECISÃO PEDIDA, onde ela pode ser tomada. Chegar aqui por um cartão
+            que diz "Requer decisão" e não encontrar nada para decidir é um beco:
+            a marca vira ruído permanente na fila de quem não pode resolvê-la. */}
+        {alvo?.requerDecisao && (
+          <DecisaoSobreCausa
+            taskId={alvo.taskId}
+            titulo={alvo.titulo}
+            motivo={alvo.causaRemovidaMotivo}
+            podeDecidir={pode("tarefas.excluir")}
+            aoDecidir={(decisao) => {
+              // MANTER devolve o trabalho: o alvo continua sendo o alvo, e a
+              // Central abre o executor como abriria por qualquer deep-link.
+              // ENCERRAR tira a tarefa da fila — não há mais onde parar.
+              setResolvido((prev) =>
+                prev && decisao === "MANTER" && prev.alvo
+                  ? { chave: prev.chave, alvo: { ...prev.alvo, requerDecisao: false } }
+                  : prev && { chave: prev.chave, alvo: null },
+              )
+              carregar(true)
+            }}
+          />
+        )}
+
         {/* ===== Central Operacional (largura cheia, sem sidebar) ===== */}
         <div className="min-w-0">
           <PainelDaFase
@@ -939,6 +1061,8 @@ export function ProcessoCentralOperacional({
             // sem herdar nada da fase anterior.
             key={`${faseCodeData ?? "?"}-${drawerDocId ?? "none"}`}
             documentoId={drawerDocId}
+            // Quem chegou pela fila vem executar: abre direto no Workflow.
+            abaInicial={alvo?.documentoId != null && alvo.documentoId === drawerDocId ? "workflow" : "operation"}
             isOpen={drawerDocId !== null}
             bannerAntecipada={bannerAntecipada}
             // CONTEXTO DA OPERAÇÃO ANTECIPADA — o ALVO do documento aberto. Ela vive

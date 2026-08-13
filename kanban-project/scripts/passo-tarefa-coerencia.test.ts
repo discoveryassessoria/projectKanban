@@ -173,11 +173,24 @@ async function main() {
     create: { nome: "Sync", email: "sync@teste.local", senha: "x", tipo: "admin" },
   })
   const arvore = await prisma.arvore.create({ data: { nome: "Árvore SYNC" } })
-  await prisma.pessoa.create({ data: { nome: "Ana", sobrenome: "Souza", arvoreId: arvore.id, linhaReta: true, requerente: "maior" } })
+  const ana = await prisma.pessoa.create({ data: { nome: "Ana", sobrenome: "Souza", arvoreId: arvore.id, linhaReta: true, requerente: "maior" }, select: { id: true } })
   const processo = await prisma.processo.create({
     data: { nome: "Processo SYNC", codigo: "T-SYNC", pais: "Alemanha", arvoreId: arvore.id, faseAtualKey: "genealogia", tipoProcessoMotorId: tipo.id, workflowRuntime: "v2" },
   })
-  await materializarExecucaoDaFase({ processoId: processo.id, fonte: "PROCESSO_CRIADO" })
+  // A OBRIGAÇÃO REAL. O passo `localizar_registro` opera por NECESSIDADE: sem
+  // uma certidão a localizar, o motor recusa materializar e explica por quê
+  // (SEM_ALVO_APLICAVEL) — comportamento correto que este palco não atendia.
+  // O que se prova aqui é a coerência passo × tarefa, e ela pressupõe trabalho.
+  await prisma.necessidadeDocumental.create({
+    data: {
+      processoId: processo.id, itemCatalogoId: item.id, pessoaId: ana.id, ciclo: 1,
+      chaveIdempotencia: "SYNC-nec-nasc-ana",
+    },
+  })
+  const rel = await materializarExecucaoDaFase({ processoId: processo.id, fonte: "PROCESSO_CRIADO" })
+  if (rel.passosTotais === 0) {
+    throw new Error(`palco não materializou: ${rel.estado} — ${rel.mensagemAdministrativa ?? ""}`)
+  }
 
   const parAtual = async () => {
     const p = await prisma.phaseWorkflowStepInstance.findFirst({
@@ -254,7 +267,11 @@ async function main() {
   const ciclo2 = await prisma.phaseWorkflowInstance.findFirst({ where: { processoId: processo.id, faseMacroKey: "genealogia", ciclo: 2 }, select: { id: true } })
   const passosCiclo2 = await prisma.phaseWorkflowStepInstance.findMany({ where: { workflowInstanceId: ciclo2!.id }, select: { id: true, status: true, tarefas: { select: { id: true, statusTarefa: true } } } })
   check("o ciclo 2 tem passos próprios", passosCiclo2.length > 0, String(passosCiclo2.length))
-  check("cada passo do ciclo 2 tem tarefa própria", passosCiclo2.every((p) => p.tarefas.length === 1))
+  // O ciclo 1 fechou o trabalho; reabrir a fase pede o trabalho DE NOVO, e cada
+  // passo novo precisa da sua tarefa — sem tarefa, o passo é invisível para a
+  // fila, para o responsável e para o prazo.
+  check("cada passo do ciclo 2 tem tarefa própria", passosCiclo2.every((p) => p.tarefas.length === 1),
+    JSON.stringify(passosCiclo2.map((p) => p.tarefas.length)))
   check("os pares do ciclo 2 nascem coerentes e abertos",
     passosCiclo2.every((p) => paresCoerentes(p.status, p.tarefas[0].statusTarefa) && p.tarefas[0].statusTarefa === "NAO_INICIADA"))
   check("nenhuma tarefa do ciclo 2 é reaproveitada do ciclo 1",

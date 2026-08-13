@@ -15,9 +15,10 @@ import {
 } from "../src/services/phase-workflow-helpers"
 import { validarDefinicao } from "../src/services/workflow-definition-validator"
 import {
-  montarChaveTarefa, mapearPrioridade, addDiasUteis, calcularPrazo,
+  mapearPrioridade, addDiasUteis, calcularPrazo,
   resolverResponsavel, passoGeraTarefa,
 } from "../src/services/passo-tarefa-helpers"
+import { chaveDaUnidade } from "../lib/operacional/identidade-da-tarefa"
 import * as D from "../src/services/task-step-sync-helpers"
 import * as B from "../src/lib/motor/blocking-helpers"
 import * as F from "../src/lib/motor/phase-advance-helpers"
@@ -181,14 +182,23 @@ async function run() {
   console.log("14) Chave e prioridade:")
   // A chave identifica a UNIDADE DE TRABALHO (a obrigação), não o passo: cinco
   // passos da mesma certidão convergem para a MESMA tarefa.
-  const bt = { stepInstanceId: 10, taskRole: "principal", ciclo: 1, processoId: 7, necessidadeId: 55, pessoaId: 3 }
-  ok(montarChaveTarefa(bt) === montarChaveTarefa({ ...bt }), "chave Tarefa determinística")
-  ok(montarChaveTarefa(bt) !== montarChaveTarefa({ ...bt, ciclo: 2 }), "ciclo distinto => chave distinta")
-  ok(montarChaveTarefa(bt) !== montarChaveTarefa({ ...bt, taskRole: "revisor" }), "role distinto => chave distinta")
-  ok(montarChaveTarefa(bt) === montarChaveTarefa({ ...bt, stepInstanceId: 11 }), "passo distinto, MESMA obrigação => MESMA tarefa")
-  ok(montarChaveTarefa(bt) !== montarChaveTarefa({ ...bt, necessidadeId: 56 }), "obrigação distinta => tarefa distinta")
-  ok(montarChaveTarefa({ ...bt, necessidadeId: null }) !== montarChaveTarefa({ ...bt, necessidadeId: null, stepInstanceId: 11 }),
+  const bt = { stepInstanceId: 10, ciclo: 1, processoId: 7, necessidadeId: 55, pessoaId: 3 }
+  ok(chaveDaUnidade(bt) === chaveDaUnidade({ ...bt }), "chave Tarefa determinística")
+  ok(chaveDaUnidade(bt) !== chaveDaUnidade({ ...bt, ciclo: 2 }), "ciclo distinto => chave distinta")
+  ok(chaveDaUnidade(bt) === chaveDaUnidade({ ...bt, stepInstanceId: 11 }), "passo distinto, MESMA obrigação => MESMA tarefa")
+  ok(chaveDaUnidade(bt) !== chaveDaUnidade({ ...bt, necessidadeId: 56 }), "obrigação distinta => tarefa distinta")
+  ok(chaveDaUnidade({ ...bt, necessidadeId: null }) !== chaveDaUnidade({ ...bt, necessidadeId: null, stepInstanceId: 11 }),
     "sem obrigação (passo administrativo) a identidade volta a ser o passo")
+  // O PAPEL SAIU DA IDENTIDADE. Ele já rendeu duas tarefas vivas para a mesma
+  // certidão (documento 2111), e a regra do domínio é "uma obrigação real, uma
+  // tarefa". Papel é atributo do trabalho — quem executa, quem aprova —, não um
+  // segundo trabalho.
+  ok(chaveDaUnidade({ ...bt }) === chaveDaUnidade({ ...bt }), "papel não multiplica a tarefa")
+  // E a MESMA unidade, conhecida por lados diferentes, dá a MESMA chave: é isso
+  // que fazia o reconciliador e a mudança de fase não se enxergarem.
+  ok(chaveDaUnidade({ processoId: 523, necessidadeId: 190, pessoaId: 2692, ciclo: 1 })
+     === chaveDaUnidade({ processoId: 523, necessidadeId: 190, documentoId: 2111, pessoaId: 2692, ciclo: 1 }),
+    "obrigação conhecida com ou sem o documento => MESMA tarefa")
   ok(mapearPrioridade("low") === "BAIXA" && mapearPrioridade("medium") === "MEDIA" && mapearPrioridade("high") === "ALTA", "prioridade low/medium/high")
   ok(mapearPrioridade(undefined) === "MEDIA" && mapearPrioridade("xyz") === "MEDIA", "prioridade default MEDIA")
 

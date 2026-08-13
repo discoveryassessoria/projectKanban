@@ -63,5 +63,7 @@ export interface AlvoResolvido {
   /** Estado terminal ou "causa removida" mudam o que a tela deve oferecer. */
   statusTarefa: string
   requerDecisao: boolean
+  /** O que aconteceu com a obrigação — o contexto da decisão pedida. */
+  causaRemovidaMotivo: string | null
   titulo: string
 }

@@ -62,14 +62,25 @@ const posAtribuir = await detalhe(SEM_DONO)
 ok("§33) atribuir pela tela NÃO inicia", posAtribuir?.statusTarefa === "NAO_INICIADA", posAtribuir?.statusTarefa)
 ok("§33) e não preenche data de início", posAtribuir?.tempos?.iniciadaEm == null)
 
-// abrir o dossiê três vezes
+// ABRIR A TAREFA TRÊS VEZES.
+//
+// Abrir hoje é NAVEGAR: o cartão leva à Central Operacional do processo, e não
+// abre mais painel nenhum por cima da fila (não existe mais um segundo lugar
+// para executar a mesma etapa). O que o §37 protege continua o mesmo — olhar o
+// trabalho não pode marcá-lo como começado —, mas o gesto agora é ir e voltar.
 await func.page.goto(`${BASE}/operacao`, { waitUntil: "domcontentloaded", timeout: 60000 })
 await func.page.waitForTimeout(4000)
 for (let i = 0; i < 3; i++) {
   const card = func.page.locator("button.cursor-pointer").filter({ hasText: "João da Silva" }).first()
-  if (await card.count()) { await card.click(); await func.page.waitForTimeout(2200)
-    const fechar = func.page.getByRole("button", { name: "Fechar" }).first()
-    if (await fechar.count()) { await fechar.click(); await func.page.waitForTimeout(1200) } }
+  if (await card.count()) {
+    await card.click()
+    await func.page.waitForTimeout(2500)
+    ok(`§22) abrir (${i + 1}ª) leva ao processo, não a um painel local`,
+      /\/kanban\?/.test(func.page.url()) && /taskId=\d+/.test(func.page.url()),
+      func.page.url().replace(BASE, ""))
+    await func.page.goto(`${BASE}/operacao`, { waitUntil: "domcontentloaded", timeout: 60000 })
+    await func.page.waitForTimeout(3000)
+  }
 }
 const posAbrir = await detalhe(SEM_DONO)
 ok("§37) abrir a tarefa três vezes NÃO inicia", posAbrir?.statusTarefa === "NAO_INICIADA", posAbrir?.statusTarefa)

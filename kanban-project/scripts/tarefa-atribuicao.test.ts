@@ -116,7 +116,11 @@ async function main() {
   let ns = await notifs(p.tarefaId, "ATRIBUICAO")
   ok("exatamente uma notificação", ns.length === 1, `${ns.length}`)
   ok("para a Daniela", ns[0]?.destinatarioId === daniela.id)
-  ok("com link canônico para a tarefa", ns[0]?.link === linkDaTarefa(p.tarefaId), String(ns[0]?.link))
+  // O link do aviso é o MESMO deep-link da fila: processo + Central + taskId.
+  // Enquanto ele era só `/operacao?taskId=`, clicar no sino levava à lista em
+  // vez de levar ao trabalho.
+  ok("com link canônico para a tarefa",
+    ns[0]?.link === linkDaTarefa(p.tarefaId, p.processoId), String(ns[0]?.link))
   ok("e o título diz o que aconteceu", /Nova tarefa atribuída/.test(ns[0]?.titulo ?? ""))
 
   // O retry: mesma chamada de novo. A tarefa já é da Daniela, então o comando
@@ -189,7 +193,8 @@ async function main() {
   ok("e a segunda varredura não conta ESTE aviso como novo", v2.atraso === 0, JSON.stringify(v2))
   ok("o atraso não criou tarefa nova", (await prisma.tarefa.count({ where: { processoId: p.processoId } })) === 1)
   const nAtraso = await notifs(p.tarefaId, "ATRASO")
-  ok("o aviso é da tarefa e aponta para ela", nAtraso[0]?.link === linkDaTarefa(p.tarefaId))
+  ok("o aviso é da tarefa e aponta para ela",
+    nAtraso[0]?.link === linkDaTarefa(p.tarefaId, p.processoId), String(nAtraso[0]?.link))
 
   // Prazo futuro dentro da janela → aviso de prazo, também um por dia.
   await prisma.tarefa.update({ where: { id: p.tarefaId }, data: { dataPrazo: new Date(Date.now() + 86400000) } })

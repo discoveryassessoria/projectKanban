@@ -32,6 +32,7 @@
 // ============================================================================
 import { prisma } from '@/lib/prisma'
 import type { Prisma, StatusTarefa } from '@prisma/client'
+import { chaveDaUnidade, identidadeDaUnidade, tarefaVivaDaUnidade } from '@/lib/operacional/identidade-da-tarefa'
 
 /** O trabalho que a tarefa representa. Sem isto ela seria órfã. */
 export interface OrigemDoTrabalho {
@@ -64,13 +65,84 @@ export interface NovaTarefaOperacional extends OrigemDoTrabalho {
 /**
  * A CHAVE DE IDENTIDADE DO TRABALHO.
  *
- * Deliberadamente sem título e sem etapa: o título é rótulo e muda; a etapa
- * corrente muda sete vezes durante a mesma tarefa. O que não muda é QUAL
- * obrigação, de QUEM, em QUAL processo, em QUAL ciclo.
+ * ESTE ARQUIVO JÁ TEVE A SUA PRÓPRIA. Era o mesmo conceito escrito em outro
+ * formato (`tarefa::proc:…` contra `unidade|proc…`), e a consequência não foi
+ * estética: o reconciliador procurava no formato dele, não encontrava a tarefa
+ * que a mudança de fase tinha criado no formato dela, e criava a segunda. Foram
+ * duas tarefas vivas para a certidão do Ademir.
+ *
+ * A identidade agora mora em UM lugar (`identidade-da-tarefa`), e este módulo a
+ * consome como qualquer outro escritor.
  */
-export function chaveDaTarefa(o: OrigemDoTrabalho): string {
-  const obrigacao = o.necessidadeId != null ? `nec:${o.necessidadeId}` : `doc:${o.documentoId ?? 0}`
-  return `tarefa::proc:${o.processoId}::${obrigacao}::pes:${o.pessoaId ?? 0}::ciclo:${o.ciclo}`
+export const chaveDaTarefa = chaveDaUnidade
+
+/**
+ * A TAREFA SEGUE O TRABALHO PARA A FASE NOVA.
+ *
+ * Mudar de fase MOVE o trabalho; não o multiplica. Quando a fase seguinte
+ * materializa um passo sobre uma obrigação que JÁ tem tarefa, o certo é
+ * reapontar aquela tarefa — não abrir a segunda. Foi a segunda que deixou a
+ * certidão do Ademir com dois cartões vivos na fila da mesma pessoa.
+ *
+ * O que se preserva é tudo o que dá identidade e história: o `taskId`, o
+ * responsável, o que já foi iniciado, a auditoria, os anexos. O que muda é o
+ * ponteiro para o roteiro que agora vale.
+ *
+ * Mora aqui, e não no materializador de passo, porque escrever a âncora
+ * operacional da tarefa é ato do dono da tarefa — a mesma razão pela qual
+ * `iniciar`, `concluir` e `cancelar` também têm porta própria.
+ */
+export async function reancorarTarefaNaUnidade(
+  tx: Prisma.TransactionClient,
+  args: {
+    tarefaId: number
+    workflowInstanceId: number
+    workflowStepInstanceId: number
+    faseMacroKey?: string | null
+    chaveIdempotencia: string
+    necessidadeId?: number | null
+    documentoId?: number | null
+    pessoaId?: number | null
+    /** Para a auditoria contar de onde a tarefa veio. */
+    deInstanciaId?: number | null
+    chaveAnterior?: string | null
+  },
+) {
+  const tarefa = await tx.tarefa.update({
+    where: { id: args.tarefaId },
+    data: {
+      workflowInstanceId: args.workflowInstanceId,
+      workflowStepInstanceId: args.workflowStepInstanceId,
+      faseMacroKey: args.faseMacroKey ?? null,
+      chaveIdempotencia: args.chaveIdempotencia,
+      // O vínculo com a obrigação é COMPLETADO, nunca apagado: a normalização
+      // pode ter descoberto a necessidade que faltava, mas nada aqui desfaz um
+      // vínculo que já existia.
+      necessidadeId: args.necessidadeId ?? undefined,
+      documentoId: args.documentoId ?? undefined,
+      pessoaId: args.pessoaId ?? undefined,
+      lockVersion: { increment: 1 },
+    },
+  })
+  await tx.logAuditoria.create({
+    data: {
+      acao: 'TAREFA_REANCORADA',
+      entidade: 'Tarefa',
+      entidadeId: tarefa.id,
+      descricao:
+        `Tarefa "${tarefa.titulo}" seguiu o trabalho para a fase ${args.faseMacroKey ?? '—'}: ` +
+        `o mesmo documento não vira uma segunda tarefa quando a fase muda.`,
+      detalhes: {
+        tarefaId: tarefa.id,
+        stepInstanceId: args.workflowStepInstanceId,
+        deInstancia: args.deInstanciaId ?? null,
+        paraInstancia: args.workflowInstanceId,
+        chaveAnterior: args.chaveAnterior ?? null,
+        chaveAtual: args.chaveIdempotencia,
+      },
+    },
+  })
+  return tarefa
 }
 
 /**
@@ -107,10 +179,28 @@ export async function materializarTarefaOperacional(
   nova: NovaTarefaOperacional,
   agora: Date,
 ): Promise<ResultadoMaterializacao> {
-  const chave = chaveDaTarefa(nova)
+  const { chave, unidade } = await identidadeDaUnidade(tx, nova)
 
   const existente = await tx.tarefa.findUnique({ where: { chaveIdempotencia: chave }, select: { id: true } })
   if (existente) return { tarefaId: existente.id, criada: false, motivo: 'já existia' }
+
+  // E PELA OBRIGAÇÃO, não só pela chave: a tarefa que já existe pode ter sido
+  // gravada num formato anterior, ou por um escritor que conhecia a unidade
+  // pelo outro lado (documento em vez de necessidade). Procurar só pela chave
+  // encontraria "não existe" — e o "não existe" é que criava a segunda tarefa.
+  const daUnidade = await tarefaVivaDaUnidade(tx, unidade)
+  if (daUnidade) {
+    await tx.tarefa.update({
+      where: { id: daUnidade.id },
+      data: {
+        chaveIdempotencia: chave,
+        necessidadeId: unidade.necessidadeId ?? undefined,
+        documentoId: unidade.documentoId ?? undefined,
+        pessoaId: unidade.pessoaId ?? undefined,
+      },
+    })
+    return { tarefaId: daUnidade.id, criada: false, motivo: 'a unidade já tinha tarefa' }
+  }
 
   // ESTA CONSULTA JÁ FOI "a instância só pode ter UMA tarefa".
   //
@@ -247,7 +337,10 @@ export async function sincronizarTarefaComWorkflow(
 ): Promise<{ mudou: boolean; status: StatusTarefa; stepAtualId: number | null }> {
   const tarefa = await tx.tarefa.findUnique({
     where: { id: tarefaId },
-    select: { id: true, workflowInstanceId: true, statusTarefa: true, workflowStepInstanceId: true, dataConclusao: true, dataInicio: true },
+    select: {
+      id: true, workflowInstanceId: true, statusTarefa: true, workflowStepInstanceId: true,
+      dataConclusao: true, dataInicio: true, necessidadeId: true, documentoId: true,
+    },
   })
   if (!tarefa?.workflowInstanceId) {
     return { mudou: false, status: tarefa?.statusTarefa ?? 'NAO_INICIADA', stepAtualId: null }
@@ -264,8 +357,29 @@ export async function sincronizarTarefaComWorkflow(
     return { mudou: false, status: tarefa.statusTarefa, stepAtualId: tarefa.workflowStepInstanceId }
   }
 
+  // OS PASSOS DA UNIDADE — não os da instância inteira.
+  //
+  // A instância é da FASE, e a fase abriga uma tarefa por unidade de trabalho:
+  // quatro certidões de uma Emissão Documental são quatro tarefas dentro da
+  // MESMA instância. Ler todos os passos da instância misturava o trabalho de
+  // pessoas diferentes: a "etapa atual" da certidão do Ademir virava o passo
+  // aberto da certidão de outra pessoa, e o estado derivado da tarefa dele
+  // passava a depender do que faltava na dela.
+  //
+  // O filtro é a obrigação — a mesma que dá identidade à tarefa. Sem obrigação
+  // (passo administrativo de fase), a unidade é o próprio passo da tarefa.
+  const daUnidade: Prisma.PhaseWorkflowStepInstanceWhereInput[] = []
+  if (tarefa.necessidadeId != null) daUnidade.push({ necessidadeId: tarefa.necessidadeId })
+  if (tarefa.documentoId != null) daUnidade.push({ documentoId: tarefa.documentoId })
   const steps = await tx.phaseWorkflowStepInstance.findMany({
-    where: { workflowInstanceId: tarefa.workflowInstanceId },
+    where: {
+      workflowInstanceId: tarefa.workflowInstanceId,
+      ...(daUnidade.length > 0
+        ? { OR: daUnidade }
+        : tarefa.workflowStepInstanceId != null
+          ? { id: tarefa.workflowStepInstanceId }
+          : { necessidadeId: null, documentoId: null }),
+    },
     select: { id: true, status: true, obrigatorio: true, ordem: true, stepKey: true },
     orderBy: { ordem: 'asc' },
   })

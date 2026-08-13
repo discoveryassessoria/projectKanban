@@ -155,7 +155,15 @@ const MIGRATION = join(DIR_MIGRATIONS, '0000_baseline', 'migration.sql')
 //
 //   anterior : 7cd1f90827eef93f97a0fc35efe238d1d4e0a5dc45138c388ad53cc0f2fafb37
 //   atual    : dc38860b04bca0a0355e2eabd00c3bbe28659a9688e44b1f1cea7296cd7622b4
-const CHECKSUM_LEDGER = '8e66a6548e71c7aafceab85e705ef78fd0efa47b0ab6b64b0571ffb44291eb01'
+//
+// 13/08/2026 — quatro colunas anulaveis na Tarefa (a DECISAO sobre a tarefa que
+// perdeu a causa: `causaDecididaEm`, `causaDecisao`, `causaDecisaoAutorId`,
+// `causaDecisaoMotivo`). Aditivo, sem escrita em linha existente. Ledger de
+// producao reconciliado no mesmo deploy da migration
+// 20260812220000_decisao_sobre_causa_removida.
+//
+//   anterior : 8e66a6548e71c7aafceab85e705ef78fd0efa47b0ab6b64b0571ffb44291eb01
+const CHECKSUM_LEDGER = '00a3504ec57a9531ac0664374baad33a887ddcb1ebf42bfcb0e47b96aca53138'
 
 /**
  * Migrations criadas DEPOIS da consolidacao de 02/08/2026. Toda migration nova
@@ -186,6 +194,7 @@ const MIGRATIONS_POS_BASELINE: string[] = [
   '20260812140000_remover_arvore_subtarefas',
   '20260812180000_camada_operacional_funcionario',
   '20260812200000_aptidao_por_unidade_operacional',
+  '20260812220000_decisao_sobre_causa_removida',
 ]
 
 const sha256 = (t: string) => createHash('sha256').update(t).digest('hex')

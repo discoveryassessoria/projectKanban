@@ -80,13 +80,27 @@ ok("chaveIdempotencia da tarefa é @unique",
 ok("workflowInstanceId NÃO é @unique",
   !/workflowInstanceId\s+Int\?\s+@unique/.test(corpoTarefa),
   "a instância é da FASE: N unidades de trabalho convivem nela")
-const helpers = ler("src/services/passo-tarefa-helpers.ts")
+// A IDENTIDADE MORA EM UM LUGAR SÓ. Já morou em dois — um formato no
+// reconciliador, outro na mudança de fase —, e a divergência entre eles é que
+// produziu duas tarefas vivas para a mesma certidão.
+const identidade = semComentarios(ler("lib/operacional/identidade-da-tarefa.ts"))
 ok("a chave é montada a partir da OBRIGAÇÃO, não do passo",
-  /necessidadeId != null \? `nec\$\{/.test(semComentarios(helpers)),
+  /necessidadeId != null \? `nec\$\{/.test(identidade),
   "era `stepinst{id}` — cada instância de passo ganhava a sua própria tarefa")
 ok("e o passo só vira identidade quando não há obrigação",
-  /: `stepinst\$\{i\.stepInstanceId\}`/.test(semComentarios(helpers)),
+  /: `stepinst\$\{u\.stepInstanceId \?\? 0\}`/.test(identidade),
   "passo administrativo de fase não pertence a documento nem a pessoa")
+ok("o PAPEL não entra na identidade",
+  !/role/.test(identidade.split("export function chaveDaUnidade")[1]?.split("}")[0] ?? ""),
+  "uma obrigação real, uma tarefa — papel é atributo do trabalho")
+ok("a unidade é NORMALIZADA antes de virar chave",
+  /export async function normalizarUnidade/.test(identidade) &&
+  /identidadeDaUnidade/.test(semComentarios(ler("src/services/passo-tarefa.ts"))) &&
+  /identidadeDaUnidade/.test(semComentarios(ler("lib/operacional/tarefa-canonica.ts"))),
+  "conhecer a unidade pelo documento ou pela necessidade tem de dar a MESMA chave")
+ok("e ninguém mais monta chave de tarefa por conta própria",
+  !/`tarefa::proc:/.test(semComentarios(ler("lib/operacional/tarefa-canonica.ts"))) &&
+  !/montarChaveTarefa/.test(semComentarios(ler("src/services/passo-tarefa-helpers.ts"))))
 ok("a etapa corrente NÃO é @unique (é projeção, não identidade)",
   !/workflowStepInstanceId\s+Int\?\s+@unique/.test(corpoTarefa))
 

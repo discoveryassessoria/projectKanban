@@ -26,45 +26,6 @@ export type FailureCodeC =
 export const TASK_ROLE_PADRAO = "principal"
 
 /** Chave de idempotência da Tarefa: 1 principal por (passo, role, ciclo). */
-/**
- * A IDENTIDADE DA TAREFA É A UNIDADE DE TRABALHO — não o passo.
- *
- * Esta chave era `stepinst{id}`: cada instância de passo ganhava a sua própria
- * tarefa. Com a Emissão Documental publicada em cinco passos (solicitar,
- * aguardar, receber, conferir, validar), UM documento produzia CINCO tarefas —
- * cinco prazos, cinco responsáveis, cinco linhas na fila — para um trabalho só.
- * E concluir "solicitar" fechava uma tarefa sem que nada tivesse sido obtido.
- *
- * A unidade de trabalho é a OBRIGAÇÃO: a necessidade documental (ou, na falta
- * dela, o documento) daquela pessoa naquele ciclo. Os cinco passos convergem
- * para a mesma chave e, portanto, para a MESMA tarefa — que é o que "etapa não
- * é tarefa" significa na prática.
- *
- * Granularidade preservada: dois documentos da mesma pessoa são duas
- * obrigações, logo duas chaves e duas tarefas. O que desaparece é a
- * multiplicação por passo, não a multiplicação por documento.
- *
- * `taskRole` continua na chave: papéis distintos sobre a mesma obrigação
- * (executar × aprovar) são trabalhos distintos de pessoas distintas.
- */
-export function montarChaveTarefa(i: {
-  stepInstanceId: number
-  taskRole: string
-  ciclo: number
-  processoId: number
-  necessidadeId?: number | null
-  documentoId?: number | null
-  pessoaId?: number | null
-}): string {
-  const obrigacao =
-    i.necessidadeId != null ? `nec${i.necessidadeId}`
-    : i.documentoId != null ? `doc${i.documentoId}`
-    // Sem obrigação identificável o trabalho é do PASSO — passo administrativo
-    // de fase, que não pertence a documento nem a pessoa nenhuma.
-    : `stepinst${i.stepInstanceId}`
-  return `unidade|proc${i.processoId}|${obrigacao}|pes${i.pessoaId ?? 0}|role${i.taskRole}|c${i.ciclo}`
-}
-
 /** Prioridade do snapshot (low|medium|high) → PrioridadeTarefa. Default MEDIA. */
 export function mapearPrioridade(p: string | null | undefined): PrioridadeTarefaStr {
   switch ((p ?? "").toLowerCase()) {

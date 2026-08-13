@@ -18,7 +18,7 @@ import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { exigirBancoDeTeste } from './_banco-de-teste'
 import { urlOperacionalDaTarefa } from '../lib/operacional/navegacao'
-import { criarTarefaManual } from '../lib/operacional/tarefa-ciclo'
+import { criarTarefaManual, decidirSobreCausaRemovida } from '../lib/operacional/tarefa-ciclo'
 import { atribuirTarefa } from '../lib/operacional/tarefa-comandos'
 import { minhaFila } from '../lib/operacional/tarefa-projecoes'
 
@@ -181,6 +181,58 @@ async function main() {
   ok('§26) e a Central NÃO abre o executor para ela',
     /if \(!alvo \|\| alvo\.requerDecisao\) return/.test(central))
 
+  // ── E A DECISÃO TEM ONDE SER TOMADA ──────────────────────────────────────
+  // Marcar sem oferecer saída é beco: o cartão pede uma decisão e a tela não
+  // aceita nenhuma. As duas respostas legítimas vivem na porta canônica.
+  ok('§27) a Central oferece a decisão', /DecisaoSobreCausa/.test(central))
+  ok('§27) com as duas saídas do domínio',
+    /decidir\("MANTER"\)/.test(central) && /decidir\("ENCERRAR"\)/.test(central))
+  ok('§27) pela porta única de comandos',
+    /\/api\/tarefas\/\$\{taskId\}\/comando/.test(central) && /acao: "decidir_causa"/.test(central))
+  ok('§27) e sem justificativa não decide',
+    /if \(!justificativa\.trim\(\)\)/.test(central))
+
+  const semJustificativa = await decidirSobreCausaRemovida({
+    tarefaId: alvoDecisao, autorId: gestor.id, decisao: 'MANTER', motivo: '   ',
+  })
+  ok('§27) o serviço também recusa decisão sem porquê',
+    !semJustificativa.ok && semJustificativa.codigo === 'SEM_MOTIVO')
+
+  const mantida = await decidirSobreCausaRemovida({
+    tarefaId: alvoDecisao, autorId: gestor.id, decisao: 'MANTER',
+    motivo: 'A certidão já foi pedida ao cartório — o documento continua necessário.',
+  })
+  ok('§27) MANTER devolve o trabalho à fila', mantida.ok)
+  const depoisDeManter = (await minhaFila(dani.id)).find((l) => l.taskId === alvoDecisao)
+  ok('§27) e a tarefa deixa de pedir decisão', depoisDeManter?.requerDecisao === false)
+  const decidida = await prisma.tarefa.findUnique({
+    where: { id: alvoDecisao },
+    select: { causaDecididaEm: true, causaDecisao: true, causaDecisaoMotivo: true, statusTarefa: true },
+  })
+  ok('§27) a decisão fica registrada', decidida?.causaDecisao === 'MANTER' && decidida?.causaDecididaEm != null)
+  ok('§27) e o motivo do que aconteceu não se perde',
+    (decidida?.causaDecisaoMotivo ?? '').includes('cartório'))
+  ok('§27) decidir não inicia nem conclui a tarefa', decidida?.statusTarefa !== 'CONCLUIDO_RECEBIDO')
+  const auditoriaDecisao = await prisma.logAuditoria.count({
+    where: { entidade: 'Tarefa', entidadeId: alvoDecisao, acao: 'TAREFA_CAUSA_DECIDIDA' },
+  })
+  ok('§27) com auditoria', auditoriaDecisao === 1)
+
+  // O reconciliador olha o WORKFLOW encerrado, não a marca. Sem respeitar a
+  // decisão, ele remarcaria a tarefa e pediria de novo o que já foi decidido.
+  const respeita = semComentarios(ler('lib/operacional/reconciliar-tarefas.ts'))
+  ok('§27) o reconciliador respeita a decisão tomada', /causaDecididaEm: null,/.test(respeita))
+
+  const denovo = await decidirSobreCausaRemovida({
+    tarefaId: alvoDecisao, autorId: gestor.id, decisao: 'MANTER', motivo: 'de novo',
+  })
+  ok('§27) decidir de novo o mesmo é inócuo', denovo.ok)
+  const trocaDeRumo = await decidirSobreCausaRemovida({
+    tarefaId: alvoDecisao, autorId: gestor.id, decisao: 'ENCERRAR', motivo: 'mudei de ideia',
+  })
+  ok('§27) e trocar a decisão exige a porta do estado atual',
+    !trocaDeRumo.ok && trocaDeRumo.codigo === 'JA_DECIDIDA')
+
   // ══════════════════════════════════════════════════════════════════════════
   secao('§6/§16/§17/§18) A Central se posiciona sozinha')
   // ══════════════════════════════════════════════════════════════════════════
@@ -194,6 +246,21 @@ async function main() {
   ok('§18) a pessoa do alvo expande — e só ela', /chaveDaPessoaAlvo/.test(painel))
   ok('§12) a Minha Fila não virou executor: "Continuar" navega',
     /router\.push\(urlOperacionalDaTarefa/.test(tela))
+
+  // ── ABRIR ≠ INICIAR, INCLUSIVE NO GESTO ──────────────────────────────────
+  // Clicar no cartão e clicar no botão chegam ao mesmo lugar e NÃO fazem a
+  // mesma coisa. Enquanto o cartão inteiro chamava a ação principal, passar os
+  // olhos numa tarefa A FAZER a marcava como iniciada: data de início, evento e
+  // prazo correndo, sem ninguém ter decidido nada.
+  ok('§33) abrir o cartão apenas navega',
+    /const abrirOTrabalho = useCallback\(\(l: LinhaOperacional\) => \{\s*router\.push/.test(tela),
+    'sem comando nenhum antes do push')
+  ok('§33) e é ele que o corpo do cartão usa',
+    /onClick=\{aoAbrir\} className="min-w-0 flex-1/.test(tela))
+  ok('§34) iniciar continua explícito, no botão',
+    /onClick=\{aoExecutar\}[\s\S]{0,200}?\{acao\.rotulo\}/.test(tela))
+  ok('§34) e só o botão comanda',
+    /const irParaOTrabalho[\s\S]{0,400}?acao\.comando === "iniciar"[\s\S]{0,200}?comandar\(/.test(tela))
 
   // ══════════════════════════════════════════════════════════════════════════
   secao('§1/§18/§22) NÃO EXISTEM DOIS LUGARES PARA EXECUTAR O MESMO TRABALHO')

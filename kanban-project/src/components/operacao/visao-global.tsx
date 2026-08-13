@@ -25,7 +25,6 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react"
 import { useRouter } from "next/navigation"
-import { TarefaOperacional } from "./tarefa-operacional"
 import { urlOperacionalDaTarefa } from "@/lib/operacional/navegacao"
 import {
   auth, dataCurta, Estado, Etiqueta, ROTULO_PRIORIDADE, ROTULO_STATUS,
@@ -176,7 +175,6 @@ export function VisaoGlobal() {
   const [filtros, setFiltros] = useState<Filtros>(SEM_FILTRO)
   const [resultado, setResultado] = useState<{ chave: string; d: Resposta | null } | null>(null)
   const [recarga, setRecarga] = useState(0)
-  const [aberta, setAberta] = useState<number | null>(null)
   const [alvo, setAlvo] = useState<LinhaGerencial | null>(null)
   const [ocupado, setOcupado] = useState(false)
   const [erroComando, setErroComando] = useState<string | null>(null)
@@ -447,21 +445,22 @@ export function VisaoGlobal() {
             linhas={ordenadas}
             ordem={ordem}
             aoOrdenar={(campo) => setOrdem((o) => ({ campo, asc: o.campo === campo ? !o.asc : true }))}
-            aoAbrir={setAberta}
+            aoAbrir={(id) => { const l = linhas.find((x) => x.taskId === id); if (l) irParaOProcesso(l) }}
             aoDistribuir={setAlvo}
             aoSugerir={sugerir}
-            aoAbrirNoProcesso={irParaOProcesso}
           />
         )}
         {dados && linhas.length > 0 && modo === "kanban" && (
-          <Quadro porColuna={porColuna} aoAbrir={setAberta} aoDistribuir={setAlvo} aoSugerir={sugerir} aoComandar={comandar} ocupado={ocupado} />
+          <Quadro
+            porColuna={porColuna}
+            aoAbrir={(id) => { const l = linhas.find((x) => x.taskId === id); if (l) irParaOProcesso(l) }}
+            aoDistribuir={setAlvo}
+            aoSugerir={sugerir}
+            aoComandar={comandar}
+            ocupado={ocupado}
+          />
         )}
       </div>
-
-      {/* Clicar abre a MESMA Tarefa Operacional canônica — não um modal daqui. */}
-      {aberta != null && (
-        <TarefaOperacional taskId={aberta} aoFechar={() => setAberta(null)} aoMudar={recarregar} />
-      )}
 
       {sugerindo && (
         <PainelSugestao
@@ -541,7 +540,7 @@ function tempo(dias: number | null, atrasada: boolean): string {
 }
 
 function Lista({
-  linhas, ordem, aoOrdenar, aoAbrir, aoDistribuir, aoSugerir, aoAbrirNoProcesso,
+  linhas, ordem, aoOrdenar, aoAbrir, aoDistribuir, aoSugerir,
 }: {
   linhas: LinhaGerencial[]
   ordem: { campo: keyof LinhaGerencial; asc: boolean }
@@ -549,7 +548,6 @@ function Lista({
   aoAbrir: (id: number) => void
   aoDistribuir: (l: LinhaGerencial) => void
   aoSugerir: (l: LinhaGerencial) => void
-  aoAbrirNoProcesso: (l: LinhaGerencial) => void
 }) {
   return (
     <table className="w-full border-collapse text-left">
@@ -604,13 +602,6 @@ function Lista({
                     Sugerir
                   </button>
                 )}
-                <button
-                  onClick={() => aoAbrirNoProcesso(l)}
-                  className="rounded border border-white/12 px-2 py-1 text-[10px] text-white/60 transition-colors hover:bg-white/[0.06] hover:text-white/90"
-                  title="Abrir na Central Operacional do processo"
-                >
-                  Abrir no processo
-                </button>
                 <button
                   onClick={() => aoDistribuir(l)}
                   className="rounded border border-white/12 px-2 py-1 text-[10px] text-white/60 transition-colors hover:bg-white/[0.06] hover:text-white/90"
