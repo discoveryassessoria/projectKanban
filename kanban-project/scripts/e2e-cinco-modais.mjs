@@ -72,6 +72,24 @@ await page.addInitScript(([t, u]) => {
 // produto. Aqui ele é respondido com 200; todo o resto (presign, registro do
 // arquivo, validação de evidência, conclusão da etapa) roda de verdade.
 await page.route(/r2\.cloudflarestorage\.com/, (route) => route.fulfill({ status: 200, body: "" }))
+// O bucket pode estar atrás de um domínio próprio: o que define "é o bucket" é
+// ser um PUT para fora do Discovery, não o nome do host. Sem esta rede, o teste
+// falha por infraestrutura e finge que é defeito de produto.
+await page.route("**/*", async (route) => {
+  const req = route.request()
+  const paraFora = !req.url().startsWith(BASE) && !req.url().startsWith("http://localhost")
+  if (req.method() === "PUT" && paraFora) return route.fulfill({ status: 200, body: "" })
+  return route.fallback()
+})
+
+// FALHA DE REDE É DIAGNÓSTICO, NÃO RUÍDO. Sem isto, um upload recusado aparece
+// como "o requerimento não foi aceito" e some a causa.
+page.on("response", (r) => {
+  if (r.status() >= 400 && !/_next|\.(css|js|png|woff2?)$/.test(r.url())) {
+    console.log(`    ✗ ${r.status()} ${r.request().method()} ${r.url().replace(BASE, "")}`)
+  }
+})
+page.on("console", (m) => { if (m.type() === "error") console.log(`    ! ${m.text().slice(0, 200)}`) })
 
 /** Lê o estado real do servidor — a verdade não é o que a tela desenhou. */
 async function estado() {
@@ -81,24 +99,79 @@ async function estado() {
   return (await r.json()).tarefa
 }
 
-/** Abre a tarefa pela FILA — o caminho do funcionário, não uma URL direta. */
+/**
+ * Abre a tarefa pela FILA — o caminho do funcionário, não uma URL direta.
+ *
+ * A Minha Fila não executa mais nada: a ação principal INICIA (quando é o caso)
+ * e navega para a Central Operacional do processo, que se posiciona sozinha no
+ * documento certo e na aba Workflow. O executor especializado é montado lá, num
+ * lugar só — antes existia um painel local aqui, e eram dois caminhos para a
+ * mesma etapa.
+ */
 async function abrirTarefaPelaFila() {
+  // O TÍTULO VEM DO SERVIDOR. A fila tem várias certidões "Inteiro Teor", e
+  // clicar na primeira que casa com o texto abre a tarefa de outra pessoa — o
+  // teste passaria a medir outro trabalho, sem avisar.
+  const titulo = (await estado())?.titulo ?? ""
   await page.goto(`${BASE}/operacao`, { waitUntil: "domcontentloaded", timeout: 60000 })
-  await page.waitForTimeout(3000)
+  await page.waitForTimeout(3500)
   const aba = page.getByRole("button", { name: /^Minha fila$/ }).first()
-  if (await aba.count()) { await aba.click(); await page.waitForTimeout(2000) }
-  const linha = page.locator("button.cursor-pointer").filter({ hasText: "Inteiro Teor" }).first()
-  await linha.click()
-  await page.waitForTimeout(2500)
+  if (await aba.count()) { await aba.click(); await page.waitForTimeout(2500) }
+
+  const corpoDoCartao = page.locator("button.cursor-pointer").filter({ hasText: titulo }).first()
+  await corpoDoCartao.waitFor({ timeout: 30000 })
+  // A ação principal DESTE cartão — não a do primeiro da lista. Ela é irmã do
+  // corpo dentro da mesma linha; é ela que inicia e leva ao trabalho, enquanto
+  // clicar no corpo apenas navega (abrir não é iniciar).
+  const linha = corpoDoCartao.locator("xpath=..")
+  const acao = linha.getByRole("button", { name: /^(Iniciar tarefa|Continuar|Ver etapa)$/ }).first()
+  if (await acao.count()) await acao.click()
+  else await corpoDoCartao.click()
+  await page.waitForTimeout(6000)
 }
 
-/** Clica no CTA da etapa corrente e espera o executor montar. */
+/**
+ * Clica no CTA da etapa corrente e espera o EXECUTOR ESPECIALIZADO montar.
+ *
+ * São dois gestos, e eles significam coisas diferentes: "Central da Etapa" abre
+ * o contexto do passo (anexos, observações, timeline, ações de gestão), e
+ * "Abrir editor" abre o formulário do trabalho — os oito canais, o protocolo, a
+ * conferência. O teste precisa do segundo, mas passa pelo primeiro porque é por
+ * ele que o operador passa.
+ */
 async function abrirEtapaAtual() {
-  const cta = page.getByRole("button", { name: /^(Abrir etapa|Continuar etapa)$/ }).first()
-  if (!(await cta.count())) return false
-  await cta.click()
+  const cta = page.getByRole("button", { name: /^(Central da Etapa|Abrir etapa|Continuar etapa)/ }).first()
+  if (await cta.count()) { await cta.click(); await page.waitForTimeout(3000) }
+  const editor = page.getByRole("button", { name: /^Abrir editor$/ }).first()
+  if (!(await editor.count())) return false
+  await editor.click()
   await page.waitForTimeout(3500)
   return true
+}
+
+/**
+ * Preenche os campos AINDA VAZIOS do modal aberto.
+ *
+ * O placeholder de alguns campos é um EXEMPLO derivado do caso ("ex: Eduardo
+ * Almeida"), então procurar por ele acerta num palco e erra em todos os outros
+ * — o campo fica vazio, a ação terminal continua bloqueada, e o teste reporta
+ * "não liberou" sem dizer que foi ele quem não preencheu.
+ *
+ * O que não está vazio não é tocado: valor que a tela já trouxe é decisão dela.
+ */
+async function preencherCamposDoModal(valorTexto = "Registro conferido pela operação") {
+  const modal = page.locator("div.fixed.inset-0").last()
+  const campos = modal.locator('input:not([type="file"]):not([type="radio"]):not([type="checkbox"]):not([type="hidden"]), textarea')
+  const n = await campos.count()
+  for (let i = 0; i < n; i++) {
+    const c = campos.nth(i)
+    if (!(await c.isVisible().catch(() => false))) continue
+    if (!(await c.isEditable().catch(() => false))) continue
+    if ((await c.inputValue().catch(() => "x")) !== "") continue
+    const tipo = await c.getAttribute("type")
+    await c.fill(tipo === "date" ? "1970-03-14" : tipo === "number" ? "1" : valorTexto).catch(() => {})
+  }
+  await page.waitForTimeout(1000)
 }
 
 /** Preenche pelo placeholder — é o que o operador vê dentro do campo. */
@@ -114,9 +187,25 @@ async function preencherPorPlaceholder(placeholder, valor) {
 // "Confirmar recebimento · concluir etapa", "Confirmar decisão · FINALIZAR
 // etapa". Cada executor nomeia o próprio gesto — o que elas têm em comum é
 // fechar a etapa.
-const acaoTerminal = () => page.locator("button").filter({ hasText: /(concluir|finalizar) etapa/i }).first()
+// E ela vive DENTRO do modal. A Central da Etapa, aberta por baixo, também tem
+// um "Concluir etapa": pegar o primeiro do documento clicava no de trás, que a
+// sobreposição do modal (z-10005) bloqueia — o teste travava mirando o botão
+// errado. O do modal é o último a entrar no DOM.
+const acaoTerminal = () => page.locator("button").filter({ hasText: /(concluir|finalizar) etapa/i }).last()
 const acaoTerminalHabilitada = async () =>
   (await acaoTerminal().count()) > 0 && (await acaoTerminal().isEnabled().catch(() => false))
+/** Diagnóstico: quantas ações terminais o documento tem, e em que estado. */
+async function mapearAcoesTerminais(rotulo) {
+  const todas = page.locator("button").filter({ hasText: /(concluir|finalizar) etapa/i })
+  const n = await todas.count()
+  const linhas = []
+  for (let i = 0; i < n; i++) {
+    const b = todas.nth(i)
+    linhas.push(`[${i}] "${(await b.innerText().catch(() => "?")).replace(/\n/g, " ")}" visível=${await b.isVisible().catch(() => false)} habilitado=${await b.isEnabled().catch(() => false)}`)
+  }
+  console.log(`    · ${rotulo}: ${n} ação(ões) terminal(is)\n      ${linhas.join("\n      ")}`)
+}
+
 /** Motivo do bloqueio, quando houver — sem derrubar o teste se o botão sumiu. */
 const impedimento = async () =>
   (await acaoTerminal().count()) === 0
@@ -205,10 +294,14 @@ ok("as evidências se ajustam ao canal escolhido",
 
 // Anexar o requerimento — evidência obrigatória do canal.
 const pdf = pdfDeTeste(OUT, "requerimento-inteiro-teor.pdf")
+// O executor abre POR CIMA da Central da Etapa, e a Central também tem o seu
+// "Anexar arquivo". Pegar o primeiro input da página anexava no lugar errado —
+// sem erro nenhum, e a evidência do canal continuava faltando. O input do
+// modal é o ÚLTIMO a entrar no DOM.
 const inputs = page.locator('input[type="file"]')
 if (await inputs.count()) {
-  await inputs.first().setInputFiles(pdf)
-  await page.waitForTimeout(3500)
+  await inputs.last().setInputFiles(pdf)
+  await page.waitForTimeout(4000)
 }
 // A prova de que o anexo "pegou" não é o texto na tela — é a ação terminal
 // deixar de estar bloqueada por falta dele.
@@ -259,7 +352,8 @@ await fecharSobreposicoes()
 await abrirTarefaPelaFila()
 ok("o executor da etapa 3 abriu", await abrirEtapaAtual())
 const fileIn3 = page.locator('input[type="file"]')
-if (await fileIn3.count()) { await fileIn3.first().setInputFiles(pdfDeTeste(OUT, "certidao-recebida.pdf")); await page.waitForTimeout(4000) }
+// O input do MODAL, não o da Central da Etapa que está aberta por baixo.
+if (await fileIn3.count()) { await fileIn3.last().setInputFiles(pdfDeTeste(OUT, "certidao-recebida.pdf")); await page.waitForTimeout(4000) }
 // TIPO DE MÍDIA é exigência do recebimento: o cartório devolve papel, PDF
 // assinado ou os dois, e isso muda o que acontece com o documento depois.
 // EXIGÊNCIAS REAIS DO RECEBIMENTO: arquivo (já anexado acima) e TIPO DE MÍDIA
@@ -267,7 +361,7 @@ if (await fileIn3.count()) { await fileIn3.first().setInputFiles(pdfDeTeste(OUT,
 // acontece com o documento depois.
 // O alvo é o BOTÃO da opção — clicar pelo texto solto acertava o fundo do
 // drawer e fechava o modal.
-await page.locator("button").filter({ hasText: "Digital (PDF eletrônico)" }).first().click()
+await page.locator("button").filter({ hasText: "Digital (PDF eletrônico)" }).last().click()
 await page.waitForTimeout(1200)
 await preencherPorPlaceholder("Recebido por correios em 28/05/2026, sem avarias...", "Recebido por e-mail, PDF assinado, sem avarias.")
 await page.waitForTimeout(800)
@@ -290,8 +384,8 @@ await page.screenshot({ path: `${OUT}/e2e-4-conferir.png` })
 // (é o que permite comparar com o cadastro) e o resultado da conferência.
 // O campo do titular tem o próprio placeholder. `primeiro campo visível`
 // pegava a BUSCA DO CABEÇALHO — fora do modal, e sem efeito nenhum aqui.
-await preencherPorPlaceholder("Eduardo Almeida", "Eduardo Almeida")
-await page.locator("button").filter({ hasText: /Aprovar/ }).first().click()
+await preencherCamposDoModal("Maria Ferreira")
+await page.locator("button").filter({ hasText: /Aprovar/ }).last().click()
 await page.waitForTimeout(1200)
 await page.screenshot({ path: `${OUT}/e2e-4-conferir.png` })
 ok("4) a ação terminal liberou", await acaoTerminalHabilitada(), await impedimento())
