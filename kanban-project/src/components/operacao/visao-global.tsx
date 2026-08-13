@@ -24,7 +24,9 @@
 "use client"
 
 import { useCallback, useEffect, useMemo, useState } from "react"
+import { useRouter } from "next/navigation"
 import { TarefaOperacional } from "./tarefa-operacional"
+import { urlOperacionalDaTarefa } from "@/lib/operacional/navegacao"
 import {
   auth, dataCurta, Estado, Etiqueta, ROTULO_PRIORIDADE, ROTULO_STATUS,
   rotularFase, SeletorResponsavel, type LinhaDeFila,
@@ -180,6 +182,17 @@ export function VisaoGlobal() {
   const [erroComando, setErroComando] = useState<string | null>(null)
   const [aviso, setAviso] = useState<string | null>(null)
   const [ordem, setOrdem] = useState<{ campo: keyof LinhaGerencial; asc: boolean }>({ campo: "dataPrazo", asc: true })
+  const router = useRouter()
+  /**
+   * A MESMA NAVEGAÇÃO DA MINHA FILA — uma tarefa, um destino.
+   *
+   * Supervisionar e executar são coisas diferentes: aqui o clique na linha abre
+   * o painel de leitura, e "Abrir no processo" leva ao lugar onde o trabalho
+   * acontece. As duas telas usam a mesma função para montar a URL.
+   */
+  const irParaOProcesso = useCallback((l: LinhaGerencial) => {
+    router.push(urlOperacionalDaTarefa({ taskId: l.taskId, processoId: l.processoId }))
+  }, [router])
   /** A tarefa cuja sugestão está aberta. `null` = nenhuma. */
   const [sugerindo, setSugerindo] = useState<{ l: LinhaGerencial; s: Simulacao | null; erro: string | null } | null>(null)
 
@@ -437,6 +450,7 @@ export function VisaoGlobal() {
             aoAbrir={setAberta}
             aoDistribuir={setAlvo}
             aoSugerir={sugerir}
+            aoAbrirNoProcesso={irParaOProcesso}
           />
         )}
         {dados && linhas.length > 0 && modo === "kanban" && (
@@ -527,7 +541,7 @@ function tempo(dias: number | null, atrasada: boolean): string {
 }
 
 function Lista({
-  linhas, ordem, aoOrdenar, aoAbrir, aoDistribuir, aoSugerir,
+  linhas, ordem, aoOrdenar, aoAbrir, aoDistribuir, aoSugerir, aoAbrirNoProcesso,
 }: {
   linhas: LinhaGerencial[]
   ordem: { campo: keyof LinhaGerencial; asc: boolean }
@@ -535,6 +549,7 @@ function Lista({
   aoAbrir: (id: number) => void
   aoDistribuir: (l: LinhaGerencial) => void
   aoSugerir: (l: LinhaGerencial) => void
+  aoAbrirNoProcesso: (l: LinhaGerencial) => void
 }) {
   return (
     <table className="w-full border-collapse text-left">
@@ -589,6 +604,13 @@ function Lista({
                     Sugerir
                   </button>
                 )}
+                <button
+                  onClick={() => aoAbrirNoProcesso(l)}
+                  className="rounded border border-white/12 px-2 py-1 text-[10px] text-white/60 transition-colors hover:bg-white/[0.06] hover:text-white/90"
+                  title="Abrir na Central Operacional do processo"
+                >
+                  Abrir no processo
+                </button>
                 <button
                   onClick={() => aoDistribuir(l)}
                   className="rounded border border-white/12 px-2 py-1 text-[10px] text-white/60 transition-colors hover:bg-white/[0.06] hover:text-white/90"

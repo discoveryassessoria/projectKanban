@@ -209,7 +209,10 @@ ok("a varredura distingue criada de reencontrada", /if \(r\.criada\)/.test(coman
 // corrente — é delegação de transição, não tipo de notificação.)
 ok("nenhum tipo de notificação é de etapa",
   !/tipo:\s*'(STEP|PASSO_|ETAPA_)/.test(comandos))
-ok("o link do aviso é o link canônico da tarefa", /link: linkDaTarefa\(ev\.tarefaId\)/.test(comandos))
+// O link passou a carregar o PROCESSO, para o aviso abrir a Central no
+// documento certo em vez da home da operação. Continua sendo o helper canônico.
+ok("o link do aviso é o link canônico da tarefa", /link: linkDaTarefa\(ev\.tarefaId,/.test(comandos))
+ok("e ele leva ao processo, não à home da operação", /urlOperacionalDaTarefa/.test(comandos))
 
 // ═══════════════════════════════════════════════════════════════════════════
 secao("10) O motor atravessa fases sem destruir trabalho")

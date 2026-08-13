@@ -178,6 +178,8 @@ const AUTORIZADOS_FORA_DO_RUNTIME: Record<string, string> = {
     "fluxo de distribuição: monta e derruba os PRÓPRIOS processos (marca DISTR), só no banco de teste — o cenário precisa de obrigação real para o motor criar a tarefa sozinho, que é justamente o que se prova",
   "scripts/palco-distribuicao.ts":
     "palco visual da Operação: monta e derruba os PRÓPRIOS processos (marca PALCO), só no banco de teste, para a captura de tela com dados realistas — não roda em produção",
+  "scripts/navegacao-operacional.test.ts":
+    "deep-link operacional: monta e derruba as PRÓPRIAS 15 certidões de 5 pessoas (marca NAV), só no banco de teste — a prova de que cada tarefa abre exatamente a sua exige quinze unidades reais, com necessidade e documento próprios",
   "scripts/identidade-operacional.test.ts":
     "invariantes da operação: monta e derruba o PRÓPRIO processo (marca IDENT), só no banco de teste — prova que atribuir não inicia, abrir não inicia e iniciar é idempotente; a limpeza remove a necessidade que o palco criou",
   "scripts/organizacao-capacidade.test.ts":

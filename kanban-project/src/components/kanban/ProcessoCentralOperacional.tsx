@@ -203,8 +203,25 @@ interface CentralOpData {
   }
 }
 
+/** O cabeçalho de sessão — mesmo padrão das demais chamadas da tela. */
+const authHeaders = (): Record<string, string> => ({
+  Authorization: `Bearer ${typeof window !== "undefined" ? localStorage.getItem("authToken") ?? "" : ""}`,
+})
+
 interface ProcessoCentralOperacionalProps {
   processo: ProcessoWithStatus | Processo
+  /**
+   * DEEP-LINK: a tarefa que trouxe o usuário até aqui.
+   *
+   * A Central é um índice — com quinze certidões, chegar por um link e ter de
+   * procurar qual delas anula o propósito do link. Com isto preenchido, a
+   * pessoa dela abre, a linha recebe realce e o painel de operação abre
+   * sozinho, no documento certo.
+   *
+   * A resolução acontece no SERVIDOR (`/navegacao`): a URL é do usuário, e
+   * trocar um número nela não pode virar chave de outro processo.
+   */
+  taskIdAlvo?: number | null
   /** Chamado quando a fase ATIVA do processo muda aqui (ex.: retorno de fase),
    *  para o container (modal) invalidar Header/Drawer/Kanban. */
   onProcessoMudou?: () => void
@@ -321,6 +338,7 @@ const SEM_PHASES: PhaseMeta[] = []
 export function ProcessoCentralOperacional({
   processo,
   onProcessoMudou,
+  taskIdAlvo = null,
 }: ProcessoCentralOperacionalProps) {
   const { pode } = usePermissoes()
 
@@ -388,6 +406,31 @@ export function ProcessoCentralOperacional({
   const [novaTransversalCtx, setNovaTransversalCtx] = useState<{ necessidadeId?: number | null; pessoaId?: number | null; label?: string } | null>(null)
   // Banner "executada antecipadamente para atender…" exibido na tela oficial (drawer) reusada.
   const [bannerAntecipada, setBannerAntecipada] = useState<string | null>(null)
+
+  // ─── O ALVO DO DEEP-LINK ──────────────────────────────────────────────────
+  //
+  // O resultado carrega a CHAVE do pedido que o produziu: assim "ainda não
+  // resolvi" é derivação, não um `setState(null)` no corpo do efeito — e a
+  // resposta de um link antigo não se passa pela do atual.
+  type AlvoDaTela = { taskId: number; documentoId: number | null; requerDecisao: boolean; titulo: string }
+  const [resolvido, setResolvido] = useState<{ chave: number; alvo: AlvoDaTela | null } | null>(null)
+  useEffect(() => {
+    if (taskIdAlvo == null) return
+    let vivo = true
+    fetch(`/api/operacao/tarefas/${taskIdAlvo}/navegacao`, { headers: authHeaders() })
+      .then((r) => (r.ok ? r.json() : Promise.reject(new Error(String(r.status)))))
+      .then((d: { alvo: AlvoDaTela }) => { if (vivo) setResolvido({ chave: taskIdAlvo, alvo: d.alvo }) })
+      // Sem acesso ou inexistente: a Central abre normalmente, sem alvo. Não é
+      // erro de tela — é o servidor recusando revelar o que não é de quem pediu.
+      .catch(() => { if (vivo) setResolvido({ chave: taskIdAlvo, alvo: null }) })
+    return () => { vivo = false }
+  }, [taskIdAlvo])
+  const alvo = taskIdAlvo != null && resolvido?.chave === taskIdAlvo ? resolvido.alvo : null
+
+  /** O alvo já aberto — referência, não estado: não deve provocar render. */
+  const alvoAberto = useRef<number | null>(null)
+
+
 
   // TROCA DE CONTEXTO NO AVANÇO DE FASE: quando a fase da Central muda (avanço/retorno),
   // qualquer drawer aberto está exibindo o contexto da fase ANTIGA (ex.: o passo
@@ -549,6 +592,32 @@ export function ProcessoCentralOperacional({
   })()
   const viewReq = useApi<CentralOpData>(chaveView)
   const viewData = chaveView ? (viewReq.dados ?? null) : null
+
+  // ─── ABRIR SOZINHO, UMA VEZ ───────────────────────────────────────────────
+  //
+  // Assim que o índice chega, o documento do alvo é localizado por ID e a porta
+  // única de execução é acionada — a MESMA que o clique manual usa. `alvoAbriu`
+  // impede que uma revalidação em segundo plano reabra o painel por cima do
+  // trabalho de quem já seguiu adiante.
+  //
+  // Tarefa com CAUSA REMOVIDA não abre executor: ela precisa de decisão, não de
+  // execução. A Central mostra o contexto e o realce; o painel fica ao alcance
+  // de um clique, mas não se impõe.
+  useEffect(() => {
+    if (!alvo || alvo.requerDecisao) return
+    if (alvoAberto.current === alvo.taskId) return
+    if (alvo.documentoId == null) return
+    const indice = (viewData ?? data)?.indice
+    if (!indice) return
+    const todas = [...indice.linhaPrincipal, ...indice.foraDaLinha, ...indice.pendenteClassificacao]
+    const doc = todas.flatMap((p) => p.documentos).find((d) => d.documentoId === alvo.documentoId)
+    if (!doc) return
+    alvoAberto.current = alvo.taskId
+    // AGENDADA, não executada durante o commit: abrir o painel é uma AÇÃO em
+    // resposta ao índice ter chegado, e disparar a cascata de estado dentro do
+    // efeito é o que a regra do React existe para evitar.
+    queueMicrotask(() => abrirDetalhes(doc))
+  }, [alvo, data, viewData, abrirDetalhes])
   const viewLoading = Boolean(chaveView) && viewReq.carregando
   const viewErro = chaveView && viewReq.erro ? "Não foi possível carregar os dados desta fase." : null
 
@@ -666,6 +735,9 @@ export function ProcessoCentralOperacional({
     "Genealogia"
 
   const painel = mapearPainel(bodyData, faseAtualNome)
+
+
+
   const meta = FASE_META[faseAtualNome] || { sub: "", tabs: ["Resumo"] }
 
   // Detecta a fase de Análise Documental (tolerante a acento/caixa)
@@ -837,6 +909,7 @@ export function ProcessoCentralOperacional({
             // expansão, para o card nunca mostrar a posição de outro trabalho.
             chaveExpansao={`${processo.id}|${bodyData.phaseContext?.faseMacroKey ?? faseAtualNome}|${bodyData.phaseContext?.ciclo ?? ""}`}
             onAbrirDetalhes={abrirDetalhes}
+            documentoDestacadoId={alvo?.documentoId ?? null}
             readOnly={readOnly}
             modoReestruturacao={!!bodyData.genealogiaReestruturacao}
             avisoReestruturacao={bodyData.mensagemReestruturacao ?? undefined}

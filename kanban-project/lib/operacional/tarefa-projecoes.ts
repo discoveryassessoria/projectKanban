@@ -33,9 +33,33 @@ export function diaOperacional(d: Date): string {
   return d.toLocaleDateString('en-CA', { timeZone: FUSO_OPERACIONAL })
 }
 
+/**
+ * A JANELA DO DIA OPERACIONAL, em instantes UTC.
+ *
+ * Meia-noite EM SÃO PAULO, não meia-noite UTC. A diferença parece pedante e não
+ * é: entre 21h e meia-noite (00:00–03:00 UTC), a derivação em memória dizia
+ * "atrasada" e o filtro no banco dizia que não, porque comparavam com cortes
+ * diferentes. O mesmo prazo, duas respostas, e a fila deixando de mostrar o que
+ * já estourou justamente no fim do expediente.
+ *
+ * O deslocamento é medido no próprio instante — assim o horário de verão, se
+ * voltar, entra sozinho na conta.
+ */
+function deslocamentoDoFuso(d: Date): number {
+  const comoUtc = new Date(d.toLocaleString('en-US', { timeZone: 'UTC' }))
+  const noFuso = new Date(d.toLocaleString('en-US', { timeZone: FUSO_OPERACIONAL }))
+  return comoUtc.getTime() - noFuso.getTime()
+}
+
+export function janelaDoDiaOperacional(agora: Date): { inicio: Date; fim: Date } {
+  const meiaNoiteNominal = new Date(`${diaOperacional(agora)}T00:00:00.000Z`)
+  const inicio = new Date(meiaNoiteNominal.getTime() + deslocamentoDoFuso(agora))
+  return { inicio, fim: new Date(inicio.getTime() + 86400000 - 1) }
+}
+
 /** Meia-noite do dia operacional de HOJE, em instante — para filtrar no banco. */
 export function inicioDoDiaOperacional(agora: Date): Date {
-  return new Date(`${diaOperacional(agora)}T00:00:00.000Z`)
+  return janelaDoDiaOperacional(agora).inicio
 }
 
 export interface LinhaDeFila {
@@ -732,8 +756,8 @@ function whereGerencial(f: FiltrosGerenciais, agora: Date): Prisma.TarefaWhereIn
   // passado e trabalho ainda por fazer.
   if (f.atrasadas) e.push({ dataPrazo: { lt: inicioDoDiaOperacional(agora) }, statusTarefa: { in: STATUS_ATIVOS } })
   if (f.venceHoje) {
-    const dia = diaOperacional(agora)
-    e.push({ dataPrazo: { gte: new Date(`${dia}T00:00:00.000Z`), lte: new Date(`${dia}T23:59:59.999Z`) } })
+    const { inicio, fim } = janelaDoDiaOperacional(agora)
+    e.push({ dataPrazo: { gte: inicio, lte: fim } })
   }
 
   // A busca é uma caixa só porque é assim que se procura: o gestor lembra do
@@ -789,7 +813,7 @@ export interface IndicadoresGerenciais {
 export async function indicadoresGerenciais(f: FiltrosGerenciais = {}, agora = new Date()): Promise<IndicadoresGerenciais> {
   const base = { ...f, atrasadas: false, venceHoje: false, coluna: null, status: undefined }
   const w = (extra: Prisma.TarefaWhereInput) => ({ AND: [whereGerencial(base, agora), extra] })
-  const dia = diaOperacional(agora)
+  const janela = janelaDoDiaOperacional(agora)
   const [total, semResp, andamento, aguardando, bloqueadas, atrasadas, venceHoje, concluidas] = await Promise.all([
     prisma.tarefa.count({ where: w({ statusTarefa: { in: STATUS_ATIVOS } }) }),
     prisma.tarefa.count({ where: w({ statusTarefa: { in: STATUS_ATIVOS }, responsavelId: null }) }),
@@ -800,7 +824,7 @@ export async function indicadoresGerenciais(f: FiltrosGerenciais = {}, agora = n
     prisma.tarefa.count({
       where: w({
         statusTarefa: { in: STATUS_ATIVOS },
-        dataPrazo: { gte: new Date(`${dia}T00:00:00.000Z`), lte: new Date(`${dia}T23:59:59.999Z`) },
+        dataPrazo: { gte: janela.inicio, lte: janela.fim },
       }),
     }),
     prisma.tarefa.count({ where: w({ statusTarefa: { in: STATUS_CONCLUIDOS } }) }),

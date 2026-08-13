@@ -130,6 +130,8 @@ export function KanbanContent() {
   const initialPessoaId = linkConsumido ? null : inteiroDaUrl(searchParams.get("pessoaId"))
   const initialSidebarTab = linkConsumido ? null : searchParams.get("sidebarTab")
   const initialAtividadeId = linkConsumido ? null : inteiroDaUrl(searchParams.get("atividadeId"))
+  // DEEP-LINK OPERACIONAL: a tarefa que a Central deve localizar lá dentro.
+  const initialTaskId = linkConsumido ? null : inteiroDaUrl(searchParams.get("taskId"))
 
   // Modal de processo na aba Clientes
   const [clientesProcessoModal, setClientesProcessoModal] = useState<Processo | null>(null)
@@ -163,6 +165,7 @@ export function KanbanContent() {
     newUrl.searchParams.delete("pessoaId")
     newUrl.searchParams.delete("sidebarTab")
     newUrl.searchParams.delete("atividadeId")
+    newUrl.searchParams.delete("taskId")
     window.history.replaceState({}, "", newUrl.toString())
 
     setLinkConsumido(true)
@@ -391,6 +394,7 @@ export function KanbanContent() {
                     initialSidebarTab={initialSidebarTab}
                     onModalOpened={handleModalOpened}
                     initialAtividadeId={initialAtividadeId}
+                    initialTaskId={initialTaskId}
                   />
                 )
               ) : (

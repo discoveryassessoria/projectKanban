@@ -56,6 +56,7 @@ interface KanbanBoardProps {
   initialPessoaId?: number | null
   initialSidebarTab?: string | null
   initialAtividadeId?: number | null
+  initialTaskId?: number | null
   onModalOpened?: () => void
 }
 
@@ -89,6 +90,7 @@ export function KanbanBoard({
   initialSidebarTab = null,
   onModalOpened,
   initialAtividadeId = null,
+  initialTaskId = null,
 }: KanbanBoardProps) {
   // A lista local existe para o drag-and-drop responder na hora, antes de o servidor
   // confirmar. Ela é um RASCUNHO sobre a prop: enquanto a prop for a mesma, vale o
@@ -155,6 +157,7 @@ export function KanbanBoard({
   const pessoaInicialDoModal = aberturaPorLink ? (initialPessoaId || undefined) : modalInitialPessoaId
   const sidebarInicialDoModal = aberturaPorLink ? (initialSidebarTab || undefined) : modalInitialSidebarTab
   const atividadeInicialDoModal = aberturaPorLink ? (initialAtividadeId || undefined) : modalInitialAtividadeId
+  const taskInicialDoModal = aberturaPorLink ? (initialTaskId || undefined) : undefined
 
   // Avisar o pai que o modal abriu é EFEITO (é comunicação para fora), e continua
   // sendo — só não carrega mais estado nenhum junto.
@@ -467,6 +470,7 @@ export function KanbanBoard({
         initialPessoaId={pessoaInicialDoModal}
         initialSidebarTab={sidebarInicialDoModal}
         initialAtividadeId={atividadeInicialDoModal}
+        initialTaskId={taskInicialDoModal}
       />
 
       {/* MOVIMENTAÇÃO MANUAL — o card só troca de coluna DEPOIS que o servidor

@@ -133,7 +133,10 @@ check("documento sem executor vira erro administrativo explícito (linha não so
 check("contador e lista têm a MESMA fonte (resumo do índice)", central.includes("data.indice?.resumo"))
 
 check("painel é ÍNDICE: pessoa em card, documento em linha", painel.includes("function PessoaCard") && painel.includes("function LinhaDocumento") && !painel.includes("function PassoRow"))
-check("pessoa é expansível e revela os documentos dela", painel.includes("alternar()") && painel.includes("abertos.has(`pessoa:"))
+// `abertosComAlvo` é `abertos` MAIS a pessoa do deep-link: a expansão manual
+// continua igual, e quem chega por link já encontra a pessoa aberta.
+check("pessoa é expansível e revela os documentos dela", painel.includes("alternar()") && painel.includes("abertosComAlvo.has(`pessoa:"))
+check("e a pessoa do deep-link abre sozinha", painel.includes("chaveDaPessoaAlvo"))
 check("o workflow do documento vive no MODAL, não no painel", !painel.includes("doc.passos") && read("src/components/kanban/workflow/WorkflowTab.tsx").includes("workflow.steps.map"))
 check("sem lista de tarefas paralela ao workflow", !painel.includes("ListaDeTarefas") && !painel.includes("GRUPOS_TAREFA"))
 check("sem agregado por passo misturando as pessoas", !painel.includes("function WorkflowDaFase") && !painel.includes("function PassoDoWorkflow"))

@@ -25,7 +25,7 @@
 
 "use client"
 
-import { useState } from "react"
+import { useState, useRef, useEffect } from "react"
 import {
   ExternalLink,
   ChevronDown,
@@ -77,6 +77,14 @@ export interface PainelDaFaseProps {
   onAbrirPainelCompleto?: () => void
   /** Consulta de fase passada: mesmo layout, sem ações de mutação. */
   readOnly?: boolean
+  /**
+   * DEEP-LINK: o documento que trouxe o usuário até aqui.
+   *
+   * A pessoa dele abre sozinha e a linha recebe realce discreto — com quinze
+   * certidões na tela, chegar por um link e ter de procurar qual delas é
+   * anula o propósito do link.
+   */
+  documentoDestacadoId?: number | null
   // LEGADO_INATIVO (desativação Genealogia): em modo reestruturação o painel NÃO
   // exibe KPIs/progresso antigos (derivados de Documento.status + linhaReta).
   modoReestruturacao?: boolean
@@ -101,6 +109,7 @@ export function PainelDaFase({
   onAbrirDetalhes,
   onAbrirPainelCompleto,
   readOnly = false,
+  documentoDestacadoId = null,
   modoReestruturacao = false,
   avisoReestruturacao,
 }: PainelDaFaseProps) {
@@ -199,6 +208,7 @@ export function PainelDaFase({
           chaveExpansao={chaveExpansao}
           onAbrirDetalhes={onAbrirDetalhes}
           readOnly={readOnly}
+          documentoDestacadoId={documentoDestacadoId}
         />
       </div>
     </div>
@@ -233,11 +243,13 @@ function IndiceView({
   chaveExpansao,
   onAbrirDetalhes,
   readOnly,
+  documentoDestacadoId,
 }: {
   indice: IndiceOperacional
   chaveExpansao: string
   onAbrirDetalhes?: (doc: DocumentoDoIndice) => void
   readOnly: boolean
+  documentoDestacadoId?: number | null
 }) {
   // Expansão local, por processo/fase. Preferência visual não vai ao banco.
   // O ajuste acontece DURANTE a renderização (padrão do React para estado derivado de
@@ -250,6 +262,17 @@ function IndiceView({
     setExpansao(atual)
   }
   const abertos = atual.abertos
+
+  // A PESSOA DO DOCUMENTO ALVO ABRE SOZINHA — e só ela. Expandir tudo devolveria
+  // ao usuário o mesmo problema que o link veio resolver, só que maior.
+  const pessoaAlvo = documentoDestacadoId != null
+    ? [...indice.linhaPrincipal, ...indice.foraDaLinha, ...indice.pendenteClassificacao]
+        .find((p) => p.documentos.some((d) => d.documentoId === documentoDestacadoId))
+    : undefined
+  const chaveDaPessoaAlvo = pessoaAlvo ? `pessoa:${pessoaAlvo.pessoa.pessoaId}` : null
+  const abertosComAlvo = chaveDaPessoaAlvo != null && !abertos.has(chaveDaPessoaAlvo)
+    ? new Set([...abertos, chaveDaPessoaAlvo])
+    : abertos
 
   const alternar = (chave: string) =>
     setExpansao((prev) => {
@@ -297,9 +320,10 @@ function IndiceView({
           {pessoas.map((p) => (
             <PessoaCard
               key={p.pessoa.pessoaId} linha={p}
-              aberto={abertos.has(`pessoa:${p.pessoa.pessoaId}`)}
+              aberto={abertosComAlvo.has(`pessoa:${p.pessoa.pessoaId}`)}
               alternar={() => alternar(`pessoa:${p.pessoa.pessoaId}`)}
               onAbrirDetalhes={onAbrirDetalhes} readOnly={readOnly}
+              documentoDestacadoId={documentoDestacadoId}
             />
           ))}
         </div>
@@ -351,12 +375,14 @@ function PessoaCard({
   alternar,
   onAbrirDetalhes,
   readOnly,
+  documentoDestacadoId,
 }: {
   linha: PessoaDoIndice
   aberto: boolean
   alternar: () => void
   onAbrirDetalhes?: (doc: DocumentoDoIndice) => void
   readOnly: boolean
+  documentoDestacadoId?: number | null
 }) {
   const p = linha.pessoa
   const t = linha.totais
@@ -422,7 +448,12 @@ function PessoaCard({
 
       {aberto && podeAbrir && (
         <div className="border-t border-white/10">
-          <TabelaDocumentos docs={linha.documentos} onAbrirDetalhes={onAbrirDetalhes} readOnly={readOnly} />
+          <TabelaDocumentos
+            docs={linha.documentos}
+            onAbrirDetalhes={onAbrirDetalhes}
+            readOnly={readOnly}
+            documentoDestacadoId={documentoDestacadoId}
+          />
         </div>
       )}
     </div>
@@ -451,10 +482,12 @@ function TabelaDocumentos({
   docs,
   onAbrirDetalhes,
   readOnly,
+  documentoDestacadoId,
 }: {
   docs: DocumentoDoIndice[]
   onAbrirDetalhes?: (doc: DocumentoDoIndice) => void
   readOnly: boolean
+  documentoDestacadoId?: number | null
 }) {
   if (docs.length === 0) {
     return <div className="px-4 py-4 text-[12px] text-white/40">Nenhum documento aplicável nesta fase.</div>
@@ -475,7 +508,13 @@ function TabelaDocumentos({
           <div className="text-right">Ações</div>
         </div>
         {docs.map((d) => (
-          <LinhaDocumento key={d.chave} doc={d} onAbrirDetalhes={onAbrirDetalhes} readOnly={readOnly} />
+          <LinhaDocumento
+            key={d.chave}
+            doc={d}
+            onAbrirDetalhes={onAbrirDetalhes}
+            readOnly={readOnly}
+            destacado={documentoDestacadoId != null && d.documentoId === documentoDestacadoId}
+          />
         ))}
       </div>
     </div>
@@ -517,15 +556,29 @@ function LinhaDocumento({
   doc,
   onAbrirDetalhes,
   readOnly,
+  destacado,
 }: {
   doc: DocumentoDoIndice
   onAbrirDetalhes?: (doc: DocumentoDoIndice) => void
   readOnly: boolean
+  destacado?: boolean
 }) {
   const pode = !!onAbrirDetalhes && doc.podeAbrirDetalhes
+  // O DOCUMENTO QUE TROUXE O USUÁRIO ATÉ AQUI.
+  //
+  // Realce discreto e permanente enquanto o link estiver ativo: nada pisca,
+  // nada anima. A frase que ele responde é "foi esta certidão que me trouxe",
+  // e para isso basta a linha se distinguir das outras catorze.
+  const ref = useRef<HTMLDivElement | null>(null)
+  useEffect(() => {
+    if (destacado) ref.current?.scrollIntoView({ block: "center", behavior: "smooth" })
+  }, [destacado])
   return (
     <div
-      className="grid items-center gap-3 px-4 py-3 border-b border-white/[0.07] last:border-b-0 hover:bg-[#20262e]/60 transition-colors"
+      ref={ref}
+      className={`grid items-center gap-3 px-4 py-3 border-b border-white/[0.07] last:border-b-0 transition-colors ${
+        destacado ? "bg-sky-400/[0.07] ring-1 ring-inset ring-sky-300/25" : "hover:bg-[#20262e]/60"
+      }`}
       style={{ gridTemplateColumns: COLUNAS }}
     >
       <div className="flex items-center gap-2.5 min-w-0">

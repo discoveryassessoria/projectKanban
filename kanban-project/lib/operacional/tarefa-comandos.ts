@@ -20,6 +20,7 @@
 // silêncio o que o outro acabou de decidir.
 // ============================================================================
 import { prisma } from '@/lib/prisma'
+import { urlOperacionalDaTarefa } from './navegacao'
 import type { Prisma } from '@prisma/client'
 import { randomUUID } from 'crypto'
 import { STATUS_TERMINAIS } from './tarefa-canonica'
@@ -30,10 +31,16 @@ export type ResultadoComando =
   | { ok: true; tarefaId: number; notificacaoId: number | null; jaEstavaIniciada?: boolean }
   | { ok: false; codigo: 'NAO_ENCONTRADA' | 'TERMINAL' | 'CONFLITO' | 'SEM_RESPONSAVEL' | 'MESMO_RESPONSAVEL'; mensagem: string }
 
-/** O link canônico da tarefa — um só, para todas as visões e avisos. */
-// O link do aviso leva à OPERAÇÃO — `/activities` foi aposentada junto com a
-// árvore de subtarefas, e um aviso que abre 404 é pior do que aviso nenhum.
-export const linkDaTarefa = (tarefaId: number) => `/operacao?taskId=${tarefaId}`
+/**
+ * O LINK CANÔNICO DA TAREFA — um só, para todas as visões e avisos.
+ *
+ * Delegado ao helper de navegação: aviso de atribuição, card do Kanban, linha
+ * da visão global e cartão da Minha Fila abrem exatamente o mesmo lugar. Um
+ * aviso que leva à home da operação obriga quem recebeu a procurar de novo o
+ * trabalho que o aviso já sabia qual era.
+ */
+export const linkDaTarefa = (tarefaId: number, processoId: number | null = null) =>
+  urlOperacionalDaTarefa({ taskId: tarefaId, processoId })
 
 /**
  * O AVISO DE UM MARCO DA TAREFA.
@@ -64,6 +71,10 @@ async function notificar(
   })
   if (ja) return { id: ja.id, criada: false }
 
+  // O PROCESSO VEM DA TAREFA, para o aviso levar direto ao trabalho e não à
+  // home da operação. Uma consulta, e só quando o aviso é realmente criado.
+  const daTarefa = await tx.tarefa.findUnique({ where: { id: ev.tarefaId }, select: { processoId: true } })
+
   const criada = await tx.notificacaoOperacional.create({
     data: {
       tipo: ev.tipo,
@@ -71,7 +82,7 @@ async function notificar(
       tarefaId: ev.tarefaId,
       titulo: ev.titulo.slice(0, 200),
       mensagem: ev.mensagem ?? null,
-      link: linkDaTarefa(ev.tarefaId),
+      link: linkDaTarefa(ev.tarefaId, daTarefa?.processoId ?? null),
       autorId: ev.autorId ?? null,
       chaveIdempotencia: ev.chave,
     },

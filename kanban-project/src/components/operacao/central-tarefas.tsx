@@ -21,7 +21,9 @@
 "use client"
 
 import { useCallback, useEffect, useMemo, useState } from "react"
+import { useRouter } from "next/navigation"
 import { TarefaOperacional } from "./tarefa-operacional"
+import { urlOperacionalDaTarefa } from "@/lib/operacional/navegacao"
 // O vocabulário visual e o seletor de responsável são COMPARTILHADOS com a
 // visão gerencial global — mesma implementação, não uma cópia parecida.
 import {
@@ -62,8 +64,15 @@ export function urgencia(l: LinhaOperacional): { texto: string; tom: "critico" |
   return { texto: `Vence em ${d} dias`, tom: "neutro" }
 }
 
-/** A ação principal — UMA por cartão, decidida pelo estado. */
+/**
+ * A AÇÃO PRINCIPAL — UMA por cartão, decidida pelo estado.
+ *
+ * `iniciar` chama a porta canônica ANTES de navegar; as demais só navegam. E
+ * "Requer decisão" não diz Continuar: continuar sugere executar, e essa tarefa
+ * perdeu a causa — o que ela precisa é de alguém decidir o que fazer com ela.
+ */
 export function acaoPrincipal(l: LinhaOperacional): { rotulo: string; comando: "iniciar" | null } {
+  if (l.requerDecisao) return { rotulo: "Ver decisão", comando: null }
   if (l.coluna === "A_FAZER") return { rotulo: "Iniciar tarefa", comando: "iniciar" }
   if (l.coluna === "BLOQUEADA") return { rotulo: "Ver bloqueio", comando: null }
   if (l.coluna === "AGUARDANDO_TERCEIRO") return { rotulo: "Ver etapa", comando: null }
@@ -179,12 +188,14 @@ function agruparPorDia(linhas: LinhaDeFila[]): Array<{ dia: string; rotulo: stri
  * abrir a tarefa e ler o histórico.
  */
 function CartaoDaFila({
-  l, ocupado, aoAbrir, aoIniciar, acaoSecundaria,
+  l, ocupado, aoAbrir, aoExecutar, acaoSecundaria,
 }: {
   l: LinhaOperacional
   ocupado: boolean
+  /** Leitura rápida: o painel da tarefa, sem sair da fila. */
   aoAbrir: () => void
-  aoIniciar: () => void
+  /** A ação principal: inicia se precisar e leva à Central Operacional. */
+  aoExecutar: () => void
   acaoSecundaria?: React.ReactNode
 }) {
   const u = urgencia(l)
@@ -249,7 +260,7 @@ function CartaoDaFila({
             {acaoSecundaria}
             <button
               disabled={ocupado}
-              onClick={() => (acao.comando === "iniciar" ? aoIniciar() : aoAbrir())}
+              onClick={aoExecutar}
               className="rounded border border-white/15 bg-white/[0.06] px-2.5 py-1 text-[11px] text-white/85 transition-colors hover:bg-white/[0.1] disabled:opacity-40"
             >
               {acao.rotulo}
@@ -276,6 +287,7 @@ export function CentralTarefas({ podeDistribuir }: { podeDistribuir: boolean }) 
   const [visao, setVisao] = useState<Visao>(podeDistribuir ? "sem_responsavel" : "minha_fila")
   const [resultado, setResultado] = useState<{ chave: string; lista: LinhaOperacional[] | null } | null>(null)
   const [filtro, setFiltro] = useState("todas")
+  const router = useRouter()
   const [recarga, setRecarga] = useState(0)
   const [alvo, setAlvo] = useState<LinhaDeFila | null>(null)
   const [ocupado, setOcupado] = useState(false)
@@ -338,6 +350,26 @@ export function CentralTarefas({ podeDistribuir }: { podeDistribuir: boolean }) 
     },
     [carregar],
   )
+
+  /**
+   * ONDE O TRABALHO ACONTECE — a Minha Fila não executa.
+   *
+   * Iniciar é uma transição, e ela acontece ANTES da navegação: quem chega à
+   * Central chega com a tarefa já em andamento. Depois disso, o deep-link
+   * canônico leva ao processo, na Central, com a tarefa a ser localizada lá —
+   * a MESMA função que o Kanban e a visão global usam.
+   *
+   * Tarefa que perdeu a causa não é iniciada: ela precisa de decisão, e abrir o
+   * executor para ela seria tratá-la como trabalho normal.
+   */
+  const irParaOTrabalho = useCallback(async (l: LinhaOperacional) => {
+    const acao = acaoPrincipal(l)
+    if (acao.comando === "iniciar") {
+      const ok = await comandar(l.taskId, { acao: "iniciar" }, "Tarefa iniciada.")
+      if (!ok) return
+    }
+    router.push(urlOperacionalDaTarefa({ taskId: l.taskId, processoId: l.processoId }))
+  }, [comandar, router])
 
   const contagem = useMemo(() => linhas?.length ?? 0, [linhas])
 
@@ -451,7 +483,7 @@ export function CentralTarefas({ podeDistribuir }: { podeDistribuir: boolean }) 
             l={l}
             ocupado={ocupado}
             aoAbrir={() => setAberta(l.taskId)}
-            aoIniciar={() => void comandar(l.taskId, { acao: "iniciar" }, "Tarefa iniciada.").then((ok) => { if (ok) setAberta(l.taskId) })}
+            aoExecutar={() => void irParaOTrabalho(l)}
           />
         ))}
 

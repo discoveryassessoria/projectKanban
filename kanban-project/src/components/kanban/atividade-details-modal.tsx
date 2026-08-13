@@ -86,6 +86,8 @@ interface ProcessoDetailsModalProps {
   initialPessoaId?: number
   initialSidebarTab?: string
   initialAtividadeId?: number  // ← ADICIONAR
+  /** DEEP-LINK: tarefa que a Central Operacional deve localizar. */
+  initialTaskId?: number
 }
 
 /** País do processo — usado tanto no valor inicial da aba quanto no corpo do modal. */
@@ -131,6 +133,7 @@ function ConteudoModal({
   initialPessoaId,
   initialSidebarTab,
   initialAtividadeId,    // ← ADICIONAR ESTA LINHA
+  initialTaskId,
 }: ProcessoDetailsModalProps) {
   // ✅ ATUALIZADO: Adicionado "informacoes" como possível aba
   const { pode } = usePermissoes()
@@ -965,6 +968,7 @@ function ConteudoModal({
             <div className="h-full min-h-0 overflow-y-auto">
               <ProcessoCentralOperacional
                 processo={processo}
+                taskIdAlvo={initialTaskId ?? null}
                 onProcessoMudou={() => {
                   // Retorno de fase (ou outra mudança da fase ATIVA): invalida a
                   // projeção — Header (refreshKey) + Kanban/Drawer (onSave).
