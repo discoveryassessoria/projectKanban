@@ -37,7 +37,7 @@ import {
   type PassoBruto,
   type StatusResumo,
 } from "./estrutura-operacional-core"
-import { getStepsForFase, phaseKeyToFaseCode } from "./fases-catalog"
+import { getStepsForFase, getStepDef, phaseKeyToFaseCode } from "./fases-catalog"
 import { resolverInstanciaVigente } from "./instancia-vigente-da-fase"
 
 // ============================================================
@@ -442,6 +442,11 @@ export async function getPhaseOperationalStructure(
       executor,
       erroAdministrativo,
       dependeDeStepKeys: dep,
+      // PESO CANÔNICO, resolvido pelo mesmo lookup tolerante a alias que a aba
+      // Workflow usa: a instância pode carregar a chave legada enquanto o
+      // catálogo tem a publicada, e cair para 1 silenciosamente distorceria o
+      // progresso de todos os documentos da fase.
+      peso: getStepDef(faseCode, s.stepKey)?.weight ?? 1,
     }
   })
 

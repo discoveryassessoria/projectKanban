@@ -174,6 +174,11 @@ const AUTORIZADOS_FORA_DO_RUNTIME: Record<string, string> = {
     "(marca EQUIV), só no banco de teste; a prova depende de os dois cenários serem gêmeos",
   "scripts/fronteira-documento-operacao.test.ts":
     "fronteira de documento-operacao: monta e derruba a PRÓPRIA operação por documento (marca FRONT), só no banco de teste — prova que a transição migrou para o motor sem perder metadata, necessidade nem ativação do próximo passo",
+  "scripts/palco-central-500.ts":
+    "palco visual de escala: monta e derrubа a PRÓPRIA árvore (marca ESCALA500), só no banco de teste",
+  "scripts/central-fase-500-docs.test.ts":
+    "escala da Central: monta e derruba a PRÓPRIA árvore (marca ESCALA500), só no banco de teste — " +
+    "vinte e cinco pessoas com quinhentas certidões entre elas",
   "scripts/fase-nao-duplica-tarefa.test.ts":
     "mudança de fase não duplica tarefa: monta e derruba a PRÓPRIA árvore (marca FASEDUP), " +
     "só no banco de teste — reproduz o caso em que a mesma certidão virou duas tarefas vivas",

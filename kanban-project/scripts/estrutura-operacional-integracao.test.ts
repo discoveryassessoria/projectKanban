@@ -206,8 +206,15 @@ async function main() {
   check("os documentos da Tereza permanecem INTACTOS", de2(tereza.id).documentos.every((d) => d.passos[0].disponivel && d.passos.slice(1).every((p) => p.bloqueado)))
 
   console.log("\n(4) Progresso")
-  check("progresso do documento do Marco = 1/5 (20%)", docMarco.progresso.concluidos === 1 && docMarco.progresso.total === 5 && docMarco.progresso.pct === 20)
-  check("progresso do Marco (1 documento) = o do documento", de2(marco.id).progresso.pct === 20)
+  // A FRAÇÃO é de etapas; o PERCENTUAL é ponderado pelo peso publicado. O
+  // primeiro passo da Emissão Documental ("Solicitar certidão") pesa 25 de 80 —
+  // 1/5 das etapas, quase um terço do trabalho.
+  check("progresso do documento do Marco = 1 de 5 etapas, 31% do peso",
+    docMarco.progresso.concluidos === 1 && docMarco.progresso.total === 5
+    && docMarco.progresso.pontosFeitos === 25 && docMarco.progresso.pontosTotais === 80
+    && docMarco.progresso.pct === 31,
+    `${docMarco.progresso.pontosFeitos}/${docMarco.progresso.pontosTotais} = ${docMarco.progresso.pct}%`)
+  check("progresso do Marco (1 documento) = o do documento", de2(marco.id).progresso.pct === 31)
   check("progresso da Tereza soma os 2 documentos dela", de2(tereza.id).progresso.total === 10 && de2(tereza.id).progresso.concluidos === 0)
   check("Ana não entra em denominador nenhum", de2(ana.id).progresso.total === 0)
   check("contadores da fase: 20 obrigatórios, 1 concluído", e2.resumo.passosObrigatorios === 20 && e2.resumo.passosObrigatoriosConcluidos === 1)

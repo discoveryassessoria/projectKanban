@@ -56,12 +56,15 @@ const UNIAO: UniaoBruta = { id: 90, pessoa1Id: 3, pessoa2Id: 2 }
 const PESSOAS = montarPessoasDoProcesso([MARCO, JOAO, TEREZA, ANA], [UNIAO])
 
 /** Os 5 passos publicados da Emissão, na ordem cadastrada. */
+// PESOS = os do catálogo publicado da Emissão Documental. O progresso do
+// documento é PONDERADO por eles, então o palco precisa carregá-los para o
+// teste medir a mesma coisa que a tela.
 const PASSOS_PUBLICADOS = [
-  { id: 101, key: "solicitar_certidao", titulo: "Solicitar certidão" },
-  { id: 102, key: "aguardar_retorno", titulo: "Aguardar retorno do cartório" },
-  { id: 103, key: "receber_certidao", titulo: "Receber certidão" },
-  { id: 104, key: "conferir_certidao", titulo: "Conferir certidão" },
-  { id: 105, key: "validar_certidao", titulo: "Validar certidão" },
+  { id: 101, key: "solicitar_certidao", titulo: "Solicitar certidão", peso: 25 },
+  { id: 102, key: "aguardar_retorno", titulo: "Aguardar retorno do cartório", peso: 10 },
+  { id: 103, key: "receber_certidao", titulo: "Receber certidão", peso: 18 },
+  { id: 104, key: "conferir_certidao", titulo: "Conferir certidão", peso: 15 },
+  { id: 105, key: "validar_certidao", titulo: "Validar certidão", peso: 12 },
 ]
 
 let seqId = 1000
@@ -84,6 +87,7 @@ function materializar(
       stepDefinitionId: def.id,
       stepKey: def.key,
       titulo: def.titulo,
+      peso: def.peso,
       ordem: i + 1,
       obrigatorio: !opcionais.has(def.key),
       status: feito ? "CONCLUIDO" : proximo ? "DISPONIVEL" : "PENDENTE",
@@ -174,11 +178,19 @@ const e3 = cenario({ 11: { concluidos: 5 }, 13: { concluidos: 2 } })
 const marco3 = e3.linhaPrincipal.find((l) => l.pessoa.pessoaId === 1)!
 const tereza3 = e3.foraDaLinha.find((l) => l.pessoa.pessoaId === 3)!
 check("(10) progresso do documento = obrigatórios concluídos / obrigatórios dele", marco3.documentos[0].progresso.concluidos === 5 && marco3.documentos[0].progresso.total === 5 && marco3.documentos[0].progresso.pct === 100)
-check("(10) documento parcial calcula o próprio percentual", (() => {
+// O PERCENTUAL É PONDERADO PELO PESO PUBLICADO — 25+10 de 80, não 2 de 5.
+// Contar 1/N diria que "Aguardar retorno do cartório" (peso 10) vale o mesmo
+// que "Solicitar certidão" (peso 25), e a barra mentiria para mais no começo do
+// trabalho, justamente quando ela é mais consultada.
+check("(10) documento parcial: fração de etapas, percentual PONDERADO", (() => {
   const nasc = tereza3.documentos.find((d) => d.chave === "necessidade:13")!
-  return nasc.progresso.concluidos === 2 && nasc.progresso.total === 5 && nasc.progresso.pct === 40
+  return nasc.progresso.concluidos === 2 && nasc.progresso.total === 5
+    && nasc.progresso.pontosFeitos === 35 && nasc.progresso.pontosTotais === 80
+    && nasc.progresso.pct === 44
 })())
-check("(11) progresso da pessoa = soma ponderada dos documentos dela", tereza3.progresso.concluidos === 2 && tereza3.progresso.total === 10 && tereza3.progresso.pct === 20)
+check("(11) progresso da pessoa = soma ponderada dos documentos dela",
+  tereza3.progresso.concluidos === 2 && tereza3.progresso.total === 10
+  && tereza3.progresso.pontosTotais === 160 && tereza3.progresso.pct === 22)
 check("(12) contadores da fase somam todos os obrigatórios aplicáveis", e3.resumo.passosObrigatorios === 20 && e3.resumo.passosObrigatoriosConcluidos === 7)
 check("(12) documentos concluídos e pendentes batem com a lista", e3.resumo.documentosConcluidos === 1 && e3.resumo.documentosPendentes === 3)
 check("progresso NÃO conta pessoa sem documento aplicável", linhaDe(4).progresso.total === 0)
@@ -229,7 +241,7 @@ const passoGlobal: PassoBruto = {
   ordem: 1, obrigatorio: true, status: "DISPONIVEL", ciclo: 1,
   pessoaId: null, necessidadeId: null, documentoId: null,
   responsavelId: null, responsavelNome: null, prazo: null, diasParaPrazo: null, slaDays: null,
-  motivo: null, executor: null, erroAdministrativo: "Sem executor", dependeDeStepKeys: [],
+  motivo: null, executor: null, erroAdministrativo: "Sem executor", dependeDeStepKeys: [], peso: 1,
 }
 const orfaos = materializar(99).map((p) => ({ ...p, necessidadeId: 99 }))
 const eGlobal = montarEstruturaOperacional({
@@ -250,10 +262,24 @@ const idx = montarIndiceOperacional(e3)
 const linhasIdx = [...idx.linhaPrincipal, ...idx.foraDaLinha, ...idx.pendenteClassificacao]
 const idxDe = (id: number) => linhasIdx.find((l) => l.pessoa.pessoaId === id)!
 
-// A prova mais dura: o payload do índice não contém NADA de execução.
+// A FRONTEIRA MUDOU DE LUGAR — de propósito, e ela continua existindo.
+//
+// O índice já não carregou NADA de execução, nem mesmo prazo e responsável. A
+// consequência era uma tabela que respondia "já foi traduzido? apostilado?" —
+// perguntas de fases futuras — enquanto o operador precisava abrir documento
+// por documento para saber o que faltava HOJE. Com quinhentos documentos isso
+// deixa de ser inconveniente e passa a ser inviável.
+//
+// O que o índice carrega agora é o ESTADO DERIVADO da fase: progresso, etapa
+// corrente, responsável, prazo, status. O que ele continua NÃO carregando é a
+// MAQUINARIA: a lista de passos, os ids de instância, as chaves técnicas e o
+// executor — quem executa é o modal, e ele busca o que precisa.
 const payload = JSON.stringify(idx)
-for (const proibido of ["passos", "stepInstanceId", "stepKey", "slaDays", "prazo", "diasParaPrazo", "responsavelNome", "motivoBloqueio", "disponivel", "bloqueado", "executor"]) {
-  check(`o índice NÃO carrega "${proibido}"`, !payload.includes(proibido))
+for (const proibido of ["passos", "stepInstanceId", "stepKey", "slaDays", "disponivel", "bloqueado", "executor"]) {
+  check(`o índice NÃO carrega a maquinaria: "${proibido}"`, !payload.includes(proibido))
+}
+for (const exigido of ["progresso", "etapaAtual", "responsavelNome", "prazo", "estadoLabel"]) {
+  check(`o índice CARREGA o estado da fase: "${exigido}"`, payload.includes(exigido))
 }
 check("uma linha por documento, com identidade por ID", idxDe(3).documentos.length === 2 && idxDe(3).documentos.every((d) => d.necessidadeId != null))
 check("todas as pessoas continuam no índice", linhasIdx.length === 4)
@@ -340,14 +366,27 @@ check("a única ação por documento é 'Abrir detalhes'", painel.includes("Abri
 for (const proibido of ["function PassoRow", "function PassoDoWorkflow", "function InstanciaDoPasso", "function WorkflowDaFase", "function DocumentoAccordion", "function PessoaAccordion"]) {
   check(`tela principal não tem "${proibido}"`, !painel.includes(proibido))
 }
-// Nem o vocabulário de execução.
-for (const proibido of ["statusLabel", "slaDays", "diasParaPrazo", "motivoBloqueio", "responsavelNome", "stepInstanceId", "disponivel", "OperacoesAntecipadasInline", "onNovaOperacao", "onAvaliarOperacao", "passo(s)"]) {
+// Nem o vocabulário de EXECUÇÃO. A tela lê o estado derivado da fase
+// (progresso, etapa, responsável, prazo) e não conhece passo, instância, SLA
+// nem operação antecipada — quem executa continua sendo o modal.
+for (const proibido of ["slaDays", "stepInstanceId", "stepKey", "disponivel", "OperacoesAntecipadasInline", "onNovaOperacao", "onAvaliarOperacao", "passo(s)"]) {
   check(`tela principal não usa "${proibido}"`, !painel.includes(proibido))
 }
 check("a tela principal não mapeia passos de lugar nenhum", !/\.passos\.map/.test(painel) && !/workflow\.steps/.test(painel))
 check("contadores da tela vêm do backend (totais/resumo), não de contar elementos", painel.includes("linha.totais") && painel.includes("indice.resumo"))
 check("pessoa sem documento aplicável diz isso em texto", painel.includes("Nenhum documento aplicável nesta fase"))
-check("colunas do índice são as aprovadas", ["Documento", "Certidão", "Retificada", "Tradução", "Apostila", "Status final", "Ações"].every((c) => painel.includes(`>${c}<`)))
+// AS COLUNAS RESPONDEM À FASE ATUAL.
+//
+// "Retificada", "Tradução" e "Apostila" descrevem fases FUTURAS: numa tabela de
+// Emissão Documental elas ocupam quatro colunas em todas as linhas para
+// responder o que ninguém está perguntando ali. Saíram desta tabela — não do
+// produto: são fases com tela própria, e o ciclo documental inteiro continua na
+// aba Documentos e na timeline do documento.
+check("colunas da fase são as operacionais",
+  ["Documento", "Progresso", "Etapa atual", "Responsável", "Prazo", "Status", "Ação"]
+    .every((c) => painel.includes(`>${c}<`)))
+check("colunas de fase FUTURA saíram da tabela da fase",
+  ["Retificada", "Apostila", "Status final"].every((c) => !painel.includes(`>${c}<`)))
 
 console.log("\n(B3) MODAL DO DOCUMENTO — o único executor")
 check("a aba Workflow existe e é do documento", wtab.includes("export function WorkflowTab") && wtab.includes("documentoId"))

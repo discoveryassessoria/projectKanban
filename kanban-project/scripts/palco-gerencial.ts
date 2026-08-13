@@ -190,7 +190,11 @@ async function main() {
           workflowInstanceId: inst.id, processoId: proc.id, faseMacroKey: c.fase, stepKey: chave,
           ordem: j + 1, tipo: 'HUMANO', obrigatorio: true, status: j === 0 ? 'DISPONIVEL' : 'PENDENTE',
           necessidadeId: nec.id, documentoId: doc.id, pessoaId: pes.id, papel: 'equipe_documental', slaDays: 5, ciclo: 1,
-          snapshot: { label, titulo: `${c.item} — ${c.pessoa[0]} ${c.pessoa[1]}` } as never,
+          // O SNAPSHOT DO PASSO NOMEIA O PASSO. Escrever aqui o nome do
+          // DOCUMENTO fazia a coluna "Etapa atual" mostrar "Certidão de Óbito —
+          // Antônio Rovatti" onde deveria estar "Receber certidão": o palco
+          // mentia sobre o campo, e a tela obedecia.
+          snapshot: { label, titulo: label } as never,
           chaveIdempotencia: `${MARCA}-s-${i}-${j}`,
         },
       })

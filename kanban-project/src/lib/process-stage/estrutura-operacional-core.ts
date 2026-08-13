@@ -72,6 +72,13 @@ export interface PassoBruto {
   erroAdministrativo: string | null
   /** Dependências PERSISTIDAS (por stepKey da definição), do modo de execução publicado. */
   dependeDeStepKeys: string[]
+  /**
+   * PESO CANÔNICO do passo, do catálogo da fase. Não é enfeite: a Emissão
+   * Documental pesa 25/10/18/15/12, e contar 1/5 para cada um diria que
+   * "Aguardar retorno do cartório" vale o mesmo que "Solicitar certidão".
+   * Ausente ⇒ 1, que é a contagem simples — nunca zero, que apagaria o passo.
+   */
+  peso: number
 }
 
 /** O alvo concreto sobre o qual o workflow opera, com a identidade já resolvida. */
@@ -120,6 +127,8 @@ export interface PassoDaEstrutura {
   /** Pode ser executado agora (estado PERSISTIDO, não regra do frontend). */
   disponivel: boolean
   bloqueado: boolean
+  /** Peso canônico deste passo dentro do workflow da fase. */
+  peso: number
   /** Por que está parado. Vem do motivo persistido ou da dependência publicada. */
   motivoBloqueio: string | null
   responsavelId: number | null
@@ -136,9 +145,14 @@ export interface PassoDaEstrutura {
 }
 
 export interface ProgressoEstrutura {
+  /** Passos obrigatórios concluídos — a fração que a pessoa lê ("2 de 5"). */
   concluidos: number
   total: number
+  /** Percentual PONDERADO pelo peso canônico dos passos. */
   pct: number
+  /** Pontos feitos e possíveis — o que explica o percentual quando ele não é n/N. */
+  pontosFeitos: number
+  pontosTotais: number
 }
 
 /** Um alvo com o workflow COMPLETO da fase aplicado só a ele. */
@@ -235,6 +249,54 @@ export interface ArtefatosDoDocumento {
   apostila: StatusResumo
 }
 
+/**
+ * O ESTADO OPERACIONAL DA TAREFA — o que a linha da fase precisa responder.
+ *
+ * Deriva dos passos JÁ carregados do alvo. Não é um status novo: é a mesma
+ * leitura que a Minha Fila faz, escrita aqui a partir do que a fase tem em mãos.
+ */
+export type EstadoOperacionalDaLinha =
+  | "A_FAZER"
+  | "EM_ANDAMENTO"
+  | "AGUARDANDO_TERCEIRO"
+  | "BLOQUEADA"
+  | "CONCLUIDA"
+
+export const ROTULO_ESTADO_LINHA: Record<EstadoOperacionalDaLinha, string> = {
+  A_FAZER: "A fazer",
+  EM_ANDAMENTO: "Em andamento",
+  AGUARDANDO_TERCEIRO: "Aguardando terceiro",
+  BLOQUEADA: "Bloqueada",
+  CONCLUIDA: "Concluída",
+}
+
+/**
+ * COMO ESTE DOCUMENTO ESTÁ **NESTA FASE**.
+ *
+ * A tabela da fase respondia "já foi retificado? traduzido? apostilado?" —
+ * perguntas de fases FUTURAS, que com quinhentos documentos viram ruído. A
+ * pergunta desta tela é uma só: *onde este trabalho está agora*.
+ *
+ * Tudo aqui é DERIVADO dos passos que a estrutura já carregou. Nenhuma consulta
+ * a mais, nenhum campo persistido, nenhuma segunda fonte de verdade.
+ */
+export interface EstadoNaFase {
+  progresso: ProgressoEstrutura
+  /** Nome humano do passo corrente — nunca a chave técnica. */
+  etapaAtual: string | null
+  responsavelId: number | null
+  responsavelNome: string | null
+  prazo: string | null
+  /** Dias até o prazo; negativo é atraso. Derivado, nunca gravado. */
+  diasParaPrazo: number | null
+  atrasado: boolean
+  venceHoje: boolean
+  estado: EstadoOperacionalDaLinha
+  estadoLabel: string
+  /** Por que está parado, quando está. */
+  motivoBloqueio: string | null
+}
+
 /** Uma LINHA da tabela de documentos da pessoa. Sem nada de execução. */
 export interface DocumentoDoIndice {
   chave: string
@@ -248,6 +310,8 @@ export interface DocumentoDoIndice {
   artefatos: ArtefatosDoDocumento
   statusFinal: StatusResumo
   statusFinalLabel: string
+  /** COMO ESTE DOCUMENTO ESTÁ NESTA FASE — o que a tabela da fase exibe. */
+  naFase: EstadoNaFase
   /** Há executor oficial para abrir o detalhe deste documento. */
   podeAbrirDetalhes: boolean
   /** Falta de configuração, dita em texto. O documento nunca é escondido. */
@@ -333,19 +397,42 @@ export function escopoDoAlvo(p: {
   return "PROCESSO"
 }
 
+/**
+ * O PROGRESSO É PONDERADO PELO PESO PUBLICADO — a mesma conta que a aba
+ * Workflow do documento já mostrava ("0/80 pontos").
+ *
+ * Havia duas métricas com o mesmo nome: a tabela contava passos (2 de 5 = 40%)
+ * e o drawer somava pesos (35 de 80 = 44%). Duas telas, o mesmo documento,
+ * números diferentes — e nenhuma das duas errada isoladamente. Agora existe uma
+ * definição só, e é a que o domínio declara.
+ *
+ * A FRAÇÃO continua sendo de passos, porque é assim que uma pessoa lê o
+ * trabalho ("2 de 5 etapas"); o PERCENTUAL é ponderado, porque é assim que o
+ * trabalho realmente pesa.
+ */
 function progresso(passos: PassoDaEstrutura[]): ProgressoEstrutura {
   const obrig = passos.filter((s) => s.obrigatorio)
   const total = obrig.length
   const concluidos = obrig.filter((s) => s.balde === "CONCLUIDA").length
+  const pontosTotais = obrig.reduce((a, s) => a + s.peso, 0)
+  const pontosFeitos = obrig.filter((s) => s.balde === "CONCLUIDA").reduce((a, s) => a + s.peso, 0)
   // Sem passo obrigatório o alvo não tem o que exigir: 0/0 é 100% de nada a fazer,
   // não 0% de trabalho parado. Contar 0% aqui inventaria pendência inexistente.
-  return { concluidos, total, pct: total > 0 ? Math.round((concluidos / total) * 100) : 100 }
+  return {
+    concluidos, total, pontosFeitos, pontosTotais,
+    pct: pontosTotais > 0 ? Math.round((pontosFeitos / pontosTotais) * 100) : 100,
+  }
 }
 
 function somarProgresso(partes: ProgressoEstrutura[]): ProgressoEstrutura {
   const concluidos = partes.reduce((a, p) => a + p.concluidos, 0)
   const total = partes.reduce((a, p) => a + p.total, 0)
-  return { concluidos, total, pct: total > 0 ? Math.round((concluidos / total) * 100) : 100 }
+  const pontosFeitos = partes.reduce((a, p) => a + p.pontosFeitos, 0)
+  const pontosTotais = partes.reduce((a, p) => a + p.pontosTotais, 0)
+  return {
+    concluidos, total, pontosFeitos, pontosTotais,
+    pct: pontosTotais > 0 ? Math.round((pontosFeitos / pontosTotais) * 100) : 100,
+  }
 }
 
 /**
@@ -380,6 +467,7 @@ function montarPasso(p: PassoBruto, irmaos: PassoBruto[]): PassoDaEstrutura {
     balde,
     disponivel: STATUS_DISPONIVEIS.has(status),
     bloqueado: STATUS_BLOQUEADOS.has(status),
+    peso: p.peso > 0 ? p.peso : 1,
     motivoBloqueio: motivoDoBloqueio(p, irmaos),
     responsavelId: p.responsavelId,
     responsavelNome: p.responsavelNome,
@@ -555,6 +643,60 @@ export function statusFinalDoAlvo(alvo: AlvoDaEstrutura): StatusResumo {
  */
 export type ArtefatosPorChave = Map<string, Partial<ArtefatosDoDocumento>>
 
+/**
+ * O PASSO CORRENTE DO ALVO — o que uma pessoa chamaria de "onde isso está".
+ *
+ * O primeiro passo obrigatório ainda não concluído, na ordem publicada. Um em
+ * andamento vence um apenas disponível: se alguém já pôs a mão, é ali que o
+ * trabalho está.
+ */
+function passoCorrente(alvo: AlvoDaEstrutura): PassoDaEstrutura | null {
+  const abertos = alvo.passos.filter((p) => p.obrigatorio && p.balde !== "CONCLUIDA")
+  if (abertos.length === 0) return null
+  return abertos.find((p) => p.balde === "EM_ANDAMENTO") ?? abertos[0]
+}
+
+/** Espera EXTERNA: o passo corre, mas quem tem a bola é de fora. */
+const STATUS_ESPERA_EXTERNA = new Set(["AGUARDANDO", "AGUARDANDO_APROVACAO"])
+
+/**
+ * COMO ESTE DOCUMENTO ESTÁ NESTA FASE — derivado, nunca gravado.
+ *
+ * `atrasado` é CONDIÇÃO, não estado: uma tarefa atrasada continua "Em
+ * andamento". Colapsar as duas coisas num status só apagaria a informação de
+ * que ela está sendo trabalhada.
+ */
+function estadoNaFase(alvo: AlvoDaEstrutura): EstadoNaFase {
+  const corrente = passoCorrente(alvo)
+  const concluido = corrente == null
+
+  const estado: EstadoOperacionalDaLinha =
+    concluido ? "CONCLUIDA"
+    : corrente!.bloqueado && corrente!.motivoBloqueio != null ? "BLOQUEADA"
+    : STATUS_ESPERA_EXTERNA.has(String(corrente!.status).toUpperCase()) ? "AGUARDANDO_TERCEIRO"
+    : corrente!.balde === "EM_ANDAMENTO" ? "EM_ANDAMENTO"
+    : "A_FAZER"
+
+  // O prazo é o do passo corrente; concluído não tem prazo a vencer.
+  const prazo = concluido ? null : corrente!.prazo
+  const dias = concluido ? null : corrente!.diasParaPrazo
+
+  return {
+    progresso: alvo.progresso,
+    // Título do passo publicado — o rótulo humano, nunca a stepKey.
+    etapaAtual: concluido ? null : corrente!.titulo,
+    responsavelId: concluido ? null : corrente!.responsavelId,
+    responsavelNome: concluido ? null : corrente!.responsavelNome,
+    prazo,
+    diasParaPrazo: dias,
+    atrasado: !concluido && dias != null && dias < 0,
+    venceHoje: !concluido && dias === 0,
+    estado,
+    estadoLabel: ROTULO_ESTADO_LINHA[estado],
+    motivoBloqueio: concluido ? null : corrente!.motivoBloqueio,
+  }
+}
+
 function montarDocumentoDoIndice(
   alvo: AlvoDaEstrutura,
   artefatos: ArtefatosPorChave | undefined,
@@ -584,6 +726,7 @@ function montarDocumentoDoIndice(
     },
     statusFinal,
     statusFinalLabel: ROTULO_STATUS_RESUMO[statusFinal],
+    naFase: estadoNaFase(alvo),
     podeAbrirDetalhes: comExecutor,
     impedimento,
   }

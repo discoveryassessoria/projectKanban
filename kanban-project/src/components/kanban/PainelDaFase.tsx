@@ -25,7 +25,7 @@
 
 "use client"
 
-import { useState, useRef, useEffect } from "react"
+import { useState, useRef, useEffect, useMemo } from "react"
 import {
   ExternalLink,
   ChevronDown,
@@ -35,9 +35,11 @@ import {
   Users,
   AlertTriangle,
   Layers,
+  Search,
 } from "lucide-react"
 import type {
   DocumentoDoIndice,
+  EstadoOperacionalDaLinha,
   IndiceOperacional,
   PessoaDoIndice,
   StatusResumo,
@@ -114,6 +116,9 @@ export function PainelDaFase({
   avisoReestruturacao,
 }: PainelDaFaseProps) {
   const [abaAtiva, setAbaAtiva] = useState("Resumo")
+  // O RECORTE É DA TELA. Filtrar é olhar de outro jeito para o mesmo conjunto —
+  // não muda nada no banco, e por isso não precisa ir a lugar nenhum.
+  const [recorte, setRecorte] = useState<Recorte>(RECORTE_VAZIO)
 
   return (
     <div>
@@ -176,11 +181,32 @@ export function PainelDaFase({
                 : k.tone === "busca" ? "text-[#d2a948]"
                 : k.tone === "late" ? "text-[#f87171]"
                 : "text-white/95"
-              return (
-                <div key={i} className="bg-[#1b2027] border border-white/10 rounded-[10px] px-4 py-3">
+              // UM CONTADOR QUE VIRA FILTRO. "Pendentes: 137" e depois procurar
+              // os 137 na mão é um número que informa e não ajuda; clicar nele é
+              // o gesto óbvio, e ele passou a existir.
+              const alvo = recorteDoKpi(k.label)
+              const ativo = alvo != null && recorte.rapido === alvo
+              const classe = `bg-[#1b2027] border rounded-[10px] px-4 py-3 text-left transition-colors ${
+                ativo ? "border-[#7dd3fc]/60 ring-1 ring-inset ring-[#7dd3fc]/25" : "border-white/10"
+              } ${alvo != null ? "hover:border-white/25 cursor-pointer" : ""}`
+              const conteudo = (
+                <>
                   <b className={`text-[22px] font-extrabold block leading-none ${cor}`}>{k.value}</b>
                   <span className="text-[11px] text-white/40 font-semibold block mt-1.5">{k.label}</span>
-                </div>
+                </>
+              )
+              return alvo == null ? (
+                <div key={i} className={classe}>{conteudo}</div>
+              ) : (
+                <button
+                  key={i}
+                  type="button"
+                  aria-pressed={ativo}
+                  onClick={() => setRecorte((r) => ({ ...r, rapido: ativo ? "todos" : alvo }))}
+                  className={classe}
+                >
+                  {conteudo}
+                </button>
               )
             })}
           </div>
@@ -209,6 +235,8 @@ export function PainelDaFase({
           onAbrirDetalhes={onAbrirDetalhes}
           readOnly={readOnly}
           documentoDestacadoId={documentoDestacadoId}
+          recorte={recorte}
+          setRecorte={setRecorte}
         />
       </div>
     </div>
@@ -221,6 +249,139 @@ export function PainelDaFase({
 
 /** Acima disto os cards nascem fechados: abrir tudo viraria um muro. */
 const LIMITE_AUTO_EXPANSAO = 12
+
+/**
+ * Linhas desenhadas por pessoa antes do "mostrar mais".
+ *
+ * Uma pessoa com oitenta certidões não precisa de oitenta linhas no primeiro
+ * paint: precisa das primeiras e da possibilidade de ver o resto. O corte é
+ * de RENDERIZAÇÃO, não de dados — os contadores continuam falando do conjunto
+ * inteiro, e o filtro age sobre todos.
+ */
+const LINHAS_POR_PESSOA = 25
+
+// ============================================================
+// RECORTE — filtros, busca e ordenação da tabela da fase
+// ============================================================
+// Tudo aqui é DERIVAÇÃO da projeção que o servidor já mandou. Nenhum filtro
+// consulta nada, nenhum filtro grava nada: são recortes do mesmo conjunto, e é
+// por isso que os números do topo e os da tabela nunca podem discordar.
+
+export type RecorteRapido = "todos" | "prontos" | "pendentes" | "divergentes" | "atrasados" | "sem_responsavel"
+
+export interface Recorte {
+  rapido: RecorteRapido
+  busca: string
+  estado: EstadoOperacionalDaLinha | ""
+  responsavelId: number | "" | "sem"
+  etapa: string
+  ordem: OrdemDaTabela
+}
+
+export type OrdemDaTabela = "atencao" | "progresso" | "prazo" | "documento" | "etapa" | "responsavel" | "status"
+
+export const RECORTE_VAZIO: Recorte = {
+  rapido: "todos", busca: "", estado: "", responsavelId: "", etapa: "", ordem: "atencao",
+}
+
+/**
+ * O CONTADOR DO TOPO E O FILTRO SÃO A MESMA PERGUNTA.
+ *
+ * Os KPIs vêm rotulados do servidor; o mapa liga o rótulo ao recorte que ele
+ * descreve. O que não tem recorte correspondente segue sendo só número — melhor
+ * do que um clique que não faz nada.
+ */
+export function recorteDoKpi(label: string): RecorteRapido | null {
+  const t = label.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase()
+  if (t.includes("pronto") || t.includes("valida")) return "prontos"
+  if (t.includes("pendente")) return "pendentes"
+  if (t.includes("divergen") || t.includes("invalid")) return "divergentes"
+  if (t.includes("atrasad") || t.includes("vencid")) return "atrasados"
+  if (t.includes("sem responsavel")) return "sem_responsavel"
+  return null
+}
+
+const semAcento = (t: string) =>
+  t.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase()
+
+/**
+ * O documento passa pelo recorte?
+ *
+ * Os recortes rápidos usam EXATAMENTE a mesma régua dos contadores do topo
+ * (`statusFinal`), e não uma parecida. Clicar em "Pendentes: 400" e receber 450
+ * linhas seria pior do que não poder clicar: o número deixaria de significar
+ * alguma coisa. É por isso que "pendente" aqui não é "tudo que não terminou" —
+ * é o que o contador chama de pendente.
+ */
+export function passaNoRecorte(doc: DocumentoDoIndice, r: Recorte, pessoaNome: string): boolean {
+  const f = doc.naFase
+  if (r.rapido === "prontos" && doc.statusFinal !== "PRONTO") return false
+  if (r.rapido === "pendentes" && doc.statusFinal !== "PENDENTE" && doc.statusFinal !== "EM_ANDAMENTO") return false
+  if (r.rapido === "divergentes" && doc.statusFinal !== "DIVERGENTE" && doc.statusFinal !== "INVALIDADO") return false
+  if (r.rapido === "atrasados" && !f.atrasado) return false
+  if (r.rapido === "sem_responsavel" && (f.responsavelId != null || f.estado === "CONCLUIDA")) return false
+
+  if (r.estado !== "" && f.estado !== r.estado) return false
+  if (r.responsavelId === "sem" && f.responsavelId != null) return false
+  if (typeof r.responsavelId === "number" && f.responsavelId !== r.responsavelId) return false
+  if (r.etapa !== "" && f.etapaAtual !== r.etapa) return false
+
+  if (r.busca.trim() !== "") {
+    // A busca alcança o que o operador tem na cabeça: o nome da pessoa, o tipo
+    // do documento e o título do registro.
+    const alvo = semAcento([pessoaNome, doc.titulo, doc.tipoLabel ?? "", doc.pais ?? ""].join(" "))
+    for (const termo of semAcento(r.busca).split(/\s+/).filter(Boolean)) {
+      if (!alvo.includes(termo)) return false
+    }
+  }
+  return true
+}
+
+/** Peso de atenção: quanto MENOR, mais cedo a linha aparece. */
+function urgenciaDaLinha(doc: DocumentoDoIndice): number {
+  const f = doc.naFase
+  if (f.estado === "BLOQUEADA") return 0
+  if (f.atrasado) return 1
+  if (f.venceHoje) return 2
+  if (doc.statusFinal === "DIVERGENTE" || doc.statusFinal === "INVALIDADO") return 3
+  if (f.estado === "EM_ANDAMENTO") return 4
+  if (f.estado === "A_FAZER") return 5
+  if (f.estado === "AGUARDANDO_TERCEIRO") return 6
+  return 7 // concluída
+}
+
+/**
+ * A ORDEM É DETERMINÍSTICA — sempre desempatada pelo título.
+ *
+ * O padrão põe na frente o que exige atenção (bloqueado, atrasado, vence hoje),
+ * e isso é uma regra escrita, não um "score" que ninguém consegue explicar
+ * depois. As outras ordens são o que o cabeçalho diz: nada de secreto.
+ */
+export function ordenarDocumentos(docs: DocumentoDoIndice[], ordem: OrdemDaTabela): DocumentoDoIndice[] {
+  const desempate = (a: DocumentoDoIndice, b: DocumentoDoIndice) => a.titulo.localeCompare(b.titulo, "pt-BR")
+  const copia = [...docs]
+  switch (ordem) {
+    case "progresso":
+      return copia.sort((a, b) => a.naFase.progresso.pct - b.naFase.progresso.pct || desempate(a, b))
+    case "prazo":
+      // Sem prazo vai para o fim: ausência de prazo não é urgência.
+      return copia.sort((a, b) => {
+        const pa = a.naFase.prazo ? Date.parse(a.naFase.prazo) : Number.POSITIVE_INFINITY
+        const pb = b.naFase.prazo ? Date.parse(b.naFase.prazo) : Number.POSITIVE_INFINITY
+        return pa - pb || desempate(a, b)
+      })
+    case "documento":
+      return copia.sort(desempate)
+    case "etapa":
+      return copia.sort((a, b) => (a.naFase.etapaAtual ?? "~").localeCompare(b.naFase.etapaAtual ?? "~", "pt-BR") || desempate(a, b))
+    case "responsavel":
+      return copia.sort((a, b) => (a.naFase.responsavelNome ?? "~").localeCompare(b.naFase.responsavelNome ?? "~", "pt-BR") || desempate(a, b))
+    case "status":
+      return copia.sort((a, b) => a.naFase.estadoLabel.localeCompare(b.naFase.estadoLabel, "pt-BR") || desempate(a, b))
+    default:
+      return copia.sort((a, b) => urgenciaDaLinha(a) - urgenciaDaLinha(b) || desempate(a, b))
+  }
+}
 
 interface Expansao {
   chave: string
@@ -239,18 +400,82 @@ function semear(chave: string, indice: IndiceOperacional): Expansao {
 }
 
 function IndiceView({
-  indice,
+  indice: indiceBruto,
   chaveExpansao,
   onAbrirDetalhes,
   readOnly,
   documentoDestacadoId,
+  recorte = RECORTE_VAZIO,
+  setRecorte,
 }: {
   indice: IndiceOperacional
   chaveExpansao: string
   onAbrirDetalhes?: (doc: DocumentoDoIndice) => void
   readOnly: boolean
   documentoDestacadoId?: number | null
+  recorte?: Recorte
+  setRecorte?: React.Dispatch<React.SetStateAction<Recorte>>
 }) {
+  // ── O RECORTE APLICADO ────────────────────────────────────────────────────
+  //
+  // O índice filtrado é derivado do índice inteiro, e o `resumo` ORIGINAL é
+  // preservado: o topo fala da FASE, a tabela fala do recorte, e a diferença
+  // entre os dois é dita em texto em vez de virar um número que ninguém explica.
+  //
+  // O DOCUMENTO DO DEEP-LINK NUNCA É FILTRADO PARA FORA. Chegar por um link e
+  // encontrar a tela vazia porque um filtro estava ligado é o pior desfecho
+  // possível de uma navegação que existe justamente para levar até ele.
+  const filtrado = useMemo(() => {
+    const ativo =
+      recorte.rapido !== "todos" || recorte.busca.trim() !== "" || recorte.estado !== ""
+      || recorte.responsavelId !== "" || recorte.etapa !== ""
+    const recortarPessoa = (p: PessoaDoIndice): PessoaDoIndice => {
+      const docs = ativo
+        ? p.documentos.filter((d) =>
+            (documentoDestacadoId != null && d.documentoId === documentoDestacadoId)
+            || passaNoRecorte(d, recorte, p.pessoa.nome))
+        : p.documentos
+      return { ...p, documentos: ordenarDocumentos(docs, recorte.ordem) }
+    }
+    const manterComTrabalho = (p: PessoaDoIndice) => !ativo || p.documentos.length > 0
+    return {
+      ...indiceBruto,
+      linhaPrincipal: indiceBruto.linhaPrincipal.map(recortarPessoa).filter(manterComTrabalho),
+      foraDaLinha: indiceBruto.foraDaLinha.map(recortarPessoa).filter(manterComTrabalho),
+      pendenteClassificacao: indiceBruto.pendenteClassificacao.map(recortarPessoa).filter(manterComTrabalho),
+      semDono: ordenarDocumentos(
+        ativo
+          ? indiceBruto.semDono.filter((d) =>
+              (documentoDestacadoId != null && d.documentoId === documentoDestacadoId)
+              || passaNoRecorte(d, recorte, ""))
+          : indiceBruto.semDono,
+        recorte.ordem,
+      ),
+    }
+  }, [indiceBruto, recorte, documentoDestacadoId])
+  const indice = filtrado
+
+  // As opções dos seletores saem do conjunto REAL da fase, não de uma lista
+  // fixa: responsável que não trabalha aqui não aparece, etapa que não existe
+  // nesta fase também não.
+  const todosOsDocs = useMemo(
+    () => [
+      ...indiceBruto.linhaPrincipal.flatMap((p) => p.documentos),
+      ...indiceBruto.foraDaLinha.flatMap((p) => p.documentos),
+      ...indiceBruto.pendenteClassificacao.flatMap((p) => p.documentos),
+      ...indiceBruto.semDono,
+    ],
+    [indiceBruto],
+  )
+  const visiveis = useMemo(
+    () => [
+      ...indice.linhaPrincipal.flatMap((p) => p.documentos),
+      ...indice.foraDaLinha.flatMap((p) => p.documentos),
+      ...indice.pendenteClassificacao.flatMap((p) => p.documentos),
+      ...indice.semDono,
+    ].length,
+    [indice],
+  )
   // Expansão local, por processo/fase. Preferência visual não vai ao banco.
   // O ajuste acontece DURANTE a renderização (padrão do React para estado derivado de
   // prop), não num efeito: um efeito que dependesse do índice fecharia os cards a cada
@@ -282,8 +507,141 @@ function IndiceView({
       return { ...prev, abertos: proximo }
     })
 
+  const responsaveis = useMemo(() => {
+    const m = new Map<number, string>()
+    for (const d of todosOsDocs) {
+      if (d.naFase.responsavelId != null && d.naFase.responsavelNome) {
+        m.set(d.naFase.responsavelId, d.naFase.responsavelNome)
+      }
+    }
+    return [...m.entries()].sort((a, b) => a[1].localeCompare(b[1], "pt-BR"))
+  }, [todosOsDocs])
+  const etapas = useMemo(
+    () => [...new Set(todosOsDocs.map((d) => d.naFase.etapaAtual).filter((x): x is string => x != null))]
+      .sort((a, b) => a.localeCompare(b, "pt-BR")),
+    [todosOsDocs],
+  )
+  const recortando =
+    recorte.rapido !== "todos" || recorte.busca.trim() !== "" || recorte.estado !== ""
+    || recorte.responsavelId !== "" || recorte.etapa !== ""
+
   const totalPessoas =
     indice.linhaPrincipal.length + indice.foraDaLinha.length + indice.pendenteClassificacao.length
+
+  const campo = "bg-[#1b2027] border border-white/10 rounded-lg text-[11.5px] text-white/80 px-2.5 py-1.5 focus:border-white/25 focus:outline-none"
+
+  // ── A BARRA DE RECORTE ────────────────────────────────────────────────────
+  //
+  // Montada UMA vez e usada nos dois desfechos. Quando o recorte não devolve
+  // nada, ela precisa continuar na tela: sumir junto com as linhas tirava do
+  // usuário justamente o campo que ele estava usando, e desfazer uma busca
+  // virava adivinhação.
+  const barraDeRecorte = setRecorte ? (
+    // Com quinhentos documentos a pergunta deixa de ser "o que existe" e passa a
+    // ser "o que falta". Busca e filtros são a resposta; ordenação é por onde
+    // começar. Nenhum deles consulta nada: recortam o que já veio do servidor.
+    <div className="flex flex-wrap items-center gap-2 mb-3">
+      <div className="relative">
+        <Search className="w-3.5 h-3.5 text-white/30 absolute left-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+        <input
+          value={recorte.busca}
+          onChange={(e) => setRecorte((r) => ({ ...r, busca: e.target.value }))}
+          placeholder="Buscar pessoa ou documento…"
+          className={`${campo} pl-8 w-[230px]`}
+        />
+      </div>
+
+      <select
+        value={recorte.estado}
+        onChange={(e) => setRecorte((r) => ({ ...r, estado: e.target.value as EstadoOperacionalDaLinha | "" }))}
+        className={campo}
+        aria-label="Filtrar por status"
+      >
+        <option value="">Todos os status</option>
+        <option value="A_FAZER">A fazer</option>
+        <option value="EM_ANDAMENTO">Em andamento</option>
+        <option value="AGUARDANDO_TERCEIRO">Aguardando terceiro</option>
+        <option value="BLOQUEADA">Bloqueada</option>
+        <option value="CONCLUIDA">Concluída</option>
+      </select>
+
+      <select
+        value={String(recorte.responsavelId)}
+        onChange={(e) => setRecorte((r) => ({
+          ...r,
+          responsavelId: e.target.value === "" ? "" : e.target.value === "sem" ? "sem" : Number(e.target.value),
+        }))}
+        className={campo}
+        aria-label="Filtrar por responsável"
+      >
+        <option value="">Todos os responsáveis</option>
+        <option value="sem">Sem responsável</option>
+        {responsaveis.map(([id, nome]) => <option key={id} value={id}>{nome}</option>)}
+      </select>
+
+      {etapas.length > 0 && (
+        <select
+          value={recorte.etapa}
+          onChange={(e) => setRecorte((r) => ({ ...r, etapa: e.target.value }))}
+          className={campo}
+          aria-label="Filtrar por etapa atual"
+        >
+          <option value="">Todas as etapas</option>
+          {etapas.map((e) => <option key={e} value={e}>{e}</option>)}
+        </select>
+      )}
+
+      <select
+        value={recorte.ordem}
+        onChange={(e) => setRecorte((r) => ({ ...r, ordem: e.target.value as OrdemDaTabela }))}
+        className={campo}
+        aria-label="Ordenar"
+      >
+        <option value="atencao">Ordem: o que precisa de atenção</option>
+        <option value="progresso">Ordem: menor progresso</option>
+        <option value="prazo">Ordem: prazo mais próximo</option>
+        <option value="documento">Ordem: documento (A–Z)</option>
+        <option value="etapa">Ordem: etapa atual</option>
+        <option value="responsavel">Ordem: responsável</option>
+        <option value="status">Ordem: status</option>
+      </select>
+
+      {recortando && (
+        <button
+          type="button"
+          onClick={() => setRecorte(RECORTE_VAZIO)}
+          className="text-[11.5px] font-semibold text-white/55 hover:text-white/85 underline underline-offset-2"
+        >
+          Limpar filtros
+        </button>
+      )}
+    </div>
+  ) : null
+
+  if (totalPessoas === 0 && indice.semDono.length === 0 && recortando) {
+    // NADA NO RECORTE ≠ NADA NA FASE. Dizer "a fase não tem trabalho" com um
+    // filtro ligado seria mentir sobre o processo por causa de um clique. E a
+    // barra continua na tela: sumir com ela tirava do usuário justamente o
+    // campo que ele estava usando.
+    return (
+      <div>
+        {barraDeRecorte}
+      <div className="border border-white/10 rounded-xl px-5 py-8 text-center">
+        <div className="text-[13px] text-white/68">Nenhum documento neste recorte.</div>
+        <div className="text-[11.5px] text-white/40 mt-1">
+          A fase tem {indiceBruto.resumo.documentos} documento(s).
+        </div>
+        <button
+          type="button"
+          onClick={() => setRecorte?.(RECORTE_VAZIO)}
+          className="mt-3 text-[12px] font-semibold text-[#7dd3fc] hover:underline underline-offset-2"
+        >
+          Limpar filtros
+        </button>
+        </div>
+      </div>
+    )
+  }
 
   if (totalPessoas === 0 && indice.semDono.length === 0) {
     return (
@@ -332,13 +690,19 @@ function IndiceView({
 
   return (
     <div>
+      {barraDeRecorte}
+
       <div className="flex items-center gap-2.5 mb-3">
         <span className="w-[22px] h-[22px] rounded-lg grid place-items-center flex-none bg-[#252c35] text-white/55">
           <Layers className="w-3 h-3" />
         </span>
         <b className="text-[11.5px] font-extrabold tracking-wide uppercase text-white/55">Documentos por pessoa</b>
+        {/* O TOPO FALA DA FASE; ISTO FALA DO RECORTE. Dois números com o mesmo
+            nome e escopos diferentes seria a confusão que esta tela evita. */}
         <span className="ml-auto text-[11px] font-bold text-white/40 bg-[#1b2027] border border-white/10 rounded-full px-2.5 py-0.5">
-          {indice.resumo.documentos} documento(s)
+          {recortando
+            ? `${visiveis} de ${indiceBruto.resumo.documentos} documento(s)`
+            : `${indiceBruto.resumo.documentos} documento(s)`}
         </span>
       </div>
 
@@ -474,9 +838,17 @@ function Pilula({ valor, rotulo, tone }: { valor: number; rotulo: string; tone?:
 // ------------------------------------------------------------
 // DOCUMENTOS DA PESSOA — uma linha por documento, sem execução
 // ------------------------------------------------------------
-// As colunas respondem "onde este documento está", não "o que fazer agora". O que
-// fazer agora vive no modal, atrás de "Abrir detalhes".
-const COLUNAS = "minmax(220px,2.2fr) 104px 104px 104px 104px 128px 132px"
+// A LINHA RESPONDE UMA PERGUNTA SÓ: "como está este documento NESTA FASE?".
+//
+// Ela já respondeu outra: "já foi retificado? traduzido? apostilado?" — quatro
+// colunas sobre fases FUTURAS. Com um punhado de documentos isso passava; com
+// quinhentos, o operador precisava abrir item por item para descobrir o que
+// faltava HOJE, que é exatamente o que uma tabela existe para evitar.
+//
+// Retificação, tradução e apostilamento não sumiram do produto: são fases com
+// tela própria, e o ciclo documental inteiro continua na aba Documentos e na
+// timeline do documento. O que saiu foi a mistura de horizontes numa tabela só.
+const COLUNAS = "minmax(200px,2fr) 150px minmax(140px,1.2fr) 130px 120px 120px 128px"
 
 function TabelaDocumentos({
   docs,
@@ -489,6 +861,19 @@ function TabelaDocumentos({
   readOnly: boolean
   documentoDestacadoId?: number | null
 }) {
+  // CORTE DE RENDERIZAÇÃO, NÃO DE DADOS.
+  //
+  // Oitenta linhas de uma pessoa só custam oitenta vezes o mesmo trabalho de
+  // pintura, e ninguém lê oitenta de uma vez. As primeiras aparecem; o resto
+  // fica a um clique — e o número dito é o real, nunca o desenhado.
+  const [mostrarTudo, setMostrarTudo] = useState(false)
+  const alvoForaDoCorte =
+    documentoDestacadoId != null
+    && docs.findIndex((d) => d.documentoId === documentoDestacadoId) >= LINHAS_POR_PESSOA
+  // O documento que trouxe o usuário nunca fica escondido atrás de "mostrar mais".
+  const visiveis = mostrarTudo || alvoForaDoCorte ? docs : docs.slice(0, LINHAS_POR_PESSOA)
+  const ocultos = docs.length - visiveis.length
+
   if (docs.length === 0) {
     return <div className="px-4 py-4 text-[12px] text-white/40">Nenhum documento aplicável nesta fase.</div>
   }
@@ -500,14 +885,14 @@ function TabelaDocumentos({
           style={{ gridTemplateColumns: COLUNAS }}
         >
           <div>Documento</div>
-          <div>Certidão</div>
-          <div>Retificada</div>
-          <div>Tradução</div>
-          <div>Apostila</div>
-          <div>Status final</div>
-          <div className="text-right">Ações</div>
+          <div>Progresso</div>
+          <div>Etapa atual</div>
+          <div>Responsável</div>
+          <div>Prazo</div>
+          <div>Status</div>
+          <div className="text-right">Ação</div>
         </div>
-        {docs.map((d) => (
+        {visiveis.map((d) => (
           <LinhaDocumento
             key={d.chave}
             doc={d}
@@ -516,6 +901,15 @@ function TabelaDocumentos({
             destacado={documentoDestacadoId != null && d.documentoId === documentoDestacadoId}
           />
         ))}
+        {ocultos > 0 && (
+          <button
+            type="button"
+            onClick={() => setMostrarTudo(true)}
+            className="w-full px-4 py-2.5 text-[11.5px] font-semibold text-white/55 hover:text-white/85 hover:bg-[#20262e]/60 transition-colors"
+          >
+            Mostrar mais {ocultos} documento(s)
+          </button>
+        )}
       </div>
     </div>
   )
@@ -530,26 +924,97 @@ const CLS_ARTEFATO: Record<StatusResumo, string> = {
   NAO_APLICAVEL: "text-white/25",
 }
 
-const CLS_BADGE: Record<StatusResumo, string> = {
-  PRONTO: "bg-[#4ade80]/15 text-[#4ade80]",
+// ------------------------------------------------------------
+// AS CÉLULAS DA FASE
+// ------------------------------------------------------------
+// Cores pela semântica que o sistema já usa: verde = pronto, azul = andando,
+// âmbar = espera, vermelho = crítico. Nenhuma cor nova.
+
+/**
+ * PROGRESSO — barra, percentual e a fração que a pessoa lê.
+ *
+ * O percentual é PONDERADO pelo peso publicado dos passos (na Emissão
+ * Documental: 25/10/18/15/12), a mesma conta que a aba Workflow do documento
+ * mostra. A fração continua sendo de etapas, porque é assim que alguém descreve
+ * o próprio trabalho: "estou em duas de cinco".
+ *
+ * Nada aqui é persistido: se o percentual e o workflow divergirem, é o
+ * percentual que está errado, e ele se corrige sozinho na próxima leitura.
+ */
+function CelulaProgresso({ p }: { p: DocumentoDoIndice["naFase"]["progresso"] }) {
+  const completo = p.pct >= 100
+  const detalhe = p.total > 0
+    ? `${p.concluidos} de ${p.total} etapas · ${p.pontosFeitos} de ${p.pontosTotais} pontos`
+    : "Sem etapa obrigatória nesta fase"
+  return (
+    <div title={detalhe}>
+      <div className="flex items-baseline gap-1.5">
+        <b className={`text-[12.5px] font-bold tabular-nums ${completo ? "text-[#4ade80]" : "text-white/90"}`}>
+          {p.pct}%
+        </b>
+        {p.total > 0 && (
+          <span className="text-[10.5px] text-white/35 tabular-nums">{p.concluidos}/{p.total}</span>
+        )}
+      </div>
+      <div className="h-1.5 bg-[#252c35] rounded-full overflow-hidden mt-1.5">
+        <div
+          className={`h-full transition-all duration-500 ${completo ? "bg-[#4ade80]" : "bg-[#7dd3fc]"}`}
+          style={{ width: `${p.pct}%` }}
+        />
+      </div>
+    </div>
+  )
+}
+
+const CLS_ESTADO: Record<EstadoOperacionalDaLinha, string> = {
+  A_FAZER: "bg-[#252c35] text-white/68",
   EM_ANDAMENTO: "bg-[#7dd3fc]/15 text-[#7dd3fc]",
-  PENDENTE: "bg-[#252c35] text-white/68",
-  DIVERGENTE: "bg-[#f87171]/15 text-[#f87171]",
-  INVALIDADO: "bg-[#f87171]/15 text-[#f87171]",
-  NAO_APLICAVEL: "bg-transparent text-white/25",
+  AGUARDANDO_TERCEIRO: "bg-[#d2a948]/15 text-[#d2a948]",
+  BLOQUEADA: "bg-[#f87171]/15 text-[#f87171]",
+  CONCLUIDA: "bg-[#4ade80]/15 text-[#4ade80]",
 }
 
-const MARCA: Record<StatusResumo, string> = {
-  PRONTO: "Pronto",
-  EM_ANDAMENTO: "Em andamento",
-  PENDENTE: "Pendente",
-  DIVERGENTE: "Divergente",
-  INVALIDADO: "Invalidado",
-  NAO_APLICAVEL: "—",
+/**
+ * PRAZO — o que ele SIGNIFICA primeiro, a data depois.
+ *
+ * "Atrasada há 3 dias" é a informação; 14/08/2026 é a referência. E atraso é
+ * CONDIÇÃO, não status: a tarefa continua Em andamento — as duas coisas
+ * aparecem juntas porque são verdadeiras juntas.
+ *
+ * Este prazo é o da TAREFA. A previsão que o cartório deu vive no andamento da
+ * etapa e não entra aqui: um terceiro que promete quarenta dias não pode
+ * reescrever um SLA de cinco.
+ */
+function CelulaPrazo({ f }: { f: DocumentoDoIndice["naFase"] }) {
+  if (f.estado === "CONCLUIDA") return <span className="text-[11px] text-white/25">—</span>
+  if (f.prazo == null) return <span className="text-[11px] text-white/35">Sem prazo</span>
+  const d = f.diasParaPrazo
+  const texto =
+    f.atrasado ? `Atrasada há ${Math.abs(d ?? 0)} dia${Math.abs(d ?? 0) === 1 ? "" : "s"}`
+    : f.venceHoje ? "Vence hoje"
+    : d === 1 ? "Vence amanhã"
+    : d != null ? `Vence em ${d} dias`
+    : "Com prazo"
+  const cor = f.atrasado ? "text-[#f87171]" : f.venceHoje ? "text-[#d2a948]" : "text-white/68"
+  return (
+    <div>
+      <div className={`text-[11.5px] font-semibold ${cor}`}>{texto}</div>
+      <div className="text-[10.5px] text-white/30 tabular-nums">
+        {new Date(f.prazo).toLocaleDateString("pt-BR")}
+      </div>
+    </div>
+  )
 }
 
-function Artefato({ status }: { status: StatusResumo }) {
-  return <span className={`text-[12px] font-semibold ${CLS_ARTEFATO[status]}`}>{MARCA[status]}</span>
+/** O rótulo da AÇÃO segue o estado — o mesmo vocabulário da Minha Fila. */
+function rotuloDaAcao(f: DocumentoDoIndice["naFase"]): string {
+  switch (f.estado) {
+    case "A_FAZER": return "Abrir"
+    case "EM_ANDAMENTO": return "Continuar"
+    case "AGUARDANDO_TERCEIRO": return "Ver etapa"
+    case "BLOQUEADA": return "Ver bloqueio"
+    case "CONCLUIDA": return "Ver detalhes"
+  }
 }
 
 function LinhaDocumento({
@@ -591,17 +1056,54 @@ function LinhaDocumento({
             {[doc.tipoLabel, doc.pais].filter(Boolean).join(" · ") || "Certidão do processo"}
           </span>
         </div>
+        {/* DIVERGÊNCIA cabe num selo. Uma coluna inteira para um caso raro custa
+            espaço em TODAS as linhas para informar sobre pouquíssimas. */}
+        {(doc.statusFinal === "DIVERGENTE" || doc.statusFinal === "INVALIDADO") && (
+          <span
+            className="flex-none text-[10px] font-bold px-1.5 py-0.5 rounded bg-[#f87171]/15 text-[#f87171]"
+            title={doc.statusFinalLabel}
+          >
+            {doc.statusFinal === "INVALIDADO" ? "Invalidado" : "Divergente"}
+          </span>
+        )}
       </div>
 
-      <Artefato status={doc.artefatos.certidao} />
-      <Artefato status={doc.artefatos.retificada} />
-      <Artefato status={doc.artefatos.traducao} />
-      <Artefato status={doc.artefatos.apostila} />
+      <CelulaProgresso p={doc.naFase.progresso} />
 
-      <div>
-        <span className={`text-[11px] font-bold px-2.5 py-1 rounded-full ${CLS_BADGE[doc.statusFinal]}`}>
-          {doc.statusFinalLabel}
+      <div className="min-w-0">
+        <div className="text-[12px] text-white/80 truncate" title={doc.naFase.etapaAtual ?? undefined}>
+          {doc.naFase.etapaAtual ?? "—"}
+        </div>
+        {doc.naFase.motivoBloqueio && (
+          <div className="text-[10.5px] text-[#f87171]/80 truncate" title={doc.naFase.motivoBloqueio}>
+            {doc.naFase.motivoBloqueio}
+          </div>
+        )}
+      </div>
+
+      {/* O RESPONSÁVEL É O DA TAREFA. Não existe um segundo dono por documento:
+          inventar um criaria a divergência de "Daniela numa tela e Equipe
+          Documental na outra". */}
+      <div className="min-w-0 text-[11.5px] truncate">
+        {doc.naFase.responsavelNome
+          ? <span className="text-white/80">{doc.naFase.responsavelNome}</span>
+          : doc.naFase.estado === "CONCLUIDA"
+            ? <span className="text-white/25">—</span>
+            : <span className="text-[#d2a948]">Sem responsável</span>}
+      </div>
+
+      <CelulaPrazo f={doc.naFase} />
+
+      <div className="flex items-center gap-1.5 min-w-0">
+        <span className={`text-[11px] font-bold px-2.5 py-1 rounded-full whitespace-nowrap ${CLS_ESTADO[doc.naFase.estado]}`}>
+          {doc.naFase.estadoLabel}
         </span>
+        {/* ATRASADA NÃO É STATUS — é uma condição que acompanha o status. */}
+        {doc.naFase.atrasado && (
+          <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-[#f87171]/15 text-[#f87171] whitespace-nowrap">
+            Atrasada
+          </span>
+        )}
       </div>
 
       <div className="flex justify-end">
@@ -611,7 +1113,7 @@ function LinhaDocumento({
             onClick={() => onAbrirDetalhes!(doc)}
             className="inline-flex items-center gap-1.5 bg-[#252c35] text-white/95 border border-white/10 text-[12px] font-bold px-3 py-1.5 rounded-lg hover:bg-[#2d353f] transition-colors whitespace-nowrap"
           >
-            Abrir detalhes <ChevronRight className="w-3 h-3" />
+            {rotuloDaAcao(doc.naFase)} <ChevronRight className="w-3 h-3" />
           </button>
         ) : (
           // Sem executor configurado: o documento CONTINUA visível e o que falta é
