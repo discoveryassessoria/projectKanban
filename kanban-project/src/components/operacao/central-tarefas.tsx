@@ -275,12 +275,16 @@ function CartaoDaFila({
           </div>
           <div className="flex items-center gap-1.5">
             {acaoSecundaria}
+            {/* ENQUANTO O PEDIDO CORRE, O BOTÃO DIZ ISSO. Um botão que não muda
+                de aparência ao ser clicado é indistinguível de um botão que não
+                fez nada — e foi assim que uma tarefa iniciada de verdade passou
+                por "não aconteceu nada". */}
             <button
               disabled={ocupado}
               onClick={aoExecutar}
               className="rounded border border-white/15 bg-white/[0.06] px-2.5 py-1 text-[11px] text-white/85 transition-colors hover:bg-white/[0.1] disabled:opacity-40"
             >
-              {acao.rotulo}
+              {ocupado && acao.comando === "iniciar" ? "Iniciando…" : acao.rotulo}
             </button>
           </div>
         </div>
@@ -330,6 +334,30 @@ export function CentralTarefas({ podeDistribuir }: { podeDistribuir: boolean }) 
   const carregar = useCallback(() => setRecarga((n) => n + 1), [])
 
   /**
+   * A LISTA, RELIDA E **ESPERADA** — o comando não termina antes de a tela contar
+   * a verdade nova.
+   *
+   * Só disparar `carregar()` deixava uma janela em que o comando já tinha
+   * acontecido e o cartão ainda dizia o estado antigo. Se a releitura demorasse,
+   * falhasse ou fosse descartada, a janela virava permanente: era isso que
+   * fazia "cliquei em Iniciar e nada aconteceu", com a tarefa já iniciada no
+   * banco. Agora quem comanda espera a resposta nova antes de dar o ato por
+   * encerrado — e a lista devolvida é aplicada aqui mesmo.
+   */
+  const recarregarAgora = useCallback(async (): Promise<LinhaOperacional[] | null> => {
+    try {
+      const r = await fetch(`/api/operacao/tarefas?visao=${visao}`, { headers: auth() })
+      if (!r.ok) return null
+      const d: { linhas?: LinhaOperacional[] } = await r.json()
+      const lista = d.linhas ?? []
+      setResultado({ chave, lista })
+      return lista
+    } catch {
+      return null
+    }
+  }, [visao, chave])
+
+  /**
    * TODA MUDANÇA SAI POR UMA PORTA SÓ.
    *
    * Inclusive o conflito: quando outro gestor mexeu na tarefa antes, a porta
@@ -348,23 +376,40 @@ export function CentralTarefas({ podeDistribuir }: { podeDistribuir: boolean }) 
         })
         const d = await r.json().catch(() => ({}))
         if (!r.ok) {
-          const conflito = r.status === 409
-          setErroComando(conflito ? "Esta tarefa foi alterada por outro usuário. A lista foi atualizada." : (d.error ?? "Não foi possível concluir a ação."))
-          if (conflito) { setAlvo(null); carregar() }
+          // O CÓDIGO IMPORTA para quem lê. "Não foi possível" não diz se falta
+          // permissão, se alguém chegou antes ou se o servidor caiu — e é a
+          // diferença entre chamar o gestor e tentar de novo.
+          const porStatus: Record<number, string> = {
+            401: "Sua sessão expirou. Entre de novo.",
+            403: "Você não tem permissão para esta ação.",
+            409: "Esta tarefa foi alterada por outra pessoa. A lista foi atualizada.",
+            422: d.error ?? "A ação não é válida para o estado atual desta tarefa.",
+          }
+          setErroComando(porStatus[r.status] ?? d.error ?? `Não foi possível concluir a ação (HTTP ${r.status}).`)
+          setAlvo(null)
+          await recarregarAgora()
           return false
         }
         setAlvo(null)
         setAviso(sucesso)
-        carregar()
+        // ESPERA a lista nova. Sem isto o ato "terminava" antes de a tela mudar.
+        await recarregarAgora()
         return true
       } catch {
-        setErroComando("Falha de rede. Tente novamente.")
+        // FALHA DE REDE NÃO É SILÊNCIO. O comando pode ter chegado ao servidor e
+        // só a resposta ter se perdido — por isso relemos antes de acusar.
+        const lista = await recarregarAgora()
+        setErroComando(
+          lista == null
+            ? "Falha de rede. Verifique a conexão e tente novamente."
+            : "A resposta do servidor não chegou. A lista foi atualizada — confira o estado da tarefa.",
+        )
         return false
       } finally {
         setOcupado(false)
       }
     },
-    [carregar],
+    [recarregarAgora],
   )
 
   /**
@@ -379,18 +424,16 @@ export function CentralTarefas({ podeDistribuir }: { podeDistribuir: boolean }) 
   }, [router])
 
   /**
-   * A AÇÃO PRINCIPAL DO CARTÃO — e por que INICIAR não navega.
+   * A AÇÃO PRINCIPAL DO CARTÃO — assumir e ir trabalhar, no mesmo gesto.
    *
-   * Iniciar e continuar são gestos diferentes e param em lugares diferentes:
+   *   INICIAR    assume o trabalho e LEVA à etapa. Quem clica em "Iniciar" está
+   *              indo trabalhar agora; parar na fila obrigaria um segundo clique
+   *              para chegar onde o trabalho acontece.
+   *   CONTINUAR  só navega. Não reinicia nada, não escreve nada.
    *
-   *   INICIAR    assume o trabalho. Fica na fila, e o cartão vira "Continuar" —
-   *              quem acabou de assumir cinco tarefas da manhã não quer ser
-   *              jogado para dentro do processo a cada clique.
-   *   CONTINUAR  vai trabalhar. Aí sim sai da fila e chega à etapa.
-   *
-   * Isto também torna o estado VISÍVEL: começar e ser levado embora no mesmo
-   * clique escondia a transição, e "A fazer → Em andamento" acontecia numa tela
-   * que o funcionário nunca via.
+   * A NAVEGAÇÃO SÓ ACONTECE DEPOIS DO SUCESSO CONFIRMADO. Navegar junto com o
+   * pedido — ou apesar dele — levaria a pessoa para a etapa acreditando que
+   * assumiu um trabalho que continuou de ninguém.
    *
    * Tarefa que perdeu a causa não é iniciada: ela precisa de decisão, e tratá-la
    * como trabalho normal seria responder à pergunta errada.
@@ -398,10 +441,8 @@ export function CentralTarefas({ podeDistribuir }: { podeDistribuir: boolean }) 
   const irParaOTrabalho = useCallback(async (l: LinhaOperacional) => {
     const acao = acaoPrincipal(l)
     if (acao.comando === "iniciar") {
-      // A fila recarrega no sucesso (`comandar`), e o cartão passa a oferecer
-      // Continuar. Sem F5, sem navegação.
-      await comandar(l.taskId, { acao: "iniciar" }, "Tarefa iniciada — agora use “Continuar” para trabalhar nela.")
-      return
+      const ok = await comandar(l.taskId, { acao: "iniciar" }, "Tarefa iniciada.")
+      if (!ok) return
     }
     abrirOTrabalho(l)
   }, [comandar, abrirOTrabalho])
@@ -478,6 +519,27 @@ export function CentralTarefas({ podeDistribuir }: { podeDistribuir: boolean }) 
         </div>
       )}
 
+      {/* O QUE ACONTECEU — sucesso E erro, na mesma altura da tela.
+          O erro só era exibido DENTRO do seletor de responsável, que nem chega a
+          existir quando se clica em "Iniciar tarefa". Resultado: um 403, um 409
+          ou uma resposta perdida no caminho não apareciam em lugar nenhum — a
+          pessoa clicava, nada mudava, e o botão parecia morto. Falha silenciosa
+          é pior do que falha: ela ensina a desconfiar do que funciona. */}
+      {erroComando && (
+        <div
+          role="alert"
+          className="mb-2 flex items-start justify-between gap-3 rounded border border-red-300/25 bg-red-400/[0.08] px-3 py-2 text-[11px] text-red-100/90"
+        >
+          <span>{erroComando}</span>
+          <button
+            onClick={() => setErroComando(null)}
+            className="shrink-0 text-red-200/60 transition-colors hover:text-red-100"
+            aria-label="Fechar aviso de erro"
+          >
+            ✕
+          </button>
+        </div>
+      )}
       {aviso && (
         <div className="mb-2 rounded border border-sky-300/20 bg-sky-400/[0.07] px-3 py-2 text-[11px] text-sky-100/85">
           {aviso}

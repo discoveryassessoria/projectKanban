@@ -675,10 +675,33 @@ function ConteudoDrawer({
                 </div>
               </div>
 
+              {/* BLOQUEIO É ESTADO ATUAL; O RESTO É HISTÓRICO — e os dois não
+                  podem usar a mesma frase.
+
+                  `Documento.motivoBloqueio` guarda o motivo da última operação
+                  que foi bloqueada OU CANCELADA, e ninguém o apaga quando uma
+                  operação NOVA começa. Em produção o documento 2111 exibia
+                  "Bloqueado: Operação cancelada: Documento incorreto" ao mesmo
+                  tempo em que a tarefa estava EM ANDAMENTO e a etapa EM
+                  EXECUÇÃO: o texto era de uma operação encerrada às 20h54, e o
+                  trabalho vivo tinha começado às 22h11, em outra fase.
+
+                  Quem diz se ESTE trabalho está travado é a TAREFA. Sem ela
+                  travada, o texto continua visível — jogar fora seria esconder
+                  o que aconteceu — mas dito como o que é: registro anterior. */}
               {doc.motivoBloqueio && (
-                <div className="mt-3 p-2.5 rounded-md border border-amber-400/30 bg-amber-400/10 text-[11.5px] text-amber-200">
-                  <strong className="font-semibold">Bloqueado:</strong> {doc.motivoBloqueio}
-                </div>
+                tarefa?.statusTarefa === "BLOQUEADA" ? (
+                  <div className="mt-3 p-2.5 rounded-md border border-amber-400/30 bg-amber-400/10 text-[11.5px] text-amber-200">
+                    <strong className="font-semibold">Bloqueado:</strong> {doc.motivoBloqueio}
+                  </div>
+                ) : (
+                  <div className="mt-3 p-2.5 rounded-md border border-white/10 bg-white/[0.03] text-[11.5px] text-white/45">
+                    <strong className="font-semibold text-white/60">Registro anterior:</strong> {doc.motivoBloqueio}
+                    <span className="block text-[10.5px] text-white/30 mt-0.5">
+                      Refere-se a uma operação encerrada — não impede o trabalho atual.
+                    </span>
+                  </div>
+                )
               )}
             </div>
 

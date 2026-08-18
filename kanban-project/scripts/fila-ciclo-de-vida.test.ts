@@ -576,10 +576,28 @@ async function main() {
     !/AbaAnexos|AbaObservacoes|TabRegistry/.test(tela))
   ok('a navegação usa a função canônica de URL', /urlOperacionalDaTarefa/.test(tela))
   ok('e não monta rota na mão', !/`\/kanban\?/.test(tela))
-  ok('INICIAR comanda e FICA na fila — a transição é vista antes de sair dela',
+  // INICIAR COMANDA E DEPOIS NAVEGA — nesta ordem, e só com sucesso confirmado.
+  ok('INICIAR comanda e só então navega',
     /acao\.comando === "iniciar"/.test(tela)
-    && /\{ acao: "iniciar" \}[\s\S]{0,200}?return\s*\n\s*\}/.test(tela),
-    'iniciar não navega')
+    && /const ok = await comandar\(l\.taskId, \{ acao: "iniciar" \}[\s\S]{0,120}?if \(!ok\) return[\s\S]{0,80}?abrirOTrabalho\(l\)/.test(tela),
+    'navegação depois do sucesso')
+  // NENHUMA FALHA SILENCIOSA. O erro do comando era exibido só DENTRO do seletor
+  // de responsável, que nem existe quando se clica em "Iniciar tarefa": um 403
+  // não aparecia em lugar nenhum e o botão parecia morto.
+  ok('§6) o erro do comando é exibido na própria fila',
+    /\{erroComando && \(/.test(tela) && /role="alert"/.test(tela))
+  ok('§6) e o comando espera a lista nova antes de se dar por encerrado',
+    /await recarregarAgora\(\)/.test(tela))
+  ok('§6) o botão diz que está trabalhando enquanto o pedido corre',
+    /Iniciando…/.test(tela))
+  ok('§6) e o erro distingue permissão, conflito e sessão',
+    /403: /.test(tela) && /409: /.test(tela) && /401: /.test(tela))
+  // §9/§10 — BLOQUEIO É ESTADO ATUAL; O RESTO É HISTÓRICO.
+  const drawerDoc = semComentarios(ler('src/components/kanban/DocumentoOperationalDrawer.tsx'))
+  ok('§10) "Bloqueado" só aparece quando a TAREFA está bloqueada',
+    /tarefa\?\.statusTarefa === "BLOQUEADA"[\s\S]{0,200}?Bloqueado:/.test(drawerDoc))
+  ok('§10) e o motivo de uma operação encerrada aparece como registro anterior',
+    /Registro anterior:/.test(drawerDoc))
   ok('e o cartão inteiro nunca comanda — clicar para olhar não assume trabalho',
     /aoAbrir\}/.test(tela) && !/onClick=\{aoExecutar\}[\s\S]{0,80}min-w-0 flex-1/.test(tela))
   // UM ESTADO, UM NOME. O cartão dizia "Não iniciada", o filtro logo acima dizia

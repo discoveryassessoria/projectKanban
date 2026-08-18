@@ -64,30 +64,35 @@ await page.screenshot({ path: `${OUT}/1-a-fazer.png` })
 // ═══════════════════════════════════════════════════════════════════════════
 secao("§6/§7) INICIAR muda o estado — e a pessoa VÊ isso acontecer")
 // ═══════════════════════════════════════════════════════════════════════════
-const urlAntes = page.url()
-// A OUTRA certidão da Daniela continua A FAZER — o palco tem duas de propósito.
-// O que a transição muda é UM cartão, não a fila inteira.
-const iniciarAntes = await page.getByRole("button", { name: /^Iniciar tarefa$/ }).count()
+// O REQUEST REAL, observado — não a função de domínio chamada por dentro.
+const respostas = []
+page.on("response", (r) => {
+  if (r.url().includes("/comando")) respostas.push({ status: r.status(), url: r.url() })
+})
 await botaoIniciar.click()
-await page.waitForTimeout(5000)
-ok("§7) continuou na fila — iniciar não teleporta ninguém", page.url() === urlAntes, page.url())
-corpo = await page.locator("body").innerText()
-ok("§6) a tela confirma o início", /Tarefa iniciada/i.test(corpo))
-ok("§4) o estado virou EM ANDAMENTO", /Em andamento/.test(corpo))
-const botaoContinuar = page.getByRole("button", { name: /^Continuar$/ }).first()
-ok("§11) e agora a ação é CONTINUAR", (await botaoContinuar.count()) > 0)
-const iniciarDepois = await page.getByRole("button", { name: /^Iniciar tarefa$/ }).count()
-ok("§11) 'Iniciar tarefa' saiu DAQUELE cartão — e só dele",
-  iniciarDepois === iniciarAntes - 1, `${iniciarAntes} → ${iniciarDepois}`)
-ok("§2) a outra tarefa atribuída continua A FAZER — iniciar uma não inicia as outras",
-  iniciarDepois >= 1)
-await page.screenshot({ path: `${OUT}/2-em-andamento.png` })
+// A navegação faz parte do ato: esperar por ela é esperar o ato terminar.
+await page.waitForURL(/\/kanban\?/, { timeout: 45000 }).catch(() => {})
+await page.waitForTimeout(9000)
+
+ok("§1) o clique disparou o comando", respostas.length === 1, JSON.stringify(respostas))
+ok("§1) e o servidor respondeu 200", respostas[0]?.status === 200, String(respostas[0]?.status))
+ok("§4) e a tela NAVEGOU para o trabalho — sem segundo clique",
+  /\/kanban\?/.test(page.url()), page.url())
+await page.screenshot({ path: `${OUT}/2-navegou-apos-iniciar.png` })
+
+// O ESTADO MUDOU DE VERDADE — lido do servidor, não do DOM.
+const depoisDoStart = await page.evaluate(async ([taskId]) => {
+  const r = await fetch(`/api/operacao/tarefas/${taskId}/navegacao`, {
+    headers: { Authorization: `Bearer ${localStorage.getItem("authToken")}` },
+  })
+  return r.ok ? (await r.json()).alvo : null
+}, [palco.tarefaId])
+ok("§3) a tarefa está EM ANDAMENTO", depoisDoStart?.statusTarefa === "EM_ANDAMENTO", String(depoisDoStart?.statusTarefa))
+ok("§3) e é a MESMA tarefa", depoisDoStart?.taskId === palco.tarefaId)
 
 // ═══════════════════════════════════════════════════════════════════════════
-secao("§8/§9) CONTINUAR leva ao documento certo — sem drawer no caminho")
+secao("§4/§8) A navegação parou no documento certo — sem drawer no caminho")
 // ═══════════════════════════════════════════════════════════════════════════
-await botaoContinuar.click()
-await page.waitForTimeout(11000)
 const url = page.url()
 ok("§8) saiu da Operação e foi para o processo", /\/kanban\?/.test(url), url)
 ok("§9) levando a identidade da tarefa", url.includes(`taskId=${palco.tarefaId}`), url)
@@ -122,6 +127,49 @@ ok("§12) e aponta o documento DESTA tarefa",
   resposta?.alvo?.documentoId === palco.documentoId,
   `${resposta?.alvo?.documentoId} (esperado ${palco.documentoId}; a homônima é ${palco.documentoHomonimoId})`)
 ok("§12) e a pessoa certa", resposta?.alvo?.pessoaId === palco.pessoaId)
+
+// ═══════════════════════════════════════════════════════════════════════════
+secao("§13) De volta à fila, a tarefa iniciada oferece CONTINUAR — e só navega")
+// ═══════════════════════════════════════════════════════════════════════════
+await page.goto(`${BASE}/operacao`, { waitUntil: "domcontentloaded", timeout: 90000 })
+await page.waitForTimeout(6000)
+const abaFila = page.getByRole("button", { name: /^Minha fila$/ }).first()
+if (await abaFila.count()) { await abaFila.click(); await page.waitForTimeout(3000) }
+const corpoVolta = await page.locator("body").innerText()
+ok("§13) o cartão agora diz Em andamento", /Em andamento/.test(corpoVolta))
+const continuar = page.getByRole("button", { name: /^Continuar$/ }).first()
+ok("§13) e oferece Continuar", (await continuar.count()) > 0)
+ok("§5) a outra tarefa atribuída continua A FAZER — iniciar uma não inicia as outras",
+  (await page.getByRole("button", { name: /^Iniciar tarefa$/ }).count()) >= 1)
+
+const comandosAntes = respostas.length
+await continuar.click()
+await page.waitForURL(/\/kanban\?/, { timeout: 45000 }).catch(() => {})
+await page.waitForTimeout(6000)
+ok("§13) CONTINUAR não comandou nada — só navegou",
+  respostas.length === comandosAntes, `${respostas.length - comandosAntes} comando(s)`)
+ok("§13) e chegou ao mesmo lugar", page.url().includes(`taskId=${palco.tarefaId}`), page.url())
+
+// ═══════════════════════════════════════════════════════════════════════════
+secao("§6/§14) Falha NÃO é silêncio — a tela diz o que aconteceu")
+// ═══════════════════════════════════════════════════════════════════════════
+await page.goto(`${BASE}/operacao`, { waitUntil: "domcontentloaded", timeout: 90000 })
+await page.waitForTimeout(6000)
+const abaFila2 = page.getByRole("button", { name: /^Minha fila$/ }).first()
+if (await abaFila2.count()) { await abaFila2.click(); await page.waitForTimeout(3000) }
+// O servidor responde 403 a este comando — o teste força a resposta, não a UI.
+await page.route("**/api/tarefas/*/comando", (route) =>
+  route.fulfill({ status: 403, contentType: "application/json", body: JSON.stringify({ error: "sem permissão" }) }))
+const iniciarQueVaiFalhar = page.getByRole("button", { name: /^Iniciar tarefa$/ }).first()
+ok("§14) há uma tarefa A FAZER para o teste de erro", (await iniciarQueVaiFalhar.count()) > 0)
+await iniciarQueVaiFalhar.click()
+await page.waitForTimeout(6000)
+const comErro = await page.locator("body").innerText()
+ok("§6) o erro aparece na tela", /permissão/i.test(comErro), (comErro.match(/.*permiss.*/i) ?? ["—"])[0].slice(0, 80))
+ok("§6) e a UI NÃO mente dizendo que iniciou", !/Tarefa iniciada\./.test(comErro))
+ok("§4) nem navega em cima de um comando que falhou", page.url().includes("/operacao"), page.url())
+await page.screenshot({ path: `${OUT}/4-erro-visivel.png` })
+await page.unroute("**/api/tarefas/*/comando")
 
 console.log(`\n${"═".repeat(70)}`)
 console.log(`Total: ${passou + falhou} | ✅ ${passou} | ❌ ${falhou}`)
