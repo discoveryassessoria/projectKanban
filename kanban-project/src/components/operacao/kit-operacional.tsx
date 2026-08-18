@@ -71,12 +71,28 @@ function dataCurta(iso: string | null): string {
   return new Date(iso).toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit", year: "numeric" })
 }
 
+/**
+ * O ESTADO OPERACIONAL EM PORTUGUÊS — o MESMO vocabulário da Central e do filtro.
+ *
+ * `NAO_INICIADA` aparecia como "Não iniciada" no cartão enquanto o filtro logo
+ * acima dizia "A fazer" e a Central, sobre a MESMA tarefa, também dizia "A
+ * fazer". Três nomes para um estado obrigam cada pessoa a montar o próprio
+ * dicionário — e quem monta dicionário erra.
+ *
+ * "A fazer" ganha porque é o que o operador faz com a informação: é trabalho
+ * que espera por ele. "Não iniciada" descreve o passado da tarefa, não o que
+ * ela pede.
+ */
 export const ROTULO_STATUS: Record<string, string> = {
-  NAO_INICIADA: "Não iniciada",
+  NAO_INICIADA: "A fazer",
   EM_ANDAMENTO: "Em andamento",
   AGUARDANDO_TERCEIRO: "Aguardando terceiro",
   AGUARDANDO_CLIENTE: "Aguardando cliente",
   BLOQUEADA: "Bloqueada",
+  CONCLUIDO_RECEBIDO: "Concluída",
+  CONCLUIDO_NAO_POSSUI: "Concluída",
+  CANCELADA: "Cancelada",
+  SUPERSEDIDA: "Substituída",
 }
 export const ROTULO_PRIORIDADE: Record<string, string> = { URGENTE: "Urgente", ALTA: "Alta", MEDIA: "Média", BAIXA: "Baixa" }
 

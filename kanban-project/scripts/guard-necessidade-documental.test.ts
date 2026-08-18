@@ -85,6 +85,10 @@ const AUTORIZADOS_FORA_DO_RUNTIME: Record<string, string> = {
   "scripts/central-fase-500-docs.test.ts":
     "escala da Central: cria as PRÓPRIAS obrigações (marca ESCALA500) só no banco de teste — " +
     "quinhentas certidões para contar quantas consultas a tabela da fase custa",
+  "scripts/palco-fila-operacional.ts":
+    "palco visual da Minha Fila: monta e derruba as PRÓPRIAS obrigações (marca PALCO-FILA), só no banco de teste — deixa uma tarefa ATRIBUÍDA e NÃO INICIADA de pé, que é o estado que a validação visual precisa ver na tela",
+  "scripts/fila-ciclo-de-vida.test.ts":
+    "ciclo de vida da tarefa na fila: monta e derruba as PRÓPRIAS obrigações (marca FILA-CICLO), só no banco de teste — prova que atribuir não inicia, que iniciar é o único ato que começa, que transferir preserva o trabalho e que a etapa concluída não gera tarefa nova",
   "scripts/fase-nao-duplica-tarefa.test.ts":
     "mudança de fase não duplica tarefa: cria a PRÓPRIA obrigação (marca FASEDUP) só no banco " +
     "de teste — reproduz o caso do Ademir, em que a mesma certidão virou duas tarefas vivas",

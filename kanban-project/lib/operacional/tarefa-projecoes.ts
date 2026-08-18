@@ -19,9 +19,19 @@ import {
   inicioDoDiaOperacional,
   estadoTemporal,
 } from '@/lib/operacional/tempo-operacional'
-import type { Prisma, PrioridadeTarefa, StatusTarefa } from '@prisma/client'
+import type { Prisma, PrioridadeTarefa, PrismaClient, StatusTarefa } from '@prisma/client'
+
+/**
+ * O LEITOR — o cliente global por padrão, outro quando quem chama precisa.
+ *
+ * Existe pelo mesmo motivo que na leitura da fase: para que dê para MEDIR
+ * quantas idas ao banco a projeção faz. Sem isto, "a fila não tem N+1" é uma
+ * afirmação sobre o código, não um fato verificado com volume.
+ */
+type Leitor = PrismaClient | Prisma.TransactionClient
 import { STATUS_ATIVOS } from './tarefa-canonica'
 import { resolveWorkflowStepEditor } from '@/src/lib/process-stage/step-editor-registry'
+import { phaseKeyToFaseCode, rotuloDoPasso } from '@/src/lib/process-stage/fases-catalog'
 
 // O TEMPO VEM DE UM LUGAR SÓ.
 //
@@ -83,7 +93,6 @@ function projetar(
   nomes?: Map<number, string>,
   rotulosDePasso?: Map<number, string>,
 ): LinhaDeFila {
-  const snap = t.workflowStepInstance?.snapshot as { label?: string } | null
   // A RÉGUA CANÔNICA — a mesma da Central, do Kanban e da notificação.
   const tempo = estadoTemporal({
     dataPrazo: t.dataPrazo,
@@ -108,13 +117,24 @@ function projetar(
     // nasceu sem label no snapshot, e por isso a fila mostrava
     // "solicitar_certidao" para quem só queria ler "Solicitar certidão" — o
     // nome existia o tempo todo, no passo publicado.
-    etapaAtual:
-      snap?.label
-      ?? (t.workflowStepInstance?.stepDefinitionId != null
-        ? rotulosDePasso?.get(t.workflowStepInstance.stepDefinitionId) ?? null
-        : null)
-      ?? t.workflowStepInstance?.stepKey
-      ?? null,
+    // O NOME DO PASSO pela resolução ÚNICA (`rotuloDoPasso`): snapshot →
+    // definição publicada → catálogo da fase → chave, e só então a chave.
+    //
+    // Esta cadeia parava um degrau antes do catálogo, e a Central não parava. A
+    // instância da Emissão Documental nasceu sem `label` no snapshot: a mesma
+    // etapa da mesma tarefa era "Solicitar certidão" numa tela e
+    // "solicitar_certidao" na outra.
+    etapaAtual: t.workflowStepInstance
+      ? rotuloDoPasso({
+          stepKey: t.workflowStepInstance.stepKey,
+          snapshot: t.workflowStepInstance.snapshot,
+          labelPublicado:
+            t.workflowStepInstance.stepDefinitionId != null
+              ? rotulosDePasso?.get(t.workflowStepInstance.stepDefinitionId) ?? null
+              : null,
+          faseCode: phaseKeyToFaseCode(t.faseMacroKey),
+        })
+      : null,
     statusTarefa: t.statusTarefa,
     equipeKey: t.equipeKey,
     responsavelId: t.responsavelId,
@@ -144,22 +164,22 @@ function projetar(
  * `stepDefinitionId` é FK solta (sem relation no modelo), então o join não vem
  * de graça no `select`: resolve-se em lote, como os nomes de pessoa.
  */
-async function rotulosDosPassos(linhas: Bruta[]): Promise<Map<number, string>> {
+async function rotulosDosPassos(linhas: Bruta[], db: Leitor = prisma): Promise<Map<number, string>> {
   const ids = [...new Set(
     linhas.map((l) => l.workflowStepInstance?.stepDefinitionId).filter((x): x is number => x != null),
   )]
   if (ids.length === 0) return new Map()
-  const defs = await prisma.phaseInternalWorkflowStep.findMany({
+  const defs = await db.phaseInternalWorkflowStep.findMany({
     where: { id: { in: ids } }, select: { id: true, label: true },
   })
   return new Map(defs.map((d) => [d.id, d.label]))
 }
 
 /** Os nomes das pessoas das linhas — UMA consulta, nunca uma por tarefa. */
-async function nomesDasPessoas(linhas: Array<{ pessoaId: number | null }>): Promise<Map<number, string>> {
+async function nomesDasPessoas(linhas: Array<{ pessoaId: number | null }>, db: Leitor = prisma): Promise<Map<number, string>> {
   const ids = [...new Set(linhas.map((l) => l.pessoaId).filter((x): x is number => x != null))]
   if (ids.length === 0) return new Map()
-  const pessoas = await prisma.pessoa.findMany({ where: { id: { in: ids } }, select: { id: true, nome: true, sobrenome: true } })
+  const pessoas = await db.pessoa.findMany({ where: { id: { in: ids } }, select: { id: true, nome: true, sobrenome: true } })
   return new Map(pessoas.map((p) => [p.id, [p.nome, p.sobrenome].filter(Boolean).join(' ')]))
 }
 
@@ -170,7 +190,7 @@ async function nomesDasPessoas(linhas: Array<{ pessoaId: number | null }>): Prom
  * próximo, depois prioridade. Tarefa sem prazo vai para o fim, não para o
  * começo: ausência de prazo não é urgência.
  */
-export async function minhaFila(usuarioId: number, agora = new Date()): Promise<LinhaGerencial[]> {
+export async function minhaFila(usuarioId: number, agora = new Date(), db: Leitor = prisma): Promise<LinhaGerencial[]> {
   // UMA FONTE, DUAS TELAS.
   //
   // A Minha Fila lia uma projeção mais pobre que a da visão gerencial: sem
@@ -179,7 +199,7 @@ export async function minhaFila(usuarioId: number, agora = new Date()): Promise<
   // projeções do mesmo fato acabam divergindo.
   //
   // Agora é a MESMA consulta, com o recorte de quem executa.
-  const { linhas } = await visaoGerencial({ responsavelId: usuarioId, porPagina: 500 }, agora)
+  const { linhas } = await visaoGerencial({ responsavelId: usuarioId, porPagina: 500 }, agora, db)
   // Encerradas não são fila: o que já foi entregue não é trabalho de hoje.
   return ordenarFila(linhas.filter((l) => l.coluna !== 'CONCLUIDA')) as LinhaGerencial[]
 }
@@ -747,12 +767,12 @@ function whereGerencial(f: FiltrosGerenciais, agora: Date): Prisma.TarefaWhereIn
 }
 
 /** Desde quando cada tarefa espera / por que bloqueou — UMA consulta, em lote. */
-async function contextoDeParada(ids: number[]): Promise<Map<number, { esperandoDesde?: Date; motivo?: string }>> {
+async function contextoDeParada(ids: number[], db: Leitor = prisma): Promise<Map<number, { esperandoDesde?: Date; motivo?: string }>> {
   const mapa = new Map<number, { esperandoDesde?: Date; motivo?: string }>()
   if (ids.length === 0) return mapa
   // Ordem crescente e sobrescrita: o último registro de cada tarefa vence, que
   // é o que interessa — a espera ATUAL, não a primeira que já houve.
-  const logs = await prisma.logAuditoria.findMany({
+  const logs = await db.logAuditoria.findMany({
     where: { entidade: 'Tarefa', entidadeId: { in: ids }, acao: { in: ['TAREFA_AGUARDANDO_TERCEIRO', 'TAREFA_BLOQUEADA'] } },
     select: { entidadeId: true, acao: true, criadoEm: true, detalhes: true },
     orderBy: { criadoEm: 'asc' },
@@ -829,14 +849,15 @@ const SELECT_GERENCIAL = {
 export async function visaoGerencial(
   f: FiltrosGerenciais = {},
   agora = new Date(),
+  db: Leitor = prisma,
 ): Promise<{ linhas: LinhaGerencial[]; total: number; pagina: number; porPagina: number }> {
   const porPagina = Math.min(Math.max(f.porPagina ?? 200, 1), 500)
   const pagina = Math.max(f.pagina ?? 1, 1)
   const where = whereGerencial(f, agora)
 
   const [total, brutas] = await Promise.all([
-    prisma.tarefa.count({ where }),
-    prisma.tarefa.findMany({
+    db.tarefa.count({ where }),
+    db.tarefa.findMany({
       where,
       select: SELECT_GERENCIAL,
       orderBy: [{ dataPrazo: { sort: 'asc', nulls: 'last' } }, { prioridade: 'desc' }, { id: 'asc' }],
@@ -845,9 +866,14 @@ export async function visaoGerencial(
     }),
   ])
 
-  const [nomes, rotulos] = await Promise.all([nomesDasPessoas(brutas), rotulosDosPassos(brutas)])
+  // TUDO EM LOTE, e o número de consultas NÃO depende do número de linhas:
+  // uma contagem, uma página de tarefas, os nomes das pessoas, os rótulos dos
+  // passos e o contexto de parada. Cinco idas ao banco para 10 tarefas e cinco
+  // para 500.
+  const [nomes, rotulos] = await Promise.all([nomesDasPessoas(brutas, db), rotulosDosPassos(brutas, db)])
   const paradas = await contextoDeParada(
     brutas.filter((t) => t.statusTarefa === 'BLOQUEADA' || t.statusTarefa === 'AGUARDANDO_TERCEIRO').map((t) => t.id),
+    db,
   )
   const hoje = diaOperacional(agora)
 

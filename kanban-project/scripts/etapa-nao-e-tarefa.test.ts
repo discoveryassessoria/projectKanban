@@ -91,7 +91,14 @@ async function palco(sufixo: string, documentos: string[]) {
           status: i === 0 ? "DISPONIVEL" : "PENDENTE",
           necessidadeId: nec.id, documentoId: doc.id, pessoaId: pes.id, papel: "equipe_documental",
           slaDays: 5, ciclo: 1,
-          snapshot: { titulo: `${nomeDoc} — Teste Operacional`, label } as never,
+          // O SNAPSHOT DO PASSO GUARDA O RÓTULO DO PASSO.
+          //
+          // Aqui `titulo` carregava o nome do DOCUMENTO — o palco descrevia um
+          // dado que não existe: `construirSnapshotPasso` grava `titulo:
+          // def.label`, o rótulo publicado da etapa. Com o campo ocupado pelo
+          // nome do documento, a fila e a Central discordavam sobre a mesma
+          // etapa conforme qual das duas chaves cada uma lesse primeiro.
+          snapshot: { titulo: label, label, documento: `${nomeDoc} — Teste Operacional` } as never,
           chaveIdempotencia: `${MARCA}-s-${sufixo}-${d}-${i}-${proc.id}`,
         }, select: { id: true },
       })

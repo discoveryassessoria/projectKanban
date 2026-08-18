@@ -183,6 +183,10 @@ const AUTORIZADOS_FORA_DO_RUNTIME: Record<string, string> = {
   "scripts/central-fase-500-docs.test.ts":
     "escala da Central: monta e derruba a PRÓPRIA árvore (marca ESCALA500), só no banco de teste — " +
     "vinte e cinco pessoas com quinhentas certidões entre elas",
+  "scripts/palco-fila-operacional.ts":
+    "palco visual da Minha Fila: monta e derruba a PRÓPRIA árvore (marca PALCO-FILA), só no banco de teste — precisa de pessoas homônimas para a validação visual provar que \"Continuar\" abre a certidão certa",
+  "scripts/fila-ciclo-de-vida.test.ts":
+    "ciclo de vida da tarefa na fila: monta e derruba a PRÓPRIA árvore (marca FILA-CICLO), só no banco de teste — o palco precisa de pessoas homônimas para provar que a navegação abre o documento certo por ID, e não pelo título",
   "scripts/fase-nao-duplica-tarefa.test.ts":
     "mudança de fase não duplica tarefa: monta e derruba a PRÓPRIA árvore (marca FASEDUP), " +
     "só no banco de teste — reproduz o caso em que a mesma certidão virou duas tarefas vivas",

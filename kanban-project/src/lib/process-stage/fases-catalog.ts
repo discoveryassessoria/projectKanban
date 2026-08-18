@@ -275,6 +275,47 @@ export function getStepDef(
   return fase.steps.find((c) => c.stepKey === canonico || c.stepKey === stepKey)
 }
 /**
+ * O NOME HUMANO DE UM PASSO — uma resolução, todas as telas.
+ *
+ * O operador lê "Solicitar certidão". A chave técnica (`solicitar_certidao`)
+ * não é nome de nada: é identificador, e mostrá-la é o mesmo que mostrar o id.
+ *
+ * ─── POR QUE UMA CADEIA, E NÃO UM CAMPO ─────────────────────────────────────
+ * O rótulo pode estar em três lugares, e nenhum deles está sempre preenchido:
+ *
+ *   1. o SNAPSHOT da instância — o que o passo era quando foi materializado.
+ *      É a fonte mais fiel ao momento, e a que sobrevive a mudanças de cadastro.
+ *   2. a DEFINIÇÃO publicada — o rótulo de hoje, quando o snapshot não tem.
+ *   3. o CATÁLOGO da fase — o último recurso antes de desistir.
+ *
+ * A instância da Emissão Documental nasceu SEM `label` no snapshot: a Central
+ * caía no catálogo e mostrava "Solicitar certidão", a Minha Fila não caía e
+ * mostrava "solicitar_certidao". O mesmo passo, a mesma tarefa, dois nomes —
+ * e quem lê as duas telas conclui que são coisas diferentes.
+ *
+ * Devolver a `stepKey` continua sendo o fim da linha: é feio, mas é honesto, e
+ * inventar um nome bonito a partir dela esconderia a falta de cadastro.
+ */
+export function rotuloDoPasso(args: {
+  stepKey: string
+  /** `snapshot` da instância — aceita `titulo` e `label`, que convivem no dado real. */
+  snapshot?: unknown
+  /** Rótulo da definição publicada, quando quem chama já o resolveu em lote. */
+  labelPublicado?: string | null
+  faseCode?: FaseCode | null
+}): string {
+  const snap = args.snapshot
+  if (snap && typeof snap === "object") {
+    for (const chave of ["titulo", "label"] as const) {
+      const v = (snap as Record<string, unknown>)[chave]
+      if (typeof v === "string" && v.trim()) return v
+    }
+  }
+  if (args.labelPublicado && args.labelPublicado.trim()) return args.labelPublicado
+  return getStepDef(args.faseCode ?? null, args.stepKey)?.title ?? args.stepKey
+}
+
+/**
  * O RÓTULO DA FASE A PARTIR DA `phaseKey` — para quem só tem a chave gravada.
  *
  * A Tarefa guarda `faseMacroKey` (a chave), não o rótulo. Telas que precisavam

@@ -68,9 +68,18 @@ export function urgencia(l: LinhaOperacional): { texto: string; tom: "critico" |
 /**
  * A AÇÃO PRINCIPAL — UMA por cartão, decidida pelo estado.
  *
- * `iniciar` chama a porta canônica ANTES de navegar; as demais só navegam. E
- * "Requer decisão" não diz Continuar: continuar sugere executar, e essa tarefa
- * perdeu a causa — o que ela precisa é de alguém decidir o que fazer com ela.
+ * O rótulo diz o que vai acontecer, e o `comando` diz se algo é ESCRITO:
+ *
+ *   A FAZER              Iniciar tarefa   → comanda (assume o trabalho)
+ *   EM ANDAMENTO         Continuar        → só navega
+ *   AGUARDANDO TERCEIRO  Ver etapa        → só navega
+ *   BLOQUEADA            Ver bloqueio     → só navega
+ *   CONCLUÍDA            Ver histórico    → só navega
+ *   causa removida       Ver decisão      → só navega
+ *
+ * "Continuar" nunca aparece para uma tarefa que ninguém começou, e "Requer
+ * decisão" não diz Continuar: continuar sugere executar, e essa tarefa perdeu a
+ * causa — o que ela precisa é de alguém decidir o que fazer com ela.
  */
 export function acaoPrincipal(l: LinhaOperacional): { rotulo: string; comando: "iniciar" | null } {
   if (l.requerDecisao) return { rotulo: "Ver decisão", comando: null }
@@ -214,12 +223,11 @@ function CartaoDaFila({
     <div className={`border-b border-l-2 border-white/[0.06] px-4 py-3 transition-colors last:border-b-0 hover:bg-white/[0.02] ${corDaBorda}`}>
       <div className="flex items-start justify-between gap-4">
         {/* O CARTÃO LEVA AO TRABALHO — E SÓ LEVA.
-            Clicar no cartão e clicar no botão chegam ao MESMO lugar (a Central
-            Operacional do processo, no documento certo), mas não fazem a mesma
-            coisa: ABRIR é olhar, INICIAR é assumir. O cartão inteiro chamando o
-            comando fazia passar os olhos numa tarefa marcá-la como começada —
-            com data de início, evento e prazo correndo — sem ninguém ter
-            decidido nada. */}
+            Clicar no cartão nunca comanda: leva à Central Operacional do
+            processo, no documento certo. O cartão inteiro chamando o comando
+            fazia passar os olhos numa tarefa marcá-la como começada — com data
+            de início, evento e prazo correndo — sem ninguém ter decidido nada.
+            Assumir é ato explícito, e tem botão próprio. */}
         <button type="button" onClick={aoAbrir} className="min-w-0 flex-1 cursor-pointer text-left">
           <div className="flex flex-wrap items-center gap-2">
             <span className="truncate text-[13px] font-medium text-white/90">{l.titulo}</span>
@@ -362,23 +370,38 @@ export function CentralTarefas({ podeDistribuir }: { podeDistribuir: boolean }) 
   /**
    * ONDE O TRABALHO ACONTECE — a Minha Fila não executa.
    *
-   * Iniciar é uma transição, e ela acontece ANTES da navegação: quem chega à
-   * Central chega com a tarefa já em andamento. Depois disso, o deep-link
-   * canônico leva ao processo, na Central, com a tarefa a ser localizada lá —
-   * a MESMA função que o Kanban e a visão global usam.
-   *
-   * Tarefa que perdeu a causa não é iniciada: ela precisa de decisão, e abrir o
-   * executor para ela seria tratá-la como trabalho normal.
+   * O deep-link canônico leva ao processo, na Central, no documento e na etapa
+   * daquela tarefa. É a MESMA função que o Kanban, a visão global e as
+   * notificações usam — a fila não monta rota própria.
    */
   const abrirOTrabalho = useCallback((l: LinhaOperacional) => {
     router.push(urlOperacionalDaTarefa({ taskId: l.taskId, processoId: l.processoId }))
   }, [router])
 
+  /**
+   * A AÇÃO PRINCIPAL DO CARTÃO — e por que INICIAR não navega.
+   *
+   * Iniciar e continuar são gestos diferentes e param em lugares diferentes:
+   *
+   *   INICIAR    assume o trabalho. Fica na fila, e o cartão vira "Continuar" —
+   *              quem acabou de assumir cinco tarefas da manhã não quer ser
+   *              jogado para dentro do processo a cada clique.
+   *   CONTINUAR  vai trabalhar. Aí sim sai da fila e chega à etapa.
+   *
+   * Isto também torna o estado VISÍVEL: começar e ser levado embora no mesmo
+   * clique escondia a transição, e "A fazer → Em andamento" acontecia numa tela
+   * que o funcionário nunca via.
+   *
+   * Tarefa que perdeu a causa não é iniciada: ela precisa de decisão, e tratá-la
+   * como trabalho normal seria responder à pergunta errada.
+   */
   const irParaOTrabalho = useCallback(async (l: LinhaOperacional) => {
     const acao = acaoPrincipal(l)
     if (acao.comando === "iniciar") {
-      const ok = await comandar(l.taskId, { acao: "iniciar" }, "Tarefa iniciada.")
-      if (!ok) return
+      // A fila recarrega no sucesso (`comandar`), e o cartão passa a oferecer
+      // Continuar. Sem F5, sem navegação.
+      await comandar(l.taskId, { acao: "iniciar" }, "Tarefa iniciada — agora use “Continuar” para trabalhar nela.")
+      return
     }
     abrirOTrabalho(l)
   }, [comandar, abrirOTrabalho])

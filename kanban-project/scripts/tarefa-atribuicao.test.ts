@@ -160,10 +160,15 @@ async function main() {
   // ═════════════════════════════════════════════════════════════════════════
   secao("Concorrência — dois gestores ao mesmo tempo")
   // ═════════════════════════════════════════════════════════════════════════
+  // OS DOIS DESTINOS SÃO NOVOS de propósito. Um deles era o dono ATUAL, e aí o
+  // perdedor podia falhar por "já é dessa pessoa" em vez de por conflito — o
+  // teste passava ou não conforme a ordem em que as duas transações rodassem, e
+  // uma falha intermitente ensina a equipe a reexecutar em vez de investigar.
+  const terceiro = await usuario("Terceiro")
   const versao = (await prisma.tarefa.findUniqueOrThrow({ where: { id: p.tarefaId }, select: { lockVersion: true } })).lockVersion
   const [a, b] = await Promise.all([
     atribuirTarefa({ tarefaId: p.tarefaId, responsavelId: daniela.id, autorId: gestor.id, lockVersion: versao }),
-    atribuirTarefa({ tarefaId: p.tarefaId, responsavelId: joao.id, autorId: joao.id, lockVersion: versao }),
+    atribuirTarefa({ tarefaId: p.tarefaId, responsavelId: terceiro.id, autorId: gestor.id, lockVersion: versao }),
   ])
   ok("só um dos dois vence", [a.ok, b.ok].filter(Boolean).length === 1, `${a.ok}/${b.ok}`)
   const perdedor = a.ok ? b : a

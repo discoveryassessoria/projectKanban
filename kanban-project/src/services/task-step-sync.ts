@@ -14,7 +14,7 @@ import { resolveWorkflowRuntime } from "@/src/lib/workflow-runtime"
 import * as H from "@/src/services/task-step-sync-helpers"
 import { projetarTarefaDoPasso, assegurarCoerenciaPassoTarefa } from "@/src/services/passo-tarefa-projecao"
 import { processarOutbox } from "@/src/services/outbox-dispatcher"
-import { estadoDerivado, sincronizarTarefaComWorkflow } from "@/lib/operacional/tarefa-canonica"
+import { escopoDaUnidade, estadoDerivado, sincronizarTarefaComWorkflow } from "@/lib/operacional/tarefa-canonica"
 
 const TAREFA_CONCLUIDA_STATUS = "CONCLUIDO_RECEBIDO"
 const TAREFA_CONCLUIDA_SET = new Set<string>(["CONCLUIDO_RECEBIDO", "CONCLUIDO_NAO_POSSUI"])
@@ -29,11 +29,22 @@ const TAREFA_CONCLUIDA_SET = new Set<string>(["CONCLUIDO_RECEBIDO", "CONCLUIDO_N
 async function statusDerivadoDaTarefa(tx: TX, tarefaId: number): Promise<string | null> {
   const t = await tx.tarefa.findUnique({
     where: { id: tarefaId },
-    select: { workflowInstanceId: true, dataInicio: true },
+    select: {
+      workflowInstanceId: true, dataInicio: true,
+      // A UNIDADE. Sem ela a conta lia os passos da FASE inteira: numa Emissão
+      // com quatro certidões, a tarefa de uma só concluía quando as outras três
+      // concluíssem, e ficava BLOQUEADA porque a certidão de outra pessoa travou.
+      necessidadeId: true, documentoId: true, workflowStepInstanceId: true,
+    },
   })
   if (!t?.workflowInstanceId) return null
   const steps = await tx.phaseWorkflowStepInstance.findMany({
-    where: { workflowInstanceId: t.workflowInstanceId },
+    where: escopoDaUnidade({
+      workflowInstanceId: t.workflowInstanceId,
+      necessidadeId: t.necessidadeId,
+      documentoId: t.documentoId,
+      workflowStepInstanceId: t.workflowStepInstanceId,
+    }),
     select: { id: true, status: true, obrigatorio: true, ordem: true, stepKey: true },
     orderBy: { ordem: "asc" },
   })
@@ -224,11 +235,36 @@ export async function transicionarPassoTx(
  */
 export async function ativarProximoPassoTx(
   tx: TX,
-  args: { workflowInstanceId: number; ordemConcluida: number },
+  args: {
+    workflowInstanceId: number
+    ordemConcluida: number
+    /**
+     * A UNIDADE do passo concluído — a obrigação a que ele pertence.
+     *
+     * Sem ela, "a próxima etapa" era a primeira PENDENTE da INSTÂNCIA com ordem
+     * maior. A instância é da FASE: numa Emissão com quatro certidões há quatro
+     * passos de ordem 2 pendentes, e concluir "Solicitar certidão" do Ademir
+     * abria "Aguardar retorno" da Tereza. O empate era resolvido pelo acaso do
+     * `orderBy`, e o trabalho do Ademir ficava parado com todas as etapas
+     * pendentes enquanto a tarefa dele apontava para o documento de outra pessoa.
+     *
+     * Quem conclui SEMPRE conhece a unidade: ela vem do próprio passo.
+     */
+    necessidadeId?: number | null
+    documentoId?: number | null
+  },
   o: Omit<TransicaoPassoOpts, "ciclo" | "processoId" | "workflowInstanceId">,
 ): Promise<number | null> {
   const proxima = await tx.phaseWorkflowStepInstance.findFirst({
-    where: { workflowInstanceId: args.workflowInstanceId, status: "PENDENTE", ordem: { gt: args.ordemConcluida } },
+    where: {
+      ...escopoDaUnidade({
+        workflowInstanceId: args.workflowInstanceId,
+        necessidadeId: args.necessidadeId,
+        documentoId: args.documentoId,
+      }),
+      status: "PENDENTE",
+      ordem: { gt: args.ordemConcluida },
+    },
     select: { id: true, ciclo: true, processoId: true },
     orderBy: { ordem: "asc" },
   })
@@ -612,8 +648,18 @@ export async function concluirPasso(stepInstanceId: number, ctx: SyncContexto): 
         // conclusão vinda daqui fechava a etapa e o trabalho parava com todas
         // as seguintes PENDENTES.
         if (rc.changed && step.workflowInstanceId != null) {
-          const ativada = await ativarProximoPassoTx(tx, { workflowInstanceId: step.workflowInstanceId, ordemConcluida: step.ordem },
-            { correlationId, operacao: "step-complete-proximo" })
+          const ativada = await ativarProximoPassoTx(
+            tx,
+            {
+              workflowInstanceId: step.workflowInstanceId,
+              ordemConcluida: step.ordem,
+              // A PRÓXIMA ETAPA É DESTE DOCUMENTO. O passo concluído sabe de
+              // qual obrigação é; a instância, não.
+              necessidadeId: step.necessidadeId,
+              documentoId: step.documentoId,
+            },
+            { correlationId, operacao: "step-complete-proximo" },
+          )
           if (ativada != null) eventos.push("PASSO_DISPONIBILIZADO")
         }
       }

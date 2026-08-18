@@ -67,6 +67,24 @@ function ok(cond: boolean, nome: string, detalhe?: string) {
   else { failed++; violacoes.push(detalhe ? `${nome} — ${detalhe}` : nome); console.log(`  ❌ ${nome}${detalhe ? ` — ${detalhe}` : ""}`) }
 }
 
+// ESCREVER É `data:`. Um campo com o mesmo nome dentro do ARGUMENTO de uma
+// função é leitura repassada, não mutação — `buildSlaProjection({ faseAtualKey:
+// proc.faseAtualKey, … })` lê a fase para projetar SLA e não escreve nada. O
+// guard reprovava isso, e uma guarda que acusa leitura ensina a equipe a
+// ignorá-la: quando ela apontar uma escrita de verdade, ninguém vai acreditar.
+//
+// A janela é curta de propósito. Ela não entende TypeScript — o que segura a
+// regra continua sendo a ALLOWLIST, que só encolhe; isto só evita o falso
+// positivo mais óbvio.
+const JANELA_DATA = 8
+const dentroDeEscritaPrisma = (linhas: string[], i: number): boolean => {
+  for (let k = i; k >= Math.max(0, i - JANELA_DATA); k--) {
+    if (/\bdata\s*:\s*\{/.test(linhas[k])) return true
+    if (/\.(update|updateMany|create|createMany|upsert)\s*\(/.test(linhas[k])) return true
+  }
+  return false
+}
+
 console.log("\nGUARDA — escrita direta de faseAtualKey")
 for (const file of walk(SRC)) {
   const rel = relative(ROOT, file)
@@ -76,6 +94,7 @@ for (const file of walk(SRC)) {
     if (!FASE_WRITE.test(semComentario)) return
     if (FASE_WRITE_FALSE_POSITIVE.test(semComentario)) return
     if (ALLOWLIST_FASE_WRITE.has(rel)) return
+    if (!dentroDeEscritaPrisma(linhas, i)) return
     ok(false, `escrita direta de faseAtualKey proibida`, `${rel}:${i + 1}`)
   })
 }

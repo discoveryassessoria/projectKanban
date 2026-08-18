@@ -303,6 +303,64 @@ export function estadoDerivado(
   return { status: 'NAO_INICIADA', motivo: 'nenhuma etapa iniciada' }
 }
 
+/**
+ * OS PASSOS DESTA UNIDADE DE TRABALHO — não os da fase inteira.
+ *
+ * A instância do workflow é da FASE, e a fase abriga UMA tarefa por unidade:
+ * quatro certidões de uma Emissão Documental são quatro tarefas dentro da mesma
+ * instância, com os mesmos cinco `stepKey` repetidos quatro vezes.
+ *
+ * Ler todos os passos da instância mistura o trabalho de pessoas diferentes, e
+ * o efeito não é sutil:
+ *
+ *   • a "etapa atual" da certidão do Ademir vira o passo aberto da certidão da
+ *     Tereza — e o "Continuar" da fila abre o documento errado;
+ *   • o estado derivado da tarefa dele passa a depender do que falta na dela:
+ *     a tarefa só conclui quando TODAS as certidões concluírem, e fica
+ *     "bloqueada" porque a certidão de outra pessoa travou;
+ *   • a checagem de dependência casa `solicitar_certidao` de outro documento,
+ *     e recusa ou libera a etapa por causa de trabalho alheio.
+ *
+ * O filtro é a OBRIGAÇÃO — a mesma coisa que dá identidade à tarefa
+ * (`identidade-da-tarefa`). Um passo administrativo de fase não tem obrigação;
+ * ali a unidade é o próprio passo da tarefa, e sem nem isso são os passos que
+ * também não têm alvo nenhum.
+ */
+export function escopoDaUnidade(u: {
+  workflowInstanceId: number
+  necessidadeId?: number | null
+  documentoId?: number | null
+  workflowStepInstanceId?: number | null
+}): Prisma.PhaseWorkflowStepInstanceWhereInput {
+  const porObrigacao: Prisma.PhaseWorkflowStepInstanceWhereInput[] = []
+  if (u.necessidadeId != null) porObrigacao.push({ necessidadeId: u.necessidadeId })
+  if (u.documentoId != null) porObrigacao.push({ documentoId: u.documentoId })
+  return {
+    workflowInstanceId: u.workflowInstanceId,
+    ...(porObrigacao.length > 0
+      ? { OR: porObrigacao }
+      : u.workflowStepInstanceId != null
+        ? { id: u.workflowStepInstanceId }
+        : { necessidadeId: null, documentoId: null }),
+  }
+}
+
+/** A unidade a que um PASSO pertence — lida do próprio passo, nunca inferida. */
+export function unidadeDoPasso(p: {
+  workflowInstanceId: number | null
+  necessidadeId?: number | null
+  documentoId?: number | null
+  id?: number
+}): { workflowInstanceId: number; necessidadeId: number | null; documentoId: number | null; workflowStepInstanceId: number | null } | null {
+  if (p.workflowInstanceId == null) return null
+  return {
+    workflowInstanceId: p.workflowInstanceId,
+    necessidadeId: p.necessidadeId ?? null,
+    documentoId: p.documentoId ?? null,
+    workflowStepInstanceId: p.id ?? null,
+  }
+}
+
 /** A etapa que a tarefa mostra: a primeira viva na ordem do workflow. */
 export function etapaCorrente<T extends { status: string; ordem: number; id: number }>(steps: T[]): T | null {
   const prioridade = ['EM_ANDAMENTO', 'AGUARDANDO_APROVACAO', 'EXECUTADO', 'AGUARDANDO', 'BLOQUEADO', 'DISPONIVEL', 'PENDENTE']
@@ -356,29 +414,15 @@ export async function sincronizarTarefaComWorkflow(
     return { mudou: false, status: tarefa.statusTarefa, stepAtualId: tarefa.workflowStepInstanceId }
   }
 
-  // OS PASSOS DA UNIDADE — não os da instância inteira.
-  //
-  // A instância é da FASE, e a fase abriga uma tarefa por unidade de trabalho:
-  // quatro certidões de uma Emissão Documental são quatro tarefas dentro da
-  // MESMA instância. Ler todos os passos da instância misturava o trabalho de
-  // pessoas diferentes: a "etapa atual" da certidão do Ademir virava o passo
-  // aberto da certidão de outra pessoa, e o estado derivado da tarefa dele
-  // passava a depender do que faltava na dela.
-  //
-  // O filtro é a obrigação — a mesma que dá identidade à tarefa. Sem obrigação
-  // (passo administrativo de fase), a unidade é o próprio passo da tarefa.
-  const daUnidade: Prisma.PhaseWorkflowStepInstanceWhereInput[] = []
-  if (tarefa.necessidadeId != null) daUnidade.push({ necessidadeId: tarefa.necessidadeId })
-  if (tarefa.documentoId != null) daUnidade.push({ documentoId: tarefa.documentoId })
+  // OS PASSOS DA UNIDADE — não os da instância inteira. A regra mora em
+  // `escopoDaUnidade`, e é a MESMA que a conclusão de etapa e o motor usam.
   const steps = await tx.phaseWorkflowStepInstance.findMany({
-    where: {
+    where: escopoDaUnidade({
       workflowInstanceId: tarefa.workflowInstanceId,
-      ...(daUnidade.length > 0
-        ? { OR: daUnidade }
-        : tarefa.workflowStepInstanceId != null
-          ? { id: tarefa.workflowStepInstanceId }
-          : { necessidadeId: null, documentoId: null }),
-    },
+      necessidadeId: tarefa.necessidadeId,
+      documentoId: tarefa.documentoId,
+      workflowStepInstanceId: tarefa.workflowStepInstanceId,
+    }),
     select: { id: true, status: true, obrigatorio: true, ordem: true, stepKey: true },
     orderBy: { ordem: 'asc' },
   })

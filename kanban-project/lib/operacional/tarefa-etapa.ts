@@ -21,7 +21,7 @@
 import { randomUUID } from 'crypto'
 import { prisma } from '@/lib/prisma'
 import type { Prisma } from '@prisma/client'
-import { STATUS_TERMINAIS, estadoDerivado, etapaCorrente } from './tarefa-canonica'
+import { STATUS_TERMINAIS, escopoDaUnidade, estadoDerivado, etapaCorrente } from './tarefa-canonica'
 import { transicionarPassoTx, ativarProximoPassoTx, aplicarTarefaTx } from '@/src/services/task-step-sync'
 import { assegurarCoerenciaPassoTarefa } from '@/src/services/passo-tarefa-projecao'
 import { processarOutbox } from '@/src/services/outbox-dispatcher'
@@ -118,6 +118,9 @@ export async function concluirEtapa(args: {
       select: {
         id: true, titulo: true, statusTarefa: true, workflowInstanceId: true,
         workflowStepInstanceId: true, dataInicio: true, dataConclusao: true, lockVersion: true,
+        // A UNIDADE DE TRABALHO. Sem ela esta porta lia os passos da FASE
+        // inteira — ver o comentário da consulta abaixo.
+        necessidadeId: true, documentoId: true,
       },
     })
     if (!tarefa) return { ok: false as const, codigo: 'TAREFA_NAO_ENCONTRADA' as const, mensagem: 'Tarefa não existe.' }
@@ -152,11 +155,27 @@ export async function concluirEtapa(args: {
       }
     }
 
+    // OS PASSOS DESTA UNIDADE — não os da instância inteira.
+    //
+    // A instância é da FASE e abriga uma tarefa por certidão. Lendo todos os
+    // passos dela, esta porta misturava o trabalho de pessoas diferentes em
+    // QUATRO lugares de uma vez: a etapa corrente era a de outro documento, a
+    // dependência casava `solicitar_certidao` alheio, o estado derivado da
+    // tarefa dependia do que faltava nas outras certidões, e o ponteiro da
+    // etapa acabava apontando para o documento de outra pessoa — que é
+    // exatamente o que o "Continuar" da fila abriria.
+    //
+    // O escopo é o mesmo que a sincronização canônica usa; ele mora num lugar só.
     const steps = await tx.phaseWorkflowStepInstance.findMany({
-      where: { workflowInstanceId: tarefa.workflowInstanceId },
+      where: escopoDaUnidade({
+        workflowInstanceId: tarefa.workflowInstanceId,
+        necessidadeId: tarefa.necessidadeId,
+        documentoId: tarefa.documentoId,
+        workflowStepInstanceId: tarefa.workflowStepInstanceId,
+      }),
       select: {
         id: true, status: true, obrigatorio: true, ordem: true, stepKey: true,
-        documentoId: true, processoId: true, dependeDeStepKeys: true, ciclo: true,
+        documentoId: true, necessidadeId: true, processoId: true, dependeDeStepKeys: true, ciclo: true,
       },
       orderBy: { ordem: 'asc' },
     })
@@ -252,7 +271,14 @@ export async function concluirEtapa(args: {
     const depois = steps.map((s) => (s.id === alvo.id ? { ...s, status: 'CONCLUIDO' } : s))
     const ativadaId = await ativarProximoPassoTx(
       tx,
-      { workflowInstanceId: tarefa.workflowInstanceId, ordemConcluida: alvo.ordem },
+      {
+        workflowInstanceId: tarefa.workflowInstanceId,
+        ordemConcluida: alvo.ordem,
+        // A próxima etapa é a DESTE documento. A unidade vem do passo que
+        // acabou de fechar — ele sabe de qual obrigação é.
+        necessidadeId: alvo.necessidadeId,
+        documentoId: alvo.documentoId,
+      },
       { correlationId, operacao: 'tarefa-ativar-proxima-etapa' },
     )
     const proxima = ativadaId != null ? depois.find((s) => s.id === ativadaId) : undefined

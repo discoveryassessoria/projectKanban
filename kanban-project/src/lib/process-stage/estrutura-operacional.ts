@@ -38,7 +38,7 @@ import {
   type StatusResumo,
   type TarefasPorChave,
 } from "./estrutura-operacional-core"
-import { getStepsForFase, getStepDef, phaseKeyToFaseCode } from "./fases-catalog"
+import { getStepDef, phaseKeyToFaseCode, rotuloDoPasso } from "./fases-catalog"
 import { diasEntreDiasOperacionais } from "@/lib/operacional/tempo-operacional"
 import {
   chaveDaUnidade,
@@ -393,16 +393,12 @@ export async function getPhaseOperationalStructure(
   // 4) RÓTULOS — do SNAPSHOT publicado; catálogo e stepKey só como último recurso.
   // ------------------------------------------------------------
   const faseCode = phaseKeyToFaseCode(ctx.faseMacroKey)
-  const catalogo = faseCode ? getStepsForFase(faseCode as FaseCode) : []
-  const tituloDoPasso = (stepKey: string, snapshot: unknown): string => {
-    if (snapshot && typeof snapshot === "object") {
-      for (const chave of ["titulo", "label"] as const) {
-        const v = (snapshot as Record<string, unknown>)[chave]
-        if (typeof v === "string" && v.trim()) return v
-      }
-    }
-    return catalogo.find((c) => c.stepKey === stepKey)?.title ?? stepKey
-  }
+  // A RESOLUÇÃO DO NOME DO PASSO É A MESMA DA MINHA FILA — uma função, duas
+  // telas. Enquanto cada uma tinha a sua, a Central caía no catálogo e a fila
+  // não: o mesmo passo aparecia como "Solicitar certidão" aqui e
+  // "solicitar_certidao" lá.
+  const tituloDoPasso = (stepKey: string, snapshot: unknown): string =>
+    rotuloDoPasso({ stepKey, snapshot, faseCode: faseCode as FaseCode | null })
 
   // NOME DA OBRIGAÇÃO — do Cadastro Mestre quando a regra aponta para um único
   // documento aceito. `matrizSnapshot.requisito` é texto administrativo da regra

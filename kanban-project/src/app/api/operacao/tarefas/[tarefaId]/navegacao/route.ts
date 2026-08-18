@@ -19,7 +19,7 @@ import { type NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { verificarPermissao } from '@/src/lib/verificar-permissao'
 import { negarSeNaoForDonoDaTarefa } from '@/src/lib/tarefa-acesso'
-import type { AlvoResolvido } from '@/lib/operacional/navegacao'
+import { resolverAlvoDaTarefa } from '@/lib/operacional/navegacao'
 
 export async function GET(request: NextRequest, ctx: { params: Promise<{ tarefaId: string }> }) {
   const taskId = Number((await ctx.params).tarefaId)
@@ -29,38 +29,17 @@ export async function GET(request: NextRequest, ctx: { params: Promise<{ tarefaI
   const erro = await verificarPermissao(request, 'tarefas.ver')
   if (erro) return erro
 
-  const t = await prisma.tarefa.findUnique({
-    where: { id: taskId },
-    select: {
-      id: true, titulo: true, processoId: true, pessoaId: true, documentoId: true,
-      necessidadeId: true, workflowInstanceId: true, workflowStepInstanceId: true,
-      statusTarefa: true, causaRemovidaEm: true, causaRemovidaMotivo: true, responsavelId: true,
-      workflowStepInstance: { select: { pessoaId: true, documentoId: true } },
-    },
-  })
+  // A RESOLUÇÃO MORA NO DOMÍNIO, não na rota. Uma cópia aqui e outra num teste
+  // divergiriam no primeiro campo novo — e "abriu o documento errado" é o tipo
+  // de defeito que ninguém liga à segunda cópia.
+  const { alvo, responsavelId } = await resolverAlvoDaTarefa(prisma, taskId)
   // NÃO EXISTE e NÃO POSSO VER respondem a mesma coisa de propósito: distinguir
   // as duas ensina quem sonda a URL a mapear o que existe do outro lado.
-  if (!t || t.processoId == null) {
+  if (!alvo) {
     return NextResponse.json({ error: 'tarefa não encontrada' }, { status: 404 })
   }
-  const negado = await negarSeNaoForDonoDaTarefa(request, t.responsavelId)
+  const negado = await negarSeNaoForDonoDaTarefa(request, responsavelId)
   if (negado) return negado
 
-  const alvo: AlvoResolvido = {
-    taskId: t.id,
-    processoId: t.processoId,
-    // O passo é mais específico que a tarefa: quando ele nomeia a pessoa ou o
-    // documento, é ele que diz onde a Central deve parar.
-    pessoaId: t.workflowStepInstance?.pessoaId ?? t.pessoaId ?? null,
-    documentoId: t.workflowStepInstance?.documentoId ?? t.documentoId ?? null,
-    necessidadeId: t.necessidadeId,
-    workflowInstanceId: t.workflowInstanceId,
-    stepInstanceId: t.workflowStepInstanceId,
-    statusTarefa: t.statusTarefa,
-    requerDecisao: t.causaRemovidaEm != null,
-    // Pedir uma decisão sem dizer o que aconteceu é pedir um chute.
-    causaRemovidaMotivo: t.causaRemovidaMotivo,
-    titulo: t.titulo,
-  }
   return NextResponse.json({ alvo })
 }
