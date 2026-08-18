@@ -28,6 +28,7 @@ async function limpar() {
   const ids = procs.map((p) => p.id)
   await prisma.phaseWorkflowStepInstance.deleteMany({ where: { processoId: { in: ids } } })
   await prisma.phaseWorkflowInstance.deleteMany({ where: { processoId: { in: ids } } })
+  await prisma.tarefa.deleteMany({ where: { processoId: { in: ids } } })
   await prisma.necessidadeDocumental.deleteMany({ where: { processoId: { in: ids } } })
   await prisma.documento.deleteMany({ where: { descricao: { startsWith: MARCA } } })
   for (const p of procs) if (p.arvoreId) await prisma.pessoa.deleteMany({ where: { arvoreId: p.arvoreId } })
@@ -49,8 +50,31 @@ async function main() {
     select: { id: true },
   })
   const arvore = await prisma.arvore.create({ data: { nome: `${MARCA} árvore` }, select: { id: true } })
+  // O PALCO PRECISA CABER NO QUADRO.
+  //
+  // O processo nascia com `pais: 'espanha'` fixo e sem tipo. O Kanban desenha as
+  // colunas a partir do CatalogoPais ativo e do TipoProcessoNacionalidade — num
+  // banco de teste que só tem Itália cadastrada, o palco existia no banco e não
+  // aparecia em quadro nenhum, e a validação visual não tinha o que abrir.
+  // Agora ele nasce no primeiro país/tipo que o quadro realmente oferece.
+  const tipo = await prisma.tipoProcessoNacionalidade.findFirst({
+    where: { ativo: true, arquivado: false },
+    orderBy: { id: 'asc' },
+    select: { id: true, countryKey: true },
+  })
+  if (!tipo) {
+    console.error('❌ o banco de teste não tem TipoProcessoNacionalidade ativo — o quadro não teria coluna para o palco.')
+    process.exit(1)
+  }
   const processo = await prisma.processo.create({
-    data: { nome: `${MARCA} Família`, pais: 'espanha', arvoreId: arvore.id, workflowRuntime: 'v2', faseAtualKey: FASE },
+    data: {
+      nome: `${MARCA} Família`,
+      pais: tipo.countryKey,
+      tipoProcessoMotorId: tipo.id,
+      arvoreId: arvore.id,
+      workflowRuntime: 'v2',
+      faseAtualKey: FASE,
+    },
     select: { id: true },
   })
   const instancia = await prisma.phaseWorkflowInstance.create({
@@ -118,10 +142,36 @@ async function main() {
         chaveIdempotencia: `${MARCA}-s-${i}-${j}`,
       })),
     })
+
+    // A TAREFA DA UNIDADE — responsável, prazo e status da LINHA saem dela.
+    // Um palco sem tarefa desenharia uma fase que não existe.
+    if (feitos < PASSOS.length) {
+      await prisma.tarefa.create({
+        data: {
+          titulo: `Certidão de Nascimento · Pessoa ${i}`,
+          processoId: processo.id,
+          faseMacroKey: FASE,
+          workflowInstanceId: instancia.id,
+          necessidadeId: nec.id,
+          documentoId: doc.id,
+          pessoaId,
+          ciclo: 1,
+          equipeKey: 'equipe_documental',
+          responsavelId: faixa % 3 !== 0 ? dani.id : null,
+          dataPrazo: faixa === 8 ? new Date(agora.getTime() - 2 * 86400000) : new Date(agora.getTime() + 5 * 86400000),
+          statusTarefa: (faixa === 5 ? 'AGUARDANDO_TERCEIRO'
+            : faixa === 6 ? 'BLOQUEADA'
+            : faixa === 7 ? 'EM_ANDAMENTO'
+            : feitos > 0 ? 'EM_ANDAMENTO'
+            : 'NAO_INICIADA') as never,
+          chaveIdempotencia: `unidade|proc${processo.id}|nec${nec.id}|pes${pessoaId}|c1`,
+        },
+      })
+    }
   }
 
 
-  console.log(JSON.stringify({ processoId: processo.id, documentos: TOTAL, pessoas: PESSOAS }))
+  console.log(JSON.stringify({ processoId: processo.id, pais: tipo.countryKey, documentos: TOTAL, pessoas: PESSOAS }))
 }
 
 void main().finally(() => prisma.$disconnect())

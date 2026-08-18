@@ -145,12 +145,23 @@ if (await ordem.count()) {
 // ═══════════════════════════════════════════════════════════════════════════
 secao("§15 · A linha abre o painel do documento — a porta de sempre")
 // ═══════════════════════════════════════════════════════════════════════════
-const acao = page.getByRole("button", { name: /^(Abrir|Continuar|Ver etapa|Ver bloqueio|Ver detalhes)$/ }).first()
+const acao = page.getByRole("button", { name: /^(Iniciar|Continuar|Ver etapa|Ver bloqueio|Ver detalhes)$/ }).first()
 if (await acao.count()) {
   await acao.click()
-  await page.waitForTimeout(4000)
+  await page.waitForTimeout(5000)
   const painel = await page.locator("body").innerText()
   ok("§15) o painel operacional do documento abriu", /Workflow|Anexos|Observações/i.test(painel))
+  // ITEM 1 §7/§9/§28 — a ação leva DIRETO ao workflow daquele documento. O
+  // painel entrava por uma aba "Operação" que repetia a linha inteira e ainda
+  // exigia mais um clique: uma Central dentro da Central.
+  ok("§7) não existe mais a aba 'Operação' no painel do documento",
+    !(await page.getByRole("button", { name: /^Operação$/ }).count()))
+  ok("§9) e o painel já mostra o WORKFLOW do documento",
+    /Central da Etapa|etapas ·|concluídas/i.test(painel))
+  ok("§12) com a etapa atual à vista", /Solicitar certidão|Aguardar retorno do cartório|Receber certidão|Conferir certidão|Validar certidão/.test(painel))
+  // ITEM 1 §2 — o cabeçalho do painel mostra a MESMA pessoa que a linha.
+  ok("§2) o responsável do painel não contradiz a linha",
+    /Daniela Brait|Não atribuído/.test(painel))
   await page.screenshot({ path: `${OUT}/5-documento.png` })
 } else {
   ok("§15) o painel operacional do documento abriu", false, "nenhuma ação de linha encontrada")
