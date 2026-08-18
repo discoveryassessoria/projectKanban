@@ -297,6 +297,8 @@
     "test:guard-tarefa": "tsx scripts/guard-tarefa-operacional.test.ts",
     "test:tarefa-atribuicao": "tsx scripts/tarefa-atribuicao.test.ts",
     "test:motor-fases-tarefas": "tsx scripts/motor-operacional-fases.test.ts",
+    "reparar:passo-duplicado": "tsx scripts/reparar-passo-duplicado.ts",
+    "test:progresso-coerencia": "tsx scripts/progresso-coerencia.test.ts",
     "test:portas-tarefa": "tsx scripts/portas-tarefa.test.ts",
     "test:concluir-etapa": "tsx scripts/concluir-etapa.test.ts",
     "test:equivalencia-portas": "tsx scripts/equivalencia-portas-etapa.test.ts",

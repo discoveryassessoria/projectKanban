@@ -192,7 +192,32 @@ export async function materializarGenealogia(processoId: number, db: DB = prisma
       // A distinção vem do perfil cadastrado, não de uma lista de exceções.
       if (instancia && recebeWorkflowOperacional(tipoDoc)) {
         const chave = chaveStep(necessidade.id, instancia.ciclo)
-        const existente = await db.phaseWorkflowStepInstance.findUnique({ where: { chaveIdempotencia: chave }, select: { id: true } })
+        // CONVERGÊNCIA PELA IDENTIDADE LÓGICA, não pela string da chave.
+        //
+        // O passo desta obrigação pode já ter sido criado pelo materializador do
+        // WORKFLOW PUBLICADO, que usa outro formato de chave
+        // (`wfi…|stepdef…|…`). Procurar só por `matdoc|…` não encontra nada — e
+        // então este caminho cria um SEGUNDO passo para a mesma obrigação, na
+        // mesma instância e no mesmo ciclo.
+        //
+        // Foi o que aconteceu no processo 523: `localizar_registro` da
+        // necessidade 190 existia duas vezes na instância 300, um CONCLUÍDO e
+        // outro DISPONÍVEL. A certidão mostrava 1/2 enquanto a fase se dizia
+        // concluída — cada projeção contava um dos dois.
+        //
+        // A convergência do lado publicado já era bilateral; esta era de mão
+        // única. É a mesma família de defeito das duas tarefas vivas: duas
+        // chaves para a mesma coisa, e quem procura numa nunca acha a outra.
+        const existente = await db.phaseWorkflowStepInstance.findFirst({
+          where: {
+            workflowInstanceId: instancia.id,
+            ciclo: instancia.ciclo,
+            stepKey: STEP_LOCALIZAR,
+            necessidadeId: necessidade.id,
+            status: { notIn: ["SUPERSEDIDO", "CANCELADO"] },
+          },
+          select: { id: true },
+        })
         if (existente) { res.stepsReusados++ }
         else {
           await db.phaseWorkflowStepInstance.create({

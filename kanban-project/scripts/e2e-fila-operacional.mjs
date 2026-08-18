@@ -171,6 +171,44 @@ ok("§4) nem navega em cima de um comando que falhou", page.url().includes("/ope
 await page.screenshot({ path: `${OUT}/4-erro-visivel.png` })
 await page.unroute("**/api/tarefas/*/comando")
 
+// ═══════════════════════════════════════════════════════════════════════════
+secao("PROGRESSO COERENTE) A fase não se diz concluída com trabalho aberto")
+// ═══════════════════════════════════════════════════════════════════════════
+// As três leituras da MESMA tela, lidas do servidor: o que a fase conta, o que a
+// barra mostra e o que a linha do documento diz.
+await page.goto(`${BASE}/kanban?processoId=${palco.processoId}&tab=central`, { waitUntil: "domcontentloaded", timeout: 90000 })
+await page.waitForTimeout(9000)
+const central = await page.evaluate(async ([procId, docId]) => {
+  const r = await fetch(`/api/processos/${procId}/central-operacional?queue=all&sort=priority`, {
+    headers: { Authorization: `Bearer ${localStorage.getItem("authToken")}` },
+  })
+  if (!r.ok) return { erro: r.status }
+  const d = await r.json()
+  const i = d.indice
+  const doc = [...i.linhaPrincipal, ...i.foraDaLinha, ...i.pendenteClassificacao]
+    .flatMap((p) => p.documentos).concat(i.semDono).find((x) => x.documentoId === docId)
+  return {
+    matrix: { pct: d.matrix.percentage, done: d.matrix.completed, total: d.matrix.total },
+    fase: d.faseProgress ? { pct: d.faseProgress.percent, done: d.faseProgress.done, total: d.faseProgress.total } : null,
+    doc: doc ? { pct: doc.naFase.progresso.pct, frac: `${doc.naFase.progresso.concluidos}/${doc.naFase.progresso.total}`, statusFinal: doc.statusFinal } : null,
+    resumo: i.resumo,
+  }
+}, [palco.processoId, palco.documentoId])
+
+ok("a Central respondeu", central?.matrix != null, JSON.stringify(central))
+ok("§C) a fase conta 0 de 3 concluídos — nenhum documento terminou",
+  central.matrix.done === 0, `${central.matrix.done}/${central.matrix.total}`)
+ok("§99) e o percentual da fase NÃO é 99%", central.matrix.pct !== 99, `${central.matrix.pct}%`)
+ok("§16) nem 100%", central.matrix.pct < 100)
+ok("§A) o documento tem progresso PRÓPRIO, diferente do da fase",
+  central.doc != null && central.doc.pct >= 0, `${central.doc?.pct}% · ${central.doc?.frac}`)
+ok("§B) e não está marcado como pronto", central.doc?.statusFinal !== "PRONTO", String(central.doc?.statusFinal))
+ok("§17) os contadores da Central concordam — 0 prontos",
+  central.resumo.prontos === 0, JSON.stringify(central.resumo))
+const corpoCentral = await page.locator("body").innerText()
+ok("§D) a tela NÃO anuncia a fase concluída", !/concluída — todos os documentos validados/i.test(corpoCentral))
+await page.screenshot({ path: `${OUT}/5-progresso-coerente.png` })
+
 console.log(`\n${"═".repeat(70)}`)
 console.log(`Total: ${passou + falhou} | ✅ ${passou} | ❌ ${falhou}`)
 if (falhas.length) { console.log("\nFALHAS:"); for (const f of falhas) console.log(`  • ${f}`) }

@@ -141,37 +141,107 @@ const PASSO_OK = new Set(["CONCLUIDO", "DISPENSADO", "SUPERSEDIDO"])
 const passoConcluido = (s: { status: string }) => PASSO_OK.has(s.status)
 
 /**
+ * O QUE CONTA COMO PASSO FEITO — para o gate, para o progresso e para a tela.
+ *
+ * Exportado porque a tabela da fase precisa da MESMA régua: enquanto ela tinha a
+ * sua, um passo EXECUTADO (feito pelo executor, aguardando aprovação) aparecia
+ * como concluído na linha e continuava pendente para o gate. `EXECUTADO` e
+ * `AGUARDANDO_APROVACAO` ficam de fora de propósito — o trabalho foi feito, a
+ * conclusão formal não.
+ */
+export const PASSO_CONTA_COMO_FEITO: ReadonlySet<string> = PASSO_OK
+
+/**
+ * A OBRIGAÇÃO ESTÁ CONCLUÍDA **NESTA FASE**? — o predicado canônico, um só.
+ *
+ * ─── POR QUE ELE PRECISOU EXISTIR ───────────────────────────────────────────
+ * A mesma pergunta tinha TRÊS respostas diferentes no sistema:
+ *
+ *   • a tabela da fase somava TODOS os passos obrigatórios da unidade;
+ *   • o progresso por NECESSIDADE olhava UM passo (o primeiro que achasse) ou
+ *     aceitava `necessidade.status === "ATENDIDA"` como equivalente;
+ *   • o progresso por DOCUMENTO olhava só o passo de MAIOR ordem.
+ *
+ * Em produção (processo 523, Genealogia) isso apareceu junto na mesma tela: a
+ * certidão do Ademir em 1/2, "Localizar registro" em andamento — e a fase
+ * dizendo "1 de 1 documentos validados", "Genealogia concluída", 99%.
+ *
+ * ─── A REGRA ────────────────────────────────────────────────────────────────
+ * A obrigação está concluída quando **TODOS os passos OBRIGATÓRIOS dela nesta
+ * fase** estão em estado terminal-feito. Um passo aberto — qualquer um — impede,
+ * e é o mesmo passo que impede o gate. Isso é o que faz 100% significar 100%.
+ *
+ * ─── O QUE **NÃO** É CONCLUSÃO ──────────────────────────────────────────────
+ * `necessidade.status === "ATENDIDA"` diz que o REGISTRO foi localizado. É um
+ * estado DOCUMENTAL, e não responde se o trabalho da fase terminou: localizado,
+ * recebido, conferido e validado são coisas diferentes, e tratá-las como
+ * sinônimo foi o que produziu "validado" com o workflow no meio.
+ *
+ * Ele volta a valer num caso só, e explicitamente: quando a obrigação NÃO TEM
+ * passo nenhum nesta fase. Aí não há workflow a consultar, e negar a conclusão
+ * deixaria a fase presa numa exigência que ela não executa.
+ */
+function obrigacaoConcluidaNaFase(
+  passosDaUnidade: GateStepData[],
+  estadoDocumental: boolean,
+): boolean {
+  // Passo cancelado saiu do fluxo: não conta como feito nem como pendência.
+  const vivos = passosDaUnidade.filter((s) => s.status !== "CANCELADO")
+  const obrigatorios = vivos.filter((s) => s.obrigatorio)
+  // Sem passo obrigatório na fase, quem responde é o estado documental.
+  if (obrigatorios.length === 0) return estadoDocumental
+  return obrigatorios.every(passoConcluido)
+}
+
+/**
+ * OS PASSOS DE CADA OBRIGAÇÃO — a união de tudo que aponta para ela.
+ *
+ * Um passo pode nomear a necessidade, o documento que a atende, ou os dois. A
+ * unidade de trabalho é a mesma nos três casos, e ler só um dos lados perde
+ * passos: era assim que um passo aberto ficava invisível para a conta da fase.
+ */
+function passosPorObrigacao(input: ProjectionInput): Map<number, GateStepData[]> {
+  const docsPorNec = new Map<number, Set<number>>()
+  const necPorDoc = new Map<number, number>()
+  for (const d of input.documentos) {
+    if (d.necessidadeId == null) continue
+    necPorDoc.set(d.id, d.necessidadeId)
+    const set = docsPorNec.get(d.necessidadeId) ?? new Set<number>()
+    set.add(d.id)
+    docsPorNec.set(d.necessidadeId, set)
+  }
+  const mapa = new Map<number, GateStepData[]>()
+  const juntar = (necId: number, s: GateStepData) => {
+    const arr = mapa.get(necId) ?? []
+    if (!arr.some((x) => x.id === s.id)) arr.push(s)
+    mapa.set(necId, arr)
+  }
+  for (const s of input.steps) {
+    if (s.necessidadeId != null) juntar(s.necessidadeId, s)
+    else if (s.documentoId != null) {
+      const nec = necPorDoc.get(s.documentoId)
+      if (nec != null) juntar(nec, s)
+    }
+  }
+  return mapa
+}
+
+/**
  * Escopo DOCUMENTO (Emissão): as CERTIDÕES OBRIGATÓRIAS são o denominador da fase — a
  * fase só avança quando TODAS estiverem resolvidas. Docs de apoio (RG/CPF etc.) NÃO
- * gateiam. Uma certidão está resolvida quando SEU documento (Documento.necessidadeId) tem
- * a operação da fase concluída (último passo por-documento concluído). Fonte ÚNICA usada
- * por computeGate E computeProgress → gate e progresso nunca divergem (100% ⟺ pode avançar).
+ * gateiam. Fonte ÚNICA usada por computeGate E computeProgress → gate e progresso
+ * nunca divergem (100% ⟺ pode avançar).
  */
 function certidoesObrigatoriasDocumento(input: ProjectionInput): {
   certObrig: NecessidadeData[]
   emitida: (n: NecessidadeData) => boolean
 } {
   const certObrig = input.necessidades.filter((n) => n.ehCertidao && n.obrigatoria && n.status !== "DISPENSADA")
-  const stepsByDoc = new Map<number, GateStepData[]>()
-  for (const s of input.steps) {
-    if (s.documentoId == null) continue
-    const arr = stepsByDoc.get(s.documentoId) ?? []
-    arr.push(s)
-    stepsByDoc.set(s.documentoId, arr)
-  }
-  const docConcluiu = (docId: number): boolean => {
-    const ss = stepsByDoc.get(docId) ?? []
-    if (ss.length === 0) return false
-    return passoConcluido(ss.reduce((a, b) => (b.ordem > a.ordem ? b : a)))
-  }
-  const docsByNec = new Map<number, number[]>()
-  for (const d of input.documentos) {
-    if (d.necessidadeId == null) continue
-    const arr = docsByNec.get(d.necessidadeId) ?? []
-    arr.push(d.id)
-    docsByNec.set(d.necessidadeId, arr)
-  }
-  const emitida = (n: NecessidadeData): boolean => (docsByNec.get(n.id) ?? []).some(docConcluiu)
+  const porObrigacao = passosPorObrigacao(input)
+  // O estado documental só decide quando não há passo — ver o predicado canônico.
+  // "Existe documento" nunca foi conclusão de nada.
+  const emitida = (n: NecessidadeData): boolean =>
+    obrigacaoConcluidaNaFase(porObrigacao.get(n.id) ?? [], false)
   return { certObrig, emitida }
 }
 
@@ -336,14 +406,14 @@ function computeProgress(input: ProjectionInput, blocked: boolean): ProgressResu
     }
     nextAction = proximaAcaoDe(input.faseCode, gateSteps.filter((s) => s.documentoId != null))
   } else if (scope === "NECESSIDADE") {
-    const stepByNec = new Map<number, GateStepData>()
-    for (const s of gateSteps.filter((x) => x.necessidadeId != null)) {
-      if (!stepByNec.has(s.necessidadeId as number)) stepByNec.set(s.necessidadeId as number, s)
-    }
-    const localizada = (n: NecessidadeData): boolean => {
-      const s = stepByNec.get(n.id)
-      return (!!s && passoConcluido(s)) || n.status === "ATENDIDA"
-    }
+    // A MESMA RÉGUA DO ESCOPO DOCUMENTO. Aqui liam-se UM passo por necessidade —
+    // o primeiro encontrado — e o status "ATENDIDA" como se fosse conclusão.
+    // Com dois passos para a mesma obrigação, um concluído e outro em aberto, a
+    // conta dizia "1 de 1 concluído" enquanto o gate (que olha todos) bloqueava:
+    // 100% virava 99% pela blindagem, e a tela anunciava a fase concluída.
+    const porObrigacao = passosPorObrigacao(input)
+    const localizada = (n: NecessidadeData): boolean =>
+      obrigacaoConcluidaNaFase(porObrigacao.get(n.id) ?? [], n.status === "ATENDIDA")
     // Legítimas = certidões não dispensadas; progresso sobre as OBRIGATÓRIAS.
     const obrig = input.necessidades.filter((n) => n.ehCertidao && n.status !== "DISPENSADA" && n.obrigatoria)
     for (const n of obrig) {
@@ -351,7 +421,9 @@ function computeProgress(input: ProjectionInput, blocked: boolean): ProgressResu
       required += 1
       if (localizada(n)) { completedWeight += 1; completed += 1 }
     }
-    nextAction = proximaAcaoDe(input.faseCode, [...stepByNec.values()])
+    // A PRÓXIMA AÇÃO é a do trabalho que falta — entre os passos por-necessidade
+    // que ainda estão abertos, e não "o primeiro passo de cada obrigação".
+    nextAction = proximaAcaoDe(input.faseCode, gateSteps.filter((s) => s.necessidadeId != null))
   } else {
     // PROCESSO: passos genéricos OBRIGATÓRIOS legítimos (a esteira do processo).
     const obrigSteps = gateSteps.filter((s) => s.obrigatorio)

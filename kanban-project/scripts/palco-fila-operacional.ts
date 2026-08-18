@@ -53,6 +53,7 @@ async function limpar() {
   for (const p of procs) if (p.arvoreId) await prisma.pessoa.deleteMany({ where: { arvoreId: p.arvoreId } })
   await prisma.processo.deleteMany({ where: { id: { in: ids } } })
   await prisma.arvore.deleteMany({ where: { nome: { startsWith: MARCA } } })
+  await prisma.tipoDocumentoCadastro.deleteMany({ where: { code: { startsWith: MARCA } } })
   await prisma.itemCatalogo.deleteMany({ where: { code: { startsWith: MARCA } } })
   await prisma.usuario.deleteMany({ where: { email: { endsWith: '@palco-fila.test' } } })
 }
@@ -116,6 +117,11 @@ async function main() {
     const item = await prisma.itemCatalogo.create({
       data: { code: `${MARCA}_${i}`, name: 'Certidão de Nascimento - Inteiro Teor', natureza: 'DOCUMENTO' },
       select: { id: true },
+    })
+    // A NATUREZA VEM DO CADASTRO MESTRE. Sem ela a obrigação existe e não entra
+    // no denominador da fase — o palco mostraria uma fase sem o que contar.
+    await prisma.tipoDocumentoCadastro.create({
+      data: { code: `${MARCA}_T${i}`, name: 'Certidão de Nascimento - Inteiro Teor', nature: 'certidao', itemCatalogoId: item.id },
     })
     const pes = await prisma.pessoa.create({
       data: { arvoreId: arv.id, nome: p.nome, sobrenome: p.sobrenome, linhaReta: true }, select: { id: true },

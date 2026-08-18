@@ -37,6 +37,7 @@ import { aguardarTerceiro, devolverAFila } from '@/lib/operacional/tarefa-ciclo'
 import { minhaFila, semResponsavel, colunaDaTarefa } from '@/lib/operacional/tarefa-projecoes'
 import { resolverAlvoDaTarefa, urlOperacionalDaTarefa } from '@/lib/operacional/navegacao'
 import { getPhaseOperationalSummary } from '@/src/lib/process-stage/estrutura-operacional'
+import { resolveProgressoFaseDocumento } from '@/src/lib/process-stage/resolve-fase-progresso'
 import { acaoPrincipal } from '@/src/components/operacao/central-tarefas'
 import { ROTULO_STATUS } from '@/src/components/operacao/kit-operacional'
 import { PrismaClient } from '@prisma/client'
@@ -77,6 +78,7 @@ async function limpar() {
   for (const p of procs) if (p.arvoreId) await prisma.pessoa.deleteMany({ where: { arvoreId: p.arvoreId } })
   await prisma.processo.deleteMany({ where: { id: { in: ids } } })
   await prisma.arvore.deleteMany({ where: { nome: { startsWith: MARCA } } })
+  await prisma.tipoDocumentoCadastro.deleteMany({ where: { code: { startsWith: MARCA } } })
   await prisma.itemCatalogo.deleteMany({ where: { code: { startsWith: MARCA } } })
   await prisma.usuario.deleteMany({ where: { email: { endsWith: '@fila-ciclo.test' } } })
 }
@@ -108,6 +110,13 @@ async function palco(quantas: number, nomes: string[]) {
     const item = await prisma.itemCatalogo.create({
       data: { code: `${S}_${i}`, name: 'Certidão de Nascimento - Inteiro Teor', natureza: 'DOCUMENTO' },
       select: { id: true },
+    })
+    // O CADASTRO MESTRE CLASSIFICA A NATUREZA — e é ele que diz "isto é certidão".
+    // Sem esta linha o palco tem a obrigação mas ela não entra no denominador da
+    // fase: o progresso da fase conta CERTIDÕES, não itens quaisquer, e o teste
+    // mediria uma fase sem denominador em vez do caso real.
+    await prisma.tipoDocumentoCadastro.create({
+      data: { code: `${S}_T${i}`, name: 'Certidão de Nascimento - Inteiro Teor', nature: 'certidao', itemCatalogoId: item.id },
     })
     // HOMÔNIMOS DE VERDADE: os dois primeiros têm o MESMO nome completo e a
     // MESMA certidão. É o caso em que navegar por título abre a certidão da
@@ -563,6 +572,57 @@ async function main() {
   ok('e cada linha continua sabendo o seu documento',
     filaGrande.every((l) => l.etapaAtual != null && !/_/.test(l.etapaAtual)),
     'nenhuma chave técnica escapou para a fila')
+
+  // ═════════════════════════════════════════════════════════════════════════
+  secao('CONCLUSÃO REAL) A fase só vira 100% quando a última obrigação termina')
+  // ═════════════════════════════════════════════════════════════════════════
+  // Um documento só, e o caminho inteiro percorrido pelas portas oficiais. A cada
+  // etapa concluída, três perguntas são refeitas: quanto andou o DOCUMENTO,
+  // quantas obrigações a FASE tem inteiras, e a fase pode avançar.
+  const solo = await palco(1, ['Solitario'])
+  const alvoSolo = solo.alvos[0]
+  await atribuirTarefa({ tarefaId: alvoSolo.tarefaId, responsavelId: daniela.id, autorId: gestor.id })
+  await iniciarTarefa({ tarefaId: alvoSolo.tarefaId, autorId: daniela.id })
+
+  const olhar = async () => {
+    const prog = await resolveProgressoFaseDocumento(solo.processoId)
+    const { indice } = await getPhaseOperationalSummary({ processoId: solo.processoId, faseMacroKey: FASE })
+    const doc = [...indice.linhaPrincipal, ...indice.foraDaLinha, ...indice.pendenteClassificacao]
+      .flatMap((x) => x.documentos).concat(indice.semDono)
+      .find((d) => d.documentoId === alvoSolo.documentoId)
+    return { fase: prog, doc }
+  }
+
+  let v = await olhar()
+  ok('no começo: fase 0 de 1', v.fase.done === 0 && v.fase.total === 1, `${v.fase.done}/${v.fase.total}`)
+  ok('e 0%', v.fase.percent === 0, `${v.fase.percent}%`)
+  ok('com o documento em 0%', v.doc?.naFase.progresso.pct === 0)
+
+  // Conclui as cinco etapas, uma a uma, pela porta oficial.
+  for (let i = 0; i < PASSOS.length; i++) {
+    const r = await concluirEtapa({ tarefaId: alvoSolo.tarefaId, autorId: daniela.id })
+    if (!r.ok) { ok(`concluir etapa ${i + 1}`, false, `${r.codigo}: ${r.mensagem}`); break }
+    v = await olhar()
+    const ultima = i === PASSOS.length - 1
+    ok(`§15) depois da etapa ${i + 1}, o documento reflete na hora`,
+      v.doc?.naFase.progresso.concluidos === i + 1, `${v.doc?.naFase.progresso.concluidos}/${v.doc?.naFase.progresso.total}`)
+    if (!ultima) {
+      ok(`§17) e a FASE continua 0 de 1 — ainda há trabalho aberto`,
+        v.fase.done === 0, `${v.fase.done}/${v.fase.total}`)
+      ok(`§16) sem chegar a 100%`, v.fase.percent < 100, `${v.fase.percent}%`)
+    }
+  }
+
+  v = await olhar()
+  ok('só com a ÚLTIMA etapa a fase fica 1 de 1', v.fase.done === 1 && v.fase.total === 1,
+    `${v.fase.done}/${v.fase.total}`)
+  ok('§16) e 100% significa 100%', v.fase.percent === 100, `${v.fase.percent}%`)
+  ok('o documento também está em 100%', v.doc?.naFase.progresso.pct === 100)
+  ok('e a tabela o dá por PRONTO', v.doc?.statusFinal === 'PRONTO', String(v.doc?.statusFinal))
+  ok('§13) nenhuma tarefa nova nasceu no caminho',
+    (await prisma.tarefa.count({ where: { necessidadeId: alvoSolo.necessidadeId } })) === 1)
+  ok('§14) nem workflow novo',
+    (await prisma.phaseWorkflowInstance.count({ where: { processoId: solo.processoId } })) === 1)
 
   // ═════════════════════════════════════════════════════════════════════════
   secao('§10/§27) A Minha Fila NÃO executa — ela leva ao trabalho')

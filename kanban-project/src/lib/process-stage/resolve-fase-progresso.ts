@@ -12,9 +12,18 @@ import { phaseKeyToFaseCode, getStepsForFase } from "./fases-catalog"
 import { escopoDaFase } from "@/src/lib/motor/resolve-passos-bloqueantes"
 import { itemCatalogosDeCertidao } from "@/src/lib/documentos/natureza-certidao"
 import { resolverInstanciaVigente } from "./instancia-vigente-da-fase"
+import { PASSO_CONTA_COMO_FEITO } from "@/src/lib/motor/operational-projection-core"
 import type { FaseCode } from "@prisma/client"
 
-const stepConcluidoRe = (status: string) => /conclu|finaliz/i.test(String(status))
+/**
+ * PASSO FEITO — a régua do MOTOR, a mesma do gate e da tabela da fase.
+ *
+ * Era um `/conclu|finaliz/i` sobre o texto do status: casa "CONCLUIDO", não casa
+ * "DISPENSADO" nem "SUPERSEDIDO" (que o gate conta como feitos) e casaria
+ * qualquer status futuro que tivesse a sílaba. Adivinhar estado por substring é
+ * como o mesmo passo acabava contado de um jeito aqui e de outro no gate.
+ */
+const stepConcluidoRe = (status: string) => PASSO_CONTA_COMO_FEITO.has(String(status).toUpperCase())
 
 export interface WfDocSteps {
   documentoId: number
@@ -75,7 +84,7 @@ export async function resolveProgressoFaseDocumento(processoId: number, contexto
           OR: [{ documentoId: { not: null } }, { necessidadeId: { not: null } }],
           status: { notIn: ["SUPERSEDIDO", "CANCELADO"] },
         },
-        select: { documentoId: true, necessidadeId: true, faseMacroKey: true, stepKey: true, ordem: true, status: true, responsavelId: true, ciclo: true, updatedAt: true },
+        select: { documentoId: true, necessidadeId: true, faseMacroKey: true, stepKey: true, ordem: true, status: true, obrigatorio: true, responsavelId: true, ciclo: true, updatedAt: true },
         orderBy: [{ documentoId: "asc" }, { ordem: "asc" }],
       })
     : []
@@ -114,7 +123,7 @@ export async function resolveProgressoFaseDocumento(processoId: number, contexto
   const pessoas = processo?.arvoreId
     ? await prisma.pessoa.findMany({
         where: { arvoreId: processo.arvoreId, linhaReta: true },
-        select: { id: true, documentos: { select: { id: true, status: true } } },
+        select: { id: true, documentos: { select: { id: true, status: true, necessidadeId: true } } },
       })
     : []
   // só docs que TÊM operação materializada na fase atual OU status não cancelado; o
@@ -124,16 +133,54 @@ export async function resolveProgressoFaseDocumento(processoId: number, contexto
   // linhaRetaDocs), excluindo CANCELADO. Doc sem workflow materializado ainda conta no
   // total (e como NÃO concluído) — não infla nem esconde o denominador.
   const linhaRetaDocIds: number[] = []
+  // A OBRIGAÇÃO QUE CADA DOCUMENTO ATENDE — é por ela que um passo sem
+  // `documentoId` encontra o documento a que pertence.
+  const docsPorNecessidade = new Map<number, number[]>()
   for (const p of pessoas) for (const d of p.documentos) {
     if (d.status === "CANCELADO") continue
     linhaRetaDocIds.push(d.id)
+    if (d.necessidadeId != null) {
+      const arr = docsPorNecessidade.get(d.necessidadeId) ?? []
+      arr.push(d.id)
+      docsPorNecessidade.set(d.necessidadeId, arr)
+    }
+  }
+
+  // ────────────────────────────────────────────────────────────────────────────
+  // O DOCUMENTO CONCLUIU A FASE? — TODOS os passos obrigatórios dele, não o último.
+  //
+  // Duas coisas escondiam trabalho aberto desta conta:
+  //
+  //   1. olhar só o passo de MAIOR ORDEM. Num workflow em que a última etapa
+  //      termina antes de outra obrigatória — ou em que há mais de um passo na
+  //      mesma ordem — o documento se dizia pronto com etapa em aberto;
+  //   2. só considerar passos com `documentoId`. Um passo materializado sobre a
+  //      NECESSIDADE (sem documento) sumia da conta inteira. Foi assim que o
+  //      processo 523 mostrou "1 de 1 validado" com a certidão em 1/2: o passo
+  //      aberto era o da necessidade, e esta conta nunca o viu.
+  //
+  // Agora a unidade é a obrigação: os passos do documento MAIS os da necessidade
+  // que ele atende. É a mesma régua do gate e da tabela da fase.
+  // ────────────────────────────────────────────────────────────────────────────
+  const passosDaUnidade = new Map<number, Array<{ status: string; obrigatorio: boolean }>>()
+  const juntarNaUnidade = (docId: number, s: { status: string; obrigatorio: boolean }) => {
+    const arr = passosDaUnidade.get(docId) ?? []
+    arr.push(s)
+    passosDaUnidade.set(docId, arr)
+  }
+  for (const s of stepInstancesRaw) {
+    if (s.documentoId != null) { juntarNaUnidade(s.documentoId, s); continue }
+    if (s.necessidadeId == null) continue
+    for (const d of docsPorNecessidade.get(s.necessidadeId) ?? []) juntarNaUnidade(d, s)
   }
 
   const concluiuDoc = (docId: number): boolean => {
-    const steps = wfPorDoc.get(docId)?.steps ?? []
-    if (steps.length === 0) return false
-    const ultima = steps.reduce((a, b) => (b.ordem > a.ordem ? b : a))
-    return stepConcluidoRe(ultima.status)
+    const todos = passosDaUnidade.get(docId) ?? []
+    const obrigatorios = todos.filter((s) => s.obrigatorio)
+    // Sem passo obrigatório na fase, o documento não tem o que concluir aqui —
+    // e "não tem workflow" nunca foi conclusão.
+    if (obrigatorios.length === 0) return false
+    return obrigatorios.every((s) => stepConcluidoRe(s.status))
   }
   const catSteps = faseCode ? getStepsForFase(faseCode) : []
   const tituloStep = (k: string) => catSteps.find((c) => c.stepKey === k)?.title ?? k
@@ -203,13 +250,28 @@ export async function resolveProgressoFaseDocumento(processoId: number, contexto
     const obrig = necsAll.filter(
       (n) => n.obrigatoriedade === "OBRIGATORIA" && certItens.has(n.itemCatalogoId) && n.status !== "DISPENSADA",
     )
-    const concluidoPorNec = new Map<number, boolean>()
+    // A OBRIGAÇÃO SÓ ACABA QUANDO TODOS OS PASSOS OBRIGATÓRIOS DELA ACABAM.
+    //
+    // Aqui era um OU: bastava UM passo concluído para a necessidade contar como
+    // feita. Com dois passos para a mesma obrigação — um concluído, outro em
+    // aberto —, esta conta dizia "1 de 1" enquanto a certidão mostrava 1/2 e o
+    // gate bloqueava. O 99% da tela era a blindagem tentando conciliar as duas.
+    //
+    // Mesma régua do gate e da tabela da fase: E, não OU.
+    const passosPorNec = new Map<number, Array<{ status: string; obrigatorio: boolean }>>()
     for (const s of stepInstancesRaw) {
       if (s.necessidadeId == null) continue
-      concluidoPorNec.set(s.necessidadeId, (concluidoPorNec.get(s.necessidadeId) ?? false) || stepConcluidoRe(s.status))
+      const arr = passosPorNec.get(s.necessidadeId) ?? []
+      arr.push(s)
+      passosPorNec.set(s.necessidadeId, arr)
+    }
+    const necConcluida = (necId: number): boolean => {
+      const obrigatorios = (passosPorNec.get(necId) ?? []).filter((x) => x.obrigatorio)
+      if (obrigatorios.length === 0) return false
+      return obrigatorios.every((x) => stepConcluidoRe(x.status))
     }
     total = obrig.length
-    done = obrig.filter((n) => concluidoPorNec.get(n.id) === true).length
+    done = obrig.filter((n) => necConcluida(n.id)).length
   } else {
     total = linhaRetaDocIds.length
     done = concluidosPorDoc.size

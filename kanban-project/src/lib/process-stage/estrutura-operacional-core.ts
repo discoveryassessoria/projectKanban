@@ -38,6 +38,17 @@
 import type { PessoaDoProcesso } from "./central-operacional-core"
 import { baldeDoPasso, rotuloStatusPasso, type BaldeTarefa } from "./central-operacional-core"
 import { estadoTemporal } from "@/lib/operacional/tempo-operacional"
+import { PASSO_CONTA_COMO_FEITO } from "@/src/lib/motor/operational-projection-core"
+
+/**
+ * PASSO FEITO — a régua do MOTOR, não uma parecida.
+ *
+ * A tabela usava o BALDE (agrupamento de apresentação), que trata `EXECUTADO`
+ * como concluído. O gate não: executado é trabalho entregue com aprovação
+ * pendente. Com duas réguas, a linha podia dizer 100% enquanto a fase não
+ * avançava — e "100%" precisa significar a mesma coisa nas duas.
+ */
+const passoFeito = (s: { status: string }) => PASSO_CONTA_COMO_FEITO.has(String(s.status).toUpperCase())
 
 // ============================================================
 // ENTRADA — o que a camada de I/O carrega e entrega já resolvido
@@ -479,9 +490,9 @@ export function escopoDoAlvo(p: {
 function progresso(passos: PassoDaEstrutura[]): ProgressoEstrutura {
   const obrig = passos.filter((s) => s.obrigatorio)
   const total = obrig.length
-  const concluidos = obrig.filter((s) => s.balde === "CONCLUIDA").length
+  const concluidos = obrig.filter(passoFeito).length
   const pontosTotais = obrig.reduce((a, s) => a + s.peso, 0)
-  const pontosFeitos = obrig.filter((s) => s.balde === "CONCLUIDA").reduce((a, s) => a + s.peso, 0)
+  const pontosFeitos = obrig.filter(passoFeito).reduce((a, s) => a + s.peso, 0)
   // Sem passo obrigatório o alvo não tem o que exigir: 0/0 é 100% de nada a fazer,
   // não 0% de trabalho parado. Contar 0% aqui inventaria pendência inexistente.
   return {
@@ -665,7 +676,7 @@ export function montarEstruturaOperacional(input: EstruturaInput): EstruturaOper
     documentosDivergentes: todosOsAlvos.filter((b) => b.divergente).length,
     documentosVencidos: todosOsAlvos.filter((b) => b.vencido).length,
     passosObrigatorios: obrigatorios.length,
-    passosObrigatoriosConcluidos: obrigatorios.filter((s) => s.balde === "CONCLUIDA").length,
+    passosObrigatoriosConcluidos: obrigatorios.filter(passoFeito).length,
     pessoasComTrabalho: linhas.filter((l) => !l.semTrabalhoAplicavel).length,
   }
 
@@ -727,7 +738,9 @@ export type ArtefatosPorChave = Map<
  * trabalho está.
  */
 function passoCorrente(alvo: AlvoDaEstrutura): PassoDaEstrutura | null {
-  const abertos = alvo.passos.filter((p) => p.obrigatorio && p.balde !== "CONCLUIDA")
+  // ABERTO é o que a régua do motor não conta como feito — a mesma da conta
+  // de progresso, para "sem etapa atual" e "100%" nunca discordarem.
+  const abertos = alvo.passos.filter((p) => p.obrigatorio && !passoFeito(p))
   if (abertos.length === 0) return null
   return abertos.find((p) => p.balde === "EM_ANDAMENTO") ?? abertos[0]
 }
