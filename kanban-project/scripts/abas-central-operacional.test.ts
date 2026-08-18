@@ -77,10 +77,17 @@ for (const removida of ["Divergências", "Protocolo", "Devoluções", "Tentativa
   ok(!temAba(drawerDoc, removida), `10. a aba "${removida}" não existe mais no documento`)
 }
 
-const ordemEsperada = ["Operação", "Workflow", "Dados Registrais", "Histórico", "Anexos", "Observações"]
+// A aba "Operação" SAIU: era um segundo cockpit com status, próxima ação,
+// responsável, SLA, aging e atalhos — a linha da Central já responde tudo isso,
+// e a régua de prazo dele era própria. O painel abre direto no WORKFLOW, que é
+// onde o trabalho acontece. O que só existia lá (iniciar a operação de um
+// documento não materializado) virou o corpo do painel, não uma aba.
+const ordemEsperada = ["Workflow", "Dados Registrais", "Histórico", "Anexos", "Observações"]
 const ordemReal = [...drawerDoc.matchAll(/\{ id: "(\w+)", label: "([^"]+)" \}/g)].map((m) => m[2])
 ok(JSON.stringify(ordemReal) === JSON.stringify(ordemEsperada),
-  `11. as seis abas do documento estão na ordem canônica (${ordemReal.join(" · ")})`)
+  `11. as cinco abas do documento estão na ordem canônica (${ordemReal.join(" · ")})`)
+ok(!temAba(drawerDoc, "Operação"),
+  "11b. a aba \"Operação\" não existe mais — uma Central dentro da Central")
 
 ok(!/function Placeholder/.test(drawerDoc),
   "12. o componente de placeholder saiu do documento — não sobrou aba vazia")

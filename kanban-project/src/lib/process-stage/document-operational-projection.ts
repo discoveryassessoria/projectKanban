@@ -17,9 +17,36 @@
 import { prisma } from "@/lib/prisma"
 import { getFase, phaseKeyToFaseCode, isFaseReady } from "./fases-catalog"
 import { garantirOperacaoDocumentoV2 } from "@/src/services/documento-operacao"
+import { chaveDaUnidade, normalizarUnidade, tarefasVivasDasUnidades } from "@/lib/operacional/identidade-da-tarefa"
+import { estadoTemporal } from "@/lib/operacional/tempo-operacional"
 import type { FaseCode } from "@prisma/client"
 
 export type DocumentOperationalState = "OPERATIONAL" | "NOT_MATERIALIZED"
+
+/**
+ * A TAREFA CANÔNICA DESTE DOCUMENTO — a unidade operacional de trabalho.
+ *
+ * O cabeçalho do Drawer lia responsável, prazo e status do próprio `Documento`
+ * (`responsavelId`, `dataPrazoOperacao`, `status`). São campos do REGISTRO, não
+ * do trabalho: em produção o documento 2111 tinha responsável Daniela e
+ * `dataPrazoOperacao` NULO, então o Drawer mostrava "SLA —" enquanto a tabela da
+ * fase mostrava a mesma certidão atrasada. Três telas, três respostas.
+ *
+ * Agora a resposta vem de onde ela existe: a Tarefa. `null` = não há tarefa viva
+ * para esta obrigação, e o Drawer diz isso em vez de inventar dono e prazo.
+ */
+export interface TarefaCanonicaDoDocumento {
+  taskId: number
+  statusTarefa: string
+  responsavelId: number | null
+  responsavelNome: string | null
+  dataPrazo: string | null
+  /** A frase única do prazo — a MESMA da tabela da fase e da Minha Fila. */
+  rotuloDoPrazo: string
+  atrasado: boolean
+  venceHoje: boolean
+  diasParaPrazo: number | null
+}
 
 export interface DocumentOperationalProjection {
   processId: string
@@ -30,6 +57,8 @@ export interface DocumentOperationalProjection {
   stepInstanceId: string | null
   currentStep: { key: string; label: string; status: string } | null
   nextAction: { key: string; label: string } | null
+  /** A Tarefa que responde por este documento. Fonte ÚNICA de responsável/prazo/status. */
+  tarefa: TarefaCanonicaDoDocumento | null
   permissions: {
     canStart: boolean
     canOperate: boolean
@@ -129,6 +158,50 @@ export async function resolveDocumentOperationalProjection(
 
   const state: DocumentOperationalState = temOperacao ? "OPERATIONAL" : "NOT_MATERIALIZED"
 
+  // ────────────────────────────────────────────────────────────────────────────
+  // A TAREFA CANÔNICA DESTE DOCUMENTO.
+  //
+  // Pela porta ÚNICA da identidade (`identidade-da-tarefa`), que normaliza a
+  // unidade (documento → necessidade → pessoa → ciclo da obrigação) antes de
+  // procurar. Uma consulta própria aqui seria uma segunda resposta para "qual é
+  // a tarefa deste documento" — e é exatamente essa segunda resposta que já fez
+  // a mesma certidão ter duas tarefas vivas.
+  // ────────────────────────────────────────────────────────────────────────────
+  let tarefa: TarefaCanonicaDoDocumento | null = null
+  if (processo?.id != null) {
+    const unidade = await normalizarUnidade(prisma, {
+      processoId: processo.id,
+      documentoId: documentId,
+      ciclo: 1,
+    })
+    const t = (await tarefasVivasDasUnidades(prisma, [unidade])).get(chaveDaUnidade(unidade)) ?? null
+    if (t) {
+      // A RÉGUA É A CANÔNICA — a mesma frase que a tabela da fase e a Minha
+      // Fila mostram sobre esta tarefa. O Drawer tinha a sua (`computeSla`),
+      // e por isso conseguia dizer "—" sobre uma tarefa atrasada.
+      const tempo = estadoTemporal({
+        dataPrazo: t.dataPrazo,
+        dataConclusao: t.dataConclusao,
+        statusTarefa: t.statusTarefa,
+        aguardandoTerceiro: t.statusTarefa === "AGUARDANDO_TERCEIRO" || t.statusTarefa === "AGUARDANDO_CLIENTE",
+        slaPausadoEm: t.slaPausadoEm,
+        slaPausaAcumuladaMin: t.slaPausaAcumuladaMin,
+        criadaEm: t.criadaEm,
+      })
+      tarefa = {
+        taskId: t.id,
+        statusTarefa: t.statusTarefa,
+        responsavelId: t.responsavelId,
+        responsavelNome: t.responsavelNome,
+        dataPrazo: t.dataPrazo?.toISOString() ?? null,
+        rotuloDoPrazo: tempo.rotulo,
+        atrasado: tempo.atrasado,
+        venceHoje: tempo.venceHoje,
+        diasParaPrazo: tempo.diasParaPrazo,
+      }
+    }
+  }
+
   const currentStep = passoAtivo
     ? { key: passoAtivo.stepKey, label: String(passoAtivo.title ?? passoAtivo.stepKey), status: String(passoAtivo.status) }
     : null
@@ -151,6 +224,7 @@ export async function resolveDocumentOperationalProjection(
     stepInstanceId: passoAtivo ? String(passoAtivo.id) : null,
     currentStep,
     nextAction,
+    tarefa,
     // Viabilidade ESTRUTURAL (a UI ainda aplica o gate de papel via usePermissoes).
     permissions: {
       canStart: state === "NOT_MATERIALIZED" && podeMaterializar,

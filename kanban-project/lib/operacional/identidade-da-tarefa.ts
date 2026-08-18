@@ -136,6 +136,40 @@ export async function identidadeDaUnidade(
 export const TERMINAIS_DA_UNIDADE = ['CONCLUIDO_RECEBIDO', 'CONCLUIDO_NAO_POSSUI', 'CANCELADA'] as const
 
 /**
+ * O QUE UMA TAREFA VIVA CARREGA — tudo o que uma PROJEÇÃO precisa dela.
+ *
+ * Os campos temporais viajam juntos porque a régua canônica (`estadoTemporal`)
+ * exige os quatro para responder "atrasada?": o prazo sozinho não sabe que o
+ * relógio parou numa espera externa nem que o trabalho já terminou.
+ */
+export interface TarefaVivaDaUnidade {
+  id: number
+  workflowInstanceId: number | null
+  workflowStepInstanceId: number | null
+  statusTarefa: string
+  chaveIdempotencia: string | null
+  responsavelId: number | null
+  responsavelNome: string | null
+  dataPrazo: Date | null
+  dataConclusao: Date | null
+  slaPausadoEm: Date | null
+  slaPausaAcumuladaMin: number | null
+  criadaEm: Date | null
+  necessidadeId: number | null
+  documentoId: number | null
+  ciclo: number | null
+  processoId: number | null
+}
+
+const SELECT_VIVA = {
+  id: true, workflowInstanceId: true, workflowStepInstanceId: true, statusTarefa: true,
+  chaveIdempotencia: true, responsavelId: true, dataPrazo: true, dataConclusao: true,
+  slaPausadoEm: true, slaPausaAcumuladaMin: true, createdAt: true,
+  necessidadeId: true, documentoId: true, ciclo: true, processoId: true,
+  responsavel: { select: { nome: true } },
+} satisfies Prisma.TarefaSelect
+
+/**
  * A TAREFA QUE JÁ EXISTE PARA ESTA UNIDADE — procurada pelo VÍNCULO, não pela
  * chave.
  *
@@ -149,29 +183,100 @@ export const TERMINAIS_DA_UNIDADE = ['CONCLUIDO_RECEBIDO', 'CONCLUIDO_NAO_POSSUI
  *
  * Só devolve trabalho ABERTO: uma tarefa concluída no mesmo ciclo é história, e
  * história não é reaproveitada como se fosse pendência.
+ *
+ * ESTA FUNÇÃO É O SINGULAR DA DE LOTE — não uma segunda implementação da mesma
+ * pergunta. Escritor pergunta por uma unidade, projeção pergunta por
+ * quinhentas, e as duas têm de responder a mesma coisa sobre a mesma tarefa.
  */
 export async function tarefaVivaDaUnidade(
   db: Leitor,
   u: UnidadeDeTrabalho,
 ): Promise<{ id: number; workflowInstanceId: number | null; workflowStepInstanceId: number | null; statusTarefa: string; chaveIdempotencia: string | null } | null> {
-  const porObrigacao: Prisma.TarefaWhereInput[] = []
-  if (u.necessidadeId != null) porObrigacao.push({ necessidadeId: u.necessidadeId })
-  if (u.documentoId != null) porObrigacao.push({ documentoId: u.documentoId })
-  // Sem obrigação identificável, a unidade é o próprio passo — e o passo já é
-  // único por construção. Não há o que procurar.
-  if (porObrigacao.length === 0) return null
+  const achada = (await tarefasVivasDasUnidades(db, [u])).get(chaveDaUnidade(u)) ?? null
+  if (achada == null) return null
+  return {
+    id: achada.id,
+    workflowInstanceId: achada.workflowInstanceId,
+    workflowStepInstanceId: achada.workflowStepInstanceId,
+    statusTarefa: achada.statusTarefa,
+    chaveIdempotencia: achada.chaveIdempotencia,
+  }
+}
 
-  const achada = await db.tarefa.findFirst({
+/**
+ * AS TAREFAS VIVAS DE N UNIDADES — a MESMA regra, numa consulta só.
+ *
+ * A tela da fase precisa da tarefa canônica de cada documento. Perguntar uma
+ * por uma é quinhentas consultas para desenhar uma tabela; perguntar por outra
+ * régua seria uma segunda resposta para "qual é a tarefa deste documento" — e é
+ * exatamente essa segunda resposta que já produziu duas tarefas vivas para a
+ * mesma certidão.
+ *
+ * A chave do mapa é `chaveDaUnidade(u)` das unidades RECEBIDAS: quem chama já
+ * conhece as suas unidades e as reencontra sem adivinhar formato. Unidade sem
+ * obrigação identificável não entra — o passo administrativo é único por
+ * construção e não tem o que ser procurado.
+ */
+export async function tarefasVivasDasUnidades(
+  db: Leitor,
+  unidades: UnidadeDeTrabalho[],
+): Promise<Map<string, TarefaVivaDaUnidade>> {
+  const mapa = new Map<string, TarefaVivaDaUnidade>()
+  const comObrigacao = unidades.filter((u) => u.necessidadeId != null || u.documentoId != null)
+  if (comObrigacao.length === 0) return mapa
+
+  const processos = [...new Set(comObrigacao.map((u) => u.processoId))]
+  const ciclos = [...new Set(comObrigacao.map((u) => u.ciclo))]
+  const necIds = [...new Set(comObrigacao.map((u) => u.necessidadeId).filter((x): x is number => x != null))]
+  const docIds = [...new Set(comObrigacao.map((u) => u.documentoId).filter((x): x is number => x != null))]
+
+  const porObrigacao: Prisma.TarefaWhereInput[] = []
+  if (necIds.length > 0) porObrigacao.push({ necessidadeId: { in: necIds } })
+  if (docIds.length > 0) porObrigacao.push({ documentoId: { in: docIds } })
+
+  const candidatas = await db.tarefa.findMany({
     where: {
-      processoId: u.processoId,
-      ciclo: u.ciclo,
+      processoId: { in: processos },
+      ciclo: { in: ciclos },
       statusTarefa: { notIn: [...TERMINAIS_DA_UNIDADE] },
       OR: porObrigacao,
     },
     // A MAIS ANTIGA vence: ela é a identidade original do trabalho, e é o
-    // histórico dela que as pessoas reconhecem.
+    // histórico dela que as pessoas reconhecem. A ordem crescente faz o
+    // primeiro encontro de cada unidade já ser o certo.
     orderBy: { id: 'asc' },
-    select: { id: true, workflowInstanceId: true, workflowStepInstanceId: true, statusTarefa: true, chaveIdempotencia: true },
+    select: SELECT_VIVA,
   })
-  return achada
+
+  for (const u of comObrigacao) {
+    const chave = chaveDaUnidade(u)
+    if (mapa.has(chave)) continue
+    const t = candidatas.find(
+      (c) =>
+        c.processoId === u.processoId &&
+        c.ciclo === u.ciclo &&
+        ((u.necessidadeId != null && c.necessidadeId === u.necessidadeId) ||
+          (u.documentoId != null && c.documentoId === u.documentoId)),
+    )
+    if (!t) continue
+    mapa.set(chave, {
+      id: t.id,
+      workflowInstanceId: t.workflowInstanceId,
+      workflowStepInstanceId: t.workflowStepInstanceId,
+      statusTarefa: t.statusTarefa,
+      chaveIdempotencia: t.chaveIdempotencia,
+      responsavelId: t.responsavelId,
+      responsavelNome: t.responsavel?.nome ?? null,
+      dataPrazo: t.dataPrazo,
+      dataConclusao: t.dataConclusao,
+      slaPausadoEm: t.slaPausadoEm,
+      slaPausaAcumuladaMin: t.slaPausaAcumuladaMin,
+      criadaEm: t.createdAt,
+      necessidadeId: t.necessidadeId,
+      documentoId: t.documentoId,
+      ciclo: t.ciclo,
+      processoId: t.processoId,
+    })
+  }
+  return mapa
 }

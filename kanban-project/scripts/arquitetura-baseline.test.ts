@@ -112,9 +112,13 @@ console.log("\n(4) Central Operacional:")
 const drawerDoc = ler("src/components/kanban/DocumentoOperationalDrawer.tsx")
 const drawerEtapa = ler("src/components/kanban/workflow/CentralDaEtapaDrawer.tsx")
 const ordemDoc = [...drawerDoc.matchAll(/\{ id: "(\w+)", label: "([^"]+)" \}/g)].map((m) => m[2])
+// A aba "Operação" saiu: era um segundo cockpit operacional dentro do painel do
+// documento — status, próxima ação, responsável, SLA e atalhos que a linha da
+// Central já responde, com régua de prazo própria. O painel abre no WORKFLOW,
+// que é onde o trabalho acontece.
 ok(JSON.stringify(ordemDoc) === JSON.stringify(
-     ["Operação", "Workflow", "Dados Registrais", "Histórico", "Anexos", "Observações"]),
-  `4.1 D11: as seis abas do documento na ordem congelada (${ordemDoc.join(" · ")})`)
+     ["Workflow", "Dados Registrais", "Histórico", "Anexos", "Observações"]),
+  `4.1 D11: as cinco abas do documento na ordem congelada (${ordemDoc.join(" · ")})`)
 ok(/type TabId = "anexos" \| "comentarios" \| "timeline"/.test(drawerEtapa),
   "4.2 D11: a etapa tem exatamente três abas")
 ok(!/display:\s*none|featureFlag|FEATURE_/.test(drawerDoc + drawerEtapa),

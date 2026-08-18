@@ -4,24 +4,38 @@
 //
 // REGRA DE INTERFACE (a razão de este arquivo existir):
 //
-//   A Central Operacional INDEXA. O modal do documento EXECUTA.
+//   A Central Operacional INDEXA. O painel do documento EXECUTA.
 //
 //   Central Operacional
 //   └── Linha principal / Fora da linhagem
 //       └── PESSOA (card, com contadores)
 //           └── DOCUMENTO (uma linha na tabela)
-//               └── "Abrir detalhes" → modal do documento → aba Workflow
-//                                      └── passos, status, responsável, SLA,
-//                                          bloqueios, ações e Operação Antecipada
+//               └── AÇÃO → painel do documento, ABERTO NO WORKFLOW DELE
+//                          └── passo atual em foco → Central da Etapa → executor
 //
-// FORA DO MODAL não aparece NADA de execução: nem passo, nem nome de passo, nem
-// status de passo, nem executor, nem responsável de passo, nem SLA, nem prazo, nem
-// motivo de bloqueio, nem botão por passo, nem Operação Antecipada, nem barra de
-// progresso do workflow, nem "1/5 passos". Isso não é filtro de renderização — o DTO
-// que esta tela recebe (IndiceOperacional) não carrega essas coisas.
+// O CAMINHO É UM SÓ. A ação da linha ("Iniciar", "Continuar", "Ver etapa", "Ver
+// bloqueio", "Ver detalhes") muda de nome conforme o estado, nunca de destino:
+// leva sempre ao workflow daquele documento. Havia um desvio — o painel abria
+// numa aba "Operação" que repetia status, próxima ação, responsável, SLA e
+// atalhos, com régua de prazo própria. Era uma Central dentro da Central, e
+// exigia mais um clique para chegar onde o trabalho acontece.
 //
-// Duas telas desenhando o mesmo workflow divergem no primeiro dia em que uma delas
-// deixa de ser atualizada. Só existe um executor: a aba Workflow do documento.
+// O QUE A LINHA MOSTRA, E DE ONDE VEM:
+//
+//   PROGRESSO   workflow do documento, ponderado pelo peso publicado dos passos
+//   ETAPA       passo corrente do workflow
+//   RESPONSÁVEL  TAREFA — a unidade operacional
+//   PRAZO        TAREFA
+//   STATUS       TAREFA (o estado DOCUMENTAL acompanha, em segundo plano)
+//
+// Responsável, prazo e status saíam todos do PASSO CORRENTE, que tem campos com
+// nomes parecidos e significado outro (quem executa aquela etapa, até quando ela
+// corre). O resultado em produção: a tabela dizia "Sem responsável" e todas as
+// outras telas diziam "Daniela Brait", sobre a mesma certidão.
+//
+// Fora do painel do documento continua não aparecendo NADA de execução: nem
+// botão por passo, nem editor, nem operação antecipada. Isso não é filtro de
+// renderização — o DTO que esta tela recebe (IndiceOperacional) não os carrega.
 
 "use client"
 
@@ -215,7 +229,16 @@ export function PainelDaFase({
           <div className="bg-[#1b2027] border border-white/10 rounded-xl px-5 py-4 mb-5">
             <div className="flex items-center justify-between gap-4 mb-2 flex-wrap">
               <div>
-                <div className="text-[13px] font-semibold text-white/55 mb-1">Progresso da fase {faseNome}</div>
+                {/* O QUE ESTE NÚMERO CONTA — dito no rótulo.
+                    O topo mede DOCUMENTOS INTEIROS concluídos (a mesma régua do
+                    gate de avanço): 0 de 1 validado é 0%, mesmo com a certidão a
+                    44%. A linha mede o WORKFLOW daquele documento, ponderado
+                    pelo peso dos passos. São duas perguntas, e chamar as duas de
+                    "progresso da fase" fazia o operador achar que uma delas
+                    estava errada. */}
+                <div className="text-[13px] font-semibold text-white/55 mb-1">
+                  Documentos concluídos na {faseNome}
+                </div>
                 <div className="text-[28px] font-extrabold text-white/95 leading-none">{progressoPct}%</div>
               </div>
               <div className="text-[13px] text-white/55">{progressoConcluidos} de {progressoTotal} documentos validados</div>
@@ -1006,7 +1029,7 @@ function CelulaPrazo({ f }: { f: DocumentoDoIndice["naFase"] }) {
 /** O rótulo da AÇÃO segue o estado — o mesmo vocabulário da Minha Fila. */
 function rotuloDaAcao(f: DocumentoDoIndice["naFase"]): string {
   switch (f.estado) {
-    case "A_FAZER": return "Abrir"
+    case "A_FAZER": return "Iniciar"
     case "EM_ANDAMENTO": return "Continuar"
     case "AGUARDANDO_TERCEIRO": return "Ver etapa"
     case "BLOQUEADA": return "Ver bloqueio"
@@ -1091,15 +1114,29 @@ function LinhaDocumento({
 
       <CelulaPrazo f={doc.naFase} />
 
-      <div className="flex items-center gap-1.5 min-w-0">
-        <span className={`text-[11px] font-bold px-2.5 py-1 rounded-full whitespace-nowrap ${CLS_ESTADO[doc.naFase.estado]}`}>
-          {doc.naFase.estadoLabel}
-        </span>
-        {/* ATRASADA NÃO É STATUS — é uma condição que acompanha o status. */}
-        {doc.naFase.atrasado && (
-          <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-[#f87171]/15 text-[#f87171] whitespace-nowrap">
-            Atrasada
+      {/* STATUS OPERACIONAL DA TAREFA em primeiro plano; o ESTADO DOCUMENTAL
+          abaixo, em segundo. São perguntas diferentes — "como vai o trabalho" e
+          "o que este registro é hoje" — e as duas têm resposta. A tabela da fase
+          responde a primeira; a segunda acompanha, nunca substitui. */}
+      <div className="min-w-0">
+        <div className="flex items-center gap-1.5 min-w-0">
+          <span className={`text-[11px] font-bold px-2.5 py-1 rounded-full whitespace-nowrap ${CLS_ESTADO[doc.naFase.estado]}`}>
+            {doc.naFase.estadoLabel}
           </span>
+          {/* ATRASADA NÃO É STATUS — é uma condição que acompanha o status. */}
+          {doc.naFase.atrasado && (
+            <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-[#f87171]/15 text-[#f87171] whitespace-nowrap">
+              Atrasada
+            </span>
+          )}
+        </div>
+        {doc.naFase.statusDocumentalLabel && (
+          <div
+            className="text-[10.5px] text-white/35 mt-1 truncate"
+            title={`Estado do documento: ${doc.naFase.statusDocumentalLabel}`}
+          >
+            Doc.: {doc.naFase.statusDocumentalLabel}
+          </div>
         )}
       </div>
 

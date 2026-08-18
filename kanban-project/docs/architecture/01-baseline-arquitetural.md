@@ -176,7 +176,7 @@ Cada uma tem teste automático. Quebrar qualquer uma é regressão.
 | D8 | Guards **recusam**, nunca corrigem | correção silenciosa foi como o cadastro chegou a estados inválidos |
 | D9 | Ambíguo não se repara | vincular sem de onde deduzir é inventar |
 | D10 | `ON DELETE SET NULL` no documento permanece | CASCADE apagaria histórico do passo; RESTRICT impediria excluir pessoa |
-| D11 | Abas: só o que o operador usa | etapa = Anexos/Observações/Timeline; documento = 6 abas. Remoção é de apresentação; o domínio fica |
+| D11 | Abas: só o que o operador usa | etapa = Anexos/Observações/Timeline; documento = 5 abas, começando pelo Workflow. Remoção é de apresentação; o domínio fica |
 | D12 | Fingerprint do banco por hash de host+db+prefixo | verifica identidade sem guardar segredo |
 
 ---

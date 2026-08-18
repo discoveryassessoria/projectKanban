@@ -36,9 +36,15 @@ import {
   type IndiceOperacional,
   type PassoBruto,
   type StatusResumo,
+  type TarefasPorChave,
 } from "./estrutura-operacional-core"
 import { getStepsForFase, getStepDef, phaseKeyToFaseCode } from "./fases-catalog"
 import { diasEntreDiasOperacionais } from "@/lib/operacional/tempo-operacional"
+import {
+  chaveDaUnidade,
+  tarefasVivasDasUnidades,
+  type UnidadeDeTrabalho,
+} from "@/lib/operacional/identidade-da-tarefa"
 import { resolverInstanciaVigente } from "./instancia-vigente-da-fase"
 
 // ============================================================
@@ -74,6 +80,32 @@ export const TIPO_DOCUMENTO_LABELS: Record<string, string> = {
 export function rotuloTipoDocumento(tipo: string | null | undefined): string | null {
   if (!tipo) return null
   return TIPO_DOCUMENTO_LABELS[tipo] ?? tipo
+}
+
+/**
+ * O ESTADO DOCUMENTAL em português — o que o REGISTRO é hoje.
+ *
+ * Fica aqui, ao lado dos rótulos de tipo, porque esta é a camada de leitura da
+ * Central: a tela recebe a frase pronta e não traduz enum. É informação
+ * SECUNDÁRIA da linha — "Solicitado" descreve o documento, não o trabalho, e
+ * nunca ocupa o lugar do status operacional da Tarefa.
+ */
+export const DOCUMENTO_STATUS_LABELS: Record<string, string> = {
+  PENDENTE: "Pendente",
+  SOLICITADO: "Solicitado",
+  EM_BUSCA: "Em busca",
+  SOLICITAR: "Solicitar",
+  RECEBIDO: "Recebido",
+  EM_ANALISE: "Em análise",
+  RETIFICANDO: "Retificando",
+  EM_TRADUCAO: "Em tradução",
+  TRADUZIDO: "Traduzido",
+  EM_APOSTILAMENTO: "Em apostilamento",
+  APOSTILADO: "Apostilado",
+  ENTREGUE: "Entregue",
+  INVALIDO: "Inválido",
+  NAO_ENCONTRADO: "Não encontrado",
+  CANCELADO: "Cancelado",
 }
 
 const STATUS_NECESSIDADE_LABELS: Record<string, string> = {
@@ -124,6 +156,14 @@ export interface EstruturaFaseResultado {
   estrutura: EstruturaOperacional
   /** Ocorrências detectadas nesta leitura (também emitidas no log estruturado). */
   diagnosticos: DiagnosticoEstrutura[]
+  /**
+   * CICLO DA OBRIGAÇÃO por necessidade — parte da IDENTIDADE da tarefa.
+   *
+   * Não é o ciclo da FASE: a fase sobe de ciclo a cada ida e volta, a obrigação
+   * só sobe quando a exigência é outra. Quem procura a tarefa de um documento
+   * precisa do ciclo certo, senão não encontra a que existe.
+   */
+  cicloDaObrigacao: Map<number, number>
 }
 
 /** Roster já carregado pelo chamador (evita reler a árvore na mesma requisição). */
@@ -171,7 +211,7 @@ export async function getPhaseOperationalStructure(
     registrar(d)
   }
 
-  if (!ctx.faseMacroKey) return { estrutura: ESTRUTURA_VAZIA, diagnosticos }
+  if (!ctx.faseMacroKey) return { estrutura: ESTRUTURA_VAZIA, diagnosticos, cicloDaObrigacao: new Map() }
 
   // ------------------------------------------------------------
   // 1) ROSTER — vínculo oficial com a árvore. A pessoa existe na Central por estar
@@ -235,7 +275,7 @@ export async function getPhaseOperationalStructure(
   // Fase sem instância materializada: as PESSOAS continuam aparecendo (o roster não
   // depende de trabalho). O que falta é workflow publicado, e isso a tela diz.
   if (instancias.length === 0) {
-    return { estrutura: montarEstruturaOperacional({ pessoas, passos: [], alvos: [] }), diagnosticos }
+    return { estrutura: montarEstruturaOperacional({ pessoas, passos: [], alvos: [] }), diagnosticos, cicloDaObrigacao: new Map() }
   }
 
   // ------------------------------------------------------------
@@ -245,7 +285,7 @@ export async function getPhaseOperationalStructure(
   const respIds = [...new Set(instancias.map((s) => s.responsavelId).filter((x): x is number => x != null))]
 
   const SELECT_NECESSIDADE = {
-    id: true, pessoaId: true, status: true, matrizSnapshot: true,
+    id: true, pessoaId: true, status: true, matrizSnapshot: true, ciclo: true,
     itemCatalogo: { select: { name: true } },
     // Certidão de casamento tem a UNIÃO como sujeito. O titular operacional é
     // pessoa1 — mesma régua do motor documental, nunca uma escolha de tela.
@@ -524,7 +564,7 @@ export async function getPhaseOperationalStructure(
     diag("ALVO_SEM_DONO", { chave: a.chave, necessidadeId: a.necessidadeId, documentoId: a.documentoId })
   }
 
-  return { estrutura, diagnosticos }
+  return { estrutura, diagnosticos, cicloDaObrigacao: new Map(necessidades.map((n) => [n.id, n.ciclo])) }
 }
 
 // ============================================================
@@ -556,7 +596,7 @@ export async function getPhaseOperationalSummary(
   opcoes: EstruturaFaseOpcoes = {},
 ): Promise<IndiceFaseResultado> {
   const db = opcoes.db ?? prisma
-  const { estrutura, diagnosticos } = await getPhaseOperationalStructure(ctx, opcoes)
+  const { estrutura, diagnosticos, cicloDaObrigacao } = await getPhaseOperationalStructure(ctx, opcoes)
 
   // ARTEFATOS — colunas "Certidão retificada", "Tradução" e "Apostila" da tabela.
   // Vêm dos registros OFICIAIS do documento; o que o domínio não registra fica
@@ -569,6 +609,54 @@ export async function getPhaseOperationalSummary(
   ]
   const docIds = alvos.map((a) => a.documentoId).filter((x): x is number => x != null)
   const artefatos: ArtefatosPorChave = new Map()
+
+  // ────────────────────────────────────────────────────────────────────────────
+  // A TAREFA CANÔNICA DE CADA DOCUMENTO — responsável, prazo e status da linha.
+  //
+  // A tabela lia os três do PASSO CORRENTE, que tem campos com nomes parecidos e
+  // significado outro: `responsavelId` do passo é quem executa AQUELA etapa,
+  // `prazo` do passo é até quando ELA corre. Em produção os cinco passos da
+  // certidão do Ademir estavam com responsável nulo enquanto a Tarefa era da
+  // Daniela — a tabela dizia "Sem responsável", o drawer dizia "Daniela Brait",
+  // e a Minha Fila dizia "Daniela Brait". Duas verdades para o mesmo trabalho.
+  //
+  // A identidade da tarefa NÃO é resolvida aqui: vem de `identidade-da-tarefa`,
+  // o dono único da pergunta "qual é a tarefa desta obrigação". Aqui só se
+  // pergunta por TODAS as unidades da fase de uma vez — 1 consulta, não 500.
+  // ────────────────────────────────────────────────────────────────────────────
+  const unidades: UnidadeDeTrabalho[] = []
+  const unidadePorChave = new Map<string, UnidadeDeTrabalho>()
+  for (const a of alvos) {
+    if (a.necessidadeId == null && a.documentoId == null) continue
+    const u: UnidadeDeTrabalho = {
+      processoId: ctx.processoId,
+      necessidadeId: a.necessidadeId,
+      documentoId: a.documentoId,
+      pessoaId: a.pessoaId,
+      // O ciclo da OBRIGAÇÃO. Sem necessidade registrada não há obrigação a
+      // consultar, e o ciclo 1 é o que a materialização grava nesse caso.
+      ciclo: (a.necessidadeId != null ? cicloDaObrigacao.get(a.necessidadeId) : null) ?? 1,
+    }
+    unidades.push(u)
+    unidadePorChave.set(a.chave, u)
+  }
+  const vivas = await tarefasVivasDasUnidades(db, unidades)
+  const tarefas: TarefasPorChave = new Map()
+  for (const [chave, u] of unidadePorChave) {
+    const t = vivas.get(chaveDaUnidade(u))
+    if (!t) continue
+    tarefas.set(chave, {
+      taskId: t.id,
+      statusTarefa: t.statusTarefa,
+      responsavelId: t.responsavelId,
+      responsavelNome: t.responsavelNome,
+      dataPrazo: t.dataPrazo?.toISOString() ?? null,
+      dataConclusao: t.dataConclusao?.toISOString() ?? null,
+      slaPausadoEm: t.slaPausadoEm?.toISOString() ?? null,
+      slaPausaAcumuladaMin: t.slaPausaAcumuladaMin,
+      criadaEm: t.criadaEm?.toISOString() ?? null,
+    })
+  }
 
   if (docIds.length > 0) {
     const [documentos, retificadas] = await Promise.all([
@@ -602,9 +690,13 @@ export async function getPhaseOperationalSummary(
           d?.apostilado === true || d?.status === "APOSTILADO",
           d?.status === "EM_APOSTILAMENTO",
         ),
+        // ESTADO DOCUMENTAL — o que o REGISTRO é hoje. Vem junto (mesma leitura,
+        // zero consulta a mais) e a tela o mostra como informação secundária: ele
+        // responde "o que é este documento", não "como vai o trabalho".
+        statusDocumentalLabel: d ? DOCUMENTO_STATUS_LABELS[String(d.status)] ?? String(d.status) : null,
       })
     }
   }
 
-  return { indice: montarIndiceOperacional(estrutura, artefatos), diagnosticos }
+  return { indice: montarIndiceOperacional(estrutura, artefatos, tarefas), diagnosticos }
 }

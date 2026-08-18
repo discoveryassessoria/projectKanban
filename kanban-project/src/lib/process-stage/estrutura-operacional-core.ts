@@ -251,6 +251,51 @@ export interface ArtefatosDoDocumento {
 }
 
 /**
+ * A TAREFA CANÔNICA DO ALVO — a unidade operacional de trabalho daquele documento.
+ *
+ * Chega de fora JÁ RESOLVIDA (`tarefasVivasDasUnidades`), porque a identidade da
+ * tarefa tem um dono só e não é este arquivo. O núcleo não procura tarefa, não
+ * escolhe entre duas e não infere responsável: recebe a que o domínio diz ser a
+ * daquela obrigação e a projeta.
+ *
+ * Os campos temporais vêm todos porque a régua canônica precisa dos quatro: o
+ * prazo sozinho não sabe que o relógio parou numa espera nem que o trabalho
+ * acabou.
+ */
+export interface TarefaDoAlvo {
+  taskId: number
+  statusTarefa: string
+  responsavelId: number | null
+  responsavelNome: string | null
+  dataPrazo: string | null
+  dataConclusao: string | null
+  slaPausadoEm: string | null
+  slaPausaAcumuladaMin: number | null
+  criadaEm: string | null
+}
+
+/** Tarefa canônica por CHAVE DE ALVO (a mesma `chaveDoAlvo` da estrutura). */
+export type TarefasPorChave = Map<string, TarefaDoAlvo>
+
+/**
+ * STATUS DA TAREFA → ESTADO DA LINHA.
+ *
+ * Um mapeamento, escrito uma vez. A tabela da fase, a Minha Fila e o Kanban
+ * falam do MESMO trabalho: se cada uma traduzir o status por conta própria, a
+ * mesma tarefa fica "Em andamento" numa tela e "A fazer" na outra sem que
+ * nenhum dado tenha mudado.
+ */
+const ESTADO_POR_STATUS_TAREFA: Record<string, EstadoOperacionalDaLinha> = {
+  NAO_INICIADA: "A_FAZER",
+  EM_ANDAMENTO: "EM_ANDAMENTO",
+  AGUARDANDO_CLIENTE: "AGUARDANDO_TERCEIRO",
+  AGUARDANDO_TERCEIRO: "AGUARDANDO_TERCEIRO",
+  BLOQUEADA: "BLOQUEADA",
+  CONCLUIDO_RECEBIDO: "CONCLUIDA",
+  CONCLUIDO_NAO_POSSUI: "CONCLUIDA",
+}
+
+/**
  * O ESTADO OPERACIONAL DA TAREFA — o que a linha da fase precisa responder.
  *
  * Deriva dos passos JÁ carregados do alvo. Não é um status novo: é a mesma
@@ -285,6 +330,15 @@ export interface EstadoNaFase {
   progresso: ProgressoEstrutura
   /** Nome humano do passo corrente — nunca a chave técnica. */
   etapaAtual: string | null
+  /**
+   * A TAREFA que responde por este documento nesta fase. É ela que o "Continuar"
+   * continua, é ela que aparece na Minha Fila e no Kanban, e é dela que saem
+   * responsável, prazo e status desta linha.
+   *
+   * `null` = não existe tarefa viva para esta obrigação. A linha diz isso; não
+   * inventa dono nem prazo para preencher coluna.
+   */
+  taskId: number | null
   responsavelId: number | null
   responsavelNome: string | null
   prazo: string | null
@@ -298,6 +352,15 @@ export interface EstadoNaFase {
   rotuloDoPrazo: string
   /** Por que está parado, quando está. */
   motivoBloqueio: string | null
+  /**
+   * O ESTADO DOCUMENTAL — "Solicitado", "Recebido", "Em análise".
+   *
+   * Fala do DOCUMENTO (o que o registro é hoje), não do TRABALHO (como está a
+   * execução). São duas perguntas diferentes e as duas têm resposta: fundi-las
+   * apagaria uma. Por isso ele vem SEPARADO e a tela o mostra como informação
+   * secundária — nunca no lugar do status operacional.
+   */
+  statusDocumentalLabel: string | null
 }
 
 /** Uma LINHA da tabela de documentos da pessoa. Sem nada de execução. */
@@ -644,7 +707,17 @@ export function statusFinalDoAlvo(alvo: AlvoDaEstrutura): StatusResumo {
  * domínio não registra vem como NAO_APLICAVEL — nunca um estado inventado para
  * preencher coluna.
  */
-export type ArtefatosPorChave = Map<string, Partial<ArtefatosDoDocumento>>
+export type ArtefatosPorChave = Map<
+  string,
+  Partial<ArtefatosDoDocumento> & {
+    /**
+     * O rótulo do ESTADO DOCUMENTAL ("Solicitado", "Recebido"). Vem junto porque
+     * sai da mesma leitura do Documento que os artefatos — não é uma consulta a
+     * mais, e é informação SECUNDÁRIA da linha, nunca o status operacional.
+     */
+    statusDocumentalLabel?: string | null
+  }
+>
 
 /**
  * O PASSO CORRENTE DO ALVO — o que uma pessoa chamaria de "onde isso está".
@@ -665,52 +738,90 @@ const STATUS_ESPERA_EXTERNA = new Set(["AGUARDANDO", "AGUARDANDO_APROVACAO"])
 /**
  * COMO ESTE DOCUMENTO ESTÁ NESTA FASE — derivado, nunca gravado.
  *
+ * ─── DE ONDE VEM CADA COISA ─────────────────────────────────────────────────
+ * ETAPA ATUAL vem do WORKFLOW: é o passo em que o trabalho está.
+ * RESPONSÁVEL, PRAZO e STATUS vêm da TAREFA, que é a unidade operacional.
+ *
+ * A separação não é estética. Esta função lia os TRÊS do passo corrente, e o
+ * passo tem os seus próprios `responsavelId` e `prazo` — campos que existem para
+ * dizer QUEM EXECUTA AQUELA ETAPA e ATÉ QUANDO ELA corre, não quem responde pelo
+ * trabalho. Em produção (processo 523, certidão do Ademir) os cinco passos
+ * tinham `responsavelId` nulo enquanto a Tarefa #3358 era da Daniela: a tabela
+ * dizia "Sem responsável" e todas as outras telas diziam "Daniela Brait". O
+ * mesmo com o prazo: o passo vencia 14/08, a Tarefa 15/08, e cada tela mostrava
+ * a sua data.
+ *
  * `atrasado` é CONDIÇÃO, não estado: uma tarefa atrasada continua "Em
  * andamento". Colapsar as duas coisas num status só apagaria a informação de
  * que ela está sendo trabalhada.
+ *
+ * SEM TAREFA VIVA a linha não inventa dono nem prazo: cai para o que o workflow
+ * sabe dizer sozinho (o estado derivado dos passos) e deixa responsável e prazo
+ * vazios. Documento concluído normalmente está aqui — a tarefa terminou e
+ * história não é pendência.
  */
-function estadoNaFase(alvo: AlvoDaEstrutura): EstadoNaFase {
+function estadoNaFase(
+  alvo: AlvoDaEstrutura,
+  tarefa: TarefaDoAlvo | null,
+  statusDocumentalLabel: string | null,
+): EstadoNaFase {
   const corrente = passoCorrente(alvo)
   const concluido = corrente == null
 
-  const estado: EstadoOperacionalDaLinha =
+  // O ESTADO DERIVADO DOS PASSOS — usado quando não há tarefa viva, e só então.
+  const estadoDosPassos: EstadoOperacionalDaLinha =
     concluido ? "CONCLUIDA"
     : corrente!.bloqueado && corrente!.motivoBloqueio != null ? "BLOQUEADA"
     : STATUS_ESPERA_EXTERNA.has(String(corrente!.status).toUpperCase()) ? "AGUARDANDO_TERCEIRO"
     : corrente!.balde === "EM_ANDAMENTO" ? "EM_ANDAMENTO"
     : "A_FAZER"
 
-  // O prazo é o do passo corrente; concluído não tem prazo a vencer.
-  const prazo = concluido ? null : corrente!.prazo
-  const dias = concluido ? null : corrente!.diasParaPrazo
-  // A FRASE vem da régua canônica, para a tabela da fase dizer exatamente o que
-  // a Minha Fila diz sobre a mesma tarefa.
+  // STATUS OPERACIONAL = O DA TAREFA. A coerência passo↔tarefa é garantida na
+  // escrita (assegurarCoerenciaPassoTarefa), então os dois não podem se
+  // contradizer; onde eles legitimamente DIFEREM — passo DISPONIVEL com tarefa
+  // já iniciada — quem tem razão é a tarefa, porque é ela que alguém começou.
+  const estado: EstadoOperacionalDaLinha =
+    tarefa != null ? ESTADO_POR_STATUS_TAREFA[tarefa.statusTarefa] ?? estadoDosPassos : estadoDosPassos
+
+  // O PRAZO É O DA TAREFA. A previsão que o cartório deu continua no andamento
+  // da etapa, que é onde ela foi registrada — não vira prazo de ninguém.
+  const prazo = tarefa?.dataPrazo ?? null
+  // A FRASE vem da régua canônica, com as MESMAS entradas que a Minha Fila usa
+  // para a mesma tarefa: sem `dataConclusao` e sem a pausa de SLA, a régua
+  // responderia sobre outro trabalho.
   const tempo = estadoTemporal({
     dataPrazo: prazo,
-    statusTarefa: concluido ? 'CONCLUIDO_RECEBIDO' : null,
+    dataConclusao: tarefa?.dataConclusao ?? null,
+    statusTarefa: tarefa?.statusTarefa ?? (concluido ? 'CONCLUIDO_RECEBIDO' : null),
     aguardandoTerceiro: estado === 'AGUARDANDO_TERCEIRO',
+    slaPausadoEm: tarefa?.slaPausadoEm ?? null,
+    slaPausaAcumuladaMin: tarefa?.slaPausaAcumuladaMin ?? null,
+    criadaEm: tarefa?.criadaEm ?? null,
   })
 
   return {
     progresso: alvo.progresso,
     // Título do passo publicado — o rótulo humano, nunca a stepKey.
     etapaAtual: concluido ? null : corrente!.titulo,
-    responsavelId: concluido ? null : corrente!.responsavelId,
-    responsavelNome: concluido ? null : corrente!.responsavelNome,
+    taskId: tarefa?.taskId ?? null,
+    responsavelId: tarefa?.responsavelId ?? null,
+    responsavelNome: tarefa?.responsavelNome ?? null,
     prazo,
-    diasParaPrazo: dias,
-    atrasado: !concluido && dias != null && dias < 0,
-    venceHoje: !concluido && dias === 0,
+    diasParaPrazo: tempo.diasParaPrazo,
+    atrasado: tempo.atrasado,
+    venceHoje: tempo.venceHoje,
     estado,
     estadoLabel: ROTULO_ESTADO_LINHA[estado],
     rotuloDoPrazo: tempo.rotulo,
     motivoBloqueio: concluido ? null : corrente!.motivoBloqueio,
+    statusDocumentalLabel,
   }
 }
 
 function montarDocumentoDoIndice(
   alvo: AlvoDaEstrutura,
   artefatos: ArtefatosPorChave | undefined,
+  tarefas: TarefasPorChave | undefined,
 ): DocumentoDoIndice {
   const statusFinal = statusFinalDoAlvo(alvo)
   const extra = artefatos?.get(alvo.chave) ?? {}
@@ -737,14 +848,18 @@ function montarDocumentoDoIndice(
     },
     statusFinal,
     statusFinalLabel: ROTULO_STATUS_RESUMO[statusFinal],
-    naFase: estadoNaFase(alvo),
+    naFase: estadoNaFase(alvo, tarefas?.get(alvo.chave) ?? null, extra.statusDocumentalLabel ?? null),
     podeAbrirDetalhes: comExecutor,
     impedimento,
   }
 }
 
-function montarPessoaDoIndice(linha: PessoaDaEstrutura, artefatos: ArtefatosPorChave | undefined): PessoaDoIndice {
-  const documentos = linha.documentos.map((d) => montarDocumentoDoIndice(d, artefatos))
+function montarPessoaDoIndice(
+  linha: PessoaDaEstrutura,
+  artefatos: ArtefatosPorChave | undefined,
+  tarefas: TarefasPorChave | undefined,
+): PessoaDoIndice {
+  const documentos = linha.documentos.map((d) => montarDocumentoDoIndice(d, artefatos, tarefas))
   return {
     pessoa: linha.pessoa,
     documentos,
@@ -770,11 +885,12 @@ function montarPessoaDoIndice(linha: PessoaDaEstrutura, artefatos: ArtefatosPorC
 export function montarIndiceOperacional(
   estrutura: EstruturaOperacional,
   artefatos?: ArtefatosPorChave,
+  tarefas?: TarefasPorChave,
 ): IndiceOperacional {
-  const linhaPrincipal = estrutura.linhaPrincipal.map((l) => montarPessoaDoIndice(l, artefatos))
-  const foraDaLinha = estrutura.foraDaLinha.map((l) => montarPessoaDoIndice(l, artefatos))
-  const pendenteClassificacao = estrutura.pendenteClassificacao.map((l) => montarPessoaDoIndice(l, artefatos))
-  const semDono = estrutura.semDono.map((d) => montarDocumentoDoIndice(d, artefatos))
+  const linhaPrincipal = estrutura.linhaPrincipal.map((l) => montarPessoaDoIndice(l, artefatos, tarefas))
+  const foraDaLinha = estrutura.foraDaLinha.map((l) => montarPessoaDoIndice(l, artefatos, tarefas))
+  const pendenteClassificacao = estrutura.pendenteClassificacao.map((l) => montarPessoaDoIndice(l, artefatos, tarefas))
+  const semDono = estrutura.semDono.map((d) => montarDocumentoDoIndice(d, artefatos, tarefas))
 
   const todos = [
     ...linhaPrincipal.flatMap((p) => p.documentos),

@@ -15,7 +15,7 @@
 | **D8** | Guards **recusam**, nunca corrigem | correção silenciosa foi como o cadastro chegou aos estados inválidos |
 | **D9** | Ambíguo **não** se repara | vincular sem de onde deduzir é inventar |
 | **D10** | `ON DELETE SET NULL` no documento permanece | CASCADE apagaria o histórico do passo; RESTRICT impediria excluir pessoa da árvore. As duas são piores que o vínculo nulo. |
-| **D11** | Abas: só o que o operador usa | etapa = Anexos/Observações/Timeline; documento = 6 abas. Remoção é de **apresentação**; o domínio permanece intacto. |
+| **D11** | Abas: só o que o operador usa | etapa = Anexos/Observações/Timeline; documento = 5 abas, a primeira sendo o **Workflow**. A aba "Operação" era um segundo cockpit da Central dentro do painel do documento; o que só existia nela (iniciar operação não materializada) virou corpo do painel. Remoção é de **apresentação**; o domínio permanece intacto. |
 | **D12** | Fingerprint do banco por hash de host+db+prefixo | verifica identidade sem guardar segredo |
 | **D13** | Perfil Operacional é definido no **Cadastro Mestre**; o Workflow Interno apenas **consome** o contrato | quem sabe o que o documento é, é o cadastro. O workflow executa. |
 | **D14** | A baseline verifica **invariantes**, nunca ids | prender a arquitetura ao processo 505 transformou uso normal do sistema em falha de build. Corrigido no mesmo dia. |

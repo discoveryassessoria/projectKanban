@@ -6,14 +6,12 @@ import { estadoTemporal } from "@/lib/operacional/tempo-operacional"
 
 import { useState, useEffect, useCallback, useMemo, useRef } from "react"
 import { useApi } from "@/src/lib/dados"
-import type { WorkflowShape } from "./TabOperationCockpit"
 import { createPortal } from "react-dom"
 import { X, Loader2, AlertTriangle, UserRound, Clock, CalendarDays, FileText } from "lucide-react"
 import { usePermissoes } from "@/src/hooks/use-permissoes"
 import { WorkflowTab, type ContextoAntecipada } from "./workflow/WorkflowTab"
 import { InitOperationModal } from "./InitOperationModal"
 import { WorkflowControls } from "./WorkflowControls"
-import { TabOperationCockpit } from "./TabOperationCockpit"
 
 // ============================================================
 // LABELS (mantidos no componente porque o GET retorna o documento cru)
@@ -156,14 +154,6 @@ interface DocumentoOperationalDrawerProps {
    * só encaminha, sem resolver nada por texto.
    */
   contextoAntecipada?: ContextoAntecipada
-  /**
-   * A ABA EM QUE O DRAWER ABRE.
-   *
-   * Quem chega pela fila vem para EXECUTAR: abrir em "Operação" e obrigar mais
-   * um clique até "Workflow" desfaz metade do que o deep-link resolveu. Quem
-   * abre pela listagem continua caindo na visão geral do documento.
-   */
-  abaInicial?: "operation" | "workflow"
 }
 
 import {
@@ -171,18 +161,28 @@ import {
   AbaObservacoesDocumentais,
 } from "./documento/AbasDocumentais"
 
-// ABAS DO DOCUMENTO — as seis que o operador realmente usa, nesta ordem.
+// ABAS DO DOCUMENTO — as cinco que o operador realmente usa, nesta ordem.
 //
-// Saíram: Divergências, Devoluções, Tentativas e Auditoria (eram placeholders — a
-// aba existia, o conteúdo não) e Protocolo. A de Protocolo saiu por outro motivo:
-// os dados dela existem e são canônicos, mas já aparecem onde o trabalho acontece
-// — na etapa "Solicitar certidão", nos Anexos da etapa e do documento e na etapa
-// "Aguardar retorno". Uma aba a mais era uma segunda vitrine do mesmo registro.
+// A primeira é o WORKFLOW, porque é onde o trabalho acontece. Saiu a aba
+// "Operação": um cockpit com Status documental, Próxima ação, Responsável, SLA,
+// Aging, Prioridade, impeditivos e atalhos para as outras abas. Tudo o que a
+// linha da Central já responde, respondido de novo — e com régua de prazo
+// própria (`Math.round(diff / 86400000)`), que é como a mesma etapa conseguia
+// dizer "sem prazo" aqui e "atrasada" na tabela.
+//
+// O QUE ERA EXCLUSIVO DELE FICOU: "Iniciar operação" para o documento ainda não
+// materializado virou o corpo do painel, com a mesma ação inicial vinda do
+// Workflow Interno. A delegação por PASSO não ficou de propósito — o responsável
+// pelo trabalho é o da TAREFA, e ele se transfere pela porta de tarefa; quem
+// executa cada etapa continua sendo dito e trocado na Central da Etapa.
+//
+// Antes já haviam saído: Divergências, Devoluções, Tentativas e Auditoria (eram
+// placeholders — a aba existia, o conteúdo não) e Protocolo, cujos dados são
+// canônicos mas já aparecem onde o trabalho acontece.
 //
 // NADA foi apagado do domínio: SolicitacaoDocumento, Protocolo, o requerimento e
 // o LogAuditoria continuam intactos e consultáveis. O que saiu foi a exposição.
 type TabId =
-  | "operation"
   | "workflow"
   | "registry"
   | "history"
@@ -199,6 +199,18 @@ interface DocumentOperationalProjection {
   workflowInstanceId: string | null
   stepInstanceId: string | null
   currentStep: { key: string; label: string; status: string } | null
+  /** A TAREFA canônica deste documento — fonte única de responsável/prazo/status. */
+  tarefa: {
+    taskId: number
+    statusTarefa: string
+    responsavelId: number | null
+    responsavelNome: string | null
+    dataPrazo: string | null
+    rotuloDoPrazo: string
+    atrasado: boolean
+    venceHoje: boolean
+    diasParaPrazo: number | null
+  } | null
   nextAction: { key: string; label: string } | null
   permissions: {
     canStart: boolean
@@ -239,14 +251,22 @@ const fmtDateTime = (s: string | null): string => {
  *
  * A conta e a frase vêm da régua canônica; aqui fica só a cor.
  */
-const computeSla = (prazo: string | null): { text: string; cls: string } => {
-  if (!prazo) return { text: "—", cls: "" }
-  const t = estadoTemporal({ dataPrazo: prazo })
-  return {
-    text: t.rotulo,
-    cls: t.tom === "critico" ? "text-[#f87171]" : t.tom === "alerta" ? "text-[#d2a948]" : "text-[#4ade80]",
-  }
+/**
+ * O STATUS OPERACIONAL DA TAREFA em português — o MESMO vocabulário da tabela da
+ * fase e da Minha Fila. O cabeçalho mostrava o estado DOCUMENTAL ("Solicitado")
+ * no campo "Status", e por isso a mesma certidão era "Em andamento" na linha e
+ * "Solicitado" no painel.
+ */
+const ROTULO_STATUS_TAREFA: Record<string, string> = {
+  NAO_INICIADA: "A fazer",
+  EM_ANDAMENTO: "Em andamento",
+  AGUARDANDO_CLIENTE: "Aguardando terceiro",
+  AGUARDANDO_TERCEIRO: "Aguardando terceiro",
+  BLOQUEADA: "Bloqueada",
+  CONCLUIDO_RECEBIDO: "Concluída",
+  CONCLUIDO_NAO_POSSUI: "Concluída",
 }
+
 
 // Relativo "há Xmin/Xh/N dias" para a última movimentação.
 const relativeTime = (s: string | null): string => {
@@ -273,10 +293,38 @@ const relativeTime = (s: string | null): string => {
  * cada carga — e que, entre abrir e o efeito rodar, deixava aparecer a projeção do
  * documento anterior.
  */
-// A forma do workflow vem do próprio consumidor (o cockpit), em vez de ser
-// redeclarada aqui: uma definição, não duas que podem divergir em silêncio. Antes isto
-// trafegava como `any`.
-type WorkflowDoDrawer = WorkflowShape
+// A FORMA DO WORKFLOW que este painel repassa aos controles do topo.
+//
+// Morava em `TabOperationCockpit`, que era o único consumidor além daqui e foi
+// removido junto com a segunda Central. O tipo continua sendo o espelho do que o
+// backend devolve — nunca `any`, que é o que fazia a divergência ficar invisível
+// até alguém ler o JSON na mão.
+interface StepDoDrawer {
+  id: number
+  ordem: number
+  stepKey: string
+  title: string
+  description: string | null
+  weight: number
+  status: string
+  ownerKey: string
+  dueAt: string | Date | null
+  startedAt: string | Date | null
+  completedAt: string | Date | null
+  assignee?: { id: number; nome: string } | null
+  notes?: string | null
+  externalProtocol?: string | null
+}
+
+interface WorkflowDoDrawer {
+  id: number
+  status: string
+  progress: number
+  prioridade?: string | null
+  startedAt: string | Date | null
+  cancelledAt?: string | Date | null
+  steps: StepDoDrawer[]
+}
 
 export function DocumentoOperationalDrawer(props: DocumentoOperationalDrawerProps) {
   if (!props.isOpen) return null
@@ -292,11 +340,17 @@ function ConteudoDrawer({
   backLabel,
   bannerAntecipada,
   contextoAntecipada,
-  abaInicial,
 }: DocumentoOperationalDrawerProps) {
   const { pode } = usePermissoes()
   const [delegandoResp, setDelegandoResp] = useState(false)
-  const [activeTab, setActiveTab] = useState<TabId>(abaInicial ?? "operation")
+  // O DOCUMENTO ABRE NO SEU WORKFLOW.
+  //
+  // A aba de entrada era "Operação": um segundo cockpit com status, próxima
+  // ação, responsável, SLA, aging, impeditivos e atalhos — tudo o que a linha da
+  // Central já diz, dito outra vez, com uma régua de prazo própria. Clicar em
+  // "Continuar" abria uma Central dentro da Central e ainda exigia mais um
+  // clique para chegar onde o trabalho acontece.
+  const [activeTab, setActiveTab] = useState<TabId>("workflow")
   const [salvando, setSalvando] = useState(false)
   const [initModalOpen, setInitModalOpen] = useState(false)
 
@@ -355,56 +409,70 @@ function ConteudoDrawer({
     return () => document.removeEventListener("keydown", onEsc)
   }, [isOpen, onClose])
 
-  // Atribui/troca o responsável do passo (mesmo endpoint do "Transferir" da Central
-  // da Etapa). Reusa o contrato existente; recarrega o drawer ao concluir.
-  const atribuirResponsavel = async (stepId: number, responsavelId: number | null) => {
-    if (!documentoId) return
-    try {
-      await fetch(`/api/documentos/${documentoId}/workflow/steps/${stepId}`, {
-        method: "PATCH",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${localStorage.getItem("authToken")}`,
-        },
-        body: JSON.stringify({ assigneeId: responsavelId }),
-      })
-      await carregar()
-      onSave?.()
-    } catch (e) {
-      console.error("[DocumentoOperationalDrawer] atribuir:", e)
-    }
-  }
-
-  // Salva via PUT (usa o endpoint que já existe)
-  const putDoc = async (patch: Record<string, any>) => {
-    if (!documentoId) return
+  // ────────────────────────────────────────────────────────────────────────────
+  // DELEGAR = TRANSFERIR A TAREFA, pela porta canônica.
+  //
+  // Aqui havia `atribuirResponsavel(stepId, …)`, que fazia PATCH em
+  // `…/workflow/steps/{id}` com `assigneeId` — e isso move o executor DAQUELE
+  // PASSO, não o responsável pelo trabalho. Duas telas ofereciam "delegar" e
+  // cada uma escrevia num lugar: o passo, o documento. A Tarefa, que é a
+  // unidade operacional e a que a Minha Fila lê, não era tocada por nenhuma.
+  //
+  // A porta é `POST /api/tarefas/{id}/atribuir` → `atribuirTarefa`, que já faz
+  // auditoria, notificação e trava otimista. Este componente não decide nada
+  // sobre atribuição: só chama.
+  // ────────────────────────────────────────────────────────────────────────────
+  const delegarTarefa = async (responsavelId: number) => {
+    const taskId = projection?.tarefa?.taskId
+    if (!taskId) return
     setSalvando(true)
     try {
-      await fetch(`/api/documentos/${documentoId}`, {
-        method: "PUT",
+      const r = await fetch(`/api/tarefas/${taskId}/atribuir`, {
+        method: "POST",
         headers: {
           "Content-Type": "application/json",
           Authorization: `Bearer ${localStorage.getItem("authToken")}`,
         },
-        body: JSON.stringify(patch),
+        body: JSON.stringify({ responsavelId }),
       })
+      if (!r.ok) {
+        const j = await r.json().catch(() => null)
+        console.error("[DocumentoOperationalDrawer] delegar:", j?.error ?? r.status)
+      }
       await carregar()
       onSave?.()
     } catch (e) {
-      console.error(e)
+      console.error("[DocumentoOperationalDrawer] delegar:", e)
     } finally {
       setSalvando(false)
     }
   }
 
 
-  const sla = doc ? computeSla(doc.dataPrazoOperacao) : { text: "—", cls: "" }
+  // ────────────────────────────────────────────────────────────────────────────
+  // O CABEÇALHO FALA DA TAREFA — a mesma que a linha da Central mostra.
+  //
+  // Ele lia os três do próprio `Documento`: `responsavelId`, `dataPrazoOperacao`
+  // e `status`. São campos do REGISTRO. Em produção o documento 2111 tinha
+  // `dataPrazoOperacao` nulo enquanto a Tarefa dele estava atrasada — o Drawer
+  // dizia "SLA —" e a tabela da fase dizia "Atrasada". Uma tarefa não pode estar
+  // sem prazo numa tela e vencida na outra.
+  //
+  // O ESTADO DOCUMENTAL não sumiu: continua abaixo, dito como o que é.
+  // ────────────────────────────────────────────────────────────────────────────
+  const tarefa = projection?.tarefa ?? null
+  const sla = tarefa
+    ? {
+        text: tarefa.rotuloDoPrazo,
+        cls: tarefa.atrasado ? "text-[#f87171]" : tarefa.venceHoje ? "text-[#d2a948]" : "text-[#4ade80]",
+      }
+    : { text: "Sem tarefa nesta fase", cls: "text-white/45" }
   const statusCls = doc ? (STATUS_PILL_CLS[doc.status] || STATUS_NEUTRAL_PILL) : ""
   const tipoLabel = doc ? (TIPO_LABELS[doc.tipo] || doc.tipo) : ""
-  const statusLabel = doc ? (STATUS_LABELS[doc.status] || doc.status) : ""
+  const statusDocumentalLabel = doc ? (STATUS_LABELS[doc.status] || doc.status) : ""
+  const statusLabel = tarefa ? ROTULO_STATUS_TAREFA[tarefa.statusTarefa] ?? tarefa.statusTarefa : "Sem tarefa"
 
   const tabsAll: Array<{ id: TabId; label: string; count?: number; danger?: boolean }> = [
-    { id: "operation", label: "Operação" },
     { id: "workflow", label: "Workflow" },
     { id: "registry", label: "Dados Registrais" },
     { id: "history", label: "Histórico" },
@@ -516,15 +584,24 @@ function ConteudoDrawer({
               {/* STATUS BAR — card sólido único, 4 colunas */}
               <div className="bg-[#161b21] border border-white/10 rounded-xl px-4 py-3.5 grid grid-cols-4 gap-4">
                 {/* STATUS */}
-                <div className="flex flex-col gap-1.5">
+                <div className="flex flex-col gap-1.5 min-w-0">
                   <div className="text-[10px] font-bold uppercase tracking-wider text-white/40">
                     Status
                   </div>
                   <div>
-                    <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10.5px] font-bold uppercase tracking-wider ${statusCls}`}>
+                    <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10.5px] font-bold uppercase tracking-wider ${
+                      tarefa ? "bg-[#7dd3fc]/15 text-[#7dd3fc]" : STATUS_NEUTRAL_PILL
+                    }`}>
                       <span className="w-1.5 h-1.5 rounded-full bg-current" />
                       {statusLabel}
                     </span>
+                  </div>
+                  {/* ESTADO DOCUMENTAL — o que o registro é hoje. Informação
+                      secundária: acompanha o status do trabalho, não o substitui.
+                      Era ele que ocupava o campo "Status" e fazia a mesma certidão
+                      ser "Em andamento" na linha e "Solicitado" aqui. */}
+                  <div className={`text-[10.5px] truncate ${statusCls ? "text-white/40" : "text-white/40"}`}>
+                    Documento: {statusDocumentalLabel}
                   </div>
                 </div>
                 {/* RESPONSÁVEL */}
@@ -534,26 +611,37 @@ function ConteudoDrawer({
                   </div>
                   <div className="flex items-center gap-1.5 text-[13px] text-white/85 min-w-0">
                     <UserRound className="w-4 h-4 text-white/50 flex-shrink-0" />
-                    <span className="truncate">{doc.responsavel?.nome || "Não atribuído"}</span>
+                    <span className="truncate">{tarefa?.responsavelNome || "Não atribuído"}</span>
                   </div>
                   {delegandoResp ? (
                     <select
                       autoFocus
                       disabled={salvando}
-                      value={doc.responsavelId ?? ""}
-                      onChange={async (e) => { await putDoc({ responsavelId: e.target.value ? Number(e.target.value) : null }); setDelegandoResp(false) }}
+                      value={tarefa?.responsavelId ?? ""}
+                      onChange={async (e) => {
+                        if (e.target.value) await delegarTarefa(Number(e.target.value))
+                        setDelegandoResp(false)
+                      }}
                       onBlur={() => setDelegandoResp(false)}
                       className="self-start rounded-md border border-white/10 bg-[#12161c] px-1.5 py-1 text-[12px] text-white/85 focus:outline-none focus:border-[#7dd3fc]/50 focus:ring-1 focus:ring-[#7dd3fc]/25 disabled:opacity-50"
                     >
-                      <option value="" className="bg-[#20262e]">— Não atribuído —</option>
+                      <option value="" className="bg-[#20262e]">— selecione —</option>
                       {usuarios.map((u) => (
                         <option key={u.id} value={u.id} className="bg-[#20262e]">{u.nome}</option>
                       ))}
                     </select>
                   ) : (
+                    /* DELEGAR MOVE A TAREFA — pela porta canônica de atribuição, a
+                       mesma que a tela de Tarefas usa. Este botão escrevia
+                       `Documento.responsavelId`: um TERCEIRO lugar para guardar de
+                       quem é o trabalho, que a linha da Central não lê e ninguém
+                       sabia qual valia. Sem tarefa não há a quem delegar — e isso
+                       é dito, não escondido atrás de um botão que não faz nada. */
                     <button
-                      onClick={() => setDelegandoResp(true)}
-                      className="self-start text-[#7dd3fc] text-[12px] hover:underline"
+                      onClick={() => tarefa && setDelegandoResp(true)}
+                      disabled={!tarefa || salvando}
+                      title={tarefa ? "Transferir a tarefa deste documento" : "Sem tarefa nesta fase para delegar"}
+                      className="self-start text-[#7dd3fc] text-[12px] hover:underline disabled:text-white/25 disabled:no-underline disabled:cursor-not-allowed"
                     >
                       Delegar
                     </button>
@@ -569,7 +657,7 @@ function ConteudoDrawer({
                     <span>{sla.text}</span>
                   </div>
                   <div className="text-white/40 text-[11px]">
-                    Prazo: {fmtDateTime(doc.dataPrazoOperacao)}
+                    Prazo: {fmtDateTime(tarefa?.dataPrazo ?? null)}
                   </div>
                 </div>
                 {/* ÚLTIMA MOVIMENTAÇÃO */}
@@ -630,25 +718,30 @@ function ConteudoDrawer({
 
             {/* BODY */}
             <div className="flex-1 overflow-y-auto px-6 py-5" style={{ background: "#0f1419" }}>
-              {activeTab === "operation" && (
-                <TabOperationCockpit
-                  doc={doc as any}
-                  workflow={workflow}
-                  documentoId={documentoId}
-                  usuarios={usuarios}
-                  onAtribuir={atribuirResponsavel}
-                  onAbrirIniciar={() => setInitModalOpen(true)}
-                  onTrocarAba={(tab) => setActiveTab(tab as TabId)}
-                  onAbrirCentralDaEtapa={() => {
-                    setActiveTab("workflow")
-                  }}
-                  // Estado CONFIRMADO pela projeção (nunca durante LOADING). O empty-state
-                  // só aparece quando o backend confirmou NOT_MATERIALIZED; o botão de início
-                  // só quando canStart e usa a ação inicial do Workflow Interno.
-                  notMaterialized={opState === "NOT_MATERIALIZED"}
-                  canStart={projection?.permissions.canStart ?? false}
-                  nextActionLabel={projection?.nextAction?.label ?? null}
-                />
+              {/* OPERAÇÃO NÃO MATERIALIZADA — estado do DOCUMENTO, não uma aba.
+                  Era a única coisa que só existia no cockpit removido: o convite
+                  a iniciar a operação da fase quando ela ainda não existe. Vira
+                  o corpo do painel, porque é o que há para fazer — e some
+                  sozinho assim que a operação passa a existir. */}
+              {opState === "NOT_MATERIALIZED" && (
+                <div className="mb-4 bg-[#161b21] border border-white/10 rounded-xl p-6 text-center">
+                  <h4 className="text-sm font-bold text-white mb-1">
+                    {projection?.permissions.canStart ? "Operação não iniciada" : "Sem operação nesta fase"}
+                  </h4>
+                  <p className="text-[12px] text-white/50 mb-4">
+                    {projection?.permissions.canStart
+                      ? "Este documento ainda não tem operação materializada na fase atual."
+                      : "Este documento não é operado por workflow de documento na fase atual."}
+                  </p>
+                  {projection?.permissions.canStart && (
+                    <button
+                      onClick={() => setInitModalOpen(true)}
+                      className="inline-flex items-center gap-2 px-4 py-2 text-sm font-semibold text-white bg-[#2563eb] hover:bg-[#1d4ed8] rounded-md transition-colors"
+                    >
+                      {projection?.nextAction?.label ? `Iniciar: ${projection.nextAction.label}` : "Iniciar operação"}
+                    </button>
+                  )}
+                </div>
               )}
               {activeTab === "registry" && <TabRegistry doc={doc} tipoLabel={tipoLabel} />}
               {activeTab === "history" && <TabHistory doc={doc} />}

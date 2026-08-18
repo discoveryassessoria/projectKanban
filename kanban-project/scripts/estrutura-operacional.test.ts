@@ -361,7 +361,13 @@ console.log("\n(B2) TELA PRINCIPAL — índice, nunca executor")
 check("o painel recebe o ÍNDICE, não a estrutura", painel.includes("indice: IndiceOperacional") && !painel.includes("estrutura: EstruturaOperacional"))
 check("a Central repassa o índice ao painel", central.includes("indice={bodyData.indice") && central.includes("indice?: IndiceOperacional"))
 check("o painel renderiza pessoa (card) → documento (linha)", painel.includes("function PessoaCard") && painel.includes("function LinhaDocumento"))
-check("a única ação por documento é 'Abrir detalhes'", painel.includes("Abrir detalhes") && painel.includes("onAbrirDetalhes"))
+// UMA AÇÃO POR DOCUMENTO, UM DESTINO SÓ. O rótulo segue o estado ("Iniciar",
+// "Continuar", "Ver etapa", "Ver bloqueio", "Ver detalhes") e todos chamam a
+// MESMA porta — a linha nunca decide para onde ir, só como se chamar.
+check("a única ação por documento chama a porta única",
+  painel.includes("onAbrirDetalhes!(doc)") && painel.includes("rotuloDaAcao(doc.naFase)"))
+check("e o rótulo é derivado do estado, nunca fixo",
+  /case "EM_ANDAMENTO": return "Continuar"/.test(painel) && /case "CONCLUIDA": return "Ver detalhes"/.test(painel))
 // Os componentes de execução NÃO existem mais na tela principal.
 for (const proibido of ["function PassoRow", "function PassoDoWorkflow", "function InstanciaDoPasso", "function WorkflowDaFase", "function DocumentoAccordion", "function PessoaAccordion"]) {
   check(`tela principal não tem "${proibido}"`, !painel.includes(proibido))

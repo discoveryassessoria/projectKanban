@@ -45,6 +45,7 @@ async function limpar() {
   const ids = procs.map((p) => p.id)
   await prisma.phaseWorkflowStepInstance.deleteMany({ where: { processoId: { in: ids } } })
   await prisma.phaseWorkflowInstance.deleteMany({ where: { processoId: { in: ids } } })
+  await prisma.tarefa.deleteMany({ where: { processoId: { in: ids } } })
   await prisma.necessidadeDocumental.deleteMany({ where: { processoId: { in: ids } } })
   await prisma.documento.deleteMany({ where: { descricao: { startsWith: MARCA } } })
   for (const p of procs) if (p.arvoreId) await prisma.pessoa.deleteMany({ where: { arvoreId: p.arvoreId } })
@@ -134,6 +135,38 @@ async function main() {
         chaveIdempotencia: `${MARCA}-s-${i}-${j}`,
       })),
     })
+
+    // A TAREFA DA UNIDADE — o palco só é real com ela.
+    //
+    // Responsável, prazo e status da linha saem daqui: um palco sem tarefa
+    // testaria uma fase que não existe (toda certidão operada tem a sua). O
+    // documento CONCLUÍDO não ganha tarefa viva, como em produção — a terminal
+    // sai da busca canônica e a linha se vira com o workflow.
+    if (feitos < PASSOS.length) {
+      await prisma.tarefa.create({
+        data: {
+          titulo: `${MARCA} Certidão ${i}`,
+          processoId: processo.id,
+          faseMacroKey: FASE,
+          workflowInstanceId: instancia.id,
+          necessidadeId: nec.id,
+          documentoId: doc.id,
+          pessoaId,
+          ciclo: 1,
+          equipeKey: 'equipe_documental',
+          // A cada três documentos um fica na fila, sem responsável — é o
+          // estado "esperando distribuição", e ele precisa aparecer.
+          responsavelId: faixa % 3 !== 0 ? dani.id : null,
+          dataPrazo: faixa === 8 ? new Date(agora.getTime() - 2 * 86400000) : new Date(agora.getTime() + 5 * 86400000),
+          statusTarefa: (faixa === 5 ? 'AGUARDANDO_TERCEIRO'
+            : faixa === 6 ? 'BLOQUEADA'
+            : faixa === 7 ? 'EM_ANDAMENTO'
+            : feitos > 0 ? 'EM_ANDAMENTO'
+            : 'NAO_INICIADA') as never,
+          chaveIdempotencia: `unidade|proc${processo.id}|nec${nec.id}|pes${pessoaId}|c1`,
+        },
+      })
+    }
   }
 
   // ══════════════════════════════════════════════════════════════════════════

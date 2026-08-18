@@ -18,7 +18,7 @@ import {
 // CONSULTA OFICIAL da Central: devolve a fase já na hierarquia de execução
 // (pessoa → documento → workflow do documento → passos). O agrupamento é feito no
 // domínio, por IDs relacionais — a tela não recombina nada por nome.
-import { getPhaseOperationalSummary, TIPO_DOCUMENTO_LABELS } from "@/src/lib/process-stage/estrutura-operacional"
+import { DOCUMENTO_STATUS_LABELS, getPhaseOperationalSummary, TIPO_DOCUMENTO_LABELS } from "@/src/lib/process-stage/estrutura-operacional"
 import { resolverInstanciaVigente } from "@/src/lib/process-stage/instancia-vigente-da-fase"
 import { materializarExecucaoDaFase } from "@/src/services/materializar-fase"
 import type { IndiceOperacional } from "@/src/lib/process-stage/estrutura-operacional-core"
@@ -206,22 +206,9 @@ const STATUS_VALIDADOS = ["RECEBIDO", "ENTREGUE", "APOSTILADO", "TRADUZIDO"]
 // Rótulos de tipo documental: fonte única na camada de leitura da Central.
 const TIPO_LABELS = TIPO_DOCUMENTO_LABELS
 
-const STATUS_LABELS: Record<string, string> = {
-  PENDENTE: "Pendente",
-  SOLICITADO: "Solicitado",
-  EM_BUSCA: "Em busca",
-  SOLICITAR: "Solicitar",
-  RECEBIDO: "Recebido",
-  EM_ANALISE: "Em análise",
-  RETIFICANDO: "Retificando",
-  EM_TRADUCAO: "Em tradução",
-  TRADUZIDO: "Traduzido",
-  EM_APOSTILAMENTO: "Em apostilamento",
-  APOSTILADO: "Apostilado",
-  ENTREGUE: "Entregue",
-  INVALIDO: "Inválido",
-  NAO_ENCONTRADO: "Não encontrado",
-}
+// Rótulos de estado documental: a MESMA tabela da camada de leitura da Central.
+// Uma segunda cópia aqui já divergiu antes ("Invalidado" × "Inválido").
+const STATUS_LABELS = DOCUMENTO_STATUS_LABELS
 
 // ============================================================
 // HANDLER

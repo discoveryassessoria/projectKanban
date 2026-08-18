@@ -25,6 +25,7 @@ import {
   type PassoBruto,
   type AlvoBruto,
   type DocumentoDoIndice,
+  type TarefasPorChave,
 } from '../src/lib/process-stage/estrutura-operacional-core'
 import type { PessoaDoProcesso } from '../src/lib/process-stage/central-operacional-core'
 import {
@@ -34,7 +35,7 @@ import {
   RECORTE_VAZIO,
   type Recorte,
 } from '../src/components/kanban/PainelDaFase'
-import { readFileSync } from 'node:fs'
+import { existsSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
 
 let passou = 0, falhou = 0
@@ -46,6 +47,7 @@ const ok = (nome: string, cond: boolean, extra = '') => {
 const secao = (t: string) => console.log(`\n${t}`)
 const RAIZ = join(__dirname, '..')
 const ler = (p: string) => readFileSync(join(RAIZ, p), 'utf8')
+const existe = (p: string) => existsSync(join(RAIZ, p))
 const semComentarios = (t: string) => t.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '')
 
 // ── O workflow publicado da Emissão Documental, com os pesos do catálogo ─────
@@ -70,6 +72,55 @@ interface Cena {
   responsavelNome?: string | null
   /** Dias até o prazo do passo corrente; negativo = atrasado. */
   diasParaPrazo?: number | null
+  // ── A TAREFA DA UNIDADE ───────────────────────────────────────────────────
+  // Responsável, prazo e status da LINHA saem daqui, não do passo. A cena
+  // descreve os dois lados de propósito: é assim que se prova que a tabela não
+  // volta a ler o passo quando os dois discordam.
+  semTarefa?: boolean
+  statusTarefa?: string
+  tarefaResponsavelId?: number | null
+  tarefaResponsavelNome?: string | null
+  /** Dias até o prazo da TAREFA; negativo = atrasada. */
+  diasParaPrazoTarefa?: number | null
+}
+
+/** O status de tarefa coerente com o passo corrente — o que o motor projetaria. */
+function statusTarefaDaCena(c: Cena): string {
+  if ((c.concluidos ?? 0) >= PUBLICADOS.length) return 'CONCLUIDO_RECEBIDO'
+  if (c.statusTarefa) return c.statusTarefa
+  const st = (c.statusCorrente ?? 'DISPONIVEL').toUpperCase()
+  if (st === 'BLOQUEADO') return 'BLOQUEADA'
+  if (st === 'AGUARDANDO' || st === 'AGUARDANDO_APROVACAO') return 'AGUARDANDO_TERCEIRO'
+  if (st === 'EM_ANDAMENTO') return 'EM_ANDAMENTO'
+  return 'NAO_INICIADA'
+}
+
+/**
+ * A TAREFA VIVA de cada cena, no formato que a camada de I/O entrega.
+ *
+ * Documento concluído NÃO tem tarefa viva (terminal sai da busca canônica) —
+ * é assim em produção, e a projeção precisa continuar coerente sem ela.
+ */
+function tarefasDasCenas(cenas: Cena[]): TarefasPorChave {
+  const m: TarefasPorChave = new Map()
+  let id = 3000
+  for (const c of cenas) {
+    id++
+    if (c.semTarefa || (c.concluidos ?? 0) >= PUBLICADOS.length) continue
+    const dias = c.diasParaPrazoTarefa
+    m.set(`necessidade:${c.necessidadeId}`, {
+      taskId: id,
+      statusTarefa: statusTarefaDaCena(c),
+      responsavelId: c.tarefaResponsavelId ?? null,
+      responsavelNome: c.tarefaResponsavelNome ?? null,
+      dataPrazo: dias != null ? new Date(Date.now() + dias * 86400000).toISOString() : null,
+      dataConclusao: null,
+      slaPausadoEm: null,
+      slaPausaAcumuladaMin: 0,
+      criadaEm: new Date(Date.now() - 5 * 86400000).toISOString(),
+    })
+  }
+  return m
 }
 
 function passosDaCena(c: Cena): PassoBruto[] {
@@ -125,7 +176,11 @@ function indiceDe(cenas: Cena[], pessoas: PessoaDoProcesso[]) {
     statusLabel: null,
     pais: 'Espanha',
   }))
-  return montarIndiceOperacional(montarEstruturaOperacional({ pessoas, passos, alvos }))
+  return montarIndiceOperacional(
+    montarEstruturaOperacional({ pessoas, passos, alvos }),
+    undefined,
+    tarefasDasCenas(cenas),
+  )
 }
 
 const docsDe = (idx: ReturnType<typeof indiceDe>): DocumentoDoIndice[] =>
@@ -173,7 +228,9 @@ function main() {
   // ══════════════════════════════════════════════════════════════════════════
   const emAndamento = docsDe(indiceDe([{
     necessidadeId: 4, pessoaId: 1, concluidos: 2, statusCorrente: 'EM_ANDAMENTO',
-    responsavelId: 12, responsavelNome: 'Daniela Brait', diasParaPrazo: 2,
+    // O PASSO SEM DONO E COM OUTRO PRAZO — exatamente o que produção tinha.
+    responsavelId: null, responsavelNome: null, diasParaPrazo: -9,
+    tarefaResponsavelId: 12, tarefaResponsavelNome: 'Daniela Brait', diasParaPrazoTarefa: 2,
   }], P))[0]
   ok('§10) a etapa atual é o nome humano', emAndamento.naFase.etapaAtual === 'Receber certidão')
   ok('§10) e nunca a chave técnica', !/receber_certidao/.test(emAndamento.naFase.etapaAtual ?? ''))
@@ -210,7 +267,7 @@ function main() {
   // ── §41: atraso é condição, não status ──────────────────────────────────
   const atrasada = docsDe(indiceDe([{
     necessidadeId: 9, pessoaId: 1, concluidos: 2, statusCorrente: 'EM_ANDAMENTO',
-    responsavelId: 12, responsavelNome: 'Daniela Brait', diasParaPrazo: -3,
+    tarefaResponsavelId: 12, tarefaResponsavelNome: 'Daniela Brait', diasParaPrazoTarefa: -3,
   }], P))[0]
   ok('§41) atrasada continua EM ANDAMENTO', atrasada.naFase.estado === 'EM_ANDAMENTO')
   ok('§41) e o atraso é uma condição à parte', atrasada.naFase.atrasado === true)
@@ -218,6 +275,124 @@ function main() {
   ok('§13) "ATRASADA" não virou status',
     !['A_FAZER', 'EM_ANDAMENTO', 'AGUARDANDO_TERCEIRO', 'BLOQUEADA', 'CONCLUIDA']
       .includes('ATRASADA' as never))
+
+  // ══════════════════════════════════════════════════════════════════════════
+  secao('ITEM 1 §2/§3/§5) UMA TAREFA, UM RESPONSÁVEL — a tabela não inventa o seu')
+  // ══════════════════════════════════════════════════════════════════════════
+  // O CASO REAL. Processo 523, certidão do Ademir (doc 2111): os CINCO passos com
+  // `responsavelId` nulo, a Tarefa #3358 da Daniela. A tabela dizia "Sem
+  // responsável", o painel do documento dizia "Daniela Brait", a Minha Fila dizia
+  // "Daniela Brait". Três telas, duas respostas, o mesmo trabalho.
+  const ademir = docsDe(indiceDe([{
+    necessidadeId: 20, pessoaId: 1, concluidos: 2, statusCorrente: 'EM_ANDAMENTO',
+    responsavelId: null, responsavelNome: null,
+    tarefaResponsavelId: 12, tarefaResponsavelNome: 'Daniela Brait',
+  }], P))[0]
+  ok('§2) passo sem dono NÃO faz a linha dizer "sem responsável"',
+    ademir.naFase.responsavelNome === 'Daniela Brait')
+  ok('§3) e a linha aponta a TAREFA que a fila também aponta', ademir.naFase.taskId != null)
+
+  // CENÁRIO C — transferir a tarefa muda a linha, e só a tarefa manda.
+  const transferida = docsDe(indiceDe([{
+    necessidadeId: 21, pessoaId: 1, concluidos: 2, statusCorrente: 'EM_ANDAMENTO',
+    responsavelId: 12, responsavelNome: 'Daniela Brait',
+    tarefaResponsavelId: 77, tarefaResponsavelNome: 'Gabriel',
+  }], P))[0]
+  ok('§5-C) transferida a Tarefa, a linha mostra o novo responsável',
+    transferida.naFase.responsavelNome === 'Gabriel')
+  ok('§5-C) e o responsável ANTIGO do passo não sobrevive na linha',
+    transferida.naFase.responsavelNome !== 'Daniela Brait')
+
+  // CENÁRIO B — tarefa sem responsável: a linha diz isso, e não pega o do passo.
+  const semDonoNaTarefa = docsDe(indiceDe([{
+    necessidadeId: 22, pessoaId: 1, concluidos: 1, statusCorrente: 'EM_ANDAMENTO',
+    responsavelId: 12, responsavelNome: 'Daniela Brait',
+    tarefaResponsavelId: null, tarefaResponsavelNome: null,
+  }], P))[0]
+  ok('§5-B) tarefa sem responsável ⇒ linha sem responsável',
+    semDonoNaTarefa.naFase.responsavelId === null && semDonoNaTarefa.naFase.responsavelNome === null)
+
+  // ══════════════════════════════════════════════════════════════════════════
+  secao('ITEM 1 §17/§18) O PRAZO É O DA TAREFA — um só, em todas as projeções')
+  // ══════════════════════════════════════════════════════════════════════════
+  // Em produção o passo "Receber certidão" vencia 14/08 e a Tarefa 15/08. Cada
+  // tela mostrava a sua data e as duas pareciam certas.
+  const prazoDivergente = docsDe(indiceDe([{
+    necessidadeId: 23, pessoaId: 1, concluidos: 2, statusCorrente: 'EM_ANDAMENTO',
+    diasParaPrazo: -9, tarefaResponsavelId: 12, tarefaResponsavelNome: 'Daniela Brait',
+    diasParaPrazoTarefa: -3,
+  }], P))[0]
+  ok('§18) a linha usa o prazo da TAREFA, não o do passo',
+    prazoDivergente.naFase.diasParaPrazo === -3, `${prazoDivergente.naFase.diasParaPrazo}`)
+  ok('§18) e o atraso é contado sobre ele', prazoDivergente.naFase.atrasado === true)
+
+  // TAREFA SEM PRAZO não vira "no prazo" nem herda o do passo: é dito.
+  const tarefaSemPrazo = docsDe(indiceDe([{
+    necessidadeId: 24, pessoaId: 1, concluidos: 2, statusCorrente: 'EM_ANDAMENTO',
+    diasParaPrazo: -4, tarefaResponsavelId: 12, tarefaResponsavelNome: 'Daniela Brait',
+  }], P))[0]
+  ok('§17) tarefa sem prazo é uma informação, não o prazo do passo',
+    tarefaSemPrazo.naFase.prazo === null && tarefaSemPrazo.naFase.atrasado === false)
+  ok('§17) e a frase é a canônica', tarefaSemPrazo.naFase.rotuloDoPrazo === 'Sem prazo')
+
+  // ══════════════════════════════════════════════════════════════════════════
+  secao('ITEM 1 §15/§16) STATUS OPERACIONAL × ESTADO DOCUMENTAL')
+  // ══════════════════════════════════════════════════════════════════════════
+  // A tabela dizia "Em andamento" e o painel dizia "Solicitado". Não era
+  // contradição: eram duas perguntas. Agora as duas aparecem, na ordem certa.
+  const comDocumental = montarIndiceOperacional(
+    montarEstruturaOperacional({
+      pessoas: P,
+      passos: passosDaCena({ necessidadeId: 25, pessoaId: 1, concluidos: 2, statusCorrente: 'EM_ANDAMENTO' }),
+      alvos: [{
+        chave: 'necessidade:25', escopo: 'NECESSIDADE', necessidadeId: 25, documentoId: 5025,
+        pessoaId: 1, titulo: 'Certidão de Nascimento #25', subtitulo: 'Certidão de Nascimento',
+        statusLabel: null, pais: 'Espanha',
+      }],
+    }),
+    new Map([['necessidade:25', { statusDocumentalLabel: 'Solicitado' }]]),
+    tarefasDasCenas([{ necessidadeId: 25, pessoaId: 1, concluidos: 2, statusCorrente: 'EM_ANDAMENTO' }]),
+  )
+  const linhaDupla = docsDe(comDocumental)[0]
+  ok('§15) o status da linha é o OPERACIONAL da tarefa', linhaDupla.naFase.estado === 'EM_ANDAMENTO')
+  ok('§15) o estado documental continua existindo, em segundo plano',
+    linhaDupla.naFase.statusDocumentalLabel === 'Solicitado')
+  ok('§15) e um não substitui o outro',
+    linhaDupla.naFase.estadoLabel === 'Em andamento' && linhaDupla.naFase.statusDocumentalLabel === 'Solicitado')
+
+  // SEM TAREFA a linha não inventa dono nem prazo — cai no que o workflow sabe.
+  const orfa = docsDe(indiceDe([{
+    necessidadeId: 26, pessoaId: 1, concluidos: 2, statusCorrente: 'EM_ANDAMENTO',
+    responsavelId: 12, responsavelNome: 'Daniela Brait', diasParaPrazo: -5, semTarefa: true,
+  }], P))[0]
+  ok('§4) documento sem tarefa viva não ganha responsável emprestado',
+    orfa.naFase.responsavelNome === null && orfa.naFase.taskId === null)
+  ok('§4) nem prazo emprestado do passo', orfa.naFase.prazo === null)
+  ok('§4) e o estado ainda é derivado do workflow', orfa.naFase.estado === 'EM_ANDAMENTO')
+
+  // ══════════════════════════════════════════════════════════════════════════
+  secao('ITEM 1 §6/§7/§9/§28) "CONTINUAR" NÃO ABRE UMA SEGUNDA CENTRAL')
+  // ══════════════════════════════════════════════════════════════════════════
+  const drawer = semComentarios(ler('src/components/kanban/DocumentoOperationalDrawer.tsx'))
+  const central = semComentarios(ler('src/components/kanban/ProcessoCentralOperacional.tsx'))
+  ok('§6) o cockpit paralelo de operação não existe mais',
+    !/TabOperationCockpit/.test(drawer + central) && !existe('src/components/kanban/TabOperationCockpit.tsx'))
+  ok('§9) o painel do documento abre NO WORKFLOW',
+    /useState<TabId>\("workflow"\)/.test(drawer))
+  ok('§7) e não há mais aba "Operação" para desviar o caminho',
+    !/id: "operation"/.test(drawer))
+  ok('§8) o que era exclusivo do cockpit ficou — iniciar a operação não materializada',
+    /permissions\.canStart/.test(drawer) && /InitOperationModal/.test(drawer))
+  ok('§2/§3) o cabeçalho do painel lê a TAREFA, não o documento',
+    /projection\?\.tarefa/.test(drawer)
+    && !/doc\.responsavel\?\.nome/.test(drawer)
+    && !/doc\.dataPrazoOperacao/.test(drawer))
+  ok('§3) e delegar move a TAREFA, pela porta canônica',
+    /\/api\/tarefas\/\$\{taskId\}\/atribuir/.test(drawer))
+  ok('§12) o passo atual é trazido à vista sozinho',
+    /scrollIntoView/.test(semComentarios(ler('src/components/kanban/workflow/WorkflowTab.tsx'))))
+  ok('§13) o executor especializado continua sendo a Central da Etapa',
+    /CentralDaEtapaDrawer/.test(semComentarios(ler('src/components/kanban/workflow/WorkflowTab.tsx'))))
 
   // ══════════════════════════════════════════════════════════════════════════
   secao('§4/§5) AS COLUNAS DE FASE FUTURA SAÍRAM DA TABELA DA FASE')
@@ -240,7 +415,7 @@ function main() {
   secao('§14) A AÇÃO DA LINHA SEGUE O ESTADO')
   // ══════════════════════════════════════════════════════════════════════════
   for (const [estado, rotulo] of [
-    ['A_FAZER', 'Abrir'], ['EM_ANDAMENTO', 'Continuar'],
+    ['A_FAZER', 'Iniciar'], ['EM_ANDAMENTO', 'Continuar'],
     ['AGUARDANDO_TERCEIRO', 'Ver etapa'], ['BLOQUEADA', 'Ver bloqueio'],
     ['CONCLUIDA', 'Ver detalhes'],
   ] as const) {

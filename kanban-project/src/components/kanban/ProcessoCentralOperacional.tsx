@@ -1061,8 +1061,6 @@ export function ProcessoCentralOperacional({
             // sem herdar nada da fase anterior.
             key={`${faseCodeData ?? "?"}-${drawerDocId ?? "none"}`}
             documentoId={drawerDocId}
-            // Quem chegou pela fila vem executar: abre direto no Workflow.
-            abaInicial={alvo?.documentoId != null && alvo.documentoId === drawerDocId ? "workflow" : "operation"}
             isOpen={drawerDocId !== null}
             bannerAntecipada={bannerAntecipada}
             // CONTEXTO DA OPERAÇÃO ANTECIPADA — o ALVO do documento aberto. Ela vive

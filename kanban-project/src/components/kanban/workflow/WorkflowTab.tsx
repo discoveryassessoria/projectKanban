@@ -1,7 +1,7 @@
 // src/components/kanban/workflow/WorkflowTab.tsx
 "use client"
 
-import { useState, useEffect, useCallback } from "react"
+import { useState, useEffect, useCallback, useRef } from "react"
 import { useApi } from "@/src/lib/dados"
 import {
   Check,
@@ -170,6 +170,13 @@ export function WorkflowTab({ documentoId, onChange, contextoAntecipada }: Workf
   const opsDoAlvo = (opsReq.dados?.operacoes ?? []).filter((o) => necId != null && o.necessidadeId === necId)
   const [criandoAntecipada, setCriandoAntecipada] = useState(false)
 
+  // O PASSO ATUAL APARECE SEM NINGUÉM PROCURAR.
+  //
+  // O painel abre listando o workflow inteiro, e num documento de cinco etapas
+  // isso ainda cabe na tela; num de doze, não. Quem clicou em "Continuar" quer
+  // continuar de ONDE ESTÁ — não ler o histórico até achar o cartão azul.
+  const passoAtual = useRef<HTMLDivElement | null>(null)
+
   const avaliarAntecipada = useCallback(
     async (id: number, resultado: ResultadoAvaliacaoUI, resultadoObtido: string, resultadoDados?: Record<string, unknown>) => {
       await fetch(`/api/operacoes-antecipadas/${id}`, {
@@ -192,6 +199,13 @@ export function WorkflowTab({ documentoId, onChange, contextoAntecipada }: Workf
   const loading = consulta.carregando
   const erro = consulta.erro ? "Erro ao carregar workflow." : null
   const carregar = consulta.recarregar
+
+  // O foco só existe DEPOIS que a lista chegou: no primeiro render ainda é o
+  // esqueleto de carregamento, e não há cartão nenhum para trazer à vista.
+  useEffect(() => {
+    if (!workflow) return
+    passoAtual.current?.scrollIntoView({ block: "nearest", behavior: "smooth" })
+  }, [workflow])
 
   // "Iniciar operação" manual foi removido do fluxo: o backend materializa a operação
   // da fase atual automaticamente ao carregar o workflow (garantirOperacaoDocumentoV2).
@@ -295,6 +309,7 @@ export function WorkflowTab({ documentoId, onChange, contextoAntecipada }: Workf
             key={step.id}
             step={step}
             onOpenCentral={() => setCentralStepId(step.id)}
+            refDoAtual={(el) => { if (el) passoAtual.current = el }}
           />
         ))}
       </div>
@@ -374,9 +389,12 @@ export function WorkflowTab({ documentoId, onChange, contextoAntecipada }: Workf
 function StepCard({
   step,
   onOpenCentral,
+  refDoAtual,
 }: {
   step: WorkflowStep
   onOpenCentral: () => void
+  /** Recebe o nó do passo ATIVO para que ele apareça sem ninguém procurar. */
+  refDoAtual?: (el: HTMLDivElement | null) => void
 }) {
   const isDone = step.status === "concluida"
   const isActive =
@@ -479,7 +497,7 @@ function StepCard({
     <div className={`bg-slate-900/60 border ${cardBorderCls} rounded-md overflow-hidden`}>
 
       {/* Cabeçalho do step ativo */}
-      <div className="px-3 py-3 flex items-start gap-3">
+      <div ref={refDoAtual} className="px-3 py-3 flex items-start gap-3">
         <div className={`w-6 h-6 rounded-full ${circleCls} flex items-center justify-center flex-shrink-0 mt-0.5`}>
           {isBloqueada ? (
             <Lock className="w-3 h-3 text-white" />
@@ -503,8 +521,14 @@ function StepCard({
           {/* Meta compacta — esconde se for lock-step wait (responsável/SLA não fazem sentido) */}
           {!isLockStepWait && (
             <div className="flex items-center gap-2 flex-wrap text-[11px] text-slate-300 mt-2">
+              {/* QUEM EXECUTA ESTA ETAPA — não "o responsável".
+                  O responsável pelo trabalho é o da TAREFA, e ele aparece uma
+                  vez só, no topo do painel. Um nome solto aqui era lido como
+                  "dono do documento" e disputava com aquele: a mesma certidão
+                  parecia ter dois donos conforme onde se olhasse. */}
               <span className="inline-flex items-center gap-1.5">
                 <span className="w-1.5 h-1.5 rounded-full" style={{ background: dotColor }} />
+                <span className="text-slate-500">executa</span>
                 {responsibleName}
               </span>
               <span className="text-slate-600">·</span>
