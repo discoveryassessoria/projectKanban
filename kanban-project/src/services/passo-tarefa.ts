@@ -258,7 +258,14 @@ export async function garantirTarefaDePasso(
           necessidadeId: step.necessidadeId,
           documentoId: step.documentoId,
           faseMacroKey: step.faseMacroKey,
-          ciclo: step.ciclo,
+          // O CICLO DA OBRIGAÇÃO — o MESMO que a chave de identidade carrega.
+          //
+          // Aqui era `step.ciclo`, o ciclo da FASE. Os dois só coincidem
+          // enquanto ninguém volta de fase: na reexecução a chave dizia `c1`
+          // (ciclo da necessidade) e a coluna guardava `2` (ciclo da instância),
+          // e a busca canônica — que filtrava pela coluna — deixava de achar a
+          // própria tarefa que acabara de nascer.
+          ciclo: unidade.ciclo,
           taskRole,
           origem,
           correlationId,

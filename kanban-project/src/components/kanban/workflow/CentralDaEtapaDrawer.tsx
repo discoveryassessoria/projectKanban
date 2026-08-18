@@ -334,7 +334,18 @@ function ConteudoDrawer({
     setSaving(null)
   }
 
-  const handleTransferir = async () => {
+  /**
+   * ALTERAR O EXECUTOR DESTA ETAPA — não transferir a tarefa.
+   *
+   * O PATCH grava `assigneeId` em `PhaseWorkflowStepInstance`: quem executa
+   * AQUELA etapa. O responsável pelo TRABALHO é o da Tarefa, e ele se move pela
+   * porta de tarefa (`/api/tarefas/{id}/atribuir`), com auditoria e aviso.
+   *
+   * O botão chamava-se "Transferir" e não transferia coisa nenhuma: a tarefa
+   * continuava com a mesma pessoa, e quem clicava saía convencido de que tinha
+   * repassado o trabalho. Um nome errado aqui é pior do que um botão a menos.
+   */
+  const handleAlterarExecutor = async () => {
     if (!transferUserId) {
       alert("Selecione um responsável.")
       return
@@ -600,7 +611,7 @@ function ConteudoDrawer({
                       className="inline-flex items-center gap-1.5 px-3 py-2 text-[12px] font-semibold bg-[#1b2027]/10 hover:bg-[#1b2027]/15 disabled:opacity-50 text-white rounded-md transition-colors"
                     >
                       <ArrowLeftRight className="w-3.5 h-3.5" />
-                      Transferir
+                      Alterar executor
                     </button>
                   )}
 
@@ -668,11 +679,11 @@ function ConteudoDrawer({
                 </div>
               )}
 
-              {/* Form inline: Transferir */}
+              {/* Form inline: executor DA ETAPA — o dono da tarefa não muda aqui */}
               {showTransferForm && (
                 <div className="mt-3 p-3 rounded-md border border-[#7dd3fc]/30 bg-[#7dd3fc]/10">
                   <label className="block text-[10px] uppercase font-semibold tracking-wider text-[#7dd3fc]/80 mb-1.5">
-                    Transferir para
+                    Quem executa esta etapa
                   </label>
                   <select
                     value={transferUserId ?? ""}
@@ -682,7 +693,7 @@ function ConteudoDrawer({
                     className="w-full px-2.5 py-1.5 bg-[#1b2027]/5 border border-white/10 rounded text-[12px] text-white focus:outline-none focus:border-[#7dd3fc]/50"
                   >
                     <option value="" className="bg-[#20262e]">
-                      — Selecione um responsável —
+                      — Selecione quem executa —
                     </option>
                     {usuarios.map((u) => (
                       <option key={u.id} value={u.id} className="bg-[#20262e]">
@@ -692,11 +703,11 @@ function ConteudoDrawer({
                   </select>
                   <div className="flex gap-2 mt-2">
                     <button
-                      onClick={handleTransferir}
+                      onClick={handleAlterarExecutor}
                       disabled={!!saving || !transferUserId}
                       className="px-3 py-1.5 text-[11px] font-semibold bg-[#7dd3fc] hover:bg-[#7dd3fc] disabled:opacity-50 disabled:cursor-not-allowed text-white rounded"
                     >
-                      {saving === "transferindo" ? "Transferindo…" : "Confirmar"}
+                      {saving === "transferindo" ? "Alterando…" : "Confirmar"}
                     </button>
                     <button
                       onClick={() => {

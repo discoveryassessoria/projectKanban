@@ -27,16 +27,20 @@
 import { prisma } from '@/lib/prisma'
 import { exigirBancoDeTeste } from './_banco-de-teste'
 import { atribuirTarefa, transferirTarefa, iniciarTarefa } from '@/lib/operacional/tarefa-comandos'
-import { aguardarTerceiro } from '@/lib/operacional/tarefa-ciclo'
+
 import { concluirEtapa } from '@/lib/operacional/tarefa-etapa'
 import { reconciliarTarefas } from '@/lib/operacional/reconciliar-tarefas'
-import { minhaFila, colunaDaTarefa } from '@/lib/operacional/tarefa-projecoes'
+import {
+  chaveDaUnidade, normalizarUnidade, tarefaVivaDaUnidade, tarefasVivasDasUnidades,
+} from '@/lib/operacional/identidade-da-tarefa'
+import { aguardarTerceiro, devolverAFila } from '@/lib/operacional/tarefa-ciclo'
+import { minhaFila, semResponsavel, colunaDaTarefa } from '@/lib/operacional/tarefa-projecoes'
 import { resolverAlvoDaTarefa, urlOperacionalDaTarefa } from '@/lib/operacional/navegacao'
 import { getPhaseOperationalSummary } from '@/src/lib/process-stage/estrutura-operacional'
 import { acaoPrincipal } from '@/src/components/operacao/central-tarefas'
 import { ROTULO_STATUS } from '@/src/components/operacao/kit-operacional'
 import { PrismaClient } from '@prisma/client'
-import { readFileSync } from 'node:fs'
+import { existsSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
 
 const MARCA = 'FILA-CICLO'
@@ -58,6 +62,7 @@ const ok = (nome: string, cond: boolean, extra = '') => {
 const secao = (t: string) => console.log(`\n${t}`)
 const RAIZ = join(__dirname, '..')
 const ler = (p: string) => readFileSync(join(RAIZ, p), 'utf8')
+const existe = (p: string) => existsSync(join(RAIZ, p))
 const semComentarios = (t: string) => t.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '')
 
 async function limpar() {
@@ -158,6 +163,9 @@ const tarefa = (id: number) =>
       workflowStepInstanceId: true, workflowInstanceId: true, prioridade: true,
     },
   })
+
+/** A porta canônica de "retirar responsável" — a mesma que a Operação usa. */
+const comandoDevolverAFila = (tarefaId: number, autorId: number) => devolverAFila({ tarefaId, autorId })
 
 const eventos = (tarefaId: number, acao: string) =>
   prisma.logAuditoria.count({ where: { entidade: 'Tarefa', entidadeId: tarefaId, acao } })
@@ -400,6 +408,124 @@ async function main() {
     (await tarefa(a3.tarefaId)).statusTarefa === 'NAO_INICIADA')
   ok('o gestor, esse pode destravar a fila',
     (await iniciarTarefa({ tarefaId: a3.tarefaId, autorId: gestor.id, permiteDeTerceiro: true })).ok === true)
+
+  // ═════════════════════════════════════════════════════════════════════════
+  secao('ITEM 3 §1/§2) A TAREFA VIVA É ENCONTRADA MESMO COM O CICLO DIVERGENTE')
+  // ═════════════════════════════════════════════════════════════════════════
+  // O CASO DE PRODUÇÃO. Processo 523: a fase voltou para a Genealogia (ciclo 2)
+  // e a tarefa da certidão do Ademir nasceu com `Tarefa.ciclo = 2`, enquanto a
+  // necessidade 190 seguia no ciclo 1. A busca canônica filtrava pela COLUNA e
+  // não achava a tarefa — a Central mostrava "Sem responsável" para um trabalho
+  // atribuído à Daniela, e os escritores estavam a um passo de criar a segunda.
+  await prisma.tarefa.update({ where: { id: a3.tarefaId }, data: { ciclo: 99 } })
+  const uDivergente = await normalizarUnidade(prisma, {
+    processoId: p.processoId, documentoId: a3.documentoId, ciclo: 1,
+  })
+  const achadaSingular = await tarefaVivaDaUnidade(prisma, uDivergente)
+  ok('§2) a busca singular acha a tarefa viva mesmo com o ciclo fora de sincronia',
+    achadaSingular?.id === a3.tarefaId, `${achadaSingular?.id} (esperado ${a3.tarefaId})`)
+  const emLote = await tarefasVivasDasUnidades(prisma, [uDivergente])
+  ok('§2) e a busca em lote — a que a Central usa — acha a MESMA',
+    emLote.get(chaveDaUnidade(uDivergente))?.id === a3.tarefaId)
+  const { indice: indDiv } = await getPhaseOperationalSummary({ processoId: p.processoId, faseMacroKey: FASE })
+  const linhaDiv = [...indDiv.linhaPrincipal, ...indDiv.foraDaLinha, ...indDiv.pendenteClassificacao]
+    .flatMap((x) => x.documentos).find((d) => d.documentoId === a3.documentoId)
+  ok('§1) a Central mostra o responsável, não "Sem responsável"',
+    linhaDiv?.naFase.responsavelId != null, String(linhaDiv?.naFase.responsavelNome))
+  await prisma.tarefa.update({ where: { id: a3.tarefaId }, data: { ciclo: 1 } })
+
+  // E A TAREFA NASCE COM O CICLO DA OBRIGAÇÃO — para a divergência não voltar.
+  const nascida = await prisma.tarefa.findUniqueOrThrow({
+    where: { id: a2.tarefaId }, select: { ciclo: true, necessidadeId: true },
+  })
+  const cicloDaNec = (await prisma.necessidadeDocumental.findUniqueOrThrow({
+    where: { id: nascida.necessidadeId! }, select: { ciclo: true },
+  })).ciclo
+  ok('§2) a tarefa nasce com o ciclo da OBRIGAÇÃO, não o da fase',
+    nascida.ciclo === cicloDaNec, `tarefa c${nascida.ciclo} × necessidade c${cicloDaNec}`)
+
+  // ═════════════════════════════════════════════════════════════════════════
+  secao('ITEM 3 §24/§25) ATRIBUIR PELO PROCESSO É A MESMA PORTA DA OPERAÇÃO')
+  // ═════════════════════════════════════════════════════════════════════════
+  // A Central não tem porta própria: ela chama `atribuirTarefa`, a mesma que a
+  // Operação chama. Provar isso é provar que o histórico, a notificação, a trava
+  // otimista e a guarda de terminal são as mesmas — não "parecidas".
+  const semDono2 = p.alvos[2]
+  await transferirTarefa({ tarefaId: semDono2.tarefaId, responsavelId: daniela.id, autorId: gestor.id, motivo: 'reset' })
+  await comandoDevolverAFila(semDono2.tarefaId, gestor.id)
+  let tv = await tarefa(semDono2.tarefaId)
+  ok('§9) devolver à fila retira o responsável', tv.responsavelId === null)
+  ok('§9) sem apagar o que já foi feito', tv.statusTarefa !== 'NAO_INICIADA' || tv.dataInicio === null)
+  ok('§28) e ela reaparece em "Sem responsável"',
+    (await semResponsavel()).some((l) => l.taskId === semDono2.tarefaId))
+
+  const antesDoProcesso = await tarefa(semDono2.tarefaId)
+  const iniciosAntes = await eventos(semDono2.tarefaId, 'TAREFA_INICIADA')
+  const rProc = await atribuirTarefa({ tarefaId: semDono2.tarefaId, responsavelId: gabriel.id, autorId: gestor.id })
+  ok('§24) atribuir deu certo', rProc.ok === true)
+  tv = await tarefa(semDono2.tarefaId)
+  ok('§24) o responsável mudou', tv.responsavelId === gabriel.id)
+  ok('§7/§21) e NÃO iniciou', String(tv.dataInicio) === String(antesDoProcesso.dataInicio))
+  ok('§7) nem mudou o estado', tv.statusTarefa === antesDoProcesso.statusTarefa, tv.statusTarefa)
+  ok('§7) nem a etapa', tv.workflowStepInstanceId === antesDoProcesso.workflowStepInstanceId)
+  ok('§7) nem o prazo', String(tv.dataPrazo) === String(antesDoProcesso.dataPrazo))
+  ok('§21) nenhum evento de início NOVO nasceu — atribuir não começa trabalho',
+    (await eventos(semDono2.tarefaId, 'TAREFA_INICIADA')) === iniciosAntes, `${iniciosAntes}`)
+  ok('§22) o histórico é o canônico, venha de onde vier',
+    (await eventos(semDono2.tarefaId, 'TAREFA_ATRIBUIDA')) + (await eventos(semDono2.tarefaId, 'TAREFA_TRANSFERIDA')) >= 1)
+  ok('§23) e a notificação é a única da porta',
+    (await prisma.notificacaoOperacional.count({
+      where: { tarefaId: semDono2.tarefaId, tipo: { in: ['ATRIBUICAO', 'TRANSFERENCIA'] } },
+    })) >= 1)
+  ok('§24) some da fila "Sem responsável"',
+    !(await semResponsavel()).some((l) => l.taskId === semDono2.tarefaId))
+  ok('§24) e aparece na Minha Fila de quem recebeu',
+    (await linhaDaFila(gabriel.id, semDono2.tarefaId)) != null)
+
+  // ═════════════════════════════════════════════════════════════════════════
+  secao('ITEM 3 §3/§30) UMA ÚNICA FONTE DE RESPONSABILIDADE')
+  // ═════════════════════════════════════════════════════════════════════════
+  const docDaTarefa = await prisma.documento.findUniqueOrThrow({
+    where: { id: semDono2.documentoId }, select: { responsavelId: true },
+  })
+  ok('§3) a Central não passou a escrever responsável no DOCUMENTO',
+    docDaTarefa.responsavelId == null, String(docDaTarefa.responsavelId))
+  const passosDoAlvo = await prisma.phaseWorkflowStepInstance.findMany({
+    where: { documentoId: semDono2.documentoId }, select: { responsavelId: true },
+  })
+  ok('§3/§14) nem no PASSO — executor de etapa é outro conceito',
+    passosDoAlvo.every((x) => x.responsavelId == null))
+  const { indice: ind3 } = await getPhaseOperationalSummary({ processoId: p.processoId, faseMacroKey: FASE })
+  const linha3 = [...ind3.linhaPrincipal, ...ind3.foraDaLinha, ...ind3.pendenteClassificacao]
+    .flatMap((x) => x.documentos).find((d) => d.documentoId === semDono2.documentoId)
+  const fila3 = await linhaDaFila(gabriel.id, semDono2.tarefaId)
+  ok('§12/§35) Central e Operação mostram o MESMO responsável',
+    linha3?.naFase.responsavelId === fila3?.responsavelId
+    && linha3?.naFase.responsavelId === gabriel.id,
+    `${linha3?.naFase.responsavelNome} × ${fila3?.responsavelNome}`)
+
+  // ═════════════════════════════════════════════════════════════════════════
+  secao('ITEM 3 §4/§5/§18/§33) A TELA CHAMA A PORTA — e não inventa a sua')
+  // ═════════════════════════════════════════════════════════════════════════
+  const central = semComentarios(ler('src/components/kanban/ProcessoCentralOperacional.tsx'))
+  const painel = semComentarios(ler('src/components/kanban/PainelDaFase.tsx'))
+  ok('§4) a Central atribui pela porta única de comando',
+    /\/api\/tarefas\/\$\{taskId\}\/comando/.test(central))
+  ok('§5) e "retirar responsável" é devolver à fila — não um update solto',
+    /acao: "devolver_a_fila"/.test(central))
+  ok('§4) a rota paralela de delegação não existe mais',
+    !existe('src/app/api/processos/[processoId]/genealogia/delegar/route.ts')
+    && !/genealogia\/delegar/.test(central))
+  ok('§18) a ação é gated por permissão de gestão',
+    /pode\("tarefas\.editar"\)/.test(central))
+  ok('§33) e o seletor abre sob demanda — não um por linha',
+    /editando \? \(/.test(painel) || /if \(editando\)/.test(painel))
+  ok('§19) o seletor usa a MESMA lista de elegíveis da Operação',
+    /\/api\/operacao\/atribuiveis/.test(central))
+  ok('§19/§33) carregada UMA vez pela tela, nunca por linha',
+    /usuarios=\{atribuiveis\}/.test(central) && !/fetch\(/.test(painel))
+  ok('§17) a tela não toca em passo, progresso nem materialização',
+    !/phaseWorkflowStepInstance|materializar|reconciliar/.test(painel))
 
   // ═════════════════════════════════════════════════════════════════════════
   secao('CASO 11/§26) Com volume, a fila continua custando o mesmo')

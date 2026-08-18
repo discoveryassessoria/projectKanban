@@ -226,7 +226,6 @@ export async function tarefasVivasDasUnidades(
   if (comObrigacao.length === 0) return mapa
 
   const processos = [...new Set(comObrigacao.map((u) => u.processoId))]
-  const ciclos = [...new Set(comObrigacao.map((u) => u.ciclo))]
   const necIds = [...new Set(comObrigacao.map((u) => u.necessidadeId).filter((x): x is number => x != null))]
   const docIds = [...new Set(comObrigacao.map((u) => u.documentoId).filter((x): x is number => x != null))]
 
@@ -234,16 +233,27 @@ export async function tarefasVivasDasUnidades(
   if (necIds.length > 0) porObrigacao.push({ necessidadeId: { in: necIds } })
   if (docIds.length > 0) porObrigacao.push({ documentoId: { in: docIds } })
 
+  // O CICLO NÃO ENTRA NO **FILTRO** — só no desempate. E a distinção custou caro.
+  //
+  // A chave usa o ciclo da OBRIGAÇÃO; a coluna `Tarefa.ciclo` era gravada com o
+  // ciclo da FASE (`step.ciclo`). Numa reexecução os dois divergem: em produção
+  // (processo 523) a tarefa viva da certidão do Ademir ficou com `ciclo = 2`
+  // enquanto a necessidade 190 continuava no ciclo 1. O filtro por ciclo então
+  // NÃO ENCONTRAVA uma tarefa que existe, está viva e tem dono — a Central
+  // mostrava "Sem responsável" para um trabalho atribuído à Daniela, e os
+  // escritores, que fazem a mesma pergunta, estavam a um passo de criar a
+  // segunda tarefa da mesma obrigação.
+  //
+  // O que garante "uma tarefa" não é o ciclo: é a OBRIGAÇÃO mais o recorte de
+  // trabalho ABERTO. Um ciclo anterior já cumprido está encerrado, e encerrado
+  // não é candidato. Sobrando mais de uma viva, o ciclo desempata — e depois
+  // dele, a mais antiga, que é a identidade original.
   const candidatas = await db.tarefa.findMany({
     where: {
       processoId: { in: processos },
-      ciclo: { in: ciclos },
       statusTarefa: { notIn: [...TERMINAIS_DA_UNIDADE] },
       OR: porObrigacao,
     },
-    // A MAIS ANTIGA vence: ela é a identidade original do trabalho, e é o
-    // histórico dela que as pessoas reconhecem. A ordem crescente faz o
-    // primeiro encontro de cada unidade já ser o certo.
     orderBy: { id: 'asc' },
     select: SELECT_VIVA,
   })
@@ -251,13 +261,13 @@ export async function tarefasVivasDasUnidades(
   for (const u of comObrigacao) {
     const chave = chaveDaUnidade(u)
     if (mapa.has(chave)) continue
-    const t = candidatas.find(
+    const daUnidade = candidatas.filter(
       (c) =>
         c.processoId === u.processoId &&
-        c.ciclo === u.ciclo &&
         ((u.necessidadeId != null && c.necessidadeId === u.necessidadeId) ||
           (u.documentoId != null && c.documentoId === u.documentoId)),
     )
+    const t = daUnidade.find((c) => c.ciclo === u.ciclo) ?? daUnidade[0]
     if (!t) continue
     mapa.set(chave, {
       id: t.id,

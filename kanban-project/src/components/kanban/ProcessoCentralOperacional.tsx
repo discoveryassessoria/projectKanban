@@ -626,46 +626,88 @@ export function ProcessoCentralOperacional({
       .catch(() => {})
   }, [])
 
-  // Delega o passo localizar_registro de uma necessidade (fila) SEM abrir a operação
-  // nem criar Documento. Grava o responsável direto no passo.
-  const getUserId = (): number | null => {
-    try {
-      const stored = localStorage.getItem("user")
-      if (stored) {
-        const u = JSON.parse(stored)
-        return u.id ?? null
-      }
-    } catch {}
-    return null
-  }
+  // ────────────────────────────────────────────────────────────────────────────
+  // GESTÃO DE RESPONSABILIDADE, AQUI DENTRO — pelas MESMAS portas da Operação.
+  //
+  // O gestor que está olhando o processo e vê uma certidão sem dono não deve
+  // precisar sair para a Operação, procurar a tarefa numa lista de todos os
+  // processos, atribuir e voltar. O PROCESSO é o contexto de gestão individual;
+  // a Operação é a visão transversal. As duas superfícies, a MESMA tarefa.
+  //
+  // Aqui havia uma rota própria (`genealogia/delegar`) que gravava
+  // `responsavelId` no passo e na tarefa com `updateMany` cru — sem auditoria,
+  // sem notificação, sem trava otimista e sem guarda de tarefa encerrada. Era
+  // uma segunda porta de responsabilidade, e ela ficou sem consumidor. Saiu.
+  //
+  // Atribuir/transferir e devolver à fila são comandos do domínio, e o comando
+  // é um só: `POST /api/tarefas/{id}/comando`. Esta tela não decide nada sobre
+  // responsabilidade — nem sequer se pode: a permissão é conferida no servidor.
+  // ────────────────────────────────────────────────────────────────────────────
+  // QUEM PODE RECEBER TRABALHO — a MESMA lista que a Operação oferece.
+  //
+  // Não é "todo mundo do cadastro": é quem tem permissão de EXECUTAR tarefa,
+  // resolvida pelo sistema real de perfis. Atribuir a quem não pode executar
+  // cria uma tarefa que nasce travada — aparece na fila de alguém que não
+  // consegue movê-la, e o bloqueio só é descoberto quando o prazo já correu.
+  //
+  // UMA consulta para a tela inteira, não uma por linha: com quinhentos
+  // documentos, um seletor por linha seria quinhentas listas de gente no DOM
+  // para no máximo uma ser usada. O seletor em si abre sob demanda.
+  const [atribuiveis, setAtribuiveis] = useState<Array<{ id: number; nome: string }>>([])
+  useEffect(() => {
+    if (!pode("tarefas.editar")) return
+    fetch("/api/operacao/atribuiveis", { headers: { Authorization: `Bearer ${localStorage.getItem("authToken")}` } })
+      .then((r) => (r.ok ? r.json() : Promise.reject(new Error(String(r.status)))))
+      .then((d: { funcionarios?: Array<{ id: number; nome: string }> }) => setAtribuiveis(d.funcionarios ?? []))
+      .catch(() => setAtribuiveis([]))
+  }, [pode])
 
-  const delegar = useCallback(
-    async (necessidadeId: number, responsavelId: number | null) => {
+  const [salvandoResp, setSalvandoResp] = useState<number | null>(null)
+  const comandarTarefa = useCallback(
+    async (taskId: number, corpo: Record<string, unknown>) => {
+      setSalvandoResp(taskId)
+      setErroOperacao(null)
       try {
-        const res = await fetch(`/api/processos/${processo.id}/genealogia/delegar`, {
-          method: "PATCH",
+        const r = await fetch(`/api/tarefas/${taskId}/comando`, {
+          method: "POST",
           headers: {
             "Content-Type": "application/json",
             Authorization: `Bearer ${localStorage.getItem("authToken")}`,
           },
-          body: JSON.stringify({ necessidadeId, responsavelId }),
+          body: JSON.stringify(corpo),
         })
-        if (!res.ok) {
-          const j = await res.json().catch(() => ({}))
-          setErroOperacao(j?.error || `Não foi possível delegar (HTTP ${res.status}).`)
+        if (!r.ok) {
+          const j = await r.json().catch(() => ({}))
+          setErroOperacao(
+            r.status === 409
+              ? "Esta tarefa foi alterada por outra pessoa. A tela foi atualizada."
+              : j?.error || `Não foi possível concluir a ação (HTTP ${r.status}).`,
+          )
+          carregar(true)
           return
         }
+        // A CENTRAL E A OPERAÇÃO LEEM A MESMA TAREFA: recarregar aqui basta para
+        // esta tela; a outra lê do servidor na próxima vez que abrir ou
+        // recarregar. Não há cópia a sincronizar porque não há cópia.
         carregar(true)
       } catch {
-        setErroOperacao("Falha de rede ao delegar.")
+        setErroOperacao("Falha de rede. Tente novamente.")
+      } finally {
+        setSalvandoResp(null)
       }
     },
-    // `carregar` entra de verdade: a memoização anterior declarava só `processo.id` e
-    // fechava sobre um `carregar` mais antigo.
-    [processo.id, carregar]
+    [carregar],
   )
 
-
+  const atribuirResponsavel = useCallback(
+    (taskId: number, responsavelId: number) => comandarTarefa(taskId, { acao: "atribuir", responsavelId }),
+    [comandarTarefa],
+  )
+  /** Devolver à fila é a porta canônica de "retirar responsável" — não um update. */
+  const retirarResponsavel = useCallback(
+    (taskId: number) => comandarTarefa(taskId, { acao: "devolver_a_fila" }),
+    [comandarTarefa],
+  )
 
   // "Abrir operação" de uma antecipada: reusa a MESMA tela oficial (drawer) + banner.
   const abrirOperacaoAlvo = useCallback((documentoId: number, necessidadeId: number | null, objetivo: string | null) => {
@@ -1031,6 +1073,13 @@ export function ProcessoCentralOperacional({
             // expansão, para o card nunca mostrar a posição de outro trabalho.
             chaveExpansao={`${processo.id}|${bodyData.phaseContext?.faseMacroKey ?? faseAtualNome}|${bodyData.phaseContext?.ciclo ?? ""}`}
             onAbrirDetalhes={abrirDetalhes}
+            // GESTÃO CONTEXTUAL — só para quem já pode distribuir trabalho. A
+            // permissão é conferida DE NOVO no servidor: esconder o botão é
+            // desenho, não controle de acesso.
+            onAtribuirResponsavel={pode("tarefas.editar") ? atribuirResponsavel : undefined}
+            onRetirarResponsavel={pode("tarefas.editar") ? retirarResponsavel : undefined}
+            usuarios={atribuiveis}
+            salvandoResponsavel={salvandoResp}
             documentoDestacadoId={alvo?.documentoId ?? null}
             readOnly={readOnly}
             modoReestruturacao={!!bodyData.genealogiaReestruturacao}

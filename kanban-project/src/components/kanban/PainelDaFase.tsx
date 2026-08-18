@@ -90,6 +90,23 @@ export interface PainelDaFaseProps {
   chaveExpansao: string
   /** Abre o MODAL do documento — a única porta para a execução. */
   onAbrirDetalhes?: (doc: DocumentoDoIndice) => void
+  /**
+   * GESTÃO DE RESPONSABILIDADE NO CONTEXTO DO PROCESSO.
+   *
+   * O gestor que vê uma certidão sem dono resolve ali, sem sair para a Operação
+   * e voltar. As duas superfícies chamam a MESMA porta de domínio; esta tela só
+   * repassa o `taskId` e a pessoa escolhida.
+   *
+   * Ausentes ⇒ a coluna vira leitura pura. É o caso de quem executa: ele PRECISA
+   * ver de quem é o trabalho, e não ganha o poder de distribuí-lo por estar
+   * olhando o processo.
+   */
+  onAtribuirResponsavel?: (taskId: number, responsavelId: number) => void | Promise<void>
+  onRetirarResponsavel?: (taskId: number) => void | Promise<void>
+  /** Quem pode receber trabalho. Carregada UMA vez pelo container, nunca por linha. */
+  usuarios?: Array<{ id: number; nome: string }>
+  /** taskId em gravação — trava só a linha que está mudando. */
+  salvandoResponsavel?: number | null
   onAbrirPainelCompleto?: () => void
   /** Consulta de fase passada: mesmo layout, sem ações de mutação. */
   readOnly?: boolean
@@ -124,6 +141,10 @@ export function PainelDaFase({
   chaveExpansao,
   onAbrirDetalhes,
   onAbrirPainelCompleto,
+  onAtribuirResponsavel,
+  onRetirarResponsavel,
+  usuarios,
+  salvandoResponsavel = null,
   readOnly = false,
   documentoDestacadoId = null,
   modoReestruturacao = false,
@@ -256,6 +277,7 @@ export function PainelDaFase({
           indice={indice}
           chaveExpansao={chaveExpansao}
           onAbrirDetalhes={onAbrirDetalhes}
+          gestao={{ onAtribuirResponsavel, onRetirarResponsavel, usuarios, salvandoResponsavel }}
           readOnly={readOnly}
           documentoDestacadoId={documentoDestacadoId}
           recorte={recorte}
@@ -406,6 +428,20 @@ export function ordenarDocumentos(docs: DocumentoDoIndice[], ordem: OrdemDaTabel
   }
 }
 
+/**
+ * O QUE A LINHA PRECISA PARA SER GERIDA — repassado inteiro, nunca por prop solta.
+ *
+ * Fica num objeto só porque as quatro coisas viajam juntas de ponta a ponta: sem
+ * as ações não há o que fazer, sem a lista não há a quem atribuir, e sem saber
+ * quem está gravando a linha pisca duas vezes.
+ */
+export interface GestaoDeResponsavel {
+  onAtribuirResponsavel?: (taskId: number, responsavelId: number) => void | Promise<void>
+  onRetirarResponsavel?: (taskId: number) => void | Promise<void>
+  usuarios?: Array<{ id: number; nome: string }>
+  salvandoResponsavel?: number | null
+}
+
 interface Expansao {
   chave: string
   semeado: boolean
@@ -426,6 +462,7 @@ function IndiceView({
   indice: indiceBruto,
   chaveExpansao,
   onAbrirDetalhes,
+  gestao,
   readOnly,
   documentoDestacadoId,
   recorte = RECORTE_VAZIO,
@@ -434,6 +471,7 @@ function IndiceView({
   indice: IndiceOperacional
   chaveExpansao: string
   onAbrirDetalhes?: (doc: DocumentoDoIndice) => void
+  gestao?: GestaoDeResponsavel
   readOnly: boolean
   documentoDestacadoId?: number | null
   recorte?: Recorte
@@ -703,7 +741,7 @@ function IndiceView({
               key={p.pessoa.pessoaId} linha={p}
               aberto={abertosComAlvo.has(`pessoa:${p.pessoa.pessoaId}`)}
               alternar={() => alternar(`pessoa:${p.pessoa.pessoaId}`)}
-              onAbrirDetalhes={onAbrirDetalhes} readOnly={readOnly}
+              onAbrirDetalhes={onAbrirDetalhes} gestao={gestao} readOnly={readOnly}
               documentoDestacadoId={documentoDestacadoId}
             />
           ))}
@@ -743,7 +781,7 @@ function IndiceView({
               Sem pessoa vinculada · revisar cadastro do registro
             </b>
           </div>
-          <TabelaDocumentos docs={indice.semDono} onAbrirDetalhes={onAbrirDetalhes} readOnly={readOnly} />
+          <TabelaDocumentos docs={indice.semDono} onAbrirDetalhes={onAbrirDetalhes} gestao={gestao} readOnly={readOnly} />
         </div>
       )}
     </div>
@@ -761,6 +799,7 @@ function PessoaCard({
   aberto,
   alternar,
   onAbrirDetalhes,
+  gestao,
   readOnly,
   documentoDestacadoId,
 }: {
@@ -768,6 +807,7 @@ function PessoaCard({
   aberto: boolean
   alternar: () => void
   onAbrirDetalhes?: (doc: DocumentoDoIndice) => void
+  gestao?: GestaoDeResponsavel
   readOnly: boolean
   documentoDestacadoId?: number | null
 }) {
@@ -838,6 +878,7 @@ function PessoaCard({
           <TabelaDocumentos
             docs={linha.documentos}
             onAbrirDetalhes={onAbrirDetalhes}
+            gestao={gestao}
             readOnly={readOnly}
             documentoDestacadoId={documentoDestacadoId}
           />
@@ -876,11 +917,13 @@ const COLUNAS = "minmax(200px,2fr) 150px minmax(140px,1.2fr) 130px 120px 120px 1
 function TabelaDocumentos({
   docs,
   onAbrirDetalhes,
+  gestao,
   readOnly,
   documentoDestacadoId,
 }: {
   docs: DocumentoDoIndice[]
   onAbrirDetalhes?: (doc: DocumentoDoIndice) => void
+  gestao?: GestaoDeResponsavel
   readOnly: boolean
   documentoDestacadoId?: number | null
 }) {
@@ -920,6 +963,7 @@ function TabelaDocumentos({
             key={d.chave}
             doc={d}
             onAbrirDetalhes={onAbrirDetalhes}
+            gestao={gestao}
             readOnly={readOnly}
             destacado={documentoDestacadoId != null && d.documentoId === documentoDestacadoId}
           />
@@ -1037,14 +1081,111 @@ function rotuloDaAcao(f: DocumentoDoIndice["naFase"]): string {
   }
 }
 
+/**
+ * QUEM RESPONDE POR ESTE TRABALHO — e como isso se muda, sem sair do processo.
+ *
+ * ─── POR QUE A AÇÃO MORA NA COLUNA ──────────────────────────────────────────
+ * O gestor está olhando o processo e vê uma certidão sem dono. O caminho antigo
+ * era: sair para a Operação, achar a tarefa numa lista de TODOS os processos,
+ * atribuir, e voltar para onde já estava. A pergunta nasce aqui; a resposta
+ * passou a caber aqui.
+ *
+ * A Operação continua existindo e continua sendo o lugar da distribuição em
+ * escala — cem tarefas sem dono não se resolvem uma linha por vez. As duas
+ * superfícies chamam a MESMA porta de domínio, sobre a MESMA tarefa.
+ *
+ * ─── O SELETOR ABRE SOB DEMANDA ─────────────────────────────────────────────
+ * Quinhentas linhas com um `<select>` montado em cada uma são quinhentas listas
+ * de funcionários no DOM para no máximo uma ser usada. O seletor nasce no
+ * clique; a lista de gente vem pronta do container, carregada UMA vez.
+ *
+ * ─── ATRIBUIR NÃO INICIA ────────────────────────────────────────────────────
+ * Este controle muda o DONO. Não toca em estado, prazo, etapa ou progresso —
+ * quem começa o trabalho é quem executa, na fila dele, com um clique próprio.
+ */
+function CelulaResponsavel({
+  doc,
+  gestao,
+  readOnly,
+}: {
+  doc: DocumentoDoIndice
+  gestao?: GestaoDeResponsavel
+  readOnly: boolean
+}) {
+  const [editando, setEditando] = useState(false)
+  const f = doc.naFase
+  const taskId = f.taskId
+  const salvando = gestao?.salvandoResponsavel != null && gestao.salvandoResponsavel === taskId
+  // SEM TAREFA NÃO HÁ A QUEM ATRIBUIR — e isso é dito, não escondido atrás de um
+  // botão que não faria nada. Documento concluído também não se redistribui.
+  const podeGerir =
+    !readOnly
+    && taskId != null
+    && f.estado !== "CONCLUIDA"
+    && !!gestao?.onAtribuirResponsavel
+    && (gestao?.usuarios?.length ?? 0) > 0
+
+  const nome = f.responsavelNome
+    ? <span className="text-white/80 truncate">{f.responsavelNome}</span>
+    : f.estado === "CONCLUIDA"
+      ? <span className="text-white/25">—</span>
+      : <span className="text-[#d2a948]">Sem responsável</span>
+
+  if (!podeGerir) return <div className="min-w-0 text-[11.5px] truncate">{nome}</div>
+
+  if (editando) {
+    return (
+      <div className="min-w-0 text-[11.5px]">
+        <select
+          autoFocus
+          aria-label="Responsável pela tarefa"
+          disabled={salvando}
+          defaultValue={f.responsavelId ?? ""}
+          onChange={async (e) => {
+            const v = e.target.value
+            setEditando(false)
+            if (v === "") await gestao!.onRetirarResponsavel?.(taskId!)
+            else await gestao!.onAtribuirResponsavel!(taskId!, Number(v))
+          }}
+          onBlur={() => setEditando(false)}
+          className="w-full rounded border border-white/15 bg-[#12161c] px-1.5 py-1 text-[11.5px] text-white/85 focus:outline-none focus:border-[#7dd3fc]/50 disabled:opacity-50"
+        >
+          <option value="" className="bg-[#20262e]">
+            {f.responsavelId != null ? "— retirar responsável —" : "— selecione —"}
+          </option>
+          {gestao!.usuarios!.map((u) => (
+            <option key={u.id} value={u.id} className="bg-[#20262e]">{u.nome}</option>
+          ))}
+        </select>
+      </div>
+    )
+  }
+
+  return (
+    <div className="min-w-0 text-[11.5px]">
+      <div className="truncate">{nome}</div>
+      <button
+        type="button"
+        disabled={salvando}
+        onClick={() => setEditando(true)}
+        className="text-[10.5px] text-[#7dd3fc]/80 hover:text-[#7dd3fc] hover:underline disabled:opacity-40"
+      >
+        {salvando ? "salvando…" : f.responsavelId != null ? "alterar" : "atribuir"}
+      </button>
+    </div>
+  )
+}
+
 function LinhaDocumento({
   doc,
   onAbrirDetalhes,
+  gestao,
   readOnly,
   destacado,
 }: {
   doc: DocumentoDoIndice
   onAbrirDetalhes?: (doc: DocumentoDoIndice) => void
+  gestao?: GestaoDeResponsavel
   readOnly: boolean
   destacado?: boolean
 }) {
@@ -1103,14 +1244,8 @@ function LinhaDocumento({
 
       {/* O RESPONSÁVEL É O DA TAREFA. Não existe um segundo dono por documento:
           inventar um criaria a divergência de "Daniela numa tela e Equipe
-          Documental na outra". */}
-      <div className="min-w-0 text-[11.5px] truncate">
-        {doc.naFase.responsavelNome
-          ? <span className="text-white/80">{doc.naFase.responsavelNome}</span>
-          : doc.naFase.estado === "CONCLUIDA"
-            ? <span className="text-white/25">—</span>
-            : <span className="text-[#d2a948]">Sem responsável</span>}
-      </div>
+          Documental na outra". E é AQUI que ele se muda — ver CelulaResponsavel. */}
+      <CelulaResponsavel doc={doc} gestao={gestao} readOnly={readOnly} />
 
       <CelulaPrazo f={doc.naFase} />
 

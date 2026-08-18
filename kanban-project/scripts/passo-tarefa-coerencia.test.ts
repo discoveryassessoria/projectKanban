@@ -64,7 +64,6 @@ console.log("\n(C) Blindagem estática — nenhum caminho escreve passo sem proj
 const projecao = read("src/services/passo-tarefa-projecao.ts")
 const docOp = read("src/services/documento-operacao.ts")
 const sync = read("src/services/task-step-sync.ts")
-const delegar = read("src/app/api/processos/[processoId]/genealogia/delegar/route.ts")
 
 check("existe UM mapeamento oficial", projecao.includes("export const STATUS_TAREFA_POR_PASSO"))
 check("existe a projeção transacional", projecao.includes("export async function projetarTarefaDoPasso"))
@@ -75,8 +74,6 @@ check("a projeção nunca decide a transição do PASSO", !/phaseWorkflowStepIns
 check("a operação por documento projeta a tarefa", docOp.includes("projetarTarefaDoPasso"))
 check("a operação por documento trava a coerência antes do commit", docOp.includes("assegurarCoerenciaPassoTarefa"))
 check("o sincronismo canônico também trava", sync.includes("assegurarCoerenciaPassoTarefa"))
-check("delegar move o responsável do PAR, não só do passo",
-  delegar.includes("tx.tarefa.updateMany") && delegar.includes("responsavelId"))
 
 // Nenhum arquivo fora do trio oficial pode escrever `status:` num passo.
 const AUTORIZADOS = new Set([
@@ -104,6 +101,23 @@ for (const arquivo of varrer("src")) {
 }
 check("nenhum arquivo fora dos serviços oficiais escreve STATUS de passo",
   escritoresIndevidos.length === 0, escritoresIndevidos.join(", "))
+
+// RESPONSABILIDADE SÓ MUDA PELA PORTA CANÔNICA.
+//
+// Havia uma rota (`genealogia/delegar`) que gravava `responsavelId` no passo e
+// na tarefa com `updateMany` cru: sem auditoria, sem notificação, sem CAS e sem
+// guarda de tarefa encerrada. Ela não tinha mais consumidor e foi removida — o
+// que a substitui é `atribuirTarefa`/`devolverAFila`, as MESMAS portas que a
+// Operação usa. Este check impede que o atalho volte por outra rota: distribuir
+// trabalho tem uma porta, e ela audita e avisa.
+const rotasComResponsavel = varrer("src/app/api")
+  .filter((f) => !f.includes("/api/tarefas/"))
+  .filter((f) => {
+    const t = read(f)
+    return /tarefa\.update(Many)?\s*\(/.test(t) && /responsavelId/.test(t)
+  })
+check("nenhuma rota fora de /api/tarefas escreve responsável de tarefa",
+  rotasComResponsavel.length === 0, rotasComResponsavel.join(", "))
 
 const reparo = read("scripts/reparar-passo-tarefa.ts")
 check("o reparo existe e é dry-run por padrão", reparo.includes("--execute") && reparo.includes("SOMENTE LEITURA"))

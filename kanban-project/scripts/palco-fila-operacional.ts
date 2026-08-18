@@ -73,6 +73,13 @@ async function main() {
     data: { nome: 'Marco Rovatti', email: 'gestor@palco-fila.test', senha: 'x', tipo: 'admin' },
     select: { id: true },
   })
+  const gabriel = await prisma.usuario.create({
+    data: {
+      nome: 'Gabriel Souza', email: 'gabriel@palco-fila.test', senha: 'x', tipo: 'assistente',
+      permissoesCustom: PERMISSOES_DO_EXECUTOR,
+    },
+    select: { id: true },
+  })
 
   // O QUADRO PRECISA TER COLUNA PARA ESTE PROCESSO — mesma razão do palco de 500.
   const tipo = await prisma.tipoProcessoNacionalidade.findFirst({
@@ -150,8 +157,15 @@ async function main() {
   const alvoHomonimo = tarefas.find((t) => t.necessidadeId === alvos[1].necessidadeId)!
   await atribuirTarefa({ tarefaId: alvoHomonimo.id, responsavelId: daniela.id, autorId: gestor.id })
 
+  // A TERCEIRA certidão fica SEM DONO de propósito: é a linha em que o gestor,
+  // olhando o processo, precisa conseguir atribuir sem sair dele.
+  const semDono = tarefas.find((t) => t.necessidadeId === alvos[2].necessidadeId)!
+
   console.log(JSON.stringify({
     processoId: proc.id,
+    gabrielId: gabriel.id,
+    tarefaSemDonoId: semDono.id,
+    documentoSemDonoId: alvos[2].documentoId,
     danielaId: daniela.id,
     danielaEmail: 'daniela@palco-fila.test',
     gestorId: gestor.id,
