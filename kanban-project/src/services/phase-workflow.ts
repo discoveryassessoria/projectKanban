@@ -12,7 +12,8 @@ import { Prisma, type PhaseWorkflowInstance, type PhaseWorkflowStepInstance, typ
 import { resolveWorkflowRuntime } from "@/src/lib/workflow-runtime"
 import { validarDefinicao } from "@/src/services/workflow-definition-validator"
 import { exigirDocumentoNoPasso } from "@/src/services/invariante-documental"
-import { phaseKeyToFaseCode, FASES } from "@/src/lib/process-stage/fases-catalog"
+import { phaseKeyToFaseCode } from "@/src/lib/process-stage/fases-catalog"
+import { resolverEscopoDaFase } from "@/src/lib/process-stage/escopo-operacional-da-fase"
 import {
   type DefWorkflow,
   type DefStep,
@@ -535,11 +536,14 @@ export async function instanciarWorkflowDaFase(
   // PLANO DE MATERIALIZAÇÃO — o que a CONFIGURAÇÃO publicada manda existir.
   // Calculado antes da transação de escrita e reusado pelos dois caminhos (instância
   // nova e instância já existente), para que os dois convirjam para o mesmo estado.
-  // ESCOPO OPERACIONAL CANÔNICO da fase (fases-catalog): é a declaração oficial de
-  // por qual entidade a fase opera. O passo pode sobrepor no cadastro; sem sobreposição,
-  // herda daqui. Fase fora do catálogo cai em PROCESSO (1 instância por fase/ciclo).
-  const faseCodeMat = phaseKeyToFaseCode(input.faseMacroKey)
-  const escopoDaFase: Cardinalidade = faseCodeMat ? (FASES[faseCodeMat].scope as Cardinalidade) : "PROCESSO"
+  // ESCOPO OPERACIONAL da fase: a declaração oficial de por qual entidade ela opera.
+  // Vem do catálogo em código quando a fase é uma das canônicas e do CADASTRO quando
+  // ela foi criada por lá — é o que permite uma fase nascer sem alteração de código e
+  // ainda assim materializar certo. O passo pode sobrepor no cadastro dele; sem
+  // sobreposição, herda daqui. Fase que não declarou escopo em lugar nenhum cai em
+  // PROCESSO (1 instância por fase/ciclo), que é o mínimo que não inventa entidade.
+  const escopoDaFase: Cardinalidade =
+    ((await resolverEscopoDaFase(input.faseMacroKey, db)) as Cardinalidade | null) ?? "PROCESSO"
   const { ctx: ctxEscopo, diagnosticos: diagEscopo } = await carregarContextoEscopo(processo.id, steps, escopoDaFase, db)
   const plano = planejarMaterializacao(steps, workflow.execucao, escopoDaFase, ctxEscopo)
   const avisos = [...val.warnings, ...diagEscopo, ...plano.avisos]

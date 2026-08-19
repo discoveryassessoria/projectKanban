@@ -305,6 +305,20 @@ export default function MacroKanbanTab() {
                   {fasesDisponiveis.map((c) => <option key={c.phaseKey} value={c.phaseKey} className="bg-zinc-900">{c.label}</option>)}
                 </select>
                 <button onClick={adicionarFase} disabled={!addKey} className="rounded-lg border border-white/15 px-3 py-2 text-sm text-white/80 transition hover:bg-white/10 disabled:opacity-40">+ Adicionar fase</button>
+
+                {/* A FASE QUE AINDA NÃO EXISTE.
+                    Quem está compondo um fluxo e não encontra a fase no seletor
+                    procura o caminho AQUI — e antes não havia nenhum, o que fazia
+                    parecer que criar fase não era possível. O link leva ao MESMO
+                    cadastro canônico (Processos › Estrutura › Fases); esta tela
+                    continua sendo só o compositor, e não ganha um CRUD paralelo. */}
+                <a
+                  href="?screen=fases"
+                  className="rounded-lg px-2 py-2 text-xs text-white/45 underline-offset-4 transition hover:text-white/70 hover:underline"
+                  title="Abre o cadastro de fases, onde novas fases são criadas"
+                >
+                  A fase que preciso não está na lista
+                </a>
               </div>
 
               {/* Barra de ações */}

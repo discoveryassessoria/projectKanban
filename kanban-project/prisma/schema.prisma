@@ -2973,6 +2973,19 @@ model CatalogoFase {
   id                Int      @id @default(autoincrement())
   phaseKey          String   @unique @db.VarChar(60)
   label             String   @db.VarChar(120)
+  /// O QUE A FASE É, em texto do operador. Não participa de nenhuma decisão.
+  descricao         String?  @db.Text
+  /// SOBRE O QUE A FASE OPERA — processo, pessoa, necessidade ou documento.
+  ///
+  /// É o que a materialização usa para decidir sobre quantas entidades os passos se
+  /// multiplicam: uma fase DOCUMENTO gera um roteiro por certidão; uma fase PROCESSO
+  /// gera um só. Enquanto isso vivia apenas no catálogo em código, nenhuma fase nova
+  /// podia declarar o próprio escopo — nascia PROCESSO por omissão, sem que ninguém
+  /// tivesse escolhido. `null` = fase ainda não utilizável (o cadastro recusa usá-la).
+  escopo            EscopoExecucao?
+  /// ORDEM PADRÃO — só o valor sugerido ao semear um macrofluxo novo. A ordem REAL de
+  /// uma fase pertence ao workflow que a usa (`FaseMacro.ordem`): a mesma fase pode
+  /// ser a terceira num fluxo e a quarta noutro.
   ordemPadrao       Int      @default(0)
   requiredPadrao    Boolean  @default(true)
   conditionalPadrao Boolean  @default(false)

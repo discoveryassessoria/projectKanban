@@ -187,6 +187,7 @@ export const MANAGEMENT_NAVIGATION: ManagementNavigationItem[] = [
       a(10, "macrokanban", "Workflow Macro", ["workflow", "macro", "kanban", "fluxo", "sequencia", "sequência", "coluna", "sla"], "Fluxos"),
       a(20, "phaseiwf", "Workflow Interno", ["workflow", "interno", "passo", "fluxo", "tarefa"], "Fluxos"),
 
+
       a(30, "transicoes", "Transições", ["transicao", "transição", "caminho", "entrada", "avanco", "avanço", "regra"]),
 
       a(40, "execmotor", "Executor do Motor", ["executor", "motor", "execucao", "execução", "gatilho"], "Configurações"),

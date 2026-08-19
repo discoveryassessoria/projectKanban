@@ -192,6 +192,7 @@
     "test:motor-fases": "tsx scripts/motor-fases-passos.test.ts",
     "test:motor-reentrada": "tsx scripts/motor-reentrada-fase.test.ts",
     "test:workflow-ciclo": "tsx scripts/workflow-ciclo-atual.test.ts",
+    "test:cadastro-fases": "tsx scripts/cadastro-de-fases.test.ts",
     "palco:retrocesso": "tsx scripts/palco-retrocesso-motor.ts",
     "e2e:retrocesso": "node scripts/e2e-retrocesso-motor.mjs",
     "verifica:retrocesso": "tsx scripts/verifica-retrocesso-motor.ts",

@@ -14,6 +14,8 @@ interface Fase {
   id: number
   phaseKey: string
   label: string
+  descricao: string | null
+  escopo: Escopo | null
   ordemPadrao: number
   requiredPadrao: boolean
   conditionalPadrao: boolean
@@ -31,10 +33,26 @@ const labelCls = "mb-1 block text-xs text-white/60"
 const IEdit = () => (<svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 20h9" /><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z" /></svg>)
 const ITrash = () => (<svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 6h18" /><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" /></svg>)
 
+/**
+ * SOBRE O QUE A FASE OPERA. É o que decide sobre quantas entidades os passos se
+ * multiplicam quando a fase é materializada — um roteiro por certidão, por pessoa,
+ * por registro a localizar, ou um só para o processo inteiro. Sem esta escolha a
+ * fase existe no cadastro e não pode compor fluxo nenhum.
+ */
+type Escopo = "PROCESSO" | "PESSOA" | "NECESSIDADE" | "DOCUMENTO"
+const ESCOPOS: Array<{ v: Escopo; nome: string; ajuda: string }> = [
+  { v: "PROCESSO", nome: "Processo", ajuda: "um roteiro único para o processo inteiro" },
+  { v: "PESSOA", nome: "Pessoa", ajuda: "um roteiro por pessoa da árvore" },
+  { v: "NECESSIDADE", nome: "Registro a localizar", ajuda: "um roteiro por certidão que precisa ser encontrada" },
+  { v: "DOCUMENTO", nome: "Documento", ajuda: "um roteiro por documento materializado" },
+]
+
 type Form = {
   id?: number
   phaseKey: string
   label: string
+  descricao: string
+  escopo: Escopo | ""
   ordemPadrao: number
   requiredPadrao: boolean
   conditionalPadrao: boolean
@@ -43,7 +61,7 @@ type Form = {
 }
 
 const vazio = (ordem: number): Form => ({
-  phaseKey: "", label: "", ordemPadrao: ordem, requiredPadrao: true,
+  phaseKey: "", label: "", descricao: "", escopo: "", ordemPadrao: ordem, requiredPadrao: true,
   conditionalPadrao: false, slaDiasPadrao: 30, ativo: true,
 })
 
@@ -185,6 +203,7 @@ export default function CatalogoFasesTab() {
                       title="Editar" aria-label="Editar"
                       onClick={() => setForm({
                         id: f.id, phaseKey: f.phaseKey, label: f.label, ordemPadrao: f.ordemPadrao,
+                        descricao: f.descricao ?? "", escopo: f.escopo ?? "",
                         requiredPadrao: f.requiredPadrao, conditionalPadrao: f.conditionalPadrao,
                         slaDiasPadrao: f.slaDiasPadrao, ativo: f.ativo,
                       })}
@@ -228,9 +247,39 @@ export default function CatalogoFasesTab() {
                 />
                 {form.id && <p className="mt-1 text-[11px] text-white/40">A chave é o vínculo com fluxos, automações e runtime — não pode ser alterada.</p>}
               </div>
-              <div className="grid grid-cols-2 gap-3">
+              <div className="mt-3">
+                <label className={labelCls}>Descrição</label>
+                <textarea
+                  value={form.descricao}
+                  onChange={e => setForm(f => f && { ...f, descricao: e.target.value })}
+                  rows={2}
+                  className={inputCls}
+                  placeholder="O que acontece nesta fase, em uma frase."
+                />
+              </div>
+
+              {/* ESCOPO — a escolha que torna a fase utilizável. Fica junto do nome
+                  de propósito: é decisão estrutural, não configuração fina. */}
+              <div className="mt-3">
+                <label className={labelCls}>Opera sobre *{form.id ? " (imutável enquanto a fase estiver em uso)" : ""}</label>
+                <select
+                  value={form.escopo}
+                  onChange={e => setForm(f => f && { ...f, escopo: e.target.value as Escopo })}
+                  className={inputCls}
+                >
+                  <option value="" className="bg-zinc-900">— escolher —</option>
+                  {ESCOPOS.map(e => (
+                    <option key={e.v} value={e.v} className="bg-zinc-900">{e.nome} — {e.ajuda}</option>
+                  ))}
+                </select>
+                <p className="mt-1 text-[11px] text-white/40">
+                  Decide quantos roteiros a fase cria: um por documento, por pessoa, por registro — ou um só para o processo.
+                </p>
+              </div>
+
+              <div className="mt-3 grid grid-cols-2 gap-3">
                 <div>
-                  <label className={labelCls}>Ordem padrão</label>
+                  <label className={labelCls}>Ordem padrão <span className="text-white/40">(só sugestão ao criar fluxo novo)</span></label>
                   <input type="number" value={form.ordemPadrao} onChange={e => setForm(f => f && { ...f, ordemPadrao: Number(e.target.value) })} className={inputCls} />
                 </div>
                 <div>

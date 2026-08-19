@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { verificarPermissao } from '@/src/lib/verificar-permissao'
-import { phaseKeyToFaseCode } from '@/src/lib/process-stage/fases-catalog'
+import { avaliarAptidaoDaFase } from '@/src/lib/process-stage/escopo-operacional-da-fase'
 
 // GET - Bootstrap: tipos de processo + catálogo de fases (+ flags dos países)
 export async function GET(request: NextRequest) {
@@ -52,24 +52,27 @@ export async function POST(request: NextRequest) {
     if (b.seedDefaults) {
       const cat = await prisma.catalogoFase.findMany({ where: { ativo: true }, orderBy: { ordemPadrao: 'asc' } })
 
-      // O macro NASCE canônico ou não nasce. O catálogo de fases é um cadastro
-      // editável, e uma chave que não existe no catálogo oficial produz uma fase que
-      // o motor nunca vai resolver — o processo trava nela. Foi assim que três
-      // macrofluxos nasceram com `traducao`/`retificacao`.
+      // O macro NASCE UTILIZÁVEL ou não nasce.
       //
-      // RECUSAR, nunca converter: traduzir a chave aqui seria um alias escondido no
-      // endpoint, e o operador continuaria cadastrando errado sem saber.
-      const invalidas = cat.filter((f) => phaseKeyToFaseCode(f.phaseKey) == null)
+      // A pergunta MUDOU. Antes era "esta chave está no catálogo em código?", e isso
+      // recusava qualquer fase criada pelo cadastro — inclusive uma legítima. Agora é
+      // "esta fase é utilizável?": tem escopo declarado (em código, para as canônicas,
+      // ou no cadastro, para as novas) e não é a chave antiga de uma canônica.
+      //
+      // RECUSAR, nunca converter, e sempre DIZENDO o que falta: recusar sem nomear a
+      // canônica foi o que deixou três macrofluxos nascerem com `traducao`/`retificacao`
+      // e ninguém entender por quê.
+      const aptidoes = await Promise.all(cat.map(async (f) => ({ f, a: await avaliarAptidaoDaFase(f.phaseKey) })))
+      const invalidas = aptidoes.filter((x) => !x.a.apta)
       if (invalidas.length > 0) {
         return NextResponse.json(
           {
             error:
-              `O catálogo de fases tem ${invalidas.length} fase(s) com chave fora do catálogo oficial: ` +
-              invalidas.map((f) => `"${f.phaseKey}" (${f.label})`).join(', ') +
-              '. Corrija o cadastro em Gerenciamento › Processos › Estrutura › Fases antes de criar o macrofluxo — ' +
-              'um macro criado assim nasce com fases que o motor não resolve.',
-            code: 'CATALOGO_FASE_COM_CHAVE_INVALIDA',
-            fases: invalidas.map((f) => ({ id: f.id, phaseKey: f.phaseKey, label: f.label })),
+              `O catálogo tem ${invalidas.length} fase(s) que não podem compor um fluxo: ` +
+              invalidas.map((x) => `"${x.f.phaseKey}" (${x.f.label}) — ${x.a.motivo}`).join(' | ') +
+              ' Ajuste o cadastro em Gerenciamento › Processos › Estrutura › Fases.',
+            code: 'CATALOGO_FASE_NAO_UTILIZAVEL',
+            fases: invalidas.map((x) => ({ id: x.f.id, phaseKey: x.f.phaseKey, label: x.f.label, motivo: x.a.motivo, code: x.a.code, canonica: x.a.canonica ?? null })),
           },
           { status: 422 },
         )

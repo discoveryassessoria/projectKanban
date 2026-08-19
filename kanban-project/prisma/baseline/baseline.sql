@@ -5,7 +5,7 @@
 --   corpo        → gerado do prisma/schema.prisma
 --   bloco manual → prisma/baseline/bloco-manual.sql (edite LÁ)
 --
--- Gerado em : 2026-08-13
+-- Gerado em : 2026-08-19
 -- Prisma    : 6.19.3
 --
 -- PARA QUE SERVE: reconstruir o banco DO ZERO. O histórico de migrations NÃO
@@ -2292,6 +2292,8 @@ CREATE TABLE "CatalogoFase" (
     "id" SERIAL NOT NULL,
     "phaseKey" VARCHAR(60) NOT NULL,
     "label" VARCHAR(120) NOT NULL,
+    "descricao" TEXT,
+    "escopo" "EscopoExecucao",
     "ordemPadrao" INTEGER NOT NULL DEFAULT 0,
     "requiredPadrao" BOOLEAN NOT NULL DEFAULT true,
     "conditionalPadrao" BOOLEAN NOT NULL DEFAULT false,

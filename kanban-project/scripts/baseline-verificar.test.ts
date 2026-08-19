@@ -163,7 +163,16 @@ const MIGRATION = join(DIR_MIGRATIONS, '0000_baseline', 'migration.sql')
 // 20260812220000_decisao_sobre_causa_removida.
 //
 //   anterior : 8e66a6548e71c7aafceab85e705ef78fd0efa47b0ab6b64b0571ffb44291eb01
-const CHECKSUM_LEDGER = '00a3504ec57a9531ac0664374baad33a887ddcb1ebf42bfcb0e47b96aca53138'
+//
+// 19/08/2026 — CADASTRO CANONICO DE FASES. `CatalogoFase` ganhou `descricao` e
+// `escopo`: sem o escopo, uma fase criada pelo cadastro nascia utilizavel so na
+// aparencia (o motor a materializava como PROCESSO por omissao) e o Workflow Macro
+// a recusava por nao estar no catalogo em codigo. Aditivo: duas colunas nulas e um
+// backfill das dez fases existentes. Ledger de producao reconciliado no MESMO deploy
+// da migration 20260819120000_catalogo_fase_escopo_descricao.
+//
+//   anterior : 00a3504ec57a9531ac0664374baad33a887ddcb1ebf42bfcb0e47b96aca53138
+const CHECKSUM_LEDGER = '882ba788a0fbb21f556741114a2121ddf55e483fb9676b584e2cc36d4b9bc1f8'
 
 /**
  * Migrations criadas DEPOIS da consolidacao de 02/08/2026. Toda migration nova
@@ -195,6 +204,7 @@ const MIGRATIONS_POS_BASELINE: string[] = [
   '20260812180000_camada_operacional_funcionario',
   '20260812200000_aptidao_por_unidade_operacional',
   '20260812220000_decisao_sobre_causa_removida',
+  '20260819120000_catalogo_fase_escopo_descricao',
 ]
 
 const sha256 = (t: string) => createHash('sha256').update(t).digest('hex')

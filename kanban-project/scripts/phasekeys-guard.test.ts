@@ -170,8 +170,12 @@ check("nenhum componente monta uma lista própria de phaseKeys", (() => {
 
 // ENDPOINT de criação de macro: recusa cadastro legado, nunca converte.
 const rotaMacro = read("src/app/api/gerenciamento/workflow-macro/route.ts")
+// A PERGUNTA MUDOU, a exigência não: o endpoint continua validando o catálogo antes
+// de persistir — só que agora pergunta "esta fase é UTILIZÁVEL?" (tem escopo e não é
+// chave legada) em vez de "esta chave está no catálogo em código?". A segunda forma
+// recusava também as fases criadas pelo cadastro, que são legítimas.
 check("o endpoint de criação valida o catálogo antes de persistir",
-  rotaMacro.includes("CATALOGO_FASE_COM_CHAVE_INVALIDA") && rotaMacro.includes("phaseKeyToFaseCode"))
+  rotaMacro.includes("CATALOGO_FASE_NAO_UTILIZAVEL") && rotaMacro.includes("avaliarAptidaoDaFase"))
 check("o endpoint RECUSA a chave legada, não a traduz",
   !/traducao_juramentada['"]?\s*:|EQUIVALENCIA_LEGADA|MAPEAMENTO/.test(rotaMacro))
 check("o endpoint também barra catálogo com chave repetida", rotaMacro.includes("CATALOGO_FASE_DUPLICADA"))

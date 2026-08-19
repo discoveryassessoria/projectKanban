@@ -11,7 +11,12 @@
 
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import { verificarPermissao } from '@/src/lib/verificar-permissao'
+import { verificarPermissao, extrairUsuarioComPermissoes } from '@/src/lib/verificar-permissao'
+import { EQUIVALENCIA_LEGADA } from '@/src/lib/process-stage/verificar-phasekeys'
+
+/** Sobre o que uma fase pode operar. Mesmo vocabulário do enum EscopoExecucao. */
+const ESCOPOS_VALIDOS = ['PROCESSO', 'PESSOA', 'NECESSIDADE', 'DOCUMENTO'] as const as readonly string[]
+
 
 // "Emissão de Certidões" -> "emissao_de_certidoes"
 function slug(s: string) {
@@ -58,10 +63,32 @@ export async function POST(request: NextRequest) {
     const jaExiste = await prisma.catalogoFase.findUnique({ where: { phaseKey } })
     if (jaExiste) return NextResponse.json({ error: `Já existe uma fase com a chave "${phaseKey}".` }, { status: 409 })
 
+    // CHAVE LEGADA: `retificacao` é o nome antigo de `retificacao_registros`. Deixar
+    // criar de novo é reabrir o defeito que custou três macrofluxos.
+    const legada = EQUIVALENCIA_LEGADA[phaseKey]
+    if (legada) {
+      return NextResponse.json(
+        { error: `"${phaseKey}" é a chave antiga de "${legada}". Use a fase canônica em vez de recriá-la.`, code: 'CHAVE_LEGADA', canonica: legada },
+        { status: 422 },
+      )
+    }
+
+    // ESCOPO: sem ele a fase existe e não é utilizável. Exigir na criação evita o
+    // cadastro pela metade que só aparece como erro lá na frente, no fluxo.
+    const escopo = String(b?.escopo || '').trim().toUpperCase()
+    if (!ESCOPOS_VALIDOS.includes(escopo)) {
+      return NextResponse.json(
+        { error: `Informe sobre o que a fase opera: ${ESCOPOS_VALIDOS.join(', ')}.`, code: 'ESCOPO_OBRIGATORIO' },
+        { status: 400 },
+      )
+    }
+
     const fase = await prisma.catalogoFase.create({
       data: {
         phaseKey,
         label,
+        descricao: b?.descricao ? String(b.descricao).trim() : null,
+        escopo: escopo as never,
         ordemPadrao: Number.isFinite(Number(b?.ordemPadrao)) ? Number(b.ordemPadrao) : 0,
         requiredPadrao: b?.requiredPadrao !== false,
         conditionalPadrao: !!b?.conditionalPadrao,
@@ -69,6 +96,14 @@ export async function POST(request: NextRequest) {
         ativo: b?.ativo !== false,
       },
     })
+    const usuario = await extrairUsuarioComPermissoes(request)
+    await prisma.logAuditoria.create({
+      data: {
+        acao: 'PHASE_CREATED', entidade: 'CatalogoFase', entidadeId: fase.id,
+        descricao: `Fase "${fase.label}" criada (chave ${fase.phaseKey}, opera sobre ${escopo}).`,
+        detalhes: { depois: fase } as never, usuarioId: usuario?.userId ?? null,
+      },
+    }).catch(() => null)
     return NextResponse.json({ fase: { ...fase, usos: 0 } }, { status: 201 })
   } catch (e) {
     console.error('POST catalogo-fases', e)
