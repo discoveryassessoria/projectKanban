@@ -103,6 +103,29 @@ export interface Semelhante { tarefaId: number; titulo: string; statusTarefa: St
  * bloqueio aqui obrigaria o operador a mentir no título para conseguir
  * cadastrar o que ele sabe ser necessário.
  */
+/**
+ * O MOTOR DE FASES É PERGUNTADO DEPOIS DOS COMANDOS QUE MEXEM NO GATE.
+ *
+ * Nem todo comando muda o que a fase espera: atribuir, transferir e alterar prazo
+ * movem a GESTÃO do trabalho, não a sua existência. Cancelar, desbloquear, retomar
+ * de espera e decidir sobre causa removida DERRUBAM pendência — e enquanto ninguém
+ * perguntava ao gate depois deles, a última pendência podia cair sem que o processo
+ * saísse do lugar. A pergunta mora aqui, na porta canônica, e não na rota: a rota
+ * não conhece Prisma, e um segundo caminho de comando herdaria o esquecimento.
+ *
+ * PÓS-COMMIT e best-effort: nunca derruba o comando, que já está gravado.
+ */
+async function reconciliarMotorApos(tarefaId: number, motivo: string): Promise<void> {
+  try {
+    const t = await prisma.tarefa.findUnique({ where: { id: tarefaId }, select: { processoId: true } })
+    if (!t?.processoId) return
+    const { reconciliarMotorDeFases } = await import('@/src/lib/motor/reconciliar-motor-fases')
+    await reconciliarMotorDeFases(t.processoId, { origem: motivo })
+  } catch (e) {
+    console.error(`[tarefa-ciclo] reconciliação do motor de fases falhou (tarefa ${tarefaId}):`, e)
+  }
+}
+
 export async function tarefasSemelhantesAbertas(n: {
   processoId: number; pessoaId?: number | null; documentoId?: number | null; necessidadeId?: number | null
 }): Promise<Semelhante[]> {
@@ -202,7 +225,7 @@ export async function criarTarefaManual(
  * Motivo é obrigatório. Uma tarefa que sai de concluída sem explicação
  * transforma o histórico em algo que ninguém consegue auditar depois.
  */
-export async function reabrirTarefa(args: {
+async function reabrirTarefaNucleo(args: {
   tarefaId: number
   autorId: number
   motivo: string
@@ -365,7 +388,7 @@ export async function bloquearTarefa(args: {
   })
 }
 
-export async function desbloquearTarefa(args: { tarefaId: number; autorId: number; motivo?: string | null }): Promise<Resultado> {
+async function desbloquearTarefaNucleo(args: { tarefaId: number; autorId: number; motivo?: string | null }): Promise<Resultado> {
   const agora = new Date()
   return prisma.$transaction(async (tx) => {
     const t = await tx.tarefa.findUnique({
@@ -555,7 +578,7 @@ export async function aguardarTerceiro(args: {
 }
 
 /** O terceiro respondeu — a MESMA tarefa volta ao ponto em que estava. */
-export async function retomarDeEspera(args: { tarefaId: number; autorId: number; motivo?: string | null }): Promise<Resultado> {
+async function retomarDeEsperaNucleo(args: { tarefaId: number; autorId: number; motivo?: string | null }): Promise<Resultado> {
   const agora = new Date()
   return prisma.$transaction(async (tx) => {
     const t = await tx.tarefa.findUnique({
@@ -664,7 +687,7 @@ export async function concluirTarefaSemWorkflow(args: {
   })
 }
 
-export async function cancelarTarefa(args: {
+async function cancelarTarefaNucleo(args: {
   tarefaId: number; autorId: number; motivo: string; codigo?: string | null
 }): Promise<Resultado> {
   if (!args.motivo?.trim()) return { ok: false, codigo: 'SEM_MOTIVO', mensagem: 'Informe o motivo do cancelamento.' }
@@ -725,7 +748,7 @@ export async function cancelarTarefa(args: {
  * Decidir NÃO inicia a tarefa e NÃO conclui a tarefa: é sobre a causa, não
  * sobre a execução.
  */
-export async function decidirSobreCausaRemovida(args: {
+async function decidirSobreCausaRemovidaNucleo(args: {
   tarefaId: number
   autorId: number
   decisao: 'MANTER' | 'ENCERRAR'
@@ -805,7 +828,7 @@ export async function decidirSobreCausaRemovida(args: {
 }
 
 /** Remove uma dependência declarada. Remover o que não existe não é erro. */
-export async function removerDependencia(args: { tarefaId: number; dependeDeId: number; autorId?: number | null }): Promise<Resultado> {
+async function removerDependenciaNucleo(args: { tarefaId: number; dependeDeId: number; autorId?: number | null }): Promise<Resultado> {
   const r = await prisma.tarefaDependencia.deleteMany({
     where: { tarefaId: args.tarefaId, dependeDeId: args.dependeDeId },
   })
@@ -820,4 +843,45 @@ export async function removerDependencia(args: { tarefaId: number; dependeDeId: 
     })
   }
   return { ok: true, tarefaId: args.tarefaId }
+}
+
+// ── AS PORTAS PÚBLICAS ─────────────────────────────────────────────────────
+// Cada uma faz o seu comando e, se ele mudou alguma coisa, pergunta ao motor de
+// fases. O núcleo continua sendo a transação; a pergunta vem DEPOIS dela, e não
+// pode alterar o resultado do comando.
+
+export async function reabrirTarefa(args: Parameters<typeof reabrirTarefaNucleo>[0]): Promise<Resultado> {
+  const r = await reabrirTarefaNucleo(args)
+  if (r.ok) await reconciliarMotorApos(args.tarefaId, 'comando:reabrir')
+  return r
+}
+
+export async function desbloquearTarefa(args: Parameters<typeof desbloquearTarefaNucleo>[0]): Promise<Resultado> {
+  const r = await desbloquearTarefaNucleo(args)
+  if (r.ok) await reconciliarMotorApos(args.tarefaId, 'comando:desbloquear')
+  return r
+}
+
+export async function retomarDeEspera(args: Parameters<typeof retomarDeEsperaNucleo>[0]): Promise<Resultado> {
+  const r = await retomarDeEsperaNucleo(args)
+  if (r.ok) await reconciliarMotorApos(args.tarefaId, 'comando:retomar_espera')
+  return r
+}
+
+export async function cancelarTarefa(args: Parameters<typeof cancelarTarefaNucleo>[0]): Promise<Resultado> {
+  const r = await cancelarTarefaNucleo(args)
+  if (r.ok) await reconciliarMotorApos(args.tarefaId, 'comando:cancelar')
+  return r
+}
+
+export async function decidirSobreCausaRemovida(args: Parameters<typeof decidirSobreCausaRemovidaNucleo>[0]): Promise<Resultado> {
+  const r = await decidirSobreCausaRemovidaNucleo(args)
+  if (r.ok) await reconciliarMotorApos(args.tarefaId, 'comando:decidir_causa')
+  return r
+}
+
+export async function removerDependencia(args: Parameters<typeof removerDependenciaNucleo>[0]): Promise<Resultado> {
+  const r = await removerDependenciaNucleo(args)
+  if (r.ok) await reconciliarMotorApos(args.tarefaId, 'comando:remover_dependencia')
+  return r
 }

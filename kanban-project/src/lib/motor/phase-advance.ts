@@ -194,6 +194,16 @@ interface Plano {
   origemInstancia: OrigemInstanciaStr
   /** Fonte declarada para o materializador oficial — a MESMA para todas as origens. */
   fonteMaterializacao: FonteMaterializacao
+  /**
+   * REFAZER O TRABALHO, em vez de reencontrá-lo.
+   *
+   * Entrar de novo numa fase preserva o que a visita anterior concluiu: voltar não
+   * desfaz trabalho. REABRIR é a operação que existe justamente para pedir o
+   * trabalho DE NOVO — e é a única que nasce do zero. Por isso a distinção é
+   * explícita aqui, e não deduzida da origem da instância: `returnPhase` e
+   * `reopenPhase` compartilham a origem REABERTURA e querem coisas opostas.
+   */
+  reexecutarDoZero?: boolean
   encerramento: "CONCLUIR" | "SUPERSEDER" | "NENHUM"
   eventoFaseTipo: "FASE_AVANCADA" | "FASE_AVANCADA_FORCADO" | "FASE_REABERTA" | "FASE_RETORNADA" | "FASE_MOVIDA"
   correlationId: string
@@ -270,7 +280,7 @@ async function executarPlano(p: Plano): Promise<AdvanceResult> {
         {
           processoId: p.processoId, faseMacroKey: p.faseDestino, ciclo: p.cicloAlvo,
           origem: p.origemInstancia, correlationId: p.correlationId, causationId: chave,
-          solicitadoPorId: p.solicitadoPorId,
+          solicitadoPorId: p.solicitadoPorId, reexecutarDoZero: p.reexecutarDoZero === true,
         },
         tx,
       )
@@ -608,8 +618,14 @@ export async function advance(processoId: number, ctx: AdvanceCtx = {}): Promise
   // apenas para a auditoria da tentativa.
   const snap = await snapshotPendencias(processoId, c.processo.faseAtual, correlationId)
   if (!snap.pend.canAdvance) {
-    // Auditoria da tentativa BLOQUEADA (uma por correlação) — sem mutação.
-    const log = await prisma.phaseAdvanceLog.create({
+    // AUDITORIA DA TENTATIVA BLOQUEADA — uma por correlação, sem mutação de estado.
+    //
+    // `createMany` com `skipDuplicates` em vez de `create`: a reconciliação
+    // convergente pergunta de novo, de hora em hora, com a MESMA correlação por
+    // posição — e a segunda pergunta não é um erro a engolir, é a mesma tentativa.
+    // Com `create` cada repetição levantava violação de unicidade e enchia o log de
+    // erro do runtime com uma falha que não existe.
+    const dadosBloqueio: { data: Prisma.PhaseAdvanceLogCreateManyInput } = {
       data: {
         processoId, faseAtual: c.processo.faseAtual, fasePretendida: proxima,
         policy: "ALL_REQUIRED_COMPLETED", regrasAvaliadas: snap.regrasAvaliadas,
@@ -618,7 +634,11 @@ export async function advance(processoId: number, ctx: AdvanceCtx = {}): Promise
         forcado: false, correlationId, causationId: ctx.causationId ?? null,
         chaveIdempotencia: montarChaveAdvanceBloqueio({ processoId, operacao: "AVANCAR", faseAtual: c.processo.faseAtual, correlationId }),
       },
-    }).catch(() => null)
+    }
+    await prisma.phaseAdvanceLog.createMany({ data: [dadosBloqueio.data], skipDuplicates: true }).catch(() => null)
+    const log = await prisma.phaseAdvanceLog
+      .findUnique({ where: { chaveIdempotencia: dadosBloqueio.data.chaveIdempotencia }, select: { id: true } })
+      .catch(() => null)
     return {
       success: false, resultado: "BLOQUEADO", code: "BLOQUEADO",
       message: "Avanço bloqueado por pendências obrigatórias",
@@ -701,6 +721,8 @@ export async function reopenPhase(processoId: number, input: ReopenInput): Promi
     operacao: "REABRIR", processoId, faseAtual: c.processo.faseAtual, lockVersion: c.processo.lockVersion,
     faseDestino: c.processo.faseAtual, novaFaseAtualKey: c.processo.faseAtual, cicloAlvo,
     origemInstancia: "REABERTURA", fonteMaterializacao: "REABERTURA",
+    // A ÚNICA operação que refaz: reabrir é pedir o trabalho de novo.
+    reexecutarDoZero: true,
     encerramento: "SUPERSEDER", eventoFaseTipo: "FASE_REABERTA",
     correlationId, causationId: input.causationId ?? null, solicitadoPorId: input.solicitadoPorId,
     forcado: false, justificativa: input.justificativa, motivoCodigo: input.motivoCodigo,

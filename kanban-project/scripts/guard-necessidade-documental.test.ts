@@ -85,6 +85,11 @@ const AUTORIZADOS_FORA_DO_RUNTIME: Record<string, string> = {
   "scripts/central-fase-500-docs.test.ts":
     "escala da Central: cria as PRÓPRIAS obrigações (marca ESCALA500) só no banco de teste — " +
     "quinhentas certidões para contar quantas consultas a tabela da fase custa",
+  "scripts/palco-retrocesso-motor.ts":
+    "palco do retrocesso de fase: monta e derruba o PRÓPRIO cenário (marca PALCO-RETROCESSO) " +
+    "só no banco de teste — o ciclo A→B→A precisa de duas obrigações reais, uma feita na " +
+    "visita anterior e outra nascida depois, para que a reentrada tenha o que preservar e o " +
+    "que exigir",
   "scripts/palco-fila-operacional.ts":
     "palco visual da Minha Fila: monta e derruba as PRÓPRIAS obrigações (marca PALCO-FILA), só no banco de teste — deixa uma tarefa ATRIBUÍDA e NÃO INICIADA de pé, que é o estado que a validação visual precisa ver na tela",
   "scripts/fila-ciclo-de-vida.test.ts":

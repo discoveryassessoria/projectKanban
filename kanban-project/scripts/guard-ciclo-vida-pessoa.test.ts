@@ -183,6 +183,8 @@ const AUTORIZADOS_FORA_DO_RUNTIME: Record<string, string> = {
   "scripts/central-fase-500-docs.test.ts":
     "escala da Central: monta e derruba a PRÓPRIA árvore (marca ESCALA500), só no banco de teste — " +
     "vinte e cinco pessoas com quinhentas certidões entre elas",
+  "scripts/palco-retrocesso-motor.ts":
+    "palco do retrocesso de fase: monta e derruba a PRÓPRIA árvore (marca PALCO-RETROCESSO), só no banco de teste — o requerente precisa existir para a fase documental ter obrigação, e o ciclo A→B→A precisa de duas certidões da mesma pessoa",
   "scripts/palco-fila-operacional.ts":
     "palco visual da Minha Fila: monta e derruba a PRÓPRIA árvore (marca PALCO-FILA), só no banco de teste — precisa de pessoas homônimas para a validação visual provar que \"Continuar\" abre a certidão certa",
   "scripts/fila-ciclo-de-vida.test.ts":

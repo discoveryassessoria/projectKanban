@@ -144,7 +144,7 @@ const FASES_MACRO = ["genealogia", "emissao_documental", "analise_documental", "
 async function main() {
   const { iniciarPasso, concluirPasso, concluirTarefa, iniciarTarefa } = await import("../src/services/task-step-sync")
   const { materializarExecucaoDaFase } = await import("../src/services/materializar-fase")
-  const { movePhaseManual } = await import("../src/lib/motor/phase-advance")
+  const { movePhaseManual, reopenPhase } = await import("../src/lib/motor/phase-advance")
   const { conferirCoerenciaPassoTarefa, assegurarCoerenciaPassoTarefa, DivergenciaPassoTarefaError } =
     await import("../src/services/passo-tarefa-projecao")
 
@@ -240,9 +240,14 @@ async function main() {
 
   console.log("\n(B4) Concluir pela TAREFA conclui o passo (o outro sentido)")
   // Fase seguinte (escopo PROCESSO), passo novo e limpo.
-  const advMod = await import("../src/lib/motor/phase-advance")
-  const av = await advMod.advance(processo.id, { origem: "teste" })
-  check("avançou para a próxima fase", av.success === true, JSON.stringify(av))
+  //
+  // O AVANÇO JÁ ACONTECEU: concluir o passo acima derrubou a última pendência, e a
+  // máquina de passos reconcilia o motor de fases logo depois de commitar. Pedir
+  // `advance` aqui devolveria BLOQUEADO — não porque algo falhou, mas porque a
+  // pergunta já foi feita e respondida, e agora o processo está na fase seguinte,
+  // com o trabalho dela em aberto.
+  check("o motor levou o processo para a próxima fase sozinho",
+    (await prisma.processo.findUnique({ where: { id: processo.id }, select: { faseAtualKey: true } }))?.faseAtualKey === "emissao_documental")
   const parEmissao = await prisma.phaseWorkflowStepInstance.findFirst({
     where: { processoId: processo.id, faseMacroKey: "emissao_documental" },
     select: { id: true, status: true, tarefas: { select: { id: true }, orderBy: { id: "asc" } } },
@@ -277,22 +282,48 @@ async function main() {
   )
   check("nenhum par preexistente mudou de estado", JSON.stringify(antes) === JSON.stringify(depois), JSON.stringify({ antes, depois }))
 
-  console.log("\n(B7) Novo ciclo cria PARES novos; o ciclo anterior fica intacto")
+  console.log("\n(B7) VOLTAR reencontra o trabalho; REABRIR é que pede de novo")
   const ciclo2 = await prisma.phaseWorkflowInstance.findFirst({ where: { processoId: processo.id, faseMacroKey: "genealogia", ciclo: 2 }, select: { id: true } })
-  const passosCiclo2 = await prisma.phaseWorkflowStepInstance.findMany({ where: { workflowInstanceId: ciclo2!.id }, select: { id: true, status: true, tarefas: { select: { id: true, statusTarefa: true } } } })
+  const passosCiclo2 = await prisma.phaseWorkflowStepInstance.findMany({ where: { workflowInstanceId: ciclo2!.id }, select: { id: true, status: true, stepKey: true, tarefas: { select: { id: true, statusTarefa: true } } } })
   check("o ciclo 2 tem passos próprios", passosCiclo2.length > 0, String(passosCiclo2.length))
-  // O ciclo 1 fechou o trabalho; reabrir a fase pede o trabalho DE NOVO, e cada
-  // passo novo precisa da sua tarefa — sem tarefa, o passo é invisível para a
-  // fila, para o responsável e para o prazo.
-  check("cada passo do ciclo 2 tem tarefa própria", passosCiclo2.every((p) => p.tarefas.length === 1),
-    JSON.stringify(passosCiclo2.map((p) => p.tarefas.length)))
-  check("os pares do ciclo 2 nascem coerentes e abertos",
-    passosCiclo2.every((p) => paresCoerentes(p.status, p.tarefas[0].statusTarefa) && p.tarefas[0].statusTarefa === "NAO_INICIADA"))
-  check("nenhuma tarefa do ciclo 2 é reaproveitada do ciclo 1",
+  // MUDANÇA DE REGRA, deliberada. Antes, reentrar numa fase pedia o trabalho DE
+  // NOVO: o ciclo 2 nascia zerado e cada passo ganhava a sua tarefa. Isso fazia uma
+  // certidão com "solicitar" e "aguardar" já concluídos voltar a 0 de 5 só porque o
+  // administrador precisou olhar a fase anterior — trabalho real desaparecendo da
+  // tela sem que ninguém o tivesse desfeito.
+  //
+  // Agora VOLTAR reencontra: o passo equivalente da visita anterior entrega o seu
+  // estado terminal ao passo novo, e passo concluído não gera tarefa (não há o que
+  // fazer nele). Quem quer o trabalho de novo tem uma operação com esse nome —
+  // `reopenPhase` —, e ela continua nascendo do zero. Ver
+  // `scripts/motor-reentrada-fase.test.ts` para o ciclo completo.
+  check("os passos do ciclo 2 herdaram o estado terminal da visita anterior",
+    passosCiclo2.every((p) => p.status === "CONCLUIDO"), JSON.stringify(passosCiclo2.map((p) => p.status)))
+  check("passo herdado como concluído não abre tarefa nova (não há o que fazer nele)",
+    passosCiclo2.every((p) => p.tarefas.length === 0), JSON.stringify(passosCiclo2.map((p) => p.tarefas.length)))
+  check("nenhum passo do ciclo 2 é o mesmo registro do ciclo 1",
     passosCiclo2.every((p) => !antes.some((a) => a.id === p.id)))
 
+  // A CONTRAPARTE: reabrir pede o trabalho de novo, e por isso NÃO herda.
+  const reab = await reopenPhase(processo.id, {
+    justificativa: "Refazer a localização do registro por erro na certidão.",
+    motivoCodigo: "RETORNO_PARA_REGULARIZACAO", solicitadoPorId: usuario.id, origem: "teste",
+  })
+  check("reabertura aceita", reab.success === true, JSON.stringify(reab).slice(0, 140))
+  const ciclo3 = await prisma.phaseWorkflowInstance.findFirst({ where: { processoId: processo.id, faseMacroKey: "genealogia", ciclo: 3 }, select: { id: true } })
+  const passosCiclo3 = await prisma.phaseWorkflowStepInstance.findMany({ where: { workflowInstanceId: ciclo3!.id }, select: { id: true, status: true, tarefas: { select: { id: true, statusTarefa: true } } } })
+  check("a reabertura materializou um ciclo novo", passosCiclo3.length > 0, String(passosCiclo3.length))
+  check("e ele NÃO herdou — o trabalho é para fazer de novo",
+    passosCiclo3.every((p) => !["CONCLUIDO", "DISPENSADO"].includes(p.status)), JSON.stringify(passosCiclo3.map((p) => p.status)))
+  check("cada passo reaberto tem a sua tarefa", passosCiclo3.every((p) => p.tarefas.length === 1),
+    JSON.stringify(passosCiclo3.map((p) => p.tarefas.length)))
+
   console.log("\n(B8) Divergência derruba a transação (rollback)")
-  const alvo = passosCiclo2[0]
+  // O alvo tem de ser um passo ABERTO com tarefa: é a combinação em que "concluir o
+  // passo sem projetar a tarefa" é de fato uma contradição. Os passos herdados do
+  // ciclo 2 já nascem concluídos e sem tarefa — o ciclo REABERTO é onde há trabalho
+  // em aberto.
+  const alvo = passosCiclo3[0]
   let derrubou = false
   try {
     await prisma.$transaction(async (tx) => {

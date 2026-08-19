@@ -7,16 +7,14 @@
 // requerente/árvore, operação de genealogia. Assim, no instante em que a última
 // pendência blocking cai, a fase avança sozinha — sem arrastar o card.
 //
-// advance() é IDEMPOTENTE e GATED: só avança com zero pendências blocking (a mesma
-// fonte oficial computeGate). Portanto é SEGURO chamar liberalmente — se ainda houver
-// pendência, não faz nada. Best-effort: NUNCA lança (não pode derrubar a mutação que
-// o chamou). Faz um pequeno laço para encadear fases vazias que ficam prontas em
-// sequência (limite de segurança evita loop infinito).
+// A DECISÃO E O LAÇO MORAM NO RECONCILIADOR (`reconciliar-motor-fases.ts`), que é gateado
+// pelo mesmo `computeGate` e explica o motivo quando não avança. Aqui ficou só o
+// gancho: uma porta fina, best-effort, que nunca lança — não pode derrubar a mutação
+// que a chamou. Duas implementações do mesmo laço seria a segunda fonte de verdade
+// que esta arquitetura não admite.
 
-import { advance } from "@/src/lib/motor/phase-advance"
+import { reconciliarMotorDeFases } from "@/src/lib/motor/reconciliar-motor-fases"
 import { concluirWorkflowInternoDaFase } from "@/src/services/alinhar-workflow-fase"
-
-const MAX_SALTOS = 5
 
 /**
  * Conclusão de uma fase por-processo (fluxo bespoke): alinha o Workflow Interno V2 da fase
@@ -33,15 +31,15 @@ export async function concluirFaseBespokeEAvancar(
   await tentarAvancoAutomatico(processoId)
 }
 
-export async function tentarAvancoAutomatico(processoId: number | null | undefined): Promise<void> {
+export async function tentarAvancoAutomatico(
+  processoId: number | null | undefined,
+  origem = "auto-avanco",
+): Promise<void> {
   if (!processoId) return
+  // O reconciliador já é best-effort e não lança; o try aqui é a segunda cinta de
+  // segurança para um erro de import/infra, que também não pode derrubar o chamador.
   try {
-    for (let i = 0; i < MAX_SALTOS; i++) {
-      const r = (await advance(processoId)) as { success?: boolean; changed?: boolean }
-      // avançou uma fase → tenta encadear a próxima (caso já esteja pronta/vazia).
-      if (r?.success === true) continue
-      break
-    }
+    await reconciliarMotorDeFases(processoId, { origem })
   } catch (e) {
     console.error(`[auto-avanço] falhou p/ processo ${processoId}:`, e)
   }

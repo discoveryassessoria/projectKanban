@@ -8,7 +8,7 @@
 
 import { randomUUID } from "crypto"
 import { prisma } from "@/lib/prisma"
-import { Prisma, type PhaseWorkflowInstance, type PhaseWorkflowStepInstance } from "@prisma/client"
+import { Prisma, type PhaseWorkflowInstance, type PhaseWorkflowStepInstance, type StepInstanceStatus } from "@prisma/client"
 import { resolveWorkflowRuntime } from "@/src/lib/workflow-runtime"
 import { validarDefinicao } from "@/src/services/workflow-definition-validator"
 import { exigirDocumentoNoPasso } from "@/src/services/invariante-documental"
@@ -42,6 +42,12 @@ export interface InstanciarWorkflowDaFaseInput {
   causationId?: string
   origem?: OrigemInstanciaStr
   solicitadoPorId?: number
+  /**
+   * REABERTURA EXPLÍCITA: materializa a fase do zero, sem herdar o que a visita
+   * anterior concluiu. Só a reabertura pede isso — reentrar numa fase (voltar,
+   * retornar, avançar de novo) preserva o trabalho já feito.
+   */
+  reexecutarDoZero?: boolean
 }
 
 export type FailureCode =
@@ -245,6 +251,8 @@ async function materializarAlvos(
     instantiatedAt: string
     /** CONTRATO (Fatia 1): o workflow declarou que executa sobre documento? */
     exigeDocumento?: boolean
+    /** Reabertura: não herda o estado da visita anterior (ver InstanciarWorkflowDaFaseInput). */
+    reexecutarDoZero?: boolean
   },
   alvos: AlvoDePasso[],
 ): Promise<{ criados: PhaseWorkflowStepInstance[]; existentes: PhaseWorkflowStepInstance[] }> {
@@ -280,8 +288,99 @@ async function materializarAlvos(
     if (e.necessidadeId != null) porChave.set(`${e.stepKey}|p-|n${e.necessidadeId}|d-`, e)
   }
 
+  // ── REENTRADA NA FASE: o trabalho já feito da MESMA obrigação não recomeça ──
+  //
+  // Voltar a uma fase abre um CICLO novo — é assim que o sistema distingue "a fase"
+  // de "esta passagem pela fase", e é o que permite ler cada visita separadamente.
+  // Mas o ciclo é da VISITA; a unidade de trabalho é da OBRIGAÇÃO. Materializar o
+  // ciclo novo do zero fazia a mesma certidão, com "solicitar" e "aguardar" já
+  // concluídos, voltar a 0 de 5 — o operador perdia de vista trabalho que existiu, e
+  // o gate passava a exigir de novo o que já tinha sido feito.
+  //
+  // Aqui o passo novo NASCE no estado terminal que o passo equivalente da visita
+  // anterior alcançou. Equivalente = mesma fase, mesma stepKey, MESMA unidade
+  // (necessidade/documento/pessoa). Só herda estado TERMINAL POSITIVO: concluído e
+  // dispensado são trabalho feito; cancelado e supersedido não são, e obrigação nova
+  // não tem de quem herdar — continua pendente, e a fase continua barrada por ela.
+  const HERDAVEIS: StepInstanceStatus[] = ["CONCLUIDO", "DISPENSADO"]
+  type Ancestral = { id: number; status: StepInstanceStatus; ciclo: number; startedAt: Date | null; completedAt: Date | null }
+  const ancestrais = new Map<string, Ancestral>()
+  if (ctx.ciclo > 1 && alvos.length > 0 && ctx.reexecutarDoZero !== true) {
+    const anteriores = await tx.phaseWorkflowStepInstance.findMany({
+      where: {
+        processoId: ctx.processoId,
+        faseMacroKey: ctx.faseMacroKey,
+        ciclo: { lt: ctx.ciclo },
+        stepKey: { in: [...new Set(alvos.map((a) => a.def.key))] },
+        status: { in: HERDAVEIS },
+      },
+      select: {
+        id: true, stepKey: true, ciclo: true, status: true, startedAt: true, completedAt: true,
+        pessoaId: true, necessidadeId: true, documentoId: true,
+      },
+      orderBy: { ciclo: "desc" },
+    })
+    // O ciclo MAIS RECENTE vence: se a mesma unidade passou por aqui três vezes, o que
+    // vale é o último estado alcançado, não o primeiro.
+    const guardar = (k: string, p: Ancestral) => { if (!ancestrais.has(k)) ancestrais.set(k, p) }
+    for (const p of anteriores) {
+      guardar(idLogica(p), p)
+      // As duas tolerâncias do reconhecimento acima, na mesma direção: o passo de uma
+      // visita pode ter nascido antes do Documento existir (ou depois), e continua
+      // sendo a mesma obrigação.
+      if (p.necessidadeId != null) guardar(`${p.stepKey}|n${p.necessidadeId}`, p)
+      if (p.documentoId != null) guardar(`${p.stepKey}|d${p.documentoId}`, p)
+    }
+  }
+  const acharAncestral = (a: AlvoDePasso): Ancestral | undefined =>
+    ancestrais.get(idLogica({ stepKey: a.def.key, pessoaId: a.pessoaId, necessidadeId: a.necessidadeId, documentoId: a.documentoId })) ??
+    (a.necessidadeId != null ? ancestrais.get(`${a.def.key}|n${a.necessidadeId}`) : undefined) ??
+    (a.documentoId != null ? ancestrais.get(`${a.def.key}|d${a.documentoId}`) : undefined)
+
+  // ── ONDE A FILA COMEÇA, QUANDO A FASE NÃO COMEÇA DO ZERO ──────────────────
+  // O plano de materialização descreve uma fase que começa do zero: no SEQUENCIAL só
+  // o primeiro passo nasce DISPONÍVEL e os demais dependem do anterior. Há dois casos
+  // legítimos em que ela não começa do zero — a REENTRADA, onde os primeiros passos
+  // nascem herdados como concluídos, e a OBRIGAÇÃO NOVA, publicada depois numa fase
+  // cujos passos anteriores já estão feitos. Nos dois, o plano cru abriria a fase sem
+  // nada executável: trabalho parado que ninguém pode pegar.
+  //
+  // A correção é do STATUS INICIAL, decidida aqui, antes de criar — e não uma
+  // transição depois. Passo criado não é passo movido: quem move passo é a máquina de
+  // passos, e ela continua sendo a única.
+  const chaveDaUnidade = (x: { pessoaId: number | null; necessidadeId: number | null; documentoId: number | null }) =>
+    `p${x.pessoaId ?? "-"}|n${x.necessidadeId ?? "-"}|d${x.documentoId ?? "-"}`
+  const statusInicial = new Map<AlvoDePasso, string>()
+  {
+    const porUnidade = new Map<string, AlvoDePasso[]>()
+    for (const a of alvos) {
+      const k = chaveDaUnidade(a)
+      porUnidade.set(k, [...(porUnidade.get(k) ?? []), a])
+    }
+    for (const [unidade, daUnidade] of porUnidade) {
+      // O que JÁ está feito nesta unidade: o herdado da visita anterior mais o que
+      // já existe neste ciclo (caso da obrigação publicada depois).
+      const feito = new Set<string>()
+      for (const a of daUnidade) {
+        const h = acharAncestral(a)
+        if (h) feito.add(a.def.key)
+      }
+      for (const e of jaExistem) {
+        if (chaveDaUnidade(e) === unidade && HERDAVEIS.includes(e.status)) feito.add(e.stepKey)
+      }
+      if (feito.size === 0) continue // fase que começa do zero: o plano já está certo
+      const ordenados = [...daUnidade].sort((x, y) => x.def.ordem - y.def.ordem)
+      const proximo = ordenados.find(
+        (a) => !feito.has(a.def.key) && a.status === "PENDENTE" && a.dependeDeStepKeys.every((k) => feito.has(k)),
+      )
+      if (proximo) statusInicial.set(proximo, "DISPONIVEL")
+    }
+  }
+
   const criados: PhaseWorkflowStepInstance[] = []
   const existentes: PhaseWorkflowStepInstance[] = []
+  /** Unidades que herdaram algo — usado no diagnóstico da materialização. */
+  const unidadesHerdadas = new Set<string>()
 
   for (let i = 0; i < alvos.length; i++) {
     const a = alvos[i]
@@ -304,6 +403,9 @@ async function materializarAlvos(
     })
 
     const tipoRes = mapearTipoPasso(a.def)
+    // O estado herdado da visita anterior, quando existe (ver bloco REENTRADA acima).
+    const herdado = acharAncestral(a)
+    if (herdado) unidadesHerdadas.add(`p${a.pessoaId ?? "-"}|n${a.necessidadeId ?? "-"}|d${a.documentoId ?? "-"}`)
     const si = await tx.phaseWorkflowStepInstance.create({
       data: {
         workflowInstanceId: ctx.instanciaId,
@@ -321,7 +423,14 @@ async function materializarAlvos(
         obrigatorio: a.def.required,
         geraTarefa: a.def.createsTask,
         ciclo: ctx.ciclo,
-        status: a.status,
+        // HERANÇA DE REENTRADA: nasce onde a visita anterior parou, ou no estado
+        // planejado quando não há de quem herdar.
+        status: (herdado ? herdado.status : statusInicial.get(a) ?? a.status) as StepInstanceStatus,
+        startedAt: herdado?.startedAt ?? null,
+        completedAt: herdado?.completedAt ?? null,
+        metadata: herdado
+          ? ({ reentrada: { herdadoDoPassoId: herdado.id, cicloAnterior: herdado.ciclo, status: herdado.status } } as Prisma.InputJsonValue)
+          : undefined,
         prioridade: a.def.priority,
         papel: a.def.owner ?? null,
         slaDays: a.def.slaDays,
@@ -350,10 +459,14 @@ async function materializarAlvos(
         dados: {
           stepKey: a.def.key, ordem: a.def.ordem, tipo: tipoRes.tipo, ciclo: ctx.ciclo,
           cardinalidade: a.cardinalidade, pessoaId: a.pessoaId, necessidadeId: a.necessidadeId, documentoId: a.documentoId,
+          // CAUSALIDADE DA HERANÇA — o histórico precisa dizer que este passo nasceu
+          // concluído porque a visita anterior o concluiu, e de qual passo veio.
+          ...(herdado ? { herdadoDoPassoId: herdado.id, herdadoDoCiclo: herdado.ciclo, herdadoStatus: herdado.status } : {}),
         },
       },
     })
   }
+
   return { criados, existentes }
 }
 
@@ -444,6 +557,7 @@ export async function instanciarWorkflowDaFase(
             instanciaId: existente.id, processoId: processo.id, faseMacroKey: input.faseMacroKey,
             ciclo: existente.ciclo, correlationId, causationId: chaveWorkflow, instantiatedAt,
             exigeDocumento: workflow.exigeDocumento === true,
+            reexecutarDoZero: input.reexecutarDoZero === true,
           },
           plano.alvos,
         )
@@ -502,6 +616,7 @@ export async function instanciarWorkflowDaFase(
           instanciaId: instancia.id, processoId: processo.id, faseMacroKey: input.faseMacroKey,
           ciclo, correlationId, causationId: chaveWorkflow, instantiatedAt,
           exigeDocumento: workflow.exigeDocumento === true,
+          reexecutarDoZero: input.reexecutarDoZero === true,
         },
         plano.alvos,
       )

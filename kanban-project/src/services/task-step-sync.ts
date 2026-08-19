@@ -449,7 +449,7 @@ export async function iniciarTarefa(tarefaId: number, ctx: SyncContexto): Promis
   const causationId = ctx.causationId ?? H.chaveComando("task-start", "tarefa", tarefaId, "EM_ANDAMENTO", ciclo)
   const base: ApplyOpts = { correlationId, causationId, ciclo, processoId: t.processoId!, workflowInstanceId: t.workflowInstanceId }
   try {
-    return await prisma.$transaction(async (tx) => {
+    const resultado = await prisma.$transaction(async (tx) => {
       const rt = await aplicarTarefa(tx, tarefaId, "EM_ANDAMENTO", "TAREFA_INICIADA", base)
       if (rt.code) return ko(rt.code, correlationId)
       let rp: { changed: boolean; anterior?: string; atual?: string } = { changed: false }
@@ -457,6 +457,7 @@ export async function iniciarTarefa(tarefaId: number, ctx: SyncContexto): Promis
       if (t.workflowStepInstanceId) await assegurarCoerenciaPassoTarefa(tx, [t.workflowStepInstanceId])
       return ok(rt.changed || rp.changed, correlationId, { tarefa: rt.anterior, passo: rp.anterior }, { tarefa: rt.atual, passo: rp.atual }, ["TAREFA_INICIADA", ...(rp.changed ? ["PASSO_INICIADO"] : [])])
     })
+    return resultado
   } catch (e) { return convergirOuThrow(e, correlationId) }
 }
 
@@ -477,7 +478,7 @@ export async function concluirTarefa(tarefaId: number, ctx: SyncContexto): Promi
   }
 
   try {
-    return await prisma.$transaction(async (tx) => {
+    const resultado = await prisma.$transaction(async (tx) => {
       const rt = await aplicarTarefa(tx, tarefaId, TAREFA_CONCLUIDA_STATUS, "TAREFA_CONCLUIDA", { ...base, extra: { executedById: ctx.usuarioId ?? t.responsavelId } })
       if (rt.code) return ko(rt.code, correlationId)
       const eventos = ["TAREFA_CONCLUIDA"]
@@ -499,6 +500,8 @@ export async function concluirTarefa(tarefaId: number, ctx: SyncContexto): Promi
       if (t.workflowStepInstanceId) await assegurarCoerenciaPassoTarefa(tx, [t.workflowStepInstanceId])
       return ok(rt.changed, correlationId, { tarefa: rt.anterior, passo: passoAnterior }, { tarefa: rt.atual, passo: passoAtual }, eventos)
     })
+    if (resultado.success && resultado.changed) await reconciliarMotorAposCommit(t.processoId, "tarefa:terminal")
+    return resultado
   } catch (e) { return convergirOuThrow(e, correlationId) }
 }
 
@@ -513,7 +516,7 @@ export async function bloquearTarefa(tarefaId: number, ctx: SyncContexto): Promi
   const causationId = ctx.causationId ?? H.chaveComando("task-block", "tarefa", tarefaId, "BLOQUEADA", ciclo)
   const base: ApplyOpts = { correlationId, causationId, ciclo, processoId: t.processoId!, workflowInstanceId: t.workflowInstanceId }
   try {
-    return await prisma.$transaction(async (tx) => {
+    const resultado = await prisma.$transaction(async (tx) => {
       const rt = await aplicarTarefa(tx, tarefaId, "BLOQUEADA", "TAREFA_BLOQUEADA", { ...base, extra: { blockedPreviousStatus: t.statusTarefa, motivoCodigo: ctx.motivoCodigo, justificativa: ctx.justificativa } })
       if (rt.code) return ko(rt.code, correlationId)
       const eventos = ["TAREFA_BLOQUEADA"]
@@ -526,6 +529,7 @@ export async function bloquearTarefa(tarefaId: number, ctx: SyncContexto): Promi
       }
       return ok(rt.changed, correlationId, { tarefa: rt.anterior, passo: passoAnt }, { tarefa: rt.atual, passo: passoAt }, eventos)
     })
+    return resultado
   } catch (e) { return convergirOuThrow(e, correlationId) }
 }
 
@@ -540,7 +544,7 @@ export async function desbloquearTarefa(tarefaId: number, ctx: SyncContexto): Pr
   const causationId = ctx.causationId ?? H.chaveComando("task-unblock", "tarefa", tarefaId, alvoT, ciclo)
   const base: ApplyOpts = { correlationId, causationId, ciclo, processoId: t.processoId!, workflowInstanceId: t.workflowInstanceId }
   try {
-    return await prisma.$transaction(async (tx) => {
+    const resultado = await prisma.$transaction(async (tx) => {
       const rt = await aplicarTarefa(tx, tarefaId, alvoT, "TAREFA_DESBLOQUEADA", { ...base, extra: { blockedPreviousStatus: null } })
       if (rt.code) return ko(rt.code, correlationId)
       const eventos = ["TAREFA_DESBLOQUEADA"]
@@ -554,6 +558,7 @@ export async function desbloquearTarefa(tarefaId: number, ctx: SyncContexto): Pr
       }
       return ok(rt.changed, correlationId, { tarefa: rt.anterior, passo: passoAnt }, { tarefa: rt.atual, passo: passoAt }, eventos)
     })
+    return resultado
   } catch (e) { return convergirOuThrow(e, correlationId) }
 }
 
@@ -571,7 +576,7 @@ export async function cancelarTarefa(tarefaId: number, ctx: SyncContexto): Promi
   const base: ApplyOpts = { correlationId, causationId, ciclo, processoId: t.processoId!, workflowInstanceId: t.workflowInstanceId }
   const evtT: WorkflowEventoTipo = destino.tarefaAlvo === "SUPERSEDIDA" ? "TAREFA_SUPERSEDIDA" : "TAREFA_CANCELADA"
   try {
-    return await prisma.$transaction(async (tx) => {
+    const resultado = await prisma.$transaction(async (tx) => {
       const rt = await aplicarTarefa(tx, tarefaId, destino.tarefaAlvo, evtT, { ...base, extra: { motivoCodigo: ctx.motivoCodigo, justificativa: ctx.justificativa } })
       if (rt.code) return ko(rt.code, correlationId)
       const eventos = [evtT as string]
@@ -584,12 +589,39 @@ export async function cancelarTarefa(tarefaId: number, ctx: SyncContexto): Promi
       }
       return ok(rt.changed, correlationId, { tarefa: rt.anterior, passo: passoAnt }, { tarefa: rt.atual, passo: passoAt }, eventos)
     })
+    if (resultado.success && resultado.changed) await reconciliarMotorAposCommit(t.processoId, "tarefa:cancelada")
+    return resultado
   } catch (e) { return convergirOuThrow(e, correlationId) }
 }
 
 // ============================================================
 // PASSO → TAREFA
 // ============================================================
+// ── O MOTOR DE FASES É PERGUNTADO DEPOIS DE TODA TRANSIÇÃO TERMINAL ─────────
+//
+// Esta máquina é a dona única das transições de passo e de tarefa — e são elas
+// que compõem o gate da fase. Enquanto o avanço dependia de o CHAMADOR lembrar de
+// chamar o gancho, todo caminho novo nascia com a chance de deixar o processo
+// parado com a fase satisfeita: foi assim que o processo 523 ficou em Genealogia
+// com `canAdvance = true`. Perguntar aqui é perguntar no lugar onde a pendência
+// realmente cai, e não em cada porta que por acaso passa por cima dela.
+//
+// PÓS-COMMIT e best-effort: nunca dentro da transação (o avanço abre a sua), nunca
+// derrubando a operação que já foi gravada. O import é dinâmico porque o motor de
+// fases importa esta máquina de volta — resolver o ciclo em tempo de chamada, e não
+// de carga do módulo, é o que mantém os dois lados independentes.
+const TRANSICOES_QUE_MEXEM_NO_GATE = new Set(["CONCLUIDO", "DISPENSADO", "CANCELADO", "SUPERSEDIDO"])
+
+async function reconciliarMotorAposCommit(processoId: number | null | undefined, motivo: string): Promise<void> {
+  if (!processoId) return
+  try {
+    const { reconciliarMotorDeFases } = await import("@/src/lib/motor/reconciliar-motor-fases")
+    await reconciliarMotorDeFases(processoId, { origem: motivo })
+  } catch (e) {
+    console.error(`[task-step-sync] reconciliação do motor de fases falhou (proc ${processoId}):`, e)
+  }
+}
+
 async function opPassoSimples(stepInstanceId: number, ctx: SyncContexto, alvoPasso: string, evtPasso: WorkflowEventoTipo, opKey: string, sincronizarTarefa?: { alvo: string; evt: WorkflowEventoTipo; extra?: Record<string, unknown> }): Promise<SyncResultado> {
   const correlationId = corr(ctx)
   const step = await carregarStep(stepInstanceId)
@@ -601,7 +633,7 @@ async function opPassoSimples(stepInstanceId: number, ctx: SyncContexto, alvoPas
   const base: ApplyOpts = { correlationId, causationId, ciclo, processoId: step.processoId, workflowInstanceId: step.workflowInstanceId }
   const tarefa = step.tarefas[0]
   try {
-    return await prisma.$transaction(async (tx) => {
+    const resultado = await prisma.$transaction(async (tx) => {
       const rp = await aplicarPasso(tx, stepInstanceId, alvoPasso, evtPasso, base)
       if (rp.code) return ko(rp.code, correlationId)
       const eventos = [evtPasso as string]
@@ -614,6 +646,10 @@ async function opPassoSimples(stepInstanceId: number, ctx: SyncContexto, alvoPas
       await assegurarCoerenciaPassoTarefa(tx, [stepInstanceId])
       return ok(rp.changed, correlationId, { passo: rp.anterior, tarefa: tAnt }, { passo: rp.atual, tarefa: tAt }, eventos)
     })
+    if (resultado.success && resultado.changed && TRANSICOES_QUE_MEXEM_NO_GATE.has(alvoPasso)) {
+      await reconciliarMotorAposCommit(step.processoId, `passo:${opKey}`)
+    }
+    return resultado
   } catch (e) { return convergirOuThrow(e, correlationId) }
 }
 
@@ -702,6 +738,7 @@ export async function concluirPasso(stepInstanceId: number, ctx: SyncContexto): 
     // vez de esperar o próximo ciclo da fila. Best-effort: se falhar, o evento
     // continua PENDENTE e reprocessa — nada se perde.
     await processarOutbox({ tipos: ["step.concluido"], limite: 20 }).catch(() => {})
+    if (resultado.success && resultado.changed) await reconciliarMotorAposCommit(step.processoId, "passo:step-complete")
     return resultado
   } catch (e) { return convergirOuThrow(e, correlationId) }
 }

@@ -24,6 +24,7 @@ import {
 } from '@/lib/operacional/tarefa-ciclo'
 import { concluirEtapa } from '@/lib/operacional/tarefa-etapa'
 
+
 /** O código do domínio vira o status HTTP — um mapa só, nenhuma exceção local. */
 const HTTP: Record<string, number> = {
   NAO_ENCONTRADA: 404, TAREFA_NAO_ENCONTRADA: 404, ETAPA_NAO_ENCONTRADA: 404,
@@ -192,6 +193,8 @@ export async function POST(request: NextRequest, ctx: { params: Promise<{ tarefa
   if (!r.ok) {
     return NextResponse.json({ error: r.mensagem, codigo: r.codigo }, { status: HTTP[r.codigo] ?? 422 })
   }
+
+
   const extra = 'extra' in r ? (r as { extra: Record<string, unknown> }).extra : null
   return NextResponse.json({ tarefaId: r.tarefaId, acao, ...(extra ?? {}) })
 }
