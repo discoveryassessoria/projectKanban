@@ -146,7 +146,10 @@ async function main() {
   // mesma fase — e, por ser específico de tipo, ele venceria o canônico na resolução.
   console.log('\n── PhaseInternalWorkflow ──')
   const wfs = await prisma.phaseInternalWorkflow.findMany({
-    where: { phaseKey: { in: LEGADAS } },
+    // ARQUIVADO fica de fora: ele não é referência ATUAL — é histórico, e histórico
+    // com chave antiga é o que se espera dele. Relatá-lo como conflito aberto faria o
+    // script gritar para sempre por um caso já resolvido.
+    where: { phaseKey: { in: LEGADAS }, arquivado: false },
     include: { passos: { select: { key: true, label: true, ordem: true, required: true } } },
   })
   for (const w of wfs) {
