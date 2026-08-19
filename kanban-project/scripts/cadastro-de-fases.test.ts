@@ -82,6 +82,25 @@ const nav = read("src/components/gerenciamentoComponents/managementNavigation.ts
 check("o cadastro de fases continua existindo uma única vez na navegação",
   (nav.match(/a\(\d+, "fases"/g) ?? []).length === 1)
 
+// ── O PIPELINE NÃO DEIXA CÓDIGO NOVO SUBIR ANTES DO SCHEMA ────────────────
+// Em 19/08 uma migration aditiva subiu sem ser aplicada: o guard existia, mas só
+// estava ligado num script alternativo que a Vercel não usa. A proteção não pode
+// depender de alguém lembrar.
+const pkg = read("package.json")
+check("o build de produção verifica migration pendente", pkg.includes("scripts/migration-pendente-guard.mjs"))
+check("e o guard de aplicação está no MESMO caminho de build", /"build":[^"]*"[^"]*prod-migrate-guard\.mjs/.test(pkg))
+const guardMig = read("scripts/migration-pendente-guard.mjs")
+check("o guard de pendência não aplica nada — só recusa", !guardMig.includes("migrate deploy") && !guardMig.includes("$executeRaw"))
+check("e só vale em deploy real", guardMig.includes("VERCEL_ENV") && guardMig.includes("production"))
+
+// ── CANONICALIZAÇÃO: nenhuma chave legada pode voltar a existir ───────────
+const reconc = read("scripts/canonicalizar-fases.ts")
+check("existe reconciliador canônico de chaves de fase", reconc.includes("EQUIVALENCIA_LEGADA") && reconc.includes("--execute"))
+check("ele é dry-run por padrão", reconc.includes("SOMENTE LEITURA (use --execute para aplicar)"))
+check("ele NÃO funde configurações não equivalentes", reconc.includes("CONFLITOS NÃO MIGRADOS"))
+check("ele registra a canonicalização na auditoria", reconc.includes("WORKFLOW_PHASE_CANONICALIZED"))
+check("e não toca em estado operacional", !reconc.includes("tarefa.update") && !reconc.includes("processo.update"))
+
 // O escopo canônico continua vindo do código para as fases do catálogo oficial.
 check("genealogia opera sobre registro a localizar", escopoCanonicoDaFase("genealogia") === "NECESSIDADE")
 check("emissão documental opera sobre documento", escopoCanonicoDaFase("emissao_documental") === "DOCUMENTO")
