@@ -30,13 +30,31 @@ const PASSOS = [
   { key: 'validar_certidao', titulo: 'Validar certidão' },
 ]
 
-/** Quem EXECUTA: vê, inicia e conclui a própria fila. Não distribui. */
+/**
+ * Quem EXECUTA: vê, inicia e conclui a própria fila — e EXECUTA A ETAPA.
+ *
+ * `workflow.iniciarPasso` e `workflow.concluirPasso` são as permissões que a
+ * Central da Etapa exige para oferecer salvar andamento, registrar contato,
+ * anexar e concluir. Sem elas o painel abre sem ação nenhuma — que é o estado
+ * legítimo de quem só acompanha, e é o mesmo conjunto que a Daniela tem em
+ * produção. Distribuir (`tarefas.editar`) continua fora: quem executa não
+ * decide de quem é o trabalho.
+ */
 const PERMISSOES_DO_EXECUTOR = {
   'tarefas.ver': true,
   'tarefas.iniciar_concluir': true,
   'processos.ver': true,
   'documentos.ver': true,
   'documentos.editar': true,
+  'workflow.iniciarPasso': true,
+  'workflow.concluirPasso': true,
+}
+
+/** Quem só ACOMPANHA: vê o trabalho e não o executa. O caso negativo. */
+const PERMISSOES_DE_OBSERVADOR = {
+  'tarefas.ver': true,
+  'processos.ver': true,
+  'documentos.ver': true,
 }
 
 async function limpar() {
@@ -77,7 +95,8 @@ async function main() {
   const gabriel = await prisma.usuario.create({
     data: {
       nome: 'Gabriel Souza', email: 'gabriel@palco-fila.test', senha: 'x', tipo: 'assistente',
-      permissoesCustom: PERMISSOES_DO_EXECUTOR,
+      // O OBSERVADOR: recebe trabalho, mas não tem permissão de mexer na etapa.
+      permissoesCustom: PERMISSOES_DE_OBSERVADOR,
     },
     select: { id: true },
   })

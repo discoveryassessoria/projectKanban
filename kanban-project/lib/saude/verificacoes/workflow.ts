@@ -255,6 +255,100 @@ registrar({
 })
 
 registrar({
+  id: 'saude.workflow.interno-inalcancavel',
+  codigo: 'WF-006',
+  nome: 'Workflow interno alcançável e sem ambiguidade',
+  descricao:
+    'Workflow interno ativo que nenhum processo pode alcançar — ou que disputa a mesma fase com outro — é rotina publicada que ninguém revisa.',
+  dominio: 'WORKFLOW',
+  modulo: 'Workflow Interno',
+  severidadePadrao: 'ALERTA',
+  obrigatoria: true,
+  modos: ['COMPLETO', 'PROFUNDO'],
+  introduzidaEm: '1.0.0',
+  timeoutMs: 20_000,
+  orientacao:
+    'Aponte o workflow para um tipo de processo existente, ou desative-o. Havendo dois ativos para a mesma fase e tipo, mantenha um.',
+  rotaCorrecao: ROTA_INTERNO,
+  responsavel: 'Workflow',
+  ativo: true,
+  executar: async (): Promise<ResultadoVerificacao> => {
+    // ─── POR QUE ESTA VERIFICAÇÃO EXISTE ───────────────────────────────────
+    // A resolução do workflow aplicável é "o do TIPO vence; sem ele, o
+    // genérico". Um workflow apontando para um tipo que não existe fica
+    // invisível: não roda, não dá erro, e ninguém revisa o que não aparece.
+    // Ele só reaparece no dia em que alguém cria um tipo com aquele id — e aí
+    // passa a MANDAR na fase, com a ordem e os rótulos que estiverem lá.
+    //
+    // Em produção havia um assim na Emissão Documental: ordem trocada
+    // (aguardar retorno antes de solicitar, validar antes de conferir) e um
+    // passo rotulado "VVVVVVVVVVV". Zero instâncias — porque o tipo não
+    // existia. Uma bomba de cadastro esperando um id.
+    const orfaos = await prisma.$queryRawUnsafe<{ id: number; nome: string | null; phasekey: string | null; tipoid: number | null }[]>(
+      `SELECT w.id, w.name AS nome, w."phaseKey" AS phasekey, w."tipoProcessoId" AS tipoid
+         FROM "PhaseInternalWorkflow" w
+        WHERE w.active = true AND w.arquivado = false
+          AND w."tipoProcessoId" IS NOT NULL
+          AND NOT EXISTS (
+            SELECT 1 FROM "TipoProcessoNacionalidade" t
+             WHERE t.id = w."tipoProcessoId" AND t.ativo = true AND t.arquivado = false
+          )
+        LIMIT 100`,
+    )
+    // DOIS ATIVOS PARA A MESMA (fase, tipo): a seleção usa `findFirst`, então
+    // quem vence é o que o banco devolver primeiro — ou seja, o acaso.
+    const ambiguos = await prisma.$queryRawUnsafe<{ phasekey: string; tipoid: number | null; quantos: number; ids: string }[]>(
+      `SELECT w."phaseKey" AS phasekey, w."tipoProcessoId" AS tipoid,
+              COUNT(*)::int AS quantos, string_agg(w.id::text, ', ' ORDER BY w.id) AS ids
+         FROM "PhaseInternalWorkflow" w
+        WHERE w.active = true AND w.arquivado = false
+        GROUP BY w."phaseKey", w."tipoProcessoId"
+       HAVING COUNT(*) > 1
+        LIMIT 100`,
+    )
+    const achados: Achado[] = [
+      ...orfaos.map((l): Achado => ({
+        chave: `wf-interno-tipo-inexistente:${l.id}`,
+        severidade: 'ALERTA',
+        titulo: `Workflow interno "${l.nome ?? l.id}" aponta para um tipo de processo que não existe`,
+        descricao: `O workflow da fase ${l.phasekey ?? '—'} está ativo e vinculado ao tipo ${l.tipoid}, que não existe (ou está inativo/arquivado).`,
+        explicacao:
+          'A resolução do workflow aplicável prefere o do TIPO ao genérico. Sem o tipo, este workflow nunca é escolhido — e nunca é revisado.',
+        impacto:
+          'Rotina publicada fora de uso e fora de revisão. No dia em que um tipo com esse id existir, ela passa a mandar na fase — com a ordem e os rótulos que estiverem gravados nela.',
+        entidade: 'PhaseInternalWorkflow',
+        registroId: String(l.id),
+        registroNome: l.nome,
+        quantidade: 1,
+        link: ROTA_INTERNO,
+        recomendacao: 'Aponte para um tipo existente ou desative o workflow.',
+        evidencia: { workflowId: l.id, phaseKey: l.phasekey, tipoProcessoId: l.tipoid },
+      })),
+      ...ambiguos.map((l): Achado => ({
+        chave: `wf-interno-ambiguo:${l.phasekey}:${l.tipoid ?? 'null'}`,
+        severidade: 'ERRO',
+        titulo: `Fase "${l.phasekey}" tem ${l.quantos} workflows internos ativos para o mesmo tipo`,
+        descricao: `Workflows #${l.ids} estão ativos para a fase ${l.phasekey} e o tipo ${l.tipoid ?? 'genérico'}.`,
+        explicacao:
+          'A seleção do workflow aplicável pega o PRIMEIRO que o banco devolver. Com dois candidatos idênticos em critério, quem manda na fase é o acaso da consulta.',
+        impacto: 'Dois processos iguais podem materializar roteiros diferentes, com ordens e rótulos diferentes.',
+        entidade: 'PhaseInternalWorkflow',
+        registroId: l.ids,
+        registroNome: l.phasekey,
+        quantidade: l.quantos,
+        link: ROTA_INTERNO,
+        recomendacao: 'Mantenha um ativo por (fase, tipo) e arquive o outro.',
+        evidencia: { phaseKey: l.phasekey, tipoProcessoId: l.tipoid, workflowIds: l.ids },
+      })),
+    ]
+    if (!achados.length) {
+      return { achados: [], metricas: { orfaos: 0, ambiguos: 0 }, resumo: 'Todo workflow interno ativo é alcançável e único por fase e tipo.' }
+    }
+    return { achados, metricas: { orfaos: orfaos.length, ambiguos: ambiguos.length } }
+  },
+})
+
+registrar({
   id: 'saude.workflow.tipos-catalogo-vazio',
   codigo: 'WF-005',
   nome: 'Catálogo de fases populado',

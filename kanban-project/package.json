@@ -151,6 +151,7 @@
     "test:dados-prazo": "tsx scripts/camada-dados-prazo.test.ts",
     "test:doc21": "tsx scripts/requerimento-doc21.test.ts",
     "test:doccats": "tsx scripts/lote-a-doccats.test.ts",
+    "e2e:central-da-etapa": "node scripts/e2e-central-da-etapa.mjs",
     "test:editor-etapa": "tsx scripts/editor-etapa.test.ts",
     "test:editor-etapa-integracao": "tsx scripts/editor-etapa-integracao.test.ts",
     "test:emissao-gate": "tsx scripts/emissao-gate.test.ts",
