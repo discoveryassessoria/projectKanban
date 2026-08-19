@@ -18,6 +18,7 @@ import {
   getFase, getStepDef, isFaseReady, phaseKeyToFaseCode, faseCodeToPhaseKey, resolveStepKeyCompat,
 } from "@/src/lib/process-stage/fases-catalog"
 import { resolveWorkflowStepEditor } from "@/src/lib/process-stage/step-editor-registry"
+import { resolverInstanciaVigente } from "@/src/lib/process-stage/instancia-vigente-da-fase"
 import {
   acoesPermitidasDaEtapa, acaoCompativelComEstado, PERMISSAO_DA_ACAO, type AcaoEtapa,
 } from "@/src/lib/process-stage/acoes-etapa"
@@ -99,12 +100,41 @@ export interface PassoOperacaoV2 {
 }
 
 /**
- * Fase ATUAL persistida do processo do documento — ÚNICA fonte de verdade do escopo
- * operacional. Um mesmo Documento acumula passos de várias fases ao longo da vida
- * (localizar_registro na Genealogia, depois solicitar/receber/... na Emissão). O
- * workflow/operação exibido deve ser SEMPRE o da fase atual, nunca uma mistura.
- * Genérico: vale para qualquer fase do Workflow Macro, sem condicional por fase.
+ * A VISITA ATUAL DO DOCUMENTO — processo, fase atual e INSTÂNCIA VIGENTE dela.
+ *
+ * A fase sozinha não basta como escopo. Um documento acumula passos de várias fases
+ * ao longo da vida (localizar_registro na Genealogia, depois solicitar/receber/… na
+ * Emissão) e, desde que o motor passou a suportar reentrada, acumula também vários
+ * CICLOS da MESMA fase: voltar para uma fase abre uma visita nova, com passos novos,
+ * e os da visita anterior continuam no banco — de propósito, porque são histórico.
+ *
+ * Escopar só por fase misturava as duas visitas: o Abellan mostrava 7 etapas ("1.
+ * Solicitar" duas vezes) e 61% numa fase que a Central, corretamente escopada por
+ * instância, mostrava como 5 etapas e 44%. Duas contas para a mesma pergunta.
+ *
+ * A instância vigente vem do resolvedor CANÔNICO — o mesmo que a Central usa. Aqui
+ * não se decide qual é a visita atual; pergunta-se a quem decide.
  */
+export interface VisitaDoDocumento {
+  processoId: number
+  faseMacroKey: string
+  workflowInstanceId: number
+  ciclo: number
+}
+
+export async function visitaAtualDoDocumento(documentoId: number): Promise<VisitaDoDocumento | null> {
+  const doc = await prisma.documento.findUnique({
+    where: { id: documentoId },
+    select: { pessoa: { select: { arvore: { select: { processos: { select: { id: true, faseAtualKey: true } } } } } } },
+  })
+  const processo = doc?.pessoa?.arvore?.processos?.[0]
+  if (!processo?.faseAtualKey) return null
+  const inst = await resolverInstanciaVigente(processo.id, processo.faseAtualKey)
+  if (!inst) return null
+  return { processoId: processo.id, faseMacroKey: processo.faseAtualKey, workflowInstanceId: inst.id, ciclo: inst.ciclo }
+}
+
+/** Fase ATUAL persistida do processo do documento. Escopo de último recurso. */
 async function faseAtualKeyDoDoc(documentoId: number): Promise<string | null> {
   const doc = await prisma.documento.findUnique({
     where: { id: documentoId },
@@ -113,13 +143,26 @@ async function faseAtualKeyDoDoc(documentoId: number): Promise<string | null> {
   return doc?.pessoa?.arvore?.processos?.[0]?.faseAtualKey ?? null
 }
 
-/** Passos operacionais V2 de UM documento NA FASE ATUAL (ativos), ordenados. */
-export async function passosOperacaoV2(documentoId: number): Promise<PassoOperacaoV2[]> {
+/**
+ * O FILTRO DE ESCOPO da leitura operacional de um documento, em ordem de precisão:
+ * instância vigente (fase + visita) → fase atual → nada. O último caso é o documento
+ * sem processo: aí não há visita para escopar, e ler tudo é o comportamento honesto.
+ */
+async function escopoDaVisita(documentoId: number): Promise<{ where: Record<string, unknown>; visita: VisitaDoDocumento | null }> {
+  const visita = await visitaAtualDoDocumento(documentoId)
+  if (visita) return { where: { workflowInstanceId: visita.workflowInstanceId }, visita }
   const faseAtualKey = await faseAtualKeyDoDoc(documentoId)
+  return { where: faseAtualKey ? { faseMacroKey: faseAtualKey } : {}, visita: null }
+}
+
+/** Passos operacionais V2 de UM documento NA VISITA ATUAL (ativos), ordenados. */
+export async function passosOperacaoV2(documentoId: number): Promise<PassoOperacaoV2[]> {
+  const { where: escopo } = await escopoDaVisita(documentoId)
   const rows = await prisma.phaseWorkflowStepInstance.findMany({
-    // Escopo à FASE ATUAL: passos de fases anteriores (mesmo CONCLUIDO) não entram no
-    // workflow operacional. Sem faseAtualKey (doc sem processo) cai no comportamento antigo.
-    where: { documentoId, status: { notIn: INATIVOS }, ...(faseAtualKey ? { faseMacroKey: faseAtualKey } : {}) },
+    // Escopo à VISITA ATUAL (instância da fase), não só à fase: passos de fases
+    // anteriores E de ciclos anteriores da mesma fase são histórico, não trabalho a
+    // fazer. Sem processo/instância, cai no escopo de fase e, por fim, no antigo.
+    where: { documentoId, status: { notIn: INATIVOS }, ...escopo },
     orderBy: { ordem: "asc" },
     select: {
       id: true, stepKey: true, status: true, faseMacroKey: true, ordem: true,
@@ -137,13 +180,12 @@ export async function passosOperacaoV2(documentoId: number): Promise<PassoOperac
   })
 }
 
-/** Documento já tem operação por-documento NA FASE ATUAL no V2? (discrimina V2 × fallback
- *  legado E impede "operação já existe" por causa de passos de fase anterior). */
+/** Documento já tem operação por-documento NA VISITA ATUAL no V2? (discrimina V2 ×
+ *  fallback legado E impede "operação já existe" por causa de fase — ou de ciclo —
+ *  anterior: numa reentrada, a visita nova começa sem operação até ser materializada.) */
 export async function temOperacaoV2(documentoId: number): Promise<boolean> {
-  const faseAtualKey = await faseAtualKeyDoDoc(documentoId)
-  const n = await prisma.phaseWorkflowStepInstance.count({
-    where: { documentoId, ...(faseAtualKey ? { faseMacroKey: faseAtualKey } : {}) },
-  })
+  const { where: escopo } = await escopoDaVisita(documentoId)
+  const n = await prisma.phaseWorkflowStepInstance.count({ where: { documentoId, ...escopo } })
   return n > 0
 }
 
@@ -190,6 +232,16 @@ export interface WorkflowV2Shape {
   status: string
   progress: number
   steps: Array<Record<string, unknown>>
+  /**
+   * DE QUAL VISITA este roteiro está falando. Sem isto, "7 etapas" e "5 etapas" eram
+   * indistinguíveis do lado de fora: não havia como uma tela, um teste ou um log
+   * afirmarem qual instância/ciclo produziu a lista. É contrato de diagnóstico, não
+   * detalhe interno — a UI não precisa desenhá-lo, mas precisa poder prová-lo.
+   */
+  workflowInstanceId: number | null
+  ciclo: number | null
+  /** A etapa atual DESTA visita — nunca escolhida por nome ou por id maior. */
+  currentStepId: number | null
 }
 
 /**
@@ -252,7 +304,17 @@ export async function montarWorkflowV2(
   })
   const progress = totalW > 0 ? Math.round((doneW / totalW) * 100) : 0
   const concluido = passos.every((p) => ["CONCLUIDO", "DISPENSADO"].includes(p.status))
-  return { id: `v2-${documentoId}-${faseMacroKey}`, documentoId, faseCode, status: concluido ? "concluido" : "em_andamento", progress, steps }
+  // A ETAPA ATUAL sai da própria lista já escopada: a primeira não-terminal na ordem.
+  // Resolver por stepKey, por updatedAt ou pelo maior id atravessaria visitas.
+  const atual = passos.find((p) => !["CONCLUIDO", "DISPENSADO"].includes(p.status)) ?? null
+  const visita = await visitaAtualDoDocumento(documentoId)
+  return {
+    id: `v2-${documentoId}-${faseMacroKey}${visita ? `-c${visita.ciclo}` : ""}`,
+    documentoId, faseCode, status: concluido ? "concluido" : "em_andamento", progress, steps,
+    workflowInstanceId: visita?.workflowInstanceId ?? null,
+    ciclo: visita?.ciclo ?? null,
+    currentStepId: atual?.id ?? null,
+  }
 }
 
 type IniciarOpts = { responsavelId?: number | null; dataPrazoInicial?: Date | null; observacaoInicial?: string | null }
@@ -276,11 +338,15 @@ export async function iniciarOperacaoDocumentoV2(
   if (!faseCode) return { ok: false, error: "Processo sem fase definida", status: 422 }
   if (!isFaseReady(faseCode)) return { ok: false, error: `A fase "${faseCode}" não tem etapas no catálogo`, status: 422 }
   const faseMacroKey = faseCodeToPhaseKey(faseCode) as string
-  const inst = await prisma.phaseWorkflowInstance.findFirst({
-    where: { processoId: processo.id, faseMacroKey, status: { notIn: ["CANCELADO", "SUPERSEDIDO"] } },
-    orderBy: { ciclo: "desc" },
-    select: { id: true, ciclo: true, workflowDefinitionId: true },
-  })
+  // A INSTÂNCIA É A VIGENTE, pelo resolvedor canônico — a mesma regra da leitura e da
+  // Central. Uma segunda regra aqui significaria materializar numa visita e ler de
+  // outra, que é a divergência que esta rodada está fechando.
+  const vigente = await resolverInstanciaVigente(processo.id, faseMacroKey)
+  const inst = vigente
+    ? await prisma.phaseWorkflowInstance.findUnique({
+        where: { id: vigente.id }, select: { id: true, ciclo: true, workflowDefinitionId: true },
+      })
+    : null
   if (!inst) return { ok: false, error: "Instância V2 da fase não encontrada (processo não migrado)", status: 422 }
   const catSteps = getFase(faseCode).steps
   const now = new Date()
@@ -671,7 +737,9 @@ export async function aplicarTransicaoDoPassoTx(
     // PROGRESSÃO POR-DOCUMENTO: ao concluir uma etapa, a PRÓXIMA do MESMO documento é liberada.
     if (liberarProximo) {
       const proximo = await tx.phaseWorkflowStepInstance.findFirst({
-        where: { documentoId, faseMacroKey: p.faseMacroKey, ordem: { gt: p.ordem }, status: { in: ["BLOQUEADO", "PENDENTE"] } },
+        // MESMA VISITA: a próxima etapa é a deste documento NESTA instância da fase.
+        // Por fase apenas, um ciclo anterior podia oferecer a "próxima" etapa dele.
+        where: { documentoId, workflowInstanceId: p.workflowInstanceId, ordem: { gt: p.ordem }, status: { in: ["BLOQUEADO", "PENDENTE"] } },
         orderBy: { ordem: "asc" },
         select: { id: true, stepKey: true },
       })
@@ -696,7 +764,8 @@ export async function aplicarTransicaoDoPassoTx(
     // REABERTURA: bloqueia as etapas posteriores do mesmo documento (voltam a depender desta).
     if (vaiReabrir) {
       const posteriores = await tx.phaseWorkflowStepInstance.findMany({
-        where: { documentoId, faseMacroKey: p.faseMacroKey, ordem: { gt: p.ordem }, status: { in: ["EM_ANDAMENTO", "AGUARDANDO"] } },
+        // MESMA VISITA (ver acima): reabrir uma etapa não pode mexer noutro ciclo.
+        where: { documentoId, workflowInstanceId: p.workflowInstanceId, ordem: { gt: p.ordem }, status: { in: ["EM_ANDAMENTO", "AGUARDANDO"] } },
         select: { id: true },
       })
       for (const posterior of posteriores) {
@@ -857,13 +926,17 @@ export async function controlarOperacaoV2(
 ): Promise<OpResult> {
   const passos = await passosOperacaoV2(documentoId)
   if (passos.length === 0) return { ok: false, error: "Operação não encontrada", status: 404 }
+  const { where: escopoControlar } = await escopoDaVisita(documentoId)
   const now = new Date()
   const obs = (observacao ?? "").trim()
   const correlationId = randomUUID()
   if (action === "cancelar" || action === "invalidar") {
     await prisma.$transaction(async (tx) => {
       const alvos = await tx.phaseWorkflowStepInstance.findMany({
-        where: { documentoId, status: { notIn: ["CONCLUIDO", "SUPERSEDIDO", "CANCELADO"] } },
+        // Cancelar a operação cancela os passos da VISITA ATUAL. Sem o escopo, uma
+        // etapa aberta de um ciclo antigo era cancelada junto — mexer no histórico
+        // por causa de um comando sobre o presente.
+        where: { documentoId, ...escopoControlar, status: { notIn: ["CONCLUIDO", "SUPERSEDIDO", "CANCELADO"] } },
         select: { id: true, ciclo: true, processoId: true, workflowInstanceId: true },
       })
       // Cancelar a operação de um documento cancela os passos dele — pelo motor,
@@ -883,7 +956,7 @@ export async function controlarOperacaoV2(
     })
   } else if (action === "pausar") {
     await prisma.$transaction(async (tx) => {
-      const alvos = await tx.phaseWorkflowStepInstance.findMany({ where: { documentoId, status: "EM_ANDAMENTO" }, select: { id: true, ciclo: true, processoId: true, workflowInstanceId: true } })
+      const alvos = await tx.phaseWorkflowStepInstance.findMany({ where: { documentoId, ...escopoControlar, status: "EM_ANDAMENTO" }, select: { id: true, ciclo: true, processoId: true, workflowInstanceId: true } })
       for (const alvo of alvos) {
         await transicionarPassoTx(tx, alvo.id, "BLOQUEADO", { correlationId, operacao: "documento-controlar-pausar", ciclo: alvo.ciclo, processoId: alvo.processoId, workflowInstanceId: alvo.workflowInstanceId, extra: { motivo: obs ? `Operação pausada: ${obs}` : "Operação pausada" } })
       }

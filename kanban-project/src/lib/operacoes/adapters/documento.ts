@@ -8,6 +8,7 @@
 // + mesma pessoa). Nunca corrompe Documento.necessidadeId com um documento de APOIO.
 
 import { prisma } from "@/lib/prisma"
+import { resolverInstanciaVigente } from "@/src/lib/process-stage/instancia-vigente-da-fase"
 import { Prisma } from "@prisma/client"
 import { montarWorkflowV2, atualizarPassoV2 } from "@/src/services/documento-operacao"
 import type { ExecutionAdapter } from "../tipos"
@@ -117,10 +118,17 @@ export const documentoAdapter: ExecutionAdapter = {
     const proc = await prisma.processo.findUnique({ where: { id: ctx.processoId }, select: { faseAtualKey: true } })
     if (!proc?.faseAtualKey) return { concluidos: 0 }
     const docs = await prisma.documento.findMany({ where: { necessidadeId: ctx.necessidadeId }, select: { id: true } })
+    // A VISITA ATUAL da fase — não a fase inteira. Depois de uma reentrada, a fase
+    // guarda os passos de mais de um ciclo; concluir "os abertos da fase" alcançaria
+    // uma etapa de um ciclo anterior, que é histórico e não trabalho a fazer.
+    const instancia = await resolverInstanciaVigente(ctx.processoId, proc.faseAtualKey)
     let concluidos = 0
     for (const d of docs) {
       const abertos = await prisma.phaseWorkflowStepInstance.findMany({
-        where: { documentoId: d.id, faseMacroKey: proc.faseAtualKey, obrigatorio: true, status: { notIn: PASSO_TERMINAL as never } },
+        where: {
+          documentoId: d.id, obrigatorio: true, status: { notIn: PASSO_TERMINAL as never },
+          ...(instancia ? { workflowInstanceId: instancia.id } : { faseMacroKey: proc.faseAtualKey }),
+        },
         orderBy: { ordem: "asc" }, select: { id: true },
       })
       for (const s of abertos) {
