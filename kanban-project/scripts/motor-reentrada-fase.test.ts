@@ -98,8 +98,8 @@ check("a varredura usa o MESMO gate (não força)", !cron.includes("forceAdvance
 const ciclo = read("lib/operacional/tarefa-ciclo.ts")
 check("as portas canônicas de comando reconciliam depois de mexer no gate",
   ciclo.includes("reconciliarMotorApos") &&
-  ["cancelar", "desbloquear", "retomar_espera", "decidir_causa", "reabrir", "remover_dependencia"]
-    .every((c) => ciclo.includes(`'comando:${c}'`)))
+  ["cancelarTarefa", "desbloquearTarefa", "retomarDeEspera", "decidirSobreCausaRemovida", "reabrirTarefa", "removerDependencia"]
+    .every((f) => new RegExp(`export async function ${f}\\(`).test(ciclo) && ciclo.includes(`${f}Nucleo(args)`)))
 check("e a rota HTTP continua sem conhecer Prisma",
   !semComentarios(read("src/app/api/tarefas/[tarefaId]/comando/route.ts")).includes("prisma."))
 const sync = read("src/services/task-step-sync.ts")
@@ -113,6 +113,22 @@ check("só herda estado terminal POSITIVO", pw.includes('HERDAVEIS: StepInstance
 check("a herança é registrada no evento (causalidade)", pw.includes("herdadoDoPassoId"))
 check("a fila é reposicionada no STATUS INICIAL, não por transição depois",
   pw.includes("ONDE A FILA COMEÇA") && pw.includes("statusInicial.get(a)"))
+
+// ── O RÓTULO DE ORIGEM NÃO PODE DERRUBAR A TRANSIÇÃO ──────────────────────
+// `PhaseAdvanceLog.origem` é VarChar(20). Um rótulo comprido a mais fazia o INSERT
+// do log estourar e a transação inteira cair — o processo deixava de avançar por
+// causa do nome de quem pediu. Aconteceu de verdade ao reconciliar o 523.
+check("o motor corta o rótulo de origem no tamanho da coluna",
+  advance.includes("function rotuloDeOrigem") && advance.includes("slice(0, 20)"))
+check("nenhuma escrita de origem escapa do corte",
+  !/origem: (p\.origemLog|ctx\.origem)\b/.test(advance), "há origem sem rotuloDeOrigem")
+const ORIGENS = [
+  ...ciclo.matchAll(/reconciliarMotorApos\(args\.tarefaId, '([^']+)'\)/g),
+  ...sync.matchAll(/reconciliarMotorAposCommit\([^,]+, "([^"]+)"\)/g),
+].map((m) => m[1])
+check("e os rótulos que o código usa já cabem sem corte",
+  ORIGENS.length > 0 && ORIGENS.every((o) => o.length <= 20),
+  JSON.stringify(ORIGENS.filter((o) => o.length > 20)))
 
 // ============================================================
 // (B) COMPORTAMENTO — banco real

@@ -647,7 +647,7 @@ async function opPassoSimples(stepInstanceId: number, ctx: SyncContexto, alvoPas
       return ok(rp.changed, correlationId, { passo: rp.anterior, tarefa: tAnt }, { passo: rp.atual, tarefa: tAt }, eventos)
     })
     if (resultado.success && resultado.changed && TRANSICOES_QUE_MEXEM_NO_GATE.has(alvoPasso)) {
-      await reconciliarMotorAposCommit(step.processoId, `passo:${opKey}`)
+      await reconciliarMotorAposCommit(step.processoId, `passo:${opKey}`.slice(0, 20))
     }
     return resultado
   } catch (e) { return convergirOuThrow(e, correlationId) }
@@ -738,7 +738,7 @@ export async function concluirPasso(stepInstanceId: number, ctx: SyncContexto): 
     // vez de esperar o próximo ciclo da fila. Best-effort: se falhar, o evento
     // continua PENDENTE e reprocessa — nada se perde.
     await processarOutbox({ tipos: ["step.concluido"], limite: 20 }).catch(() => {})
-    if (resultado.success && resultado.changed) await reconciliarMotorAposCommit(step.processoId, "passo:step-complete")
+    if (resultado.success && resultado.changed) await reconciliarMotorAposCommit(step.processoId, "passo:concluido")
     return resultado
   } catch (e) { return convergirOuThrow(e, correlationId) }
 }

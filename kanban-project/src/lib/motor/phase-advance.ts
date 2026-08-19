@@ -183,6 +183,19 @@ async function proximoCiclo(processoId: number, faseMacroKey: string): Promise<n
 // Plano de mutação (compartilhado por todas as operações)
 // --------------------------------------------------------------------------
 
+/**
+ * O ROTULO DE ORIGEM NUNCA PODE DERRUBAR UMA TRANSIÇÃO.
+ *
+ * `PhaseAdvanceLog.origem` é `VarChar(20)`. Quem chama o motor passa um rótulo para
+ * a auditoria — "kanban-drag", "cron-reconciliacao", "comando:cancelar" — e um rótulo
+ * comprido a mais fazia o INSERT do log estourar e a transação INTEIRA cair: o
+ * processo deixava de avançar por causa do nome de quem pediu. Auditoria descreve o
+ * fato; ela não pode impedi-lo. Aqui o rótulo é cortado no tamanho da coluna.
+ */
+function rotuloDeOrigem(v: string | undefined | null): string {
+  return String(v ?? "advance").slice(0, 20)
+}
+
 interface Plano {
   operacao: AdvanceOperacao
   processoId: number
@@ -358,7 +371,7 @@ async function executarPlano(p: Plano): Promise<AdvanceResult> {
             },
           } as unknown as Prisma.InputJsonValue,
           pendencias: p.pendencias, warnings: p.warnings,
-          resultado: resultadoEnum, origem: p.origemLog, solicitadoPorId: p.solicitadoPorId ?? null,
+          resultado: resultadoEnum, origem: rotuloDeOrigem(p.origemLog), solicitadoPorId: p.solicitadoPorId ?? null,
           justificativa: p.justificativa ?? null, motivoCodigo: p.motivoCodigo ?? null,
           forcado: p.forcado, correlationId: p.correlationId, causationId: p.causationId,
           chaveIdempotencia: chave,
@@ -380,7 +393,7 @@ async function executarPlano(p: Plano): Promise<AdvanceResult> {
         faseNovaInstanceId: inst.workflowInstance.id,
         ciclo: p.cicloAlvo,
         operacao: p.operacao,
-        origem: p.origemLog,
+        origem: rotuloDeOrigem(p.origemLog),
         solicitadoPorId: p.solicitadoPorId ?? null,
         macroVersion: inst.workflowInstance.macroVersion ?? null,
         chaveTransicao: chave,
@@ -630,7 +643,7 @@ export async function advance(processoId: number, ctx: AdvanceCtx = {}): Promise
         processoId, faseAtual: c.processo.faseAtual, fasePretendida: proxima,
         policy: "ALL_REQUIRED_COMPLETED", regrasAvaliadas: snap.regrasAvaliadas,
         pendencias: snap.pendencias, warnings: snap.warnings, resultado: "BLOQUEADO",
-        origem: ctx.origem ?? "advance", solicitadoPorId: ctx.solicitadoPorId ?? null,
+        origem: rotuloDeOrigem(ctx.origem), solicitadoPorId: ctx.solicitadoPorId ?? null,
         forcado: false, correlationId, causationId: ctx.causationId ?? null,
         chaveIdempotencia: montarChaveAdvanceBloqueio({ processoId, operacao: "AVANCAR", faseAtual: c.processo.faseAtual, correlationId }),
       },

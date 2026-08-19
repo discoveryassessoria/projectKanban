@@ -858,13 +858,13 @@ export async function reabrirTarefa(args: Parameters<typeof reabrirTarefaNucleo>
 
 export async function desbloquearTarefa(args: Parameters<typeof desbloquearTarefaNucleo>[0]): Promise<Resultado> {
   const r = await desbloquearTarefaNucleo(args)
-  if (r.ok) await reconciliarMotorApos(args.tarefaId, 'comando:desbloquear')
+  if (r.ok) await reconciliarMotorApos(args.tarefaId, 'comando:desbloq')
   return r
 }
 
 export async function retomarDeEspera(args: Parameters<typeof retomarDeEsperaNucleo>[0]): Promise<Resultado> {
   const r = await retomarDeEsperaNucleo(args)
-  if (r.ok) await reconciliarMotorApos(args.tarefaId, 'comando:retomar_espera')
+  if (r.ok) await reconciliarMotorApos(args.tarefaId, 'comando:espera')
   return r
 }
 
@@ -876,12 +876,12 @@ export async function cancelarTarefa(args: Parameters<typeof cancelarTarefaNucle
 
 export async function decidirSobreCausaRemovida(args: Parameters<typeof decidirSobreCausaRemovidaNucleo>[0]): Promise<Resultado> {
   const r = await decidirSobreCausaRemovidaNucleo(args)
-  if (r.ok) await reconciliarMotorApos(args.tarefaId, 'comando:decidir_causa')
+  if (r.ok) await reconciliarMotorApos(args.tarefaId, 'comando:causa')
   return r
 }
 
 export async function removerDependencia(args: Parameters<typeof removerDependenciaNucleo>[0]): Promise<Resultado> {
   const r = await removerDependenciaNucleo(args)
-  if (r.ok) await reconciliarMotorApos(args.tarefaId, 'comando:remover_dependencia')
+  if (r.ok) await reconciliarMotorApos(args.tarefaId, 'comando:dependencia')
   return r
 }
