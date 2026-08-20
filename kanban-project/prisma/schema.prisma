@@ -3052,6 +3052,8 @@ model PhaseInternalWorkflow {
   atualizadoEm   DateTime @updatedAt
 
   passos PhaseInternalWorkflowStep[]
+  /// Versões congeladas desta definição (ver PhaseInternalWorkflowVersao).
+  versoes PhaseInternalWorkflowVersao[]
 
   // ── CONTRATO DE EXECUÇÃO ───────────────────────────────────────────────────
   // O workflow declara SOBRE O QUE executa. Antes só se sabia a fase, e o escopo
@@ -3078,6 +3080,55 @@ model PhaseInternalWorkflow {
   @@index([phaseKey])
   @@index([tipoProcessoId])
   @@index([familiaDocumentalId])
+}
+
+/// VERSÃO PUBLICADA DE UM WORKFLOW INTERNO — imutável, e a razão de existir.
+///
+/// `PhaseInternalWorkflow` é a definição EDITÁVEL: ela é o que o administrador vê e
+/// muda. As instâncias em execução já registravam `workflowDefinitionId` +
+/// `workflowVersion`, mas `versao` nunca era incrementada e a edição apagava e
+/// recriava os passos — o par (definição, versão) apontava para um conteúdo que
+/// mudava por baixo. Uma execução iniciada semana passada passava a ser lida pela
+/// configuração de hoje, sem que nada no dado registrasse a diferença.
+///
+/// Esta tabela CONGELA o conteúdo de cada versão no momento em que ela passa a
+/// valer. A identidade é o par que a instância já guarda — `(workflowId, versao)` —,
+/// e é por isso que nenhuma coluna nova foi criada na instância: o vínculo já
+/// existia; o que faltava era ter o que ele aponta.
+///
+/// IMUTÁVEL POR CONTRATO: nada no runtime atualiza uma linha destas. Editar o
+/// workflow congela a versão vigente (se ainda não estiver) e cria a próxima.
+model PhaseInternalWorkflowVersao {
+  id         Int                   @id @default(autoincrement())
+  workflowId Int
+  workflow   PhaseInternalWorkflow @relation(fields: [workflowId], references: [id], onDelete: Cascade)
+  versao     Int
+
+  // ── O CONTEÚDO CONGELADO ────────────────────────────────────────────────
+  // Cópia fiel do que a definição dizia quando esta versão passou a valer. Os
+  // campos escalares ficam em colunas (consultáveis) e os passos em JSON: eles são
+  // lidos como um conjunto, sempre inteiro, e nunca por linha.
+  phaseKey                 String          @db.VarChar(60)
+  tipoProcessoId           Int?
+  name                     String          @db.VarChar(200)
+  execucao                 String          @db.VarChar(20)
+  escopoExecucao           EscopoExecucao?
+  familiaDocumentalId      Int?
+  exigeDocumento           Boolean         @default(false)
+  exigePessoa              Boolean         @default(false)
+  pausarSlaEmEsperaExterna Boolean         @default(false)
+  pausarSlaEmBloqueio      Boolean         @default(false)
+  /// Passos como estavam: key, label, ordem, obrigatório, gera tarefa, responsável
+  /// padrão, prioridade, SLA, cardinalidade, condição de conclusão e checklist.
+  passos                   Json
+
+  congeladoEm     DateTime @default(now())
+  congeladoPorId  Int?
+  /// Por que esta versão nasceu: PUBLICACAO (edição), CRIACAO, BACKFILL.
+  origem          String   @db.VarChar(20)
+
+  @@unique([workflowId, versao])
+  @@index([workflowId])
 }
 
 model PhaseInternalWorkflowStep {

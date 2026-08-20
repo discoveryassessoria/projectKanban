@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { Prisma } from '@prisma/client'
 import { verificarPermissao } from '@/src/lib/verificar-permissao'
+import { congelarVersaoVigente } from '@/src/services/versao-publicada'
 
 // GET — dados da tela: processos+fases + workflows internos aplicados (sem biblioteca de modelos)
 export async function GET(request: NextRequest) {
@@ -68,6 +69,9 @@ export async function POST(request: NextRequest) {
         data: { wfUid, tipoProcessoId, phaseKey, name: 'Workflow Interno · ' + phaseLabel },
         include: { passos: { orderBy: { ordem: 'asc' } } },
       })
+      // A V1 nasce congelada: um workflow sem versão congelada é um ponteiro sem
+      // alvo no dia em que a primeira instância o registrar.
+      await congelarVersaoVigente(criado.id, 'CRIACAO')
       return NextResponse.json({ workflow: criado }, { status: 201 })
     }
 

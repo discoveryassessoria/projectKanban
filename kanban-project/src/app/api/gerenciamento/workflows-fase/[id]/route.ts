@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { Prisma } from '@prisma/client'
-import { verificarPermissao } from '@/src/lib/verificar-permissao'
+import { verificarPermissao, extrairUsuarioComPermissoes } from '@/src/lib/verificar-permissao'
+import { publicarNovaVersao, congelarVersaoVigente } from '@/src/services/versao-publicada'
 
 function slug(s: string) {
   return String(s || '')
@@ -64,20 +65,43 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
     if (body.active !== undefined) dataBase.active = !!body.active
     if (body.arquivado !== undefined) dataBase.arquivado = !!body.arquivado
 
-    if (Array.isArray(body.steps)) {
-      const stepData = buildSteps(body.steps, id)
-      // TRANSAÇÃO INTERATIVA — ordem garantida: apaga TUDO, depois cria de novo
+    // EDITAR UM WORKFLOW PUBLICADO É PUBLICAR UMA VERSÃO NOVA.
+    //
+    // O conteúdo vigente é CONGELADO antes de qualquer alteração, e só então a
+    // definição muda e o número da versão anda. Processos em execução guardam o
+    // número antigo e passam a ler o conteúdo congelado — nada do que eles
+    // materializaram é reinterpretado pela configuração de hoje.
+    //
+    // Tudo numa transação só: entre congelar, alterar e incrementar não pode haver
+    // janela em que a versão vigente aponte para conteúdo que já mudou.
+    const usuario = await extrairUsuarioComPermissoes(request)
+    const mudouDefinicao = Array.isArray(body.steps) || Object.keys(dataBase).length > 0
+    let versaoNova: number | null = null
+
+    if (mudouDefinicao) {
       await prisma.$transaction(async (tx) => {
-        await tx.phaseInternalWorkflowStep.deleteMany({ where: { workflowId: id } })
+        const r = await publicarNovaVersao(id, tx, usuario?.userId ?? null)
+        versaoNova = r.nova
         if (Object.keys(dataBase).length) {
           await tx.phaseInternalWorkflow.update({ where: { id }, data: dataBase })
         }
-        if (stepData.length) {
-          await tx.phaseInternalWorkflowStep.createMany({ data: stepData })
+        if (Array.isArray(body.steps)) {
+          const stepData = buildSteps(body.steps, id)
+          await tx.phaseInternalWorkflowStep.deleteMany({ where: { workflowId: id } })
+          if (stepData.length) await tx.phaseInternalWorkflowStep.createMany({ data: stepData })
         }
+        // A versão NOVA também nasce congelada: toda versão que uma instância possa
+        // vir a registrar precisa ter conteúdo desde o primeiro instante.
+        await congelarVersaoVigente(id, "PUBLICACAO", tx, usuario?.userId ?? null)
       })
-    } else if (Object.keys(dataBase).length) {
-      await prisma.phaseInternalWorkflow.update({ where: { id }, data: dataBase })
+      await prisma.logAuditoria.create({
+        data: {
+          acao: 'WORKFLOW_VERSION_PUBLISHED', entidade: 'PhaseInternalWorkflow', entidadeId: id,
+          descricao: `Workflow interno "${atual.name}" publicado na versão ${versaoNova}. A versão ${(versaoNova ?? 1) - 1} foi congelada e continua valendo para os processos que já a registraram.`,
+          detalhes: { versaoAnterior: (versaoNova ?? 1) - 1, versaoNova, alterouPassos: Array.isArray(body.steps) } as never,
+          usuarioId: usuario?.userId ?? null,
+        },
+      }).catch(() => null)
     }
 
     const wf = await prisma.phaseInternalWorkflow.findUnique({

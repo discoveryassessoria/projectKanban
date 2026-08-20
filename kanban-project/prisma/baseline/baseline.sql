@@ -5,7 +5,7 @@
 --   corpo        → gerado do prisma/schema.prisma
 --   bloco manual → prisma/baseline/bloco-manual.sql (edite LÁ)
 --
--- Gerado em : 2026-08-19
+-- Gerado em : 2026-08-20
 -- Prisma    : 6.19.3
 --
 -- PARA QUE SERVE: reconstruir o banco DO ZERO. O histórico de migrations NÃO
@@ -2360,6 +2360,29 @@ CREATE TABLE "PhaseInternalWorkflow" (
     "pausarSlaEmBloqueio" BOOLEAN NOT NULL DEFAULT false,
 
     CONSTRAINT "PhaseInternalWorkflow_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "PhaseInternalWorkflowVersao" (
+    "id" SERIAL NOT NULL,
+    "workflowId" INTEGER NOT NULL,
+    "versao" INTEGER NOT NULL,
+    "phaseKey" VARCHAR(60) NOT NULL,
+    "tipoProcessoId" INTEGER,
+    "name" VARCHAR(200) NOT NULL,
+    "execucao" VARCHAR(20) NOT NULL,
+    "escopoExecucao" "EscopoExecucao",
+    "familiaDocumentalId" INTEGER,
+    "exigeDocumento" BOOLEAN NOT NULL DEFAULT false,
+    "exigePessoa" BOOLEAN NOT NULL DEFAULT false,
+    "pausarSlaEmEsperaExterna" BOOLEAN NOT NULL DEFAULT false,
+    "pausarSlaEmBloqueio" BOOLEAN NOT NULL DEFAULT false,
+    "passos" JSONB NOT NULL,
+    "congeladoEm" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "congeladoPorId" INTEGER,
+    "origem" VARCHAR(20) NOT NULL,
+
+    CONSTRAINT "PhaseInternalWorkflowVersao_pkey" PRIMARY KEY ("id")
 );
 
 -- CreateTable
@@ -5096,6 +5119,12 @@ CREATE INDEX "PhaseInternalWorkflow_tipoProcessoId_idx" ON "PhaseInternalWorkflo
 CREATE INDEX "PhaseInternalWorkflow_familiaDocumentalId_idx" ON "PhaseInternalWorkflow"("familiaDocumentalId");
 
 -- CreateIndex
+CREATE INDEX "PhaseInternalWorkflowVersao_workflowId_idx" ON "PhaseInternalWorkflowVersao"("workflowId");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "PhaseInternalWorkflowVersao_workflowId_versao_key" ON "PhaseInternalWorkflowVersao"("workflowId", "versao");
+
+-- CreateIndex
 CREATE UNIQUE INDEX "PhaseInternalWorkflowStep_workflowId_key_key" ON "PhaseInternalWorkflowStep"("workflowId", "key");
 
 -- CreateIndex
@@ -6399,6 +6428,9 @@ ALTER TABLE "FaseMacro" ADD CONSTRAINT "FaseMacro_macroWorkflowId_fkey" FOREIGN 
 
 -- AddForeignKey
 ALTER TABLE "PhaseInternalWorkflow" ADD CONSTRAINT "PhaseInternalWorkflow_familiaDocumentalId_fkey" FOREIGN KEY ("familiaDocumentalId") REFERENCES "FamiliaDocumental"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "PhaseInternalWorkflowVersao" ADD CONSTRAINT "PhaseInternalWorkflowVersao_workflowId_fkey" FOREIGN KEY ("workflowId") REFERENCES "PhaseInternalWorkflow"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "PhaseInternalWorkflowStep" ADD CONSTRAINT "PhaseInternalWorkflowStep_workflowId_fkey" FOREIGN KEY ("workflowId") REFERENCES "PhaseInternalWorkflow"("id") ON DELETE CASCADE ON UPDATE CASCADE;

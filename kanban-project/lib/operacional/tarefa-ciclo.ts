@@ -24,6 +24,7 @@ import type { Prisma, StatusTarefa } from '@prisma/client'
 import { randomUUID } from 'crypto'
 import { STATUS_TERMINAIS, calcularPrazo, etapaCorrente } from './tarefa-canonica'
 import { reabrirPassoTx } from '@/src/services/task-step-sync'
+import { versaoDaInstancia } from '@/src/services/versao-publicada'
 
 export type Falha =
   | 'NAO_ENCONTRADA' | 'TERMINAL' | 'NAO_TERMINAL' | 'CONFLITO' | 'SEM_MOTIVO' | 'INVALIDO'
@@ -317,6 +318,22 @@ async function reabrirTarefaNucleo(args: {
  */
 export async function politicaDeSla(workflowInstanceId: number | null): Promise<{ pausaEspera: boolean; pausaBloqueio: boolean }> {
   if (workflowInstanceId == null) return { pausaEspera: false, pausaBloqueio: false }
+
+  // A POLÍTICA É A DA VERSÃO QUE A EXECUÇÃO REGISTROU, não a de hoje.
+  //
+  // Esta leitura decide se o relógio de uma tarefa EM ANDAMENTO pausa. Enquanto ela
+  // consultava a definição VIVA, marcar "pausar na espera externa" no cadastro
+  // mudava o prazo de tarefas que tinham começado sob a regra anterior — a
+  // configuração nova reinterpretando execução antiga, em silêncio.
+  const daVersao = await versaoDaInstancia(workflowInstanceId)
+  if (daVersao) {
+    return { pausaEspera: daVersao.pausarSlaEmEsperaExterna, pausaBloqueio: daVersao.pausarSlaEmBloqueio }
+  }
+
+  // SEM VERSÃO CONGELADA — instância anterior ao versionamento. Ler a definição viva
+  // aqui é o comportamento antigo, mantido de propósito: o alternativo seria mudar o
+  // SLA dessas tarefas para "nunca pausa", o que também seria reinterpretar o
+  // passado, só que na direção contrária. O backfill da V1 esvazia este caminho.
   const inst = await prisma.phaseWorkflowInstance.findUnique({
     where: { id: workflowInstanceId },
     select: { workflowDefinitionId: true },

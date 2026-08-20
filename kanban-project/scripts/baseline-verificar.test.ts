@@ -172,7 +172,16 @@ const MIGRATION = join(DIR_MIGRATIONS, '0000_baseline', 'migration.sql')
 // da migration 20260819120000_catalogo_fase_escopo_descricao.
 //
 //   anterior : 00a3504ec57a9531ac0664374baad33a887ddcb1ebf42bfcb0e47b96aca53138
-const CHECKSUM_LEDGER = '882ba788a0fbb21f556741114a2121ddf55e483fb9676b584e2cc36d4b9bc1f8'
+//
+// 20/08/2026 — GATE 1, VERSAO PUBLICADA IMUTAVEL. Nova tabela
+// `PhaseInternalWorkflowVersao`: as instancias ja gravavam (definicao, versao), mas
+// `versao` nunca era incrementada e a edicao recriava os passos — o par apontava
+// para conteudo que mudava por baixo. Aditivo: uma tabela, nenhuma coluna alterada.
+// Ledger de producao reconciliado no MESMO deploy da migration
+// 20260820100000_versao_publicada_imutavel.
+//
+//   anterior : 882ba788a0fbb21f556741114a2121ddf55e483fb9676b584e2cc36d4b9bc1f8
+const CHECKSUM_LEDGER = '761f266e42dc04f48f383b06c05a08c62a1cf583f0e57ccbb3855ecc7370ed08'
 
 /**
  * Migrations criadas DEPOIS da consolidacao de 02/08/2026. Toda migration nova
@@ -205,6 +214,7 @@ const MIGRATIONS_POS_BASELINE: string[] = [
   '20260812200000_aptidao_por_unidade_operacional',
   '20260812220000_decisao_sobre_causa_removida',
   '20260819120000_catalogo_fase_escopo_descricao',
+  '20260820100000_versao_publicada_imutavel',
 ]
 
 const sha256 = (t: string) => createHash('sha256').update(t).digest('hex')

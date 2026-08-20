@@ -193,6 +193,8 @@
     "test:motor-reentrada": "tsx scripts/motor-reentrada-fase.test.ts",
     "test:workflow-ciclo": "tsx scripts/workflow-ciclo-atual.test.ts",
     "test:cadastro-fases": "tsx scripts/cadastro-de-fases.test.ts",
+    "test:versao-publicada": "tsx scripts/versao-publicada.test.ts",
+    "backfill:versao-publicada": "tsx scripts/backfill-versao-publicada.ts",
     "canonicalizar:fases": "tsx scripts/canonicalizar-fases.ts",
     "palco:retrocesso": "tsx scripts/palco-retrocesso-motor.ts",
     "e2e:retrocesso": "node scripts/e2e-retrocesso-motor.mjs",
