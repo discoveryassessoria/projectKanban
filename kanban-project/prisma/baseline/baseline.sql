@@ -2835,6 +2835,27 @@ CREATE TABLE "PhaseWorkflowInstance" (
 );
 
 -- CreateTable
+CREATE TABLE "StepExecution" (
+    "id" SERIAL NOT NULL,
+    "stepInstanceId" INTEGER NOT NULL,
+    "sequencia" INTEGER NOT NULL,
+    "status" "StepInstanceStatus" NOT NULL,
+    "motivo" VARCHAR(30) NOT NULL,
+    "startedAt" TIMESTAMP(3),
+    "completedAt" TIMESTAMP(3),
+    "executadoPorId" INTEGER,
+    "resultado" VARCHAR(60),
+    "payload" JSONB,
+    "supersededAt" TIMESTAMP(3),
+    "supersededPorId" INTEGER,
+    "correlationId" VARCHAR(60),
+    "chaveIdempotencia" VARCHAR(200) NOT NULL,
+    "criadoEm" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT "StepExecution_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
 CREATE TABLE "PhaseWorkflowStepInstance" (
     "id" SERIAL NOT NULL,
     "workflowInstanceId" INTEGER NOT NULL,
@@ -5314,6 +5335,15 @@ CREATE INDEX "PhaseWorkflowInstance_previousInstanceId_idx" ON "PhaseWorkflowIns
 CREATE INDEX "PhaseWorkflowInstance_processoId_requerRegularizacao_idx" ON "PhaseWorkflowInstance"("processoId", "requerRegularizacao");
 
 -- CreateIndex
+CREATE UNIQUE INDEX "StepExecution_chaveIdempotencia_key" ON "StepExecution"("chaveIdempotencia");
+
+-- CreateIndex
+CREATE INDEX "StepExecution_stepInstanceId_idx" ON "StepExecution"("stepInstanceId");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "StepExecution_stepInstanceId_sequencia_key" ON "StepExecution"("stepInstanceId", "sequencia");
+
+-- CreateIndex
 CREATE UNIQUE INDEX "PhaseWorkflowStepInstance_chaveIdempotencia_key" ON "PhaseWorkflowStepInstance"("chaveIdempotencia");
 
 -- CreateIndex
@@ -6500,6 +6530,9 @@ ALTER TABLE "PhaseWorkflowInstance" ADD CONSTRAINT "PhaseWorkflowInstance_regula
 
 -- AddForeignKey
 ALTER TABLE "PhaseWorkflowInstance" ADD CONSTRAINT "PhaseWorkflowInstance_criadoPorId_fkey" FOREIGN KEY ("criadoPorId") REFERENCES "Usuario"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "StepExecution" ADD CONSTRAINT "StepExecution_stepInstanceId_fkey" FOREIGN KEY ("stepInstanceId") REFERENCES "PhaseWorkflowStepInstance"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "PhaseWorkflowStepInstance" ADD CONSTRAINT "PhaseWorkflowStepInstance_workflowInstanceId_fkey" FOREIGN KEY ("workflowInstanceId") REFERENCES "PhaseWorkflowInstance"("id") ON DELETE CASCADE ON UPDATE CASCADE;

@@ -189,3 +189,34 @@ export async function versaoDaInstancia(
   if (!inst?.workflowDefinitionId || inst.workflowVersion == null) return null
   return lerVersaoPublicada(inst.workflowDefinitionId, inst.workflowVersion, db)
 }
+
+/**
+ * A DEFINIÇÃO HISTÓRICA DE UM PASSO — a que o originou, não a de hoje.
+ *
+ * `PhaseWorkflowStepInstance.stepDefinitionId` aponta para uma linha de
+ * `PhaseInternalWorkflowStep` que a edição do workflow apaga e recria: publicar uma
+ * versão nova deixava o ponteiro pendurado, e a instância histórica perdia a
+ * definição que a gerou. Era a pendência declarada no Gate 1.
+ *
+ * A resposta não é ressuscitar a linha: é perguntar à VERSÃO CONGELADA da instância
+ * — que existe desde o Gate 1 e é imutável — pelo passo com aquela `stepKey`. O
+ * ponteiro frágil (id de linha) dá lugar ao par estável (versão, chave).
+ *
+ * `null` quando a instância não registra versão ou quando a versão não contém a
+ * chave (passo removido numa publicação posterior — caso legítimo, e é justamente o
+ * que o chamador precisa poder distinguir).
+ */
+export async function definicaoHistoricaDoPasso(
+  stepInstanceId: number,
+  db: DB = prisma,
+): Promise<{ versao: number; passo: PassoCongelado } | null> {
+  const passo = await db.phaseWorkflowStepInstance.findUnique({
+    where: { id: stepInstanceId },
+    select: { stepKey: true, workflowInstanceId: true },
+  })
+  if (!passo) return null
+  const versao = await versaoDaInstancia(passo.workflowInstanceId, db)
+  if (!versao) return null
+  const def = versao.passos.find((p) => p.key === passo.stepKey)
+  return def ? { versao: versao.versao, passo: def } : null
+}

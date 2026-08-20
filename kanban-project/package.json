@@ -194,6 +194,8 @@
     "test:workflow-ciclo": "tsx scripts/workflow-ciclo-atual.test.ts",
     "test:cadastro-fases": "tsx scripts/cadastro-de-fases.test.ts",
     "test:versao-publicada": "tsx scripts/versao-publicada.test.ts",
+    "test:execucao-passo": "tsx scripts/execucao-do-passo.test.ts",
+    "backfill:tentativas": "tsx scripts/backfill-tentativa-de-execucao.ts",
     "backfill:versao-publicada": "tsx scripts/backfill-versao-publicada.ts",
     "canonicalizar:fases": "tsx scripts/canonicalizar-fases.ts",
     "palco:retrocesso": "tsx scripts/palco-retrocesso-motor.ts",

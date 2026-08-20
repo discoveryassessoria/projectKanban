@@ -4033,6 +4033,56 @@ model PhaseWorkflowInstance {
   @@index([processoId, requerRegularizacao])
 }
 
+/// TENTATIVA DE EXECUÇÃO DE UM PASSO — o que faltava para reexecutar sem mentir.
+///
+/// O modelo já sabia representar a execução da FASE: `PhaseWorkflowInstance` tem
+/// `ciclo` e `previousInstanceId`, e voltar a uma fase abre uma visita nova. O que
+/// não existia era a tentativa DO PASSO dentro de uma mesma visita. Reabrir um passo
+/// fazia `UPDATE ... completedAt = NULL` na própria linha: a execução que aconteceu
+/// deixava de ter acontecido, e não sobrava com o que responder "concluída em qual
+/// execução?".
+///
+/// Cada linha aqui é UMA TENTATIVA, e tentativas são APPEND-ONLY. A instância do
+/// passo continua sendo a obrigação ("executar `receber_certidao` para esta certidão
+/// nesta visita da fase"); a tentativa é cada vez que se tentou cumpri-la.
+///
+/// A TENTATIVA VIGENTE é a única com `supersededAt` nulo — garantido por índice
+/// parcial no banco, não por convenção. Não se descobre a atual por `ORDER BY
+/// createdAt DESC`: descobre-se porque é a única que não foi substituída.
+model StepExecution {
+  id             Int                       @id @default(autoincrement())
+  stepInstanceId Int
+  stepInstance   PhaseWorkflowStepInstance @relation(fields: [stepInstanceId], references: [id], onDelete: Cascade)
+
+  /// Metadado humano e auditável (1, 2, 3…). A identidade real é o `id`.
+  sequencia Int
+  status    StepInstanceStatus
+
+  /// POR QUE esta tentativa nasceu. Sem isto, "tentativa 2" não se explica.
+  motivo    String @db.VarChar(30)
+
+  startedAt      DateTime?
+  completedAt    DateTime?
+  executadoPorId Int?
+
+  /// Desfecho declarado pelo executor (aprovado, divergente, nova via…). Fica aqui,
+  /// e não sobrescrito no passo, porque é fato DA TENTATIVA.
+  resultado String? @db.VarChar(60)
+  /// Os dados de domínio preenchidos na tentativa (hoje `metadata.operacao`).
+  payload   Json?
+
+  /// Quando esta tentativa deixou de ser a vigente, e por qual. `null` = é a atual.
+  supersededAt      DateTime?
+  supersededPorId   Int?
+  correlationId     String?  @db.VarChar(60)
+  /// Retry de HTTP não pode virar tentativa nova.
+  chaveIdempotencia String   @unique @db.VarChar(200)
+  criadoEm          DateTime @default(now())
+
+  @@unique([stepInstanceId, sequencia])
+  @@index([stepInstanceId])
+}
+
 model PhaseWorkflowStepInstance {
   id                 Int                   @id @default(autoincrement())
   workflowInstanceId Int
@@ -4105,6 +4155,9 @@ model PhaseWorkflowStepInstance {
   @@index([documentoId])
   @@index([stepKey])
   @@index([chaveIdempotencia])
+
+  /// Tentativas de execução deste passo (append-only). Ver StepExecution.
+  execucoes StepExecution[]
 }
 
 // Eventos append-only (sem rota de update/delete â garantido por contrato).

@@ -93,9 +93,16 @@ ok("transicionarPassoTx reaproveita aplicarPasso, não reimplementa",
 ok("a tabela de eventos por alvo é única",
   /export const EVENTO_PASSO_POR_ALVO/.test(syncCode),
   "sem ela cada chamador escolhe o tipo do evento e o mesmo alvo vira dois nomes no histórico")
+// A JANELA CRESCEU COM O GATE 2: reabrir passou a abrir uma TENTATIVA nova antes de
+// mexer no passo, e esse bloco fica entre o início da função e a emissão do evento.
+// O que o guard protege continua sendo o mesmo — reabrir sem evento apaga do
+// histórico que o trabalho já tinha sido concluído —, e o evento continua lá.
 ok("reabrirPassoTx emite PASSO_REABERTO",
-  /reabrirPassoTx[\s\S]{0,2000}?tipo:\s*"PASSO_REABERTO"/.test(syncCode),
+  /reabrirPassoTx[\s\S]{0,4000}?"PASSO_REABERTO"/.test(syncCode),
   "reabrir sem evento apaga do histórico que o trabalho já tinha sido concluído")
+ok("reabrirPassoTx abre uma TENTATIVA nova em vez de desconcluir a anterior",
+  /reabrirPassoTx[\s\S]{0,2500}?abrirTentativa\(/.test(syncCode),
+  "sem tentativa nova, `completedAt = null` apaga a execução que aconteceu")
 
 // ═══════════════════════════════════════════════════════════════════════════
 secao("2) O estado da TAREFA é derivado — o dono do passo não decide por ela")

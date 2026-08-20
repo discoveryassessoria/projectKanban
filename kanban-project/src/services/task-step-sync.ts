@@ -9,9 +9,13 @@
 
 import { randomUUID } from "crypto"
 import { prisma } from "@/lib/prisma"
-import { Prisma, type Tarefa, type PhaseWorkflowStepInstance, type WorkflowEventoTipo } from "@prisma/client"
+import { Prisma, type Tarefa, type PhaseWorkflowStepInstance, type WorkflowEventoTipo, type StepInstanceStatus } from "@prisma/client"
 import { resolveWorkflowRuntime } from "@/src/lib/workflow-runtime"
 import * as H from "@/src/services/task-step-sync-helpers"
+import {
+  abrirTentativa, garantirTentativa, registrarNaTentativa,
+  MOTIVOS_DE_TENTATIVA, type MotivoDeTentativa,
+} from "@/src/services/execucao-do-passo"
 import { projetarTarefaDoPasso, assegurarCoerenciaPassoTarefa } from "@/src/services/passo-tarefa-projecao"
 import { processarOutbox } from "@/src/services/outbox-dispatcher"
 import { escopoDaUnidade, estadoDerivado, sincronizarTarefaComWorkflow } from "@/lib/operacional/tarefa-canonica"
@@ -85,6 +89,8 @@ interface ApplyOpts {
   workflowInstanceId?: number | null
   extra?: Record<string, unknown>
   dados?: Prisma.InputJsonValue
+  /** Quem executou — carimbado na TENTATIVA, que é onde a autoria é fato. */
+  usuarioId?: number | null
 }
 
 // ---------------- APLICADOR: PASSO (CAS) ----------------
@@ -128,6 +134,20 @@ async function aplicarPasso(tx: TX, stepId: number, alvo: string, tipoEvento: Wo
       payload: { stepId, alvo, ciclo: o.ciclo },
     },
   })
+  // A TENTATIVA REGISTRA O QUE ACONTECEU. O status do passo continua sendo o estado
+  // corrente da obrigação; a tentativa é o fato — com início, fim, autor e dados.
+  // Passo anterior a este modelo ganha a primeira tentativa aqui, marcada como tal.
+  await garantirTentativa(stepId, {
+    motivo: MOTIVOS_DE_TENTATIVA.BACKFILL, status: step.status as StepInstanceStatus,
+    startedAt: step.startedAt, completedAt: step.completedAt,
+  }, tx)
+  await registrarNaTentativa(stepId, {
+    status: alvo as StepInstanceStatus,
+    startedAt: (data as { startedAt?: Date }).startedAt ?? undefined,
+    completedAt: (data as { completedAt?: Date }).completedAt ?? undefined,
+    executadoPorId: o.usuarioId ?? undefined,
+  }, tx)
+
   return { changed: true, anterior: step.status, atual: alvo }
 }
 
@@ -183,6 +203,14 @@ export interface TransicaoPassoOpts {
   /** Campos adicionais na MESMA escrita (ex.: `motivo` da conclusão). */
   extra?: Record<string, unknown>
   tipoEvento?: WorkflowEventoTipo
+  /** Quem executou — carimbado na tentativa. */
+  usuarioId?: number | null
+  /**
+   * POR QUE a tentativa nova nasce, quando esta transição é uma reabertura.
+   * Sem isto toda reexecução seria "reabertura manual", inclusive a que veio de
+   * nova via ou de documento invalidado — e o histórico não saberia distinguir.
+   */
+  motivoTentativa?: string
 }
 
 export type TransicaoPassoResultado = {
@@ -338,6 +366,30 @@ export async function reabrirPassoTx(
   if (!step) return { changed: false, anterior: "", atual: "", code: "STEP_NAO_ENCONTRADO" as H.FailureCodeD }
   if (step.status === alvo) return { changed: false, anterior: step.status, atual: step.status }
 
+  // REABRIR NÃO DESCONCLUI O PASSADO — ABRE UMA TENTATIVA NOVA.
+  //
+  // Antes, esta era a linha que apagava a história: `completedAt = null` sobre a
+  // própria row. A execução que aconteceu deixava de ter acontecido, e o sistema
+  // perdia a resposta para "concluída em qual execução?".
+  //
+  // Agora a tentativa vigente é SUBSTITUÍDA — mantendo fim, autor, resultado e
+  // dados — e uma tentativa nova nasce para receber o retrabalho. O `completedAt`
+  // do PASSO é limpo porque ele descreve a obrigação corrente, que de fato voltou a
+  // estar aberta; o da tentativa concluída permanece, e é ele que o histórico lê.
+  await garantirTentativa(stepId, {
+    motivo: MOTIVOS_DE_TENTATIVA.BACKFILL, status: step.status as StepInstanceStatus,
+    startedAt: step.startedAt, completedAt: step.completedAt,
+  }, tx)
+  const nova = await abrirTentativa({
+    stepInstanceId: stepId,
+    motivo: (o.motivoTentativa as MotivoDeTentativa | undefined) ?? MOTIVOS_DE_TENTATIVA.REABERTURA_MANUAL,
+    status: alvo as StepInstanceStatus,
+    executadoPorId: o.usuarioId ?? null,
+    correlationId: o.correlationId,
+    // A chave amarra a tentativa ao COMANDO: reenviar o mesmo reopen não abre outra.
+    chaveIdempotencia: `stepexec|si${stepId}|reopen|${o.correlationId}`,
+  }, tx)
+
   const res = await tx.phaseWorkflowStepInstance.updateMany({
     where: { id: stepId, status: step.status as Prisma.PhaseWorkflowStepInstanceWhereInput["status"], lockVersion: step.lockVersion },
     data: {
@@ -348,6 +400,7 @@ export async function reabrirPassoTx(
     },
   })
   if (res.count === 0) return { changed: false, anterior: step.status, atual: step.status, code: "CONFLITO" as H.FailureCodeD }
+  void nova
 
   const causationId = H.chaveComando(o.operacao, "step_instance", stepId, alvo, o.ciclo, step.lockVersion)
   const chaveEvt = H.chaveEvento("PASSO_REABERTO", "step_instance", stepId, alvo, o.ciclo, step.lockVersion)

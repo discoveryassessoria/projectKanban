@@ -30,6 +30,7 @@ import {
 } from "@/src/services/phase-workflow-helpers"
 import { planejarMaterializacao, cardinalidadeEfetiva, type ContextoEscopo, type AlvoDePasso } from "@/src/services/phase-workflow-escopo"
 import { itemCatalogosDeCertidao } from "@/src/lib/documentos/natureza-certidao"
+import { garantirTentativa, MOTIVOS_DE_TENTATIVA } from "@/src/services/execucao-do-passo"
 
 export type OrigemInstanciaStr = "MOTOR" | "MANUAL" | "MIGRACAO" | "REABERTURA"
 
@@ -446,6 +447,17 @@ async function materializarAlvos(
       },
     })
     criados.push(si)
+
+    // A OBRIGAÇÃO NASCE COM A PRIMEIRA TENTATIVA. Um passo sem tentativa seria uma
+    // obrigação sobre a qual não se pode dizer nada — nem que ninguém a tentou.
+    // Passo herdado nasce com a tentativa já concluída: o trabalho é da visita
+    // anterior, e a linhagem fica em `motivo`.
+    await garantirTentativa(si.id, {
+      motivo: herdado ? MOTIVOS_DE_TENTATIVA.BACKFILL : MOTIVOS_DE_TENTATIVA.ABERTURA,
+      status: si.status,
+      startedAt: si.startedAt,
+      completedAt: si.completedAt,
+    }, tx)
 
     await tx.workflowEvento.createMany({
       skipDuplicates: true,

@@ -181,7 +181,15 @@ const MIGRATION = join(DIR_MIGRATIONS, '0000_baseline', 'migration.sql')
 // 20260820100000_versao_publicada_imutavel.
 //
 //   anterior : 882ba788a0fbb21f556741114a2121ddf55e483fb9676b584e2cc36d4b9bc1f8
-const CHECKSUM_LEDGER = '761f266e42dc04f48f383b06c05a08c62a1cf583f0e57ccbb3855ecc7370ed08'
+//
+// 20/08/2026 — GATE 2, TENTATIVA DE EXECUCAO DO PASSO. Nova tabela
+// `StepExecution`: reabrir fazia `completedAt = NULL` na propria linha e a execucao
+// que aconteceu deixava de ter acontecido. Aditivo: uma tabela, nenhuma coluna
+// alterada. Ledger reconciliado no MESMO deploy da migration
+// 20260820140000_tentativa_de_execucao_do_passo.
+//
+//   anterior : 761f266e42dc04f48f383b06c05a08c62a1cf583f0e57ccbb3855ecc7370ed08
+const CHECKSUM_LEDGER = 'a4cba5fc2febbc4e09c5e19276c74059c20078e27d73ae9401c955a6a1dac7e4'
 
 /**
  * Migrations criadas DEPOIS da consolidacao de 02/08/2026. Toda migration nova
@@ -215,6 +223,7 @@ const MIGRATIONS_POS_BASELINE: string[] = [
   '20260812220000_decisao_sobre_causa_removida',
   '20260819120000_catalogo_fase_escopo_descricao',
   '20260820100000_versao_publicada_imutavel',
+  '20260820140000_tentativa_de_execucao_do_passo',
 ]
 
 const sha256 = (t: string) => createHash('sha256').update(t).digest('hex')
