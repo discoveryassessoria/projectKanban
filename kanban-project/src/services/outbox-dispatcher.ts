@@ -33,7 +33,34 @@ const CLAIM_STALE_MS = 5 * 60 * 1000
 // sempre. A fila cresceu por 12 dias sem que nada estivesse "com erro" — só
 // represado. O efeito das tarefas já é garantido por `phase.entered`; este evento
 // é informativo, então arquivar é o comportamento correto.
-const TIPOS_SEM_EFEITO = new Set(["phase.completed", "phase-workflow.instanced"])
+// TIPOS QUE SÃO NOTIFICAÇÃO, NÃO COMANDO.
+//
+// Eles nascem porque toda transição publica no outbox — o que é útil como ponto de
+// integração e como rastro. O que não podem é ACUMULAR: em produção havia 110
+// `tarefa.generated` e dezenas de `step.*` parados desde agosto, porque não estavam
+// na lista de drenagem e ninguém os arquivava. Fila que só cresce é fila quebrada,
+// mesmo quando ninguém depende do que está nela.
+//
+// Estar aqui significa: "é processado e arquivado, sem efeito colateral". No dia em
+// que um deles ganhar consumidor, sai desta lista e ganha um `else if` lá embaixo.
+const TIPOS_SEM_EFEITO = new Set([
+  "phase.completed",
+  "phase-workflow.instanced",
+  "tarefa.generated",
+  "tarefa.concluido_recebido",
+  "financeiro.obrigacao.criada",
+  "step.em_andamento",
+  "step.disponivel",
+  "step.bloqueado",
+  "step.reaberto",
+  "step.cancelado",
+  "step.dispensado",
+  "step.supersedido",
+  "step.aguardando",
+  "step.executado",
+  "step.aguardando_aprovacao",
+  "step.pendente",
+])
 
 /**
  * TODOS os tipos que o dispatcher drena. Um tipo emitido e ausente daqui nunca é
@@ -44,6 +71,14 @@ export const TIPOS_DRENADOS = [
   "phase.entered",
   "phase.completed",
   "phase-workflow.instanced",
+  // NOTIFICAÇÕES — drenadas para ARQUIVAR. Ver `TIPOS_SEM_EFEITO` acima: elas não
+  // têm consumidor hoje, e é exatamente por isso que precisam ser drenadas.
+  ...[
+    "tarefa.generated", "tarefa.concluido_recebido", "financeiro.obrigacao.criada",
+    "step.em_andamento", "step.disponivel", "step.bloqueado", "step.reaberto",
+    "step.cancelado", "step.dispensado", "step.supersedido", "step.aguardando",
+    "step.executado", "step.aguardando_aprovacao", "step.pendente",
+  ],
   "requerente.adicionado",
   // MRG — reconciliação contínua: nova certidão / necessidade transicionada /
   // árvore alterada disparam revalidação fora do caminho crítico do upload.

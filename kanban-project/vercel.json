@@ -19,6 +19,10 @@
     {
       "path": "/api/cron/reconciliar-fases",
       "schedule": "0 * * * *"
+    },
+    {
+      "path": "/api/cron/outbox",
+      "schedule": "*/15 * * * *"
     }
   ]
 }

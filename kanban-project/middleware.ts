@@ -60,6 +60,24 @@ const API_PUBLICA: string[] = [
   // futura que esquecesse desse gate.
   "/api/cron/cambio",
   "/api/cron/registral",
+  // ── ENTRARAM EM 21/08, DEPOIS DE TRÊS MESES SEM RODAR ────────────────────
+  //
+  // O desenho acima está certo — cron novo nasce bloqueado — e foi justamente ele
+  // que pegou o erro: `saude`, `avisos-prazo` e `reconciliar-fases` foram agendados
+  // no `vercel.json` e NUNCA entraram aqui. A Vercel os chamava no horário e o
+  // middleware devolvia 401, todas as vezes, em silêncio. O diagnóstico automático
+  // estava parado desde 2 de agosto; os avisos de prazo nunca saíram; o
+  // reconciliador de fases, que existe para o processo não ficar estacionado, nunca
+  // varreu nada.
+  //
+  // Os três se auto-verificam (`x-vercel-cron`, `CRON_SECRET` ou operador com
+  // permissão de gerenciamento) — conferido um a um antes de listar. E
+  // `scripts/guard-crons-alcancaveis.test.ts` passou a cobrar que todo cron do
+  // `vercel.json` esteja aqui, para não haver uma quarta vez.
+  "/api/cron/saude",
+  "/api/cron/avisos-prazo",
+  "/api/cron/reconciliar-fases",
+  "/api/cron/outbox",
 ]
 
 function isApiPublica(pathname: string): boolean {

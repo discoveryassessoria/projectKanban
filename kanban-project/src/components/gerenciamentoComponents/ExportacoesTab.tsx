@@ -37,7 +37,10 @@ const FONTES: Fonte[] = [
   { chave: "impostos", nome: "Impostos", modulo: "Financeiro", url: "/api/gerenciamento/impostos", raiz: "impostos" },
   { chave: "orgaos-protocolo", nome: "Cartórios e Órgãos", modulo: "Órgãos", url: "/api/gerenciamento/orgaos-protocolo", raiz: "orgaos" },
   { chave: "fornecedores", nome: "Fornecedores", modulo: "Órgãos", url: "/api/gerenciamento/fornecedores", raiz: "fornecedores" },
-  { chave: "departamentos", nome: "Departamentos", modulo: "Usuários", url: "/api/gerenciamento/departamentos", raiz: "departamentos" },
+  // "Departamentos" saiu daqui em 21/08: o cadastro foi retirado da navegação por ser
+  // cadastro sem consumidor, a tabela está vazia e a rota nunca existiu. A entrada
+  // sobreviveu à remoção e oferecia um download que só podia falhar — foi o que a
+  // verificação IMP-001 acusou.
   { chave: "grupos", nome: "Equipes", modulo: "Usuários", url: "/api/gerenciamento/cadastros/grupos", raiz: "registros" },
   { chave: "auditoria", nome: "Trilha de Auditoria", modulo: "Sistema", url: "/api/gerenciamento/auditoria?take=1000", raiz: "logs" },
 ]

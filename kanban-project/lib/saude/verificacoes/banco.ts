@@ -23,6 +23,14 @@ registrar({
   responsavel: 'Infraestrutura',
   ativo: true,
   executar: async (): Promise<ResultadoVerificacao> => {
+    // A CONEXÃO NÃO É A LATÊNCIA DA CONSULTA.
+    //
+    // Sem isto, a primeira verificação de uma rodada media conexão + consulta e
+    // reportava a soma como "banco respondendo em Xms". Numa execução a frio contra o
+    // banco de produção o número estourou o timeout de 10s — e a verificação que
+    // existe para dizer se o banco está bem passou a dizer que ele está mal, por causa
+    // do próprio handshake. Métrica tem de medir o que o nome dela diz.
+    await prisma.$connect()
     const t0 = Date.now()
     await prisma.$queryRawUnsafe('SELECT 1')
     const latencia = Date.now() - t0
