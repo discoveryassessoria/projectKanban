@@ -68,6 +68,46 @@ export interface PassoCongelado {
   requisitos: RequisitoCongelado[]
 }
 
+/**
+ * O CANAL DO PASSO, COM A EXIGÊNCIA JÁ RESOLVIDA — em UM lugar só.
+ *
+ * A EXIGÊNCIA DO PASSO SÓ ACRESCENTA. `null` = não decidiu, vale o catálogo; `true` =
+ * soma. O passo nunca DISPENSA o que o canal exige de origem — se pudesse, um passo
+ * mal configurado deixaria passar solicitação sem protocolo por um canal que só existe
+ * com protocolo, e a exigência do catálogo viraria sugestão.
+ *
+ * Esta função existe porque a mesma conta era feita em dois lugares — aqui, ao
+ * congelar, e no retrato da definição viva, para o diff. Duas contas para o mesmo fato
+ * fazem a prévia mentir exatamente onde elas discordam.
+ */
+export function resolverCanalDoPasso(sc: {
+  ordem: number
+  ativo: boolean
+  exigeProtocolo: boolean | null
+  exigeAnexo: boolean | null
+  exigeRastreio: boolean | null
+  exigeObservacao: boolean | null
+  camposObrigatorios: unknown
+  condicao: unknown
+  canal: {
+    key: string; label: string; descricao: string | null; ativo: boolean
+    protocoloObrigatorio: boolean; anexoObrigatorioLabel: string | null
+    rastreioObrigatorio: boolean; observacaoObrigatoria: boolean
+  }
+}): CanalCongelado {
+  return {
+    key: sc.canal.key, label: sc.canal.label, descricao: sc.canal.descricao,
+    ordem: sc.ordem, ativo: sc.ativo && sc.canal.ativo,
+    exigeProtocolo: sc.exigeProtocolo === true || sc.canal.protocoloObrigatorio,
+    exigeAnexo: sc.exigeAnexo === true || sc.canal.anexoObrigatorioLabel != null,
+    anexoLabel: sc.canal.anexoObrigatorioLabel,
+    exigeRastreio: sc.exigeRastreio === true || sc.canal.rastreioObrigatorio,
+    exigeObservacao: sc.exigeObservacao === true || sc.canal.observacaoObrigatoria,
+    camposObrigatorios: Array.isArray(sc.camposObrigatorios) ? (sc.camposObrigatorios as string[]) : [],
+    condicao: sc.condicao ?? null,
+  }
+}
+
 /// Um canal como ESTE passo o oferecia, com o que ele exigia aqui.
 export interface CanalCongelado {
   key: string
@@ -228,22 +268,7 @@ export async function congelarVersaoVigente(
     })),
     // O CANAL É CONGELADO COM O QUE ELE EXIGIA. Inativar um canal no catálogo não pode
     // mudar o que uma execução antiga oferecia — nem apagar o que ela escolheu.
-    canais: p.canais.map((sc) => ({
-      key: sc.canal.key, label: sc.canal.label, descricao: sc.canal.descricao,
-      ordem: sc.ordem, ativo: sc.ativo && sc.canal.ativo,
-      // A EXIGÊNCIA DO PASSO SÓ ACRESCENTA. `null` = não decidiu, vale o catálogo;
-      // `true` = soma. O passo nunca DISPENSA o que o canal exige de origem — se
-      // pudesse, um passo mal configurado deixaria passar solicitação sem protocolo
-      // por um canal que só existe com protocolo, e a exigência do catálogo viraria
-      // sugestão.
-      exigeProtocolo: sc.exigeProtocolo === true || sc.canal.protocoloObrigatorio,
-      exigeAnexo: sc.exigeAnexo === true || sc.canal.anexoObrigatorioLabel != null,
-      anexoLabel: sc.canal.anexoObrigatorioLabel,
-      exigeRastreio: sc.exigeRastreio === true || sc.canal.rastreioObrigatorio,
-      exigeObservacao: sc.exigeObservacao === true || sc.canal.observacaoObrigatoria,
-      camposObrigatorios: Array.isArray(sc.camposObrigatorios) ? (sc.camposObrigatorios as string[]) : [],
-      condicao: sc.condicao ?? null,
-    })),
+    canais: p.canais.map((sc) => resolverCanalDoPasso(sc)),
     requisitos: p.requisitos.map((r) => ({
       key: r.key, label: r.label, descricao: r.descricao, tipo: r.tipo, alvoKey: r.alvoKey,
       minimo: r.minimo, obrigatorio: r.obrigatorio, condicao: r.condicao ?? null,

@@ -18,7 +18,7 @@
 
 import { prisma } from "@/lib/prisma"
 import type { Prisma } from "@prisma/client"
-import { lerVersaoPublicada, congelarVersaoVigente, publicarNovaVersao, type PassoCongelado } from "@/src/services/versao-publicada"
+import { lerVersaoPublicada, congelarVersaoVigente, publicarNovaVersao, resolverCanalDoPasso, type PassoCongelado } from "@/src/services/versao-publicada"
 import { validarWorkflowParaPublicar, type ProblemaDePublicacao } from "@/src/services/validacao-de-publicacao"
 
 type TX = Prisma.TransactionClient
@@ -86,17 +86,10 @@ async function retratoDaDefinicaoViva(workflowId: number, db: typeof prisma | TX
     checkItens: p.checkItens.map((i) => ({
       key: i.key, label: i.label, descricao: i.descricao, obrigatorio: i.obrigatorio, ordem: i.ordem, ativo: i.ativo,
     })),
-    canais: p.canais.map((sc) => ({
-      key: sc.canal.key, label: sc.canal.label, descricao: sc.canal.descricao, ordem: sc.ordem,
-      ativo: sc.ativo && sc.canal.ativo,
-      exigeProtocolo: sc.exigeProtocolo ?? sc.canal.protocoloObrigatorio,
-      exigeAnexo: sc.exigeAnexo ?? sc.canal.anexoObrigatorioLabel != null,
-      anexoLabel: sc.canal.anexoObrigatorioLabel,
-      exigeRastreio: sc.exigeRastreio ?? sc.canal.rastreioObrigatorio,
-      exigeObservacao: sc.exigeObservacao ?? sc.canal.observacaoObrigatoria,
-      camposObrigatorios: Array.isArray(sc.camposObrigatorios) ? (sc.camposObrigatorios as string[]) : [],
-      condicao: sc.condicao ?? null,
-    })),
+    // A MESMA conta do congelamento — importada, não repetida. O diff compara o
+    // congelado com o vivo; se cada lado resolvesse a exigência à sua maneira, a
+    // prévia acusaria mudança onde não houve, ou calaria onde houve.
+    canais: p.canais.map((sc) => resolverCanalDoPasso(sc)),
     requisitos: p.requisitos.map((r) => ({
       key: r.key, label: r.label, descricao: r.descricao, tipo: r.tipo, alvoKey: r.alvoKey,
       minimo: r.minimo, obrigatorio: r.obrigatorio, condicao: r.condicao ?? null,
@@ -120,10 +113,13 @@ function compararPorChave<T extends { key: string }>(
     }
     const a = mapaAntes.get(d.key)!
     for (const c of campos) {
+      // O ALVO é nomeado pelo rótulo ANTIGO quando é o próprio rótulo que muda: dizer
+      // «"Canal utilizado": nome "Canal usado" → "Canal utilizado"» deixa o
+      // administrador achar a linha na tela que ele ainda vê.
       const va = JSON.stringify(c.ler(a) ?? null)
       const vd = JSON.stringify(c.ler(d) ?? null)
       if (va !== vd) {
-        saida.push({ escopo, tipo: "ALTERADO", passo, alvo: rotulo(d), detalhe: `${c.nome}: ${va} → ${vd}` })
+        saida.push({ escopo, tipo: "ALTERADO", passo, alvo: rotulo(a), detalhe: `${c.nome}: ${va} → ${vd}` })
       }
     }
   }
@@ -172,21 +168,38 @@ export async function preverPublicacao(workflowId: number): Promise<PreviewDePub
     const a = antes.find((x) => x.key === d.key)
     if (!a) continue
     mudancas.push(
+      // TODO CAMPO QUE O CADASTRO DEIXA EDITAR entra na comparação — a começar pelo
+      // RÓTULO, que era justamente o que o diff não via: renomear uma ação aparecia
+      // como nada, porque o rótulo é o que dá nome à linha do diff. O que a tela
+      // permite mudar e o diff não mostra é uma mudança que ninguém revisa.
       ...compararPorChave(a.acoes ?? [], d.acoes ?? [], "AÇÃO", d.label, (x) => x.label,
-        [{ nome: "efeito", ler: (x) => x.effectKey }, { nome: "ordem", ler: (x) => x.ordem },
-         { nome: "ativa", ler: (x) => x.ativo }, { nome: "condição", ler: (x) => x.condicao }]),
+        [{ nome: "nome", ler: (x) => x.label }, { nome: "efeito", ler: (x) => x.effectKey },
+         { nome: "explicação", ler: (x) => x.descricao }, { nome: "ordem", ler: (x) => x.ordem },
+         { nome: "ativa", ler: (x) => x.ativo }, { nome: "condição", ler: (x) => x.condicao },
+         { nome: "campos exigidos", ler: (x) => x.requerCampos }, { nome: "permissão", ler: (x) => x.permissao }]),
       ...compararPorChave(a.campos ?? [], d.campos ?? [], "CAMPO", d.label, (x) => x.label,
-        [{ nome: "tipo", ler: (x) => x.tipo }, { nome: "obrigatório", ler: (x) => x.obrigatorio },
-         { nome: "ordem", ler: (x) => x.ordem }, { nome: "condição", ler: (x) => x.condicao }]),
-      ...compararPorChave(a.checkItens ?? [], d.checkItens ?? [], "CHECKLIST", d.label, (x) => x.label,
-        [{ nome: "obrigatório", ler: (x) => x.obrigatorio }, { nome: "ordem", ler: (x) => x.ordem },
+        [{ nome: "nome", ler: (x) => x.label }, { nome: "tipo", ler: (x) => x.tipo },
+         { nome: "obrigatório", ler: (x) => x.obrigatorio }, { nome: "ordem", ler: (x) => x.ordem },
+         { nome: "condição", ler: (x) => x.condicao }, { nome: "ajuda", ler: (x) => x.ajuda },
          { nome: "ativo", ler: (x) => x.ativo }]),
+      ...compararPorChave(a.checkItens ?? [], d.checkItens ?? [], "CHECKLIST", d.label, (x) => x.label,
+        [{ nome: "nome", ler: (x) => x.label }, { nome: "obrigatório", ler: (x) => x.obrigatorio },
+         { nome: "explicação", ler: (x) => x.descricao }, { nome: "ordem", ler: (x) => x.ordem },
+         { nome: "ativo", ler: (x) => x.ativo }]),
+      // O CANAL COMPARA AS QUATRO EXIGÊNCIAS. Faltavam rastreio e observação — e
+      // "este passo passou a exigir observação neste canal" é exatamente o tipo de
+      // mudança que o operador sente e o administrador precisa ter visto antes.
       ...compararPorChave(a.canais ?? [], d.canais ?? [], "CANAL", d.label, (x) => x.label,
-        [{ nome: "exige protocolo", ler: (x) => x.exigeProtocolo }, { nome: "exige anexo", ler: (x) => x.exigeAnexo },
+        [{ nome: "nome", ler: (x) => x.label },
+         { nome: "exige protocolo", ler: (x) => x.exigeProtocolo }, { nome: "exige anexo", ler: (x) => x.exigeAnexo },
+         { nome: "exige rastreio", ler: (x) => x.exigeRastreio }, { nome: "exige observação", ler: (x) => x.exigeObservacao },
+         { nome: "campos obrigatórios", ler: (x) => x.camposObrigatorios }, { nome: "condição", ler: (x) => x.condicao },
          { nome: "ativo", ler: (x) => x.ativo }, { nome: "ordem", ler: (x) => x.ordem }]),
       ...compararPorChave(a.requisitos ?? [], d.requisitos ?? [], "REQUISITO", d.label, (x) => x.label,
-        [{ nome: "tipo", ler: (x) => x.tipo }, { nome: "alvo", ler: (x) => x.alvoKey },
-         { nome: "obrigatório", ler: (x) => x.obrigatorio }, { nome: "ativo", ler: (x) => x.ativo }]),
+        [{ nome: "nome", ler: (x) => x.label }, { nome: "tipo", ler: (x) => x.tipo },
+         { nome: "alvo", ler: (x) => x.alvoKey }, { nome: "obrigatório", ler: (x) => x.obrigatorio },
+         { nome: "quantidade mínima", ler: (x) => x.minimo }, { nome: "condição", ler: (x) => x.condicao },
+         { nome: "ação", ler: (x) => x.acaoKey }, { nome: "ativo", ler: (x) => x.ativo }]),
     )
     // As opções são comparadas dentro de cada campo — a identidade delas é a `key`.
     for (const campoDepois of d.campos ?? []) {
@@ -196,7 +209,9 @@ export async function preverPublicacao(workflowId: number): Promise<PreviewDePub
         ...compararPorChave(
           campoAntes.opcoesCadastradas ?? [], campoDepois.opcoesCadastradas ?? [],
           "OPÇÃO", `${d.label} › ${campoDepois.label}`, (x) => x.label,
-          [{ nome: "ativa", ler: (x) => x.ativo }, { nome: "ordem", ler: (x) => x.ordem }],
+          [{ nome: "nome", ler: (x) => x.label }, { nome: "explicação", ler: (x) => x.descricao },
+           { nome: "ativa", ler: (x) => x.ativo }, { nome: "ordem", ler: (x) => x.ordem },
+           { nome: "condição", ler: (x) => x.condicao }],
         ),
       )
     }
