@@ -205,5 +205,22 @@ check("o PUT do cadastro grava rascunho, não publica", rotaAdmin.includes("marc
 check("publicar é um ato próprio, com trava de versão", rotaAdmin.includes("versaoEsperada"))
 check("o PUT não congela versão por conta própria", !rotaAdmin.includes("congelarVersaoVigente("))
 
+// 6.6 — IDA E VOLTA DO CANAL. A leitura devolve o canal ANINHADO (o vínculo junto com
+// o catálogo) e a edição manda a CHAVE. Sem normalizar, abrir um passo já configurado
+// mostraria nenhum canal marcado — e salvar apagaria os que estavam lá. O defeito é
+// silencioso: some configuração sem erro nenhum na tela.
+const modalCfg = semComentarios(ler("src/components/gerenciamentoComponents/ConfiguracaoDoPassoModal.tsx"))
+check("o editor normaliza o canal aninhado para a chave ao abrir",
+  /canalKey:\s*c\.canalKey\s*\?\?[\s\S]{0,120}canal\?\.key/.test(modalCfg))
+check("e a rota aceita as duas formas ao gravar",
+  /canalKey:\s*String\(c\?\.canalKey\s*\?\?\s*c\?\.canal\?\.key/.test(rotaAdmin))
+
+// 6.7 — TODA COLEÇÃO DO PASSO ATRAVESSA O SALVAMENTO. Uma coleção que a leitura
+// devolve e o `buildFilhos` não regrava é uma coleção que o primeiro save apaga.
+for (const colecao of ["acoes", "campos", "checkItens", "canais", "requisitos"]) {
+  check(`o salvamento regrava "${colecao}"`, rotaAdmin.includes(`filhos.${colecao}`) || rotaAdmin.includes(`s?.${colecao}`))
+}
+check("e regrava as opções do campo", rotaAdmin.includes("filhos.opcoesPorCampo"))
+
 console.log(`\n${falhas.length === 0 ? "✅ PASSOU" : "❌ FALHOU"}: ${ok} ok, ${falhas.length} falhas`)
 if (falhas.length) { for (const f of falhas) console.log(`  · ${f}`); process.exit(1) }

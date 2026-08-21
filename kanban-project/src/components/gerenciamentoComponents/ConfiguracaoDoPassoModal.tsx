@@ -56,7 +56,10 @@ export interface CampoCfg { key?: string; label: string; tipo: string; obrigator
 export interface OpcaoCfg { key?: string; label: string; descricao?: string | null; ordem?: number; ativo?: boolean }
 /** Canal que ESTE passo oferece. `null` nas exigências = herda o catálogo. */
 export interface CanalCfg {
-  canalKey: string; ordem?: number; ativo?: boolean
+  /** A chave do catálogo. O servidor devolve o canal aninhado; a tela edita pela chave. */
+  canalKey: string
+  canal?: { key: string; label?: string }
+  ordem?: number; ativo?: boolean
   exigeProtocolo?: boolean | null; exigeAnexo?: boolean | null
   exigeRastreio?: boolean | null; exigeObservacao?: boolean | null
 }
@@ -132,7 +135,14 @@ export default function ConfiguracaoDoPassoModal({
     acoes: passo.acoes ?? [],
     campos: passo.campos ?? [],
     checkItens: passo.checkItens ?? [],
-    canais: passo.canais ?? [],
+    // O SERVIDOR DEVOLVE O CANAL ANINHADO (`{ canal: { key } }`, porque a leitura junta
+    // o vínculo com o catálogo); a tela edita pela CHAVE. Sem esta normalização, abrir
+    // um passo já configurado mostraria nenhum canal marcado — e salvar apagaria os
+    // que estavam lá.
+    canais: (passo.canais ?? []).map((c) => ({
+      ...c,
+      canalKey: c.canalKey ?? (c as { canal?: { key?: string } }).canal?.key ?? "",
+    })).filter((c) => c.canalKey),
     requisitos: passo.requisitos ?? [],
   })
   const [salvando, setSalvando] = useState(false)

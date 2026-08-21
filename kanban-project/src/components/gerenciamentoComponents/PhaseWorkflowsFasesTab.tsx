@@ -45,7 +45,10 @@ interface Step {
   acoes?: Array<{ key?: string; label: string; descricao?: string | null; effectKey: string; ordem?: number; requerCampos?: string[]; ativo?: boolean }>
   campos?: Array<{ key?: string; label: string; tipo: string; obrigatorio?: boolean; opcoes?: unknown; ajuda?: string | null; ordem?: number; ativo?: boolean }>
   checkItens?: Array<{ key?: string; label: string; descricao?: string | null; obrigatorio?: boolean; ordem?: number; ativo?: boolean }>
-  canais?: Array<{ canalKey: string; ordem?: number; ativo?: boolean; exigeProtocolo?: boolean | null; exigeAnexo?: boolean | null; exigeRastreio?: boolean | null; exigeObservacao?: boolean | null }>
+  // A LEITURA devolve o canal aninhado (junta o vínculo com o catálogo); a EDIÇÃO
+  // manda a chave. As duas formas convivem aqui porque este tipo descreve as duas
+  // pontas; quem normaliza é o modal, ao abrir.
+  canais?: Array<{ canalKey?: string; canal?: { key: string; label?: string }; ordem?: number; ativo?: boolean; exigeProtocolo?: boolean | null; exigeAnexo?: boolean | null; exigeRastreio?: boolean | null; exigeObservacao?: boolean | null }>
   requisitos?: Array<{ key?: string; label: string; descricao?: string | null; tipo: string; alvoKey?: string | null; minimo?: number; obrigatorio?: boolean; acaoKey?: string | null; ordem?: number; ativo?: boolean }>
   key: string
   label: string

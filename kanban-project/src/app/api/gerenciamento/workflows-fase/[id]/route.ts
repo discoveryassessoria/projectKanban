@@ -94,7 +94,9 @@ function buildFilhos(s: any, stepId: number) {
       })),
     })),
     canais: lista(s?.canais).map((c: any, i: number) => ({
-      canalKey: String(c?.canalKey ?? c?.key ?? ''),
+      // Aceita as duas formas que a tela pode mandar: a chave direta ou o canal
+      // aninhado, que é como a leitura devolve.
+      canalKey: String(c?.canalKey ?? c?.canal?.key ?? c?.key ?? ''),
       ordem: Number(c?.ordem) || i + 1,
       ativo: c?.ativo !== false,
       // `null` = herda o requisito do catálogo; `true`/`false` = o passo decide.

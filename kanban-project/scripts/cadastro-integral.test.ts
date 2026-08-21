@@ -329,6 +329,108 @@ async function main() {
   check("o passo pode acrescentar exigência ao canal", acrescentado?.exigeObservacao === true)
 
   // ══════════════════════════════════════════════════════════════
+  console.log("\n(M) Checklist e ação também são cadastro — num passo criado agora")
+  // ══════════════════════════════════════════════════════════════
+  //
+  // O passo abaixo nasce DEPOIS de tudo já estar rodando, com checklist, ação e
+  // requisito de checklist. Nada do que ele contém existe em código: nem a chave do
+  // passo, nem a das ações, nem a dos itens de conferência. Se o motor o executa, a
+  // resposta para "dá para criar um passo novo sem deploy?" é sim, e é verificável.
+  const passo2 = await prisma.phaseInternalWorkflowStep.create({
+    data: {
+      workflowId: wf.id, key: "conferir_lote_recebido", label: "Conferir lote recebido",
+      ordem: 3, createsTask: true, required: true, cardinalidade: "PROCESSO",
+      executorKey: "padrao", dependeDe: [] as never,
+    },
+    select: { id: true, key: true },
+  })
+  check("o nome do passo NOVO também não existe no código",
+    !fontes.includes("conferir_lote_recebido") && !fontes.includes("lote_conferido"))
+
+  await prisma.stepChecklistItem.createMany({
+    data: [
+      { stepId: passo2.id, key: "paginas_completas", label: "Todas as páginas presentes", obrigatorio: true, ordem: 1 },
+      { stepId: passo2.id, key: "selo_legivel", label: "Selo legível", obrigatorio: true, ordem: 2 },
+      { stepId: passo2.id, key: "observacao_extra", label: "Anotação opcional", obrigatorio: false, ordem: 3 },
+    ],
+  })
+  await prisma.stepAction.createMany({
+    data: [
+      { stepId: passo2.id, key: "lote_conferido", label: "Lote conferido", effectKey: "COMPLETE_STEP", ordem: 1 },
+      { stepId: passo2.id, key: "so_registrar", label: "Só registrar o andamento", effectKey: "REGISTER_ONLY", ordem: 2 },
+    ],
+  })
+  await prisma.stepRequirement.create({
+    data: {
+      stepId: passo2.id, key: "conferencia_completa", label: "Conferência completa",
+      tipo: "CHECKLIST_COMPLETO", alvoKey: null, ordem: 1,
+      // SÓ NA AÇÃO QUE CONCLUI. "Só registrar o andamento" não pode cobrar a
+      // conferência inteira — senão registrar meio caminho seria impossível.
+      acaoKey: "lote_conferido",
+    },
+  })
+  await marcarRascunho(wf.id, null)
+  const pubM = await publicarWorkflow({ workflowId: wf.id, actorId: null })
+  check("o passo novo entra numa versão nova", pubM.ok, JSON.stringify(pubM))
+
+  // A VERSÃO É DA VISITA À FASE, não do passo solto. Uma visita nova registra a versão
+  // publicada agora; a visita anterior continua na dela — e é assim que o passo novo
+  // aparece para quem começa hoje sem aparecer para quem já estava rodando.
+  const inst2 = await prisma.phaseWorkflowInstance.create({
+    data: {
+      processoId: proc.id, faseMacroKey: fase.phaseKey, ciclo: 2, status: "ATIVO",
+      workflowDefinitionId: wf.id, workflowVersion: pubM.versaoNova ?? 2,
+      previousInstanceId: inst.id, chaveIdempotencia: `${M}-i2`,
+    },
+    select: { id: true },
+  })
+  const si2 = await prisma.phaseWorkflowStepInstance.create({
+    data: {
+      workflowInstanceId: inst2.id, processoId: proc.id, faseMacroKey: fase.phaseKey, ciclo: 2,
+      stepKey: passo2.key, ordem: 3, tipo: "HUMANO", obrigatorio: true, geraTarefa: true,
+      status: "EM_ANDAMENTO", dependeDeStepKeys: [] as never,
+      stepDefinitionId: passo2.id, stepDefinitionVersion: 1, chaveIdempotencia: `${M}-p2`,
+    },
+    select: { id: true },
+  })
+  await garantirTentativa(si2.id, { motivo: MOTIVOS_DE_TENTATIVA.ABERTURA, status: "DISPONIVEL" })
+
+  const hist2 = await definicaoHistoricaDoPasso(si2.id)
+  check("a visita nova lê a versão publicada agora", hist2?.versao === (pubM.versaoNova ?? 2), String(hist2?.versao))
+  check("e a visita ANTERIOR continua na v1 — onde o passo novo NÃO existe",
+    (await definicaoHistoricaDoPasso(si.id))?.versao === 1 &&
+    !(await lerVersaoPublicada(wf.id, 1))!.passos.some((p) => p.key === passo2.key) &&
+    (await lerVersaoPublicada(wf.id, pubM.versaoNova ?? 2))!.passos.some((p) => p.key === passo2.key))
+  check("o passo novo resolve o checklist cadastrado", (hist2?.passo.checkItens ?? []).length === 3)
+  check("e as ações cadastradas", (hist2?.passo.acoes ?? []).length === 2)
+
+  const pendChecklist = (valores: Record<string, unknown>, acaoKey: string) => requisitosPendentes({
+    stepInstanceId: si2.id, requisitos: hist2!.passo.requisitos ?? [], campos: hist2!.passo.campos,
+    checklist: hist2!.passo.checkItens, canais: [], valores, acaoKey,
+  })
+  check("concluir sem marcar o checklist é barrado",
+    (await pendChecklist({}, "lote_conferido")).length > 0)
+  check("marcar só um item obrigatório ainda barra",
+    (await pendChecklist({ checklist: { paginas_completas: true } }, "lote_conferido")).length > 0)
+  check("os dois obrigatórios marcados liberam — o opcional não é cobrado",
+    (await pendChecklist({ checklist: { paginas_completas: true, selo_legivel: true } }, "lote_conferido")).length === 0)
+  check("e a ação de só registrar não cobra a conferência inteira",
+    (await pendChecklist({}, "so_registrar")).length === 0,
+    "requisito com acaoKey vale para AQUELA ação, não para todas")
+
+  const semChecklist = await executarAcaoCadastrada(si2.id, "lote_conferido", {},
+    { usuarioId: 1, permissoes: PERMS, correlationId: `${M}-m1` })
+  check("a porta recusa a conclusão com checklist pendente",
+    !semChecklist.ok && semChecklist.codigo === "REQUISITO_PENDENTE", JSON.stringify(semChecklist))
+  const comChecklist = await executarAcaoCadastrada(si2.id, "lote_conferido",
+    { checklist: { paginas_completas: true, selo_legivel: true } },
+    { usuarioId: 1, permissoes: PERMS, correlationId: `${M}-m2` })
+  check("com o checklist conferido, o passo NOVO conclui — sem uma linha de código para ele",
+    comChecklist.ok, JSON.stringify(comChecklist))
+  check("e ficou concluído de verdade",
+    (await prisma.phaseWorkflowStepInstance.findUnique({ where: { id: si2.id }, select: { status: true } }))?.status === "CONCLUIDO")
+
+  // ══════════════════════════════════════════════════════════════
   console.log("\n(J) Reordenar não duplica nem remateria o que já roda")
   // ══════════════════════════════════════════════════════════════
   const antes = await prisma.phaseWorkflowStepInstance.count({ where: { workflowInstanceId: inst.id } })
