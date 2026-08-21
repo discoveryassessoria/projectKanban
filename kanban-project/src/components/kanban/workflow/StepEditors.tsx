@@ -17,6 +17,7 @@
 import * as React from "react"
 import { useState, useEffect, useCallback, useMemo, useRef } from "react"
 import PainelDeclarativoDaEtapa from "./PainelDeclarativoDaEtapa"
+import { useConfiguracaoDaEtapa } from "./useConfiguracaoDaEtapa"
 import { useApi } from "@/src/lib/dados"
 import { createPortal } from "react-dom"
 import {
@@ -541,7 +542,44 @@ interface CanalConfig {
   }
 }
 
-const CANAIS: CanalConfig[] = CANAIS_SOLICITACAO.map((c) => ({
+/**
+ * OS CANAIS VÊM DO CADASTRO — esta lista é o desenho, não o conteúdo.
+ *
+ * `canaisDoCadastro` converte o que o servidor devolveu (campo `canal` do passo, cujas
+ * opções o servidor resolve do catálogo `CanalOperacional`) no formato que esta tela
+ * já sabe desenhar. Ícone e dica de observação continuam locais: são apresentação, e
+ * apresentação não é cadastro.
+ *
+ * `CANAIS_SEMENTE` existe só para o caso de a etapa não ter o campo `canal`
+ * cadastrado — dado anterior à configuração. Ela desenha exatamente os mesmos oito
+ * canais que o cadastro contém, o que a torna indistinguível na tela e é justamente
+ * o que `scripts/cadastro-canonico.test.ts` prova.
+ */
+function canaisDoCadastro(opcoes: Array<{ value: string; label: string; meta?: Record<string, unknown> }>): CanalConfig[] {
+  return opcoes.map((o) => {
+    const m = (o.meta ?? {}) as {
+      descricao?: string | null; protocoloObrigatorio?: boolean
+      anexoObrigatorioLabel?: string | null; rastreioObrigatorio?: boolean; observacaoObrigatoria?: boolean
+    }
+    return {
+      canal: o.value as CanalSolicitacaoDocumento,
+      id: o.value.toLowerCase(),
+      label: o.label,
+      desc: m.descricao ?? "",
+      icon: ICONE_DO_CANAL[o.value as CanalSolicitacaoDocumento] ?? "•",
+      requires: {
+        attachment: (m.anexoObrigatorioLabel ?? null) !== null,
+        attachmentLabel: m.anexoObrigatorioLabel ?? "Comprovante do envio",
+        protocol: !!m.protocoloObrigatorio,
+        trackingCode: !!m.rastreioObrigatorio,
+        observation: !!m.observacaoObrigatoria,
+        observationHint: DICA_OBSERVACAO[o.value as CanalSolicitacaoDocumento],
+      },
+    }
+  })
+}
+
+const CANAIS_SEMENTE: CanalConfig[] = CANAIS_SOLICITACAO.map((c) => ({
   canal: c.canal,
   id: c.canal.toLowerCase(),
   label: c.label,
@@ -752,7 +790,11 @@ function FormSolicitarCertidao({
 
   const readOnly = stepStatus === "concluida"
 
-  const canalConfig = form.canal ? CANAIS.find((c) => c.id === form.canal)! : null
+  // A LISTA DE CANAIS DESTA ETAPA, pela configuração da versão que ela registrou.
+  const { cfg: cfgEtapa, opcoesDe: opcoesDaEtapa, executarAcao: executarAcaoDaEtapa } = useConfiguracaoDaEtapa(stepId)
+  const opcoesCanal = opcoesDaEtapa("canal")
+  const CANAIS = opcoesCanal.length > 0 ? canaisDoCadastro(opcoesCanal) : CANAIS_SEMENTE
+  const canalConfig = form.canal ? CANAIS.find((c) => c.id === form.canal) ?? null : null
   const recomendacao = doc ? getRecomendacao(doc) : null
 
   // EXIGÊNCIA DE EVIDÊNCIA — QUAL documento mestre esta etapa pede. Vem do
@@ -1996,7 +2038,18 @@ function SummaryField({
 
 type DocumentMedium = "fisico" | "digital" | "ambos"
 
-const MEDIUM_OPTIONS: {
+/**
+ * COMO O DOCUMENTO CHEGOU — as opções vêm do campo `midia` cadastrado no passo.
+ * O que fica aqui é o ícone e a explicação de tela; o VOCABULÁRIO é do cadastro.
+ */
+const ICONE_MIDIA: Record<string, string> = { fisico: "📄", digital: "💻", ambos: "📄💻" }
+const DESC_MIDIA: Record<string, string> = {
+  fisico: "Recebido por correio ou balcão · precisa ser guardado e digitalizado",
+  digital: "Certidão eletrônica com assinatura digital · não há papel",
+  ambos: "Recebido em papel + também há versão eletrônica",
+}
+
+const MEDIUM_SEMENTE: {
   value: DocumentMedium
   icon: string
   label: string
@@ -2054,6 +2107,18 @@ function FormReceberCertidao({
   const [arquivoNome, setArquivoNome] = useState(() => texto(doc?.arquivo_nome))
   const [arquivoTamanho, setArquivoTamanho] = useState<number | null>(() => numeroOuNulo(doc?.arquivo_tamanho))
   const [arquivoMime, setArquivoMime] = useState<string | null>(() => textoOuNulo(doc?.arquivo_mime_type))
+  // AS OPÇÕES VÊM DO CADASTRO. Acrescentar uma forma de recebimento passa a ser
+  // configuração — a tela desenha o que o campo `midia` da versão declara.
+  const { opcoesDe: opcoesDaEtapa } = useConfiguracaoDaEtapa(stepId)
+  const opcoesMidia = opcoesDaEtapa("midia")
+  const MEDIUM_OPTIONS = opcoesMidia.length > 0
+    ? opcoesMidia.map((o) => ({
+        value: o.value as DocumentMedium,
+        icon: ICONE_MIDIA[o.value] ?? "•",
+        label: o.label,
+        desc: DESC_MIDIA[o.value] ?? "",
+      }))
+    : MEDIUM_SEMENTE
   const [medium, setMedium] = useState<DocumentMedium | null>(
     () => (etapa?.documentMedium as DocumentMedium) || null,
   )
@@ -2331,7 +2396,32 @@ interface ReviewChecklist {
   traducao_ok: boolean
 }
 
-const CHECKLIST_ITEMS: Array<{
+/**
+ * O CHECKLIST VEM DO CADASTRO. Esta lista é a SEMENTE — os mesmos cinco itens que
+ * `StepChecklistItem` contém, para a etapa que ainda não os tem cadastrados. O
+ * administrador acrescenta "Certificado digital conferido" sem deploy, e ele aparece
+ * aqui na versão publicada depois.
+ */
+const CORES_POR_EFEITO: Record<string, "emerald" | "blue" | "amber" | "red"> = {
+  COMPLETE_DOCUMENT: "emerald",
+  APPROVE_FOR_ANALYSIS: "emerald",
+  COMPLETE_STEP: "emerald",
+  REGISTER_DIVERGENCE: "blue",
+  REQUEST_NEW_COPY: "amber",
+  GO_RETIFICATION: "red",
+  INVALIDATE_DOCUMENT: "red",
+}
+const ICONE_POR_EFEITO: Record<string, React.ReactNode> = {
+  COMPLETE_DOCUMENT: <Check className="w-4 h-4" />,
+  APPROVE_FOR_ANALYSIS: <Check className="w-4 h-4" />,
+  COMPLETE_STEP: <Check className="w-4 h-4" />,
+  REGISTER_DIVERGENCE: <AlertCircle className="w-4 h-4" />,
+  REQUEST_NEW_COPY: <Send className="w-4 h-4" />,
+  GO_RETIFICATION: <XCircle className="w-4 h-4" />,
+  INVALIDATE_DOCUMENT: <XCircle className="w-4 h-4" />,
+}
+
+const CHECKLIST_SEMENTE: Array<{
   id: keyof ReviewChecklist
   label: string
   desc: string
@@ -2440,6 +2530,14 @@ function FormConferirCertidao({
 
   // Checklist + resultado. O padrão só vale quando a etapa ainda não tem checklist
   // gravado — era o `if (step.reviewChecklist)` do carregador.
+  const { cfg: cfgConferencia, opcoesDe: _opcoesConf, executarAcao: executarAcaoConferencia } = useConfiguracaoDaEtapa(stepId)
+  const CHECKLIST_ITEMS = (cfgConferencia?.checklist?.length ?? 0) > 0
+    ? cfgConferencia!.checklist.map((i) => ({ id: i.key as keyof ReviewChecklist, label: i.label, desc: i.descricao ?? "" }))
+    : CHECKLIST_SEMENTE
+  // OS RESULTADOS TAMBÉM. Se o cadastro declarou ações para esta etapa, são elas que
+  // o operador vê — e é pela porta canônica que a escolha é executada.
+  const acoesConferencia = cfgConferencia?.acoes ?? []
+  const usandoCadastroConferencia = acoesConferencia.length > 0
   const [checklist, setChecklist] = useState<ReviewChecklist>(() => {
     const gravado = etapa?.reviewChecklist as Record<string, unknown> | undefined
     if (!gravado) {
@@ -2484,11 +2582,18 @@ function FormConferirCertidao({
     setSaving(true)
     setErroServidor(null)
     try {
-      // 1. Persiste dados literais no documento + status
+      // OS DADOS LITERAIS SÃO DA CONFERÊNCIA; O QUE ACONTECE COM O DOCUMENTO, NÃO.
+      //
+      // Aqui a tela decidia o status: "divergente" virava RETIFICANDO — a Emissão
+      // classificando juridicamente um registro. Quando a etapa tem ações cadastradas,
+      // esse mapa não é usado: o efeito da ação escolhida é que decide, e a competência
+      // da fase é cobrada no servidor.
       let docStatus: string | null = null
-      if (resultado === "aprovado") docStatus = "RECEBIDO"
-      else if (resultado === "divergente") docStatus = "RETIFICANDO"
-      else if (resultado === "nova_via") docStatus = "SOLICITAR"
+      if (!usandoCadastroConferencia) {
+        if (resultado === "aprovado") docStatus = "RECEBIDO"
+        else if (resultado === "divergente") docStatus = "RETIFICANDO"
+        else if (resultado === "nova_via") docStatus = "SOLICITAR"
+      }
 
       const okDoc = await putDocumento(documentoId, {
         nome_registrado: nomeRegistrado.trim() || null,
@@ -2501,7 +2606,19 @@ function FormConferirCertidao({
       })
       if (!okDoc) throw new Error("PUT doc falhou")
 
-      // 2. Persiste checklist + resultado no step + conclui
+      // O RESULTADO VAI PELA PORTA CANÔNICA quando ele é cadastrado.
+      if (usandoCadastroConferencia) {
+        const r = await executarAcaoConferencia(resultado, {
+          checklist,
+          observacao: observacao.trim() || null,
+          motivo: observacao.trim() || null,
+        })
+        if (!r.ok) { setErroServidor(r.mensagem ?? "A conferência não pôde ser registrada."); return }
+        onSaved?.()
+        return
+      }
+
+      // ETAPA SEM CONFIGURAÇÃO CADASTRADA — caminho antigo, e só ele.
       const r = await patchStepComErro(documentoId, stepId, {
         status: "concluida",
         completedById: getUserId(),
@@ -2775,34 +2892,48 @@ function FormConferirCertidao({
               3. Resultado da conferência
             </div>
             <div className="text-[11px] text-white/55 leading-snug mb-2">
-              Se aprovado, o documento segue para validação jurídica final. Se divergente
-              ou nova via, o fluxo é redirecionado conforme a decisão.
+              {usandoCadastroConferencia
+                ? "Os resultados abaixo são os cadastrados para esta etapa nesta versão do workflow."
+                : "Se aprovado, o documento segue para validação jurídica final."}
             </div>
+            {/* OS BOTÕES SÃO OS RESULTADOS CADASTRADOS.
+                Eram três, fixos, e um deles — "Divergente · vai para Retificação" —
+                fazia a conferência da Emissão classificar juridicamente o registro.
+                A semente (abaixo, quando não há cadastro) mantém só o que é
+                operacional; a decisão jurídica mora na Análise. */}
             <div className="grid grid-cols-3 gap-2">
-              <ResultadoBtn
-                ativo={resultado === "aprovado"}
-                onClick={() => !readOnly && setResultado("aprovado")}
-                cor="emerald"
-                icon={<Check className="w-4 h-4" />}
-                label="Aprovar"
-                desc="libera para Validar"
-              />
-              <ResultadoBtn
-                ativo={resultado === "divergente"}
-                onClick={() => !readOnly && setResultado("divergente")}
-                cor="amber"
-                icon={<AlertTriangle className="w-4 h-4" />}
-                label="Divergente"
-                desc="vai para Retificação"
-              />
-              <ResultadoBtn
-                ativo={resultado === "nova_via"}
-                onClick={() => !readOnly && setResultado("nova_via")}
-                cor="red"
-                icon={<XCircle className="w-4 h-4" />}
-                label="Nova via"
-                desc="pede novo ao cartório"
-              />
+              {usandoCadastroConferencia
+                ? acoesConferencia.map((a) => (
+                    <ResultadoBtn
+                      key={a.key}
+                      ativo={resultado === (a.key as ConferirResultado)}
+                      onClick={() => !readOnly && setResultado(a.key as ConferirResultado)}
+                      cor={CORES_POR_EFEITO[a.effectKey] === "red" ? "red" : CORES_POR_EFEITO[a.effectKey] === "amber" ? "amber" : "emerald"}
+                      icon={ICONE_POR_EFEITO[a.effectKey] ?? <Check className="w-4 h-4" />}
+                      label={a.label}
+                      desc={a.descricao ?? a.efeito?.descricao ?? ""}
+                    />
+                  ))
+                : (
+                  <>
+                    <ResultadoBtn
+                      ativo={resultado === "aprovado"}
+                      onClick={() => !readOnly && setResultado("aprovado")}
+                      cor="emerald"
+                      icon={<Check className="w-4 h-4" />}
+                      label="Aprovar"
+                      desc="libera para Validar"
+                    />
+                    <ResultadoBtn
+                      ativo={resultado === "nova_via"}
+                      onClick={() => !readOnly && setResultado("nova_via")}
+                      cor="amber"
+                      icon={<XCircle className="w-4 h-4" />}
+                      label="Nova via"
+                      desc="pede novo ao cartório"
+                    />
+                  </>
+                )}
             </div>
           </div>
 
@@ -2883,7 +3014,18 @@ function ResultadoBtn({
 
 type ValidarDecisao = "aprovado" | "aprovado_ressalvas" | "nova_via" | "rejeitado"
 
-const DECISAO_OPTIONS: {
+/**
+ * OS RESULTADOS DA VALIDAÇÃO VÊM DO CADASTRO.
+ *
+ * Esta lista era a fonte: quatro opções fixas, entre elas "Rejeitado · retificação",
+ * que mandava o processo para a Retificação a partir da EMISSÃO — decisão da Análise,
+ * tomada na fase anterior, por um array de componente. Hoje ela é SEMENTE: só desenha
+ * quando a etapa não tem ações cadastradas na versão dela.
+ *
+ * O que a etapa oferece de fato vem de `StepAction`, e o que cada resultado FAZ é um
+ * efeito do catálogo, cobrado contra a competência da fase pelo servidor.
+ */
+const DECISAO_SEMENTE: {
   value: ValidarDecisao
   icon: React.ReactNode
   label: string
@@ -2987,6 +3129,18 @@ function FormValidarCertidao({
   // Decisão: o que já está gravado na etapa; se não há nada gravado, a SUGESTÃO derivada
   // da conferência. Antes isso eram dois efeitos em sequência — carregar e depois
   // pré-selecionar — e a tela mostrava "nenhuma decisão" no meio do caminho.
+  // O QUE ESTA ETAPA PODE DECIDIR, pela versão que ela registrou.
+  const { cfg: cfgValidacao, executarAcao: executarAcaoValidacao } = useConfiguracaoDaEtapa(stepId)
+  const DECISAO_OPTIONS = (cfgValidacao?.acoes?.length ?? 0) > 0
+    ? cfgValidacao!.acoes.map((a) => ({
+        value: a.key as ValidarDecisao,
+        icon: ICONE_POR_EFEITO[a.effectKey] ?? <Check className="w-4 h-4" />,
+        label: a.label,
+        desc: a.descricao ?? a.efeito?.descricao ?? "",
+        cor: CORES_POR_EFEITO[a.effectKey] ?? "blue",
+      }))
+    : DECISAO_SEMENTE
+  const usandoCadastro = (cfgValidacao?.acoes?.length ?? 0) > 0
   const [decisao, setDecisao] = useState<ValidarDecisao | null>(() => {
     const gravada = (etapa?.validationResult as ValidarDecisao) || null
     if (gravada) return gravada
@@ -3023,7 +3177,31 @@ function FormValidarCertidao({
     setSaving(true)
     setErroServidor(null)
     try {
-      // 1. Atualiza status do documento conforme a decisão
+      // A TELA NÃO DECIDE MAIS O QUE ACONTECE.
+      //
+      // Aqui havia o mapa `decisao → status do documento` e um PUT direto: "aprovado"
+      // virava RECEBIDO, "rejeitado" virava INVALIDO, e o roteamento para a
+      // Retificação saía daqui. Três decisões de domínio dentro de um componente.
+      //
+      // Agora a tela diz QUAL resultado o operador escolheu e o que foi preenchido. O
+      // que isso faz — status do documento, nova via, ativar a Retificação, concluir a
+      // etapa — é do efeito cadastrado, executado pelo motor. E a recusa dele volta
+      // como texto: "esta fase não tem competência para isso" é informação, não erro.
+      if (usandoCadastro) {
+        const r = await executarAcaoValidacao(decisao, {
+          parecer: parecer.trim() || null,
+          justificativa: parecer.trim() || null,
+          motivo: parecer.trim() || null,
+          descricao: parecer.trim() || null,
+        })
+        if (!r.ok) { setErroServidor(r.mensagem ?? "A decisão não pôde ser registrada."); return }
+        onSaved?.()
+        return
+      }
+
+      // ETAPA SEM CONFIGURAÇÃO CADASTRADA — anterior ao versionamento da configuração.
+      // Segue pelo caminho antigo, e é a única coisa que ainda o usa. A verificação
+      // CAD-005 acusa workflow cuja versão vigente não carrega configuração.
       let docStatus: string | null = null
       if (decisao === "aprovado" || decisao === "aprovado_ressalvas") docStatus = "RECEBIDO"
       else if (decisao === "nova_via") docStatus = "SOLICITAR"
@@ -3033,7 +3211,6 @@ function FormValidarCertidao({
         await putDocumento(documentoId, { status: docStatus })
       }
 
-      // 2. Persiste decisão + parecer no step + conclui
       const r = await patchStepComErro(documentoId, stepId, {
         status: "concluida",
         completedById: getUserId(),

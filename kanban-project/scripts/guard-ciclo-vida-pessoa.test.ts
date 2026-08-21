@@ -111,6 +111,21 @@ const ALVOS: Alvo[] = [
  * regra "tudo em scripts/ pode".
  */
 const AUTORIZADOS_FORA_DO_RUNTIME: Record<string, string> = {
+  "scripts/e2e-master.test.ts":
+    "E2E master: monta e derruba a PRÓPRIA árvore, pessoa e documentos (marca E2E) " +
+    "só no banco de teste — o fluxo inteiro precisa de um palco inteiro",
+  "scripts/reconciliadores-idempotentes.test.ts":
+    "idempotência dos reconciliadores: monta e derruba o PRÓPRIO cenário (marca RECON) " +
+    "só no banco de teste, e compara o banco antes e depois de cada passagem",
+  "scripts/projecoes-concordam.test.ts":
+    "concordância das projeções: monta e derruba a PRÓPRIA pessoa e tarefa (marca PROJ) " +
+    "só no banco de teste",
+  "scripts/concorrencia-adversarial.test.ts":
+    "matriz de concorrência: monta e derruba um palco por cenário (marca CONC) " +
+    "só no banco de teste",
+  "scripts/performance-escala.test.ts":
+    "performance em escala: cria e apaga até 50.000 tarefas e 500 documentos próprios " +
+    "(marca PERF) só no banco de teste",
   "scripts/cadastro-canonico.test.ts":
     "cadastro canônico de execução: monta e derruba a PRÓPRIA árvore e pessoa (marca CC) " +
     "só no banco de teste, para provar que nova via preserva o documento anterior",

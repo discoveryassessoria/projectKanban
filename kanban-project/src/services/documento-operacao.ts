@@ -26,6 +26,8 @@ import {
   lerAndamento, aplicarAndamento, gravarAndamento, previsaoEfetiva,
   type EntradaAndamento,
 } from "@/src/lib/process-stage/andamento-etapa"
+import { lerOperacao, gravarOperacao } from "@/src/services/operacao-da-etapa"
+import { garantirTentativa, MOTIVOS_DE_TENTATIVA } from "@/src/services/execucao-do-passo"
 import { mapLegacyStepStatus, stepInstanceStatusToLegacy } from "@/src/lib/process-stage/legacy-status-map"
 import { montarChavePasso } from "@/src/services/phase-workflow-helpers"
 import { evoluirNecessidadePorPasso, reabrirAtendimentoNecessidade } from "@/src/services/necessidade-documental"
@@ -171,14 +173,20 @@ export async function passosOperacaoV2(documentoId: number): Promise<PassoOperac
       lockVersion: true,
     },
   })
-  return rows.map((r) => {
-    const meta = (r.metadata ?? null) as { operacao?: Record<string, unknown> } | null
+  // A OPERAÇÃO VEM DA TENTATIVA VIGENTE, não do blob da linha do passo.
+  //
+  // A linha do passo é a OBRIGAÇÃO — uma só. O que foi preenchido pertence à VEZ em
+  // que se preencheu, e reexecutar não pode sobrescrever o que a execução anterior
+  // registrou. `lerOperacao` ainda cai no blob antigo quando a tentativa não carrega
+  // nada, que é o dado anterior ao backfill; a saúde (OPE-001) acusa divergência.
+  return Promise.all(rows.map(async (r) => {
+    const { payload } = await lerOperacao(r.id)
     return {
       id: r.id, stepKey: r.stepKey, status: r.status, faseMacroKey: r.faseMacroKey, ordem: r.ordem,
       responsavelId: r.responsavelId, prazo: r.prazo, startedAt: r.startedAt, completedAt: r.completedAt,
-      motivo: r.motivo, lockVersion: r.lockVersion, operacao: meta?.operacao ?? null,
+      motivo: r.motivo, lockVersion: r.lockVersion, operacao: payload,
     }
-  })
+  }))
 }
 
 /** Documento já tem operação por-documento NA VISITA ATUAL no V2? (discrimina V2 ×
@@ -361,7 +369,10 @@ export async function iniciarOperacaoDocumentoV2(
       const s = catSteps[i]
       const isActive = i === 0
       const chave = montarChavePasso({ workflowInstanceId: inst.id, stepDefinitionId: defId, stepKey: s.stepKey, stepDefinitionVersion: 1, ciclo: inst.ciclo, documentoId })
-      const meta = isActive && opts.observacaoInicial ? ({ operacao: { notes: opts.observacaoInicial } } as Prisma.InputJsonValue) : undefined
+      // A OBSERVAÇÃO INICIAL É DA PRIMEIRA EXECUÇÃO, e vai para a tentativa dela
+      // (logo abaixo, depois de o passo existir). Gravá-la na linha do passo faria a
+      // anotação da primeira vez sobreviver a uma reexecução como se fosse da segunda.
+      const notaInicial = isActive && opts.observacaoInicial ? String(opts.observacaoInicial) : null
       await tx.phaseWorkflowStepInstance.upsert({
         where: { chaveIdempotencia: chave },
         create: {
@@ -370,10 +381,16 @@ export async function iniciarOperacaoDocumentoV2(
           processoId: processo.id, faseMacroKey, ordem: s.ordem, status: isActive ? "EM_ANDAMENTO" : "BLOQUEADO",
           ciclo: inst.ciclo, chaveIdempotencia: chave, documentoId,
           responsavelId: isActive ? opts.responsavelId ?? null : null, prazo: isActive ? firstDue : null,
-          startedAt: isActive ? now : null, ...(meta ? { metadata: meta } : {}),
+          startedAt: isActive ? now : null,
         },
         update: {},
       })
+      // A PRIMEIRA TENTATIVA NASCE COM O PASSO, e é nela que a observação inicial fica.
+      const criado = await tx.phaseWorkflowStepInstance.findUnique({ where: { chaveIdempotencia: chave }, select: { id: true, status: true } })
+      if (criado) {
+        await garantirTentativa(criado.id, { motivo: MOTIVOS_DE_TENTATIVA.ABERTURA, status: criado.status, startedAt: isActive ? now : null }, tx)
+        if (notaInicial) await gravarOperacao(criado.id, { notes: notaInicial }, tx)
+      }
     }
     await tx.documento.update({
       where: { id: documentoId },
@@ -605,8 +622,10 @@ export async function aplicarTransicaoDoPassoTx(
   const liberarProximo = novo === "CONCLUIDO" && !eraConcluida
   const vaiReabrir = eraConcluida && novo !== "CONCLUIDO"
 
-  // metadata.operacao: preserva o existente e sobrepõe os campos de domínio do patch
-  const metaExist = ((p.metadata ?? {}) as { operacao?: Record<string, unknown> }).operacao ?? {}
+  // A BASE DO PATCH É O QUE A EXECUÇÃO ATUAL JÁ TEM — preencher um campo não pode
+  // apagar os que já estavam preenchidos. `lerOperacao` responde pela tentativa
+  // vigente e, só para dado anterior ao backfill, pelo blob antigo.
+  const { payload: metaExist } = await lerOperacao(p.id)
   const opPatch: Record<string, unknown> = { ...metaExist }
   for (const k of CAMPOS_OPERACAO) if (patch[k] !== undefined) opPatch[k] = patch[k]
   // AUTORIA DA CONCLUSÃO vem do token, nunca do corpo da requisição. O cliente
@@ -629,8 +648,12 @@ export async function aplicarTransicaoDoPassoTx(
   // OS CAMPOS DOCUMENTAIS — o que é DESTE domínio e não da máquina de estados:
   // o diário da operação, quem responde, o prazo combinado e o motivo do bloqueio.
   // Eles viajam JUNTO com a transição, na mesma escrita, via `extra`.
+  // O BLOB DEIXOU DE SER ESCRITO. Quem guarda o que foi preenchido é a TENTATIVA
+  // (`gravarOperacao`, logo abaixo da transição). Continuar escrevendo os dois seria
+  // manter duas fontes para o mesmo fato — e a que sobrevive à reexecução é a
+  // tentativa. O que fica na linha do passo é só o que descreve a OBRIGAÇÃO
+  // corrente: responsável, prazo e motivo do bloqueio.
   const camposDocumentais: Record<string, unknown> = {
-    metadata: { operacao: opPatch } as Prisma.InputJsonValue,
     ...(patch.assigneeId !== undefined ? { responsavelId: (patch.assigneeId as number | null) } : {}),
     ...(patch.dueAt !== undefined ? { prazo: patch.dueAt ? new Date(patch.dueAt as string) : null } : {}),
     ...(patch.motivoBloqueio !== undefined ? { motivo: patch.motivoBloqueio as string | null } : {}),
@@ -667,6 +690,14 @@ export async function aplicarTransicaoDoPassoTx(
       })
       if (!r.changed && r.code) throw new TransicaoDePassoRecusada(r.code, p.status, novo)
     }
+
+    // A OPERAÇÃO É DA TENTATIVA — e entra na MESMA transação da transição.
+    //
+    // Depois de a transição acontecer, a tentativa vigente já é a certa: numa
+    // reabertura ela é a NOVA, e é nela que o preenchimento desta vez fica. O que a
+    // execução anterior registrou permanece na tentativa anterior, intacto — que é
+    // exatamente o que o blob na linha do passo não conseguia fazer.
+    await gravarOperacao(p.id, opPatch, tx)
 
     // A TAREFA É PROJEÇÃO DO PASSO. Esta transação escrevia só o passo e deixava a
     // tarefa como estava: em produção o passo "Localizar registro da certidão" ficou
@@ -886,7 +917,10 @@ export async function registrarAndamentoPassoV2(
   }
 
   const now = new Date()
-  const operacaoAtual = ((p.metadata ?? {}) as { operacao?: Record<string, unknown> }).operacao ?? {}
+  // O ANDAMENTO É DA EXECUÇÃO ATUAL. Contatos e campos de acompanhamento pertencem à
+  // vez em que o trabalho foi feito: reexecutar abre uma folha nova, e o que se
+  // registrou na anterior continua sendo o registro dela.
+  const { payload: operacaoAtual } = await lerOperacao(p.id)
   const r = aplicarAndamento(lerAndamento(operacaoAtual), entrada, { autorId: ctx.usuarioId, agora: now })
   if (r.erros.length > 0) return { ok: false, error: `VALIDATION_ERROR:${r.erros.join(",")}`, status: 422 }
 
@@ -902,14 +936,15 @@ export async function registrarAndamentoPassoV2(
     await prisma.$transaction(async (tx) => {
       // TRAVA OTIMISTA: o update só casa se lockVersion ainda for o que lemos. Duas
       // gravações concorrentes ⇒ a segunda não encontra linha e vira CONCURRENT_UPDATE.
+      // O LOCK CONTINUA NA LINHA DO PASSO — ela é a obrigação, e é sobre ela que duas
+      // pessoas disputam. O CONTEÚDO vai para a tentativa; a versão que arbitra a
+      // disputa continua sendo uma só.
       const escrita = await tx.phaseWorkflowStepInstance.updateMany({
         where: { id: p.id, lockVersion: p.lockVersion },
-        data: {
-          metadata: { operacao: novaOperacao } as Prisma.InputJsonValue,
-          lockVersion: { increment: 1 },
-        },
+        data: { lockVersion: { increment: 1 } },
       })
       if (escrita.count !== 1) throw new ConflitoDeConcorrencia()
+      await gravarOperacao(p.id, novaOperacao, tx)
 
       await tx.documento.update({ where: { id: documentoId }, data: { ultimaMovimentacao: now } })
 

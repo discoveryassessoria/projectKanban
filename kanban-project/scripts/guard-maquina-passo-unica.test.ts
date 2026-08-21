@@ -334,8 +334,17 @@ secao("5) Fora da camada de tarefa: a dívida é NOMEADA e CONTADA")
  */
 const DIVIDA_CONHECIDA: Record<string, { teto: number; motivo: string }> = {
   "src/services/task-step-sync.ts": {
-    teto: 2,
-    motivo: "é o DONO da máquina de estados (aplicarPasso + reabrirPassoTx)",
+    // Três sites, todos DENTRO da máquina — que é o ponto: o guard existe para
+    // impedir uma terceira família FORA daqui, não para congelar o dono.
+    //   1. `aplicarPasso`      — a transição normal, com precedência e CAS
+    //   2. `reabrirPassoTx`    — a descida de retrabalho do passo reaberto
+    //   3. a CASCATA da reabertura — a descida do descendente JÁ CONCLUÍDO. Ela não
+    //      pode passar por `aplicarPasso` porque a precedência recusa
+    //      CONCLUIDO → BLOQUEADO, e recusa com razão: essa descida só é legítima
+    //      quando alguém reabre. Aqui é o mesmo ato, propagado — a tentativa é
+    //      arquivada antes, exatamente como na reabertura direta.
+    teto: 3,
+    motivo: "é o DONO da máquina de estados (aplicarPasso + reabrirPassoTx + cascata da reabertura)",
   },
   "src/services/genealogia/materializar-genealogia.ts": {
     teto: 1,

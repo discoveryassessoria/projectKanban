@@ -106,15 +106,18 @@ export async function novaViaDocumental(a: AlvoDoEfeito) {
   const origem = await prisma.documento.findUnique({ where: { id: a.documentoId } })
   if (!origem) return { criado: null, motivo: "Documento de origem não encontrado." }
 
-  const marca = `[nova-via:${a.sync.correlationId}]`
-  const jaFeito = await prisma.documento.findFirst({
-    where: { derivadoDeId: origem.id, observacoes: { contains: marca } },
-    select: { id: true },
-  })
+  // A IDENTIDADE DO ATO, não uma marca no texto. Duas requisições do mesmo comando
+  // carregam a mesma chave; o índice único recusa a segunda, e ela devolve a via que
+  // a primeira criou. Procurar antes de criar continua existindo — mas como atalho
+  // para o caso comum, não como a garantia.
+  const chaveDerivacao = `novavia|doc${origem.id}|${a.sync.correlationId}`.slice(0, 200)
+  const jaFeito = await prisma.documento.findUnique({ where: { chaveDerivacao }, select: { id: true } })
   if (jaFeito) return { criado: jaFeito.id, jaExistia: true, origemId: origem.id, necessidadeId: origem.necessidadeId }
 
   const motivo = texto(a.valores.motivo) ?? "não informado"
-  const novo = await prisma.$transaction(async (tx) => {
+  let novo: { id: number }
+  try {
+    novo = await prisma.$transaction(async (tx) => {
     const criado = await tx.documento.create({
       data: {
         pessoaId: origem.pessoaId,
@@ -131,7 +134,8 @@ export async function novaViaDocumental(a: AlvoDoEfeito) {
         status: "SOLICITAR",
         derivadoDeId: origem.id,
         derivacaoTipo: "NOVA_VIA",
-        observacoes: `Nova via de ${origem.publicCode ?? `documento #${origem.id}`}. Motivo: ${motivo}. ${marca}`,
+        observacoes: `Nova via de ${origem.publicCode ?? `documento #${origem.id}`}. Motivo: ${motivo}.`,
+        chaveDerivacao,
         origem: "automatica",
       },
       select: { id: true },
@@ -140,7 +144,16 @@ export async function novaViaDocumental(a: AlvoDoEfeito) {
     // deixa de ser o vigente da necessidade. O que ele dizia continua consultável.
     await tx.documento.update({ where: { id: origem.id }, data: { substituidoEm: new Date() } })
     return criado
-  })
+    })
+  } catch (e) {
+    // PERDEU A CORRIDA: o índice único recusou. A via existe — foi a outra requisição
+    // que a criou —, e é ela que se devolve. Erro seria mentir sobre um trabalho feito.
+    if ((e as { code?: string }).code === "P2002") {
+      const vencedora = await prisma.documento.findUnique({ where: { chaveDerivacao }, select: { id: true } })
+      if (vencedora) return { criado: vencedora.id, jaExistia: true, origemId: origem.id, necessidadeId: origem.necessidadeId }
+    }
+    throw e
+  }
 
   await observar(a, "nova-via", `Nova via solicitada (documento #${novo.id}). Motivo: ${motivo}. Esta via continua consultável.`)
   return { criado: novo.id, origemId: origem.id, necessidadeId: origem.necessidadeId, jaExistia: false }

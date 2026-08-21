@@ -432,6 +432,7 @@ CREATE TABLE "Documento" (
     "derivadoDeId" INTEGER,
     "derivacaoTipo" VARCHAR(20),
     "substituidoEm" TIMESTAMP(3),
+    "chaveDerivacao" VARCHAR(200),
     "transcricaoTexto" TEXT,
     "transcricaoPaginas" JSONB,
     "transcricaoFonte" VARCHAR(40),
@@ -4390,6 +4391,9 @@ CREATE INDEX "Arvore_familiaId_idx" ON "Arvore"("familiaId");
 
 -- CreateIndex
 CREATE UNIQUE INDEX "Documento_publicCode_key" ON "Documento"("publicCode");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "Documento_chaveDerivacao_key" ON "Documento"("chaveDerivacao");
 
 -- CreateIndex
 CREATE INDEX "Documento_documentTypeId_idx" ON "Documento"("documentTypeId");

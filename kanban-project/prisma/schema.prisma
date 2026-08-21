@@ -345,6 +345,13 @@ model Documento {
   /// Quando este documento deixou de ser o vigente da necessidade. O documento
   /// continua legível — apenas não é mais o que vale.
   substituidoEm  DateTime?
+  /// IDENTIDADE DO ATO QUE CRIOU ESTE DOCUMENTO DERIVADO.
+  ///
+  /// A idempotência da nova via era ler-e-então-escrever: duas requisições
+  /// simultâneas liam "ainda não existe" e criavam duas vias. Ler antes de escrever
+  /// nunca é idempotência sob concorrência — é uma janela. Com a chave única, o
+  /// banco recusa a segunda, e quem perdeu a corrida encontra a via que a outra criou.
+  chaveDerivacao String?     @unique @db.VarChar(200)
 
   // CP-4A â vÃ­nculos operacionais do runtime v2 (back-relations)
   tarefasVinculadas Tarefa[]                    @relation("TarefaDocumento")

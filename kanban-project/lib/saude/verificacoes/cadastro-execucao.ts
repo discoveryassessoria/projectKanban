@@ -372,3 +372,73 @@ registrar({
     }
   },
 })
+
+// ── OPERAÇÃO: A TENTATIVA É A FONTE ─────────────────────────────────────────
+
+registrar({
+  id: 'saude.operacao.tentativa-e-fonte',
+  codigo: 'OPE-001',
+  nome: 'A operação da etapa vive na tentativa',
+  descricao:
+    'O que foi preenchido numa etapa pertence à EXECUÇÃO que o preencheu. Enquanto houver passo cuja ' +
+    'operação só existe no blob antigo da linha, reexecutar essa etapa sobrescreveria o preenchimento anterior.',
+  dominio: 'WORKFLOW',
+  modulo: 'Operação da etapa',
+  severidadePadrao: 'ALERTA',
+  obrigatoria: false,
+  modos: ['COMPLETO', 'PROFUNDO'],
+  introduzidaEm: '1.1.0',
+  timeoutMs: 30_000,
+  orientacao: 'Rode `npm run backfill:operacao -- --execute`. É idempotente e não apaga o blob.',
+  rotaCorrecao: ROTA_INTERNO,
+  responsavel: 'Workflow',
+  ativo: true,
+  executar: async (): Promise<ResultadoVerificacao> => {
+    const RESERVADAS = new Set(['acao', 'efeito', 'versaoDaConfiguracao', 'decididoEm', 'detalhes'])
+    const passos = await prisma.phaseWorkflowStepInstance.findMany({
+      select: { id: true, stepKey: true, metadata: true, execucoes: { where: { supersededAt: null }, select: { payload: true } } },
+    })
+    const soNoBlob: number[] = []
+    const divergentes: number[] = []
+    for (const p of passos) {
+      const blob = ((p.metadata ?? {}) as { operacao?: Record<string, unknown> }).operacao ?? null
+      const chavesBlob = blob ? Object.keys(blob).filter((k) => !RESERVADAS.has(k)) : []
+      if (chavesBlob.length === 0) continue
+      const payload = (p.execucoes[0]?.payload ?? {}) as Record<string, unknown>
+      const chavesTent = Object.keys(payload).filter((k) => !RESERVADAS.has(k))
+      if (chavesTent.length === 0) { soNoBlob.push(p.id); continue }
+      // DIVERGÊNCIA REAL: o blob tem campo que a tentativa não tem. O contrário é
+      // normal — a tentativa recebe o que foi preenchido depois da troca de fonte.
+      if (chavesBlob.some((k) => !(k in payload))) divergentes.push(p.id)
+    }
+    if (!soNoBlob.length && !divergentes.length) {
+      return { achados: [], metricas: { passos: passos.length, soNoBlob: 0, divergentes: 0 }, resumo: 'Toda operação preenchida está na tentativa que a preencheu.' }
+    }
+    const achados: Achado[] = []
+    if (soNoBlob.length) {
+      achados.push({
+        chave: 'operacao-so-no-blob', severidade: 'ALERTA',
+        titulo: `${soNoBlob.length} etapa(s) com operação só no formato antigo`,
+        descricao: 'O preenchimento dessas etapas está na linha do passo, não na tentativa.',
+        explicacao: 'A linha do passo guarda um estado só. Reexecutar sobrescreveria o que a execução anterior registrou — o mesmo defeito do completedAt, uma camada acima.',
+        impacto: 'O histórico de preenchimento dessas etapas não sobrevive a uma reexecução.',
+        entidade: 'PhaseWorkflowStepInstance', quantidade: soNoBlob.length,
+        link: ROTA_INTERNO, recomendacao: 'Execute o backfill da operação para a tentativa.',
+        evidencia: { exemplos: soNoBlob.slice(0, 10) },
+      })
+    }
+    if (divergentes.length) {
+      achados.push({
+        chave: 'operacao-divergente', severidade: 'ERRO',
+        titulo: `${divergentes.length} etapa(s) com blob e tentativa divergentes`,
+        descricao: 'O blob antigo tem campos que a tentativa não tem.',
+        explicacao: 'Depois da troca de fonte, só a tentativa é escrita. Campo que existe no blob e não nela indica escrita por um caminho que não passou pela porta canônica.',
+        impacto: 'Duas respostas para "o que foi preenchido nesta etapa".',
+        entidade: 'PhaseWorkflowStepInstance', quantidade: divergentes.length,
+        link: ROTA_INTERNO, recomendacao: 'Investigue quem escreveu; rode o backfill para reconciliar.',
+        evidencia: { exemplos: divergentes.slice(0, 10) },
+      })
+    }
+    return { achados, metricas: { passos: passos.length, soNoBlob: soNoBlob.length, divergentes: divergentes.length } }
+  },
+})

@@ -105,6 +105,43 @@ interface ApplyOpts {
   ignorarDependencias?: boolean
 }
 
+/**
+ * TRAVA A UNIDADE DE TRABALHO ANTES DE DECIDIR.
+ *
+ * A pré-condição de dependência é lida e conferida dentro de uma transação. Duas
+ * transações concorrentes leem o MESMO instantâneo, cada uma conclui que a sua
+ * condição vale, e as duas escrevem: abrir "Receber" e reabrir "Solicitar" ao mesmo
+ * tempo deixa a sucessora em execução com a predecessora aberta. É write-skew — não
+ * há conflito de escrita entre elas, então nenhum lock otimista o pega.
+ *
+ * `FOR UPDATE` sobre as linhas da unidade serializa as duas: a segunda espera, relê,
+ * e vê o mundo depois da primeira. O escopo é a UNIDADE (a certidão, a pessoa, o
+ * registro) — nunca a fase inteira, porque a Emissão de quatro certidões não deve
+ * ficar em fila por causa de uma.
+ */
+async function travarUnidade(
+  tx: TX,
+  passo: { workflowInstanceId: number | null; necessidadeId: number | null; documentoId: number | null },
+): Promise<void> {
+  if (!passo.workflowInstanceId) return
+  // Ordem estável por id: duas transações que travam o mesmo conjunto adquirem os
+  // locks na mesma sequência, e não há como uma esperar a outra em sentido inverso.
+  if (passo.documentoId != null) {
+    await tx.$queryRaw`SELECT id FROM "PhaseWorkflowStepInstance"
+      WHERE "workflowInstanceId" = ${passo.workflowInstanceId} AND "documentoId" = ${passo.documentoId}
+      ORDER BY id FOR UPDATE`
+  } else if (passo.necessidadeId != null) {
+    await tx.$queryRaw`SELECT id FROM "PhaseWorkflowStepInstance"
+      WHERE "workflowInstanceId" = ${passo.workflowInstanceId} AND "necessidadeId" = ${passo.necessidadeId}
+      ORDER BY id FOR UPDATE`
+  } else {
+    await tx.$queryRaw`SELECT id FROM "PhaseWorkflowStepInstance"
+      WHERE "workflowInstanceId" = ${passo.workflowInstanceId}
+        AND "documentoId" IS NULL AND "necessidadeId" IS NULL
+      ORDER BY id FOR UPDATE`
+  }
+}
+
 // ---------------- APLICADOR: PASSO (CAS) ----------------
 async function aplicarPasso(tx: TX, stepId: number, alvo: string, tipoEvento: WorkflowEventoTipo, o: ApplyOpts) {
   const step = await tx.phaseWorkflowStepInstance.findUnique({ where: { id: stepId } })
@@ -124,6 +161,7 @@ async function aplicarPasso(tx: TX, stepId: number, alvo: string, tipoEvento: Wo
   // e `reabrirPassoTx`), então não há caminho que a contorne sem dizer que está
   // contornando.
   if ((alvo === "DISPONIVEL" || alvo === "EM_ANDAMENTO") && !o.ignorarDependencias) {
+    await travarUnidade(tx, step)
     const deps = Array.isArray(step.dependeDeStepKeys)
       ? (step.dependeDeStepKeys as unknown[]).filter((x): x is string => typeof x === "string")
       : []
@@ -457,6 +495,7 @@ export async function reabrirPassoTx(
   // aquilo de que ela depende está em aberto. Reabrir o PREDECESSOR é o gesto certo;
   // reabrir o sucessor sozinho é começar pelo fim.
   if (!o.ignorarDependencias) {
+    await travarUnidade(tx, step)
     const deps = Array.isArray(step.dependeDeStepKeys)
       ? (step.dependeDeStepKeys as unknown[]).filter((x): x is string => typeof x === "string")
       : []
@@ -541,10 +580,65 @@ export async function reabrirPassoTx(
       ? (x.dependeDeStepKeys as unknown[]).filter((y): y is string => typeof y === "string")
       : null,
   }))
-  const EM_VOO = new Set(["DISPONIVEL", "EM_ANDAMENTO", "AGUARDANDO"])
+  const ALCANCAVEIS = new Set(["DISPONIVEL", "EM_ANDAMENTO", "AGUARDANDO", "CONCLUIDO", "EXECUTADO"])
   for (const desc of descendentes(grafoDaUnidade, step.stepKey)) {
-    if (!EM_VOO.has(desc.status)) continue
+    if (!ALCANCAVEIS.has(desc.status)) continue
     const info = daUnidadeParaPropagar.find((x) => x.id === desc.id)!
+
+    // O DESCENDENTE JÁ CONCLUÍDO TAMBÉM VOLTA — e é o modelo de tentativas que
+    // torna isso possível sem destruir nada.
+    //
+    // Ele foi concluído sob uma premissa que acabou de mudar: aquilo de que ele
+    // depende voltou a estar aberto. Deixá-lo concluído seria manter, na execução
+    // ATUAL, um sucessor pronto apoiado em algo que não está. Antes de existir
+    // tentativa, reabri-lo apagaria o trabalho — por isso ele ficava. Agora a
+    // execução dele é ARQUIVADA com o fim, o autor e o que foi preenchido, e uma
+    // tentativa nova nasce para o retrabalho.
+    if (desc.status === "CONCLUIDO" || desc.status === "EXECUTADO") {
+      // DESCER UM PASSO CONCLUÍDO É RETRABALHO, e retrabalho não passa pela
+      // precedência normal — `aplicarPasso` recusa CONCLUIDO → BLOQUEADO, e recusa
+      // com razão: essa descida só é legítima quando alguém reabre. Aqui é o mesmo
+      // ato, propagado: a tentativa é arquivada e a linha desce por CAS, exatamente
+      // como a reabertura direta faz.
+      await abrirTentativa({
+        stepInstanceId: desc.id,
+        motivo: MOTIVOS_DE_TENTATIVA.CORRECAO,
+        status: "BLOQUEADO" as StepInstanceStatus,
+        executadoPorId: o.usuarioId ?? null,
+        correlationId: o.correlationId,
+        // Amarrada ao MESMO comando de reabertura: reenviá-lo não abre outra rodada
+        // de tentativas nos descendentes.
+        chaveIdempotencia: `stepexec|si${desc.id}|cascata|${o.correlationId}`,
+      }, tx)
+      const atual = await tx.phaseWorkflowStepInstance.findUnique({
+        where: { id: desc.id }, select: { status: true, lockVersion: true },
+      })
+      const desceu = await tx.phaseWorkflowStepInstance.updateMany({
+        where: { id: desc.id, status: atual!.status, lockVersion: atual!.lockVersion },
+        data: {
+          status: "BLOQUEADO", lockVersion: { increment: 1 },
+          // O `completedAt` do PASSO é limpo porque ele descreve a obrigação corrente,
+          // que voltou a estar aberta. O da tentativa arquivada permanece — e é ele
+          // que responde "quando isto foi concluído da primeira vez?".
+          completedAt: null, startedAt: null, motivo: null,
+        },
+      })
+      if (desceu.count > 0) {
+        const chaveDesc = H.chaveEvento("PASSO_BLOQUEADO", "step_instance", desc.id, "BLOQUEADO", o.ciclo, atual!.lockVersion)
+        await tx.workflowEvento.create({
+          data: {
+            tipo: "PASSO_BLOQUEADO", entityType: "step_instance", entityId: desc.id,
+            processoId: info.processoId, workflowInstanceId: step.workflowInstanceId ?? undefined,
+            stepInstanceId: desc.id, correlationId: o.correlationId,
+            causationId: H.chaveComando(o.operacao, "step_instance", desc.id, "BLOQUEADO", o.ciclo, atual!.lockVersion),
+            chaveIdempotencia: chaveDesc,
+          },
+        })
+        await projetarTarefaDoPasso(tx, { stepInstanceId: desc.id, statusPasso: "BLOQUEADO", agora: new Date() }).catch(() => null)
+      }
+      continue
+    }
+
     await aplicarPasso(tx, desc.id, "BLOQUEADO", "PASSO_BLOQUEADO", {
       correlationId: o.correlationId,
       causationId: H.chaveComando(o.operacao, "step_instance", desc.id, "BLOQUEADO", o.ciclo, undefined),
@@ -637,7 +731,17 @@ function ko(code: H.FailureCodeD, correlationId: string, msg: string = code): Sy
 async function carregarStep(stepId: number) {
   return prisma.phaseWorkflowStepInstance.findUnique({
     where: { id: stepId },
-    include: { tarefas: { where: { chaveIdempotencia: { not: null } }, take: 1 }, workflowInstance: { select: { status: true } } },
+    // A TAREFA DA ETAPA É A TAREFA DA ETAPA — venha ela de onde vier.
+    //
+    // Aqui havia `where: { chaveIdempotencia: { not: null } }`, filtrando as tarefas
+    // criadas fora da porta idempotente. O efeito era pior do que o problema que
+    // tentava evitar: a projeção não enxergava essa tarefa e não a atualizava, mas a
+    // trava de coerência — que não filtra — enxergava e derrubava a transação. Concluir
+    // a etapa passava a ser impossível, com um erro que acusava contradição sem dizer
+    // que o próprio carregamento a havia criado.
+    //
+    // Se a tarefa aponta para a etapa, ela é projeção dessa etapa e precisa acompanhá-la.
+    include: { tarefas: { orderBy: { id: "asc" }, take: 1 }, workflowInstance: { select: { status: true } } },
   })
 }
 

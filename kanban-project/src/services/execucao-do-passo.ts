@@ -190,10 +190,18 @@ export async function registrarNaTentativa(
 ): Promise<Tentativa | null> {
   const vigente = await tentativaVigente(stepInstanceId, db)
   if (!vigente) return null
+  // CUMPRIDA TEM MOMENTO. Passar a tentativa para CONCLUIDO sem data deixaria um
+  // estado de conclusão sem a conclusão — o mesmo buraco que o Gate 2 fechou do outro
+  // lado. Quando quem chama não informa (a ação cadastrada não sabe o relógio do
+  // motor), o instante é agora; quando já havia data, ela é preservada.
+  const cumprindo = dados.status === "CONCLUIDO" || dados.status === "EXECUTADO"
+  const dataDeConclusao =
+    dados.completedAt ?? vigente.completedAt ?? (cumprindo ? new Date() : null)
   const atualizada = await db.stepExecution.update({
     where: { id: vigente.id },
     data: {
       status: dados.status,
+      ...(cumprindo && vigente.completedAt == null ? { completedAt: dataDeConclusao } : {}),
       ...(dados.startedAt !== undefined && vigente.startedAt == null ? { startedAt: dados.startedAt } : {}),
       ...(dados.completedAt !== undefined && vigente.completedAt == null ? { completedAt: dados.completedAt } : {}),
       ...(dados.executadoPorId !== undefined ? { executadoPorId: dados.executadoPorId } : {}),
@@ -218,10 +226,15 @@ export async function garantirTentativa(
   const vigente = await tentativaVigente(stepInstanceId, db)
   if (vigente) return vigente
   const chave = `stepexec|si${stepInstanceId}|seq1|${args.motivo}`
+  // Um passo já CONCLUÍDO cuja linha não guardou `completedAt` — dado antigo, de
+  // antes de a data ser cobrada — não pode produzir uma tentativa concluída sem
+  // momento. `criadoEm` é a melhor verdade disponível e é dita como tal.
+  const jaCumprido = args.status === "CONCLUIDO" || args.status === "EXECUTADO"
+  const fim = args.completedAt ?? (jaCumprido ? new Date() : null)
   await db.stepExecution.createMany({
     data: [{
       stepInstanceId, sequencia: 1, status: args.status, motivo: args.motivo,
-      startedAt: args.startedAt ?? null, completedAt: args.completedAt ?? null,
+      startedAt: args.startedAt ?? null, completedAt: fim,
       payload: args.payload ?? undefined, chaveIdempotencia: chave,
     }],
     skipDuplicates: true,

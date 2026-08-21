@@ -198,7 +198,17 @@ const MIGRATION = join(DIR_MIGRATIONS, '0000_baseline', 'migration.sql')
 // 20260821090000_cadastro_canonico_de_execucao.
 //
 //   anterior : a4cba5fc2febbc4e09c5e19276c74059c20078e27d73ae9401c955a6a1dac7e4
-const CHECKSUM_LEDGER = '6a0e5a4347160b8885408776a13ed43a87fea558eb58a2584dec85e74d4dfdbe'
+//
+// 21/08/2026 — CONSTRAINTS DE ESTADO IMPOSSÍVEL + CHAVE DE DERIVAÇÃO. Uma tarefa
+// viva por etapa, tentativa concluída com data, substituição coerente, ação com
+// efeito, campo com tipo, derivação declarando o tipo, e chave única da nova via.
+// Aditivo: nenhuma coluna alterada, nenhuma linha violando no momento da aplicação.
+// Ledger reconciliado no MESMO deploy das migrations
+// 20260821140000_constraints_de_estado_impossivel e
+// 20260821160000_chave_de_derivacao_documental.
+//
+//   anterior : 6a0e5a4347160b8885408776a13ed43a87fea558eb58a2584dec85e74d4dfdbe
+const CHECKSUM_LEDGER = '0a9fad73eef7c8d540bed54a7d07bef4ac618dbc639ea9981f6a2bcef748fe5c'
 
 /**
  * Migrations criadas DEPOIS da consolidacao de 02/08/2026. Toda migration nova
@@ -234,6 +244,8 @@ const MIGRATIONS_POS_BASELINE: string[] = [
   '20260820100000_versao_publicada_imutavel',
   '20260820140000_tentativa_de_execucao_do_passo',
   '20260821090000_cadastro_canonico_de_execucao',
+  '20260821140000_constraints_de_estado_impossivel',
+  '20260821160000_chave_de_derivacao_documental',
 ]
 
 const sha256 = (t: string) => createHash('sha256').update(t).digest('hex')
