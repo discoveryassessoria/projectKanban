@@ -364,6 +364,120 @@ async function main() {
   check("  nem continua 100% — há trabalho reaberto", pct < 100, `${pct}%`)
   check("  e reflete só as 2 certidões mexidas (≈96%)", pct >= 90 && pct < 100, `${pct}%`)
 
+  // ══════════════════════════════════════════════════════════════
+  secao("TESTE 7 — o ciclo completo: concluída → reabrir → executar → concluir")
+  // ══════════════════════════════════════════════════════════════
+  //
+  // Reabrir é meia prova. O que importa é o roteiro voltar a andar depois: a etapa
+  // reaberta conclui de novo, o dependente é liberado pela dependência, conclui, e a
+  // execução anterior continua inteira ao lado da nova.
+  const cicloIdx = 44
+  const cicloDoc = (await prisma.phaseWorkflowStepInstance.findUnique({
+    where: { id: idPorEtapa[cicloIdx].solicitar }, select: { documentoId: true },
+  }))!.documentoId
+  const passoDe = async (k: string) =>
+    (await prisma.phaseWorkflowStepInstance.findFirst({
+      where: { processoId: proc.id, stepKey: k, documentoId: cicloDoc },
+      orderBy: { id: "desc" }, select: { id: true },
+    }))!.id
+
+  const cSolicitar = await passoDe("solicitar")
+  const cAguardar = await passoDe("aguardar")
+  const antesCiclo = await fotografar(proc.id)
+
+  const rCiclo = await executarReabertura({
+    stepInstanceId: cSolicitar, motivoCodigo: "ERRO_OPERACIONAL",
+    justificativa: "Refazer o pedido e o que depende dele.", comDependentes: true, actorId: actor.id,
+  })
+  check("a etapa é reaberta", rCiclo.ok, JSON.stringify(rCiclo))
+  const depoisReabrir = await prisma.phaseWorkflowStepInstance.findMany({
+    where: { id: { in: [cSolicitar, cAguardar] } }, select: { id: true, status: true },
+  })
+  check("  a reaberta volta a executar", depoisReabrir.find((x) => x.id === cSolicitar)?.status === "EM_ANDAMENTO")
+  check("  e o dependente fica AGUARDANDO a dependência",
+    depoisReabrir.find((x) => x.id === cAguardar)?.status === "BLOQUEADO")
+
+  // O DEPENDENTE NÃO ANDA ENQUANTO A DEPENDÊNCIA ESTIVER ABERTA.
+  const { transicionarPassoTx, concluirPasso } = await import("../src/services/task-step-sync")
+  const inst2 = (await prisma.phaseWorkflowStepInstance.findUnique({
+    where: { id: cAguardar }, select: { workflowInstanceId: true },
+  }))!.workflowInstanceId
+  const tentaAndar = await prisma.$transaction((tx) =>
+    transicionarPassoTx(tx, cAguardar, "EM_ANDAMENTO", {
+      correlationId: `${M}-ciclo-dep`, operacao: "teste", ciclo: 1, processoId: proc.id, workflowInstanceId: inst2,
+    }))
+  check("  o dependente é RECUSADO enquanto a dependência não fecha",
+    !tentaAndar.changed && tentaAndar.code === "DEPENDENCIA_PENDENTE", JSON.stringify(tentaAndar))
+
+  // EXECUTAR DE NOVO E CONCLUIR.
+  const rConcluir = await concluirPasso(cSolicitar, { origem: "USER", correlationId: `${M}-ciclo-concluir` })
+  check("a etapa reaberta conclui de novo", rConcluir.success && rConcluir.changed, JSON.stringify(rConcluir).slice(0, 160))
+  const aguardarDepois = await prisma.phaseWorkflowStepInstance.findUnique({
+    where: { id: cAguardar }, select: { status: true },
+  })
+  check("  e o dependente é LIBERADO pela dependência cumprida",
+    aguardarDepois?.status === "DISPONIVEL", String(aguardarDepois?.status))
+
+  const rDep = await concluirPasso(cAguardar, { origem: "USER", correlationId: `${M}-ciclo-dep-concluir` })
+  check("  o dependente conclui na sequência", rDep.success && rDep.changed)
+
+  const tCiclo = await tentativasDoPasso(cSolicitar)
+  check("a execução ANTERIOR continua inteira ao lado da nova",
+    tCiclo.length === 2 && tCiclo[0].supersededAt != null && tCiclo[0].completedAt != null &&
+    tCiclo[1].supersededAt == null && tCiclo[1].completedAt != null,
+    JSON.stringify(tCiclo.map((t) => ({ seq: t.sequencia, st: t.status, fim: !!t.completedAt, arq: !!t.supersededAt }))))
+  check("  e as duas têm identidades diferentes", tCiclo[0].id !== tCiclo[1].id)
+
+  // NADA FORA DA UNIDADE FOI TOCADO PELO CICLO INTEIRO.
+  const depoisCiclo = await fotografar(proc.id)
+  const foraDaUnidade = depoisCiclo.passos.filter((d) => {
+    if (d.documentoId === cicloDoc) return false
+    const a = antesCiclo.passos.find((x) => x.id === d.id)
+    return !a || a.status !== d.status || a.completedAt?.toISOString() !== d.completedAt?.toISOString()
+  })
+  check("o ciclo completo não tocou nenhuma outra unidade", foraDaUnidade.length === 0,
+    JSON.stringify(foraDaUnidade.slice(0, 4).map((x) => [x.stepKey, x.documentoId, x.status])))
+
+  // ══════════════════════════════════════════════════════════════
+  secao("TESTE 8 — idempotência: reconciliar, recarregar e navegar não duplicam")
+  // ══════════════════════════════════════════════════════════════
+  //
+  // O usuário abre a tela, o cron passa, alguém dá F5. Nada disso é um comando — e
+  // nada disso pode criar instância, tarefa, execução ou obrigação.
+  // A PRIMEIRA PASSAGEM CONVERGE; a idempotência é sobre as SEGUINTES.
+  //
+  // Este palco monta as 250 instâncias direto no banco, sem passar pela projeção de
+  // tarefa — então a primeira reconciliação legitimamente materializa o que faltava.
+  // Confundir convergência com duplicação reprovaria o reconciliador por fazer o
+  // trabalho dele. O que se cobra é: S1 → reconcile → S1.
+  const { reconciliarTarefas } = await import("../lib/operacional/reconciliar-tarefas")
+  const { reconciliarMotorDeFases } = await import("../src/lib/motor/reconciliar-motor-fases")
+  await reconciliarTarefas({ processoId: proc.id }).catch(() => null)
+  await reconciliarMotorDeFases(proc.id, { origem: "teste-idem", correlationId: `${M}-idem-warm` }).catch(() => null)
+
+  const antesIdem = await fotografar(proc.id)
+  const tarefasAntes = await prisma.tarefa.count({ where: { processoId: proc.id } })
+  console.log(`      estado estável: ${antesIdem.passos.length} instâncias · ${antesIdem.execs.length} execuções · ${tarefasAntes} tarefas`)
+
+  for (let i = 0; i < 5; i++) {
+    await reconciliarTarefas({ processoId: proc.id }).catch(() => null)
+    await reconciliarMotorDeFases(proc.id, { origem: "teste-idem", correlationId: `${M}-idem-${i}` }).catch(() => null)
+    // "Recarregar a tela" é ler o plano — leitura pura, repetida.
+    await planejarReabertura(cSolicitar)
+  }
+  const depoisIdem = await fotografar(proc.id)
+  check("a partir do estado estável, 5 reconciliações + 5 leituras não criam instância",
+    depoisIdem.passos.length === antesIdem.passos.length,
+    `${antesIdem.passos.length} → ${depoisIdem.passos.length}`)
+  check("  nem execução", depoisIdem.execs.length === antesIdem.execs.length,
+    `${antesIdem.execs.length} → ${depoisIdem.execs.length}`)
+  check("  nem tarefa", (await prisma.tarefa.count({ where: { processoId: proc.id } })) === tarefasAntes)
+  check("  e não mudaram nenhum estado válido",
+    JSON.stringify(depoisIdem.passos) === JSON.stringify(antesIdem.passos))
+  const duplicadas = await prisma.$queryRawUnsafe<Array<{ n: number }>>(
+    `SELECT COUNT(*)::int n FROM (SELECT "stepInstanceId" FROM "StepExecution" WHERE "supersededAt" IS NULL GROUP BY 1 HAVING COUNT(*)>1) x`)
+  check("  nenhuma etapa ficou com duas execuções vigentes", duplicadas[0].n === 0)
+
   await limpar()
   console.log(`\n${falhas.length === 0 ? "✅ PASSOU" : "❌ FALHOU"}: ${ok} ok, ${falhas.length} falhas`)
   if (falhas.length) for (const f of falhas) console.log(`  · ${f}`)
