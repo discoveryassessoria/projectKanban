@@ -58,6 +58,9 @@ const AUTORIZADOS_FORA_DO_RUNTIME: Record<string, string> = {
   "scripts/provas-finais.test.ts":
     "provas finais: monta e derruba a PRÓPRIA árvore, pessoas e necessidades (marca PROVA) " +
     "só no banco de teste — a prova de exclusão precisa de alguém para excluir",
+  "scripts/retrocesso-de-fase.test.ts":
+    "retrocesso de fase: monta e derruba a PRÓPRIA árvore, pessoa e necessidade (marca RETRO) " +
+    "só no banco de teste — o caso real precisa de um processo com a fase já concluída",
   "scripts/e2e-master.test.ts":
     "E2E master: cria a PRÓPRIA necessidade (marca E2E) só no banco de teste — o fluxo " +
     "documental inteiro precisa de uma necessidade para o documento atender",

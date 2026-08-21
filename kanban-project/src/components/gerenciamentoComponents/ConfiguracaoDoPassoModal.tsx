@@ -33,6 +33,10 @@ export interface PassoConfiguravel {
   completionRule?: string | null
   executorKey?: string | null
   dependeDe?: string[] | null
+  reaberturaPermitida?: boolean
+  reaberturaEstrategia?: string
+  reaberturaExigeJustificativa?: boolean
+  reaberturaPermissao?: string | null
   acoes?: AcaoCfg[]
   campos?: CampoCfg[]
   checkItens?: ItemCfg[]
@@ -45,10 +49,11 @@ interface Efeito { key: string; label: string; descricao: string; competencia: s
 interface Executor { key: string; label: string; campos: string[]; efeitos: string[]; acoesCadastradas: boolean; checklistCadastrado: boolean }
 interface Catalogo { efeitos: Efeito[]; executores: Executor[]; tiposDeCampo: string[]; canais: Array<{ key: string; label: string }> }
 
-const ABAS = ["geral", "dependencias", "campos", "acoes", "checklist"] as const
+const ABAS = ["geral", "dependencias", "reabertura", "campos", "acoes", "checklist"] as const
 type Aba = (typeof ABAS)[number]
 const TITULO: Record<Aba, string> = {
-  geral: "Geral", dependencias: "Dependências", campos: "Campos", acoes: "Ações/Resultados", checklist: "Checklist",
+  geral: "Geral", dependencias: "Dependências", reabertura: "Reabertura",
+  campos: "Campos", acoes: "Ações/Resultados", checklist: "Checklist",
 }
 
 const inp = "w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-white placeholder-white/30 outline-none focus:border-blue-400/50"
@@ -72,6 +77,10 @@ export default function ConfiguracaoDoPassoModal({
   const [f, setF] = useState<PassoConfiguravel>({
     ...passo,
     dependeDe: passo.dependeDe ?? [],
+    reaberturaPermitida: passo.reaberturaPermitida !== false,
+    reaberturaEstrategia: passo.reaberturaEstrategia ?? "ESCOLHA_MANUAL",
+    reaberturaExigeJustificativa: passo.reaberturaExigeJustificativa !== false,
+    reaberturaPermissao: passo.reaberturaPermissao ?? null,
     acoes: passo.acoes ?? [],
     campos: passo.campos ?? [],
     checkItens: passo.checkItens ?? [],
@@ -199,6 +208,55 @@ export default function ConfiguracaoDoPassoModal({
                   </label>
                 )
               })}
+            </>
+          )}
+
+          {aba === "reabertura" && (
+            <>
+              <p className="text-xs text-white/50">
+                O que acontece quando alguém precisa <b>refazer</b> esta etapa depois de concluída — seja pela
+                Central, seja ao retroceder a fase. Reabrir nunca apaga a execução anterior: ela é arquivada com
+                o que foi registrado, e uma execução nova começa.
+              </p>
+              <label className={`flex cursor-pointer items-start gap-3 ${card}`}>
+                <input type="checkbox" className="mt-1" checked={f.reaberturaPermitida !== false}
+                  onChange={(e) => set("reaberturaPermitida", e.target.checked)} />
+                <span>
+                  <span className="text-sm text-white">Esta etapa pode ser reexecutada</span>
+                  <span className="block text-[11px] text-white/40">
+                    Desmarcado, ela aparece na tela de retrocesso com o motivo — e não como um botão desabilitado sem explicação.
+                  </span>
+                </span>
+              </label>
+              <div>
+                <label className={lbl}>O que propor por padrão</label>
+                <select className={inp} value={f.reaberturaEstrategia ?? "ESCOLHA_MANUAL"}
+                  onChange={(e) => set("reaberturaEstrategia", e.target.value)}>
+                  <option value="ESCOLHA_MANUAL">Perguntar — o administrador escolhe o que reabrir</option>
+                  <option value="SOMENTE_ESTA">Somente esta etapa</option>
+                  <option value="ESTA_E_DEPENDENTES">Esta e as que dependem dela</option>
+                </select>
+                <p className="mt-1 text-[11px] text-white/40">
+                  Isto é só a sugestão que a tela marca; quem decide continua sendo quem executa o retrocesso.
+                  &quot;As que dependem dela&quot; vem do grafo cadastrado na aba Dependências — nunca da ordem da lista.
+                </p>
+              </div>
+              <label className={`flex cursor-pointer items-start gap-3 ${card}`}>
+                <input type="checkbox" className="mt-1" checked={f.reaberturaExigeJustificativa !== false}
+                  onChange={(e) => set("reaberturaExigeJustificativa", e.target.checked)} />
+                <span>
+                  <span className="text-sm text-white">Exigir justificativa</span>
+                  <span className="block text-[11px] text-white/40">
+                    Reabrir sem dizer por quê deixa o histórico com um buraco no lugar do motivo.
+                  </span>
+                </span>
+              </label>
+              <div>
+                <label className={lbl}>Permissão exigida (vazio = a permissão geral de reabrir)</label>
+                <input className={inp} value={f.reaberturaPermissao ?? ""}
+                  onChange={(e) => set("reaberturaPermissao", e.target.value || null)}
+                  placeholder="ex.: processos.moverFaseManual" />
+              </div>
             </>
           )}
 

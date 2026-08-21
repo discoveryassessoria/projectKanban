@@ -3204,6 +3204,21 @@ model PhaseInternalWorkflowStep {
   /// é o que permite um passo novo nascer executável sem código.
   executorKey    String?               @db.VarChar(40)
 
+  /// PODE SER REEXECUTADO? — política de reabertura, cadastrada, não presumida.
+  ///
+  /// Reabrir uma etapa concluída sempre foi possível no motor e nunca foi uma decisão
+  /// declarada: quem podia, com que justificativa e o que acontecia com os dependentes
+  /// eram respostas do código. Aqui viram cadastro — e ficam congeladas na versão,
+  /// como todo o resto da configuração.
+  reaberturaPermitida Boolean @default(true)
+  /// SOMENTE_ESTA | ESTA_E_DEPENDENTES | ESCOLHA_MANUAL — o que a tela propõe por
+  /// padrão quando alguém reabre. `ESCOLHA_MANUAL` não propõe: pergunta.
+  reaberturaEstrategia String @default("ESCOLHA_MANUAL") @db.VarChar(24)
+  /// Reabrir sem dizer por quê deixa o histórico com um buraco no lugar do motivo.
+  reaberturaExigeJustificativa Boolean @default(true)
+  /// Permissão exigida para reabrir esta etapa. `null` = a permissão geral de reabrir.
+  reaberturaPermissao String? @db.VarChar(60)
+
   acoes      StepAction[]
   campos     StepField[]
   checkItens StepChecklistItem[]

@@ -2409,6 +2409,10 @@ CREATE TABLE "PhaseInternalWorkflowStep" (
     "versao" INTEGER NOT NULL DEFAULT 1,
     "dependeDe" JSONB,
     "executorKey" VARCHAR(40),
+    "reaberturaPermitida" BOOLEAN NOT NULL DEFAULT true,
+    "reaberturaEstrategia" VARCHAR(24) NOT NULL DEFAULT 'ESCOLHA_MANUAL',
+    "reaberturaExigeJustificativa" BOOLEAN NOT NULL DEFAULT true,
+    "reaberturaPermissao" VARCHAR(60),
 
     CONSTRAINT "PhaseInternalWorkflowStep_pkey" PRIMARY KEY ("id")
 );

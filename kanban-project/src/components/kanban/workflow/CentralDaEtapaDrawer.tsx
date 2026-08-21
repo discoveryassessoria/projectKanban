@@ -31,6 +31,7 @@ import {
 } from "lucide-react"
 import { EditorRegistralModal } from "./EditorRegistralModal"
 import { StepEditorRouter } from "./StepEditors"
+import ReabrirEtapaModal from "./ReabrirEtapaModal"
 import {
   resolveWorkflowStepEditor,
   type StepEditorKind,
@@ -385,23 +386,15 @@ function ConteudoDrawer({
     }
   }
 
-  const handleReabrir = async () => {
-    if (
-      !confirm(
-        `Reabrir a etapa "${step?.title}"?\n\n` +
-          `Isso vai:\n` +
-          `• Voltar esta etapa para "Em andamento"\n` +
-          `• Bloquear a próxima etapa ativa (se houver)\n` +
-          `• Manter etapas já concluídas posteriores intactas\n\n` +
-          `Confirmar?`,
-      )
-    )
-      return
-    setSaving("reabrindo")
-    const ok = await patchStep({ status: "em_andamento" })
-    setSaving(null)
-    if (ok) onClose()
-  }
+  // REABRIR PASSOU A SER UM ATO COM IMPACTO NA FRENTE.
+  //
+  // Aqui havia um `confirm()` do navegador afirmando o que ia acontecer — "bloquear a
+  // próxima etapa ativa", "manter concluídas posteriores intactas" — sem perguntar ao
+  // servidor. Eram descrições da intenção, e o efeito real depende das dependências
+  // CADASTRADAS, que esta tela não conhece. Agora o impacto é calculado pelo mesmo
+  // grafo que o motor executa, e a reabertura passa pela porta que cria execução nova
+  // em vez de mexer no status da linha.
+  const [reabrindoModal, setReabrindoModal] = useState(false)
 
   // -- Encontra o step na lista
   const step = workflow?.steps.find((s) => s.id === stepId) || null
@@ -528,11 +521,11 @@ function ConteudoDrawer({
                   </button>
                   {permite(step, "reabrir") && (
                     <button
-                      onClick={handleReabrir}
+                      onClick={() => setReabrindoModal(true)}
                       disabled={!!saving}
                       className="inline-flex items-center gap-1.5 px-3 py-2 text-[12px] font-semibold bg-[#1b2027]/10 hover:bg-[#1b2027]/15 disabled:opacity-50 text-white rounded-md transition-colors border border-white/15"
                     >
-                      {saving === "reabrindo" ? "Reabrindo…" : "↻ Reabrir etapa"}
+                      ↻ Reabrir etapa
                     </button>
                   )}
                   <button
@@ -880,6 +873,21 @@ function ConteudoDrawer({
             setEditorAberto(false)
             carregar()
             onUpdate?.()
+          }}
+        />
+      )}
+
+      {/* REABRIR — o impacto vem do servidor, pelas dependências cadastradas. */}
+      {reabrindoModal && stepId != null && (
+        <ReabrirEtapaModal
+          stepInstanceId={stepId}
+          titulo={step?.title ?? "esta etapa"}
+          onFechar={() => setReabrindoModal(false)}
+          onReaberto={() => {
+            setReabrindoModal(false)
+            carregar()
+            onUpdate?.()
+            onClose()
           }}
         />
       )}

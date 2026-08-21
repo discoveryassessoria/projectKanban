@@ -55,6 +55,12 @@ export interface PassoCongelado {
   /// versionamento existe para impedir. A ação é dado; dado versionado vive aqui.
   executorKey: string | null
   dependeDe: string[]
+  /// A política de reabertura da época. Congelada como o resto: mudar a política hoje
+  /// não muda o que valia para uma execução que começou ontem.
+  reaberturaPermitida: boolean
+  reaberturaEstrategia: string
+  reaberturaExigeJustificativa: boolean
+  reaberturaPermissao: string | null
   acoes: AcaoCongelada[]
   campos: CampoCongelado[]
   checkItens: ItemChecklistCongelado[]
@@ -155,6 +161,10 @@ export async function congelarVersaoVigente(
     completionRule: p.completionRule, checklist: p.checklist ?? null, versao: p.versao,
     executorKey: p.executorKey,
     dependeDe: Array.isArray(p.dependeDe) ? (p.dependeDe as string[]) : [],
+    reaberturaPermitida: p.reaberturaPermitida,
+    reaberturaEstrategia: p.reaberturaEstrategia,
+    reaberturaExigeJustificativa: p.reaberturaExigeJustificativa,
+    reaberturaPermissao: p.reaberturaPermissao,
     acoes: p.acoes.map((a) => ({
       key: a.key, label: a.label, descricao: a.descricao, ordem: a.ordem,
       effectKey: a.effectKey,
@@ -242,6 +252,13 @@ export async function lerVersaoPublicada(
       ...(p as PassoCongelado),
       executorKey: p.executorKey ?? null,
       dependeDe: Array.isArray(p.dependeDe) ? p.dependeDe : [],
+      // VERSÃO CONGELADA ANTES DA POLÍTICA: `true`/`ESCOLHA_MANUAL` é o que valia
+      // então — permitido, perguntando o que reabrir. Não é suposição: é o
+      // comportamento que aquelas versões de fato tinham.
+      reaberturaPermitida: p.reaberturaPermitida ?? true,
+      reaberturaEstrategia: p.reaberturaEstrategia ?? "ESCOLHA_MANUAL",
+      reaberturaExigeJustificativa: p.reaberturaExigeJustificativa ?? true,
+      reaberturaPermissao: p.reaberturaPermissao ?? null,
       acoes: Array.isArray(p.acoes) ? p.acoes : [],
       campos: Array.isArray(p.campos) ? p.campos : [],
       checkItens: Array.isArray(p.checkItens) ? p.checkItens : [],

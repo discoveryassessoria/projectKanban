@@ -47,6 +47,14 @@ function buildSteps(raw: any[], workflowId: number) {
         ? s.dependeDe.filter((x: unknown) => typeof x === 'string')
         : undefined) as Prisma.InputJsonValue | undefined,
       executorKey: s?.executorKey ? String(s.executorKey) : null,
+      // POLÍTICA DE REABERTURA — cadastrada, não presumida. Estratégia fora do
+      // vocabulário fechado vira a mais conservadora: perguntar.
+      reaberturaPermitida: s?.reaberturaPermitida !== false,
+      reaberturaEstrategia: ['SOMENTE_ESTA', 'ESTA_E_DEPENDENTES', 'ESCOLHA_MANUAL'].includes(String(s?.reaberturaEstrategia))
+        ? String(s.reaberturaEstrategia)
+        : 'ESCOLHA_MANUAL',
+      reaberturaExigeJustificativa: s?.reaberturaExigeJustificativa !== false,
+      reaberturaPermissao: s?.reaberturaPermissao ? String(s.reaberturaPermissao) : null,
     }
   })
 }

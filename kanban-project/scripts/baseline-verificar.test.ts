@@ -208,7 +208,14 @@ const MIGRATION = join(DIR_MIGRATIONS, '0000_baseline', 'migration.sql')
 // 20260821160000_chave_de_derivacao_documental.
 //
 //   anterior : 6a0e5a4347160b8885408776a13ed43a87fea558eb58a2584dec85e74d4dfdbe
-const CHECKSUM_LEDGER = '0a9fad73eef7c8d540bed54a7d07bef4ac618dbc639ea9981f6a2bcef748fe5c'
+//
+// 21/08/2026 — POLÍTICA DE REABERTURA. Quatro colunas na definição do passo
+// (permitida, estratégia, exige justificativa, permissão) com os defaults que
+// reproduzem o comportamento de hoje — nenhuma etapa muda por efeito da migration.
+// Ledger reconciliado no MESMO deploy de 20260821200000_politica_de_reabertura.
+//
+//   anterior : 0a9fad73eef7c8d540bed54a7d07bef4ac618dbc639ea9981f6a2bcef748fe5c
+const CHECKSUM_LEDGER = '5955d26c1b544edf95fc04eca4f4f437a14328791f10737271d9c192e0e5582d'
 
 /**
  * Migrations criadas DEPOIS da consolidacao de 02/08/2026. Toda migration nova
@@ -246,6 +253,7 @@ const MIGRATIONS_POS_BASELINE: string[] = [
   '20260821090000_cadastro_canonico_de_execucao',
   '20260821140000_constraints_de_estado_impossivel',
   '20260821160000_chave_de_derivacao_documental',
+  '20260821200000_politica_de_reabertura',
 ]
 
 const sha256 = (t: string) => createHash('sha256').update(t).digest('hex')
