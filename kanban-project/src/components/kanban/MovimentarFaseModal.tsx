@@ -43,36 +43,13 @@ interface ContextoMovimentacao {
   justificativa: { min: number; max: number }
 }
 
-/** Uma obrigação da fase de destino, como o servidor a descreve. */
-interface ObrigacaoDoDestino {
-  stepInstanceId: number
-  stepKey: string
-  titulo: string
-  ordem: number
-  status: string
-  obrigatorio: boolean
-  concluidaEm: string | null
-  dependeDe: string[]
-  execucoes: number
-  podeReabrir: boolean
-  motivoNaoPode: string | null
-  estrategiaPadrao: string
-  exigeJustificativa: boolean
-  alcancaSeReaberta: Array<{ stepInstanceId: number; stepKey: string; titulo: string; status: string }>
-}
-
 interface PlanoDeRetrocesso {
   ehRetrocesso: boolean
   faseDestinoLabel: string
-  obrigacoes: ObrigacaoDoDestino[]
+  /** Leitura, não seleção: o que existe lá, para o administrador saber antes de mover. */
+  retrato: { unidades: number; obrigacoes: number; concluidas: number; emAberto: number }
   fasesPosterioresVisitadas: Array<{ faseMacroKey: string; ciclos: number; obrigacoes: number }>
   aviso: string
-}
-
-const ROTULO_ESTADO: Record<string, string> = {
-  CONCLUIDO: "concluída", EM_ANDAMENTO: "em execução", DISPONIVEL: "disponível",
-  BLOQUEADO: "aguardando dependência", PENDENTE: "pendente", AGUARDANDO: "aguardando terceiro",
-  DISPENSADO: "dispensada", CANCELADO: "cancelada", SUPERSEDIDO: "substituída",
 }
 
 export interface MovimentarFaseModalProps {
@@ -103,14 +80,17 @@ export function MovimentarFaseModal({
   // TRAVA DE ENVIO DUPLO: um clique duplo (ou duas abas) não pode virar duas
   // movimentações. O ref fecha a porta antes de qualquer await.
   const enviandoRef = useRef(false)
-  // RETROCESSO É OUTRO COMANDO. Quando o destino é uma fase anterior, o servidor sabe
-  // dizer o que existe lá e o que pode ser reexecutado — e é isso que o administrador
-  // precisa ver ANTES de confirmar. Sem esta pergunta, ele retrocedia e ia procurar,
-  // na Central, um jeito de refazer o trabalho; o único botão que mudava algo era
-  // "Cancelar operação", que diz o contrário de refazer.
+  // RETROCESSO É OUTRO COMANDO — mas é APENAS a movimentação.
+  //
+  // Este modal já perguntou quais tarefas reabrir, e estava errado. Mover a fase é um
+  // fato sobre a posição do processo; refazer trabalho é uma decisão sobre UMA unidade
+  // — esta certidão, desta pessoa. Numa Emissão com cinquenta certidões a pergunta não
+  // cabe aqui: são cinquenta decisões, tomadas na Central, uma de cada vez.
+  //
+  // O que fica é o RETRATO: quantas unidades e obrigações existem no destino, para o
+  // administrador saber o que vai encontrar. Sem checkbox e sem consequência.
   const [plano, setPlano] = useState<PlanoDeRetrocesso | null>(null)
   const [carregandoPlano, setCarregandoPlano] = useState(false)
-  const [selecionadas, setSelecionadas] = useState<Record<number, { comDependentes: boolean }>>({})
   // A CORRELAÇÃO NASCE COM O MODAL: o mesmo comando reenviado (duplo clique, retry de
   // rede, segunda aba com a tela aberta) carrega a mesma, e não vira duas execuções.
   // Gerada no primeiro efeito, não no render: relógio e sorteio são impuros, e chamá-los
@@ -152,8 +132,7 @@ export function MovimentarFaseModal({
       if (!vivo) return
       if (!faseAlvo || !ctx || faseAlvo === ctx.faseAtual) { setPlano(null); return }
       setCarregandoPlano(true)
-      setSelecionadas({})
-      try {
+        try {
         const res = await fetch(`/api/processos/${processoId}/phase/rollback?faseDestino=${encodeURIComponent(faseAlvo)}`, {
           headers: { Authorization: `Bearer ${token()}` },
         })
@@ -178,10 +157,6 @@ export function MovimentarFaseModal({
       // DOIS COMANDOS, DUAS ROTAS. Avançar continua em `phase/move`; retroceder tem
       // rota própria, porque carrega uma decisão que avançar não tem: o que reexecutar.
       const ehRetrocesso = plano?.ehRetrocesso === true
-      const reabrir = Object.entries(selecionadas).map(([id, v]) => ({
-        stepInstanceId: Number(id), comDependentes: v.comDependentes,
-      }))
-
       const res = await fetch(
         ehRetrocesso ? `/api/processos/${processoId}/phase/rollback` : `/api/processos/${processoId}/phase/move`,
         {
@@ -190,7 +165,7 @@ export function MovimentarFaseModal({
           // userId NÃO vai no corpo: quem assina é o token.
           body: JSON.stringify(
             ehRetrocesso
-              ? { faseDestino: faseAlvo, motivoCodigo, justificativa, reabrir, origem, correlationId: correlacao.current }
+              ? { faseDestino: faseAlvo, motivoCodigo, justificativa, origem, correlationId: correlacao.current }
               : { faseAlvo, motivoCodigo, justificativa, origem },
           ),
         },
@@ -201,12 +176,11 @@ export function MovimentarFaseModal({
           setErro(d?.mensagem || d?.error || "Não foi possível retroceder o processo. Nada foi alterado.")
           return
         }
-        const quantas = Array.isArray(d.reabertas) ? d.reabertas.length : 0
         onMovido({
           faseAtual: d.faseAtual, faseAtualLabel: plano?.faseDestinoLabel ?? d.faseAtual,
-          message: quantas > 0
-            ? `Processo retrocedido. ${quantas} obrigação(ões) reaberta(s) para nova execução; as execuções anteriores continuam no histórico.`
-            : "Processo retrocedido. Nenhuma obrigação foi reaberta.",
+          message:
+            "Processo retrocedido. Nenhuma tarefa foi reaberta — o que já estava concluído continua concluído. " +
+            "Para refazer alguma, use “Reabrir tarefa” na Central Operacional, no documento da pessoa.",
         })
         return
       }
@@ -222,7 +196,7 @@ export function MovimentarFaseModal({
       enviandoRef.current = false
       setEnviando(false)
     }
-  }, [processoId, faseAlvo, motivoCodigo, justificativa, origem, onMovido, plano, selecionadas])
+  }, [processoId, faseAlvo, motivoCodigo, justificativa, origem, onMovido, plano])
 
   const min = ctx?.justificativa.min ?? 10
   const max = ctx?.justificativa.max ?? 500
@@ -369,93 +343,21 @@ export function MovimentarFaseModal({
               {plano?.ehRetrocesso && (
                 <div className="rounded-lg border border-[#d2a948]/30 bg-[#d2a948]/5 px-3 py-3">
                   <div className="text-[11px] font-bold uppercase tracking-wider text-[#d2a948]">
-                    Obrigações em {plano.faseDestinoLabel}
+                    O que existe em {plano.faseDestinoLabel}
                   </div>
-                  <p className="mt-1 text-[11.5px] leading-snug text-white/55">{plano.aviso}</p>
-
-                  {plano.obrigacoes.length === 0 && (
-                    <p className="mt-2 text-[12px] text-white/45">
-                      Não há obrigações materializadas nessa fase — o retrocesso apenas reposiciona o processo.
-                    </p>
-                  )}
-
-                  <div className="mt-2.5 space-y-1.5">
-                    {plano.obrigacoes.map((o) => {
-                      const marcada = !!selecionadas[o.stepInstanceId]
-                      return (
-                        <div
-                          key={o.stepInstanceId}
-                          className={`rounded-lg border px-2.5 py-2 ${marcada ? "border-[#d2a948]/50 bg-[#d2a948]/10" : "border-white/10 bg-[#15191f]"}`}
-                        >
-                          <label className={`flex items-start gap-2 ${o.podeReabrir ? "cursor-pointer" : "cursor-not-allowed"}`}>
-                            <input
-                              type="checkbox"
-                              className="mt-0.5"
-                              disabled={!o.podeReabrir || enviando}
-                              checked={marcada}
-                              onChange={(e) =>
-                                setSelecionadas((s) => {
-                                  const n = { ...s }
-                                  if (e.target.checked) {
-                                    n[o.stepInstanceId] = { comDependentes: o.estrategiaPadrao === "ESTA_E_DEPENDENTES" }
-                                  } else delete n[o.stepInstanceId]
-                                  return n
-                                })
-                              }
-                            />
-                            <span className="min-w-0 flex-1">
-                              <span className="text-[12.5px] text-white/90">{o.titulo}</span>
-                              <span className="ml-2 text-[11px] text-white/40">
-                                {ROTULO_ESTADO[o.status] ?? o.status.toLowerCase()}
-                                {o.obrigatorio ? " · obrigatória" : " · opcional"}
-                                {o.execucoes > 1 ? ` · ${o.execucoes} execuções` : ""}
-                              </span>
-                              {o.dependeDe.length > 0 && (
-                                <span className="block text-[11px] text-white/35">depende de: {o.dependeDe.join(", ")}</span>
-                              )}
-                              {!o.podeReabrir && o.motivoNaoPode && (
-                                <span className="block text-[11px] text-[#d2a948]/80">{o.motivoNaoPode}</span>
-                              )}
-                            </span>
-                          </label>
-
-                          {marcada && o.alcancaSeReaberta.length > 0 && (
-                            <label className="mt-1.5 ml-6 flex items-start gap-2 cursor-pointer">
-                              <input
-                                type="checkbox"
-                                className="mt-0.5"
-                                disabled={enviando}
-                                checked={selecionadas[o.stepInstanceId]?.comDependentes === true}
-                                onChange={(e) =>
-                                  setSelecionadas((s) => ({ ...s, [o.stepInstanceId]: { comDependentes: e.target.checked } }))
-                                }
-                              />
-                              <span className="text-[11.5px] text-white/70">
-                                Reabrir a cadeia dependente
-                                <span className="block text-[11px] text-white/40">
-                                  {o.alcancaSeReaberta.map((a) => a.titulo).join(" · ")} — pelas dependências cadastradas, não pela ordem da lista.
-                                </span>
-                              </span>
-                            </label>
-                          )}
-                        </div>
-                      )
-                    })}
-                  </div>
-
+                  <p className="mt-1 text-[12px] text-white/70">
+                    {plano.retrato.unidades} unidade(s) de trabalho · {plano.retrato.obrigacoes} obrigação(ões)
+                    {plano.retrato.concluidas > 0 && ` · ${plano.retrato.concluidas} concluída(s)`}
+                    {plano.retrato.emAberto > 0 && ` · ${plano.retrato.emAberto} em aberto`}
+                  </p>
+                  <p className="mt-1.5 text-[11.5px] leading-snug text-white/55">{plano.aviso}</p>
                   {plano.fasesPosterioresVisitadas.length > 0 && (
-                    <p className="mt-2.5 text-[11px] text-white/40">
+                    <p className="mt-2 text-[11px] text-white/40">
                       O trabalho das fases posteriores continua registrado
                       {" "}({plano.fasesPosterioresVisitadas.map((f) => `${f.faseMacroKey}: ${f.obrigacoes} obrigação(ões)`).join(" · ")}).
                       Nada é apagado.
                     </p>
                   )}
-
-                  <p className="mt-2 text-[11.5px] font-semibold text-white/70">
-                    {Object.keys(selecionadas).length === 0
-                      ? "Somente retroceder — nenhuma obrigação será reexecutada."
-                      : `${Object.keys(selecionadas).length} obrigação(ões) serão reabertas em nova execução. As execuções anteriores continuam no histórico.`}
-                  </p>
                 </div>
               )}
 
@@ -484,9 +386,7 @@ export function MovimentarFaseModal({
             {enviando && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
             {enviando
               ? (plano?.ehRetrocesso ? "Retrocedendo…" : "Movendo…")
-              : plano?.ehRetrocesso
-                ? (Object.keys(selecionadas).length === 0 ? "Somente retroceder" : "Retroceder e reabrir")
-                : "Confirmar movimentação"}
+              : plano?.ehRetrocesso ? "Confirmar retrocesso" : "Confirmar movimentação"}
           </button>
         </div>
       </div>

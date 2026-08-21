@@ -301,6 +301,19 @@ export interface TransicaoPassoOpts {
    * contornar a pré-condição em execução normal.
    */
   ignorarDependencias?: boolean
+  /**
+   * A CASCATA ALCANÇA O DESCENDENTE JÁ CONCLUÍDO?
+   *
+   * Padrão `true` — reabrir um predecessor deixa o sucessor pronto apoiado em algo que
+   * voltou a estar aberto, e refazê-lo costuma ser o que se quer.
+   *
+   * Mas nem sempre: o administrador pode saber que o trabalho seguinte continua
+   * válido, e "reabrir somente esta tarefa" é uma escolha legítima que ele faz na
+   * Central. Nesse caso os descendentes EM VOO ainda são bloqueados — eles não têm
+   * como prosseguir com a dependência aberta —, e os já concluídos permanecem
+   * concluídos, porque são fato consumado que ninguém mandou desfazer.
+   */
+  alcancarConcluidos?: boolean
 }
 
 export type TransicaoPassoResultado = {
@@ -580,7 +593,10 @@ export async function reabrirPassoTx(
       ? (x.dependeDeStepKeys as unknown[]).filter((y): y is string => typeof y === "string")
       : null,
   }))
-  const ALCANCAVEIS = new Set(["DISPONIVEL", "EM_ANDAMENTO", "AGUARDANDO", "CONCLUIDO", "EXECUTADO"])
+  const EM_VOO = ["DISPONIVEL", "EM_ANDAMENTO", "AGUARDANDO"]
+  const CUMPRIDOS = ["CONCLUIDO", "EXECUTADO"]
+  const alcancarConcluidos = o.alcancarConcluidos !== false
+  const ALCANCAVEIS = new Set(alcancarConcluidos ? [...EM_VOO, ...CUMPRIDOS] : EM_VOO)
   for (const desc of descendentes(grafoDaUnidade, step.stepKey)) {
     if (!ALCANCAVEIS.has(desc.status)) continue
     const info = daUnidadeParaPropagar.find((x) => x.id === desc.id)!

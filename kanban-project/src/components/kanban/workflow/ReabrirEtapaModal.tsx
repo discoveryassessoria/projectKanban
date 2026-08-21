@@ -1,64 +1,79 @@
 "use client"
 // src/components/kanban/workflow/ReabrirEtapaModal.tsx
 //
-// REABRIR UMA ETAPA — o ato explícito, com o impacto na frente.
+// REABRIR UMA TAREFA — desta pessoa, deste documento, desta etapa.
 //
-// Aqui havia um `confirm()` do navegador com três linhas de texto escritas à mão,
-// que afirmavam o que ia acontecer sem perguntar ao servidor: "bloquear a próxima
-// etapa ativa", "manter concluídas posteriores intactas". Eram descrições da
-// intenção, não do efeito — e o efeito depende das dependências CADASTRADAS, que a
-// tela não conhecia.
+// A tela precisa dizer, sem ambiguidade, DE QUEM é o trabalho que vai ser refeito.
+// "Reabrir Solicitar certidão" não é um comando: numa Emissão com cinquenta certidões,
+// é ambíguo entre cinquenta. Por isso o cabeçalho mostra fase, pessoa, documento e
+// etapa — e o rodapé diz quantas outras unidades NÃO serão tocadas.
 //
-// Agora o impacto vem calculado do servidor, pelo mesmo grafo que o motor executa:
-// o que é reexecutado, o que é reavaliado por depender disso, o que é herdado e o
-// que fica onde está. E a execução anterior é dita pelo que ela é — arquivada, não
-// apagada.
+// O impacto vem calculado do servidor, pelo mesmo grafo que o motor executa e no mesmo
+// escopo de unidade: a cadeia dependente é a DESTE documento, nunca a das etapas
+// homônimas dos outros.
 
 import { useCallback, useEffect, useState } from "react"
 
-interface Preview {
-  passo: { id: number; stepKey: string; status: string; fase: string; ciclo: number }
-  seraReexecutado: Array<{ id: number; stepKey: string; status: string }>
-  seraoReavaliados: Array<{ id: number; stepKey: string; status: string }>
-  herdados: Array<{ id: number; stepKey: string; status: string }>
-  intactos: Array<{ id: number; stepKey: string; status: string }>
-  execucoesAnteriores: number
+interface Plano {
+  identidade: {
+    faseLabel: string
+    ciclo: number
+    pessoaNome: string | null
+    documentoTitulo: string | null
+    documentoId: number | null
+    stepTitulo: string
+    stepKey: string
+  }
+  podeReabrir: boolean
+  motivoNaoPode: string | null
+  estrategiaPadrao: string
+  exigeJustificativa: boolean
+  execucoes: Array<{
+    sequencia: number; status: string; motivo: string
+    iniciadaEm: string | null; concluidaEm: string | null
+    executadoPorNome: string | null; resultado: string | null
+  }>
+  dependentesDaMesmaUnidade: Array<{ stepInstanceId: number; stepKey: string; titulo: string; status: string }>
+  outrasUnidadesNaFase: number
   aviso: string
 }
 
-const ROTULO: Record<string, string> = {
-  CONCLUIDO: "concluída", EM_ANDAMENTO: "em execução", DISPONIVEL: "disponível",
-  BLOQUEADO: "aguardando dependência", PENDENTE: "pendente", AGUARDANDO: "aguardando terceiro",
-}
+interface Motivo { codigo: string; label: string; descricao: string }
+
+const data = (iso: string | null) =>
+  iso ? new Date(iso).toLocaleString("pt-BR", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" }) : "—"
 
 function headers(): HeadersInit {
   const t = typeof window !== "undefined" ? localStorage.getItem("token") ?? localStorage.getItem("authToken") : null
   return { "Content-Type": "application/json", ...(t ? { Authorization: `Bearer ${t}` } : {}) }
 }
 
-const lista = (v: Array<{ stepKey: string }>) => (v.length ? v.map((x) => x.stepKey).join(" · ") : "nenhuma")
-
 export default function ReabrirEtapaModal({
-  stepInstanceId, titulo, onFechar, onReaberto,
+  stepInstanceId, onFechar, onReaberto,
 }: {
   stepInstanceId: number
-  titulo: string
   onFechar: () => void
   onReaberto: () => void
 }) {
-  const [preview, setPreview] = useState<Preview | null>(null)
+  const [plano, setPlano] = useState<Plano | null>(null)
+  const [motivos, setMotivos] = useState<Motivo[]>([])
   const [carregando, setCarregando] = useState(true)
   const [erro, setErro] = useState<string | null>(null)
+  const [motivoCodigo, setMotivoCodigo] = useState("")
   const [justificativa, setJustificativa] = useState("")
-  const [comDependentes, setComDependentes] = useState(true)
+  const [comDependentes, setComDependentes] = useState(false)
   const [enviando, setEnviando] = useState(false)
 
   const carregar = useCallback(async () => {
     try {
-      const r = await fetch(`/api/workflow-step-instances/${stepInstanceId}/reexecutar`, { headers: headers() })
-      if (!r.ok) { setErro("Não foi possível calcular o impacto da reabertura."); return }
-      setPreview(await r.json())
-    } catch { setErro("Erro de conexão ao calcular o impacto.") }
+      const r = await fetch(`/api/workflow-step-instances/${stepInstanceId}/reabrir`, { headers: headers() })
+      const j = await r.json().catch(() => ({}))
+      if (!r.ok || !j?.plano) { setErro(j?.error ?? "Não foi possível carregar esta tarefa."); return }
+      setPlano(j.plano as Plano)
+      setMotivos((j.motivos ?? []) as Motivo[])
+      // A estratégia CADASTRADA é a sugestão; a decisão continua sendo de quem confirma.
+      setComDependentes((j.plano as Plano).estrategiaPadrao === "ESTA_E_DEPENDENTES")
+    } catch { setErro("Erro de conexão ao carregar esta tarefa.") }
     finally { setCarregando(false) }
   }, [stepInstanceId])
 
@@ -71,13 +86,13 @@ export default function ReabrirEtapaModal({
   async function confirmar() {
     setEnviando(true); setErro(null)
     try {
-      const r = await fetch(`/api/workflow-step-instances/${stepInstanceId}/reexecutar`, {
+      const r = await fetch(`/api/workflow-step-instances/${stepInstanceId}/reabrir`, {
         method: "POST", headers: headers(),
         body: JSON.stringify({
-          justificativa,
-          // A correlação é do PASSO e da execução atual: reenviar o mesmo comando não
-          // abre uma segunda execução.
-          correlationId: `reabrir|si${stepInstanceId}|${preview?.execucoesAnteriores ?? 0}`,
+          motivoCodigo, justificativa, comDependentes,
+          // A correlação inclui quantas execuções já havia: o mesmo comando reenviado
+          // (duplo clique, segunda aba, retry) não abre uma execução a mais.
+          correlationId: `reabrir|si${stepInstanceId}|${plano?.execucoes.length ?? 0}`,
         }),
       })
       const j = await r.json()
@@ -88,64 +103,140 @@ export default function ReabrirEtapaModal({
   }
 
   const inp = "w-full rounded-lg border border-white/10 bg-[#15191f] px-3 py-2 text-[13px] text-white/95 outline-none focus:border-[#7dd3fc]/50"
+  const rot = "text-[10px] font-bold uppercase tracking-wider text-white/40"
+  const atual = plano?.execucoes.find((e) => e.status !== "SUPERSEDIDO") ?? plano?.execucoes[plano.execucoes.length - 1] ?? null
+  const podeConfirmar =
+    !enviando && !!plano?.podeReabrir && !!motivoCodigo &&
+    (!plano.exigeJustificativa || justificativa.trim().length >= 5)
 
   return (
     <div className="fixed inset-0 z-[10060] flex items-center justify-center bg-black/60 px-4" onClick={enviando ? undefined : onFechar}>
-      <div className="w-full max-w-[540px] max-h-[88vh] overflow-y-auto rounded-2xl border border-white/10 bg-[#1b2027] shadow-2xl"
-        onClick={(e) => e.stopPropagation()} role="dialog" aria-modal="true" aria-label="Reabrir etapa">
+      <div className="w-full max-w-[560px] max-h-[90vh] overflow-y-auto rounded-2xl border border-white/10 bg-[#1b2027] shadow-2xl"
+        onClick={(e) => e.stopPropagation()} role="dialog" aria-modal="true" aria-label="Reabrir tarefa">
         <div className="border-b border-white/10 px-5 py-4">
-          <h2 className="text-[16px] font-extrabold text-white/95">Reabrir “{titulo}”</h2>
+          <h2 className="text-[16px] font-extrabold text-white/95">Reabrir tarefa</h2>
           <p className="mt-0.5 text-[12px] text-white/50">
-            Reabrir cria uma execução NOVA. A execução atual é arquivada com o que foi registrado nela — nada é apagado.
+            Uma execução nova começa. A atual é arquivada com o que foi registrado nela — nada é apagado.
           </p>
         </div>
 
         <div className="space-y-3 px-5 py-4">
-          {carregando && <div className="text-[13px] text-white/50">Calculando o impacto…</div>}
+          {carregando && <div className="text-[13px] text-white/50">Carregando…</div>}
 
-          {preview && (
-            <div className="rounded-lg border border-[#d2a948]/30 bg-[#d2a948]/5 px-3 py-3 text-[12px]">
-              <div className="text-[11px] font-bold uppercase tracking-wider text-[#d2a948]">O que a reabertura faz</div>
-              <ul className="mt-1.5 space-y-1 text-white/75">
-                <li>Reexecutada: <b>{lista(preview.seraReexecutado)}</b></li>
-                <li>Reavaliadas por dependerem dela: <b>{lista(preview.seraoReavaliados)}</b></li>
-                <li>Herdadas (continuam valendo): <b>{lista(preview.herdados)}</b></li>
-                <li>Intactas: <b>{lista(preview.intactos)}</b></li>
-              </ul>
-              <p className="mt-2 text-[11.5px] text-white/45">{preview.aviso}</p>
-              {preview.execucoesAnteriores > 1 && (
-                <p className="mt-1 text-[11.5px] text-white/45">
-                  Esta obrigação já teve {preview.execucoesAnteriores} execuções; a próxima será a {preview.execucoesAnteriores + 1}ª.
-                </p>
+          {plano && (
+            <>
+              {/* DE QUEM É O TRABALHO — a identidade, antes de tudo. */}
+              <div className="grid grid-cols-2 gap-3 rounded-lg border border-white/10 bg-[#15191f] px-3 py-3">
+                <div><div className={rot}>Fase</div><div className="text-[13px] text-white/90">{plano.identidade.faseLabel}</div></div>
+                <div><div className={rot}>Pessoa</div><div className="text-[13px] text-white/90">{plano.identidade.pessoaNome ?? "—"}</div></div>
+                <div className="col-span-2">
+                  <div className={rot}>Documento</div>
+                  <div className="text-[13px] text-white/90">
+                    {plano.identidade.documentoTitulo ?? "—"}
+                    {plano.identidade.documentoId && <span className="ml-1.5 text-[11px] text-white/35">#{plano.identidade.documentoId}</span>}
+                  </div>
+                </div>
+                <div className="col-span-2"><div className={rot}>Passo</div><div className="text-[13px] text-white/90">{plano.identidade.stepTitulo}</div></div>
+              </div>
+
+              {/* O QUE JÁ HOUVE NESTA UNIDADE */}
+              <div className="rounded-lg border border-white/10 bg-[#15191f] px-3 py-3">
+                <div className={rot}>Execução anterior</div>
+                {atual ? (
+                  <div className="mt-1 text-[12.5px] text-white/80">
+                    Execução {atual.sequencia} · {atual.status.toLowerCase()}
+                    {atual.concluidaEm && ` · concluída em ${data(atual.concluidaEm)}`}
+                    {atual.executadoPorNome && ` · por ${atual.executadoPorNome}`}
+                    {atual.resultado && ` · resultado: ${atual.resultado}`}
+                  </div>
+                ) : <div className="mt-1 text-[12.5px] text-white/50">Sem execução registrada.</div>}
+                {plano.execucoes.length > 1 && (
+                  <div className="mt-1 text-[11px] text-white/40">
+                    {plano.execucoes.length} execuções no histórico desta tarefa; a próxima será a {plano.execucoes.length + 1}ª.
+                  </div>
+                )}
+              </div>
+
+              {!plano.podeReabrir && (
+                <div className="rounded-lg border border-[#d2a948]/40 bg-[#d2a948]/10 px-3 py-2.5 text-[12.5px] text-[#d2a948]">
+                  {plano.motivoNaoPode}
+                </div>
               )}
-              <p className="mt-1 text-[11.5px] text-white/45">
-                Estado atual: {ROTULO[preview.passo.status] ?? preview.passo.status.toLowerCase()}.
-              </p>
-            </div>
+
+              {plano.podeReabrir && (
+                <>
+                  <div>
+                    <div className={rot}>O que reabrir</div>
+                    <label className="mt-1 flex cursor-pointer items-start gap-2 rounded-lg border border-white/10 bg-[#15191f] px-3 py-2">
+                      <input type="radio" className="mt-0.5" checked={!comDependentes} onChange={() => setComDependentes(false)} />
+                      <span className="text-[12.5px] text-white/85">
+                        Reabrir somente esta tarefa
+                        <span className="block text-[11px] text-white/40">Nenhuma outra etapa é tocada.</span>
+                      </span>
+                    </label>
+                    <label className={`mt-1.5 flex items-start gap-2 rounded-lg border px-3 py-2 ${plano.dependentesDaMesmaUnidade.length ? "cursor-pointer border-white/10 bg-[#15191f]" : "cursor-not-allowed border-white/5 bg-[#15191f]/50 opacity-50"}`}>
+                      <input type="radio" className="mt-0.5" disabled={!plano.dependentesDaMesmaUnidade.length}
+                        checked={comDependentes} onChange={() => setComDependentes(true)} />
+                      <span className="text-[12.5px] text-white/85">
+                        Reabrir esta tarefa e as que dependem dela
+                        <span className="block text-[11px] text-white/40">
+                          {plano.dependentesDaMesmaUnidade.length
+                            ? "Só as deste documento — as etapas de mesmo nome dos outros documentos não são tocadas."
+                            : "Nenhuma etapa depende desta."}
+                        </span>
+                      </span>
+                    </label>
+                  </div>
+
+                  {/* PREVIEW EXATO — o que vai acontecer, com nome e sobrenome. */}
+                  <div className="rounded-lg border border-[#d2a948]/30 bg-[#d2a948]/5 px-3 py-3 text-[12px]">
+                    <div className="text-[11px] font-bold uppercase tracking-wider text-[#d2a948]">Será criada nova execução para</div>
+                    <div className="mt-1 text-white/85">
+                      {plano.identidade.pessoaNome ?? "—"}
+                      <div className="ml-3">→ {plano.identidade.documentoTitulo ?? "—"}</div>
+                      <div className="ml-6">→ {plano.identidade.stepTitulo}</div>
+                    </div>
+                    {comDependentes && plano.dependentesDaMesmaUnidade.length > 0 && (
+                      <>
+                        <div className="mt-2 text-[11px] font-bold uppercase tracking-wider text-[#d2a948]">Também serão afetados</div>
+                        <div className="mt-1 text-white/85">
+                          {plano.dependentesDaMesmaUnidade.map((d) => (
+                            <div key={d.stepInstanceId} className="ml-3">→ {d.titulo}</div>
+                          ))}
+                        </div>
+                      </>
+                    )}
+                    <div className="mt-2 font-semibold text-white/70">
+                      {plano.outrasUnidadesNaFase > 0
+                        ? `Nenhuma outra unidade será alterada — as outras ${plano.outrasUnidadesNaFase} desta fase ficam exatamente como estão.`
+                        : "Nenhuma outra unidade será alterada."}
+                    </div>
+                    <p className="mt-1.5 text-[11px] text-white/45">{plano.aviso}</p>
+                  </div>
+
+                  <label className="block">
+                    <span className={rot}>Motivo da reabertura *</span>
+                    <select className={`${inp} mt-1`} value={motivoCodigo} onChange={(e) => setMotivoCodigo(e.target.value)}>
+                      <option value="">— escolher —</option>
+                      {motivos.map((m) => <option key={m.codigo} value={m.codigo}>{m.label}</option>)}
+                    </select>
+                    {motivoCodigo && (
+                      <span className="mt-1 block text-[11px] text-white/40">{motivos.find((m) => m.codigo === motivoCodigo)?.descricao}</span>
+                    )}
+                  </label>
+
+                  <label className="block">
+                    <span className={rot}>Justificativa {plano.exigeJustificativa ? "*" : "(opcional)"}</span>
+                    <textarea className={`${inp} mt-1 resize-y`} rows={3} value={justificativa}
+                      onChange={(e) => setJustificativa(e.target.value.slice(0, 400))}
+                      placeholder="ex.: certidão recebida com o nome da mãe errado; refazer o pedido" />
+                  </label>
+                </>
+              )}
+            </>
           )}
 
-          {preview && preview.seraoReavaliados.length > 0 && (
-            <label className="flex items-start gap-2 cursor-pointer">
-              <input type="checkbox" className="mt-0.5" checked={comDependentes} onChange={(e) => setComDependentes(e.target.checked)} />
-              <span className="text-[12.5px] text-white/80">
-                Reabrir a cadeia dependente
-                <span className="block text-[11px] text-white/45">
-                  As etapas acima dependem desta pelo cadastro; enquanto ela não concluir de novo, elas ficam aguardando.
-                </span>
-              </span>
-            </label>
-          )}
-
-          <label className="block">
-            <span className="text-[11px] font-bold uppercase tracking-wider text-white/40">Por quê *</span>
-            <textarea className={`${inp} mt-1 resize-y`} rows={3} value={justificativa}
-              onChange={(e) => setJustificativa(e.target.value.slice(0, 400))}
-              placeholder="ex.: certidão recebida com o nome da mãe errado; refazer o pedido" />
-          </label>
-
-          {erro && (
-            <div className="rounded-lg border border-[#f87171]/40 bg-[#f87171]/10 px-3 py-2.5 text-[12.5px] text-[#f87171]">{erro}</div>
-          )}
+          {erro && <div className="rounded-lg border border-[#f87171]/40 bg-[#f87171]/10 px-3 py-2.5 text-[12.5px] text-[#f87171]">{erro}</div>}
         </div>
 
         <div className="flex items-center justify-end gap-2 border-t border-white/10 px-5 py-4">
@@ -153,7 +244,7 @@ export default function ReabrirEtapaModal({
             className="rounded-lg border border-white/10 px-4 py-2 text-[12.5px] font-semibold text-white/80 hover:bg-white/5 disabled:opacity-40">
             Cancelar
           </button>
-          <button onClick={() => void confirmar()} disabled={enviando || justificativa.trim().length < 5 || !preview}
+          <button onClick={() => void confirmar()} disabled={!podeConfirmar}
             className="rounded-lg bg-[#d2a948] px-4 py-2 text-[12.5px] font-bold text-[#1b2027] hover:bg-[#e0bd6a] disabled:opacity-40">
             {enviando ? "Reabrindo…" : "Confirmar reabertura"}
           </button>

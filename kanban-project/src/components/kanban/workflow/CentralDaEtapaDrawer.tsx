@@ -881,7 +881,6 @@ function ConteudoDrawer({
       {reabrindoModal && stepId != null && (
         <ReabrirEtapaModal
           stepInstanceId={stepId}
-          titulo={step?.title ?? "esta etapa"}
           onFechar={() => setReabrindoModal(false)}
           onReaberto={() => {
             setReabrindoModal(false)

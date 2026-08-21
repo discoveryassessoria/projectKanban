@@ -119,3 +119,79 @@ export async function historicoDaOperacao(
     payload: limpar(t.payload),
   }))
 }
+
+/**
+ * A OPERAÇÃO DESTA OBRIGAÇÃO ATRAVÉS DAS VISITAS.
+ *
+ * Voltar para uma fase abre uma VISITA NOVA, com linhas novas para as mesmas
+ * obrigações. O que foi preenchido na visita anterior continua no banco — mas preso à
+ * linha anterior, e a Central, que mostra a visita vigente, deixava de enxergá-lo. Do
+ * ponto de vista de quem opera, a informação tinha sumido.
+ *
+ * Aqui a leitura segue a OBRIGAÇÃO, não a linha: mesma etapa, mesma unidade de
+ * trabalho (o documento, a necessidade), atravessando as visitas da mesma fase.
+ *
+ * O QUE É DESTA EXECUÇÃO E O QUE É HERDADO fica distinguido em `visitaAtual`. Uma
+ * execução nova NÃO herda o preenchimento como se o tivesse produzido — ela o
+ * consulta. Registrar o anexo da primeira via como produzido pela segunda seria
+ * afirmar um trabalho que não aconteceu.
+ */
+export async function historicoDaOperacaoDaUnidade(
+  stepInstanceId: number,
+  db: DB = prisma,
+): Promise<Array<{
+  visitaId: number
+  ciclo: number
+  visitaAtual: boolean
+  sequencia: number
+  motivo: string
+  atual: boolean
+  concluidaEm: Date | null
+  payload: PayloadOperacional
+}>> {
+  const passo = await db.phaseWorkflowStepInstance.findUnique({
+    where: { id: stepInstanceId },
+    select: {
+      stepKey: true, processoId: true, faseMacroKey: true, documentoId: true,
+      necessidadeId: true, pessoaId: true, workflowInstanceId: true,
+    },
+  })
+  if (!passo) return []
+
+  // AS LINHAS DA MESMA OBRIGAÇÃO em todas as visitas da fase. A âncora é a mesma que
+  // o motor usa para isolar a unidade — comparar só o que ambos os lados declaram.
+  const irmaos = await db.phaseWorkflowStepInstance.findMany({
+    where: {
+      processoId: passo.processoId,
+      faseMacroKey: passo.faseMacroKey,
+      stepKey: passo.stepKey,
+      ...(passo.documentoId != null ? { documentoId: passo.documentoId } : {}),
+      ...(passo.necessidadeId != null ? { necessidadeId: passo.necessidadeId } : {}),
+      ...(passo.documentoId == null && passo.necessidadeId != null ? {} : {}),
+    },
+    select: { id: true, workflowInstanceId: true, ciclo: true },
+    orderBy: { id: "asc" },
+  })
+
+  const saida: Array<{
+    visitaId: number; ciclo: number; visitaAtual: boolean; sequencia: number
+    motivo: string; atual: boolean; concluidaEm: Date | null; payload: PayloadOperacional
+  }> = []
+  for (const irmao of irmaos) {
+    for (const t of await tentativasDoPasso(irmao.id, db)) {
+      saida.push({
+        visitaId: irmao.workflowInstanceId ?? 0,
+        ciclo: irmao.ciclo,
+        visitaAtual: irmao.workflowInstanceId === passo.workflowInstanceId,
+        sequencia: t.sequencia,
+        motivo: t.motivo,
+        // "Atual" só na visita atual: a tentativa vigente de uma visita encerrada é
+        // histórico, por mais que a coluna `supersededAt` dela esteja nula.
+        atual: t.supersededAt == null && irmao.workflowInstanceId === passo.workflowInstanceId,
+        concluidaEm: t.completedAt,
+        payload: limpar(t.payload),
+      })
+    }
+  }
+  return saida.sort((a, b) => a.ciclo - b.ciclo || a.sequencia - b.sequencia)
+}

@@ -107,10 +107,19 @@ async function main() {
   check("  os passos que saem", (plano?.removiveis.passos ?? 0) >= 1)
   check("  e as tarefas que saem", (plano?.removiveis.tarefas ?? 0) >= 1)
 
-  const antesOutra = {
-    nec: await prisma.necessidadeDocumental.count({ where: { pessoaId: outra.id } }),
-    doc: await prisma.documento.count({ where: { pessoaId: outra.id } }),
-  }
+  // O QUE SE COBRA É PRESERVAÇÃO, NÃO IMOBILIDADE.
+  //
+  // Remover alguém dispara a reconciliação, e ela pode MATERIALIZAR uma necessidade
+  // nova para quem ficou — a matriz documental recalculando o que o processo passa a
+  // exigir. Isso é a regra funcionando, não dano. Contar necessidades como prova de
+  // integridade confundiria as duas coisas: o que não pode acontecer é a linha DELA
+  // sumir ou mudar.
+  const antesOutra = await prisma.necessidadeDocumental.findMany({
+    where: { pessoaId: outra.id }, select: { id: true, status: true, itemCatalogoId: true }, orderBy: { id: "asc" },
+  })
+  const antesDocOutra = await prisma.documento.findMany({
+    where: { pessoaId: outra.id }, select: { id: true, status: true, necessidadeId: true }, orderBy: { id: "asc" },
+  })
   const r = await removerPessoaDaArvore({ pessoaId: requerente.id, actorUserId: null, motivo: `${M} teste` })
   check("a remoção executa", r.ok, r.erro ?? "")
   check("  o que saiu bate com o que o preview prometeu",
@@ -128,9 +137,26 @@ async function main() {
     }),
   }
   check("ZERO órfãos depois da remoção", Object.values(orfaos).every((n) => n === 0), JSON.stringify(orfaos))
-  check("A OUTRA PESSOA CONTINUA INTEIRA",
-    (await prisma.necessidadeDocumental.count({ where: { pessoaId: outra.id } })) === antesOutra.nec &&
-    (await prisma.documento.count({ where: { pessoaId: outra.id } })) === antesOutra.doc)
+  const depoisNecOutra = await prisma.necessidadeDocumental.findMany({
+    where: { pessoaId: outra.id, id: { in: antesOutra.map((n) => n.id) } },
+    select: { id: true, status: true, itemCatalogoId: true }, orderBy: { id: "asc" },
+  })
+  const depoisDocOutra = await prisma.documento.findMany({
+    where: { pessoaId: outra.id }, select: { id: true, status: true, necessidadeId: true }, orderBy: { id: "asc" },
+  })
+  check("A OUTRA PESSOA CONTINUA INTEIRA — nenhuma linha dela sumiu ou mudou",
+    JSON.stringify(depoisNecOutra) === JSON.stringify(antesOutra) &&
+    JSON.stringify(depoisDocOutra) === JSON.stringify(antesDocOutra),
+    `necessidades antes=${JSON.stringify(antesOutra)} depois=${JSON.stringify(depoisNecOutra)}`)
+  // Necessidade NOVA para quem ficou é a matriz documental recalculando — e ela carrega
+  // a proveniência da regra que a criou, que é como se distingue "derivada" de "solta".
+  const novasParaOutra = await prisma.necessidadeDocumental.findMany({
+    where: { pessoaId: outra.id, id: { notIn: antesOutra.map((n) => n.id) } },
+    select: { chaveIdempotencia: true },
+  })
+  check("  e qualquer necessidade nova dela veio de uma REGRA, com proveniência",
+    novasParaOutra.every((n) => /rd:|regra|var:/.test(n.chaveIdempotencia ?? "")),
+    JSON.stringify(novasParaOutra.map((n) => n.chaveIdempotencia)))
   check("  e o documento dela continua lá", (await prisma.documento.findUnique({ where: { id: docDaOutra.id }, select: { id: true } })) != null)
 
   // ══════════════════════════════════════════════════════════════

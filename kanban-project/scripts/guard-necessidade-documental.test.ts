@@ -58,6 +58,9 @@ const AUTORIZADOS_FORA_DO_RUNTIME: Record<string, string> = {
   "scripts/provas-finais.test.ts":
     "provas finais: monta e derruba a PRÓPRIA árvore, pessoas e necessidades (marca PROVA) " +
     "só no banco de teste — a prova de exclusão precisa de alguém para excluir",
+  "scripts/isolamento-50-certidoes.test.ts":
+    "isolamento em escala: monta e derruba 10 pessoas, 50 documentos e 50 necessidades " +
+    "próprios (marca ESCALA50) só no banco de teste — o isolamento só se prova com massa",
   "scripts/retrocesso-de-fase.test.ts":
     "retrocesso de fase: monta e derruba a PRÓPRIA árvore, pessoa e necessidade (marca RETRO) " +
     "só no banco de teste — o caso real precisa de um processo com a fase já concluída",

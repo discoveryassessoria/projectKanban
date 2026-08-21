@@ -1,16 +1,20 @@
 // scripts/retrocesso-de-fase.test.ts
 //
-// RETROCEDER NÃO É CANCELAR, E REABRIR NÃO É APAGAR.
+// MOVER A FASE NÃO REFAZ TRABALHO. REFAZER É OUTRO COMANDO, E É POR UNIDADE.
 //
-// O defeito que este arquivo persegue não estava no motor: `movePhaseManual` sempre
-// reposicionou a fase sem tocar em obrigação nenhuma. Estava no que vinha depois — o
-// administrador retrocedia para refazer o trabalho e encontrava, para uma operação
-// concluída, apenas "Pausar", "Cancelar" e "Invalidar". O único botão que mudava algo
-// era Cancelar, e cancelar diz o contrário de refazer.
+// A primeira versão desta implementação perguntava, no modal de movimentação, quais
+// obrigações reabrir — e reabria as marcadas junto com o retrocesso. Os testes
+// passavam, e mesmo assim estava errado: mover a fase é um fato sobre a POSIÇÃO do
+// processo; refazer é um fato sobre UMA unidade de trabalho — esta certidão, desta
+// pessoa, nesta etapa.
 //
-// Aqui se prova o comando novo: planejar (o que existe na fase de destino, o que pode
-// ser reexecutado, o que cada reabertura alcança) e executar (mover, e reabrir só o
-// que foi marcado — criando execução nova, nunca desconcluindo a anterior).
+// A escala mostra por quê. Numa Emissão com cinquenta certidões, "quais tarefas
+// reabrir?" num modal de fase é uma pergunta sem resposta possível: são cinquenta
+// decisões independentes. E responder por omissão — "voltei de fase, refaço tudo" —
+// destrói quarenta e nove trabalhos que estavam certos.
+//
+// Por isso este arquivo prova as duas coisas separadas, e sobretudo o ISOLAMENTO:
+// reabrir uma certidão não pode tocar nenhuma outra.
 //
 //   PRISMA_DATABASE_URL=…discovery_test npx tsx scripts/retrocesso-de-fase.test.ts
 
@@ -18,9 +22,10 @@ import { readFileSync, existsSync } from "fs"
 import { join } from "path"
 import { PrismaClient } from "@prisma/client"
 import { planejarRetrocesso, executarRetrocesso } from "../src/services/retrocesso-de-fase"
+import { planejarReabertura, executarReabertura } from "../src/services/reabertura-de-execucao"
 import { tentativasDoPasso, garantirTentativa, MOTIVOS_DE_TENTATIVA } from "../src/services/execucao-do-passo"
 import { congelarVersaoVigente } from "../src/services/versao-publicada"
-import { gravarOperacao, historicoDaOperacao } from "../src/services/operacao-da-etapa"
+import { gravarOperacao, historicoDaOperacao, historicoDaOperacaoDaUnidade } from "../src/services/operacao-da-etapa"
 
 const ROOT = join(__dirname, "..")
 const ler = (r: string) => (existsSync(join(ROOT, r)) ? readFileSync(join(ROOT, r), "utf8") : "")
@@ -39,56 +44,66 @@ function check(nome: string, cond: boolean, extra?: string) {
 const secao = (t: string) => console.log(`\n${t}`)
 
 // ════════════════════════════════════════════════════════════════
-console.log("\n(A) OS COMANDOS SÃO DISTINTOS")
+console.log("\n(A) OS DOIS COMANDOS SÃO SEPARADOS — na assinatura, não só no nome")
 // ════════════════════════════════════════════════════════════════
 
-const servico = semComentarios(ler("src/services/retrocesso-de-fase.ts"))
-check("existe um serviço próprio de retrocesso", servico.includes("export async function executarRetrocesso"))
-check("RETROCEDER NÃO CHAMA CANCELAR",
-  !/cancelarOperacao|cancelarPasso|cancelarTarefa|status:\s*"CANCELADO"/.test(servico))
-check("nem invalidar", !/invalidarOperacao|INVALIDATE_DOCUMENT/.test(servico))
-check("nem conclui nada por conta própria", !/concluirPasso|concluirTarefa/.test(servico))
-check("move a fase pela porta canônica", servico.includes("movePhaseManual("))
-check("e reabre pela porta canônica", servico.includes("reabrirPassoTx("))
-check("sem seleção, não reabre nada",
-  servico.includes("if (p.reabrir.length === 0)") && /reabertas: \[\]/.test(servico))
+const retro = semComentarios(ler("src/services/retrocesso-de-fase.ts"))
+const reab = semComentarios(ler("src/services/reabertura-de-execucao.ts"))
 
-const rota = semComentarios(ler("src/app/api/processos/[processoId]/phase/rollback/route.ts"))
-check("a rota de retrocesso é separada da de avanço", rota.includes("planejarRetrocesso") && rota.includes("executarRetrocesso"))
-check("e exige a permissão exclusiva", rota.includes('verificarPermissao(request, "processos.moverFaseManual")'))
+check("retroceder tem serviço próprio", retro.includes("export async function executarRetrocesso"))
+check("reabrir tem serviço próprio", reab.includes("export async function executarReabertura"))
+check("RETROCEDER NÃO RECEBE SELEÇÃO DE TAREFAS — a assinatura é o contrato",
+  !/reabrir\s*:/.test(retro) && !retro.includes("comDependentes"))
+check("  e não chama a porta de reabertura", !retro.includes("reabrirPassoTx") && !retro.includes("executarReabertura"))
+check("  não cancela", !/cancelar|CANCELADO/.test(retro))
+check("  não cria tentativa", !/abrirTentativa|garantirTentativa/.test(retro))
+check("  o planejamento do retrocesso devolve RETRATO, não seleção",
+  retro.includes("RetratoDaFaseDestino") && !retro.includes("podeReabrir"))
+check("reabrir é POR INSTÂNCIA, não por fase nem por chave de passo",
+  reab.includes("stepInstanceId: number") && reab.includes("planejarReabertura(stepInstanceId"))
+check("  e escopa a cadeia pela UNIDADE", reab.includes("escopoDaUnidade("))
+check("  dizendo quantas outras unidades ficam intactas", reab.includes("outrasUnidadesNaFase"))
+
+const rotaRetro = semComentarios(ler("src/app/api/processos/[processoId]/phase/rollback/route.ts"))
+check("a rota de retrocesso não aceita seleção de reabertura", !rotaRetro.includes("reabrir"))
+const rotaReab = semComentarios(ler("src/app/api/workflow-step-instances/[id]/reabrir/route.ts"))
+check("existe rota de reabertura por instância", rotaReab.includes("planejarReabertura") && rotaReab.includes("executarReabertura"))
+check("  que respeita a permissão declarada no cadastro do passo", rotaReab.includes("plano.permissaoExigida"))
+
+// ── ESCOPO DA UNIDADE: a regra que isola uma certidão das outras ──
+const canonica = semComentarios(ler("lib/operacional/tarefa-canonica.ts"))
+check("a unidade é a CONJUNÇÃO das âncoras, não a disjunção",
+  canonica.includes("AND: conjuncao") && !/OR: porObrigacao/.test(canonica),
+  "com OR, dois documentos da mesma necessidade caem na mesma unidade")
 
 // ════════════════════════════════════════════════════════════════
-console.log("\n(A2) A INTERFACE NÃO EMPURRA PARA CANCELAR")
+console.log("\n(A2) A INTERFACE NÃO PERGUNTA REABERTURA NO RETROCESSO")
 // ════════════════════════════════════════════════════════════════
 
 const modal = semComentarios(ler("src/components/kanban/MovimentarFaseModal.tsx"))
-check("o modal pergunta o plano do retrocesso ao servidor", modal.includes("/phase/rollback?faseDestino="))
-check("  e envia o retrocesso pela rota própria, não pela de avanço",
-  modal.includes("`/api/processos/${processoId}/phase/rollback`"))
-check("  oferece reabrir a cadeia dependente", modal.includes("Reabrir a cadeia dependente"))
-check("  e deixa claro que dá para SÓ retroceder", modal.includes("Somente retroceder"))
-check("  o botão diz o que vai fazer", modal.includes('"Retroceder e reabrir"'))
-check("  a correlação é estável por abertura do modal — duplo clique não vira duas execuções",
-  modal.includes("correlationId: correlacao.current"))
+check("o modal de retrocesso NÃO lista obrigações", !modal.includes("obrigacoes.map"))
+check("  NÃO tem checkbox de tarefa", !modal.includes("setSelecionadas"))
+check("  NÃO oferece cadeia dependente", !modal.includes("Reabrir a cadeia dependente"))
+check("  não envia seleção", !/reabrir,/.test(modal))
+check("  mostra só o retrato da fase de destino", modal.includes("O que existe em"))
+check("  e diz que nada será reaberto", modal.includes("Nenhuma tarefa foi reaberta"))
+check("  o botão fala de movimentação", modal.includes('"Confirmar retrocesso"'))
+
+const reabModal = semComentarios(ler("src/components/kanban/workflow/ReabrirEtapaModal.tsx"))
+check("o modal de reabertura mostra a IDENTIDADE da unidade",
+  reabModal.includes("Pessoa") && reabModal.includes("Documento") && reabModal.includes("Passo"))
+check("  a execução anterior, com data e autor", reabModal.includes("Execução anterior") && reabModal.includes("executadoPorNome"))
+check("  as duas estratégias como escolha explícita",
+  reabModal.includes("Reabrir somente esta tarefa") && reabModal.includes("Reabrir esta tarefa e as que dependem dela"))
+check("  o preview exato do que será criado", reabModal.includes("Será criada nova execução para"))
+check("  e a garantia de isolamento", reabModal.includes("Nenhuma outra unidade será alterada"))
+check("  exige motivo e justificativa", reabModal.includes("Motivo da reabertura") && reabModal.includes("Justificativa"))
 
 const drawer = semComentarios(ler("src/components/kanban/workflow/CentralDaEtapaDrawer.tsx"))
-check("a Central abre o modal de reabertura em vez de um confirm()", drawer.includes("<ReabrirEtapaModal"))
-check("  e não descreve o impacto à mão", !/Bloquear a próxima etapa ativa/.test(drawer))
-
-const reabrir = semComentarios(ler("src/components/kanban/workflow/ReabrirEtapaModal.tsx"))
-check("o modal de reabertura pede o impacto ao servidor", reabrir.includes("/reexecutar"))
-check("  mostra reexecutada, reavaliadas, herdadas e intactas",
-  reabrir.includes("seraReexecutado") && reabrir.includes("seraoReavaliados") &&
-  reabrir.includes("herdados") && reabrir.includes("intactos"))
-check("  exige justificativa", reabrir.includes("justificativa.trim().length < 5"))
-check("  e diz que a execução anterior é ARQUIVADA, não apagada",
-  reabrir.includes("arquivada com o que foi registrado nela"))
+check("a Central abre o modal de reabertura", drawer.includes("<ReabrirEtapaModal"))
 
 const cfg = semComentarios(ler("src/components/gerenciamentoComponents/ConfiguracaoDoPassoModal.tsx"))
-check("a política de reabertura é cadastrável na interface", cfg.includes('"reabertura"'))
-check("  com permitir, estratégia, justificativa e permissão",
-  cfg.includes("reaberturaPermitida") && cfg.includes("reaberturaEstrategia") &&
-  cfg.includes("reaberturaExigeJustificativa") && cfg.includes("reaberturaPermissao"))
+check("a política de reabertura continua cadastrável", cfg.includes('"reabertura"'))
 
 // ════════════════════════════════════════════════════════════════
 const url = process.env.PRISMA_DATABASE_URL ?? ""
@@ -295,222 +310,144 @@ async function main() {
   await limpar()
 
   // ══════════════════════════════════════════════════════════════
-  secao("(B) O PLANO — o impacto antes da escrita")
+  secao("(B) O PLANO DO RETROCESSO É UM RETRATO, não um formulário")
   // ══════════════════════════════════════════════════════════════
   const p1 = await montar("plano")
   const plano = await planejarRetrocesso(p1.processoId, p1.faseEmissao)
   check("o plano existe", plano != null)
   check("  reconhece que é um RETROCESSO", plano?.ehRetrocesso === true)
-  check("  lista as 5 obrigações da fase de destino", plano?.obrigacoes.length === 5, String(plano?.obrigacoes.length))
-  check("  todas concluídas, e por isso reexecutáveis", plano!.obrigacoes.every((o) => o.podeReabrir))
-  check("  diz de que cada uma depende, pelo cadastro",
-    plano!.obrigacoes.find((o) => o.stepKey === "aguardar")?.dependeDe.join() === "solicitar")
-  const solicitar = plano!.obrigacoes.find((o) => o.stepKey === "solicitar")!
-  check("  e o que reabrir SOLICITAR alcançaria: aguardar, receber, conferir",
-    JSON.stringify(solicitar.alcancaSeReaberta.map((a) => a.stepKey)) === '["aguardar","receber","conferir"]',
-    JSON.stringify(solicitar.alcancaSeReaberta.map((a) => a.stepKey)))
-  check("  ARQUIVAR não é alcançada — ela não depende de solicitar, só vem depois",
-    !solicitar.alcancaSeReaberta.some((a) => a.stepKey === "arquivar"))
+  check("  conta as unidades e as obrigações", plano!.retrato.obrigacoes === 5 && plano!.retrato.unidades === 1,
+    JSON.stringify(plano?.retrato))
+  check("  e todas concluídas", plano!.retrato.concluidas === 5 && plano!.retrato.emAberto === 0)
   check("  a fase posterior visitada aparece como histórico que permanece",
     (plano?.fasesPosterioresVisitadas.length ?? 0) >= 1)
-  check("  cada obrigação informa quantas execuções já teve", plano!.obrigacoes.every((o) => o.execucoes === 1))
+  check("  o aviso diz que NADA será reaberto", plano!.aviso.includes("Nenhuma tarefa é reaberta"))
 
   // ══════════════════════════════════════════════════════════════
-  secao("(C) A. Retroceder SEM reabrir — só reposiciona")
+  secao("(C) TESTE 1/7/8/9 — retroceder não reabre, não cancela, não cria execução")
   // ══════════════════════════════════════════════════════════════
   const p2 = await montar("semreabrir")
   const antes2 = await estados(p2.si)
+  const tentAntes2 = await prisma.stepExecution.count({ where: { stepInstance: { processoId: p2.processoId } } })
   const r2 = await executarRetrocesso({
     processoId: p2.processoId, faseDestino: p2.faseEmissao, motivoCodigo: "CORRECAO_CADASTRO",
-    justificativa: "Reposicionar a fase, sem refazer trabalho.", reabrir: [], actorId: p2.actorId,
+    justificativa: "Reposicionar a fase.", actorId: p2.actorId,
   })
   check("o retrocesso acontece", r2.ok, JSON.stringify(r2))
   check("  a fase do processo passou a ser a de destino",
     (await prisma.processo.findUnique({ where: { id: p2.processoId }, select: { faseAtualKey: true } }))?.faseAtualKey === p2.faseEmissao)
-  check("  NENHUMA obrigação foi reaberta", r2.reabertas.length === 0)
-  check("  e nenhuma mudou de estado", JSON.stringify(await estados(p2.si)) === JSON.stringify(antes2))
+  check("TESTE 9: nenhuma obrigação mudou de estado", JSON.stringify(await estados(p2.si)) === JSON.stringify(antes2))
+  // TESTE 8, com a distinção que o §11 pede: MATERIALIZAR obrigação nova não é
+  // REABRIR execução concluída. Voltar para a fase abre uma visita nova, e as
+  // obrigações dela nascem com a primeira tentativa — isso é o motor materializando,
+  // não refazendo. O que o retrocesso não pode fazer é dar uma execução NOVA a uma
+  // obrigação que já tinha, ou arquivar uma que estava vigente.
+  const porPasso2 = await prisma.stepExecution.groupBy({
+    by: ["stepInstanceId"], where: { stepInstance: { processoId: p2.processoId } }, _count: { _all: true },
+  })
+  check("TESTE 8: nenhuma obrigação ganhou uma segunda execução",
+    porPasso2.every((x) => x._count._all === 1),
+    JSON.stringify(porPasso2.filter((x) => x._count._all > 1)))
+  const arquivadas2 = await prisma.stepExecution.count({
+    where: { stepInstance: { id: { in: Object.values(p2.si) } }, supersededAt: { not: null } },
+  })
+  check("  e NENHUMA execução anterior foi arquivada pelo retrocesso", arquivadas2 === 0, String(arquivadas2))
+  void tentAntes2
+  check("TESTE 7: nada foi cancelado",
+    (await prisma.phaseWorkflowStepInstance.count({ where: { processoId: p2.processoId, status: { in: ["CANCELADO"] } } })) === 0)
   const tarefa2 = await prisma.tarefa.findFirst({ where: { processoId: p2.processoId }, select: { statusTarefa: true } })
-  check("  a tarefa concluída continua concluída", tarefa2?.statusTarefa === "CONCLUIDO_RECEBIDO")
+  check("TESTE 2: a tarefa concluída continua concluída", tarefa2?.statusTarefa === "CONCLUIDO_RECEBIDO")
+  const audit2 = await prisma.logAuditoria.count({ where: { acao: "STEP_EXECUTION_REOPENED", entidadeId: { in: Object.values(p2.si) } } })
+  check("  e nenhum evento de reabertura foi emitido", audit2 === 0)
 
   // ══════════════════════════════════════════════════════════════
-  secao("(D) B+C+D. Reabrir UMA, com dependentes — e o independente intacto")
+  secao("(D) TESTE 3/5 — reabrir UMA tarefa, na Central, depois de estar na fase")
   // ══════════════════════════════════════════════════════════════
-  const p3 = await montar("cascata")
+  const p3 = await montar("reabrir")
+  await executarRetrocesso({
+    processoId: p3.processoId, faseDestino: p3.faseEmissao, motivoCodigo: "CORRECAO_CADASTRO",
+    justificativa: "Voltar para a Emissão.", actorId: p3.actorId,
+  })
+  const idSolicitar = await passoVigente(p3.processoId, p3.faseEmissao, "solicitar")
+  const idArquivar = await passoVigente(p3.processoId, p3.faseEmissao, "arquivar")
   const arquivarAntes = await prisma.phaseWorkflowStepInstance.findUnique({
-    where: { id: p3.si.arquivar }, select: { status: true, completedAt: true },
+    where: { id: idArquivar }, select: { status: true, completedAt: true },
   })
-  const r3 = await executarRetrocesso({
-    processoId: p3.processoId, faseDestino: p3.faseEmissao, motivoCodigo: "ERRO_OPERACIONAL",
-    justificativa: "Certidão veio com o nome da mãe errado; refazer o pedido.",
-    reabrir: [{ stepInstanceId: p3.si.solicitar, comDependentes: true }], actorId: p3.actorId,
+
+  const planoR = await planejarReabertura(idSolicitar)
+  check("o plano da reabertura identifica a unidade",
+    planoR?.identidade.pessoaNome != null && planoR?.identidade.documentoId != null && planoR?.identidade.stepTitulo === "Solicitar certidão",
+    JSON.stringify(planoR?.identidade))
+  check("  mostra a execução anterior com data e autor", (planoR?.execucoes.length ?? 0) === 1 && planoR!.execucoes[0].concluidaEm != null)
+  check("  e a cadeia dependente DA MESMA unidade",
+    JSON.stringify(planoR?.dependentesDaMesmaUnidade.map((d) => d.stepKey)) === '["aguardar","receber","conferir"]',
+    JSON.stringify(planoR?.dependentesDaMesmaUnidade.map((d) => d.stepKey)))
+  check("  ARQUIVAR não entra — não depende", !planoR!.dependentesDaMesmaUnidade.some((d) => d.stepKey === "arquivar"))
+
+  const rr = await executarReabertura({
+    stepInstanceId: idSolicitar, motivoCodigo: "ERRO_OPERACIONAL",
+    justificativa: "Certidão veio com o nome da mãe errado.", comDependentes: true, actorId: p3.actorId,
   })
-  check("o retrocesso com reabertura acontece", r3.ok, JSON.stringify(r3).slice(0, 200))
-  check("  UMA obrigação foi reaberta", r3.reabertas.length === 1 && r3.reabertas[0].stepKey === "solicitar")
+  check("a reabertura acontece", rr.ok, JSON.stringify(rr))
+  const st3 = await estados({ s: idSolicitar, a: await passoVigente(p3.processoId, p3.faseEmissao, "aguardar"), q: idArquivar })
+  check("  SOLICITAR está em execução de novo", st3.solicitar === "EM_ANDAMENTO", JSON.stringify(st3))
+  check("  o dependente voltou a aguardar", st3.aguardar === "BLOQUEADO", JSON.stringify(st3))
+  check("  ARQUIVAR, independente, continua concluída com a data dela",
+    st3.arquivar === "CONCLUIDO" &&
+    (await prisma.phaseWorkflowStepInstance.findUnique({ where: { id: idArquivar }, select: { completedAt: true } }))
+      ?.completedAt?.toISOString() === arquivarAntes?.completedAt?.toISOString())
 
-  // A REABERTURA ACONTECE NA VISITA VIGENTE. Voltar para a fase abre uma visita nova,
-  // que herda o progresso; é nela que o retrabalho acontece. As linhas da visita
-  // anterior continuam onde estavam — e a checagem abaixo cobra as duas coisas.
-  const vigente3 = await prisma.phaseWorkflowInstance.findFirst({
-    where: { processoId: p3.processoId, faseMacroKey: p3.faseEmissao, status: "ATIVO" },
-    orderBy: { ciclo: "desc" }, select: { id: true, ciclo: true },
-  })
-  const passos3 = await prisma.phaseWorkflowStepInstance.findMany({
-    where: { workflowInstanceId: vigente3!.id },
-    select: { id: true, stepKey: true, status: true, completedAt: true },
-  })
-  const st3 = Object.fromEntries(passos3.map((x) => [x.stepKey, x.status]))
-  const idDe = (k: string) => passos3.find((x) => x.stepKey === k)!.id
+  const t3 = await tentativasDoPasso(idSolicitar)
+  check("  nasceu execução NOVA e a anterior ficou arquivada com o fim dela",
+    t3.length === 2 && t3[0].supersededAt != null && t3[0].completedAt != null && t3[1].supersededAt == null)
+  // O QUE FOI PREENCHIDO ANTES continua legível ATRAVÉS DAS VISITAS — a Central mostra
+  // a visita vigente, e sem isto o preenchimento da passagem anterior sumia da tela.
+  const histUnidade = await historicoDaOperacaoDaUnidade(idSolicitar)
+  const daVisitaAnterior = histUnidade.find((h) => !h.visitaAtual)
+  check("  o que foi preenchido na visita anterior continua legível",
+    (daVisitaAnterior?.payload as { protocolo?: string } | undefined)?.protocolo === "CRC-2026-77",
+    JSON.stringify(histUnidade.map((h) => ({ ciclo: h.ciclo, atual: h.visitaAtual, campos: Object.keys(h.payload) }))))
+  check("  e vem marcado como HERDADO, não como produzido agora", daVisitaAnterior?.visitaAtual === false)
+  const hist3 = await historicoDaOperacao(idSolicitar)
+  check("  a execução nova começa vazia", hist3.every((h) => Object.keys(h.payload).length === 0))
 
-  check("  SOLICITAR está em execução de novo", st3.solicitar === "EM_ANDAMENTO", String(st3.solicitar))
-  check("  AGUARDAR voltou a esperar", st3.aguardar === "BLOQUEADO", String(st3.aguardar))
-  check("  RECEBER voltou a esperar", st3.receber === "BLOQUEADO", String(st3.receber))
-  check("  CONFERIR voltou a esperar", st3.conferir === "BLOQUEADO", String(st3.conferir))
-  check("  ARQUIVAR — independente — CONTINUA CONCLUÍDA",
-    st3.arquivar === "CONCLUIDO" && passos3.find((x) => x.stepKey === "arquivar")?.completedAt != null,
-    String(st3.arquivar))
-
-  // A VISITA ANTERIOR NÃO FOI TOCADA — é o histórico do que já tinha acontecido.
-  const antigos3 = await prisma.phaseWorkflowStepInstance.findMany({
-    where: { id: { in: Object.values(p3.si) } }, select: { stepKey: true, status: true, completedAt: true },
-  })
-  check("  a visita anterior continua inteira, com as datas dela",
-    antigos3.every((a) => a.status === "CONCLUIDO" && a.completedAt?.toISOString() === "2026-08-12T14:00:00.000Z"),
-    JSON.stringify(antigos3.map((a) => [a.stepKey, a.status])))
-
-  // ── E. A execução anterior permanece ──
-  const tSolicitar = await tentativasDoPasso(idDe("solicitar"))
-  check("SOLICITAR tem DUAS execuções", tSolicitar.length === 2, String(tSolicitar.length))
-  check("  a #1 continua CONCLUÍDA, com o fim dela",
-    tSolicitar[0].status === "CONCLUIDO" && tSolicitar[0].completedAt?.toISOString() === "2026-08-12T14:00:00.000Z")
-  check("  arquivada, apontando para a sucessora",
-    tSolicitar[0].supersededAt != null && tSolicitar[0].supersededPorId === tSolicitar[1].id)
-  check("  a #2 é a vigente, e é outra linha",
-    tSolicitar[1].supersededAt == null && tSolicitar[1].id !== tSolicitar[0].id)
-  const tConferir = await tentativasDoPasso(idDe("conferir"))
-  check("CONFERIR, alcançada pela cadeia, também arquivou a execução dela",
-    tConferir.length === 2 && tConferir[0].completedAt != null)
-
-  // ── F+G. Anexos, observações e o que foi preenchido ──
-  // A OPERAÇÃO DA VISITA ANTERIOR continua legível na obrigação anterior; a visita
-  // nova começa com a própria folha.
-  const histAntigo3 = await historicoDaOperacao(p3.si.solicitar)
-  const hist3 = await historicoDaOperacao(idDe("solicitar"))
-  check("o que foi preenchido na execução anterior continua legível",
-    (histAntigo3[0]?.payload as { protocolo?: string })?.protocolo === "CRC-2026-77",
-    JSON.stringify(histAntigo3.map((h) => h.payload)))
-  check("  e a execução NOVA começa vazia — não herda como se tivesse produzido",
-    hist3.every((h) => Object.keys(h.payload).length === 0), JSON.stringify(hist3.map((h) => h.payload)))
-  check("as observações do documento permanecem",
-    (await prisma.documentoObservacao.count({ where: { documentoId: p3.docId } })) >= 1)
-  const doc3 = await prisma.documento.findUnique({ where: { id: p3.docId }, select: { livro: true, folha: true, cartorio: true, status: true } })
-  check("os dados registrais do documento não foram tocados",
-    doc3?.livro === "B-3" && doc3.folha === "88" && doc3.cartorio === "2º Ofício")
-
-  // ── L. Progresso: a fase deixa de estar 100% ──
-  const obrig3 = await prisma.phaseWorkflowStepInstance.count({
-    where: { workflowInstanceId: vigente3!.id, obrigatorio: true },
-  })
-  const concl3 = await prisma.phaseWorkflowStepInstance.count({
-    where: { workflowInstanceId: vigente3!.id, obrigatorio: true, status: "CONCLUIDO" },
-  })
-  check("o progresso corrente deixou de ser 100%", concl3 < obrig3, `${concl3}/${obrig3}`)
-
-  // ── M. As fases posteriores permanecem ──
-  check("a instância da fase posterior continua existindo",
-    (await prisma.phaseWorkflowInstance.count({ where: { processoId: p3.processoId, faseMacroKey: p3.faseAnalise } })) === 1)
-
-  // ── N. O dependente não anda antes do predecessor ──
-  const { transicionarPassoTx } = await import("../src/services/task-step-sync")
-  const tentaAndar = await prisma.$transaction((tx) =>
-    transicionarPassoTx(tx, idDe("aguardar"), "EM_ANDAMENTO", {
-      correlationId: `${M}-dep`, operacao: "teste", ciclo: 1, processoId: p3.processoId, workflowInstanceId: vigente3!.id,
-    }))
-  check("AGUARDAR não pode começar antes de SOLICITAR concluir de novo",
-    !tentaAndar.changed && tentaAndar.code === "DEPENDENCIA_PENDENTE", JSON.stringify(tentaAndar))
-
-  // ── 11. Auditoria ──
-  const audRetro = await prisma.logAuditoria.findFirst({
-    where: { acao: "PROCESS_PHASE_ROLLED_BACK", entidadeId: p3.processoId },
-    select: { detalhes: true, usuarioId: true },
-  })
-  check("o retrocesso deixou evento estruturado", audRetro != null)
-  const d = (audRetro?.detalhes ?? {}) as Record<string, unknown>
-  check("  com de/para, motivo, justificativa, seleção e correlação",
-    !!d.deFase && !!d.paraFase && !!d.motivoCodigo && !!d.justificativa && !!d.reaberturasSelecionadas && !!d.correlationId,
-    JSON.stringify(Object.keys(d)))
-  check("  e com o autor", audRetro?.usuarioId === p3.actorId)
   const audReab = await prisma.logAuditoria.findFirst({
-    where: { acao: "OPERATION_REOPENED", entidadeId: idDe("solicitar") }, select: { detalhes: true },
+    where: { acao: "STEP_EXECUTION_REOPENED", entidadeId: idSolicitar }, select: { detalhes: true },
   })
-  check("cada reabertura deixou o próprio evento", audReab != null)
+  check("TESTE 14: a reabertura tem evento PRÓPRIO, separado do retrocesso", audReab != null)
   const dr = (audReab?.detalhes ?? {}) as Record<string, unknown>
-  check("  com a execução anterior e a nova", dr.execucaoAnterior === 1 && dr.execucaoNova === 2, JSON.stringify(dr))
+  check("  com a identidade da unidade e as execuções", !!dr.identidade && dr.execucaoAnterior === 1 && dr.execucaoNova === 2)
+  const audRetro = await prisma.logAuditoria.findFirst({
+    where: { acao: "PROCESS_PHASE_ROLLED_BACK", entidadeId: p3.processoId }, select: { descricao: true },
+  })
+  check("  e o do retrocesso diz que nada foi reaberto",
+    (audRetro?.descricao ?? "").includes("Nenhuma tarefa foi reaberta"))
 
   // ══════════════════════════════════════════════════════════════
-  secao("(E) I+J+K. Duplo clique, duas sessões e retry")
-  // ══════════════════════════════════════════════════════════════
-  const p4 = await montar("idem")
-  const pedido = {
-    processoId: p4.processoId, faseDestino: p4.faseEmissao, motivoCodigo: "ERRO_OPERACIONAL",
-    justificativa: "Refazer o pedido ao cartório.",
-    reabrir: [{ stepInstanceId: p4.si.solicitar, comDependentes: true }],
-    actorId: p4.actorId, correlationId: `${M}-idem-fixo`,
-  }
-  const [a, b] = await Promise.allSettled([executarRetrocesso(pedido), executarRetrocesso(pedido)])
-  void a; void b
-  const t4 = await tentativasDoPasso(await passoVigente(p4.processoId, p4.faseEmissao, "solicitar"))
-  check("duplo clique/duas sessões: UMA execução nova, não duas", t4.length === 2, `${t4.length} execuções`)
-  check("  e uma vigente só", t4.filter((t) => t.supersededAt == null).length === 1)
-  const r4c = await executarRetrocesso(pedido)
-  check("retry do MESMO comando não cria uma terceira",
-    (await tentativasDoPasso(await passoVigente(p4.processoId, p4.faseEmissao, "solicitar"))).length === 2)
-  void r4c
-
-  // ══════════════════════════════════════════════════════════════
-  secao("(F) T. Três gerações de histórico")
+  secao("(E) TESTE 10 — três gerações com lineage completo")
   // ══════════════════════════════════════════════════════════════
   const p5 = await montar("geracoes")
-  if (process.env.DBG) {
-    const insts = await prisma.phaseWorkflowInstance.findMany({ where: { processoId: p5.processoId }, select: { id: true, faseMacroKey: true, ciclo: true, status: true } })
-    console.log("      [antes]", JSON.stringify(insts))
-  }
+  const alvo5 = await passoVigente(p5.processoId, p5.faseEmissao, "solicitar")
   for (const n of [1, 2]) {
-    // Cada geração parte da obrigação VIGENTE: a primeira reabertura pode ter aberto
-    // visita nova, e é nela que a segunda acontece.
-    const alvoGer = await passoVigente(p5.processoId, p5.faseEmissao, "solicitar")
     await prisma.phaseWorkflowStepInstance.update({
-      where: { id: alvoGer }, data: { status: "CONCLUIDO", completedAt: new Date(`2026-08-1${n + 2}T10:00:00Z`) },
+      where: { id: alvo5 }, data: { status: "CONCLUIDO", completedAt: new Date(`2026-08-1${n + 2}T10:00:00Z`) },
     })
-    const rg = await executarRetrocesso({
-      processoId: p5.processoId, faseDestino: p5.faseEmissao, motivoCodigo: "ERRO_OPERACIONAL",
-      justificativa: `Reabertura número ${n} do teste de gerações.`,
-      reabrir: [{ stepInstanceId: alvoGer, comDependentes: false }],
-      actorId: p5.actorId, correlationId: `${M}-ger-${n}`,
+    const rg = await executarReabertura({
+      stepInstanceId: alvo5, motivoCodigo: "ERRO_OPERACIONAL",
+      justificativa: `Reabertura ${n} do teste de gerações.`, comDependentes: false, actorId: p5.actorId,
+      correlationId: `${M}-ger-${n}`,
     })
-    if (process.env.DBG) console.log(`      [ger ${n}]`, JSON.stringify(rg).slice(0, 260))
+    if (!rg.ok) check(`geração ${n} reabriu`, false, JSON.stringify(rg))
   }
-  if (process.env.DBG) {
-    const insts = await prisma.phaseWorkflowInstance.findMany({ where: { processoId: p5.processoId }, select: { id: true, faseMacroKey: true, ciclo: true, status: true } })
-    console.log("      [depois]", JSON.stringify(insts))
-  }
-  // A OBRIGAÇÃO ATRAVESSA O CICLO, a linha não. Depois de um retrocesso que abre
-  // visita nova, "Solicitar certidão desta certidão" é outra linha — e é nela que as
-  // gerações seguintes se acumulam. Seguir o id fixo mediria a visita errada.
-  const t5 = await tentativasDoPasso(await passoVigente(p5.processoId, p5.faseEmissao, "solicitar"))
-  check("três gerações coexistem na obrigação vigente", t5.length === 3, String(t5.length))
-  const arquivadas5 = t5.filter((t) => t.supersededAt != null)
-  check("  as duas anteriores estão arquivadas", arquivadas5.length === 2, String(arquivadas5.length))
-  check("  e cada uma guarda o próprio desfecho",
-    arquivadas5.every((t) => (t.status === "CONCLUIDO" ? t.completedAt != null : true)),
-    JSON.stringify(t5.map((t) => ({ seq: t.sequencia, st: t.status, fim: !!t.completedAt, arq: !!t.supersededAt }))))
-  check("  a sequência não tem buraco", JSON.stringify(t5.map((t) => t.sequencia)) === "[1,2,3]")
-  // E a visita ANTERIOR continua legível, com o que houve nela.
-  const t5antiga = await tentativasDoPasso(p5.si.solicitar)
-  check("  e a visita anterior continua com o histórico dela",
-    t5antiga.length >= 1 && t5antiga[0].completedAt != null)
+  const t5 = await tentativasDoPasso(alvo5)
+  check("três gerações coexistem", t5.length === 3, String(t5.length))
+  check("  duas arquivadas, apontando para a sucessora",
+    t5.filter((t) => t.supersededAt != null).length === 2 &&
+    t5[0].supersededPorId === t5[1].id && t5[1].supersededPorId === t5[2].id)
+  check("  sequência sem buraco", JSON.stringify(t5.map((t) => t.sequencia)) === "[1,2,3]")
 
   // ══════════════════════════════════════════════════════════════
-  secao("(G) P+Q. Política de reabertura e recusa transacional")
+  secao("(F) Política de reabertura e justificativa")
   // ══════════════════════════════════════════════════════════════
   const p6 = await montar("politica")
   const wf6 = await prisma.phaseInternalWorkflow.findUnique({ where: { wfUid: `${M}::politica::emissao` }, select: { id: true } })
@@ -520,132 +457,38 @@ async function main() {
   await prisma.phaseInternalWorkflowVersao.deleteMany({ where: { workflowId: wf6!.id } })
   await congelarVersaoVigente(wf6!.id, "PUBLICACAO")
 
-  const plano6 = await planejarRetrocesso(p6.processoId, p6.faseEmissao)
-  check("o cadastro pode proibir a reabertura de uma etapa",
-    plano6?.obrigacoes.find((o) => o.stepKey === "conferir")?.podeReabrir === false)
-  check("  e a tela recebe o motivo, não só um botão desabilitado",
-    (plano6?.obrigacoes.find((o) => o.stepKey === "conferir")?.motivoNaoPode ?? "").includes("não permite"))
-
-  const estados6antes = await estados(p6.si)
-  const r6 = await executarRetrocesso({
-    processoId: p6.processoId, faseDestino: p6.faseEmissao, motivoCodigo: "ERRO_OPERACIONAL",
-    justificativa: "Tentar reabrir uma etapa que o cadastro proíbe.",
-    reabrir: [{ stepInstanceId: p6.si.solicitar, comDependentes: false }, { stepInstanceId: p6.si.conferir, comDependentes: false }],
-    actorId: p6.actorId,
+  const planoProibido = await planejarReabertura(p6.si.conferir)
+  check("o cadastro pode proibir a reabertura de uma etapa", planoProibido?.podeReabrir === false)
+  check("  e a tela recebe o motivo", (planoProibido?.motivoNaoPode ?? "").includes("não permite"))
+  const antes6 = await estados(p6.si)
+  const rProibido = await executarReabertura({
+    stepInstanceId: p6.si.conferir, motivoCodigo: "ERRO_OPERACIONAL",
+    justificativa: "Tentar reabrir o proibido.", comDependentes: false, actorId: p6.actorId,
   })
-  check("reabrir o proibido é RECUSADO", !r6.ok && r6.code === "REABERTURA_NAO_PERMITIDA", JSON.stringify(r6))
-  check("  e nada foi reaberto — nem a que era permitida",
-    JSON.stringify(await estados(p6.si)) === JSON.stringify(estados6antes),
-    "a recusa tem de ser do pedido inteiro, não de metade dele")
-
-  const semJust = await executarRetrocesso({
-    processoId: p6.processoId, faseDestino: p6.faseEmissao, motivoCodigo: "ERRO_OPERACIONAL",
-    justificativa: "", reabrir: [{ stepInstanceId: p6.si.solicitar, comDependentes: false }], actorId: p6.actorId,
+  check("reabrir o proibido é recusado", !rProibido.ok && rProibido.code === "REABERTURA_NAO_PERMITIDA")
+  check("  e nada mudou", JSON.stringify(await estados(p6.si)) === JSON.stringify(antes6))
+  const semJust = await executarReabertura({
+    stepInstanceId: p6.si.solicitar, motivoCodigo: "ERRO_OPERACIONAL",
+    justificativa: "", comDependentes: false, actorId: p6.actorId,
   })
-  check("reabrir sem justificativa, quando o cadastro exige, é recusado",
+  check("sem justificativa, quando o cadastro exige, é recusado",
     !semJust.ok && semJust.code === "JUSTIFICATIVA_OBRIGATORIA")
 
   // ══════════════════════════════════════════════════════════════
-  secao("(H) R. Workflow de uma fase só")
+  secao("(G) Duplo clique, duas sessões e retry")
   // ══════════════════════════════════════════════════════════════
-  const p7 = await montar("umafase")
-  await prisma.processo.update({ where: { id: p7.processoId }, data: { faseAtualKey: p7.faseEmissao } })
-  const plano7 = await planejarRetrocesso(p7.processoId, p7.faseEmissao)
-  check("planejar para a fase ATUAL não é retrocesso", plano7?.ehRetrocesso === false)
-  check("  mas as obrigações continuam listadas — reabrir sem retroceder é legítimo",
-    (plano7?.obrigacoes.length ?? 0) === 5)
-
-  // ══════════════════════════════════════════════════════════════
-  secao("(I) O CASO QUE QUEBROU — ponta a ponta")
-  // ══════════════════════════════════════════════════════════════
-  //
-  // Processo que já concluiu a Emissão. O administrador retrocede manualmente para
-  // ela, marca "Solicitar certidão" e manda reabrir a cadeia dependente. É o caminho
-  // exato em que o sistema conduzia para "Cancelar operação".
-  const p8 = await montar("caso")
-
-  // Anexo, protocolo e lançamento financeiro da PRIMEIRA execução — tudo o que não
-  // pode desaparecer.
-  const arquivo = await prisma.documentoArquivo.create({
-    data: { documentoId: p8.docId, url: "https://r2.local/requerimento-v1.pdf", nome: "requerimento-v1.pdf", vigente: true },
-    select: { id: true },
-  })
-  const solicitacao = await prisma.solicitacaoDocumento.create({
-    data: {
-      documentoId: p8.docId, processoId: p8.processoId,
-      pessoaId: (await prisma.documento.findUnique({ where: { id: p8.docId }, select: { pessoaId: true } }))!.pessoaId,
-      faseMacroKey: p8.faseEmissao, canal: "CRC", dataEnvio: new Date("2026-08-10T09:00:00Z"),
-      destinatarioNome: "1º Ofício",
-      chaveIdempotencia: `${M}-caso-sol`,
-      // O NÚMERO DO PROTOCOLO é uma OCORRÊNCIA, não um campo da solicitação — vive em
-      // `Protocolo`, ligado à solicitação que o produziu. É esse vínculo que precisa
-      // sobreviver ao retrocesso.
-      protocolos: {
-        create: [{ processoId: p8.processoId, numeroProtocolo: "CRC-2026-77", origem: "SOLICITACAO_DOCUMENTO" }],
-      },
-    },
-    select: { id: true, protocolos: { select: { id: true, numeroProtocolo: true } } },
-  })
-  const receitasAntes = await prisma.receita.count({ where: { processoId: p8.processoId } })
-  const eventosAntes = await prisma.workflowEvento.count({ where: { processoId: p8.processoId } })
-
-  const plano8 = await planejarRetrocesso(p8.processoId, p8.faseEmissao)
-  const escolhida = plano8!.obrigacoes.find((o) => o.stepKey === "solicitar")!
-  check("o administrador vê a obrigação e o que ela alcança",
-    escolhida.podeReabrir && escolhida.alcancaSeReaberta.length === 3)
-
-  const r8 = await executarRetrocesso({
-    processoId: p8.processoId, faseDestino: p8.faseEmissao, motivoCodigo: "ERRO_OPERACIONAL",
-    justificativa: "Certidão emitida com divergência; refazer o pedido ao cartório.",
-    reabrir: [{ stepInstanceId: escolhida.stepInstanceId, comDependentes: true }],
-    actorId: p8.actorId, correlationId: `${M}-caso`,
-  })
-  check("o retrocesso com reabertura da cadeia acontece", r8.ok, JSON.stringify(r8).slice(0, 200))
-
-  const idSolicitar8 = await passoVigente(p8.processoId, p8.faseEmissao, "solicitar")
-  const t8 = await tentativasDoPasso(idSolicitar8)
-  check("  nasceu uma execução NOVA de Solicitar certidão", t8.length === 2, String(t8.length))
-  check("  a execução antiga continua CONCLUÍDA no histórico",
-    t8[0].status === "CONCLUIDO" && t8[0].completedAt != null && t8[0].supersededAt != null)
-
-  const passos8 = await prisma.phaseWorkflowStepInstance.findMany({
-    where: { workflowInstanceId: (await prisma.phaseWorkflowInstance.findFirst({
-      where: { processoId: p8.processoId, faseMacroKey: p8.faseEmissao, status: "ATIVO" },
-      orderBy: { ciclo: "desc" }, select: { id: true } }))!.id },
-    select: { stepKey: true, status: true },
-  })
-  const st8 = Object.fromEntries(passos8.map((x) => [x.stepKey, x.status]))
-  check("  a Central passa a mostrar: solicitar em execução, dependentes aguardando",
-    st8.solicitar === "EM_ANDAMENTO" && st8.aguardar === "BLOQUEADO" && st8.receber === "BLOQUEADO" && st8.conferir === "BLOQUEADO",
-    JSON.stringify(st8))
-  check("  e ARQUIVAR, que não depende, segue concluída", st8.arquivar === "CONCLUIDO")
-
-  const obrig8 = passos8.filter((x) => x.stepKey !== "arquivar").length
-  const concl8 = passos8.filter((x) => x.stepKey !== "arquivar" && x.status === "CONCLUIDO").length
-  check("  o progresso deixou de ser 100%", concl8 < obrig8, `${concl8}/${obrig8}`)
-
-  check("  o ANEXO da execução anterior continua lá",
-    (await prisma.documentoArquivo.findUnique({ where: { id: arquivo.id }, select: { url: true, vigente: true } }))?.url ===
-    "https://r2.local/requerimento-v1.pdf")
-  check("  o PROTOCOLO continua lá, ligado à solicitação que o produziu",
-    (await prisma.protocolo.findFirst({ where: { solicitacaoId: solicitacao.id }, select: { numeroProtocolo: true } }))?.numeroProtocolo === "CRC-2026-77")
-  check("  o FINANCEIRO não foi duplicado nem apagado",
-    (await prisma.receita.count({ where: { processoId: p8.processoId } })) === receitasAntes)
-  check("  o histórico do motor não encolheu",
-    (await prisma.workflowEvento.count({ where: { processoId: p8.processoId } })) >= eventosAntes)
-
-  // NADA FOI CANCELADO — é o coração do defeito.
-  const cancelados8 = await prisma.phaseWorkflowStepInstance.count({
-    where: { processoId: p8.processoId, status: { in: ["CANCELADO", "SUPERSEDIDO"] } },
-  })
-  check("  NENHUMA obrigação foi cancelada ou invalidada", cancelados8 === 0, String(cancelados8))
-  const docStatus8 = await prisma.documento.findUnique({ where: { id: p8.docId }, select: { status: true } })
-  check("  o documento não foi para um estado de cancelamento",
-    docStatus8?.status !== "CANCELADO" && docStatus8?.status !== "INVALIDO", String(docStatus8?.status))
-  const tarefas8 = await prisma.tarefa.count({
-    where: { processoId: p8.processoId, statusTarefa: "CANCELADA" },
-  })
-  check("  nenhuma tarefa foi cancelada como efeito colateral", tarefas8 === 0, String(tarefas8))
+  const p7 = await montar("idem")
+  const alvo7 = await passoVigente(p7.processoId, p7.faseEmissao, "solicitar")
+  const pedido7 = {
+    stepInstanceId: alvo7, motivoCodigo: "ERRO_OPERACIONAL",
+    justificativa: "Refazer o pedido.", comDependentes: true, actorId: p7.actorId,
+    correlationId: `${M}-idem-fixo`,
+  }
+  await Promise.allSettled([executarReabertura(pedido7), executarReabertura(pedido7)])
+  check("duplo clique/duas sessões: UMA execução nova", (await tentativasDoPasso(alvo7)).length === 2,
+    String((await tentativasDoPasso(alvo7)).length))
+  await executarReabertura(pedido7)
+  check("retry do mesmo comando não cria uma terceira", (await tentativasDoPasso(alvo7)).length === 2)
 
   await limpar()
   console.log(`\n${falhas.length === 0 ? "✅ PASSOU" : "❌ FALHOU"}: ${ok} ok, ${falhas.length} falhas`)

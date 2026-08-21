@@ -332,13 +332,27 @@ export function escopoDaUnidade(u: {
   documentoId?: number | null
   workflowStepInstanceId?: number | null
 }): Prisma.PhaseWorkflowStepInstanceWhereInput {
-  const porObrigacao: Prisma.PhaseWorkflowStepInstanceWhereInput[] = []
-  if (u.necessidadeId != null) porObrigacao.push({ necessidadeId: u.necessidadeId })
-  if (u.documentoId != null) porObrigacao.push({ documentoId: u.documentoId })
+  // A UNIDADE É A CONJUNÇÃO DAS ÂNCORAS, NÃO A DISJUNÇÃO.
+  //
+  // Aqui havia `OR: [{ necessidadeId }, { documentoId }]`, e o efeito era mais largo
+  // do que o nome prometia: dois documentos que atendem à MESMA necessidade — que é
+  // exatamente o que uma nova via produz — caíam na mesma unidade. Concluir uma etapa
+  // de um alcançaria as etapas do outro; reabrir uma reabriria as duas.
+  //
+  // Numa Emissão com cinquenta certidões, a diferença deixa de ser sutil: a unidade
+  // precisa ser UMA certidão, e nada além dela. Duas etapas pertencem à mesma unidade
+  // quando concordam em TODAS as âncoras — a necessidade E o documento.
+  //
+  // Sem âncora nenhuma (cardinalidade PROCESSO), a unidade é a fase inteira, e o
+  // filtro por nulos é o que a delimita: passos de processo não se misturam com
+  // passos de documento.
+  const conjuncao: Prisma.PhaseWorkflowStepInstanceWhereInput[] = []
+  if (u.necessidadeId != null) conjuncao.push({ necessidadeId: u.necessidadeId })
+  if (u.documentoId != null) conjuncao.push({ documentoId: u.documentoId })
   return {
     workflowInstanceId: u.workflowInstanceId,
-    ...(porObrigacao.length > 0
-      ? { OR: porObrigacao }
+    ...(conjuncao.length > 0
+      ? { AND: conjuncao }
       : u.workflowStepInstanceId != null
         ? { id: u.workflowStepInstanceId }
         : { necessidadeId: null, documentoId: null }),
