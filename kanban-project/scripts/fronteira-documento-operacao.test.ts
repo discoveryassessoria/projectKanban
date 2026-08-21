@@ -21,6 +21,7 @@ import { prisma } from "@/lib/prisma"
 import { exigirBancoDeTeste } from "./_banco-de-teste"
 import { atualizarPassoV2, controlarOperacaoV2, aplicarTransicaoDoPassoTx, TransicaoDePassoRecusada } from "@/src/services/documento-operacao"
 import { marcarNaoLocalizada } from "@/src/services/necessidade-documental"
+import { lerOperacao } from "@/src/services/operacao-da-etapa"
 import { classificarNecessidade } from "@/src/lib/motor/blocking-helpers"
 
 const MARCA = "FRONT"
@@ -122,10 +123,14 @@ async function main() {
   ok("C) com prazo calculado pelo SLA do passo aberto", s1.prazo != null)
   ok("C) e a abertura também virou evento", ev1.some((e) => e.tipo === "PASSO_INICIADO" && e.stepInstanceId === p.stepIds[1]))
 
-  // A carga documental viaja na MESMA escrita da transição.
-  const meta = (s0.metadata as { operacao?: Record<string, unknown> } | null)?.operacao ?? {}
+  // A carga documental viaja na MESMA escrita da transição — e vai para a TENTATIVA.
+  //
+  // Ela morava em `metadata.operacao`, na linha do passo. Aquela linha guarda um
+  // estado só: reexecutar sobrescrevia o que a execução anterior tinha registrado. A
+  // operação passou a ser da tentativa, que é append-only; a asserção segue a fonte.
+  const meta = (await lerOperacao(p.stepIds[0])).payload
   ok("A) o protocolo documental foi gravado junto", meta.externalProtocol === "PROT-123",
-    "metadata é do domínio documental e não foi para o motor")
+    "a carga documental viaja na tentativa, não no blob da linha do passo")
   ok("A) a necessidade evoluiu para ATENDIDA", (await nec(p.necessidadeId)).status === "ATENDIDA")
 
   // ═════════════════════════════════════════════════════════════════════════

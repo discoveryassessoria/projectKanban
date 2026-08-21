@@ -17,6 +17,7 @@ import { registrar } from '../catalogo'
 import type { Achado, ResultadoVerificacao } from '../tipos'
 import { efeitoExiste, efeitosDaFase } from '@/src/lib/motor/catalogo-de-efeitos'
 import { detectarCiclo } from '@/src/services/validacao-de-publicacao'
+import { REGISTRO_DE_EXECUTORES } from '@/src/lib/motor/registro-de-executores'
 
 const ROTA_INTERNO = '/administrator?screen=phaseiwf'
 const ROTA_CANAIS = '/administrator?screen=canais'
@@ -440,5 +441,297 @@ registrar({
       })
     }
     return { achados, metricas: { passos: passos.length, soNoBlob: soNoBlob.length, divergentes: divergentes.length } }
+  },
+})
+
+// ── O CADASTRO INTEGRAL DO PASSO ────────────────────────────────────────────
+//
+// Cada coisa que saiu do código para o cadastro trouxe junto uma classe nova de
+// inconsistência possível: opção sem identidade, canal apontando para catálogo
+// desativado, requisito cobrando um campo que ninguém cadastrou, executor que não
+// existe mais no registro. Nenhuma delas trava a publicação de HOJE — a validação já
+// cobre isso; elas nascem do que ficou no banco de ontem, ou de uma linha inserida por
+// fora. É por isso que são verificação, e não só validação.
+
+registrar({
+  id: 'saude.cadastro.passo-com-executor-inexistente',
+  codigo: 'CAD-006',
+  nome: 'Executor do passo existe no registro',
+  descricao: 'Passo apontando para um executor que não está no registro abre uma etapa que nenhuma tela sabe desenhar.',
+  dominio: 'WORKFLOW',
+  modulo: 'Cadastro do passo',
+  severidadePadrao: 'ERRO',
+  obrigatoria: true,
+  modos: ['RAPIDO', 'COMPLETO', 'PROFUNDO'],
+  introduzidaEm: '1.2.0',
+  timeoutMs: 15_000,
+  orientacao: 'Abra o passo em Workflows internos → Configurar → Geral e escolha um executor do registro.',
+  rotaCorrecao: ROTA_INTERNO,
+  responsavel: 'Workflow',
+  ativo: true,
+  executar: async (): Promise<ResultadoVerificacao> => {
+    const conhecidos = new Set(Object.keys(REGISTRO_DE_EXECUTORES))
+    const passos = await prisma.phaseInternalWorkflowStep.findMany({
+      where: { executorKey: { not: null } },
+      select: { id: true, key: true, executorKey: true, workflow: { select: { name: true } } },
+    })
+    const orfaos = passos.filter((p) => p.executorKey && !conhecidos.has(p.executorKey))
+    if (!orfaos.length) return vazio({ passos: passos.length, orfaos: 0 }, `${passos.length} passo(s) com executor declarado, todos no registro.`)
+    return {
+      achados: orfaos.map((p): Achado => ({
+        chave: `executor-inexistente:${p.id}`, severidade: 'ERRO',
+        titulo: `"${p.key}" aponta para o executor "${p.executorKey}"`,
+        descricao: `O passo "${p.key}" de "${p.workflow.name}" declara um executor que não está no registro.`,
+        explicacao: 'O registro de executores é o vocabulário fechado do que o sistema sabe desenhar. Uma chave fora dele não tem tela.',
+        impacto: 'A etapa abre sem painel, ou cai no painel genérico sem as capacidades que o cadastro supõe.',
+        entidade: 'PhaseInternalWorkflowStep', registroId: String(p.id), registroNome: p.key, quantidade: 1,
+        link: ROTA_INTERNO,
+        recomendacao: 'Escolha um executor existente ou deixe em branco para o painel declarativo.',
+        evidencia: { passoId: p.id, executorKey: p.executorKey },
+      })),
+      metricas: { passos: passos.length, orfaos: orfaos.length },
+    }
+  },
+})
+
+registrar({
+  id: 'saude.cadastro.campo-de-escolha-sem-opcao',
+  codigo: 'CAD-007',
+  nome: 'Campo de escolha tem opção',
+  descricao: 'Campo select/radio sem nenhuma opção não deixa o operador escolher nada — e o requisito que o cobra nunca fica satisfeito.',
+  dominio: 'WORKFLOW',
+  modulo: 'Cadastro do passo',
+  severidadePadrao: 'ERRO',
+  obrigatoria: true,
+  modos: ['COMPLETO', 'PROFUNDO'],
+  introduzidaEm: '1.2.0',
+  timeoutMs: 20_000,
+  orientacao: 'Abra o passo → Campos → cadastre as opções, ou aponte o campo para um catálogo.',
+  rotaCorrecao: ROTA_INTERNO,
+  responsavel: 'Workflow',
+  ativo: true,
+  executar: async (): Promise<ResultadoVerificacao> => {
+    const campos = await prisma.stepField.findMany({
+      where: { ativo: true, tipo: { in: ['select', 'multiselect', 'radio'] } },
+      select: {
+        id: true, key: true, label: true, opcoes: true,
+        step: { select: { id: true, key: true, workflow: { select: { name: true } } } },
+        opcoesCadastradas: { where: { ativo: true }, select: { id: true } },
+      },
+    })
+    const semOpcao = campos.filter((c) => {
+      if (c.opcoesCadastradas.length > 0) return false
+      const o = c.opcoes as { catalogo?: string } | unknown[] | null
+      if (o && !Array.isArray(o) && typeof o === 'object' && typeof (o as { catalogo?: string }).catalogo === 'string') return false
+      return !Array.isArray(o) || o.length === 0
+    })
+    if (!semOpcao.length) return vazio({ campos: campos.length, semOpcao: 0 }, `${campos.length} campo(s) de escolha, todos com opção.`)
+    return {
+      achados: semOpcao.map((c): Achado => ({
+        chave: `campo-sem-opcao:${c.id}`, severidade: 'ERRO',
+        titulo: `"${c.label}" não tem opção`,
+        descricao: `O campo "${c.key}" do passo "${c.step.key}" (${c.step.workflow.name}) é de escolha e não oferece nenhuma.`,
+        explicacao: 'Antes de a opção ter identidade própria, uma lista vazia significava "o executor decide". Agora significa exatamente o que diz: não há o que escolher.',
+        impacto: 'O operador trava na etapa; se o campo for obrigatório, a conclusão fica impossível.',
+        entidade: 'StepField', registroId: String(c.id), registroNome: c.key, quantidade: 1,
+        link: ROTA_INTERNO,
+        recomendacao: 'Cadastre as opções do campo ou aponte-o para um catálogo.',
+        evidencia: { campoId: c.id, stepId: c.step.id },
+      })),
+      metricas: { campos: campos.length, semOpcao: semOpcao.length },
+    }
+  },
+})
+
+registrar({
+  id: 'saude.cadastro.canal-do-passo-desativado',
+  codigo: 'CAD-008',
+  nome: 'Canal do passo continua ativo no catálogo',
+  descricao: 'Passo que oferece um canal desativado no catálogo mostra ao operador um caminho que o servidor recusa.',
+  dominio: 'WORKFLOW',
+  modulo: 'Cadastro do passo',
+  severidadePadrao: 'ALERTA',
+  obrigatoria: false,
+  modos: ['COMPLETO', 'PROFUNDO'],
+  introduzidaEm: '1.2.0',
+  timeoutMs: 15_000,
+  orientacao: 'Reative o canal no catálogo, ou desmarque-o nos passos que ainda o oferecem.',
+  rotaCorrecao: ROTA_CANAIS,
+  responsavel: 'Workflow',
+  ativo: true,
+  executar: async (): Promise<ResultadoVerificacao> => {
+    const vinculos = await prisma.stepChannel.findMany({
+      where: { ativo: true, canal: { ativo: false } },
+      select: { id: true, canal: { select: { key: true, label: true } }, step: { select: { key: true, workflow: { select: { name: true } } } } },
+      take: 50,
+    })
+    const total = await prisma.stepChannel.count()
+    if (!vinculos.length) return vazio({ vinculos: total, desativados: 0 }, `${total} vínculo(s) de canal, nenhum apontando para canal desativado.`)
+    return {
+      achados: vinculos.map((v): Achado => ({
+        chave: `canal-desativado:${v.id}`, severidade: 'ALERTA',
+        titulo: `"${v.step.key}" ainda oferece o canal "${v.canal.label}"`,
+        descricao: `O passo "${v.step.key}" de "${v.step.workflow.name}" oferece um canal que foi desativado no catálogo.`,
+        explicacao: 'Desativar no catálogo tira o canal de circulação; o vínculo do passo continua existindo porque o histórico das execuções que o usaram precisa continuar legível.',
+        impacto: 'O canal pode aparecer na tela do operador e ser recusado no envio.',
+        entidade: 'StepChannel', registroId: String(v.id), registroNome: v.canal.key, quantidade: 1,
+        link: ROTA_CANAIS,
+        recomendacao: 'Reative o canal ou desmarque-o no passo.',
+        evidencia: { vinculoId: v.id, canal: v.canal.key },
+      })),
+      metricas: { vinculos: total, desativados: vinculos.length },
+    }
+  },
+})
+
+registrar({
+  id: 'saude.cadastro.requisito-com-alvo-inexistente',
+  codigo: 'CAD-009',
+  nome: 'Requisito aponta para alvo existente',
+  descricao: 'Requisito que cobra um campo, item ou ação que não existe no passo nunca fica satisfeito — e a etapa não conclui nunca.',
+  dominio: 'WORKFLOW',
+  modulo: 'Cadastro do passo',
+  severidadePadrao: 'CRITICO',
+  obrigatoria: true,
+  modos: ['RAPIDO', 'COMPLETO', 'PROFUNDO'],
+  introduzidaEm: '1.2.0',
+  timeoutMs: 20_000,
+  orientacao: 'Abra o passo → Requisitos e reaponte o requisito, ou cadastre o alvo que falta.',
+  rotaCorrecao: ROTA_INTERNO,
+  responsavel: 'Workflow',
+  ativo: true,
+  executar: async (): Promise<ResultadoVerificacao> => {
+    const passos = await prisma.phaseInternalWorkflowStep.findMany({
+      where: { requisitos: { some: { ativo: true } } },
+      select: {
+        id: true, key: true, workflow: { select: { name: true } },
+        requisitos: { where: { ativo: true }, select: { id: true, key: true, label: true, tipo: true, alvoKey: true, acaoKey: true } },
+        campos: { select: { key: true } },
+        checkItens: { select: { key: true } },
+        acoes: { select: { key: true } },
+      },
+    })
+    const achados: Achado[] = []
+    let total = 0
+    for (const p of passos) {
+      const campos = new Set(p.campos.map((c) => c.key))
+      const itens = new Set(p.checkItens.map((c) => c.key))
+      const acoes = new Set(p.acoes.map((c) => c.key))
+      for (const r of p.requisitos) {
+        total++
+        // ALVO VAZIO É LEGÍTIMO: "checklist completo" sem alvo significa o checklist
+        // inteiro. O defeito é apontar para uma chave que não existe.
+        const problemas: string[] = []
+        if (r.alvoKey) {
+          if (r.tipo === 'CAMPO_PREENCHIDO' && !campos.has(r.alvoKey)) problemas.push(`campo "${r.alvoKey}"`)
+          if (r.tipo === 'CHECKLIST_COMPLETO' && !itens.has(r.alvoKey)) problemas.push(`item "${r.alvoKey}"`)
+          if (r.tipo === 'ACAO_EXECUTADA' && !acoes.has(r.alvoKey)) problemas.push(`ação "${r.alvoKey}"`)
+        } else if (r.tipo === 'CAMPO_PREENCHIDO' || r.tipo === 'ACAO_EXECUTADA') {
+          problemas.push('nenhum alvo declarado')
+        }
+        if (r.acaoKey && !acoes.has(r.acaoKey)) problemas.push(`ação condicionante "${r.acaoKey}"`)
+        if (!problemas.length) continue
+        achados.push({
+          chave: `requisito-alvo:${r.id}`, severidade: 'CRITICO',
+          titulo: `"${r.label}" cobra algo que não existe no passo`,
+          descricao: `Em "${p.workflow.name}", o requisito "${r.key}" do passo "${p.key}" aponta para ${problemas.join(', ')}.`,
+          explicacao: 'O requisito é avaliado sobre o que a etapa tem. Apontando para uma chave inexistente, a avaliação nunca dá satisfeita.',
+          impacto: 'A etapa fica impossível de concluir, e o operador lê um motivo que não corresponde a nenhum campo da tela.',
+          entidade: 'StepRequirement', registroId: String(r.id), registroNome: r.key, quantidade: 1,
+          link: ROTA_INTERNO,
+          recomendacao: 'Reaponte o requisito ou cadastre o alvo.',
+          evidencia: { requisitoId: r.id, tipo: r.tipo, alvoKey: r.alvoKey, problemas },
+        })
+      }
+    }
+    if (!achados.length) return vazio({ requisitos: total, quebrados: 0 }, `${total} requisito(s) cadastrado(s), todos apontando para alvo existente.`)
+    return { achados, metricas: { requisitos: total, quebrados: achados.length } }
+  },
+})
+
+registrar({
+  id: 'saude.cadastro.execucao-aponta-para-versao-inexistente',
+  codigo: 'CAD-010',
+  nome: 'Execução alcança a versão que registrou',
+  descricao: 'Instância que registrou uma versão sem conteúdo congelado não consegue dizer o que a configuração dizia quando ela começou.',
+  dominio: 'WORKFLOW',
+  modulo: 'Versionamento',
+  severidadePadrao: 'ERRO',
+  obrigatoria: true,
+  modos: ['COMPLETO', 'PROFUNDO'],
+  introduzidaEm: '1.2.0',
+  timeoutMs: 25_000,
+  orientacao: 'Rode `npm run backfill:versao-publicada -- --execute`; ele congela as versões vigentes que faltam.',
+  rotaCorrecao: ROTA_INTERNO,
+  responsavel: 'Workflow',
+  ativo: true,
+  executar: async (): Promise<ResultadoVerificacao> => {
+    // SEM `.catch`. Uma verificação que engole o próprio erro devolve "0 achados" e
+    // fica indistinguível de saudável — foi exatamente assim que esta query passou a
+    // reportar tudo em ordem enquanto apontava para colunas que não existem.
+    const linhas = await prisma.$queryRawUnsafe<Array<{ workflowId: number; versao: number; n: bigint }>>(
+      `SELECT i."workflowDefinitionId" AS "workflowId", i."workflowVersion" AS versao, COUNT(*) AS n
+         FROM "PhaseWorkflowInstance" i
+        WHERE i."workflowDefinitionId" IS NOT NULL AND i."workflowVersion" IS NOT NULL
+          AND NOT EXISTS (
+            SELECT 1 FROM "PhaseInternalWorkflowVersao" v
+             WHERE v."workflowId" = i."workflowDefinitionId" AND v."versao" = i."workflowVersion")
+        GROUP BY 1, 2 LIMIT 50`,
+    )
+    if (!linhas.length) return vazio({ orfas: 0 }, 'Toda execução alcança a versão congelada que registrou.')
+    return {
+      achados: linhas.map((l): Achado => ({
+        chave: `versao-inalcancavel:${l.workflowId}:${l.versao}`, severidade: 'ERRO',
+        titulo: `${Number(l.n)} execução(ões) apontam para a v${l.versao} do workflow #${l.workflowId}, que não está congelada`,
+        descricao: 'A instância registrou um número de versão cujo conteúdo não existe.',
+        explicacao: 'O número da versão é a promessa de que o conteúdo daquele dia continua legível. Sem a linha congelada, a promessa não é cumprível.',
+        impacto: 'Essas execuções caem na configuração de hoje ou em nenhuma — as duas coisas reinterpretam o passado.',
+        entidade: 'PhaseWorkflowInstance', registroId: String(l.workflowId), quantidade: Number(l.n),
+        link: ROTA_INTERNO,
+        recomendacao: 'Execute o backfill de versão publicada.',
+        evidencia: { workflowId: l.workflowId, versao: l.versao, instancias: Number(l.n) },
+      })),
+      metricas: { orfas: linhas.length },
+    }
+  },
+})
+
+registrar({
+  id: 'saude.cadastro.rascunho-nao-publicado',
+  codigo: 'CAD-011',
+  nome: 'Rascunho de workflow sem publicação',
+  descricao: 'Alteração salva e não publicada não vale para nenhum processo — e é fácil supor que valha.',
+  dominio: 'WORKFLOW',
+  modulo: 'Versionamento',
+  severidadePadrao: 'INFORMATIVO',
+  obrigatoria: false,
+  modos: ['COMPLETO', 'PROFUNDO'],
+  introduzidaEm: '1.2.0',
+  timeoutMs: 10_000,
+  orientacao: 'Abra o workflow e use "Publicar…" para ver o que muda e confirmar.',
+  rotaCorrecao: ROTA_INTERNO,
+  responsavel: 'Workflow',
+  ativo: true,
+  executar: async (): Promise<ResultadoVerificacao> => {
+    const wfs = await prisma.phaseInternalWorkflow.findMany({
+      where: { arquivado: false, rascunhoAlteradoEm: { not: null } },
+      select: { id: true, name: true, versao: true, rascunhoAlteradoEm: true },
+      take: 50,
+    })
+    if (!wfs.length) return vazio({ rascunhos: 0 }, 'Nenhum workflow com alteração pendente de publicação.')
+    return {
+      achados: wfs.map((w): Achado => ({
+        chave: `rascunho:${w.id}`, severidade: 'INFORMATIVO',
+        titulo: `"${w.name}" tem alteração não publicada`,
+        descricao: `A definição viva difere da versão ${w.versao}, publicada por último.`,
+        explicacao: 'Salvar deixou de publicar justamente para o administrador poder revisar antes. O efeito colateral é que a alteração fica invisível para os processos até alguém publicar.',
+        impacto: 'Os processos em andamento continuam na versão anterior — o que é correto, mas pode não ser o que se espera.',
+        entidade: 'PhaseInternalWorkflow', registroId: String(w.id), registroNome: w.name, quantidade: 1,
+        link: ROTA_INTERNO,
+        recomendacao: 'Revise a prévia e publique, ou desfaça a alteração.',
+        evidencia: { workflowId: w.id, versaoPublicada: w.versao, alteradoEm: w.rascunhoAlteradoEm },
+      })),
+      metricas: { rascunhos: wfs.length },
+    }
   },
 })

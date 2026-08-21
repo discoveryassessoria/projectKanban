@@ -2363,6 +2363,8 @@ CREATE TABLE "PhaseInternalWorkflow" (
     "exigePessoa" BOOLEAN NOT NULL DEFAULT false,
     "pausarSlaEmEsperaExterna" BOOLEAN NOT NULL DEFAULT false,
     "pausarSlaEmBloqueio" BOOLEAN NOT NULL DEFAULT false,
+    "rascunhoAlteradoEm" TIMESTAMP(3),
+    "rascunhoAlteradoPor" INTEGER,
 
     CONSTRAINT "PhaseInternalWorkflow_pkey" PRIMARY KEY ("id")
 );
@@ -2454,6 +2456,63 @@ CREATE TABLE "StepField" (
     "atualizadoEm" TIMESTAMP(3) NOT NULL,
 
     CONSTRAINT "StepField_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "StepFieldOption" (
+    "id" SERIAL NOT NULL,
+    "fieldId" INTEGER NOT NULL,
+    "key" VARCHAR(60) NOT NULL,
+    "label" VARCHAR(200) NOT NULL,
+    "descricao" TEXT,
+    "ordem" INTEGER NOT NULL DEFAULT 0,
+    "ativo" BOOLEAN NOT NULL DEFAULT true,
+    "condicao" JSONB,
+    "metadata" JSONB,
+    "criadoEm" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "atualizadoEm" TIMESTAMP(3) NOT NULL,
+
+    CONSTRAINT "StepFieldOption_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "StepChannel" (
+    "id" SERIAL NOT NULL,
+    "stepId" INTEGER NOT NULL,
+    "canalId" INTEGER NOT NULL,
+    "ordem" INTEGER NOT NULL DEFAULT 0,
+    "ativo" BOOLEAN NOT NULL DEFAULT true,
+    "exigeProtocolo" BOOLEAN,
+    "exigeAnexo" BOOLEAN,
+    "exigeRastreio" BOOLEAN,
+    "exigeObservacao" BOOLEAN,
+    "camposObrigatorios" JSONB,
+    "condicao" JSONB,
+    "criadoEm" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "atualizadoEm" TIMESTAMP(3) NOT NULL,
+
+    CONSTRAINT "StepChannel_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "StepRequirement" (
+    "id" SERIAL NOT NULL,
+    "stepId" INTEGER NOT NULL,
+    "key" VARCHAR(60) NOT NULL,
+    "label" VARCHAR(200) NOT NULL,
+    "descricao" TEXT,
+    "tipo" VARCHAR(30) NOT NULL,
+    "alvoKey" VARCHAR(60),
+    "minimo" INTEGER NOT NULL DEFAULT 1,
+    "obrigatorio" BOOLEAN NOT NULL DEFAULT true,
+    "condicao" JSONB,
+    "acaoKey" VARCHAR(60),
+    "ordem" INTEGER NOT NULL DEFAULT 0,
+    "ativo" BOOLEAN NOT NULL DEFAULT true,
+    "criadoEm" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "atualizadoEm" TIMESTAMP(3) NOT NULL,
+
+    CONSTRAINT "StepRequirement_pkey" PRIMARY KEY ("id")
 );
 
 -- CreateTable
@@ -5252,6 +5311,27 @@ CREATE INDEX "StepField_stepId_idx" ON "StepField"("stepId");
 CREATE UNIQUE INDEX "StepField_stepId_key_key" ON "StepField"("stepId", "key");
 
 -- CreateIndex
+CREATE INDEX "StepFieldOption_fieldId_idx" ON "StepFieldOption"("fieldId");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "StepFieldOption_fieldId_key_key" ON "StepFieldOption"("fieldId", "key");
+
+-- CreateIndex
+CREATE INDEX "StepChannel_stepId_idx" ON "StepChannel"("stepId");
+
+-- CreateIndex
+CREATE INDEX "StepChannel_canalId_idx" ON "StepChannel"("canalId");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "StepChannel_stepId_canalId_key" ON "StepChannel"("stepId", "canalId");
+
+-- CreateIndex
+CREATE INDEX "StepRequirement_stepId_idx" ON "StepRequirement"("stepId");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "StepRequirement_stepId_key_key" ON "StepRequirement"("stepId", "key");
+
+-- CreateIndex
 CREATE INDEX "StepChecklistItem_stepId_idx" ON "StepChecklistItem"("stepId");
 
 -- CreateIndex
@@ -6585,6 +6665,18 @@ ALTER TABLE "StepAction" ADD CONSTRAINT "StepAction_stepId_fkey" FOREIGN KEY ("s
 
 -- AddForeignKey
 ALTER TABLE "StepField" ADD CONSTRAINT "StepField_stepId_fkey" FOREIGN KEY ("stepId") REFERENCES "PhaseInternalWorkflowStep"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "StepFieldOption" ADD CONSTRAINT "StepFieldOption_fieldId_fkey" FOREIGN KEY ("fieldId") REFERENCES "StepField"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "StepChannel" ADD CONSTRAINT "StepChannel_stepId_fkey" FOREIGN KEY ("stepId") REFERENCES "PhaseInternalWorkflowStep"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "StepChannel" ADD CONSTRAINT "StepChannel_canalId_fkey" FOREIGN KEY ("canalId") REFERENCES "CanalOperacional"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "StepRequirement" ADD CONSTRAINT "StepRequirement_stepId_fkey" FOREIGN KEY ("stepId") REFERENCES "PhaseInternalWorkflowStep"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "StepChecklistItem" ADD CONSTRAINT "StepChecklistItem_stepId_fkey" FOREIGN KEY ("stepId") REFERENCES "PhaseInternalWorkflowStep"("id") ON DELETE CASCADE ON UPDATE CASCADE;

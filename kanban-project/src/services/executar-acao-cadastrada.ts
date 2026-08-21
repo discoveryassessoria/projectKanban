@@ -31,6 +31,8 @@ import { efeito, efeitosDaFase } from "@/src/lib/motor/catalogo-de-efeitos"
 import { executorSuportaEfeito } from "@/src/lib/motor/registro-de-executores"
 import { executorEfetivo } from "@/src/services/validacao-de-publicacao"
 import { registrarNaTentativa, tentativaVigente } from "@/src/services/execucao-do-passo"
+import { requisitosPendentes } from "@/src/services/requisitos-da-etapa"
+import { avaliarCondicao, type Condicao } from "@/src/lib/motor/condicoes"
 import { concluirPasso, bloquearTarefa, desbloquearTarefa } from "@/src/services/task-step-sync"
 import { novaViaDocumental, invalidarDocumento, marcarDocumentoRecebido, aprovarParaAnalise, concluirDocumento, registrarDivergencia, decidirRetificacao } from "@/src/services/efeitos-de-dominio"
 
@@ -53,7 +55,14 @@ export interface ContextoDaAcao {
 function faltando(campos: CampoCongelado[], acao: AcaoCongelada, valores: Record<string, unknown>): string[] {
   const def = efeito(acao.effectKey)
   const exigidos = new Set<string>([...(acao.requerCampos ?? []), ...(def?.camposObrigatorios ?? [])])
-  for (const c of campos) if (c.obrigatorio && c.ativo !== false) exigidos.add(c.key)
+  // Campo escondido por condição não é exigido: pedir o que não aparece é pedir o
+  // impossível. A publicação recusa "obrigatório + condicional" justamente por isso;
+  // esta linha protege o dado antigo, publicado antes daquela validação existir.
+  for (const c of campos) {
+    if (!c.obrigatorio || c.ativo === false) continue
+    if (!avaliarCondicao(c.condicao as Condicao | null, { valores })) continue
+    exigidos.add(c.key)
+  }
   const falta: string[] = []
   for (const k of exigidos) {
     const v = valores[k]
@@ -121,11 +130,72 @@ export async function executarAcaoCadastrada(
     return { ok: false, codigo: "SEM_PERMISSAO", mensagem: `Esta ação exige a permissão "${permissao}".` }
   }
 
+  // A AÇÃO PODE ESTAR ESCONDIDA POR CONDIÇÃO. Se ela não deveria aparecer com estes
+  // valores, executá-la é contornar a regra — e o cliente pode ter mandado a chave
+  // mesmo sem o botão existir na tela.
+  if (!avaliarCondicao(acao.condicao as Condicao | null, { valores })) {
+    return { ok: false, codigo: "ACAO_INDISPONIVEL",
+      mensagem: `"${acao.label}" não está disponível com o que foi preenchido.` }
+  }
+
+  // O CANAL ESCOLHIDO PRECISA SER UM DOS OFERECIDOS POR ESTA VERSÃO. Sem isto, o
+  // cliente poderia mandar um canal inativado — ou inexistente — e o servidor aceitaria.
+  //
+  // QUAL CAMPO CARREGA O CANAL é uma pergunta de cadastro, não de convenção de nome.
+  // Um campo cujas opções apontam para o catálogo de canais É o campo do canal; sem
+  // essa declaração, vale a chave reservada `canal`. E se um campo com essa chave tem
+  // opções PRÓPRIAS cadastradas, ele não é o campo do canal — o valor dele é julgado
+  // logo abaixo, pelas opções dele. Julgar a mesma escolha por dois vocabulários
+  // diferentes recusaria configuração legítima.
+  const canaisDaVersao = hist.passo.canais ?? []
+  const campoDoCatalogo = hist.passo.campos.find((c) => {
+    const o = c.opcoes as { catalogo?: string } | unknown[] | null
+    return !!o && !Array.isArray(o) && typeof o === "object" && (o as { catalogo?: string }).catalogo === "canais"
+  })
+  const campoCanalPadrao = hist.passo.campos.find((c) => c.key === "canal")
+  const chaveDoCanal = campoDoCatalogo
+    ? campoDoCatalogo.key
+    : campoCanalPadrao && (campoCanalPadrao.opcoesCadastradas ?? []).length > 0
+      ? null
+      : "canal"
+  const canalEscolhido = chaveDoCanal && typeof valores[chaveDoCanal] === "string" ? (valores[chaveDoCanal] as string) : null
+  if (canalEscolhido && canaisDaVersao.length > 0) {
+    const ofertado = canaisDaVersao.find((c) => c.key === canalEscolhido && c.ativo !== false)
+    if (!ofertado) {
+      return { ok: false, codigo: "CANAL_INVALIDO",
+        mensagem: `O canal "${canalEscolhido}" não é oferecido por esta etapa nesta versão.` }
+    }
+  }
+
+  // AS OPÇÕES ESCOLHIDAS PRECISAM EXISTIR. Mesma razão: a autoridade é do servidor.
+  for (const campo of hist.passo.campos) {
+    const cadastradas = (campo.opcoesCadastradas ?? []).filter((o) => o.ativo !== false)
+    if (cadastradas.length === 0) continue
+    const v = valores[campo.key]
+    const escolhidas = Array.isArray(v) ? v : v == null || v === "" ? [] : [v]
+    for (const e of escolhidas) {
+      if (!cadastradas.some((o) => o.key === e)) {
+        return { ok: false, codigo: "OPCAO_INVALIDA",
+          mensagem: `"${String(e)}" não é uma opção válida de "${campo.label}" nesta versão.` }
+      }
+    }
+  }
+
   const falta = faltando(hist.passo.campos, acao, valores)
   if (falta.length) {
     const rotulos = falta.map((k) => hist.passo.campos.find((c) => c.key === k)?.label ?? k)
     return { ok: false, codigo: "CAMPO_OBRIGATORIO",
       mensagem: `Preencha antes de continuar: ${rotulos.join(", ")}.` }
+  }
+
+  // OS REQUISITOS CADASTRADOS — a mesma conta que a tela mostrou, cobrada aqui.
+  const pendentes = await requisitosPendentes({
+    stepInstanceId, requisitos: hist.passo.requisitos ?? [], campos: hist.passo.campos,
+    checklist: hist.passo.checkItens, canais: canaisDaVersao, valores, acaoKey: acao.key,
+  })
+  if (pendentes.length > 0) {
+    return { ok: false, codigo: "REQUISITO_PENDENTE",
+      mensagem: pendentes.map((p) => p.motivo).join(" "), detalhes: { pendencias: pendentes } }
   }
 
   // ── EFEITO ──────────────────────────────────────────────────────────────

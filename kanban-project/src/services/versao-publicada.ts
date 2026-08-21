@@ -64,6 +64,38 @@ export interface PassoCongelado {
   acoes: AcaoCongelada[]
   campos: CampoCongelado[]
   checkItens: ItemChecklistCongelado[]
+  canais: CanalCongelado[]
+  requisitos: RequisitoCongelado[]
+}
+
+/// Um canal como ESTE passo o oferecia, com o que ele exigia aqui.
+export interface CanalCongelado {
+  key: string
+  label: string
+  descricao: string | null
+  ordem: number
+  ativo: boolean
+  exigeProtocolo: boolean
+  exigeAnexo: boolean
+  anexoLabel: string | null
+  exigeRastreio: boolean
+  exigeObservacao: boolean
+  camposObrigatorios: string[]
+  condicao: unknown
+}
+
+export interface RequisitoCongelado {
+  key: string
+  label: string
+  descricao: string | null
+  tipo: string
+  alvoKey: string | null
+  minimo: number
+  obrigatorio: boolean
+  condicao: unknown
+  acaoKey: string | null
+  ordem: number
+  ativo: boolean
 }
 
 export interface AcaoCongelada {
@@ -79,11 +111,22 @@ export interface AcaoCongelada {
   ativo: boolean
 }
 
+export interface OpcaoCongelada {
+  key: string
+  label: string
+  descricao: string | null
+  ordem: number
+  ativo: boolean
+  condicao: unknown
+}
+
 export interface CampoCongelado {
   key: string
   label: string
   tipo: string
   obrigatorio: boolean
+  /// Opções CADASTRADAS, com identidade. `opcoes` (JSON) segue como o formato antigo.
+  opcoesCadastradas: OpcaoCongelada[]
   opcoes: unknown
   condicao: unknown
   ajuda: string | null
@@ -140,8 +183,10 @@ export async function congelarVersaoVigente(
         orderBy: { ordem: "asc" },
         include: {
           acoes: { orderBy: { ordem: "asc" } },
-          campos: { orderBy: { ordem: "asc" } },
+          campos: { orderBy: { ordem: "asc" }, include: { opcoesCadastradas: { orderBy: { ordem: "asc" } } } },
           checkItens: { orderBy: { ordem: "asc" } },
+          canais: { orderBy: { ordem: "asc" }, include: { canal: true } },
+          requisitos: { orderBy: { ordem: "asc" } },
         },
       },
     },
@@ -174,8 +219,35 @@ export async function congelarVersaoVigente(
     })),
     campos: p.campos.map((c) => ({
       key: c.key, label: c.label, tipo: c.tipo, obrigatorio: c.obrigatorio,
+      opcoesCadastradas: c.opcoesCadastradas.map((o) => ({
+        key: o.key, label: o.label, descricao: o.descricao, ordem: o.ordem,
+        ativo: o.ativo, condicao: o.condicao ?? null,
+      })),
       opcoes: c.opcoes ?? null, condicao: c.condicao ?? null, ajuda: c.ajuda,
       ordem: c.ordem, ativo: c.ativo,
+    })),
+    // O CANAL É CONGELADO COM O QUE ELE EXIGIA. Inativar um canal no catálogo não pode
+    // mudar o que uma execução antiga oferecia — nem apagar o que ela escolheu.
+    canais: p.canais.map((sc) => ({
+      key: sc.canal.key, label: sc.canal.label, descricao: sc.canal.descricao,
+      ordem: sc.ordem, ativo: sc.ativo && sc.canal.ativo,
+      // A EXIGÊNCIA DO PASSO SÓ ACRESCENTA. `null` = não decidiu, vale o catálogo;
+      // `true` = soma. O passo nunca DISPENSA o que o canal exige de origem — se
+      // pudesse, um passo mal configurado deixaria passar solicitação sem protocolo
+      // por um canal que só existe com protocolo, e a exigência do catálogo viraria
+      // sugestão.
+      exigeProtocolo: sc.exigeProtocolo === true || sc.canal.protocoloObrigatorio,
+      exigeAnexo: sc.exigeAnexo === true || sc.canal.anexoObrigatorioLabel != null,
+      anexoLabel: sc.canal.anexoObrigatorioLabel,
+      exigeRastreio: sc.exigeRastreio === true || sc.canal.rastreioObrigatorio,
+      exigeObservacao: sc.exigeObservacao === true || sc.canal.observacaoObrigatoria,
+      camposObrigatorios: Array.isArray(sc.camposObrigatorios) ? (sc.camposObrigatorios as string[]) : [],
+      condicao: sc.condicao ?? null,
+    })),
+    requisitos: p.requisitos.map((r) => ({
+      key: r.key, label: r.label, descricao: r.descricao, tipo: r.tipo, alvoKey: r.alvoKey,
+      minimo: r.minimo, obrigatorio: r.obrigatorio, condicao: r.condicao ?? null,
+      acaoKey: r.acaoKey, ordem: r.ordem, ativo: r.ativo,
     })),
     checkItens: p.checkItens.map((i) => ({
       key: i.key, label: i.label, descricao: i.descricao,
@@ -260,8 +332,14 @@ export async function lerVersaoPublicada(
       reaberturaExigeJustificativa: p.reaberturaExigeJustificativa ?? true,
       reaberturaPermissao: p.reaberturaPermissao ?? null,
       acoes: Array.isArray(p.acoes) ? p.acoes : [],
-      campos: Array.isArray(p.campos) ? p.campos : [],
+      campos: (Array.isArray(p.campos) ? p.campos : []).map((c) => ({
+        ...(c as CampoCongelado),
+        opcoesCadastradas: Array.isArray((c as CampoCongelado).opcoesCadastradas)
+          ? (c as CampoCongelado).opcoesCadastradas : [],
+      })),
       checkItens: Array.isArray(p.checkItens) ? p.checkItens : [],
+      canais: Array.isArray(p.canais) ? p.canais : [],
+      requisitos: Array.isArray(p.requisitos) ? p.requisitos : [],
     })),
     congeladoEm: v.congeladoEm, origem: v.origem,
   }

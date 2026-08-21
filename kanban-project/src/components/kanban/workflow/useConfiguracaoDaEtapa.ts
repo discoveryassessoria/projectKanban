@@ -37,12 +37,39 @@ export interface ItemConferencia {
   obrigatorio: boolean
 }
 
+/**
+ * Canal que ESTE passo oferece — do cadastro do passo, não do catálogo inteiro.
+ *
+ * As exigências já chegam RESOLVIDAS: a versão congelada soma o que o catálogo pede
+ * com o que o passo acrescentou. A tela não refaz essa conta, senão passariam a
+ * existir duas respostas para "este canal exige protocolo?".
+ */
+export interface CanalDoPasso {
+  key: string
+  label: string
+  descricao: string | null
+  ordem: number
+  ativo: boolean
+  exigeProtocolo: boolean
+  exigeAnexo: boolean
+  anexoLabel: string | null
+  exigeRastreio: boolean
+  exigeObservacao: boolean
+  camposObrigatorios: string[]
+}
+/** O que falta para concluir — calculado pelo servidor, com a mesma conta que recusa. */
+export interface PendenciaDaEtapa { key: string; label: string; tipo: string; obrigatorio: boolean; motivo: string }
+
 export interface ConfiguracaoDaEtapa {
   versao: number | null
   executor: string | null
   campos: CampoConfigurado[]
   acoes: AcaoConfigurada[]
   checklist: ItemConferencia[]
+  canais: CanalDoPasso[]
+  pendencias: PendenciaDaEtapa[]
+  /** O que já foi preenchido nesta tentativa — o servidor devolve para a tela recarregar cheia. */
+  valores: Record<string, unknown>
   /** Execução atual e anteriores — para o executor mostrar "o que houve antes". */
   execucaoAtual: { id: number; sequencia: number; resultado: string | null } | null
   execucoesAnteriores: Array<{ id: number; sequencia: number; resultado: string | null; completedAt: string | null; motivo: string }>
@@ -81,6 +108,9 @@ export function useConfiguracaoDaEtapa(stepInstanceId: number | null) {
           campos: j.configuracao?.campos ?? [],
           acoes: j.configuracao?.acoes ?? [],
           checklist: j.configuracao?.checklist ?? [],
+          canais: j.configuracao?.canais ?? [],
+          pendencias: j.pendencias ?? [],
+          valores: j.valores ?? {},
           execucaoAtual: j.execucaoAtual ? { id: j.execucaoAtual.id, sequencia: j.execucaoAtual.sequencia, resultado: j.execucaoAtual.resultado } : null,
           execucoesAnteriores: j.execucoesAnteriores ?? [],
         })
@@ -95,6 +125,28 @@ export function useConfiguracaoDaEtapa(stepInstanceId: number | null) {
 
   /** Opções de um campo cadastrado. Vazio = o cadastro não declarou este campo. */
   const opcoesDe = (campoKey: string) => cfg?.campos.find((c) => c.key === campoKey)?.opcoes ?? []
+
+  /**
+   * OS CANAIS DESTE PASSO, no formato que os executores já desenham.
+   *
+   * A ordem da resposta é a do cadastro do passo (`StepChannel`). Só quando o passo
+   * não cadastrou canal nenhum é que a lista fica vazia — e aí o executor cai no
+   * campo `canal`, que resolve do catálogo, e por último na semente. Nenhum desses
+   * caminhos inventa canal: os três dizem a mesma lista, em graus de especificidade
+   * decrescentes.
+   */
+  const canaisDoPasso = () =>
+    (cfg?.canais ?? []).filter((c) => c.ativo !== false).slice().sort((a, b) => a.ordem - b.ordem).map((c) => ({
+      value: c.key,
+      label: c.label,
+      meta: {
+        descricao: c.descricao,
+        protocoloObrigatorio: c.exigeProtocolo,
+        anexoObrigatorioLabel: c.exigeAnexo ? (c.anexoLabel ?? "Comprovante do envio") : null,
+        rastreioObrigatorio: c.exigeRastreio,
+        observacaoObrigatoria: c.exigeObservacao,
+      } as Record<string, unknown>,
+    }))
 
   /**
    * EXECUTA UMA AÇÃO CADASTRADA pela porta única de domínio.
@@ -135,6 +187,9 @@ export function useConfiguracaoDaEtapa(stepInstanceId: number | null) {
     /** `true` quando a etapa não tem configuração cadastrada nesta versão. */
     ausente: !carregando && !erro && cfg != null && cfg.acoes.length === 0 && cfg.campos.length === 0,
     opcoesDe,
+    canaisDoPasso,
+    /** O que o servidor diz que falta. A tela mostra; quem recusa é a porta. */
+    pendencias: cfg?.pendencias ?? [],
     executarAcao,
     recarregar: () => setRecarga((n) => n + 1),
   }

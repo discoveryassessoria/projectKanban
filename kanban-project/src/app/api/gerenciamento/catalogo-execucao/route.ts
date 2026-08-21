@@ -29,10 +29,22 @@ export async function GET(request: NextRequest) {
       key: x.key, label: x.label, campos: x.campos,
       efeitos: x.efeitos === '*' ? CATALOGO_DE_EFEITOS.map((e) => e.key) : x.efeitos,
       acoesCadastradas: x.acoesCadastradas, checklistCadastrado: x.checklistCadastrado,
+      // AS CAPACIDADES INTEIRAS, não um recorte. A tela precisa saber se o executor
+      // desenha canal, evidência, espera externa e condição para não oferecer ao
+      // administrador um cadastro que nunca vai aparecer para o operador.
+      suportaCanais: x.suportaCanais, suportaEvidencia: x.suportaEvidencia,
+      suportaEsperaExterna: x.suportaEsperaExterna, suportaCondicoes: x.suportaCondicoes,
     })),
     tiposDeCampo: TIPOS_DE_CAMPO,
     canais: await prisma.canalOperacional.findMany({
-      where: { ativo: true }, orderBy: [{ ordem: 'asc' }], select: { key: true, label: true },
+      where: { ativo: true }, orderBy: [{ ordem: 'asc' }],
+      // AS EXIGÊNCIAS DO CATÁLOGO VÊM JUNTO: o passo pode exigir MAIS que o canal,
+      // nunca menos, e o administrador só sabe o que está acrescentando se vir o que
+      // já é exigido de origem.
+      select: {
+        key: true, label: true, protocoloObrigatorio: true, anexoObrigatorioLabel: true,
+        rastreioObrigatorio: true, observacaoObrigatoria: true,
+      },
     }),
   })
 }

@@ -215,7 +215,17 @@ const MIGRATION = join(DIR_MIGRATIONS, '0000_baseline', 'migration.sql')
 // Ledger reconciliado no MESMO deploy de 20260821200000_politica_de_reabertura.
 //
 //   anterior : 0a9fad73eef7c8d540bed54a7d07bef4ac618dbc639ea9981f6a2bcef748fe5c
-const CHECKSUM_LEDGER = '5955d26c1b544edf95fc04eca4f4f437a14328791f10737271d9c192e0e5582d'
+//
+// 21/08/2026 — CADASTRO INTEGRAL DO PASSO. Tres tabelas novas (StepFieldOption,
+// StepChannel, StepRequirement) e duas colunas anulaveis de rascunho em
+// PhaseInternalWorkflow. ADITIVA: enquanto as tabelas estao vazias e as colunas
+// nulas, o runtime responde como respondia. O baseline mudou porque quem instalar do
+// zero precisa cria-las; o banco de producao NAO mudou de forma nenhuma nesta
+// reconciliacao — so o registro de qual arquivo foi aplicado.
+// Ledger reconciliado no MESMO deploy de 20260821220000_cadastro_integral_do_passo.
+//
+//   anterior : 5955d26c1b544edf95fc04eca4f4f437a14328791f10737271d9c192e0e5582d
+const CHECKSUM_LEDGER = 'be3f3a4bfe7df13659c1270e6c640587899726ef311b84cf9064c2a369ffb0b9'
 
 /**
  * Migrations criadas DEPOIS da consolidacao de 02/08/2026. Toda migration nova
@@ -254,6 +264,7 @@ const MIGRATIONS_POS_BASELINE: string[] = [
   '20260821140000_constraints_de_estado_impossivel',
   '20260821160000_chave_de_derivacao_documental',
   '20260821200000_politica_de_reabertura',
+  '20260821220000_cadastro_integral_do_passo',
 ]
 
 const sha256 = (t: string) => createHash('sha256').update(t).digest('hex')

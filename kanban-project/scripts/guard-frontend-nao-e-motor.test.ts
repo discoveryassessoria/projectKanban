@@ -139,5 +139,71 @@ const runtime = [...arquivos("src/services"), ...arquivos("src/app/api"), ...arq
 const escrevemBlob = runtime.filter((f) => /metadata:\s*\{\s*operacao:/.test(semComentarios(ler(f))))
 check("nenhum arquivo de runtime escreve o blob antigo", escrevemBlob.length === 0, escrevemBlob.join(", "))
 
+// ════════════════════════════════════════════════════════════════
+console.log("\n(6) O hardcode operacional não volta pela porta dos fundos")
+// ════════════════════════════════════════════════════════════════
+//
+// As regras acima cobram os pontos que JÁ foram migrados. Estas cobram o caminho de
+// VOLTA: um executor novo, ou uma alteração num existente, reintroduzindo em código a
+// lista que agora é cadastro. É a diferença entre provar que hoje está limpo e
+// impedir que amanhã não esteja.
+
+const EXECUTORES = [
+  "src/components/kanban/workflow/StepEditors.tsx",
+  "src/components/kanban/workflow/CentralDaEtapaDrawer.tsx",
+  "src/components/kanban/workflow/PainelDeclarativoDaEtapa.tsx",
+]
+
+// 6.1 — CANAL LITERAL. As chaves de canal são dado; escrevê-las dentro de um array de
+// tela recria a segunda lista que discordava da oficial.
+const CHAVES_DE_CANAL = ["CRC", "ECARTORIO", "WHATSAPP", "BALCAO", "COMUNE", "CONSULADO"]
+for (const f of EXECUTORES) {
+  const t = semComentarios(ler(f))
+  if (!t) continue
+  // Um objeto literal com três ou mais chaves de canal É uma lista de canais.
+  const literaisDeCanal = /\[[^\]]{0,4000}?\]/g
+  let reincidente: string | null = null
+  for (const bloco of t.match(literaisDeCanal) ?? []) {
+    const quantas = CHAVES_DE_CANAL.filter((c) => bloco.includes(`"${c}"`) || bloco.includes(`'${c}'`)).length
+    // `ICONE_DO_CANAL` e `DICA_OBSERVACAO` são mapas de APRESENTAÇÃO por canal — não
+    // dizem quais canais existem nem o que cada um exige. Eles são objetos, não
+    // arrays, e por isso não caem aqui.
+    if (quantas >= 3) { reincidente = bloco.slice(0, 80); break }
+  }
+  check(`${f.split("/").pop()} não traz uma lista de canais em código`, reincidente === null, reincidente ?? "")
+}
+
+// 6.2 — EXIGÊNCIA POR CANAL EM CÓDIGO. "se o canal é X, exija Y" é cadastro desde que
+// `StepChannel` existe; um `switch`/`if` sobre a chave do canal é a regra voltando.
+for (const f of EXECUTORES) {
+  const t = semComentarios(ler(f))
+  if (!t) continue
+  check(`${f.split("/").pop()} não ramifica exigência por chave de canal`,
+    !/(switch\s*\(\s*[a-zA-Z_.]*canal|canal\s*===\s*["'](CRC|ECARTORIO|WHATSAPP|BALCAO|COMUNE|CONSULADO)["'])/i.test(t),
+    "a exigência por canal vem do cadastro, somada à do catálogo")
+}
+
+// 6.3 — A TELA NÃO DECIDE QUE UM REQUISITO ESTÁ CUMPRIDO. Ela mostra o que o servidor
+// calculou; a conta é uma só, e é a que recusa.
+check("as pendências que a tela mostra vêm do servidor",
+  editores.includes("pendencias: pendenciasDaEtapa") || editores.includes("pendenciasDaEtapa"),
+  "o executor precisa consumir `pendencias` do hook, não recalcular requisitos")
+check("o hook busca as pendências da rota de execução",
+  semComentarios(ler("src/components/kanban/workflow/useConfiguracaoDaEtapa.ts")).includes("pendencias: j.pendencias"))
+
+// 6.4 — AS OPÇÕES TÊM IDENTIDADE. O runtime resolve `StepFieldOption` antes do JSON;
+// inverter a ordem faria a opção renomeada perder o vínculo com o que foi escolhido.
+const rotaExec = semComentarios(ler("src/app/api/workflow-step-instances/[id]/execucao/route.ts"))
+check("as opções cadastradas têm precedência sobre o JSON antigo",
+  rotaExec.indexOf("opcoesCadastradas") < rotaExec.indexOf("Array.isArray(o) ? o : []"))
+check("opção inativa não é oferecida", rotaExec.includes('filter((o) => o.ativo !== false)'))
+
+// 6.5 — SALVAR NÃO PUBLICA. Se a rota de gravação voltar a congelar versão, três
+// ajustes viram três versões e a prévia deixa de ter função.
+const rotaAdmin = semComentarios(ler("src/app/api/gerenciamento/workflows-fase/[id]/route.ts"))
+check("o PUT do cadastro grava rascunho, não publica", rotaAdmin.includes("marcarRascunho(id"))
+check("publicar é um ato próprio, com trava de versão", rotaAdmin.includes("versaoEsperada"))
+check("o PUT não congela versão por conta própria", !rotaAdmin.includes("congelarVersaoVigente("))
+
 console.log(`\n${falhas.length === 0 ? "✅ PASSOU" : "❌ FALHOU"}: ${ok} ok, ${falhas.length} falhas`)
 if (falhas.length) { for (const f of falhas) console.log(`  · ${f}`); process.exit(1) }

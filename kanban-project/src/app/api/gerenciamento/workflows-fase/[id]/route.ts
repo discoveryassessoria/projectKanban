@@ -2,8 +2,8 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { Prisma } from '@prisma/client'
 import { verificarPermissao, extrairUsuarioComPermissoes } from '@/src/lib/verificar-permissao'
-import { publicarNovaVersao, congelarVersaoVigente } from '@/src/services/versao-publicada'
 import { validarWorkflowParaPublicar } from '@/src/services/validacao-de-publicacao'
+import { marcarRascunho, publicarWorkflow, preverPublicacao } from '@/src/services/publicacao-de-workflow'
 
 function slug(s: string) {
   return String(s || '')
@@ -82,6 +82,44 @@ function buildFilhos(s: any, stepId: number) {
       ajuda: c?.ajuda ? String(c.ajuda) : null,
       ordem: Number(c?.ordem) || i + 1, ativo: c?.ativo !== false,
     })),
+    opcoesPorCampo: lista(s?.campos).map((c: any, i: number) => ({
+      campoKey: slug(String(c?.key || c?.label || `campo_${i + 1}`)),
+      opcoes: (Array.isArray(c?.opcoesCadastradas) ? c.opcoesCadastradas : []).map((o: any, j: number) => ({
+        key: slug(String(o?.key || o?.label || `opcao_${j + 1}`)),
+        label: String(o?.label || 'Opção'),
+        descricao: o?.descricao ? String(o.descricao) : null,
+        ordem: Number(o?.ordem) || j + 1,
+        ativo: o?.ativo !== false,
+        condicao: (o?.condicao ?? undefined) as Prisma.InputJsonValue | undefined,
+      })),
+    })),
+    canais: lista(s?.canais).map((c: any, i: number) => ({
+      canalKey: String(c?.canalKey ?? c?.key ?? ''),
+      ordem: Number(c?.ordem) || i + 1,
+      ativo: c?.ativo !== false,
+      // `null` = herda o requisito do catálogo; `true`/`false` = o passo decide.
+      exigeProtocolo: typeof c?.exigeProtocolo === 'boolean' ? c.exigeProtocolo : null,
+      exigeAnexo: typeof c?.exigeAnexo === 'boolean' ? c.exigeAnexo : null,
+      exigeRastreio: typeof c?.exigeRastreio === 'boolean' ? c.exigeRastreio : null,
+      exigeObservacao: typeof c?.exigeObservacao === 'boolean' ? c.exigeObservacao : null,
+      camposObrigatorios: (Array.isArray(c?.camposObrigatorios)
+        ? c.camposObrigatorios.filter((x: unknown) => typeof x === 'string') : undefined) as Prisma.InputJsonValue | undefined,
+      condicao: (c?.condicao ?? undefined) as Prisma.InputJsonValue | undefined,
+    })),
+    requisitos: lista(s?.requisitos).map((r: any, i: number) => ({
+      key: slug(String(r?.key || r?.label || `requisito_${i + 1}`)),
+      label: String(r?.label || 'Requisito'),
+      descricao: r?.descricao ? String(r.descricao) : null,
+      tipo: ['CAMPO_PREENCHIDO', 'CHECKLIST_COMPLETO', 'EVIDENCIA_ANEXADA', 'ACAO_EXECUTADA'].includes(String(r?.tipo))
+        ? String(r.tipo) : 'CAMPO_PREENCHIDO',
+      alvoKey: r?.alvoKey ? String(r.alvoKey) : null,
+      minimo: Math.max(1, Number(r?.minimo) || 1),
+      obrigatorio: r?.obrigatorio !== false,
+      condicao: (r?.condicao ?? undefined) as Prisma.InputJsonValue | undefined,
+      acaoKey: r?.acaoKey ? String(r.acaoKey) : null,
+      ordem: Number(r?.ordem) || i + 1,
+      ativo: r?.ativo !== false,
+    })),
     checkItens: lista(s?.checkItens).map((k: any, i: number) => ({
       stepId, key: slug(String(k?.key || k?.label || `item_${i + 1}`)),
       label: String(k?.label || 'Item'), descricao: k?.descricao ? String(k.descricao) : null,
@@ -129,8 +167,9 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
 
     if (mudouDefinicao) {
       await prisma.$transaction(async (tx) => {
-        const r = await publicarNovaVersao(id, tx, usuario?.userId ?? null)
-        versaoNova = r.nova
+        // SALVAR NÃO PUBLICA. A definição viva É o rascunho; a versão congelada é o
+        // publicado. Antes, cada save incrementava a versão — três ajustes viravam
+        // três versões, e o diff nunca podia ser olhado antes de decidir.
         if (Object.keys(dataBase).length) {
           await tx.phaseInternalWorkflow.update({ where: { id }, data: dataBase })
         }
@@ -146,29 +185,65 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
             if (filhos.acoes.length) await tx.stepAction.createMany({ data: filhos.acoes })
             if (filhos.campos.length) await tx.stepField.createMany({ data: filhos.campos })
             if (filhos.checkItens.length) await tx.stepChecklistItem.createMany({ data: filhos.checkItens })
+            if (filhos.requisitos.length) {
+              await tx.stepRequirement.createMany({
+                data: filhos.requisitos.map((r) => ({ ...r, stepId: criado.id })) as Prisma.StepRequirementCreateManyInput[],
+              })
+            }
+
+            // OPÇÕES — filhas do campo, então só depois de os campos existirem.
+            for (const grupo of filhos.opcoesPorCampo) {
+              if (grupo.opcoes.length === 0) continue
+              const campo = await tx.stepField.findFirst({
+                where: { stepId: criado.id, key: grupo.campoKey }, select: { id: true },
+              })
+              if (!campo) continue
+              await tx.stepFieldOption.createMany({
+                data: grupo.opcoes.map((o: (typeof grupo.opcoes)[number]) => ({ ...o, fieldId: campo.id })) as Prisma.StepFieldOptionCreateManyInput[],
+              })
+            }
+
+            // CANAIS — a associação é com o catálogo; canal inexistente é ignorado
+            // aqui e recusado na publicação, com o nome dele na mensagem.
+            for (const c of filhos.canais) {
+              if (!c.canalKey) continue
+              const canal = await tx.canalOperacional.findUnique({ where: { key: c.canalKey }, select: { id: true } })
+              if (!canal) continue
+              const { canalKey: _k, ...resto } = c
+              await tx.stepChannel.create({ data: { ...resto, stepId: criado.id, canalId: canal.id } })
+            }
           }
         }
 
-        // A PUBLICAÇÃO RECUSA CONFIGURAÇÃO IMPOSSÍVEL.
+        // A CONFIGURAÇÃO É CONFERIDA AO SALVAR, mesmo sem publicar.
         //
-        // Dependência inexistente, ciclo, efeito fora do catálogo, efeito fora da
-        // competência da fase, campo que o executor não desenha. Recusar aqui é a
-        // diferença entre uma mensagem clara para quem configurou e um passo que
-        // trava um processo real semanas depois. `$transaction` desfaz tudo.
+        // Deixar para a publicação faria o administrador descobrir três ajustes depois
+        // que o primeiro estava errado. `$transaction` desfaz tudo — um rascunho
+        // inválido não fica guardado parecendo bom.
         const problemas = await validarWorkflowParaPublicar(id, tx)
         if (problemas.length) {
           throw Object.assign(new Error('PUBLICACAO_INVALIDA'), { problemas })
         }
+        // TEMPO SUFICIENTE PARA GRAVAR O WORKFLOW INTEIRO. Um passo com ações,
+        // campos, opções, canais, checklist e requisitos são várias escritas; com o
+        // banco de produção do outro lado da rede, os 5 s do padrão estouram no meio e
+        // a transação morre com metade dos passos gravados. Ela desfaz tudo — mas o
+        // administrador perde a edição sem saber por quê.
+      }, { maxWait: 20_000, timeout: 120_000 })
 
-        // A versão NOVA também nasce congelada: toda versão que uma instância possa
-        // vir a registrar precisa ter conteúdo desde o primeiro instante.
-        await congelarVersaoVigente(id, "PUBLICACAO", tx, usuario?.userId ?? null)
-      })
+      // SALVAR NÃO É PUBLICAR.
+      //
+      // Antes, cada save publicava uma versão: ajustar três coisas gerava três
+      // versões, e não havia como olhar o diff antes de decidir. O rascunho é a mesma
+      // definição viva de sempre — o que passou a existir é a marca de que ela difere
+      // da última publicação. Publicar é `POST ?acao=publicar`.
+      await marcarRascunho(id, usuario?.userId ?? null)
+      versaoNova = null
       await prisma.logAuditoria.create({
         data: {
-          acao: 'WORKFLOW_VERSION_PUBLISHED', entidade: 'PhaseInternalWorkflow', entidadeId: id,
-          descricao: `Workflow interno "${atual.name}" publicado na versão ${versaoNova}. A versão ${(versaoNova ?? 1) - 1} foi congelada e continua valendo para os processos que já a registraram.`,
-          detalhes: { versaoAnterior: (versaoNova ?? 1) - 1, versaoNova, alterouPassos: Array.isArray(body.steps) } as never,
+          acao: 'WORKFLOW_DRAFT_SAVED', entidade: 'PhaseInternalWorkflow', entidadeId: id,
+          descricao: `Rascunho do workflow interno "${atual.name}" salvo. Os processos em andamento continuam na versão ${atual.versao}; nada muda para eles até a publicação.`,
+          detalhes: { versaoPublicada: atual.versao, alterouPassos: Array.isArray(body.steps) } as never,
           usuarioId: usuario?.userId ?? null,
         },
       }).catch(() => null)
@@ -181,8 +256,10 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
           orderBy: { ordem: 'asc' },
           include: {
             acoes: { orderBy: { ordem: 'asc' } },
-            campos: { orderBy: { ordem: 'asc' } },
+            campos: { orderBy: { ordem: 'asc' }, include: { opcoesCadastradas: { orderBy: { ordem: 'asc' } } } },
             checkItens: { orderBy: { ordem: 'asc' } },
+            canais: { orderBy: { ordem: 'asc' }, include: { canal: true } },
+            requisitos: { orderBy: { ordem: 'asc' } },
           },
         },
       },
@@ -199,6 +276,83 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
     console.error('PUT workflows-fase/[id]', e)
     return NextResponse.json({ error: 'Erro ao salvar o workflow.' }, { status: 500 })
   }
+}
+
+
+// ============================================================================
+// GET — a configuração VIVA (o rascunho) e, com ?preview=1, o que a publicação faria.
+//
+// O editor precisa das duas coisas separadas: o que está gravado agora e o que os
+// processos passariam a ver se isso fosse publicado. Misturar as duas numa resposta
+// só foi o que fez o administrador publicar sem saber o que estava publicando.
+// ============================================================================
+export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  const erro = await verificarPermissao(request, 'usuarios.gerenciar')
+  if (erro) return erro
+
+  const { id: idStr } = await params
+  const id = Number(idStr)
+  if (!Number.isFinite(id)) return NextResponse.json({ error: 'Workflow inválido.' }, { status: 400 })
+
+  if (request.nextUrl.searchParams.get('preview') === '1') {
+    const preview = await preverPublicacao(id)
+    if (!preview) return NextResponse.json({ error: 'Workflow não encontrado.' }, { status: 404 })
+    return NextResponse.json({ preview })
+  }
+
+  const wf = await prisma.phaseInternalWorkflow.findUnique({
+    where: { id },
+    include: {
+      passos: {
+        orderBy: { ordem: 'asc' },
+        include: {
+          acoes: { orderBy: { ordem: 'asc' } },
+          campos: { orderBy: { ordem: 'asc' }, include: { opcoesCadastradas: { orderBy: { ordem: 'asc' } } } },
+          checkItens: { orderBy: { ordem: 'asc' } },
+          canais: { orderBy: { ordem: 'asc' }, include: { canal: true } },
+          requisitos: { orderBy: { ordem: 'asc' } },
+        },
+      },
+    },
+  })
+  if (!wf) return NextResponse.json({ error: 'Workflow não encontrado.' }, { status: 404 })
+  return NextResponse.json({ workflow: wf, temRascunho: wf.rascunhoAlteradoEm != null })
+}
+
+// ============================================================================
+// POST ?acao=publicar — congela a versão vigente e passa a valer a nova.
+//
+// `versaoEsperada` é o número que a tela tinha em mãos. Sem ele, dois administradores
+// publicando ao mesmo tempo criariam duas versões, a segunda idêntica à primeira.
+// ============================================================================
+export async function POST(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  const erro = await verificarPermissao(request, 'usuarios.gerenciar')
+  if (erro) return erro
+
+  const { id: idStr } = await params
+  const id = Number(idStr)
+  if (!Number.isFinite(id)) return NextResponse.json({ error: 'Workflow inválido.' }, { status: 400 })
+
+  const acao = request.nextUrl.searchParams.get('acao')
+  if (acao !== 'publicar') {
+    return NextResponse.json({ error: 'Ação desconhecida. Use ?acao=publicar.' }, { status: 400 })
+  }
+
+  const body = await request.json().catch(() => ({} as Record<string, unknown>))
+  const usuario = await extrairUsuarioComPermissoes(request)
+  const versaoEsperada = Number((body as { versaoEsperada?: unknown }).versaoEsperada)
+
+  const r = await publicarWorkflow({
+    workflowId: id,
+    actorId: usuario?.userId ?? null,
+    versaoEsperada: Number.isFinite(versaoEsperada) ? versaoEsperada : undefined,
+  })
+
+  if (!r.ok) {
+    const status = r.code === 'CONFLITO_DE_VERSAO' ? 409 : r.code === 'WORKFLOW_INEXISTENTE' ? 404 : 422
+    return NextResponse.json({ error: r.mensagem ?? 'A configuração não pode ser publicada.', code: r.code, problemas: r.problemas }, { status })
+  }
+  return NextResponse.json(r)
 }
 
 // DELETE — apaga o workflow (passos caem em cascade) e devolve usedByCount ao modelo

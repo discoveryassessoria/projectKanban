@@ -40,20 +40,68 @@ export interface PassoConfiguravel {
   acoes?: AcaoCfg[]
   campos?: CampoCfg[]
   checkItens?: ItemCfg[]
+  canais?: CanalCfg[]
+  requisitos?: RequisitoCfg[]
 }
 export interface AcaoCfg { key?: string; label: string; descricao?: string | null; effectKey: string; ordem?: number; requerCampos?: string[]; ativo?: boolean }
-export interface CampoCfg { key?: string; label: string; tipo: string; obrigatorio?: boolean; opcoes?: unknown; ajuda?: string | null; ordem?: number; ativo?: boolean }
+export interface CampoCfg { key?: string; label: string; tipo: string; obrigatorio?: boolean; opcoes?: unknown; opcoesCadastradas?: OpcaoCfg[]; ajuda?: string | null; ordem?: number; ativo?: boolean }
+/**
+ * OPÇÃO COM IDENTIDADE.
+ *
+ * `key` é o que a execução grava. Ele nasce do rótulo e depois NÃO muda: renomear
+ * "Cartório" para "Cartório de origem" tem de deixar as escolhas antigas apontando
+ * para a mesma opção. Tirar uma opção de circulação é `ativo: false`, não remover —
+ * remover deixaria execuções passadas apontando para nada.
+ */
+export interface OpcaoCfg { key?: string; label: string; descricao?: string | null; ordem?: number; ativo?: boolean }
+/** Canal que ESTE passo oferece. `null` nas exigências = herda o catálogo. */
+export interface CanalCfg {
+  canalKey: string; ordem?: number; ativo?: boolean
+  exigeProtocolo?: boolean | null; exigeAnexo?: boolean | null
+  exigeRastreio?: boolean | null; exigeObservacao?: boolean | null
+}
+/** O que precisa estar cumprido antes de a etapa poder ser concluída. */
+export interface RequisitoCfg {
+  key?: string; label: string; descricao?: string | null
+  tipo: string; alvoKey?: string | null; minimo?: number
+  obrigatorio?: boolean; acaoKey?: string | null; ordem?: number; ativo?: boolean
+}
 export interface ItemCfg { key?: string; label: string; descricao?: string | null; obrigatorio?: boolean; ordem?: number; ativo?: boolean }
 
 interface Efeito { key: string; label: string; descricao: string; competencia: string; permitidoNestaFase: boolean; camposObrigatorios: string[] }
-interface Executor { key: string; label: string; campos: string[]; efeitos: string[]; acoesCadastradas: boolean; checklistCadastrado: boolean }
-interface Catalogo { efeitos: Efeito[]; executores: Executor[]; tiposDeCampo: string[]; canais: Array<{ key: string; label: string }> }
+interface Executor {
+  key: string; label: string; campos: string[]; efeitos: string[]
+  acoesCadastradas: boolean; checklistCadastrado: boolean
+  suportaCanais?: boolean; suportaEvidencia?: boolean; suportaEsperaExterna?: boolean; suportaCondicoes?: boolean
+}
+interface Catalogo {
+  efeitos: Efeito[]; executores: Executor[]; tiposDeCampo: string[]
+  canais: Array<{ key: string; label: string; protocoloObrigatorio?: boolean; anexoObrigatorioLabel?: string | null; rastreioObrigatorio?: boolean; observacaoObrigatoria?: boolean }>
+}
 
-const ABAS = ["geral", "dependencias", "reabertura", "campos", "acoes", "checklist"] as const
+/** Os tipos de requisito que o motor sabe avaliar. Vocabulário fechado, não texto livre. */
+const TIPOS_DE_REQUISITO = [
+  { key: "CAMPO_PREENCHIDO", label: "Campo preenchido", alvo: "campo" },
+  { key: "CHECKLIST_COMPLETO", label: "Checklist completo", alvo: "item" },
+  { key: "EVIDENCIA_ANEXADA", label: "Evidência anexada", alvo: null },
+  { key: "ACAO_EXECUTADA", label: "Ação já executada", alvo: "acao" },
+] as const
+
+/** Chave estável a partir do rótulo — a mesma regra do servidor. */
+function chaveDe(s: string) {
+  return String(s || "")
+    .normalize("NFD").replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase().trim()
+    .replace(/[^a-z0-9]+/g, "_").replace(/^_+|_+$/g, "")
+    .slice(0, 60)
+}
+
+const ABAS = ["geral", "dependencias", "reabertura", "campos", "acoes", "checklist", "canais", "requisitos"] as const
 type Aba = (typeof ABAS)[number]
 const TITULO: Record<Aba, string> = {
   geral: "Geral", dependencias: "Dependências", reabertura: "Reabertura",
   campos: "Campos", acoes: "Ações/Resultados", checklist: "Checklist",
+  canais: "Canais", requisitos: "Requisitos",
 }
 
 const inp = "w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-white placeholder-white/30 outline-none focus:border-blue-400/50"
@@ -84,6 +132,8 @@ export default function ConfiguracaoDoPassoModal({
     acoes: passo.acoes ?? [],
     campos: passo.campos ?? [],
     checkItens: passo.checkItens ?? [],
+    canais: passo.canais ?? [],
+    requisitos: passo.requisitos ?? [],
   })
   const [salvando, setSalvando] = useState(false)
 
@@ -104,10 +154,20 @@ export default function ConfiguracaoDoPassoModal({
   const tiposOfertados = exec ? exec.campos : (cat?.tiposDeCampo ?? [])
 
   const set = <K extends keyof PassoConfiguravel>(k: K, v: PassoConfiguravel[K]) => setF((x) => ({ ...x, [k]: v }))
-  const listaSet = <T,>(nome: "acoes" | "campos" | "checkItens", i: number, patch: Partial<T>) =>
-    setF((x) => ({ ...x, [nome]: (x[nome] as T[]).map((it, j) => (j === i ? { ...it, ...patch } : it)) }))
-  const listaDel = (nome: "acoes" | "campos" | "checkItens", i: number) =>
-    setF((x) => ({ ...x, [nome]: (x[nome] as unknown[]).filter((_, j) => j !== i) }))
+  type Colecao = "acoes" | "campos" | "checkItens" | "canais" | "requisitos"
+  const listaSet = <T,>(nome: Colecao, i: number, patch: Partial<T>) =>
+    setF((x) => ({ ...x, [nome]: ((x[nome] ?? []) as T[]).map((it, j) => (j === i ? { ...it, ...patch } : it)) }))
+  const listaDel = (nome: Colecao, i: number) =>
+    setF((x) => ({ ...x, [nome]: ((x[nome] ?? []) as unknown[]).filter((_, j) => j !== i) }))
+
+  /** Altera UMA opção de UM campo, preservando a chave já gravada. */
+  const opcaoSet = (iCampo: number, iOpcao: number, patch: Partial<OpcaoCfg>) =>
+    setF((x) => ({
+      ...x,
+      campos: (x.campos ?? []).map((c, j) => j !== iCampo ? c : {
+        ...c, opcoesCadastradas: (c.opcoesCadastradas ?? []).map((o, k) => (k === iOpcao ? { ...o, ...patch } : o)),
+      }),
+    }))
 
   async function salvar() {
     setSalvando(true)
@@ -122,7 +182,7 @@ export default function ConfiguracaoDoPassoModal({
         <div className="border-b border-white/10 px-6 py-4">
           <h3 className="font-semibold text-white">Configurar “{f.label}”</h3>
           <p className="mt-0.5 text-xs text-white/50">
-            Fase: {faseLabel} · chave <code className="text-white/70">{f.key}</code> · salvar publica uma versão nova; os processos em andamento continuam na versão deles.
+            Fase: {faseLabel} · chave <code className="text-white/70">{f.key}</code> · salvar guarda um rascunho; nada muda para os processos em andamento até você publicar.
           </p>
         </div>
 
@@ -134,6 +194,8 @@ export default function ConfiguracaoDoPassoModal({
               {a === "campos" && (f.campos?.length ?? 0) > 0 && <span className="ml-1.5 text-white/40">{f.campos!.length}</span>}
               {a === "acoes" && (f.acoes?.length ?? 0) > 0 && <span className="ml-1.5 text-white/40">{f.acoes!.length}</span>}
               {a === "checklist" && (f.checkItens?.length ?? 0) > 0 && <span className="ml-1.5 text-white/40">{f.checkItens!.length}</span>}
+              {a === "canais" && (f.canais?.length ?? 0) > 0 && <span className="ml-1.5 text-white/40">{f.canais!.length}</span>}
+              {a === "requisitos" && (f.requisitos?.length ?? 0) > 0 && <span className="ml-1.5 text-white/40">{f.requisitos!.length}</span>}
             </button>
           ))}
         </div>
@@ -292,14 +354,41 @@ export default function ConfiguracaoDoPassoModal({
                     )}
                   </div>
                   {["select", "multiselect", "radio"].includes(c.tipo) && !(c.opcoes as { catalogo?: string } | null)?.catalogo && (
-                    <div className="mt-2">
-                      <label className={lbl}>Opções (uma por linha: valor | rótulo)</label>
-                      <textarea className={inp} rows={3}
-                        value={(Array.isArray(c.opcoes) ? c.opcoes as Array<{ value: string; label: string }> : []).map((o) => `${o.value} | ${o.label}`).join("\n")}
-                        onChange={(e) => listaSet<CampoCfg>("campos", i, {
-                          opcoes: e.target.value.split("\n").map((l) => l.split("|")).filter((p) => p[0]?.trim())
-                            .map((p) => ({ value: p[0].trim(), label: (p[1] ?? p[0]).trim() })),
-                        })} />
+                    <div className="mt-3 rounded-lg border border-white/10 bg-black/20 p-3">
+                      <div className="flex items-center justify-between">
+                        <label className={`${lbl} mb-0`}>Opções</label>
+                        <button
+                          onClick={() => listaSet<CampoCfg>("campos", i, {
+                            opcoesCadastradas: [...(c.opcoesCadastradas ?? []), { label: "Nova opção", ativo: true }],
+                          })}
+                          className="rounded-lg border border-white/10 px-2 py-1 text-[11px] text-white/70 hover:bg-white/10">+ Opção</button>
+                      </div>
+                      <p className="mt-1 text-[11px] text-white/35">
+                        Cada opção tem uma chave própria. O rótulo pode ser reescrito quando quiser — o que o operador
+                        já escolheu continua apontando para a mesma opção. Para tirar de circulação, desmarque
+                        &quot;disponível&quot;: remover apagaria o significado das execuções antigas.
+                      </p>
+                      {(c.opcoesCadastradas ?? []).length === 0 && (
+                        <p className="mt-2 text-[11px] text-amber-300/70">
+                          Nenhuma opção cadastrada. Um campo de escolha sem opção não deixa o operador escolher nada — a publicação recusa.
+                        </p>
+                      )}
+                      {(c.opcoesCadastradas ?? []).map((o, k) => (
+                        <div key={k} className="mt-2 grid grid-cols-[1fr_150px_auto_auto] items-center gap-2">
+                          <input className={inp} value={o.label}
+                            onChange={(e) => opcaoSet(i, k, { label: e.target.value, key: o.key ?? chaveDe(e.target.value) })} />
+                          <code className="truncate text-[11px] text-white/35" title="Chave gravada nas execuções — não muda.">
+                            {o.key ?? chaveDe(o.label)}
+                          </code>
+                          <label className="flex items-center gap-1.5 whitespace-nowrap text-[11px] text-white/60">
+                            <input type="checkbox" checked={o.ativo !== false} onChange={(e) => opcaoSet(i, k, { ativo: e.target.checked })} />
+                            disponível
+                          </label>
+                          <button onClick={() => opcaoSet(i, k, { ativo: false })}
+                            title="Opções não são removidas: são desativadas, para o histórico continuar legível."
+                            className="rounded-lg border border-white/10 px-2 py-1 text-[11px] text-white/40 hover:bg-white/10">↓</button>
+                        </div>
+                      ))}
                     </div>
                   )}
                 </div>
@@ -379,13 +468,128 @@ export default function ConfiguracaoDoPassoModal({
                 className="rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-blue-500">+ Item</button>
             </>
           )}
+
+          {aba === "canais" && (
+            <>
+              <p className="text-xs text-white/50">
+                Por onde esta etapa pode ser feita. Antes, quem listava os canais era o componente da tela — todos os
+                canais ativos apareciam em todo passo, porque o código dizia que sim. Agora quem diz é este cadastro.
+              </p>
+              {exec && exec.suportaCanais === false && (
+                <p className="text-[11px] text-amber-300/70">
+                  O executor &ldquo;{exec.label}&rdquo; não desenha escolha de canal; os canais ficam cadastrados mas não aparecem nele.
+                </p>
+              )}
+              {(cat?.canais ?? []).length === 0 && (
+                <p className="text-[11px] text-amber-300/70">Nenhum canal no catálogo. Cadastre em Gerenciamento → Canais.</p>
+              )}
+              {(cat?.canais ?? []).map((canal) => {
+                const i = (f.canais ?? []).findIndex((x) => x.canalKey === canal.key)
+                const atual = i >= 0 ? f.canais![i] : null
+                const herdado = [
+                  canal.protocoloObrigatorio ? "protocolo" : null,
+                  canal.anexoObrigatorioLabel ? "anexo" : null,
+                  canal.rastreioObrigatorio ? "rastreio" : null,
+                  canal.observacaoObrigatoria ? "observação" : null,
+                ].filter(Boolean)
+                return (
+                  <div key={canal.key} className={card}>
+                    <label className="flex items-center gap-2 text-sm text-white/80">
+                      <input type="checkbox" checked={!!atual}
+                        onChange={(e) => setF((x) => ({
+                          ...x,
+                          canais: e.target.checked
+                            ? [...(x.canais ?? []), { canalKey: canal.key, ordem: (x.canais?.length ?? 0) + 1, ativo: true }]
+                            : (x.canais ?? []).filter((c) => c.canalKey !== canal.key),
+                        }))} />
+                      {canal.label} <code className="text-[11px] text-white/35">{canal.key}</code>
+                    </label>
+                    <p className="mt-1 text-[11px] text-white/35">
+                      {herdado.length ? `O catálogo já exige: ${herdado.join(", ")}.` : "O catálogo não exige nada por este canal."}
+                      {" "}Marcar abaixo é exigência DESTE passo, além da do catálogo.
+                    </p>
+                    {atual && (
+                      <div className="mt-2 flex flex-wrap gap-4">
+                        {([
+                          ["exigeProtocolo", "Protocolo"], ["exigeAnexo", "Anexo"],
+                          ["exigeRastreio", "Rastreio"], ["exigeObservacao", "Observação"],
+                        ] as Array<[keyof CanalCfg, string]>).map(([campo, rotulo]) => (
+                          <label key={String(campo)} className="flex items-center gap-2 text-xs text-white/60">
+                            <input type="checkbox" checked={atual[campo] === true}
+                              onChange={(e) => listaSet<CanalCfg>("canais", i, { [campo]: e.target.checked ? true : null } as Partial<CanalCfg>)} />
+                            {rotulo}
+                          </label>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )
+              })}
+            </>
+          )}
+
+          {aba === "requisitos" && (
+            <>
+              <p className="text-xs text-white/50">
+                O que precisa estar cumprido para a etapa poder ser concluída. Isto substitui as conferências que
+                viviam dentro do componente: o motor recusa a conclusão citando o requisito pelo nome que está aqui.
+              </p>
+              {(f.requisitos ?? []).map((r, i) => {
+                const tipo = TIPOS_DE_REQUISITO.find((t) => t.key === r.tipo)
+                const alvos =
+                  tipo?.alvo === "campo" ? (f.campos ?? []).map((c) => ({ key: c.key ?? chaveDe(c.label), label: c.label }))
+                  : tipo?.alvo === "item" ? (f.checkItens ?? []).map((c) => ({ key: c.key ?? chaveDe(c.label), label: c.label }))
+                  : tipo?.alvo === "acao" ? (f.acoes ?? []).map((c) => ({ key: c.key ?? chaveDe(c.label), label: c.label }))
+                  : []
+                return (
+                  <div key={i} className={card}>
+                    <div className="grid grid-cols-[1fr_auto] items-end gap-2">
+                      <div>
+                        <label className={lbl}>O que o operador lê quando falta</label>
+                        <input className={inp} value={r.label} onChange={(e) => listaSet<RequisitoCfg>("requisitos", i, { label: e.target.value })} />
+                      </div>
+                      <button onClick={() => listaDel("requisitos", i)} className="rounded-lg border border-white/10 px-2 py-2 text-xs text-red-300 hover:bg-red-500/10">Remover</button>
+                    </div>
+                    <div className="mt-2 grid grid-cols-2 gap-2">
+                      <div>
+                        <label className={lbl}>Tipo</label>
+                        <select className={inp} value={r.tipo}
+                          onChange={(e) => listaSet<RequisitoCfg>("requisitos", i, { tipo: e.target.value, alvoKey: null })}>
+                          {TIPOS_DE_REQUISITO.map((t) => <option key={t.key} value={t.key}>{t.label}</option>)}
+                        </select>
+                      </div>
+                      <div>
+                        <label className={lbl}>{tipo?.alvo ? `Qual ${tipo.alvo}` : "Quantidade mínima"}</label>
+                        {tipo?.alvo ? (
+                          <select className={inp} value={r.alvoKey ?? ""}
+                            onChange={(e) => listaSet<RequisitoCfg>("requisitos", i, { alvoKey: e.target.value || null })}>
+                            <option value="">(todos)</option>
+                            {alvos.map((a) => <option key={a.key} value={a.key}>{a.label}</option>)}
+                          </select>
+                        ) : (
+                          <input className={inp} type="number" min={1} value={r.minimo ?? 1}
+                            onChange={(e) => listaSet<RequisitoCfg>("requisitos", i, { minimo: Math.max(1, Number(e.target.value) || 1) })} />
+                        )}
+                      </div>
+                    </div>
+                    <label className="mt-2 flex items-center gap-2 text-xs text-white/60">
+                      <input type="checkbox" checked={r.obrigatorio !== false} onChange={(e) => listaSet<RequisitoCfg>("requisitos", i, { obrigatorio: e.target.checked })} />
+                      Bloqueia a conclusão (desmarcado: só avisa)
+                    </label>
+                  </div>
+                )
+              })}
+              <button onClick={() => setF((x) => ({ ...x, requisitos: [...(x.requisitos ?? []), { label: "Novo requisito", tipo: "CAMPO_PREENCHIDO", obrigatorio: true }] }))}
+                className="rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-blue-500">+ Requisito</button>
+            </>
+          )}
         </div>
 
         <div className="flex justify-end gap-2 border-t border-white/10 px-6 py-4">
           <button onClick={onFechar} className="rounded-lg border border-white/10 bg-white/5 px-4 py-2 text-sm text-white/70 hover:bg-white/10">Cancelar</button>
           <button onClick={salvar} disabled={salvando}
             className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-500 disabled:opacity-50">
-            {salvando ? "Publicando…" : "Salvar e publicar versão"}
+            {salvando ? "Salvando…" : "Salvar rascunho"}
           </button>
         </div>
       </div>

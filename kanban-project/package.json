@@ -208,6 +208,8 @@
     "test:writers": "tsx scripts/guard-writers-canonicos.test.ts",
     "test:frontend-nao-motor": "tsx scripts/guard-frontend-nao-e-motor.test.ts",
     "test:cadastro-canonico": "tsx scripts/cadastro-canonico.test.ts",
+    "test:cadastro-integral": "tsx scripts/cadastro-integral.test.ts",
+    "backfill:cadastro-integral": "tsx scripts/backfill-cadastro-integral-do-passo.ts",
     "test:fuzz": "tsx scripts/fuzz-invariantes.ts",
     "seed:cadastro-canonico": "tsx scripts/seed-cadastro-canonico.ts",
     "backfill:operacao": "tsx scripts/backfill-operacao-para-tentativa.ts",

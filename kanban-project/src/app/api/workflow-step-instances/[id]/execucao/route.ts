@@ -14,6 +14,8 @@ import { executarAcaoCadastrada } from "@/src/services/executar-acao-cadastrada"
 import { tentativasDoPasso, tentativaVigente } from "@/src/services/execucao-do-passo"
 import { efeito } from "@/src/lib/motor/catalogo-de-efeitos"
 import { executorEfetivo } from "@/src/services/validacao-de-publicacao"
+import { requisitosPendentes } from "@/src/services/requisitos-da-etapa"
+import { avaliarCondicao, descreverCondicao, type Condicao } from "@/src/lib/motor/condicoes"
 
 export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const erro = await verificarPermissao(request, "workflow.iniciarPasso")
@@ -35,8 +37,16 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
     where: { ativo: true }, orderBy: [{ ordem: "asc" }],
     select: { key: true, label: true, descricao: true, protocoloObrigatorio: true, anexoObrigatorioLabel: true, rastreioObrigatorio: true, observacaoObrigatoria: true },
   })
-  const resolverOpcoes = (opcoes: unknown) => {
-    const o = opcoes as { catalogo?: string } | unknown[] | null
+  // AS OPÇÕES VÊM, NESTA ORDEM: das cadastradas na versão (identidade própria, com
+  // inativação), do catálogo global quando o campo aponta para ele, e por último do
+  // JSON antigo — que é o formato de antes de a opção ter identidade.
+  const resolverOpcoes = (campo: { opcoesCadastradas?: Array<{ key: string; label: string; ativo: boolean; ordem: number; condicao: unknown }>; opcoes: unknown }) => {
+    const cadastradas = (campo.opcoesCadastradas ?? []).filter((o) => o.ativo !== false)
+    if (cadastradas.length > 0) {
+      return [...cadastradas].sort((a, b) => a.ordem - b.ordem)
+        .map((o) => ({ value: o.key, label: o.label, condicao: o.condicao }))
+    }
+    const o = campo.opcoes as { catalogo?: string } | unknown[] | null
     if (o && !Array.isArray(o) && typeof o === "object" && (o as { catalogo?: string }).catalogo === "canais") {
       return canais.map((c) => ({ value: c.key, label: c.label, meta: c }))
     }
@@ -45,6 +55,9 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
 
   const tentativas = await tentativasDoPasso(id)
   const vigente = await tentativaVigente(id)
+  // O que já foi preenchido nesta execução — é sobre ele que condição e requisito são
+  // avaliados, e é ele que a tela devolve preenchido ao recarregar.
+  const valoresAtuais = ((vigente?.payload as { valores?: Record<string, unknown> } | null)?.valores ?? {}) as Record<string, unknown>
 
   return NextResponse.json({
     passo,
@@ -58,15 +71,40 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
           label: hist.passo.label,
           descricao: hist.passo.description,
           campos: hist.passo.campos.filter((c) => c.ativo !== false)
-            .map((c) => ({ ...c, opcoes: resolverOpcoes(c.opcoes) })),
+            .map((c) => ({
+              ...c,
+              opcoes: resolverOpcoes(c),
+              // A condição vai legível para a tela poder EXPLICAR por que um campo não
+              // aparece, em vez de simplesmente escondê-lo.
+              condicaoDescrita: descreverCondicao(c.condicao as Condicao | null,
+                Object.fromEntries(hist.passo.campos.map((x) => [x.key, x.label]))),
+            })),
           acoes: hist.passo.acoes.filter((a) => a.ativo !== false).map((a) => ({
             ...a, efeito: efeito(a.effectKey),
           })),
           checklist: hist.passo.checkItens.filter((i) => i.ativo !== false),
+          // OS CANAIS DESTE PASSO — os cadastrados na versão. Sem cadastro, a lista
+          // fica vazia e o executor cai na semente, que é o dado de antes do cadastro.
+          canais: (hist.passo.canais ?? []).filter((c) => c.ativo !== false)
+            .filter((c) => avaliarCondicao(c.condicao as Condicao | null, { valores: valoresAtuais })),
+          requisitos: (hist.passo.requisitos ?? []).filter((r) => r.ativo !== false),
         }
       : null,
     execucaoAtual: vigente,
     execucoesAnteriores: tentativas.filter((t) => t.supersededAt != null),
+    valores: valoresAtuais,
+    // O QUE FALTA, calculado no servidor. A tela mostra para ajudar; quem recusa é a
+    // porta de execução, com a mesma conta.
+    pendencias: hist
+      ? await requisitosPendentes({
+          stepInstanceId: id,
+          requisitos: hist.passo.requisitos ?? [],
+          campos: hist.passo.campos,
+          checklist: hist.passo.checkItens,
+          canais: hist.passo.canais ?? [],
+          valores: valoresAtuais,
+        })
+      : [],
   })
 }
 

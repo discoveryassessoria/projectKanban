@@ -23,8 +23,10 @@ export async function GET(request: NextRequest) {
           orderBy: { ordem: 'asc' },
           include: {
             acoes: { orderBy: { ordem: 'asc' } },
-            campos: { orderBy: { ordem: 'asc' } },
+            campos: { orderBy: { ordem: 'asc' }, include: { opcoesCadastradas: { orderBy: { ordem: 'asc' } } } },
             checkItens: { orderBy: { ordem: 'asc' } },
+            canais: { orderBy: { ordem: 'asc' }, include: { canal: true } },
+            requisitos: { orderBy: { ordem: 'asc' } },
           },
         },
         // CONTRATO — o cabeçalho da tela exibe família e perfil por NOME; sem a

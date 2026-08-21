@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useCallback } from "react"
 import ConfiguracaoDoPassoModal, { type PassoConfiguravel } from "./ConfiguracaoDoPassoModal"
+import PublicarWorkflowModal from "./PublicarWorkflowModal"
 
 // Rótulo da CARDINALIDADE do passo (quantas instâncias, presas a qual entidade).
 // Nada a ver com "global (compartilhado)", que é o compartilhamento do WORKFLOW.
@@ -44,6 +45,8 @@ interface Step {
   acoes?: Array<{ key?: string; label: string; descricao?: string | null; effectKey: string; ordem?: number; requerCampos?: string[]; ativo?: boolean }>
   campos?: Array<{ key?: string; label: string; tipo: string; obrigatorio?: boolean; opcoes?: unknown; ajuda?: string | null; ordem?: number; ativo?: boolean }>
   checkItens?: Array<{ key?: string; label: string; descricao?: string | null; obrigatorio?: boolean; ordem?: number; ativo?: boolean }>
+  canais?: Array<{ canalKey: string; ordem?: number; ativo?: boolean; exigeProtocolo?: boolean | null; exigeAnexo?: boolean | null; exigeRastreio?: boolean | null; exigeObservacao?: boolean | null }>
+  requisitos?: Array<{ key?: string; label: string; descricao?: string | null; tipo: string; alvoKey?: string | null; minimo?: number; obrigatorio?: boolean; acaoKey?: string | null; ordem?: number; ativo?: boolean }>
   key: string
   label: string
   description?: string | null
@@ -67,6 +70,8 @@ interface Workflow {
   name: string
   active: boolean
   versao?: number
+  /** Preenchido = a definição viva difere da última publicação. */
+  rascunhoAlteradoEm?: string | null
   passos: Step[]
   // CONTRATO DE EXECUÇÃO — o que o workflow declara operar. Antes isso era
   // conhecimento do motor (escopo canônico da fase); agora é do cadastro.
@@ -137,6 +142,7 @@ export default function PhaseWorkflowsFasesTab() {
   const [stepModal, setStepModal] = useState<{ wf: Workflow; editKey?: string } | null>(null)
   const [configModal, setConfigModal] = useState<{ wf: Workflow; step: Step } | null>(null)
   const [problemas, setProblemas] = useState<Array<{ codigo: string; stepKey: string | null; mensagem: string }>>([])
+  const [publicarWf, setPublicarWf] = useState<Workflow | null>(null)
   const [stepForm, setStepForm] = useState({ label: "", createsTask: true, required: true, cardinalidade: "", owner: "", slaDays: 0, completionRule: "" })
 
   const load = useCallback(async () => {
@@ -411,12 +417,23 @@ export default function PhaseWorkflowsFasesTab() {
                     {wf.exigeDocumento && <span className="rounded bg-emerald-500/15 px-1.5 py-0.5 text-emerald-300">exige documento</span>}
                     {wf.exigePessoa && <span className="rounded bg-emerald-500/15 px-1.5 py-0.5 text-emerald-300">exige pessoa</span>}
                     {wf.versao != null && <span className="rounded bg-white/10 px-1.5 py-0.5 text-white/50">v{wf.versao}</span>}
+                    {wf.rascunhoAlteradoEm && (
+                      <span className="rounded bg-amber-500/15 px-1.5 py-0.5 text-amber-300" title="Há alterações salvas que ainda não valem para os processos.">
+                        rascunho não publicado
+                      </span>
+                    )}
                   </div>
                 )}
               </div>
               {wf && (
                 <div className="flex flex-none flex-wrap justify-end gap-1.5">
                   <button onClick={() => openAddStep(wf)} className="rounded-lg bg-blue-600 px-2.5 py-1 text-xs font-medium text-white hover:bg-blue-500">+ Passo</button>
+                  {/* PUBLICAR É UM ATO SEPARADO DE SALVAR. Enquanto não se clica aqui,
+                      o que os processos leem continua sendo a versão anterior. */}
+                  <button onClick={() => setPublicarWf(wf)}
+                    className={`rounded-lg px-2.5 py-1 text-xs font-medium ${wf.rascunhoAlteradoEm ? "bg-emerald-600 text-white hover:bg-emerald-500" : "border border-white/10 bg-white/5 text-white/60 hover:bg-white/10"}`}>
+                    Publicar…
+                  </button>
                   <button onClick={() => excluirWorkflow(wf)} className="rounded-lg border border-white/10 bg-white/5 px-2.5 py-1 text-xs text-red-300 hover:bg-red-500/10">Excluir</button>
                 </div>
               )}
@@ -485,6 +502,20 @@ export default function PhaseWorkflowsFasesTab() {
             const steps = wf.passos.map((s) => (s.key === configModal.step.key ? { ...s, ...novo } : s))
             await putSteps(wf, steps as Step[])
             setConfigModal(null)
+          }}
+        />
+      )}
+
+      {/* PUBLICAÇÃO — a prévia do que muda, antes de mudar */}
+      {publicarWf && (
+        <PublicarWorkflowModal
+          workflowId={publicarWf.id}
+          authHeaders={authHeaders}
+          onFechar={() => setPublicarWf(null)}
+          onPublicado={async (_v, mensagem) => {
+            setPublicarWf(null)
+            showFlash(mensagem)
+            await load()
           }}
         />
       )}

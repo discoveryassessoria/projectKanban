@@ -791,8 +791,13 @@ function FormSolicitarCertidao({
   const readOnly = stepStatus === "concluida"
 
   // A LISTA DE CANAIS DESTA ETAPA, pela configuração da versão que ela registrou.
-  const { cfg: cfgEtapa, opcoesDe: opcoesDaEtapa, executarAcao: executarAcaoDaEtapa } = useConfiguracaoDaEtapa(stepId)
-  const opcoesCanal = opcoesDaEtapa("canal")
+  const { cfg: cfgEtapa, opcoesDe: opcoesDaEtapa, canaisDoPasso, pendencias: pendenciasDaEtapa, executarAcao: executarAcaoDaEtapa } = useConfiguracaoDaEtapa(stepId)
+  // A LISTA VEM, NESTA ORDEM: dos canais cadastrados NESTE passo, das opções do campo
+  // `canal` (que o servidor resolve do catálogo) e, por último, da semente — o dado de
+  // antes de o cadastro existir. Os três dizem a mesma lista em graus decrescentes de
+  // especificidade; nenhum inventa canal.
+  const canaisCadastrados = canaisDoPasso()
+  const opcoesCanal = canaisCadastrados.length > 0 ? canaisCadastrados : opcoesDaEtapa("canal")
   const CANAIS = opcoesCanal.length > 0 ? canaisDoCadastro(opcoesCanal) : CANAIS_SEMENTE
   const canalConfig = form.canal ? CANAIS.find((c) => c.id === form.canal) ?? null : null
   const recomendacao = doc ? getRecomendacao(doc) : null
@@ -809,23 +814,46 @@ function FormSolicitarCertidao({
   const evidencia = exig.dados?.exigencias?.principal ?? null
   const anexoJaRegistrado = exig.dados?.exigencias?.anexoAtual ?? null
 
-  // VALIDAÇÃO pela configuração OFICIAL do canal — a mesma que o servidor aplica.
-  // Antes a regra vivia só aqui dentro; a rota aceitava qualquer coisa.
+  // VALIDAÇÃO pela configuração do canal — a mesma que o servidor aplica.
+  //
+  // Quando o passo tem canais CADASTRADOS, a exigência é a dele (`canalConfig`, que
+  // já traz somado o que o catálogo pede e o que o passo acrescentou). Só quando não
+  // há cadastro é que a conta em código responde. As duas dão a mesma resposta para
+  // os canais semeados — o que muda é quem manda quando o administrador mexer.
   const canalDominio = canalDoTexto(form.canal)
-  const faltando = canalDominio
-    ? faltamCamposDoCanal({
-        canal: canalDominio,
-        numeroProtocolo: form.protocolo,
-        // O que já está REGISTRADO satisfaz a exigência: etapa reaberta não pede
-        // de novo o arquivo que o sistema já tem.
-        anexoUrl: form.attachmentUrl || anexoJaRegistrado?.url || "",
-        codigoRastreio: form.trackingCode,
-        observacao: form.observacao,
-        destinatarioNome: form.destinatario,
-      })
-    : ["CANAL_INVALIDO"]
+  const anexoDisponivel = form.attachmentUrl || anexoJaRegistrado?.url || ""
+  const faltando = canaisCadastrados.length > 0
+    ? (() => {
+        if (!canalConfig) return ["CANAL_INVALIDO"]
+        const f: string[] = []
+        if (canalConfig.requires.protocol && !form.protocolo.trim()) f.push("NUMERO_PROTOCOLO")
+        if (canalConfig.requires.attachment && !anexoDisponivel.trim()) f.push("REQUERIMENTO")
+        if (canalConfig.requires.trackingCode && !form.trackingCode.trim()) f.push("CODIGO_RASTREIO")
+        if (canalConfig.requires.observation && !form.observacao.trim()) f.push("OBSERVACAO")
+        if (!form.destinatario.trim()) f.push("DESTINATARIO")
+        return f
+      })()
+    : canalDominio
+      ? faltamCamposDoCanal({
+          canal: canalDominio,
+          numeroProtocolo: form.protocolo,
+          // O que já está REGISTRADO satisfaz a exigência: etapa reaberta não pede
+          // de novo o arquivo que o sistema já tem.
+          anexoUrl: anexoDisponivel,
+          codigoRastreio: form.trackingCode,
+          observacao: form.observacao,
+          destinatarioNome: form.destinatario,
+        })
+      : ["CANAL_INVALIDO"]
   const errosValidacao = faltando.map((f) => LABEL_CAMPO_FALTANDO[f] ?? f)
   const podeConcluir = errosValidacao.length === 0
+  // OS REQUISITOS CADASTRADOS aparecem, mas NÃO travam o botão aqui.
+  //
+  // O servidor os calcula sobre o que está GRAVADO na tentativa, não sobre o que o
+  // operador está digitando agora. Travar por eles deixaria o botão morto enquanto o
+  // formulário ainda nem foi enviado. Quem recusa é a porta — com a mesma lista, já
+  // com os valores do envio. Aqui eles servem de aviso antecipado.
+  const avisosDoCadastro = pendenciasDaEtapa.map((p) => p.motivo)
   const [erroServidor, setErroServidor] = useState<string | null>(null)
 
   const handleSalvar = async () => {
@@ -926,6 +954,13 @@ function FormSolicitarCertidao({
       }
       footer={
         <div className="flex items-center justify-end gap-3">
+          {/* AVISO DO CADASTRO — o que os requisitos configurados ainda cobram. Não
+              trava o botão: quem recusa é a porta, com os valores do envio. */}
+          {avisosDoCadastro.length > 0 && !readOnly && (
+            <span className="mr-auto text-[11px] text-amber-300/70" title={avisosDoCadastro.join(" · ")}>
+              {avisosDoCadastro.length === 1 ? avisosDoCadastro[0] : `${avisosDoCadastro.length} requisitos cadastrados pendentes`}
+            </span>
+          )}
           <button
             onClick={onClose}
             disabled={saving}

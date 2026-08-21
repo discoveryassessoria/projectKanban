@@ -39,6 +39,14 @@ export interface CapacidadesDoExecutor {
   acoesCadastradas: boolean
   /** O executor sabe consumir checklist cadastrado? */
   checklistCadastrado: boolean
+  /** Sabe oferecer os canais cadastrados no passo? */
+  suportaCanais: boolean
+  /** Sabe receber evidência (arquivo) como parte da execução? */
+  suportaEvidencia: boolean
+  /** Sabe representar espera externa (aguardando terceiro)? */
+  suportaEsperaExterna: boolean
+  /** Sabe esconder/exigir campo por condição declarativa? */
+  suportaCondicoes: boolean
 }
 
 /**
@@ -57,6 +65,10 @@ export const REGISTRO_DE_EXECUTORES: Record<StepEditorKind, CapacidadesDoExecuto
     efeitos: "*",
     acoesCadastradas: true,
     checklistCadastrado: true,
+    suportaCanais: true,
+    suportaEvidencia: true,
+    suportaEsperaExterna: true,
+    suportaCondicoes: true,
   },
   solicitacao_cartorio: {
     key: "solicitacao_cartorio",
@@ -65,6 +77,10 @@ export const REGISTRO_DE_EXECUTORES: Record<StepEditorKind, CapacidadesDoExecuto
     efeitos: ["COMPLETE_STEP", "PAUSE_FOR_EXTERNAL_WAIT", "REGISTER_ONLY"],
     acoesCadastradas: true,
     checklistCadastrado: false,
+    suportaCanais: true,
+    suportaEvidencia: true,
+    suportaEsperaExterna: true,
+    suportaCondicoes: true,
   },
   acompanhamento_retorno: {
     key: "acompanhamento_retorno",
@@ -73,6 +89,10 @@ export const REGISTRO_DE_EXECUTORES: Record<StepEditorKind, CapacidadesDoExecuto
     efeitos: ["COMPLETE_STEP", "PAUSE_FOR_EXTERNAL_WAIT", "RESUME", "REGISTER_ONLY"],
     acoesCadastradas: true,
     checklistCadastrado: false,
+    suportaCanais: false,
+    suportaEvidencia: true,
+    suportaEsperaExterna: true,
+    suportaCondicoes: true,
   },
   recebimento_documento: {
     key: "recebimento_documento",
@@ -81,6 +101,10 @@ export const REGISTRO_DE_EXECUTORES: Record<StepEditorKind, CapacidadesDoExecuto
     efeitos: ["MARK_DOCUMENT_RECEIVED", "COMPLETE_STEP", "REGISTER_ONLY"],
     acoesCadastradas: true,
     checklistCadastrado: false,
+    suportaCanais: false,
+    suportaEvidencia: true,
+    suportaEsperaExterna: false,
+    suportaCondicoes: true,
   },
   conferencia_documento: {
     key: "conferencia_documento",
@@ -93,6 +117,10 @@ export const REGISTRO_DE_EXECUTORES: Record<StepEditorKind, CapacidadesDoExecuto
     efeitos: ["APPROVE_FOR_ANALYSIS", "REQUEST_NEW_COPY", "COMPLETE_STEP", "REGISTER_ONLY"],
     acoesCadastradas: true,
     checklistCadastrado: true,
+    suportaCanais: false,
+    suportaEvidencia: true,
+    suportaEsperaExterna: false,
+    suportaCondicoes: true,
   },
   validacao_juridica: {
     key: "validacao_juridica",
@@ -109,6 +137,10 @@ export const REGISTRO_DE_EXECUTORES: Record<StepEditorKind, CapacidadesDoExecuto
     ],
     acoesCadastradas: true,
     checklistCadastrado: true,
+    suportaCanais: false,
+    suportaEvidencia: true,
+    suportaEsperaExterna: false,
+    suportaCondicoes: true,
   },
   registral: {
     key: "registral",
@@ -117,8 +149,15 @@ export const REGISTRO_DE_EXECUTORES: Record<StepEditorKind, CapacidadesDoExecuto
     efeitos: ["COMPLETE_STEP", "REGISTER_ONLY"],
     acoesCadastradas: false,
     checklistCadastrado: false,
+    suportaCanais: false,
+    suportaEvidencia: false,
+    suportaEsperaExterna: false,
+    suportaCondicoes: false,
   },
 }
+
+/** Alias legível — a publicação pergunta "o que este executor sabe fazer?". */
+export const capacidadeDoExecutor = capacidades
 
 export function capacidades(key: string): CapacidadesDoExecutor | null {
   return (REGISTRO_DE_EXECUTORES as Record<string, CapacidadesDoExecutor>)[key] ?? null

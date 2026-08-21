@@ -3111,6 +3111,15 @@ model PhaseInternalWorkflow {
   @@index([phaseKey])
   @@index([tipoProcessoId])
   @@index([familiaDocumentalId])
+
+  /// ALTERADO DESDE A ÚLTIMA PUBLICAÇÃO?
+  ///
+  /// A definição viva SEMPRE foi o rascunho e a versão congelada SEMPRE foi o
+  /// publicado — o modelo já dizia isso, mas salvar publicava junto, e não havia
+  /// como olhar o que mudaria antes de decidir. Estas duas colunas separam "guardei"
+  /// de "publiquei", sem inventar uma segunda árvore de definição.
+  rascunhoAlteradoEm  DateTime?
+  rascunhoAlteradoPor Int?
 }
 
 /// VERSÃO PUBLICADA DE UM WORKFLOW INTERNO — imutável, e a razão de existir.
@@ -3222,6 +3231,8 @@ model PhaseInternalWorkflowStep {
   acoes      StepAction[]
   campos     StepField[]
   checkItens StepChecklistItem[]
+  canais     StepChannel[]
+  requisitos StepRequirement[]
 
   @@unique([workflowId, key])
 }
@@ -3282,6 +3293,98 @@ model StepField {
   criadoEm     DateTime @default(now())
   atualizadoEm DateTime @updatedAt
 
+  opcoesCadastradas StepFieldOption[]
+
+  @@unique([stepId, key])
+  @@index([stepId])
+}
+
+/// UMA OPÇÃO DE UM CAMPO — com identidade própria, ordem e inativação.
+///
+/// As opções viviam num JSON dentro do campo. Enquanto são três strings isso passa;
+/// no dia em que alguém precisa INATIVAR uma opção sem apagá-la — porque processos
+/// antigos a escolheram e o histórico precisa continuar dizendo o que ela era — o JSON
+/// não tem onde guardar isso. Aqui a opção tem `key` estável: renomear o rótulo não
+/// muda o que ficou gravado na execução.
+model StepFieldOption {
+  id           Int       @id @default(autoincrement())
+  fieldId      Int
+  field        StepField @relation(fields: [fieldId], references: [id], onDelete: Cascade)
+  key          String    @db.VarChar(60)
+  label        String    @db.VarChar(200)
+  descricao    String?   @db.Text
+  ordem        Int       @default(0)
+  ativo        Boolean   @default(true)
+  /// Condição declarativa de visibilidade da OPÇÃO: { campo, op, valor }.
+  condicao     Json?
+  metadata     Json?
+  criadoEm     DateTime  @default(now())
+  atualizadoEm DateTime  @updatedAt
+
+  @@unique([fieldId, key])
+  @@index([fieldId])
+}
+
+/// CANAL ASSOCIADO A UM PASSO — quais canais ESTE passo oferece, e o que cada um exige.
+///
+/// `CanalOperacional` é o catálogo da casa; esta tabela é a escolha do passo. Sem ela,
+/// "quais canais aparecem em Solicitar certidão" só podia ser respondido com "todos os
+/// ativos" — e o que um canal exige NESTE passo (protocolo, comprovante, destinatário)
+/// não tinha onde ser configurado sem virar regra no código.
+model StepChannel {
+  id           Int                       @id @default(autoincrement())
+  stepId       Int
+  step         PhaseInternalWorkflowStep @relation(fields: [stepId], references: [id], onDelete: Cascade)
+  canalId      Int
+  canal        CanalOperacional          @relation(fields: [canalId], references: [id], onDelete: Cascade)
+  ordem        Int                       @default(0)
+  ativo        Boolean                   @default(true)
+  /// Sobrescreve o requisito do catálogo NESTE passo. `null` = herda do canal.
+  exigeProtocolo   Boolean?
+  exigeAnexo       Boolean?
+  exigeRastreio    Boolean?
+  exigeObservacao  Boolean?
+  /// Campos (`StepField.key`) que este canal torna obrigatórios.
+  camposObrigatorios Json?
+  /// Condição declarativa para o canal aparecer.
+  condicao     Json?
+  criadoEm     DateTime @default(now())
+  atualizadoEm DateTime @updatedAt
+
+  @@unique([stepId, canalId])
+  @@index([stepId])
+  @@index([canalId])
+}
+
+/// REQUISITO — a condição necessária para concluir o passo ou executar uma ação.
+///
+/// Campo, checklist e evidência são COISAS; requisito é uma AFIRMAÇÃO sobre elas
+/// ("o protocolo precisa estar preenchido", "o checklist precisa estar completo").
+/// Sem esta separação, "exige comprovante" só existia dentro do executor, e mudá-lo
+/// era deploy.
+model StepRequirement {
+  id           Int                       @id @default(autoincrement())
+  stepId       Int
+  step         PhaseInternalWorkflowStep @relation(fields: [stepId], references: [id], onDelete: Cascade)
+  key          String                    @db.VarChar(60)
+  label        String                    @db.VarChar(200)
+  descricao    String?                   @db.Text
+  /// CAMPO_PREENCHIDO | CHECKLIST_COMPLETO | EVIDENCIA_ANEXADA | ACAO_EXECUTADA
+  tipo         String                    @db.VarChar(30)
+  /// A que ele se refere: a `key` do campo, do item de checklist ou da ação.
+  alvoKey      String?                   @db.VarChar(60)
+  /// Quantidade mínima, quando o tipo admite (ex.: evidências).
+  minimo       Int                       @default(1)
+  obrigatorio  Boolean                   @default(true)
+  /// Só vale quando a condição for verdadeira. `null` = sempre.
+  condicao     Json?
+  /// Aplica-se a esta ação; `null` = à conclusão do passo.
+  acaoKey      String?                   @db.VarChar(60)
+  ordem        Int                       @default(0)
+  ativo        Boolean                   @default(true)
+  criadoEm     DateTime                  @default(now())
+  atualizadoEm DateTime                  @updatedAt
+
   @@unique([stepId, key])
   @@index([stepId])
 }
@@ -3328,6 +3431,8 @@ model CanalOperacional {
   aplicacao             Json?
   criadoEm              DateTime @default(now())
   atualizadoEm          DateTime @updatedAt
+
+  passos StepChannel[]
 }
 
 model PhaseAutomationRule {

@@ -138,6 +138,9 @@ const AUTORIZADOS_FORA_DO_RUNTIME: Record<string, string> = {
   "scripts/cadastro-canonico.test.ts":
     "cadastro canônico de execução: monta e derruba a PRÓPRIA árvore e pessoa (marca CC) " +
     "só no banco de teste, para provar que nova via preserva o documento anterior",
+  "scripts/cadastro-integral.test.ts":
+    "cadastro integral do passo: monta e derruba a PRÓPRIA árvore e pessoa (marca CI) " +
+    "só no banco de teste, para provar que renomear e desativar opção não apaga escolha registrada",
   "scripts/concluir-etapa.test.ts":
     "porta de conclusão de etapa: monta e derruba os PRÓPRIOS processos (marca ETAPA) " +
     "só no banco de teste",

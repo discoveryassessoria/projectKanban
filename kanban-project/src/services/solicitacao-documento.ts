@@ -37,6 +37,8 @@ import {
   type WorkflowV2Shape,
 } from "@/src/services/documento-operacao"
 import { canalDoTexto, configDoCanal } from "@/src/lib/process-stage/canais-solicitacao"
+import { definicaoHistoricaDoPasso } from "@/src/services/versao-publicada"
+import { requisitosPendentes } from "@/src/services/requisitos-da-etapa"
 import { faltamCamposDoCanalCadastrado, canaisVigentes } from "@/src/lib/process-stage/canais-fonte"
 import {
   vincularArquivoDocumentoTx,
@@ -202,6 +204,44 @@ export async function registrarSolicitacaoDocumento(
   })
   if (faltando.length > 0) {
     return { ok: false, error: `VALIDATION_ERROR:${faltando.join(",")}`, status: 422 }
+  }
+
+  // 4.0.1) OS REQUISITOS CADASTRADOS DA ETAPA.
+  //
+  // O que este executor cobrava sozinho — protocolo, comprovante, observação — agora
+  // pode ser acrescentado pelo administrador, por passo, sem deploy. A conta é a
+  // MESMA que a rota declarativa usa (`requisitosPendentes`), sobre os valores DESTE
+  // envio: não existe uma regra para quem executa pelo painel e outra para quem
+  // executa por aqui. Sem requisito cadastrado, a lista volta vazia e nada muda.
+  if (entrada.concluirEtapa) {
+    const hist = await definicaoHistoricaDoPasso(stepInstanceId)
+    if (hist && (hist.passo.requisitos ?? []).length > 0) {
+      const pendentes = await requisitosPendentes({
+        stepInstanceId,
+        requisitos: hist.passo.requisitos ?? [],
+        campos: hist.passo.campos,
+        checklist: hist.passo.checkItens,
+        // Os canais entram vazios: a exigência POR CANAL já foi cobrada logo acima,
+        // pelo cadastro de canais. Passá-los aqui cobraria a mesma coisa duas vezes,
+        // com duas mensagens diferentes para a mesma falta.
+        canais: [],
+        valores: {
+          canal,
+          numero_protocolo: numeroProtocolo,
+          codigo_rastreio: codigoRastreio,
+          observacao,
+          destinatario: destinatarioNome,
+          requerimento: requerimentoUrl ?? requerimentoJaRegistrado?.url ?? null,
+        },
+      })
+      if (pendentes.length > 0) {
+        return {
+          ok: false,
+          error: `VALIDATION_ERROR:REQUISITO_PENDENTE:${pendentes.map((p) => p.motivo).join(" ")}`,
+          status: 422,
+        }
+      }
+    }
   }
 
   // 4.1) EVIDÊNCIA OBRIGATÓRIA — a etapa não conclui sem o documento mestre que a
