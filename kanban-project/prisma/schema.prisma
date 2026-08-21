@@ -245,6 +245,16 @@ model Documento {
   status                StatusDocumento @default(PENDENTE)
   descricao             String?         @db.VarChar(200)
   cartorio              String?         @db.VarChar(200)
+  /// O ÓRGÃO/CARTÓRIO QUE EMITE ESTE DOCUMENTO — por ID, não por nome.
+  ///
+  /// `cartorio` acima é texto livre e continua sendo o que o operador digitou. Ele
+  /// nunca serviu para responder "por onde dá para pedir este documento", porque nome
+  /// não tem canal, não tem endereço e não tem cadastro. Esta coluna é o vínculo com
+  /// `OrgaoProtocolo` — e é ela que a subtarefa consulta para resolver os canais do
+  /// fornecedor concreto. `null` = ainda não identificado, e a subtarefa que depende
+  /// de canal fica bloqueada dizendo exatamente isso.
+  orgaoId               Int?
+  orgao                 OrgaoProtocolo? @relation("DocumentoOrgaoEmissor", fields: [orgaoId], references: [id], onDelete: SetNull)
   livro                 String?         @db.VarChar(20)
   folha                 String?         @db.VarChar(20)
   termo                 String?         @db.VarChar(30)
@@ -3228,13 +3238,119 @@ model PhaseInternalWorkflowStep {
   /// Permissão exigida para reabrir esta etapa. `null` = a permissão geral de reabrir.
   reaberturaPermissao String? @db.VarChar(60)
 
+  /// REGRA DE CONCLUSÃO do passo, em vocabulário fechado.
+  ///
+  /// `completionRule` acima é texto livre herdado e continua sendo exibido; ele nunca
+  /// foi interpretado pelo motor. Esta coluna é o que o motor lê:
+  ///   TODAS_SUBTAREFAS_OBRIGATORIAS — o passo conclui quando toda subtarefa
+  ///                                   obrigatória e aplicável estiver concluída;
+  ///   QUALQUER_SUBTAREFA            — basta uma;
+  ///   ACAO_DO_PASSO                 — quem conclui é a ação do passo (o que sempre
+  ///                                   valeu, e continua sendo o padrão).
+  regraDeConclusao String @default("ACAO_DO_PASSO") @db.VarChar(40)
+
   acoes      StepAction[]
   campos     StepField[]
   checkItens StepChecklistItem[]
   canais     StepChannel[]
   requisitos StepRequirement[]
+  subtarefas StepSubtaskDefinition[]
 
   @@unique([workflowId, key])
+}
+
+/// SUBTAREFA CADASTRADA DE UM PASSO — o que acontece DENTRO dele.
+///
+/// ─── O QUE FALTAVA ─────────────────────────────────────────────────────────
+/// "Solicitar via fornecedor", "Registrar protocolo", "Aguardar retorno" eram três
+/// coisas dentro de um passo chamado "Solicitar certidão" — e não eram nada: eram
+/// trechos de um componente React. Não tinham identidade, não tinham estado, não
+/// tinham execução, não tinham histórico. Perguntar "quem registrou o protocolo e
+/// quando?" não tinha onde ser respondido, porque a única coisa que existia era o
+/// passo inteiro, concluído ou não.
+///
+/// ─── O QUE ESTA ENTIDADE ESTABELECE ────────────────────────────────────────
+/// A subtarefa é DEFINIÇÃO: identidade estável (`key`), configuração própria (campos,
+/// ações, checklist, requisitos, dependências, condições, SLA, responsável, executor,
+/// política de reabertura) e versionamento junto com o passo. A EXECUÇÃO dela é
+/// `SubtaskExecution`, append-only, exatamente como a tentativa do passo.
+///
+/// ─── O QUE ELA NÃO É ───────────────────────────────────────────────────────
+/// Não é um segundo motor de workflow escondido dentro do passo: ela pertence ao
+/// `PhaseInternalWorkflowStep` e morre com ele. Não é tarefa: `Tarefa` continua sendo
+/// a unidade atribuível, e subtarefa não cria tarefa por conta própria.
+model StepSubtaskDefinition {
+  id     Int                       @id @default(autoincrement())
+  stepId Int
+  step   PhaseInternalWorkflowStep @relation(fields: [stepId], references: [id], onDelete: Cascade)
+
+  /// IDENTIDADE ESTÁVEL. É ela que a execução grava; o rótulo pode ser reescrito.
+  key       String  @db.VarChar(60)
+  label     String  @db.VarChar(200)
+  descricao String? @db.Text
+  ordem     Int     @default(0)
+  ativo     Boolean @default(true)
+
+  /// Obrigatória para o passo concluir (quando a regra de conclusão olha subtarefas).
+  obrigatoria Boolean @default(true)
+  /// Pode acontecer mais de uma vez (ex.: "registrar protocolo" a cada tentativa).
+  repetivel   Boolean @default(false)
+  /// Teto de ocorrências quando repetível. `null` = sem teto.
+  maxOcorrencias Int?
+
+  /// MANUAL = alguém executa; AUTOMATICA = o motor conclui ao satisfazer a condição.
+  modoExecucao String @default("MANUAL") @db.VarChar(20)
+
+  /// HERDA | ESPECIFICO | REGRA — de onde sai o responsável desta subtarefa.
+  responsavelRegra String  @default("HERDA") @db.VarChar(20)
+  /// Quando ESPECIFICO. Referência solta a Usuario (o motor projeta, não cascateia).
+  responsavelId    Int?
+  /// SLA próprio em dias úteis. `null` = herda o do passo.
+  slaDays          Int?
+
+  /// CONDIÇÕES DECLARATIVAS (motor `src/lib/motor/condicoes.ts`; nunca código).
+  /// Entrada: quando ela fica DISPONÍVEL. Conclusão: o que precisa valer para
+  /// concluir. Visibilidade: quando ela APARECE — e aparecer não é poder executar.
+  condicaoEntrada      Json?
+  condicaoConclusao    Json?
+  condicaoVisibilidade Json?
+
+  /// DEPENDÊNCIA DECLARADA entre subtarefas do MESMO passo (lista de `key`).
+  /// Ordem não é dependência: B e C podem depender de A sem depender uma da outra.
+  dependeDe Json?
+
+  /// Executor próprio. `null` = o do passo. É capacidade técnica, nunca negócio.
+  executorKey String? @db.VarChar(40)
+
+  /// Escopo próprio. `null` = o do passo. Ver `cardinalidade` do passo.
+  cardinalidade String? @db.VarChar(20)
+
+  /// FONTE DOS CANAIS desta subtarefa — quando ela envia algo para fora.
+  ///   NENHUMA               — não usa canal;
+  ///   FORNECEDOR_RELACIONADO — os canais que o fornecedor CONCRETO daquele documento
+  ///                            oferece. O workflow não copia o cadastro dele;
+  ///   TIPOS_PERMITIDOS       — restringe aos tipos listados em `tiposDeCanal`.
+  fonteDeCanais String  @default("NENHUMA") @db.VarChar(30)
+  /// Restrição por tipo de canal (chaves de `CanalOperacional`), quando aplicável.
+  tiposDeCanal  Json?
+
+  /// POLÍTICA DE REABERTURA própria. `null` nos booleanos = herda a do passo.
+  reaberturaPermitida          Boolean?
+  reaberturaExigeJustificativa Boolean?
+  reaberturaPermissao          String? @db.VarChar(60)
+
+  metadata Json?
+
+  criadoEm     DateTime @default(now())
+  atualizadoEm DateTime @updatedAt
+
+  acoes      StepAction[]
+  campos     StepField[]
+  checkItens StepChecklistItem[]
+  requisitos StepRequirement[]
+
+  @@unique([stepId, key])
+  @@index([stepId])
 }
 
 /// AÇÃO CADASTRADA DE UM PASSO — o resultado que o operador escolhe.
@@ -3267,7 +3383,27 @@ model StepAction {
   criadoEm     DateTime @default(now())
   atualizadoEm DateTime @updatedAt
 
-  @@unique([stepId, key])
+  /// A QUAL SUBTAREFA pertence. `null` = pertence ao PASSO, como sempre foi.
+  ///
+  /// A coluna é anulável porque a subtarefa nasceu depois: tudo o que já estava
+  /// cadastrado continua sendo do passo, sem uma linha de migração de dado.
+  subtaskId Int?
+  subtask   StepSubtaskDefinition? @relation(fields: [subtaskId], references: [id], onDelete: Cascade)
+
+  // ── A IDENTIDADE É POR DONO ─────────────────────────────────────────────
+  //
+  // Era `@@unique([stepId, key])`: a chave tinha de ser única no PASSO INTEIRO. Isso
+  // impedia duas subtarefas de terem, cada uma, um campo "observacao" — e impedia uma
+  // subtarefa de usar uma chave que o passo já usava. São peças de donos diferentes;
+  // exigir que não se repitam entre donos é confundir "identidade" com "nome global".
+  //
+  // A trava passou a ser DOIS índices parciais (ver a migration
+  // 20260822100000_identidade_por_dono), que o schema.prisma não sabe expressar:
+  //   UNIQUE (stepId, key)    WHERE subtaskId IS NULL      — as peças do passo
+  //   UNIQUE (subtaskId, key) WHERE subtaskId IS NOT NULL  — as peças de cada subtarefa
+  // Sem os dois, NULL sendo distinto de NULL no Postgres deixaria o passo aceitar dois
+  // campos com a mesma chave.
+
   @@index([stepId])
 }
 
@@ -3295,7 +3431,27 @@ model StepField {
 
   opcoesCadastradas StepFieldOption[]
 
-  @@unique([stepId, key])
+  /// A QUAL SUBTAREFA pertence. `null` = pertence ao PASSO, como sempre foi.
+  ///
+  /// A coluna é anulável porque a subtarefa nasceu depois: tudo o que já estava
+  /// cadastrado continua sendo do passo, sem uma linha de migração de dado.
+  subtaskId Int?
+  subtask   StepSubtaskDefinition? @relation(fields: [subtaskId], references: [id], onDelete: Cascade)
+
+  // ── A IDENTIDADE É POR DONO ─────────────────────────────────────────────
+  //
+  // Era `@@unique([stepId, key])`: a chave tinha de ser única no PASSO INTEIRO. Isso
+  // impedia duas subtarefas de terem, cada uma, um campo "observacao" — e impedia uma
+  // subtarefa de usar uma chave que o passo já usava. São peças de donos diferentes;
+  // exigir que não se repitam entre donos é confundir "identidade" com "nome global".
+  //
+  // A trava passou a ser DOIS índices parciais (ver a migration
+  // 20260822100000_identidade_por_dono), que o schema.prisma não sabe expressar:
+  //   UNIQUE (stepId, key)    WHERE subtaskId IS NULL      — as peças do passo
+  //   UNIQUE (subtaskId, key) WHERE subtaskId IS NOT NULL  — as peças de cada subtarefa
+  // Sem os dois, NULL sendo distinto de NULL no Postgres deixaria o passo aceitar dois
+  // campos com a mesma chave.
+
   @@index([stepId])
 }
 
@@ -3380,12 +3536,44 @@ model StepRequirement {
   condicao     Json?
   /// Aplica-se a esta ação; `null` = à conclusão do passo.
   acaoKey      String?                   @db.VarChar(60)
+  /// EVIDÊNCIA — só faz sentido em `tipo = EVIDENCIA_ANEXADA`.
+  ///
+  /// Qual DOCUMENTO MESTRE o arquivo precisa ser (por ID, nunca por nome de arquivo),
+  /// que formatos são aceitos e em que momento a exigência vale. Isto está aqui, e não
+  /// numa tabela própria, porque "precisa haver comprovante anexado" É um requisito —
+  /// separá-lo criaria duas respostas para "o que falta para concluir".
+  evidenciaTipoId  Int?
+  evidenciaTipo    TipoDocumentoCadastro? @relation("RequisitoEvidenciaMestre", fields: [evidenciaTipoId], references: [id], onDelete: SetNull)
+  /// Formatos aceitos (ex.: ["application/pdf","image/jpeg"]). `null` = qualquer um.
+  mimesPermitidos  Json?
+  /// AO_CONCLUIR | AO_EXECUTAR_ACAO | SEMPRE — quando a exigência é cobrada.
+  momento          String @default("AO_CONCLUIR") @db.VarChar(24)
   ordem        Int                       @default(0)
   ativo        Boolean                   @default(true)
   criadoEm     DateTime                  @default(now())
   atualizadoEm DateTime                  @updatedAt
 
-  @@unique([stepId, key])
+  /// A QUAL SUBTAREFA pertence. `null` = pertence ao PASSO, como sempre foi.
+  ///
+  /// A coluna é anulável porque a subtarefa nasceu depois: tudo o que já estava
+  /// cadastrado continua sendo do passo, sem uma linha de migração de dado.
+  subtaskId Int?
+  subtask   StepSubtaskDefinition? @relation(fields: [subtaskId], references: [id], onDelete: Cascade)
+
+  // ── A IDENTIDADE É POR DONO ─────────────────────────────────────────────
+  //
+  // Era `@@unique([stepId, key])`: a chave tinha de ser única no PASSO INTEIRO. Isso
+  // impedia duas subtarefas de terem, cada uma, um campo "observacao" — e impedia uma
+  // subtarefa de usar uma chave que o passo já usava. São peças de donos diferentes;
+  // exigir que não se repitam entre donos é confundir "identidade" com "nome global".
+  //
+  // A trava passou a ser DOIS índices parciais (ver a migration
+  // 20260822100000_identidade_por_dono), que o schema.prisma não sabe expressar:
+  //   UNIQUE (stepId, key)    WHERE subtaskId IS NULL      — as peças do passo
+  //   UNIQUE (subtaskId, key) WHERE subtaskId IS NOT NULL  — as peças de cada subtarefa
+  // Sem os dois, NULL sendo distinto de NULL no Postgres deixaria o passo aceitar dois
+  // campos com a mesma chave.
+
   @@index([stepId])
 }
 
@@ -3403,8 +3591,72 @@ model StepChecklistItem {
   criadoEm     DateTime @default(now())
   atualizadoEm DateTime @updatedAt
 
-  @@unique([stepId, key])
+  /// A QUAL SUBTAREFA pertence. `null` = pertence ao PASSO, como sempre foi.
+  ///
+  /// A coluna é anulável porque a subtarefa nasceu depois: tudo o que já estava
+  /// cadastrado continua sendo do passo, sem uma linha de migração de dado.
+  subtaskId Int?
+  subtask   StepSubtaskDefinition? @relation(fields: [subtaskId], references: [id], onDelete: Cascade)
+
+  // ── A IDENTIDADE É POR DONO ─────────────────────────────────────────────
+  //
+  // Era `@@unique([stepId, key])`: a chave tinha de ser única no PASSO INTEIRO. Isso
+  // impedia duas subtarefas de terem, cada uma, um campo "observacao" — e impedia uma
+  // subtarefa de usar uma chave que o passo já usava. São peças de donos diferentes;
+  // exigir que não se repitam entre donos é confundir "identidade" com "nome global".
+  //
+  // A trava passou a ser DOIS índices parciais (ver a migration
+  // 20260822100000_identidade_por_dono), que o schema.prisma não sabe expressar:
+  //   UNIQUE (stepId, key)    WHERE subtaskId IS NULL      — as peças do passo
+  //   UNIQUE (subtaskId, key) WHERE subtaskId IS NOT NULL  — as peças de cada subtarefa
+  // Sem os dois, NULL sendo distinto de NULL no Postgres deixaria o passo aceitar dois
+  // campos com a mesma chave.
+
   @@index([stepId])
+}
+
+/// OS CANAIS QUE UMA ORGANIZAÇÃO ATENDE.
+///
+/// ─── O ERRO QUE ISTO DESFAZ ────────────────────────────────────────────────
+/// O workflow tinha um cadastro próprio de canais e o passo declarava quais oferecia.
+/// Só que "por onde dá para pedir" não é decisão do workflow: é fato do CARTÓRIO. Um
+/// cartório que só atende no balcão continuava aparecendo com CRC e e-mail porque o
+/// passo dizia que sim — e o operador descobria tentando.
+///
+/// Agora o vocabulário de tipos (`CanalOperacional`) continua sendo domínio fechado, e
+/// a DISPONIBILIDADE é da organização. O passo apenas declara "use os canais do
+/// fornecedor relacionado", e o runtime resolve pelo fornecedor concreto daquele
+/// documento. Nenhum cadastro é duplicado.
+model OrganizacaoCanal {
+  id             Int              @id @default(autoincrement())
+  organizacaoId  Int
+  organizacao    OrgaoProtocolo   @relation(fields: [organizacaoId], references: [id], onDelete: Cascade)
+  canalId        Int
+  canal          CanalOperacional @relation(fields: [canalId], references: [id], onDelete: Cascade)
+
+  ativo Boolean @default(true)
+  ordem Int     @default(0)
+
+  /// EXIGÊNCIA PRÓPRIA DESTA ORGANIZAÇÃO neste canal. `null` = vale a do tipo de
+  /// canal. Só ACRESCENTA: uma organização não dispensa o que o canal exige de origem.
+  exigeProtocolo  Boolean?
+  exigeAnexo      Boolean?
+  exigeRastreio   Boolean?
+  exigeObservacao Boolean?
+
+  /// Endereço/identificador da organização NESTE canal (e-mail, URL do portal,
+  /// telefone do WhatsApp, guichê). É dado de contato, não de workflow.
+  endereco String? @db.VarChar(300)
+  /// Prazo típico de retorno por este canal, em dias.
+  prazoDias Int?
+  observacao String? @db.Text
+
+  criadoEm     DateTime @default(now())
+  atualizadoEm DateTime @updatedAt
+
+  @@unique([organizacaoId, canalId])
+  @@index([organizacaoId])
+  @@index([canalId])
 }
 
 /// CANAL OPERACIONAL — por onde um pedido sai da casa.
@@ -3433,6 +3685,7 @@ model CanalOperacional {
   atualizadoEm          DateTime @updatedAt
 
   passos StepChannel[]
+  organizacoes OrganizacaoCanal[]
 }
 
 model PhaseAutomationRule {
@@ -3556,6 +3809,11 @@ model OrgaoProtocolo {
   // protocolizações recebidas por este órgão (ocorrências dentro dos processos)
   protocolos            Protocolo[]
   solicitacaoDocumentos SolicitacaoDocumento[]
+  /// Por onde ESTA organização atende. Ver `OrganizacaoCanal`.
+  canais                OrganizacaoCanal[]
+  execucoesDeSubtarefa  SubtaskExecution[]
+  /// Documentos que ESTA organização emite. Ver `Documento.orgaoId`.
+  documentosEmitidos    Documento[]        @relation("DocumentoOrgaoEmissor")
 
   /// Anti-duplicidade do cadastro mestre: mesma entidade não entra duas vezes.
   @@unique([name, country])
@@ -3598,6 +3856,8 @@ model TipoDocumentoCadastro {
   arquivosClassificados   DocumentoArquivo[]        @relation("ArquivoTipoMestre")
   exigenciasComoAlvo      ExigenciaEvidenciaEtapa[] @relation("ExigenciaDocumentoOperacional")
   exigenciasComoEvidencia ExigenciaEvidenciaEtapa[] @relation("ExigenciaEvidenciaMestre")
+  /// Requisitos de evidência que apontam para ESTE tipo mestre (ver StepRequirement).
+  requisitosComoEvidencia StepRequirement[]         @relation("RequisitoEvidenciaMestre")
   configFinanceiras       ProdutoFinanceiro[]       @relation("ConfigFinTipoDocumento")
   econRules               PhaseEconomicRule[]       @relation("EconTipoDocumento")
   participaPlanilha       Boolean                   @default(false)
@@ -4357,6 +4617,77 @@ model StepExecution {
   @@index([stepInstanceId])
 }
 
+/// A EXECUÇÃO DE UMA SUBTAREFA — append-only, exatamente como a do passo.
+///
+/// A tentativa do passo (`StepExecution`) responde "esta obrigação foi cumprida?". Ela
+/// não sabe responder "quem registrou o protocolo, quando, em qual tentativa" — porque
+/// registrar o protocolo era um trecho de tela, não um fato. Aqui passa a ser.
+///
+/// ─── A VIGENTE ─────────────────────────────────────────────────────────────
+/// É a única com `supersededAt` nulo, e quem garante que é uma só é um índice parcial
+/// no banco. Reabrir uma subtarefa SUBSTITUI a vigente (que mantém `completedAt`,
+/// executor e resultado) e abre outra. O passado continua sendo passado.
+///
+/// ─── ISOLAMENTO ────────────────────────────────────────────────────────────
+/// A execução é da subtarefa NAQUELA instância do passo. Reabrir "conferir selo" da
+/// certidão do avô não toca a subtarefa homônima das outras 49 certidões, porque a
+/// instância do passo é outra — o mesmo isolamento que já vale um nível acima.
+model SubtaskExecution {
+  id             Int                       @id @default(autoincrement())
+  stepInstanceId Int
+  stepInstance   PhaseWorkflowStepInstance @relation(fields: [stepInstanceId], references: [id], onDelete: Cascade)
+
+  /// A CHAVE da subtarefa, não o id da definição: é ela que sobrevive à republicação.
+  subtaskKey String @db.VarChar(60)
+  /// A definição que valia quando esta execução nasceu (solta — a versão congelada é
+  /// quem resolve o conteúdo histórico).
+  subtaskDefinitionId Int?
+  /// Versão do workflow que esta execução registrou.
+  workflowVersao      Int?
+
+  sequencia Int
+  /// PENDENTE | DISPONIVEL | EM_ANDAMENTO | AGUARDANDO_EXTERNO | BLOQUEADO |
+  /// CONCLUIDO | CANCELADO | INVALIDADO | FALHOU — vocabulário fechado, conferido
+  /// por CHECK no banco.
+  status    String @db.VarChar(24)
+  /// POR QUE esta execução nasceu (ABERTURA, REABERTURA_MANUAL, RETRY…).
+  motivo    String @db.VarChar(30)
+
+  /// CAUSA ESTRUTURADA do bloqueio — "bloqueada porque depende de X", não um texto.
+  bloqueioCodigo String? @db.VarChar(40)
+  bloqueioAlvo   String? @db.VarChar(120)
+
+  startedAt      DateTime?
+  completedAt    DateTime?
+  executadoPorId Int?
+  responsavelId  Int?
+  prazo          DateTime?
+
+  /// Desfecho declarado (a `key` da ação escolhida).
+  resultado String? @db.VarChar(60)
+  /// Os dados preenchidos NESTA execução.
+  payload   Json?
+
+  /// OPERAÇÃO EXTERNA — quando a subtarefa espera um terceiro.
+  fornecedorId Int?
+  fornecedor   OrgaoProtocolo? @relation(fields: [fornecedorId], references: [id], onDelete: SetNull)
+  canalKey     String?         @db.VarChar(40)
+  protocolo    String?         @db.VarChar(120)
+  enviadoEm    DateTime?
+  previstoPara DateTime?
+
+  supersededAt      DateTime?
+  supersededPorId   Int?
+  correlationId     String?  @db.VarChar(60)
+  /// Retry de HTTP não pode virar execução nova.
+  chaveIdempotencia String   @unique @db.VarChar(200)
+  criadoEm          DateTime @default(now())
+
+  @@unique([stepInstanceId, subtaskKey, sequencia])
+  @@index([stepInstanceId])
+  @@index([subtaskKey])
+}
+
 model PhaseWorkflowStepInstance {
   id                 Int                   @id @default(autoincrement())
   workflowInstanceId Int
@@ -4432,6 +4763,7 @@ model PhaseWorkflowStepInstance {
 
   /// Tentativas de execução deste passo (append-only). Ver StepExecution.
   execucoes StepExecution[]
+  execucoesDeSubtarefa SubtaskExecution[]
 }
 
 // Eventos append-only (sem rota de update/delete â garantido por contrato).

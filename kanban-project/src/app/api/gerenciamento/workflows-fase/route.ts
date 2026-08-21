@@ -22,11 +22,21 @@ export async function GET(request: NextRequest) {
         passos: {
           orderBy: { ordem: 'asc' },
           include: {
-            acoes: { orderBy: { ordem: 'asc' } },
-            campos: { orderBy: { ordem: 'asc' }, include: { opcoesCadastradas: { orderBy: { ordem: 'asc' } } } },
-            checkItens: { orderBy: { ordem: 'asc' } },
+            acoes: { where: { subtaskId: null }, orderBy: { ordem: 'asc' } },
+            campos: { where: { subtaskId: null }, orderBy: { ordem: 'asc' }, include: { opcoesCadastradas: { orderBy: { ordem: 'asc' } } } },
+            checkItens: { where: { subtaskId: null }, orderBy: { ordem: 'asc' } },
             canais: { orderBy: { ordem: 'asc' }, include: { canal: true } },
-            requisitos: { orderBy: { ordem: 'asc' } },
+            requisitos: { where: { subtaskId: null }, orderBy: { ordem: 'asc' } },
+            // AS SUBTAREFAS com os filhos DELAS — é o que o editor completo consome.
+            subtarefas: {
+              orderBy: { ordem: 'asc' },
+              include: {
+                acoes: { orderBy: { ordem: 'asc' } },
+                campos: { orderBy: { ordem: 'asc' }, include: { opcoesCadastradas: { orderBy: { ordem: 'asc' } } } },
+                checkItens: { orderBy: { ordem: 'asc' } },
+                requisitos: { orderBy: { ordem: 'asc' } },
+              },
+            },
           },
         },
         // CONTRATO — o cabeçalho da tela exibe família e perfil por NOME; sem a

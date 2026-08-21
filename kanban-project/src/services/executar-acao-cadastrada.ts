@@ -31,6 +31,9 @@ import { efeito, efeitosDaFase } from "@/src/lib/motor/catalogo-de-efeitos"
 import { executorSuportaEfeito } from "@/src/lib/motor/registro-de-executores"
 import { executorEfetivo } from "@/src/services/validacao-de-publicacao"
 import { registrarNaTentativa, tentativaVigente } from "@/src/services/execucao-do-passo"
+import { subtarefasDaEtapa, passoPodeConcluir } from "@/src/services/subtarefas-da-etapa"
+import { canaisDaSubtarefa } from "@/src/lib/motor/canais-do-fornecedor"
+import { registrarNaExecucao, garantirExecucao, ESTADOS_DA_SUBTAREFA } from "@/src/services/execucao-da-subtarefa"
 import { requisitosPendentes } from "@/src/services/requisitos-da-etapa"
 import { avaliarCondicao, type Condicao } from "@/src/lib/motor/condicoes"
 import { concluirPasso, bloquearTarefa, desbloquearTarefa } from "@/src/services/task-step-sync"
@@ -50,6 +53,16 @@ export interface ContextoDaAcao {
   permissoes: string[]
   correlationId: string
   origem?: "USER" | "MOTOR" | "SYSTEM"
+  /**
+   * A SUBTAREFA em que a ação acontece. Ausente = a ação é do PASSO, como sempre foi.
+   *
+   * Quando presente, tudo se resolve DENTRO dela: a ação vem das ações dela, os campos
+   * obrigatórios são os dela, os requisitos cobrados são os dela, e o que ficou
+   * decidido é registrado na execução dela — não na tentativa do passo inteiro.
+   */
+  subtaskKey?: string | null
+  /** O fornecedor concreto do documento, para resolver canais e bloqueios. */
+  fornecedorId?: number | null
 }
 
 function faltando(campos: CampoCongelado[], acao: AcaoCongelada, valores: Record<string, unknown>): string[] {
@@ -98,10 +111,48 @@ export async function executarAcaoCadastrada(
     return { ok: false, codigo: "SEM_CONFIGURACAO_HISTORICA",
       mensagem: "Esta etapa não tem configuração versionada — é anterior ao versionamento. Use o painel da etapa." }
   }
-  const acao = hist.passo.acoes.find((a) => a.key === acaoKey && a.ativo !== false)
+  // ── DE ONDE VEM A AÇÃO: do passo ou da subtarefa ────────────────────────
+  //
+  // A subtarefa tem as ações DELA. Procurar no passo quando a ação é dela faria uma
+  // ação de "registrar protocolo" ser recusada por não existir — ou, pior, encontrar
+  // uma homônima do passo e executar outra coisa.
+  const subtarefa = ctx.subtaskKey
+    ? (hist.passo.subtarefas ?? []).find((st) => st.key === ctx.subtaskKey && st.ativo !== false)
+    : null
+  if (ctx.subtaskKey && !subtarefa) {
+    return { ok: false, codigo: "SUBTAREFA_INEXISTENTE",
+      mensagem: `A subtarefa "${ctx.subtaskKey}" não existe na versão ${hist.versao} desta etapa.` }
+  }
+
+  // A SUBTAREFA PRECISA ESTAR DISPONÍVEL. O cliente pode mandar a chave mesmo sem o
+  // botão existir na tela — e executar uma subtarefa bloqueada é contornar a
+  // dependência que o administrador declarou.
+  if (subtarefa) {
+    const projetadas = await subtarefasDaEtapa({
+      stepInstanceId, valores, fornecedorId: ctx.fornecedorId ?? null,
+    })
+    const alvo = projetadas.find((x) => x.key === subtarefa.key)
+    if (alvo && !alvo.disponivel && !alvo.concluida) {
+      return { ok: false, codigo: "SUBTAREFA_INDISPONIVEL",
+        mensagem: alvo.bloqueioTexto ?? `"${subtarefa.label}" não está disponível agora.`,
+        detalhes: { bloqueioCodigo: alvo.bloqueioCodigo, bloqueioAlvo: alvo.bloqueioAlvo } }
+    }
+    // JÁ CONCLUÍDA e não repetível: executar de novo criaria uma segunda conclusão do
+    // mesmo fato. Repetir é capacidade declarada, não consequência de clicar duas vezes.
+    if (alvo?.concluida && !alvo.podeRepetir) {
+      return { ok: false, codigo: "SUBTAREFA_JA_CONCLUIDA",
+        mensagem: `"${subtarefa.label}" já foi concluída. Para fazer de novo, é preciso reabri-la.` }
+    }
+  }
+
+  const acoesDisponiveis = subtarefa ? subtarefa.acoes : hist.passo.acoes
+  const camposDisponiveis = subtarefa ? subtarefa.campos : hist.passo.campos
+  const acao = acoesDisponiveis.find((a) => a.key === acaoKey && a.ativo !== false)
   if (!acao) {
     return { ok: false, codigo: "ACAO_INEXISTENTE",
-      mensagem: `A ação "${acaoKey}" não existe na versão ${hist.versao} desta etapa.` }
+      mensagem: subtarefa
+        ? `A ação "${acaoKey}" não existe na subtarefa "${subtarefa.label}" da versão ${hist.versao}.`
+        : `A ação "${acaoKey}" não existe na versão ${hist.versao} desta etapa.` }
   }
 
   const def = efeito(acao.effectKey)
@@ -147,12 +198,27 @@ export async function executarAcaoCadastrada(
   // opções PRÓPRIAS cadastradas, ele não é o campo do canal — o valor dele é julgado
   // logo abaixo, pelas opções dele. Julgar a mesma escolha por dois vocabulários
   // diferentes recusaria configuração legítima.
-  const canaisDaVersao = hist.passo.canais ?? []
-  const campoDoCatalogo = hist.passo.campos.find((c) => {
+  //
+  // NUMA SUBTAREFA, os canais vêm do FORNECEDOR concreto — o passo não os lista mais.
+  // A lista congelada do passo continua valendo para as ações do próprio passo, que
+  // são as publicadas antes de a subtarefa existir.
+  const canaisDaVersao = subtarefa
+    ? (await canaisDaSubtarefa({
+        fonteDeCanais: subtarefa.fonteDeCanais,
+        tiposPermitidos: subtarefa.tiposDeCanal,
+        fornecedorId: ctx.fornecedorId ?? null,
+      })).map((c) => ({
+        key: c.key, label: c.label, descricao: c.descricao, ordem: c.ordem, ativo: true,
+        exigeProtocolo: c.exigeProtocolo, exigeAnexo: c.exigeAnexo, anexoLabel: c.anexoLabel,
+        exigeRastreio: c.exigeRastreio, exigeObservacao: c.exigeObservacao,
+        camposObrigatorios: [] as string[], condicao: null as unknown,
+      }))
+    : (hist.passo.canais ?? [])
+  const campoDoCatalogo = camposDisponiveis.find((c) => {
     const o = c.opcoes as { catalogo?: string } | unknown[] | null
     return !!o && !Array.isArray(o) && typeof o === "object" && (o as { catalogo?: string }).catalogo === "canais"
   })
-  const campoCanalPadrao = hist.passo.campos.find((c) => c.key === "canal")
+  const campoCanalPadrao = camposDisponiveis.find((c) => c.key === "canal")
   const chaveDoCanal = campoDoCatalogo
     ? campoDoCatalogo.key
     : campoCanalPadrao && (campoCanalPadrao.opcoesCadastradas ?? []).length > 0
@@ -168,7 +234,7 @@ export async function executarAcaoCadastrada(
   }
 
   // AS OPÇÕES ESCOLHIDAS PRECISAM EXISTIR. Mesma razão: a autoridade é do servidor.
-  for (const campo of hist.passo.campos) {
+  for (const campo of camposDisponiveis) {
     const cadastradas = (campo.opcoesCadastradas ?? []).filter((o) => o.ativo !== false)
     if (cadastradas.length === 0) continue
     const v = valores[campo.key]
@@ -181,17 +247,23 @@ export async function executarAcaoCadastrada(
     }
   }
 
-  const falta = faltando(hist.passo.campos, acao, valores)
+  const falta = faltando(camposDisponiveis, acao, valores)
   if (falta.length) {
-    const rotulos = falta.map((k) => hist.passo.campos.find((c) => c.key === k)?.label ?? k)
+    const rotulos = falta.map((k) => camposDisponiveis.find((c) => c.key === k)?.label ?? k)
     return { ok: false, codigo: "CAMPO_OBRIGATORIO",
       mensagem: `Preencha antes de continuar: ${rotulos.join(", ")}.` }
   }
 
   // OS REQUISITOS CADASTRADOS — a mesma conta que a tela mostrou, cobrada aqui.
+  // OS REQUISITOS SÃO OS DO ESCOPO. Cobrar os do passo inteiro ao executar uma
+  // subtarefa faria "registrar protocolo" exigir o comprovante que só a conclusão do
+  // passo pede — e a subtarefa nunca poderia ser feita na ordem certa.
   const pendentes = await requisitosPendentes({
-    stepInstanceId, requisitos: hist.passo.requisitos ?? [], campos: hist.passo.campos,
-    checklist: hist.passo.checkItens, canais: canaisDaVersao, valores, acaoKey: acao.key,
+    stepInstanceId,
+    requisitos: (subtarefa ? subtarefa.requisitos : hist.passo.requisitos) ?? [],
+    campos: camposDisponiveis,
+    checklist: (subtarefa ? subtarefa.checkItens : hist.passo.checkItens) ?? [],
+    canais: canaisDaVersao, valores, acaoKey: acao.key,
   })
   if (pendentes.length > 0) {
     return { ok: false, codigo: "REQUISITO_PENDENTE",
@@ -230,6 +302,55 @@ export async function executarAcaoCadastrada(
         mensagem: `O efeito "${acao.effectKey}" está no catálogo mas não tem execução ligada.` }
   }
 
+  // ── REGISTRO NA EXECUÇÃO DA SUBTAREFA ───────────────────────────────────
+  //
+  // Quando a ação é de uma subtarefa, é NELA que o que foi decidido fica. Guardar isso
+  // na tentativa do passo devolveria o problema ao ponto de partida: três coisas
+  // acontecendo dentro de um passo e um único lugar para registrar as três.
+  if (subtarefa) {
+    await garantirExecucao({
+      stepInstanceId, subtaskKey: subtarefa.key, workflowVersao: hist.versao,
+      status: ESTADOS_DA_SUBTAREFA.EM_ANDAMENTO,
+    })
+    // ── EXECUTAR UMA AÇÃO CONCLUI A SUBTAREFA ─────────────────────────────
+    //
+    // Concluir a SUBTAREFA e concluir o PASSO são perguntas diferentes. A primeira é
+    // "o operador terminou o que esta subtarefa pedia?" — e escolher um resultado é
+    // exatamente isso. Amarrá-la ao efeito do passo deixava "registrar o protocolo"
+    // eternamente em andamento, porque o efeito dela é REGISTER_ONLY: a subtarefa
+    // nunca ficaria pronta, e o passo que dependesse dela nunca concluiria.
+    //
+    // A exceção é a espera externa, que é um estado real e não uma conclusão: quem
+    // manda a solicitação e fica aguardando o cartório não terminou nada ainda.
+    //
+    // Quando a subtarefa declara `condicaoConclusao`, é ela que decide — o cadastro
+    // manda sobre o padrão.
+    const esperandoTerceiro = def.key === "PAUSE_FOR_EXTERNAL_WAIT"
+    const condicaoOk = avaliarCondicao(subtarefa.condicaoConclusao as Condicao | null, { valores })
+    const estadoDaSubtarefa = esperandoTerceiro
+      ? ESTADOS_DA_SUBTAREFA.AGUARDANDO_EXTERNO
+      : condicaoOk
+        ? ESTADOS_DA_SUBTAREFA.CONCLUIDO
+        : ESTADOS_DA_SUBTAREFA.EM_ANDAMENTO
+    await registrarNaExecucao(stepInstanceId, subtarefa.key, {
+      status: estadoDaSubtarefa,
+      resultado: acao.key,
+      executadoPorId: ctx.usuarioId,
+      startedAt: new Date(),
+      payload: {
+        acao: acao.key, efeito: acao.effectKey, versaoDaConfiguracao: hist.versao,
+        valores, detalhes: {}, decididoEm: new Date().toISOString(),
+      } as never,
+      ...(typeof valores.canal === "string" ? { canalKey: valores.canal } : {}),
+      ...(typeof valores.numero_protocolo === "string" ? { protocolo: valores.numero_protocolo } : {}),
+      ...(ctx.fornecedorId ? { fornecedorId: ctx.fornecedorId } : {}),
+    })
+    // CONCLUIR A SUBTAREFA MUDA O ESTADO DAS QUE DEPENDIAM DELA. Sem reconciliar, elas
+    // continuariam BLOQUEADO no banco enquanto a projeção já as considera disponíveis.
+    const { reconciliarSubtarefas } = await import("@/src/services/subtarefas-da-etapa")
+    await reconciliarSubtarefas({ stepInstanceId, valores, fornecedorId: ctx.fornecedorId ?? null })
+  }
+
   // ── REGISTRO NA TENTATIVA ───────────────────────────────────────────────
   // O que ficou decidido pertence à TENTATIVA, não ao passo: se este passo for
   // reaberto amanhã, esta decisão continua sendo a desta execução.
@@ -247,8 +368,34 @@ export async function executarAcaoCadastrada(
     })
   }
 
+  // ── QUEM CONCLUI O PASSO ────────────────────────────────────────────────
+  //
+  // Com a regra `ACAO_DO_PASSO` — o padrão e o que sempre valeu — quem conclui é a
+  // ação: se ela declara `concluiPasso`, o passo fecha.
+  //
+  // Com uma regra baseada em subtarefas, quem conclui é a ÚLTIMA subtarefa
+  // obrigatória a ficar pronta, seja qual for o efeito da ação que a fechou. Amarrar
+  // a conclusão a uma ação específica deixaria o passo aberto para sempre no caso mais
+  // comum: o operador conclui a última subtarefa com um "registrar" e o passo, que já
+  // tinha tudo o que pedia, continuaria pendurado esperando um clique que ninguém sabe
+  // que precisa dar.
+  const gate = await passoPodeConcluir({ stepInstanceId, valores, fornecedorId: ctx.fornecedorId ?? null })
+  const regraOlhaSubtarefas = gate.regra !== "ACAO_DO_PASSO"
+  const deveConcluir = regraOlhaSubtarefas ? gate.pode : def.concluiPasso
+
   let concluiu = false
-  if (def.concluiPasso) {
+  if (def.concluiPasso && regraOlhaSubtarefas && !gate.pode) {
+    // A AÇÃO FOI EXECUTADA E VALEU. O que não aconteceu foi a conclusão do passo — e
+    // isso não é erro: é o estado real, com o nome do que falta. Recusar a ação inteira
+    // desfaria uma subtarefa que o operador concluiu de verdade.
+    return {
+      ok: true, efeito: acao.effectKey, concluiuPasso: false,
+      codigo: "SUBTAREFAS_PENDENTES",
+      mensagem: `Registrado. A etapa ainda não conclui: ${gate.faltando.map((f) => `${f.label} (${f.motivo})`).join("; ")}`,
+      detalhes: { regra: gate.regra, faltando: gate.faltando },
+    }
+  }
+  if (deveConcluir) {
     const r = await concluirPasso(stepInstanceId, sync)
     concluiu = r.success && r.changed
     if (!r.success) {

@@ -47,8 +47,12 @@ const svc = semComentarios(read("src/services/execucao-do-passo.ts"))
 check("existe o serviço de tentativas", svc.includes("export async function abrirTentativa"))
 check("a vigente é a NÃO substituída — não sai de ORDER BY createdAt",
   svc.includes("supersededAt: null") && !svc.includes('orderBy: { criadoEm: "desc" }'))
-check("abrir tentativa cria a nova ANTES de substituir a anterior",
-  svc.indexOf("createMany") < svc.indexOf("supersededAt: agora"))
+// A ORDEM CERTA É O CONTRÁRIO do que este teste afirmava. Ver a explicação na INV-24
+// de `baseline-retrocesso-reabertura.test.ts`: com a anterior ainda vigente, é a
+// INSERÇÃO que viola o índice parcial — e `skipDuplicates` a descartava em silêncio.
+check("abrir tentativa substitui a anterior ANTES de inserir a nova",
+  svc.indexOf("supersededAt: agora") < svc.indexOf("createMany") &&
+  svc.includes("supersededPorId: nova.id"))
 check("substituir preserva completedAt da anterior",
   !/supersededAt: agora[\s\S]{0,200}completedAt: null/.test(svc))
 check("registrar NUNCA reescreve completedAt já gravado",
@@ -266,11 +270,52 @@ async function main() {
   check("cada uma responde 'concluída em qual execução?'",
     historico.filter((h) => h.status === "CONCLUIDO").every((h) => h.completedAt != null && h.sequencia > 0))
 
+  // ══════════════════════════════════════════════════════════════════════════════
+  // A REABERTURA ACONTECE DE VERDADE — sob a trava do banco, não só no código.
+  //
+  // A verificação estrutural acima olha a ORDEM das chamadas. Ela não seria capaz de
+  // pegar o defeito que existia: a inserção era descartada em silêncio pelo índice
+  // parcial, e a função devolvia "já existia" com toda a naturalidade. O que pega isso é
+  // contar as linhas depois de reabrir.
+  // ══════════════════════════════════════════════════════════════════════════════
+  {
+  const passoDaProva = await prisma.phaseWorkflowStepInstance.findFirst({
+    where: { chaveIdempotencia: { startsWith: MARCA } }, select: { id: true }, orderBy: { id: "asc" },
+  })
+  if (passoDaProva) {
+    await garantirTentativa(passoDaProva.id, { motivo: MOTIVOS_DE_TENTATIVA.ABERTURA, status: "DISPONIVEL" })
+    const antesDaReabertura = (await tentativasDoPasso(passoDaProva.id)).length
+    const r1 = await abrirTentativa({
+      stepInstanceId: passoDaProva.id, motivo: MOTIVOS_DE_TENTATIVA.REABERTURA_MANUAL, status: "DISPONIVEL",
+    })
+    const depoisDaReabertura = await tentativasDoPasso(passoDaProva.id)
+    check("reabrir CRIA a tentativa nova — e o índice parcial não a engole",
+      r1.criada && depoisDaReabertura.length === antesDaReabertura + 1,
+      `${antesDaReabertura} → ${depoisDaReabertura.length}, criada=${r1.criada}`)
+    check("a anterior ficou substituída, apontando para a sucessora",
+      depoisDaReabertura.filter((t) => t.supersededAt != null).length === antesDaReabertura &&
+      depoisDaReabertura.some((t) => t.supersededPorId === r1.tentativa.id))
+    check("e existe UMA vigente só — a trava do banco continua valendo",
+      depoisDaReabertura.filter((t) => t.supersededAt == null).length === 1)
+    // O RETRY DO MESMO COMANDO não cria a terceira, e não deixa a anterior substituída
+    // por engano: ela volta a ser a vigente se nada foi inserido.
+    const r2 = await abrirTentativa({
+      stepInstanceId: passoDaProva.id, motivo: MOTIVOS_DE_TENTATIVA.REABERTURA_MANUAL, status: "DISPONIVEL",
+      chaveIdempotencia: r1.tentativa.chaveIdempotencia,
+    })
+    check("o retry do mesmo comando devolve a mesma tentativa, sem criar outra",
+      !r2.criada && r2.tentativa.id === r1.tentativa.id &&
+      (await tentativasDoPasso(passoDaProva.id)).length === depoisDaReabertura.length)
+    check("e a vigente continua sendo uma só depois do retry",
+      (await tentativasDoPasso(passoDaProva.id)).filter((t) => t.supersededAt == null).length === 1)
+  }
+  }
+
   await limpar()
   console.log(`\n${falhas.length === 0 ? "✅ PASSOU" : "❌ FALHOU"}: ${ok} ok, ${falhas.length} falhas`)
   if (falhas.length) { for (const f of falhas) console.log(`  · ${f}`) }
   await prisma.$disconnect()
   process.exit(falhas.length ? 1 : 0)
-}
+  }
 
 void main()

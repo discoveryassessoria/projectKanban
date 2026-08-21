@@ -60,14 +60,60 @@ export interface CanalDoPasso {
 /** O que falta para concluir — calculado pelo servidor, com a mesma conta que recusa. */
 export interface PendenciaDaEtapa { key: string; label: string; tipo: string; obrigatorio: boolean; motivo: string }
 
+/**
+ * UMA SUBTAREFA, projetada pelo servidor — com estado, motivo e canais resolvidos.
+ *
+ * `visivel`, `disponivel`, `concluida` e `obrigatoria` são quatro coisas diferentes.
+ * Tratar escondida como cumprida faria o passo concluir sem que ela acontecesse.
+ */
+export interface SubtarefaProjetada {
+  key: string
+  label: string
+  descricao: string | null
+  ordem: number
+  obrigatoria: boolean
+  repetivel: boolean
+  maxOcorrencias: number | null
+  modoExecucao: string
+  slaDays: number | null
+  executorKey: string | null
+  dependeDe: string[]
+  visivel: boolean
+  disponivel: boolean
+  concluida: boolean
+  status: string
+  bloqueioCodigo: string | null
+  bloqueioAlvo: string | null
+  /// O motivo em português, pronto para a tela. Quem o escreve é o servidor.
+  bloqueioTexto: string | null
+  execucao: { id: number; sequencia: number; resultado: string | null; completedAt: string | null } | null
+  ocorrencias: number
+  podeRepetir: boolean
+  canais: Array<{ key: string; label: string; exigeProtocolo: boolean; exigeAnexo: boolean; exigeRastreio: boolean; exigeObservacao: boolean; endereco: string | null }>
+  definicao: {
+    acoes: AcaoConfigurada[]
+    campos: CampoConfigurado[]
+    checkItens: ItemConferencia[]
+    requisitos: Array<{ key: string; label: string; tipo: string }>
+  }
+}
+
 export interface ConfiguracaoDaEtapa {
   versao: number | null
   executor: string | null
   campos: CampoConfigurado[]
   acoes: AcaoConfigurada[]
   checklist: ItemConferencia[]
+  /// De quais passos ESTE depende — é isto que responde "qual é a etapa anterior".
+  dependeDe: string[]
   canais: CanalDoPasso[]
   pendencias: PendenciaDaEtapa[]
+  /// O que acontece DENTRO do passo. Vazio = este passo não tem subtarefa cadastrada.
+  subtarefas: SubtarefaProjetada[]
+  /// O órgão do documento — quem responde quais canais existem para esta etapa.
+  fornecedor: { id: number; nome: string } | null
+  /// O que falta para o PASSO concluir, segundo a regra cadastrada.
+  conclusao: { pode: boolean; regra: string; faltando: Array<{ key: string; label: string; motivo: string }> }
   /** O que já foi preenchido nesta tentativa — o servidor devolve para a tela recarregar cheia. */
   valores: Record<string, unknown>
   /** Execução atual e anteriores — para o executor mostrar "o que houve antes". */
@@ -108,8 +154,12 @@ export function useConfiguracaoDaEtapa(stepInstanceId: number | null) {
           campos: j.configuracao?.campos ?? [],
           acoes: j.configuracao?.acoes ?? [],
           checklist: j.configuracao?.checklist ?? [],
+          dependeDe: j.configuracao?.dependeDe ?? [],
           canais: j.configuracao?.canais ?? [],
           pendencias: j.pendencias ?? [],
+          subtarefas: j.subtarefas ?? [],
+          fornecedor: j.fornecedor ?? null,
+          conclusao: j.conclusao ?? { pode: true, regra: "ACAO_DO_PASSO", faltando: [] },
           valores: j.valores ?? {},
           execucaoAtual: j.execucaoAtual ? { id: j.execucaoAtual.id, sequencia: j.execucaoAtual.sequencia, resultado: j.execucaoAtual.resultado } : null,
           execucoesAnteriores: j.execucoesAnteriores ?? [],
@@ -159,6 +209,8 @@ export function useConfiguracaoDaEtapa(stepInstanceId: number | null) {
   const executarAcao = async (
     acaoKey: string,
     valores: Record<string, unknown>,
+    /// A subtarefa em que a ação acontece. Ausente = a ação é do PASSO.
+    subtarefa?: string | null,
   ): Promise<{ ok: boolean; mensagem?: string; concluiuPasso?: boolean }> => {
     if (!stepInstanceId) return { ok: false, mensagem: "Etapa não identificada." }
     try {
@@ -168,7 +220,8 @@ export function useConfiguracaoDaEtapa(stepInstanceId: number | null) {
         body: JSON.stringify({
           acao: acaoKey,
           valores,
-          correlationId: `acao|si${stepInstanceId}|${acaoKey}|${cfg?.execucaoAtual?.id ?? 0}`,
+          subtarefa: subtarefa ?? null,
+          correlationId: `acao|si${stepInstanceId}|${subtarefa ?? "-"}|${acaoKey}|${cfg?.execucaoAtual?.id ?? 0}`,
         }),
       })
       const j = await r.json()
@@ -184,6 +237,10 @@ export function useConfiguracaoDaEtapa(stepInstanceId: number | null) {
     cfg,
     carregando,
     erro,
+    /** As subtarefas projetadas, já ordenadas e com o motivo do bloqueio pronto. */
+    subtarefas: cfg?.subtarefas ?? [],
+    fornecedor: cfg?.fornecedor ?? null,
+    conclusao: cfg?.conclusao ?? { pode: true, regra: "ACAO_DO_PASSO", faltando: [] },
     /** `true` quando a etapa não tem configuração cadastrada nesta versão. */
     ausente: !carregando && !erro && cfg != null && cfg.acoes.length === 0 && cfg.campos.length === 0,
     opcoesDe,

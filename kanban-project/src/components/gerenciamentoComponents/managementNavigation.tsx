@@ -186,10 +186,6 @@ export const MANAGEMENT_NAVIGATION: ManagementNavigationItem[] = [
     children: [
       a(10, "macrokanban", "Workflow Macro", ["workflow", "macro", "kanban", "fluxo", "sequencia", "sequência", "coluna", "sla"], "Fluxos"),
       a(20, "phaseiwf", "Workflow Interno", ["workflow", "interno", "passo", "fluxo", "tarefa"], "Fluxos"),
-      // OS CANAIS SAÍRAM DO CÓDIGO. Ficam sob Workflow porque é o que os consome: um
-      // campo de passo aponta para este cadastro em vez de repetir a lista.
-      a(25, "canais", "Canais de solicitação", ["canal", "canais", "crc", "cartorio", "cartório", "email", "e-mail", "whatsapp", "balcao", "balcão", "correios", "consulado", "solicitacao", "solicitação"], "Fluxos"),
-
 
       a(30, "transicoes", "Transições", ["transicao", "transição", "caminho", "entrada", "avanco", "avanço", "regra"]),
 
@@ -307,6 +303,15 @@ export const MANAGEMENT_NAVIGATION: ManagementNavigationItem[] = [
     children: [
       a(10, "organs", "Cartórios e Órgãos", ["cartorio", "cartório", "orgao", "órgão", "consulado", "tribunal", "prefeitura", "comune", "protocolo", "organizacao", "organização"], "Organizações"),
       a(20, "suppliers", "Fornecedores", ["fornecedor", "parceiro", "tradutor", "advogado", "escritorio", "banco", "empresa", "organizacao"], "Organizações"),
+      // OS CANAIS SÃO DA ORGANIZAÇÃO, não do workflow.
+      //
+      // Eles ficavam sob Workflow → "Canais de solicitação", como cadastro estrutural
+      // próprio, e cada passo declarava quais oferecia. Só que "por onde dá para
+      // pedir" é fato do CARTÓRIO: um que só atende no balcão aparecia com CRC e
+      // e-mail porque o passo dizia que sim. O vocabulário de tipos continua sendo
+      // domínio; a DISPONIBILIDADE passou a ser de quem atende, e o workflow apenas
+      // referencia "os canais do fornecedor relacionado".
+      a(25, "canais", "Canais de atendimento", ["canal", "canais", "crc", "cartorio", "cartório", "email", "e-mail", "whatsapp", "balcao", "balcão", "correios", "consulado", "solicitacao", "solicitação", "atendimento", "fornecedor"], "Organizações"),
       a(30, "orgcats", "Categorias", ["categoria", "tipo", "orgao", "organizacao"]),
     ],
   },

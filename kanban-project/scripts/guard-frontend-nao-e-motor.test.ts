@@ -210,8 +210,13 @@ check("o PUT não congela versão por conta própria", !rotaAdmin.includes("cong
 // mostraria nenhum canal marcado — e salvar apagaria os que estavam lá. O defeito é
 // silencioso: some configuração sem erro nenhum na tela.
 const modalCfg = semComentarios(ler("src/components/gerenciamentoComponents/ConfiguracaoDoPassoModal.tsx"))
-check("o editor normaliza o canal aninhado para a chave ao abrir",
-  /canalKey:\s*c\.canalKey\s*\?\?[\s\S]{0,120}canal\?\.key/.test(modalCfg))
+// O EDITOR NÃO EDITA MAIS CANAL DO PASSO — os canais são do fornecedor. O que ele
+// precisa garantir é que os canais LEGADOS, publicados antes desta mudança, atravessem
+// o salvamento sem se perder. Ele os carrega em `f` e os devolve intactos; quem aceita
+// as duas formas é a rota, cobrada logo abaixo.
+check("o editor preserva os canais legados do passo em vez de descartá-los",
+  modalCfg.includes("canais?: Array<{ canalKey?: string; canal?: { key: string; label?: string }"),
+  "descartá-los faria o primeiro save apagar a configuração de canal já publicada")
 check("e a rota aceita as duas formas ao gravar",
   /canalKey:\s*String\(c\?\.canalKey\s*\?\?\s*c\?\.canal\?\.key/.test(rotaAdmin))
 
@@ -221,6 +226,90 @@ for (const colecao of ["acoes", "campos", "checkItens", "canais", "requisitos"])
   check(`o salvamento regrava "${colecao}"`, rotaAdmin.includes(`filhos.${colecao}`) || rotaAdmin.includes(`s?.${colecao}`))
 }
 check("e regrava as opções do campo", rotaAdmin.includes("filhos.opcoesPorCampo"))
+
+// ════════════════════════════════════════════════════════════════
+console.log("\n(7) A subtarefa é cadastro — nunca invenção do executor")
+// ════════════════════════════════════════════════════════════════
+//
+// A regra que dá nome a esta seção: se para criar uma subtarefa de negócio for preciso
+// escrever código, a arquitetura voltou ao ponto de partida. Estas verificações cobram
+// o caminho de volta em cada uma das formas que ele já teve.
+
+// 7.1 — NENHUM EXECUTOR RAMIFICA POR CHAVE DE PASSO OU DE FASE. Era assim que
+// "solicitar_certidao mostra estas três coisas" existia: um `if` sobre o nome.
+const CHAVES_DE_NEGOCIO = [
+  "solicitar_certidao", "receber_certidao", "conferir_certidao", "validar_certidao",
+  "aguardar_retorno_do_cartorio", "localizar_registro", "registrar_divergencias",
+]
+for (const f of EXECUTORES) {
+  const t = semComentarios(ler(f))
+  if (!t) continue
+  const ramifica = CHAVES_DE_NEGOCIO.filter((k) =>
+    new RegExp(`(===|!==|includes\\(|case\\s+)\\s*["'\`]${k}["'\`]`).test(t))
+  check(`${f.split("/").pop()} não ramifica por chave de passo de negócio`,
+    ramifica.length === 0, ramifica.join(", "))
+  check(`${f.split("/").pop()} não ramifica por phaseKey`,
+    !/(phaseKey|faseMacroKey)\s*(===|!==)\s*["'\`]/.test(t),
+    "regra de negócio por fase é exatamente o que o motor universal desfaz")
+}
+
+// 7.2 — O PAINEL GENÉRICO CONSOME A PROJEÇÃO, não recalcula estado. Quem sabe por que
+// uma subtarefa está bloqueada é quem tem o grafo — o servidor.
+const painel = semComentarios(ler("src/components/kanban/workflow/PainelDeclarativoDaEtapa.tsx"))
+check("o painel desenha as subtarefas que o servidor projetou", painel.includes("d.subtarefas"))
+check("e mostra o motivo do bloqueio que veio pronto", painel.includes("st.bloqueioTexto"))
+check("a tela não decide dependência de subtarefa por conta própria",
+  !/dependeDe[\s\S]{0,80}(every|some|filter)\(/.test(painel),
+  "o grafo é resolvido no servidor; recalcular aqui daria uma segunda resposta")
+check("executar manda QUAL subtarefa — sem isso o servidor procuraria a ação no passo",
+  painel.includes("subtarefa: subtarefa ?? null"))
+
+// 7.3 — OS CANAIS VÊM DO FORNECEDOR. O workflow não tem mais cadastro próprio deles.
+const resolvedor = semComentarios(ler("src/lib/motor/canais-do-fornecedor.ts"))
+check("existe um resolvedor de canais por organização", resolvedor.includes("export async function canaisDaOrganizacao"))
+check("a restrição por tipo é INTERSEÇÃO, nunca acréscimo",
+  resolvedor.includes("doFornecedor.filter((c) => permitidos.has(c.key))"),
+  "o passo pode proibir um canal que o fornecedor atende; não pode habilitar um que ele não atende")
+check("a exigência da organização SÓ ACRESCENTA à do tipo",
+  /exigeProtocolo:\s*l\.exigeProtocolo === true \|\| l\.canal\.protocoloObrigatorio/.test(resolvedor))
+check("sem fornecedor, a lista é VAZIA — não é a lista global",
+  /if \(!args\.fornecedorId\) return \[\]/.test(resolvedor))
+
+// 7.4 — A PORTA RESOLVE A AÇÃO NO ESCOPO CERTO. Procurar no passo uma ação que é da
+// subtarefa encontraria uma homônima e executaria outra coisa.
+const porta7 = semComentarios(ler("src/services/executar-acao-cadastrada.ts"))
+check("a porta procura a ação nas ações da subtarefa quando há subtarefa",
+  porta7.includes("const acoesDisponiveis = subtarefa ? subtarefa.acoes : hist.passo.acoes"))
+check("recusa executar subtarefa indisponível", porta7.includes("SUBTAREFA_INDISPONIVEL"))
+check("recusa repetir subtarefa que não é repetível", porta7.includes("SUBTAREFA_JA_CONCLUIDA"))
+check("e respeita a regra de conclusão cadastrada do passo", porta7.includes("SUBTAREFAS_PENDENTES"))
+check("o fornecedor é resolvido no SERVIDOR, não aceito do cliente",
+  semComentarios(ler("src/app/api/workflow-step-instances/[id]/execucao/route.ts"))
+    .includes("alvo?.documento?.orgaoId ?? null"))
+
+// 7.5 — A EXECUÇÃO DA SUBTAREFA É APPEND-ONLY, como a do passo.
+const execSub = semComentarios(ler("src/services/execucao-da-subtarefa.ts"))
+check("reabrir SUBSTITUI a execução vigente em vez de desconcluir",
+  execSub.includes("supersededAt: agora, supersededPorId: nova.id"))
+check("a vigente é a que não foi substituída", execSub.includes("supersededAt: null"))
+check("bloqueio nasce com causa nomeada", execSub.includes("CAUSAS_DE_BLOQUEIO"))
+check("cancelada e invalidada NÃO contam como cumpridas",
+  semComentarios(ler("src/services/subtarefas-da-etapa.ts")).includes('porChave.get(d.key)?.status === ESTADOS_DA_SUBTAREFA.CONCLUIDO'),
+  "liberar dependente por causa de uma subtarefa cancelada seria dar por feito o que não foi feito")
+
+// 7.6 — O MENU NÃO TEM MAIS CADASTRO DE CANAL DENTRO DO WORKFLOW.
+const nav = semComentarios(ler("src/components/gerenciamentoComponents/managementNavigation.tsx"))
+const blocoWorkflow = nav.slice(nav.indexOf("grp_workflow"), nav.indexOf("grp_workflow") + 1800)
+check("Workflow não tem mais cadastro de canais", !blocoWorkflow.includes('"canais"'),
+  "canal é da organização; o workflow apenas referencia os do fornecedor")
+
+// 7.7 — O EDITOR É O MESMO PARA PASSO E SUBTAREFA.
+const modal7 = semComentarios(ler("src/components/gerenciamentoComponents/ConfiguracaoDoPassoModal.tsx"))
+check("o editor de peças é compartilhado entre passo e subtarefa",
+  (modal7.match(/<EditorDePecasDoPasso/g) ?? []).length >= 2,
+  "dois editores fariam a subtarefa oferecer menos que o passo, sem razão")
+check("o editor tem a aba de subtarefas", modal7.includes('"subtarefas"'))
+check("e a de evidências", modal7.includes('"evidencias"'))
 
 console.log(`\n${falhas.length === 0 ? "✅ PASSOU" : "❌ FALHOU"}: ${ok} ok, ${falhas.length} falhas`)
 if (falhas.length) { for (const f of falhas) console.log(`  · ${f}`); process.exit(1) }

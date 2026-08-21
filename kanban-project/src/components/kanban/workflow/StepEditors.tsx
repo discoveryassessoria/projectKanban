@@ -3107,8 +3107,24 @@ interface ConferenciaSnapshot {
 /** Casca: carrega, e monta o formulário com a semente já em mãos. */
 export function EditorValidarCertidao(props: StepEditorBaseProps) {
   const { doc, etapa, etapas, carregando } = useDocumentoEEtapa(props.isOpen ? props.documentoId : null, props.stepId)
-  // A conferência (etapa anterior) é contexto de decisão desta tela.
-  const conferenciaEtapa = etapas.find((s) => s.stepKey === "conferir_certidao") ?? null
+  const { cfg: cfgDoPasso } = useConfiguracaoDaEtapa(props.isOpen ? props.stepId : null)
+  // A ETAPA ANTERIOR VEM DA DEPENDÊNCIA DECLARADA, não do nome dela.
+  //
+  // Aqui estava `etapas.find((s) => s.stepKey === "conferir_certidao")`: o executor
+  // sabia, em código, qual passo o precede. Isso quebra no dia em que o administrador
+  // renomeia o passo, cria um fluxo sem ele, ou monta uma validação que se apoia em
+  // outra conferência. A dependência declarada é a resposta certa — e é a mesma que o
+  // motor usa para liberar e para reabrir.
+  const dependencias = cfgDoPasso?.dependeDe ?? []
+  const ordemDe = (s: EtapaCarregada) => Number(s.ordem ?? 0)
+  const conferenciaEtapa =
+    etapas.find((s) => dependencias.includes(String(s.stepKey ?? ""))) ??
+    // Sem dependência declarada (configuração anterior ao grafo), o contexto é a etapa
+    // CONCLUÍDA imediatamente anterior na ordem — que é o que a ordem sabe dizer.
+    [...etapas]
+      .filter((s) => String(s.status ?? "") === "concluida" && ordemDe(s) < ordemDe(etapa ?? ({} as EtapaCarregada)))
+      .sort((a, b) => ordemDe(b) - ordemDe(a))[0] ??
+    null
   if (!props.isOpen) return null
   return (
     <FormValidarCertidao

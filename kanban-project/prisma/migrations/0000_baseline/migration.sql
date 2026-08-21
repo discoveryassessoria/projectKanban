@@ -373,6 +373,7 @@ CREATE TABLE "Documento" (
     "status" "StatusDocumento" NOT NULL DEFAULT 'PENDENTE',
     "descricao" VARCHAR(200),
     "cartorio" VARCHAR(200),
+    "orgaoId" INTEGER,
     "livro" VARCHAR(20),
     "folha" VARCHAR(20),
     "termo" VARCHAR(30),
@@ -2415,8 +2416,43 @@ CREATE TABLE "PhaseInternalWorkflowStep" (
     "reaberturaEstrategia" VARCHAR(24) NOT NULL DEFAULT 'ESCOLHA_MANUAL',
     "reaberturaExigeJustificativa" BOOLEAN NOT NULL DEFAULT true,
     "reaberturaPermissao" VARCHAR(60),
+    "regraDeConclusao" VARCHAR(40) NOT NULL DEFAULT 'ACAO_DO_PASSO',
 
     CONSTRAINT "PhaseInternalWorkflowStep_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "StepSubtaskDefinition" (
+    "id" SERIAL NOT NULL,
+    "stepId" INTEGER NOT NULL,
+    "key" VARCHAR(60) NOT NULL,
+    "label" VARCHAR(200) NOT NULL,
+    "descricao" TEXT,
+    "ordem" INTEGER NOT NULL DEFAULT 0,
+    "ativo" BOOLEAN NOT NULL DEFAULT true,
+    "obrigatoria" BOOLEAN NOT NULL DEFAULT true,
+    "repetivel" BOOLEAN NOT NULL DEFAULT false,
+    "maxOcorrencias" INTEGER,
+    "modoExecucao" VARCHAR(20) NOT NULL DEFAULT 'MANUAL',
+    "responsavelRegra" VARCHAR(20) NOT NULL DEFAULT 'HERDA',
+    "responsavelId" INTEGER,
+    "slaDays" INTEGER,
+    "condicaoEntrada" JSONB,
+    "condicaoConclusao" JSONB,
+    "condicaoVisibilidade" JSONB,
+    "dependeDe" JSONB,
+    "executorKey" VARCHAR(40),
+    "cardinalidade" VARCHAR(20),
+    "fonteDeCanais" VARCHAR(30) NOT NULL DEFAULT 'NENHUMA',
+    "tiposDeCanal" JSONB,
+    "reaberturaPermitida" BOOLEAN,
+    "reaberturaExigeJustificativa" BOOLEAN,
+    "reaberturaPermissao" VARCHAR(60),
+    "metadata" JSONB,
+    "criadoEm" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "atualizadoEm" TIMESTAMP(3) NOT NULL,
+
+    CONSTRAINT "StepSubtaskDefinition_pkey" PRIMARY KEY ("id")
 );
 
 -- CreateTable
@@ -2435,6 +2471,7 @@ CREATE TABLE "StepAction" (
     "ativo" BOOLEAN NOT NULL DEFAULT true,
     "criadoEm" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "atualizadoEm" TIMESTAMP(3) NOT NULL,
+    "subtaskId" INTEGER,
 
     CONSTRAINT "StepAction_pkey" PRIMARY KEY ("id")
 );
@@ -2454,6 +2491,7 @@ CREATE TABLE "StepField" (
     "ativo" BOOLEAN NOT NULL DEFAULT true,
     "criadoEm" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "atualizadoEm" TIMESTAMP(3) NOT NULL,
+    "subtaskId" INTEGER,
 
     CONSTRAINT "StepField_pkey" PRIMARY KEY ("id")
 );
@@ -2507,10 +2545,14 @@ CREATE TABLE "StepRequirement" (
     "obrigatorio" BOOLEAN NOT NULL DEFAULT true,
     "condicao" JSONB,
     "acaoKey" VARCHAR(60),
+    "evidenciaTipoId" INTEGER,
+    "mimesPermitidos" JSONB,
+    "momento" VARCHAR(24) NOT NULL DEFAULT 'AO_CONCLUIR',
     "ordem" INTEGER NOT NULL DEFAULT 0,
     "ativo" BOOLEAN NOT NULL DEFAULT true,
     "criadoEm" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "atualizadoEm" TIMESTAMP(3) NOT NULL,
+    "subtaskId" INTEGER,
 
     CONSTRAINT "StepRequirement_pkey" PRIMARY KEY ("id")
 );
@@ -2527,8 +2569,29 @@ CREATE TABLE "StepChecklistItem" (
     "ativo" BOOLEAN NOT NULL DEFAULT true,
     "criadoEm" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "atualizadoEm" TIMESTAMP(3) NOT NULL,
+    "subtaskId" INTEGER,
 
     CONSTRAINT "StepChecklistItem_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "OrganizacaoCanal" (
+    "id" SERIAL NOT NULL,
+    "organizacaoId" INTEGER NOT NULL,
+    "canalId" INTEGER NOT NULL,
+    "ativo" BOOLEAN NOT NULL DEFAULT true,
+    "ordem" INTEGER NOT NULL DEFAULT 0,
+    "exigeProtocolo" BOOLEAN,
+    "exigeAnexo" BOOLEAN,
+    "exigeRastreio" BOOLEAN,
+    "exigeObservacao" BOOLEAN,
+    "endereco" VARCHAR(300),
+    "prazoDias" INTEGER,
+    "observacao" TEXT,
+    "criadoEm" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "atualizadoEm" TIMESTAMP(3) NOT NULL,
+
+    CONSTRAINT "OrganizacaoCanal_pkey" PRIMARY KEY ("id")
 );
 
 -- CreateTable
@@ -2997,6 +3060,39 @@ CREATE TABLE "StepExecution" (
     "criadoEm" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
     CONSTRAINT "StepExecution_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "SubtaskExecution" (
+    "id" SERIAL NOT NULL,
+    "stepInstanceId" INTEGER NOT NULL,
+    "subtaskKey" VARCHAR(60) NOT NULL,
+    "subtaskDefinitionId" INTEGER,
+    "workflowVersao" INTEGER,
+    "sequencia" INTEGER NOT NULL,
+    "status" VARCHAR(24) NOT NULL,
+    "motivo" VARCHAR(30) NOT NULL,
+    "bloqueioCodigo" VARCHAR(40),
+    "bloqueioAlvo" VARCHAR(120),
+    "startedAt" TIMESTAMP(3),
+    "completedAt" TIMESTAMP(3),
+    "executadoPorId" INTEGER,
+    "responsavelId" INTEGER,
+    "prazo" TIMESTAMP(3),
+    "resultado" VARCHAR(60),
+    "payload" JSONB,
+    "fornecedorId" INTEGER,
+    "canalKey" VARCHAR(40),
+    "protocolo" VARCHAR(120),
+    "enviadoEm" TIMESTAMP(3),
+    "previstoPara" TIMESTAMP(3),
+    "supersededAt" TIMESTAMP(3),
+    "supersededPorId" INTEGER,
+    "correlationId" VARCHAR(60),
+    "chaveIdempotencia" VARCHAR(200) NOT NULL,
+    "criadoEm" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT "SubtaskExecution_pkey" PRIMARY KEY ("id")
 );
 
 -- CreateTable
@@ -5299,16 +5395,16 @@ CREATE UNIQUE INDEX "PhaseInternalWorkflowVersao_workflowId_versao_key" ON "Phas
 CREATE UNIQUE INDEX "PhaseInternalWorkflowStep_workflowId_key_key" ON "PhaseInternalWorkflowStep"("workflowId", "key");
 
 -- CreateIndex
+CREATE INDEX "StepSubtaskDefinition_stepId_idx" ON "StepSubtaskDefinition"("stepId");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "StepSubtaskDefinition_stepId_key_key" ON "StepSubtaskDefinition"("stepId", "key");
+
+-- CreateIndex
 CREATE INDEX "StepAction_stepId_idx" ON "StepAction"("stepId");
 
 -- CreateIndex
-CREATE UNIQUE INDEX "StepAction_stepId_key_key" ON "StepAction"("stepId", "key");
-
--- CreateIndex
 CREATE INDEX "StepField_stepId_idx" ON "StepField"("stepId");
-
--- CreateIndex
-CREATE UNIQUE INDEX "StepField_stepId_key_key" ON "StepField"("stepId", "key");
 
 -- CreateIndex
 CREATE INDEX "StepFieldOption_fieldId_idx" ON "StepFieldOption"("fieldId");
@@ -5329,13 +5425,16 @@ CREATE UNIQUE INDEX "StepChannel_stepId_canalId_key" ON "StepChannel"("stepId", 
 CREATE INDEX "StepRequirement_stepId_idx" ON "StepRequirement"("stepId");
 
 -- CreateIndex
-CREATE UNIQUE INDEX "StepRequirement_stepId_key_key" ON "StepRequirement"("stepId", "key");
-
--- CreateIndex
 CREATE INDEX "StepChecklistItem_stepId_idx" ON "StepChecklistItem"("stepId");
 
 -- CreateIndex
-CREATE UNIQUE INDEX "StepChecklistItem_stepId_key_key" ON "StepChecklistItem"("stepId", "key");
+CREATE INDEX "OrganizacaoCanal_organizacaoId_idx" ON "OrganizacaoCanal"("organizacaoId");
+
+-- CreateIndex
+CREATE INDEX "OrganizacaoCanal_canalId_idx" ON "OrganizacaoCanal"("canalId");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "OrganizacaoCanal_organizacaoId_canalId_key" ON "OrganizacaoCanal"("organizacaoId", "canalId");
 
 -- CreateIndex
 CREATE UNIQUE INDEX "CanalOperacional_key_key" ON "CanalOperacional"("key");
@@ -5534,6 +5633,18 @@ CREATE INDEX "StepExecution_stepInstanceId_idx" ON "StepExecution"("stepInstance
 
 -- CreateIndex
 CREATE UNIQUE INDEX "StepExecution_stepInstanceId_sequencia_key" ON "StepExecution"("stepInstanceId", "sequencia");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "SubtaskExecution_chaveIdempotencia_key" ON "SubtaskExecution"("chaveIdempotencia");
+
+-- CreateIndex
+CREATE INDEX "SubtaskExecution_stepInstanceId_idx" ON "SubtaskExecution"("stepInstanceId");
+
+-- CreateIndex
+CREATE INDEX "SubtaskExecution_subtaskKey_idx" ON "SubtaskExecution"("subtaskKey");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "SubtaskExecution_stepInstanceId_subtaskKey_sequencia_key" ON "SubtaskExecution"("stepInstanceId", "subtaskKey", "sequencia");
 
 -- CreateIndex
 CREATE UNIQUE INDEX "PhaseWorkflowStepInstance_chaveIdempotencia_key" ON "PhaseWorkflowStepInstance"("chaveIdempotencia");
@@ -6217,6 +6328,9 @@ ALTER TABLE "Arvore" ADD CONSTRAINT "Arvore_pessoaPrincipalId_fkey" FOREIGN KEY 
 ALTER TABLE "Arvore" ADD CONSTRAINT "Arvore_familiaId_fkey" FOREIGN KEY ("familiaId") REFERENCES "Familia"("id") ON DELETE SET NULL ON UPDATE CASCADE;
 
 -- AddForeignKey
+ALTER TABLE "Documento" ADD CONSTRAINT "Documento_orgaoId_fkey" FOREIGN KEY ("orgaoId") REFERENCES "OrgaoProtocolo"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
 ALTER TABLE "Documento" ADD CONSTRAINT "Documento_pessoaId_fkey" FOREIGN KEY ("pessoaId") REFERENCES "Pessoa"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
@@ -6661,10 +6775,19 @@ ALTER TABLE "PhaseInternalWorkflowVersao" ADD CONSTRAINT "PhaseInternalWorkflowV
 ALTER TABLE "PhaseInternalWorkflowStep" ADD CONSTRAINT "PhaseInternalWorkflowStep_workflowId_fkey" FOREIGN KEY ("workflowId") REFERENCES "PhaseInternalWorkflow"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
+ALTER TABLE "StepSubtaskDefinition" ADD CONSTRAINT "StepSubtaskDefinition_stepId_fkey" FOREIGN KEY ("stepId") REFERENCES "PhaseInternalWorkflowStep"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
 ALTER TABLE "StepAction" ADD CONSTRAINT "StepAction_stepId_fkey" FOREIGN KEY ("stepId") REFERENCES "PhaseInternalWorkflowStep"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
+ALTER TABLE "StepAction" ADD CONSTRAINT "StepAction_subtaskId_fkey" FOREIGN KEY ("subtaskId") REFERENCES "StepSubtaskDefinition"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
 ALTER TABLE "StepField" ADD CONSTRAINT "StepField_stepId_fkey" FOREIGN KEY ("stepId") REFERENCES "PhaseInternalWorkflowStep"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "StepField" ADD CONSTRAINT "StepField_subtaskId_fkey" FOREIGN KEY ("subtaskId") REFERENCES "StepSubtaskDefinition"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "StepFieldOption" ADD CONSTRAINT "StepFieldOption_fieldId_fkey" FOREIGN KEY ("fieldId") REFERENCES "StepField"("id") ON DELETE CASCADE ON UPDATE CASCADE;
@@ -6679,7 +6802,22 @@ ALTER TABLE "StepChannel" ADD CONSTRAINT "StepChannel_canalId_fkey" FOREIGN KEY 
 ALTER TABLE "StepRequirement" ADD CONSTRAINT "StepRequirement_stepId_fkey" FOREIGN KEY ("stepId") REFERENCES "PhaseInternalWorkflowStep"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
+ALTER TABLE "StepRequirement" ADD CONSTRAINT "StepRequirement_evidenciaTipoId_fkey" FOREIGN KEY ("evidenciaTipoId") REFERENCES "TipoDocumentoCadastro"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "StepRequirement" ADD CONSTRAINT "StepRequirement_subtaskId_fkey" FOREIGN KEY ("subtaskId") REFERENCES "StepSubtaskDefinition"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
 ALTER TABLE "StepChecklistItem" ADD CONSTRAINT "StepChecklistItem_stepId_fkey" FOREIGN KEY ("stepId") REFERENCES "PhaseInternalWorkflowStep"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "StepChecklistItem" ADD CONSTRAINT "StepChecklistItem_subtaskId_fkey" FOREIGN KEY ("subtaskId") REFERENCES "StepSubtaskDefinition"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "OrganizacaoCanal" ADD CONSTRAINT "OrganizacaoCanal_organizacaoId_fkey" FOREIGN KEY ("organizacaoId") REFERENCES "OrgaoProtocolo"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "OrganizacaoCanal" ADD CONSTRAINT "OrganizacaoCanal_canalId_fkey" FOREIGN KEY ("canalId") REFERENCES "CanalOperacional"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "TipoDocumentoCadastro" ADD CONSTRAINT "TipoDocumentoCadastro_itemCatalogoId_fkey" FOREIGN KEY ("itemCatalogoId") REFERENCES "ItemCatalogo"("id") ON DELETE SET NULL ON UPDATE CASCADE;
@@ -6749,6 +6887,12 @@ ALTER TABLE "PhaseWorkflowInstance" ADD CONSTRAINT "PhaseWorkflowInstance_criado
 
 -- AddForeignKey
 ALTER TABLE "StepExecution" ADD CONSTRAINT "StepExecution_stepInstanceId_fkey" FOREIGN KEY ("stepInstanceId") REFERENCES "PhaseWorkflowStepInstance"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "SubtaskExecution" ADD CONSTRAINT "SubtaskExecution_stepInstanceId_fkey" FOREIGN KEY ("stepInstanceId") REFERENCES "PhaseWorkflowStepInstance"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "SubtaskExecution" ADD CONSTRAINT "SubtaskExecution_fornecedorId_fkey" FOREIGN KEY ("fornecedorId") REFERENCES "OrgaoProtocolo"("id") ON DELETE SET NULL ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "PhaseWorkflowStepInstance" ADD CONSTRAINT "PhaseWorkflowStepInstance_workflowInstanceId_fkey" FOREIGN KEY ("workflowInstanceId") REFERENCES "PhaseWorkflowInstance"("id") ON DELETE CASCADE ON UPDATE CASCADE;

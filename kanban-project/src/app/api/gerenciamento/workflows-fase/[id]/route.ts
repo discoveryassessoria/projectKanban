@@ -38,6 +38,11 @@ function buildSteps(raw: any[], workflowId: number) {
         ? String(s.cardinalidade)
         : null,
       completionRule: s?.completionRule ? String(s.completionRule) : null,
+      // REGRA DE CONCLUSÃO em vocabulário fechado. Fora dele, vale o que sempre valeu:
+      // quem conclui é a ação do passo.
+      regraDeConclusao: ['ACAO_DO_PASSO', 'TODAS_SUBTAREFAS_OBRIGATORIAS', 'QUALQUER_SUBTAREFA'].includes(String(s?.regraDeConclusao))
+        ? String(s.regraDeConclusao)
+        : 'ACAO_DO_PASSO',
       checklist: (s?.checklist == null ? undefined : s.checklist) as Prisma.InputJsonValue | undefined,
       // DEPENDÊNCIA DECLARADA. `undefined` (campo ausente no corpo) = não declarada, e
       // o modo de execução continua respondendo. Array vazio é uma DECLARAÇÃO: "este
@@ -59,12 +64,18 @@ function buildSteps(raw: any[], workflowId: number) {
   })
 }
 
-/** Filhos cadastrados de um passo: ações, campos e checklist. */
-function buildFilhos(s: any, stepId: number) {
+/**
+ * AS PEÇAS COMUNS — ação, campo, opção, checklist e requisito.
+ *
+ * São as mesmas no passo e na subtarefa; o que muda é a quem pertencem. Uma subtarefa
+ * NÃO tem subtarefa (não é um segundo motor escondido) nem canal próprio (os canais
+ * vêm do fornecedor), e por isso esta função para aqui em vez de se chamar de novo.
+ */
+function buildFilhosSimples(s: any) {
   const lista = (v: unknown) => (Array.isArray(v) ? v : [])
   return {
     acoes: lista(s?.acoes).map((a: any, i: number) => ({
-      stepId, key: slug(String(a?.key || a?.label || `acao_${i + 1}`)),
+      key: slug(String(a?.key || a?.label || `acao_${i + 1}`)),
       label: String(a?.label || 'Ação'), descricao: a?.descricao ? String(a.descricao) : null,
       ordem: Number(a?.ordem) || i + 1, effectKey: String(a?.effectKey || 'REGISTER_ONLY'),
       requerCampos: (Array.isArray(a?.requerCampos) ? a.requerCampos.filter((x: unknown) => typeof x === 'string') : undefined) as Prisma.InputJsonValue | undefined,
@@ -74,7 +85,7 @@ function buildFilhos(s: any, stepId: number) {
       ativo: a?.ativo !== false,
     })),
     campos: lista(s?.campos).map((c: any, i: number) => ({
-      stepId, key: slug(String(c?.key || c?.label || `campo_${i + 1}`)),
+      key: slug(String(c?.key || c?.label || `campo_${i + 1}`)),
       label: String(c?.label || 'Campo'), tipo: String(c?.tipo || 'texto'),
       obrigatorio: !!c?.obrigatorio,
       opcoes: (c?.opcoes ?? undefined) as Prisma.InputJsonValue | undefined,
@@ -93,20 +104,11 @@ function buildFilhos(s: any, stepId: number) {
         condicao: (o?.condicao ?? undefined) as Prisma.InputJsonValue | undefined,
       })),
     })),
-    canais: lista(s?.canais).map((c: any, i: number) => ({
-      // Aceita as duas formas que a tela pode mandar: a chave direta ou o canal
-      // aninhado, que é como a leitura devolve.
-      canalKey: String(c?.canalKey ?? c?.canal?.key ?? c?.key ?? ''),
-      ordem: Number(c?.ordem) || i + 1,
-      ativo: c?.ativo !== false,
-      // `null` = herda o requisito do catálogo; `true`/`false` = o passo decide.
-      exigeProtocolo: typeof c?.exigeProtocolo === 'boolean' ? c.exigeProtocolo : null,
-      exigeAnexo: typeof c?.exigeAnexo === 'boolean' ? c.exigeAnexo : null,
-      exigeRastreio: typeof c?.exigeRastreio === 'boolean' ? c.exigeRastreio : null,
-      exigeObservacao: typeof c?.exigeObservacao === 'boolean' ? c.exigeObservacao : null,
-      camposObrigatorios: (Array.isArray(c?.camposObrigatorios)
-        ? c.camposObrigatorios.filter((x: unknown) => typeof x === 'string') : undefined) as Prisma.InputJsonValue | undefined,
-      condicao: (c?.condicao ?? undefined) as Prisma.InputJsonValue | undefined,
+    checkItens: lista(s?.checkItens).map((k: any, i: number) => ({
+      key: slug(String(k?.key || k?.label || `item_${i + 1}`)),
+      label: String(k?.label || 'Item'), descricao: k?.descricao ? String(k.descricao) : null,
+      obrigatorio: k?.obrigatorio !== false, ordem: Number(k?.ordem) || i + 1,
+      ativo: k?.ativo !== false,
     })),
     requisitos: lista(s?.requisitos).map((r: any, i: number) => ({
       key: slug(String(r?.key || r?.label || `requisito_${i + 1}`)),
@@ -119,14 +121,84 @@ function buildFilhos(s: any, stepId: number) {
       obrigatorio: r?.obrigatorio !== false,
       condicao: (r?.condicao ?? undefined) as Prisma.InputJsonValue | undefined,
       acaoKey: r?.acaoKey ? String(r.acaoKey) : null,
+      evidenciaTipoId: Number(r?.evidenciaTipoId) > 0 ? Number(r.evidenciaTipoId) : null,
+      mimesPermitidos: (Array.isArray(r?.mimesPermitidos)
+        ? r.mimesPermitidos.filter((x: unknown) => typeof x === 'string')
+        : undefined) as Prisma.InputJsonValue | undefined,
+      momento: ['AO_CONCLUIR', 'AO_EXECUTAR_ACAO', 'SEMPRE'].includes(String(r?.momento)) ? String(r.momento) : 'AO_CONCLUIR',
       ordem: Number(r?.ordem) || i + 1,
       ativo: r?.ativo !== false,
     })),
-    checkItens: lista(s?.checkItens).map((k: any, i: number) => ({
-      stepId, key: slug(String(k?.key || k?.label || `item_${i + 1}`)),
-      label: String(k?.label || 'Item'), descricao: k?.descricao ? String(k.descricao) : null,
-      obrigatorio: k?.obrigatorio !== false, ordem: Number(k?.ordem) || i + 1,
-      ativo: k?.ativo !== false,
+  }
+}
+
+/**
+ * Filhos cadastrados de um passo: as peças comuns, mais o que só o PASSO tem —
+ * os canais herdados (legado) e as subtarefas.
+ */
+function buildFilhos(s: any, stepId: number) {
+  const lista = (v: unknown) => (Array.isArray(v) ? v : [])
+  const comuns = buildFilhosSimples(s)
+  return {
+    // As peças comuns já vêm prontas; o `stepId` entra aqui porque só o passo o tem.
+    acoes: comuns.acoes.map((a) => ({ ...a, stepId })),
+    campos: comuns.campos.map((c) => ({ ...c, stepId })),
+    checkItens: comuns.checkItens.map((k) => ({ ...k, stepId })),
+    opcoesPorCampo: comuns.opcoesPorCampo,
+    requisitos: comuns.requisitos,
+    // CANAIS DO PASSO — legado. Os canais passaram a ser do FORNECEDOR; o que sobra
+    // aqui é o que já estava publicado, que continua sendo lido para não reinterpretar
+    // execução antiga. Configuração nova declara a fonte na SUBTAREFA.
+    canais: lista(s?.canais).map((c: any, i: number) => ({
+      canalKey: String(c?.canalKey ?? c?.canal?.key ?? c?.key ?? ''),
+      ordem: Number(c?.ordem) || i + 1,
+      ativo: c?.ativo !== false,
+      exigeProtocolo: typeof c?.exigeProtocolo === 'boolean' ? c.exigeProtocolo : null,
+      exigeAnexo: typeof c?.exigeAnexo === 'boolean' ? c.exigeAnexo : null,
+      exigeRastreio: typeof c?.exigeRastreio === 'boolean' ? c.exigeRastreio : null,
+      exigeObservacao: typeof c?.exigeObservacao === 'boolean' ? c.exigeObservacao : null,
+      camposObrigatorios: (Array.isArray(c?.camposObrigatorios)
+        ? c.camposObrigatorios.filter((x: unknown) => typeof x === 'string') : undefined) as Prisma.InputJsonValue | undefined,
+      condicao: (c?.condicao ?? undefined) as Prisma.InputJsonValue | undefined,
+    })),
+    // ── AS SUBTAREFAS, com os filhos DELAS ────────────────────────────────
+    //
+    // Gravadas depois do passo (precisam do id dele) e antes dos filhos delas (que
+    // precisam do id delas). O corpo de cada uma é o mesmo do passo: ação, campo,
+    // opção, checklist e requisito são as mesmas peças, um nível abaixo.
+    subtarefas: lista(s?.subtarefas).map((t: any, i: number) => ({
+      key: slug(String(t?.key || t?.label || `subtarefa_${i + 1}`)),
+      label: String(t?.label || 'Subtarefa'),
+      descricao: t?.descricao ? String(t.descricao) : null,
+      ordem: Number(t?.ordem) || i + 1,
+      ativo: t?.ativo !== false,
+      obrigatoria: t?.obrigatoria !== false,
+      repetivel: !!t?.repetivel,
+      // TETO SÓ EXISTE PARA QUEM REPETE — o banco recusa a incoerência, e aqui ela
+      // nem chega a ser tentada.
+      maxOcorrencias: t?.repetivel && Number(t?.maxOcorrencias) > 0 ? Number(t.maxOcorrencias) : null,
+      modoExecucao: ['MANUAL', 'AUTOMATICA'].includes(String(t?.modoExecucao)) ? String(t.modoExecucao) : 'MANUAL',
+      responsavelRegra: ['HERDA', 'ESPECIFICO', 'REGRA'].includes(String(t?.responsavelRegra)) ? String(t.responsavelRegra) : 'HERDA',
+      responsavelId: Number(t?.responsavelId) > 0 ? Number(t.responsavelId) : null,
+      slaDays: Number(t?.slaDays) > 0 ? Number(t.slaDays) : null,
+      condicaoEntrada: (t?.condicaoEntrada ?? undefined) as Prisma.InputJsonValue | undefined,
+      condicaoConclusao: (t?.condicaoConclusao ?? undefined) as Prisma.InputJsonValue | undefined,
+      condicaoVisibilidade: (t?.condicaoVisibilidade ?? undefined) as Prisma.InputJsonValue | undefined,
+      dependeDe: (Array.isArray(t?.dependeDe)
+        ? t.dependeDe.filter((x: unknown) => typeof x === 'string')
+        : undefined) as Prisma.InputJsonValue | undefined,
+      executorKey: t?.executorKey ? String(t.executorKey) : null,
+      cardinalidade: ['PROCESSO', 'PESSOA', 'NECESSIDADE', 'DOCUMENTO'].includes(String(t?.cardinalidade))
+        ? String(t.cardinalidade) : null,
+      fonteDeCanais: ['NENHUMA', 'FORNECEDOR_RELACIONADO', 'TIPOS_PERMITIDOS'].includes(String(t?.fonteDeCanais))
+        ? String(t.fonteDeCanais) : 'NENHUMA',
+      tiposDeCanal: (Array.isArray(t?.tiposDeCanal)
+        ? t.tiposDeCanal.filter((x: unknown) => typeof x === 'string')
+        : undefined) as Prisma.InputJsonValue | undefined,
+      reaberturaPermitida: typeof t?.reaberturaPermitida === 'boolean' ? t.reaberturaPermitida : null,
+      reaberturaExigeJustificativa: typeof t?.reaberturaExigeJustificativa === 'boolean' ? t.reaberturaExigeJustificativa : null,
+      reaberturaPermissao: t?.reaberturaPermissao ? String(t.reaberturaPermissao) : null,
+      _filhos: buildFilhosSimples(t),
     })),
   }
 }
@@ -197,12 +269,57 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
             for (const grupo of filhos.opcoesPorCampo) {
               if (grupo.opcoes.length === 0) continue
               const campo = await tx.stepField.findFirst({
-                where: { stepId: criado.id, key: grupo.campoKey }, select: { id: true },
+                // `subtaskId: null` — a opção do campo DO PASSO. Sem isso, um campo
+                // homônimo dentro de uma subtarefa poderia receber as opções do passo.
+                where: { stepId: criado.id, subtaskId: null, key: grupo.campoKey }, select: { id: true },
               })
               if (!campo) continue
               await tx.stepFieldOption.createMany({
                 data: grupo.opcoes.map((o: (typeof grupo.opcoes)[number]) => ({ ...o, fieldId: campo.id })) as Prisma.StepFieldOptionCreateManyInput[],
               })
+            }
+
+            // ── AS SUBTAREFAS ─────────────────────────────────────────
+            //
+            // UMA A UMA porque cada uma tem filhos que precisam do id dela. É o mesmo
+            // motivo pelo qual os passos são criados um a um.
+            for (const st of filhos.subtarefas) {
+              const { _filhos, ...dadosDaSubtarefa } = st
+              const sub = await tx.stepSubtaskDefinition.create({
+                data: { ...dadosDaSubtarefa, stepId: criado.id } as Prisma.StepSubtaskDefinitionUncheckedCreateInput,
+                select: { id: true },
+              })
+              if (_filhos.acoes.length) {
+                await tx.stepAction.createMany({
+                  data: _filhos.acoes.map((a) => ({ ...a, stepId: criado.id, subtaskId: sub.id })) as Prisma.StepActionCreateManyInput[],
+                })
+              }
+              if (_filhos.campos.length) {
+                await tx.stepField.createMany({
+                  data: _filhos.campos.map((c) => ({ ...c, stepId: criado.id, subtaskId: sub.id })) as Prisma.StepFieldCreateManyInput[],
+                })
+              }
+              if (_filhos.checkItens.length) {
+                await tx.stepChecklistItem.createMany({
+                  data: _filhos.checkItens.map((k) => ({ ...k, stepId: criado.id, subtaskId: sub.id })) as Prisma.StepChecklistItemCreateManyInput[],
+                })
+              }
+              if (_filhos.requisitos.length) {
+                await tx.stepRequirement.createMany({
+                  data: _filhos.requisitos.map((r) => ({ ...r, stepId: criado.id, subtaskId: sub.id })) as Prisma.StepRequirementCreateManyInput[],
+                })
+              }
+              // As opções são filhas do CAMPO da subtarefa — só depois de ele existir.
+              for (const grupo of _filhos.opcoesPorCampo) {
+                if (grupo.opcoes.length === 0) continue
+                const campo = await tx.stepField.findFirst({
+                  where: { stepId: criado.id, subtaskId: sub.id, key: grupo.campoKey }, select: { id: true },
+                })
+                if (!campo) continue
+                await tx.stepFieldOption.createMany({
+                  data: grupo.opcoes.map((o: (typeof grupo.opcoes)[number]) => ({ ...o, fieldId: campo.id })) as Prisma.StepFieldOptionCreateManyInput[],
+                })
+              }
             }
 
             // CANAIS — a associação é com o catálogo; canal inexistente é ignorado
@@ -257,11 +374,21 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
         passos: {
           orderBy: { ordem: 'asc' },
           include: {
-            acoes: { orderBy: { ordem: 'asc' } },
-            campos: { orderBy: { ordem: 'asc' }, include: { opcoesCadastradas: { orderBy: { ordem: 'asc' } } } },
-            checkItens: { orderBy: { ordem: 'asc' } },
+            acoes: { where: { subtaskId: null }, orderBy: { ordem: 'asc' } },
+            campos: { where: { subtaskId: null }, orderBy: { ordem: 'asc' }, include: { opcoesCadastradas: { orderBy: { ordem: 'asc' } } } },
+            checkItens: { where: { subtaskId: null }, orderBy: { ordem: 'asc' } },
             canais: { orderBy: { ordem: 'asc' }, include: { canal: true } },
-            requisitos: { orderBy: { ordem: 'asc' } },
+            requisitos: { where: { subtaskId: null }, orderBy: { ordem: 'asc' } },
+            // AS SUBTAREFAS com os filhos DELAS — é o que o editor completo consome.
+            subtarefas: {
+              orderBy: { ordem: 'asc' },
+              include: {
+                acoes: { orderBy: { ordem: 'asc' } },
+                campos: { orderBy: { ordem: 'asc' }, include: { opcoesCadastradas: { orderBy: { ordem: 'asc' } } } },
+                checkItens: { orderBy: { ordem: 'asc' } },
+                requisitos: { orderBy: { ordem: 'asc' } },
+              },
+            },
           },
         },
       },
@@ -308,11 +435,20 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
       passos: {
         orderBy: { ordem: 'asc' },
         include: {
-          acoes: { orderBy: { ordem: 'asc' } },
-          campos: { orderBy: { ordem: 'asc' }, include: { opcoesCadastradas: { orderBy: { ordem: 'asc' } } } },
-          checkItens: { orderBy: { ordem: 'asc' } },
+          acoes: { where: { subtaskId: null }, orderBy: { ordem: 'asc' } },
+          campos: { where: { subtaskId: null }, orderBy: { ordem: 'asc' }, include: { opcoesCadastradas: { orderBy: { ordem: 'asc' } } } },
+          checkItens: { where: { subtaskId: null }, orderBy: { ordem: 'asc' } },
           canais: { orderBy: { ordem: 'asc' }, include: { canal: true } },
-          requisitos: { orderBy: { ordem: 'asc' } },
+          requisitos: { where: { subtaskId: null }, orderBy: { ordem: 'asc' } },
+          subtarefas: {
+            orderBy: { ordem: 'asc' },
+            include: {
+              acoes: { orderBy: { ordem: 'asc' } },
+              campos: { orderBy: { ordem: 'asc' }, include: { opcoesCadastradas: { orderBy: { ordem: 'asc' } } } },
+              checkItens: { orderBy: { ordem: 'asc' } },
+              requisitos: { orderBy: { ordem: 'asc' } },
+            },
+          },
         },
       },
     },

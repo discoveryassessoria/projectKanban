@@ -11,6 +11,7 @@
 // desligaria o histórico do canal que o produziu. O rótulo muda à vontade.
 
 import { useEffect, useState } from "react"
+import CanaisPorOrganizacaoPanel from "./CanaisPorOrganizacaoPanel"
 
 interface Canal {
   id: number
@@ -39,6 +40,7 @@ const VAZIO = {
 }
 
 export default function CanaisOperacionaisTab() {
+  const [visao, setVisao] = useState<"tipos" | "organizacoes">("organizacoes")
   const [canais, setCanais] = useState<Canal[] | null>(null)
   const [erro, setErro] = useState("")
   const [form, setForm] = useState<typeof VAZIO | null>(null)
@@ -86,12 +88,26 @@ export default function CanaisOperacionaisTab() {
   return (
     <div className="space-y-4 p-1">
       <div>
-        <h2 className="text-lg font-semibold text-white">Canais de solicitação</h2>
+        <h2 className="text-lg font-semibold text-white">Canais de atendimento</h2>
         <p className="mt-0.5 text-xs text-white/50">
-          Por onde um pedido sai da casa, e o que cada canal exige como comprovação. Um canal novo passa a ser
-          oferecido nas versões de workflow publicadas depois dele; os processos em andamento não mudam.
+          Duas perguntas diferentes, dois donos. <b>Tipos</b> é o vocabulário do domínio — quais canais existem
+          e o que cada um exige. <b>Por organização</b> é a disponibilidade real: por onde cada cartório atende.
+          O workflow não copia nenhuma das duas; ele referencia os canais do fornecedor relacionado.
         </p>
       </div>
+
+      <div className="flex gap-1 border-b border-white/10">
+        {(["tipos", "organizacoes"] as const).map((v) => (
+          <button key={v} onClick={() => setVisao(v)}
+            className={`rounded-t-lg px-3 py-2 text-xs ${visao === v ? "bg-white/10 text-white" : "text-white/50 hover:text-white/80"}`}>
+            {v === "tipos" ? "Tipos de canal" : "Por organização"}
+          </button>
+        ))}
+      </div>
+
+      {visao === "organizacoes" && <CanaisPorOrganizacaoPanel />}
+      {visao === "tipos" && (
+      <div className="space-y-4">
 
       {erro && <div className="rounded-lg border border-red-400/30 bg-red-500/10 px-3 py-2 text-xs text-red-200">{erro}</div>}
 
@@ -172,6 +188,8 @@ export default function CanaisOperacionaisTab() {
         </div>
       ) : (
         <button onClick={() => setForm({ ...VAZIO })} className="rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-blue-500">+ Canal</button>
+      )}
+      </div>
       )}
     </div>
   )

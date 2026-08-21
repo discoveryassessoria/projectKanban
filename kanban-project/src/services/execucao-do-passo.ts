@@ -73,6 +73,8 @@ export interface Tentativa {
   payload: unknown
   supersededAt: Date | null
   supersededPorId: number | null
+  /// A chave do comando que a criou. É por ela que o retry devolve a mesma tentativa.
+  chaveIdempotencia: string
   criadoEm: Date
 }
 
@@ -131,6 +133,24 @@ export async function abrirTentativa(
   if (jaExiste) return { tentativa: jaExiste, substituiu: null, criada: false }
 
   const agora = new Date()
+  // ── A SUBSTITUIÇÃO VEM ANTES DA CRIAÇÃO ─────────────────────────────────
+  //
+  // O índice parcial admite UMA linha não-substituída. Inserir a nova antes de tirar a
+  // antiga de cena viola o índice — e, com `ON CONFLICT DO NOTHING`, a violação é
+  // SILENCIOSA: nada é inserido, a função devolve "já existia" e a reabertura
+  // simplesmente não acontece, sem erro nenhum. Era assim em produção.
+  //
+  // O ponteiro para a sucessora fica NULO por um instante, e a trava do banco permite
+  // exatamente isso: ela exige que a substituída tenha data e que o ponteiro, quando
+  // existir, aponte para OUTRA linha. "Saiu de cena, e já se sabe quando" é um estado
+  // legítimo; "aponta para si mesma" nunca seria.
+  if (vigente) {
+    await db.stepExecution.update({
+      where: { id: vigente.id },
+      data: { supersededAt: agora },
+    })
+  }
+
   // TENTATIVA CONCLUÍDA TEM DATA — inclusive a que nasce assim.
   //
   // Uma tentativa nova normalmente nasce aberta, mas nada impede um chamador de abrir
@@ -155,11 +175,18 @@ export async function abrirTentativa(
     skipDuplicates: true,
   })
   const nova = (await db.stepExecution.findUnique({ where: { chaveIdempotencia: chave } })) as Tentativa
-  if (criadas.count === 0) return { tentativa: nova, substituiu: null, criada: false }
+  if (criadas.count === 0) {
+    // Nada foi inserido: a chave de idempotência já existia (retry do mesmo comando).
+    // A substituição feita acima precisa ser desfeita — o que existe continua vigente.
+    if (vigente) {
+      await db.stepExecution.update({
+        where: { id: vigente.id }, data: { supersededAt: null, supersededPorId: null },
+      })
+    }
+    return { tentativa: nova, substituiu: null, criada: false }
+  }
 
-  // A SUBSTITUIÇÃO VEM DEPOIS DA CRIAÇÃO, de propósito: o índice parcial exige que
-  // exista no máximo uma não-substituída, então a antiga só pode sair de cena quando
-  // a nova já existe para tomar o lugar. Se a criação falhar, nada foi substituído.
+  // O PONTEIRO CERTO, agora que a sucessora existe.
   if (vigente) {
     await db.stepExecution.update({
       where: { id: vigente.id },

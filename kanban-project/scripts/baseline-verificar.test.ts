@@ -225,7 +225,27 @@ const MIGRATION = join(DIR_MIGRATIONS, '0000_baseline', 'migration.sql')
 // Ledger reconciliado no MESMO deploy de 20260821220000_cadastro_integral_do_passo.
 //
 //   anterior : 5955d26c1b544edf95fc04eca4f4f437a14328791f10737271d9c192e0e5582d
-const CHECKSUM_LEDGER = 'be3f3a4bfe7df13659c1270e6c640587899726ef311b84cf9064c2a369ffb0b9'
+//
+// 22/08/2026 — SUBTAREFA CANÔNICA. Duas tabelas de definição (StepSubtaskDefinition,
+// OrganizacaoCanal), uma de execução (SubtaskExecution), `subtaskId` nos quatro filhos
+// do passo, os atributos de evidência no requisito, `regraDeConclusao` no passo e
+// `orgaoId` no documento. ADITIVA: enquanto não houver subtarefa cadastrada, o motor
+// responde como respondia — a regra de conclusao nasce em ACAO_DO_PASSO, que e o que
+// sempre valeu, e os filhos continuam do passo com `subtaskId` nulo.
+// Ledger reconciliado no MESMO deploy de 20260822090000_subtarefa_canonica.
+//
+//   anterior : be3f3a4bfe7df13659c1270e6c640587899726ef311b84cf9064c2a369ffb0b9
+//
+// 22/08/2026 — IDENTIDADE POR DONO. A chave de acao, campo, item e requisito deixou de
+// ser unica no PASSO INTEIRO e passou a ser unica dentro do DONO: dois indices
+// parciais, um para as pecas do passo (subtaskId nulo) e outro para as de cada
+// subtarefa. Sem isso, duas subtarefas do mesmo passo nao podiam ter, cada uma, um
+// campo "observacao". Nao pode ser UNIQUE(stepId, subtaskId, key): NULL e distinto de
+// NULL no Postgres, e as pecas do passo deixariam de ser deduplicadas.
+// Ledger reconciliado no MESMO deploy de 20260822100000_identidade_por_dono.
+//
+//   anterior : 523d2e8ad455b533ff6e608c992c36d29fd111b454b1b1635d2ab9ed3ee9b96f
+const CHECKSUM_LEDGER = 'ad01855eecd5d2cf3f3a183b9a3ecf8933cbba63fc77ffe3dda662b06cfa9c33'
 
 /**
  * Migrations criadas DEPOIS da consolidacao de 02/08/2026. Toda migration nova
@@ -265,6 +285,8 @@ const MIGRATIONS_POS_BASELINE: string[] = [
   '20260821160000_chave_de_derivacao_documental',
   '20260821200000_politica_de_reabertura',
   '20260821220000_cadastro_integral_do_passo',
+  '20260822090000_subtarefa_canonica',
+  '20260822100000_identidade_por_dono',
 ]
 
 const sha256 = (t: string) => createHash('sha256').update(t).digest('hex')

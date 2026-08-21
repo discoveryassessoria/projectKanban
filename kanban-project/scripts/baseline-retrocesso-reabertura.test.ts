@@ -144,8 +144,29 @@ secao("(4) A EXECUÇÃO ANTERIOR NÃO É SOBRESCRITA")
 
 inv("23", "a tentativa vigente é a NÃO substituída — não sai de ORDER BY",
   execucao.includes("supersededAt: null") && !/orderBy: \{ criadoEm: "desc" \}/.test(execucao))
-inv("24", "abrir tentativa cria a nova ANTES de substituir a anterior",
-  execucao.indexOf("createMany") < execucao.indexOf("supersededAt: agora"))
+// A ORDEM ERA O CONTRÁRIO — e estava errada.
+//
+// Esta invariante afirmava "cria a nova ANTES de substituir a anterior", com a
+// justificativa de que o índice parcial exige no máximo uma não-substituída e a antiga
+// só poderia sair de cena quando a sucessora existisse. O raciocínio se inverte: com a
+// antiga ainda vigente, a INSERÇÃO é que viola o índice — e, por `skipDuplicates`
+// (`ON CONFLICT DO NOTHING`), ela era descartada em SILÊNCIO. Em produção, onde o
+// índice existe, reabrir uma tentativa não criava tentativa nenhuma e a função
+// devolvia "já existia".
+//
+// O banco de teste não tinha o índice parcial (`prisma db push` não cria índice
+// escrito à mão), então a suíte inteira media um banco mais permissivo que produção e
+// esta invariante passava. O `mrg-banco-teste` passou a aplicar as travas das
+// migrations; foi o que revelou o defeito.
+//
+// A ordem correta: substituir a anterior (o ponteiro para a sucessora fica nulo por um
+// instante, que é o que a trava do banco permite), inserir a nova, apontar. O que a
+// invariante protege continua valendo e está nas INV-25 e INV-27: a anterior preserva
+// o `completedAt` e o histórico não é sobrescrito.
+inv("24", "abrir tentativa substitui a anterior ANTES de inserir a nova",
+  execucao.indexOf("supersededAt: agora") < execucao.indexOf("createMany") &&
+  // e o ponteiro para a sucessora é corrigido depois que ela existe
+  execucao.includes("supersededPorId: nova.id"))
 inv("25", "substituir preserva o completedAt da anterior",
   !/supersededAt: agora[\s\S]{0,200}completedAt: null/.test(execucao))
 inv("26", "registrar nunca reescreve completedAt já gravado",

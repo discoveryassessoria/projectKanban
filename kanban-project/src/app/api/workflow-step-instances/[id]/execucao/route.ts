@@ -15,6 +15,7 @@ import { tentativasDoPasso, tentativaVigente } from "@/src/services/execucao-do-
 import { efeito } from "@/src/lib/motor/catalogo-de-efeitos"
 import { executorEfetivo } from "@/src/services/validacao-de-publicacao"
 import { requisitosPendentes } from "@/src/services/requisitos-da-etapa"
+import { subtarefasDaEtapa, passoPodeConcluir } from "@/src/services/subtarefas-da-etapa"
 import { avaliarCondicao, descreverCondicao, type Condicao } from "@/src/lib/motor/condicoes"
 
 export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
@@ -25,7 +26,13 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
 
   const passo = await prisma.phaseWorkflowStepInstance.findUnique({
     where: { id },
-    select: { id: true, stepKey: true, status: true, faseMacroKey: true, ciclo: true, documentoId: true, processoId: true },
+    select: {
+      id: true, stepKey: true, status: true, faseMacroKey: true, ciclo: true,
+      documentoId: true, processoId: true,
+      // O FORNECEDOR CONCRETO vem do documento, por ID. É ele que responde quais canais
+      // existem para esta etapa — não uma lista global.
+      documento: { select: { orgaoId: true, orgao: { select: { id: true, name: true, nomeFantasia: true } } } },
+    },
   })
   if (!passo) return NextResponse.json({ error: "Etapa não encontrada." }, { status: 404 })
 
@@ -70,6 +77,12 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
       ? {
           label: hist.passo.label,
           descricao: hist.passo.description,
+          // A DEPENDÊNCIA DECLARADA vai para a tela porque é ela que responde "qual é
+          // a etapa anterior". O executor encontrava essa etapa pelo NOME dela —
+          // conhecimento de negócio dentro do componente, e que quebra no dia em que
+          // o administrador renomear o passo ou criar um fluxo sem ele.
+          dependeDe: hist.passo.dependeDe ?? [],
+          regraDeConclusao: hist.passo.regraDeConclusao,
           campos: hist.passo.campos.filter((c) => c.ativo !== false)
             .map((c) => ({
               ...c,
@@ -90,6 +103,20 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
           requisitos: (hist.passo.requisitos ?? []).filter((r) => r.ativo !== false),
         }
       : null,
+    // ── AS SUBTAREFAS ─────────────────────────────────────────────────────
+    //
+    // O que acontece DENTRO do passo, com estado e motivo. Lista vazia = este passo
+    // não tem subtarefa cadastrada, e o executor desenha o que sempre desenhou.
+    subtarefas: await subtarefasDaEtapa({
+      stepInstanceId: id, valores: valoresAtuais, fornecedorId: passo.documento?.orgaoId ?? null,
+    }),
+    fornecedor: passo.documento?.orgao
+      ? { id: passo.documento.orgao.id, nome: passo.documento.orgao.nomeFantasia || passo.documento.orgao.name }
+      : null,
+    // O QUE FALTA PARA O PASSO CONCLUIR, segundo a regra CADASTRADA.
+    conclusao: await passoPodeConcluir({
+      stepInstanceId: id, valores: valoresAtuais, fornecedorId: passo.documento?.orgaoId ?? null,
+    }),
     execucaoAtual: vigente,
     execucoesAnteriores: tentativas.filter((t) => t.supersededAt != null),
     valores: valoresAtuais,
@@ -119,13 +146,21 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
   if (!acaoKey) return NextResponse.json({ error: "Ação não informada." }, { status: 400 })
 
   const u = await extrairUsuarioComPermissoes(request)
+  // O FORNECEDOR é resolvido no SERVIDOR, pelo documento. Aceitá-lo do cliente deixaria
+  // o operador escolher por quem a exigência de canal seria julgada.
+  const alvo = await prisma.phaseWorkflowStepInstance.findUnique({
+    where: { id }, select: { documento: { select: { orgaoId: true } } },
+  })
   const r = await executarAcaoCadastrada(id, acaoKey, (body?.valores ?? {}) as Record<string, unknown>, {
     usuarioId: u?.userId ?? null,
+    // A SUBTAREFA em que a ação acontece. Ausente = a ação é do passo.
+    subtaskKey: typeof body?.subtarefa === "string" ? body.subtarefa : null,
+    fornecedorId: alvo?.documento?.orgaoId ?? null,
     // O mapa de permissões é `{ chave: boolean }`; a porta quer a lista das concedidas.
     permissoes: Object.entries(u?.permissoes ?? {}).filter(([, v]) => v === true).map(([k]) => k),
     // IDEMPOTÊNCIA DO COMANDO: o mesmo clique reenviado traz a mesma correlação e não
     // vira duas execuções. Sem ela, dois cliques criariam duas novas vias.
-    correlationId: String(body?.correlationId ?? `acao|si${id}|${acaoKey}|${u?.userId ?? 0}`),
+    correlationId: String(body?.correlationId ?? `acao|si${id}|${body?.subtarefa ?? "-"}|${acaoKey}|${u?.userId ?? 0}`),
   })
   return NextResponse.json(r, { status: r.ok ? 200 : 422 })
 }

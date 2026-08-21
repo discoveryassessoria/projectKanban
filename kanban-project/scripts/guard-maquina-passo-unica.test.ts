@@ -553,8 +553,22 @@ ok('§5) a relação "Subtarefas" não voltou ao schema', !/@relation\(\s*"Subta
 // Antes havia leitores legítimos (`where: { tarefaPaiId: { not: null } }`, para
 // não listar a mesma tarefa duas vezes). A coluna não existe mais: um leitor
 // hoje só pode significar que alguém a recriou.
+//
+// A REGRA É SOBRE A TAREFA, NÃO SOBRE A PALAVRA.
+//
+// O padrão pegava qualquer `subtarefas:` no código. Isso valia enquanto "subtarefa"
+// só podia significar uma coisa: a Tarefa se decompondo em Tarefas, que é o que este
+// guarda existe para impedir. Desde 22/08 a palavra também nomeia a subtarefa do
+// PASSO (`StepSubtaskDefinition`) — que não é decomposição de tarefa nenhuma: ela
+// pertence ao StepDefinition, tem execução própria e morre com o passo.
+//
+// Proibir a palavra proibiria o conceito certo junto com o errado. O que se cobra é a
+// TAREFA se decompondo: as colunas que sumiram do schema, e `subtarefas` num contexto
+// de tarefa. A auto-relação no schema continua sendo cobrada logo acima, que é onde a
+// reintrodução teria de passar.
+const CONTEXTO_DE_TAREFA = /\btarefaPaiId\b|\btipoSubtarefa\b|tarefa\.subtarefas\b|subtarefas\s*:\s*Tarefa/
 const mencionamArvore = TODOS.filter((a) => !a.includes("prisma/"))
-  .filter((arq) => /\btarefaPaiId\b|\btipoSubtarefa\b|subtarefas\s*:/.test(semComentarios(ler(arq))))
+  .filter((arq) => CONTEXTO_DE_TAREFA.test(semComentarios(ler(arq))))
   .map((a) => a.split("\\").join("/").replace(RAIZ.split("\\").join("/") + "/", ""))
 ok("§5) nenhum arquivo da aplicação menciona a árvore de subtarefas",
   mencionamArvore.length === 0,

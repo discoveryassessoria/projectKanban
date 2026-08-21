@@ -125,11 +125,11 @@ ok(JSON.stringify(itensDaSecao("grp_processos", "Cadastros")) === JSON.stringify
 // e Regras. Nenhum runtime a consumia; era cadastro sem consumidor.
 ok(JSON.stringify(itensDaSecao("grp_processos", "Estrutura")) === JSON.stringify(["fases"]), "Processos › Estrutura = Fases")
 ok(JSON.stringify(itensDaSecao("grp_processos", "Configurações")) === JSON.stringify(["sla", "cfgversions", "proccfg"]), "Processos › Configurações = SLA, Versões, Configurações Gerais")
-// "Canais de solicitação" entrou em 21/08: a lista de canais (CRC, e-cartório,
-// e-mail, WhatsApp, balcão, comune, correios, consulado) era um array em código, e
-// acrescentar um exigia deploy. Fica sob Fluxos porque é o Workflow Interno que a
-// consome — um campo de passo aponta para este cadastro em vez de repetir a lista.
-ok(JSON.stringify(itensDaSecao("grp_workflow", "Fluxos")) === JSON.stringify(["macrokanban", "phaseiwf", "canais"]), "Workflow › Fluxos = Workflow Macro + Workflow Interno + Canais")
+// OS CANAIS SAÍRAM DO WORKFLOW em 22/08. Eles entraram sob Fluxos em 21/08, quando o
+// que importava era tirá-los do código; a segunda metade da correção é que eles nunca
+// foram do workflow. "Por onde dá para pedir" é fato do CARTÓRIO — o workflow apenas
+// declara "use os canais do fornecedor relacionado". Ver `grp_orgaos › Organizações`.
+ok(JSON.stringify(itensDaSecao("grp_workflow", "Fluxos")) === JSON.stringify(["macrokanban", "phaseiwf"]), "Workflow › Fluxos = Workflow Macro + Workflow Interno")
 // Classificação financeira ELIMINADA (02/08/2026): o comportamento financeiro vive na
 // Configuração Financeira do cadastro mestre; preço, na Tabela de Valores. Sem cadastro
 // intermediário — nem categoria, nem plano de contas, nem centro de custo.
@@ -140,7 +140,7 @@ ok(JSON.stringify(itensDaSecao("grp_financeiro", "Cobrança")) === JSON.stringif
 // A Planilha Documental entra aqui porque é onde se escolhe QUAIS itens do
 // cadastro viram coluna — decisão vizinha ao preço, e que não define preço.
 ok(JSON.stringify(itensDaSecao("grp_financeiro", "Tabela de Valores")) === JSON.stringify(["pricingtable", "discrules", "pricing", "planilhacolunas"]), "Financeiro › Tabela de Valores = Tabelas de Preços, Regras, Aplicabilidade, Planilha Documental")
-ok(JSON.stringify(itensDaSecao("grp_orgaos", "Organizações")) === JSON.stringify(["organs", "suppliers"]), "Órgãos › Organizações = Cartórios e Órgãos + Fornecedores")
+ok(JSON.stringify(itensDaSecao("grp_orgaos", "Organizações")) === JSON.stringify(["organs", "suppliers", "canais"]), "Órgãos › Organizações = Cartórios e Órgãos + Fornecedores + Canais de atendimento")
 // A seção deixou de se chamar "Grupos": Capacidade Operacional não é um grupo
 // de pessoas. Departamentos e Cargos saíram — eram cadastros sem consumidor
 // (nenhuma FK, nenhuma regra, e ninguém podia ser associado a eles).

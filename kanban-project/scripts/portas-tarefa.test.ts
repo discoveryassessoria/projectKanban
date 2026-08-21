@@ -42,6 +42,21 @@ async function limpar() {
   // nela — e asserções sobre "quantos TAREFA_CRIADA existem" passam a depender
   // de quantas vezes o teste já rodou.
   await prisma.logAuditoria.deleteMany({ where: { entidade: "Tarefa", entidadeId: { in: tids } } })
+  // E A AUDITORIA ÓRFÃ — a de tarefas que não existem mais.
+  //
+  // A limpeza acima só alcança as tarefas dos processos DESTE teste que ainda estão
+  // no banco. Log de tarefa apagada por outro teste sobrevive, e o id volta a ser
+  // usado: `nextval` não reaproveita, mas outra suíte que reinicia a sequência faz o
+  // id repetir. Aí a tarefa desta rodada nasce com o histórico de uma tarefa alheia
+  // colado nela, e "quantos TAREFA_CRIADA existem" passa a depender de quem rodou
+  // antes. Foi assim que esta suíte ficou vermelha num banco reutilizado e verde num
+  // banco limpo — o teste medindo o passado em vez de medir o código.
+  const idsVivos = new Set((await prisma.tarefa.findMany({ select: { id: true } })).map((t) => t.id))
+  const logsDeTarefa = await prisma.logAuditoria.findMany({
+    where: { entidade: "Tarefa" }, select: { id: true, entidadeId: true },
+  })
+  const orfaos = logsDeTarefa.filter((l) => l.entidadeId != null && !idsVivos.has(l.entidadeId)).map((l) => l.id)
+  if (orfaos.length) await prisma.logAuditoria.deleteMany({ where: { id: { in: orfaos } } })
   await prisma.tarefa.deleteMany({ where: { processoId: { in: ids } } })
   await prisma.phaseWorkflowStepInstance.deleteMany({ where: { processoId: { in: ids } } })
   await prisma.phaseWorkflowInstance.deleteMany({ where: { processoId: { in: ids } } })

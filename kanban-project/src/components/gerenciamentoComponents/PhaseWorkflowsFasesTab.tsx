@@ -49,7 +49,11 @@ interface Step {
   // manda a chave. As duas formas convivem aqui porque este tipo descreve as duas
   // pontas; quem normaliza é o modal, ao abrir.
   canais?: Array<{ canalKey?: string; canal?: { key: string; label?: string }; ordem?: number; ativo?: boolean; exigeProtocolo?: boolean | null; exigeAnexo?: boolean | null; exigeRastreio?: boolean | null; exigeObservacao?: boolean | null }>
-  requisitos?: Array<{ key?: string; label: string; descricao?: string | null; tipo: string; alvoKey?: string | null; minimo?: number; obrigatorio?: boolean; acaoKey?: string | null; ordem?: number; ativo?: boolean }>
+  requisitos?: Array<{ key?: string; label: string; descricao?: string | null; tipo: string; alvoKey?: string | null; minimo?: number; obrigatorio?: boolean; acaoKey?: string | null; evidenciaTipoId?: number | null; mimesPermitidos?: string[] | null; momento?: string; ordem?: number; ativo?: boolean }>
+  /// A REGRA DE CONCLUSÃO cadastrada. `ACAO_DO_PASSO` = o que sempre valeu.
+  regraDeConclusao?: string
+  /// AS SUBTAREFAS — o que acontece dentro do passo, com os filhos delas.
+  subtarefas?: Array<Record<string, unknown>>
   key: string
   label: string
   description?: string | null
@@ -469,12 +473,13 @@ export default function PhaseWorkflowsFasesTab() {
                         {(st.acoes?.length ?? 0) > 0 && <span className="rounded bg-violet-500/15 px-1.5 py-0.5 text-violet-300">{st.acoes!.length} ações</span>}
                         {(st.campos?.length ?? 0) > 0 && <span className="rounded bg-violet-500/15 px-1.5 py-0.5 text-violet-300">{st.campos!.length} campos</span>}
                         {(st.checkItens?.length ?? 0) > 0 && <span className="rounded bg-violet-500/15 px-1.5 py-0.5 text-violet-300">checklist {st.checkItens!.length}</span>}
+                        {(st.subtarefas?.length ?? 0) > 0 && <span className="rounded bg-indigo-500/15 px-1.5 py-0.5 text-indigo-300">{st.subtarefas!.length} subtarefas</span>}
                         {(st.dependeDe?.length ?? 0) > 0 && <span className="rounded bg-white/10 px-1.5 py-0.5 text-white/60">depende de {st.dependeDe!.length}</span>}
                         {problemas.some((pr) => pr.stepKey === st.key) && <span className="rounded bg-red-500/20 px-1.5 py-0.5 text-red-300">publicação recusada</span>}
                       </div>
                     </div>
                     <div className="flex flex-none items-center gap-0.5 text-white/50">
-                      <button title="Configurar campos, ações, checklist e dependências" aria-label="Configurar"
+                      <button title="Configurar tudo o que acontece dentro deste passo" aria-label="Configurar"
                         onClick={() => setConfigModal({ wf, step: st })}
                         className="rounded px-2 py-1 text-[11px] text-blue-300 hover:bg-blue-500/10 hover:text-blue-200">Configurar</button>
                       <button title="Editar" aria-label="Editar" onClick={() => openEditStep(wf, st)} className="rounded p-1 hover:bg-white/10 hover:text-white"><IEdit /></button>

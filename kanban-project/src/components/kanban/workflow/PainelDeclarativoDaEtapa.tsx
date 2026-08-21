@@ -40,11 +40,40 @@ interface Preview {
   aviso: string
 }
 
+/**
+ * UMA SUBTAREFA PROJETADA pelo servidor.
+ *
+ * `bloqueioTexto` vem pronto: quem sabe POR QUE ela não pode ser feita é quem tem o
+ * grafo de dependências e as condições — o servidor. A tela que reescrevesse esse
+ * motivo daria uma segunda explicação, e as duas divergiriam no primeiro caso difícil.
+ */
+interface Subtarefa {
+  key: string
+  label: string
+  descricao: string | null
+  ordem: number
+  obrigatoria: boolean
+  repetivel: boolean
+  visivel: boolean
+  disponivel: boolean
+  concluida: boolean
+  status: string
+  bloqueioTexto: string | null
+  ocorrencias: number
+  podeRepetir: boolean
+  canais: Array<{ key: string; label: string; exigeProtocolo: boolean; exigeAnexo: boolean; exigeRastreio: boolean; exigeObservacao: boolean; endereco: string | null }>
+  execucao: { id: number; sequencia: number; resultado: string | null; completedAt: string | null } | null
+  definicao: { acoes: Acao[]; campos: Campo[]; checkItens: ItemChecklist[] }
+}
+
 interface Dados {
   passo: { id: number; stepKey: string; status: string }
   versao: number | null
   executor: string | null
   configuracao: { label: string; descricao: string | null; campos: Campo[]; acoes: Acao[]; checklist: ItemChecklist[] } | null
+  subtarefas?: Subtarefa[]
+  fornecedor?: { id: number; nome: string } | null
+  conclusao?: { pode: boolean; regra: string; faltando: Array<{ key: string; label: string; motivo: string }> }
   execucaoAtual: Tentativa | null
   execucoesAnteriores: Tentativa[]
 }
@@ -79,6 +108,11 @@ export default function PainelDeclarativoDaEtapa({
   const [justificativa, setJustificativa] = useState("")
   const [recusa, setRecusa] = useState("")
   const [feito, setFeito] = useState("")
+  // O QUE FOI PREENCHIDO EM CADA SUBTAREFA, separado. Um único mapa de valores faria
+  // dois campos homônimos de subtarefas diferentes serem o mesmo campo.
+  const [valoresDaSub, setValoresDaSub] = useState<Record<string, Record<string, unknown>>>({})
+  const [marcadosDaSub, setMarcadosDaSub] = useState<Record<string, Record<string, boolean>>>({})
+  const [subAberta, setSubAberta] = useState<string | null>(null)
 
   const carregar = useCallback(async () => {
     setErroCarga("")
@@ -102,17 +136,21 @@ export default function PainelDeclarativoDaEtapa({
     return () => { vivo = false }
   }, [carregar])
 
-  async function executar(acao: Acao) {
-    setEnviando(acao.key); setRecusa(""); setFeito("")
+  async function executar(acao: Acao, subtarefa?: string | null) {
+    setEnviando(`${subtarefa ?? "-"}|${acao.key}`); setRecusa(""); setFeito("")
     try {
       const r = await fetch(`/api/workflow-step-instances/${stepInstanceId}/execucao`, {
         method: "POST", headers: headers(),
         body: JSON.stringify({
           acao: acao.key,
-          valores: { ...valores, checklist: marcados },
+          // A SUBTAREFA vai junto: sem ela, o servidor procuraria a ação nas do passo.
+          subtarefa: subtarefa ?? null,
+          valores: subtarefa
+            ? { ...(valoresDaSub[subtarefa] ?? {}), checklist: marcadosDaSub[subtarefa] ?? {} }
+            : { ...valores, checklist: marcados },
           // O MESMO CLIQUE REENVIADO não vira duas execuções: a correlação identifica
           // o comando, não a tentativa de rede.
-          correlationId: `acao|si${stepInstanceId}|${acao.key}|${d?.execucaoAtual?.id ?? 0}`,
+          correlationId: `acao|si${stepInstanceId}|${subtarefa ?? "-"}|${acao.key}|${d?.execucaoAtual?.id ?? 0}`,
         }),
       })
       const j = await r.json()
@@ -184,6 +222,144 @@ export default function PainelDeclarativoDaEtapa({
           {d.execucoesAnteriores.length > 0 && ` · ${d.execucoesAnteriores.length} execução(ões) anterior(es)`}
         </p>
       </div>
+
+      {/* ─────────────────────── AS SUBTAREFAS ─────────────────────── */}
+      {(d.subtarefas ?? []).length > 0 && (
+        <div className="space-y-2">
+          <div className="flex items-center justify-between">
+            <div className="text-xs font-medium text-white/70">O que fazer nesta etapa</div>
+            {d.fornecedor && <span className="text-[11px] text-white/40">órgão: {d.fornecedor.nome}</span>}
+          </div>
+
+          {(d.subtarefas ?? []).filter((st) => st.visivel).map((st) => {
+            const aberta = subAberta === st.key
+            const vals = valoresDaSub[st.key] ?? {}
+            const marc = marcadosDaSub[st.key] ?? {}
+            const podeAgir = st.disponivel || (st.concluida && st.podeRepetir)
+            return (
+              <div key={st.key} className="rounded-lg border border-white/10 bg-white/5 p-3">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-2">
+                      <span className={`h-2 w-2 flex-none rounded-full ${
+                        st.concluida ? "bg-emerald-400"
+                        : st.status === "BLOQUEADO" || st.status === "PENDENTE" ? "bg-white/25"
+                        : st.status === "AGUARDANDO_EXTERNO" ? "bg-sky-400"
+                        : "bg-amber-400"}`} />
+                      <span className={`text-sm ${st.concluida ? "text-white/50 line-through" : "text-white"}`}>{st.label}</span>
+                      {st.obrigatoria && !st.concluida && <span className="rounded bg-amber-500/15 px-1.5 py-0.5 text-[10px] text-amber-300">obrigatória</span>}
+                      {st.ocorrencias > 1 && <span className="rounded bg-white/10 px-1.5 py-0.5 text-[10px] text-white/50">{st.ocorrencias}ª vez</span>}
+                    </div>
+                    {st.descricao && <p className="mt-0.5 text-[11px] text-white/40">{st.descricao}</p>}
+                    {/* O MOTIVO VEM DO SERVIDOR. A tela não deduz por que está bloqueada. */}
+                    {!st.disponivel && !st.concluida && st.bloqueioTexto && (
+                      <p className="mt-1 text-[11px] text-amber-300/70">{st.bloqueioTexto}</p>
+                    )}
+                    {st.concluida && st.execucao?.resultado && (
+                      <p className="mt-1 text-[11px] text-emerald-300/60">
+                        {st.execucao.resultado}
+                        {st.execucao.completedAt && ` · ${new Date(st.execucao.completedAt).toLocaleDateString("pt-BR")}`}
+                      </p>
+                    )}
+                  </div>
+                  {podeAgir && (
+                    <button onClick={() => setSubAberta(aberta ? null : st.key)}
+                      className="flex-none rounded-lg border border-white/10 bg-white/5 px-3 py-1.5 text-xs text-white/70 hover:bg-white/10">
+                      {aberta ? "Fechar" : st.concluida ? "Fazer de novo" : "Abrir"}
+                    </button>
+                  )}
+                </div>
+
+                {aberta && (
+                  <div className="mt-3 space-y-3 border-t border-white/10 pt-3">
+                    {/* OS CANAIS vêm do fornecedor concreto — não do catálogo inteiro. */}
+                    {st.canais.length > 0 && (
+                      <div>
+                        <label className={lbl}>Por onde enviar</label>
+                        <select className={inp} value={String(vals.canal ?? "")}
+                          onChange={(e) => setValoresDaSub({ ...valoresDaSub, [st.key]: { ...vals, canal: e.target.value } })}>
+                          <option value="">— escolher —</option>
+                          {st.canais.map((c) => <option key={c.key} value={c.key}>{c.label}</option>)}
+                        </select>
+                        {(() => {
+                          const c = st.canais.find((x) => x.key === vals.canal)
+                          if (!c) return null
+                          const exige = [
+                            c.exigeProtocolo ? "protocolo" : null, c.exigeAnexo ? "comprovante" : null,
+                            c.exigeRastreio ? "rastreio" : null, c.exigeObservacao ? "observação" : null,
+                          ].filter(Boolean)
+                          return (
+                            <p className="mt-1 text-[11px] text-white/40">
+                              {c.endereco ? `${c.endereco} · ` : ""}
+                              {exige.length ? `exige ${exige.join(", ")}.` : "não exige comprovação específica."}
+                            </p>
+                          )
+                        })()}
+                      </div>
+                    )}
+
+                    {st.definicao.campos.filter((c) => visivel(c, vals)).map((c) => (
+                      <div key={c.key}>
+                        <label className={lbl}>{c.label}{c.obrigatorio && <span className="text-amber-300"> *</span>}</label>
+                        {c.tipo === "textarea" ? (
+                          <textarea className={inp} rows={3} value={String(vals[c.key] ?? "")}
+                            onChange={(e) => setValoresDaSub({ ...valoresDaSub, [st.key]: { ...vals, [c.key]: e.target.value } })} />
+                        ) : c.tipo === "select" || c.tipo === "multiselect" || c.tipo === "radio" ? (
+                          <select className={inp} value={String(vals[c.key] ?? "")}
+                            onChange={(e) => setValoresDaSub({ ...valoresDaSub, [st.key]: { ...vals, [c.key]: e.target.value } })}>
+                            <option value="">— escolher —</option>
+                            {c.opcoes.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+                          </select>
+                        ) : (
+                          <input className={inp} type={c.tipo === "data" ? "date" : c.tipo === "numero" ? "number" : "text"}
+                            value={String(vals[c.key] ?? "")}
+                            onChange={(e) => setValoresDaSub({ ...valoresDaSub, [st.key]: { ...vals, [c.key]: e.target.value } })} />
+                        )}
+                        {c.ajuda && <p className="mt-1 text-[11px] text-white/35">{c.ajuda}</p>}
+                      </div>
+                    ))}
+
+                    {st.definicao.checkItens.length > 0 && (
+                      <div className="space-y-1.5">
+                        <label className={lbl}>Conferência</label>
+                        {st.definicao.checkItens.map((it) => (
+                          <label key={it.key} className="flex items-start gap-2 text-xs text-white/70">
+                            <input type="checkbox" className="mt-0.5" checked={!!marc[it.key]}
+                              onChange={(e) => setMarcadosDaSub({ ...marcadosDaSub, [st.key]: { ...marc, [it.key]: e.target.checked } })} />
+                            <span>{it.label}{it.obrigatorio && <span className="text-amber-300"> *</span>}
+                              {it.descricao && <span className="block text-[11px] text-white/35">{it.descricao}</span>}</span>
+                          </label>
+                        ))}
+                      </div>
+                    )}
+
+                    <div className="flex flex-wrap gap-2">
+                      {st.definicao.acoes.length === 0 && (
+                        <p className="text-[11px] text-amber-300/70">Esta subtarefa não tem resultado cadastrado.</p>
+                      )}
+                      {st.definicao.acoes.map((a) => (
+                        <button key={a.key} onClick={() => executar(a, st.key)}
+                          disabled={enviando !== null}
+                          title={a.descricao ?? undefined}
+                          className="rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-blue-500 disabled:opacity-50">
+                          {enviando === `${st.key}|${a.key}` ? "Executando…" : a.label}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )
+          })}
+
+          {/* O QUE FALTA PARA O PASSO CONCLUIR, segundo a regra cadastrada. */}
+          {d.conclusao && !d.conclusao.pode && (
+            <p className="text-[11px] text-amber-300/70">
+              A etapa só conclui quando: {d.conclusao.faltando.map((x) => x.label).join(", ")}.
+            </p>
+          )}
+        </div>
+      )}
 
       {cfg.campos.length > 0 && (
         <div className="space-y-3">
@@ -257,7 +433,7 @@ export default function PainelDeclarativoDaEtapa({
           {cfg.acoes.map((a) => (
             <button key={a.key} onClick={() => void executar(a)} disabled={enviando != null}
               className="w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2.5 text-left hover:bg-white/10 disabled:opacity-50">
-              <div className="text-sm font-medium text-white">{enviando === a.key ? "Executando…" : a.label}</div>
+              <div className="text-sm font-medium text-white">{enviando === `-|${a.key}` ? "Executando…" : a.label}</div>
               {(a.descricao || a.efeito) && (
                 <div className="mt-0.5 text-[11px] text-white/45">{a.descricao ?? a.efeito?.descricao}</div>
               )}

@@ -16,8 +16,9 @@
 // PG_BIN). Nada é instalado por este script.
 // ============================================================================
 import { execFileSync, spawnSync } from 'node:child_process'
-import { existsSync, mkdirSync } from 'node:fs'
-import { join } from 'node:path'
+import { existsSync, mkdirSync, readdirSync, readFileSync } from 'node:fs'
+import { join, dirname } from 'node:path'
+import { fileURLToPath } from 'node:url'
 import os from 'node:os'
 
 const ACAO = (process.argv[2] || '').toLowerCase()
@@ -88,7 +89,55 @@ function up() {
     PRISMA_DATABASE_URL: URL,
     DIRECT_DATABASE_URL: URL,
   })
+
+  // ── AS TRAVAS QUE O `db push` NÃO CRIA ────────────────────────────────────
+  //
+  // Índice parcial e CHECK não existem no schema.prisma: eles vivem nas migrations,
+  // escritos à mão. `db push` monta o banco a partir do schema — e monta um banco SEM
+  // essas travas.
+  //
+  // Isso fez o pior tipo de teste verde: a suíte inteira rodava contra um banco mais
+  // permissivo que produção. A reabertura de uma tentativa, que em produção esbarra no
+  // índice parcial e é SILENCIOSAMENTE descartada pelo `ON CONFLICT DO NOTHING`,
+  // passava aqui sem nunca tocar a trava. O teste media outra coisa.
+  //
+  // Aplicá-las aqui é o que faz o banco de teste responder como o de produção.
+  console.log('· aplicando as travas escritas à mão (índices parciais e CHECKs)')
+  aplicarTravas(URL)
+
   console.log(`\n✅ banco de teste pronto: ${URL}\n`)
+}
+
+/**
+ * AS TRAVAS ESCRITAS À MÃO, extraídas das migrations.
+ *
+ * A lista é derivada dos arquivos de migration, não copiada: reescrevê-la à mão faria
+ * o banco de teste divergir do de produção assim que alguém acrescentasse uma trava e
+ * esquecesse de espelhar aqui — que é exatamente o defeito que este bloco corrige.
+ */
+function aplicarTravas(url) {
+  const psql = bin('psql')
+  const dirMigrations = join(dirname(fileURLToPath(import.meta.url)), '..', 'prisma', 'migrations')
+  const comandos = []
+  for (const nome of readdirSync(dirMigrations).sort()) {
+    const arquivo = join(dirMigrations, nome, 'migration.sql')
+    if (!existsSync(arquivo)) continue
+    const sql = readFileSync(arquivo, 'utf8')
+    // Só o que o `db push` não sabe montar: índice parcial (tem WHERE) e CHECK.
+    for (const m of sql.matchAll(/CREATE UNIQUE INDEX[^;]*WHERE[^;]*;/gi)) comandos.push(m[0])
+    for (const m of sql.matchAll(/ALTER TABLE[^;]*ADD CONSTRAINT[^;]*CHECK[^;]*;/gi)) comandos.push(m[0])
+  }
+  let aplicadas = 0
+  for (const cmd of comandos) {
+    // IF NOT EXISTS não existe para CHECK: rodar e ignorar "já existe" é o caminho.
+    const r = spawnSync(psql, ['-h', '127.0.0.1', '-p', PORTA, '-U', 'postgres', '-d', BANCO, '-c', cmd],
+      { encoding: 'utf8' })
+    if (r.status === 0) aplicadas++
+    else if (!/already exists|já existe/i.test(String(r.stderr))) {
+      console.log(`  ! ${String(r.stderr).trim().split('\n')[0]}`)
+    }
+  }
+  console.log(`  ${aplicadas}/${comandos.length} trava(s) aplicada(s)`)
 }
 
 function down() {

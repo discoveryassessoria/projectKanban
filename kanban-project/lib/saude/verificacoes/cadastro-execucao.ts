@@ -735,3 +735,307 @@ registrar({
     }
   },
 })
+
+// ── A SUBTAREFA CANÔNICA ────────────────────────────────────────────────────
+//
+// A subtarefa trouxe consigo classes novas de inconsistência: execução apontando para
+// uma subtarefa que saiu do cadastro, subtarefa manual sem ação (o operador a vê e não
+// pode concluí-la), ciclo entre irmãs, passo que conclui por subtarefas e não tem
+// nenhuma. A validação da publicação recusa tudo isso HOJE; estas verificações olham o
+// que ficou no banco de ontem — e o que entrar por fora dela.
+
+registrar({
+  id: 'saude.subtarefa.execucao-sem-definicao',
+  codigo: 'SUB-001',
+  nome: 'Execução de subtarefa alcança sua definição',
+  descricao: 'Execução cuja subtarefa não existe mais na versão que ela registrou não sabe dizer o que era.',
+  dominio: 'WORKFLOW',
+  modulo: 'Subtarefas',
+  severidadePadrao: 'ERRO',
+  obrigatoria: true,
+  modos: ['COMPLETO', 'PROFUNDO'],
+  introduzidaEm: '1.3.0',
+  timeoutMs: 25_000,
+  orientacao: 'A subtarefa foi removida do cadastro em vez de inativada. Recadastre-a com a MESMA chave e inative-a.',
+  rotaCorrecao: ROTA_INTERNO,
+  responsavel: 'Workflow',
+  ativo: true,
+  executar: async (): Promise<ResultadoVerificacao> => {
+    // A definição histórica vem da versão CONGELADA, então basta conferir se a chave
+    // existe entre as subtarefas daquela versão.
+    const execucoes = await prisma.subtaskExecution.findMany({
+      where: { supersededAt: null },
+      select: {
+        id: true, subtaskKey: true, workflowVersao: true,
+        stepInstance: { select: { id: true, stepKey: true, workflowInstance: { select: { workflowDefinitionId: true } } } },
+      },
+      take: 500,
+    })
+    if (execucoes.length === 0) return vazio({ execucoes: 0, orfas: 0 }, 'Nenhuma execução de subtarefa ainda.')
+
+    const versoes = await prisma.phaseInternalWorkflowVersao.findMany({ select: { workflowId: true, versao: true, passos: true } })
+    const chavesPor = new Map<string, Set<string>>()
+    for (const v of versoes) {
+      const passos = Array.isArray(v.passos) ? (v.passos as Array<{ key: string; subtarefas?: Array<{ key: string }> }>) : []
+      for (const p of passos) {
+        chavesPor.set(`${v.workflowId}|${v.versao}|${p.key}`, new Set((p.subtarefas ?? []).map((s) => s.key)))
+      }
+    }
+    const orfas = execucoes.filter((e) => {
+      const wfId = e.stepInstance.workflowInstance.workflowDefinitionId
+      if (!wfId || e.workflowVersao == null) return false
+      const chaves = chavesPor.get(`${wfId}|${e.workflowVersao}|${e.stepInstance.stepKey}`)
+      // Sem versão congelada para comparar, esta verificação não tem o que afirmar —
+      // quem cobra isso é CAD-010, e duplicar o achado só faria barulho.
+      if (!chaves) return false
+      return !chaves.has(e.subtaskKey)
+    })
+    if (orfas.length === 0) return vazio({ execucoes: execucoes.length, orfas: 0 }, `${execucoes.length} execução(ões) de subtarefa, todas com definição alcançável.`)
+    return {
+      achados: orfas.slice(0, 20).map((e): Achado => ({
+        chave: `subexec-orfa:${e.id}`, severidade: 'ERRO',
+        titulo: `Execução #${e.id} aponta para a subtarefa "${e.subtaskKey}", que não está na v${e.workflowVersao}`,
+        descricao: `A etapa "${e.stepInstance.stepKey}" tem execução de uma subtarefa que a versão registrada não contém.`,
+        explicacao: 'A chave da subtarefa é o que a execução guarda. Sumindo do cadastro, ela deixa de saber o que era.',
+        impacto: 'O histórico dessa execução fica sem nome e sem configuração; a tela não consegue desenhá-la.',
+        entidade: 'SubtaskExecution', registroId: String(e.id), registroNome: e.subtaskKey, quantidade: 1,
+        link: ROTA_INTERNO,
+        recomendacao: 'Recadastre a subtarefa com a mesma chave e inative-a, em vez de removê-la.',
+        evidencia: { execucaoId: e.id, subtaskKey: e.subtaskKey, versao: e.workflowVersao },
+      })),
+      metricas: { execucoes: execucoes.length, orfas: orfas.length },
+    }
+  },
+})
+
+registrar({
+  id: 'saude.subtarefa.manual-sem-acao',
+  codigo: 'SUB-002',
+  nome: 'Subtarefa manual tem como ser concluída',
+  descricao: 'Subtarefa manual sem nenhuma ação aparece para o operador sem nenhum botão — ele a vê e não pode fechá-la.',
+  dominio: 'WORKFLOW',
+  modulo: 'Subtarefas',
+  severidadePadrao: 'ERRO',
+  obrigatoria: true,
+  modos: ['RAPIDO', 'COMPLETO', 'PROFUNDO'],
+  introduzidaEm: '1.3.0',
+  timeoutMs: 15_000,
+  orientacao: 'Abra o passo → Subtarefas → Configurar → Ações e cadastre ao menos um resultado.',
+  rotaCorrecao: ROTA_INTERNO,
+  responsavel: 'Workflow',
+  ativo: true,
+  executar: async (): Promise<ResultadoVerificacao> => {
+    const subs = await prisma.stepSubtaskDefinition.findMany({
+      where: { ativo: true, modoExecucao: 'MANUAL' },
+      select: {
+        id: true, key: true, label: true,
+        step: { select: { key: true, workflow: { select: { name: true } } } },
+        acoes: { where: { ativo: true }, select: { id: true } },
+      },
+    })
+    const mudas = subs.filter((s) => s.acoes.length === 0)
+    if (mudas.length === 0) return vazio({ subtarefas: subs.length, mudas: 0 }, `${subs.length} subtarefa(s) manual(is), todas com ação.`)
+    return {
+      achados: mudas.map((s): Achado => ({
+        chave: `subtarefa-muda:${s.id}`, severidade: 'ERRO',
+        titulo: `"${s.label}" não tem nenhum resultado`,
+        descricao: `A subtarefa "${s.key}" de "${s.step.key}" (${s.step.workflow.name}) é manual e não oferece ação nenhuma.`,
+        explicacao: 'Uma subtarefa manual é concluída escolhendo um resultado. Sem resultado cadastrado, não há o que escolher.',
+        impacto: 'O operador vê a subtarefa aberta e não tem como fechá-la — e o passo que depender dela não conclui.',
+        entidade: 'StepSubtaskDefinition', registroId: String(s.id), registroNome: s.key, quantidade: 1,
+        link: ROTA_INTERNO,
+        recomendacao: 'Cadastre ao menos uma ação, ou marque a subtarefa como automática.',
+        evidencia: { subtarefaId: s.id, passo: s.step.key },
+      })),
+      metricas: { subtarefas: subs.length, mudas: mudas.length },
+    }
+  },
+})
+
+registrar({
+  id: 'saude.subtarefa.dependencia-quebrada',
+  codigo: 'SUB-003',
+  nome: 'Dependência entre subtarefas é válida e sem ciclo',
+  descricao: 'Dependência para subtarefa inexistente trava a subtarefa para sempre; ciclo trava todas as envolvidas.',
+  dominio: 'WORKFLOW',
+  modulo: 'Subtarefas',
+  severidadePadrao: 'CRITICO',
+  obrigatoria: true,
+  modos: ['RAPIDO', 'COMPLETO', 'PROFUNDO'],
+  introduzidaEm: '1.3.0',
+  timeoutMs: 20_000,
+  orientacao: 'Abra o passo → Subtarefas → Configurar → Geral e reveja "Depende de".',
+  rotaCorrecao: ROTA_INTERNO,
+  responsavel: 'Workflow',
+  ativo: true,
+  executar: async (): Promise<ResultadoVerificacao> => {
+    const passos = await prisma.phaseInternalWorkflowStep.findMany({
+      where: { subtarefas: { some: {} } },
+      select: {
+        id: true, key: true, workflow: { select: { name: true } },
+        subtarefas: { where: { ativo: true }, select: { key: true, label: true, dependeDe: true } },
+      },
+    })
+    const achados: Achado[] = []
+    let total = 0
+    for (const p of passos) {
+      total += p.subtarefas.length
+      const chaves = new Set(p.subtarefas.map((s) => s.key))
+      for (const s of p.subtarefas) {
+        const deps = Array.isArray(s.dependeDe) ? (s.dependeDe as string[]) : []
+        for (const d of deps) {
+          if (chaves.has(d) && d !== s.key) continue
+          achados.push({
+            chave: `subdep-quebrada:${p.id}:${s.key}:${d}`, severidade: 'CRITICO',
+            titulo: `"${s.label}" depende de "${d}", que não é subtarefa deste passo`,
+            descricao: `Em "${p.workflow.name}", o passo "${p.key}" tem dependência de subtarefa apontando para o nada.`,
+            explicacao: 'A dependência é satisfeita quando a irmã é concluída. Apontando para uma chave inexistente, ela nunca é.',
+            impacto: 'A subtarefa fica bloqueada para sempre — e o passo que depender dela não conclui nunca.',
+            entidade: 'StepSubtaskDefinition', registroId: String(p.id), registroNome: s.key, quantidade: 1,
+            link: ROTA_INTERNO,
+            recomendacao: 'Reaponte a dependência ou cadastre a subtarefa que falta.',
+            evidencia: { passo: p.key, subtarefa: s.key, dependeDe: d },
+          })
+        }
+      }
+      const ciclo = detectarCiclo(p.subtarefas.map((s) => ({
+        key: s.key, label: s.label,
+        dependeDe: Array.isArray(s.dependeDe) ? (s.dependeDe as string[]) : [],
+      })))
+      if (ciclo) {
+        achados.push({
+          chave: `subdep-ciclo:${p.id}`, severidade: 'CRITICO',
+          titulo: `As subtarefas de "${p.key}" formam um ciclo`,
+          descricao: `O ciclo é ${ciclo.join(' → ')}.`,
+          explicacao: 'Cada uma espera a outra. Nenhuma fica disponível, e não há ordem que resolva.',
+          impacto: 'O passo trava por completo.',
+          entidade: 'PhaseInternalWorkflowStep', registroId: String(p.id), registroNome: p.key, quantidade: 1,
+          link: ROTA_INTERNO,
+          recomendacao: 'Quebre o ciclo removendo uma das dependências.',
+          evidencia: { passo: p.key, ciclo },
+        })
+      }
+    }
+    if (achados.length === 0) return vazio({ subtarefas: total, quebradas: 0 }, `${total} subtarefa(s) com dependências consistentes.`)
+    return { achados, metricas: { subtarefas: total, quebradas: achados.length } }
+  },
+})
+
+registrar({
+  id: 'saude.subtarefa.conclusao-sem-subtarefa',
+  codigo: 'SUB-004',
+  nome: 'Passo que conclui por subtarefas tem subtarefas',
+  descricao: 'Passo cuja regra de conclusão olha subtarefas e não tem nenhuma nunca conclui.',
+  dominio: 'WORKFLOW',
+  modulo: 'Subtarefas',
+  severidadePadrao: 'CRITICO',
+  obrigatoria: true,
+  modos: ['RAPIDO', 'COMPLETO', 'PROFUNDO'],
+  introduzidaEm: '1.3.0',
+  timeoutMs: 15_000,
+  orientacao: 'Cadastre as subtarefas, ou volte a condição de conclusão para "quando a ação do passo for executada".',
+  rotaCorrecao: ROTA_INTERNO,
+  responsavel: 'Workflow',
+  ativo: true,
+  executar: async (): Promise<ResultadoVerificacao> => {
+    const passos = await prisma.phaseInternalWorkflowStep.findMany({
+      where: { regraDeConclusao: { not: 'ACAO_DO_PASSO' } },
+      select: {
+        id: true, key: true, label: true, regraDeConclusao: true,
+        workflow: { select: { name: true } },
+        subtarefas: { where: { ativo: true }, select: { id: true } },
+      },
+    })
+    const sem = passos.filter((p) => p.subtarefas.length === 0)
+    if (sem.length === 0) return vazio({ passos: passos.length, sem: 0 }, `${passos.length} passo(s) concluem por subtarefa, todos com subtarefas.`)
+    return {
+      achados: sem.map((p): Achado => ({
+        chave: `conclusao-sem-subtarefa:${p.id}`, severidade: 'CRITICO',
+        titulo: `"${p.label}" conclui por subtarefas e não tem nenhuma`,
+        descricao: `Em "${p.workflow.name}", o passo declara ${p.regraDeConclusao} e não tem subtarefa ativa.`,
+        explicacao: 'A regra pergunta às subtarefas se pode concluir. Sem nenhuma, a resposta nunca chega.',
+        impacto: 'O passo não conclui, e a fase inteira trava atrás dele.',
+        entidade: 'PhaseInternalWorkflowStep', registroId: String(p.id), registroNome: p.key, quantidade: 1,
+        link: ROTA_INTERNO,
+        recomendacao: 'Cadastre as subtarefas ou volte a regra para a ação do passo.',
+        evidencia: { passo: p.key, regra: p.regraDeConclusao },
+      })),
+      metricas: { passos: passos.length, sem: sem.length },
+    }
+  },
+})
+
+registrar({
+  id: 'saude.subtarefa.canal-sem-organizacao',
+  codigo: 'SUB-005',
+  nome: 'Quem usa canal do fornecedor tem fornecedor com canal',
+  descricao: 'Subtarefa que envia pelo fornecedor fica bloqueada em todo documento cujo órgão não tem canal cadastrado.',
+  dominio: 'WORKFLOW',
+  modulo: 'Subtarefas',
+  severidadePadrao: 'ALERTA',
+  obrigatoria: false,
+  modos: ['COMPLETO', 'PROFUNDO'],
+  introduzidaEm: '1.3.0',
+  timeoutMs: 20_000,
+  orientacao: 'Cadastre os canais em Órgãos e Organizações → Canais de atendimento.',
+  rotaCorrecao: '/administrator?screen=canais',
+  responsavel: 'Workflow',
+  ativo: true,
+  executar: async (): Promise<ResultadoVerificacao> => {
+    const usamCanal = await prisma.stepSubtaskDefinition.count({
+      where: { ativo: true, fonteDeCanais: { not: 'NENHUMA' } },
+    })
+    if (usamCanal === 0) return vazio({ subtarefas: 0, orgaosSemCanal: 0 }, 'Nenhuma subtarefa depende de canal do fornecedor.')
+
+    // NENHUMA ORGANIZAÇÃO COM CANAL é o caso mais grave e o menos visível: a conta
+    // abaixo, que compara órgãos EM USO contra órgãos com canal, dá "tudo certo"
+    // quando nenhum documento aponta para órgão nenhum. Zero contra zero fecha, e o
+    // sistema parece saudável enquanto toda solicitação publicada bloquearia.
+    const totalDeVinculos = await prisma.organizacaoCanal.count({ where: { ativo: true } })
+    if (totalDeVinculos === 0) {
+      return {
+        achados: [{
+          chave: 'nenhuma-organizacao-com-canal', severidade: 'ALERTA',
+          titulo: `${usamCanal} subtarefa(s) enviam pelo fornecedor, e nenhuma organização tem canal cadastrado`,
+          descricao: 'A tabela de canais por organização está vazia.',
+          explicacao: 'A subtarefa resolve os canais pelo cadastro do órgão do documento. Sem nenhum cadastrado, ela bloqueia em todo documento — e publicar essa configuração pararia a solicitação inteira.',
+          impacto: 'Toda etapa de solicitação ficaria bloqueada assim que a configuração fosse publicada.',
+          entidade: 'OrganizacaoCanal', quantidade: 0,
+          link: '/administrator?screen=canais',
+          recomendacao: 'Cadastre por onde cada órgão atende ANTES de publicar as subtarefas que usam canal.',
+          evidencia: { subtarefasQueUsamCanal: usamCanal, vinculos: 0 },
+        }],
+        metricas: { subtarefas: usamCanal, orgaosSemCanal: 0, vinculos: 0 },
+      }
+    }
+
+    // OS ÓRGÃOS QUE JÁ SÃO USADOS por algum documento e não têm canal cadastrado. Órgão
+    // que ninguém usa não é problema: ele não bloqueia execução nenhuma.
+    const usados = await prisma.documento.groupBy({
+      by: ['orgaoId'], where: { orgaoId: { not: null } }, _count: { _all: true },
+    })
+    const comCanal = new Set((await prisma.organizacaoCanal.findMany({
+      where: { ativo: true }, select: { organizacaoId: true },
+    })).map((c) => c.organizacaoId))
+    const sem = usados.filter((u) => u.orgaoId && !comCanal.has(u.orgaoId))
+    if (sem.length === 0) return vazio({ subtarefas: usamCanal, orgaosSemCanal: 0 }, `${usamCanal} subtarefa(s) usam canal; todo órgão em uso tem canal cadastrado.`)
+
+    const nomes = await prisma.orgaoProtocolo.findMany({
+      where: { id: { in: sem.map((s) => s.orgaoId!).slice(0, 20) } }, select: { id: true, name: true },
+    })
+    return {
+      achados: nomes.map((o): Achado => ({
+        chave: `orgao-sem-canal:${o.id}`, severidade: 'ALERTA',
+        titulo: `"${o.name}" não tem canal de atendimento cadastrado`,
+        descricao: `${sem.find((s) => s.orgaoId === o.id)?._count._all ?? 0} documento(s) apontam para este órgão.`,
+        explicacao: 'A subtarefa que envia pelo fornecedor resolve os canais pelo cadastro dele. Sem canal, ela bloqueia.',
+        impacto: 'Toda etapa de solicitação nesses documentos fica bloqueada com "o órgão não tem canal cadastrado".',
+        entidade: 'OrgaoProtocolo', registroId: String(o.id), registroNome: o.name, quantidade: 1,
+        link: '/administrator?screen=canais',
+        recomendacao: 'Cadastre por onde este órgão atende.',
+        evidencia: { orgaoId: o.id },
+      })),
+      metricas: { subtarefas: usamCanal, orgaosSemCanal: sem.length },
+    }
+  },
+})

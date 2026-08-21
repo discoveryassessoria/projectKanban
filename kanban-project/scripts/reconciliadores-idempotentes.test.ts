@@ -66,6 +66,10 @@ const RECONCILIADORES: Array<{ arquivo: string; fn: string; oQueConverge: string
   { arquivo: "src/services/registral/reconciliacao-documental.ts", fn: "reconciliarDocumentalDoProcesso", oQueConverge: "documentos × linhagem registral" },
   { arquivo: "src/services/financeiro/reconciliacao-documental-financeira.ts", fn: "reconciliarDocumentalFinanceiro", oQueConverge: "documento × lançamento financeiro" },
   { arquivo: "lib/operacional/reconciliar-tarefas.ts", fn: "reconciliarTarefas", oQueConverge: "tarefa × passos" },
+  // Concluir uma subtarefa muda o estado das que dependiam dela. Sem reconciliar, elas
+  // continuariam BLOQUEADO no banco enquanto a projeção já as considera disponíveis —
+  // duas respostas para a mesma pergunta.
+  { arquivo: "src/services/subtarefas-da-etapa.ts", fn: "reconciliarSubtarefas", oQueConverge: "execução da subtarefa × dependências e condições" },
 ]
 
 const encontrados: string[] = []

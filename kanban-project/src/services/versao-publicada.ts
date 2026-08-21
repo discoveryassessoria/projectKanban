@@ -66,6 +66,45 @@ export interface PassoCongelado {
   checkItens: ItemChecklistCongelado[]
   canais: CanalCongelado[]
   requisitos: RequisitoCongelado[]
+  /// A REGRA DE CONCLUSÃO da época. Mudar hoje "conclui quando todas as subtarefas
+  /// obrigatórias estiverem feitas" não muda o que valia para quem já estava rodando.
+  regraDeConclusao: string
+  /// AS SUBTAREFAS como o passo as oferecia. Sem congelá-las, acrescentar uma em V2
+  /// apareceria dentro de um processo que roda V1 — a mesma contaminação que o
+  /// versionamento já impede um nível acima.
+  subtarefas: SubtarefaCongelada[]
+}
+
+/// Uma subtarefa como ESTE passo a definia, com tudo o que era dela.
+export interface SubtarefaCongelada {
+  key: string
+  label: string
+  descricao: string | null
+  ordem: number
+  ativo: boolean
+  obrigatoria: boolean
+  repetivel: boolean
+  maxOcorrencias: number | null
+  modoExecucao: string
+  responsavelRegra: string
+  responsavelId: number | null
+  slaDays: number | null
+  condicaoEntrada: unknown
+  condicaoConclusao: unknown
+  condicaoVisibilidade: unknown
+  dependeDe: string[]
+  executorKey: string | null
+  cardinalidade: string | null
+  fonteDeCanais: string
+  tiposDeCanal: string[]
+  reaberturaPermitida: boolean | null
+  reaberturaExigeJustificativa: boolean | null
+  reaberturaPermissao: string | null
+  /// Os filhos DELA — os que o passo tem para si ficam no passo.
+  acoes: AcaoCongelada[]
+  campos: CampoCongelado[]
+  checkItens: ItemChecklistCongelado[]
+  requisitos: RequisitoCongelado[]
 }
 
 /**
@@ -136,6 +175,10 @@ export interface RequisitoCongelado {
   acaoKey: string | null
   ordem: number
   ativo: boolean
+  /// EVIDÊNCIA — qual documento mestre, que formatos, e em que momento é cobrada.
+  evidenciaTipoId: number | null
+  mimesPermitidos: string[] | null
+  momento: string
 }
 
 export interface AcaoCongelada {
@@ -210,36 +253,97 @@ export interface VersaoPublicada {
  *
  * Devolve `true` quando esta chamada foi a que congelou.
  */
-export async function congelarVersaoVigente(
-  workflowId: number,
-  origem: OrigemVersao,
-  db: DB = prisma,
-  congeladoPorId?: number | null,
-): Promise<boolean> {
-  const wf = await db.phaseInternalWorkflow.findUnique({
-    where: { id: workflowId },
-    include: {
-      passos: {
-        orderBy: { ordem: "asc" },
-        include: {
-          acoes: { orderBy: { ordem: "asc" } },
-          campos: { orderBy: { ordem: "asc" }, include: { opcoesCadastradas: { orderBy: { ordem: "asc" } } } },
-          checkItens: { orderBy: { ordem: "asc" } },
-          canais: { orderBy: { ordem: "asc" }, include: { canal: true } },
-          requisitos: { orderBy: { ordem: "asc" } },
-        },
+/**
+ * O QUE PRECISA SER LIDO para montar o retrato de uma definição.
+ *
+ * Exportado porque o congelamento e a PRÉVIA DE PUBLICAÇÃO leem a mesma coisa: um
+ * compara o congelado com o vivo, o outro grava o vivo. Dois `include` diferentes para
+ * a mesma leitura fariam a prévia acusar mudança em campo que o congelamento nem lê.
+ */
+export const INCLUDE_DA_DEFINICAO = {
+  orderBy: { ordem: "asc" },
+  include: {
+    acoes: { where: { subtaskId: null }, orderBy: { ordem: "asc" } },
+    campos: { where: { subtaskId: null }, orderBy: { ordem: "asc" }, include: { opcoesCadastradas: { orderBy: { ordem: "asc" } } } },
+    checkItens: { where: { subtaskId: null }, orderBy: { ordem: "asc" } },
+    canais: { orderBy: { ordem: "asc" }, include: { canal: true } },
+    requisitos: { where: { subtaskId: null }, orderBy: { ordem: "asc" } },
+    subtarefas: {
+      orderBy: { ordem: "asc" },
+      include: {
+        acoes: { orderBy: { ordem: "asc" } },
+        campos: { orderBy: { ordem: "asc" }, include: { opcoesCadastradas: { orderBy: { ordem: "asc" } } } },
+        checkItens: { orderBy: { ordem: "asc" } },
+        requisitos: { orderBy: { ordem: "asc" } },
       },
     },
-  })
-  if (!wf) return false
+  },
+} as const
 
-  const jaCongelada = await db.phaseInternalWorkflowVersao.findUnique({
-    where: { workflowId_versao: { workflowId, versao: wf.versao } },
-    select: { id: true },
-  })
-  if (jaCongelada) return false
+// ── OS MAPEADORES SÃO COMPARTILHADOS ENTRE PASSO E SUBTAREFA ────────────────
+//
+// Campo, ação, checklist e requisito são a MESMA coisa nos dois lugares — o que muda
+// é a quem pertencem. Duplicar o mapeamento faria a subtarefa congelar menos atributos
+// que o passo, e a diferença só apareceria meses depois, num histórico incompleto.
 
-  const passos: PassoCongelado[] = wf.passos.map((p) => ({
+function congelarAcao(a: {
+  key: string; label: string; descricao: string | null; ordem: number; effectKey: string
+  requerCampos: unknown; permissao: string | null; condicao: unknown; metadata: unknown; ativo: boolean
+}): AcaoCongelada {
+  return {
+    key: a.key, label: a.label, descricao: a.descricao, ordem: a.ordem, effectKey: a.effectKey,
+    requerCampos: Array.isArray(a.requerCampos) ? (a.requerCampos as string[]) : [],
+    permissao: a.permissao, condicao: a.condicao ?? null, metadata: a.metadata ?? null,
+    ativo: a.ativo,
+  }
+}
+
+function congelarCampo(c: {
+  key: string; label: string; tipo: string; obrigatorio: boolean; ajuda: string | null
+  ordem: number; ativo: boolean; opcoes: unknown; condicao: unknown
+  opcoesCadastradas: Array<{ key: string; label: string; descricao: string | null; ordem: number; ativo: boolean; condicao: unknown }>
+}): CampoCongelado {
+  return {
+    key: c.key, label: c.label, tipo: c.tipo, obrigatorio: c.obrigatorio,
+    opcoesCadastradas: c.opcoesCadastradas.map((o) => ({
+      key: o.key, label: o.label, descricao: o.descricao, ordem: o.ordem,
+      ativo: o.ativo, condicao: o.condicao ?? null,
+    })),
+    opcoes: c.opcoes ?? null, condicao: c.condicao ?? null, ajuda: c.ajuda,
+    ordem: c.ordem, ativo: c.ativo,
+  }
+}
+
+function congelarItem(i: {
+  key: string; label: string; descricao: string | null; obrigatorio: boolean; ordem: number; ativo: boolean
+}): ItemChecklistCongelado {
+  return { key: i.key, label: i.label, descricao: i.descricao, obrigatorio: i.obrigatorio, ordem: i.ordem, ativo: i.ativo }
+}
+
+function congelarRequisito(r: {
+  key: string; label: string; descricao: string | null; tipo: string; alvoKey: string | null
+  minimo: number; obrigatorio: boolean; condicao: unknown; acaoKey: string | null
+  ordem: number; ativo: boolean; evidenciaTipoId: number | null; mimesPermitidos: unknown; momento: string
+}): RequisitoCongelado {
+  return {
+    key: r.key, label: r.label, descricao: r.descricao, tipo: r.tipo, alvoKey: r.alvoKey,
+    minimo: r.minimo, obrigatorio: r.obrigatorio, condicao: r.condicao ?? null,
+    acaoKey: r.acaoKey, ordem: r.ordem, ativo: r.ativo,
+    evidenciaTipoId: r.evidenciaTipoId,
+    mimesPermitidos: Array.isArray(r.mimesPermitidos) ? (r.mimesPermitidos as string[]) : null,
+    momento: r.momento,
+  }
+}
+
+/**
+ * O RETRATO DE UMA DEFINIÇÃO — o mesmo formato do congelado, a partir do vivo.
+ *
+ * Exportado porque a prévia de publicação precisa comparar maçã com maçã: o congelado
+ * de ontem contra o vivo de hoje. Antes cada lado montava o seu retrato, e a prévia
+ * mentia exatamente nos atributos em que os dois discordavam.
+ */
+export function retratarPassos(passos: PassosComFilhos): PassoCongelado[] {
+  return passos.map((p) => ({
     key: p.key, label: p.label, description: p.description, ordem: p.ordem,
     createsTask: p.createsTask, required: p.required, owner: p.owner,
     priority: p.priority, slaDays: p.slaDays, cardinalidade: p.cardinalidade,
@@ -250,35 +354,64 @@ export async function congelarVersaoVigente(
     reaberturaEstrategia: p.reaberturaEstrategia,
     reaberturaExigeJustificativa: p.reaberturaExigeJustificativa,
     reaberturaPermissao: p.reaberturaPermissao,
-    acoes: p.acoes.map((a) => ({
-      key: a.key, label: a.label, descricao: a.descricao, ordem: a.ordem,
-      effectKey: a.effectKey,
-      requerCampos: Array.isArray(a.requerCampos) ? (a.requerCampos as string[]) : [],
-      permissao: a.permissao, condicao: a.condicao ?? null, metadata: a.metadata ?? null,
-      ativo: a.ativo,
+    regraDeConclusao: p.regraDeConclusao,
+    subtarefas: p.subtarefas.map((st) => ({
+      key: st.key, label: st.label, descricao: st.descricao, ordem: st.ordem, ativo: st.ativo,
+      obrigatoria: st.obrigatoria, repetivel: st.repetivel, maxOcorrencias: st.maxOcorrencias,
+      modoExecucao: st.modoExecucao, responsavelRegra: st.responsavelRegra,
+      responsavelId: st.responsavelId, slaDays: st.slaDays,
+      condicaoEntrada: st.condicaoEntrada ?? null,
+      condicaoConclusao: st.condicaoConclusao ?? null,
+      condicaoVisibilidade: st.condicaoVisibilidade ?? null,
+      dependeDe: Array.isArray(st.dependeDe) ? (st.dependeDe as string[]) : [],
+      executorKey: st.executorKey, cardinalidade: st.cardinalidade,
+      fonteDeCanais: st.fonteDeCanais,
+      tiposDeCanal: Array.isArray(st.tiposDeCanal) ? (st.tiposDeCanal as string[]) : [],
+      reaberturaPermitida: st.reaberturaPermitida,
+      reaberturaExigeJustificativa: st.reaberturaExigeJustificativa,
+      reaberturaPermissao: st.reaberturaPermissao,
+      acoes: st.acoes.map(congelarAcao),
+      campos: st.campos.map(congelarCampo),
+      checkItens: st.checkItens.map(congelarItem),
+      requisitos: st.requisitos.map(congelarRequisito),
     })),
-    campos: p.campos.map((c) => ({
-      key: c.key, label: c.label, tipo: c.tipo, obrigatorio: c.obrigatorio,
-      opcoesCadastradas: c.opcoesCadastradas.map((o) => ({
-        key: o.key, label: o.label, descricao: o.descricao, ordem: o.ordem,
-        ativo: o.ativo, condicao: o.condicao ?? null,
-      })),
-      opcoes: c.opcoes ?? null, condicao: c.condicao ?? null, ajuda: c.ajuda,
-      ordem: c.ordem, ativo: c.ativo,
-    })),
+    acoes: p.acoes.map(congelarAcao),
+    campos: p.campos.map(congelarCampo),
     // O CANAL É CONGELADO COM O QUE ELE EXIGIA. Inativar um canal no catálogo não pode
     // mudar o que uma execução antiga oferecia — nem apagar o que ela escolheu.
     canais: p.canais.map((sc) => resolverCanalDoPasso(sc)),
-    requisitos: p.requisitos.map((r) => ({
-      key: r.key, label: r.label, descricao: r.descricao, tipo: r.tipo, alvoKey: r.alvoKey,
-      minimo: r.minimo, obrigatorio: r.obrigatorio, condicao: r.condicao ?? null,
-      acaoKey: r.acaoKey, ordem: r.ordem, ativo: r.ativo,
-    })),
-    checkItens: p.checkItens.map((i) => ({
-      key: i.key, label: i.label, descricao: i.descricao,
-      obrigatorio: i.obrigatorio, ordem: i.ordem, ativo: i.ativo,
-    })),
+    requisitos: p.requisitos.map(congelarRequisito),
+    checkItens: p.checkItens.map(congelarItem),
   }))
+}
+
+/** O tipo que `INCLUDE_DA_DEFINICAO` produz. */
+export type PassosComFilhos = Prisma.PhaseInternalWorkflowStepGetPayload<typeof INCLUDE_DA_DEFINICAO>[]
+
+export async function congelarVersaoVigente(
+  workflowId: number,
+  origem: OrigemVersao,
+  db: DB = prisma,
+  congeladoPorId?: number | null,
+): Promise<boolean> {
+  const wf = await db.phaseInternalWorkflow.findUnique({
+    where: { id: workflowId },
+    include: {
+      // OS FILHOS DO PASSO são os que NÃO pertencem a subtarefa nenhuma (ver
+      // INCLUDE_DA_DEFINICAO). Sem esse filtro, um campo da subtarefa apareceria duas
+      // vezes na versão congelada — uma como campo do passo, outra como campo dela.
+      passos: INCLUDE_DA_DEFINICAO,
+    },
+  })
+  if (!wf) return false
+
+  const jaCongelada = await db.phaseInternalWorkflowVersao.findUnique({
+    where: { workflowId_versao: { workflowId, versao: wf.versao } },
+    select: { id: true },
+  })
+  if (jaCongelada) return false
+
+  const passos = retratarPassos(wf.passos)
 
   const r = await db.phaseInternalWorkflowVersao.createMany({
     data: [{
