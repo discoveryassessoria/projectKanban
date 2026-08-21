@@ -55,6 +55,9 @@ const DONO_RUNTIME = "src/services/necessidade-documental.ts"
  * há regra "tudo em scripts/ pode".
  */
 const AUTORIZADOS_FORA_DO_RUNTIME: Record<string, string> = {
+  "scripts/provas-finais.test.ts":
+    "provas finais: monta e derruba a PRÓPRIA árvore, pessoas e necessidades (marca PROVA) " +
+    "só no banco de teste — a prova de exclusão precisa de alguém para excluir",
   "scripts/e2e-master.test.ts":
     "E2E master: cria a PRÓPRIA necessidade (marca E2E) só no banco de teste — o fluxo " +
     "documental inteiro precisa de uma necessidade para o documento atender",

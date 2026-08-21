@@ -199,6 +199,7 @@
     "test:concorrencia": "tsx scripts/concorrencia-adversarial.test.ts",
     "test:projecoes": "tsx scripts/projecoes-concordam.test.ts",
     "test:performance": "tsx scripts/performance-escala.test.ts",
+    "test:provas-finais": "tsx scripts/provas-finais.test.ts",
     "test:e2e-master": "tsx scripts/e2e-master.test.ts",
     "test:writers": "tsx scripts/guard-writers-canonicos.test.ts",
     "test:frontend-nao-motor": "tsx scripts/guard-frontend-nao-e-motor.test.ts",
