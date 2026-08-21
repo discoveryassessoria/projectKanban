@@ -10,6 +10,7 @@ const ROTAS = [
   ["TOCADA", "/api/gerenciamento/workflows-fase"],
   ["TOCADA", "/api/gerenciamento/catalogo-execucao"],
   ["TOCADA", "/api/gerenciamento/canais"],
+  ["TOCADA", "/api/gerenciamento/organizacoes-canais"],
   // ── NÃO tocadas ────────────────────────────────────────────────────────
   ["INTACTA", "/login"],
   ["INTACTA", "/kanban"],
