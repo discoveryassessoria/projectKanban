@@ -210,6 +210,7 @@
     "test:cadastro-canonico": "tsx scripts/cadastro-canonico.test.ts",
     "test:cadastro-integral": "tsx scripts/cadastro-integral.test.ts",
     "test:cadastro-integral-http": "tsx scripts/e2e-cadastro-integral-http.test.ts",
+    "smoke:producao": "node scripts/smoke-producao.mjs",
     "backfill:cadastro-integral": "tsx scripts/backfill-cadastro-integral-do-passo.ts",
     "test:fuzz": "tsx scripts/fuzz-invariantes.ts",
     "seed:cadastro-canonico": "tsx scripts/seed-cadastro-canonico.ts",
