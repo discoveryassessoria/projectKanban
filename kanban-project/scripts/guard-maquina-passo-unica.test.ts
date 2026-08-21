@@ -93,16 +93,28 @@ ok("transicionarPassoTx reaproveita aplicarPasso, não reimplementa",
 ok("a tabela de eventos por alvo é única",
   /export const EVENTO_PASSO_POR_ALVO/.test(syncCode),
   "sem ela cada chamador escolhe o tipo do evento e o mesmo alvo vira dois nomes no histórico")
-// A JANELA CRESCEU COM O GATE 2: reabrir passou a abrir uma TENTATIVA nova antes de
-// mexer no passo, e esse bloco fica entre o início da função e a emissão do evento.
-// O que o guard protege continua sendo o mesmo — reabrir sem evento apaga do
-// histórico que o trabalho já tinha sido concluído —, e o evento continua lá.
-ok("reabrirPassoTx emite PASSO_REABERTO",
-  /reabrirPassoTx[\s\S]{0,4000}?"PASSO_REABERTO"/.test(syncCode),
+// JANELA DE CARACTERES NÃO É ESTRUTURA.
+//
+// Estas asserções mediam "existe X nos primeiros N caracteres depois do nome da
+// função", e reprovaram duas vezes por a função ter crescido — sem que nada do que
+// elas protegem tivesse mudado. O guard passa a ler o CORPO da função: cresça o
+// quanto crescer, o que se cobra é que estas coisas estejam nele.
+function corpoDaFuncao(codigo: string, nome: string): string {
+  const i = codigo.indexOf(`export async function ${nome}`)
+  if (i < 0) return ""
+  const j = codigo.indexOf("\nexport ", i + 1)
+  return codigo.slice(i, j < 0 ? codigo.length : j)
+}
+const corpoReabrir = corpoDaFuncao(syncCode, "reabrirPassoTx")
+ok("reabrirPassoTx existe e é legível como uma função inteira", corpoReabrir.length > 0)
+ok("reabrirPassoTx emite PASSO_REABERTO", /"PASSO_REABERTO"/.test(corpoReabrir),
   "reabrir sem evento apaga do histórico que o trabalho já tinha sido concluído")
-ok("reabrirPassoTx abre uma TENTATIVA nova em vez de desconcluir a anterior",
-  /reabrirPassoTx[\s\S]{0,2500}?abrirTentativa\(/.test(syncCode),
+ok("reabrirPassoTx abre uma TENTATIVA nova em vez de desconcluir a anterior", /abrirTentativa\(/.test(corpoReabrir),
   "sem tentativa nova, `completedAt = null` apaga a execução que aconteceu")
+ok("reabrir alcança QUEM DEPENDE do passo reaberto", /descendentes\(grafoDaUnidade/.test(corpoReabrir),
+  "sem propagação, um sucessor continua em execução dependendo do que voltou a estar aberto")
+ok("reabrir respeita a dependência: não se reabre o sucessor sozinho", /DEPENDENCIA_PENDENTE/.test(corpoReabrir),
+  "começar pelo fim é a forma exata do estado impossível que apareceu no Abellan")
 
 // ═══════════════════════════════════════════════════════════════════════════
 secao("2) O estado da TAREFA é derivado — o dono do passo não decide por ela")

@@ -1,6 +1,7 @@
 "use client"
 
 import { useEffect, useState, useCallback } from "react"
+import ConfiguracaoDoPassoModal, { type PassoConfiguravel } from "./ConfiguracaoDoPassoModal"
 
 // Rótulo da CARDINALIDADE do passo (quantas instâncias, presas a qual entidade).
 // Nada a ver com "global (compartilhado)", que é o compartilhamento do WORKFLOW.
@@ -37,6 +38,12 @@ const CARDINALIDADE_LABEL: Record<string, string> = {
 // ============================================================
 interface Step {
   id?: number
+  /** Configuração cadastrada do passo — o que era array dentro do executor. */
+  executorKey?: string | null
+  dependeDe?: string[] | null
+  acoes?: Array<{ key?: string; label: string; descricao?: string | null; effectKey: string; ordem?: number; requerCampos?: string[]; ativo?: boolean }>
+  campos?: Array<{ key?: string; label: string; tipo: string; obrigatorio?: boolean; opcoes?: unknown; ajuda?: string | null; ordem?: number; ativo?: boolean }>
+  checkItens?: Array<{ key?: string; label: string; descricao?: string | null; obrigatorio?: boolean; ordem?: number; ativo?: boolean }>
   key: string
   label: string
   description?: string | null
@@ -128,6 +135,8 @@ export default function PhaseWorkflowsFasesTab() {
   const [replaceAsk, setReplaceAsk] = useState<{ templateId: number; phaseKey: string; label: string } | null>(null)
 
   const [stepModal, setStepModal] = useState<{ wf: Workflow; editKey?: string } | null>(null)
+  const [configModal, setConfigModal] = useState<{ wf: Workflow; step: Step } | null>(null)
+  const [problemas, setProblemas] = useState<Array<{ codigo: string; stepKey: string | null; mensagem: string }>>([])
   const [stepForm, setStepForm] = useState({ label: "", createsTask: true, required: true, cardinalidade: "", owner: "", slaDays: 0, completionRule: "" })
 
   const load = useCallback(async () => {
@@ -219,7 +228,15 @@ export default function PhaseWorkflowsFasesTab() {
         method: "PUT", headers: authHeaders(), body: JSON.stringify({ steps }),
       })
       const j = await res.json().catch(() => ({}))
-      if (res.ok && j.workflow) upsertWorkflowLocal(j.workflow)   // troca pelo real (ids/ordem)
+      if (res.ok && j.workflow) { setProblemas([]); upsertWorkflowLocal(j.workflow) }   // troca pelo real (ids/ordem)
+      else if (Array.isArray(j.problemas)) {
+        // A PUBLICAÇÃO FOI RECUSADA e o servidor disse por quê. A tela mostra o motivo
+        // no lugar onde ele se conserta, em vez de um "erro ao salvar" genérico —
+        // e recarrega, porque a transação inteira foi desfeita no servidor.
+        setProblemas(j.problemas)
+        showFlash("A configuração não pôde ser publicada — veja os motivos no passo.")
+        await load()
+      }
       else { showFlash(j.error || "Erro ao salvar — recarregando."); await load() }
     } catch {
       showFlash("Erro de conexão — recarregando."); await load()
@@ -429,9 +446,17 @@ export default function PhaseWorkflowsFasesTab() {
                         <span className="rounded bg-sky-500/15 px-1.5 py-0.5 text-sky-300">{CARDINALIDADE_LABEL[st.cardinalidade || ""] ?? st.cardinalidade}</span>
                         {st.owner && <span className="rounded bg-white/10 px-1.5 py-0.5 text-white/60">{st.owner}</span>}
                         {!!st.slaDays && st.slaDays > 0 && <span className="rounded bg-white/10 px-1.5 py-0.5 text-white/60">SLA {st.slaDays}d</span>}
+                        {(st.acoes?.length ?? 0) > 0 && <span className="rounded bg-violet-500/15 px-1.5 py-0.5 text-violet-300">{st.acoes!.length} ações</span>}
+                        {(st.campos?.length ?? 0) > 0 && <span className="rounded bg-violet-500/15 px-1.5 py-0.5 text-violet-300">{st.campos!.length} campos</span>}
+                        {(st.checkItens?.length ?? 0) > 0 && <span className="rounded bg-violet-500/15 px-1.5 py-0.5 text-violet-300">checklist {st.checkItens!.length}</span>}
+                        {(st.dependeDe?.length ?? 0) > 0 && <span className="rounded bg-white/10 px-1.5 py-0.5 text-white/60">depende de {st.dependeDe!.length}</span>}
+                        {problemas.some((pr) => pr.stepKey === st.key) && <span className="rounded bg-red-500/20 px-1.5 py-0.5 text-red-300">publicação recusada</span>}
                       </div>
                     </div>
                     <div className="flex flex-none items-center gap-0.5 text-white/50">
+                      <button title="Configurar campos, ações, checklist e dependências" aria-label="Configurar"
+                        onClick={() => setConfigModal({ wf, step: st })}
+                        className="rounded px-2 py-1 text-[11px] text-blue-300 hover:bg-blue-500/10 hover:text-blue-200">Configurar</button>
                       <button title="Editar" aria-label="Editar" onClick={() => openEditStep(wf, st)} className="rounded p-1 hover:bg-white/10 hover:text-white"><IEdit /></button>
                       <button title="Duplicar" aria-label="Duplicar" onClick={() => dupStep(wf, st)} className="rounded p-1 hover:bg-white/10 hover:text-white"><ICopy /></button>
                       <button title="Subir" aria-label="Subir" disabled={idx === 0} onClick={() => moveStep(wf, st, -1)} className="rounded p-1 hover:bg-white/10 hover:text-white disabled:opacity-30"><IUp /></button>
@@ -445,6 +470,24 @@ export default function PhaseWorkflowsFasesTab() {
           </div>
         )
       })}
+
+      {/* CONFIGURAÇÃO DO PASSO — campos, ações, checklist e dependências */}
+      {configModal && (
+        <ConfiguracaoDoPassoModal
+          passo={configModal.step as PassoConfiguravel}
+          irmaos={configModal.wf.passos.map((s) => ({ key: s.key, label: s.label }))}
+          phaseKey={configModal.wf.phaseKey}
+          faseLabel={configModal.wf.name}
+          problemas={problemas}
+          onFechar={() => setConfigModal(null)}
+          onSalvar={async (novo) => {
+            const wf = configModal.wf
+            const steps = wf.passos.map((s) => (s.key === configModal.step.key ? { ...s, ...novo } : s))
+            await putSteps(wf, steps as Step[])
+            setConfigModal(null)
+          }}
+        />
+      )}
 
       {/* MODAL — aplicar modelo */}
       {applyFor && (

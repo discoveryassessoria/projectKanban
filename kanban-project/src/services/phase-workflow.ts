@@ -147,8 +147,11 @@ export async function resolverWorkflowAplicavel(
     slaDays: p.slaDays, completionRule: p.completionRule, checklist: p.checklist, versao: p.versao,
     cardinalidade: normalizarCardinalidade(p.cardinalidade),
     tipo: null,
-    // A sequência é derivada do MODO DE EXECUÇÃO configurado no workflow, no
-    // planejamento (phase-workflow-escopo). Aqui não se decide nada.
+    // A DEPENDÊNCIA DECLARADA vem do cadastro; quando ela não existe, o modo de
+    // execução responde no planejamento (phase-workflow-escopo). Aqui não se decide
+    // nada — só se carrega o que foi declarado.
+    dependeDe: Array.isArray(p.dependeDe) ? (p.dependeDe as string[]) : null,
+    executorKey: p.executorKey,
     dependeDeStepKeys: null,
   }))
   return { workflow, steps }

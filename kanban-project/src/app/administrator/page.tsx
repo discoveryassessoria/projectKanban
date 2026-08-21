@@ -127,6 +127,7 @@ const MigracaoMotorTab = dynamic(() => import("@/src/components/gerenciamentoCom
 // REESTRUTURAÇÃO 25/07 — telas dedicadas dos cadastros que já tinham API e antes
 // só existiam como modal dentro de Tipos de Processo (países/modalidades) ou como
 // scaffold sem persistência (países). Mesmas rotas, mesmo contrato, mesmas regras.
+const CanaisOperacionaisTab = dynamic(() => import("@/src/components/gerenciamentoComponents/CanaisOperacionaisTab"), { ssr: false, loading: () => <CarregandoTela /> })
 const CatalogoFasesTab = dynamic(() => import("@/src/components/gerenciamentoComponents/CatalogoFasesTab"), { ssr: false, loading: () => <CarregandoTela /> })
 const ModalidadesTab = dynamic(() => import("@/src/components/gerenciamentoComponents/ModalidadesTab"), { ssr: false, loading: () => <CarregandoTela /> })
 const PaisesRegioesTab = dynamic(() => import("@/src/components/gerenciamentoComponents/PaisesRegioesTab"), { ssr: false, loading: () => <CarregandoTela /> })
@@ -244,6 +245,7 @@ const TELAS: Record<string, React.ComponentType> = {
 
   // bespoke (lote 3)
   phaseiwf: PhaseWorkflowsFasesTab,
+  canais: CanaisOperacionaisTab,
 
   // bespoke (lote 4)
   catalog: ProdutosTab,

@@ -125,7 +125,11 @@ ok(JSON.stringify(itensDaSecao("grp_processos", "Cadastros")) === JSON.stringify
 // e Regras. Nenhum runtime a consumia; era cadastro sem consumidor.
 ok(JSON.stringify(itensDaSecao("grp_processos", "Estrutura")) === JSON.stringify(["fases"]), "Processos › Estrutura = Fases")
 ok(JSON.stringify(itensDaSecao("grp_processos", "Configurações")) === JSON.stringify(["sla", "cfgversions", "proccfg"]), "Processos › Configurações = SLA, Versões, Configurações Gerais")
-ok(JSON.stringify(itensDaSecao("grp_workflow", "Fluxos")) === JSON.stringify(["macrokanban", "phaseiwf"]), "Workflow › Fluxos = Workflow Macro + Workflow Interno")
+// "Canais de solicitação" entrou em 21/08: a lista de canais (CRC, e-cartório,
+// e-mail, WhatsApp, balcão, comune, correios, consulado) era um array em código, e
+// acrescentar um exigia deploy. Fica sob Fluxos porque é o Workflow Interno que a
+// consome — um campo de passo aponta para este cadastro em vez de repetir a lista.
+ok(JSON.stringify(itensDaSecao("grp_workflow", "Fluxos")) === JSON.stringify(["macrokanban", "phaseiwf", "canais"]), "Workflow › Fluxos = Workflow Macro + Workflow Interno + Canais")
 // Classificação financeira ELIMINADA (02/08/2026): o comportamento financeiro vive na
 // Configuração Financeira do cadastro mestre; preço, na Tabela de Valores. Sem cadastro
 // intermediário — nem categoria, nem plano de contas, nem centro de custo.

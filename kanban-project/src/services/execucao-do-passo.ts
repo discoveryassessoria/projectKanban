@@ -110,6 +110,8 @@ export async function abrirTentativa(
     motivo: MotivoDeTentativa
     status: StepInstanceStatus
     startedAt?: Date | null
+    /** Quando a tentativa já nasce cumprida (backfill, herança), o momento disso. */
+    completedAt?: Date | null
     executadoPorId?: number | null
     payload?: Prisma.InputJsonValue | null
     correlationId?: string | null
@@ -129,11 +131,20 @@ export async function abrirTentativa(
   if (jaExiste) return { tentativa: jaExiste, substituiu: null, criada: false }
 
   const agora = new Date()
+  // TENTATIVA CONCLUÍDA TEM DATA — inclusive a que nasce assim.
+  //
+  // Uma tentativa nova normalmente nasce aberta, mas nada impede um chamador de abrir
+  // uma já no estado em que o passo está, e o passo pode estar cumprido. Nascer
+  // "CONCLUIDO" com `completedAt` nulo produziria exatamente o que o Gate 2 existe
+  // para impedir: um estado de conclusão sem o momento dela. O fuzz encontrou isso em
+  // 19 comandos; aqui a incoerência deixa de ser representável.
+  const nasceCumprida = args.status === "CONCLUIDO" || args.status === "EXECUTADO"
   const criadas = await db.stepExecution.createMany({
     data: [{
       stepInstanceId: args.stepInstanceId,
       sequencia,
       status: args.status,
+      completedAt: nasceCumprida ? (args.completedAt ?? agora) : (args.completedAt ?? null),
       motivo: args.motivo,
       startedAt: args.startedAt ?? null,
       executadoPorId: args.executadoPorId ?? null,

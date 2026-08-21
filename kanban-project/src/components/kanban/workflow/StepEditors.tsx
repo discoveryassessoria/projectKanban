@@ -14,7 +14,9 @@
 
 "use client"
 
+import * as React from "react"
 import { useState, useEffect, useCallback, useMemo, useRef } from "react"
+import PainelDeclarativoDaEtapa from "./PainelDeclarativoDaEtapa"
 import { useApi } from "@/src/lib/dados"
 import { createPortal } from "react-dom"
 import {
@@ -420,6 +422,28 @@ export interface StepEditorRouterProps {
   onSaved?: () => void
 }
 
+/**
+ * Decide entre o painel declarativo e o operacional PELO DADO: se a etapa tem
+ * configuração cadastrada na versão dela, é ela que manda a tela. A pergunta é feita
+ * ao servidor uma vez; enquanto ela não volta, nada pisca — o painel operacional já
+ * é a resposta certa para a maioria das etapas hoje.
+ */
+function PainelDeclarativoComFallback({
+  stepInstanceId, onExecutado, fallback,
+}: { stepInstanceId: number; onExecutado?: () => void; fallback: React.ReactNode }) {
+  const [temConfig, setTemConfig] = React.useState<boolean | null>(null)
+  React.useEffect(() => {
+    const t = typeof window !== "undefined" ? localStorage.getItem("token") : null
+    fetch(`/api/workflow-step-instances/${stepInstanceId}/execucao`, { headers: t ? { Authorization: `Bearer ${t}` } : {} })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((j) => setTemConfig(Boolean(j?.configuracao?.acoes?.length || j?.configuracao?.campos?.length)))
+      .catch(() => setTemConfig(false))
+  }, [stepInstanceId])
+  if (temConfig === null) return <>{fallback}</>
+  if (!temConfig) return <>{fallback}</>
+  return <PainelDeclarativoDaEtapa stepInstanceId={stepInstanceId} onExecutado={onExecutado} />
+}
+
 export function StepEditorRouter(props: StepEditorRouterProps) {
   const { stepKey, phaseKey, editorKind, stepTitle, ...rest } = props
   const kind: StepEditorKind =
@@ -443,8 +467,21 @@ export function StepEditorRouter(props: StepEditorRouterProps) {
     case "padrao":
     default:
       // NÃO É ERRO. Toda etapa publicada tem interface executável — quando não há
-      // editor específico, vale o painel operacional padrão.
-      return <DefaultWorkflowStepEditor stepTitle={stepTitle ?? null} {...rest} />
+      // editor específico, vale o painel declarativo, que desenha o que o CADASTRO
+      // diz que esta etapa tem. É por causa dele que um passo criado pelo
+      // administrador executa sem código: os campos, os resultados e o checklist vêm
+      // da versão congelada, não daqui.
+      //
+      // Sem configuração cadastrada — etapa anterior ao versionamento —, o painel
+      // operacional de sempre continua respondendo. As duas coisas convivem porque
+      // são estados de dado diferentes, não dois caminhos para a mesma coisa.
+      return (
+        <PainelDeclarativoComFallback
+          stepInstanceId={rest.stepId}
+          onExecutado={rest.onSaved}
+          fallback={<DefaultWorkflowStepEditor stepTitle={stepTitle ?? null} {...rest} />}
+        />
+      )
   }
 }
 

@@ -1,0 +1,178 @@
+"use client"
+// src/components/gerenciamentoComponents/CanaisOperacionaisTab.tsx
+//
+// OS CANAIS SÃO CADASTRO.
+//
+// CRC, e-cartório, e-mail, WhatsApp, balcão, comune, correios, consulado viviam num
+// array de código: acrescentar "Portal Estadual" era um deploy. Aqui eles são dado,
+// com o que cada um exige — protocolo no ato, comprovante, rastreio, observação.
+//
+// A CHAVE NÃO SE EDITA. Ela é o que as solicitações já enviadas referenciam; trocá-la
+// desligaria o histórico do canal que o produziu. O rótulo muda à vontade.
+
+import { useEffect, useState } from "react"
+
+interface Canal {
+  id: number
+  key: string
+  label: string
+  descricao: string | null
+  ordem: number
+  ativo: boolean
+  protocoloObrigatorio: boolean
+  anexoObrigatorioLabel: string | null
+  rastreioObrigatorio: boolean
+  observacaoObrigatoria: boolean
+}
+
+const inp = "w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-white placeholder-white/30 outline-none focus:border-blue-400/50"
+const lbl = "mb-1 block text-[11px] uppercase tracking-wide text-white/40"
+
+function headers(): HeadersInit {
+  const t = typeof window !== "undefined" ? localStorage.getItem("token") : null
+  return { "Content-Type": "application/json", ...(t ? { Authorization: `Bearer ${t}` } : {}) }
+}
+
+const VAZIO = {
+  key: "", label: "", descricao: "", protocoloObrigatorio: false,
+  anexoObrigatorioLabel: "", rastreioObrigatorio: false, observacaoObrigatoria: false,
+}
+
+export default function CanaisOperacionaisTab() {
+  const [canais, setCanais] = useState<Canal[] | null>(null)
+  const [erro, setErro] = useState("")
+  const [form, setForm] = useState<typeof VAZIO | null>(null)
+  const [editando, setEditando] = useState<Canal | null>(null)
+  const [salvando, setSalvando] = useState(false)
+
+  async function carregar() {
+    try {
+      const r = await fetch("/api/gerenciamento/canais", { headers: headers() })
+      const j = await r.json()
+      setCanais(j.canais ?? [])
+    } catch { setErro("Não foi possível carregar os canais.") }
+  }
+  useEffect(() => {
+    // Ver o comentário equivalente no painel da etapa: a carga sai do corpo do efeito
+    // para o primeiro `setState` não cair na mesma passagem de render.
+    let vivo = true
+    void Promise.resolve().then(() => { if (vivo) return carregar() })
+    return () => { vivo = false }
+  }, [])
+
+  async function criar() {
+    if (!form) return
+    setSalvando(true); setErro("")
+    try {
+      const r = await fetch("/api/gerenciamento/canais", { method: "POST", headers: headers(), body: JSON.stringify(form) })
+      const j = await r.json()
+      if (!r.ok) setErro(j.error ?? "Não foi possível cadastrar.")
+      else { setForm(null); await carregar() }
+    } finally { setSalvando(false) }
+  }
+
+  async function salvar(c: Canal) {
+    setSalvando(true); setErro("")
+    try {
+      const r = await fetch("/api/gerenciamento/canais", { method: "PUT", headers: headers(), body: JSON.stringify(c) })
+      const j = await r.json()
+      if (!r.ok) setErro(j.error ?? "Não foi possível salvar.")
+      else { setEditando(null); await carregar() }
+    } finally { setSalvando(false) }
+  }
+
+  if (canais === null) return <div className="p-6 text-sm text-white/50">Carregando canais…</div>
+
+  return (
+    <div className="space-y-4 p-1">
+      <div>
+        <h2 className="text-lg font-semibold text-white">Canais de solicitação</h2>
+        <p className="mt-0.5 text-xs text-white/50">
+          Por onde um pedido sai da casa, e o que cada canal exige como comprovação. Um canal novo passa a ser
+          oferecido nas versões de workflow publicadas depois dele; os processos em andamento não mudam.
+        </p>
+      </div>
+
+      {erro && <div className="rounded-lg border border-red-400/30 bg-red-500/10 px-3 py-2 text-xs text-red-200">{erro}</div>}
+
+      <div className="space-y-1.5">
+        {canais.length === 0 && (
+          <div className="rounded-lg border border-white/10 bg-white/5 px-4 py-6 text-center text-sm text-white/40">
+            Nenhum canal cadastrado ainda.
+          </div>
+        )}
+        {canais.map((c) => (
+          <div key={c.id} className="rounded-lg border border-white/10 bg-white/5 px-3 py-2">
+            {editando?.id === c.id ? (
+              <div className="space-y-2">
+                <div className="grid grid-cols-2 gap-2">
+                  <div><label className={lbl}>Nome</label>
+                    <input className={inp} value={editando.label} onChange={(e) => setEditando({ ...editando, label: e.target.value })} /></div>
+                  <div><label className={lbl}>Chave (não editável)</label>
+                    <input className={`${inp} opacity-50`} value={editando.key} disabled /></div>
+                </div>
+                <div><label className={lbl}>Descrição</label>
+                  <input className={inp} value={editando.descricao ?? ""} onChange={(e) => setEditando({ ...editando, descricao: e.target.value })} /></div>
+                <div><label className={lbl}>Comprovante exigido (vazio = opcional)</label>
+                  <input className={inp} value={editando.anexoObrigatorioLabel ?? ""} onChange={(e) => setEditando({ ...editando, anexoObrigatorioLabel: e.target.value })} /></div>
+                <div className="flex flex-wrap gap-4 text-xs text-white/70">
+                  <label className="flex items-center gap-2"><input type="checkbox" checked={editando.protocoloObrigatorio} onChange={(e) => setEditando({ ...editando, protocoloObrigatorio: e.target.checked })} /> Devolve protocolo no ato</label>
+                  <label className="flex items-center gap-2"><input type="checkbox" checked={editando.rastreioObrigatorio} onChange={(e) => setEditando({ ...editando, rastreioObrigatorio: e.target.checked })} /> Exige rastreio</label>
+                  <label className="flex items-center gap-2"><input type="checkbox" checked={editando.observacaoObrigatoria} onChange={(e) => setEditando({ ...editando, observacaoObrigatoria: e.target.checked })} /> Exige observação</label>
+                  <label className="flex items-center gap-2"><input type="checkbox" checked={editando.ativo} onChange={(e) => setEditando({ ...editando, ativo: e.target.checked })} /> Ativo</label>
+                </div>
+                <div className="flex justify-end gap-2">
+                  <button onClick={() => setEditando(null)} className="rounded-lg border border-white/10 bg-white/5 px-3 py-1.5 text-xs text-white/70">Cancelar</button>
+                  <button onClick={() => salvar(editando)} disabled={salvando} className="rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-medium text-white disabled:opacity-50">Salvar</button>
+                </div>
+              </div>
+            ) : (
+              <div className="flex items-center justify-between gap-3">
+                <div className="min-w-0">
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm text-white">{c.label}</span>
+                    <code className="text-[10px] text-white/35">{c.key}</code>
+                    {!c.ativo && <span className="rounded bg-white/10 px-1.5 py-0.5 text-[10px] text-white/50">inativo</span>}
+                  </div>
+                  <div className="mt-0.5 flex flex-wrap gap-1.5 text-[10px]">
+                    {c.protocoloObrigatorio && <span className="rounded bg-sky-500/15 px-1.5 py-0.5 text-sky-300">protocolo no ato</span>}
+                    {c.anexoObrigatorioLabel && <span className="rounded bg-white/10 px-1.5 py-0.5 text-white/60">{c.anexoObrigatorioLabel}</span>}
+                    {c.rastreioObrigatorio && <span className="rounded bg-amber-500/15 px-1.5 py-0.5 text-amber-300">rastreio</span>}
+                    {c.observacaoObrigatoria && <span className="rounded bg-white/10 px-1.5 py-0.5 text-white/60">observação</span>}
+                  </div>
+                </div>
+                <button onClick={() => setEditando(c)} className="flex-none rounded-lg border border-white/10 bg-white/5 px-2.5 py-1 text-xs text-white/70 hover:bg-white/10">Editar</button>
+              </div>
+            )}
+          </div>
+        ))}
+      </div>
+
+      {form ? (
+        <div className="space-y-2 rounded-lg border border-blue-400/30 bg-blue-500/5 p-3">
+          <div className="grid grid-cols-2 gap-2">
+            <div><label className={lbl}>Nome do canal</label>
+              <input className={inp} autoFocus value={form.label} onChange={(e) => setForm({ ...form, label: e.target.value })} placeholder="ex.: Portal Estadual" /></div>
+            <div><label className={lbl}>Chave (em branco = derivada do nome)</label>
+              <input className={inp} value={form.key} onChange={(e) => setForm({ ...form, key: e.target.value })} placeholder="PORTAL_ESTADUAL" /></div>
+          </div>
+          <div><label className={lbl}>Descrição</label>
+            <input className={inp} value={form.descricao} onChange={(e) => setForm({ ...form, descricao: e.target.value })} /></div>
+          <div><label className={lbl}>Comprovante exigido (vazio = opcional)</label>
+            <input className={inp} value={form.anexoObrigatorioLabel} onChange={(e) => setForm({ ...form, anexoObrigatorioLabel: e.target.value })} /></div>
+          <div className="flex flex-wrap gap-4 text-xs text-white/70">
+            <label className="flex items-center gap-2"><input type="checkbox" checked={form.protocoloObrigatorio} onChange={(e) => setForm({ ...form, protocoloObrigatorio: e.target.checked })} /> Devolve protocolo no ato</label>
+            <label className="flex items-center gap-2"><input type="checkbox" checked={form.rastreioObrigatorio} onChange={(e) => setForm({ ...form, rastreioObrigatorio: e.target.checked })} /> Exige rastreio</label>
+            <label className="flex items-center gap-2"><input type="checkbox" checked={form.observacaoObrigatoria} onChange={(e) => setForm({ ...form, observacaoObrigatoria: e.target.checked })} /> Exige observação</label>
+          </div>
+          <div className="flex justify-end gap-2">
+            <button onClick={() => setForm(null)} className="rounded-lg border border-white/10 bg-white/5 px-3 py-1.5 text-xs text-white/70">Cancelar</button>
+            <button onClick={criar} disabled={salvando || !form.label.trim()} className="rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-medium text-white disabled:opacity-50">Cadastrar canal</button>
+          </div>
+        </div>
+      ) : (
+        <button onClick={() => setForm({ ...VAZIO })} className="rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-blue-500">+ Canal</button>
+      )}
+    </div>
+  )
+}

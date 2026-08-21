@@ -11,7 +11,11 @@ import type { Dominio, ModoExecucao, ResultadoVerificacao, Severidade } from './
 import { DOMINIOS } from './tipos'
 
 /** Sobe a cada mudança no conjunto de verificações. Fica gravado na execução. */
-export const VERSAO_CATALOGO = '1.0.0'
+// 1.1.0 — 21/08/2026: entraram as verificações do cadastro declarativo e da
+// identidade de execução (EXE-001/002, CAD-001..005, DOC-L01). Cada uma existe
+// porque a classe de falha correspondente virou impossível por construção, e o que
+// se vigia aqui é justamente a construção continuar valendo no ambiente real.
+export const VERSAO_CATALOGO = '1.1.0'
 
 export interface ContextoVerificacao {
   /** agora, congelado no início da rodada (execuções são comparáveis) */

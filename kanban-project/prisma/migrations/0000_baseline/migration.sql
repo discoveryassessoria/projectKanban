@@ -5,7 +5,7 @@
 --   corpo        → gerado do prisma/schema.prisma
 --   bloco manual → prisma/baseline/bloco-manual.sql (edite LÁ)
 --
--- Gerado em : 2026-08-20
+-- Gerado em : 2026-08-21
 -- Prisma    : 6.19.3
 --
 -- PARA QUE SERVE: reconstruir o banco DO ZERO. O histórico de migrations NÃO
@@ -429,6 +429,9 @@ CREATE TABLE "Documento" (
     "registral" JSONB,
     "documentTypeId" INTEGER,
     "necessidadeId" INTEGER,
+    "derivadoDeId" INTEGER,
+    "derivacaoTipo" VARCHAR(20),
+    "substituidoEm" TIMESTAMP(3),
     "transcricaoTexto" TEXT,
     "transcricaoPaginas" JSONB,
     "transcricaoFonte" VARCHAR(40),
@@ -2299,6 +2302,7 @@ CREATE TABLE "CatalogoFase" (
     "conditionalPadrao" BOOLEAN NOT NULL DEFAULT false,
     "slaDiasPadrao" INTEGER NOT NULL DEFAULT 30,
     "ativo" BOOLEAN NOT NULL DEFAULT true,
+    "efeitosPermitidos" JSONB,
     "criadoEm" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "atualizadoEm" TIMESTAMP(3) NOT NULL,
 
@@ -2402,8 +2406,84 @@ CREATE TABLE "PhaseInternalWorkflowStep" (
     "completionRule" TEXT,
     "checklist" JSONB,
     "versao" INTEGER NOT NULL DEFAULT 1,
+    "dependeDe" JSONB,
+    "executorKey" VARCHAR(40),
 
     CONSTRAINT "PhaseInternalWorkflowStep_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "StepAction" (
+    "id" SERIAL NOT NULL,
+    "stepId" INTEGER NOT NULL,
+    "key" VARCHAR(60) NOT NULL,
+    "label" VARCHAR(160) NOT NULL,
+    "descricao" TEXT,
+    "ordem" INTEGER NOT NULL DEFAULT 0,
+    "effectKey" VARCHAR(60) NOT NULL,
+    "requerCampos" JSONB,
+    "permissao" VARCHAR(60),
+    "condicao" JSONB,
+    "metadata" JSONB,
+    "ativo" BOOLEAN NOT NULL DEFAULT true,
+    "criadoEm" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "atualizadoEm" TIMESTAMP(3) NOT NULL,
+
+    CONSTRAINT "StepAction_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "StepField" (
+    "id" SERIAL NOT NULL,
+    "stepId" INTEGER NOT NULL,
+    "key" VARCHAR(60) NOT NULL,
+    "label" VARCHAR(160) NOT NULL,
+    "tipo" VARCHAR(20) NOT NULL,
+    "obrigatorio" BOOLEAN NOT NULL DEFAULT false,
+    "opcoes" JSONB,
+    "condicao" JSONB,
+    "ajuda" TEXT,
+    "ordem" INTEGER NOT NULL DEFAULT 0,
+    "ativo" BOOLEAN NOT NULL DEFAULT true,
+    "criadoEm" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "atualizadoEm" TIMESTAMP(3) NOT NULL,
+
+    CONSTRAINT "StepField_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "StepChecklistItem" (
+    "id" SERIAL NOT NULL,
+    "stepId" INTEGER NOT NULL,
+    "key" VARCHAR(60) NOT NULL,
+    "label" VARCHAR(200) NOT NULL,
+    "descricao" TEXT,
+    "obrigatorio" BOOLEAN NOT NULL DEFAULT true,
+    "ordem" INTEGER NOT NULL DEFAULT 0,
+    "ativo" BOOLEAN NOT NULL DEFAULT true,
+    "criadoEm" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "atualizadoEm" TIMESTAMP(3) NOT NULL,
+
+    CONSTRAINT "StepChecklistItem_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "CanalOperacional" (
+    "id" SERIAL NOT NULL,
+    "key" VARCHAR(40) NOT NULL,
+    "label" VARCHAR(120) NOT NULL,
+    "descricao" TEXT,
+    "ordem" INTEGER NOT NULL DEFAULT 0,
+    "ativo" BOOLEAN NOT NULL DEFAULT true,
+    "protocoloObrigatorio" BOOLEAN NOT NULL DEFAULT false,
+    "anexoObrigatorioLabel" VARCHAR(160),
+    "rastreioObrigatorio" BOOLEAN NOT NULL DEFAULT false,
+    "observacaoObrigatoria" BOOLEAN NOT NULL DEFAULT false,
+    "aplicacao" JSONB,
+    "criadoEm" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "atualizadoEm" TIMESTAMP(3) NOT NULL,
+
+    CONSTRAINT "CanalOperacional_pkey" PRIMARY KEY ("id")
 );
 
 -- CreateTable
@@ -4318,6 +4398,9 @@ CREATE INDEX "Documento_documentTypeId_idx" ON "Documento"("documentTypeId");
 CREATE INDEX "Documento_necessidadeId_idx" ON "Documento"("necessidadeId");
 
 -- CreateIndex
+CREATE INDEX "Documento_derivadoDeId_idx" ON "Documento"("derivadoDeId");
+
+-- CreateIndex
 CREATE INDEX "Documento_pessoaId_idx" ON "Documento"("pessoaId");
 
 -- CreateIndex
@@ -5147,6 +5230,27 @@ CREATE UNIQUE INDEX "PhaseInternalWorkflowVersao_workflowId_versao_key" ON "Phas
 
 -- CreateIndex
 CREATE UNIQUE INDEX "PhaseInternalWorkflowStep_workflowId_key_key" ON "PhaseInternalWorkflowStep"("workflowId", "key");
+
+-- CreateIndex
+CREATE INDEX "StepAction_stepId_idx" ON "StepAction"("stepId");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "StepAction_stepId_key_key" ON "StepAction"("stepId", "key");
+
+-- CreateIndex
+CREATE INDEX "StepField_stepId_idx" ON "StepField"("stepId");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "StepField_stepId_key_key" ON "StepField"("stepId", "key");
+
+-- CreateIndex
+CREATE INDEX "StepChecklistItem_stepId_idx" ON "StepChecklistItem"("stepId");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "StepChecklistItem_stepId_key_key" ON "StepChecklistItem"("stepId", "key");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "CanalOperacional_key_key" ON "CanalOperacional"("key");
 
 -- CreateIndex
 CREATE UNIQUE INDEX "PhaseAutomationRule_publicCode_key" ON "PhaseAutomationRule"("publicCode");
@@ -6037,6 +6141,9 @@ ALTER TABLE "Documento" ADD CONSTRAINT "Documento_documentTypeId_fkey" FOREIGN K
 ALTER TABLE "Documento" ADD CONSTRAINT "Documento_necessidadeId_fkey" FOREIGN KEY ("necessidadeId") REFERENCES "NecessidadeDocumental"("id") ON DELETE SET NULL ON UPDATE CASCADE;
 
 -- AddForeignKey
+ALTER TABLE "Documento" ADD CONSTRAINT "Documento_derivadoDeId_fkey" FOREIGN KEY ("derivadoDeId") REFERENCES "Documento"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
 ALTER TABLE "Processo" ADD CONSTRAINT "Processo_arvoreId_fkey" FOREIGN KEY ("arvoreId") REFERENCES "Arvore"("id") ON DELETE SET NULL ON UPDATE CASCADE;
 
 -- AddForeignKey
@@ -6464,6 +6571,15 @@ ALTER TABLE "PhaseInternalWorkflowVersao" ADD CONSTRAINT "PhaseInternalWorkflowV
 
 -- AddForeignKey
 ALTER TABLE "PhaseInternalWorkflowStep" ADD CONSTRAINT "PhaseInternalWorkflowStep_workflowId_fkey" FOREIGN KEY ("workflowId") REFERENCES "PhaseInternalWorkflow"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "StepAction" ADD CONSTRAINT "StepAction_stepId_fkey" FOREIGN KEY ("stepId") REFERENCES "PhaseInternalWorkflowStep"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "StepField" ADD CONSTRAINT "StepField_stepId_fkey" FOREIGN KEY ("stepId") REFERENCES "PhaseInternalWorkflowStep"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "StepChecklistItem" ADD CONSTRAINT "StepChecklistItem_stepId_fkey" FOREIGN KEY ("stepId") REFERENCES "PhaseInternalWorkflowStep"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "TipoDocumentoCadastro" ADD CONSTRAINT "TipoDocumentoCadastro_itemCatalogoId_fkey" FOREIGN KEY ("itemCatalogoId") REFERENCES "ItemCatalogo"("id") ON DELETE SET NULL ON UPDATE CASCADE;

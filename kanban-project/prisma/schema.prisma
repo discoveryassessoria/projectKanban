@@ -330,6 +330,22 @@ model Documento {
   necessidadeId Int?
   necessidade   NecessidadeDocumental? @relation(fields: [necessidadeId], references: [id], onDelete: SetNull)
 
+  /// LINHAGEM DOCUMENTAL — de qual documento este nasceu.
+  ///
+  /// Nova via e documento retificado eram materializados sobrescrevendo o documento
+  /// existente: o anterior deixava de existir, e a pergunta "o que a primeira via
+  /// dizia?" não tinha resposta. Agora o documento anterior permanece e o novo aponta
+  /// para ele. A NECESSIDADE não se duplica — `necessidadeId` continua sendo o mesmo
+  /// nos dois, porque a necessidade é a mesma; o que mudou foi a materialização.
+  derivadoDeId   Int?
+  derivadoDe     Documento?  @relation("LinhagemDocumental", fields: [derivadoDeId], references: [id], onDelete: SetNull)
+  derivados      Documento[] @relation("LinhagemDocumental")
+  /// Por que nasceu: NOVA_VIA | RETIFICACAO | SEGUNDA_EMISSAO.
+  derivacaoTipo  String?     @db.VarChar(20)
+  /// Quando este documento deixou de ser o vigente da necessidade. O documento
+  /// continua legível — apenas não é mais o que vale.
+  substituidoEm  DateTime?
+
   // CP-4A â vÃ­nculos operacionais do runtime v2 (back-relations)
   tarefasVinculadas Tarefa[]                    @relation("TarefaDocumento")
   stepInstances     PhaseWorkflowStepInstance[]
@@ -364,6 +380,7 @@ model Documento {
 
   @@index([documentTypeId])
   @@index([necessidadeId])
+  @@index([derivadoDeId])
   @@index([pessoaId])
   @@index([tipo])
   @@index([status])
@@ -2991,6 +3008,13 @@ model CatalogoFase {
   conditionalPadrao Boolean  @default(false)
   slaDiasPadrao     Int      @default(30)
   ativo             Boolean  @default(true)
+  /// COMPETÊNCIA DA FASE — quais efeitos os passos desta fase podem executar.
+  ///
+  /// Emissão Documental mandava o processo para Retificação a partir de um resultado
+  /// escolhido no executor: quem decide retificação é a Análise, e a decisão vazava
+  /// para a fase anterior sem que nada no cadastro dissesse que podia. Lista de
+  /// `effectKey`; `null` = sem restrição declarada (compatibilidade com o existente).
+  efeitosPermitidos Json?
   criadoEm          DateTime @default(now())
   atualizadoEm      DateTime @updatedAt
 
@@ -3158,7 +3182,130 @@ model PhaseInternalWorkflowStep {
   versao         Int                   @default(1) // CP-4A â versionamento (definiÃ§Ã£o/template)
 
   // TRAVA: cada chave sÃ³ existe UMA vez por workflow (impede duplicaÃ§Ã£o silenciosa)
+
+  /// DEPENDÊNCIA DECLARADA — lista de `key` de passos do MESMO workflow.
+  ///
+  /// Antes a dependência era DERIVADA da ordem: modo SEQUENCIAL fazia cada passo
+  /// depender do anterior da lista, e reabrir um passo invalidava tudo com
+  /// `ordem >= N`. Duas coisas diferentes — "vem depois" e "depende de" — eram a
+  /// mesma coisa, e não havia como declarar que B e C dependem de A mas não um do
+  /// outro. `null` = não declarado, e aí o modo de execução continua respondendo
+  /// (compatibilidade com o que já está publicado).
+  dependeDe      Json?
+  /// EXECUTOR declarado do passo. `null` = o registro resolve pela chave, como sempre
+  /// fez. Um passo criado pelo administrador declara aqui qual interface o executa —
+  /// é o que permite um passo novo nascer executável sem código.
+  executorKey    String?               @db.VarChar(40)
+
+  acoes      StepAction[]
+  campos     StepField[]
+  checkItens StepChecklistItem[]
+
   @@unique([workflowId, key])
+}
+
+/// AÇÃO CADASTRADA DE UM PASSO — o resultado que o operador escolhe.
+///
+/// "Aprovado", "Aprovado com ressalvas", "Solicitar nova via" eram um array dentro do
+/// componente React: o administrador não podia acrescentar um resultado, e o servidor
+/// não sabia quais existiam. Aqui a ação é dado, e o que ela FAZ é um `effectKey` do
+/// catálogo de efeitos — o administrador escolhe entre efeitos que já existem no
+/// código, nunca escreve comportamento.
+///
+/// IDENTIDADE É A `key`, não o rótulo: renomear não quebra o histórico, porque o que
+/// ficou gravado na execução foi a chave.
+model StepAction {
+  id           Int      @id @default(autoincrement())
+  stepId       Int
+  step         PhaseInternalWorkflowStep @relation(fields: [stepId], references: [id], onDelete: Cascade)
+  key          String   @db.VarChar(60)
+  label        String   @db.VarChar(160)
+  descricao    String?  @db.Text
+  ordem        Int      @default(0)
+  /// Chave do CATÁLOGO DE EFEITOS (código). A publicação recusa efeito inexistente.
+  effectKey    String   @db.VarChar(60)
+  /// Campos (`StepField.key`) que esta ação exige preenchidos.
+  requerCampos Json?
+  /// Permissão exigida para executar. `null` = a permissão do passo.
+  permissao    String?  @db.VarChar(60)
+  condicao     Json?
+  metadata     Json?
+  ativo        Boolean  @default(true)
+  criadoEm     DateTime @default(now())
+  atualizadoEm DateTime @updatedAt
+
+  @@unique([stepId, key])
+  @@index([stepId])
+}
+
+/// CAMPO CADASTRADO DE UM PASSO — o que o operador preenche.
+model StepField {
+  id           Int      @id @default(autoincrement())
+  stepId       Int
+  step         PhaseInternalWorkflowStep @relation(fields: [stepId], references: [id], onDelete: Cascade)
+  key          String   @db.VarChar(60)
+  label        String   @db.VarChar(160)
+  /// texto | textarea | numero | moeda | data | select | multiselect | checkbox | radio | upload | booleano
+  tipo         String   @db.VarChar(20)
+  obrigatorio  Boolean  @default(false)
+  /// Opções de select/multiselect/radio: [{ value, label }]. Também aceita a chave de
+  /// um catálogo global (`{ catalogo: "canais" }`) — é assim que o campo "canal"
+  /// oferece os canais cadastrados sem repetir a lista dentro do passo.
+  opcoes       Json?
+  /// Condição de visibilidade declarativa: { campo, op, valor }.
+  condicao     Json?
+  ajuda        String?  @db.Text
+  ordem        Int      @default(0)
+  ativo        Boolean  @default(true)
+  criadoEm     DateTime @default(now())
+  atualizadoEm DateTime @updatedAt
+
+  @@unique([stepId, key])
+  @@index([stepId])
+}
+
+/// ITEM DE CHECKLIST CADASTRADO DE UM PASSO.
+model StepChecklistItem {
+  id           Int      @id @default(autoincrement())
+  stepId       Int
+  step         PhaseInternalWorkflowStep @relation(fields: [stepId], references: [id], onDelete: Cascade)
+  key          String   @db.VarChar(60)
+  label        String   @db.VarChar(200)
+  descricao    String?  @db.Text
+  obrigatorio  Boolean  @default(true)
+  ordem        Int      @default(0)
+  ativo        Boolean  @default(true)
+  criadoEm     DateTime @default(now())
+  atualizadoEm DateTime @updatedAt
+
+  @@unique([stepId, key])
+  @@index([stepId])
+}
+
+/// CANAL OPERACIONAL — por onde um pedido sai da casa.
+///
+/// CRC, e-cartório, e-mail, WhatsApp, balcão, comune, correios, consulado eram um
+/// array em `src/lib/process-stage/canais-solicitacao.ts`: acrescentar um canal
+/// exigia deploy. O enum `CanalSolicitacaoDocumento` continua existindo — ele é a
+/// coluna que as solicitações já gravadas usam —, mas quem responde "quais canais
+/// existem e o que cada um exige" passa a ser esta tabela.
+model CanalOperacional {
+  id                    Int      @id @default(autoincrement())
+  key                   String   @unique @db.VarChar(40)
+  label                 String   @db.VarChar(120)
+  descricao             String?  @db.Text
+  ordem                 Int      @default(0)
+  ativo                 Boolean  @default(true)
+  /// O canal devolve número de protocolo no ato do envio?
+  protocoloObrigatorio  Boolean  @default(false)
+  /// Rótulo do comprovante exigido. null = anexo opcional.
+  anexoObrigatorioLabel String?  @db.VarChar(160)
+  rastreioObrigatorio   Boolean  @default(false)
+  observacaoObrigatoria Boolean  @default(false)
+  /// Restrição de aplicação: { paises: [], tiposDocumento: [] }. null = qualquer.
+  aplicacao             Json?
+  criadoEm              DateTime @default(now())
+  atualizadoEm          DateTime @updatedAt
 }
 
 model PhaseAutomationRule {

@@ -10,12 +10,16 @@
 import { useEffect, useState, useCallback } from "react"
 import { useApi } from "@/src/lib/dados"
 
+interface EfeitoCat { key: string; label: string; descricao: string; competencia: string }
+
 interface Fase {
   id: number
   phaseKey: string
   label: string
   descricao: string | null
   escopo: Escopo | null
+  /** Efeitos que os passos desta fase podem executar. null = sem restrição declarada. */
+  efeitosPermitidos?: string[] | null
   ordemPadrao: number
   requiredPadrao: boolean
   conditionalPadrao: boolean
@@ -53,6 +57,7 @@ type Form = {
   label: string
   descricao: string
   escopo: Escopo | ""
+  efeitosPermitidos: string[] | null
   ordemPadrao: number
   requiredPadrao: boolean
   conditionalPadrao: boolean
@@ -61,11 +66,22 @@ type Form = {
 }
 
 const vazio = (ordem: number): Form => ({
-  phaseKey: "", label: "", descricao: "", escopo: "", ordemPadrao: ordem, requiredPadrao: true,
+  phaseKey: "", label: "", descricao: "", escopo: "", efeitosPermitidos: null, ordemPadrao: ordem, requiredPadrao: true,
   conditionalPadrao: false, slaDiasPadrao: 30, ativo: true,
 })
 
 export default function CatalogoFasesTab() {
+  // O catálogo de efeitos vem do SERVIDOR. Escrevê-lo aqui faria a tela oferecer
+  // competências que o motor não conhece — o mesmo erro, noutro lugar.
+  const [efeitos, setEfeitos] = useState<EfeitoCat[]>([])
+  useEffect(() => {
+    const t = typeof window !== "undefined" ? localStorage.getItem("token") : null
+    fetch("/api/gerenciamento/catalogo-execucao", { headers: t ? { Authorization: `Bearer ${t}` } : {} })
+      .then(r => (r.ok ? r.json() : null))
+      .then(d => d?.efeitos && setEfeitos(d.efeitos))
+      .catch(() => setEfeitos([]))
+  }, [])
+
   const [busy, setBusy] = useState(false)
   const [flash, setFlash] = useState("")
   // Erro de ESCRITA continua em estado; o de LEITURA vem da consulta.
@@ -204,6 +220,7 @@ export default function CatalogoFasesTab() {
                       onClick={() => setForm({
                         id: f.id, phaseKey: f.phaseKey, label: f.label, ordemPadrao: f.ordemPadrao,
                         descricao: f.descricao ?? "", escopo: f.escopo ?? "",
+                        efeitosPermitidos: f.efeitosPermitidos ?? null,
                         requiredPadrao: f.requiredPadrao, conditionalPadrao: f.conditionalPadrao,
                         slaDiasPadrao: f.slaDiasPadrao, ativo: f.ativo,
                       })}
@@ -274,6 +291,44 @@ export default function CatalogoFasesTab() {
                 </select>
                 <p className="mt-1 text-[11px] text-white/40">
                   Decide quantos roteiros a fase cria: um por documento, por pessoa, por registro — ou um só para o processo.
+                </p>
+              </div>
+
+              {/* COMPETÊNCIA — o que os passos desta fase podem FAZER.
+                  Sem isto declarado, qualquer fase podia disparar qualquer efeito, e foi
+                  por aí que a decisão de retificar — que é da Análise — passou a poder
+                  ser tomada na Emissão. */}
+              <div className="mt-3">
+                <label className={labelCls}>Esta fase pode</label>
+                {efeitos.length === 0 && <p className="text-[11px] text-white/40">Carregando o catálogo de efeitos…</p>}
+                <div className="mt-1 max-h-52 space-y-1 overflow-auto rounded-lg border border-white/10 bg-white/5 p-2">
+                  {efeitos.map(ef => {
+                    const lista = form.efeitosPermitidos
+                    const marcado = lista === null ? true : lista.includes(ef.key)
+                    return (
+                      <label key={ef.key} className="flex cursor-pointer items-start gap-2 rounded px-1.5 py-1 hover:bg-white/5">
+                        <input
+                          type="checkbox"
+                          className="mt-1"
+                          checked={marcado}
+                          onChange={() => {
+                            const base = lista === null ? efeitos.map(e => e.key) : lista
+                            const nova = marcado ? base.filter(k => k !== ef.key) : [...base, ef.key]
+                            setForm(f => f && { ...f, efeitosPermitidos: nova })
+                          }}
+                        />
+                        <span className="min-w-0">
+                          <span className="text-xs text-white">{ef.label}</span>
+                          <span className="ml-1.5 rounded bg-white/10 px-1 py-0.5 text-[10px] text-white/50">{ef.competencia}</span>
+                          <span className="block text-[11px] text-white/40">{ef.descricao}</span>
+                        </span>
+                      </label>
+                    )
+                  })}
+                </div>
+                <p className="mt-1 text-[11px] text-white/40">
+                  A publicação de um workflow desta fase recusa qualquer resultado cujo efeito não esteja marcado aqui.
+                  {form.efeitosPermitidos === null && " Hoje esta fase não declara nada — ela pode tudo."}
                 </p>
               </div>
 

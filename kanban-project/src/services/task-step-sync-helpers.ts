@@ -17,6 +17,9 @@ export type FailureCodeD =
   | "POLITICA_INVALIDA"
   | "NAO_AGUARDANDO_APROVACAO"
   | "CONFIGURACAO_INVALIDA"
+  // A etapa depende de outra que ainda não foi cumprida. Não é transição inválida —
+  // o estado de origem permitia; o que não permite é o roteiro.
+  | "DEPENDENCIA_PENDENTE"
 
 export interface SyncIssue { code: string; message: string }
 

@@ -36,7 +36,8 @@ import {
   type ContextoLeituraWorkflow,
   type WorkflowV2Shape,
 } from "@/src/services/documento-operacao"
-import { canalDoTexto, faltamCamposDoCanal, configDoCanal } from "@/src/lib/process-stage/canais-solicitacao"
+import { canalDoTexto, configDoCanal } from "@/src/lib/process-stage/canais-solicitacao"
+import { faltamCamposDoCanalCadastrado, canaisVigentes } from "@/src/lib/process-stage/canais-fonte"
 import {
   vincularArquivoDocumentoTx,
   registrarObservacaoDocumentoTx,
@@ -187,8 +188,11 @@ export async function registrarSolicitacaoDocumento(
     orderBy: { id: "desc" },
   })
 
-  // 4) campos obrigatórios POR CANAL — a mesma configuração que a tela recebeu
-  const faltando = faltamCamposDoCanal({
+  // 4) campos obrigatórios POR CANAL — pelo CADASTRO, que é onde os canais moram
+  // desde 21/08. A lista em código continua sendo a semente e a prova de regressão;
+  // quem responde no runtime é a tabela, e é por isso que um canal cadastrado hoje
+  // já é validado por este caminho sem deploy.
+  const faltando = await faltamCamposDoCanalCadastrado({
     canal,
     numeroProtocolo,
     anexoUrl: requerimentoUrl ?? requerimentoJaRegistrado?.url ?? null,
@@ -643,6 +647,11 @@ export async function carregarResumoProtocoloDocumento(
     },
   })
 
+  // RÓTULO E EXIGÊNCIA VÊM DO CADASTRO — e um canal renomeado pelo administrador é
+  // lido com o nome novo, inclusive nas solicitações antigas, porque o vínculo é a
+  // chave. Uma consulta só para a lista inteira; nada de N+1.
+  const cadastroDeCanais = new Map((await canaisVigentes(false)).map((c) => [c.canal, c]))
+
   return {
     documentoId,
     vigenteId: solicitacoes[0]?.id ?? null,
@@ -650,7 +659,7 @@ export async function carregarResumoProtocoloDocumento(
       id: s.id,
       documentoId: s.documentoId,
       canal: s.canal,
-      canalLabel: configDoCanal(s.canal)?.label ?? null,
+      canalLabel: cadastroDeCanais.get(s.canal)?.label ?? configDoCanal(s.canal)?.label ?? null,
       destinatarioNome: s.destinatarioNome,
       atendente: s.atendente,
       dataEnvio: s.dataEnvio.toISOString(),
@@ -666,7 +675,7 @@ export async function carregarResumoProtocoloDocumento(
       stepInstanceId: s.stepInstanceId,
       tarefaId: s.tarefaId,
       createdAt: s.createdAt.toISOString(),
-      protocoloObrigatorio: configDoCanal(s.canal)?.protocoloObrigatorio ?? false,
+      protocoloObrigatorio: cadastroDeCanais.get(s.canal)?.protocoloObrigatorio ?? configDoCanal(s.canal)?.protocoloObrigatorio ?? false,
       protocolos: s.protocolos.map((p, i) => ({
         id: p.id,
         numero: p.numeroProtocolo,

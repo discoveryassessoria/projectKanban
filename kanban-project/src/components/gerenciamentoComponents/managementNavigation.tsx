@@ -186,6 +186,9 @@ export const MANAGEMENT_NAVIGATION: ManagementNavigationItem[] = [
     children: [
       a(10, "macrokanban", "Workflow Macro", ["workflow", "macro", "kanban", "fluxo", "sequencia", "sequência", "coluna", "sla"], "Fluxos"),
       a(20, "phaseiwf", "Workflow Interno", ["workflow", "interno", "passo", "fluxo", "tarefa"], "Fluxos"),
+      // OS CANAIS SAÍRAM DO CÓDIGO. Ficam sob Workflow porque é o que os consome: um
+      // campo de passo aponta para este cadastro em vez de repetir a lista.
+      a(25, "canais", "Canais de solicitação", ["canal", "canais", "crc", "cartorio", "cartório", "email", "e-mail", "whatsapp", "balcao", "balcão", "correios", "consulado", "solicitacao", "solicitação"], "Fluxos"),
 
 
       a(30, "transicoes", "Transições", ["transicao", "transição", "caminho", "entrada", "avanco", "avanço", "regra"]),

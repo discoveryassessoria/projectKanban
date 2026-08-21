@@ -33,6 +33,7 @@ import { chaveEvento } from "@/src/services/task-step-sync-helpers"
 import { recalcularFaseDoProcesso } from "@/src/lib/process-stage/recalcular-fase"
 import { randomUUID } from "crypto"
 import { projetarTarefaDoPasso, assegurarCoerenciaPassoTarefa } from "@/src/services/passo-tarefa-projecao"
+import { impactoDaReabertura, type PassoComDependencia } from "@/src/services/dependencias-do-passo"
 import { transicionarPassoTx, reabrirPassoTx } from "@/src/services/task-step-sync"
 import { sincronizarTarefaComWorkflow } from "@/lib/operacional/tarefa-canonica"
 import { projetarCustosDocumentaisDoPasso } from "@/src/services/financeiro/projecao-documental"
@@ -761,13 +762,33 @@ export async function aplicarTransicaoDoPassoTx(
         await projetarTarefaDoPasso(tx, { stepInstanceId: proximo.id, statusPasso: "EM_ANDAMENTO", agora: now })
       }
     }
-    // REABERTURA: bloqueia as etapas posteriores do mesmo documento (voltam a depender desta).
+    // REABERTURA ALCANÇA QUEM DEPENDE, NÃO QUEM VEM DEPOIS.
+    //
+    // `ordem > N` derrubava tudo o que estivesse adiante na lista, inclusive o que não
+    // dependia do passo reaberto. Numa fase com dois caminhos independentes isso
+    // destruía trabalho alheio: reabrir a conferência de uma certidão bloqueava a
+    // etapa de outro assunto só porque ela tinha ordem maior.
+    //
+    // Quem não desce da raiz reaberta fica intacto — e continua valendo, porque nada
+    // do que ele dependia mudou.
     if (vaiReabrir) {
-      const posteriores = await tx.phaseWorkflowStepInstance.findMany({
+      const daUnidade = await tx.phaseWorkflowStepInstance.findMany({
         // MESMA VISITA (ver acima): reabrir uma etapa não pode mexer noutro ciclo.
-        where: { documentoId, workflowInstanceId: p.workflowInstanceId, ordem: { gt: p.ordem }, status: { in: ["EM_ANDAMENTO", "AGUARDANDO"] } },
-        select: { id: true },
+        where: { documentoId, workflowInstanceId: p.workflowInstanceId },
+        select: { id: true, stepKey: true, ordem: true, status: true, dependeDeStepKeys: true },
       })
+      const grafo: PassoComDependencia[] = daUnidade.map((x) => ({
+        id: x.id, stepKey: x.stepKey, ordem: x.ordem, status: x.status,
+        dependeDeStepKeys: Array.isArray(x.dependeDeStepKeys)
+          ? (x.dependeDeStepKeys as unknown[]).filter((y): y is string => typeof y === "string")
+          : null,
+      }))
+      const declaram = grafo.some((x) => (x.dependeDeStepKeys ?? []).length > 0)
+      // SEM DEPENDÊNCIA DECLARADA a fila por ordem continua sendo o que o roteiro diz.
+      const alcancados = declaram
+        ? impactoDaReabertura(grafo, p.stepKey).alcancados
+        : grafo.filter((x) => x.ordem > p.ordem)
+      const posteriores = alcancados.filter((x) => x.status === "EM_ANDAMENTO" || x.status === "AGUARDANDO")
       for (const posterior of posteriores) {
         await transicionarPassoTx(tx, posterior.id, "BLOQUEADO", { ...opts, extra: { startedAt: null, prazo: null, motivo: null } })
         passosTocados.push(posterior.id)

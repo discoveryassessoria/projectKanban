@@ -217,3 +217,67 @@ registrar({
     }
   },
 })
+
+// ── RECONCILIAÇÃO DE FASES ──────────────────────────────────────────────────
+//
+// Este cron não deixa rastro quando nada muda — e é justamente esse o silêncio
+// perigoso: ele parar de rodar é indistinguível de ele rodar e não ter o que fazer.
+// O que se vigia, então, não é o job: é o EFEITO dele. Um processo cujo gate está
+// satisfeito e que continua parado prova que ninguém está convergindo o motor.
+
+registrar({
+  id: 'saude.cron.reconciliacao-convergindo',
+  codigo: 'CRON-005',
+  nome: 'A reconciliação de fases está convergindo',
+  descricao:
+    'O cron horário /api/cron/reconciliar-fases avança os processos cujo gate já está satisfeito. ' +
+    'Processo pronto para avançar e parado há horas é prova de que a varredura não está acontecendo.',
+  dominio: 'OBSERVABILIDADE',
+  modulo: 'Plataforma / Jobs agendados',
+  severidadePadrao: 'ERRO',
+  obrigatoria: false,
+  modos: ['COMPLETO', 'PROFUNDO'],
+  introduzidaEm: '1.1.0',
+  timeoutMs: 45_000,
+  orientacao: 'Confira o cron /api/cron/reconciliar-fases na Vercel e o CRON_SECRET do ambiente.',
+  responsavel: 'Plataforma',
+  ativo: true,
+  executar: async (): Promise<ResultadoVerificacao> => {
+    const { calcularPendencias } = await import('@/src/lib/motor/blocking-engine')
+    const processos = await prisma.processo.findMany({
+      where: { workflowRuntime: 'v2', faseAtualKey: { not: null }, dataConclusao: null },
+      select: { id: true, nome: true, faseAtualKey: true, updatedAt: true },
+      orderBy: { id: 'asc' },
+      // AMOSTRA, não varredura: esta verificação roda a cada hora junto com dezenas de
+      // outras. Um processo parado indevidamente não fica sozinho por muito tempo.
+      take: 40,
+    })
+    const limite = Date.now() - 3 * 60 * 60 * 1000
+    const parados: Array<{ id: number; nome: string; fase: string }> = []
+    for (const p of processos) {
+      // Mexido há pouco não é sintoma: o reconciliador roda de hora em hora, e um
+      // processo que acabou de mudar ainda não teve a passagem dele.
+      if (p.updatedAt.getTime() > limite) continue
+      const g = await calcularPendencias(p.id, p.faseAtualKey!, { correlationId: `saude-reconc-${p.id}` }).catch(() => null)
+      if (g?.canAdvance) parados.push({ id: p.id, nome: p.nome, fase: p.faseAtualKey! })
+    }
+    if (!parados.length) {
+      return { achados: [], metricas: { avaliados: processos.length, prontosEParados: 0 }, resumo: `${processos.length} processo(s) avaliado(s); nenhum pronto para avançar e parado.` }
+    }
+    return {
+      achados: parados.map((p): Achado => ({
+        chave: `reconc-parado:${p.id}`,
+        severidade: 'ERRO',
+        titulo: `"${p.nome}" pode avançar de ${p.fase} e não avançou`,
+        descricao: 'O gate da fase está satisfeito há mais de três horas e o processo continua nela.',
+        explicacao: 'O reconciliador horário existe para fechar exatamente essa distância entre "pode avançar" e "avançou". Se ela persiste, ele não está rodando.',
+        impacto: 'Processos param sozinhos sem que ninguém receba erro — o silêncio parece normalidade.',
+        entidade: 'Processo', registroId: String(p.id), registroNome: p.nome, quantidade: 1,
+        link: `/kanban?processo=${p.id}`,
+        recomendacao: 'Verifique o agendamento e os logs de /api/cron/reconciliar-fases.',
+        evidencia: { processoId: p.id, fase: p.fase },
+      })),
+      metricas: { avaliados: processos.length, prontosEParados: parados.length },
+    }
+  },
+})

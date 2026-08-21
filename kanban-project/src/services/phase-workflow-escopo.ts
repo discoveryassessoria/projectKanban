@@ -88,8 +88,19 @@ export function planejarMaterializacao(
   const alvos: AlvoDePasso[] = []
 
   ordenados.forEach((def, i) => {
-    // Dependência derivada do MODO configurado, não da posição em si.
-    const deps = execucao === "SEQUENCIAL" && i > 0 ? [ordenados[i - 1].key] : []
+    // A DEPENDÊNCIA DECLARADA MANDA. O modo de execução só responde quando o cadastro
+    // não declarou nada — que é o caso de tudo que foi publicado antes de a
+    // dependência poder ser declarada. Enquanto o modo era a ÚNICA fonte, "vem
+    // depois na lista" e "depende de" eram a mesma coisa: não havia como dizer que
+    // B e C dependem de A sem que C dependesse de B.
+    const declaradas = Array.isArray(def.dependeDe)
+      ? def.dependeDe.filter((k): k is string => typeof k === "string")
+      : null
+    const deps = declaradas && declaradas.length > 0
+      ? declaradas
+      : declaradas /* declarada e VAZIA = "não depende de nada", e isso é uma escolha */
+        ? []
+        : execucao === "SEQUENCIAL" && i > 0 ? [ordenados[i - 1].key] : []
     const status = estadoInicialPasso(deps.length > 0)
     const cardinalidade = cardinalidadeEfetiva(def.cardinalidade, escopoDaFase)
     const base = { def, cardinalidade, status, dependeDeStepKeys: deps }

@@ -16,6 +16,7 @@ import {
   abrirTentativa, garantirTentativa, registrarNaTentativa,
   MOTIVOS_DE_TENTATIVA, type MotivoDeTentativa,
 } from "@/src/services/execucao-do-passo"
+import { liberadosPor, descendentes, ESTADOS_CUMPRIDOS, type PassoComDependencia } from "@/src/services/dependencias-do-passo"
 import { projetarTarefaDoPasso, assegurarCoerenciaPassoTarefa } from "@/src/services/passo-tarefa-projecao"
 import { processarOutbox } from "@/src/services/outbox-dispatcher"
 import { escopoDaUnidade, estadoDerivado, sincronizarTarefaComWorkflow } from "@/lib/operacional/tarefa-canonica"
@@ -91,6 +92,17 @@ interface ApplyOpts {
   dados?: Prisma.InputJsonValue
   /** Quem executou — carimbado na TENTATIVA, que é onde a autoria é fato. */
   usuarioId?: number | null
+  /**
+   * ABRIR UM PASSO COM DEPENDÊNCIA EM ABERTO — deliberadamente.
+   *
+   * Existe para a MATERIALIZAÇÃO e para a HERANÇA de reentrada, que montam o estado
+   * inicial de um roteiro: ali o passo ainda não tem irmãos com quem se comparar, e
+   * cobrar dependência seria cobrar de um grafo que está sendo construído.
+   *
+   * Não é um "forçar" de uso geral. Quem passa isto está dizendo que constrói o
+   * estado, não que executa dentro dele.
+   */
+  ignorarDependencias?: boolean
 }
 
 // ---------------- APLICADOR: PASSO (CAS) ----------------
@@ -99,6 +111,40 @@ async function aplicarPasso(tx: TX, stepId: number, alvo: string, tipoEvento: Wo
   if (!step) return { changed: false, anterior: "", atual: "", code: "STEP_NAO_ENCONTRADO" as H.FailureCodeD }
   if (step.status === alvo) return { changed: false, anterior: step.status, atual: step.status }
   if (!H.podeAplicarPasso(step.status, alvo)) return { changed: false, anterior: step.status, atual: step.status, code: "TRANSICAO_INVALIDA" as H.FailureCodeD }
+
+  // A DEPENDÊNCIA É PRÉ-CONDIÇÃO, NÃO SUGESTÃO.
+  //
+  // A máquina validava PARA ONDE se pode ir a partir do estado atual, e só isso. Abrir
+  // um passo cujas dependências continuam em aberto era uma transição legal — e é
+  // exatamente a forma do defeito que apareceu no Abellan: passo 1 "em execução" com
+  // os passos 2 a 4 concluídos à frente dele. O fuzz reproduz isso em quatro comandos
+  // (`INICIAR#a → REABRIR#d`), e reproduzia porque a regra não existia em lugar nenhum.
+  //
+  // Agora existe, e mora aqui: nesta função passam as duas portas (`transicionarPassoTx`
+  // e `reabrirPassoTx`), então não há caminho que a contorne sem dizer que está
+  // contornando.
+  if ((alvo === "DISPONIVEL" || alvo === "EM_ANDAMENTO") && !o.ignorarDependencias) {
+    const deps = Array.isArray(step.dependeDeStepKeys)
+      ? (step.dependeDeStepKeys as unknown[]).filter((x): x is string => typeof x === "string")
+      : []
+    if (deps.length > 0) {
+      // NA MESMA UNIDADE: numa fase com quatro certidões há quatro passos com a mesma
+      // chave, e o que importa é o da certidão deste passo.
+      const irmaos = await tx.phaseWorkflowStepInstance.findMany({
+        where: escopoDaUnidade({
+          workflowInstanceId: step.workflowInstanceId,
+          necessidadeId: step.necessidadeId,
+          documentoId: step.documentoId,
+        }),
+        select: { stepKey: true, status: true },
+      })
+      const cumpridas = new Set(irmaos.filter((i) => ESTADOS_CUMPRIDOS.has(i.status)).map((i) => i.stepKey))
+      const abertas = deps.filter((d) => !cumpridas.has(d))
+      if (abertas.length > 0) {
+        return { changed: false, anterior: step.status, atual: step.status, code: "DEPENDENCIA_PENDENTE" as H.FailureCodeD }
+      }
+    }
+  }
 
   const now = new Date()
   const data: Prisma.PhaseWorkflowStepInstanceUpdateManyMutationInput = {
@@ -211,6 +257,12 @@ export interface TransicaoPassoOpts {
    * nova via ou de documento invalidado — e o histórico não saberia distinguir.
    */
   motivoTentativa?: string
+  /**
+   * Constrói o estado inicial de um roteiro em vez de executar dentro dele.
+   * Ver `ApplyOpts.ignorarDependencias`: é para materialização e herança, não para
+   * contornar a pré-condição em execução normal.
+   */
+  ignorarDependencias?: boolean
 }
 
 export type TransicaoPassoResultado = {
@@ -246,6 +298,8 @@ export async function transicionarPassoTx(
     processoId: o.processoId,
     workflowInstanceId: o.workflowInstanceId,
     extra: o.extra,
+    usuarioId: o.usuarioId,
+    ignorarDependencias: o.ignorarDependencias,
   })
 }
 
@@ -283,27 +337,56 @@ export async function ativarProximoPassoTx(
   },
   o: Omit<TransicaoPassoOpts, "ciclo" | "processoId" | "workflowInstanceId">,
 ): Promise<number | null> {
-  const proxima = await tx.phaseWorkflowStepInstance.findFirst({
-    where: {
-      ...escopoDaUnidade({
-        workflowInstanceId: args.workflowInstanceId,
-        necessidadeId: args.necessidadeId,
-        documentoId: args.documentoId,
-      }),
-      status: "PENDENTE",
-      ordem: { gt: args.ordemConcluida },
-    },
-    select: { id: true, ciclo: true, processoId: true },
+  // QUEM DEPENDE, NÃO QUEM VEM DEPOIS.
+  //
+  // Antes: "a primeira PENDENTE com ordem maior". Isso é uma fila, e só coincide com
+  // dependência enquanto o roteiro for reto. Com dois caminhos independentes na mesma
+  // fase, abrir "o próximo por ordem" abria o passo errado — e abria UM só, quando
+  // concluir A podia liberar B e C ao mesmo tempo.
+  //
+  // A ordem continua no `orderBy`: ela desempata a apresentação. Não é ela que libera.
+  const daUnidade = await tx.phaseWorkflowStepInstance.findMany({
+    where: escopoDaUnidade({
+      workflowInstanceId: args.workflowInstanceId,
+      necessidadeId: args.necessidadeId,
+      documentoId: args.documentoId,
+    }),
+    select: { id: true, stepKey: true, ordem: true, status: true, ciclo: true, processoId: true, dependeDeStepKeys: true },
     orderBy: { ordem: "asc" },
   })
-  if (!proxima) return null
-  const r = await transicionarPassoTx(tx, proxima.id, "DISPONIVEL", {
-    ...o,
-    ciclo: proxima.ciclo,
-    processoId: proxima.processoId,
-    workflowInstanceId: args.workflowInstanceId,
-  })
-  return r.changed ? proxima.id : null
+  const comoDependencia: PassoComDependencia[] = daUnidade.map((p) => ({
+    id: p.id, stepKey: p.stepKey, ordem: p.ordem, status: p.status,
+    dependeDeStepKeys: Array.isArray(p.dependeDeStepKeys)
+      ? (p.dependeDeStepKeys as unknown[]).filter((x): x is string => typeof x === "string")
+      : null,
+  }))
+  const concluido = daUnidade.find((p) => p.ordem === args.ordemConcluida && ESTADOS_CUMPRIDOS.has(p.status))
+    ?? daUnidade.find((p) => p.ordem === args.ordemConcluida)
+  if (!concluido) return null
+
+  const liberados = liberadosPor(comoDependencia, concluido.stepKey)
+  // COMPATIBILIDADE COM O QUE NÃO DECLARA DEPENDÊNCIA: quando nenhum passo da unidade
+  // declara nada, `liberadosPor` não devolve ninguém — porque ninguém aponta para o
+  // concluído. Aí a fila por ordem continua sendo a resposta, que é o que aqueles
+  // workflows significam.
+  const alvos = liberados.length > 0
+    ? liberados
+    : comoDependencia.some((p) => (p.dependeDeStepKeys ?? []).length > 0)
+      ? []
+      : comoDependencia.filter((p) => p.status === "PENDENTE" && p.ordem > args.ordemConcluida).slice(0, 1)
+
+  let primeiro: number | null = null
+  for (const alvo of alvos) {
+    const info = daUnidade.find((d) => d.id === alvo.id)!
+    const r = await transicionarPassoTx(tx, alvo.id, "DISPONIVEL", {
+      ...o,
+      ciclo: info.ciclo,
+      processoId: info.processoId,
+      workflowInstanceId: args.workflowInstanceId,
+    })
+    if (r.changed && primeiro === null) primeiro = alvo.id
+  }
+  return primeiro
 }
 
 /**
@@ -366,6 +449,33 @@ export async function reabrirPassoTx(
   if (!step) return { changed: false, anterior: "", atual: "", code: "STEP_NAO_ENCONTRADO" as H.FailureCodeD }
   if (step.status === alvo) return { changed: false, anterior: step.status, atual: step.status }
 
+  // REABRIR TAMBÉM RESPEITA A DEPENDÊNCIA.
+  //
+  // Esta porta escreve o próprio update — ela não passa por `aplicarPasso` —, então a
+  // pré-condição precisa ser cobrada aqui também. Sem isto, reabrir era o caminho que
+  // continuava produzindo o estado impossível: uma etapa volta a executar enquanto
+  // aquilo de que ela depende está em aberto. Reabrir o PREDECESSOR é o gesto certo;
+  // reabrir o sucessor sozinho é começar pelo fim.
+  if (!o.ignorarDependencias) {
+    const deps = Array.isArray(step.dependeDeStepKeys)
+      ? (step.dependeDeStepKeys as unknown[]).filter((x): x is string => typeof x === "string")
+      : []
+    if (deps.length > 0) {
+      const irmaos = await tx.phaseWorkflowStepInstance.findMany({
+        where: escopoDaUnidade({
+          workflowInstanceId: step.workflowInstanceId,
+          necessidadeId: step.necessidadeId,
+          documentoId: step.documentoId,
+        }),
+        select: { stepKey: true, status: true },
+      })
+      const cumpridas = new Set(irmaos.filter((i) => ESTADOS_CUMPRIDOS.has(i.status)).map((i) => i.stepKey))
+      if (deps.some((d) => !cumpridas.has(d))) {
+        return { changed: false, anterior: step.status, atual: step.status, code: "DEPENDENCIA_PENDENTE" as H.FailureCodeD }
+      }
+    }
+  }
+
   // REABRIR NÃO DESCONCLUI O PASSADO — ABRE UMA TENTATIVA NOVA.
   //
   // Antes, esta era a linha que apagava a história: `completedAt = null` sobre a
@@ -403,6 +513,48 @@ export async function reabrirPassoTx(
   void nova
 
   const causationId = H.chaveComando(o.operacao, "step_instance", stepId, alvo, o.ciclo, step.lockVersion)
+  // REABRIR UM PREDECESSOR ALCANÇA QUEM DEPENDE DELE.
+  //
+  // Sem isto, reabrir "Solicitar" deixava "Receber" em execução dependendo de algo que
+  // voltou a estar aberto — a contradição que este trabalho inteiro persegue, e que o
+  // fuzz reproduz em 23 comandos. Quem depende volta a BLOQUEADO: não perde nada, e
+  // volta a esperar o que sempre esperou.
+  //
+  // ALCANÇA POR DEPENDÊNCIA, NÃO POR ORDEM: o que não desce desta raiz continua
+  // exatamente onde estava, porque nada do que ele dependia mudou.
+  //
+  // O DESCENDENTE JÁ CONCLUÍDO NÃO É DESCONCLUÍDO aqui. O trabalho dele aconteceu, e a
+  // tentativa que o registrou continua sendo verdade. Se ele precisar ser refeito, é
+  // uma reexecução — ato explícito, com identidade própria — e não um efeito colateral
+  // de mexer no vizinho.
+  const daUnidadeParaPropagar = await tx.phaseWorkflowStepInstance.findMany({
+    where: escopoDaUnidade({
+      workflowInstanceId: step.workflowInstanceId,
+      necessidadeId: step.necessidadeId,
+      documentoId: step.documentoId,
+    }),
+    select: { id: true, stepKey: true, ordem: true, status: true, ciclo: true, processoId: true, dependeDeStepKeys: true },
+  })
+  const grafoDaUnidade: PassoComDependencia[] = daUnidadeParaPropagar.map((x) => ({
+    id: x.id, stepKey: x.stepKey, ordem: x.ordem, status: x.status,
+    dependeDeStepKeys: Array.isArray(x.dependeDeStepKeys)
+      ? (x.dependeDeStepKeys as unknown[]).filter((y): y is string => typeof y === "string")
+      : null,
+  }))
+  const EM_VOO = new Set(["DISPONIVEL", "EM_ANDAMENTO", "AGUARDANDO"])
+  for (const desc of descendentes(grafoDaUnidade, step.stepKey)) {
+    if (!EM_VOO.has(desc.status)) continue
+    const info = daUnidadeParaPropagar.find((x) => x.id === desc.id)!
+    await aplicarPasso(tx, desc.id, "BLOQUEADO", "PASSO_BLOQUEADO", {
+      correlationId: o.correlationId,
+      causationId: H.chaveComando(o.operacao, "step_instance", desc.id, "BLOQUEADO", o.ciclo, undefined),
+      ciclo: info.ciclo,
+      processoId: info.processoId,
+      workflowInstanceId: step.workflowInstanceId,
+      extra: { startedAt: null, motivo: null },
+    })
+  }
+
   const chaveEvt = H.chaveEvento("PASSO_REABERTO", "step_instance", stepId, alvo, o.ciclo, step.lockVersion)
   await tx.workflowEvento.create({
     data: {

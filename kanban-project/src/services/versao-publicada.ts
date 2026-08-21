@@ -50,6 +50,48 @@ export interface PassoCongelado {
   completionRule: string | null
   checklist: unknown
   versao: number
+  /// CONFIGURAÇÃO CADASTRADA, congelada junto. Sem isto, acrescentar um resultado em
+  /// V2 apareceria dentro de um processo que roda V1 — que é a contaminação que o
+  /// versionamento existe para impedir. A ação é dado; dado versionado vive aqui.
+  executorKey: string | null
+  dependeDe: string[]
+  acoes: AcaoCongelada[]
+  campos: CampoCongelado[]
+  checkItens: ItemChecklistCongelado[]
+}
+
+export interface AcaoCongelada {
+  key: string
+  label: string
+  descricao: string | null
+  ordem: number
+  effectKey: string
+  requerCampos: string[]
+  permissao: string | null
+  condicao: unknown
+  metadata: unknown
+  ativo: boolean
+}
+
+export interface CampoCongelado {
+  key: string
+  label: string
+  tipo: string
+  obrigatorio: boolean
+  opcoes: unknown
+  condicao: unknown
+  ajuda: string | null
+  ordem: number
+  ativo: boolean
+}
+
+export interface ItemChecklistCongelado {
+  key: string
+  label: string
+  descricao: string | null
+  obrigatorio: boolean
+  ordem: number
+  ativo: boolean
 }
 
 export interface VersaoPublicada {
@@ -87,7 +129,16 @@ export async function congelarVersaoVigente(
 ): Promise<boolean> {
   const wf = await db.phaseInternalWorkflow.findUnique({
     where: { id: workflowId },
-    include: { passos: { orderBy: { ordem: "asc" } } },
+    include: {
+      passos: {
+        orderBy: { ordem: "asc" },
+        include: {
+          acoes: { orderBy: { ordem: "asc" } },
+          campos: { orderBy: { ordem: "asc" } },
+          checkItens: { orderBy: { ordem: "asc" } },
+        },
+      },
+    },
   })
   if (!wf) return false
 
@@ -102,6 +153,24 @@ export async function congelarVersaoVigente(
     createsTask: p.createsTask, required: p.required, owner: p.owner,
     priority: p.priority, slaDays: p.slaDays, cardinalidade: p.cardinalidade,
     completionRule: p.completionRule, checklist: p.checklist ?? null, versao: p.versao,
+    executorKey: p.executorKey,
+    dependeDe: Array.isArray(p.dependeDe) ? (p.dependeDe as string[]) : [],
+    acoes: p.acoes.map((a) => ({
+      key: a.key, label: a.label, descricao: a.descricao, ordem: a.ordem,
+      effectKey: a.effectKey,
+      requerCampos: Array.isArray(a.requerCampos) ? (a.requerCampos as string[]) : [],
+      permissao: a.permissao, condicao: a.condicao ?? null, metadata: a.metadata ?? null,
+      ativo: a.ativo,
+    })),
+    campos: p.campos.map((c) => ({
+      key: c.key, label: c.label, tipo: c.tipo, obrigatorio: c.obrigatorio,
+      opcoes: c.opcoes ?? null, condicao: c.condicao ?? null, ajuda: c.ajuda,
+      ordem: c.ordem, ativo: c.ativo,
+    })),
+    checkItens: p.checkItens.map((i) => ({
+      key: i.key, label: i.label, descricao: i.descricao,
+      obrigatorio: i.obrigatorio, ordem: i.ordem, ativo: i.ativo,
+    })),
   }))
 
   const r = await db.phaseInternalWorkflowVersao.createMany({
@@ -165,7 +234,18 @@ export async function lerVersaoPublicada(
     exigeDocumento: v.exigeDocumento, exigePessoa: v.exigePessoa,
     pausarSlaEmEsperaExterna: v.pausarSlaEmEsperaExterna,
     pausarSlaEmBloqueio: v.pausarSlaEmBloqueio,
-    passos: (v.passos as unknown as PassoCongelado[]) ?? [],
+    // VERSÃO CONGELADA ANTES DA CONFIGURAÇÃO CADASTRADA existe — as do Gate 1 não têm
+    // ações, campos nem checklist. Lê-las como listas vazias é a resposta certa, e é
+    // a verdade: naquela versão o cadastro não tinha nada disso. Não é fallback para
+    // a definição viva, que é o que este módulo existe para impedir.
+    passos: ((v.passos as unknown as Partial<PassoCongelado>[]) ?? []).map((p) => ({
+      ...(p as PassoCongelado),
+      executorKey: p.executorKey ?? null,
+      dependeDe: Array.isArray(p.dependeDe) ? p.dependeDe : [],
+      acoes: Array.isArray(p.acoes) ? p.acoes : [],
+      campos: Array.isArray(p.campos) ? p.campos : [],
+      checkItens: Array.isArray(p.checkItens) ? p.checkItens : [],
+    })),
     congeladoEm: v.congeladoEm, origem: v.origem,
   }
 }

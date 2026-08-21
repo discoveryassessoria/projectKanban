@@ -9,6 +9,7 @@
 
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
+import { efeitoExiste } from '@/src/lib/motor/catalogo-de-efeitos'
 import { verificarPermissao, extrairUsuarioComPermissoes } from '@/src/lib/verificar-permissao'
 
 /** Sobre o que uma fase pode operar. Mesmo vocabulário do enum EscopoExecucao. */
@@ -58,6 +59,12 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
         slaDiasPadrao: b?.slaDiasPadrao !== undefined && Number.isFinite(Number(b.slaDiasPadrao)) ? Number(b.slaDiasPadrao) : atual.slaDiasPadrao,
         descricao: b?.descricao !== undefined ? (String(b.descricao).trim() || null) : atual.descricao,
         escopo: escopoPedido ? (escopoPedido as never) : atual.escopo,
+        // COMPETÊNCIA DA FASE — quais efeitos os passos dela podem executar. Recusa
+        // chave que não existe no catálogo: uma competência inventada não protegeria
+        // nada e ainda daria a impressão de estar protegendo.
+        efeitosPermitidos: Array.isArray(b?.efeitosPermitidos)
+          ? (b.efeitosPermitidos.filter((k: unknown) => typeof k === 'string' && efeitoExiste(k)) as never)
+          : (atual.efeitosPermitidos as never),
         ativo: b?.ativo !== undefined ? !!b.ativo : atual.ativo,
       },
     })

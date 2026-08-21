@@ -98,6 +98,10 @@ export interface DefStep {
   cardinalidade: Cardinalidade | null
   tipo?: string | null // a definição atual NÃO tem; reservado p/ futuro
   dependeDeStepKeys?: string[] | null // derivado do modo de execução do workflow
+  /** DEPENDÊNCIA DECLARADA no cadastro. `null` = não declarada (o modo responde). */
+  dependeDe?: string[] | null
+  /** Executor declarado. `null` = o registro resolve pela chave. */
+  executorKey?: string | null
 }
 
 // ---------- Chaves de idempotência (determinísticas) ----------

@@ -19,7 +19,14 @@ export async function GET(request: NextRequest) {
       prisma.phaseInternalWorkflow.findMany({
         where: { arquivado: false },
         include: {
-        passos: { orderBy: { ordem: 'asc' } },
+        passos: {
+          orderBy: { ordem: 'asc' },
+          include: {
+            acoes: { orderBy: { ordem: 'asc' } },
+            campos: { orderBy: { ordem: 'asc' } },
+            checkItens: { orderBy: { ordem: 'asc' } },
+          },
+        },
         // CONTRATO — o cabeçalho da tela exibe família e perfil por NOME; sem a
         // relação carregada a UI teria de mapear id→nome localmente, que é o
         // mapa paralelo que esta arquitetura vem eliminando.

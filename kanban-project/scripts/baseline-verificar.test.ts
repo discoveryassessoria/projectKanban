@@ -189,7 +189,16 @@ const MIGRATION = join(DIR_MIGRATIONS, '0000_baseline', 'migration.sql')
 // 20260820140000_tentativa_de_execucao_do_passo.
 //
 //   anterior : 761f266e42dc04f48f383b06c05a08c62a1cf583f0e57ccbb3855ecc7370ed08
-const CHECKSUM_LEDGER = 'a4cba5fc2febbc4e09c5e19276c74059c20078e27d73ae9401c955a6a1dac7e4'
+//
+// 21/08/2026 — CADASTRO CANÔNICO DE EXECUÇÃO. Quatro tabelas (StepAction,
+// StepField, StepChecklistItem, CanalOperacional), seis colunas anuláveis
+// (dependeDe, executorKey, efeitosPermitidos, derivadoDeId, derivacaoTipo,
+// substituidoEm) e a linhagem documental. Tudo aditivo; nenhuma coluna alterada.
+// Ledger reconciliado no MESMO deploy da migration
+// 20260821090000_cadastro_canonico_de_execucao.
+//
+//   anterior : a4cba5fc2febbc4e09c5e19276c74059c20078e27d73ae9401c955a6a1dac7e4
+const CHECKSUM_LEDGER = '6a0e5a4347160b8885408776a13ed43a87fea558eb58a2584dec85e74d4dfdbe'
 
 /**
  * Migrations criadas DEPOIS da consolidacao de 02/08/2026. Toda migration nova
@@ -224,6 +233,7 @@ const MIGRATIONS_POS_BASELINE: string[] = [
   '20260819120000_catalogo_fase_escopo_descricao',
   '20260820100000_versao_publicada_imutavel',
   '20260820140000_tentativa_de_execucao_do_passo',
+  '20260821090000_cadastro_canonico_de_execucao',
 ]
 
 const sha256 = (t: string) => createHash('sha256').update(t).digest('hex')

@@ -18,6 +18,7 @@ import './verificacoes/agendados'
 import './verificacoes/interface'
 // capacidades precisam estar registradas ANTES das verificações que as avaliam
 import './capacidades/operacionais'
+import './verificacoes/cadastro-execucao'
 import './verificacoes/prontidao'
 
 export { catalogo, cobertura, dominiosSemCobertura, elegiveis, metadados, VERSAO_CATALOGO } from './catalogo'
