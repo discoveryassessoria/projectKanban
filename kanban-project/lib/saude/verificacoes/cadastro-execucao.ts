@@ -18,6 +18,7 @@ import type { Achado, ResultadoVerificacao } from '../tipos'
 import { efeitoExiste, efeitosDaFase } from '@/src/lib/motor/catalogo-de-efeitos'
 import { detectarCiclo } from '@/src/services/validacao-de-publicacao'
 import { REGISTRO_DE_EXECUTORES } from '@/src/lib/motor/registro-de-executores'
+import { executorEfetivo } from '@/src/services/validacao-de-publicacao'
 
 const ROTA_INTERNO = '/administrator?screen=phaseiwf'
 const ROTA_CANAIS = '/administrator?screen=canais'
@@ -1138,5 +1139,102 @@ registrar({
       })),
       metricas: { workflows: alcancaveis.length, ambiguos: ambiguos.length },
     }
+  },
+})
+
+// ── PASSO ATIVO SEM MEIO DE EXECUÇÃO ────────────────────────────────────────
+//
+// Um passo publicado, ativo, numa fase que já roda, e sem nada cadastrado, é uma
+// etapa que o operador abre e não consegue fechar. Foi o caso dos seis da Retificação.
+//
+// ─── O QUE ESTA VERIFICAÇÃO PRECISOU APRENDER ──────────────────────────────
+// A primeira versão desta conta (feita à mão numa auditoria) contou linhas de cadastro
+// e acusou `localizar_registro` junto com eles. Estava errado: aquele passo tem
+// executor ESPECIALIZADO (`registral`), que traz o próprio formulário e grava na fonte
+// canônica — o Documento —, e por contrato NÃO consome ações cadastradas. Cadastro
+// vazio ali é o esperado, não um defeito.
+//
+// A distinção que importa é entre:
+//   · executor DECLARATIVO — desenha exatamente o que estiver cadastrado. Sem cadastro,
+//     tela vazia. É defeito.
+//   · executor ESPECIALIZADO que não consome ações cadastradas — tem contrato próprio.
+//     Cadastro vazio é normal.
+//   · fase que NUNCA rodou — é rascunho de futuro, não operação quebrada. Vira INFO.
+
+registrar({
+  id: 'saude.cadastro.passo-ativo-sem-execucao',
+  codigo: 'CAD-012',
+  nome: 'Passo ativo tem como ser executado',
+  descricao: 'Passo publicado numa fase que já roda, com executor declarativo e nenhum cadastro, abre vazio para o operador.',
+  dominio: 'WORKFLOW',
+  modulo: 'Cadastro do passo',
+  severidadePadrao: 'ERRO',
+  obrigatoria: true,
+  modos: ['COMPLETO', 'PROFUNDO'],
+  introduzidaEm: '1.5.0',
+  timeoutMs: 25_000,
+  orientacao: 'Abra o passo em Workflows internos → Configurar e cadastre ao menos um resultado, ou declare um executor que traga o próprio formulário.',
+  rotaCorrecao: ROTA_INTERNO,
+  responsavel: 'Workflow',
+  ativo: true,
+  executar: async (): Promise<ResultadoVerificacao> => {
+    const passos = await prisma.phaseInternalWorkflowStep.findMany({
+      where: { workflow: { arquivado: false, active: true } },
+      select: {
+        id: true, key: true, label: true, executorKey: true, createsTask: true,
+        workflow: { select: { id: true, name: true, phaseKey: true } },
+        acoes: { where: { ativo: true }, select: { id: true } },
+        campos: { where: { ativo: true }, select: { id: true } },
+        checkItens: { where: { ativo: true }, select: { id: true } },
+        subtarefas: { where: { ativo: true }, select: { id: true } },
+      },
+    })
+    if (!passos.length) return vazio({ passos: 0, incompletos: 0 }, 'Nenhum passo ativo.')
+
+    // FASES QUE JÁ RODARAM — a diferença entre operação quebrada e rascunho de futuro.
+    const rodaram = new Set(
+      (await prisma.phaseWorkflowInstance.groupBy({ by: ['faseMacroKey'], _count: { _all: true } }))
+        .filter((i) => i._count._all > 0).map((i) => i.faseMacroKey),
+    )
+
+    const semCadastro = passos.filter((p) =>
+      !p.acoes.length && !p.campos.length && !p.checkItens.length && !p.subtarefas.length)
+
+    const achados: Achado[] = []
+    let placeholders = 0
+    let especializados = 0
+    for (const p of semCadastro) {
+      // O EXECUTOR EFETIVO decide se cadastro vazio é defeito. Sem `executorKey`, o
+      // registro resolve pela chave do passo — pode cair num especializado.
+      const exec = executorEfetivo({ key: p.key, executorKey: p.executorKey }, p.workflow.phaseKey)
+      const cap = REGISTRO_DE_EXECUTORES[exec as keyof typeof REGISTRO_DE_EXECUTORES]
+      if (cap && !cap.acoesCadastradas) { especializados++; continue }
+      if (!rodaram.has(p.workflow.phaseKey)) { placeholders++; continue }
+
+      achados.push({
+        chave: `passo-sem-execucao:${p.id}`,
+        severidade: 'ERRO',
+        titulo: `"${p.label}" não tem como ser executado`,
+        descricao: `O passo "${p.key}" de "${p.workflow.name}" usa o executor declarativo "${exec}" e não tem ação, campo, checklist nem subtarefa cadastrada.`,
+        explicacao: 'O executor declarativo desenha exatamente o que está cadastrado. Sem cadastro, o operador abre a etapa e não encontra nada — nem como concluí-la.',
+        impacto: `A fase ${p.workflow.phaseKey} já tem execuções: quem chegar neste passo trava nele.`,
+        entidade: 'PhaseInternalWorkflowStep', registroId: String(p.id), registroNome: p.key, quantidade: 1,
+        link: ROTA_INTERNO,
+        recomendacao: 'Cadastre ao menos um resultado, ou declare um executor com formulário próprio.',
+        evidencia: { passo: p.key, fase: p.workflow.phaseKey, executor: exec },
+      })
+    }
+
+    const metricas = {
+      passos: passos.length, semCadastro: semCadastro.length,
+      incompletos: achados.length, placeholders, especializados,
+    }
+    if (!achados.length) {
+      return {
+        achados: [], metricas,
+        resumo: `${passos.length} passo(s) ativos; ${especializados} com executor próprio e ${placeholders} em fase que nunca rodou — nenhum operacionalmente vazio.`,
+      }
+    }
+    return { achados, metricas }
   },
 })
