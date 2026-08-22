@@ -64,6 +64,72 @@ export function lerToken(token: string | null): TokenLido | null {
 
 const token = (): string | null => (typeof window !== "undefined" ? localStorage.getItem("authToken") : null)
 
+/**
+ * O QUE É "ESTAR LOGADO" NO CLIENTE — uma definição só.
+ *
+ * ─── O DEFEITO QUE ISTO FECHA ──────────────────────────────────────────────
+ * Havia duas. A tela de login considerava logado quem tinha `authToken` no
+ * localStorage E o cookie; o dashboard considerava logado quem tinha `authToken` E
+ * `user`. Com token e cookie presentes e `user` ausente — estado que o próprio
+ * sistema produz, porque a renovação reescreve o token e não o `user` — cada lado
+ * dizia o contrário do outro:
+ *
+ *   /login    "está logado"     → router.replace("/dashboard")
+ *   /dashboard "não está logado" → router.replace("/login")
+ *
+ * Medido no navegador: 1.853 navegações em 12 segundos. O formulário era destruído a
+ * cada volta, então digitar e clicar viravam sorte — e a tentativa que conseguia sair
+ * ficava presa em "Entrando…", porque a navegação de sucesso era engolida pelo laço.
+ *
+ * ─── A REGRA ───────────────────────────────────────────────────────────────
+ * A sessão é COMPLETA ou não existe. Um conjunto pela metade não é "meio logado": é
+ * lixo de uma sessão anterior, e o único destino correto dele é ser apagado. Quem
+ * descobre isso apaga e FICA no login — navegar com credencial incompleta é o que
+ * fecha o ciclo.
+ */
+export interface CredenciaisDoCliente {
+  token: string | null
+  cookie: string | null
+  usuario: string | null
+  /** Tudo presente e o token em formato JWT. É o único "sim". */
+  completa: boolean
+  /** Algo presente, mas não tudo — resto de sessão anterior. */
+  incompleta: boolean
+}
+
+function ehJwt(t: string | null): boolean {
+  return !!t && t.split(".").length === 3
+}
+
+export function credenciaisDoCliente(): CredenciaisDoCliente {
+  if (typeof window === "undefined") {
+    return { token: null, cookie: null, usuario: null, completa: false, incompleta: false }
+  }
+  let token: string | null = null
+  let usuario: string | null = null
+  try {
+    token = localStorage.getItem("authToken")
+    usuario = localStorage.getItem("user")
+  } catch { /* storage bloqueado: trata como ausente */ }
+  const cookie = lerCookieDeSessao("authToken")
+  const presentes = [token, cookie, usuario].filter(Boolean).length
+  const completa = presentes === 3 && ehJwt(token) && ehJwt(cookie)
+  return { token, cookie, usuario, completa, incompleta: presentes > 0 && !completa }
+}
+
+/** Lê um cookie do documento. Exportado para a tela de login não ter a sua cópia. */
+export function lerCookieDeSessao(nome: string): string | null {
+  if (typeof document === "undefined") return null
+  const m = document.cookie.split("; ").find((l) => l.startsWith(`${nome}=`))
+  return m ? decodeURIComponent(m.split("=")[1]) : null
+}
+
+/** Apaga o resto de sessão. Exportado porque quem detecta o lixo precisa limpá-lo. */
+export function descartarCredenciais(): void {
+  if (typeof window === "undefined") return
+  limparCredenciais()
+}
+
 function limparCredenciais() {
   localStorage.removeItem("authToken")
   localStorage.removeItem("user")

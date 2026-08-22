@@ -19,7 +19,7 @@ import { HomeContent } from "@/src/components/home/home-content"
 import { HomeShell } from "@/src/components/home/home-shell"
 import { HomeSkeleton } from "@/src/components/home/home-skeleton"
 import { BlocoCard, ErrorState } from "@/src/components/home/home-primitives"
-import { encerrarSessao } from "@/src/lib/sessao/cliente"
+import { encerrarSessao, credenciaisDoCliente, descartarCredenciais } from "@/src/lib/sessao/cliente"
 import { useIsClient, useLocalStorage } from "@/src/lib/cliente"
 
 export default function DashboardPage() {
@@ -31,12 +31,24 @@ export default function DashboardPage() {
   const noCliente = useIsClient()
   const token = useLocalStorage("authToken")
   const usuario = useLocalStorage("user")
+  // A MESMA DEFINIÇÃO DE SESSÃO QUE A TELA DE LOGIN USA. Aqui era "token + user" e
+  // lá era "token + cookie": com `user` ausente, cada lado mandava para o outro,
+  // num laço de ~150 navegações por segundo. `token`/`usuario` acima continuam
+  // alimentando o render (é o que decide mostrar o esqueleto); quem decide NAVEGAR
+  // é a definição única.
   const autorizado = noCliente && Boolean(token && usuario)
 
   // Sem sessão, volta para o login. Navegar é efeito; a autorização não era.
   useEffect(() => {
-    if (noCliente && !autorizado) router.replace("/login")
-  }, [noCliente, autorizado, router])
+    if (!noCliente) return
+    const c = credenciaisDoCliente()
+    if (c.completa) return
+    // APAGA ANTES DE SAIR. Ir para o login deixando credencial pela metade é o que
+    // fazia o login mandar de volta para cá — cada tela confiando no sinal que a
+    // outra não olhava.
+    if (c.incompleta) descartarCredenciais()
+    router.replace("/login")
+  }, [noCliente, router])
 
   // Sessão expirada durante a chamada → volta pro login.
   useEffect(() => {

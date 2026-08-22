@@ -1039,3 +1039,104 @@ registrar({
     }
   },
 })
+
+// ── DUPLICIDADE E ÓRFÃOS DE WORKFLOW INTERNO ────────────────────────────────
+//
+// Em 22/08 dois workflows respondiam pela fase de Emissão Documental: o genérico
+// (`all::emissao_documental`, 6 instâncias) e um preso a `tipoProcessoId = 2`
+// (`2::emissao_documental`, nunca executado) — um tipo de processo que havia sido
+// APAGADO. A referência ao tipo é solta, sem chave estrangeira, então o workflow
+// sobreviveu ao dono e ficou pendurado: inalcançável por qualquer processo, mas
+// visível no cadastro, dobrando o trabalho do administrador e acumulando
+// configuração que ninguém executa.
+
+registrar({
+  id: 'saude.workflow.tipo-de-processo-inexistente',
+  codigo: 'WFI-001',
+  nome: 'Workflow interno aponta para tipo de processo existente',
+  descricao: 'Workflow preso a um tipo de processo apagado é inalcançável: nenhum processo pode selecioná-lo.',
+  dominio: 'WORKFLOW',
+  modulo: 'Workflow interno',
+  severidadePadrao: 'ALERTA',
+  obrigatoria: false,
+  modos: ['RAPIDO', 'COMPLETO', 'PROFUNDO'],
+  introduzidaEm: '1.4.0',
+  timeoutMs: 15_000,
+  orientacao: 'Reaponte o workflow para um tipo existente, torne-o genérico, ou arquive-o.',
+  rotaCorrecao: ROTA_INTERNO,
+  responsavel: 'Workflow',
+  ativo: true,
+  executar: async (): Promise<ResultadoVerificacao> => {
+    const wfs = await prisma.phaseInternalWorkflow.findMany({
+      where: { arquivado: false, tipoProcessoId: { not: null } },
+      select: { id: true, name: true, wfUid: true, phaseKey: true, tipoProcessoId: true },
+    })
+    if (!wfs.length) return vazio({ workflows: 0, orfaos: 0 }, 'Nenhum workflow interno preso a tipo de processo.')
+    const tipos = new Set((await prisma.tipoProcessoNacionalidade.findMany({ select: { id: true } })).map((t) => t.id))
+    const orfaos = wfs.filter((w) => w.tipoProcessoId != null && !tipos.has(w.tipoProcessoId))
+    if (!orfaos.length) return vazio({ workflows: wfs.length, orfaos: 0 }, `${wfs.length} workflow(s) por tipo, todos apontando para tipo existente.`)
+    return {
+      achados: orfaos.map((w): Achado => ({
+        chave: `wf-tipo-inexistente:${w.id}`, severidade: 'ALERTA',
+        titulo: `"${w.name}" está preso ao tipo de processo ${w.tipoProcessoId}, que não existe`,
+        descricao: `O workflow ${w.wfUid} da fase ${w.phaseKey} referencia um tipo de processo apagado.`,
+        explicacao: 'A referência ao tipo é solta, sem chave estrangeira: o workflow sobrevive ao dono e fica inalcançável — nenhum processo pode selecioná-lo.',
+        impacto: 'Ele aparece no cadastro, dobra o trabalho do administrador e acumula configuração que nunca executa.',
+        entidade: 'PhaseInternalWorkflow', registroId: String(w.id), registroNome: w.name, quantidade: 1,
+        link: ROTA_INTERNO,
+        recomendacao: 'Reaponte para um tipo existente, torne genérico, ou arquive.',
+        evidencia: { wfUid: w.wfUid, tipoProcessoId: w.tipoProcessoId },
+      })),
+      metricas: { workflows: wfs.length, orfaos: orfaos.length },
+    }
+  },
+})
+
+registrar({
+  id: 'saude.workflow.dois-ativos-para-a-mesma-fase',
+  codigo: 'WFI-002',
+  nome: 'Uma definição ativa por fase e contexto',
+  descricao: 'Dois workflows ativos alcançáveis pela mesma fase tornam ambíguo qual configuração vale.',
+  dominio: 'WORKFLOW',
+  modulo: 'Workflow interno',
+  severidadePadrao: 'ERRO',
+  obrigatoria: true,
+  modos: ['RAPIDO', 'COMPLETO', 'PROFUNDO'],
+  introduzidaEm: '1.4.0',
+  timeoutMs: 15_000,
+  orientacao: 'Arquive o que não é canônico, ou dê a cada um um tipo de processo distinto e existente.',
+  rotaCorrecao: ROTA_INTERNO,
+  responsavel: 'Workflow',
+  ativo: true,
+  executar: async (): Promise<ResultadoVerificacao> => {
+    const wfs = await prisma.phaseInternalWorkflow.findMany({
+      where: { arquivado: false, active: true },
+      select: { id: true, name: true, phaseKey: true, tipoProcessoId: true },
+    })
+    const tipos = new Set((await prisma.tipoProcessoNacionalidade.findMany({ select: { id: true } })).map((t) => t.id))
+    // ALCANÇÁVEL = genérico, ou preso a um tipo que existe. Um workflow órfão não
+    // disputa com ninguém — quem o acusa é a WFI-001.
+    const alcancaveis = wfs.filter((w) => w.tipoProcessoId == null || tipos.has(w.tipoProcessoId))
+    const porContexto = new Map<string, typeof alcancaveis>()
+    for (const w of alcancaveis) {
+      const ctx = `${w.phaseKey}|${w.tipoProcessoId ?? 'todos'}`
+      porContexto.set(ctx, [...(porContexto.get(ctx) ?? []), w])
+    }
+    const ambiguos = [...porContexto.entries()].filter(([, l]) => l.length > 1)
+    if (!ambiguos.length) return vazio({ workflows: alcancaveis.length, ambiguos: 0 }, `${alcancaveis.length} workflow(s) alcançável(is), um por fase e contexto.`)
+    return {
+      achados: ambiguos.map(([ctx, lista]): Achado => ({
+        chave: `wf-ambiguo:${ctx}`, severidade: 'ERRO',
+        titulo: `${lista.length} workflows ativos para ${ctx.split('|')[0]}`,
+        descricao: `São eles: ${lista.map((w) => `#${w.id} "${w.name}"`).join(', ')}.`,
+        explicacao: 'Com dois alcançáveis pelo mesmo contexto, qual configuração vale passa a depender da ordem da consulta.',
+        impacto: 'O administrador configura um e o processo executa o outro.',
+        entidade: 'PhaseInternalWorkflow', registroId: String(lista[0].id), quantidade: lista.length,
+        link: ROTA_INTERNO,
+        recomendacao: 'Arquive o que não é canônico, ou dê a cada um um tipo de processo distinto.',
+        evidencia: { contexto: ctx, workflows: lista.map((w) => w.id) },
+      })),
+      metricas: { workflows: alcancaveis.length, ambiguos: ambiguos.length },
+    }
+  },
+})

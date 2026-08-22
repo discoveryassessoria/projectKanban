@@ -3,6 +3,7 @@
 import type React from "react"
 import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
+import { credenciaisDoCliente, descartarCredenciais } from "@/src/lib/sessao/cliente"
 
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -123,26 +124,22 @@ export default function AuthComponent({
   //
   // Roda apenas no mount (deps vazias).
   useEffect(() => {
-    const tokenLS = localStorage.getItem("authToken")
-    const tokenCookie = lerCookie("authToken")
+    // A DEFINIÇÃO DE SESSÃO É UMA SÓ, e mora em `src/lib/sessao/cliente.ts`.
+    //
+    // Aqui existia uma segunda: "logado = authToken + cookie". O dashboard usava
+    // outra: "logado = authToken + user". Com token e cookie presentes e `user`
+    // ausente, esta tela mandava para o dashboard e o dashboard mandava de volta —
+    // 1.853 navegações em 12 segundos, o formulário destruído a cada volta, e o
+    // login preso em "Entrando…" porque a navegação de sucesso era engolida no meio.
+    const c = credenciaisDoCliente()
 
-    // 1. Token em formato antigo → limpa e fica no login
-    if (
-      (tokenLS && !isJwtFormat(tokenLS)) ||
-      (tokenCookie && !isJwtFormat(tokenCookie))
-    ) {
-      limparAuth()
-      return
-    }
+    // SESSÃO PELA METADE NÃO É MEIO LOGADO: é resto de sessão anterior. Apaga e FICA
+    // aqui. Navegar com credencial incompleta é exatamente o que fechava o ciclo.
+    if (c.incompleta) { descartarCredenciais(); return }
 
-    // 2. Ambos presentes e em formato JWT → redireciona
-    if (tokenLS && tokenCookie) {
-      router.replace(redirectTo)
-    } else if (tokenLS || tokenCookie) {
-      // 3. Só um → inconsistente, limpa
-      limparAuth()
-    }
-    // 4. Nenhum → não faz nada, fica no login
+    // Sessão completa: quem valida de verdade é o middleware, no destino.
+    if (c.completa) router.replace(redirectTo)
+    // Nenhuma credencial: fica no login, que é onde o usuário já está.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []) // ← deps vazias: roda só uma vez no mount
 
