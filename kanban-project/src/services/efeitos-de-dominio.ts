@@ -12,6 +12,9 @@
 // ============================================================================
 
 import { prisma } from "@/lib/prisma"
+import { registrarProtocoloTx, ORIGENS_DE_PROTOCOLO } from "@/src/services/protocolo-canonico"
+import { definicaoHistoricaDoPasso } from "@/src/services/versao-publicada"
+import { alvoDoCampo, idReferenciado } from "@/src/lib/motor/fontes-de-campo"
 import type { StatusDocumento } from "@prisma/client"
 import { reopenPhase } from "@/src/lib/motor/phase-advance"
 
@@ -179,6 +182,56 @@ export async function registrarDivergencia(a: AlvoDoEfeito) {
  * Ativa a fase de Retificação pelo motor de fases, com justificativa. O executor não
  * mexe em fase: ele pede ao motor, que é quem decide se pode.
  */
+/**
+ * REGISTRAR O PROTOCOLO no cadastro que é dono dele.
+ *
+ * O órgão NÃO vem de um campo com nome combinado. Vem do primeiro campo de referência
+ * que aponta para `ORGANIZACAO` — que é estrutura, não convenção de nome. Um passo que
+ * chame o campo de "cartório", "órgão" ou "conservatória" funciona igual, e nenhum
+ * `stepKey` ou `phaseKey` aparece nesta função.
+ */
+export async function registrarProtocoloDaEtapa(a: AlvoDoEfeito) {
+  const numero = texto(a.valores.numero_protocolo)
+  const quando = a.valores.data_protocolo
+  if (!numero) return { protocoloId: null, motivo: "SEM_NUMERO" }
+  const data = quando instanceof Date ? quando : new Date(String(quando ?? ""))
+  if (Number.isNaN(data.getTime())) return { protocoloId: null, motivo: "DATA_INVALIDA" }
+
+  const orgaoId = await orgaoReferenciadoNaEtapa(a)
+  const r = await prisma.$transaction((tx) => registrarProtocoloTx(tx, {
+    processoId: a.processoId,
+    numeroProtocolo: numero,
+    dataProtocolo: data,
+    origem: ORIGENS_DE_PROTOCOLO.ETAPA,
+    orgaoId,
+    responsavelId: a.usuarioId,
+    observacoes: texto(a.valores.observacao_protocolo),
+    documentoIds: a.documentoId ? [a.documentoId] : [],
+  }))
+
+  // A TENTATIVA GUARDA A REFERÊNCIA, não o número. É o ponto inteiro desta mudança.
+  const vigente = await prisma.stepExecution.findFirst({
+    where: { stepInstanceId: a.stepInstanceId, supersededAt: null },
+    select: { id: true },
+  })
+  if (vigente) {
+    await prisma.stepExecution.update({ where: { id: vigente.id }, data: { protocoloId: r.protocoloId } })
+  }
+  return { protocoloId: r.protocoloId, jaExistia: r.jaExistia }
+}
+
+/** O órgão escolhido na etapa, achado pela ESTRUTURA do campo — nunca pelo nome dele. */
+async function orgaoReferenciadoNaEtapa(a: AlvoDoEfeito): Promise<number | null> {
+  const hist = await definicaoHistoricaDoPasso(a.stepInstanceId)
+  for (const c of hist?.passo.campos ?? []) {
+    if (c.tipo !== "referencia") continue
+    if (alvoDoCampo(c.opcoes) !== "ORGANIZACAO") continue
+    const id = idReferenciado(a.valores[c.key])
+    if (id != null) return id
+  }
+  return null
+}
+
 export async function decidirRetificacao(a: AlvoDoEfeito) {
   const justificativa = texto(a.valores.justificativa) ?? "Decisão da Análise Documental."
   if (a.documentoId) {

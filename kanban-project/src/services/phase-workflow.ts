@@ -171,7 +171,7 @@ async function carregarContextoEscopo(
   db: Prisma.TransactionClient | typeof prisma,
 ): Promise<{ ctx: ContextoEscopo; diagnosticos: WorkflowValidationIssue[] }> {
   const cards = new Set(steps.map((st) => cardinalidadeEfetiva(st.cardinalidade, escopoDaFase)))
-  const ctx: ContextoEscopo = { pessoaIds: [], necessidadeIds: [], documentoIds: [], documentoIdPorNecessidade: new Map() }
+  const ctx: ContextoEscopo = { pessoaIds: [], necessidadeIds: [], documentoIds: [], retificacaoPacoteIds: [], documentoIdPorNecessidade: new Map() }
   // DIAGNÓSTICO, não log: quando a fase não materializa nada, o motivo tem de chegar
   // até quem pediu a materialização — e daí até a tela. Um console.error aqui foi o
   // que deixou "0 documentos" sem explicação em produção.
@@ -229,6 +229,23 @@ async function carregarContextoEscopo(
     }
   }
 
+  if (cards.has("RETIFICACAO")) {
+    // OS PEDIDOS ABERTOS. Um pacote validado ou bloqueado não é trabalho a fazer —
+    // materializar passos para ele encheria a fila de etapas que já terminaram.
+    const pacotes = await db.retificacaoPacote.findMany({
+      where: { processoId, status: { notIn: ["validado", "cancelado"] } },
+      select: { id: true }, orderBy: { id: "asc" },
+    })
+    ctx.retificacaoPacoteIds = pacotes.map((p) => p.id)
+    if (pacotes.length === 0) {
+      diagnosticos.push({
+        code: "NENHUM_PEDIDO_DE_RETIFICACAO",
+        message: "Esta fase opera por pedido de retificação e o processo não tem nenhum aberto. Abra o pedido com as divergências que entram nele: a fase converge sozinha quando ele existir.",
+        entityType: "processo", entityId: processoId,
+      })
+    }
+  }
+
   if (cards.has("DOCUMENTO") && proc?.arvoreId) {
     const docs = await db.documento.findMany({
       where: { pessoa: { arvoreId: proc.arvoreId }, status: { not: "CANCELADO" } },
@@ -266,6 +283,7 @@ async function materializarAlvos(
       workflowInstanceId: ctx.instanciaId, stepDefinitionId: a.def.id, stepKey: a.def.key,
       stepDefinitionVersion: a.def.versao, ciclo: ctx.ciclo,
       documentoId: a.documentoId, pessoaId: a.pessoaId, necessidadeId: a.necessidadeId,
+      retificacaoPacoteId: a.retificacaoPacoteId,
     }),
   )
   // CONVERGÊNCIA POR IDENTIDADE LÓGICA, não só pela string da chave. O passo de uma
@@ -282,15 +300,15 @@ async function materializarAlvos(
         },
       })
     : []
-  const idLogica = (x: { stepKey: string; pessoaId: number | null; necessidadeId: number | null; documentoId: number | null }) =>
-    `${x.stepKey}|p${x.pessoaId ?? "-"}|n${x.necessidadeId ?? "-"}|d${x.documentoId ?? "-"}`
+  const idLogica = (x: { stepKey: string; pessoaId: number | null; necessidadeId: number | null; documentoId: number | null; retificacaoPacoteId?: number | null }) =>
+    `${x.stepKey}|p${x.pessoaId ?? "-"}|n${x.necessidadeId ?? "-"}|d${x.documentoId ?? "-"}|r${x.retificacaoPacoteId ?? "-"}`
   const porChave = new Map<string, (typeof jaExistem)[number]>()
   for (const e of jaExistem) {
     porChave.set(e.chaveIdempotencia, e)
     porChave.set(idLogica(e), e)
     // Passo criado por outro caminho ANTES de o Documento existir fica com
     // documentoId=null; o alvo atual já traz o Documento. É o mesmo trabalho.
-    if (e.necessidadeId != null) porChave.set(`${e.stepKey}|p-|n${e.necessidadeId}|d-`, e)
+    if (e.necessidadeId != null) porChave.set(`${e.stepKey}|p-|n${e.necessidadeId}|d-|r-`, e)
   }
 
   // ── REENTRADA NA FASE: o trabalho já feito da MESMA obrigação não recomeça ──
@@ -321,7 +339,7 @@ async function materializarAlvos(
       },
       select: {
         id: true, stepKey: true, ciclo: true, status: true, startedAt: true, completedAt: true,
-        pessoaId: true, necessidadeId: true, documentoId: true,
+        pessoaId: true, necessidadeId: true, documentoId: true, retificacaoPacoteId: true,
       },
       orderBy: { ciclo: "desc" },
     })
@@ -338,7 +356,7 @@ async function materializarAlvos(
     }
   }
   const acharAncestral = (a: AlvoDePasso): Ancestral | undefined =>
-    ancestrais.get(idLogica({ stepKey: a.def.key, pessoaId: a.pessoaId, necessidadeId: a.necessidadeId, documentoId: a.documentoId })) ??
+    ancestrais.get(idLogica({ stepKey: a.def.key, pessoaId: a.pessoaId, necessidadeId: a.necessidadeId, documentoId: a.documentoId, retificacaoPacoteId: a.retificacaoPacoteId })) ??
     (a.necessidadeId != null ? ancestrais.get(`${a.def.key}|n${a.necessidadeId}`) : undefined) ??
     (a.documentoId != null ? ancestrais.get(`${a.def.key}|d${a.documentoId}`) : undefined)
 
@@ -392,7 +410,7 @@ async function materializarAlvos(
     const chavePasso = chaves[i]
     const existente =
       porChave.get(chavePasso) ??
-      porChave.get(idLogica({ stepKey: a.def.key, pessoaId: a.pessoaId, necessidadeId: a.necessidadeId, documentoId: a.documentoId })) ??
+      porChave.get(idLogica({ stepKey: a.def.key, pessoaId: a.pessoaId, necessidadeId: a.necessidadeId, documentoId: a.documentoId, retificacaoPacoteId: a.retificacaoPacoteId })) ??
       (a.necessidadeId != null ? porChave.get(`${a.def.key}|p-|n${a.necessidadeId}|d-`) : undefined)
     if (existente) { existentes.push(existente); continue }
 
@@ -443,6 +461,7 @@ async function materializarAlvos(
         pessoaId: a.pessoaId,
         necessidadeId: a.necessidadeId,
         documentoId: a.documentoId,
+        retificacaoPacoteId: a.retificacaoPacoteId,
         dependeDeStepKeys: a.dependeDeStepKeys,
         chaveIdempotencia: chavePasso,
         correlationId: ctx.correlationId,
@@ -475,6 +494,7 @@ async function materializarAlvos(
         dados: {
           stepKey: a.def.key, ordem: a.def.ordem, tipo: tipoRes.tipo, ciclo: ctx.ciclo,
           cardinalidade: a.cardinalidade, pessoaId: a.pessoaId, necessidadeId: a.necessidadeId, documentoId: a.documentoId,
+          retificacaoPacoteId: a.retificacaoPacoteId,
           // CAUSALIDADE DA HERANÇA — o histórico precisa dizer que este passo nasceu
           // concluído porque a visita anterior o concluiu, e de qual passo veio.
           ...(herdado ? { herdadoDoPassoId: herdado.id, herdadoDoCiclo: herdado.ciclo, herdadoStatus: herdado.status } : {}),

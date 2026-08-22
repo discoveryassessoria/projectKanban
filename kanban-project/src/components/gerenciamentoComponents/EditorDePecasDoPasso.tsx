@@ -12,7 +12,8 @@
 // listas e devolve as listas.
 
 import type { AcaoCfg, CampoCfg, ItemCfg, RequisitoCfg, OpcaoCfg } from "./tiposDoCadastroDoPasso"
-import { chaveDe, TIPOS_DE_REQUISITO, nomeDoTipoDeCampo, TIPOS_COM_OPCOES } from "./tiposDoCadastroDoPasso"
+import { chaveDe, TIPOS_DE_REQUISITO, nomeDoTipoDeCampo, TIPOS_COM_OPCOES, TIPO_REFERENCIA } from "./tiposDoCadastroDoPasso"
+import { ALVOS_DE_REFERENCIA, CHAVES_DE_ALVO, alvoDeReferencia, alvoDoCampo } from "@/src/lib/motor/fontes-de-campo"
 
 export interface Efeito {
   key: string; label: string; descricao: string; competencia: string
@@ -85,6 +86,39 @@ export default function EditorDePecasDoPasso({
             </label>
             <code className="text-[11px] text-white/35" title="Chave gravada nas execuções — não muda.">{c.key ?? chaveDe(c.label)}</code>
           </div>
+          {c.tipo === TIPO_REFERENCIA && (
+            <div className="mt-3 rounded-lg border border-white/10 bg-black/20 p-3">
+              <label className={lbl}>Qual cadastro</label>
+              {/* NÃO se escrevem opções aqui: a lista É o cadastro, e ela muda quando
+                  o cadastro muda. O que se escolhe é para ONDE o campo aponta. */}
+              <select
+                className={inp}
+                value={alvoDoCampo(c.opcoes) ?? ""}
+                onChange={(e) => setLista("campos", i, {
+                  opcoes: e.target.value ? { referencia: e.target.value } : null,
+                  opcoesCadastradas: [],
+                })}
+              >
+                <option value="">— escolher o cadastro —</option>
+                {CHAVES_DE_ALVO.map((k) => (
+                  <option key={k} value={k}>{ALVOS_DE_REFERENCIA[k].label}</option>
+                ))}
+              </select>
+              {(() => {
+                const a = alvoDeReferencia(alvoDoCampo(c.opcoes))
+                return a ? (
+                  <p className="mt-1 text-[11px] text-white/35">
+                    {a.descricao} Fica gravado o identificador do registro, não o nome — renomear lá
+                    aparece aqui sem regravar nada.
+                  </p>
+                ) : (
+                  <p className="mt-1 text-[11px] text-amber-300/70">
+                    Referência sem cadastro escolhido não deixa escolher nada — a publicação recusa.
+                  </p>
+                )
+              })()}
+            </div>
+          )}
           {TIPOS_COM_OPCOES.includes(c.tipo) && (
             <div className="mt-3 rounded-lg border border-white/10 bg-black/20 p-3">
               <div className="flex items-center justify-between">

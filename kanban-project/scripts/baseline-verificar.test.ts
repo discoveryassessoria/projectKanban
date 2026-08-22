@@ -287,6 +287,8 @@ const MIGRATIONS_POS_BASELINE: string[] = [
   '20260821220000_cadastro_integral_do_passo',
   '20260822090000_subtarefa_canonica',
   '20260822100000_identidade_por_dono',
+  '20260822170000_protocolo_na_execucao',
+  '20260822180000_retificacao_unidade_canonica',
 ]
 
 const sha256 = (t: string) => createHash('sha256').update(t).digest('hex')

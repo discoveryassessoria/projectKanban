@@ -26,6 +26,7 @@
 // telas legadas os consomem: espelho de compatibilidade, não fonte.
 
 import { prisma } from "@/lib/prisma"
+import { registrarProtocoloTx, ORIGENS_DE_PROTOCOLO } from "@/src/services/protocolo-canonico"
 import { Prisma } from "@prisma/client"
 import type { CanalSolicitacaoDocumento, TipoArquivoDocumento } from "@prisma/client"
 import {
@@ -549,37 +550,26 @@ export async function registrarProtocoloDaSolicitacaoTx(
     orgaoId?: number | null
   },
 ): Promise<number> {
-  // Mesmo número, mesma solicitação = mesmo protocolo. Reenviar não duplica.
-  const existente = await tx.protocolo.findFirst({
-    where: { solicitacaoId: args.solicitacaoId, numeroProtocolo: args.numeroProtocolo },
-    select: { id: true },
+  // QUEM ESCREVE `Protocolo` É UM SÓ. Esta função sabe traduzir canal em tipo e forma
+  // de envio — conhecimento da solicitação — e entrega o resto à porta canônica. Antes
+  // ela criava a linha por conta própria, e era o segundo writer do mesmo fato.
+  //
+  // A idempotência não afrouxou: a porta procura por processo + número + origem +
+  // solicitação, que é mais estrito do que o par que estava aqui.
+  const { protocoloId } = await registrarProtocoloTx(tx, {
+    processoId: args.processoId,
+    solicitacaoId: args.solicitacaoId,
+    origem: ORIGENS_DE_PROTOCOLO.SOLICITACAO_DOCUMENTO,
+    orgaoId: args.orgaoId ?? null,
+    numeroProtocolo: args.numeroProtocolo,
+    tipoProtocolo: tipoProtocoloDoCanal(args.canal),
+    formaEnvio: formaEnvioDoCanal(args.canal),
+    dataProtocolo: args.dataProtocolo,
+    responsavelId: args.responsavelId,
+    observacoes: args.observacoes ?? null,
+    documentoIds: [args.documentoId],
   })
-  if (existente) return existente.id
-
-  const protocolo = await tx.protocolo.create({
-    data: {
-      processoId: args.processoId,
-      solicitacaoId: args.solicitacaoId,
-      origem: "SOLICITACAO_DOCUMENTO",
-      orgaoId: args.orgaoId ?? null,
-      numeroProtocolo: args.numeroProtocolo,
-      tipoProtocolo: tipoProtocoloDoCanal(args.canal),
-      formaEnvio: formaEnvioDoCanal(args.canal),
-      dataProtocolo: args.dataProtocolo,
-      responsavelId: args.responsavelId,
-      observacoes: args.observacoes ?? null,
-    },
-    select: { id: true },
-  })
-
-  // Vínculo canônico protocolo↔documento — a junção que já existia e nunca era usada.
-  await tx.protocoloDocumento.upsert({
-    where: { protocoloId_documentoId: { protocoloId: protocolo.id, documentoId: args.documentoId } },
-    create: { protocoloId: protocolo.id, documentoId: args.documentoId },
-    update: {},
-  })
-
-  return protocolo.id
+  return protocoloId
 }
 
 // ════════════════════════════════════════════════════════════════════════════

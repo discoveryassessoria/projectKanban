@@ -46,11 +46,14 @@ export type ModoExecucaoPassos = "SEQUENCIAL" | "PARALELO"
  *  • PESSOA:      1 por pessoa aplicável da árvore.
  *  • NECESSIDADE: 1 por registro/certidão a localizar (preserva pessoa + registro).
  *  • DOCUMENTO:   1 por documento materializado.
+ *  • RETIFICACAO: 1 por pedido de retificação aberto no processo. É a unidade de
+ *    trabalho de um pedido: um pacote reúne as divergências que vão numa mesma
+ *    petição, e dois pedidos no mesmo processo são duas cadeias independentes.
  */
-export type Cardinalidade = "PROCESSO" | "PESSOA" | "NECESSIDADE" | "DOCUMENTO"
+export type Cardinalidade = "PROCESSO" | "PESSOA" | "NECESSIDADE" | "DOCUMENTO" | "RETIFICACAO"
 
 export const MODOS_EXECUCAO: readonly ModoExecucaoPassos[] = ["SEQUENCIAL", "PARALELO"]
-export const CARDINALIDADES: readonly Cardinalidade[] = ["PROCESSO", "PESSOA", "NECESSIDADE", "DOCUMENTO"]
+export const CARDINALIDADES: readonly Cardinalidade[] = ["PROCESSO", "PESSOA", "NECESSIDADE", "DOCUMENTO", "RETIFICACAO"]
 
 /** Normaliza o valor persistido; desconhecido cai no default declarado no schema. */
 export function normalizarModoExecucao(v: string | null | undefined): ModoExecucaoPassos {
@@ -139,6 +142,10 @@ export function montarChavePasso(i: {
   pessoaId?: number | null
   // Passo POR-NECESSIDADE (escopo DOCUMENTO sem Documento materializado ainda).
   necessidadeId?: number | null
+  // Passo POR-PEDIDO-DE-RETIFICAÇÃO: distingue a mesma stepKey entre dois pedidos
+  // abertos no mesmo processo. Sem este segmento, os dois pedidos colidiriam na mesma
+  // chave e o segundo seria descartado como duplicata do primeiro.
+  retificacaoPacoteId?: number | null
 }): string {
   const base = [
     `wfi${i.workflowInstanceId}`,
@@ -151,6 +158,7 @@ export function montarChavePasso(i: {
   // A chave lógica é processo+ciclo+passo publicado+entidade do escopo (item 26 da
   // especificação): reexecutar a materialização converge, nunca duplica.
   if (i.documentoId != null) base.push(`doc${i.documentoId}`)
+  if (i.retificacaoPacoteId != null) base.push(`ret${i.retificacaoPacoteId}`)
   if (i.pessoaId != null) base.push(`pes${i.pessoaId}`)
   if (i.necessidadeId != null) base.push(`nec${i.necessidadeId}`)
   return base.join("|")

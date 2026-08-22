@@ -124,8 +124,19 @@ function aplicarTravas(url) {
     if (!existsSync(arquivo)) continue
     const sql = readFileSync(arquivo, 'utf8')
     // Só o que o `db push` não sabe montar: índice parcial (tem WHERE) e CHECK.
-    for (const m of sql.matchAll(/CREATE UNIQUE INDEX[^;]*WHERE[^;]*;/gi)) comandos.push(m[0])
-    for (const m of sql.matchAll(/ALTER TABLE[^;]*ADD CONSTRAINT[^;]*CHECK[^;]*;/gi)) comandos.push(m[0])
+    //
+    // NA ORDEM, E COM OS DROPS. Extrair só os CREATEs recriava trava que uma migration
+    // POSTERIOR derrubou — e o banco de teste ficava mais estrito que produção. Foi o
+    // que aconteceu com `Tarefa_workflowInstanceId_key`: criado em 10/08, derrubado em
+    // 12/08, e ressuscitado aqui a cada `up`. O teste então falhava por uma regra que
+    // produção não tem, o que é o mesmo defeito de antes com o sinal trocado.
+    const trechos = [
+      ...sql.matchAll(/CREATE UNIQUE INDEX[^;]*WHERE[^;]*;/gi),
+      ...sql.matchAll(/ALTER TABLE[^;]*ADD CONSTRAINT[^;]*CHECK[^;]*;/gi),
+      ...sql.matchAll(/DROP INDEX[^;]*;/gi),
+      ...sql.matchAll(/ALTER TABLE[^;]*DROP CONSTRAINT[^;]*;/gi),
+    ].sort((x, y) => x.index - y.index)
+    for (const m of trechos) comandos.push(m[0])
   }
   let aplicadas = 0
   for (const cmd of comandos) {
@@ -133,7 +144,9 @@ function aplicarTravas(url) {
     const r = spawnSync(psql, ['-h', '127.0.0.1', '-p', PORTA, '-U', 'postgres', '-d', BANCO, '-c', cmd],
       { encoding: 'utf8' })
     if (r.status === 0) aplicadas++
-    else if (!/already exists|já existe/i.test(String(r.stderr))) {
+    // DROP do que nunca chegou a existir não é erro: o `db push` pode já ter montado o
+    // schema sem a trava que a migration antiga criava.
+    else if (!/already exists|já existe|does not exist|não existe/i.test(String(r.stderr))) {
       console.log(`  ! ${String(r.stderr).trim().split('\n')[0]}`)
     }
   }

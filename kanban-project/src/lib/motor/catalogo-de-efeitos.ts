@@ -49,6 +49,15 @@ export interface DefinicaoDeEfeito {
   idempotente: boolean
   /** O efeito conclui o passo por si? Evita ação que "faz" e não fecha nada. */
   concluiPasso: boolean
+  /**
+   * Campos cujo VALOR passa a morar na entidade dona e por isso NÃO fica na execução.
+   *
+   * Sem esta lista, o payload guardaria uma cópia editável do que agora tem dono: o
+   * operador corrigiria o protocolo no cadastro e a etapa continuaria mostrando o
+   * número velho, sem ninguém para dizer qual está certo. A execução fica com a
+   * referência; o valor, com quem responde por ele.
+   */
+  camposConsumidos?: string[]
 }
 
 export const CATALOGO_DE_EFEITOS: DefinicaoDeEfeito[] = [
@@ -163,6 +172,26 @@ export const CATALOGO_DE_EFEITOS: DefinicaoDeEfeito[] = [
     camposObrigatorios: ["motivo"],
     idempotente: true,
     concluiPasso: false,
+  },
+  {
+    key: "REGISTER_PROTOCOL",
+    label: "Registrar o protocolo",
+    descricao:
+      "Grava o protocolo no cadastro de Protocolos — número, data, órgão e responsável — e amarra a etapa a ele. " +
+      "A etapa fica com a referência; o número mora no protocolo, que é o dono do fato.",
+    // GERAL, e não RETIFICAÇÃO: protocolar é registrar um fato, não decidir nada.
+    // Qualquer fase que entregue algo a um terceiro protocola, e amarrar o efeito a
+    // uma competência faria a próxima precisar de um efeito gêmeo.
+    competencia: COMPETENCIAS.GERAL,
+    permissao: "processos.editar",
+    // Sem número e sem data não há protocolo — não é preferência de tela, é o que
+    // identifica o ato. O órgão vem do campo de referência quando o passo tiver um.
+    camposObrigatorios: ["numero_protocolo", "data_protocolo"],
+    idempotente: true,
+    concluiPasso: true,
+    // O número e a data passam a viver em `Protocolo`. O campo de referência ao órgão
+    // NÃO entra aqui: ele já é uma referência, e referência não é cópia.
+    camposConsumidos: ["numero_protocolo", "data_protocolo", "observacao_protocolo"],
   },
   {
     key: "REGISTER_ONLY",

@@ -19,6 +19,9 @@ import { efeitoExiste, efeitosDaFase } from '@/src/lib/motor/catalogo-de-efeitos
 import { detectarCiclo } from '@/src/services/validacao-de-publicacao'
 import { REGISTRO_DE_EXECUTORES } from '@/src/lib/motor/registro-de-executores'
 import { executorEfetivo } from '@/src/services/validacao-de-publicacao'
+import { alvoDoCampo, alvoDeReferencia, idReferenciado } from '@/src/lib/motor/fontes-de-campo'
+import { resolverReferencias } from '@/src/services/referencia-canonica'
+import { Prisma } from '@prisma/client'
 
 const ROTA_INTERNO = '/administrator?screen=phaseiwf'
 const ROTA_CANAIS = '/administrator?screen=canais'
@@ -1236,5 +1239,243 @@ registrar({
       }
     }
     return { achados, metricas }
+  },
+})
+
+// ── REFERÊNCIA A CADASTRO: alvo inválido e ID órfão ──────────────────────────
+
+registrar({
+  id: 'saude.cadastro.referencia-invalida',
+  codigo: 'REF-001',
+  nome: 'Campo de referência aponta para cadastro que existe',
+  descricao: 'Campo do tipo referência sem alvo declarado, ou apontando para um alvo fora do vocabulário.',
+  dominio: 'WORKFLOW',
+  modulo: 'Cadastro do passo',
+  severidadePadrao: 'ERRO',
+  obrigatoria: true,
+  modos: ['COMPLETO', 'PROFUNDO'],
+  introduzidaEm: '1.6.0',
+  timeoutMs: 20_000,
+  orientacao: 'Abra o passo em Workflows internos → Configurar e escolha o cadastro para o qual o campo aponta.',
+  rotaCorrecao: ROTA_INTERNO,
+  responsavel: 'Workflow',
+  ativo: true,
+  executar: async (): Promise<ResultadoVerificacao> => {
+    const campos = await prisma.stepField.findMany({
+      where: { tipo: 'referencia', ativo: true },
+      select: { id: true, key: true, label: true, opcoes: true, step: { select: { key: true, workflow: { select: { name: true } } } } },
+    })
+    if (!campos.length) return vazio({ campos: 0 }, 'Nenhum campo de referência cadastrado.')
+
+    const achados: Achado[] = campos.flatMap((c) => {
+      const alvo = alvoDoCampo(c.opcoes)
+      const problema = !alvo
+        ? 'não diz a qual cadastro aponta'
+        : !alvoDeReferencia(alvo) ? `aponta para "${alvo}", que não está no vocabulário` : null
+      if (!problema) return []
+      return [{
+        chave: `referencia-invalida:${c.id}`, severidade: 'ERRO' as const,
+        titulo: `"${c.label}" não sabe a qual cadastro aponta`,
+        descricao: `O campo "${c.key}" de "${c.step.key}" em "${c.step.workflow.name}" ${problema}.`,
+        explicacao: 'Um campo de referência sem alvo válido chega ao operador como uma caixa sem nada dentro.',
+        impacto: 'A etapa não pode ser concluída se o campo for obrigatório.',
+        entidade: 'StepField', registroId: String(c.id), registroNome: c.key, quantidade: 1,
+        link: ROTA_INTERNO, recomendacao: 'Escolha o cadastro no configurador do passo.',
+        evidencia: { campo: c.key, passo: c.step.key, alvo },
+      }]
+    })
+    const metricas = { campos: campos.length, invalidos: achados.length }
+    return achados.length ? { achados, metricas }
+      : { achados: [], metricas, resumo: `${campos.length} campo(s) de referência, todos com alvo válido.` }
+  },
+})
+
+registrar({
+  id: 'saude.cadastro.referencia-orfa',
+  codigo: 'REF-002',
+  nome: 'Referência gravada ainda existe no cadastro',
+  descricao: 'Execução que aponta para uma organização que foi apagada do cadastro.',
+  dominio: 'WORKFLOW',
+  modulo: 'Execução',
+  severidadePadrao: 'ALERTA',
+  obrigatoria: false,
+  modos: ['PROFUNDO'],
+  introduzidaEm: '1.6.0',
+  timeoutMs: 30_000,
+  orientacao: 'A organização foi removida em vez de desativada. Recadastre-a, ou corrija a etapa.',
+  rotaCorrecao: ROTA_INTERNO,
+  responsavel: 'Workflow',
+  ativo: true,
+  executar: async (): Promise<ResultadoVerificacao> => {
+    // INATIVA NÃO É ÓRFÃ. Desativar é ato normal e o histórico continua resolvendo;
+    // órfã é a referência para um registro que não existe mais em lugar nenhum.
+    const campos = await prisma.stepField.findMany({
+      where: { tipo: 'referencia', ativo: true },
+      select: { key: true, opcoes: true, stepId: true },
+    })
+    const porAlvo = new Map<string, Set<string>>()
+    for (const c of campos) {
+      const alvo = alvoDoCampo(c.opcoes)
+      if (!alvo) continue
+      const s = porAlvo.get(alvo) ?? new Set<string>()
+      s.add(c.key); porAlvo.set(alvo, s)
+    }
+    if (porAlvo.size === 0) return vazio({ execucoes: 0 }, 'Nenhum campo de referência em uso.')
+
+    const execs = await prisma.stepExecution.findMany({
+      where: { supersededAt: null, payload: { not: Prisma.DbNull } },
+      select: { id: true, stepInstanceId: true, payload: true },
+      take: 5000,
+    })
+    const achados: Achado[] = []
+    let verificadas = 0
+    for (const [alvo, chaves] of porAlvo) {
+      const usados = new Map<number, number[]>()
+      for (const e of execs) {
+        const vals = (e.payload as { valores?: Record<string, unknown> } | null)?.valores ?? {}
+        for (const k of chaves) {
+          const id = idReferenciado(vals[k])
+          if (id == null) continue
+          verificadas++
+          usados.set(id, [...(usados.get(id) ?? []), e.id])
+        }
+      }
+      if (usados.size === 0) continue
+      const vivos = await resolverReferencias(alvo, [...usados.keys()])
+      for (const [id, execIds] of usados) {
+        if (vivos.has(id)) continue
+        achados.push({
+          chave: `referencia-orfa:${alvo}:${id}`, severidade: 'ALERTA',
+          titulo: `Registro ${id} de ${alvo} não existe mais`,
+          descricao: `${execIds.length} execução(ões) apontam para um registro que foi removido do cadastro.`,
+          explicacao: 'Desativar tira de circulação e preserva o histórico; remover apaga o nome de quem foi escolhido.',
+          impacto: 'A etapa mostra o identificador sem nome, e ninguém consegue dizer que organização era.',
+          entidade: 'StepExecution', registroId: String(execIds[0]), registroNome: String(id),
+          quantidade: execIds.length, link: ROTA_INTERNO,
+          recomendacao: 'Recadastre a organização removida — desativar, e não apagar, é o caminho.',
+          evidencia: { alvo, id, execucoes: execIds.slice(0, 10) },
+        })
+      }
+    }
+    const metricas = { referenciasVerificadas: verificadas, orfas: achados.length }
+    return achados.length ? { achados, metricas }
+      : { achados: [], metricas, resumo: `${verificadas} referência(s) gravadas, todas resolvem no cadastro.` }
+  },
+})
+
+// ── PROTOCOLO: uma verdade só ───────────────────────────────────────────────
+
+registrar({
+  id: 'saude.execucao.protocolo-copia-concorrente',
+  codigo: 'PRT-001',
+  nome: 'A execução não guarda cópia do protocolo',
+  descricao: 'Tentativa que guarda número de protocolo no payload ao lado do Protocolo canônico.',
+  dominio: 'WORKFLOW',
+  modulo: 'Execução',
+  severidadePadrao: 'ALERTA',
+  obrigatoria: false,
+  modos: ['PROFUNDO'],
+  introduzidaEm: '1.6.0',
+  timeoutMs: 30_000,
+  orientacao: 'Republique o passo com a ação apontando para "Registrar o protocolo": o número passa a viver no cadastro de Protocolos.',
+  rotaCorrecao: ROTA_INTERNO,
+  responsavel: 'Workflow',
+  ativo: true,
+  executar: async (): Promise<ResultadoVerificacao> => {
+    const execs = await prisma.stepExecution.findMany({
+      where: { supersededAt: null, payload: { not: Prisma.DbNull } },
+      select: { id: true, stepInstanceId: true, protocoloId: true, payload: true },
+      take: 5000,
+    })
+    const comCopia = execs.filter((e) => {
+      const v = (e.payload as { valores?: Record<string, unknown> } | null)?.valores ?? {}
+      return typeof v.numero_protocolo === 'string' && v.numero_protocolo.trim() !== ''
+    })
+    // DUAS VERDADES é o caso grave: a execução tem o ponteiro E a cópia, e elas podem
+    // divergir. Só a cópia é dívida histórica — anterior à porta canônica existir.
+    const divergentes = comCopia.filter((e) => e.protocoloId != null)
+    const achados: Achado[] = divergentes.map((e) => ({
+      chave: `protocolo-duplo:${e.id}`, severidade: 'ALERTA' as const,
+      titulo: `Tentativa ${e.id} tem o protocolo em dois lugares`,
+      descricao: 'A execução aponta para um Protocolo canônico e também guarda o número dentro do payload.',
+      explicacao: 'Dois lugares editáveis para o mesmo fato divergem na primeira correção feita em um só.',
+      impacto: 'Corrigir o número no cadastro deixa a etapa mostrando o número velho.',
+      entidade: 'StepExecution', registroId: String(e.id), registroNome: `si${e.stepInstanceId}`, quantidade: 1,
+      link: ROTA_INTERNO, recomendacao: 'A cópia no payload deve sair; a referência é a verdade.',
+      evidencia: { stepExecutionId: e.id, protocoloId: e.protocoloId },
+    }))
+    const metricas = {
+      tentativas: execs.length, comNumeroNoPayload: comCopia.length,
+      comReferencia: execs.filter((e) => e.protocoloId != null).length, duplicadas: achados.length,
+    }
+    return achados.length ? { achados, metricas }
+      : { achados: [], metricas,
+          resumo: `${metricas.comReferencia} tentativa(s) com protocolo por referência; nenhuma verdade duplicada.` }
+  },
+})
+
+// ── RETIFICAÇÃO: a unidade de trabalho ──────────────────────────────────────
+
+registrar({
+  id: 'saude.retificacao.dois-motores',
+  codigo: 'RET-001',
+  nome: 'A retificação tem um motor só',
+  descricao: 'Pedido de retificação conduzido ao mesmo tempo pela máquina de estados legada e pelo Workflow Interno.',
+  dominio: 'WORKFLOW',
+  modulo: 'Retificação',
+  severidadePadrao: 'ERRO',
+  obrigatoria: true,
+  modos: ['COMPLETO', 'PROFUNDO'],
+  introduzidaEm: '1.6.0',
+  timeoutMs: 20_000,
+  orientacao: 'Um pedido é conduzido pelo Workflow Interno OU pela tela legada de Retificação — nunca pelos dois.',
+  rotaCorrecao: ROTA_INTERNO,
+  responsavel: 'Workflow',
+  ativo: true,
+  executar: async (): Promise<ResultadoVerificacao> => {
+    const pacotes = await prisma.retificacaoPacote.findMany({
+      select: {
+        id: true, num: true, processoId: true, currentStep: true, workflow: true,
+        _count: { select: { passos: true, divergencias: true } },
+      },
+    })
+    if (!pacotes.length) return vazio({ pacotes: 0 }, 'Nenhum pedido de retificação cadastrado.')
+
+    const achados: Achado[] = []
+    for (const p of pacotes) {
+      const temLegado = p.workflow != null
+      const temCanonico = p._count.passos > 0
+      if (temLegado && temCanonico) {
+        achados.push({
+          chave: `retificacao-dois-motores:${p.id}`, severidade: 'ERRO',
+          titulo: `O pedido ${p.num} está sendo conduzido por dois motores`,
+          descricao: `Tem ${p._count.passos} passo(s) do Workflow Interno e também a máquina de estados legada (currentStep="${p.currentStep}").`,
+          explicacao: 'Dois motores para o mesmo pedido concluem etapas em ordens diferentes e nenhum sabe do outro.',
+          impacto: 'O que o operador vê depende da tela por onde ele entrou.',
+          entidade: 'RetificacaoPacote', registroId: String(p.id), registroNome: p.num, quantidade: 1,
+          link: ROTA_INTERNO, recomendacao: 'Escolha um motor para este pedido e limpe o estado do outro.',
+          evidencia: { pacoteId: p.id, passosCanonicos: p._count.passos, currentStep: p.currentStep },
+        })
+      }
+      if (p._count.divergencias === 0) {
+        achados.push({
+          chave: `retificacao-sem-divergencia:${p.id}`, severidade: 'ALERTA',
+          titulo: `O pedido ${p.num} não diz o que veio corrigir`,
+          descricao: 'Nenhuma divergência vinculada ao pedido.',
+          explicacao: 'A divergência é o motivo do pedido; sem ela, não há como conferir se a correção resolveu o que motivou.',
+          impacto: 'A validação final não tem contra o que comparar.',
+          entidade: 'RetificacaoPacote', registroId: String(p.id), registroNome: p.num, quantidade: 1,
+          link: ROTA_INTERNO, recomendacao: 'Vincule as divergências que este pedido vai corrigir.',
+          evidencia: { pacoteId: p.id },
+        })
+      }
+    }
+    const metricas = {
+      pacotes: pacotes.length,
+      comMotorCanonico: pacotes.filter((p) => p._count.passos > 0).length,
+      problemas: achados.length,
+    }
+    return achados.length ? { achados, metricas }
+      : { achados: [], metricas, resumo: `${pacotes.length} pedido(s) de retificação, um motor cada.` }
   },
 })

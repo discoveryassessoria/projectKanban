@@ -836,6 +836,9 @@ model Protocolo {
   /// enviado, os comprovantes). E REFERENCIA ao mesmo DocumentoArquivo que a etapa
   /// e o documento leem - nao existe copia do binario nem segunda linha.
   arquivos        DocumentoArquivo[]    @relation("ArquivoProtocolo")
+  tentativas           StepExecution[]    @relation("ProtocoloDaTentativa")
+  retificacoes         RetificacaoPacote[] @relation("ProtocoloDaRetificacao")
+  execucoesDeSubtarefa SubtaskExecution[] @relation("ProtocoloDaSubtarefa")
   contratante     Contratante?          @relation(fields: [contratanteId], references: [id], onDelete: Cascade)
   processo        Processo              @relation(fields: [processoId], references: [id], onDelete: Cascade)
   requerente      Requerente?           @relation(fields: [requerenteId], references: [id], onDelete: Cascade)
@@ -1920,6 +1923,8 @@ model Divergencia {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
+  pacotes RetificacaoPacoteDivergencia[]
+
   @@index([analiseId])
   @@index([status])
   @@index([severidade])
@@ -2051,8 +2056,27 @@ model RetificacaoPacote {
   atendente      String?
   prazo          String?
   statusAdm      String?
+  /// ORGAO que recebe o pedido. FONTE UNICA: Orgaos e Organizacoes. Substitui o
+  /// campo `cartorio` (texto), que ficava congelado no dia em que a organizacao
+  /// mudasse de nome. `cartorio` segue existindo para nao apagar historico.
+  orgaoId        Int?
+  orgao          OrgaoProtocolo? @relation("OrgaoDaRetificacao", fields: [orgaoId], references: [id], onDelete: SetNull)
+  /// PROTOCOLO canonico do pedido. Substitui os campos `protocolo`/`dataProtocolo`
+  /// (texto), pela mesma razao: o protocolo tem dono.
+  protocoloId    Int?
+  protocoloRef   Protocolo?      @relation("ProtocoloDaRetificacao", fields: [protocoloId], references: [id], onDelete: SetNull)
+
+  /// AS DIVERGENCIAS DESTE PACOTE, por vinculo real. O campo `divergenceIds` (Json)
+  /// era um snapshot: nao havia como perguntar ao banco quais pacotes tratam uma
+  /// divergencia, nem impedir que a mesma entrasse em dois pedidos.
+  divergencias   RetificacaoPacoteDivergencia[]
+  /// As instancias de passo ancoradas NESTE pacote. E o que da isolamento: reabrir
+  /// um pacote nao toca no outro porque sao instancias diferentes.
+  passos         PhaseWorkflowStepInstance[]    @relation("PassosDaRetificacao")
+
   // VariÃ¡veis (Json)
   workflow       Json? // 6 passos RET_STEPS
+  /// LEGADO: snapshot textual das divergencias. Preservado; a verdade e `divergencias`.
   divergenceIds  Json? // divergÃªncias vinculadas (snapshot)
   affectedDocIds Json? // documentos afetados (snapshot)
   movements      Json? // [{data,tipo,desc,resp,prox}]
@@ -2061,8 +2085,29 @@ model RetificacaoPacote {
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
 
+  @@unique([processoId, num])
   @@index([processoId])
+  @@index([orgaoId])
+  @@index([protocoloId])
 }
+
+/// UMA DIVERGENCIA DENTRO DE UM PACOTE DE RETIFICACAO.
+///
+/// A unicidade e o ponto: a mesma divergencia nao pode estar em dois pedidos abertos
+/// ao mesmo tempo sem que alguem tenha decidido isso. Como snapshot Json, nada
+/// impedia — e nada conseguia responder "esta divergencia ja esta sendo tratada?".
+model RetificacaoPacoteDivergencia {
+  id            Int               @id @default(autoincrement())
+  pacoteId      Int
+  pacote        RetificacaoPacote @relation(fields: [pacoteId], references: [id], onDelete: Cascade)
+  divergenciaId Int
+  divergencia   Divergencia       @relation(fields: [divergenciaId], references: [id], onDelete: Cascade)
+  criadoEm      DateTime          @default(now())
+
+  @@unique([pacoteId, divergenciaId])
+  @@index([divergenciaId])
+}
+
 
 model EmissaoRetificada {
   id                Int      @id @default(autoincrement())
@@ -3822,6 +3867,7 @@ model OrgaoProtocolo {
   @@index([ativo])
   @@index([provincia])
   @@index([funcoes])
+  retificacoes RetificacaoPacote[] @relation("OrgaoDaRetificacao")
 }
 
 /// Funções que uma organização exerce. Uma organização = UM registro, N funções.
@@ -4605,6 +4651,12 @@ model StepExecution {
   /// Os dados de domínio preenchidos na tentativa (hoje `metadata.operacao`).
   payload   Json?
 
+  /// PROTOCOLO CANÔNICO registrado por esta tentativa. É REFERÊNCIA, não cópia: o
+  /// número, a data, o órgão e o responsável vivem em `Protocolo`, que é o dono do
+  /// fato. Guardar o número aqui também criaria duas verdades editáveis.
+  protocoloId Int?
+  protocolo   Protocolo? @relation("ProtocoloDaTentativa", fields: [protocoloId], references: [id], onDelete: SetNull)
+
   /// Quando esta tentativa deixou de ser a vigente, e por qual. `null` = é a atual.
   supersededAt      DateTime?
   supersededPorId   Int?
@@ -4672,7 +4724,13 @@ model SubtaskExecution {
   fornecedorId Int?
   fornecedor   OrgaoProtocolo? @relation(fields: [fornecedorId], references: [id], onDelete: SetNull)
   canalKey     String?         @db.VarChar(40)
+  /// PROJEÇÃO TEXTUAL histórica do número. Continua sendo escrita para não quebrar
+  /// leitor nenhum; a verdade passou a ser `protocoloId`. Removível quando os
+  /// leitores migrarem.
   protocolo    String?         @db.VarChar(120)
+  /// PROTOCOLO CANÔNICO desta execução de subtarefa. Mesma regra do passo.
+  protocoloId  Int?
+  protocoloRef Protocolo?      @relation("ProtocoloDaSubtarefa", fields: [protocoloId], references: [id], onDelete: SetNull)
   enviadoEm    DateTime?
   previstoPara DateTime?
 
@@ -4715,6 +4773,12 @@ model PhaseWorkflowStepInstance {
   necessidade   NecessidadeDocumental? @relation(fields: [necessidadeId], references: [id], onDelete: SetNull)
   documentoId   Int?
   documento     Documento?             @relation(fields: [documentoId], references: [id], onDelete: SetNull)
+  /// PACOTE DE RETIFICACAO ao qual esta unidade de trabalho pertence (cardinalidade
+  /// RETIFICACAO). E a quarta ancora possivel, e a razao dela e a mesma das outras
+  /// tres: sem ela, dois pedidos de retificacao no mesmo processo compartilhariam
+  /// uma unica cadeia de passos — reabrir um reabriria o outro.
+  retificacaoPacoteId Int?
+  retificacaoPacote   RetificacaoPacote? @relation("PassosDaRetificacao", fields: [retificacaoPacoteId], references: [id], onDelete: SetNull)
 
   ciclo         Int                @default(1)
   status        StepInstanceStatus @default(PENDENTE)

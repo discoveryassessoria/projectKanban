@@ -5,6 +5,7 @@
 // cronológica única).
 
 import { NextResponse } from "next/server"
+import { registrarProtocoloTx, ORIGENS_DE_PROTOCOLO } from "@/src/services/protocolo-canonico"
 import { prisma } from "@/lib/prisma"
 import { TipoProtocolo, FormaEnvioProtocolo } from "@prisma/client"
 import { verificarPermissao, extrairUsuarioComPermissoes } from "@/src/lib/verificar-permissao"
@@ -99,25 +100,25 @@ export async function POST(request: Request) {
       : []
 
     const protocolo = await prisma.$transaction(async (tx) => {
-      const criado = await tx.protocolo.create({
-        data: {
-          processoId,
-          contratanteId: contratanteId || null,
-          requerenteId: requerenteId || null,
-          orgaoId: Number(orgaoId),
-          setor: setor || null,
-          dataProtocolo: quando,
-          numeroProtocolo,
-          tipoProtocolo,
-          formaEnvio,
-          responsavelId: Number(responsavelId),
-          observacoes: observacoes || null,
-          ...(ids.length
-            ? { documentos: { create: ids.map((documentoId) => ({ documentoId })) } }
-            : {}),
-        },
-        include: INCLUDE_PROTOCOLO,
+      // QUEM ESCREVE `Protocolo` É UM SÓ. Esta rota continua sendo a tela de
+      // protocolização do dossiê; o que ela deixou de fazer é criar a linha por conta
+      // própria, que a tornava o segundo writer do mesmo fato.
+      const { protocoloId } = await registrarProtocoloTx(tx, {
+        processoId,
+        contratanteId: contratanteId || null,
+        requerenteId: requerenteId || null,
+        orgaoId: Number(orgaoId),
+        setor: setor || null,
+        dataProtocolo: quando,
+        numeroProtocolo,
+        tipoProtocolo,
+        formaEnvio,
+        origem: ORIGENS_DE_PROTOCOLO.PROCESSO,
+        responsavelId: Number(responsavelId),
+        observacoes: observacoes || null,
+        documentoIds: ids,
       })
+      const criado = await tx.protocolo.findUniqueOrThrow({ where: { id: protocoloId }, include: INCLUDE_PROTOCOLO })
 
       const titulo = descreverProtocolizacao({
         numeroProtocolo: criado.numeroProtocolo,

@@ -304,7 +304,7 @@ export default function PainelDeclarativoDaEtapa({
                         {c.tipo === "textarea" ? (
                           <textarea className={inp} rows={3} value={String(vals[c.key] ?? "")}
                             onChange={(e) => setValoresDaSub({ ...valoresDaSub, [st.key]: { ...vals, [c.key]: e.target.value } })} />
-                        ) : c.tipo === "select" || c.tipo === "multiselect" || c.tipo === "radio" ? (
+                        ) : c.tipo === "select" || c.tipo === "multiselect" || c.tipo === "radio" || c.tipo === "referencia" ? (
                           <select className={inp} value={String(vals[c.key] ?? "")}
                             onChange={(e) => setValoresDaSub({ ...valoresDaSub, [st.key]: { ...vals, [c.key]: e.target.value } })}>
                             <option value="">— escolher —</option>
@@ -368,7 +368,11 @@ export default function PainelDeclarativoDaEtapa({
               <label className={lbl}>{c.label}{c.obrigatorio && <span className="text-amber-300"> *</span>}</label>
               {c.tipo === "textarea" ? (
                 <textarea className={inp} rows={3} value={String(valores[c.key] ?? "")} onChange={(e) => setValores({ ...valores, [c.key]: e.target.value })} />
-              ) : c.tipo === "select" || c.tipo === "multiselect" ? (
+              ) : c.tipo === "select" || c.tipo === "multiselect" || c.tipo === "referencia" ? (
+                /* REFERÊNCIA a cadastro: as opções chegam resolvidas do servidor — o
+                   `value` é o ID canônico e o rótulo é o nome de agora. A tela não
+                   sabe de qual cadastro veio, e é por isso que um alvo novo não pede
+                   componente novo. */
                 <select className={inp} value={String(valores[c.key] ?? "")} onChange={(e) => setValores({ ...valores, [c.key]: e.target.value })}>
                   <option value="">— escolher —</option>
                   {c.opcoes.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}

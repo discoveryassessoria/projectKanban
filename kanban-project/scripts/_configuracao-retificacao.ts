@@ -10,7 +10,12 @@
 
 export const CONFIGURACAO: Record<string, {
   dependeDe: string[]
-  campos: Array<{ key: string; label: string; tipo: string; obrigatorio?: boolean; ajuda?: string; opcoes?: Array<{ key: string; label: string }> }>
+  campos: Array<{
+    key: string; label: string; tipo: string; obrigatorio?: boolean; ajuda?: string
+    opcoes?: Array<{ key: string; label: string }>
+    /** Alvo de referência, quando o campo aponta para um cadastro canônico. */
+    referencia?: string
+  }>
   acoes: Array<{ key: string; label: string; effectKey: string; descricao: string; requerCampos?: string[] }>
   checkItens?: Array<{ key: string; label: string; obrigatorio?: boolean }>
   requisitos?: Array<{ key: string; label: string; tipo: string; alvoKey?: string; acaoKey?: string }>
@@ -48,12 +53,25 @@ export const CONFIGURACAO: Record<string, {
   protocolar_retificacao: {
     dependeDe: ["preparar_requerimento_peticao"],
     campos: [
+      // O ÓRGÃO APONTA PARA O CADASTRO. Era a lacuna que ficou aberta na primeira
+      // rodada: sem campo referencial, a única saída seria um texto "cartório", e o
+      // nome congelaria no dia em que a organização mudasse de nome.
+      {
+        key: "orgao_receptor", label: "Órgão que recebeu", tipo: "referencia", obrigatorio: true,
+        referencia: "ORGANIZACAO",
+        ajuda: "Escolhido em Órgãos e Organizações. Fica gravado o registro, não o nome.",
+      },
       { key: "numero_protocolo", label: "Número do protocolo", tipo: "texto", obrigatorio: true },
       { key: "data_protocolo", label: "Data do protocolo", tipo: "data", obrigatorio: true },
       { key: "observacao_protocolo", label: "Observação", tipo: "textarea" },
     ],
-    acoes: [{ key: "protocolado", label: "Protocolado", effectKey: "COMPLETE_STEP", descricao: "O pedido deu entrada e passa a depender de terceiro.", requerCampos: ["numero_protocolo", "data_protocolo"] }],
-    requisitos: [{ key: "tem_protocolo", label: "Número do protocolo", tipo: "CAMPO_PREENCHIDO", alvoKey: "numero_protocolo" }],
+    // O PROTOCOLO VIRA LINHA NO CADASTRO DE PROTOCOLOS, que é o dono do fato. A etapa
+    // fica com a referência; o número não é copiado para dentro da execução.
+    acoes: [{ key: "protocolado", label: "Protocolado", effectKey: "REGISTER_PROTOCOL", descricao: "Registra o protocolo no cadastro e encerra a etapa: o pedido passa a depender de terceiro.", requerCampos: ["orgao_receptor", "numero_protocolo", "data_protocolo"] }],
+    requisitos: [
+      { key: "tem_protocolo", label: "Número do protocolo", tipo: "CAMPO_PREENCHIDO", alvoKey: "numero_protocolo" },
+      { key: "tem_orgao", label: "Órgão que recebeu", tipo: "CAMPO_PREENCHIDO", alvoKey: "orgao_receptor" },
+    ],
   },
 
   // 4 ─ A espera. "Em exigência" é estado do domínio, não invenção da tela.

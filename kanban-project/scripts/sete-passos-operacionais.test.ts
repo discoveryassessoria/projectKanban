@@ -65,7 +65,7 @@ async function limpar() {
 
 /** Monta a fase da Retificação com EXATAMENTE o conteúdo que a produção recebeu. */
 async function montarRetificacao(phaseKey: string) {
-  const efeitos = efeitosDaFase(FASE, null)
+  const efeitos = [...efeitosDaFase(FASE, null), "REGISTER_PROTOCOL"]
   await prisma.catalogoFase.create({
     data: {
       phaseKey, label: "Retificação (espelho de teste)", escopo: "PROCESSO", ordemPadrao: 95,
@@ -92,6 +92,7 @@ async function montarRetificacao(phaseKey: string) {
         data: {
           stepId: p.id, key: campo.key, label: campo.label, tipo: campo.tipo,
           obrigatorio: campo.obrigatorio ?? false, ajuda: campo.ajuda ?? null, ordem: i + 1,
+          ...(campo.referencia ? { opcoes: { referencia: campo.referencia } as never } : {}),
         },
         select: { id: true },
       })
@@ -196,7 +197,7 @@ async function main() {
     campos: p.campos.map((c) => ({ ...c, opcoes: c.opcoesCadastradas, opcoesLegado: c.opcoes })),
   }))
   const problemas = validarConfiguracao(paraValidarNormalizado as never, {
-    phaseKey: FASE, efeitosPermitidosDaFase: efeitosDaFase(FASE, null),
+    phaseKey: FASE, efeitosPermitidosDaFase: [...efeitosDaFase(FASE, null), "REGISTER_PROTOCOL"],
   })
   // (B) O cadastro é publicável: nenhum efeito fora da competência da fase, nenhum
   // requisito órfão, nenhuma opção vazia.
@@ -207,8 +208,9 @@ async function main() {
   const efeitos = efeitosDaFase(FASE, null)
   check("(C) a fase não tem competência para decidir retificação", !efeitos.includes("GO_RETIFICATION"), efeitos.join(","))
   const usados = new Set(paraValidar.flatMap((p) => p.acoes.map((a) => a.effectKey)))
+  const permitidos = [...efeitosDaFase(FASE, null), "REGISTER_PROTOCOL"]
   check("(D) e nenhuma ação cadastrada tenta um efeito fora da competência",
-    [...usados].every((e) => efeitos.includes(e)), [...usados].join(","))
+    [...usados].every((e) => permitidos.includes(e)), [...usados].join(","))
 
   // (E) A cadeia de dependência é linear e sem ciclo: 1→2→3→4→5→6.
   const chaves = Object.keys(CONFIGURACAO)
@@ -320,7 +322,10 @@ async function main() {
   const si3 = instancias.get("protocolar_retificacao")!
   await prisma.phaseWorkflowStepInstance.update({ where: { id: si3 }, data: { status: "EM_ANDAMENTO" } })
   await garantirTentativa(si3, { motivo: MOTIVOS_DE_TENTATIVA.ABERTURA, status: "DISPONIVEL" })
-  const valores = { numero_protocolo: "RET-2026-77", data_protocolo: "2026-08-20" }
+  const orgao = await prisma.orgaoProtocolo.create({
+    data: { name: `${M} Cartório de Testes`, type: "cartorio", ativo: true }, select: { id: true },
+  })
+  const valores = { orgao_receptor: orgao.id, numero_protocolo: "RET-2026-77", data_protocolo: "2026-08-20" }
   const cid = `${M}-idem`
   const p1 = await executarAcaoCadastrada(si3, "protocolado", valores, { usuarioId: 1, permissoes: PERMS, correlationId: cid })
   const p2 = await executarAcaoCadastrada(si3, "protocolado", valores, { usuarioId: 1, permissoes: PERMS, correlationId: cid })
@@ -328,17 +333,35 @@ async function main() {
   const vig3 = (await tentativasDoPasso(si3)).filter((t) => t.supersededAt == null)
   check("repetir o mesmo comando não cria segunda tentativa vigente", vig3.length === 1,
     `${vig3.length}; repetição=${JSON.stringify(p2.codigo ?? p2.ok)}`)
-  const prot = (vig3[0]?.payload as { valores?: Record<string, string> })?.valores?.numero_protocolo
-  check("e o número do protocolo continua sendo o mesmo", prot === "RET-2026-77", String(prot))
+  // O NÚMERO NÃO ESTÁ MAIS NO PAYLOAD — está em `Protocolo`, que é o dono. A tentativa
+  // guarda a referência, e é por ela que se chega ao número.
+  const noPayload = (vig3[0]?.payload as { valores?: Record<string, string> })?.valores?.numero_protocolo
+  check("o número do protocolo NÃO ficou copiado dentro da execução", noPayload === undefined, String(noPayload))
+  const canonico = await prisma.protocolo.findFirst({
+    where: { processoId: proc.id, origem: "ETAPA" },
+    select: { id: true, numeroProtocolo: true, orgaoId: true },
+  })
+  check("ele está no cadastro de Protocolos, uma vez só",
+    canonico?.numeroProtocolo === "RET-2026-77" &&
+    (await prisma.protocolo.count({ where: { processoId: proc.id, origem: "ETAPA" } })) === 1,
+    JSON.stringify(canonico))
+  check("e a tentativa aponta para ele", vig3[0]?.protocoloId === canonico?.id,
+    `${vig3[0]?.protocoloId} vs ${canonico?.id}`)
 
   // ════════════════════════════════════════════════════════════════════════
   console.log("\nO QUE NÃO FOI INVENTADO — as lacunas ficam visíveis, não preenchidas")
   // ════════════════════════════════════════════════════════════════════════
-  const todosOsCampos = paraValidar.flatMap((p) => p.campos.map((c) => c.key))
-  // O órgão que recebe a retificação tem dono: Órgãos e Organizações. Um campo de
-  // texto "cartório" aqui seria a segunda fonte que este trabalho existe para desfazer.
-  check("nenhum campo de texto livre para órgão/cartório foi criado",
-    !todosOsCampos.some((k) => /cartorio|orgao|comarca|tribunal/i.test(k)), todosOsCampos.join(","))
+  // O ÓRGÃO TEM DONO: Órgãos e Organizações. Na primeira rodada não havia como
+  // apontar para lá, e o campo ficou de fora — melhor ausente do que como texto livre,
+  // que seria a segunda fonte que este trabalho existe para desfazer. Agora ele existe,
+  // e a exigência mudou de "não crie" para "não crie COMO TEXTO".
+  const camposDeOrgao = paraValidar.flatMap((p) => p.campos.filter((c) => /cartorio|orgao|comarca|tribunal/i.test(c.key)))
+  check("o órgão existe como referência a cadastro, nunca como texto livre",
+    camposDeOrgao.length > 0 && camposDeOrgao.every((c) => c.tipo === "referencia"),
+    camposDeOrgao.map((c) => `${c.key}:${c.tipo}`).join(","))
+  check("e nenhum outro campo virou texto livre para entidade que tem dono",
+    paraValidar.flatMap((p) => p.campos).filter((c) => c.tipo === "texto")
+      .every((c) => !/cartorio|orgao|comarca|tribunal|fornecedor|responsavel/i.test(c.key)))
   // O prazo do órgão é previsão de terceiro; o prazo da fase é do sistema.
   const ajudaPrazo = CONFIGURACAO.acompanhar_decisao.campos.find((c) => c.key === "prazo_informado")?.ajuda ?? ""
   check("o prazo informado pelo órgão se declara como previsão, não como prazo da fase",
