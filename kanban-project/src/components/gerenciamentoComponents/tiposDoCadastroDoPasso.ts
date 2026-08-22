@@ -115,6 +115,73 @@ export const REGRAS_DE_CONCLUSAO = [
   { key: "QUALQUER_SUBTAREFA", label: "Quando qualquer subtarefa for concluída", ajuda: "Para passos em que os caminhos são alternativos." },
 ] as const
 
+/**
+ * OS TIPOS DE CAMPO, com nome humano.
+ *
+ * A chave é o vocabulário do motor (`TIPOS_DE_CAMPO` do registro de executores) e não
+ * muda. O que muda é o que o administrador lê: "textarea" e "upload" são palavras de
+ * quem escreve o formulário, não de quem configura o negócio. A lista aqui é
+ * APRESENTAÇÃO — quem decide quais tipos existem continua sendo o executor, e um tipo
+ * que ele suporte e não esteja aqui aparece pela própria chave, sem sumir da tela.
+ */
+export const NOME_DO_TIPO_DE_CAMPO: Record<string, string> = {
+  texto: "Texto curto",
+  textarea: "Texto longo",
+  numero: "Número",
+  moeda: "Valor monetário",
+  data: "Data",
+  booleano: "Sim/Não",
+  checkbox: "Caixa de marcação",
+  select: "Seleção única",
+  multiselect: "Seleção múltipla",
+  radio: "Escolha entre opções",
+  upload: "Arquivo/Evidência",
+}
+export function nomeDoTipoDeCampo(tipo: string): string {
+  return NOME_DO_TIPO_DE_CAMPO[tipo] ?? tipo
+}
+/** Os tipos que oferecem opções ao operador. */
+export const TIPOS_COM_OPCOES = ["select", "multiselect", "radio"]
+
+/**
+ * A CARDINALIDADE, explicada.
+ *
+ * A enum canônica não muda — o que faltava era dizer o que cada valor PRODUZ. "PESSOA"
+ * não informa nada a quem configura; "uma unidade por pessoa aplicável da árvore"
+ * informa tudo.
+ */
+export const CARDINALIDADES = [
+  { key: "", label: "Herda o escopo da fase", ajuda: "O escopo operacional declarado no catálogo da fase decide quantas unidades existem." },
+  { key: "PROCESSO", label: "Uma vez por processo", ajuda: "Uma única unidade deste passo por visita à fase." },
+  { key: "PESSOA", label: "Uma vez por pessoa", ajuda: "Será criada uma unidade para cada pessoa aplicável da árvore." },
+  { key: "NECESSIDADE", label: "Uma vez por registro a localizar", ajuda: "Uma unidade para cada necessidade documental — cada registro que precisa ser encontrado." },
+  { key: "DOCUMENTO", label: "Uma vez por documento", ajuda: "Será criada uma unidade deste passo para cada documento aplicável." },
+] as const
+
+/** A prioridade, no vocabulário que o modelo realmente admite (low | medium | high). */
+export const PRIORIDADES = [
+  { key: "low", label: "Baixa" },
+  { key: "medium", label: "Média" },
+  { key: "high", label: "Alta" },
+] as const
+
+/**
+ * AS CINCO ÁREAS DO CONFIGURADOR — a ordem em que o administrador pensa.
+ *
+ * A tela estava organizada pela estrutura interna do motor: onze abas de primeiro
+ * nível, uma por tabela. Quem configura não pergunta "onde fica o requisito"; pergunta
+ * o que é o passo, o que se faz nele, o que precisa estar cumprido, o que pode
+ * acontecer, e que regras especiais existem. As áreas seguem essa ordem.
+ */
+export const AREAS = [
+  { key: "geral", label: "Geral", ajuda: "Defina o que é este passo, sua obrigatoriedade, escopo e responsável." },
+  { key: "execucao", label: "Execução", ajuda: "Defina o que o operador precisa fazer." },
+  { key: "conclusao", label: "Conclusão", ajuda: "Defina o que precisa estar cumprido para finalizar." },
+  { key: "resultados", label: "Resultados", ajuda: "Defina quais decisões ou resultados podem ser registrados." },
+  { key: "avancado", label: "Avançado", ajuda: "Dependências, executor técnico e regras especiais." },
+] as const
+export type AreaDoPasso = (typeof AREAS)[number]["key"]
+
 /** Chave estável a partir do rótulo — a mesma regra do servidor. */
 export function chaveDe(s: string) {
   return String(s || "")

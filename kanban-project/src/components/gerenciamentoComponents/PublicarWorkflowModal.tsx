@@ -27,6 +27,23 @@ interface Preview {
   aviso: string
 }
 
+/**
+ * O DIFF AGRUPADO PELO MODELO MENTAL, não pelas tabelas do motor.
+ *
+ * A prévia listava por escopo técnico — PASSO, AÇÃO, CAMPO, OPÇÃO, CANAL, CHECKLIST,
+ * REQUISITO, SUBTAREFA — que é a divisão do banco. Quem revisa antes de publicar
+ * pergunta outra coisa: o que mudou no que o operador FAZ, no que precisa estar
+ * cumprido, no que pode acontecer. As mesmas mudanças, reagrupadas.
+ */
+const AREA_DO_ESCOPO: Record<string, string> = {
+  PASSO: "Geral", SLA: "Geral", "RESPONSÁVEL": "Geral",
+  SUBTAREFA: "Execução", CAMPO: "Execução", "OPÇÃO": "Execução", CHECKLIST: "Execução", CANAL: "Execução",
+  REQUISITO: "Conclusão",
+  "AÇÃO": "Resultados",
+  "DEPENDÊNCIA": "Avançado", EXECUTOR: "Avançado",
+}
+const ORDEM_DAS_AREAS = ["Geral", "Execução", "Conclusão", "Resultados", "Avançado"]
+
 const COR_DO_TIPO: Record<string, string> = {
   ACRESCENTADO: "bg-emerald-500/15 text-emerald-300",
   REMOVIDO: "bg-red-500/15 text-red-300",
@@ -80,12 +97,14 @@ export default function PublicarWorkflowModal({
     } finally { setPublicando(false) }
   }
 
-  const porPasso = new Map<string, Mudanca[]>()
+  const porArea = new Map<string, Mudanca[]>()
   for (const m of preview?.mudancas ?? []) {
-    const atual = porPasso.get(m.passo) ?? []
+    const area = AREA_DO_ESCOPO[m.escopo] ?? "Avançado"
+    const atual = porArea.get(area) ?? []
     atual.push(m)
-    porPasso.set(m.passo, atual)
+    porArea.set(area, atual)
   }
+  const areasComMudanca = ORDEM_DAS_AREAS.filter((a) => porArea.has(a))
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm" onClick={onFechar}>
@@ -118,17 +137,19 @@ export default function PublicarWorkflowModal({
             </p>
           )}
 
-          {preview && [...porPasso.entries()].map(([passo, itens]) => (
-            <div key={passo} className="rounded-lg border border-white/10 bg-white/5 p-3">
-              <div className="text-xs font-medium text-white/80">{passo || "(workflow)"}</div>
+          {preview && areasComMudanca.map((area) => (
+            <div key={area} className="rounded-lg border border-white/10 bg-white/5 p-3">
+              <div className="text-xs font-medium text-white/80">
+                {area} <span className="text-white/35">· {porArea.get(area)!.length} alteração(ões)</span>
+              </div>
               <ul className="mt-1.5 space-y-1">
-                {itens.map((m, i) => (
-                  <li key={i} className="flex items-start gap-2 text-xs">
+                {porArea.get(area)!.map((m, i) => (
+                  <li key={i} className="flex flex-wrap items-start gap-x-2 gap-y-0.5 text-xs">
                     <span className={`mt-0.5 flex-none rounded px-1.5 py-0.5 text-[10px] ${COR_DO_TIPO[m.tipo] ?? "bg-white/10 text-white/60"}`}>
                       {m.tipo.toLowerCase()}
                     </span>
-                    <span className="text-white/40">{m.escopo}</span>
                     <span className="text-white/80">{m.alvo}</span>
+                    {m.passo && <span className="text-white/35">em {m.passo}</span>}
                     <span className="text-white/50">{m.detalhe}</span>
                   </li>
                 ))}

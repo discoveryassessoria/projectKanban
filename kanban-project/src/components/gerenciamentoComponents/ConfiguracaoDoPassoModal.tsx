@@ -27,6 +27,7 @@ import { useEffect, useState } from "react"
 import EditorDePecasDoPasso, { type PecasDoPasso, type Efeito } from "./EditorDePecasDoPasso"
 import {
   chaveDe, FONTES_DE_CANAIS, MODOS_DE_EXECUCAO, REGRAS_DE_RESPONSAVEL, REGRAS_DE_CONCLUSAO,
+  AREAS, CARDINALIDADES, PRIORIDADES, type AreaDoPasso,
   type AcaoCfg, type CampoCfg, type ItemCfg, type RequisitoCfg, type SubtarefaCfg, type OpcaoCfg,
 } from "./tiposDoCadastroDoPasso"
 
@@ -73,17 +74,10 @@ interface Catalogo {
   canais: Array<{ key: string; label: string }>
 }
 
-const ABAS = [
-  "geral", "subtarefas", "campos", "acoes", "checklist", "requisitos", "evidencias",
-  "dependencias", "responsavel", "executor", "reabertura",
-] as const
-type Aba = (typeof ABAS)[number]
-const TITULO: Record<Aba, string> = {
-  geral: "Geral", subtarefas: "Subtarefas", campos: "Campos", acoes: "Ações/Resultados",
-  checklist: "Checklist", requisitos: "Requisitos", evidencias: "Evidências",
-  dependencias: "Dependências", responsavel: "Responsável", executor: "Executor",
-  reabertura: "Reabertura",
-}
+// AS CINCO ÁREAS vivem em `tiposDoCadastroDoPasso`. Eram onze abas de primeiro nível,
+// uma por tabela do motor — a tela organizada como banco de dados. Agora ela é
+// organizada como processo de trabalho: o que é, o que se faz, o que precisa estar
+// cumprido, o que pode acontecer, e as regras especiais.
 
 const inp = "w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-white placeholder-white/30 outline-none focus:border-blue-400/50"
 const lbl = "mb-1 block text-[11px] uppercase tracking-wide text-white/40"
@@ -101,7 +95,15 @@ export default function ConfiguracaoDoPassoModal({
   onSalvar: (p: PassoConfiguravel) => Promise<void> | void
   problemas?: Array<{ codigo: string; stepKey: string | null; mensagem: string }>
 }) {
-  const [aba, setAba] = useState<Aba>("geral")
+  const [area, setArea] = useState<AreaDoPasso>("geral")
+  // DENTRO DE EXECUÇÃO e CONCLUSÃO as peças viram SUBSEÇÕES, não abas de primeiro
+  // nível: elas respondem à mesma pergunta e por isso pertencem à mesma área.
+  const [secaoExec, setSecaoExec] = useState<"subtarefas" | "campos" | "checklist">("subtarefas")
+  const [secaoConcl, setSecaoConcl] = useState<"requisitos" | "evidencias">("requisitos")
+  // ALTERAÇÕES NÃO SALVAS: fechar sem avisar perde o que foi digitado.
+  const [sujo, setSujo] = useState(false)
+  const [confirmandoSaida, setConfirmandoSaida] = useState(false)
+  const [erroAoSalvar, setErroAoSalvar] = useState("")
   const [cat, setCat] = useState<Catalogo | null>(null)
   const [subAberta, setSubAberta] = useState<number | null>(null)
   const [abaDaSub, setAbaDaSub] = useState<"geral" | "campos" | "acoes" | "checklist" | "requisitos" | "evidencias">("geral")
@@ -142,14 +144,38 @@ export default function ConfiguracaoDoPassoModal({
     e.permitidoNestaFase && (!exec || exec.efeitos.includes(e.key)))
   const tiposOfertados = exec ? exec.campos : (cat?.tiposDeCampo ?? [])
 
-  const set = <K extends keyof PassoConfiguravel>(k: K, v: PassoConfiguravel[K]) => setF((x) => ({ ...x, [k]: v }))
+  const set = <K extends keyof PassoConfiguravel>(k: K, v: PassoConfiguravel[K]) => {
+    setSujo(true)
+    setF((x) => ({ ...x, [k]: v }))
+  }
+  /** Aplica um patch inteiro (usado pelo editor de peças) e marca como sujo. */
+  const aplicar = (patch: Partial<PassoConfiguravel>) => {
+    setSujo(true)
+    setF((x) => ({ ...x, ...patch }))
+  }
   const subs = f.subtarefas ?? []
-  const setSub = (i: number, patch: Partial<SubtarefaCfg>) =>
+  const setSub = (i: number, patch: Partial<SubtarefaCfg>) => {
+    setSujo(true)
     setF((x) => ({ ...x, subtarefas: (x.subtarefas ?? []).map((s, j) => (j === i ? { ...s, ...patch } : s)) }))
+  }
 
   async function salvar() {
     setSalvando(true)
-    try { await onSalvar(f) } finally { setSalvando(false) }
+    setErroAoSalvar("")
+    try {
+      await onSalvar(f)
+      // SÓ LIMPA O SUJO DEPOIS DE SALVAR. Se a gravação falhar, o que foi digitado
+      // continua na tela e o aviso de saída continua valendo.
+      setSujo(false)
+    } catch (e) {
+      setErroAoSalvar(e instanceof Error ? e.message : "Não foi possível salvar. O que você digitou continua aqui.")
+    } finally { setSalvando(false) }
+  }
+
+  /** Fechar com alteração pendente pergunta antes; sem alteração, fecha direto. */
+  function tentarFechar() {
+    if (sujo) { setConfirmandoSaida(true); return }
+    onFechar()
   }
 
   const meus = (problemas ?? []).filter((p) => p.stepKey === f.key || p.stepKey === null)
@@ -158,33 +184,80 @@ export default function ConfiguracaoDoPassoModal({
     checkItens: f.checkItens ?? [], requisitos: f.requisitos ?? [],
   }
 
+  // O QUE CADA ÁREA CARREGA — dito na própria navegação, para o administrador saber
+  // onde procurar antes de clicar. Era isto que as onze abas soltas não conseguiam
+  // comunicar: "Requisitos 0" não diz que requisito e evidência respondem à mesma
+  // pergunta.
+  const requisitosSimples = (f.requisitos ?? []).filter((r) => r.tipo !== "EVIDENCIA_ANEXADA")
+  const evidencias = (f.requisitos ?? []).filter((r) => r.tipo === "EVIDENCIA_ANEXADA")
+  const plural = (n: number, um: string, muitos: string) => `${n} ${n === 1 ? um : muitos}`
+  const RESUMO: Record<AreaDoPasso, string> = {
+    geral: [f.required ? "obrigatório" : "opcional",
+      (CARDINALIDADES.find((c) => c.key === (f.cardinalidade ?? ""))?.label ?? "").toLowerCase(),
+      (f.slaDays ?? 0) > 0 ? `prazo ${f.slaDays}d` : "sem prazo"].filter(Boolean).join(" · "),
+    execucao: [plural(subs.length, "subtarefa", "subtarefas"),
+      plural(f.campos?.length ?? 0, "campo", "campos"),
+      plural(f.checkItens?.length ?? 0, "item de conferência", "itens de conferência")].join(" · "),
+    conclusao: [plural(requisitosSimples.length, "requisito", "requisitos"),
+      plural(evidencias.length, "evidência", "evidências")].join(" · "),
+    resultados: plural(f.acoes?.length ?? 0, "resultado", "resultados"),
+    avancado: [plural(f.dependeDe?.length ?? 0, "dependência", "dependências"),
+      exec ? exec.label : "executor padrão"].join(" · "),
+  }
+
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm" onClick={onFechar}>
-      <div className="flex max-h-[92vh] w-full max-w-4xl flex-col overflow-hidden rounded-2xl border border-white/10 bg-zinc-900/95 shadow-2xl" onClick={(e) => e.stopPropagation()}>
-        <div className="border-b border-white/10 px-6 py-4">
-          <h3 className="font-semibold text-white">Configurar “{f.label}”</h3>
-          <p className="mt-0.5 text-xs text-white/50">
-            Fase: {faseLabel} · chave <code className="text-white/70">{f.key}</code> · tudo o que acontece dentro
-            deste passo se configura aqui. Salvar guarda um rascunho; nada muda para os processos em andamento
-            até você publicar.
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm" onClick={tentarFechar}>
+      <div
+        role="dialog" aria-modal="true" aria-label={`Configurar ${f.label}`}
+        className="flex max-h-[92vh] w-full max-w-4xl flex-col overflow-hidden rounded-2xl border border-white/10 bg-zinc-900/95 shadow-2xl"
+        onClick={(e) => e.stopPropagation()}
+        onKeyDown={(e) => { if (e.key === "Escape") { e.stopPropagation(); tentarFechar() } }}
+      >
+        {/* CABEÇALHO FIXO — a configuração é longa e Salvar/Cancelar não podem sumir
+            no scroll. O corpo rola; cabeçalho e rodapé ficam. */}
+        <div className="flex-none border-b border-white/10 px-6 py-4">
+          <div className="flex items-start justify-between gap-3">
+            <div className="min-w-0">
+              <h3 className="font-semibold text-white">Configurar “{f.label}”</h3>
+              <p className="mt-0.5 text-xs text-white/50">
+                {faseLabel} · <code className="text-white/70">{f.key}</code>
+              </p>
+            </div>
+            <div className="flex flex-none items-center gap-2">
+              {/* RASCUNHO × PUBLICADO — o administrador precisa saber, antes de mexer,
+                  se o que ele fizer atinge quem já está rodando. Não atinge. */}
+              <span className="rounded-full border border-amber-400/30 bg-amber-500/10 px-2.5 py-1 text-[11px] text-amber-200">
+                Rascunho
+              </span>
+              {sujo && (
+                <span className="flex items-center gap-1.5 text-[11px] text-white/50" title="Há alterações que ainda não foram salvas.">
+                  <span className="h-1.5 w-1.5 rounded-full bg-amber-400" aria-hidden />
+                  Alterações não salvas
+                </span>
+              )}
+            </div>
+          </div>
+          <p className="mt-1.5 text-[11px] text-white/35">
+            As alterações ficam em rascunho e <b>não afetam processos em andamento</b>. Elas passam a valer quando
+            você publicar, na tela do workflow.
           </p>
         </div>
 
-        <div className="flex flex-wrap gap-1 border-b border-white/10 px-4 pt-3">
-          {ABAS.map((a) => (
-            <button key={a} onClick={() => setAba(a)}
-              className={`rounded-t-lg px-3 py-2 text-xs ${aba === a ? "bg-white/10 text-white" : "text-white/50 hover:text-white/80"}`}>
-              {TITULO[a]}
-              {a === "subtarefas" && subs.length > 0 && <span className="ml-1.5 text-white/40">{subs.length}</span>}
-              {a === "campos" && (f.campos?.length ?? 0) > 0 && <span className="ml-1.5 text-white/40">{f.campos!.length}</span>}
-              {a === "acoes" && (f.acoes?.length ?? 0) > 0 && <span className="ml-1.5 text-white/40">{f.acoes!.length}</span>}
-              {a === "checklist" && (f.checkItens?.length ?? 0) > 0 && <span className="ml-1.5 text-white/40">{f.checkItens!.length}</span>}
-              {a === "requisitos" && (f.requisitos?.filter((r) => r.tipo !== "EVIDENCIA_ANEXADA").length ?? 0) > 0 &&
-                <span className="ml-1.5 text-white/40">{f.requisitos!.filter((r) => r.tipo !== "EVIDENCIA_ANEXADA").length}</span>}
-              {a === "evidencias" && (f.requisitos?.filter((r) => r.tipo === "EVIDENCIA_ANEXADA").length ?? 0) > 0 &&
-                <span className="ml-1.5 text-white/40">{f.requisitos!.filter((r) => r.tipo === "EVIDENCIA_ANEXADA").length}</span>}
-            </button>
-          ))}
+        {/* AS CINCO ÁREAS */}
+        <div className="flex-none border-b border-white/10 px-4 pt-3" role="tablist" aria-label="Áreas do passo">
+          <div className="flex flex-wrap gap-1">
+            {AREAS.map((a) => (
+              <button key={a.key} role="tab" aria-selected={area === a.key} type="button"
+                onClick={() => setArea(a.key)}
+                title={a.ajuda}
+                className={`rounded-t-lg px-3 py-2 text-xs ${area === a.key ? "bg-white/10 text-white" : "text-white/50 hover:text-white/80"}`}>
+                {a.label}
+              </button>
+            ))}
+          </div>
+          <p className="px-1 py-2 text-[11px] text-white/40">
+            {AREAS.find((a) => a.key === area)?.ajuda} <span className="text-white/25">· {RESUMO[area]}</span>
+          </p>
         </div>
 
         {meus.length > 0 && (
@@ -198,7 +271,7 @@ export default function ConfiguracaoDoPassoModal({
 
         <div className="flex-1 space-y-4 overflow-auto px-6 py-4">
           {/* ───────────────────────────── GERAL ───────────────────────────── */}
-          {aba === "geral" && (
+          {area === "geral" && (
             <>
               <div className="grid grid-cols-2 gap-3">
                 <div>
@@ -215,58 +288,92 @@ export default function ConfiguracaoDoPassoModal({
                 <label className={lbl}>Descrição</label>
                 <input className={inp} value={f.description ?? ""} onChange={(e) => set("description", e.target.value)} />
               </div>
-              <div className="grid grid-cols-3 gap-3">
-                <div>
-                  <label className={lbl}>Cardinalidade</label>
-                  <select className={inp} value={f.cardinalidade ?? ""} onChange={(e) => set("cardinalidade", e.target.value || null)}>
-                    <option value="">(herda o escopo da fase)</option>
-                    <option value="PROCESSO">Uma por processo</option>
-                    <option value="PESSOA">Uma por pessoa</option>
-                    <option value="NECESSIDADE">Uma por registro a localizar</option>
-                    <option value="DOCUMENTO">Uma por documento</option>
-                  </select>
-                </div>
+              <div>
+                <label className={lbl}>Onde este passo se aplica</label>
+                <select className={inp} value={f.cardinalidade ?? ""} onChange={(e) => set("cardinalidade", e.target.value || null)}>
+                  {CARDINALIDADES.map((c) => <option key={c.key} value={c.key}>{c.label}</option>)}
+                </select>
+                {/* A ENUM NÃO MUDA — o que faltava era dizer o que cada valor PRODUZ.
+                    "PESSOA" não informa nada a quem configura. */}
+                <p className="mt-1 text-[11px] text-white/40">
+                  {CARDINALIDADES.find((c) => c.key === (f.cardinalidade ?? ""))?.ajuda}
+                </p>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className={lbl}>Prioridade</label>
                   <select className={inp} value={f.priority ?? "medium"} onChange={(e) => set("priority", e.target.value)}>
-                    <option value="low">baixa</option><option value="medium">média</option><option value="high">alta</option>
+                    {PRIORIDADES.map((x) => <option key={x.key} value={x.key}>{x.label}</option>)}
                   </select>
                 </div>
                 <div>
-                  <label className={lbl}>Peso / SLA (dias)</label>
+                  {/* O RÓTULO DIZIA "Peso / SLA (dias)" e inventava um segundo conceito:
+                      o modelo tem UM atributo, `slaDays`, que é prazo. Não existe
+                      `weight`. Corrigido o rótulo, sem tocar no dado. */}
+                  <label className={lbl}>Prazo interno (dias úteis)</label>
                   <input className={inp} type="number" min={0} value={f.slaDays ?? 0} onChange={(e) => set("slaDays", Number(e.target.value) || 0)} />
+                  <p className="mt-1 text-[11px] text-white/40">
+                    Vale para as subtarefas que não declaram o próprio. Não se confunde com a previsão que o órgão dá.
+                  </p>
                 </div>
               </div>
+              <div>
+                <label className={lbl}>Responsável padrão</label>
+                <input className={inp} value={f.owner ?? ""} placeholder="equipe, papel ou pessoa"
+                  onChange={(e) => set("owner", e.target.value || null)} />
+                <p className="mt-1 text-[11px] text-white/40">
+                  Quem recebe a etapa quando ninguém a assume. Não confundir com o <b>executor</b>, que é o
+                  mecanismo técnico que desenha a tela — esse fica em Avançado.
+                </p>
+              </div>
               <div className="flex flex-wrap gap-4">
-                <label className="flex items-center gap-2 text-xs text-white/60">
-                  <input type="checkbox" checked={f.createsTask} onChange={(e) => set("createsTask", e.target.checked)} /> Etapa executável
+                <label className="flex items-center gap-2 text-xs text-white/60"
+                  title="Marcado, o passo entra no roteiro de trabalho do operador e conta para o progresso.">
+                  <input type="checkbox" checked={f.createsTask} onChange={(e) => set("createsTask", e.target.checked)} />
+                  Este passo gera trabalho operacional
                 </label>
                 <label className="flex items-center gap-2 text-xs text-white/60">
                   <input type="checkbox" checked={f.required} onChange={(e) => set("required", e.target.checked)} /> Obrigatória
                 </label>
               </div>
-              <div className={card}>
-                <label className={lbl}>Condição de conclusão</label>
-                <select className={inp} value={f.regraDeConclusao ?? "ACAO_DO_PASSO"} onChange={(e) => set("regraDeConclusao", e.target.value)}>
-                  {REGRAS_DE_CONCLUSAO.map((r) => <option key={r.key} value={r.key}>{r.label}</option>)}
-                </select>
-                <p className="mt-1 text-[11px] text-white/40">
-                  {REGRAS_DE_CONCLUSAO.find((r) => r.key === (f.regraDeConclusao ?? "ACAO_DO_PASSO"))?.ajuda}
-                </p>
-                {f.regraDeConclusao !== "ACAO_DO_PASSO" && subs.length === 0 && (
-                  <p className="mt-2 text-[11px] text-amber-300/70">
-                    Esta regra olha para subtarefas e este passo não tem nenhuma — ele nunca concluiria. A publicação recusa.
-                  </p>
-                )}
-                <input className={`${inp} mt-2`} placeholder="Observação para o operador (texto livre, não interpretado)"
-                  value={f.completionRule ?? ""} onChange={(e) => set("completionRule", e.target.value)} />
-              </div>
+              {/* A CONDIÇÃO DE CONCLUSÃO MORA EM "Conclusão", e só lá. Ela estava
+                  aqui também — dois seletores para o mesmo atributo, que é a
+                  duplicidade que esta reorganização existe para desfazer. */}
+              <p className="rounded-lg border border-white/10 bg-white/5 p-3 text-[11px] text-white/45">
+                Este passo termina: <b>{REGRAS_DE_CONCLUSAO.find((r) => r.key === (f.regraDeConclusao ?? "ACAO_DO_PASSO"))?.label}</b>.
+                {" "}Para mudar, vá em <b>Conclusão</b>.
+              </p>
             </>
           )}
 
-          {/* ─────────────────────────── SUBTAREFAS ─────────────────────────── */}
-          {aba === "subtarefas" && (
+          {/* ─────────────────────────── EXECUÇÃO ─────────────────────────── */}
+          {area === "execucao" && (
             <>
+              <div className="flex gap-1 border-b border-white/10 pb-2" role="tablist" aria-label="Seções de execução">
+                {([["subtarefas", `Subtarefas (${subs.length})`],
+                   ["campos", `Campos (${f.campos?.length ?? 0})`],
+                   ["checklist", `Checklist (${f.checkItens?.length ?? 0})`]] as const).map(([k, rotulo]) => (
+                  <button key={k} type="button" role="tab" aria-selected={secaoExec === k} onClick={() => setSecaoExec(k)}
+                    className={`rounded-t-lg px-2.5 py-1.5 text-[11px] ${secaoExec === k ? "bg-white/10 text-white" : "text-white/50 hover:text-white/80"}`}>
+                    {rotulo}
+                  </button>
+                ))}
+              </div>
+              {(secaoExec === "campos" || secaoExec === "checklist") && (
+                <EditorDePecasDoPasso
+                  aba={secaoExec}
+                  pecas={pecasDoPasso}
+                  aoMudar={aplicar}
+                  efeitosOfertados={efeitosOfertados}
+                  todosOsEfeitos={cat?.efeitos ?? []}
+                  tiposDeCampo={tiposOfertados}
+                  avisoDoExecutor={exec && !exec.checklistCadastrado && secaoExec === "checklist"
+                    ? `O executor “${exec.label}” não desenha checklist; os itens ficam cadastrados mas não aparecem nele.`
+                    : null}
+                />
+              )}
+              {secaoExec === "subtarefas" && (
+              <>
               <p className="text-xs text-white/50">
                 O que acontece DENTRO deste passo. Cada subtarefa tem identidade própria, estado próprio,
                 execução própria e histórico próprio — e pode depender das irmãs.
@@ -485,29 +592,77 @@ export default function ConfiguracaoDoPassoModal({
               {subs.length > 0 && f.regraDeConclusao === "ACAO_DO_PASSO" && (
                 <p className="text-[11px] text-white/40">
                   Este passo tem subtarefas e conclui pela ação do passo — elas não travam a conclusão. Para que travem,
-                  mude a condição de conclusão na aba Geral.
+                  mude a condição de conclusão em <b>Conclusão</b>.
                 </p>
+              )}
+              </>
               )}
             </>
           )}
 
-          {/* ─────────── AS PEÇAS DO PASSO (mesmo editor da subtarefa) ─────────── */}
-          {(aba === "campos" || aba === "acoes" || aba === "checklist" || aba === "requisitos" || aba === "evidencias") && (
+          {/* ───────────────────────── CONCLUSÃO ───────────────────────── */}
+          {area === "conclusao" && (
+            <>
+              <div className={card}>
+                <label className={lbl}>Quando este passo termina</label>
+                <select className={inp} value={f.regraDeConclusao ?? "ACAO_DO_PASSO"} onChange={(e) => set("regraDeConclusao", e.target.value)}>
+                  {REGRAS_DE_CONCLUSAO.map((r) => <option key={r.key} value={r.key}>{r.label}</option>)}
+                </select>
+                <p className="mt-1 text-[11px] text-white/40">
+                  {REGRAS_DE_CONCLUSAO.find((r) => r.key === (f.regraDeConclusao ?? "ACAO_DO_PASSO"))?.ajuda}
+                </p>
+                {f.regraDeConclusao !== "ACAO_DO_PASSO" && subs.length === 0 && (
+                  <p className="mt-2 text-[11px] text-amber-300/70">
+                    Esta regra olha para subtarefas e este passo não tem nenhuma — ele nunca concluiria. A publicação recusa.
+                  </p>
+                )}
+                <input className={`${inp} mt-2`} placeholder="Observação para o operador (texto livre, não interpretado)"
+                  value={f.completionRule ?? ""} onChange={(e) => set("completionRule", e.target.value)} />
+              </div>
+
+              {/* REQUISITO E EVIDÊNCIA SÃO A MESMA LISTA, vista por dois recortes. Dois
+                  CRUDs concorrentes sobre o mesmo registro é o que a UX anterior fazia:
+                  duas abas de primeiro nível editando `StepRequirement`. */}
+              <div className="flex gap-1 border-b border-white/10 pb-2" role="tablist" aria-label="Seções de conclusão">
+                {([["requisitos", `Requisitos (${requisitosSimples.length})`],
+                   ["evidencias", `Evidências obrigatórias (${evidencias.length})`]] as const).map(([k, rotulo]) => (
+                  <button key={k} type="button" role="tab" aria-selected={secaoConcl === k} onClick={() => setSecaoConcl(k)}
+                    className={`rounded-t-lg px-2.5 py-1.5 text-[11px] ${secaoConcl === k ? "bg-white/10 text-white" : "text-white/50 hover:text-white/80"}`}>
+                    {rotulo}
+                  </button>
+                ))}
+              </div>
+              <EditorDePecasDoPasso
+                aba={secaoConcl}
+                pecas={pecasDoPasso}
+                aoMudar={aplicar}
+                efeitosOfertados={efeitosOfertados}
+                todosOsEfeitos={cat?.efeitos ?? []}
+                tiposDeCampo={tiposOfertados}
+              />
+            </>
+          )}
+
+          {/* ───────────────────────── RESULTADOS ───────────────────────── */}
+          {area === "resultados" && (
             <EditorDePecasDoPasso
-              aba={aba}
+              aba="acoes"
               pecas={pecasDoPasso}
-              aoMudar={(patch) => setF((x) => ({ ...x, ...patch }))}
+              aoMudar={aplicar}
               efeitosOfertados={efeitosOfertados}
+              todosOsEfeitos={cat?.efeitos ?? []}
               tiposDeCampo={tiposOfertados}
-              avisoDoExecutor={exec && !exec.checklistCadastrado && aba === "checklist"
-                ? `O executor “${exec.label}” não desenha checklist; os itens ficam cadastrados mas não aparecem nele.`
-                : null}
             />
           )}
 
-          {/* ────────────────────────── DEPENDÊNCIAS ────────────────────────── */}
-          {aba === "dependencias" && (
-            <>
+          {/* ─────────────────────────── AVANÇADO ─────────────────────────── */}
+          {area === "avancado" && (
+            <div className="space-y-3">
+              <details open className={card}>
+                <summary className="cursor-pointer text-sm font-medium text-white/80">
+                  Dependências <span className="text-white/35">({f.dependeDe?.length ?? 0})</span>
+                </summary>
+                <div className="mt-3 space-y-2">
               <p className="text-xs text-white/50">
                 De quais PASSOS este depende. Ordem não é dependência: dois passos podem depender do mesmo
                 sem depender um do outro — e reabrir alcança quem depende, não quem vem depois.
@@ -529,36 +684,14 @@ export default function ConfiguracaoDoPassoModal({
                   )
                 })}
               </div>
-            </>
-          )}
+                </div>
+              </details>
 
-          {/* ────────────────────── RESPONSÁVEL / SLA ────────────────────── */}
-          {aba === "responsavel" && (
-            <>
-              <div>
-                <label className={lbl}>Responsável padrão</label>
-                <input className={inp} value={f.owner ?? ""} placeholder="equipe, papel ou pessoa"
-                  onChange={(e) => set("owner", e.target.value || null)} />
-                <p className="mt-1 text-[11px] text-white/40">
-                  Quem recebe a etapa quando ninguém a assume. Cada subtarefa pode herdar isto, apontar outra
-                  pessoa ou usar a regra de elegibilidade — configurado dentro dela.
-                </p>
-              </div>
-              {/* O SLA MORA NA ABA GERAL, e só lá.
-                  Ele estava aqui também, e um atributo com dois campos na mesma tela é a
-                  mesma duplicidade que o editor curto tinha com o configurador: o
-                  administrador muda num, olha no outro e vê valor diferente até salvar. */}
-              <p className="rounded-lg border border-white/10 bg-white/5 p-3 text-[11px] text-white/45">
-                O prazo do passo está em <b>Geral › Peso / SLA</b>: {f.slaDays ?? 0} dia(s). Ele vale para as
-                subtarefas que não declaram o seu. É prazo interno — não se confunde com a previsão que o órgão dá,
-                que fica registrada na execução.
-              </p>
-            </>
-          )}
-
-          {/* ────────────────────────── EXECUTOR ────────────────────────── */}
-          {aba === "executor" && (
-            <>
+              <details className={card}>
+                <summary className="cursor-pointer text-sm font-medium text-white/80">
+                  Executor técnico <span className="text-white/35">({exec?.label ?? "padrão"})</span>
+                </summary>
+                <div className="mt-3 space-y-2">
               <div>
                 <label className={lbl}>Executor</label>
                 <select className={inp} value={f.executorKey ?? ""} onChange={(e) => set("executorKey", e.target.value || null)}>
@@ -591,12 +724,18 @@ export default function ConfiguracaoDoPassoModal({
                   </div>
                 </div>
               )}
-            </>
-          )}
+                </div>
+              </details>
 
-          {/* ────────────────────────── REABERTURA ────────────────────────── */}
-          {aba === "reabertura" && (
-            <>
+              <details className={card}>
+                <summary className="cursor-pointer text-sm font-medium text-white/80">
+                  Reabertura
+                </summary>
+                <div className="mt-3 space-y-2">
+                  <p className="text-[11px] text-white/40">
+                    Controla o que pode ser reexecutado <b>depois</b> que o passo foi concluído. Não se confunde com
+                    retroceder a fase: retroceder move o processo e <b>não reabre este passo automaticamente</b>.
+                  </p>
               <label className="flex items-center gap-2 text-sm text-white/80">
                 <input type="checkbox" checked={f.reaberturaPermitida !== false} onChange={(e) => set("reaberturaPermitida", e.target.checked)} />
                 Esta etapa pode ser reaberta
@@ -620,18 +759,49 @@ export default function ConfiguracaoDoPassoModal({
                 <label className={lbl}>Permissão exigida (vazio = a permissão geral)</label>
                 <input className={inp} value={f.reaberturaPermissao ?? ""} onChange={(e) => set("reaberturaPermissao", e.target.value || null)} />
               </div>
-            </>
+                </div>
+              </details>
+            </div>
           )}
         </div>
 
-        <div className="flex justify-end gap-2 border-t border-white/10 px-6 py-4">
-          <button onClick={onFechar} className="rounded-lg border border-white/10 bg-white/5 px-4 py-2 text-sm text-white/70 hover:bg-white/10">Cancelar</button>
-          <button onClick={salvar} disabled={salvando}
-            className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-500 disabled:opacity-50">
-            {salvando ? "Salvando…" : "Salvar rascunho"}
-          </button>
+        {/* RODAPÉ FIXO — Salvar e Cancelar não podem sumir no scroll de uma
+            configuração longa. */}
+        <div className="flex flex-none items-center justify-between gap-3 border-t border-white/10 px-6 py-4">
+          <div className="min-w-0 text-[11px]">
+            {erroAoSalvar
+              ? <span className="text-red-300">{erroAoSalvar}</span>
+              : sujo
+                ? <span className="text-white/45">Salvar guarda o rascunho. Publicar é um passo à parte, na tela do workflow.</span>
+                : <span className="text-white/30">Sem alterações pendentes.</span>}
+          </div>
+          <div className="flex flex-none gap-2">
+            <button type="button" onClick={tentarFechar}
+              className="rounded-lg border border-white/10 bg-white/5 px-4 py-2 text-sm text-white/70 hover:bg-white/10">Cancelar</button>
+            <button type="button" onClick={salvar} disabled={salvando}
+              className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-500 disabled:opacity-50">
+              {salvando ? "Salvando…" : "Salvar rascunho"}
+            </button>
+          </div>
         </div>
       </div>
+
+      {/* ALTERAÇÕES NÃO SALVAS — fechar sem avisar perde o que foi digitado, e o
+          administrador não tem como saber que perdeu. */}
+      {confirmandoSaida && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/70 p-4" onClick={(e) => e.stopPropagation()}>
+          <div className="w-full max-w-sm rounded-2xl border border-white/10 bg-zinc-900 p-6 shadow-2xl">
+            <h4 className="text-sm font-semibold text-white">Você tem alterações não salvas</h4>
+            <p className="mt-1 text-xs text-white/50">Se sair agora, o que você configurou nesta sessão será descartado.</p>
+            <div className="mt-4 flex justify-end gap-2">
+              <button type="button" onClick={() => setConfirmandoSaida(false)}
+                className="rounded-lg border border-white/10 bg-white/5 px-3 py-1.5 text-xs text-white/70 hover:bg-white/10">Continuar editando</button>
+              <button type="button" onClick={() => { setConfirmandoSaida(false); onFechar() }}
+                className="rounded-lg bg-red-600/80 px-3 py-1.5 text-xs font-medium text-white hover:bg-red-600">Descartar</button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

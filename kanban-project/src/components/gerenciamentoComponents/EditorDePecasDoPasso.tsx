@@ -12,7 +12,7 @@
 // listas e devolve as listas.
 
 import type { AcaoCfg, CampoCfg, ItemCfg, RequisitoCfg, OpcaoCfg } from "./tiposDoCadastroDoPasso"
-import { chaveDe, TIPOS_DE_REQUISITO } from "./tiposDoCadastroDoPasso"
+import { chaveDe, TIPOS_DE_REQUISITO, nomeDoTipoDeCampo, TIPOS_COM_OPCOES } from "./tiposDoCadastroDoPasso"
 
 export interface Efeito {
   key: string; label: string; descricao: string; competencia: string
@@ -31,12 +31,14 @@ export interface PecasDoPasso {
 }
 
 export default function EditorDePecasDoPasso({
-  aba, pecas, aoMudar, efeitosOfertados, tiposDeCampo, avisoDoExecutor,
+  aba, pecas, aoMudar, efeitosOfertados, todosOsEfeitos = [], tiposDeCampo, avisoDoExecutor,
 }: {
   aba: "campos" | "acoes" | "checklist" | "requisitos" | "evidencias"
   pecas: PecasDoPasso
   aoMudar: (patch: Partial<PecasDoPasso>) => void
   efeitosOfertados: Efeito[]
+  /** TODOS os do catálogo — para explicar por que um indisponível está indisponível. */
+  todosOsEfeitos?: Efeito[]
   tiposDeCampo: string[]
   avisoDoExecutor?: string | null
 }) {
@@ -55,6 +57,11 @@ export default function EditorDePecasDoPasso({
   if (aba === "campos") return (
     <>
       <p className="text-xs text-white/50">O que o operador preenche aqui.</p>
+      {pecas.campos.length === 0 && (
+        <p className="rounded-lg border border-dashed border-white/15 p-4 text-center text-xs text-white/40">
+          Nenhum campo configurado.
+        </p>
+      )}
       {pecas.campos.map((c, i) => (
         <div key={i} className={card}>
           <div className="grid grid-cols-[1fr_150px_auto] items-end gap-2">
@@ -64,8 +71,10 @@ export default function EditorDePecasDoPasso({
             </div>
             <div>
               <label className={lbl}>Tipo</label>
+              {/* O NOME É HUMANO, a chave continua sendo a do motor. "textarea" e
+                  "upload" são palavras de quem escreve o formulário. */}
               <select className={inp} value={c.tipo} onChange={(e) => setLista("campos", i, { tipo: e.target.value })}>
-                {tiposDeCampo.map((t) => <option key={t} value={t}>{t}</option>)}
+                {tiposDeCampo.map((t) => <option key={t} value={t}>{nomeDoTipoDeCampo(t)}</option>)}
               </select>
             </div>
             <button onClick={() => delLista("campos", i)} className="rounded-lg border border-white/10 px-2 py-2 text-xs text-red-300 hover:bg-red-500/10">Remover</button>
@@ -76,7 +85,7 @@ export default function EditorDePecasDoPasso({
             </label>
             <code className="text-[11px] text-white/35" title="Chave gravada nas execuções — não muda.">{c.key ?? chaveDe(c.label)}</code>
           </div>
-          {["select", "multiselect", "radio"].includes(c.tipo) && (
+          {TIPOS_COM_OPCOES.includes(c.tipo) && (
             <div className="mt-3 rounded-lg border border-white/10 bg-black/20 p-3">
               <div className="flex items-center justify-between">
                 <label className={`${lbl} mb-0`}>Opções</label>
@@ -120,8 +129,16 @@ export default function EditorDePecasDoPasso({
         Os resultados que o operador pode escolher. Cada um aponta para um efeito do catálogo — a lista mostra
         <b> só</b> os que esta fase tem competência para executar e que o executor sabe disparar.
       </p>
+      {pecas.acoes.length === 0 && (
+        <p className="rounded-lg border border-dashed border-white/15 p-4 text-center text-xs text-white/40">
+          Nenhum resultado disponível. Sem um resultado cadastrado o operador vê a etapa e não tem como fechá-la.
+        </p>
+      )}
       {pecas.acoes.map((a, i) => {
         const ef = efeitosOfertados.find((x) => x.key === a.effectKey)
+        // O efeito EXISTE no catálogo mas não está ofertado aqui? Então dá para dizer
+        // por quê — e a resposta vem do próprio catálogo, não de suposição da tela.
+        const indisponivel = ef ? null : todosOsEfeitos.find((x) => x.key === a.effectKey)
         return (
           <div key={i} className={card}>
             <div className="grid grid-cols-[1fr_auto] items-end gap-2">
@@ -133,12 +150,28 @@ export default function EditorDePecasDoPasso({
             </div>
             <div className="mt-2">
               <label className={lbl}>O que acontece</label>
+              {/* A LINGUAGEM É A DO NEGÓCIO. `COMPLETE_STEP` é a chave que o motor lê;
+                  o administrador escolhe "Concluir a etapa". A chave aparece como
+                  detalhe técnico, não como o nome da coisa. */}
               <select className={inp} value={a.effectKey} onChange={(e) => setLista("acoes", i, { effectKey: e.target.value })}>
-                {!efeitosOfertados.some((e) => e.key === a.effectKey) && <option value={a.effectKey}>{a.effectKey} (indisponível nesta fase)</option>}
+                {!efeitosOfertados.some((e) => e.key === a.effectKey) && (
+                  <option value={a.effectKey}>{indisponivel?.label ?? a.effectKey} — indisponível</option>
+                )}
                 {efeitosOfertados.map((e) => <option key={e.key} value={e.key}>{e.label}</option>)}
               </select>
-              {ef && <p className="mt-1 text-[11px] text-white/40">{ef.descricao} · competência {ef.competencia}
-                {ef.camposObrigatorios.length > 0 && ` · exige: ${ef.camposObrigatorios.join(", ")}`}</p>}
+              {/* INDISPONÍVEL COM MOTIVO. "(indisponível nesta fase)" não diz se o
+                  problema é a competência da fase ou o executor escolhido — e são
+                  correções diferentes. */}
+              {!efeitosOfertados.some((e) => e.key === a.effectKey) && (
+                <p className="mt-1 text-[11px] text-amber-300/80">
+                  {indisponivel
+                    ? indisponivel.permitidoNestaFase
+                      ? `O executor configurado para este passo não sabe disparar "${indisponivel.label}". Troque o executor em Avançado ou escolha outro resultado.`
+                      : `Esta fase não tem competência para "${indisponivel.label}" — quem decide isso é a fase de ${indisponivel.competencia}.`
+                    : `O resultado aponta para um efeito que não está no catálogo (${a.effectKey}).`}
+                </p>
+              )}
+              {ef && <p className="mt-1 text-[11px] text-white/40">{ef.descricao}</p>}
             </div>
             <div className="mt-2">
               <label className={lbl}>Explicação para o operador</label>
@@ -167,6 +200,11 @@ export default function EditorDePecasDoPasso({
     <>
       <p className="text-xs text-white/50">Itens de conferência.</p>
       {avisoDoExecutor && <p className="text-[11px] text-amber-300/70">{avisoDoExecutor}</p>}
+      {pecas.checkItens.length === 0 && (
+        <p className="rounded-lg border border-dashed border-white/15 p-4 text-center text-xs text-white/40">
+          Nenhum item de conferência.
+        </p>
+      )}
       {pecas.checkItens.map((k, i) => (
         <div key={i} className={card}>
           <div className="grid grid-cols-[1fr_auto] items-end gap-2">
@@ -201,9 +239,14 @@ export default function EditorDePecasDoPasso({
     <>
       <p className="text-xs text-white/50">
         {soEvidencia
-          ? "Que arquivo precisa estar anexado para concluir. Evidência é um requisito — aparece também na aba Requisitos, com o mesmo registro."
-          : "O que precisa estar cumprido para concluir. O motor recusa a conclusão citando o requisito pelo nome que está aqui."}
+          ? "Que arquivo precisa estar anexado para concluir. Evidência é um requisito do tipo “arquivo anexado”: um registro só, mostrado aqui porque tem campos próprios."
+          : "O que precisa estar cumprido para concluir. O motor recusa a conclusão citando o requisito pelo nome que está aqui. As evidências ficam logo abaixo — mesma lista, agrupada à parte."}
       </p>
+      {visiveis.length === 0 && (
+        <p className="rounded-lg border border-dashed border-white/15 p-4 text-center text-xs text-white/40">
+          {soEvidencia ? "Nenhuma evidência obrigatória." : "Nenhum requisito configurado."}
+        </p>
+      )}
       {visiveis.map(({ r, i }) => {
         const tipo = TIPOS_DE_REQUISITO.find((t) => t.key === r.tipo)
         const alvos =

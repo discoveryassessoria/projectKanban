@@ -103,7 +103,18 @@ const drawer = semComentarios(ler("src/components/kanban/workflow/CentralDaEtapa
 check("a Central abre o modal de reabertura", drawer.includes("<ReabrirEtapaModal"))
 
 const cfg = semComentarios(ler("src/components/gerenciamentoComponents/ConfiguracaoDoPassoModal.tsx"))
-check("a política de reabertura continua cadastrável", cfg.includes('"reabertura"'))
+// A INVARIANTE É A CAPACIDADE, não o nome da aba.
+//
+// Isto media `cfg.includes('"reabertura"')` — a chave da aba de primeiro nível. Quando
+// as onze abas viraram cinco áreas e a política passou a ser uma seção de "Avançado",
+// a asserção ficou vermelha sem que nada tivesse deixado de ser configurável. Uma
+// verificação presa ao nome da aba impede reorganizar a tela; presa aos ATRIBUTOS, ela
+// impede perder a capacidade — que é o que a baseline existe para proteger.
+for (const atributo of [
+  "reaberturaPermitida", "reaberturaEstrategia", "reaberturaExigeJustificativa", "reaberturaPermissao",
+]) {
+  check(`  a política de reabertura continua cadastrável: ${atributo}`, cfg.includes(`set("${atributo}"`))
+}
 
 // ════════════════════════════════════════════════════════════════
 const url = process.env.PRISMA_DATABASE_URL ?? ""
@@ -137,6 +148,24 @@ async function limpar() {
   await prisma.macroWorkflow.deleteMany({ where: { name: { startsWith: M } } })
   await prisma.tipoProcessoNacionalidade.deleteMany({ where: { name: { startsWith: M } } })
   await prisma.catalogoFase.deleteMany({ where: { phaseKey: { startsWith: "retro_" } } })
+
+  // ── A AUDITORIA ÓRFÃ ────────────────────────────────────────────────────
+  //
+  // As asserções deste arquivo contam eventos por `entidadeId` — e o id de uma
+  // instância de passo é REUTILIZADO entre execuções: outras suítes apagam as
+  // instâncias, o `logAuditoria` sobrevive, e a instância criada na próxima rodada
+  // nasce com o histórico de outra colada nela. Foi assim que "nenhum evento de
+  // reabertura foi emitido" ficou vermelho num banco reutilizado e verde num limpo:
+  // o teste passou a medir quantas vezes a suíte já rodou, não o que o código faz.
+  //
+  // Apagar o que aponta para instância que não existe mais é seguro e devolve ao
+  // teste a capacidade de medir o código.
+  const idsVivos = new Set((await prisma.phaseWorkflowStepInstance.findMany({ select: { id: true } })).map((x) => x.id))
+  const logsDePasso = await prisma.logAuditoria.findMany({
+    where: { entidade: "PhaseWorkflowStepInstance" }, select: { id: true, entidadeId: true },
+  })
+  const orfaos = logsDePasso.filter((l) => l.entidadeId != null && !idsVivos.has(l.entidadeId)).map((l) => l.id)
+  if (orfaos.length) await prisma.logAuditoria.deleteMany({ where: { id: { in: orfaos } } })
   await prisma.itemCatalogo.deleteMany({ where: { code: { startsWith: M } } })
   await prisma.usuario.deleteMany({ where: { email: { startsWith: `${M.toLowerCase()}-` } } })
 }

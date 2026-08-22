@@ -354,5 +354,85 @@ check("o SLA tem um campo só no configurador",
   (modal8.match(/set\("slaDays"/g) ?? []).length === 1,
   "ele estava em Geral E em Responsável/SLA — dois campos para o mesmo atributo na mesma tela")
 
+// ════════════════════════════════════════════════════════════════
+console.log("\n(9) O configurador é organizado como processo, não como banco de dados")
+// ════════════════════════════════════════════════════════════════
+//
+// Eram onze abas de primeiro nível, uma por tabela do motor. Quem configura não
+// pergunta "onde fica o requisito"; pergunta o que é o passo, o que se faz nele, o que
+// precisa estar cumprido, o que pode acontecer e que regras especiais existem.
+
+const vocab = semComentarios(ler("src/components/gerenciamentoComponents/tiposDoCadastroDoPasso.ts"))
+const modal9 = semComentarios(ler("src/components/gerenciamentoComponents/ConfiguracaoDoPassoModal.tsx"))
+const pecas9 = semComentarios(ler("src/components/gerenciamentoComponents/EditorDePecasDoPasso.tsx"))
+
+check("existem CINCO áreas de primeiro nível, nesta ordem",
+  /AREAS = \[[\s\S]*?"geral"[\s\S]*?"execucao"[\s\S]*?"conclusao"[\s\S]*?"resultados"[\s\S]*?"avancado"/.test(vocab) &&
+  (vocab.match(/\{ key: "(geral|execucao|conclusao|resultados|avancado)"/g) ?? []).length === 5)
+check("as onze abas de primeiro nível não existem mais",
+  !/const ABAS = \[/.test(modal9) && !/aba === "dependencias"|aba === "executor"|aba === "reabertura"/.test(modal9))
+check("cada área traz o texto que explica o que ela responde",
+  ["Defina o que é este passo", "Defina o que o operador precisa fazer",
+   "Defina o que precisa estar cumprido", "Defina quais decisões",
+   "Dependências, executor técnico"].every((t) => vocab.includes(t)))
+
+// RESPONSÁVEL ≠ EXECUTOR. Um é quem faz; o outro é o mecanismo que desenha a tela.
+check("o responsável fica em Geral", /area === "geral"[\s\S]{0,6000}Responsável padrão/.test(modal9))
+check("o executor fica em Avançado, e não como área de primeiro nível",
+  /area === "avancado"[\s\S]{0,4000}Executor técnico/.test(modal9) &&
+  !/\{ key: "executor"/.test(vocab))
+check("a tela diz que responsável e executor são coisas diferentes",
+  modal9.includes("Não confundir com o"))
+
+// O RÓTULO "Peso / SLA" inventava um segundo atributo: o modelo tem só `slaDays`.
+check('o rótulo "Peso / SLA" não existe mais', !modal9.includes("Peso / SLA"))
+check("o prazo é chamado de prazo", modal9.includes("Prazo interno (dias úteis)"))
+check("e não existe `weight` no schema para justificar dois campos",
+  !/^\s*weight\s+/m.test(ler("prisma/schema.prisma")),
+  "se um dia existir, a tela precisa mostrar os dois separadamente")
+
+// LINGUAGEM DE NEGÓCIO, não chave técnica.
+check("os tipos de campo têm nome humano", vocab.includes("Texto longo") && vocab.includes("Arquivo/Evidência"))
+check("a cardinalidade é explicada pelo que produz", vocab.includes("Será criada uma unidade deste passo para cada documento aplicável."))
+check("a prioridade oferece só o que a enum admite",
+  (vocab.match(/\{ key: "(low|medium|high)"/g) ?? []).length === 3 && !vocab.includes('key: "urgent"'))
+check("effectKey não é a linguagem principal do seletor de resultado",
+  !/\{a\.effectKey\} \(indisponível/.test(pecas9) && pecas9.includes("indisponivel?.label ?? a.effectKey"))
+check("e o indisponível explica o MOTIVO", pecas9.includes("não tem competência para") && pecas9.includes("não sabe disparar"))
+
+// REQUISITO E EVIDÊNCIA: uma fonte, dois grupos visuais.
+check("evidência e requisito saem da MESMA lista",
+  (pecas9.match(/aoMudar\(\{\s*requisitos:/g) ?? []).length === 1,
+  "dois CRUDs sobre o mesmo registro é o que a UX anterior fazia")
+check("e nenhuma das duas é área de primeiro nível",
+  !/\{ key: "requisitos"/.test(vocab) && !/\{ key: "evidencias"/.test(vocab))
+
+// ESTADO DA EDIÇÃO — não perder o que foi digitado.
+check("o configurador avisa antes de fechar com alteração pendente", modal9.includes("Você tem alterações não salvas"))
+check("e mostra que há alteração pendente", modal9.includes("Alterações não salvas"))
+check("erro ao salvar NÃO fecha o modal nem apaga o que foi digitado",
+  modal9.includes("setErroAoSalvar") && /catch \(e\)[\s\S]{0,200}setErroAoSalvar/.test(modal9))
+check("o rascunho é anunciado como rascunho", modal9.includes("não afetam processos em andamento"))
+check("cabeçalho e rodapé ficam fixos", (modal9.match(/flex-none/g) ?? []).length >= 3)
+
+// SEM CASO ESPECIAL POR FASE OU POR PASSO.
+for (const arquivo of [
+  "src/components/gerenciamentoComponents/ConfiguracaoDoPassoModal.tsx",
+  "src/components/gerenciamentoComponents/EditorDePecasDoPasso.tsx",
+  "src/components/gerenciamentoComponents/PhaseWorkflowsFasesTab.tsx",
+]) {
+  const t = semComentarios(ler(arquivo))
+  check(`${arquivo.split("/").pop()} não muda a UI por phaseKey`,
+    !/phaseKey\s*(===|!==)\s*["'`]/.test(t))
+  check(`${arquivo.split("/").pop()} não muda a UI por chave de passo`,
+    !/(stepKey|\bkey)\s*===\s*["'`](solicitar_certidao|receber_certidao|conferir_certidao|localizar_registro)["'`]/.test(t))
+}
+
+// A PRÉVIA DE PUBLICAÇÃO fala o mesmo idioma.
+const pub9 = semComentarios(ler("src/components/gerenciamentoComponents/PublicarWorkflowModal.tsx"))
+check("a prévia agrupa pelas cinco áreas",
+  pub9.includes("AREA_DO_ESCOPO") &&
+  /ORDEM_DAS_AREAS = \["Geral", "Execução", "Conclusão", "Resultados", "Avançado"\]/.test(pub9))
+
 console.log(`\n${falhas.length === 0 ? "✅ PASSOU" : "❌ FALHOU"}: ${ok} ok, ${falhas.length} falhas`)
 if (falhas.length) { for (const f of falhas) console.log(`  · ${f}`); process.exit(1) }

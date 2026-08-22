@@ -414,6 +414,50 @@ async function main() {
       ((p4c!.subtarefas ?? []) as Array<Record<string, unknown>>).map((x) => x.key).sort().join(",") === "sub_a,sub_b")
   }
 
+  // ══════════════════════════════════════════════════════════════
+  console.log("\n(12) As cinco áreas cobrem TODO atributo do passo — nada ficou órfão")
+  // ══════════════════════════════════════════════════════════════
+  //
+  // A reorganização visual só é honesta se nenhuma capacidade tiver sumido junto. O
+  // teste abaixo pega um passo com TUDO preenchido, confere que cada atributo tem uma
+  // área responsável, e prova que o ida e volta preserva o conjunto inteiro.
+  {
+    const AREAS_DO_PASSO: Record<string, string[]> = {
+      Geral: ["label", "description", "key", "required", "createsTask", "cardinalidade", "priority", "slaDays", "owner"],
+      "Execução": ["subtarefas", "campos", "checkItens"],
+      "Conclusão": ["regraDeConclusao", "completionRule", "requisitos"],
+      Resultados: ["acoes"],
+      "Avançado": ["dependeDe", "executorKey", "reaberturaPermitida", "reaberturaEstrategia", "reaberturaExigeJustificativa", "reaberturaPermissao"],
+    }
+    const wfArea = await prisma.phaseInternalWorkflow.findUnique({
+      where: { wfUid: `${M}::e2ehttp_genealogia` }, select: { id: true },
+    })
+    const r = await req(`/api/gerenciamento/workflows-fase/${wfArea!.id}`)
+    const passo = ((r.corpo?.workflow as { passos?: Array<Record<string, unknown>> })?.passos ?? [])[0]!
+    const cobertos = new Set(Object.values(AREAS_DO_PASSO).flat())
+    // Colunas de infraestrutura: id, ordem e carimbos não são configuração de negócio.
+    const INFRA = new Set(["id", "workflowId", "ordem", "versao", "criadoEm", "atualizadoEm", "checklist", "canais"])
+    const orfaos = Object.keys(passo).filter((k) => !cobertos.has(k) && !INFRA.has(k))
+    check("todo atributo do passo pertence a uma das cinco áreas", orfaos.length === 0,
+      `sem área: ${orfaos.join(", ")}`)
+    for (const [area, campos] of Object.entries(AREAS_DO_PASSO)) {
+      check(`a área ${area} tem os atributos dela presentes na leitura`,
+        campos.every((c) => c in passo), campos.filter((c) => !(c in passo)).join(", "))
+    }
+
+    // ── ROUND-TRIP SEMÂNTICO: ler, devolver sem tocar, ler de novo ──────
+    const antes = JSON.stringify(passo, (k, v) =>
+      ["id", "stepId", "subtaskId", "fieldId", "canalId", "criadoEm", "atualizadoEm", "workflowId"].includes(k) ? undefined : v)
+    await req(`/api/gerenciamento/workflows-fase/${wfArea!.id}`, {
+      method: "PUT", body: JSON.stringify({ steps: (r.corpo?.workflow as { passos?: unknown[] })?.passos ?? [] }),
+    })
+    const r2 = await req(`/api/gerenciamento/workflows-fase/${wfArea!.id}`)
+    const passo2 = ((r2.corpo?.workflow as { passos?: Array<Record<string, unknown>> })?.passos ?? [])[0]!
+    const depois = JSON.stringify(passo2, (k, v) =>
+      ["id", "stepId", "subtaskId", "fieldId", "canalId", "criadoEm", "atualizadoEm", "workflowId"].includes(k) ? undefined : v)
+    check("round-trip semântico: estado idêntico depois de salvar sem alterar", antes === depois)
+  }
+
   await limpar()
   console.log(`\n${falhas.length === 0 ? "✅ PASSOU" : "❌ FALHOU"}: ${ok} ok, ${falhas.length} falhas`)
   if (falhas.length) { for (const f of falhas) console.log(`  · ${f}`); process.exitCode = 1 }

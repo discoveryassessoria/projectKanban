@@ -471,16 +471,28 @@ export default function PhaseWorkflowsFasesTab() {
                             é uma ETAPA da tarefa da unidade de trabalho. O que a
                             flag realmente diz é que a etapa é trabalho humano que
                             entra no roteiro de execução. */}
-                        {st.createsTask && <span className="rounded bg-green-500/15 px-1.5 py-0.5 text-green-300">etapa executável</span>}
-                        {st.required && <span className="rounded bg-amber-500/15 px-1.5 py-0.5 text-amber-300">obrigatório</span>}
+                        {/* O RESUMO SEGUE O MESMO MODELO MENTAL DO CONFIGURADOR:
+                            primeiro o que o passo É, depois o que ele CONTÉM. Antes
+                            eram nove selos misturando as duas coisas. */}
+                        {st.required
+                          ? <span className="rounded bg-amber-500/15 px-1.5 py-0.5 text-amber-300">obrigatório</span>
+                          : <span className="rounded bg-white/10 px-1.5 py-0.5 text-white/50">opcional</span>}
                         <span className="rounded bg-sky-500/15 px-1.5 py-0.5 text-sky-300">{CARDINALIDADE_LABEL[st.cardinalidade || ""] ?? st.cardinalidade}</span>
+                        {!!st.slaDays && st.slaDays > 0 && <span className="rounded bg-white/10 px-1.5 py-0.5 text-white/60">prazo {st.slaDays}d</span>}
                         {st.owner && <span className="rounded bg-white/10 px-1.5 py-0.5 text-white/60">{st.owner}</span>}
-                        {!!st.slaDays && st.slaDays > 0 && <span className="rounded bg-white/10 px-1.5 py-0.5 text-white/60">SLA {st.slaDays}d</span>}
-                        {(st.acoes?.length ?? 0) > 0 && <span className="rounded bg-violet-500/15 px-1.5 py-0.5 text-violet-300">{st.acoes!.length} ações</span>}
-                        {(st.campos?.length ?? 0) > 0 && <span className="rounded bg-violet-500/15 px-1.5 py-0.5 text-violet-300">{st.campos!.length} campos</span>}
-                        {(st.checkItens?.length ?? 0) > 0 && <span className="rounded bg-violet-500/15 px-1.5 py-0.5 text-violet-300">checklist {st.checkItens!.length}</span>}
-                        {(st.subtarefas?.length ?? 0) > 0 && <span className="rounded bg-indigo-500/15 px-1.5 py-0.5 text-indigo-300">{st.subtarefas!.length} subtarefas</span>}
-                        {(st.dependeDe?.length ?? 0) > 0 && <span className="rounded bg-white/10 px-1.5 py-0.5 text-white/60">depende de {st.dependeDe!.length}</span>}
+                        {!st.createsTask && <span className="rounded bg-white/10 px-1.5 py-0.5 text-white/50" title="Não entra no roteiro de trabalho do operador.">sem trabalho operacional</span>}
+                        {(() => {
+                          const partes = [
+                            (st.subtarefas?.length ?? 0) > 0 ? `${st.subtarefas!.length} subtarefa${st.subtarefas!.length > 1 ? "s" : ""}` : null,
+                            (st.campos?.length ?? 0) > 0 ? `${st.campos!.length} campo${st.campos!.length > 1 ? "s" : ""}` : null,
+                            (st.checkItens?.length ?? 0) > 0 ? `checklist ${st.checkItens!.length}` : null,
+                            (st.acoes?.length ?? 0) > 0 ? `${st.acoes!.length} resultado${st.acoes!.length > 1 ? "s" : ""}` : null,
+                            (st.dependeDe?.length ?? 0) > 0 ? `depende de ${st.dependeDe!.length}` : null,
+                          ].filter(Boolean)
+                          return partes.length > 0
+                            ? <span className="rounded bg-violet-500/15 px-1.5 py-0.5 text-violet-300">{partes.join(" · ")}</span>
+                            : <span className="rounded bg-white/5 px-1.5 py-0.5 text-white/35">sem configuração ainda</span>
+                        })()}
                         {problemas.some((pr) => pr.stepKey === st.key) && <span className="rounded bg-red-500/20 px-1.5 py-0.5 text-red-300">publicação recusada</span>}
                       </div>
                     </div>
