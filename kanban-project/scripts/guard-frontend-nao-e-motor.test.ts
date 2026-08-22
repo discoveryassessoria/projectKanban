@@ -311,5 +311,48 @@ check("o editor de peças é compartilhado entre passo e subtarefa",
 check("o editor tem a aba de subtarefas", modal7.includes('"subtarefas"'))
 check("e a de evidências", modal7.includes('"evidencias"'))
 
+// ════════════════════════════════════════════════════════════════
+console.log("\n(8) Um passo, um configurador, zero editores concorrentes")
+// ════════════════════════════════════════════════════════════════
+//
+// A tela tinha DOIS caminhos para editar a mesma entidade: "Configurar" abria o
+// configurador completo e o lápis abria um modal curto com sete atributos. Os dois
+// gravavam pelo MESMO endpoint — não havia persistência duplicada —, mas o curto só
+// alcançava parte do passo e não conhecia a regra de conclusão em vocabulário fechado.
+// Duas telas para uma entidade obrigam o administrador a saber por qual delas entrar
+// para achar o que procura.
+
+const tab8 = semComentarios(ler("src/components/gerenciamentoComponents/PhaseWorkflowsFasesTab.tsx"))
+for (const morto of ["stepModal", "stepForm", "openAddStep", "openEditStep", "saveStep"]) {
+  check(`o editor curto não voltou: \`${morto}\` não existe`, !new RegExp(`\\b${morto}\\b`).test(tab8))
+}
+check("não há um segundo modal de passo na tela",
+  !/Editar passo|Adicionar passo/.test(tab8),
+  "o título do modal curto era esse; se voltou, voltou o editor concorrente")
+check("criar um passo abre o configurador nele",
+  tab8.includes("setConfigModal({ wf: salvo, step: criado })"),
+  "sem isso, criar um passo precisaria de um formulário próprio — o editor curto de volta")
+check("e o passo criado vem do SERVIDOR, não do otimista",
+  /const salvo = await putSteps\(/.test(tab8) && tab8.includes("salvo.passos.find"),
+  "abrir a partir do otimista abriria um passo sem id")
+check("há UM único ponto que abre o configurador",
+  (tab8.match(/setConfigModal\(\{/g) ?? []).length === 2,
+  "um para o botão Configurar, um para o passo recém-criado — mais que isso é caminho concorrente")
+
+// A ABA GERAL É DONA DOS ATRIBUTOS DO PASSO. Se algum voltar a ser editável fora dela,
+// volta a duplicidade — agora dentro do próprio configurador.
+const modal8 = semComentarios(ler("src/components/gerenciamentoComponents/ConfiguracaoDoPassoModal.tsx"))
+for (const [attr, campo] of [
+  ["nome", "value={f.label}"], ["descrição", "value={f.description"], ["chave", "value={f.key}"],
+  ["cardinalidade", 'set("cardinalidade"'], ["prioridade", 'set("priority"'],
+  ["executável", 'set("createsTask"'], ["obrigatório", 'set("required"'],
+  ["condição de conclusão", 'set("regraDeConclusao"'],
+] as const) {
+  check(`${attr} é editado em UM lugar só`, (modal8.split(campo).length - 1) === 1, campo)
+}
+check("o SLA tem um campo só no configurador",
+  (modal8.match(/set\("slaDays"/g) ?? []).length === 1,
+  "ele estava em Geral E em Responsável/SLA — dois campos para o mesmo atributo na mesma tela")
+
 console.log(`\n${falhas.length === 0 ? "✅ PASSOU" : "❌ FALHOU"}: ${ok} ok, ${falhas.length} falhas`)
 if (falhas.length) { for (const f of falhas) console.log(`  · ${f}`); process.exit(1) }

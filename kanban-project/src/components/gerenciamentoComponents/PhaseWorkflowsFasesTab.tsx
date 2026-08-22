@@ -123,7 +123,6 @@ const inputCls = "w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 
 const labelCls = "mb-1 block text-xs text-white/60"
 
 // ícones compactos
-const IEdit = () => (<svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 20h9" /><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z" /></svg>)
 const ICopy = () => (<svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" /><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" /></svg>)
 const IUp = () => (<svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m18 15-6-6-6 6" /></svg>)
 const IDown = () => (<svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m6 9 6 6 6-6" /></svg>)
@@ -146,11 +145,9 @@ export default function PhaseWorkflowsFasesTab() {
   const [applySel, setApplySel] = useState<number | null>(null)
   const [replaceAsk, setReplaceAsk] = useState<{ templateId: number; phaseKey: string; label: string } | null>(null)
 
-  const [stepModal, setStepModal] = useState<{ wf: Workflow; editKey?: string } | null>(null)
   const [configModal, setConfigModal] = useState<{ wf: Workflow; step: Step } | null>(null)
   const [problemas, setProblemas] = useState<Array<{ codigo: string; stepKey: string | null; mensagem: string }>>([])
   const [publicarWf, setPublicarWf] = useState<Workflow | null>(null)
-  const [stepForm, setStepForm] = useState({ label: "", createsTask: true, required: true, cardinalidade: "", owner: "", slaDays: 0, completionRule: "" })
 
   const load = useCallback(async () => {
     try {
@@ -232,7 +229,7 @@ export default function PhaseWorkflowsFasesTab() {
   }
 
   // ---------- passos (OTIMISTA: muda na hora, grava em 2º plano) ----------
-  async function putSteps(wf: Workflow, steps: Step[]) {
+  async function putSteps(wf: Workflow, steps: Step[]): Promise<Workflow | null> {
     const otimista: Workflow = { ...wf, passos: steps.map((s, i) => ({ ...s, ordem: i + 1 })) }
     upsertWorkflowLocal(otimista)          // UI atualiza imediatamente
     setSavingId(wf.id)
@@ -241,7 +238,10 @@ export default function PhaseWorkflowsFasesTab() {
         method: "PUT", headers: authHeaders(), body: JSON.stringify({ steps }),
       })
       const j = await res.json().catch(() => ({}))
-      if (res.ok && j.workflow) { setProblemas([]); upsertWorkflowLocal(j.workflow) }   // troca pelo real (ids/ordem)
+      // TROCA PELO REAL (ids, ordem, chaves geradas pelo servidor) e DEVOLVE. Quem
+      // acabou de criar um passo precisa do passo como ele ficou no banco para abrir
+      // o configurador nele — reabrir a partir do otimista abriria um passo sem id.
+      if (res.ok && j.workflow) { setProblemas([]); upsertWorkflowLocal(j.workflow); return j.workflow as Workflow }
       else if (Array.isArray(j.problemas)) {
         // A PUBLICAÇÃO FOI RECUSADA e o servidor disse por quê. A tela mostra o motivo
         // no lugar onde ele se conserta, em vez de um "erro ao salvar" genérico —
@@ -254,30 +254,36 @@ export default function PhaseWorkflowsFasesTab() {
     } catch {
       showFlash("Erro de conexão — recarregando."); await load()
     } finally { setSavingId(null) }
+    return null
   }
 
-  function openAddStep(wf: Workflow) {
-    setStepForm({ label: "", createsTask: true, required: true, cardinalidade: "", owner: "", slaDays: 0, completionRule: "" })
-    setStepModal({ wf })
-  }
-  function openEditStep(wf: Workflow, st: Step) {
-    setStepForm({ label: st.label, createsTask: st.createsTask, required: st.required, cardinalidade: st.cardinalidade || "", owner: st.owner || "", slaDays: st.slaDays || 0, completionRule: st.completionRule || "" })
-    setStepModal({ wf, editKey: st.key })
-  }
-  async function saveStep() {
-    if (!stepModal) return
-    const { wf, editKey } = stepModal
-    if (!stepForm.label.trim()) { showFlash("Informe o nome do passo."); return }
-    let steps: Step[]
-    if (editKey) {
-      steps = wf.passos.map(s => s.key === editKey ? { ...s, label: stepForm.label, createsTask: stepForm.createsTask, required: stepForm.required, cardinalidade: stepForm.cardinalidade || null, owner: stepForm.owner, slaDays: stepForm.slaDays, completionRule: stepForm.completionRule } : s)
-    } else {
-      let k = slug(stepForm.label) || "passo"; let n = 2
-      while (wf.passos.some(s => s.key === k)) { k = slug(stepForm.label) + "_" + n; n++ }
-      steps = [...wf.passos, { key: k, label: stepForm.label, ordem: wf.passos.length + 1, createsTask: stepForm.createsTask, required: stepForm.required, cardinalidade: stepForm.cardinalidade || null, owner: stepForm.owner, slaDays: stepForm.slaDays, completionRule: stepForm.completionRule, priority: "medium" }]
+  /**
+   * CRIAR UM PASSO É CRIAR E ABRIR O CONFIGURADOR — não preencher um formulário curto.
+   *
+   * Existia um modal "Adicionar/Editar passo" com sete atributos. Ele era um SEGUNDO
+   * editor da mesma entidade: nome, cardinalidade, SLA e condição de conclusão podiam
+   * ser mudados ali e também no configurador completo, e o modal curto não alcançava o
+   * resto (regra de conclusão em vocabulário fechado, subtarefas, campos, ações,
+   * checklist, requisitos, evidências, dependências, executor, reabertura). Duas
+   * telas para uma entidade fazem o administrador ter de saber por qual delas entrar
+   * para achar o que procura.
+   *
+   * Agora o passo nasce com o mínimo que o servidor exige — um nome e uma chave — e o
+   * configurador abre nele. Todo atributo se edita num lugar só.
+   */
+  async function criarPasso(wf: Workflow) {
+    let k = "novo_passo"; let n = 2
+    while (wf.passos.some((s) => s.key === k)) { k = `novo_passo_${n}`; n++ }
+    const novo: Step = {
+      key: k, label: "Novo passo", ordem: wf.passos.length + 1,
+      createsTask: true, required: true, cardinalidade: null,
+      owner: "", slaDays: 0, completionRule: "", priority: "medium",
     }
-    setStepModal(null)
-    await putSteps(wf, steps)
+    const salvo = await putSteps(wf, [...wf.passos, novo])
+    if (!salvo) return
+    // ABRE NO PASSO COMO ELE FICOU NO BANCO — mesma entidade, mesmo id, mesma versão.
+    const criado = salvo.passos.find((s) => s.key === k)
+    if (criado) setConfigModal({ wf: salvo, step: criado })
   }
   function dupStep(wf: Workflow, st: Step) {
     let k = st.key + "_copia"; let n = 2
@@ -434,7 +440,7 @@ export default function PhaseWorkflowsFasesTab() {
               </div>
               {wf && (
                 <div className="flex flex-none flex-wrap justify-end gap-1.5">
-                  <button onClick={() => openAddStep(wf)} className="rounded-lg bg-blue-600 px-2.5 py-1 text-xs font-medium text-white hover:bg-blue-500">+ Passo</button>
+                  <button onClick={() => void criarPasso(wf)} className="rounded-lg bg-blue-600 px-2.5 py-1 text-xs font-medium text-white hover:bg-blue-500">+ Passo</button>
                   {/* PUBLICAR É UM ATO SEPARADO DE SALVAR. Enquanto não se clica aqui,
                       o que os processos leem continua sendo a versão anterior. */}
                   <button onClick={() => setPublicarWf(wf)}
@@ -482,7 +488,11 @@ export default function PhaseWorkflowsFasesTab() {
                       <button title="Configurar tudo o que acontece dentro deste passo" aria-label="Configurar"
                         onClick={() => setConfigModal({ wf, step: st })}
                         className="rounded px-2 py-1 text-[11px] text-blue-300 hover:bg-blue-500/10 hover:text-blue-200">Configurar</button>
-                      <button title="Editar" aria-label="Editar" onClick={() => openEditStep(wf, st)} className="rounded p-1 hover:bg-white/10 hover:text-white"><IEdit /></button>
+                      {/* O LÁPIS SAIU. Ele abria um segundo editor da MESMA entidade,
+                          com sete atributos que o configurador já edita — e sem
+                          alcançar o resto do passo. Deixá-lo abrindo o configurador
+                          seria a mesma duplicidade sem o segundo modal: dois botões
+                          vizinhos para a mesma coisa. "Configurar" é a porta única. */}
                       <button title="Duplicar" aria-label="Duplicar" onClick={() => dupStep(wf, st)} className="rounded p-1 hover:bg-white/10 hover:text-white"><ICopy /></button>
                       <button title="Subir" aria-label="Subir" disabled={idx === 0} onClick={() => moveStep(wf, st, -1)} className="rounded p-1 hover:bg-white/10 hover:text-white disabled:opacity-30"><IUp /></button>
                       <button title="Descer" aria-label="Descer" disabled={idx === arr.length - 1} onClick={() => moveStep(wf, st, 1)} className="rounded p-1 hover:bg-white/10 hover:text-white disabled:opacity-30"><IDown /></button>
@@ -576,62 +586,6 @@ export default function PhaseWorkflowsFasesTab() {
         </div>
       )}
 
-      {/* MODAL — passo (add/editar) */}
-      {stepModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm" onClick={() => setStepModal(null)}>
-          <div className="w-full max-w-lg rounded-2xl border border-white/10 bg-zinc-900/95 shadow-2xl" onClick={e => e.stopPropagation()}>
-            <div className="border-b border-white/10 px-6 py-4">
-              <h3 className="font-semibold text-white">{stepModal.editKey ? "Editar passo" : "Adicionar passo"}</h3>
-            </div>
-            <div className="grid grid-cols-2 gap-3 px-6 py-4">
-              <div className="col-span-2">
-                <label className={labelCls}>Nome do passo *</label>
-                <input value={stepForm.label} onChange={e => setStepForm(f => ({ ...f, label: e.target.value }))} className={inputCls} placeholder="Ex.: Conferir certidão" />
-              </div>
-              <div>
-                <label className={labelCls}>Etapa executável</label>
-                <select value={stepForm.createsTask ? "1" : "0"} onChange={e => setStepForm(f => ({ ...f, createsTask: e.target.value === "1" }))} className={inputCls}>
-                  <option value="1" className="bg-zinc-900">Sim</option>
-                  <option value="0" className="bg-zinc-900">Não</option>
-                </select>
-              </div>
-              <div>
-                <label className={labelCls}>Obrigatório</label>
-                <select value={stepForm.required ? "1" : "0"} onChange={e => setStepForm(f => ({ ...f, required: e.target.value === "1" }))} className={inputCls}>
-                  <option value="1" className="bg-zinc-900">Sim</option>
-                  <option value="0" className="bg-zinc-900">Não</option>
-                </select>
-              </div>
-              <div>
-                <label className={labelCls}>Cardinalidade</label>
-                <select value={stepForm.cardinalidade} onChange={e => setStepForm(f => ({ ...f, cardinalidade: e.target.value }))} className={inputCls}>
-                  <option value="" className="bg-zinc-900">Conforme a fase (padrão)</option>
-                  <option value="PROCESSO" className="bg-zinc-900">1 tarefa por fase</option>
-                  <option value="PESSOA" className="bg-zinc-900">Uma por pessoa</option>
-                  <option value="NECESSIDADE" className="bg-zinc-900">Uma por certidão a localizar</option>
-                  <option value="DOCUMENTO" className="bg-zinc-900">Uma por documento</option>
-                </select>
-              </div>
-              <div>
-                <label className={labelCls}>Responsável padrão</label>
-                <input value={stepForm.owner} onChange={e => setStepForm(f => ({ ...f, owner: e.target.value }))} className={inputCls} placeholder="opcional" />
-              </div>
-              <div>
-                <label className={labelCls}>SLA (dias)</label>
-                <input type="number" value={stepForm.slaDays} onChange={e => setStepForm(f => ({ ...f, slaDays: Number(e.target.value) || 0 }))} className={inputCls} />
-              </div>
-              <div className="col-span-2">
-                <label className={labelCls}>Condição de conclusão</label>
-                <input value={stepForm.completionRule} onChange={e => setStepForm(f => ({ ...f, completionRule: e.target.value }))} className={inputCls} placeholder="opcional" />
-              </div>
-            </div>
-            <div className="flex justify-end gap-2 border-t border-white/10 px-6 py-4">
-              <button onClick={() => setStepModal(null)} className="rounded-lg border border-white/10 bg-white/5 px-4 py-2 text-sm text-white/80 hover:bg-white/10">Cancelar</button>
-              <button onClick={saveStep} className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-500">Salvar</button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   )
 }

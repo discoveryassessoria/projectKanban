@@ -34,6 +34,13 @@ async function limpar() {
     await prisma.phaseInternalWorkflowVersao.deleteMany({ where: { workflowId: wf.id } })
     await prisma.phaseInternalWorkflow.delete({ where: { id: wf.id } })
   }
+  for (const uid of ["e2ehttp_genealogia", "e2ehttp_emissao", "e2ehttp_apostilamento"]) {
+    const w = await prisma.phaseInternalWorkflow.findUnique({ where: { wfUid: `${M}::${uid}` }, select: { id: true } })
+    if (w) {
+      await prisma.phaseInternalWorkflowVersao.deleteMany({ where: { workflowId: w.id } })
+      await prisma.phaseInternalWorkflow.delete({ where: { id: w.id } })
+    }
+  }
   await prisma.catalogoFase.deleteMany({ where: { phaseKey: { startsWith: "e2ehttp_" } } })
   await prisma.canalOperacional.deleteMany({ where: { key: { startsWith: "E2EHTTP_" } } })
 }
@@ -241,6 +248,171 @@ async function main() {
     JSON.stringify(recusado.corpo?.problemas ?? []).includes("REQUISITO_ALVO_INEXISTENTE"), JSON.stringify(recusado.corpo).slice(0, 200))
   check("e a transação foi desfeita — os passos continuam lá",
     (await prisma.phaseInternalWorkflowStep.count({ where: { workflowId: wf.id } })) === antesDaRecusa)
+
+  // ══════════════════════════════════════════════════════════════
+  console.log("\n(10) O MESMO motor em três fases diferentes — e nada se perde no ida e volta")
+  // ══════════════════════════════════════════════════════════════
+  //
+  // A pergunta é se o configurador é universal ou se Emissão Documental tem um caminho
+  // privilegiado. Três fases com chaves diferentes recebem o MESMO corpo, pela MESMA
+  // rota, e o que volta tem de ser o que entrou — inclusive as subtarefas.
+  //
+  // O ROUND-TRIP É O QUE PEGA A PERDA SILENCIOSA. Salvar duas vezes seguidas o que a
+  // leitura devolveu é o que o administrador faz sem perceber ao mexer numa aba e
+  // salvar: se algum atributo não atravessar, ele some no segundo save, sem erro.
+  for (const [phaseKey, rotulo] of [
+    ["e2ehttp_genealogia", "Genealogia"],
+    ["e2ehttp_emissao", "Emissão Documental"],
+    ["e2ehttp_apostilamento", "Apostilamento"],
+  ] as const) {
+    await prisma.catalogoFase.create({
+      data: {
+        phaseKey, label: rotulo, escopo: "PROCESSO", ordemPadrao: 96, slaDiasPadrao: 3,
+        efeitosPermitidos: ["COMPLETE_STEP", "REGISTER_ONLY", "PAUSE_FOR_EXTERNAL_WAIT", "RESUME"],
+      },
+    })
+    const wfFase = await prisma.phaseInternalWorkflow.create({
+      data: { wfUid: `${M}::${phaseKey}`, phaseKey, name: `WF ${rotulo}`, versao: 1, execucao: "SEQUENCIAL" },
+      select: { id: true },
+    })
+
+    const passoUniversal = {
+      key: "verificar_elemento_universal",
+      label: "Verificar elemento universal",
+      description: "Um passo cujo nome não existe no código.",
+      ordem: 1, createsTask: true, required: true, cardinalidade: "DOCUMENTO",
+      priority: "high", slaDays: 4, owner: "equipe-teste",
+      executorKey: "padrao", dependeDe: [],
+      regraDeConclusao: "TODAS_SUBTAREFAS_OBRIGATORIAS",
+      completionRule: "observação livre do operador",
+      campos: [{ key: "parecer", label: "Parecer", tipo: "textarea", obrigatorio: true, ordem: 1 }],
+      acoes: [{ key: "verificado", label: "Verificado", effectKey: "REGISTER_ONLY", ordem: 1 }],
+      checkItens: [{ key: "conferido", label: "Conferido", obrigatorio: true, ordem: 1 }],
+      requisitos: [{ key: "parecer_dado", label: "Parecer preenchido", tipo: "CAMPO_PREENCHIDO", alvoKey: "parecer", ordem: 1 }],
+      subtarefas: [
+        {
+          key: "sub_a", label: "Primeira parte", ordem: 1, obrigatoria: true, modoExecucao: "MANUAL",
+          responsavelRegra: "HERDA", fonteDeCanais: "FORNECEDOR_RELACIONADO", dependeDe: [],
+          acoes: [{ key: "parte_a_ok", label: "Parte A feita", effectKey: "REGISTER_ONLY", ordem: 1 }],
+          campos: [{ key: "nota_a", label: "Nota A", tipo: "texto", ordem: 1 }],
+          checkItens: [{ key: "item_a", label: "Item A", obrigatorio: true, ordem: 1 }],
+          requisitos: [],
+        },
+        {
+          key: "sub_b", label: "Segunda parte", ordem: 2, obrigatoria: true, modoExecucao: "MANUAL",
+          responsavelRegra: "HERDA", fonteDeCanais: "NENHUMA", dependeDe: ["sub_a"],
+          repetivel: true, maxOcorrencias: 3,
+          acoes: [{ key: "parte_b_ok", label: "Parte B feita", effectKey: "COMPLETE_STEP", ordem: 1 }],
+          // MESMA CHAVE de campo da irmã: peças de donos diferentes podem se repetir.
+          campos: [{ key: "nota_a", label: "Nota da parte B", tipo: "texto", ordem: 1 }],
+          checkItens: [], requisitos: [],
+        },
+      ],
+    }
+
+    const r1 = await req(`/api/gerenciamento/workflows-fase/${wfFase.id}`, {
+      method: "PUT", body: JSON.stringify({ steps: [passoUniversal] }),
+    })
+    check(`[${rotulo}] o passo com subtarefas é aceito`, r1.status === 200, JSON.stringify(r1.corpo).slice(0, 200))
+
+    const lido1 = await req(`/api/gerenciamento/workflows-fase/${wfFase.id}`)
+    const p1 = ((lido1.corpo?.workflow as { passos?: Array<Record<string, unknown>> })?.passos ?? [])[0]
+    check(`[${rotulo}] a leitura devolve o passo com tudo`,
+      !!p1 && ((p1.subtarefas ?? []) as unknown[]).length === 2 &&
+      ((p1.campos ?? []) as unknown[]).length === 1 &&
+      ((p1.acoes ?? []) as unknown[]).length === 1 &&
+      ((p1.checkItens ?? []) as unknown[]).length === 1 &&
+      ((p1.requisitos ?? []) as unknown[]).length === 1,
+      JSON.stringify({ sub: (p1?.subtarefas as unknown[])?.length, campos: (p1?.campos as unknown[])?.length }))
+    check(`[${rotulo}] os atributos da aba Geral persistiram`,
+      p1?.label === "Verificar elemento universal" && p1?.cardinalidade === "DOCUMENTO" &&
+      p1?.priority === "high" && p1?.slaDays === 4 && p1?.required === true &&
+      p1?.createsTask === true && p1?.regraDeConclusao === "TODAS_SUBTAREFAS_OBRIGATORIAS" &&
+      p1?.description === "Um passo cujo nome não existe no código.",
+      JSON.stringify({ card: p1?.cardinalidade, prio: p1?.priority, sla: p1?.slaDays, regra: p1?.regraDeConclusao }))
+    const subA = ((p1?.subtarefas ?? []) as Array<Record<string, unknown>>).find((x) => x.key === "sub_a")
+    const subB = ((p1?.subtarefas ?? []) as Array<Record<string, unknown>>).find((x) => x.key === "sub_b")
+    check(`[${rotulo}] a subtarefa referencia os canais do fornecedor, sem copiar catálogo`,
+      subA?.fonteDeCanais === "FORNECEDOR_RELACIONADO" && subB?.fonteDeCanais === "NENHUMA")
+    check(`[${rotulo}] a dependência entre subtarefas persistiu`,
+      JSON.stringify(subB?.dependeDe) === '["sub_a"]')
+    check(`[${rotulo}] a repetição com teto persistiu`,
+      subB?.repetivel === true && subB?.maxOcorrencias === 3)
+    check(`[${rotulo}] duas subtarefas têm campo com a MESMA chave`,
+      ((subA?.campos ?? []) as Array<{ key: string }>).some((c) => c.key === "nota_a") &&
+      ((subB?.campos ?? []) as Array<{ key: string }>).some((c) => c.key === "nota_a"))
+
+    // ── O ROUND-TRIP: devolver o que a leitura deu, sem tocar em nada ──────
+    const passosLidos = (lido1.corpo?.workflow as { passos?: unknown[] })?.passos ?? []
+    const r2 = await req(`/api/gerenciamento/workflows-fase/${wfFase.id}`, {
+      method: "PUT", body: JSON.stringify({ steps: passosLidos }),
+    })
+    check(`[${rotulo}] salvar de novo o que foi lido é aceito`, r2.status === 200, JSON.stringify(r2.corpo).slice(0, 160))
+    const lido2 = await req(`/api/gerenciamento/workflows-fase/${wfFase.id}`)
+    const p2 = ((lido2.corpo?.workflow as { passos?: Array<Record<string, unknown>> })?.passos ?? [])[0]
+    const semVolateis = (p: Record<string, unknown> | undefined) => JSON.stringify(p, (k, v) =>
+      ["id", "stepId", "subtaskId", "fieldId", "canalId", "criadoEm", "atualizadoEm", "workflowId"].includes(k) ? undefined : v)
+    check(`[${rotulo}] NADA se perdeu no ida e volta`, semVolateis(p1) === semVolateis(p2),
+      "algum atributo não atravessa o salvamento e sumiria no segundo save, sem erro")
+  }
+
+  // ══════════════════════════════════════════════════════════════
+  console.log("\n(11) Subtarefa: criar, editar, reordenar e excluir — pela mesma porta")
+  // ══════════════════════════════════════════════════════════════
+  {
+    const wfCrud = await prisma.phaseInternalWorkflow.findUnique({
+      where: { wfUid: `${M}::e2ehttp_genealogia` }, select: { id: true },
+    })
+    const ler = async () => {
+      const r = await req(`/api/gerenciamento/workflows-fase/${wfCrud!.id}`)
+      return ((r.corpo?.workflow as { passos?: Array<Record<string, unknown>> })?.passos ?? [])[0]
+    }
+    const salvar = async (passo: Record<string, unknown>) =>
+      req(`/api/gerenciamento/workflows-fase/${wfCrud!.id}`, { method: "PUT", body: JSON.stringify({ steps: [passo] }) })
+
+    // ── CRIAR uma terceira ────────────────────────────────────────────
+    const p0 = await ler()
+    const subs0 = (p0!.subtarefas ?? []) as Array<Record<string, unknown>>
+    await salvar({ ...p0, subtarefas: [...subs0, {
+      key: "sub_c", label: "Terceira parte", ordem: 3, obrigatoria: false,
+      modoExecucao: "MANUAL", responsavelRegra: "HERDA", fonteDeCanais: "NENHUMA", dependeDe: [],
+      acoes: [{ key: "parte_c_ok", label: "Parte C feita", effectKey: "REGISTER_ONLY", ordem: 1 }],
+      campos: [], checkItens: [], requisitos: [],
+    }] })
+    const p1c = await ler()
+    check("criar: a terceira subtarefa aparece", ((p1c!.subtarefas ?? []) as unknown[]).length === 3)
+
+    // ── EDITAR: renomear e trocar a obrigatoriedade ───────────────────
+    const editadas = ((p1c!.subtarefas ?? []) as Array<Record<string, unknown>>).map((st) =>
+      st.key === "sub_c" ? { ...st, label: "Terceira parte (revisada)", obrigatoria: true } : st)
+    await salvar({ ...p1c, subtarefas: editadas })
+    const p2c = await ler()
+    const subC = ((p2c!.subtarefas ?? []) as Array<Record<string, unknown>>).find((x) => x.key === "sub_c")
+    check("editar: o rótulo mudou e a chave NÃO", subC?.label === "Terceira parte (revisada)" && subC?.key === "sub_c")
+    check("editar: a obrigatoriedade mudou", subC?.obrigatoria === true)
+
+    // ── REORDENAR: a terceira passa a ser a primeira ───────────────────
+    const reordenadas = ((p2c!.subtarefas ?? []) as Array<Record<string, unknown>>)
+      .map((st) => ({ ...st, ordem: st.key === "sub_c" ? 1 : st.key === "sub_a" ? 2 : 3 }))
+    await salvar({ ...p2c, subtarefas: reordenadas })
+    const p3c = await ler()
+    check("reordenar: a ordem persistiu na leitura",
+      ((p3c!.subtarefas ?? []) as Array<Record<string, unknown>>).map((x) => x.key).join(",") === "sub_c,sub_a,sub_b",
+      ((p3c!.subtarefas ?? []) as Array<Record<string, unknown>>).map((x) => `${x.key}:${x.ordem}`).join(" "))
+    check("reordenar NÃO mexeu na dependência declarada",
+      JSON.stringify(((p3c!.subtarefas ?? []) as Array<Record<string, unknown>>).find((x) => x.key === "sub_b")?.dependeDe) === '["sub_a"]',
+      "ordem não é dependência: mudar a ordem não pode reescrever o grafo")
+
+    // ── EXCLUIR ───────────────────────────────────────────────────────
+    await salvar({ ...p3c, subtarefas: ((p3c!.subtarefas ?? []) as Array<Record<string, unknown>>).filter((x) => x.key !== "sub_c") })
+    const p4c = await ler()
+    check("excluir: sobram duas", ((p4c!.subtarefas ?? []) as unknown[]).length === 2)
+    check("excluir: as ações da removida foram junto",
+      (await prisma.stepAction.count({ where: { key: "parte_c_ok" } })) === 0,
+      "ação órfã de subtarefa apagada continuaria pendurada no passo")
+    check("excluir: as irmãs continuam intactas",
+      ((p4c!.subtarefas ?? []) as Array<Record<string, unknown>>).map((x) => x.key).sort().join(",") === "sub_a,sub_b")
+  }
 
   await limpar()
   console.log(`\n${falhas.length === 0 ? "✅ PASSOU" : "❌ FALHOU"}: ${ok} ok, ${falhas.length} falhas`)

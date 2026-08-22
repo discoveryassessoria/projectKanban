@@ -81,7 +81,7 @@ type Aba = (typeof ABAS)[number]
 const TITULO: Record<Aba, string> = {
   geral: "Geral", subtarefas: "Subtarefas", campos: "Campos", acoes: "Ações/Resultados",
   checklist: "Checklist", requisitos: "Requisitos", evidencias: "Evidências",
-  dependencias: "Dependências", responsavel: "Responsável/SLA", executor: "Executor",
+  dependencias: "Dependências", responsavel: "Responsável", executor: "Executor",
   reabertura: "Reabertura",
 }
 
@@ -535,21 +535,23 @@ export default function ConfiguracaoDoPassoModal({
           {/* ────────────────────── RESPONSÁVEL / SLA ────────────────────── */}
           {aba === "responsavel" && (
             <>
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className={lbl}>Responsável padrão</label>
-                  <input className={inp} value={f.owner ?? ""} placeholder="equipe, papel ou pessoa"
-                    onChange={(e) => set("owner", e.target.value || null)} />
-                </div>
-                <div>
-                  <label className={lbl}>SLA (dias úteis)</label>
-                  <input className={inp} type="number" min={0} value={f.slaDays ?? 0}
-                    onChange={(e) => set("slaDays", Number(e.target.value) || 0)} />
-                </div>
+              <div>
+                <label className={lbl}>Responsável padrão</label>
+                <input className={inp} value={f.owner ?? ""} placeholder="equipe, papel ou pessoa"
+                  onChange={(e) => set("owner", e.target.value || null)} />
+                <p className="mt-1 text-[11px] text-white/40">
+                  Quem recebe a etapa quando ninguém a assume. Cada subtarefa pode herdar isto, apontar outra
+                  pessoa ou usar a regra de elegibilidade — configurado dentro dela.
+                </p>
               </div>
-              <p className="text-[11px] text-white/40">
-                O SLA do passo vale para as subtarefas que não declaram o seu. Ele é prazo interno — não se confunde
-                com a previsão que o órgão dá, que é registrada na execução.
+              {/* O SLA MORA NA ABA GERAL, e só lá.
+                  Ele estava aqui também, e um atributo com dois campos na mesma tela é a
+                  mesma duplicidade que o editor curto tinha com o configurador: o
+                  administrador muda num, olha no outro e vê valor diferente até salvar. */}
+              <p className="rounded-lg border border-white/10 bg-white/5 p-3 text-[11px] text-white/45">
+                O prazo do passo está em <b>Geral › Peso / SLA</b>: {f.slaDays ?? 0} dia(s). Ele vale para as
+                subtarefas que não declaram o seu. É prazo interno — não se confunde com a previsão que o órgão dá,
+                que fica registrada na execução.
               </p>
             </>
           )}
