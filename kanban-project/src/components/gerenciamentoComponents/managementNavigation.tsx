@@ -299,7 +299,7 @@ export const MANAGEMENT_NAVIGATION: ManagementNavigationItem[] = [
   // NÃO é cadastro de pessoa física. Sem cadastros separados por tipo de órgão.
   {
     key: "grp_orgaos", label: "Órgãos", fullLabel: "Órgãos e Organizações", icon: Building2, order: 80, status: "active",
-    description: "Entidades institucionais e jurídicas que participam dos processos.",
+    description: "Entidades e pessoas externas que participam dos processos: órgãos, fornecedores e profissionais.",
     children: [
       a(10, "organs", "Cartórios e Órgãos", ["cartorio", "cartório", "orgao", "órgão", "consulado", "tribunal", "prefeitura", "comune", "protocolo", "organizacao", "organização"], "Organizações"),
       a(20, "suppliers", "Fornecedores", ["fornecedor", "parceiro", "tradutor", "advogado", "escritorio", "banco", "empresa", "organizacao"], "Organizações"),
@@ -312,6 +312,11 @@ export const MANAGEMENT_NAVIGATION: ManagementNavigationItem[] = [
       // domínio; a DISPONIBILIDADE passou a ser de quem atende, e o workflow apenas
       // referencia "os canais do fornecedor relacionado".
       a(25, "canais", "Canais de atendimento", ["canal", "canais", "crc", "cartorio", "cartório", "email", "e-mail", "whatsapp", "balcao", "balcão", "correios", "consulado", "solicitacao", "solicitação", "atendimento", "fornecedor"], "Organizações"),
+      // PROFISSIONAL NÃO É ORGANIZAÇÃO. O escritório é pessoa jurídica e mora em
+      // "Cartórios e Órgãos"; o advogado é pessoa física, com inscrição de classe
+      // própria. Ficam no mesmo módulo porque o módulo é o das partes EXTERNAS que
+      // participam dos processos — não porque sejam a mesma coisa.
+      a(27, "profissionais", "Profissionais", ["profissional", "advogado", "oab", "tradutor", "juramentado", "despachante", "contador", "registro", "conselho", "crc", "jucesp", "escritorio", "escritório"], "Organizações"),
       a(30, "orgcats", "Categorias", ["categoria", "tipo", "orgao", "organizacao"]),
     ],
   },

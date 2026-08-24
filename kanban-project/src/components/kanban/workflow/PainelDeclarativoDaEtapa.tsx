@@ -66,8 +66,21 @@ interface Subtarefa {
   definicao: { acoes: Acao[]; campos: Campo[]; checkItens: ItemChecklist[] }
 }
 
+/**
+ * O CONTEXTO DA UNIDADE DE TRABALHO, projetado no servidor a partir dos donos de cada
+ * fato — o pedido, o profissional, o protocolo, a organização. Chega pronto para
+ * mostrar e NÃO existe no payload da execução: copiá-lo para lá "para facilitar a UI"
+ * recriaria a segunda verdade que este trabalho inteiro existe para desfazer.
+ */
+interface BlocoDeContexto {
+  chave: string
+  titulo: string
+  itens: Array<{ rotulo: string; valor: string; detalhe?: string | null }>
+}
+
 interface Dados {
   passo: { id: number; stepKey: string; status: string }
+  contexto?: { pacoteId: number; num: string; blocos: BlocoDeContexto[] } | null
   versao: number | null
   executor: string | null
   configuracao: { label: string; descricao: string | null; campos: Campo[]; acoes: Acao[]; checklist: ItemChecklist[] } | null
@@ -358,6 +371,28 @@ export default function PainelDeclarativoDaEtapa({
               A etapa só conclui quando: {d.conclusao.faltando.map((x) => x.label).join(", ")}.
             </p>
           )}
+        </div>
+      )}
+
+      {/* O CONTEXTO VEM ANTES DO FORMULÁRIO porque é o que o operador precisa ler
+          para decidir o que preencher. Quais blocos aparecem é decisão do servidor,
+          por passo — quem vai protocolar não precisa do parecer da validação. */}
+      {(d.contexto?.blocos.length ?? 0) > 0 && (
+        <div className="space-y-2">
+          {d.contexto!.blocos.map((bloco) => (
+            <div key={bloco.chave} className="rounded-lg border border-white/10 bg-white/[0.03] p-3">
+              <p className="text-[11px] uppercase tracking-wide text-white/40">{bloco.titulo}</p>
+              <dl className="mt-2 space-y-1.5">
+                {bloco.itens.map((item, i) => (
+                  <div key={i} className="flex flex-wrap items-baseline gap-x-2">
+                    <dt className="text-xs text-white/45">{item.rotulo}</dt>
+                    <dd className="text-sm text-white/85">{item.valor}</dd>
+                    {item.detalhe && <span className="text-[11px] text-white/35">{item.detalhe}</span>}
+                  </div>
+                ))}
+              </dl>
+            </div>
+          ))}
         </div>
       )}
 

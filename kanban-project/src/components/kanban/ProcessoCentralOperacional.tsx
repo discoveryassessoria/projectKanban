@@ -22,6 +22,7 @@ import { ProcessoFaseGenerica } from "./ProcessoFaseGenerica"
 import { ProcessoApostilamento } from "./ProcessoApostilamento"
 import { ProcessoFaseFinal } from "./ProcessoFaseFinal"
 import { ProcessoRetificacao } from "./ProcessoRetificacao"
+import { PedidosDeRetificacao } from "./PedidosDeRetificacao"
 import { ProcessoEmissaoRetificada } from "./ProcessoEmissaoRetificada"
 import { RetornarFaseButton } from "./RetornarFaseButton"
 import { TarefaTransversalModal } from "./TarefaTransversalModal"
@@ -1017,7 +1018,15 @@ export function ProcessoCentralOperacional({
         ) : !isView && ehApostilamento ? (
           <ProcessoApostilamento processoId={processo.id} onConcluido={() => carregar(true)} />
         ) : !isView && ehRetificacao ? (
-          <ProcessoRetificacao processoId={processo.id} onConcluido={() => carregar(true)} />
+          // OS PEDIDOS VÊM ANTES DO MOTOR ANTIGO. Com a retificação operando por
+          // pedido, a fase só cria etapas depois que existir um — e abrir o pedido era
+          // uma operação que só existia em API. A tela legada continua abaixo enquanto
+          // for o motor vigente; no dia em que a versão publicada tiver cadastro
+          // operacional, ela se recusa sozinha e este painel fica sendo o caminho.
+          <div className="space-y-6">
+            <PedidosDeRetificacao processoId={processo.id} aoMudar={() => carregar(true)} />
+            <ProcessoRetificacao processoId={processo.id} onConcluido={() => carregar(true)} />
+          </div>
         ) : !isView && ehEmissaoRetificada ? (
           <ProcessoEmissaoRetificada processoId={processo.id} onConcluido={() => carregar(true)} />
         ) : !isView && ehFaseFinal ? (

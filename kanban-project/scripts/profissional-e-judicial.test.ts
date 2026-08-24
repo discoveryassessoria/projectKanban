@@ -392,6 +392,141 @@ async function main() {
   check("e o alvo do campo de advogado é o cadastro de Profissionais",
     alvoDoCampo(paraValidar.find((p) => p.key === "definir_modo_de_retificacao")!.campos.find((c) => c.key === "advogado_responsavel")!.opcoes) === "PROFISSIONAL")
 
+  // ══════════════════════════════════════════════════════════════════════════
+  console.log("\n5 — A CENTRAL LÊ OS DONOS, NÃO O PAYLOAD")
+  // ══════════════════════════════════════════════════════════════════════════
+  const { contextoDaRetificacao } = await import("../src/services/contexto-da-retificacao")
+
+  // Protocolar o pedido A para o contexto ter protocolo e órgão.
+  const orgao = await prisma.orgaoProtocolo.create({
+    data: { name: `${M} Tribunal de Teste`, type: "tribunal", city: "São Paulo", state: "SP", ativo: true },
+    select: { id: true },
+  })
+  const siProt = porPacote.get(pacA.pacoteId)!.get("protocolar_retificacao")!
+  await prisma.phaseWorkflowStepInstance.update({ where: { id: siProt }, data: { status: "EM_ANDAMENTO" } })
+  await garantirTentativa(siProt, { motivo: MOTIVOS_DE_TENTATIVA.ABERTURA, status: "DISPONIVEL" })
+  const rProt = await executarAcaoCadastrada(siProt, "protocolado",
+    { orgao_receptor: orgao.id, numero_protocolo: "PROT-777", data_protocolo: "2026-08-24", setor_do_orgao: "2ª Vara de Registros" },
+    { usuarioId: 1, permissoes: PERMS, correlationId: `${M}-p1` })
+  check("protocolar grava no cadastro canônico", rProt.ok, JSON.stringify(rProt))
+  // O protocolo é do pedido: a ligação sobe para a unidade, não fica só na tentativa.
+  const protoCriado = await prisma.protocolo.findFirst({ where: { processoId: proc.id, origem: "ETAPA" }, select: { id: true } })
+  if (protoCriado) await prisma.retificacaoPacote.update({ where: { id: pacA.pacoteId }, data: { protocoloId: protoCriado.id, orgaoId: orgao.id } })
+
+  const ctxJud = await contextoDaRetificacao(porPacote.get(pacA.pacoteId)!.get("acompanhar_decisao")!)
+  const blocos = (ctxJud?.blocos ?? []).map((b) => b.chave)
+  check("(E) a Central recebe o contexto do PEDIDO, projetado dos donos", !!ctxJud && ctxJud.num === "PR-001", JSON.stringify(ctxJud?.num))
+  check("(F) na via judicial aparecem o processo e o responsável", blocos.includes("judicial"), blocos.join(","))
+  const itensJud = ctxJud!.blocos.find((b) => b.chave === "judicial")!.itens
+  check("o número do processo vem do pedido",
+    itensJud.some((i) => i.valor === "0801234-56.2026.8.26.0100"), JSON.stringify(itensJud))
+  check("o advogado aparece com nome e OAB/UF montados na leitura",
+    itensJud.some((i) => i.valor.includes(`${M} Ana Ribeiro`) && i.valor.includes("OAB 123457/SP")), JSON.stringify(itensJud))
+  check("o protocolo e a vara aparecem, lidos de Protocolo",
+    ctxJud!.blocos.some((b) => b.chave === "protocolo" && b.itens.some((i) => i.valor === "PROT-777")) &&
+    ctxJud!.blocos.some((b) => b.itens.some((i) => i.valor === "2ª Vara de Registros")))
+  check("o órgão receptor aparece, lido de Órgãos e Organizações",
+    ctxJud!.blocos.some((b) => b.itens.some((i) => i.valor.includes("Tribunal de Teste"))))
+
+  // (9) ADMINISTRATIVO NÃO MOSTRA BLOCO JUDICIAL VAZIO.
+  // O PEDIDO B VIROU JUDICIAL no bloco de isolamento acima. Perguntar a ele sobre a
+  // via administrativa mediria o estado errado — então a pergunta vai para um pedido
+  // que É administrativo.
+  const divAdm = await prisma.divergencia.create({
+    data: { analiseId: analise.id, pessoaNome: `${M} P`, documentoTitulo: `${M} doc`, campo: "adm",
+      campoLabel: "Adm", tipo: "nome", severidade: "baixa", status: "retificacao" },
+    select: { id: true },
+  })
+  const pacC = await abrirPacoteDeRetificacao({ processoId: proc.id, tipo: "administrativa", divergenciaIds: [divAdm.id] })
+  const siC = await prisma.phaseWorkflowStepInstance.create({
+    data: { workflowInstanceId: inst.id, processoId: proc.id, faseMacroKey: `${M.toLowerCase()}_ret`, ciclo: 1,
+      stepKey: "definir_modo_de_retificacao", ordem: 1, tipo: "HUMANO", obrigatorio: true, geraTarefa: true,
+      status: "EM_ANDAMENTO", dependeDeStepKeys: [] as never, retificacaoPacoteId: pacC.pacoteId,
+      stepDefinitionId: wf.passos[0].id, stepDefinitionVersion: pub.versaoNova ?? 2,
+      chaveIdempotencia: montarChavePasso({ workflowInstanceId: inst.id, stepDefinitionId: wf.passos[0].id,
+        stepKey: "definir_modo_de_retificacao", stepDefinitionVersion: pub.versaoNova ?? 2, ciclo: 1,
+        retificacaoPacoteId: pacC.pacoteId }) },
+    select: { id: true },
+  })
+  const ctxAdm = await contextoDaRetificacao(siC.id)
+  check("(9) na via administrativa o bloco judicial NÃO aparece",
+    !(ctxAdm?.blocos ?? []).some((b) => b.chave === "judicial"),
+    (ctxAdm?.blocos ?? []).map((b) => b.chave).join(","))
+
+  // CONTEXTUAL, não despejo: a etapa de validar não recebe o bloco judicial.
+  const ctxValidar = await contextoDaRetificacao(porPacote.get(pacA.pacoteId)!.get("validar_retificacao")!)
+  check("(8) cada etapa recebe só o que ajuda a fazer o que está na frente dela",
+    !(ctxValidar?.blocos ?? []).some((b) => b.chave === "judicial") &&
+    (ctxValidar?.blocos ?? []).some((b) => b.chave === "divergencias"),
+    (ctxValidar?.blocos ?? []).map((b) => b.chave).join(","))
+
+  // (10) NENHUMA SEGUNDA VERDADE: o contexto é projeção, não coluna.
+  const fonte = read("src/services/contexto-da-retificacao.ts")
+  check("(10) o contexto é lido dos donos, e nada é gravado para a tela",
+    !/\.update\(|\.create\(|\.upsert\(/.test(fonte) && fonte.includes("prisma.retificacaoPacote.findUnique"))
+
+  // (16) PROFISSIONAL INATIVADO DEPOIS DE USADO.
+  await prisma.profissional.update({ where: { id: adv.id }, data: { ativo: false } })
+  const ctxDepois = await contextoDaRetificacao(porPacote.get(pacA.pacoteId)!.get("acompanhar_decisao")!)
+  const respDepois = ctxDepois!.blocos.find((b) => b.chave === "judicial")!.itens.find((i) => i.rotulo === "Responsável")!
+  check("(16) inativar o profissional NÃO quebra o histórico — ele continua nomeado",
+    respDepois.valor.includes(`${M} Ana Ribeiro`), respDepois.valor)
+  check("(16b) e a tela diz que ele saiu de circulação, em vez de fingir que nada mudou",
+    (respDepois.detalhe ?? "").includes("fora de circulação"), respDepois.detalhe ?? "")
+  check("(16c) a relação histórica continua no banco",
+    (await prisma.retificacaoPacote.findUnique({ where: { id: pacA.pacoteId }, select: { profissionalId: true } }))?.profissionalId === adv.id)
+  check("(16d) e ele some das novas escolhas",
+    !(await listarAlvo("PROFISSIONAL")).some((e) => e.id === adv.id))
+  await prisma.profissional.update({ where: { id: adv.id }, data: { ativo: true } })
+
+  // ══════════════════════════════════════════════════════════════════════════
+  console.log("\n6 — O CADASTRO É ADMINISTRÁVEL PELA INTERFACE")
+  // ══════════════════════════════════════════════════════════════════════════
+  const nav = read("src/components/gerenciamentoComponents/managementNavigation.tsx")
+  check("Profissionais está no menu, no módulo das partes externas",
+    /a\(27, "profissionais", "Profissionais"/.test(nav) && nav.includes('"Organizações"'))
+  // A PERGUNTA É EM QUAL MÓDULO ele caiu. Procurar "retificacao" perto de
+  // "profissional" no arquivo inteiro acharia qualquer coisa — o arquivo tem os onze
+  // módulos. O recorte é o bloco do módulo.
+  const blocoOrgaos = nav.slice(nav.indexOf('key: "grp_orgaos"'), nav.indexOf('key: "grp_usuarios"'))
+  const blocoWorkflow = nav.slice(nav.indexOf('key: "grp_workflow"'), nav.indexOf('key: "grp_automacoes"'))
+  check("e não foi criado menu isolado nem escondido dentro de Workflow/Retificação",
+    blocoOrgaos.includes('"profissionais"') && !blocoWorkflow.includes('"profissionais"'))
+  check("a tela está registrada no roteador do administrador",
+    /profissionais: ProfissionaisTab/.test(read("src/app/administrator/page.tsx")))
+  const tela = read("src/components/gerenciamentoComponents/ProfissionaisTab.tsx")
+  for (const capacidade of [
+    ["criar", "Novo profissional"], ["editar", "Editar"], ["pesquisar", "Buscar por nome"],
+    ["ativar/inativar", "Tirar de circulação"], ["registros de classe", "Registros de classe"],
+    ["escritório por referência", "— autônomo —"],
+  ]) {
+    check(`a tela permite ${capacidade[0]}`, tela.includes(capacidade[1]))
+  }
+  check("o escritório é ESCOLHIDO em Organizações, não recadastrado",
+    tela.includes("orgaos-protocolo") && !/name:.*escritorio/i.test(tela))
+  check("exclusão de quem já foi usado nem aparece como botão",
+    /p\._count\.retificacoes === 0 && \(/.test(tela))
+  const api = read("src/app/api/gerenciamento/profissionais/[id]/route.ts")
+  check("e o servidor recusa apagar quem tem histórico, oferecendo a inativação",
+    api.includes('error: "EM_USO"') && api.includes("Tire de circulação"))
+  check("a UI reflete o schema REAL: registros são lista, porque o modelo aceita vários",
+    tela.includes("+ Registro") && /registros: \[\.\.\.f\.registros/.test(tela))
+
+  // ══════════════════════════════════════════════════════════════════════════
+  console.log("\n7 — NENHUMA CAPACIDADE FICOU SÓ EM API")
+  // ══════════════════════════════════════════════════════════════════════════
+  const painel = read("src/components/kanban/PedidosDeRetificacao.tsx")
+  check("abrir pedido e agrupar divergências tem tela",
+    painel.includes("Abrir pedido") && painel.includes("divergenciaIds"))
+  check("a tela NÃO agrupa sozinha — quem decide marca a lista",
+    painel.includes("selecionadas") && !/agruparPor|porPessoa|porDocumento/.test(painel))
+  check("e ela está montada na Central da fase de Retificação",
+    read("src/components/kanban/ProcessoCentralOperacional.tsx").includes("<PedidosDeRetificacao"))
+  check("a lista de divergências disponíveis exclui as que já estão num pedido aberto",
+    read("src/app/api/processos/[processoId]/retificacoes/divergencias/route.ts").includes("pacotes: { none:"))
+  check("o botão não nasce morto: sem divergência disponível ele explica por quê",
+    painel.includes("disabled={disponiveis.length === 0}") && painel.includes("title="))
+
   console.log(`\n${falhas.length === 0 ? "✅ PASSOU" : "❌ FALHOU"}: ${ok} ok, ${falhas.length} falhas`)
   if (falhas.length) { falhas.forEach((f) => console.log(`   · ${f}`)); process.exitCode = 1 }
   await limpar()

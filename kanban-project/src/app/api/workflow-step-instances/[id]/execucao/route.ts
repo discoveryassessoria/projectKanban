@@ -12,6 +12,7 @@ import { extrairUsuarioComPermissoes, verificarPermissao } from "@/src/lib/verif
 import { definicaoHistoricaDoPasso } from "@/src/services/versao-publicada"
 import { alvoDoCampo, idReferenciado } from "@/src/lib/motor/fontes-de-campo"
 import { listarAlvo, resolverReferencia, type EntidadeReferenciada } from "@/src/services/referencia-canonica"
+import { contextoDaRetificacao } from "@/src/services/contexto-da-retificacao"
 import { executarAcaoCadastrada } from "@/src/services/executar-acao-cadastrada"
 import { tentativasDoPasso, tentativaVigente } from "@/src/services/execucao-do-passo"
 import { efeito } from "@/src/lib/motor/catalogo-de-efeitos"
@@ -30,7 +31,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
     where: { id },
     select: {
       id: true, stepKey: true, status: true, faseMacroKey: true, ciclo: true,
-      documentoId: true, processoId: true,
+      documentoId: true, processoId: true, retificacaoPacoteId: true,
       // O FORNECEDOR CONCRETO vem do documento, por ID. É ele que responde quais canais
       // existem para esta etapa — não uma lista global.
       documento: { select: { orgaoId: true, orgao: { select: { id: true, name: true, nomeFantasia: true } } } },
@@ -109,8 +110,14 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
     escolhidasPorAlvo.set(alvo, mapa)
   }
 
+  // O CONTEXTO DA UNIDADE DE TRABALHO, projetado dos donos a cada leitura. Copiar
+  // isto para o payload "só para a tela" seria a segunda verdade voltando com outro
+  // nome — e divergiria na primeira correção feita no cadastro.
+  const contexto = passo.retificacaoPacoteId ? await contextoDaRetificacao(id) : null
+
   return NextResponse.json({
     passo,
+    contexto,
     versao: hist?.versao ?? null,
     executor: hist ? executorEfetivo({ key: passo.stepKey, executorKey: hist.passo.executorKey }, passo.faseMacroKey) : null,
     // `null` diz a verdade: esta execução é anterior ao versionamento e não tem
