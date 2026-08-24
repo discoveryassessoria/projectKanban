@@ -245,7 +245,22 @@ const MIGRATION = join(DIR_MIGRATIONS, '0000_baseline', 'migration.sql')
 // Ledger reconciliado no MESMO deploy de 20260822100000_identidade_por_dono.
 //
 //   anterior : 523d2e8ad455b533ff6e608c992c36d29fd111b454b1b1635d2ab9ed3ee9b96f
-const CHECKSUM_LEDGER = 'ad01855eecd5d2cf3f3a183b9a3ecf8933cbba63fc77ffe3dda662b06cfa9c33'
+// 24/08/2026 — RETIFICAÇÃO CANÔNICA. Três migrations aditivas: o protocolo na
+// execução (referência, nunca cópia), a unidade de trabalho do pedido de retificação
+// (vínculo real com as divergências, órgão e protocolo por FK, âncora na instância de
+// passo) e o cadastro de Profissional com os registros de classe.
+//
+// Entraram TAMBÉM três índices que as migrations criavam e o schema.prisma não
+// declarava — aplicar a migration faria produção divergir do schema no minuto
+// seguinte. Achado pela auditoria, corrigido na origem.
+//
+// Ledger reconciliado ANTES do deploy: sem isso `migrate deploy` recusa rodar
+// ("migration modificada depois de aplicada") e as três novas nunca seriam aplicadas.
+// Só a coluna `checksum` foi tocada; `started_at` e `finished_at` continuam em
+// 02/08/2026, porque é quando a baseline foi aplicada.
+//
+//   anterior : ad01855eecd5d2cf3f3a183b9a3ecf8933cbba63fc77ffe3dda662b06cfa9c33
+const CHECKSUM_LEDGER = '69706882b57756bab1a55ab717913838ca414ca3d97df40780aa8b5dba9a8fcb'
 
 /**
  * Migrations criadas DEPOIS da consolidacao de 02/08/2026. Toda migration nova
