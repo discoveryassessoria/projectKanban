@@ -2034,14 +2034,43 @@ model RetificacaoPacote {
   processoId     Int
   processo       Processo @relation(fields: [processoId], references: [id], onDelete: Cascade)
   num            String // PR-001
-  tipo           String // judicial | administrativa
+  /// MODO do procedimento. ANULAVEL: o pedido pode ser aberto (agrupando as
+  /// divergencias que vao juntas) antes de alguem decidir se o caminho e judicial ou
+  /// administrativo — que e exatamente o que o passo "Definir modo" resolve.
+  tipo           String? // judicial | administrativa
   status         String   @default("em_preparacao") // em_preparacao|protocolado|em_exigencia|decisao_recebida|validado|bloqueado
   currentStep    String   @default("definir_estrategia")
   motivo         String?
   prioridade     String?  @default("MÃ©dia")
   proxAcao       String?
+  /// PROFISSIONAL RESPONSAVEL pelo procedimento, quando houver. Referencia, nunca
+  /// nome copiado: renomear o cadastro aparece aqui sem regravar execucao nenhuma.
+  profissionalId Int?
+  profissional   Profissional? @relation("ProfissionalDaRetificacao", fields: [profissionalId], references: [id], onDelete: SetNull)
+
   // Judicial
+  /// NUMERO DO PROCESSO JUDICIAL (CNJ ou equivalente). Vive AQUI porque o pacote E o
+  /// procedimento independente de retificacao — nao ha entidade "processo judicial"
+  /// no sistema, e criar uma vazia para guardar uma string seria estrutura sem dono.
+  /// Nao e protocolo: protocolo e o comprovante de entrada, este e a identidade da
+  /// acao no tribunal, e eles nem sempre coincidem.
   processoNum    String?
+  /// ─── LEGADO TEXTUAL — PRESERVADO, NAO ESCRITO ──────────────────────────
+  /// Os campos abaixo sao da tela anterior. Continuam existindo porque apagar coluna
+  /// e apagar o que ja foi digitado; nenhum caminho canonico escreve neles, e cada um
+  /// tem hoje um dono de verdade:
+  ///
+  ///   tribunal, cartorio → `orgaoId` (Orgaos e Organizacoes). 11 tribunais e 241
+  ///                        organizacoes ja cadastrados; texto congelaria o nome.
+  ///   comarca            → atributo territorial do orgao referenciado
+  ///                        (`city`/`state`/`provincia`), lido de la.
+  ///   vara               → `Protocolo.setor`, que ja se chama "setor/guiche dentro
+  ///                        do orgao". Vara, oficio e guiche sao a mesma pergunta.
+  ///   advogado, oab      → `profissionalId` → `Profissional` + `RegistroProfissional`.
+  ///                        OAB e um VALOR de `tipo`, com numero e jurisdicao proprios.
+  ///   protocolo,
+  ///   dataProtocolo      → `protocoloId` → `Protocolo`.
+  ///   prazo              → prazo da etapa, herdado da fase.
   tribunal       String?
   vara           String?
   comarca        String?
@@ -2106,6 +2135,74 @@ model RetificacaoPacoteDivergencia {
 
   @@unique([pacoteId, divergenciaId])
   @@index([divergenciaId])
+}
+
+/// UMA PESSOA QUE EXERCE PROFISSAO REGULAMENTADA e atua nos processos.
+///
+/// NAO e `Pessoa` — aquela e o individuo da arvore genealogica, com data de obito e
+/// batismo; um advogado nao e ancestral de ninguem. NAO e `Usuario` — aquele tem
+/// e-mail unico e perfil de acesso, e criar conta de login para um advogado externo
+/// daria a ele o sistema inteiro. NAO e `OrgaoProtocolo` — organizacao e pessoa
+/// juridica; o escritorio e uma, o advogado e outra, e confundi-los faz o registro
+/// profissional virar atributo de empresa.
+///
+/// O ESCOPO E MINIMO DE PROPOSITO: identidade, categoria, vinculo opcional com a
+/// organizacao onde atua, e os registros de classe. Nao ha agenda, honorario,
+/// disponibilidade nem carteira de clientes — o sistema nao precisa disso hoje, e
+/// modelo grande vazio e pior que modelo pequeno.
+model Profissional {
+  id             Int      @id @default(autoincrement())
+  nome           String   @db.VarChar(200)
+  /// CATEGORIA em vocabulario aberto (advogado | tradutor | despachante | ...).
+  /// Aberto porque a proxima categoria nao pode exigir migration.
+  categoria      String   @db.VarChar(40)
+  email          String?  @db.VarChar(200)
+  telefone       String?  @db.VarChar(60)
+  /// ESCRITORIO/EMPRESA onde atua, quando houver. Opcional: profissional autonomo
+  /// existe, e exigir organizacao obrigaria a inventar uma para ele.
+  organizacaoId  Int?
+  organizacao    OrgaoProtocolo? @relation("ProfissionaisDaOrganizacao", fields: [organizacaoId], references: [id], onDelete: SetNull)
+  observacoes    String?  @db.Text
+  ativo          Boolean  @default(true)
+  criadoEm       DateTime @default(now())
+  atualizadoEm   DateTime @updatedAt
+
+  registros      RegistroProfissional[]
+  retificacoes   RetificacaoPacote[]    @relation("ProfissionalDaRetificacao")
+
+  @@index([categoria])
+  @@index([organizacaoId])
+  @@index([ativo])
+}
+
+/// A INSCRICAO NUM CONSELHO DE CLASSE.
+///
+/// Fica em tabela propria, e nao em colunas de `Profissional`, por duas razoes que
+/// aparecem no primeiro caso real: o mesmo advogado pode ter OAB em mais de uma UF, e
+/// um tradutor juramentado tem matricula na Junta Comercial — outro tipo de registro,
+/// com outra jurisdicao. Tres colunas (`oab`, `oabUf`, ...) resolveriam OAB e
+/// travariam tudo o mais.
+///
+/// `tipo` e vocabulario ABERTO. "OAB" nao e estrutura: e um valor.
+model RegistroProfissional {
+  id             Int      @id @default(autoincrement())
+  profissionalId Int
+  profissional   Profissional @relation(fields: [profissionalId], references: [id], onDelete: Cascade)
+  /// OAB | CRC | CREA | JUCESP | ... — o conselho, como valor.
+  tipo           String   @db.VarChar(20)
+  numero         String   @db.VarChar(40)
+  /// UF, pais ou circunscricao em que o registro vale.
+  jurisdicao     String?  @db.VarChar(40)
+  /// Orgao de classe, quando ele estiver cadastrado em Orgaos e Organizacoes.
+  orgaoDeClasseId Int?
+  orgaoDeClasse   OrgaoProtocolo? @relation("RegistrosDoOrgaoDeClasse", fields: [orgaoDeClasseId], references: [id], onDelete: SetNull)
+  ativo          Boolean  @default(true)
+  criadoEm       DateTime @default(now())
+  atualizadoEm   DateTime @updatedAt
+
+  /// A MESMA INSCRICAO NAO SE REPETE. "OAB 123456 SP" identifica uma pessoa so.
+  @@unique([tipo, numero, jurisdicao])
+  @@index([profissionalId])
 }
 
 
@@ -3868,6 +3965,8 @@ model OrgaoProtocolo {
   @@index([provincia])
   @@index([funcoes])
   retificacoes RetificacaoPacote[] @relation("OrgaoDaRetificacao")
+  profissionais       Profissional[]         @relation("ProfissionaisDaOrganizacao")
+  registrosDeClasse   RegistroProfissional[] @relation("RegistrosDoOrgaoDeClasse")
 }
 
 /// Funções que uma organização exerce. Uma organização = UM registro, N funções.

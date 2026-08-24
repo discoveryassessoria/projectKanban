@@ -1609,12 +1609,13 @@ CREATE TABLE "RetificacaoPacote" (
     "id" SERIAL NOT NULL,
     "processoId" INTEGER NOT NULL,
     "num" TEXT NOT NULL,
-    "tipo" TEXT NOT NULL,
+    "tipo" TEXT,
     "status" TEXT NOT NULL DEFAULT 'em_preparacao',
     "currentStep" TEXT NOT NULL DEFAULT 'definir_estrategia',
     "motivo" TEXT,
     "prioridade" TEXT DEFAULT 'MÃ©dia',
     "proxAcao" TEXT,
+    "profissionalId" INTEGER,
     "processoNum" TEXT,
     "tribunal" TEXT,
     "vara" TEXT,
@@ -1651,6 +1652,37 @@ CREATE TABLE "RetificacaoPacoteDivergencia" (
     "criadoEm" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
     CONSTRAINT "RetificacaoPacoteDivergencia_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "Profissional" (
+    "id" SERIAL NOT NULL,
+    "nome" VARCHAR(200) NOT NULL,
+    "categoria" VARCHAR(40) NOT NULL,
+    "email" VARCHAR(200),
+    "telefone" VARCHAR(60),
+    "organizacaoId" INTEGER,
+    "observacoes" TEXT,
+    "ativo" BOOLEAN NOT NULL DEFAULT true,
+    "criadoEm" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "atualizadoEm" TIMESTAMP(3) NOT NULL,
+
+    CONSTRAINT "Profissional_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "RegistroProfissional" (
+    "id" SERIAL NOT NULL,
+    "profissionalId" INTEGER NOT NULL,
+    "tipo" VARCHAR(20) NOT NULL,
+    "numero" VARCHAR(40) NOT NULL,
+    "jurisdicao" VARCHAR(40),
+    "orgaoDeClasseId" INTEGER,
+    "ativo" BOOLEAN NOT NULL DEFAULT true,
+    "criadoEm" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "atualizadoEm" TIMESTAMP(3) NOT NULL,
+
+    CONSTRAINT "RegistroProfissional_pkey" PRIMARY KEY ("id")
 );
 
 -- CreateTable
@@ -5158,6 +5190,21 @@ CREATE INDEX "RetificacaoPacoteDivergencia_divergenciaId_idx" ON "RetificacaoPac
 CREATE UNIQUE INDEX "RetificacaoPacoteDivergencia_pacoteId_divergenciaId_key" ON "RetificacaoPacoteDivergencia"("pacoteId", "divergenciaId");
 
 -- CreateIndex
+CREATE INDEX "Profissional_categoria_idx" ON "Profissional"("categoria");
+
+-- CreateIndex
+CREATE INDEX "Profissional_organizacaoId_idx" ON "Profissional"("organizacaoId");
+
+-- CreateIndex
+CREATE INDEX "Profissional_ativo_idx" ON "Profissional"("ativo");
+
+-- CreateIndex
+CREATE INDEX "RegistroProfissional_profissionalId_idx" ON "RegistroProfissional"("profissionalId");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "RegistroProfissional_tipo_numero_jurisdicao_key" ON "RegistroProfissional"("tipo", "numero", "jurisdicao");
+
+-- CreateIndex
 CREATE INDEX "EmissaoRetificada_processoId_idx" ON "EmissaoRetificada"("processoId");
 
 -- CreateIndex
@@ -6685,6 +6732,9 @@ ALTER TABLE "FaseFinal" ADD CONSTRAINT "FaseFinal_processoId_fkey" FOREIGN KEY (
 ALTER TABLE "RetificacaoPacote" ADD CONSTRAINT "RetificacaoPacote_processoId_fkey" FOREIGN KEY ("processoId") REFERENCES "Processo"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
+ALTER TABLE "RetificacaoPacote" ADD CONSTRAINT "RetificacaoPacote_profissionalId_fkey" FOREIGN KEY ("profissionalId") REFERENCES "Profissional"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
 ALTER TABLE "RetificacaoPacote" ADD CONSTRAINT "RetificacaoPacote_orgaoId_fkey" FOREIGN KEY ("orgaoId") REFERENCES "OrgaoProtocolo"("id") ON DELETE SET NULL ON UPDATE CASCADE;
 
 -- AddForeignKey
@@ -6695,6 +6745,15 @@ ALTER TABLE "RetificacaoPacoteDivergencia" ADD CONSTRAINT "RetificacaoPacoteDive
 
 -- AddForeignKey
 ALTER TABLE "RetificacaoPacoteDivergencia" ADD CONSTRAINT "RetificacaoPacoteDivergencia_divergenciaId_fkey" FOREIGN KEY ("divergenciaId") REFERENCES "Divergencia"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "Profissional" ADD CONSTRAINT "Profissional_organizacaoId_fkey" FOREIGN KEY ("organizacaoId") REFERENCES "OrgaoProtocolo"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "RegistroProfissional" ADD CONSTRAINT "RegistroProfissional_profissionalId_fkey" FOREIGN KEY ("profissionalId") REFERENCES "Profissional"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "RegistroProfissional" ADD CONSTRAINT "RegistroProfissional_orgaoDeClasseId_fkey" FOREIGN KEY ("orgaoDeClasseId") REFERENCES "OrgaoProtocolo"("id") ON DELETE SET NULL ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "EmissaoRetificada" ADD CONSTRAINT "EmissaoRetificada_processoId_fkey" FOREIGN KEY ("processoId") REFERENCES "Processo"("id") ON DELETE CASCADE ON UPDATE CASCADE;

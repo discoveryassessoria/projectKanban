@@ -218,6 +218,28 @@ export const CATALOGO_DE_EFEITOS: DefinicaoDeEfeito[] = [
     alvoDeReferenciaEsperado: "ORGANIZACAO",
   },
   {
+    key: "REGISTER_RETIFICATION_PLAN",
+    label: "Definir o plano da retificação",
+    descricao:
+      "Grava no pedido de retificação o caminho escolhido (judicial ou administrativo) e, quando judicial, " +
+      "o profissional responsável e o número do processo. A etapa fica com a referência; os dados moram no pedido.",
+    competencia: COMPETENCIAS.RETIFICACAO,
+    permissao: "processos.editar",
+    // O MODO É O MÍNIMO. Profissional e número do processo são exigidos por REQUISITO
+    // CONDICIONAL, não aqui — na via administrativa eles não existem, e um campo
+    // obrigatório que some é um campo impossível de preencher.
+    camposObrigatorios: ["modo"],
+    idempotente: true,
+    concluiPasso: true,
+    // ESCREVE NO PEDIDO. Nenhuma fase ganha isso por herança de competência.
+    exigeAutorizacaoExplicita: true,
+    alvoDeReferenciaEsperado: "PROFISSIONAL",
+    // O modo e o número do processo passam a morar no pedido, que é o dono deles.
+    // O profissional NÃO entra aqui: referência não é cópia, e o ID continua na
+    // execução como o que foi escolhido naquela tentativa.
+    camposConsumidos: ["modo", "numero_processo_judicial"],
+  },
+  {
     key: "REGISTER_ONLY",
     label: "Somente registrar",
     descricao:

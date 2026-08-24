@@ -38,7 +38,11 @@ export async function POST(
     if (!row) return NextResponse.json({ error: "Pacote não encontrado." }, { status: 404 })
 
     const pkg: RetPkg = {
-      tipo: row.tipo,
+      // `tipo` passou a aceitar NULL no cadastro: o pedido pode ser aberto antes de
+      // alguém decidir o caminho. A máquina legada não sabe disso e sempre assumiu um
+      // dos dois — o default preserva o que ela esperava, sem afirmar nada sobre o
+      // pacote que ainda não decidiu.
+      tipo: row.tipo ?? "judicial",
       status: row.status,
       currentStep: row.currentStep,
       motivo: row.motivo,

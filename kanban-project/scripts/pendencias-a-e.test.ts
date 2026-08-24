@@ -133,8 +133,11 @@ async function main() {
     fonteDoCampo({ catalogo: "canais" })?.especie === "DATASOURCE")
   check("(A9) o valor persistido é ID, e nome nunca vira ID",
     idReferenciado("42") === 42 && idReferenciado("Cartório X") === null && idReferenciado(0) === null)
-  const nomeDoAlvo = Object.keys(ALVOS_DE_REFERENCIA)
-  check("(A10) nenhum alvo criado além do necessário", nomeDoAlvo.length === 1 && nomeDoAlvo[0] === "ORGANIZACAO")
+  // DOIS ALVOS, e os dois porque um caso real pediu: a organização que recebe o
+  // pedido, e o profissional que o conduz. Nenhum terceiro foi criado "para o caso de".
+  const nomeDoAlvo = Object.keys(ALVOS_DE_REFERENCIA).sort()
+  check("(A10) nenhum alvo criado além dos que um caso real exigiu",
+    JSON.stringify(nomeDoAlvo) === JSON.stringify(["ORGANIZACAO", "PROFISSIONAL"]), nomeDoAlvo.join(","))
 
   // ══════════════════════════════════════════════════════════════════════════
   console.log("\nB — PROTOCOLO COM UMA FONTE SÓ")
@@ -268,7 +271,7 @@ async function main() {
   await prisma.catalogoFase.create({
     data: {
       phaseKey: `${M.toLowerCase()}_ret`, label: "Retificação (teste)", escopo: "PROCESSO",
-      ordemPadrao: 96, slaDiasPadrao: 30, efeitosPermitidos: [...escopoFase, "REGISTER_PROTOCOL"] as never,
+      ordemPadrao: 96, slaDiasPadrao: 30, efeitosPermitidos: [...escopoFase, "REGISTER_PROTOCOL", "REGISTER_RETIFICATION_PLAN"] as never,
     },
   })
   const wf = await prisma.phaseInternalWorkflow.create({
@@ -286,6 +289,7 @@ async function main() {
           stepId: p.id, key: campo.key, label: campo.label, tipo: campo.tipo,
           obrigatorio: campo.obrigatorio ?? false, ajuda: campo.ajuda ?? null, ordem: i + 1,
           ...(campo.referencia ? { opcoes: { referencia: campo.referencia } as never } : {}),
+          ...(campo.condicao ? { condicao: campo.condicao as never } : {}),
         },
         select: { id: true },
       })
@@ -306,6 +310,7 @@ async function main() {
         data: c.requisitos.map((r, i) => ({
           stepId: p.id, key: r.key, label: r.label, tipo: r.tipo,
           alvoKey: r.alvoKey ?? null, acaoKey: r.acaoKey ?? null, ordem: i + 1,
+          ...(r.condicao ? { condicao: r.condicao as never } : {}),
         })) as Prisma.StepRequirementCreateManyInput[],
       })
     }
@@ -357,7 +362,8 @@ async function main() {
   const siB1 = porPacote.get(pacB.pacoteId)!.get("definir_modo_de_retificacao")!
   await garantirTentativa(siA1, { motivo: MOTIVOS_DE_TENTATIVA.ABERTURA, status: "DISPONIVEL" })
   await garantirTentativa(siB1, { motivo: MOTIVOS_DE_TENTATIVA.ABERTURA, status: "DISPONIVEL" })
-  const c5 = await executarAcaoCadastrada(siA1, "modo_definido", { modo: "judicial" },
+  // VIA ADMINISTRATIVA: os campos judiciais não são exigidos, pela condição declarada.
+  const c5 = await executarAcaoCadastrada(siA1, "modo_definido", { modo: "administrativa" },
     { usuarioId: 1, permissoes: PERMS, correlationId: `${M}-c5` })
   const estadoB = await prisma.phaseWorkflowStepInstance.findUnique({ where: { id: siB1 }, select: { status: true } })
   check("(C5) concluir o passo do pedido A não conclui o do pedido B",
@@ -485,7 +491,7 @@ async function main() {
   })
   const problemas = validarConfiguracao(
     paraValidar.map((p) => ({ ...p, campos: p.campos.map((c) => ({ ...c, opcoes: c.opcoesCadastradas, opcoesLegado: c.opcoes })) })) as never,
-    { phaseKey: FASE, efeitosPermitidosDaFase: [...efeitosDaFase(FASE, null), "REGISTER_PROTOCOL"] },
+    { phaseKey: FASE, efeitosPermitidosDaFase: [...efeitosDaFase(FASE, null), "REGISTER_PROTOCOL", "REGISTER_RETIFICATION_PLAN"] },
   )
   check("a configuração com referência e protocolo canônico continua publicável",
     problemas.length === 0, JSON.stringify(problemas.slice(0, 3)))

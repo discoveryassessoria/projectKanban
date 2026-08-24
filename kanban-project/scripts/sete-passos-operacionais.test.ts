@@ -50,6 +50,11 @@ async function limpar() {
     await prisma.phaseWorkflowStepInstance.deleteMany({ where: { processoId: p.id } })
     await prisma.phaseWorkflowInstance.deleteMany({ where: { processoId: p.id } })
     await prisma.tarefa.deleteMany({ where: { processoId: p.id } })
+    await prisma.protocolo.deleteMany({ where: { processoId: p.id } })
+    await prisma.retificacaoPacoteDivergencia.deleteMany({ where: { pacote: { processoId: p.id } } })
+    await prisma.retificacaoPacote.deleteMany({ where: { processoId: p.id } })
+    await prisma.divergencia.deleteMany({ where: { analise: { processoId: p.id } } })
+    await prisma.analiseDocumental.deleteMany({ where: { processoId: p.id } })
     await prisma.workflowEvento.deleteMany({ where: { processoId: p.id } })
     await prisma.processo.delete({ where: { id: p.id } }).catch(() => null)
   }
@@ -66,7 +71,7 @@ async function limpar() {
 
 /** Monta a fase da Retificação com EXATAMENTE o conteúdo que a produção recebeu. */
 async function montarRetificacao(phaseKey: string) {
-  const efeitos = [...efeitosDaFase(FASE, null), "REGISTER_PROTOCOL"]
+  const efeitos = [...efeitosDaFase(FASE, null), "REGISTER_PROTOCOL", "REGISTER_RETIFICATION_PLAN"]
   await prisma.catalogoFase.create({
     data: {
       phaseKey, label: "Retificação (espelho de teste)", escopo: "PROCESSO", ordemPadrao: 95,
@@ -94,6 +99,7 @@ async function montarRetificacao(phaseKey: string) {
           stepId: p.id, key: campo.key, label: campo.label, tipo: campo.tipo,
           obrigatorio: campo.obrigatorio ?? false, ajuda: campo.ajuda ?? null, ordem: i + 1,
           ...(campo.referencia ? { opcoes: { referencia: campo.referencia } as never } : {}),
+          ...(campo.condicao ? { condicao: campo.condicao as never } : {}),
         },
         select: { id: true },
       })
@@ -121,6 +127,7 @@ async function montarRetificacao(phaseKey: string) {
         data: c.requisitos.map((r, i) => ({
           stepId: p.id, key: r.key, label: r.label, tipo: r.tipo,
           alvoKey: r.alvoKey ?? null, acaoKey: r.acaoKey ?? null, ordem: i + 1,
+          ...(r.condicao ? { condicao: r.condicao as never } : {}),
         })) as Prisma.StepRequirementCreateManyInput[],
       })
     }
@@ -198,7 +205,7 @@ async function main() {
     campos: p.campos.map((c) => ({ ...c, opcoes: c.opcoesCadastradas, opcoesLegado: c.opcoes })),
   }))
   const problemas = validarConfiguracao(paraValidarNormalizado as never, {
-    phaseKey: FASE, efeitosPermitidosDaFase: [...efeitosDaFase(FASE, null), "REGISTER_PROTOCOL"],
+    phaseKey: FASE, efeitosPermitidosDaFase: [...efeitosDaFase(FASE, null), "REGISTER_PROTOCOL", "REGISTER_RETIFICATION_PLAN"],
   })
   // (B) O cadastro é publicável: nenhum efeito fora da competência da fase, nenhum
   // requisito órfão, nenhuma opção vazia.
@@ -209,7 +216,7 @@ async function main() {
   const efeitos = efeitosDaFase(FASE, null)
   check("(C) a fase não tem competência para decidir retificação", !efeitos.includes("GO_RETIFICATION"), efeitos.join(","))
   const usados = new Set(paraValidar.flatMap((p) => p.acoes.map((a) => a.effectKey)))
-  const permitidos = [...efeitosDaFase(FASE, null), "REGISTER_PROTOCOL"]
+  const permitidos = [...efeitosDaFase(FASE, null), "REGISTER_PROTOCOL", "REGISTER_RETIFICATION_PLAN"]
   check("(D) e nenhuma ação cadastrada tenta um efeito fora da competência",
     [...usados].every((e) => permitidos.includes(e)), [...usados].join(","))
 
@@ -240,6 +247,18 @@ async function main() {
     data: { nome: `${M} processo`, pais: "espanha", arvoreId: arv.id, workflowRuntime: "v2", faseAtualKey: phaseKey },
     select: { id: true },
   })
+  // A UNIDADE É O PEDIDO. Este palco nasceu quando a fase materializava por PROCESSO;
+  // com a cardinalidade RETIFICACAO, cada pedido tem a própria cadeia — e o passo que
+  // define o modo grava NELE.
+  const analise = await prisma.analiseDocumental.create({ data: { processoId: proc.id }, select: { id: true } })
+  const div = await prisma.divergencia.create({
+    data: { analiseId: analise.id, pessoaNome: `${M} P`, documentoTitulo: `${M} doc`, campo: "sobrenome",
+      campoLabel: "Sobrenome", tipo: "nome", severidade: "media", status: "retificacao" },
+    select: { id: true },
+  })
+  const { abrirPacoteDeRetificacao } = await import("../src/services/retificacao-canonica")
+  const pacote = await abrirPacoteDeRetificacao({ processoId: proc.id, divergenciaIds: [div.id] })
+
   const inst = await prisma.phaseWorkflowInstance.create({
     data: {
       processoId: proc.id, faseMacroKey: phaseKey, ciclo: 1, status: "ATIVO",
@@ -255,6 +274,7 @@ async function main() {
         stepKey: k, ordem: i + 1, tipo: "HUMANO", obrigatorio: true, geraTarefa: true,
         status: i === 0 ? "EM_ANDAMENTO" : "PENDENTE",
         dependeDeStepKeys: CONFIGURACAO[k].dependeDe as never,
+        retificacaoPacoteId: pacote.pacoteId,
         stepDefinitionId: porChave.get(k)!, stepDefinitionVersion: 2, chaveIdempotencia: `${M}-p${i}`,
       },
       select: { id: true },
@@ -280,13 +300,17 @@ async function main() {
   check("(I) modo fora do vocabulário do domínio é recusado pelo SERVIDOR",
     !inventado.ok && inventado.codigo === "OPCAO_INVALIDA", JSON.stringify(inventado))
 
-  const feito = await executarAcaoCadastrada(si1, "modo_definido", { modo: "judicial" },
+  // VIA ADMINISTRATIVA: não exige profissional nem número de processo — é a condição
+  // declarada fazendo o que um `if` dentro do componente faria.
+  const feito = await executarAcaoCadastrada(si1, "modo_definido", { modo: "administrativa" },
     { usuarioId: 1, permissoes: PERMS, correlationId: `${M}-a2` })
   check("(J) com o modo do domínio, a etapa conclui", feito.ok, JSON.stringify(feito))
 
+  check("(K) a escolha ficou gravada NO PEDIDO, que é o dono dela",
+    (await prisma.retificacaoPacote.findUnique({ where: { id: pacote.pacoteId }, select: { tipo: true } }))?.tipo === "administrativa")
   const tent = (await tentativasDoPasso(si1)).find((t) => t.supersededAt == null)
-  check("(K) a escolha ficou gravada pela CHAVE do domínio",
-    (tent?.payload as { valores?: Record<string, string> })?.valores?.modo === "judicial")
+  check("(K2) e NÃO ficou copiada dentro da execução",
+    (tent?.payload as { valores?: Record<string, string> })?.valores?.modo === undefined)
 
   // (L) A espera é estado declarado, não etapa parada sem explicação.
   const si4 = instancias.get("acompanhar_decisao")!

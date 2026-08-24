@@ -70,6 +70,15 @@ export const ALVOS_DE_REFERENCIA = {
     rotaDoCadastro: "/administrator?modulo=base&aba=organizacoes",
     escopoMultiCliente: ESCOPO_MULTI_CLIENTE,
   },
+  PROFISSIONAL: {
+    label: "Profissionais",
+    descricao: "Aponta para um profissional cadastrado — advogado, tradutor, despachante.",
+    entidade: "Profissional",
+    permissao: "processos.editar",
+    aceitaInativaEmNovaExecucao: false,
+    rotaDoCadastro: "/administrator?modulo=base&aba=profissionais",
+    escopoMultiCliente: ESCOPO_MULTI_CLIENTE,
+  },
 } as const satisfies Record<string, AlvoDeReferencia>
 
 export type ChaveDeAlvo = keyof typeof ALVOS_DE_REFERENCIA

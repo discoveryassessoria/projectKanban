@@ -60,14 +60,23 @@ export interface PacoteAberto {
  */
 export async function abrirPacoteDeRetificacao(args: {
   processoId: number
-  tipo: ModoDeRetificacao
+  /**
+   * O MODO É OPCIONAL NA ABERTURA.
+   *
+   * Agrupar as divergências que vão no mesmo procedimento é uma decisão; escolher o
+   * caminho judicial ou administrativo é outra, e ela tem passo próprio ("Definir
+   * modo"). Exigir o modo aqui obrigaria quem agrupa a decidir o trâmite antes de
+   * olhar o conjunto — e faria o passo 1 escrever, na melhor das hipóteses, o que já
+   * estava escrito.
+   */
+  tipo?: ModoDeRetificacao | null
   divergenciaIds: number[]
   motivo?: string | null
   orgaoId?: number | null
   /** Reabrir o mesmo conjunto não deve criar um segundo pedido idêntico. */
   chaveDeIdempotencia?: string | null
 }): Promise<PacoteAberto> {
-  if (!MODOS_DE_RETIFICACAO.includes(args.tipo)) {
+  if (args.tipo != null && !MODOS_DE_RETIFICACAO.includes(args.tipo)) {
     throw new Error(`MODO_INVALIDO: "${args.tipo}" não é judicial nem administrativa.`)
   }
   const divergencias = [...new Set(args.divergenciaIds)]
@@ -97,7 +106,7 @@ export async function abrirPacoteDeRetificacao(args: {
       data: {
         processoId: args.processoId,
         num,
-        tipo: args.tipo,
+        tipo: args.tipo ?? null,
         status: ESTADOS_DO_PACOTE.EM_PREPARACAO,
         motivo: args.motivo ?? null,
         orgaoId: args.orgaoId ?? null,

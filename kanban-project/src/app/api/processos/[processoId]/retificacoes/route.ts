@@ -57,10 +57,12 @@ export async function POST(request: Request, { params }: { params: Promise<{ pro
     const body = (await request.json().catch(() => ({}))) as {
       tipo?: string; divergenciaIds?: unknown; motivo?: string | null; orgaoId?: number | null
     }
-    if (!(MODOS_DE_RETIFICACAO as readonly string[]).includes(String(body.tipo))) {
+    // O MODO É OPCIONAL AQUI. Quem agrupa as divergências não precisa ter decidido o
+    // trâmite — quem decide é o passo "Definir modo", e ele grava no pedido.
+    if (body.tipo != null && !(MODOS_DE_RETIFICACAO as readonly string[]).includes(String(body.tipo))) {
       return NextResponse.json({
         error: "MODO_INVALIDO",
-        mensagem: `O modo precisa ser ${MODOS_DE_RETIFICACAO.join(" ou ")}.`,
+        mensagem: `Quando informado, o modo precisa ser ${MODOS_DE_RETIFICACAO.join(" ou ")}.`,
       }, { status: 422 })
     }
     // A LISTA VEM DE QUEM DECIDE. O servidor confere que são números; quais entram
@@ -71,7 +73,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ pro
 
     const r = await abrirPacoteDeRetificacao({
       processoId: id,
-      tipo: body.tipo as ModoDeRetificacao,
+      tipo: (body.tipo ?? null) as ModoDeRetificacao | null,
       divergenciaIds,
       motivo: body.motivo ?? null,
       orgaoId: body.orgaoId ?? null,

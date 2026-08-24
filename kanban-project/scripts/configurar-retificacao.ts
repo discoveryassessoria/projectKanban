@@ -44,6 +44,12 @@ import { CONFIGURACAO } from "./_configuracao-retificacao"
 const prisma = new PrismaClient()
 const EXECUTAR = process.argv.includes("--execute")
 const FASE = "retificacao_registros"
+/**
+ * A UNIDADE DE TRABALHO. Cada pedido de retificação tem a própria cadeia de seis
+ * passos — é o que permite concluir um sem concluir o outro, e reabrir um sem tocar
+ * no outro. Herdar o escopo da fase (PROCESSO) dava uma cadeia só para todos.
+ */
+const CARDINALIDADE = "RETIFICACAO"
 
 /** O conteúdo de cada passo, derivado do domínio existente. */
 /**
@@ -58,14 +64,15 @@ async function admitirEfeitoDeProtocolo(dryRun: boolean): Promise<string | null>
   })
   if (!fase) return null
   const atuais = Array.isArray(fase.efeitosPermitidos) ? (fase.efeitosPermitidos as string[]) : []
-  if (atuais.includes("REGISTER_PROTOCOL")) return null
+  const faltando = ["REGISTER_PROTOCOL", "REGISTER_RETIFICATION_PLAN"].filter((e) => !atuais.includes(e))
+  if (faltando.length === 0) return null
   if (!dryRun) {
     await prisma.catalogoFase.update({
       where: { id: fase.id },
-      data: { efeitosPermitidos: [...atuais, "REGISTER_PROTOCOL"] as never },
+      data: { efeitosPermitidos: [...atuais, ...faltando] as never },
     })
   }
-  return `FASE ${FASE}: efeitosPermitidos += REGISTER_PROTOCOL`
+  return `FASE ${FASE}: efeitosPermitidos += ${faltando.join(", ")}`
 }
 
 /**
@@ -85,7 +92,7 @@ async function convergir(
   // olhava só as peças (campo, ação, conferência, requisito). Uma revisão que REMOVE
   // uma aresta ficava no arquivo e não chegava ao cadastro.
   const passoAtual = await prisma.phaseInternalWorkflowStep.findUnique({
-    where: { id: stepId }, select: { dependeDe: true, executorKey: true },
+    where: { id: stepId }, select: { dependeDe: true, executorKey: true, cardinalidade: true },
   })
   const depAgora = JSON.stringify(cfg.dependeDe)
   const depAntes = JSON.stringify(Array.isArray(passoAtual?.dependeDe) ? passoAtual.dependeDe : [])
@@ -95,6 +102,15 @@ async function convergir(
       await prisma.phaseInternalWorkflowStep.update({
         where: { id: stepId }, data: { dependeDe: cfg.dependeDe as never },
       })
+    }
+  }
+  // A CARDINALIDADE É A UNIDADE DE TRABALHO. Herdar o escopo da fase (PROCESSO)
+  // significava uma cadeia de seis passos para todos os pedidos do processo; declarar
+  // RETIFICACAO dá a cada pedido a sua.
+  if (passoAtual?.cardinalidade !== CARDINALIDADE) {
+    linhas.push(`~ CARDINALIDADE: ${passoAtual?.cardinalidade ?? "herda da fase"} → ${CARDINALIDADE}`)
+    if (!dryRun) {
+      await prisma.phaseInternalWorkflowStep.update({ where: { id: stepId }, data: { cardinalidade: CARDINALIDADE } })
     }
   }
   if (passoAtual?.executorKey !== "padrao") {
@@ -123,6 +139,7 @@ async function convergir(
             stepId, key: c.key, label: c.label, tipo: c.tipo, obrigatorio: !!c.obrigatorio,
             ajuda: c.ajuda ?? null, ordem: maiorOrdem + i + 1, ativo: true,
             ...(ponteiro ? { opcoes: ponteiro as never } : {}),
+            ...(c.condicao ? { condicao: c.condicao as never } : {}),
           },
           select: { id: true },
         })
@@ -184,7 +201,8 @@ async function convergir(
       await prisma.stepRequirement.create({
         data: { stepId, key: r.key, label: r.label, tipo: r.tipo, alvoKey: r.alvoKey ?? null,
           acaoKey: r.acaoKey ?? null, ordem: reqs.length + i + 1, obrigatorio: true, ativo: true,
-          minimo: 1, momento: "AO_CONCLUIR" },
+          minimo: 1, momento: "AO_CONCLUIR",
+          ...(r.condicao ? { condicao: r.condicao as never } : {}) },
       })
     }
   }
@@ -234,7 +252,7 @@ async function main() {
       // chave; declarar remove a dependência de uma resolução implícita.
       await tx.phaseInternalWorkflowStep.update({
         where: { id: passo.id },
-        data: { executorKey: "padrao", dependeDe: cfg.dependeDe as never },
+        data: { executorKey: "padrao", cardinalidade: CARDINALIDADE, dependeDe: cfg.dependeDe as never },
       })
       for (const [i, c] of cfg.campos.entries()) {
         const campo = await tx.stepField.create({
@@ -244,6 +262,7 @@ async function main() {
             // O ALVO DA REFERÊNCIA mora no mesmo ponteiro que `{ catalogo: "canais" }`
             // já usava. Uma coluna a menos dizendo a mesma coisa.
             ...(c.referencia ? { opcoes: { referencia: c.referencia } as never } : {}),
+            ...(c.condicao ? { condicao: c.condicao as never } : {}),
           },
           select: { id: true },
         })
@@ -273,6 +292,7 @@ async function main() {
             stepId: passo.id, key: r.key, label: r.label, tipo: r.tipo,
             alvoKey: r.alvoKey ?? null, acaoKey: r.acaoKey ?? null, ordem: i + 1,
             obrigatorio: true, ativo: true, minimo: 1, momento: "AO_CONCLUIR",
+            ...(r.condicao ? { condicao: r.condicao as never } : {}),
           })),
         })
       }

@@ -39,7 +39,7 @@ import { registrarNaExecucao, garantirExecucao, ESTADOS_DA_SUBTAREFA } from "@/s
 import { requisitosPendentes } from "@/src/services/requisitos-da-etapa"
 import { avaliarCondicao, type Condicao } from "@/src/lib/motor/condicoes"
 import { concluirPasso, bloquearTarefa, desbloquearTarefa } from "@/src/services/task-step-sync"
-import { novaViaDocumental, invalidarDocumento, marcarDocumentoRecebido, aprovarParaAnalise, concluirDocumento, registrarDivergencia, decidirRetificacao, registrarProtocoloDaEtapa } from "@/src/services/efeitos-de-dominio"
+import { novaViaDocumental, invalidarDocumento, marcarDocumentoRecebido, aprovarParaAnalise, concluirDocumento, registrarDivergencia, decidirRetificacao, registrarProtocoloDaEtapa, registrarPlanoDaRetificacao, EfeitoRecusado } from "@/src/services/efeitos-de-dominio"
 
 export interface ResultadoDaAcao {
   ok: boolean
@@ -306,6 +306,10 @@ export async function executarAcaoCadastrada(
   const alvo = { stepInstanceId, documentoId: passo.documentoId, processoId: passo.processoId, valores, sync, usuarioId: ctx.usuarioId ?? null }
   let detalhes: Record<string, unknown> = {}
 
+  // O EFEITO PODE RECUSAR. Alguns precisam de um alvo que a etapa nem sempre tem; sem
+  // um caminho de recusa, o jeito de "não fazer nada" era devolver detalhes vazios e
+  // concluir mesmo assim.
+  try {
   switch (acao.effectKey) {
     case "COMPLETE_STEP": break
     case "REGISTER_ONLY": break
@@ -316,6 +320,7 @@ export async function executarAcaoCadastrada(
     case "REGISTER_DIVERGENCE": detalhes = await registrarDivergencia(alvo); break
     case "GO_RETIFICATION": detalhes = await decidirRetificacao(alvo); break
     case "REGISTER_PROTOCOL": detalhes = await registrarProtocoloDaEtapa(alvo); break
+    case "REGISTER_RETIFICATION_PLAN": detalhes = await registrarPlanoDaRetificacao(alvo); break
     case "INVALIDATE_DOCUMENT": detalhes = await invalidarDocumento(alvo); break
     case "PAUSE_FOR_EXTERNAL_WAIT": {
       const t = await prisma.tarefa.findFirst({ where: { workflowStepInstanceId: stepInstanceId }, select: { id: true } })
@@ -332,6 +337,10 @@ export async function executarAcaoCadastrada(
     default:
       return { ok: false, codigo: "EFEITO_SEM_HANDLER",
         mensagem: `O efeito "${acao.effectKey}" está no catálogo mas não tem execução ligada.` }
+  }
+  } catch (e) {
+    if (e instanceof EfeitoRecusado) return { ok: false, codigo: e.codigo, mensagem: e.message }
+    throw e
   }
 
   // O PROTOCOLO QUE O EFEITO REGISTROU — lido do dono, para projetar sem copiar.

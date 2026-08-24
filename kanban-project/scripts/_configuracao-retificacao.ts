@@ -15,10 +15,16 @@ export const CONFIGURACAO: Record<string, {
     opcoes?: Array<{ key: string; label: string }>
     /** Alvo de referência, quando o campo aponta para um cadastro canônico. */
     referencia?: string
+    /** Condição declarativa de visibilidade. */
+    condicao?: { op: string; campo: string; valor?: unknown }
   }>
   acoes: Array<{ key: string; label: string; effectKey: string; descricao: string; requerCampos?: string[] }>
   checkItens?: Array<{ key: string; label: string; obrigatorio?: boolean }>
-  requisitos?: Array<{ key: string; label: string; tipo: string; alvoKey?: string; acaoKey?: string }>
+  requisitos?: Array<{
+    key: string; label: string; tipo: string; alvoKey?: string; acaoKey?: string
+    /** Só é cobrado quando a condição for verdadeira. */
+    condicao?: { op: string; campo: string; valor?: unknown }
+  }>
 }> = {
   // 1 ─ O modo decide todo o resto do trâmite. É a primeira coisa que se sabe.
   definir_modo_de_retificacao: {
@@ -31,9 +37,33 @@ export const CONFIGURACAO: Record<string, {
         opcoes: [{ key: "judicial", label: "Judicial" }, { key: "administrativa", label: "Administrativa" }],
       },
       { key: "fundamentacao", label: "Por que este modo", tipo: "textarea", ajuda: "O que na divergência leva a este caminho." },
+      // OS CAMPOS JUDICIAIS SÓ EXISTEM NA VIA JUDICIAL — pela condição declarada, que
+      // é o mecanismo genérico que o motor já tinha. Nenhum `if` por fase ou por
+      // passo em lugar nenhum do runtime.
+      {
+        key: "advogado_responsavel", label: "Profissional responsável", tipo: "referencia",
+        referencia: "PROFISSIONAL",
+        condicao: { op: "igual", campo: "modo", valor: "judicial" },
+        ajuda: "Escolhido no cadastro de Profissionais. Nome e OAB/UF são lidos de lá — nada é copiado.",
+      },
+      {
+        key: "numero_processo_judicial", label: "Número do processo judicial", tipo: "texto",
+        condicao: { op: "igual", campo: "modo", valor: "judicial" },
+        ajuda: "Número da ação no tribunal (CNJ). Não é o número do protocolo: o protocolo é o comprovante de entrada.",
+      },
     ],
-    acoes: [{ key: "modo_definido", label: "Modo definido", effectKey: "COMPLETE_STEP", descricao: "Registra o caminho escolhido e libera a preparação.", requerCampos: ["modo"] }],
-    requisitos: [{ key: "modo_escolhido", label: "Modo da retificação", tipo: "CAMPO_PREENCHIDO", alvoKey: "modo" }],
+    // O EFEITO GRAVA NO PEDIDO. Modo, profissional e número do processo são do
+    // procedimento, não desta tentativa — a etapa é onde se decide, não onde mora.
+    acoes: [{ key: "modo_definido", label: "Modo definido", effectKey: "REGISTER_RETIFICATION_PLAN", descricao: "Registra no pedido o caminho escolhido e, na via judicial, o profissional e o número do processo.", requerCampos: ["modo"] }],
+    requisitos: [
+      { key: "modo_escolhido", label: "Modo da retificação", tipo: "CAMPO_PREENCHIDO", alvoKey: "modo" },
+      // CONDICIONAIS, e não obrigatórios: exigir na via administrativa um campo que a
+      // condição esconde seria pedir o impossível — e a publicação recusa isso.
+      { key: "tem_profissional", label: "Profissional responsável", tipo: "CAMPO_PREENCHIDO", alvoKey: "advogado_responsavel",
+        condicao: { op: "igual", campo: "modo", valor: "judicial" } },
+      { key: "tem_processo_judicial", label: "Número do processo judicial", tipo: "CAMPO_PREENCHIDO", alvoKey: "numero_processo_judicial",
+        condicao: { op: "igual", campo: "modo", valor: "judicial" } },
+    ],
   },
 
   // 2 ─ O documento que vai ser protocolado. A evidência é o próprio requerimento.

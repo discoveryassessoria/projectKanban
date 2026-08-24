@@ -62,6 +62,46 @@ const RESOLVEDORES: Record<ChaveDeAlvo, {
       (await prisma.orgaoProtocolo.findMany({ where: { id: { in: ids } }, select: SELECT_ORG }))
         .map(projetarOrganizacao),
   },
+  // O SEGUNDO ALVO. Acrescentá-lo custou esta entrada e a declaração — nem a
+  // validação, nem a leitura da etapa, nem o painel do operador, nem o configurador
+  // souberam que ele passou a existir. Era esse o teste da capacidade ser genérica.
+  PROFISSIONAL: {
+    listarAtivas: async () =>
+      (await prisma.profissional.findMany({
+        where: { ativo: true }, orderBy: [{ nome: "asc" }], select: SELECT_PROF,
+      })).map(projetarProfissional),
+    buscarPorIds: async (ids) =>
+      (await prisma.profissional.findMany({ where: { id: { in: ids } }, select: SELECT_PROF }))
+        .map(projetarProfissional),
+  },
+}
+
+const SELECT_PROF = {
+  id: true, nome: true, categoria: true, ativo: true,
+  organizacao: { select: { nomeFantasia: true, name: true } },
+  registros: {
+    where: { ativo: true }, orderBy: { id: "asc" as const },
+    select: { tipo: true, numero: true, jurisdicao: true },
+  },
+} as const
+
+function projetarProfissional(p: {
+  id: number; nome: string; categoria: string; ativo: boolean
+  organizacao: { nomeFantasia: string | null; name: string } | null
+  registros: Array<{ tipo: string; numero: string; jurisdicao: string | null }>
+}): EntidadeReferenciada {
+  // "OAB 123456/SP" é PROJEÇÃO: montada na leitura a partir do registro, nunca gravada
+  // como texto. Corrigir o número no cadastro muda o que a tela mostra, e só.
+  const registro = p.registros[0]
+    ? `${p.registros[0].tipo} ${p.registros[0].numero}${p.registros[0].jurisdicao ? `/${p.registros[0].jurisdicao}` : ""}`
+    : null
+  const onde = p.organizacao?.nomeFantasia?.trim() || p.organizacao?.name || null
+  return {
+    id: p.id,
+    label: registro ? `${p.nome} — ${registro}` : p.nome,
+    descricao: [p.categoria, onde].filter(Boolean).join(" · ") || null,
+    ativo: p.ativo,
+  }
 }
 
 const SELECT_ORG = {

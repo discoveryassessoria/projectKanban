@@ -14,6 +14,7 @@ import { preverPublicacao } from "../src/services/publicacao-de-workflow"
 import { fonteDoCampo, alvoDeReferencia } from "../src/lib/motor/fontes-de-campo"
 import { temPrazoProprio } from "../lib/operacional/tempo-operacional"
 import { efeito } from "../src/lib/motor/catalogo-de-efeitos"
+import { descreverCondicao, type Condicao } from "../src/lib/motor/condicoes"
 
 const prisma = new PrismaClient()
 const FASE = process.argv[2] ?? "retificacao_registros"
@@ -41,13 +42,13 @@ async function main() {
           key: true, label: true, ordem: true, executorKey: true, cardinalidade: true,
           slaDays: true, owner: true, required: true, regraDeConclusao: true, dependeDe: true,
           campos: { where: { ativo: true }, orderBy: { ordem: "asc" },
-            select: { key: true, label: true, tipo: true, obrigatorio: true, opcoes: true,
+            select: { key: true, label: true, tipo: true, obrigatorio: true, opcoes: true, condicao: true,
               opcoesCadastradas: { select: { key: true, ativo: true } } } },
           acoes: { where: { ativo: true }, orderBy: { ordem: "asc" },
             select: { key: true, label: true, effectKey: true, requerCampos: true } },
           checkItens: { where: { ativo: true }, orderBy: { ordem: "asc" }, select: { key: true, obrigatorio: true } },
           requisitos: { where: { ativo: true }, orderBy: { ordem: "asc" },
-            select: { key: true, tipo: true, alvoKey: true, acaoKey: true } },
+            select: { key: true, tipo: true, alvoKey: true, acaoKey: true, condicao: true } },
           subtarefas: { where: { ativo: true }, select: { key: true } },
         },
       },
@@ -85,11 +86,13 @@ async function main() {
     console.log(`   conclusão       ${s.regraDeConclusao ?? "ACAO_DO_PASSO"}`)
     console.log(`   depende de      ${(s.dependeDe as string[])?.length ? (s.dependeDe as string[]).join(", ") : "— (primeiro da cadeia)"}`)
 
+    const rotulos = Object.fromEntries(s.campos.map((c) => [c.key, c.label]))
     if (s.campos.length) {
       console.log(`   campos (${s.campos.length})`)
       for (const c of s.campos) {
         const fonte = fonteLegivel(c.tipo, c.opcoes, c.opcoesCadastradas)
-        console.log(`     · ${c.key.padEnd(22)} ${c.tipo.padEnd(11)}${c.obrigatorio ? "obrigatório " : "            "}${fonte}`)
+        console.log(`     · ${c.key.padEnd(24)} ${c.tipo.padEnd(11)}${c.obrigatorio ? "obrigatório " : "            "}${fonte}`)
+        if (c.condicao) console.log(`       ↳ SÓ APARECE quando ${descreverCondicao(c.condicao as unknown as Condicao, rotulos)}`)
       }
     }
     if (s.acoes.length) {
@@ -104,7 +107,10 @@ async function main() {
     }
     if (s.requisitos.length) {
       console.log(`   requisitos (${s.requisitos.length})`)
-      for (const r of s.requisitos) console.log(`     · ${r.key.padEnd(22)} ${r.tipo}${r.alvoKey ? ` → ${r.alvoKey}` : ""}${r.acaoKey ? ` (na ação ${r.acaoKey})` : ""}`)
+      for (const r of s.requisitos) {
+        console.log(`     · ${r.key.padEnd(24)} ${r.tipo}${r.alvoKey ? ` → ${r.alvoKey}` : ""}${r.acaoKey ? ` (na ação ${r.acaoKey})` : ""}`)
+        if (r.condicao) console.log(`       ↳ SÓ É COBRADO quando ${descreverCondicao(r.condicao as unknown as Condicao, rotulos)}`)
+      }
     }
     if (s.checkItens.length) {
       console.log(`   conferência (${s.checkItens.length})`)
