@@ -3178,6 +3178,22 @@ model CatalogoFase {
   atualizadoEm      DateTime @updatedAt
 
   naturezasPermitidas FaseNaturezaPermitida[]
+
+  /// QUEM CONDUZ ESTA FASE: o Workflow Interno, ou a tela anterior a ele.
+  ///
+  /// Seis fases têm tela própria, escrita antes do motor existir, com maquina de
+  /// estados em JSON. Elas avisam o motor de que terminaram concluindo À FORÇA todos
+  /// os passos obrigatórios — sem requisito, sem campo, sem ação. Enquanto o motor não
+  /// conduz a fase, isso é o certo; depois, vira o oposto.
+  ///
+  /// NÃO SE INFERE da existência de cadastro publicado. Medido em 24/08/2026:
+  /// `analise_documental` tinha 5/5 passos com cadastro publicado e 15 tentativas
+  /// com ZERO ações canônicas executadas — o cadastro existia, a operação nunca
+  /// migrou. Derivar "tem cadastro logo assumiu" teria desligado a Análise.
+  ///
+  /// Trocar de motor é DECISÃO de quem administra, tomada quando a operação estiver
+  /// pronta. Nasce `false`: nada muda para ninguém até alguém dizer que mudou.
+  conduzidaPeloWorkflowInterno Boolean @default(false)
 }
 
 // Workflow Macro â 1:1 com o tipo de processo

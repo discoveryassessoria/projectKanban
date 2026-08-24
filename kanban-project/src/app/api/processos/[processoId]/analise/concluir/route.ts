@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server"
+import { recusarSeCanonicoAssumiu } from "@/src/services/motor-da-fase"
 import { prisma } from "@/lib/prisma"
 import type { FaseCode } from "@prisma/client"
 import { dispararMotorNaFaseAtual } from "@/src/lib/motor/executor"
@@ -12,6 +13,13 @@ export async function POST(
     const { processoId } = await params
     const id = parseInt(processoId)
     if (isNaN(id)) return NextResponse.json({ error: "ID inválido" }, { status: 400 })
+
+    // UM MOTOR SÓ. Quando o Workflow Interno desta fase tem cadastro operacional
+    // publicado, esta rota — que é a anterior a ele — para de aceitar comando: seguir
+    // adiante concluiria à força os passos que o motor está pedindo, e as duas telas
+    // passariam a mostrar estados diferentes do mesmo processo.
+    const recusa = await recusarSeCanonicoAssumiu("analise_documental")
+    if (recusa) return NextResponse.json({ error: recusa.erro, mensagem: recusa.mensagem }, { status: 409 })
 
     const processo = await prisma.processo.findUnique({
       where: { id },

@@ -260,7 +260,17 @@ const MIGRATION = join(DIR_MIGRATIONS, '0000_baseline', 'migration.sql')
 // 02/08/2026, porque é quando a baseline foi aplicada.
 //
 //   anterior : ad01855eecd5d2cf3f3a183b9a3ecf8933cbba63fc77ffe3dda662b06cfa9c33
-const CHECKSUM_LEDGER = '69706882b57756bab1a55ab717913838ca414ca3d97df40780aa8b5dba9a8fcb'
+// 24/08/2026 — MOTOR DA FASE DECLARADO. Uma coluna em `CatalogoFase`:
+// `conduzidaPeloWorkflowInterno`, que diz quem conduz cada fase. Nasce false para
+// todas; só a Retificação nasce true, e por prova.
+//
+// O que ela corrige: a trava de "um motor por fase" derivava o dono da existência de
+// cadastro publicado. Medido em produção, `analise_documental` tinha 5/5 passos com
+// cadastro e ZERO ações canônicas — o cadastro existia, a operação nunca migrou.
+// A derivação teria desligado a Análise.
+//
+//   anterior : 69706882b57756bab1a55ab717913838ca414ca3d97df40780aa8b5dba9a8fcb
+const CHECKSUM_LEDGER = '7c67e2f5035c1efade5380b3cadeed1a4a43bdb02934c5924cb6ec15c72a9b0c'
 
 /**
  * Migrations criadas DEPOIS da consolidacao de 02/08/2026. Toda migration nova
@@ -305,6 +315,7 @@ const MIGRATIONS_POS_BASELINE: string[] = [
   '20260822170000_protocolo_na_execucao',
   '20260822180000_retificacao_unidade_canonica',
   '20260824100000_profissional_canonico',
+  '20260824140000_motor_da_fase_declarado',
 ]
 
 const sha256 = (t: string) => createHash('sha256').update(t).digest('hex')

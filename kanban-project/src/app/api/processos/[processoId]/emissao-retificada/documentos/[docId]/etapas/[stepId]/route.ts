@@ -4,6 +4,7 @@
 // (+ gatilho do MOTOR quando a fase avança — 1 linha, best-effort)
 
 import { NextResponse } from "next/server"
+import { recusarSeCanonicoAssumiu } from "@/src/services/motor-da-fase"
 import { prisma } from "@/lib/prisma"
 import {
   applyStep, allValidated, reProgress,
@@ -19,6 +20,13 @@ export async function POST(
   const { processoId: pid, docId: did, stepId } = await params
   const processoId = Number(pid)
   const registroId = Number(did)
+
+  // UM MOTOR SÓ. Quando o Workflow Interno desta fase tem cadastro operacional
+  // publicado, esta rota — que é a anterior a ele — para de aceitar comando: seguir
+  // adiante concluiria à força os passos que o motor está pedindo, e as duas telas
+  // passariam a mostrar estados diferentes do mesmo documento.
+  const recusa = await recusarSeCanonicoAssumiu("emissao_documental_retificada")
+  if (recusa) return NextResponse.json({ error: recusa.erro, mensagem: recusa.mensagem }, { status: 409 })
 
   let payload: Record<string, unknown> = {}
   try { payload = await req.json() } catch { payload = {} }

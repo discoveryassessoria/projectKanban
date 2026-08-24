@@ -7,6 +7,7 @@
 // ============================================================
 
 import { NextResponse } from "next/server"
+import { recusarSeCanonicoAssumiu } from "@/src/services/motor-da-fase"
 import { prisma } from "@/lib/prisma"
 import type { Prisma } from "@prisma/client"
 import {
@@ -24,6 +25,7 @@ export async function POST(
     const { processoId, stepId } = await params
     const id = parseInt(processoId)
     if (isNaN(id)) return NextResponse.json({ error: "ID inválido" }, { status: 400 })
+
     const body = await request.json().catch(() => ({}))
 
     const processo = await prisma.processo.findUnique({
@@ -31,6 +33,13 @@ export async function POST(
       select: { id: true, pais: true, faseAtualKey: true },
     })
     if (!processo) return NextResponse.json({ error: "Processo não encontrado" }, { status: 404 })
+
+    // UM MOTOR SÓ. A fase final varia por processo, então a pergunta só pode ser feita
+    // depois de saber em qual delas ele está. Quando o Workflow Interno dessa fase tem
+    // cadastro operacional publicado, esta rota para de aceitar comando: seguir adiante
+    // concluiria à força os passos que o motor está pedindo.
+    const recusa = await recusarSeCanonicoAssumiu(processo.faseAtualKey ?? "")
+    if (recusa) return NextResponse.json({ error: recusa.erro, mensagem: recusa.mensagem }, { status: 409 })
 
     const key = keyFromFaseCode(processo.faseAtualKey)
     if (!key) return NextResponse.json({ error: "O processo não está numa fase final." }, { status: 422 })

@@ -43,10 +43,7 @@ import {
 
 // Lote 1 — telas bespoke (só as REGISTRADAS no mapa TELAS abaixo)
 import {
-  TeamsTab,
-  SLATab, TemplatesTab, NotificationsTab, ImportExportTab,
-  BackupTab, SettingsTab,
-} from "@/src/components/gerenciamentoComponents/GerenciamentoScaffolds"
+  BackupTab, } from "@/src/components/gerenciamentoComponents/GerenciamentoScaffolds"
 
 // Lote 2 — Diagnóstico Executivo
 import { HealthTab } from "@/src/components/gerenciamentoComponents/GerenciamentoScaffolds2"
@@ -62,9 +59,7 @@ import { encerrarSessao } from "@/src/lib/sessao/cliente"
 
 // Lote 6 — Cadastros do Motor + Saúde do Sistema (telas que faltavam)
 import {
-  ExecMatrixTab, SystemHealthTab,
-  DocMatrixTab, ConfigVersionsTab, ConfigDiagnosisTab,
-} from "@/src/components/gerenciamentoComponents/GerenciamentoScaffolds6"
+  DocMatrixTab, } from "@/src/components/gerenciamentoComponents/GerenciamentoScaffolds6"
 import { useDadosHeaderBar } from "@/src/hooks/use-dados-headerbar"
 
 // ============================================================
@@ -156,6 +151,7 @@ const DiagnosticoSistemaTab = dynamic(() => import("@/src/components/gerenciamen
 const DiagnosticoExecutivoTab = dynamic(() => import("@/src/components/gerenciamentoComponents/DiagnosticoViews").then(m => m.DiagnosticoExecutivoTab), { ssr: false, loading: () => <CarregandoTela /> })
 // Saúde do Sistema — motor de auditoria contínua (catálogo versionado + estados
 // reais). A visão antiga de integridade continua acessível em ?screen=syshealth-legado
+// — mantida de propósito: ela lê um read-model diferente e ainda serve de contraprova.
 // até o motor novo estar validado em produção.
 const SaudeSistemaTab = dynamic(() => import("@/src/components/gerenciamentoComponents/SaudeSistemaTab").then(m => m.SaudeSistemaTab), { ssr: false, loading: () => <CarregandoTela /> })
 const SaudeSistemaLegadoTab = dynamic(() => import("@/src/components/gerenciamentoComponents/DiagnosticoViews").then(m => m.SaudeSistemaTab), { ssr: false, loading: () => <CarregandoTela /> })
@@ -207,11 +203,11 @@ const TELAS: Record<string, React.ComponentType> = {
   fases: CatalogoFasesTab,
 
   // bespoke (lote 1)
-  // Cadastros REAIS (motor genérico). Os rascunhos do mockup seguem acessíveis
-  // por ?screen=<key>-rascunho.
+  // Cadastros REAIS (motor genérico). Os rascunhos do mockup foram removidos em
+  // 24/08/2026: cada um tinha a tela real ao lado, e mockup que sobrevive à tela
+  // pronta só serve para alguém abrir o errado.
   teams: cad("grupos"),
   opcapacity: CapacidadeOperacionalTab,
-  "teams-rascunho": TeamsTab,
   servcats: cad("categorias-servico"),
   orgcats: cad("categorias-organizacao"),
   // Automações por fase — MESMA tela para os itens oficiais "Financeiras" e
@@ -219,31 +215,24 @@ const TELAS: Record<string, React.ComponentType> = {
   // próprio: vira alias para `autofin` (deep-link preservado).
   autofin: function AutomacoesFinanceiras() { return <PhaseAutomationsFasesTab kindInicial="financial" /> },
   autoevt: function AutomacoesEventos() { return <PhaseAutomationsFasesTab kindInicial="event" /> },
-  // SLA consolidado (real, sobre a configuração de cada processo). O rascunho antigo
-  // continua acessível por ?screen=sla-rascunho.
+  // SLA consolidado (real, sobre a configuração de cada processo).
   sla: SLAConfiguracaoTab,
-  "sla-rascunho": SLATab,
   proccfg: ConfiguracoesGeraisProcessoTab,
   transicoes: TransicoesTab,
   integracoes: IntegracoesTab,
   governanca: function GovernancaFinanceira() { return <LogAuditoriaTab escopo="financeiro" /> },
   templates: ModelosDocumentaisTab,
-  "templates-rascunho": TemplatesTab,
   notifications: cad("notificacoes"),
-  "notifications-rascunho": NotificationsTab,
   audit: LogAuditoriaTab,
   impexp: ExportacoesTab,
-  "impexp-rascunho": ImportExportTab,
   backup: BackupTab,
   settings: ConfiguracoesGeraisSistemaTab,
-  "settings-rascunho": SettingsTab,
   identidade: IdentidadeVisualTab,
 
   // bespoke (lote 2)
   proctypes: TipoProcessoTab,
   macrokanban: MacroKanbanTab,
   mgmthealth: DiagnosticoExecutivoTab,
-  "mgmthealth-rascunho": HealthTab,
 
   // bespoke (lote 3)
   phaseiwf: PhaseWorkflowsFasesTab,
@@ -269,7 +258,6 @@ const TELAS: Record<string, React.ComponentType> = {
   runtimediag: RuntimeWorkflowDiagnostics,
   migmotor: MigracaoMotorTab,
   diagnostics: DiagnosticoSistemaTab,
-  "diagnostics-rascunho": DiagnosticsTab,
   dashboards: DashboardsTab,
   credito: CreditoTab,
   docfin: DocumentosFinanceirosTab,
@@ -285,16 +273,12 @@ const TELAS: Record<string, React.ComponentType> = {
   // Assistente de Parametrização — orquestra as telas oficiais; não as substitui.
   paramwizard: AssistenteParametrizacaoTab,
   // Versões e Diagnóstico de Configuração passam a ser telas REAIS sobre o
-  // read-model; os rascunhos seguem acessíveis por ?screen=<key>-rascunho.
+  // read-model.
   cfgversions: VersoesConfiguracaoTab,
-  "cfgversions-rascunho": ConfigVersionsTab,
   cfgdiagnosis: DiagnosticoConfiguracaoTab,
-  "cfgdiagnosis-rascunho": ConfigDiagnosisTab,
   execmatrix: HistoricoExecucoesTab,
-  "execmatrix-rascunho": ExecMatrixTab,
   syshealth: SaudeSistemaTab,
   "syshealth-legado": SaudeSistemaLegadoTab,
-  "syshealth-rascunho": SystemHealthTab,
 }
 
 function CarregandoTela() {
@@ -360,7 +344,6 @@ export default function GerenciamentoPage() {
     coa: "catalog",
     costcenters: "catalog",
     prottypes: "overview",
-    "prottypes-rascunho": "overview",
     protocols: "overview",
   }
   const resolverTela = useCallback((k: string | null): string => {

@@ -2351,6 +2351,7 @@ CREATE TABLE "CatalogoFase" (
     "efeitosPermitidos" JSONB,
     "criadoEm" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "atualizadoEm" TIMESTAMP(3) NOT NULL,
+    "conduzidaPeloWorkflowInterno" BOOLEAN NOT NULL DEFAULT false,
 
     CONSTRAINT "CatalogoFase_pkey" PRIMARY KEY ("id")
 );

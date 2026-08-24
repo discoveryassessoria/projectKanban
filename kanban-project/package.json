@@ -349,7 +349,8 @@
     "db:push:teste": "PRISMA_DATABASE_URL=postgresql://postgres@127.0.0.1:55432/discovery_test DIRECT_DATABASE_URL=postgresql://postgres@127.0.0.1:55432/discovery_test sh -c \"node scripts/guard-db-push-local.mjs && npx prisma db push --skip-generate --accept-data-loss\"",
     "guard:db-push": "node scripts/guard-db-push-local.mjs",
     "previa:publicacao": "tsx scripts/previa-publicacao.ts",
-    "test:profissional-judicial": "tsx scripts/profissional-e-judicial.test.ts"
+    "test:profissional-judicial": "tsx scripts/profissional-e-judicial.test.ts",
+    "test:um-motor": "tsx scripts/guard-um-motor-por-fase.test.ts"
   },
   "prisma": {
     "seed": "npm run guard:escrita && tsx prisma/seed.ts"

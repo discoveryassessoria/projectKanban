@@ -4,7 +4,7 @@
 // ============================================================
 
 import { NextResponse } from "next/server"
-import { recusarSeCanonicoAssumiu } from "@/src/services/motor-da-retificacao"
+import { recusarSeCanonicoAssumiu, FASE_RETIFICACAO } from "@/src/services/motor-da-fase"
 import { prisma } from "@/lib/prisma"
 import type { Prisma } from "@prisma/client"
 import { buildInitialWorkflow } from "@/src/lib/process-stage/retificacao-engine"
@@ -24,7 +24,7 @@ export async function POST(
     // anterior a ele — para de aceitar comando: dois motores dando ordens ao mesmo
     // processo mostram estados diferentes, e o que "vale" vira o da tela que alguém
     // abriu por último.
-    const recusa = await recusarSeCanonicoAssumiu()
+    const recusa = await recusarSeCanonicoAssumiu(FASE_RETIFICACAO)
     if (recusa) return NextResponse.json({ error: recusa.erro, mensagem: recusa.mensagem }, { status: 409 })
 
     const processo = await prisma.processo.findUnique({ where: { id }, select: { id: true } })

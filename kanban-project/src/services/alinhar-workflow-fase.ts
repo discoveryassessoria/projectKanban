@@ -19,6 +19,7 @@
 // pelo sistema (sem violar segregação: aprovador do sistema é nulo).
 
 import { prisma } from "@/lib/prisma"
+import { motorVigenteDaFase } from "@/src/services/motor-da-fase"
 import { WorkflowInstanceStatus } from "@prisma/client"
 import { concluirPasso, aprovarPasso } from "@/src/services/task-step-sync"
 
@@ -38,7 +39,7 @@ const PASSO_FEITO = new Set(["CONCLUIDO", "DISPENSADO", "SUPERSEDIDO", "CANCELAD
 export async function concluirWorkflowInternoDaFase(
   processoId: number,
   faseMacroKey: string,
-): Promise<{ concluidos: number }> {
+): Promise<{ concluidos: number; recusado?: "MOTOR_CANONICO_ASSUMIU" }> {
   let concluidos = 0
   try {
     const inst = await prisma.phaseWorkflowInstance.findFirst({
@@ -53,6 +54,34 @@ export async function concluirWorkflowInternoDaFase(
       },
     })
     if (!inst) return { concluidos }
+
+    // ── O ATALHO NÃO ATRAVESSA UM MOTOR QUE JÁ ESTÁ EM PÉ ───────────────────
+    //
+    // Esta função conclui À FORÇA todos os passos obrigatórios da fase: sem requisito,
+    // sem campo preenchido, sem ação escolhida. Ela existe porque as telas bespoke —
+    // Análise, Tradução, Apostilamento, Emissão Retificada, Fase Final, Retificação —
+    // conduzem a fase por fora e precisam avisar o motor de que terminaram.
+    //
+    // Enquanto os passos publicados estão VAZIOS, isso é o certo: não há nada para
+    // executar, e sem o atalho a fase nunca fecharia. No instante em que a fase ganha
+    // cadastro operacional publicado, vira o oposto — o atalho passa a dar por feito,
+    // em silêncio, exatamente o trabalho que o motor está pedindo. As duas telas
+    // mostram estados diferentes do mesmo processo, e vence a que alguém abriu por
+    // último.
+    //
+    // A troca não tem data marcada nem lista de fases: quem decide é o ato de publicar
+    // cadastro. Aqui é a última linha de defesa — as rotas recusam antes, com mensagem
+    // para quem está na tela; esta recusa existe para que nenhum chamador futuro passe
+    // por baixo delas.
+    const motor = await motorVigenteDaFase(faseMacroKey)
+    if (motor.canonico) {
+      console.warn(
+        `[alinhar-workflow-fase] RECUSADO p/ processo ${processoId} fase ${faseMacroKey}: ` +
+        `o Workflow Interno conduz esta fase (${motor.motivo}) e concluir à força apagaria ` +
+        `o trabalho que ele está pedindo.`,
+      )
+      return { concluidos, recusado: "MOTOR_CANONICO_ASSUMIU" as const }
+    }
 
     for (const s of inst.steps) {
       if (PASSO_FEITO.has(String(s.status))) continue

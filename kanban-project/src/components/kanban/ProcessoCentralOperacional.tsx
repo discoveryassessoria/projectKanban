@@ -21,7 +21,6 @@ import { ProcessoTraducao } from "./ProcessoTraducao"
 import { ProcessoFaseGenerica } from "./ProcessoFaseGenerica"
 import { ProcessoApostilamento } from "./ProcessoApostilamento"
 import { ProcessoFaseFinal } from "./ProcessoFaseFinal"
-import { ProcessoRetificacao } from "./ProcessoRetificacao"
 import { PedidosDeRetificacao } from "./PedidosDeRetificacao"
 import { ProcessoEmissaoRetificada } from "./ProcessoEmissaoRetificada"
 import { RetornarFaseButton } from "./RetornarFaseButton"
@@ -1018,15 +1017,17 @@ export function ProcessoCentralOperacional({
         ) : !isView && ehApostilamento ? (
           <ProcessoApostilamento processoId={processo.id} onConcluido={() => carregar(true)} />
         ) : !isView && ehRetificacao ? (
-          // OS PEDIDOS VÊM ANTES DO MOTOR ANTIGO. Com a retificação operando por
-          // pedido, a fase só cria etapas depois que existir um — e abrir o pedido era
-          // uma operação que só existia em API. A tela legada continua abaixo enquanto
-          // for o motor vigente; no dia em que a versão publicada tiver cadastro
-          // operacional, ela se recusa sozinha e este painel fica sendo o caminho.
-          <div className="space-y-6">
-            <PedidosDeRetificacao processoId={processo.id} aoMudar={() => carregar(true)} />
-            <ProcessoRetificacao processoId={processo.id} onConcluido={() => carregar(true)} />
-          </div>
+          // A TELA ANTERIOR SAIU. A Retificação é conduzida pelo Workflow Interno
+          // desde 24/08/2026 (v2, seis passos com cadastro, cardinalidade por pedido),
+          // e as rotas dela já recusavam tudo — tela que só sabe recusar é tela que
+          // confunde: o operador tenta, leva erro e não sabe para onde ir.
+          //
+          // Nada se perdeu: cada capacidade dela foi mapeada para um dono canônico com
+          // lugar onde é operada — órgão e cartório em Órgãos e Organizações, advogado
+          // e OAB no cadastro de Profissionais, vara em `Protocolo.setor`, comarca
+          // derivada do órgão, número do processo no pedido, protocolo em `Protocolo`,
+          // andamento e histórico nas etapas. Os dados antigos continuam no banco.
+          <PedidosDeRetificacao processoId={processo.id} aoMudar={() => carregar(true)} />
         ) : !isView && ehEmissaoRetificada ? (
           <ProcessoEmissaoRetificada processoId={processo.id} onConcluido={() => carregar(true)} />
         ) : !isView && ehFaseFinal ? (

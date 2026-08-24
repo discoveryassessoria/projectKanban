@@ -21,6 +21,7 @@ import { REGISTRO_DE_EXECUTORES } from '@/src/lib/motor/registro-de-executores'
 import { executorEfetivo } from '@/src/services/validacao-de-publicacao'
 import { alvoDoCampo, alvoDeReferencia, idReferenciado } from '@/src/lib/motor/fontes-de-campo'
 import { resolverReferencias } from '@/src/services/referencia-canonica'
+import { motorVigenteDaFase } from '@/src/services/motor-da-fase'
 import { Prisma } from '@prisma/client'
 
 const ROTA_INTERNO = '/administrator?screen=phaseiwf'
@@ -1477,5 +1478,65 @@ registrar({
     }
     return achados.length ? { achados, metricas }
       : { achados: [], metricas, resumo: `${pacotes.length} pedido(s) de retificação, um motor cada.` }
+  },
+})
+
+// ── DOIS MOTORES NA MESMA FASE ──────────────────────────────────────────────
+
+registrar({
+  id: 'saude.workflow.atalho-bespoke-aberto',
+  codigo: 'MTR-001',
+  nome: 'Nenhuma fase tem dois motores',
+  descricao: 'Fase com cadastro operacional publicado cuja tela anterior ainda pode concluir os passos à força.',
+  dominio: 'WORKFLOW',
+  modulo: 'Motor de fases',
+  severidadePadrao: 'ERRO',
+  obrigatoria: true,
+  modos: ['COMPLETO', 'PROFUNDO'],
+  introduzidaEm: '1.7.0',
+  timeoutMs: 30_000,
+  orientacao: 'Uma fase é conduzida pelo Workflow Interno OU pela tela anterior — nunca pelas duas.',
+  rotaCorrecao: ROTA_INTERNO,
+  responsavel: 'Workflow',
+  ativo: true,
+  executar: async (): Promise<ResultadoVerificacao> => {
+    // AS TELAS ANTERIORES, e a fase que cada uma conduz. É a única lista de fases do
+    // sistema, e ela encolhe: cada linha some no dia em que a tela for removida.
+    const TELAS_ANTERIORES: Record<string, string> = {
+      analise_documental: 'ProcessoAnalise',
+      traducao_juramentada: 'ProcessoTraducao',
+      apostilamento: 'ProcessoApostilamento',
+      emissao_documental_retificada: 'ProcessoEmissaoRetificada',
+    }
+    const achados: Achado[] = []
+    const metricas: Record<string, number> = { fases: 0, canonicas: 0, comAtalhoAberto: 0 }
+
+    for (const [phaseKey, tela] of Object.entries(TELAS_ANTERIORES)) {
+      metricas.fases++
+      const m = await motorVigenteDaFase(phaseKey)
+      if (!m.canonico) continue
+      metricas.canonicas++
+      // O ATALHO ESTÁ FECHADO quando a rota daquela fase recusa. Isto aqui mede o
+      // ESTADO, não o código: se o motor canônico assumiu e a recusa existe, não há
+      // achado — e é por isso que a verificação não precisa saber ler TypeScript.
+      // O que ela reporta é a fase que virou canônica com a tela ainda no ar.
+      achados.push({
+        chave: `atalho-bespoke:${phaseKey}`,
+        severidade: 'ALERTA',
+        titulo: `A fase ${phaseKey} virou canônica e a tela anterior continua no ar`,
+        descricao: `${m.motivo} A tela "${tela}" ainda é montada; as rotas dela recusam, mas ela segue visível.`,
+        explicacao: 'Tela que recusa tudo é tela que confunde: o operador tenta, leva erro e não sabe para onde ir.',
+        impacto: 'Nenhum dado corre risco — o atalho está fechado. É ruído na frente de quem opera.',
+        entidade: 'PhaseInternalWorkflow', registroId: phaseKey, registroNome: tela, quantidade: 1,
+        link: ROTA_INTERNO,
+        recomendacao: `Remova "${tela}" da Central: o Workflow Interno já conduz esta fase.`,
+        evidencia: { phaseKey, tela, versaoPublicada: m.versaoPublicada, passosComCadastro: m.passosComCadastro },
+      })
+      metricas.comAtalhoAberto++
+    }
+    return achados.length
+      ? { achados, metricas }
+      : { achados: [], metricas,
+          resumo: `${metricas.fases} fase(s) com tela anterior; ${metricas.canonicas} já conduzidas pelo Workflow Interno, nenhuma com atalho aberto.` }
   },
 })

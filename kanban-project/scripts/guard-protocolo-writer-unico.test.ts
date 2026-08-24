@@ -90,18 +90,21 @@ check("e o número projetado vem de `Protocolo`, não do payload",
   /prisma\.protocolo\.findUnique\(\{ where: \{ id \}/.test(execAcao))
 
 // UM MOTOR SÓ NA RETIFICAÇÃO.
-const arbitro = readFileSync(join(ROOT, "src/services/motor-da-retificacao.ts"), "utf8")
-check("existe um árbitro que diz qual motor conduz a Retificação",
-  arbitro.includes("motorVigenteDaRetificacao") && arbitro.includes("lerVersaoPublicada"))
+const arbitro = readFileSync(join(ROOT, "src/services/motor-da-fase.ts"), "utf8")
+check("existe um árbitro que diz qual motor conduz cada fase",
+  arbitro.includes("motorVigenteDaFase") && arbitro.includes("lerVersaoPublicada"))
 check("o árbitro decide pela versão PUBLICADA, nunca pelo rascunho",
-  /A pergunta é sobre a versão PUBLICADA, não sobre o rascunho/.test(arbitro) &&
   arbitro.includes("lerVersaoPublicada(wf.id, wf.versao)"))
+// A DERIVAÇÃO SOZINHA JÁ QUASE DESLIGOU A ANÁLISE, que tinha cadastro publicado e
+// zero ações canônicas executadas. Trocar de motor é decisão, e mora no cadastro.
+check("e exige que a fase DECLARE que migrou, em vez de inferir do cadastro",
+  arbitro.includes("conduzidaPeloWorkflowInterno"))
 for (const rota of [
   "src/app/api/processos/[processoId]/retificacao/pacotes/route.ts",
   "src/app/api/processos/[processoId]/retificacao/pacotes/[pkgId]/etapas/[stepId]/route.ts",
 ]) {
   check(`a rota legada recusa quando o canônico assume: ${rota.split("/").slice(-2).join("/")}`,
-    readFileSync(join(ROOT, rota), "utf8").includes("recusarSeCanonicoAssumiu()"))
+    readFileSync(join(ROOT, rota), "utf8").includes("recusarSeCanonicoAssumiu("))
 }
 
 // A PORTA PRECISA CONTINUAR SENDO A PORTA. Se ela deixar de criar, a allowlist
