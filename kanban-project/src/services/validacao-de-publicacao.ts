@@ -25,6 +25,7 @@
 import { prisma } from "@/lib/prisma"
 import type { Prisma } from "@prisma/client"
 import { efeito, efeitoExiste, efeitosDaFase } from "@/src/lib/motor/catalogo-de-efeitos"
+import { fonteDoCampo, alvoDeReferencia, alvoDoCampo } from "@/src/lib/motor/fontes-de-campo"
 import { executorSuportaCampo, executorSuportaEfeito, capacidades, TIPOS_DE_CAMPO } from "@/src/lib/motor/registro-de-executores"
 import { resolveWorkflowStepEditor } from "@/src/lib/process-stage/step-editor-registry"
 import { validarCondicao } from "@/src/lib/motor/condicoes"
@@ -224,6 +225,28 @@ export function validarConfiguracao(
         problemas.push({ codigo: "CAMPO_SEM_OPCAO_ATIVA", stepKey: p.key,
           mensagem: `O campo "${c.key}" é de escolha e não tem nenhuma opção cadastrada em "${p.label}".` })
       }
+      // ── REFERÊNCIA A CADASTRO ────────────────────────────────────────
+      //
+      // Um campo `referencia` sem recurso declarado, ou com um recurso que não existe,
+      // vira uma caixa vazia na tela do operador. Recusar aqui é a diferença entre
+      // descobrir isso na publicação e descobrir com o processo parado.
+      if (c.tipo === "referencia") {
+        const alvo = alvoDoCampo(c.opcoesLegado)
+        if (!alvo) {
+          problemas.push({ codigo: "REFERENCIA_SEM_ALVO", stepKey: p.key,
+            mensagem: `O campo "${c.key}" é uma referência e não diz a qual cadastro aponta.` })
+        } else if (!alvoDeReferencia(alvo)) {
+          problemas.push({ codigo: "ALVO_INEXISTENTE", stepKey: p.key,
+            mensagem: `O campo "${c.key}" aponta para "${alvo}", que não está no vocabulário de alvos de referência.` })
+        }
+      }
+      // O CONTRÁRIO TAMBÉM: declarar referência num campo que não é de referência
+      // gravaria um ID onde a tela mostra texto — e ninguém perceberia.
+      if (c.tipo !== "referencia" && fonteDoCampo(c.opcoesLegado)?.especie === "REFERENCIA") {
+        problemas.push({ codigo: "REFERENCIA_EM_TIPO_ERRADO", stepKey: p.key,
+          mensagem: `O campo "${c.key}" declara uma referência mas é do tipo "${c.tipo}". Referência exige o tipo "referencia".` })
+      }
+
       // CAMPO OBRIGATÓRIO IMPOSSÍVEL: exigir preenchimento de algo que a condição
       // esconde é pedir ao operador uma coisa que ele não pode ver.
       if (c.obrigatorio && c.condicao != null) {

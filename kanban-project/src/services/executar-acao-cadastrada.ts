@@ -31,13 +31,15 @@ import { efeito, efeitosDaFase } from "@/src/lib/motor/catalogo-de-efeitos"
 import { executorSuportaEfeito } from "@/src/lib/motor/registro-de-executores"
 import { executorEfetivo } from "@/src/services/validacao-de-publicacao"
 import { registrarNaTentativa, tentativaVigente } from "@/src/services/execucao-do-passo"
+import { alvoDoCampo, idReferenciado } from "@/src/lib/motor/fontes-de-campo"
+import { validarReferencia } from "@/src/services/referencia-canonica"
 import { subtarefasDaEtapa, passoPodeConcluir } from "@/src/services/subtarefas-da-etapa"
 import { canaisDaSubtarefa } from "@/src/lib/motor/canais-do-fornecedor"
 import { registrarNaExecucao, garantirExecucao, ESTADOS_DA_SUBTAREFA } from "@/src/services/execucao-da-subtarefa"
 import { requisitosPendentes } from "@/src/services/requisitos-da-etapa"
 import { avaliarCondicao, type Condicao } from "@/src/lib/motor/condicoes"
 import { concluirPasso, bloquearTarefa, desbloquearTarefa } from "@/src/services/task-step-sync"
-import { novaViaDocumental, invalidarDocumento, marcarDocumentoRecebido, aprovarParaAnalise, concluirDocumento, registrarDivergencia, decidirRetificacao } from "@/src/services/efeitos-de-dominio"
+import { novaViaDocumental, invalidarDocumento, marcarDocumentoRecebido, aprovarParaAnalise, concluirDocumento, registrarDivergencia, decidirRetificacao, registrarProtocoloDaEtapa, registrarPlanoDaRetificacao, EfeitoRecusado } from "@/src/services/efeitos-de-dominio"
 
 export interface ResultadoDaAcao {
   ok: boolean
@@ -247,6 +249,35 @@ export async function executarAcaoCadastrada(
     }
   }
 
+  // ── REFERÊNCIAS A CADASTRO ────────────────────────────────────────────────
+  //
+  // O formulário manda um número. Quem decide se aquele número existe, é do cadastro
+  // certo, está em circulação e se quem está executando pode escolhê-lo é o SERVIDOR —
+  // pela mesma razão que a opção de um select é conferida aqui e não lá.
+  //
+  // O que já estava escolhido nesta execução passa mesmo se tiver sido desativado
+  // depois: recusar seria travar uma execução em andamento por uma mudança de cadastro
+  // que não é dela.
+  const jaGravados = ((await tentativaVigente(stepInstanceId))?.payload as
+    { valores?: Record<string, unknown> } | null)?.valores ?? {}
+  for (const campo of camposDisponiveis) {
+    if (campo.tipo !== "referencia") continue
+    const v = valores[campo.key]
+    if (v == null || v === "") continue
+    const alvoDeclarado = alvoDoCampo(campo.opcoes)
+    const r = await validarReferencia({
+      alvo: alvoDeclarado ?? "",
+      valor: v,
+      rotuloDoCampo: campo.label ?? campo.key,
+      permissoes: ctx.permissoes ?? [],
+      jaEscolhidoAntes: idReferenciado(jaGravados[campo.key]) === idReferenciado(v),
+    })
+    if (!r.ok) return { ok: false, codigo: `REFERENCIA_${r.motivo}`, mensagem: r.mensagem }
+    // O QUE VAI PARA O PAYLOAD É O ID, normalizado a número. Nunca o rótulo: o rótulo
+    // é buscado no cadastro a cada leitura, e é isso que faz renomear funcionar.
+    valores[campo.key] = r.entidade.id
+  }
+
   const falta = faltando(camposDisponiveis, acao, valores)
   if (falta.length) {
     const rotulos = falta.map((k) => camposDisponiveis.find((c) => c.key === k)?.label ?? k)
@@ -275,6 +306,10 @@ export async function executarAcaoCadastrada(
   const alvo = { stepInstanceId, documentoId: passo.documentoId, processoId: passo.processoId, valores, sync, usuarioId: ctx.usuarioId ?? null }
   let detalhes: Record<string, unknown> = {}
 
+  // O EFEITO PODE RECUSAR. Alguns precisam de um alvo que a etapa nem sempre tem; sem
+  // um caminho de recusa, o jeito de "não fazer nada" era devolver detalhes vazios e
+  // concluir mesmo assim.
+  try {
   switch (acao.effectKey) {
     case "COMPLETE_STEP": break
     case "REGISTER_ONLY": break
@@ -284,6 +319,8 @@ export async function executarAcaoCadastrada(
     case "REQUEST_NEW_COPY": detalhes = await novaViaDocumental(alvo); break
     case "REGISTER_DIVERGENCE": detalhes = await registrarDivergencia(alvo); break
     case "GO_RETIFICATION": detalhes = await decidirRetificacao(alvo); break
+    case "REGISTER_PROTOCOL": detalhes = await registrarProtocoloDaEtapa(alvo); break
+    case "REGISTER_RETIFICATION_PLAN": detalhes = await registrarPlanoDaRetificacao(alvo); break
     case "INVALIDATE_DOCUMENT": detalhes = await invalidarDocumento(alvo); break
     case "PAUSE_FOR_EXTERNAL_WAIT": {
       const t = await prisma.tarefa.findFirst({ where: { workflowStepInstanceId: stepInstanceId }, select: { id: true } })
@@ -301,6 +338,18 @@ export async function executarAcaoCadastrada(
       return { ok: false, codigo: "EFEITO_SEM_HANDLER",
         mensagem: `O efeito "${acao.effectKey}" está no catálogo mas não tem execução ligada.` }
   }
+  } catch (e) {
+    if (e instanceof EfeitoRecusado) return { ok: false, codigo: e.codigo, mensagem: e.message }
+    throw e
+  }
+
+  // O PROTOCOLO QUE O EFEITO REGISTROU — lido do dono, para projetar sem copiar.
+  const protocoloRegistrado = await (async () => {
+    const id = (detalhes as { protocoloId?: unknown }).protocoloId
+    if (typeof id !== "number") return null
+    const p = await prisma.protocolo.findUnique({ where: { id }, select: { id: true, numeroProtocolo: true } })
+    return p ? { id: p.id, numero: p.numeroProtocolo } : null
+  })()
 
   // ── REGISTRO NA EXECUÇÃO DA SUBTAREFA ───────────────────────────────────
   //
@@ -342,7 +391,16 @@ export async function executarAcaoCadastrada(
         valores, detalhes: {}, decididoEm: new Date().toISOString(),
       } as never,
       ...(typeof valores.canal === "string" ? { canalKey: valores.canal } : {}),
-      ...(typeof valores.numero_protocolo === "string" ? { protocolo: valores.numero_protocolo } : {}),
+      // O PROTOCOLO VEM DO DONO, não do formulário.
+      //
+      // Antes, o número era copiado de `valores.numero_protocolo` direto para a coluna
+      // de texto: a subtarefa virava uma terceira afirmação sobre o mesmo fato, ao lado
+      // do payload e de `Protocolo`. Agora a coluna só recebe o que o cadastro canônico
+      // confirmou, e o vínculo (`protocoloId`) é quem manda — o texto fica como projeção
+      // para os leitores que ainda não migraram.
+      ...(protocoloRegistrado
+        ? { protocoloId: protocoloRegistrado.id, protocolo: protocoloRegistrado.numero }
+        : {}),
       ...(ctx.fornecedorId ? { fornecedorId: ctx.fornecedorId } : {}),
     })
     // CONCLUIR A SUBTAREFA MUDA O ESTADO DAS QUE DEPENDIAM DELA. Sem reconciliar, elas
@@ -350,6 +408,14 @@ export async function executarAcaoCadastrada(
     const { reconciliarSubtarefas } = await import("@/src/services/subtarefas-da-etapa")
     await reconciliarSubtarefas({ stepInstanceId, valores, fornecedorId: ctx.fornecedorId ?? null })
   }
+
+  // ── O QUE O EFEITO CONSUMIU SAI DA EXECUÇÃO ─────────────────────────────
+  //
+  // Depois que o protocolo virou linha em `Protocolo`, manter o número aqui seria a
+  // segunda verdade: dois lugares editáveis para o mesmo fato. Fica a referência, que
+  // o handler do efeito gravou, e o valor sai. Payload ANTIGO não é tocado — isto vale
+  // para o que está sendo escrito agora.
+  for (const k of def.camposConsumidos ?? []) delete valores[k]
 
   // ── REGISTRO NA TENTATIVA ───────────────────────────────────────────────
   // O que ficou decidido pertence à TENTATIVA, não ao passo: se este passo for

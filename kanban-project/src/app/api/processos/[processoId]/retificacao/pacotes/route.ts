@@ -4,6 +4,7 @@
 // ============================================================
 
 import { NextResponse } from "next/server"
+import { recusarSeCanonicoAssumiu } from "@/src/services/motor-da-retificacao"
 import { prisma } from "@/lib/prisma"
 import type { Prisma } from "@prisma/client"
 import { buildInitialWorkflow } from "@/src/lib/process-stage/retificacao-engine"
@@ -18,6 +19,13 @@ export async function POST(
     if (isNaN(id)) return NextResponse.json({ error: "ID inválido" }, { status: 400 })
     const body = await request.json().catch(() => ({}))
     const tipo = body.tipo === "administrativa" ? "administrativa" : "judicial"
+
+    // UM MOTOR SÓ. Quando o Workflow Interno da fase assume, esta rota — que é a
+    // anterior a ele — para de aceitar comando: dois motores dando ordens ao mesmo
+    // processo mostram estados diferentes, e o que "vale" vira o da tela que alguém
+    // abriu por último.
+    const recusa = await recusarSeCanonicoAssumiu()
+    if (recusa) return NextResponse.json({ error: recusa.erro, mensagem: recusa.mensagem }, { status: 409 })
 
     const processo = await prisma.processo.findUnique({ where: { id }, select: { id: true } })
     if (!processo) return NextResponse.json({ error: "Processo não encontrado" }, { status: 404 })

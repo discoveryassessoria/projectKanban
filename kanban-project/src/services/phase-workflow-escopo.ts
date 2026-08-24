@@ -32,6 +32,8 @@ export interface ContextoEscopo {
   necessidadeIds: number[]
   /** Documentos materializados (cardinalidade DOCUMENTO). */
   documentoIds: number[]
+  /** Pedidos de retificação abertos (cardinalidade RETIFICACAO). */
+  retificacaoPacoteIds: number[]
   /** Documento já vinculado a cada necessidade, quando existir. */
   documentoIdPorNecessidade: Map<number, number>
 }
@@ -43,6 +45,7 @@ export interface AlvoDePasso {
   pessoaId: number | null
   necessidadeId: number | null
   documentoId: number | null
+  retificacaoPacoteId: number | null
   /** Estado inicial derivado do MODO DE EXECUÇÃO configurado. */
   status: "DISPONIVEL" | "PENDENTE"
   dependeDeStepKeys: string[]
@@ -74,6 +77,7 @@ export function cardinalidadeEfetiva(
  * nascem DISPONIVEL. Não há regra fixa de sequência no código.
  *
  * CARDINALIDADE: PROCESSO ⇒ 1 instância por fase/ciclo. PESSOA ⇒ 1 por pessoa.
+ * RETIFICACAO ⇒ 1 por pedido de retificação aberto.
  * NECESSIDADE ⇒ 1 por registro/certidão a localizar, preservando o vínculo com a
  * pessoa e com o registro. DOCUMENTO ⇒ 1 por documento materializado.
  */
@@ -113,7 +117,7 @@ export function planejarMaterializacao(
 
     if (cardinalidade === "PESSOA") {
       if (ctx.pessoaIds.length === 0) return semAlvo("pessoa na árvore")
-      for (const pessoaId of ctx.pessoaIds) alvos.push({ ...base, pessoaId, necessidadeId: null, documentoId: null })
+      for (const pessoaId of ctx.pessoaIds) alvos.push({ ...base, pessoaId, necessidadeId: null, documentoId: null, retificacaoPacoteId: null })
       return
     }
 
@@ -121,7 +125,7 @@ export function planejarMaterializacao(
       if (ctx.necessidadeIds.length === 0) return semAlvo("registro/certidão a localizar")
       for (const necessidadeId of ctx.necessidadeIds) {
         alvos.push({
-          ...base, pessoaId: null, necessidadeId,
+          ...base, pessoaId: null, necessidadeId, retificacaoPacoteId: null,
           documentoId: ctx.documentoIdPorNecessidade.get(necessidadeId) ?? null,
         })
       }
@@ -130,13 +134,24 @@ export function planejarMaterializacao(
 
     if (cardinalidade === "DOCUMENTO") {
       if (ctx.documentoIds.length === 0) return semAlvo("documento materializado")
-      for (const documentoId of ctx.documentoIds) alvos.push({ ...base, pessoaId: null, necessidadeId: null, documentoId })
+      for (const documentoId of ctx.documentoIds) alvos.push({ ...base, pessoaId: null, necessidadeId: null, documentoId, retificacaoPacoteId: null })
+      return
+    }
+
+    if (cardinalidade === "RETIFICACAO") {
+      // O PEDIDO É A UNIDADE. Dois pedidos abertos no mesmo processo produzem duas
+      // cadeias de passos que não se tocam — que é a diferença entre poder concluir um
+      // sem concluir o outro e não poder.
+      if (ctx.retificacaoPacoteIds.length === 0) return semAlvo("pedido de retificação aberto")
+      for (const retificacaoPacoteId of ctx.retificacaoPacoteIds) {
+        alvos.push({ ...base, pessoaId: null, necessidadeId: null, documentoId: null, retificacaoPacoteId })
+      }
       return
     }
 
     // PROCESSO — uma instância da fase/ciclo. Não depende de pessoa, necessidade,
     // documento, tarefa anterior nem progresso.
-    alvos.push({ ...base, pessoaId: null, necessidadeId: null, documentoId: null })
+    alvos.push({ ...base, pessoaId: null, necessidadeId: null, documentoId: null, retificacaoPacoteId: null })
   })
 
   return { alvos, avisos }

@@ -17,6 +17,7 @@
 // ============================================================================
 
 import { prisma } from "@/lib/prisma"
+import { fonteDoCampo, alvoDeReferencia } from "@/src/lib/motor/fontes-de-campo"
 import type { Prisma } from "@prisma/client"
 import {
   lerVersaoPublicada, congelarVersaoVigente, publicarNovaVersao,
@@ -85,7 +86,21 @@ const CAMPOS_DO_CAMPO: Campos<CampoCongelado> = [
   { nome: "obrigatório", ler: (x) => x.obrigatorio }, { nome: "ordem", ler: (x) => x.ordem },
   { nome: "condição", ler: (x) => x.condicao }, { nome: "ajuda", ler: (x) => x.ajuda },
   { nome: "ativo", ler: (x) => x.ativo },
+  // DE ONDE VÊM AS OPÇÕES. Ficava de fora, e trocar o cadastro para o qual um campo
+  // aponta é mudança que ninguém revisaria: a tela do operador passaria a oferecer
+  // outra lista sem uma linha no diff dizendo isso.
+  { nome: "fonte das opções", ler: (x) => descreverFonte(x.opcoes) },
 ]
+
+/** A fonte de um campo, em uma linha legível — o diff não mostra JSON cru. */
+function descreverFonte(opcoes: unknown): string | null {
+  const f = fonteDoCampo(opcoes)
+  if (f?.especie === "REFERENCIA") return `referência a ${alvoDeReferencia(f.alvo)?.label ?? f.alvo}`
+  if (f?.especie === "DATASOURCE") return `catálogo ${f.fonte}`
+  if (Array.isArray(opcoes) && opcoes.length > 0) return `${opcoes.length} opção(ões) no formato antigo`
+  return null
+}
+
 const CAMPOS_DO_ITEM: Campos<ItemChecklistCongelado> = [
   { nome: "nome", ler: (x) => x.label }, { nome: "obrigatório", ler: (x) => x.obrigatorio },
   { nome: "explicação", ler: (x) => x.descricao }, { nome: "ordem", ler: (x) => x.ordem },

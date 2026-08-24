@@ -5,7 +5,7 @@
 --   corpo        → gerado do prisma/schema.prisma
 --   bloco manual → prisma/baseline/bloco-manual.sql (edite LÁ)
 --
--- Gerado em : 2026-08-21
+-- Gerado em : 2026-08-24
 -- Prisma    : 6.19.3
 --
 -- PARA QUE SERVE: reconstruir o banco DO ZERO. O histórico de migrations NÃO
@@ -1609,12 +1609,13 @@ CREATE TABLE "RetificacaoPacote" (
     "id" SERIAL NOT NULL,
     "processoId" INTEGER NOT NULL,
     "num" TEXT NOT NULL,
-    "tipo" TEXT NOT NULL,
+    "tipo" TEXT,
     "status" TEXT NOT NULL DEFAULT 'em_preparacao',
     "currentStep" TEXT NOT NULL DEFAULT 'definir_estrategia',
     "motivo" TEXT,
     "prioridade" TEXT DEFAULT 'MÃ©dia',
     "proxAcao" TEXT,
+    "profissionalId" INTEGER,
     "processoNum" TEXT,
     "tribunal" TEXT,
     "vara" TEXT,
@@ -1629,6 +1630,8 @@ CREATE TABLE "RetificacaoPacote" (
     "atendente" TEXT,
     "prazo" TEXT,
     "statusAdm" TEXT,
+    "orgaoId" INTEGER,
+    "protocoloId" INTEGER,
     "workflow" JSONB,
     "divergenceIds" JSONB,
     "affectedDocIds" JSONB,
@@ -1639,6 +1642,47 @@ CREATE TABLE "RetificacaoPacote" (
     "updatedAt" TIMESTAMP(3) NOT NULL,
 
     CONSTRAINT "RetificacaoPacote_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "RetificacaoPacoteDivergencia" (
+    "id" SERIAL NOT NULL,
+    "pacoteId" INTEGER NOT NULL,
+    "divergenciaId" INTEGER NOT NULL,
+    "criadoEm" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT "RetificacaoPacoteDivergencia_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "Profissional" (
+    "id" SERIAL NOT NULL,
+    "nome" VARCHAR(200) NOT NULL,
+    "categoria" VARCHAR(40) NOT NULL,
+    "email" VARCHAR(200),
+    "telefone" VARCHAR(60),
+    "organizacaoId" INTEGER,
+    "observacoes" TEXT,
+    "ativo" BOOLEAN NOT NULL DEFAULT true,
+    "criadoEm" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "atualizadoEm" TIMESTAMP(3) NOT NULL,
+
+    CONSTRAINT "Profissional_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "RegistroProfissional" (
+    "id" SERIAL NOT NULL,
+    "profissionalId" INTEGER NOT NULL,
+    "tipo" VARCHAR(20) NOT NULL,
+    "numero" VARCHAR(40) NOT NULL,
+    "jurisdicao" VARCHAR(40),
+    "orgaoDeClasseId" INTEGER,
+    "ativo" BOOLEAN NOT NULL DEFAULT true,
+    "criadoEm" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "atualizadoEm" TIMESTAMP(3) NOT NULL,
+
+    CONSTRAINT "RegistroProfissional_pkey" PRIMARY KEY ("id")
 );
 
 -- CreateTable
@@ -3053,6 +3097,7 @@ CREATE TABLE "StepExecution" (
     "executadoPorId" INTEGER,
     "resultado" VARCHAR(60),
     "payload" JSONB,
+    "protocoloId" INTEGER,
     "supersededAt" TIMESTAMP(3),
     "supersededPorId" INTEGER,
     "correlationId" VARCHAR(60),
@@ -3084,6 +3129,7 @@ CREATE TABLE "SubtaskExecution" (
     "fornecedorId" INTEGER,
     "canalKey" VARCHAR(40),
     "protocolo" VARCHAR(120),
+    "protocoloId" INTEGER,
     "enviadoEm" TIMESTAMP(3),
     "previstoPara" TIMESTAMP(3),
     "supersededAt" TIMESTAMP(3),
@@ -3113,6 +3159,7 @@ CREATE TABLE "PhaseWorkflowStepInstance" (
     "pessoaId" INTEGER,
     "necessidadeId" INTEGER,
     "documentoId" INTEGER,
+    "retificacaoPacoteId" INTEGER,
     "ciclo" INTEGER NOT NULL DEFAULT 1,
     "status" "StepInstanceStatus" NOT NULL DEFAULT 'PENDENTE',
     "prioridade" VARCHAR(20),
@@ -5128,6 +5175,36 @@ CREATE UNIQUE INDEX "FaseFinal_processoId_faseKey_key" ON "FaseFinal"("processoI
 CREATE INDEX "RetificacaoPacote_processoId_idx" ON "RetificacaoPacote"("processoId");
 
 -- CreateIndex
+CREATE INDEX "RetificacaoPacote_orgaoId_idx" ON "RetificacaoPacote"("orgaoId");
+
+-- CreateIndex
+CREATE INDEX "RetificacaoPacote_protocoloId_idx" ON "RetificacaoPacote"("protocoloId");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "RetificacaoPacote_processoId_num_key" ON "RetificacaoPacote"("processoId", "num");
+
+-- CreateIndex
+CREATE INDEX "RetificacaoPacoteDivergencia_divergenciaId_idx" ON "RetificacaoPacoteDivergencia"("divergenciaId");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "RetificacaoPacoteDivergencia_pacoteId_divergenciaId_key" ON "RetificacaoPacoteDivergencia"("pacoteId", "divergenciaId");
+
+-- CreateIndex
+CREATE INDEX "Profissional_categoria_idx" ON "Profissional"("categoria");
+
+-- CreateIndex
+CREATE INDEX "Profissional_organizacaoId_idx" ON "Profissional"("organizacaoId");
+
+-- CreateIndex
+CREATE INDEX "Profissional_ativo_idx" ON "Profissional"("ativo");
+
+-- CreateIndex
+CREATE INDEX "RegistroProfissional_profissionalId_idx" ON "RegistroProfissional"("profissionalId");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "RegistroProfissional_tipo_numero_jurisdicao_key" ON "RegistroProfissional"("tipo", "numero", "jurisdicao");
+
+-- CreateIndex
 CREATE INDEX "EmissaoRetificada_processoId_idx" ON "EmissaoRetificada"("processoId");
 
 -- CreateIndex
@@ -5632,6 +5709,9 @@ CREATE UNIQUE INDEX "StepExecution_chaveIdempotencia_key" ON "StepExecution"("ch
 CREATE INDEX "StepExecution_stepInstanceId_idx" ON "StepExecution"("stepInstanceId");
 
 -- CreateIndex
+CREATE INDEX "StepExecution_protocoloId_idx" ON "StepExecution"("protocoloId");
+
+-- CreateIndex
 CREATE UNIQUE INDEX "StepExecution_stepInstanceId_sequencia_key" ON "StepExecution"("stepInstanceId", "sequencia");
 
 -- CreateIndex
@@ -5642,6 +5722,9 @@ CREATE INDEX "SubtaskExecution_stepInstanceId_idx" ON "SubtaskExecution"("stepIn
 
 -- CreateIndex
 CREATE INDEX "SubtaskExecution_subtaskKey_idx" ON "SubtaskExecution"("subtaskKey");
+
+-- CreateIndex
+CREATE INDEX "SubtaskExecution_protocoloId_idx" ON "SubtaskExecution"("protocoloId");
 
 -- CreateIndex
 CREATE UNIQUE INDEX "SubtaskExecution_stepInstanceId_subtaskKey_sequencia_key" ON "SubtaskExecution"("stepInstanceId", "subtaskKey", "sequencia");
@@ -5660,6 +5743,9 @@ CREATE INDEX "PhaseWorkflowStepInstance_necessidadeId_idx" ON "PhaseWorkflowStep
 
 -- CreateIndex
 CREATE INDEX "PhaseWorkflowStepInstance_documentoId_idx" ON "PhaseWorkflowStepInstance"("documentoId");
+
+-- CreateIndex
+CREATE INDEX "PhaseWorkflowStepInstance_retificacaoPacoteId_idx" ON "PhaseWorkflowStepInstance"("retificacaoPacoteId");
 
 -- CreateIndex
 CREATE INDEX "PhaseWorkflowStepInstance_stepKey_idx" ON "PhaseWorkflowStepInstance"("stepKey");
@@ -6646,6 +6732,30 @@ ALTER TABLE "FaseFinal" ADD CONSTRAINT "FaseFinal_processoId_fkey" FOREIGN KEY (
 ALTER TABLE "RetificacaoPacote" ADD CONSTRAINT "RetificacaoPacote_processoId_fkey" FOREIGN KEY ("processoId") REFERENCES "Processo"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
+ALTER TABLE "RetificacaoPacote" ADD CONSTRAINT "RetificacaoPacote_profissionalId_fkey" FOREIGN KEY ("profissionalId") REFERENCES "Profissional"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "RetificacaoPacote" ADD CONSTRAINT "RetificacaoPacote_orgaoId_fkey" FOREIGN KEY ("orgaoId") REFERENCES "OrgaoProtocolo"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "RetificacaoPacote" ADD CONSTRAINT "RetificacaoPacote_protocoloId_fkey" FOREIGN KEY ("protocoloId") REFERENCES "Protocolo"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "RetificacaoPacoteDivergencia" ADD CONSTRAINT "RetificacaoPacoteDivergencia_pacoteId_fkey" FOREIGN KEY ("pacoteId") REFERENCES "RetificacaoPacote"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "RetificacaoPacoteDivergencia" ADD CONSTRAINT "RetificacaoPacoteDivergencia_divergenciaId_fkey" FOREIGN KEY ("divergenciaId") REFERENCES "Divergencia"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "Profissional" ADD CONSTRAINT "Profissional_organizacaoId_fkey" FOREIGN KEY ("organizacaoId") REFERENCES "OrgaoProtocolo"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "RegistroProfissional" ADD CONSTRAINT "RegistroProfissional_profissionalId_fkey" FOREIGN KEY ("profissionalId") REFERENCES "Profissional"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "RegistroProfissional" ADD CONSTRAINT "RegistroProfissional_orgaoDeClasseId_fkey" FOREIGN KEY ("orgaoDeClasseId") REFERENCES "OrgaoProtocolo"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
 ALTER TABLE "EmissaoRetificada" ADD CONSTRAINT "EmissaoRetificada_processoId_fkey" FOREIGN KEY ("processoId") REFERENCES "Processo"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
@@ -6889,10 +6999,16 @@ ALTER TABLE "PhaseWorkflowInstance" ADD CONSTRAINT "PhaseWorkflowInstance_criado
 ALTER TABLE "StepExecution" ADD CONSTRAINT "StepExecution_stepInstanceId_fkey" FOREIGN KEY ("stepInstanceId") REFERENCES "PhaseWorkflowStepInstance"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
+ALTER TABLE "StepExecution" ADD CONSTRAINT "StepExecution_protocoloId_fkey" FOREIGN KEY ("protocoloId") REFERENCES "Protocolo"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
 ALTER TABLE "SubtaskExecution" ADD CONSTRAINT "SubtaskExecution_stepInstanceId_fkey" FOREIGN KEY ("stepInstanceId") REFERENCES "PhaseWorkflowStepInstance"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "SubtaskExecution" ADD CONSTRAINT "SubtaskExecution_fornecedorId_fkey" FOREIGN KEY ("fornecedorId") REFERENCES "OrgaoProtocolo"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "SubtaskExecution" ADD CONSTRAINT "SubtaskExecution_protocoloId_fkey" FOREIGN KEY ("protocoloId") REFERENCES "Protocolo"("id") ON DELETE SET NULL ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "PhaseWorkflowStepInstance" ADD CONSTRAINT "PhaseWorkflowStepInstance_workflowInstanceId_fkey" FOREIGN KEY ("workflowInstanceId") REFERENCES "PhaseWorkflowInstance"("id") ON DELETE CASCADE ON UPDATE CASCADE;
@@ -6905,6 +7021,9 @@ ALTER TABLE "PhaseWorkflowStepInstance" ADD CONSTRAINT "PhaseWorkflowStepInstanc
 
 -- AddForeignKey
 ALTER TABLE "PhaseWorkflowStepInstance" ADD CONSTRAINT "PhaseWorkflowStepInstance_documentoId_fkey" FOREIGN KEY ("documentoId") REFERENCES "Documento"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "PhaseWorkflowStepInstance" ADD CONSTRAINT "PhaseWorkflowStepInstance_retificacaoPacoteId_fkey" FOREIGN KEY ("retificacaoPacoteId") REFERENCES "RetificacaoPacote"("id") ON DELETE SET NULL ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "PhaseWorkflowStepInstance" ADD CONSTRAINT "PhaseWorkflowStepInstance_previousStepInstanceId_fkey" FOREIGN KEY ("previousStepInstanceId") REFERENCES "PhaseWorkflowStepInstance"("id") ON DELETE SET NULL ON UPDATE CASCADE;

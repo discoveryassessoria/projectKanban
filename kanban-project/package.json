@@ -343,7 +343,13 @@
     "test:workflow-documental": "tsx scripts/workflow-documental-completo.test.ts",
     "test:guard-validade": "tsx scripts/guard-validade-por-estado.test.ts",
     "test:tabela-precos-projecao": "tsx scripts/tabela-precos-projecao.test.ts",
-    "test:sete-passos": "tsx scripts/sete-passos-operacionais.test.ts"
+    "test:sete-passos": "tsx scripts/sete-passos-operacionais.test.ts",
+    "test:protocolo-writer": "tsx scripts/guard-protocolo-writer-unico.test.ts",
+    "test:pendencias-a-e": "tsx scripts/pendencias-a-e.test.ts",
+    "db:push:teste": "PRISMA_DATABASE_URL=postgresql://postgres@127.0.0.1:55432/discovery_test DIRECT_DATABASE_URL=postgresql://postgres@127.0.0.1:55432/discovery_test sh -c \"node scripts/guard-db-push-local.mjs && npx prisma db push --skip-generate --accept-data-loss\"",
+    "guard:db-push": "node scripts/guard-db-push-local.mjs",
+    "previa:publicacao": "tsx scripts/previa-publicacao.ts",
+    "test:profissional-judicial": "tsx scripts/profissional-e-judicial.test.ts"
   },
   "prisma": {
     "seed": "npm run guard:escrita && tsx prisma/seed.ts"

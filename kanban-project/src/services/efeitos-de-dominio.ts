@@ -12,6 +12,10 @@
 // ============================================================================
 
 import { prisma } from "@/lib/prisma"
+import { registrarProtocoloTx, ORIGENS_DE_PROTOCOLO } from "@/src/services/protocolo-canonico"
+import { definicaoHistoricaDoPasso } from "@/src/services/versao-publicada"
+import { alvoDoCampo, idReferenciado } from "@/src/lib/motor/fontes-de-campo"
+import { efeito as definicaoDeEfeito } from "@/src/lib/motor/catalogo-de-efeitos"
 import type { StatusDocumento } from "@prisma/client"
 import { reopenPhase } from "@/src/lib/motor/phase-advance"
 
@@ -179,6 +183,124 @@ export async function registrarDivergencia(a: AlvoDoEfeito) {
  * Ativa a fase de Retificação pelo motor de fases, com justificativa. O executor não
  * mexe em fase: ele pede ao motor, que é quem decide se pode.
  */
+/**
+ * REGISTRAR O PROTOCOLO no cadastro que é dono dele.
+ *
+ * O órgão NÃO vem de um campo com nome combinado. Vem do primeiro campo de referência
+ * que aponta para `ORGANIZACAO` — que é estrutura, não convenção de nome. Um passo que
+ * chame o campo de "cartório", "órgão" ou "conservatória" funciona igual, e nenhum
+ * `stepKey` ou `phaseKey` aparece nesta função.
+ */
+export async function registrarProtocoloDaEtapa(a: AlvoDoEfeito) {
+  const numero = texto(a.valores.numero_protocolo)
+  const quando = a.valores.data_protocolo
+  if (!numero) return { protocoloId: null, motivo: "SEM_NUMERO" }
+  const data = quando instanceof Date ? quando : new Date(String(quando ?? ""))
+  if (Number.isNaN(data.getTime())) return { protocoloId: null, motivo: "DATA_INVALIDA" }
+
+  const orgaoId = await referenciaDoEfeito(a, "REGISTER_PROTOCOL")
+  const r = await prisma.$transaction((tx) => registrarProtocoloTx(tx, {
+    processoId: a.processoId,
+    numeroProtocolo: numero,
+    dataProtocolo: data,
+    origem: ORIGENS_DE_PROTOCOLO.ETAPA,
+    orgaoId,
+    responsavelId: a.usuarioId,
+    observacoes: texto(a.valores.observacao_protocolo),
+    // VARA / OFÍCIO / GUICHÊ — o setor dentro do órgão, no campo que já é dele.
+    setor: texto(a.valores.setor_do_orgao),
+    documentoIds: a.documentoId ? [a.documentoId] : [],
+  }))
+
+  // A TENTATIVA GUARDA A REFERÊNCIA, não o número. É o ponto inteiro desta mudança.
+  const vigente = await prisma.stepExecution.findFirst({
+    where: { stepInstanceId: a.stepInstanceId, supersededAt: null },
+    select: { id: true },
+  })
+  if (vigente) {
+    await prisma.stepExecution.update({ where: { id: vigente.id }, data: { protocoloId: r.protocoloId } })
+  }
+  return { protocoloId: r.protocoloId, jaExistia: r.jaExistia }
+}
+
+/**
+ * A entidade referenciada na etapa, achada pela ESTRUTURA do campo — nunca pelo nome
+ * dele, e nunca com o alvo escrito aqui: qual alvo procurar é declaração do efeito,
+ * no catálogo. Um passo que chame o campo de "cartório", "órgão" ou "conservatória"
+ * funciona igual.
+ */
+async function referenciaDoEfeito(a: AlvoDoEfeito, effectKey: string): Promise<number | null> {
+  const alvoEsperado = definicaoDeEfeito(effectKey)?.alvoDeReferenciaEsperado
+  if (!alvoEsperado) return null
+  const hist = await definicaoHistoricaDoPasso(a.stepInstanceId)
+  for (const c of hist?.passo.campos ?? []) {
+    if (c.tipo !== "referencia") continue
+    if (alvoDoCampo(c.opcoes) !== alvoEsperado) continue
+    const id = idReferenciado(a.valores[c.key])
+    if (id != null) return id
+  }
+  return null
+}
+
+/**
+ * O EFEITO RECUSOU. Erro tipado para o executor traduzir em resposta, em vez de 500.
+ *
+ * Sem isto, um efeito que não tem onde gravar só podia devolver detalhes e deixar o
+ * passo concluir — o botão faria nada, com cara de sucesso.
+ */
+export class EfeitoRecusado extends Error {
+  constructor(public readonly codigo: string, mensagem: string) {
+    super(mensagem)
+    this.name = "EfeitoRecusado"
+  }
+}
+
+/**
+ * O PLANO DO PEDIDO DE RETIFICAÇÃO — modo, profissional e número do processo.
+ *
+ * Os três moram em `RetificacaoPacote`, que é o procedimento. A etapa é onde eles são
+ * DECIDIDOS; não é onde eles vivem. Antes, "advogado" e "número do processo" só
+ * existiriam no payload de uma tentativa: corrigir o número da OAB no cadastro
+ * deixaria a etapa mostrando o número velho, e não haveria como perguntar ao banco
+ * quais pedidos aquele advogado conduz.
+ *
+ * SEM PEDIDO NÃO HÁ ONDE GRAVAR. Isso acontece enquanto a fase materializa por
+ * PROCESSO; o efeito diz isso em vez de gravar em lugar nenhum e responder "ok".
+ */
+export async function registrarPlanoDaRetificacao(a: AlvoDoEfeito) {
+  const passo = await prisma.phaseWorkflowStepInstance.findUnique({
+    where: { id: a.stepInstanceId },
+    select: { retificacaoPacoteId: true },
+  })
+  if (!passo?.retificacaoPacoteId) {
+    // RECUSA, não silêncio. O modo, o profissional e o número do processo pertencem ao
+    // pedido; sem pedido não há onde gravá-los, e concluir a etapa aqui daria por
+    // decidido algo que não ficou registrado em lugar nenhum.
+    throw new EfeitoRecusado(
+      "SEM_PEDIDO_DE_RETIFICACAO",
+      "Esta etapa não está ligada a um pedido de retificação — o modo e os dados judiciais não teriam onde ser gravados. " +
+      "Abra o pedido (agrupando as divergências que vão juntas) antes de definir o modo.",
+    )
+  }
+
+  const modo = texto(a.valores.modo)
+  const profissionalId = await referenciaDoEfeito(a, "REGISTER_RETIFICATION_PLAN")
+  const numeroProcesso = texto(a.valores.numero_processo_judicial)
+
+  await prisma.retificacaoPacote.update({
+    where: { id: passo.retificacaoPacoteId },
+    data: {
+      ...(modo ? { tipo: modo } : {}),
+      // `undefined` não mexe; `null` limparia. Só grava o que veio preenchido —
+      // trocar da via judicial para a administrativa é decisão de quem administra o
+      // pedido, não efeito colateral de reexecutar uma etapa.
+      ...(profissionalId != null ? { profissionalId } : {}),
+      ...(numeroProcesso ? { processoNum: numeroProcesso } : {}),
+    },
+  })
+  return { pacoteId: passo.retificacaoPacoteId, modo, profissionalId, processoNum: numeroProcesso }
+}
+
 export async function decidirRetificacao(a: AlvoDoEfeito) {
   const justificativa = texto(a.valores.justificativa) ?? "Decisão da Análise Documental."
   if (a.documentoId) {

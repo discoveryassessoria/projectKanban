@@ -49,6 +49,34 @@ export interface DefinicaoDeEfeito {
   idempotente: boolean
   /** O efeito conclui o passo por si? Evita ação que "faz" e não fecha nada. */
   concluiPasso: boolean
+  /**
+   * Campos cujo VALOR passa a morar na entidade dona e por isso NÃO fica na execução.
+   *
+   * Sem esta lista, o payload guardaria uma cópia editável do que agora tem dono: o
+   * operador corrigiria o protocolo no cadastro e a etapa continuaria mostrando o
+   * número velho, sem ninguém para dizer qual está certo. A execução fica com a
+   * referência; o valor, com quem responde por ele.
+   */
+  camposConsumidos?: string[]
+  /**
+   * O efeito NUNCA entra numa fase por herança de competência — só quando a fase o
+   * declara nominalmente.
+   *
+   * `efeitosDaFase` devolve, para a fase que não gravou lista, TODOS os efeitos das
+   * competências dela. Isso é razoável para "concluir a etapa" e "só registrar", e
+   * deixa de ser no momento em que um efeito passa a ESCREVER numa entidade canônica:
+   * acrescentar um efeito ao catálogo daria a oito fases, de uma vez, o poder de criar
+   * protocolo — sem que ninguém tivesse pedido.
+   */
+  exigeAutorizacaoExplicita?: boolean
+  /**
+   * O ALVO DE REFERÊNCIA que o efeito precisa encontrar entre os campos do passo.
+   *
+   * Fica aqui, e não dentro do handler, para que a busca continue sendo por ESTRUTURA:
+   * o handler pergunta ao catálogo o que procurar, em vez de trazer o nome do alvo
+   * escrito no código.
+   */
+  alvoDeReferenciaEsperado?: string
 }
 
 export const CATALOGO_DE_EFEITOS: DefinicaoDeEfeito[] = [
@@ -165,6 +193,53 @@ export const CATALOGO_DE_EFEITOS: DefinicaoDeEfeito[] = [
     concluiPasso: false,
   },
   {
+    key: "REGISTER_PROTOCOL",
+    label: "Registrar o protocolo",
+    descricao:
+      "Grava o protocolo no cadastro de Protocolos — número, data, órgão e responsável — e amarra a etapa a ele. " +
+      "A etapa fica com a referência; o número mora no protocolo, que é o dono do fato.",
+    // GERAL, e não RETIFICAÇÃO: protocolar é registrar um fato, não decidir nada.
+    // Qualquer fase que entregue algo a um terceiro protocola, e amarrar o efeito a
+    // uma competência faria a próxima precisar de um efeito gêmeo.
+    competencia: COMPETENCIAS.GERAL,
+    permissao: "processos.editar",
+    // Sem número e sem data não há protocolo — não é preferência de tela, é o que
+    // identifica o ato. O órgão vem do campo de referência quando o passo tiver um.
+    camposObrigatorios: ["numero_protocolo", "data_protocolo"],
+    idempotente: true,
+    concluiPasso: true,
+    // O número e a data passam a viver em `Protocolo`. O campo de referência ao órgão
+    // NÃO entra aqui: ele já é uma referência, e referência não é cópia.
+    camposConsumidos: ["numero_protocolo", "data_protocolo", "observacao_protocolo", "setor_do_orgao"],
+    // NENHUMA FASE GANHA ISTO DE GRAÇA. Ele escreve em `Protocolo`; quem o quer,
+    // declara. Sem esta linha, as fases que nunca gravaram lista de efeitos passariam
+    // a poder protocolar só porque o efeito passou a existir.
+    exigeAutorizacaoExplicita: true,
+    alvoDeReferenciaEsperado: "ORGANIZACAO",
+  },
+  {
+    key: "REGISTER_RETIFICATION_PLAN",
+    label: "Definir o plano da retificação",
+    descricao:
+      "Grava no pedido de retificação o caminho escolhido (judicial ou administrativo) e, quando judicial, " +
+      "o profissional responsável e o número do processo. A etapa fica com a referência; os dados moram no pedido.",
+    competencia: COMPETENCIAS.RETIFICACAO,
+    permissao: "processos.editar",
+    // O MODO É O MÍNIMO. Profissional e número do processo são exigidos por REQUISITO
+    // CONDICIONAL, não aqui — na via administrativa eles não existem, e um campo
+    // obrigatório que some é um campo impossível de preencher.
+    camposObrigatorios: ["modo"],
+    idempotente: true,
+    concluiPasso: true,
+    // ESCREVE NO PEDIDO. Nenhuma fase ganha isso por herança de competência.
+    exigeAutorizacaoExplicita: true,
+    alvoDeReferenciaEsperado: "PROFISSIONAL",
+    // O modo e o número do processo passam a morar no pedido, que é o dono deles.
+    // O profissional NÃO entra aqui: referência não é cópia, e o ID continua na
+    // execução como o que foi escolhido naquela tentativa.
+    camposConsumidos: ["modo", "numero_processo_judicial"],
+  },
+  {
     key: "REGISTER_ONLY",
     label: "Somente registrar",
     descricao:
@@ -210,7 +285,11 @@ export function efeitosDaFase(phaseKey: string, declarados: unknown): string[] {
   if (Array.isArray(declarados) && declarados.every((x) => typeof x === "string")) {
     return declarados as string[]
   }
+  // A HERANÇA POR COMPETÊNCIA NÃO ALCANÇA QUEM EXIGE AUTORIZAÇÃO NOMINAL. Uma fase
+  // que não gravou lista recebe o que a competência dela permite — menos os efeitos
+  // que só entram por decisão explícita de quem administra.
+  const herdaveis = CATALOGO_DE_EFEITOS.filter((e) => !e.exigeAutorizacaoExplicita)
   const comps = COMPETENCIA_PADRAO_DA_FASE[phaseKey]
-  if (!comps) return CATALOGO_DE_EFEITOS.map((e) => e.key) // fase sem competência declarada
-  return CATALOGO_DE_EFEITOS.filter((e) => comps.includes(e.competencia)).map((e) => e.key)
+  if (!comps) return herdaveis.map((e) => e.key) // fase sem competência declarada
+  return herdaveis.filter((e) => comps.includes(e.competencia)).map((e) => e.key)
 }

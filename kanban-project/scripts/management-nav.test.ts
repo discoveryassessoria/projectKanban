@@ -140,7 +140,11 @@ ok(JSON.stringify(itensDaSecao("grp_financeiro", "Cobrança")) === JSON.stringif
 // A Planilha Documental entra aqui porque é onde se escolhe QUAIS itens do
 // cadastro viram coluna — decisão vizinha ao preço, e que não define preço.
 ok(JSON.stringify(itensDaSecao("grp_financeiro", "Tabela de Valores")) === JSON.stringify(["pricingtable", "discrules", "pricing", "planilhacolunas"]), "Financeiro › Tabela de Valores = Tabelas de Preços, Regras, Aplicabilidade, Planilha Documental")
-ok(JSON.stringify(itensDaSecao("grp_orgaos", "Organizações")) === JSON.stringify(["organs", "suppliers", "canais"]), "Órgãos › Organizações = Cartórios e Órgãos + Fornecedores + Canais de atendimento")
+// PROFISSIONAIS entra na mesma seção porque o módulo é o das partes EXTERNAS que
+// participam dos processos — não porque advogado seja organização. O escritório é
+// pessoa jurídica e vive em "Cartórios e Órgãos"; o profissional é pessoa física com
+// inscrição de classe própria, e a Retificação apenas o REFERENCIA.
+ok(JSON.stringify(itensDaSecao("grp_orgaos", "Organizações")) === JSON.stringify(["organs", "suppliers", "canais", "profissionais"]), "Órgãos › Organizações = Cartórios e Órgãos + Fornecedores + Canais + Profissionais")
 // A seção deixou de se chamar "Grupos": Capacidade Operacional não é um grupo
 // de pessoas. Departamentos e Cargos saíram — eram cadastros sem consumidor
 // (nenhuma FK, nenhuma regra, e ninguém podia ser associado a eles).

@@ -25,6 +25,9 @@ import type { StepEditorKind } from "@/src/lib/process-stage/step-editor-registr
 export const TIPOS_DE_CAMPO = [
   "texto", "textarea", "numero", "moeda", "data",
   "select", "multiselect", "checkbox", "radio", "upload", "booleano",
+  // REFERÊNCIA a um cadastro canônico (`{ recurso: "organizacoes" }` em `opcoes`).
+  // Guarda o ID da entidade; o nome vem do cadastro na hora de mostrar.
+  "referencia",
 ] as const
 export type TipoDeCampo = (typeof TIPOS_DE_CAMPO)[number]
 

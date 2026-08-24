@@ -10,10 +10,21 @@
 
 export const CONFIGURACAO: Record<string, {
   dependeDe: string[]
-  campos: Array<{ key: string; label: string; tipo: string; obrigatorio?: boolean; ajuda?: string; opcoes?: Array<{ key: string; label: string }> }>
+  campos: Array<{
+    key: string; label: string; tipo: string; obrigatorio?: boolean; ajuda?: string
+    opcoes?: Array<{ key: string; label: string }>
+    /** Alvo de referência, quando o campo aponta para um cadastro canônico. */
+    referencia?: string
+    /** Condição declarativa de visibilidade. */
+    condicao?: { op: string; campo: string; valor?: unknown }
+  }>
   acoes: Array<{ key: string; label: string; effectKey: string; descricao: string; requerCampos?: string[] }>
   checkItens?: Array<{ key: string; label: string; obrigatorio?: boolean }>
-  requisitos?: Array<{ key: string; label: string; tipo: string; alvoKey?: string; acaoKey?: string }>
+  requisitos?: Array<{
+    key: string; label: string; tipo: string; alvoKey?: string; acaoKey?: string
+    /** Só é cobrado quando a condição for verdadeira. */
+    condicao?: { op: string; campo: string; valor?: unknown }
+  }>
 }> = {
   // 1 ─ O modo decide todo o resto do trâmite. É a primeira coisa que se sabe.
   definir_modo_de_retificacao: {
@@ -26,14 +37,43 @@ export const CONFIGURACAO: Record<string, {
         opcoes: [{ key: "judicial", label: "Judicial" }, { key: "administrativa", label: "Administrativa" }],
       },
       { key: "fundamentacao", label: "Por que este modo", tipo: "textarea", ajuda: "O que na divergência leva a este caminho." },
+      // OS CAMPOS JUDICIAIS SÓ EXISTEM NA VIA JUDICIAL — pela condição declarada, que
+      // é o mecanismo genérico que o motor já tinha. Nenhum `if` por fase ou por
+      // passo em lugar nenhum do runtime.
+      {
+        key: "advogado_responsavel", label: "Profissional responsável", tipo: "referencia",
+        referencia: "PROFISSIONAL",
+        condicao: { op: "igual", campo: "modo", valor: "judicial" },
+        ajuda: "Escolhido no cadastro de Profissionais. Nome e OAB/UF são lidos de lá — nada é copiado.",
+      },
+      {
+        key: "numero_processo_judicial", label: "Número do processo judicial", tipo: "texto",
+        condicao: { op: "igual", campo: "modo", valor: "judicial" },
+        ajuda: "Número da ação no tribunal (CNJ). Não é o número do protocolo: o protocolo é o comprovante de entrada.",
+      },
     ],
-    acoes: [{ key: "modo_definido", label: "Modo definido", effectKey: "COMPLETE_STEP", descricao: "Registra o caminho escolhido e libera a preparação.", requerCampos: ["modo"] }],
-    requisitos: [{ key: "modo_escolhido", label: "Modo da retificação", tipo: "CAMPO_PREENCHIDO", alvoKey: "modo" }],
+    // O EFEITO GRAVA NO PEDIDO. Modo, profissional e número do processo são do
+    // procedimento, não desta tentativa — a etapa é onde se decide, não onde mora.
+    acoes: [{ key: "modo_definido", label: "Modo definido", effectKey: "REGISTER_RETIFICATION_PLAN", descricao: "Registra no pedido o caminho escolhido e, na via judicial, o profissional e o número do processo.", requerCampos: ["modo"] }],
+    requisitos: [
+      { key: "modo_escolhido", label: "Modo da retificação", tipo: "CAMPO_PREENCHIDO", alvoKey: "modo" },
+      // CONDICIONAIS, e não obrigatórios: exigir na via administrativa um campo que a
+      // condição esconde seria pedir o impossível — e a publicação recusa isso.
+      { key: "tem_profissional", label: "Profissional responsável", tipo: "CAMPO_PREENCHIDO", alvoKey: "advogado_responsavel",
+        condicao: { op: "igual", campo: "modo", valor: "judicial" } },
+      { key: "tem_processo_judicial", label: "Número do processo judicial", tipo: "CAMPO_PREENCHIDO", alvoKey: "numero_processo_judicial",
+        condicao: { op: "igual", campo: "modo", valor: "judicial" } },
+    ],
   },
 
   // 2 ─ O documento que vai ser protocolado. A evidência é o próprio requerimento.
+  // A DEPENDÊNCIA 1→2 FOI REMOVIDA. Ela não passava no teste: redigir o pedido é
+  // possível antes de o modo estar registrado — o `resumo_do_pedido` ("o que precisa
+  // ser corrigido") é o mesmo nos dois caminhos. O que o modo decide é PARA QUEM a
+  // peça vai, e isso é pré-condição de PROTOCOLAR, não de redigir. Gatear aqui era
+  // ordem visual disfarçada de pré-condição.
   preparar_requerimento_peticao: {
-    dependeDe: ["definir_modo_de_retificacao"],
+    dependeDe: [],
     campos: [
       { key: "resumo_do_pedido", label: "O que está sendo pedido", tipo: "textarea", obrigatorio: true, ajuda: "O que precisa ser corrigido no registro, em uma frase." },
     ],
@@ -45,15 +85,34 @@ export const CONFIGURACAO: Record<string, {
   },
 
   // 3 ─ O protocolo é o fato que separa "preparando" de "aguardando terceiro".
+  // DUAS PRÉ-CONDIÇÕES REAIS, e as duas se justificam sozinhas: sem a peça não há o
+  // que entregar, e sem o modo não se sabe se o destinatário é tribunal ou cartório.
   protocolar_retificacao: {
-    dependeDe: ["preparar_requerimento_peticao"],
+    dependeDe: ["definir_modo_de_retificacao", "preparar_requerimento_peticao"],
     campos: [
+      // O ÓRGÃO APONTA PARA O CADASTRO. Era a lacuna que ficou aberta na primeira
+      // rodada: sem campo referencial, a única saída seria um texto "cartório", e o
+      // nome congelaria no dia em que a organização mudasse de nome.
+      {
+        key: "orgao_receptor", label: "Órgão que recebeu", tipo: "referencia", obrigatorio: true,
+        referencia: "ORGANIZACAO",
+        ajuda: "Escolhido em Órgãos e Organizações. Fica gravado o registro, não o nome.",
+      },
+      // A VARA É O SETOR. `Protocolo.setor` já existe e já se chama "setor/guichê
+      // dentro do órgão" — vara, cartório de ofício e guichê são a mesma pergunta em
+      // vocabulários diferentes. Um campo "vara" ao lado dele seria a segunda fonte.
+      { key: "setor_do_orgao", label: "Vara / setor / ofício", tipo: "texto", ajuda: "Onde dentro do órgão o pedido deu entrada. Vai para o cadastro do protocolo." },
       { key: "numero_protocolo", label: "Número do protocolo", tipo: "texto", obrigatorio: true },
       { key: "data_protocolo", label: "Data do protocolo", tipo: "data", obrigatorio: true },
       { key: "observacao_protocolo", label: "Observação", tipo: "textarea" },
     ],
-    acoes: [{ key: "protocolado", label: "Protocolado", effectKey: "COMPLETE_STEP", descricao: "O pedido deu entrada e passa a depender de terceiro.", requerCampos: ["numero_protocolo", "data_protocolo"] }],
-    requisitos: [{ key: "tem_protocolo", label: "Número do protocolo", tipo: "CAMPO_PREENCHIDO", alvoKey: "numero_protocolo" }],
+    // O PROTOCOLO VIRA LINHA NO CADASTRO DE PROTOCOLOS, que é o dono do fato. A etapa
+    // fica com a referência; o número não é copiado para dentro da execução.
+    acoes: [{ key: "protocolado", label: "Protocolado", effectKey: "REGISTER_PROTOCOL", descricao: "Registra o protocolo no cadastro e encerra a etapa: o pedido passa a depender de terceiro.", requerCampos: ["orgao_receptor", "numero_protocolo", "data_protocolo"] }],
+    requisitos: [
+      { key: "tem_protocolo", label: "Número do protocolo", tipo: "CAMPO_PREENCHIDO", alvoKey: "numero_protocolo" },
+      { key: "tem_orgao", label: "Órgão que recebeu", tipo: "CAMPO_PREENCHIDO", alvoKey: "orgao_receptor" },
+    ],
   },
 
   // 4 ─ A espera. "Em exigência" é estado do domínio, não invenção da tela.

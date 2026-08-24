@@ -87,6 +87,7 @@ const CatalogTab = dynamic(() => import("@/src/components/gerenciamentoComponent
 const ContasTab = dynamic(() => import("@/src/components/gerenciamentoComponents/ContasTab"), { ssr: false, loading: () => <CarregandoTela /> })
 const BancosTab = dynamic(() => import("@/src/components/gerenciamentoComponents/BancosTab"), { ssr: false, loading: () => <CarregandoTela /> })
 const FornecedoresTab = dynamic(() => import("@/src/components/gerenciamentoComponents/FornecedoresTab"), { ssr: false, loading: () => <CarregandoTela /> })
+const ProfissionaisTab = dynamic(() => import("@/src/components/gerenciamentoComponents/ProfissionaisTab").then(m => m.ProfissionaisTab), { ssr: false, loading: () => <CarregandoTela /> })
 const CambioTab = dynamic(() => import("@/src/components/gerenciamentoComponents/CambioTab"), { ssr: false, loading: () => <CarregandoTela /> })
 const ImpostosTab = dynamic(() => import("@/src/components/gerenciamentoComponents/ImpostosTab"), { ssr: false, loading: () => <CarregandoTela /> })
 const CarteirasTab = dynamic(() => import("@/src/components/gerenciamentoComponents/CarteirasTab"), { ssr: false, loading: () => <CarregandoTela /> })
@@ -197,6 +198,7 @@ const TELAS: Record<string, React.ComponentType> = {
   fees: TaxasPagamentoTab,
   organs: OrgaosProtocoloTab,
   suppliers: FornecedoresTab,
+  profissionais: ProfissionaisTab,
   // Países e Regiões: era um scaffold de catálogo sem persistência; agora é a tela
   // real sobre a MESMA API que o modal "Gerenciar países" já usava. Key preservada.
   countrycatalog: PaisesRegioesTab,

@@ -10,6 +10,9 @@ import { NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import { extrairUsuarioComPermissoes, verificarPermissao } from "@/src/lib/verificar-permissao"
 import { definicaoHistoricaDoPasso } from "@/src/services/versao-publicada"
+import { alvoDoCampo, idReferenciado } from "@/src/lib/motor/fontes-de-campo"
+import { listarAlvo, resolverReferencia, type EntidadeReferenciada } from "@/src/services/referencia-canonica"
+import { contextoDaRetificacao } from "@/src/services/contexto-da-retificacao"
 import { executarAcaoCadastrada } from "@/src/services/executar-acao-cadastrada"
 import { tentativasDoPasso, tentativaVigente } from "@/src/services/execucao-do-passo"
 import { efeito } from "@/src/lib/motor/catalogo-de-efeitos"
@@ -28,7 +31,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
     where: { id },
     select: {
       id: true, stepKey: true, status: true, faseMacroKey: true, ciclo: true,
-      documentoId: true, processoId: true,
+      documentoId: true, processoId: true, retificacaoPacoteId: true,
       // O FORNECEDOR CONCRETO vem do documento, por ID. É ele que responde quais canais
       // existem para esta etapa — não uma lista global.
       documento: { select: { orgaoId: true, orgao: { select: { id: true, name: true, nomeFantasia: true } } } },
@@ -44,10 +47,38 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
     where: { ativo: true }, orderBy: [{ ordem: "asc" }],
     select: { key: true, label: true, descricao: true, protocoloObrigatorio: true, anexoObrigatorioLabel: true, rastreioObrigatorio: true, observacaoObrigatoria: true },
   })
+  // ── CAMPOS DE REFERÊNCIA ─────────────────────────────────────────────────
+  //
+  // O campo guarda o ID; a lista e o nome vêm do cadastro canônico, agora. Duas
+  // listas são montadas de propósito: as ATIVAS, para quem vai escolher, e o que já
+  // foi escolhido — que entra mesmo se tiver sido desativado depois, porque sumir com
+  // ele apagaria o que a execução registrou.
+  const camposDeReferencia = (hist?.passo.campos ?? []).filter((c) => c.tipo === "referencia")
+  const opcoesPorAlvo = new Map<string, EntidadeReferenciada[]>()
+  const escolhidasPorAlvo = new Map<string, Map<number, EntidadeReferenciada>>()
+  for (const c of camposDeReferencia) {
+    const alvo = alvoDoCampo(c.opcoes)
+    if (!alvo || opcoesPorAlvo.has(alvo)) continue
+    opcoesPorAlvo.set(alvo, await listarAlvo(alvo))
+  }
+
   // AS OPÇÕES VÊM, NESTA ORDEM: das cadastradas na versão (identidade própria, com
   // inativação), do catálogo global quando o campo aponta para ele, e por último do
   // JSON antigo — que é o formato de antes de a opção ter identidade.
-  const resolverOpcoes = (campo: { opcoesCadastradas?: Array<{ key: string; label: string; ativo: boolean; ordem: number; condicao: unknown }>; opcoes: unknown }) => {
+  const resolverOpcoes = (campo: { tipo?: string; opcoesCadastradas?: Array<{ key: string; label: string; ativo: boolean; ordem: number; condicao: unknown }>; opcoes: unknown }) => {
+    // REFERÊNCIA: a lista é o cadastro canônico, e o valor é o ID.
+    if (campo.tipo === "referencia") {
+      const alvo = alvoDoCampo(campo.opcoes)
+      if (!alvo) return []
+      const ativas = opcoesPorAlvo.get(alvo) ?? []
+      const extras = escolhidasPorAlvo.get(alvo)
+      const juntas = new Map(ativas.map((e) => [e.id, e]))
+      for (const [id, e] of extras ?? []) if (!juntas.has(id)) juntas.set(id, e)
+      return [...juntas.values()].map((e) => ({
+        value: String(e.id), label: e.ativo ? e.label : `${e.label} (inativo)`,
+        meta: { id: e.id, descricao: e.descricao, ativo: e.ativo },
+      }))
+    }
     const cadastradas = (campo.opcoesCadastradas ?? []).filter((o) => o.ativo !== false)
     if (cadastradas.length > 0) {
       return [...cadastradas].sort((a, b) => a.ordem - b.ordem)
@@ -66,8 +97,27 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
   // avaliados, e é ele que a tela devolve preenchido ao recarregar.
   const valoresAtuais = ((vigente?.payload as { valores?: Record<string, unknown> } | null)?.valores ?? {}) as Record<string, unknown>
 
+  // O QUE JÁ FOI ESCOLHIDO — resolvido sem filtrar por ativo, pelo motivo acima.
+  for (const c of camposDeReferencia) {
+    const alvo = alvoDoCampo(c.opcoes)
+    const id = idReferenciado(valoresAtuais[c.key])
+    if (!alvo || id == null) continue
+    const mapa = escolhidasPorAlvo.get(alvo) ?? new Map<number, EntidadeReferenciada>()
+    if (!mapa.has(id)) {
+      const e = await resolverReferencia(alvo, id)
+      if (e) mapa.set(id, e)
+    }
+    escolhidasPorAlvo.set(alvo, mapa)
+  }
+
+  // O CONTEXTO DA UNIDADE DE TRABALHO, projetado dos donos a cada leitura. Copiar
+  // isto para o payload "só para a tela" seria a segunda verdade voltando com outro
+  // nome — e divergiria na primeira correção feita no cadastro.
+  const contexto = passo.retificacaoPacoteId ? await contextoDaRetificacao(id) : null
+
   return NextResponse.json({
     passo,
+    contexto,
     versao: hist?.versao ?? null,
     executor: hist ? executorEfetivo({ key: passo.stepKey, executorKey: hist.passo.executorKey }, passo.faseMacroKey) : null,
     // `null` diz a verdade: esta execução é anterior ao versionamento e não tem

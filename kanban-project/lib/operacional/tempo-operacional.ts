@@ -62,6 +62,25 @@ import { isDiaUtil } from '@/src/lib/diasUteis'
  * Sem SLA declarado o prazo é NULO — a tarefa fica fora da régua de atraso, o
  * que é honesto, em vez de ganhar uma data inventada.
  */
+/**
+ * PRAZO HERDADO — o passo não declara prazo próprio.
+ *
+ * O modelo guarda `slaDays` como inteiro com default 0, e 0 sempre significou "não
+ * tem prazo próprio". O que faltava era dizer isso em algum lugar: a tela mostrava um
+ * campo numérico com "0" dentro, que se lê como "prazo zero", e quem configurasse
+ * digitaria um número só para o campo não parecer vazio — gravando um override que
+ * ninguém quis.
+ *
+ * HERANÇA NÃO É OVERRIDE. Quem herda continua herdando quando o prazo da fase mudar;
+ * quem copiou o número da fase para dentro do passo, não.
+ */
+export const PRAZO_HERDADO = 0
+
+/** O passo declara prazo próprio, ou herda? Uma pergunta, um lugar. */
+export function temPrazoProprio(slaDays: number | null | undefined): boolean {
+  return typeof slaDays === "number" && Number.isFinite(slaDays) && slaDays > 0
+}
+
 export function prazoOperacional(slaDays: number | null | undefined, inicio: Date): Date | null {
   if (slaDays == null || !Number.isFinite(slaDays) || slaDays <= 0) return null
   const d = new Date(inicio.getTime())

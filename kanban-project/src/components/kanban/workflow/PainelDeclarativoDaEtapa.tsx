@@ -66,8 +66,21 @@ interface Subtarefa {
   definicao: { acoes: Acao[]; campos: Campo[]; checkItens: ItemChecklist[] }
 }
 
+/**
+ * O CONTEXTO DA UNIDADE DE TRABALHO, projetado no servidor a partir dos donos de cada
+ * fato — o pedido, o profissional, o protocolo, a organização. Chega pronto para
+ * mostrar e NÃO existe no payload da execução: copiá-lo para lá "para facilitar a UI"
+ * recriaria a segunda verdade que este trabalho inteiro existe para desfazer.
+ */
+interface BlocoDeContexto {
+  chave: string
+  titulo: string
+  itens: Array<{ rotulo: string; valor: string; detalhe?: string | null }>
+}
+
 interface Dados {
   passo: { id: number; stepKey: string; status: string }
+  contexto?: { pacoteId: number; num: string; blocos: BlocoDeContexto[] } | null
   versao: number | null
   executor: string | null
   configuracao: { label: string; descricao: string | null; campos: Campo[]; acoes: Acao[]; checklist: ItemChecklist[] } | null
@@ -304,7 +317,7 @@ export default function PainelDeclarativoDaEtapa({
                         {c.tipo === "textarea" ? (
                           <textarea className={inp} rows={3} value={String(vals[c.key] ?? "")}
                             onChange={(e) => setValoresDaSub({ ...valoresDaSub, [st.key]: { ...vals, [c.key]: e.target.value } })} />
-                        ) : c.tipo === "select" || c.tipo === "multiselect" || c.tipo === "radio" ? (
+                        ) : c.tipo === "select" || c.tipo === "multiselect" || c.tipo === "radio" || c.tipo === "referencia" ? (
                           <select className={inp} value={String(vals[c.key] ?? "")}
                             onChange={(e) => setValoresDaSub({ ...valoresDaSub, [st.key]: { ...vals, [c.key]: e.target.value } })}>
                             <option value="">— escolher —</option>
@@ -361,6 +374,28 @@ export default function PainelDeclarativoDaEtapa({
         </div>
       )}
 
+      {/* O CONTEXTO VEM ANTES DO FORMULÁRIO porque é o que o operador precisa ler
+          para decidir o que preencher. Quais blocos aparecem é decisão do servidor,
+          por passo — quem vai protocolar não precisa do parecer da validação. */}
+      {(d.contexto?.blocos.length ?? 0) > 0 && (
+        <div className="space-y-2">
+          {d.contexto!.blocos.map((bloco) => (
+            <div key={bloco.chave} className="rounded-lg border border-white/10 bg-white/[0.03] p-3">
+              <p className="text-[11px] uppercase tracking-wide text-white/40">{bloco.titulo}</p>
+              <dl className="mt-2 space-y-1.5">
+                {bloco.itens.map((item, i) => (
+                  <div key={i} className="flex flex-wrap items-baseline gap-x-2">
+                    <dt className="text-xs text-white/45">{item.rotulo}</dt>
+                    <dd className="text-sm text-white/85">{item.valor}</dd>
+                    {item.detalhe && <span className="text-[11px] text-white/35">{item.detalhe}</span>}
+                  </div>
+                ))}
+              </dl>
+            </div>
+          ))}
+        </div>
+      )}
+
       {cfg.campos.length > 0 && (
         <div className="space-y-3">
           {cfg.campos.filter((c) => visivel(c, valores)).map((c) => (
@@ -368,7 +403,11 @@ export default function PainelDeclarativoDaEtapa({
               <label className={lbl}>{c.label}{c.obrigatorio && <span className="text-amber-300"> *</span>}</label>
               {c.tipo === "textarea" ? (
                 <textarea className={inp} rows={3} value={String(valores[c.key] ?? "")} onChange={(e) => setValores({ ...valores, [c.key]: e.target.value })} />
-              ) : c.tipo === "select" || c.tipo === "multiselect" ? (
+              ) : c.tipo === "select" || c.tipo === "multiselect" || c.tipo === "referencia" ? (
+                /* REFERÊNCIA a cadastro: as opções chegam resolvidas do servidor — o
+                   `value` é o ID canônico e o rótulo é o nome de agora. A tela não
+                   sabe de qual cadastro veio, e é por isso que um alvo novo não pede
+                   componente novo. */
                 <select className={inp} value={String(valores[c.key] ?? "")} onChange={(e) => setValores({ ...valores, [c.key]: e.target.value })}>
                   <option value="">— escolher —</option>
                   {c.opcoes.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}

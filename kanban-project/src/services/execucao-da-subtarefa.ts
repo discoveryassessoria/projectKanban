@@ -98,6 +98,7 @@ export interface ExecucaoDeSubtarefa {
   fornecedorId: number | null
   canalKey: string | null
   protocolo: string | null
+  protocoloId: number | null
   enviadoEm: Date | null
   previstoPara: Date | null
   supersededAt: Date | null
@@ -256,7 +257,14 @@ export async function registrarNaExecucao(
     payload?: Prisma.InputJsonValue | null
     fornecedorId?: number | null
     canalKey?: string | null
+    /**
+     * PROJEÇÃO do número, nunca a fonte. Quem responde pelo protocolo é `Protocolo`,
+     * alcançado por `protocoloId`; este texto existe para os leitores que ainda não
+     * migraram e só deve receber o que o cadastro canônico confirmou.
+     */
     protocolo?: string | null
+    /** O protocolo canônico desta execução. É por ele que se chega ao número. */
+    protocoloId?: number | null
     enviadoEm?: Date | null
     previstoPara?: Date | null
   },
@@ -288,6 +296,7 @@ export async function registrarNaExecucao(
       ...(dados.fornecedorId !== undefined ? { fornecedorId: dados.fornecedorId } : {}),
       ...(dados.canalKey !== undefined ? { canalKey: dados.canalKey } : {}),
       ...(dados.protocolo !== undefined ? { protocolo: dados.protocolo } : {}),
+      ...(dados.protocoloId !== undefined ? { protocoloId: dados.protocoloId } : {}),
       ...(dados.enviadoEm !== undefined ? { enviadoEm: dados.enviadoEm } : {}),
       ...(dados.previstoPara !== undefined ? { previstoPara: dados.previstoPara } : {}),
     },

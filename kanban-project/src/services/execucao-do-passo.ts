@@ -71,6 +71,9 @@ export interface Tentativa {
   executadoPorId: number | null
   resultado: string | null
   payload: unknown
+  /// O PROTOCOLO CANÔNICO registrado por esta tentativa, quando houve um. É referência:
+  /// o número, a data e o órgão são lidos de `Protocolo`, nunca daqui.
+  protocoloId: number | null
   supersededAt: Date | null
   supersededPorId: number | null
   /// A chave do comando que a criou. É por ela que o retry devolve a mesma tentativa.

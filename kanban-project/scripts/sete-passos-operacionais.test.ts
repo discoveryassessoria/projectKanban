@@ -21,6 +21,7 @@ import { join } from "path"
 import { PrismaClient, Prisma } from "@prisma/client"
 import { CONFIGURACAO } from "./_configuracao-retificacao"
 import { validarConfiguracao, executorEfetivo } from "../src/services/validacao-de-publicacao"
+import { alvoDoCampo } from "../src/lib/motor/fontes-de-campo"
 import { REGISTRO_DE_EXECUTORES } from "../src/lib/motor/registro-de-executores"
 import { efeitosDaFase } from "../src/lib/motor/catalogo-de-efeitos"
 import { publicarWorkflow, preverPublicacao } from "../src/services/publicacao-de-workflow"
@@ -49,6 +50,11 @@ async function limpar() {
     await prisma.phaseWorkflowStepInstance.deleteMany({ where: { processoId: p.id } })
     await prisma.phaseWorkflowInstance.deleteMany({ where: { processoId: p.id } })
     await prisma.tarefa.deleteMany({ where: { processoId: p.id } })
+    await prisma.protocolo.deleteMany({ where: { processoId: p.id } })
+    await prisma.retificacaoPacoteDivergencia.deleteMany({ where: { pacote: { processoId: p.id } } })
+    await prisma.retificacaoPacote.deleteMany({ where: { processoId: p.id } })
+    await prisma.divergencia.deleteMany({ where: { analise: { processoId: p.id } } })
+    await prisma.analiseDocumental.deleteMany({ where: { processoId: p.id } })
     await prisma.workflowEvento.deleteMany({ where: { processoId: p.id } })
     await prisma.processo.delete({ where: { id: p.id } }).catch(() => null)
   }
@@ -65,7 +71,7 @@ async function limpar() {
 
 /** Monta a fase da Retificação com EXATAMENTE o conteúdo que a produção recebeu. */
 async function montarRetificacao(phaseKey: string) {
-  const efeitos = efeitosDaFase(FASE, null)
+  const efeitos = [...efeitosDaFase(FASE, null), "REGISTER_PROTOCOL", "REGISTER_RETIFICATION_PLAN"]
   await prisma.catalogoFase.create({
     data: {
       phaseKey, label: "Retificação (espelho de teste)", escopo: "PROCESSO", ordemPadrao: 95,
@@ -92,6 +98,8 @@ async function montarRetificacao(phaseKey: string) {
         data: {
           stepId: p.id, key: campo.key, label: campo.label, tipo: campo.tipo,
           obrigatorio: campo.obrigatorio ?? false, ajuda: campo.ajuda ?? null, ordem: i + 1,
+          ...(campo.referencia ? { opcoes: { referencia: campo.referencia } as never } : {}),
+          ...(campo.condicao ? { condicao: campo.condicao as never } : {}),
         },
         select: { id: true },
       })
@@ -119,6 +127,7 @@ async function montarRetificacao(phaseKey: string) {
         data: c.requisitos.map((r, i) => ({
           stepId: p.id, key: r.key, label: r.label, tipo: r.tipo,
           alvoKey: r.alvoKey ?? null, acaoKey: r.acaoKey ?? null, ordem: i + 1,
+          ...(r.condicao ? { condicao: r.condicao as never } : {}),
         })) as Prisma.StepRequirementCreateManyInput[],
       })
     }
@@ -196,7 +205,7 @@ async function main() {
     campos: p.campos.map((c) => ({ ...c, opcoes: c.opcoesCadastradas, opcoesLegado: c.opcoes })),
   }))
   const problemas = validarConfiguracao(paraValidarNormalizado as never, {
-    phaseKey: FASE, efeitosPermitidosDaFase: efeitosDaFase(FASE, null),
+    phaseKey: FASE, efeitosPermitidosDaFase: [...efeitosDaFase(FASE, null), "REGISTER_PROTOCOL", "REGISTER_RETIFICATION_PLAN"],
   })
   // (B) O cadastro é publicável: nenhum efeito fora da competência da fase, nenhum
   // requisito órfão, nenhuma opção vazia.
@@ -207,14 +216,27 @@ async function main() {
   const efeitos = efeitosDaFase(FASE, null)
   check("(C) a fase não tem competência para decidir retificação", !efeitos.includes("GO_RETIFICATION"), efeitos.join(","))
   const usados = new Set(paraValidar.flatMap((p) => p.acoes.map((a) => a.effectKey)))
+  const permitidos = [...efeitosDaFase(FASE, null), "REGISTER_PROTOCOL", "REGISTER_RETIFICATION_PLAN"]
   check("(D) e nenhuma ação cadastrada tenta um efeito fora da competência",
-    [...usados].every((e) => efeitos.includes(e)), [...usados].join(","))
+    [...usados].every((e) => permitidos.includes(e)), [...usados].join(","))
 
-  // (E) A cadeia de dependência é linear e sem ciclo: 1→2→3→4→5→6.
+  // (E) A DEPENDÊNCIA É PRÉ-CONDIÇÃO, NÃO ORDEM. O grafo não é a corrente 1→2→3→4→5→6
+  // que a numeração sugere: "redigir o pedido" não precisa do modo escolhido — o que
+  // precisa dele é PROTOCOLAR, que tem de saber se o destinatário é tribunal ou
+  // cartório. Gatear a redação era ordem visual disfarçada de pré-condição.
   const chaves = Object.keys(CONFIGURACAO)
-  check("(E) cada passo depende do anterior, em cadeia",
-    chaves.every((k, i) => i === 0 ? CONFIGURACAO[k].dependeDe.length === 0
-      : CONFIGURACAO[k].dependeDe.length === 1 && CONFIGURACAO[k].dependeDe[0] === chaves[i - 1]))
+  const dep = (k: string) => CONFIGURACAO[k].dependeDe
+  check("(E) os dois primeiros passos abrem juntos — nenhum é pré-condição do outro",
+    dep("definir_modo_de_retificacao").length === 0 && dep("preparar_requerimento_peticao").length === 0)
+  check("(E2) protocolar exige as DUAS pré-condições reais: a peça e o modo",
+    dep("protocolar_retificacao").length === 2 &&
+    dep("protocolar_retificacao").includes("definir_modo_de_retificacao") &&
+    dep("protocolar_retificacao").includes("preparar_requerimento_peticao"))
+  check("(E3) e daí em diante cada passo depende do anterior, porque cada um é efeito dele",
+    ["acompanhar_decisao", "registrar_averbacao", "validar_retificacao"].every((k, i) =>
+      dep(k).length === 1 && dep(k)[0] === ["protocolar_retificacao", "acompanhar_decisao", "registrar_averbacao"][i]))
+  check("(E4) nenhuma aresta é reflexiva ou aponta para passo inexistente",
+    chaves.every((k) => dep(k).every((d) => d !== k && chaves.includes(d))))
 
   const pub = await publicarWorkflow({ workflowId: wf.id, actorId: null, versaoEsperada: 1 })
   check("(F) o cadastro publica", pub.ok && pub.versaoNova === 2, JSON.stringify(pub))
@@ -225,6 +247,18 @@ async function main() {
     data: { nome: `${M} processo`, pais: "espanha", arvoreId: arv.id, workflowRuntime: "v2", faseAtualKey: phaseKey },
     select: { id: true },
   })
+  // A UNIDADE É O PEDIDO. Este palco nasceu quando a fase materializava por PROCESSO;
+  // com a cardinalidade RETIFICACAO, cada pedido tem a própria cadeia — e o passo que
+  // define o modo grava NELE.
+  const analise = await prisma.analiseDocumental.create({ data: { processoId: proc.id }, select: { id: true } })
+  const div = await prisma.divergencia.create({
+    data: { analiseId: analise.id, pessoaNome: `${M} P`, documentoTitulo: `${M} doc`, campo: "sobrenome",
+      campoLabel: "Sobrenome", tipo: "nome", severidade: "media", status: "retificacao" },
+    select: { id: true },
+  })
+  const { abrirPacoteDeRetificacao } = await import("../src/services/retificacao-canonica")
+  const pacote = await abrirPacoteDeRetificacao({ processoId: proc.id, divergenciaIds: [div.id] })
+
   const inst = await prisma.phaseWorkflowInstance.create({
     data: {
       processoId: proc.id, faseMacroKey: phaseKey, ciclo: 1, status: "ATIVO",
@@ -240,6 +274,7 @@ async function main() {
         stepKey: k, ordem: i + 1, tipo: "HUMANO", obrigatorio: true, geraTarefa: true,
         status: i === 0 ? "EM_ANDAMENTO" : "PENDENTE",
         dependeDeStepKeys: CONFIGURACAO[k].dependeDe as never,
+        retificacaoPacoteId: pacote.pacoteId,
         stepDefinitionId: porChave.get(k)!, stepDefinitionVersion: 2, chaveIdempotencia: `${M}-p${i}`,
       },
       select: { id: true },
@@ -265,13 +300,17 @@ async function main() {
   check("(I) modo fora do vocabulário do domínio é recusado pelo SERVIDOR",
     !inventado.ok && inventado.codigo === "OPCAO_INVALIDA", JSON.stringify(inventado))
 
-  const feito = await executarAcaoCadastrada(si1, "modo_definido", { modo: "judicial" },
+  // VIA ADMINISTRATIVA: não exige profissional nem número de processo — é a condição
+  // declarada fazendo o que um `if` dentro do componente faria.
+  const feito = await executarAcaoCadastrada(si1, "modo_definido", { modo: "administrativa" },
     { usuarioId: 1, permissoes: PERMS, correlationId: `${M}-a2` })
   check("(J) com o modo do domínio, a etapa conclui", feito.ok, JSON.stringify(feito))
 
+  check("(K) a escolha ficou gravada NO PEDIDO, que é o dono dela",
+    (await prisma.retificacaoPacote.findUnique({ where: { id: pacote.pacoteId }, select: { tipo: true } }))?.tipo === "administrativa")
   const tent = (await tentativasDoPasso(si1)).find((t) => t.supersededAt == null)
-  check("(K) a escolha ficou gravada pela CHAVE do domínio",
-    (tent?.payload as { valores?: Record<string, string> })?.valores?.modo === "judicial")
+  check("(K2) e NÃO ficou copiada dentro da execução",
+    (tent?.payload as { valores?: Record<string, string> })?.valores?.modo === undefined)
 
   // (L) A espera é estado declarado, não etapa parada sem explicação.
   const si4 = instancias.get("acompanhar_decisao")!
@@ -320,7 +359,10 @@ async function main() {
   const si3 = instancias.get("protocolar_retificacao")!
   await prisma.phaseWorkflowStepInstance.update({ where: { id: si3 }, data: { status: "EM_ANDAMENTO" } })
   await garantirTentativa(si3, { motivo: MOTIVOS_DE_TENTATIVA.ABERTURA, status: "DISPONIVEL" })
-  const valores = { numero_protocolo: "RET-2026-77", data_protocolo: "2026-08-20" }
+  const orgao = await prisma.orgaoProtocolo.create({
+    data: { name: `${M} Cartório de Testes`, type: "cartorio", ativo: true }, select: { id: true },
+  })
+  const valores = { orgao_receptor: orgao.id, numero_protocolo: "RET-2026-77", data_protocolo: "2026-08-20" }
   const cid = `${M}-idem`
   const p1 = await executarAcaoCadastrada(si3, "protocolado", valores, { usuarioId: 1, permissoes: PERMS, correlationId: cid })
   const p2 = await executarAcaoCadastrada(si3, "protocolado", valores, { usuarioId: 1, permissoes: PERMS, correlationId: cid })
@@ -328,17 +370,50 @@ async function main() {
   const vig3 = (await tentativasDoPasso(si3)).filter((t) => t.supersededAt == null)
   check("repetir o mesmo comando não cria segunda tentativa vigente", vig3.length === 1,
     `${vig3.length}; repetição=${JSON.stringify(p2.codigo ?? p2.ok)}`)
-  const prot = (vig3[0]?.payload as { valores?: Record<string, string> })?.valores?.numero_protocolo
-  check("e o número do protocolo continua sendo o mesmo", prot === "RET-2026-77", String(prot))
+  // O NÚMERO NÃO ESTÁ MAIS NO PAYLOAD — está em `Protocolo`, que é o dono. A tentativa
+  // guarda a referência, e é por ela que se chega ao número.
+  const noPayload = (vig3[0]?.payload as { valores?: Record<string, string> })?.valores?.numero_protocolo
+  check("o número do protocolo NÃO ficou copiado dentro da execução", noPayload === undefined, String(noPayload))
+  const canonico = await prisma.protocolo.findFirst({
+    where: { processoId: proc.id, origem: "ETAPA" },
+    select: { id: true, numeroProtocolo: true, orgaoId: true },
+  })
+  check("ele está no cadastro de Protocolos, uma vez só",
+    canonico?.numeroProtocolo === "RET-2026-77" &&
+    (await prisma.protocolo.count({ where: { processoId: proc.id, origem: "ETAPA" } })) === 1,
+    JSON.stringify(canonico))
+  check("e a tentativa aponta para ele", vig3[0]?.protocoloId === canonico?.id,
+    `${vig3[0]?.protocoloId} vs ${canonico?.id}`)
 
   // ════════════════════════════════════════════════════════════════════════
   console.log("\nO QUE NÃO FOI INVENTADO — as lacunas ficam visíveis, não preenchidas")
   // ════════════════════════════════════════════════════════════════════════
-  const todosOsCampos = paraValidar.flatMap((p) => p.campos.map((c) => c.key))
-  // O órgão que recebe a retificação tem dono: Órgãos e Organizações. Um campo de
-  // texto "cartório" aqui seria a segunda fonte que este trabalho existe para desfazer.
-  check("nenhum campo de texto livre para órgão/cartório foi criado",
-    !todosOsCampos.some((k) => /cartorio|orgao|comarca|tribunal/i.test(k)), todosOsCampos.join(","))
+  // O ÓRGÃO TEM DONO: Órgãos e Organizações. Na primeira rodada não havia como
+  // apontar para lá, e o campo ficou de fora — melhor ausente do que como texto livre,
+  // que seria a segunda fonte que este trabalho existe para desfazer. Agora ele existe,
+  // e a exigência mudou de "não crie" para "não crie COMO TEXTO".
+  // A ENTIDADE é referência. O que está DENTRO dela pode ser texto — desde que o
+  // modelo canônico também o guarde como texto, que é o caso de `Protocolo.setor`
+  // ("setor/guichê dentro do órgão"). A distinção importa: "qual órgão" tem cadastro
+  // e muda de nome; "qual vara dentro dele" não tem cadastro nenhum, e inventar um
+  // seria criar estrutura para um dado que ninguém mantém.
+  const todos = paraValidar.flatMap((p) => p.campos)
+  // Classificar por SUBSTRING confundia "qual órgão" com "onde dentro do órgão":
+  // `setor_do_orgao` contém "orgao" e não referencia entidade nenhuma. A pergunta é
+  // sobre o campo que nomeia o DESTINATÁRIO.
+  const destinatario = todos.find((c) => c.key === "orgao_receptor")
+  check("o órgão destinatário existe como referência a cadastro, nunca como texto livre",
+    destinatario?.tipo === "referencia" &&
+    alvoDoCampo((destinatario as { opcoes?: unknown }).opcoes) === "ORGANIZACAO",
+    `${destinatario?.key}:${destinatario?.tipo}`)
+  check("a comarca NÃO virou campo — ela se lê do órgão referenciado",
+    !todos.some((c) => /comarca/i.test(c.key)))
+  check("a vara/setor é texto porque `Protocolo.setor` também é — e vai para lá",
+    todos.some((c) => c.key === "setor_do_orgao" && c.tipo === "texto") &&
+    /setor: texto\(a\.valores\.setor_do_orgao\)/.test(read("src/services/efeitos-de-dominio.ts")))
+  check("nenhum campo de texto livre para entidade que tem cadastro próprio",
+    todos.filter((c) => c.tipo === "texto")
+      .every((c) => !/^(advogado|fornecedor|responsavel|orgao|cartorio|tribunal)$/i.test(c.key)))
   // O prazo do órgão é previsão de terceiro; o prazo da fase é do sistema.
   const ajudaPrazo = CONFIGURACAO.acompanhar_decisao.campos.find((c) => c.key === "prazo_informado")?.ajuda ?? ""
   check("o prazo informado pelo órgão se declara como previsão, não como prazo da fase",

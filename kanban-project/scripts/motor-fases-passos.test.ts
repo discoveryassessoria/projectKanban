@@ -256,7 +256,7 @@ async function main() {
     id: 1, key: "p1", label: "P1", description: null, ordem: 1, createsTask: true, required: true,
     owner: null, priority: "medium", slaDays: 0, completionRule: null, checklist: null, versao: 1, cardinalidade: null,
   }
-  const ctx = { pessoaIds: [10, 11, 12], necessidadeIds: [70, 71], documentoIds: [900], documentoIdPorNecessidade: new Map([[70, 900]]) }
+  const ctx = { pessoaIds: [10, 11, 12], necessidadeIds: [70, 71], documentoIds: [900], documentoIdPorNecessidade: new Map([[70, 900]]), retificacaoPacoteIds: [] }
   check("PROCESSO ⇒ 1 alvo, sem entidade",
     planejarMaterializacao([base], "SEQUENCIAL", "PROCESSO", ctx).alvos.length === 1)
   const porPessoa = planejarMaterializacao([{ ...base, cardinalidade: "PESSOA" }], "SEQUENCIAL", "PROCESSO", ctx).alvos
@@ -264,7 +264,7 @@ async function main() {
   const porDoc = planejarMaterializacao([{ ...base, cardinalidade: "NECESSIDADE" }], "SEQUENCIAL", "PROCESSO", ctx).alvos
   check("NECESSIDADE ⇒ 1 alvo por certidão", porDoc.length === 2 && porDoc.every((a) => a.necessidadeId != null))
   check("NECESSIDADE vincula o Documento quando já existe", porDoc.find((a) => a.necessidadeId === 70)?.documentoId === 900)
-  const semEntidade = planejarMaterializacao([{ ...base, cardinalidade: "PESSOA" }], "SEQUENCIAL", "PROCESSO", { pessoaIds: [], necessidadeIds: [], documentoIds: [], documentoIdPorNecessidade: new Map() })
+  const semEntidade = planejarMaterializacao([{ ...base, cardinalidade: "PESSOA" }], "SEQUENCIAL", "PROCESSO", { pessoaIds: [], necessidadeIds: [], documentoIds: [], documentoIdPorNecessidade: new Map(), retificacaoPacoteIds: [] })
   check("cardinalidade sem alvo avisa explicitamente (nunca silencioso)",
     semEntidade.alvos.length === 0 && semEntidade.avisos.some((a) => a.code === "CARDINALIDADE_SEM_ALVO"))
   const paralelo = planejarMaterializacao(

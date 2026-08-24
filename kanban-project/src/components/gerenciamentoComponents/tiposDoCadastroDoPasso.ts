@@ -136,12 +136,21 @@ export const NOME_DO_TIPO_DE_CAMPO: Record<string, string> = {
   multiselect: "Seleção múltipla",
   radio: "Escolha entre opções",
   upload: "Arquivo/Evidência",
+  referencia: "Referência a cadastro",
 }
 export function nomeDoTipoDeCampo(tipo: string): string {
   return NOME_DO_TIPO_DE_CAMPO[tipo] ?? tipo
 }
 /** Os tipos que oferecem opções ao operador. */
 export const TIPOS_COM_OPCOES = ["select", "multiselect", "radio"]
+
+/**
+ * O tipo que APONTA para um cadastro em vez de listar opções escritas no passo.
+ *
+ * Não entra em `TIPOS_COM_OPCOES` de propósito: quem configura não escreve as opções
+ * de uma referência — escolhe o cadastro, e a lista é o cadastro.
+ */
+export const TIPO_REFERENCIA = "referencia"
 
 /**
  * A CARDINALIDADE, explicada.

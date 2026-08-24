@@ -88,7 +88,12 @@ function buildFilhosSimples(s: any) {
       key: slug(String(c?.key || c?.label || `campo_${i + 1}`)),
       label: String(c?.label || 'Campo'), tipo: String(c?.tipo || 'texto'),
       obrigatorio: !!c?.obrigatorio,
-      opcoes: (c?.opcoes ?? undefined) as Prisma.InputJsonValue | undefined,
+      // `null` PRECISA CHEGAR COMO `DbNull`. Com `?? undefined`, tirar o cadastro-alvo
+      // de um campo de referência não apagava nada: o Prisma ignora `undefined`, e a
+      // referência antiga sobrevivia a uma tela que já mostrava o campo vazio.
+      opcoes: (c?.opcoes === null || c?.opcoes === undefined
+        ? Prisma.DbNull
+        : c.opcoes) as Prisma.InputJsonValue | typeof Prisma.DbNull,
       condicao: (c?.condicao ?? undefined) as Prisma.InputJsonValue | undefined,
       ajuda: c?.ajuda ? String(c.ajuda) : null,
       ordem: Number(c?.ordem) || i + 1, ativo: c?.ativo !== false,

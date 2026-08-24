@@ -1,0 +1,142 @@
+// scripts/guard-protocolo-writer-unico.test.ts
+//
+// QUEM PODE CRIAR UM PROTOCOLO.
+//
+// `Protocolo` é o dono do fato "protocolo": número, data, órgão, responsável,
+// comprovantes e o vínculo com os documentos. Enquanto três lugares diferentes
+// criavam a linha por conta própria, cada um decidia sua própria idempotência — e
+// protocolar duas vezes pelo caminho A não encontrava o que o caminho B tinha
+// gravado.
+//
+// Este guard é de CÓDIGO: lê os arquivos e recusa um writer novo que não passe pela
+// porta. Não substitui o teste de comportamento; impede a regressão silenciosa.
+//
+//   npx tsx scripts/guard-protocolo-writer-unico.test.ts
+
+import { readFileSync, readdirSync, statSync } from "fs"
+import { join, relative } from "path"
+
+const ROOT = join(__dirname, "..")
+const PORTA = "src/services/protocolo-canonico.ts"
+
+/**
+ * Escritas fora da porta, cada uma com o motivo e o que falta para sair daqui.
+ * Uma entrada sem motivo não existe: allowlist sem razão escrita vira depósito.
+ */
+const AUTORIZADOS: Record<string, string> = {
+  [PORTA]:
+    "é a porta. Único lugar que executa `protocolo.create`; todos os outros caminhos passam por ela.",
+  "src/app/api/protocolos/[protocoloId]/route.ts":
+    "EDITA e APAGA um protocolo que já existe, pelo id. Não é um segundo caminho de criação — " +
+    "é a manutenção do registro que a porta criou.",
+  "src/app/api/gerenciamento/executor-motor/route.ts":
+    "DESFAZ o que uma automação criou (`targetTable === 'Protocolo'` → delete). É rollback de " +
+    "artefato, não criação.",
+}
+
+let ok = 0
+const falhas: string[] = []
+function check(nome: string, cond: boolean, extra?: string) {
+  if (cond) { ok++; console.log(`  ✅ ${nome}`) }
+  else { falhas.push(nome); console.log(`  ❌ ${nome}${extra ? ` — ${extra}` : ""}`) }
+}
+
+function varrer(dir: string, out: string[] = []): string[] {
+  for (const nome of readdirSync(dir)) {
+    if (nome === "node_modules" || nome === ".next" || nome === ".git") continue
+    const p = join(dir, nome)
+    if (statSync(p).isDirectory()) varrer(p, out)
+    else if (/\.(ts|tsx)$/.test(nome)) out.push(p)
+  }
+  return out
+}
+
+const ESCRITA = /(?:prisma|tx|db)\s*\.\s*protocolo\s*\.\s*(create|createMany|update|updateMany|upsert|delete|deleteMany)\s*\(/
+
+console.log("\nQUEM ESCREVE `Protocolo`")
+const arquivos = [...varrer(join(ROOT, "src")), ...varrer(join(ROOT, "lib"))]
+const escritores = new Map<string, string[]>()
+for (const abs of arquivos) {
+  const rel = relative(ROOT, abs).replace(/\\/g, "/")
+  const linhas = readFileSync(abs, "utf8").split("\n")
+  const achadas = linhas
+    .map((l, i) => ({ l, i }))
+    .filter(({ l }) => ESCRITA.test(l) && !l.trim().startsWith("//"))
+    .map(({ l, i }) => `${i + 1}: ${l.trim().slice(0, 90)}`)
+  if (achadas.length) escritores.set(rel, achadas)
+}
+
+for (const [arq, linhas] of escritores) {
+  const motivo = AUTORIZADOS[arq]
+  check(`autorizado: ${arq}`, !!motivo,
+    motivo ? undefined : `escreve Protocolo fora da porta:\n       ${linhas.join("\n       ")}\n       Use registrarProtocoloTx de ${PORTA}, ou declare a exceção com motivo.`)
+}
+
+// A AUTOMAÇÃO LEGADA DE PROTOCOLO ESTÁ NEUTRALIZADA. Ela criava uma linha sem número
+// e sem data — um marcador de automação ocupando a entidade que virou fonte única.
+const motor = readFileSync(join(ROOT, "src/lib/motor/executor.ts"), "utf8")
+check("a automação legada de protocolo não cria mais placeholder",
+  !/db\.protocolo\.create|tx\.protocolo\.create/.test(motor))
+check("e a regra continua sendo lida e reportada como neutralizada",
+  /automação de protocolo neutralizada/.test(motor) && motor.includes("protocolRules"))
+
+// O TEXTO DO PROTOCOLO NA SUBTAREFA É PROJEÇÃO, NÃO FONTE.
+const execAcao = readFileSync(join(ROOT, "src/services/executar-acao-cadastrada.ts"), "utf8")
+check("a subtarefa não copia o número do formulário para a coluna de texto",
+  !/protocolo: valores\.numero_protocolo|protocolo: String\(valores/.test(execAcao))
+check("ela projeta o que o cadastro canônico confirmou, com o vínculo junto",
+  /protocoloId: protocoloRegistrado\.id, protocolo: protocoloRegistrado\.numero/.test(execAcao))
+check("e o número projetado vem de `Protocolo`, não do payload",
+  /prisma\.protocolo\.findUnique\(\{ where: \{ id \}/.test(execAcao))
+
+// UM MOTOR SÓ NA RETIFICAÇÃO.
+const arbitro = readFileSync(join(ROOT, "src/services/motor-da-retificacao.ts"), "utf8")
+check("existe um árbitro que diz qual motor conduz a Retificação",
+  arbitro.includes("motorVigenteDaRetificacao") && arbitro.includes("lerVersaoPublicada"))
+check("o árbitro decide pela versão PUBLICADA, nunca pelo rascunho",
+  /A pergunta é sobre a versão PUBLICADA, não sobre o rascunho/.test(arbitro) &&
+  arbitro.includes("lerVersaoPublicada(wf.id, wf.versao)"))
+for (const rota of [
+  "src/app/api/processos/[processoId]/retificacao/pacotes/route.ts",
+  "src/app/api/processos/[processoId]/retificacao/pacotes/[pkgId]/etapas/[stepId]/route.ts",
+]) {
+  check(`a rota legada recusa quando o canônico assume: ${rota.split("/").slice(-2).join("/")}`,
+    readFileSync(join(ROOT, rota), "utf8").includes("recusarSeCanonicoAssumiu()"))
+}
+
+// A PORTA PRECISA CONTINUAR SENDO A PORTA. Se ela deixar de criar, a allowlist
+// inteira vira ficção.
+check("a porta é quem cria", (escritores.get(PORTA) ?? []).some((l) => l.includes(".create(")))
+
+// ENTRADA MORTA na allowlist é pior que ausência: dá a impressão de que alguém
+// revisou aquele arquivo recentemente.
+const mortas = Object.keys(AUTORIZADOS).filter((k) => !escritores.has(k))
+check("nenhuma exceção morta na allowlist", mortas.length === 0, mortas.join(", "))
+
+// OS DOIS CAMINHOS QUE EXISTIAM passam pela porta agora.
+const solic = readFileSync(join(ROOT, "src/services/solicitacao-documento.ts"), "utf8")
+check("a solicitação de documento protocola pela porta", solic.includes("registrarProtocoloTx("))
+const rota = readFileSync(join(ROOT, "src/app/api/protocolos/route.ts"), "utf8")
+check("a protocolização do dossiê protocola pela porta", rota.includes("registrarProtocoloTx("))
+const efeitos = readFileSync(join(ROOT, "src/services/efeitos-de-dominio.ts"), "utf8")
+check("o efeito da etapa protocola pela porta", efeitos.includes("registrarProtocoloTx("))
+
+// E A ETAPA GUARDA REFERÊNCIA, NÃO CÓPIA.
+check("o efeito grava o protocoloId na tentativa", /protocoloId: r\.protocoloId/.test(efeitos))
+const catalogo = readFileSync(join(ROOT, "src/lib/motor/catalogo-de-efeitos.ts"), "utf8")
+check("o efeito declara os campos que consome", /camposConsumidos: \["numero_protocolo"/.test(catalogo))
+const exec = readFileSync(join(ROOT, "src/services/executar-acao-cadastrada.ts"), "utf8")
+check("e o que foi consumido sai do payload", /for \(const k of def\.camposConsumidos \?\? \[\]\) delete valores\[k\]/.test(exec))
+
+// O ÓRGÃO NÃO É ACHADO PELO NOME DO CAMPO — é achado pela estrutura.
+// O ALVO SAIU DO CÓDIGO E FOI PARA O CATÁLOGO. O handler pergunta ao efeito o que
+// procurar; se o nome do alvo estivesse escrito nele, cada efeito novo traria o seu.
+check("o handler pergunta ao catálogo qual alvo procurar, em vez de trazê-lo escrito",
+  efeitos.includes("alvoDeReferenciaEsperado") && !/!== "ORGANIZACAO"/.test(efeitos))
+check("e o catálogo é quem declara o alvo do REGISTER_PROTOCOL",
+  /alvoDeReferenciaEsperado: "ORGANIZACAO"/.test(catalogo))
+check("o órgão nunca é achado por nome de campo combinado",
+  !/valores\.(cartorio|orgao)\b/.test(efeitos))
+
+console.log(`\n${falhas.length === 0 ? "✅ PASSOU" : "❌ FALHOU"}: ${ok} ok, ${falhas.length} falhas`)
+if (falhas.length) { falhas.forEach((f) => console.log(`   · ${f}`)); process.exitCode = 1 }
