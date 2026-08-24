@@ -210,7 +210,7 @@ export const CATALOGO_DE_EFEITOS: DefinicaoDeEfeito[] = [
     concluiPasso: true,
     // O número e a data passam a viver em `Protocolo`. O campo de referência ao órgão
     // NÃO entra aqui: ele já é uma referência, e referência não é cópia.
-    camposConsumidos: ["numero_protocolo", "data_protocolo", "observacao_protocolo"],
+    camposConsumidos: ["numero_protocolo", "data_protocolo", "observacao_protocolo", "setor_do_orgao"],
     // NENHUMA FASE GANHA ISTO DE GRAÇA. Ele escreve em `Protocolo`; quem o quer,
     // declara. Sem esta linha, as fases que nunca gravaram lista de efeitos passariam
     // a poder protocolar só porque o efeito passou a existir.

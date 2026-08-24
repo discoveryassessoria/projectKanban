@@ -37,8 +37,13 @@ export const CONFIGURACAO: Record<string, {
   },
 
   // 2 ─ O documento que vai ser protocolado. A evidência é o próprio requerimento.
+  // A DEPENDÊNCIA 1→2 FOI REMOVIDA. Ela não passava no teste: redigir o pedido é
+  // possível antes de o modo estar registrado — o `resumo_do_pedido` ("o que precisa
+  // ser corrigido") é o mesmo nos dois caminhos. O que o modo decide é PARA QUEM a
+  // peça vai, e isso é pré-condição de PROTOCOLAR, não de redigir. Gatear aqui era
+  // ordem visual disfarçada de pré-condição.
   preparar_requerimento_peticao: {
-    dependeDe: ["definir_modo_de_retificacao"],
+    dependeDe: [],
     campos: [
       { key: "resumo_do_pedido", label: "O que está sendo pedido", tipo: "textarea", obrigatorio: true, ajuda: "O que precisa ser corrigido no registro, em uma frase." },
     ],
@@ -50,8 +55,10 @@ export const CONFIGURACAO: Record<string, {
   },
 
   // 3 ─ O protocolo é o fato que separa "preparando" de "aguardando terceiro".
+  // DUAS PRÉ-CONDIÇÕES REAIS, e as duas se justificam sozinhas: sem a peça não há o
+  // que entregar, e sem o modo não se sabe se o destinatário é tribunal ou cartório.
   protocolar_retificacao: {
-    dependeDe: ["preparar_requerimento_peticao"],
+    dependeDe: ["definir_modo_de_retificacao", "preparar_requerimento_peticao"],
     campos: [
       // O ÓRGÃO APONTA PARA O CADASTRO. Era a lacuna que ficou aberta na primeira
       // rodada: sem campo referencial, a única saída seria um texto "cartório", e o
@@ -61,6 +68,10 @@ export const CONFIGURACAO: Record<string, {
         referencia: "ORGANIZACAO",
         ajuda: "Escolhido em Órgãos e Organizações. Fica gravado o registro, não o nome.",
       },
+      // A VARA É O SETOR. `Protocolo.setor` já existe e já se chama "setor/guichê
+      // dentro do órgão" — vara, cartório de ofício e guichê são a mesma pergunta em
+      // vocabulários diferentes. Um campo "vara" ao lado dele seria a segunda fonte.
+      { key: "setor_do_orgao", label: "Vara / setor / ofício", tipo: "texto", ajuda: "Onde dentro do órgão o pedido deu entrada. Vai para o cadastro do protocolo." },
       { key: "numero_protocolo", label: "Número do protocolo", tipo: "texto", obrigatorio: true },
       { key: "data_protocolo", label: "Data do protocolo", tipo: "data", obrigatorio: true },
       { key: "observacao_protocolo", label: "Observação", tipo: "textarea" },

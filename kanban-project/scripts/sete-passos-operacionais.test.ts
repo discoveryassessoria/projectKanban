@@ -21,6 +21,7 @@ import { join } from "path"
 import { PrismaClient, Prisma } from "@prisma/client"
 import { CONFIGURACAO } from "./_configuracao-retificacao"
 import { validarConfiguracao, executorEfetivo } from "../src/services/validacao-de-publicacao"
+import { alvoDoCampo } from "../src/lib/motor/fontes-de-campo"
 import { REGISTRO_DE_EXECUTORES } from "../src/lib/motor/registro-de-executores"
 import { efeitosDaFase } from "../src/lib/motor/catalogo-de-efeitos"
 import { publicarWorkflow, preverPublicacao } from "../src/services/publicacao-de-workflow"
@@ -212,11 +213,23 @@ async function main() {
   check("(D) e nenhuma ação cadastrada tenta um efeito fora da competência",
     [...usados].every((e) => permitidos.includes(e)), [...usados].join(","))
 
-  // (E) A cadeia de dependência é linear e sem ciclo: 1→2→3→4→5→6.
+  // (E) A DEPENDÊNCIA É PRÉ-CONDIÇÃO, NÃO ORDEM. O grafo não é a corrente 1→2→3→4→5→6
+  // que a numeração sugere: "redigir o pedido" não precisa do modo escolhido — o que
+  // precisa dele é PROTOCOLAR, que tem de saber se o destinatário é tribunal ou
+  // cartório. Gatear a redação era ordem visual disfarçada de pré-condição.
   const chaves = Object.keys(CONFIGURACAO)
-  check("(E) cada passo depende do anterior, em cadeia",
-    chaves.every((k, i) => i === 0 ? CONFIGURACAO[k].dependeDe.length === 0
-      : CONFIGURACAO[k].dependeDe.length === 1 && CONFIGURACAO[k].dependeDe[0] === chaves[i - 1]))
+  const dep = (k: string) => CONFIGURACAO[k].dependeDe
+  check("(E) os dois primeiros passos abrem juntos — nenhum é pré-condição do outro",
+    dep("definir_modo_de_retificacao").length === 0 && dep("preparar_requerimento_peticao").length === 0)
+  check("(E2) protocolar exige as DUAS pré-condições reais: a peça e o modo",
+    dep("protocolar_retificacao").length === 2 &&
+    dep("protocolar_retificacao").includes("definir_modo_de_retificacao") &&
+    dep("protocolar_retificacao").includes("preparar_requerimento_peticao"))
+  check("(E3) e daí em diante cada passo depende do anterior, porque cada um é efeito dele",
+    ["acompanhar_decisao", "registrar_averbacao", "validar_retificacao"].every((k, i) =>
+      dep(k).length === 1 && dep(k)[0] === ["protocolar_retificacao", "acompanhar_decisao", "registrar_averbacao"][i]))
+  check("(E4) nenhuma aresta é reflexiva ou aponta para passo inexistente",
+    chaves.every((k) => dep(k).every((d) => d !== k && chaves.includes(d))))
 
   const pub = await publicarWorkflow({ workflowId: wf.id, actorId: null, versaoEsperada: 1 })
   check("(F) o cadastro publica", pub.ok && pub.versaoNova === 2, JSON.stringify(pub))
@@ -355,13 +368,28 @@ async function main() {
   // apontar para lá, e o campo ficou de fora — melhor ausente do que como texto livre,
   // que seria a segunda fonte que este trabalho existe para desfazer. Agora ele existe,
   // e a exigência mudou de "não crie" para "não crie COMO TEXTO".
-  const camposDeOrgao = paraValidar.flatMap((p) => p.campos.filter((c) => /cartorio|orgao|comarca|tribunal/i.test(c.key)))
-  check("o órgão existe como referência a cadastro, nunca como texto livre",
-    camposDeOrgao.length > 0 && camposDeOrgao.every((c) => c.tipo === "referencia"),
-    camposDeOrgao.map((c) => `${c.key}:${c.tipo}`).join(","))
-  check("e nenhum outro campo virou texto livre para entidade que tem dono",
-    paraValidar.flatMap((p) => p.campos).filter((c) => c.tipo === "texto")
-      .every((c) => !/cartorio|orgao|comarca|tribunal|fornecedor|responsavel/i.test(c.key)))
+  // A ENTIDADE é referência. O que está DENTRO dela pode ser texto — desde que o
+  // modelo canônico também o guarde como texto, que é o caso de `Protocolo.setor`
+  // ("setor/guichê dentro do órgão"). A distinção importa: "qual órgão" tem cadastro
+  // e muda de nome; "qual vara dentro dele" não tem cadastro nenhum, e inventar um
+  // seria criar estrutura para um dado que ninguém mantém.
+  const todos = paraValidar.flatMap((p) => p.campos)
+  // Classificar por SUBSTRING confundia "qual órgão" com "onde dentro do órgão":
+  // `setor_do_orgao` contém "orgao" e não referencia entidade nenhuma. A pergunta é
+  // sobre o campo que nomeia o DESTINATÁRIO.
+  const destinatario = todos.find((c) => c.key === "orgao_receptor")
+  check("o órgão destinatário existe como referência a cadastro, nunca como texto livre",
+    destinatario?.tipo === "referencia" &&
+    alvoDoCampo((destinatario as { opcoes?: unknown }).opcoes) === "ORGANIZACAO",
+    `${destinatario?.key}:${destinatario?.tipo}`)
+  check("a comarca NÃO virou campo — ela se lê do órgão referenciado",
+    !todos.some((c) => /comarca/i.test(c.key)))
+  check("a vara/setor é texto porque `Protocolo.setor` também é — e vai para lá",
+    todos.some((c) => c.key === "setor_do_orgao" && c.tipo === "texto") &&
+    /setor: texto\(a\.valores\.setor_do_orgao\)/.test(read("src/services/efeitos-de-dominio.ts")))
+  check("nenhum campo de texto livre para entidade que tem cadastro próprio",
+    todos.filter((c) => c.tipo === "texto")
+      .every((c) => !/^(advogado|fornecedor|responsavel|orgao|cartorio|tribunal)$/i.test(c.key)))
   // O prazo do órgão é previsão de terceiro; o prazo da fase é do sistema.
   const ajudaPrazo = CONFIGURACAO.acompanhar_decisao.campos.find((c) => c.key === "prazo_informado")?.ajuda ?? ""
   check("o prazo informado pelo órgão se declara como previsão, não como prazo da fase",

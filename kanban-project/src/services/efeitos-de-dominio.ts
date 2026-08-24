@@ -207,6 +207,8 @@ export async function registrarProtocoloDaEtapa(a: AlvoDoEfeito) {
     orgaoId,
     responsavelId: a.usuarioId,
     observacoes: texto(a.valores.observacao_protocolo),
+    // VARA / OFÍCIO / GUICHÊ — o setor dentro do órgão, no campo que já é dele.
+    setor: texto(a.valores.setor_do_orgao),
     documentoIds: a.documentoId ? [a.documentoId] : [],
   }))
 

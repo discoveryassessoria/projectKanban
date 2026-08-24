@@ -80,6 +80,30 @@ async function convergir(
   stepId: number, stepKey: string, cfg: (typeof CONFIGURACAO)[string], dryRun: boolean,
 ): Promise<string[]> {
   const linhas: string[] = []
+
+  // A DEPENDÊNCIA É ATRIBUTO DO PASSO, e mudava sem ninguém aplicar: o convergidor
+  // olhava só as peças (campo, ação, conferência, requisito). Uma revisão que REMOVE
+  // uma aresta ficava no arquivo e não chegava ao cadastro.
+  const passoAtual = await prisma.phaseInternalWorkflowStep.findUnique({
+    where: { id: stepId }, select: { dependeDe: true, executorKey: true },
+  })
+  const depAgora = JSON.stringify(cfg.dependeDe)
+  const depAntes = JSON.stringify(Array.isArray(passoAtual?.dependeDe) ? passoAtual.dependeDe : [])
+  if (depAntes !== depAgora) {
+    linhas.push(`~ DEPENDE DE: ${depAntes} → ${depAgora}`)
+    if (!dryRun) {
+      await prisma.phaseInternalWorkflowStep.update({
+        where: { id: stepId }, data: { dependeDe: cfg.dependeDe as never },
+      })
+    }
+  }
+  if (passoAtual?.executorKey !== "padrao") {
+    linhas.push(`~ EXECUTOR: ${passoAtual?.executorKey ?? "null"} → padrao`)
+    if (!dryRun) {
+      await prisma.phaseInternalWorkflowStep.update({ where: { id: stepId }, data: { executorKey: "padrao" } })
+    }
+  }
+
   const [campos, acoes, itens, reqs] = await Promise.all([
     prisma.stepField.findMany({ where: { stepId }, select: { id: true, key: true, tipo: true, opcoes: true, obrigatorio: true, ordem: true } }),
     prisma.stepAction.findMany({ where: { stepId }, select: { id: true, key: true, effectKey: true, requerCampos: true } }),
