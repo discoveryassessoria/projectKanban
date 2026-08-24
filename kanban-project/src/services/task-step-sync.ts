@@ -1109,6 +1109,60 @@ export function cancelarPasso(stepInstanceId: number, ctx: SyncContexto) {
     { alvo: "CANCELADA", evt: "TAREFA_CANCELADA", extra: { motivoCodigo: ctx.motivoCodigo, justificativa: ctx.justificativa } })
 }
 
+/**
+ * SUPERSEDE OS PASSOS VIVOS DE UMA INSTÂNCIA DE FASE — dentro da transação de quem
+ * está superseder a instância.
+ *
+ * ─── O DEFEITO QUE ISTO FECHA ───────────────────────────────────────────────
+ * Voltar a uma fase supersede a instância anterior e abre um ciclo novo. Só que os
+ * FILHOS dela ficavam onde estavam: medido em produção (24/08/2026), quatro passos
+ * seguiam DISPONIVEL ou EM_ANDAMENTO dentro de instâncias já SUPERSEDIDAS, e três
+ * deles com tarefa viva pendurada.
+ *
+ * O efeito é o pior possível para quem opera: trabalho na fila que não é trabalho.
+ * A pessoa abre a tarefa, faz o que ela pede, e está mexendo num ciclo que já passou —
+ * ou, mais provável, aprende a desconfiar da lista.
+ *
+ * ─── POR QUE AQUI, E COM AS MESMAS PRIMITIVAS ───────────────────────────────
+ * Não é varredura posterior nem `updateMany` solto: passa por `aplicarPasso` e
+ * `aplicarTarefa`, os mesmos que toda transição usa. Isso preserva a precedência da
+ * máquina (o que já está concluído NÃO vira supersedido), grava os eventos e mantém a
+ * trava de coerência entre passo e tarefa. Uma segunda forma de superseder passo seria
+ * uma segunda máquina de estados.
+ *
+ * Recebe `tx` porque quem supersede a instância já está numa transação — e a instância
+ * morta e os filhos vivos não podem existir nem por um instante.
+ */
+export async function supersederPassosDaInstanciaTx(
+  tx: TX,
+  workflowInstanceId: number,
+  o: ApplyOpts,
+): Promise<{ passos: number; tarefas: number }> {
+  const vivos = await tx.phaseWorkflowStepInstance.findMany({
+    // OS QUE AINDA CONTAM COMO TRABALHO. Concluído, dispensado, cancelado e falhado
+    // são desfecho — superseder um desfecho apagaria o que aconteceu.
+    where: {
+      workflowInstanceId,
+      status: { in: ["PENDENTE", "DISPONIVEL", "EM_ANDAMENTO", "AGUARDANDO", "BLOQUEADO", "EXECUTADO", "AGUARDANDO_APROVACAO"] },
+    },
+    select: { id: true, tarefas: { where: { statusTarefa: { notIn: ["CONCLUIDO_RECEBIDO", "CONCLUIDO_NAO_POSSUI", "CANCELADA", "SUPERSEDIDA"] } }, select: { id: true } } },
+  })
+  if (!vivos.length) return { passos: 0, tarefas: 0 }
+
+  let passos = 0
+  let tarefas = 0
+  for (const v of vivos) {
+    const rp = await aplicarPasso(tx, v.id, "SUPERSEDIDO", "PASSO_SUPERSEDIDO", o)
+    if (rp.changed) passos++
+    for (const t of v.tarefas) {
+      const rt = await aplicarTarefa(tx, t.id, "SUPERSEDIDA", "TAREFA_SUPERSEDIDA", o)
+      if (rt.changed) tarefas++
+    }
+  }
+  await assegurarCoerenciaPassoTarefa(tx, vivos.map((v) => v.id))
+  return { passos, tarefas }
+}
+
 export function supersederPasso(stepInstanceId: number, ctx: SyncContexto) {
   return opPassoSimples(stepInstanceId, ctx, "SUPERSEDIDO", "PASSO_SUPERSEDIDO", "step-supersede",
     { alvo: "SUPERSEDIDA", evt: "TAREFA_SUPERSEDIDA" })

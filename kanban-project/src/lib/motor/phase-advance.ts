@@ -17,6 +17,7 @@
 //    NÃO remove legado. Fora do v2 recusa explicitamente (a rota trata o legado).
 
 import { randomUUID } from "crypto"
+import { supersederPassosDaInstanciaTx } from "@/src/services/task-step-sync"
 import { prisma } from "@/lib/prisma"
 import type { Prisma } from "@prisma/client"
 import { resolveWorkflowRuntime } from "@/src/lib/workflow-runtime"
@@ -250,6 +251,10 @@ async function executarPlano(p: Plano): Promise<AdvanceResult> {
 
       // 1) encerrar/superseder a instância atual da fase de origem (histórico preservado)
       let previousInstanceId: number | null = null
+      // SUPERSEDIDA, não apenas encerrada: quando a fase é CONCLUÍDA, os passos dela já
+      // estão no desfecho deles e nada pode mudar de estado. A permissão do invariante
+      // vale só para a supersessão, e por isso é uma variável separada.
+      let instanciaSupersedidaId: number | null = null
       if (p.encerramento !== "NENHUM") {
         const atual = await tx.phaseWorkflowInstance.findFirst({
           where: { processoId: p.processoId, faseMacroKey: p.faseAtual, status: { in: ["ATIVO", "BLOQUEADO", "AGUARDANDO"] } },
@@ -264,6 +269,27 @@ async function executarPlano(p: Plano): Promise<AdvanceResult> {
               ? { status: "CONCLUIDO", completedAt: new Date() }
               : { status: "SUPERSEDIDO", supersededAt: new Date() },
           })
+          // A INSTÂNCIA MORREU; OS FILHOS DELA NÃO PODEM SEGUIR VIVOS.
+          //
+          // Superseder a instância e deixar os passos onde estavam produzia trabalho
+          // fantasma: medido em produção, quatro passos DISPONIVEL/EM_ANDAMENTO dentro
+          // de instâncias já supersedidas, três deles com tarefa na fila de alguém.
+          //
+          // Vai pela mesma máquina de estados de sempre — o que já está concluído
+          // continua concluído, porque superseder um desfecho apagaria o que aconteceu.
+          // E na MESMA transação: instância morta com filho vivo não pode existir nem
+          // por um instante.
+          if (!concluir) {
+            instanciaSupersedidaId = atual.id
+            await supersederPassosDaInstanciaTx(tx, atual.id, {
+              correlationId: p.correlationId,
+              causationId: chave,
+              ciclo: p.cicloAlvo ?? 1,
+              processoId: p.processoId,
+              workflowInstanceId: atual.id,
+            })
+          }
+
           await tx.workflowEvento.create({
             data: {
               tipo: concluir ? "WORKFLOW_CONCLUIDO" : "WORKFLOW_SUPERSEDIDO",
@@ -328,6 +354,10 @@ async function executarPlano(p: Plano): Promise<AdvanceResult> {
       // que o trabalho dele deixou de ser devido.
       const obrigacoesDepois = await fotografarObrigacoes(tx, p.processoId)
       invariantes = compararObrigacoes(obrigacoesAntes, obrigacoesDepois, {
+        // A instância que acabou de ser supersedida pode ter levado os filhos vivos
+        // junto — é a única mudança de estado que uma movimentação pode causar. Fase
+        // CONCLUÍDA não entra aqui: `instanciaSupersedidaId` fica null.
+        instanciaSupersedidaId,
         instanciaDestinoId: inst.workflowInstance.id,
         passosDoDestino: new Set(inst.stepInstances.map((s) => s.id)),
       })

@@ -39,6 +39,8 @@ export interface ObrigacaoFotografada {
   status: string
   obrigatorio: boolean
   concluidoEm: string | null
+  /** Para TAREFA: o passo do qual ela é projeção. `null` em tarefa avulsa. */
+  passoId?: number | null
 }
 
 export interface FotografiaObrigacoes {
@@ -111,6 +113,10 @@ export async function fotografarObrigacoes(
       tipo: "TAREFA",
       id: t.id,
       workflowInstanceId: t.workflowInstanceId,
+      // DE QUAL PASSO ELA É PROJEÇÃO. A tarefa pode ter `workflowInstanceId` nulo —
+      // ela nasce do passo, e nem sempre carrega a instância — então o vínculo com a
+      // fase (e com a instância) só se resolve por aqui.
+      passoId: t.workflowStepInstanceId ?? null,
       faseMacroKey: ref?.fase ?? null,
       ciclo: ref?.ciclo ?? null,
       status: `${String(t.statusTarefa)}|${t.concluida ? "concluida" : "aberta"}`,
@@ -153,17 +159,79 @@ export interface ResultadoInvariantes {
   }
 }
 
+/** Estados em que a obrigação ainda conta como trabalho por fazer. */
+const VIVOS = new Set(["PENDENTE", "DISPONIVEL", "EM_ANDAMENTO", "AGUARDANDO", "BLOQUEADO", "EXECUTADO", "AGUARDANDO_APROVACAO"])
+const VIVOS_TAREFA = new Set(["NAO_INICIADA", "EM_ANDAMENTO", "AGUARDANDO_CLIENTE", "AGUARDANDO_TERCEIRO", "BLOQUEADA"])
+
 /**
  * Compara as duas fotografias. Só a instância de DESTINO desta operação pode ganhar
  * obrigações novas; nenhuma obrigação pode mudar de status ou desaparecer.
  *
  * `instanciaDestinoId` é a instância criada/convergida pela operação. Passos e
  * tarefas dela são o único delta legítimo.
+ *
+ * ─── A ÚNICA OUTRA MUDANÇA ADMITIDA ────────────────────────────────────────
+ * `instanciaSupersedidaId`: quando a operação supersede a instância de origem, os
+ * passos e tarefas VIVOS dela podem — e devem — ir junto para SUPERSEDIDO.
+ *
+ * Não é afrouxamento: é a mesma exigência dita por inteiro. Antes, o invariante
+ * aceitava a instância morrer e os filhos dela continuarem vivos — container
+ * supersedido com conteúdo DISPONIVEL. Medido em produção (24/08/2026): dezoito de
+ * dezenove passos "abertos" do processo 523 estavam nesse estado, e qualquer contagem
+ * que esquecesse de escopar por instância viva os enxergava como trabalho a fazer.
+ *
+ * A permissão é estreita de propósito e cada limite tem razão:
+ *   · SÓ a instância que ESTÁ sendo supersedida — nenhuma outra;
+ *   · SÓ de estado VIVO para SUPERSEDIDO — concluir ou cancelar durante uma
+ *     movimentação continua sendo violação, que é o defeito real que este invariante
+ *     nasceu para pegar (a tela bespoke concluindo à força os passos da fase);
+ *   · o que já era terminal continua onde estava — superseder um desfecho apagaria
+ *     o que aconteceu.
  */
+/**
+ * A obrigação apenas ACOMPANHOU a instância que morreu?
+ *
+ * Três exigências, e nenhuma delas é dispensável:
+ *   · pertence à instância que ESTÁ sendo supersedida (a tarefa pela via do passo,
+ *     porque ela pode não carregar a instância);
+ *   · estava VIVA — o que já era desfecho continua onde estava;
+ *   · foi para SUPERSEDIDO/SUPERSEDIDA, e não para concluído nem cancelado.
+ */
+function seguiuAInstanciaMorta(
+  antes: FotografiaObrigacoes,
+  a: ObrigacaoFotografada,
+  d: ObrigacaoFotografada,
+  instanciaSupersedidaId: number | null | undefined,
+): boolean {
+  if (instanciaSupersedidaId == null) return false
+  if (d.concluidoEm !== a.concluidoEm) return false
+
+  // O STATUS DA TAREFA carrega o sufixo `|aberta`/`|concluida`. Comparar a string
+  // inteira faria "NAO_INICIADA|aberta" nunca bater com o vocabulário de estados.
+  const [estadoAntes, sufixoAntes] = a.status.split("|")
+  const [estadoDepois, sufixoDepois] = d.status.split("|")
+  if (sufixoAntes !== sufixoDepois) return false
+
+  if (a.tipo === "PASSO") {
+    if (a.workflowInstanceId !== instanciaSupersedidaId) return false
+    return VIVOS.has(estadoAntes) && estadoDepois === "SUPERSEDIDO"
+  }
+
+  // TAREFA: o vínculo com a instância vem do passo do qual ela é projeção.
+  const passo = a.passoId != null ? antes.porChave.get(`passo:${a.passoId}`) : undefined
+  if (!passo || passo.workflowInstanceId !== instanciaSupersedidaId) return false
+  return VIVOS_TAREFA.has(estadoAntes) && estadoDepois === "SUPERSEDIDA"
+}
+
 export function compararObrigacoes(
   antes: FotografiaObrigacoes,
   depois: FotografiaObrigacoes,
-  opcoes: { instanciaDestinoId: number | null; passosDoDestino?: Set<number> },
+  opcoes: {
+    instanciaDestinoId: number | null
+    passosDoDestino?: Set<number>
+    /** A instância que esta operação está supersedendo, quando há uma. */
+    instanciaSupersedidaId?: number | null
+  },
 ): ResultadoInvariantes {
   const violacoes: ViolacaoInvariante[] = []
   let criadasNoDestino = 0
@@ -184,6 +252,9 @@ export function compararObrigacoes(
       })
       continue
     }
+    // A INSTÂNCIA SUPERSEDIDA LEVA OS FILHOS VIVOS JUNTO — e só isso.
+    if (seguiuAInstanciaMorta(antes, a, d, opcoes.instanciaSupersedidaId)) continue
+
     // Uma obrigação que já existia NÃO pode mudar de estado por causa de uma
     // movimentação — nem a da fase de origem, nem a de uma fase atravessada.
     if (d.status !== a.status || d.concluidoEm !== a.concluidoEm) {

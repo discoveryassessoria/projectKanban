@@ -350,7 +350,10 @@
     "guard:db-push": "node scripts/guard-db-push-local.mjs",
     "previa:publicacao": "tsx scripts/previa-publicacao.ts",
     "test:profissional-judicial": "tsx scripts/profissional-e-judicial.test.ts",
-    "test:um-motor": "tsx scripts/guard-um-motor-por-fase.test.ts"
+    "test:um-motor": "tsx scripts/guard-um-motor-por-fase.test.ts",
+    "test:tarefa-fantasma": "tsx scripts/tarefa-fantasma.test.ts",
+    "reparar:passo-fantasma:dry": "tsx scripts/reparar-passo-fantasma.ts",
+    "reparar:passo-fantasma": "tsx scripts/reparar-passo-fantasma.ts --execute"
   },
   "prisma": {
     "seed": "npm run guard:escrita && tsx prisma/seed.ts"
