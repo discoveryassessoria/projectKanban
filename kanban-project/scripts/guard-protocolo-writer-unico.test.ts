@@ -32,11 +32,6 @@ const AUTORIZADOS: Record<string, string> = {
   "src/app/api/gerenciamento/executor-motor/route.ts":
     "DESFAZ o que uma automação criou (`targetTable === 'Protocolo'` → delete). É rollback de " +
     "artefato, não criação.",
-  "src/lib/motor/executor.ts":
-    "DÍVIDA CONHECIDA: a automação legada de protocolo cria um placeholder sem número e sem data " +
-    "(`consulado: OUTROS`, observação 'Criado pelo motor'). Não é o fato 'protocolo' — é um artefato " +
-    "de automação, e as automações legadas já estão neutralizadas para tarefa, documento e avanço de " +
-    "fase. SAÍDA: neutralizar também a regra de protocolo, junto das outras.",
 }
 
 let ok = 0
@@ -77,6 +72,38 @@ for (const [arq, linhas] of escritores) {
     motivo ? undefined : `escreve Protocolo fora da porta:\n       ${linhas.join("\n       ")}\n       Use registrarProtocoloTx de ${PORTA}, ou declare a exceção com motivo.`)
 }
 
+// A AUTOMAÇÃO LEGADA DE PROTOCOLO ESTÁ NEUTRALIZADA. Ela criava uma linha sem número
+// e sem data — um marcador de automação ocupando a entidade que virou fonte única.
+const motor = readFileSync(join(ROOT, "src/lib/motor/executor.ts"), "utf8")
+check("a automação legada de protocolo não cria mais placeholder",
+  !/db\.protocolo\.create|tx\.protocolo\.create/.test(motor))
+check("e a regra continua sendo lida e reportada como neutralizada",
+  /automação de protocolo neutralizada/.test(motor) && motor.includes("protocolRules"))
+
+// O TEXTO DO PROTOCOLO NA SUBTAREFA É PROJEÇÃO, NÃO FONTE.
+const execAcao = readFileSync(join(ROOT, "src/services/executar-acao-cadastrada.ts"), "utf8")
+check("a subtarefa não copia o número do formulário para a coluna de texto",
+  !/protocolo: valores\.numero_protocolo|protocolo: String\(valores/.test(execAcao))
+check("ela projeta o que o cadastro canônico confirmou, com o vínculo junto",
+  /protocoloId: protocoloRegistrado\.id, protocolo: protocoloRegistrado\.numero/.test(execAcao))
+check("e o número projetado vem de `Protocolo`, não do payload",
+  /prisma\.protocolo\.findUnique\(\{ where: \{ id \}/.test(execAcao))
+
+// UM MOTOR SÓ NA RETIFICAÇÃO.
+const arbitro = readFileSync(join(ROOT, "src/services/motor-da-retificacao.ts"), "utf8")
+check("existe um árbitro que diz qual motor conduz a Retificação",
+  arbitro.includes("motorVigenteDaRetificacao") && arbitro.includes("lerVersaoPublicada"))
+check("o árbitro decide pela versão PUBLICADA, nunca pelo rascunho",
+  /A pergunta é sobre a versão PUBLICADA, não sobre o rascunho/.test(arbitro) &&
+  arbitro.includes("lerVersaoPublicada(wf.id, wf.versao)"))
+for (const rota of [
+  "src/app/api/processos/[processoId]/retificacao/pacotes/route.ts",
+  "src/app/api/processos/[processoId]/retificacao/pacotes/[pkgId]/etapas/[stepId]/route.ts",
+]) {
+  check(`a rota legada recusa quando o canônico assume: ${rota.split("/").slice(-2).join("/")}`,
+    readFileSync(join(ROOT, rota), "utf8").includes("recusarSeCanonicoAssumiu()"))
+}
+
 // A PORTA PRECISA CONTINUAR SENDO A PORTA. Se ela deixar de criar, a allowlist
 // inteira vira ficção.
 check("a porta é quem cria", (escritores.get(PORTA) ?? []).some((l) => l.includes(".create(")))
@@ -102,8 +129,14 @@ const exec = readFileSync(join(ROOT, "src/services/executar-acao-cadastrada.ts")
 check("e o que foi consumido sai do payload", /for \(const k of def\.camposConsumidos \?\? \[\]\) delete valores\[k\]/.test(exec))
 
 // O ÓRGÃO NÃO É ACHADO PELO NOME DO CAMPO — é achado pela estrutura.
-check("o órgão do protocolo vem do campo de referência, não de um nome combinado",
-  efeitos.includes('alvoDoCampo(c.opcoes) !== "ORGANIZACAO"') && !/valores\.(cartorio|orgao)\b/.test(efeitos))
+// O ALVO SAIU DO CÓDIGO E FOI PARA O CATÁLOGO. O handler pergunta ao efeito o que
+// procurar; se o nome do alvo estivesse escrito nele, cada efeito novo traria o seu.
+check("o handler pergunta ao catálogo qual alvo procurar, em vez de trazê-lo escrito",
+  efeitos.includes("alvoDeReferenciaEsperado") && !/!== "ORGANIZACAO"/.test(efeitos))
+check("e o catálogo é quem declara o alvo do REGISTER_PROTOCOL",
+  /alvoDeReferenciaEsperado: "ORGANIZACAO"/.test(catalogo))
+check("o órgão nunca é achado por nome de campo combinado",
+  !/valores\.(cartorio|orgao)\b/.test(efeitos))
 
 console.log(`\n${falhas.length === 0 ? "✅ PASSOU" : "❌ FALHOU"}: ${ok} ok, ${falhas.length} falhas`)
 if (falhas.length) { falhas.forEach((f) => console.log(`   · ${f}`)); process.exitCode = 1 }

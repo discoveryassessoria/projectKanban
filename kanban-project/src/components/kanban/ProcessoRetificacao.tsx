@@ -270,7 +270,7 @@ export function ProcessoRetificacao({ processoId, onConcluido }: Props) {
         method: "POST", headers: jsonHeaders(), body: JSON.stringify({ tipo }),
       })
       const json = await res.json()
-      if (!res.ok) throw new Error(json.error || "Não foi possível criar o pacote.")
+      if (!res.ok) throw new Error(json.mensagem || json.error || "Não foi possível criar o pacote.")
       await carregar()
       if (json.pacote?.id ?? json.id) setFocusId(json.pacote?.id ?? json.id)
     } catch (e) {
@@ -287,7 +287,7 @@ export function ProcessoRetificacao({ processoId, onConcluido }: Props) {
         method: "POST", headers: jsonHeaders(), body: JSON.stringify(payload),
       })
       const json = await res.json()
-      if (!res.ok) throw new Error(json.error || "Não foi possível concluir a etapa.")
+      if (!res.ok) throw new Error(json.mensagem || json.error || "Não foi possível concluir a etapa.")
       setModal(null)
       if (json.completePhase) {
         setAviso("Retificação concluída — processo movido para Emissão documental retificada.")

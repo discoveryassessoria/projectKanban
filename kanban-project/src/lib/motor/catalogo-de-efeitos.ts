@@ -58,6 +58,25 @@ export interface DefinicaoDeEfeito {
    * referência; o valor, com quem responde por ele.
    */
   camposConsumidos?: string[]
+  /**
+   * O efeito NUNCA entra numa fase por herança de competência — só quando a fase o
+   * declara nominalmente.
+   *
+   * `efeitosDaFase` devolve, para a fase que não gravou lista, TODOS os efeitos das
+   * competências dela. Isso é razoável para "concluir a etapa" e "só registrar", e
+   * deixa de ser no momento em que um efeito passa a ESCREVER numa entidade canônica:
+   * acrescentar um efeito ao catálogo daria a oito fases, de uma vez, o poder de criar
+   * protocolo — sem que ninguém tivesse pedido.
+   */
+  exigeAutorizacaoExplicita?: boolean
+  /**
+   * O ALVO DE REFERÊNCIA que o efeito precisa encontrar entre os campos do passo.
+   *
+   * Fica aqui, e não dentro do handler, para que a busca continue sendo por ESTRUTURA:
+   * o handler pergunta ao catálogo o que procurar, em vez de trazer o nome do alvo
+   * escrito no código.
+   */
+  alvoDeReferenciaEsperado?: string
 }
 
 export const CATALOGO_DE_EFEITOS: DefinicaoDeEfeito[] = [
@@ -192,6 +211,11 @@ export const CATALOGO_DE_EFEITOS: DefinicaoDeEfeito[] = [
     // O número e a data passam a viver em `Protocolo`. O campo de referência ao órgão
     // NÃO entra aqui: ele já é uma referência, e referência não é cópia.
     camposConsumidos: ["numero_protocolo", "data_protocolo", "observacao_protocolo"],
+    // NENHUMA FASE GANHA ISTO DE GRAÇA. Ele escreve em `Protocolo`; quem o quer,
+    // declara. Sem esta linha, as fases que nunca gravaram lista de efeitos passariam
+    // a poder protocolar só porque o efeito passou a existir.
+    exigeAutorizacaoExplicita: true,
+    alvoDeReferenciaEsperado: "ORGANIZACAO",
   },
   {
     key: "REGISTER_ONLY",
@@ -239,7 +263,11 @@ export function efeitosDaFase(phaseKey: string, declarados: unknown): string[] {
   if (Array.isArray(declarados) && declarados.every((x) => typeof x === "string")) {
     return declarados as string[]
   }
+  // A HERANÇA POR COMPETÊNCIA NÃO ALCANÇA QUEM EXIGE AUTORIZAÇÃO NOMINAL. Uma fase
+  // que não gravou lista recebe o que a competência dela permite — menos os efeitos
+  // que só entram por decisão explícita de quem administra.
+  const herdaveis = CATALOGO_DE_EFEITOS.filter((e) => !e.exigeAutorizacaoExplicita)
   const comps = COMPETENCIA_PADRAO_DA_FASE[phaseKey]
-  if (!comps) return CATALOGO_DE_EFEITOS.map((e) => e.key) // fase sem competência declarada
-  return CATALOGO_DE_EFEITOS.filter((e) => comps.includes(e.competencia)).map((e) => e.key)
+  if (!comps) return herdaveis.map((e) => e.key) // fase sem competência declarada
+  return herdaveis.filter((e) => comps.includes(e.competencia)).map((e) => e.key)
 }

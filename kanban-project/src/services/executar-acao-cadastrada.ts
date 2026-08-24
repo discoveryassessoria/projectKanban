@@ -334,6 +334,14 @@ export async function executarAcaoCadastrada(
         mensagem: `O efeito "${acao.effectKey}" está no catálogo mas não tem execução ligada.` }
   }
 
+  // O PROTOCOLO QUE O EFEITO REGISTROU — lido do dono, para projetar sem copiar.
+  const protocoloRegistrado = await (async () => {
+    const id = (detalhes as { protocoloId?: unknown }).protocoloId
+    if (typeof id !== "number") return null
+    const p = await prisma.protocolo.findUnique({ where: { id }, select: { id: true, numeroProtocolo: true } })
+    return p ? { id: p.id, numero: p.numeroProtocolo } : null
+  })()
+
   // ── REGISTRO NA EXECUÇÃO DA SUBTAREFA ───────────────────────────────────
   //
   // Quando a ação é de uma subtarefa, é NELA que o que foi decidido fica. Guardar isso
@@ -374,7 +382,16 @@ export async function executarAcaoCadastrada(
         valores, detalhes: {}, decididoEm: new Date().toISOString(),
       } as never,
       ...(typeof valores.canal === "string" ? { canalKey: valores.canal } : {}),
-      ...(typeof valores.numero_protocolo === "string" ? { protocolo: valores.numero_protocolo } : {}),
+      // O PROTOCOLO VEM DO DONO, não do formulário.
+      //
+      // Antes, o número era copiado de `valores.numero_protocolo` direto para a coluna
+      // de texto: a subtarefa virava uma terceira afirmação sobre o mesmo fato, ao lado
+      // do payload e de `Protocolo`. Agora a coluna só recebe o que o cadastro canônico
+      // confirmou, e o vínculo (`protocoloId`) é quem manda — o texto fica como projeção
+      // para os leitores que ainda não migraram.
+      ...(protocoloRegistrado
+        ? { protocoloId: protocoloRegistrado.id, protocolo: protocoloRegistrado.numero }
+        : {}),
       ...(ctx.fornecedorId ? { fornecedorId: ctx.fornecedorId } : {}),
     })
     // CONCLUIR A SUBTAREFA MUDA O ESTADO DAS QUE DEPENDIAM DELA. Sem reconciliar, elas

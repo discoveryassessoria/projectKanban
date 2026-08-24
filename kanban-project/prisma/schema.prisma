@@ -4667,6 +4667,7 @@ model StepExecution {
 
   @@unique([stepInstanceId, sequencia])
   @@index([stepInstanceId])
+  @@index([protocoloId])
 }
 
 /// A EXECUÇÃO DE UMA SUBTAREFA — append-only, exatamente como a do passo.
@@ -4744,6 +4745,7 @@ model SubtaskExecution {
   @@unique([stepInstanceId, subtaskKey, sequencia])
   @@index([stepInstanceId])
   @@index([subtaskKey])
+  @@index([protocoloId])
 }
 
 model PhaseWorkflowStepInstance {
@@ -4822,6 +4824,7 @@ model PhaseWorkflowStepInstance {
   @@index([processoId, faseMacroKey, status])
   @@index([necessidadeId])
   @@index([documentoId])
+  @@index([retificacaoPacoteId])
   @@index([stepKey])
   @@index([chaveIdempotencia])
 

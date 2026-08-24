@@ -195,8 +195,11 @@ async function main() {
     saude.includes("PRT-001") && saude.includes("comNumeroNoPayload"))
 
   // O ÓRGÃO DO PROTOCOLO vem da estrutura, não de um nome de campo combinado.
-  check("(B9) o handler acha o órgão pelo alvo do campo, não pela chave dele",
-    efeitos.includes('alvoDoCampo(c.opcoes) !== "ORGANIZACAO"'))
+  // O ALVO SAIU DO CÓDIGO PARA O CATÁLOGO: o handler pergunta ao efeito o que
+  // procurar. Antes o nome do alvo estava escrito nele, e cada efeito novo traria o seu.
+  check("(B9) o handler acha a entidade pelo alvo DECLARADO no catálogo, não por nome de campo",
+    efeitos.includes("alvoDeReferenciaEsperado") && efeitos.includes("alvoDoCampo(c.opcoes) !== alvoEsperado") &&
+    !/valores\.(cartorio|orgao)\b/.test(efeitos))
 
   // ══════════════════════════════════════════════════════════════════════════
   console.log("\nC — A UNIDADE DE TRABALHO DE UMA RETIFICAÇÃO")

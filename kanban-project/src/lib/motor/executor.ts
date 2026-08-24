@@ -238,10 +238,20 @@ async function criarEvento(db: DbLancamento, pid: number, titulo: string, descri
   const ev = await db.evento.create({ data: { processoId: pid, titulo: titulo.slice(0, 200), descricao: descricao || null, tipo, dataInicio, observacoes: 'Criado pelo motor' } })
   return ev.id
 }
-async function criarProtocolo(db: DbLancamento, pid: number, nome: string): Promise<number> {
-  const p = await db.protocolo.create({ data: { processoId: pid, consulado: 'OUTROS' as Consulado, observacoes: `Criado pelo motor: ${nome}` } })
-  return p.id
-}
+// A AUTOMAÇÃO DE PROTOCOLO FICA NEUTRALIZADA, junto das de tarefa.
+//
+// Ela criava uma linha em `Protocolo` sem número, sem data e sem órgão — `consulado:
+// OUTROS`, observação "Criado pelo motor". Isso não é o fato "protocolo": é um
+// marcador de automação ocupando a entidade que passou a ser a fonte única do
+// protocolo. Um protocolo em branco no meio dos protocolos reais é pior que nenhum,
+// porque quem lê não tem como saber que aquilo nunca foi protocolado.
+//
+// Quem registra protocolo agora é `registrarProtocoloTx` — número, data e órgão
+// obrigatórios —, chamada pela solicitação de certidão, pela protocolização do
+// dossiê e pelo efeito `REGISTER_PROTOCOL` da etapa.
+//
+// As regras `kind=protocol` continuam sendo LIDAS e reportadas como neutralizadas,
+// exatamente como as de `kind=task`: some da execução, não do histórico.
 
 // ============================================================
 // Converte um FaseCode no phaseKey REAL do tipo de processo (casa pelo
@@ -392,18 +402,14 @@ export async function executarMotorNaFase(processoId: number, tipoProcessoId: nu
       (id) => created.push({ kind: 'event', targetTable: 'Evento', targetId: id, name: nome, condicaoNaoVerificada: naoVerificada || undefined }))
   }
 
-  // PROTOCOLO
+  // PROTOCOLO — NEUTRALIZADO (ver o comentário em `criarProtocolo`).
   for (const r of protocolRules) {
     const nome = r.name ?? `automação #${r.id}`
-    if (wantTrigger == null || r.trigger !== wantTrigger) { skipped.push({ name: nome, reason: `gatilho não corresponde (dispara em "${r.trigger}")` }); continue }
-    const cond = await avaliarCondicoes(r.conditions, processoId)
-    if (cond.decisao === 'bloqueia') { skipped.push({ name: nome, reason: cond.motivo || 'condição não satisfeita' }); continue }
-    const naoVerificada = cond.decisao === 'nao_verificada'
-    const akey = `${processoId}::${phaseKey}::automation::${r.id}`
-    await fazer(akey, 'Protocolo', 'protocol', 'automation', r.id, nome,
-      { nota: 'consulado OUTROS (ajustar)', ...(naoVerificada ? { condicaoNaoVerificada: true, condicaoMotivo: cond.motivo } : {}) },
-      async (tx) => criarProtocolo(tx, processoId, nome),
-      (id) => created.push({ kind: 'protocol', targetTable: 'Protocolo', targetId: id, name: nome, condicaoNaoVerificada: naoVerificada || undefined }))
+    skipped.push({
+      name: nome,
+      reason: 'automação de protocolo neutralizada — protocolo tem fonte única (Protocolo), ' +
+        'escrita por registrarProtocoloTx com número, data e órgão. A regra continua cadastrada e não executa.',
+    })
   }
 
   return { created, skipped, errors, totalCriado: created.length }

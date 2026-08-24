@@ -122,7 +122,12 @@ function aplicarTravas(url) {
   for (const nome of readdirSync(dirMigrations).sort()) {
     const arquivo = join(dirMigrations, nome, 'migration.sql')
     if (!existsSync(arquivo)) continue
+    // COMENTÁRIO NÃO É COMANDO. Duas migrations explicam, em comentário, um
+    // `DROP INDEX` que NÃO deve rodar — e a extração por regex os pescava junto,
+    // mandando prosa para o psql. Tirar os comentários antes de procurar é o que
+    // separa o que a migration FAZ do que ela EXPLICA.
     const sql = readFileSync(arquivo, 'utf8')
+      .split('\n').map((l) => l.replace(/--.*$/, '')).join('\n')
     // Só o que o `db push` não sabe montar: índice parcial (tem WHERE) e CHECK.
     //
     // NA ORDEM, E COM OS DROPS. Extrair só os CREATEs recriava trava que uma migration

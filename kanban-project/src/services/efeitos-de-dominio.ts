@@ -15,6 +15,7 @@ import { prisma } from "@/lib/prisma"
 import { registrarProtocoloTx, ORIGENS_DE_PROTOCOLO } from "@/src/services/protocolo-canonico"
 import { definicaoHistoricaDoPasso } from "@/src/services/versao-publicada"
 import { alvoDoCampo, idReferenciado } from "@/src/lib/motor/fontes-de-campo"
+import { efeito as definicaoDeEfeito } from "@/src/lib/motor/catalogo-de-efeitos"
 import type { StatusDocumento } from "@prisma/client"
 import { reopenPhase } from "@/src/lib/motor/phase-advance"
 
@@ -197,7 +198,7 @@ export async function registrarProtocoloDaEtapa(a: AlvoDoEfeito) {
   const data = quando instanceof Date ? quando : new Date(String(quando ?? ""))
   if (Number.isNaN(data.getTime())) return { protocoloId: null, motivo: "DATA_INVALIDA" }
 
-  const orgaoId = await orgaoReferenciadoNaEtapa(a)
+  const orgaoId = await referenciaDoEfeito(a, "REGISTER_PROTOCOL")
   const r = await prisma.$transaction((tx) => registrarProtocoloTx(tx, {
     processoId: a.processoId,
     numeroProtocolo: numero,
@@ -220,12 +221,19 @@ export async function registrarProtocoloDaEtapa(a: AlvoDoEfeito) {
   return { protocoloId: r.protocoloId, jaExistia: r.jaExistia }
 }
 
-/** O órgão escolhido na etapa, achado pela ESTRUTURA do campo — nunca pelo nome dele. */
-async function orgaoReferenciadoNaEtapa(a: AlvoDoEfeito): Promise<number | null> {
+/**
+ * A entidade referenciada na etapa, achada pela ESTRUTURA do campo — nunca pelo nome
+ * dele, e nunca com o alvo escrito aqui: qual alvo procurar é declaração do efeito,
+ * no catálogo. Um passo que chame o campo de "cartório", "órgão" ou "conservatória"
+ * funciona igual.
+ */
+async function referenciaDoEfeito(a: AlvoDoEfeito, effectKey: string): Promise<number | null> {
+  const alvoEsperado = definicaoDeEfeito(effectKey)?.alvoDeReferenciaEsperado
+  if (!alvoEsperado) return null
   const hist = await definicaoHistoricaDoPasso(a.stepInstanceId)
   for (const c of hist?.passo.campos ?? []) {
     if (c.tipo !== "referencia") continue
-    if (alvoDoCampo(c.opcoes) !== "ORGANIZACAO") continue
+    if (alvoDoCampo(c.opcoes) !== alvoEsperado) continue
     const id = idReferenciado(a.valores[c.key])
     if (id != null) return id
   }

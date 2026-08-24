@@ -5,7 +5,7 @@
 --   corpo        → gerado do prisma/schema.prisma
 --   bloco manual → prisma/baseline/bloco-manual.sql (edite LÁ)
 --
--- Gerado em : 2026-08-22
+-- Gerado em : 2026-08-24
 -- Prisma    : 6.19.3
 --
 -- PARA QUE SERVE: reconstruir o banco DO ZERO. O histórico de migrations NÃO
@@ -5662,6 +5662,9 @@ CREATE UNIQUE INDEX "StepExecution_chaveIdempotencia_key" ON "StepExecution"("ch
 CREATE INDEX "StepExecution_stepInstanceId_idx" ON "StepExecution"("stepInstanceId");
 
 -- CreateIndex
+CREATE INDEX "StepExecution_protocoloId_idx" ON "StepExecution"("protocoloId");
+
+-- CreateIndex
 CREATE UNIQUE INDEX "StepExecution_stepInstanceId_sequencia_key" ON "StepExecution"("stepInstanceId", "sequencia");
 
 -- CreateIndex
@@ -5672,6 +5675,9 @@ CREATE INDEX "SubtaskExecution_stepInstanceId_idx" ON "SubtaskExecution"("stepIn
 
 -- CreateIndex
 CREATE INDEX "SubtaskExecution_subtaskKey_idx" ON "SubtaskExecution"("subtaskKey");
+
+-- CreateIndex
+CREATE INDEX "SubtaskExecution_protocoloId_idx" ON "SubtaskExecution"("protocoloId");
 
 -- CreateIndex
 CREATE UNIQUE INDEX "SubtaskExecution_stepInstanceId_subtaskKey_sequencia_key" ON "SubtaskExecution"("stepInstanceId", "subtaskKey", "sequencia");
@@ -5690,6 +5696,9 @@ CREATE INDEX "PhaseWorkflowStepInstance_necessidadeId_idx" ON "PhaseWorkflowStep
 
 -- CreateIndex
 CREATE INDEX "PhaseWorkflowStepInstance_documentoId_idx" ON "PhaseWorkflowStepInstance"("documentoId");
+
+-- CreateIndex
+CREATE INDEX "PhaseWorkflowStepInstance_retificacaoPacoteId_idx" ON "PhaseWorkflowStepInstance"("retificacaoPacoteId");
 
 -- CreateIndex
 CREATE INDEX "PhaseWorkflowStepInstance_stepKey_idx" ON "PhaseWorkflowStepInstance"("stepKey");
