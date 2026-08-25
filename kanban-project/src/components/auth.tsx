@@ -349,7 +349,7 @@ export default function AuthComponent({
               disabled={isLoading}
               className="
                 text-[13px] text-slate-500 underline underline-offset-2
-                transition-colors hover:text-[#123C73]
+                transition-colors hover:text-[var(--text-primary)]
                 disabled:opacity-50 disabled:cursor-not-allowed
               "
             >

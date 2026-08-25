@@ -273,25 +273,25 @@ export function TreeOnboardingWizard({ arvore, onComplete, onArvoreUpdate }: Tre
               <TreePine className="h-10 w-10 text-white" />
             </div>
             <div>
-              <h2 className="text-2xl font-bold text-[#123C73] mb-2">Bem-vindo à sua Árvore Genealógica!</h2>
+              <h2 className="text-2xl font-bold text-[var(--text-primary)] mb-2">Bem-vindo à sua Árvore Genealógica!</h2>
               <p className="text-[var(--text-muted)] text-lg">
                 Vamos começar construindo sua história familiar. Este processo levará apenas alguns minutos.
               </p>
             </div>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-8">
               <div className="text-center p-4">
-                <User className="h-8 w-8 text-[#123C73] mx-auto mb-2" />
-                <h3 className="font-semibold text-[#123C73]">Adicione Você</h3>
+                <User className="h-8 w-8 text-[var(--text-primary)] mx-auto mb-2" />
+                <h3 className="font-semibold text-[var(--text-primary)]">Adicione Você</h3>
                 <p className="text-sm text-[var(--text-muted)]">Comece com suas informações</p>
               </div>
               <div className="text-center p-4">
-                <Users className="h-8 w-8 text-[#123C73] mx-auto mb-2" />
-                <h3 className="font-semibold text-[#123C73]">Adicione Família</h3>
+                <Users className="h-8 w-8 text-[var(--text-primary)] mx-auto mb-2" />
+                <h3 className="font-semibold text-[var(--text-primary)]">Adicione Família</h3>
                 <p className="text-sm text-[var(--text-muted)]">Pais, cônjuges e filhos</p>
               </div>
               <div className="text-center p-4">
-                <TreePine className="h-8 w-8 text-[#123C73] mx-auto mb-2" />
-                <h3 className="font-semibold text-[#123C73]">Visualize</h3>
+                <TreePine className="h-8 w-8 text-[var(--text-primary)] mx-auto mb-2" />
+                <h3 className="font-semibold text-[var(--text-primary)]">Visualize</h3>
                 <p className="text-sm text-[var(--text-muted)]">Veja sua árvore crescer</p>
               </div>
             </div>
@@ -313,7 +313,7 @@ export function TreeOnboardingWizard({ arvore, onComplete, onArvoreUpdate }: Tre
               <User className="h-8 w-8 text-white" />
             </div>
             <div>
-              <h2 className="text-xl font-bold text-[#123C73] mb-2">Adicione Suas Informações</h2>
+              <h2 className="text-xl font-bold text-[var(--text-primary)] mb-2">Adicione Suas Informações</h2>
               <p className="text-[var(--text-muted)]">Comece sua árvore genealógica adicionando suas informações pessoais.</p>
             </div>
             <Button onClick={handleAddSelf} className="bg-[var(--action-primary)] hover:bg-[var(--surface-secondary)] text-[var(--action-primary-ink)]" size="lg">
@@ -329,7 +329,7 @@ export function TreeOnboardingWizard({ arvore, onComplete, onArvoreUpdate }: Tre
               <Users className="h-8 w-8 text-white" />
             </div>
             <div>
-              <h2 className="text-xl font-bold text-[#123C73] mb-2">Adicione Seus Pais</h2>
+              <h2 className="text-xl font-bold text-[var(--text-primary)] mb-2">Adicione Seus Pais</h2>
               <p className="text-[var(--text-muted)]">
                 Adicione informações sobre seus pais para expandir sua árvore genealógica.
               </p>
@@ -338,14 +338,14 @@ export function TreeOnboardingWizard({ arvore, onComplete, onArvoreUpdate }: Tre
               <Button
                 onClick={() => handleAddParent("pai")}
                 variant="outline"
-                className="border-[var(--border-strong)] text-[#123C73] hover:bg-[var(--action-primary)] hover:text-[var(--action-primary-ink)]"
+                className="border-[var(--border-strong)] text-[var(--text-primary)] hover:bg-[var(--action-primary)] hover:text-[var(--action-primary-ink)]"
               >
                 Adicionar Pai
               </Button>
               <Button
                 onClick={() => handleAddParent("mae")}
                 variant="outline"
-                className="border-[var(--border-strong)] text-[#123C73] hover:bg-[var(--action-primary)] hover:text-[var(--action-primary-ink)]"
+                className="border-[var(--border-strong)] text-[var(--text-primary)] hover:bg-[var(--action-primary)] hover:text-[var(--action-primary-ink)]"
               >
                 Adicionar Mãe
               </Button>
@@ -353,7 +353,7 @@ export function TreeOnboardingWizard({ arvore, onComplete, onArvoreUpdate }: Tre
             <Button
               onClick={() => setCurrentStep("add-spouse")}
               variant="ghost"
-              className="text-[var(--text-muted)] hover:text-[#123C73]"
+              className="text-[var(--text-muted)] hover:text-[var(--text-primary)]"
             >
               Pular esta etapa
             </Button>
@@ -367,7 +367,7 @@ export function TreeOnboardingWizard({ arvore, onComplete, onArvoreUpdate }: Tre
               <Heart className="h-8 w-8 text-white" />
             </div>
             <div>
-              <h2 className="text-xl font-bold text-[#123C73] mb-2">Adicione Seu Cônjuge</h2>
+              <h2 className="text-xl font-bold text-[var(--text-primary)] mb-2">Adicione Seu Cônjuge</h2>
               <p className="text-[var(--text-muted)]">Se você é casado(a), adicione informações sobre seu cônjuge.</p>
             </div>
             <div className="flex flex-col sm:flex-row gap-4 justify-center">
@@ -392,7 +392,7 @@ export function TreeOnboardingWizard({ arvore, onComplete, onArvoreUpdate }: Tre
               <CheckCircle className="h-8 w-8 text-white" />
             </div>
             <div>
-              <h2 className="text-xl font-bold text-[#123C73] mb-2">Parabéns!</h2>
+              <h2 className="text-xl font-bold text-[var(--text-primary)] mb-2">Parabéns!</h2>
               <p className="text-[var(--text-muted)]">
                 Sua árvore genealógica foi criada com sucesso. Agora você pode continuar adicionando mais familiares e
                 explorando sua história.
@@ -420,7 +420,7 @@ export function TreeOnboardingWizard({ arvore, onComplete, onArvoreUpdate }: Tre
               Etapa {steps.findIndex((s) => s.id === currentStep) + 1} de {steps.length}
             </p>
           </div>
-          <CardTitle className="text-[#123C73]">{arvore.nome}</CardTitle>
+          <CardTitle className="text-[var(--text-primary)]">{arvore.nome}</CardTitle>
         </CardHeader>
         <CardContent>{renderStepContent()}</CardContent>
       </Card>

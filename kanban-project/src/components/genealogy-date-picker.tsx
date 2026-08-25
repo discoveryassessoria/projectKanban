@@ -95,7 +95,7 @@ export function GenealogyDatePicker({
       </PopoverTrigger>
       <PopoverContent className="w-auto p-4" align="start" side="bottom" sideOffset={4}>
         <div className="space-y-4">
-          <div className="text-sm font-medium text-[#123C73]">Selecionar Data</div>
+          <div className="text-sm font-medium text-[var(--text-primary)]">Selecionar Data</div>
 
           <div className="grid grid-cols-3 gap-2 min-w-[280px]">
             <div>

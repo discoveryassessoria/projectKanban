@@ -213,7 +213,7 @@ function ConteudoDialog({
   return (
     <DialogContent className="sm:max-w-[500px] max-h-[90vh] overflow-y-auto">
       <DialogHeader>
-        <DialogTitle className="text-[#123C73]">{title}</DialogTitle>
+        <DialogTitle className="text-[var(--text-primary)]">{title}</DialogTitle>
         <DialogDescription className="text-[var(--text-muted)]">{description}</DialogDescription>
       </DialogHeader>
 
