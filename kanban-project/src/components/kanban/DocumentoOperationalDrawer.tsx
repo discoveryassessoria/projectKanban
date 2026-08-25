@@ -497,7 +497,7 @@ function ConteudoDrawer({
         className="fixed top-0 right-0 h-screen z-[10001] flex flex-col text-white/70 font-sans shadow-[var(--elev-2)] transition-transform duration-300"
         style={{
           width: "45vw", minWidth: "680px", maxWidth: "920px",
-          background: "#0f1419", transform: "translateX(0)",
+          background: "var(--surface-overlay)", transform: "translateX(0)",
         }}
       >
         {/* LOADING — enquanto a projeção operacional oficial não resolve. Só skeleton:
@@ -715,7 +715,7 @@ function ConteudoDrawer({
             {/* TABS */}
             <div
               className="flex-shrink-0 flex flex-wrap px-6 border-b border-[var(--border-default)]"
-              style={{ background: "#11151b" }}
+              style={{ background: "var(--surface-secondary)" }}
             >
               {tabs.map((t) => (
                 <button
@@ -740,7 +740,7 @@ function ConteudoDrawer({
             </div>
 
             {/* BODY */}
-            <div className="flex-1 overflow-y-auto px-6 py-5" style={{ background: "#0f1419" }}>
+            <div className="flex-1 overflow-y-auto px-6 py-5" style={{ background: "var(--surface-overlay)" }}>
               {/* OPERAÇÃO NÃO MATERIALIZADA — estado do DOCUMENTO, não uma aba.
                   Era a única coisa que só existia no cockpit removido: o convite
                   a iniciar a operação da fase quando ela ainda não existe. Vira

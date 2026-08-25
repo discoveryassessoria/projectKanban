@@ -435,7 +435,7 @@ function ConteudoDrawer({
           width: "45vw",
           minWidth: "640px",
           maxWidth: "880px",
-          background: "#161b22",
+          background: "var(--surface-secondary)",
         }}
       >
         {loading && !step && (
@@ -783,7 +783,7 @@ function ConteudoDrawer({
             {/* ============== TABS ============== */}
             <div
               className="flex-shrink-0 flex flex-wrap px-6 border-b border-[var(--border-default)]"
-              style={{ background: "#11151b" }}
+              style={{ background: "var(--surface-secondary)" }}
             >
               {(
                 [
@@ -818,7 +818,7 @@ function ConteudoDrawer({
             </div>
 
             {/* ============== BODY ============== */}
-            <div className="flex-1 overflow-y-auto px-6 py-5" style={{ background: "#0f1419" }}>
+            <div className="flex-1 overflow-y-auto px-6 py-5" style={{ background: "var(--surface-overlay)" }}>
               {activeTab === "timeline" && <TabTimeline step={step} />}
               {activeTab === "anexos" && (
                 // Escopo por ETAPA: mostra o requerimento anexado ao solicitar a

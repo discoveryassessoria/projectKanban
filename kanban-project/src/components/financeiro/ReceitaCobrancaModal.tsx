@@ -420,7 +420,7 @@ function CobrancaWizard({ receitaId, valor, moeda, receita, onClose, onCriada }:
         <div className="flex flex-wrap gap-2 border-b border-[var(--border-default)] px-6 py-3">
           {PASSOS.map((p) => (
             <div key={p.n} className={`flex min-w-0 flex-1 items-center gap-2 rounded-lg border px-3 py-2 ${step === p.n ? 'border-[var(--border-strong)] bg-[var(--surface-primary)]' : 'border-transparent'}`}>
-              <span className="grid h-6 w-6 shrink-0 place-items-center rounded-full border text-[11px]" style={step === p.n ? { background: OURO, borderColor: OURO, color: '#1b1508' } : step > p.n ? { borderColor: '#34d39955', background: '#34d39914', color: '#6ee7b7' } : { borderColor: 'rgba(255,255,255,0.15)', color: 'var(--text-muted)' }}>{step > p.n ? <Check className="h-3.5 w-3.5" /> : p.n}</span>
+              <span className="grid h-6 w-6 shrink-0 place-items-center rounded-full border text-[11px]" style={step === p.n ? { background: OURO, borderColor: OURO, color: '#1b1508' } : step > p.n ? { borderColor: '#34d39955', background: '#34d39914', color: 'var(--text-secondary)' } : { borderColor: 'rgba(255,255,255,0.15)', color: 'var(--text-muted)' }}>{step > p.n ? <Check className="h-3.5 w-3.5" /> : p.n}</span>
               <div className="min-w-0">
                 <p className={`truncate text-[13px] font-medium ${step === p.n ? 'text-white' : 'text-[var(--text-secondary)]'}`}>{p.label}</p>
                 <p className="truncate text-[10px] text-[var(--text-muted)]">{p.desc}</p>

@@ -273,7 +273,7 @@ function ConteudoDrawer({
           width: "45vw",
           minWidth: "680px",
           maxWidth: "920px",
-          background: "#0f1419",
+          background: "var(--surface-overlay)",
           transform: "translateX(0)",
         }}
       >
@@ -394,7 +394,7 @@ function ConteudoDrawer({
             {/* ============== TABS ============== */}
             <div
               className="flex-shrink-0 flex overflow-x-auto px-6 border-b border-[var(--border-default)]"
-              style={{ background: "#11151b" }}
+              style={{ background: "var(--surface-secondary)" }}
             >
               {tabs.map((t) => (
                 <button
@@ -421,7 +421,7 @@ function ConteudoDrawer({
             </div>
 
             {/* ============== BODY ============== */}
-            <div className="flex-1 overflow-y-auto px-6 py-5" style={{ background: "#0f1419" }}>
+            <div className="flex-1 overflow-y-auto px-6 py-5" style={{ background: "var(--surface-overlay)" }}>
               {activeTab === "docs" && <TabDocs docs={docs} onClickDoc={onClickDoc} />}
               {activeTab === "transmissao" && (
                 <Placeholder

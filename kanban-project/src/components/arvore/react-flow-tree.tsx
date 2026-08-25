@@ -200,14 +200,14 @@ function MarcasDiscretas({ sinais }: { sinais?: SinaisPessoa }) {
         <span
           title="Divergência de dados nesta pessoa"
           className="block h-1.5 w-1.5 rounded-full"
-          style={{ backgroundColor: '#dc2626' }}
+          style={{ backgroundColor: 'var(--danger-solid)' }}
         />
       )}
       {sinais.tarefaAberta && (
         <span
           title="Tarefa aberta para esta pessoa"
           className="block h-1.5 w-1.5 rounded-full"
-          style={{ backgroundColor: '#2563eb' }}
+          style={{ backgroundColor: 'var(--action-primary)' }}
         />
       )}
     </div>

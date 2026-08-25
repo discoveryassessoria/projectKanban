@@ -179,7 +179,7 @@ function ConteudoModal({
         onClick={(e) => e.stopPropagation()}
         className="flex flex-col overflow-hidden text-white"
         style={{
-          background: "#0f1419",
+          background: "var(--surface-overlay)",
           borderRadius: "12px",
           width: "620px",
           maxWidth: "94vw",
@@ -233,7 +233,7 @@ function ConteudoModal({
               style={inputStyle}
             >
               {Object.entries(reasonsMap).map(([k, label]) => (
-                <option key={k} value={k} style={{ background: "#1a2028", color: "#fff" }}>
+                <option key={k} value={k} style={{ background: "var(--surface-tertiary)", color: "var(--text-primary)" }}>
                   {label}
                 </option>
               ))}
@@ -285,7 +285,7 @@ function ConteudoModal({
 
           {erro && (
             <div className="mt-3 px-3 py-2 rounded-md border text-[11px]"
-                 style={{ background: "rgba(220,38,38,0.12)", borderColor: "rgba(220,38,38,0.30)", color: "#fca5a5" }}>
+                 style={{ background: "rgba(220,38,38,0.12)", borderColor: "rgba(220,38,38,0.30)", color: "var(--text-secondary)" }}>
               ⚠ {erro}
             </div>
           )}
@@ -302,7 +302,7 @@ function ConteudoModal({
             className="h-[34px] px-[18px] text-[12px] font-bold rounded-[7px] disabled:opacity-50"
             style={{
               background: "rgba(255,255,255,0.08)",
-              color: "#fff",
+              color: "var(--text-primary)",
               border: "1px solid rgba(255,255,255,0.12)",
             }}
           >
@@ -313,8 +313,8 @@ function ConteudoModal({
             disabled={saving}
             className="h-[34px] px-[18px] text-[12px] font-bold rounded-[7px] inline-flex items-center gap-1.5 disabled:opacity-50"
             style={{
-              background: "#dc2626",
-              color: "#fff",
+              background: "var(--danger-solid)",
+              color: "var(--text-primary)",
               border: "1px solid #dc2626",
             }}
             onMouseEnter={(e) => { if (!saving) (e.target as HTMLButtonElement).style.background = "#b91c1c" }}
@@ -339,7 +339,7 @@ function ConteudoModal({
 const inputStyle: React.CSSProperties = {
   background: "rgba(255,255,255,0.05)",
   border: "1px solid rgba(255,255,255,0.10)",
-  color: "#fff",
+  color: "var(--text-primary)",
   fontFamily: "inherit",
   fontSize: "12px",
   padding: "8px 10px",
@@ -353,7 +353,7 @@ function Section({ num, title, children }: { num: number; title: string; childre
       <div className="text-[10px] font-extrabold uppercase tracking-[0.08em] text-white/80 mb-2 flex items-center gap-2">
         <span
           className="w-[18px] h-[18px] rounded-full text-[9px] font-extrabold flex items-center justify-center"
-          style={{ background: "#dc2626", color: "#fff" }}
+          style={{ background: "var(--danger-solid)", color: "var(--text-primary)" }}
         >
           {num}
         </span>

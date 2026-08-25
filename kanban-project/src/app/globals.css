@@ -246,7 +246,10 @@
   --accent-primary: #b98524;   /* fundo, borda, ícone, indicador */
   --accent-hover: #c8952c;
   --accent-soft: #f6efdf;      /* realce de seleção */
-  --accent-ink: #17191c;       /* texto SOBRE champagne */
+  --accent-ink: #17191c;
+  /* Vermelho SÓLIDO: só ação destrutiva confirmada. Tinta branca real. */
+  --danger-solid: #b91c1c;
+  --danger-solid-ink: #ffffff;
   /* CHAMPAGNE COMO TEXTO precisa ser mais escuro: #b98524 sobre branco dá 3.23 e
      não passa AA. Este dá 4.59, e é o que deve ser usado quando o dourado é a
      TINTA — link, valor em destaque, rótulo institucional. */

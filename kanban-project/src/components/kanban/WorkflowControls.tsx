@@ -125,7 +125,7 @@ export function WorkflowControls({
   // ============================================================
 
   return (
-    <div className="px-6 py-3 border-b border-[var(--border-default)]" style={{ background: "#11151b" }}>
+    <div className="px-6 py-3 border-b border-[var(--border-default)]" style={{ background: "var(--surface-secondary)" }}>
       <div className="bg-[var(--surface-overlay)] border border-[var(--border-default)] rounded-xl px-4 py-3.5">
 
         {/* Barra de progresso */}

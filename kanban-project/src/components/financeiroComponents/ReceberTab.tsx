@@ -260,7 +260,7 @@ export default function ReceberTab() {
       </div>
 
       {detalhe && <LancamentoDetalheModal tipo={detalhe.tipo} id={detalhe.id} onClose={() => setDetalhe(null)} />}
-      {toast && <div className="fixed bottom-4 right-4 z-50 rounded-lg border px-4 py-2 text-sm shadow-[var(--elev-3)]" style={{ background: "#27272a", borderColor: "var(--border-default)", color: "var(--text-primary)" }} onClick={() => setToast(null)}>{toast}</div>}
+      {toast && <div className="fixed bottom-4 right-4 z-50 rounded-lg border px-4 py-2 text-sm shadow-[var(--elev-3)]" style={{ background: "var(--surface-secondary)", borderColor: "var(--border-default)", color: "var(--text-primary)" }} onClick={() => setToast(null)}>{toast}</div>}
     </div>
   )
 }

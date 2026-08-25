@@ -324,7 +324,7 @@ export function CustosPorTipoCards({
         /* Variantes de cor */
         .ctc-card--blue {
           background: #eff6ff;
-          border-color: #bfdbfe;
+          border-color: var(--text-secondary);
         }
         .ctc-card--blue .ctc-card__valor {
           color: #1d4ed8;
@@ -335,7 +335,7 @@ export function CustosPorTipoCards({
 
         .ctc-card--purple {
           background: #faf5ff;
-          border-color: #e9d5ff;
+          border-color: var(--text-secondary);
         }
         .ctc-card--purple .ctc-card__valor {
           color: #7c3aed;
@@ -346,7 +346,7 @@ export function CustosPorTipoCards({
 
         .ctc-card--yellow {
           background: #fffbeb;
-          border-color: #fde68a;
+          border-color: var(--text-secondary);
         }
         .ctc-card--yellow .ctc-card__valor {
           color: #b45309;

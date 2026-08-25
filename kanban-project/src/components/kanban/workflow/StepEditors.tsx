@@ -316,7 +316,7 @@ function EditorShell({
       <div className="fixed inset-0 z-[10005] flex items-center justify-center p-4 pointer-events-none">
         <div
           className="w-full max-w-3xl max-h-[92vh] flex flex-col rounded-xl overflow-hidden shadow-[var(--elev-3)] pointer-events-auto"
-          style={{ background: "#0d1117", border: "1px solid rgba(255,255,255,0.08)" }}
+          style={{ background: "var(--surface-overlay)", border: "1px solid rgba(255,255,255,0.08)" }}
         >
           {/* Header */}
           <div
