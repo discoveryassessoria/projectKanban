@@ -161,7 +161,7 @@ export function ImportarArvoreModal({ arvoreId, aberto, onFechar, onImportado }:
             <h2 className="text-lg font-semibold">Importar Árvore</h2>
             <p className="text-sm text-white/70">Envie o print de uma árvore já montada — os cards são transcritos automaticamente.</p>
           </div>
-          <button onClick={fechar} disabled={ocupado} className="rounded p-1 text-white/60 transition hover:bg-[var(--surface-hover)] hover:text-white disabled:opacity-40" aria-label="Fechar">
+          <button onClick={fechar} disabled={ocupado} className="rounded p-1 text-[var(--text-secondary)] transition hover:bg-[var(--surface-hover)] hover:text-white disabled:opacity-40" aria-label="Fechar">
             <X className="h-5 w-5" />
           </button>
         </header>
@@ -219,8 +219,8 @@ export function ImportarArvoreModal({ arvoreId, aberto, onFechar, onImportado }:
           {etapa === "previa" && extracao && (
             <div className="space-y-4">
               <div className="flex items-center gap-4 text-sm">
-                <span className="flex items-center gap-1.5"><Users className="h-4 w-4 text-white/60" />{restantes.length} pessoa(s)</span>
-                <span className="flex items-center gap-1.5"><Link2 className="h-4 w-4 text-white/60" />{extracao.unioes.length} união(ões)</span>
+                <span className="flex items-center gap-1.5"><Users className="h-4 w-4 text-[var(--text-secondary)]" />{restantes.length} pessoa(s)</span>
+                <span className="flex items-center gap-1.5"><Link2 className="h-4 w-4 text-[var(--text-secondary)]" />{extracao.unioes.length} união(ões)</span>
               </div>
 
               {extracao.avisos.length > 0 && (
@@ -244,7 +244,7 @@ export function ImportarArvoreModal({ arvoreId, aberto, onFechar, onImportado }:
                           {p.nome} {p.sobrenome ?? ""}
                           {p.numeroLinhagem != null && <span className="ml-2 rounded bg-[var(--surface-primary)] px-1.5 py-0.5 text-[11px] text-white/70">linhagem {p.numeroLinhagem}</span>}
                         </p>
-                        <p className="mt-0.5 text-xs text-white/60">
+                        <p className="mt-0.5 text-xs text-[var(--text-secondary)]">
                           {[p.sexo, p.data_nasc && `nasc. ${p.data_nasc}`, [p.local_nasc, p.pais_nasc].filter(Boolean).join(", "),
                             p.data_obito && `fal. ${p.data_obito}`, p.nacionalidade].filter(Boolean).join(" · ") || "sem dados adicionais"}
                         </p>

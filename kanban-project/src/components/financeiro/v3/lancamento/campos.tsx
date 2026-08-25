@@ -43,7 +43,7 @@ export function Campo({
       {temMsg && (
         <div id={msgId} className="mt-1 space-y-0.5">
           {erros.map((p, i) => <p key={`e${i}`} className="text-[11px] text-[var(--danger)]">{p.mensagem}</p>)}
-          {avisos.map((p, i) => <p key={`a${i}`} className="text-[11px] text-[var(--accent-primary)]">{p.mensagem}</p>)}
+          {avisos.map((p, i) => <p key={`a${i}`} className="text-[11px] text-[var(--accent-text)]">{p.mensagem}</p>)}
           {dica && erros.length === 0 && <p className="text-[11px] text-[var(--text-muted)]">{dica}</p>}
         </div>
       )}

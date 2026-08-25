@@ -417,7 +417,7 @@ export function ProcessoInformacoes({
                 <Button
                   onClick={handleSalvar}
                   disabled={salvando}
-                  className="flex-1 bg-green-600 hover:bg-green-700"
+                  className="flex-1 bg-green-700 hover:bg-green-800"
                 >
                   {salvando && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
                   {editando ? "Salvar Alterações" : "Cadastrar"}
@@ -446,7 +446,7 @@ export function ProcessoInformacoes({
             {podeEditar && (
               <Button
                 onClick={() => setShowForm(true)}
-                className="bg-green-600 hover:bg-green-700"
+                className="bg-green-700 hover:bg-green-800"
               >
                 <Plus className="h-4 w-4 mr-2" />
                 Cadastrar Informações
@@ -461,7 +461,7 @@ export function ProcessoInformacoes({
               <div className="bg-gradient-to-r from-green-50 to-emerald-50 px-6 py-4 border-b border-gray-200">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 bg-green-600 rounded-lg flex items-center justify-center">
+                    <div className="w-10 h-10 bg-green-700 rounded-lg flex items-center justify-center">
                       <Gavel className="h-5 w-5 text-white" />
                     </div>
                     <div>
@@ -577,7 +577,7 @@ export function ProcessoInformacoes({
                               ) : (
                                 <div className="w-full h-full flex items-center justify-center bg-gray-100">
                                   {isPDF ? (
-                                    <div className="w-12 h-14 bg-red-600 rounded-sm flex items-center justify-center text-[#fff] text-xs font-bold">
+                                    <div className="w-12 h-14 bg-red-700 rounded-sm flex items-center justify-center text-[var(--action-primary-ink)] text-xs font-bold">
                                       PDF
                                     </div>
                                   ) : (
@@ -609,7 +609,7 @@ export function ProcessoInformacoes({
                                   e.preventDefault()
                                   handleExcluirAnexo(anexo.id)
                                 }}
-                                className="absolute top-1 right-1 p-1 bg-red-500 hover:bg-red-600 rounded-full text-[#fff] opacity-0 group-hover:opacity-100 transition-opacity"
+                                className="absolute top-1 right-1 p-1 bg-red-500 hover:bg-red-800 rounded-full text-[var(--action-primary-ink)] opacity-0 group-hover:opacity-100 transition-opacity"
                               >
                                 <X className="h-3 w-3" />
                               </button>
@@ -648,7 +648,7 @@ export function ProcessoInformacoes({
                         type="button"
                         onClick={handleUpload}
                         disabled={uploading}
-                        className="mt-2 w-full py-2 px-4 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-[#fff] rounded-lg font-medium transition-colors"
+                        className="mt-2 w-full py-2 px-4 bg-[var(--action-primary)] hover:bg-[var(--action-primary)] disabled:bg-blue-400 text-[var(--action-primary-ink)] rounded-lg font-medium transition-colors"
                       >
                         {uploading ? (
                           <span className="flex items-center justify-center gap-2">

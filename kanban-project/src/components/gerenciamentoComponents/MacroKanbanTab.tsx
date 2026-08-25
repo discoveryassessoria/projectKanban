@@ -210,7 +210,7 @@ export default function MacroKanbanTab() {
         <>
           {/* Seletor de processo */}
           <div className="flex flex-wrap items-center gap-3">
-            <label className="text-sm text-white/60">Processo:</label>
+            <label className="text-sm text-[var(--text-secondary)]">Processo:</label>
             <select value={tipoId ?? ''} onChange={(e) => e.target.value && selecionar(Number(e.target.value))} className={selCls + ' min-w-[260px]'}>
               <option value="" className="bg-zinc-900">— selecione um processo —</option>
               {tipos.map((t) => (
@@ -275,7 +275,7 @@ export default function MacroKanbanTab() {
                       {f.conditional && <span className="rounded-md bg-amber-50 px-2 py-0.5 text-[11px] font-medium text-amber-700">condicional</span>}
                       <button onClick={() => remover(idx)} className="rounded-md border border-red-200 px-2 py-1 text-xs text-red-700/80 transition hover:bg-red-50 hover:text-red-700">Remover</button>
                     </div>
-                    <div className="mt-2 flex flex-wrap items-center gap-x-5 gap-y-2 pl-[68px] text-xs text-white/60">
+                    <div className="mt-2 flex flex-wrap items-center gap-x-5 gap-y-2 pl-[68px] text-xs text-[var(--text-secondary)]">
                       <label className="flex items-center gap-1.5">
                         <input type="checkbox" checked={f.showInKanban} onChange={(e) => patch(idx, { showInKanban: e.target.checked })} className="h-3.5 w-3.5 accent-blue-500" />
                         No kanban

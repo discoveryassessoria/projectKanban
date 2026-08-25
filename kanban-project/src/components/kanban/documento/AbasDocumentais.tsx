@@ -170,7 +170,7 @@ function LinhaArquivo({ arquivo: a }: { arquivo: ArquivoDocumentoView }) {
           )}
         </div>
         {mestre && (
-          <div className="text-[10.5px] text-[#7dd3fc]/85 truncate">
+          <div className="text-[10.5px] text-sky-700 truncate">
             {mestre.name}
             {mestre.publicCode ? ` · ${mestre.publicCode}` : ""}
           </div>
@@ -300,14 +300,14 @@ export function AbaAnexosDocumentais({
             className="w-full px-3 py-2.5 bg-[var(--surface-overlay)] border border-dashed border-[var(--border-default)] rounded-md text-left hover:bg-[var(--surface-secondary)] transition-colors disabled:opacity-50"
           >
             <div className="flex items-center gap-2.5">
-              {enviando ? <Loader2 className="w-4 h-4 animate-spin text-white/60" /> : <Upload className="w-4 h-4 text-white/60" />}
+              {enviando ? <Loader2 className="w-4 h-4 animate-spin text-[var(--text-secondary)]" /> : <Upload className="w-4 h-4 text-[var(--text-secondary)]" />}
               <span className="text-[12px] text-white/85 font-medium">{enviando ? "Enviando…" : "Anexar arquivo"}</span>
             </div>
           </button>
         </>
       )}
       {erro && (
-        <div className="text-[11px] text-[#f87171] flex items-center gap-1.5">
+        <div className="text-[11px] text-red-700 flex items-center gap-1.5">
           <AlertTriangle className="w-3 h-3" />
           {erro}
         </div>
@@ -398,13 +398,13 @@ export function AbaObservacoesDocumentais({
             value={texto}
             onChange={(e) => setTexto(e.target.value)}
             placeholder="Anote algo relevante sobre este documento…"
-            className="w-full px-3 py-2 bg-[var(--surface-overlay)] border border-[var(--border-default)] rounded-md text-sm text-[#fff] placeholder-white/30 focus:outline-none focus:border-[#7dd3fc]/50 resize-none"
+            className="w-full px-3 py-2 bg-[var(--surface-overlay)] border border-[var(--border-default)] rounded-md text-sm text-[var(--text-primary)] placeholder-white/30 focus:outline-none focus:border-sky-200 resize-none"
           />
           <div className="flex justify-end mt-1.5">
             <button
               onClick={registrar}
               disabled={salvando || !texto.trim()}
-              className="px-3 py-1.5 text-[11.5px] font-semibold bg-[var(--surface-secondary)] hover:bg-[var(--surface-tertiary)] disabled:opacity-50 text-[#fff] rounded-md inline-flex items-center gap-1.5"
+              className="px-3 py-1.5 text-[11.5px] font-semibold bg-[var(--surface-secondary)] hover:bg-[var(--surface-tertiary)] disabled:opacity-50 text-[var(--text-primary)] rounded-md inline-flex items-center gap-1.5"
             >
               {salvando && <Loader2 className="w-3 h-3 animate-spin" />}
               Adicionar observação
@@ -412,7 +412,7 @@ export function AbaObservacoesDocumentais({
           </div>
         </div>
       )}
-      {erro && <div className="text-[11px] text-[#f87171]">{erro}</div>}
+      {erro && <div className="text-[11px] text-red-700">{erro}</div>}
     </div>
   )
 }

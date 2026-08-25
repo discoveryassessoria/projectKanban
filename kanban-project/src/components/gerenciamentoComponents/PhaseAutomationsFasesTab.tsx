@@ -78,7 +78,7 @@ function authHeaders(): HeadersInit {
   return t ? { "Content-Type": "application/json", Authorization: `Bearer ${t}` } : { "Content-Type": "application/json" }
 }
 const inputCls = "w-full rounded-lg border border-[var(--border-default)] bg-[var(--surface-primary)] px-3 py-2 text-sm text-white placeholder-white/30 outline-none focus:border-white/20"
-const labelCls = "mb-1 block text-xs text-white/60"
+const labelCls = "mb-1 block text-xs text-[var(--text-secondary)]"
 const opt = "bg-zinc-900"
 
 // ícones
@@ -321,7 +321,7 @@ export default function PhaseAutomationsFasesTab({ kindInicial }: { kindInicial?
       {/* cabeçalho */}
       <div className="rounded-2xl border border-[var(--border-default)] bg-[var(--surface-primary)] p-5 backdrop-blur-sm">
         <h2 className="text-lg font-semibold text-white">Automações e efeitos da fase</h2>
-        <p className="mt-1 text-sm text-white/60">
+        <p className="mt-1 text-sm text-[var(--text-secondary)]">
           Aqui você configura os <b className="text-white/80">efeitos adicionais</b> disparados por eventos da fase: lançamento financeiro, evento/agenda, protocolo e notificação. Tarefas obrigatórias e avanço de fase NÃO são automação — pertencem ao <span className="text-blue-700">Workflow Interno</span>. Modelos reutilizáveis ficam na biblioteca <span className="text-blue-700">“Modelos de Automação”</span>.
         </p>
         <div className="mt-3 rounded-xl border border-sky-200 bg-sky-50 px-4 py-2.5 text-xs text-sky-700">
@@ -377,13 +377,13 @@ export default function PhaseAutomationsFasesTab({ kindInicial }: { kindInicial?
       {/* DETALHE — fase específica */}
       {proc && faseAtual && (
         <div className="rounded-2xl border border-[var(--border-default)] bg-[var(--surface-primary)] p-5 backdrop-blur-sm">
-          <div className="mb-3 text-sm text-white/60"><b className="text-white">{proc.name}</b> · [{faseAtual.order}] {faseAtual.label}</div>
+          <div className="mb-3 text-sm text-[var(--text-secondary)]"><b className="text-white">{proc.name}</b> · [{faseAtual.order}] {faseAtual.label}</div>
 
           {/* abas por tipo */}
           <div className="mb-4 flex flex-wrap gap-1.5">
             {KIND_TABS.map(([k, lbl]) => (
               <button key={k} onClick={() => setTab(k)}
-                className={`rounded-full px-3 py-1 text-[11px] transition-colors ${tab === k ? "bg-blue-600 text-white" : "bg-[var(--surface-primary)] text-white/60 hover:bg-[var(--surface-hover)]"}`}>
+                className={`rounded-full px-3 py-1 text-[11px] transition-colors ${tab === k ? "bg-blue-600 text-white" : "bg-[var(--surface-primary)] text-[var(--text-secondary)] hover:bg-[var(--surface-hover)]"}`}>
                 {lbl}<span className="ml-1 opacity-60">{rulesOf(faseAtual.phaseKey, k).length}</span>
               </button>
             ))}
@@ -396,7 +396,7 @@ export default function PhaseAutomationsFasesTab({ kindInicial }: { kindInicial?
             {(() => {
               const arq = rulesOf(faseAtual.phaseKey, tab, true).filter(r => r.arquivado).length
               return arq > 0 ? (
-                <button onClick={() => setShowArchived(v => !v)} className={`ml-auto rounded-lg border px-3 py-1.5 text-xs ${showArchived ? "border-blue-200 bg-blue-50 text-blue-700" : "border-[var(--border-default)] bg-[var(--surface-primary)] text-white/60 hover:bg-[var(--surface-hover)]"}`}>
+                <button onClick={() => setShowArchived(v => !v)} className={`ml-auto rounded-lg border px-3 py-1.5 text-xs ${showArchived ? "border-blue-200 bg-blue-50 text-blue-700" : "border-[var(--border-default)] bg-[var(--surface-primary)] text-[var(--text-secondary)] hover:bg-[var(--surface-hover)]"}`}>
                   {showArchived ? "Ocultar arquivadas" : `Mostrar arquivadas (${arq})`}
                 </button>
               ) : null
@@ -511,7 +511,7 @@ export default function PhaseAutomationsFasesTab({ kindInicial }: { kindInicial?
               {/* FINANCEIRO: sem Nome/Descrição — a identidade é 100% estruturada
                   (título/descrição derivados da Config + Aplicação + gatilho + fase). */}
               {form.kind === "financial" ? (
-                <div className="col-span-2 rounded-lg border border-[var(--border-default)] bg-[var(--surface-primary)] px-3 py-2 text-xs text-white/60">
+                <div className="col-span-2 rounded-lg border border-[var(--border-default)] bg-[var(--surface-primary)] px-3 py-2 text-xs text-[var(--text-secondary)]">
                   <div className="font-medium text-white">{tituloFinanceiroDoForm(form) || "Título gerado automaticamente"}</div>
                   <div className="mt-0.5 text-[var(--text-secondary)]">{descricaoFinanceiraDoForm(form) || "A descrição é gerada a partir da regra — sem texto livre."}</div>
                 </div>
@@ -586,7 +586,7 @@ export default function PhaseAutomationsFasesTab({ kindInicial }: { kindInicial?
 
               {/* condição + avançado */}
               <div className="col-span-2 mt-1 rounded-lg border border-[var(--border-default)] bg-[var(--surface-primary)] p-3">
-                <div className="mb-2 text-xs font-semibold text-white/60">Condição (opcional)</div>
+                <div className="mb-2 text-xs font-semibold text-[var(--text-secondary)]">Condição (opcional)</div>
                 <div className="grid grid-cols-3 gap-2">
                   <input value={form.condField} onChange={e => setForm(f => f && { ...f, condField: e.target.value })} className={inputCls} placeholder="campo" />
                   <select value={form.condOp} onChange={e => setForm(f => f && { ...f, condOp: e.target.value })} className={inputCls}><option value="eq" className={opt}>igual a</option><option value="neq" className={opt}>diferente de</option><option value="exists" className={opt}>existe</option><option value="truthy" className={opt}>é verdadeiro</option></select>

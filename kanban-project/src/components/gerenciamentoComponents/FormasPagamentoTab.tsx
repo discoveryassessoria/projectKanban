@@ -20,7 +20,8 @@ import {
 } from '@/lib/financeiro/payment-method-constants'
 import { useApi } from "@/src/lib/dados"
 
-const OURO = '#D2A948'
+const OURO = 'var(--accent-primary)'
+const OURO_TINTA = 'var(--accent-text)'
 const GLASS = 'rounded-xl border border-[var(--border-default)] bg-[var(--surface-primary)] backdrop-blur-md'
 
 type MoedaRef = { id: number; code: string; name: string | null }
@@ -123,7 +124,7 @@ export default function FormasPagamentoTab() {
       {/* Cabeçalho */}
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-3">
-          <div className="flex h-10 w-10 items-center justify-center rounded-xl" style={{ background: `${OURO}22`, color: OURO }}><CreditCard className="h-5 w-5" /></div>
+          <div className="flex h-10 w-10 items-center justify-center rounded-xl" style={{ background: `${OURO}22`, color: OURO_TINTA }}><CreditCard className="h-5 w-5" /></div>
           <div>
             <h2 className="text-lg font-semibold text-white">Formas de Pagamento</h2>
             <p className="text-sm text-[var(--text-secondary)]">Capacidades técnicas do meio. Regra comercial pertence à Condição.</p>
@@ -146,7 +147,7 @@ export default function FormasPagamentoTab() {
       ) : filtrados.length === 0 ? (
         <div className={`${GLASS} flex flex-col items-center gap-2 py-16 text-center`}>
           <CreditCard className="h-10 w-10 text-[var(--text-muted)]" />
-          <p className="text-white/60">{busca ? 'Nenhuma forma encontrada.' : 'Nenhuma forma de pagamento ainda.'}</p>
+          <p className="text-[var(--text-secondary)]">{busca ? 'Nenhuma forma encontrada.' : 'Nenhuma forma de pagamento ainda.'}</p>
         </div>
       ) : (
         <div className="space-y-2">
@@ -156,7 +157,7 @@ export default function FormasPagamentoTab() {
               <div className="min-w-0 flex-1">
                 <div className="flex items-center gap-2">
                   <span className="truncate font-medium text-white">{x.name}</span>
-                  {x.type && <span className="shrink-0 rounded-md border border-[var(--border-default)] px-2 py-0.5 text-[11px] text-white/60">{TIPOS_FORMA_LABEL[x.type] || x.type}</span>}
+                  {x.type && <span className="shrink-0 rounded-md border border-[var(--border-default)] px-2 py-0.5 text-[11px] text-[var(--text-secondary)]">{TIPOS_FORMA_LABEL[x.type] || x.type}</span>}
                   {!x.ativo && <span className="shrink-0 rounded-md border border-[var(--border-default)] px-2 py-0.5 text-[11px] text-[var(--text-muted)]">inativa</span>}
                 </div>
                 <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-[var(--text-secondary)]">
@@ -198,7 +199,7 @@ function FormaPanel({ f, set, editId, moedas, carteiras, contas, salvando, erro,
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-[var(--overlay-modal)] p-4 backdrop-blur-sm" onClick={onClose}>
       <div className="max-h-[92vh] w-full max-w-3xl overflow-auto rounded-2xl border border-[var(--border-default)] bg-zinc-900/95 text-white shadow-2xl" onClick={(e) => e.stopPropagation()}>
         <div className="sticky top-0 z-10 flex items-center justify-between border-b border-[var(--border-default)] bg-zinc-900/95 px-6 py-4">
-          <div className="flex items-center gap-2"><Sparkles className="h-4 w-4" style={{ color: OURO }} /><h3 className="text-base font-semibold">{editId ? 'Editar forma de pagamento' : 'Nova forma de pagamento'}</h3></div>
+          <div className="flex items-center gap-2"><Sparkles className="h-4 w-4" style={{ color: OURO_TINTA }} /><h3 className="text-base font-semibold">{editId ? 'Editar forma de pagamento' : 'Nova forma de pagamento'}</h3></div>
           <button onClick={onClose} className="text-[var(--text-muted)] transition hover:text-white"><X className="h-4 w-4" /></button>
         </div>
 
@@ -312,7 +313,7 @@ function FormaPanel({ f, set, editId, moedas, carteiras, contas, salvando, erro,
         </div>
 
         <div className="sticky bottom-0 flex items-center justify-end gap-2 border-t border-[var(--border-default)] bg-zinc-900/95 px-6 py-4">
-          <button onClick={onClose} className="rounded-lg px-4 py-2 text-sm text-white/60 transition hover:text-white">Cancelar</button>
+          <button onClick={onClose} className="rounded-lg px-4 py-2 text-sm text-[var(--text-secondary)] transition hover:text-white">Cancelar</button>
           <button onClick={onSalvar} disabled={salvando} className="inline-flex items-center gap-1.5 rounded-lg px-4 py-2 text-sm font-semibold text-[#1b1508] transition disabled:opacity-50" style={{ background: OURO }}>{salvando ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />}{salvando ? 'Salvando…' : 'Salvar'}</button>
         </div>
       </div>
@@ -326,14 +327,14 @@ function toggle<T>(arr: T[], v: T): T[] { return arr.includes(v) ? arr.filter((x
 function Secao({ icon: Ic, titulo, dica, children }: { icon: any; titulo: string; dica?: string; children: React.ReactNode }) {
   return (
     <div className={`${GLASS} p-4`}>
-      <div className="mb-1 flex items-center gap-2"><Ic className="h-4 w-4" style={{ color: OURO }} /><h4 className="text-sm font-semibold text-white">{titulo}</h4></div>
+      <div className="mb-1 flex items-center gap-2"><Ic className="h-4 w-4" style={{ color: OURO_TINTA }} /><h4 className="text-sm font-semibold text-white">{titulo}</h4></div>
       {dica && <p className="mb-3 text-[11px] text-[var(--text-muted)]">{dica}</p>}
       <div className={dica ? '' : 'mt-2'}>{children}</div>
     </div>
   )
 }
 function Campo({ label, wide, children }: { label: string; wide?: boolean; children: React.ReactNode }) {
-  return <div className={wide ? 'sm:col-span-2' : ''}><label className="mb-1 block text-xs text-white/60">{label}</label>{children}</div>
+  return <div className={wide ? 'sm:col-span-2' : ''}><label className="mb-1 block text-xs text-[var(--text-secondary)]">{label}</label>{children}</div>
 }
 function Select({ value, onChange, options }: { value: string; onChange: (v: string) => void; options: [string, string][] }) {
   return (
@@ -358,7 +359,7 @@ function ChipsMulti({ items, selecionados, onToggle }: { items: { id: string | n
       {items.map((it) => {
         const on = selecionados.includes(it.id)
         return (
-          <button key={String(it.id)} type="button" onClick={() => onToggle(it.id)} className={`inline-flex items-center gap-1 rounded-lg border px-2.5 py-1 text-xs transition ${on ? 'text-[#1b1508]' : 'border-[var(--border-default)] text-white/60 hover:text-white'}`} style={on ? { background: OURO, borderColor: OURO } : undefined}>
+          <button key={String(it.id)} type="button" onClick={() => onToggle(it.id)} className={`inline-flex items-center gap-1 rounded-lg border px-2.5 py-1 text-xs transition ${on ? 'text-[#1b1508]' : 'border-[var(--border-default)] text-[var(--text-secondary)] hover:text-white'}`} style={on ? { background: OURO, borderColor: OURO } : undefined}>
             {on && <Check className="h-3 w-3" />}{it.label}
           </button>
         )

@@ -274,7 +274,7 @@ export default function BlogAdminPage() {
             </div>
             <Button 
               onClick={() => setShowForm(true)}
-              className="bg-amber-500 hover:bg-amber-600 text-black font-semibold"
+              className="bg-amber-500 hover:bg-amber-800 text-black font-semibold"
             >
               <Plus className="w-4 h-4 mr-2" />
               Novo Post
@@ -293,7 +293,7 @@ export default function BlogAdminPage() {
                 <CardContent className="p-5">
                   <div className="flex items-start justify-between">
                     <div>
-                      <p className="text-xs text-white/60 font-medium">{metric.label}</p>
+                      <p className="text-xs text-[var(--text-secondary)] font-medium">{metric.label}</p>
                       <p className="text-3xl font-bold mt-2">{metric.value}</p>
                     </div>
                     <div className={`p-2.5 rounded-xl ${metric.cor}`}>
@@ -385,7 +385,7 @@ export default function BlogAdminPage() {
                         <div className="flex items-start justify-between gap-4">
                           <div>
                             <h3 className="text-white font-semibold text-lg truncate">{post.titulo}</h3>
-                            <p className="text-white/60 text-sm line-clamp-2 mt-1">{post.resumo}</p>
+                            <p className="text-[var(--text-secondary)] text-sm line-clamp-2 mt-1">{post.resumo}</p>
                           </div>
                           <div className="flex items-center gap-2 flex-shrink-0">
                             {/* Status Badge */}
@@ -428,7 +428,7 @@ export default function BlogAdminPage() {
                             variant="ghost"
                             size="sm"
                             onClick={() => togglePublish(post)}
-                            className="text-white/60 hover:text-white hover:bg-[var(--surface-hover)]"
+                            className="text-[var(--text-secondary)] hover:text-white hover:bg-[var(--surface-hover)]"
                           >
                             {post.status === 'PUBLICADO' ? (
                               <><EyeOff className="w-4 h-4 mr-1" /> Despublicar</>
@@ -440,7 +440,7 @@ export default function BlogAdminPage() {
                             variant="ghost"
                             size="sm"
                             onClick={() => toggleDestaque(post)}
-                            className="text-white/60 hover:text-amber-700 hover:bg-[var(--surface-hover)]"
+                            className="text-[var(--text-secondary)] hover:text-amber-700 hover:bg-[var(--surface-hover)]"
                           >
                             {post.destaque ? (
                               <><StarOff className="w-4 h-4 mr-1" /> Remover Destaque</>
@@ -452,7 +452,7 @@ export default function BlogAdminPage() {
                             variant="ghost"
                             size="sm"
                             onClick={() => editPost(post)}
-                            className="text-white/60 hover:text-blue-700 hover:bg-[var(--surface-hover)]"
+                            className="text-[var(--text-secondary)] hover:text-blue-700 hover:bg-[var(--surface-hover)]"
                           >
                             <Pencil className="w-4 h-4 mr-1" /> Editar
                           </Button>
@@ -460,7 +460,7 @@ export default function BlogAdminPage() {
                             variant="ghost"
                             size="sm"
                             onClick={() => handleDelete(post.id)}
-                            className="text-white/60 hover:text-red-700 hover:bg-[var(--surface-hover)]"
+                            className="text-[var(--text-secondary)] hover:text-red-700 hover:bg-[var(--surface-hover)]"
                           >
                             <Trash2 className="w-4 h-4 mr-1" /> Excluir
                           </Button>
@@ -485,7 +485,7 @@ export default function BlogAdminPage() {
                 <h2 className="text-xl font-bold text-white">
                   {editingPost ? 'Editar Post' : 'Novo Post'}
                 </h2>
-                <Button variant="ghost" size="sm" onClick={resetForm} className="text-white/60 hover:text-white">
+                <Button variant="ghost" size="sm" onClick={resetForm} className="text-[var(--text-secondary)] hover:text-white">
                   <X className="w-5 h-5" />
                 </Button>
               </div>
@@ -619,7 +619,7 @@ export default function BlogAdminPage() {
                   <Button
                     type="submit"
                     disabled={saving}
-                    className="flex-1 bg-amber-500 hover:bg-amber-600 text-black font-semibold"
+                    className="flex-1 bg-amber-500 hover:bg-amber-800 text-black font-semibold"
                   >
                     {saving ? 'Salvando...' : (
                       <><Check className="w-4 h-4 mr-2" /> {editingPost ? 'Atualizar' : 'Criar Post'}</>

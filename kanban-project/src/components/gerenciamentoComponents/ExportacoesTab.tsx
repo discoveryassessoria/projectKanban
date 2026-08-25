@@ -108,7 +108,7 @@ export default function ExportacoesTab() {
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
             <h2 className="text-lg font-semibold text-white">Exportações</h2>
-            <p className="mt-1 max-w-3xl text-sm text-white/60">
+            <p className="mt-1 max-w-3xl text-sm text-[var(--text-secondary)]">
               Baixe qualquer cadastro do Gerenciamento em CSV ou JSON. Os dados vêm da mesma rota que a tela do
               cadastro usa — nada é recalculado nem duplicado aqui.
             </p>

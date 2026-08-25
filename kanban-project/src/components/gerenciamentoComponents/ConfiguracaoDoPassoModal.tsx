@@ -339,12 +339,12 @@ export default function ConfiguracaoDoPassoModal({
                 </p>
               </div>
               <div className="flex flex-wrap gap-4">
-                <label className="flex items-center gap-2 text-xs text-white/60"
+                <label className="flex items-center gap-2 text-xs text-[var(--text-secondary)]"
                   title="Marcado, o passo entra no roteiro de trabalho do operador e conta para o progresso.">
                   <input type="checkbox" checked={f.createsTask} onChange={(e) => set("createsTask", e.target.checked)} />
                   Este passo gera trabalho operacional
                 </label>
-                <label className="flex items-center gap-2 text-xs text-white/60">
+                <label className="flex items-center gap-2 text-xs text-[var(--text-secondary)]">
                   <input type="checkbox" checked={f.required} onChange={(e) => set("required", e.target.checked)} /> Obrigatória
                 </label>
               </div>
@@ -414,8 +414,8 @@ export default function ConfiguracaoDoPassoModal({
                   <div className="mt-1.5 flex flex-wrap items-center gap-1.5 text-[10px]">
                     <code className="text-[var(--text-muted)]">{st.key ?? chaveDe(st.label)}</code>
                     {st.obrigatoria !== false && <span className="rounded bg-amber-50 px-1.5 py-0.5 text-amber-700">obrigatória</span>}
-                    {st.repetivel && <span className="rounded bg-[var(--surface-primary)] px-1.5 py-0.5 text-white/60">repetível{st.maxOcorrencias ? ` ≤${st.maxOcorrencias}` : ""}</span>}
-                    {(st.dependeDe?.length ?? 0) > 0 && <span className="rounded bg-[var(--surface-primary)] px-1.5 py-0.5 text-white/60">depende de {st.dependeDe!.length}</span>}
+                    {st.repetivel && <span className="rounded bg-[var(--surface-primary)] px-1.5 py-0.5 text-[var(--text-secondary)]">repetível{st.maxOcorrencias ? ` ≤${st.maxOcorrencias}` : ""}</span>}
+                    {(st.dependeDe?.length ?? 0) > 0 && <span className="rounded bg-[var(--surface-primary)] px-1.5 py-0.5 text-[var(--text-secondary)]">depende de {st.dependeDe!.length}</span>}
                     {st.fonteDeCanais && st.fonteDeCanais !== "NENHUMA" && <span className="rounded bg-sky-50 px-1.5 py-0.5 text-sky-700">canais do fornecedor</span>}
                     {(st.acoes?.length ?? 0) > 0 && <span className="rounded bg-slate-50 px-1.5 py-0.5 text-slate-700">{st.acoes!.length} ações</span>}
                     {(st.campos?.length ?? 0) > 0 && <span className="rounded bg-slate-50 px-1.5 py-0.5 text-slate-700">{st.campos!.length} campos</span>}
@@ -453,17 +453,17 @@ export default function ConfiguracaoDoPassoModal({
                               </div>
                             </div>
                             <div className="flex flex-wrap gap-4">
-                              <label className="flex items-center gap-2 text-xs text-white/60">
+                              <label className="flex items-center gap-2 text-xs text-[var(--text-secondary)]">
                                 <input type="checkbox" checked={st.obrigatoria !== false} onChange={(e) => setSub(i, { obrigatoria: e.target.checked })} />
                                 Obrigatória para o passo concluir
                               </label>
-                              <label className="flex items-center gap-2 text-xs text-white/60">
+                              <label className="flex items-center gap-2 text-xs text-[var(--text-secondary)]">
                                 <input type="checkbox" checked={!!st.repetivel}
                                   onChange={(e) => setSub(i, { repetivel: e.target.checked, maxOcorrencias: e.target.checked ? st.maxOcorrencias ?? null : null })} />
                                 Pode acontecer mais de uma vez
                               </label>
                               {st.repetivel && (
-                                <label className="flex items-center gap-2 text-xs text-white/60">
+                                <label className="flex items-center gap-2 text-xs text-[var(--text-secondary)]">
                                   no máximo
                                   <input className="w-16 rounded-lg border border-[var(--border-default)] bg-[var(--surface-primary)] px-2 py-1 text-xs text-white"
                                     type="number" min={1} value={st.maxOcorrencias ?? ""}
@@ -471,7 +471,7 @@ export default function ConfiguracaoDoPassoModal({
                                   vezes
                                 </label>
                               )}
-                              <label className="flex items-center gap-2 text-xs text-white/60">
+                              <label className="flex items-center gap-2 text-xs text-[var(--text-secondary)]">
                                 <input type="checkbox" checked={st.ativo !== false} onChange={(e) => setSub(i, { ativo: e.target.checked })} />
                                 Ativa
                               </label>
@@ -558,12 +558,12 @@ export default function ConfiguracaoDoPassoModal({
                             </div>
 
                             <div className="flex flex-wrap gap-4">
-                              <label className="flex items-center gap-2 text-xs text-white/60">
+                              <label className="flex items-center gap-2 text-xs text-[var(--text-secondary)]">
                                 <input type="checkbox" checked={st.reaberturaPermitida !== false}
                                   onChange={(e) => setSub(i, { reaberturaPermitida: e.target.checked })} />
                                 Pode ser reaberta
                               </label>
-                              <label className="flex items-center gap-2 text-xs text-white/60">
+                              <label className="flex items-center gap-2 text-xs text-[var(--text-secondary)]">
                                 <input type="checkbox" checked={st.reaberturaExigeJustificativa !== false}
                                   onChange={(e) => setSub(i, { reaberturaExigeJustificativa: e.target.checked })} />
                                 Reabrir exige justificativa
@@ -599,7 +599,7 @@ export default function ConfiguracaoDoPassoModal({
                     dependeDe: [], acoes: [], campos: [], checkItens: [], requisitos: [],
                   }],
                 }))}
-                className="rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-medium text-[#fff] hover:bg-blue-500">+ Subtarefa</button>
+                className="rounded-lg bg-[var(--action-primary)] px-3 py-1.5 text-xs font-medium text-[var(--action-primary-ink)] hover:bg-[var(--action-primary)]">+ Subtarefa</button>
 
               {subs.length > 0 && f.regraDeConclusao === "ACAO_DO_PASSO" && (
                 <p className="text-[11px] text-[var(--text-muted)]">
@@ -763,7 +763,7 @@ export default function ConfiguracaoDoPassoModal({
                   &quot;As que dependem dela&quot; vem do grafo cadastrado na aba Dependências — nunca da ordem da lista.
                 </p>
               </div>
-              <label className="flex items-center gap-2 text-xs text-white/60">
+              <label className="flex items-center gap-2 text-xs text-[var(--text-secondary)]">
                 <input type="checkbox" checked={f.reaberturaExigeJustificativa !== false} onChange={(e) => set("reaberturaExigeJustificativa", e.target.checked)} />
                 Reabrir exige justificativa
               </label>
@@ -791,7 +791,7 @@ export default function ConfiguracaoDoPassoModal({
             <button type="button" onClick={tentarFechar}
               className="rounded-lg border border-[var(--border-default)] bg-[var(--surface-primary)] px-4 py-2 text-sm text-white/70 hover:bg-[var(--surface-hover)]">Cancelar</button>
             <button type="button" onClick={salvar} disabled={salvando}
-              className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-[#fff] hover:bg-blue-500 disabled:opacity-50">
+              className="rounded-lg bg-[var(--action-primary)] px-4 py-2 text-sm font-medium text-[var(--action-primary-ink)] hover:bg-[var(--action-primary)] disabled:opacity-50">
               {salvando ? "Salvando…" : "Salvar rascunho"}
             </button>
           </div>
@@ -809,7 +809,7 @@ export default function ConfiguracaoDoPassoModal({
               <button type="button" onClick={() => setConfirmandoSaida(false)}
                 className="rounded-lg border border-[var(--border-default)] bg-[var(--surface-primary)] px-3 py-1.5 text-xs text-white/70 hover:bg-[var(--surface-hover)]">Continuar editando</button>
               <button type="button" onClick={() => { setConfirmandoSaida(false); onFechar() }}
-                className="rounded-lg bg-red-600/80 px-3 py-1.5 text-xs font-medium text-[#fff] hover:bg-red-600">Descartar</button>
+                className="rounded-lg bg-red-600/80 px-3 py-1.5 text-xs font-medium text-[var(--action-primary-ink)] hover:bg-red-800">Descartar</button>
             </div>
           </div>
         </div>

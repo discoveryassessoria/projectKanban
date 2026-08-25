@@ -576,14 +576,14 @@ function Lista({
                 <span className="mt-1 flex flex-wrap gap-1"><Sinais l={l} /></span>
               </button>
             </td>
-            <td className="truncate px-3 py-2 text-[11px] text-white/60">{l.pessoaNome ?? "—"}</td>
-            <td className="truncate px-3 py-2 text-[11px] text-white/60">{l.processoNome ?? "—"}</td>
+            <td className="truncate px-3 py-2 text-[11px] text-[var(--text-secondary)]">{l.pessoaNome ?? "—"}</td>
+            <td className="truncate px-3 py-2 text-[11px] text-[var(--text-secondary)]">{l.processoNome ?? "—"}</td>
             <td className="truncate px-3 py-2 text-[11px] text-[var(--text-secondary)]">{rotularFase(l.faseMacroKey) ?? "—"}</td>
-            <td className="truncate px-3 py-2 text-[11px] text-white/60">{l.etapaAtual ?? "—"}</td>
+            <td className="truncate px-3 py-2 text-[11px] text-[var(--text-secondary)]">{l.etapaAtual ?? "—"}</td>
             <td className="px-3 py-2"><Responsavel nome={l.responsavelNome} /></td>
-            <td className="px-3 py-2 text-[11px] text-white/60">{ROTULO_STATUS[l.statusTarefa] ?? l.statusTarefa}</td>
-            <td className="px-3 py-2 text-[11px] text-white/60">{ROTULO_PRIORIDADE[l.prioridade] ?? l.prioridade}</td>
-            <td className={`px-3 py-2 text-[11px] tabular-nums ${l.atrasada ? "text-red-700/90" : "text-white/60"}`}>
+            <td className="px-3 py-2 text-[11px] text-[var(--text-secondary)]">{ROTULO_STATUS[l.statusTarefa] ?? l.statusTarefa}</td>
+            <td className="px-3 py-2 text-[11px] text-[var(--text-secondary)]">{ROTULO_PRIORIDADE[l.prioridade] ?? l.prioridade}</td>
+            <td className={`px-3 py-2 text-[11px] tabular-nums ${l.atrasada ? "text-red-700/90" : "text-[var(--text-secondary)]"}`}>
               {dataCurta(l.dataPrazo)}
             </td>
             <td className={`px-3 py-2 text-[11px] ${l.atrasada ? "text-red-700/80" : "text-[var(--text-muted)]"}`}>
@@ -604,7 +604,7 @@ function Lista({
                 )}
                 <button
                   onClick={() => aoDistribuir(l)}
-                  className="rounded border border-[var(--border-default)] px-2 py-1 text-[10px] text-white/60 transition-colors hover:bg-[var(--surface-primary)] hover:text-white/90"
+                  className="rounded border border-[var(--border-default)] px-2 py-1 text-[10px] text-[var(--text-secondary)] transition-colors hover:bg-[var(--surface-primary)] hover:text-white/90"
                 >
                   {l.responsavelId == null ? "Atribuir" : "Transferir"}
                 </button>
@@ -691,7 +691,7 @@ function Quadro({
             }`}
           >
             <div className="flex items-baseline justify-between border-b border-white/[0.06] px-3 py-2">
-              <span className="text-[11px] font-medium uppercase tracking-wide text-white/60">{c.rotulo}</span>
+              <span className="text-[11px] font-medium uppercase tracking-wide text-[var(--text-secondary)]">{c.rotulo}</span>
               <span className="text-[11px] tabular-nums text-[var(--text-muted)]">{linhas.length}</span>
             </div>
             {alvoValido && (
@@ -883,7 +883,7 @@ function PainelSugestao({
                   <>
                     {/* A ABSTENÇÃO É UMA RESPOSTA — com motivo, nunca um nome inventado. */}
                     <p className="text-[13px] font-medium text-amber-700/90">Sem recomendação automática</p>
-                    <p className="mt-1 text-[11px] leading-4 text-white/60">{s.abstencao?.texto}</p>
+                    <p className="mt-1 text-[11px] leading-4 text-[var(--text-secondary)]">{s.abstencao?.texto}</p>
                     <p className="mt-1.5 text-[10px] text-[var(--text-muted)]">
                       Código: {s.abstencao?.codigo}. A decisão continua sendo sua — atribuir manualmente segue disponível.
                     </p>
@@ -924,7 +924,7 @@ function PainelSugestao({
                                 <span className="tabular-nums">{p.quantidade} × {p.peso} = {p.subtotal}</span>
                               </div>
                             ))}
-                            <div className="flex justify-between border-t border-white/[0.06] pt-1 text-[10px] text-white/60">
+                            <div className="flex justify-between border-t border-white/[0.06] pt-1 text-[10px] text-[var(--text-secondary)]">
                               <span>custo operacional</span>
                               <span className="tabular-nums">{a.score}</span>
                             </div>

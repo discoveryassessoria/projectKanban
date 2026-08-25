@@ -48,7 +48,7 @@ function Cabecalho({ titulo, descricao, onReload }: { titulo: string; descricao:
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <h2 className="text-lg font-semibold text-white">{titulo}</h2>
-          <p className="mt-1 max-w-3xl text-sm text-white/60">{descricao}</p>
+          <p className="mt-1 max-w-3xl text-sm text-[var(--text-secondary)]">{descricao}</p>
         </div>
         <button onClick={onReload} className="flex-none rounded-lg border border-[var(--border-default)] bg-[var(--surface-primary)] px-3 py-2 text-xs text-white/80 hover:bg-[var(--surface-hover)]">
           Atualizar
@@ -108,9 +108,9 @@ export function CreditoTab() {
                   <tr><td colSpan={7} className="px-4 py-10 text-center text-xs text-[var(--text-muted)]">Nenhum crédito registrado.</td></tr>
                 ) : dados.creditos.map((c) => (
                   <tr key={c.id} className="border-b border-[var(--border-subtle)] last:border-0">
-                    <td className="whitespace-nowrap px-4 py-2.5 text-white/60">{data(c.criadoEm)}</td>
+                    <td className="whitespace-nowrap px-4 py-2.5 text-[var(--text-secondary)]">{data(c.criadoEm)}</td>
                     <td className="px-4 py-2.5 text-white">{c.pessoa ?? "—"}</td>
-                    <td className="px-4 py-2.5 text-white/60">{c.destino}</td>
+                    <td className="px-4 py-2.5 text-[var(--text-secondary)]">{c.destino}</td>
                     <td className="px-4 py-2.5 text-white/70">{dinheiro(c.original, c.moeda)}</td>
                     <td className="px-4 py-2.5 text-white">{dinheiro(c.disponivel, c.moeda)}</td>
                     <td className="px-4 py-2.5 text-white/70">{dinheiro(c.utilizado, c.moeda)}</td>
@@ -198,11 +198,11 @@ export function DocumentosFinanceirosTab() {
                   ) : dados.recibos.map((r) => (
                     <tr key={r.id} className="border-b border-[var(--border-subtle)] last:border-0">
                       <td className="px-4 py-2.5 text-white">{r.numero}</td>
-                      <td className="whitespace-nowrap px-4 py-2.5 text-white/60">{data(r.data)}</td>
+                      <td className="whitespace-nowrap px-4 py-2.5 text-[var(--text-secondary)]">{data(r.data)}</td>
                       <td className="px-4 py-2.5 text-white/70">{r.pagadorNome ?? "—"}</td>
-                      <td className="px-4 py-2.5 text-white/60">{r.descricao}</td>
+                      <td className="px-4 py-2.5 text-[var(--text-secondary)]">{r.descricao}</td>
                       <td className="px-4 py-2.5 text-white/80">{dinheiro(r.valorTotal)}</td>
-                      <td className="px-4 py-2.5 text-white/60">#{r.processoId}</td>
+                      <td className="px-4 py-2.5 text-[var(--text-secondary)]">#{r.processoId}</td>
                       <td className="px-4 py-2.5">
                         {r.pdfUrl
                           ? <a href={r.pdfUrl} target="_blank" rel="noreferrer" className="text-sky-700 underline hover:text-sky-700">abrir</a>
@@ -222,13 +222,13 @@ export function DocumentosFinanceirosTab() {
                     <tr><td colSpan={7} className="px-4 py-10 text-center text-xs text-[var(--text-muted)]">Nenhuma fatura emitida.</td></tr>
                   ) : dados.faturas.map((f) => (
                     <tr key={f.id} className="border-b border-[var(--border-subtle)] last:border-0">
-                      <td className="whitespace-nowrap px-4 py-2.5 text-white/60">{data(f.dataEmissao)}</td>
+                      <td className="whitespace-nowrap px-4 py-2.5 text-[var(--text-secondary)]">{data(f.dataEmissao)}</td>
                       <td className="px-4 py-2.5 text-white">{f.descricao}</td>
                       <td className="px-4 py-2.5 text-white/80">{dinheiro(f.valor, f.moeda)}</td>
-                      <td className="px-4 py-2.5 text-white/60">{f.parcelas}</td>
-                      <td className="whitespace-nowrap px-4 py-2.5 text-white/60">{f.dataVencimento ? data(f.dataVencimento) : "—"}</td>
+                      <td className="px-4 py-2.5 text-[var(--text-secondary)]">{f.parcelas}</td>
+                      <td className="whitespace-nowrap px-4 py-2.5 text-[var(--text-secondary)]">{f.dataVencimento ? data(f.dataVencimento) : "—"}</td>
                       <td className="px-4 py-2.5"><span className="rounded bg-[var(--surface-primary)] px-1.5 py-0.5 text-[10px] text-white/70">{f.status}</span></td>
-                      <td className="px-4 py-2.5 text-white/60">#{f.processoId}</td>
+                      <td className="px-4 py-2.5 text-[var(--text-secondary)]">#{f.processoId}</td>
                     </tr>
                   ))}
                 </tbody>

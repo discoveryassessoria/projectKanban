@@ -314,7 +314,7 @@ export default function EditarReceitaView({ obrigacaoId, receitaRef, natureza, o
                   <div>
                     <label className={labelCls}>Item do Cadastro Mestre</label>
                     <div className={`${inputCls} flex items-center justify-between`}>
-                      <span className={rec.itemMestreNome ? "text-[var(--text-primary)]" : "text-[var(--accent-primary)]"}>{rec.itemMestreNome ?? rec.servicoNome ?? "Item mestre não reconciliado"}</span>
+                      <span className={rec.itemMestreNome ? "text-[var(--text-primary)]" : "text-[var(--accent-text)]"}>{rec.itemMestreNome ?? rec.servicoNome ?? "Item mestre não reconciliado"}</span>
                       <span className="text-[10px] text-[var(--text-muted)]">Definido pelo Cadastro Mestre</span>
                     </div>
                   </div>
@@ -367,7 +367,7 @@ export default function EditarReceitaView({ obrigacaoId, receitaRef, natureza, o
                     <select value={moeda} disabled={!moedaEditavel} onChange={(e) => setMoeda(e.target.value)} className={`${inputCls} disabled:opacity-50`}>
                       {rec.moedasDisponiveis.map((m) => <option key={m} value={m}>{m}</option>)}
                     </select>
-                    {!moedaEditavel && <p className="mt-1 text-[11px] text-[var(--accent-primary)]">Há pagamento confirmado — moeda-base travada.</p>}
+                    {!moedaEditavel && <p className="mt-1 text-[11px] text-[var(--accent-text)]">Há pagamento confirmado — moeda-base travada.</p>}
                   </div>
                   <div>
                     <label className={labelCls}>Valor-base total ({moeda})</label>

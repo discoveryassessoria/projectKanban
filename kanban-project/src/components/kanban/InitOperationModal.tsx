@@ -194,16 +194,16 @@ function ConteudoModal({
       label: "Buscar certidão",
       desc: "Pesquisar cartório e dados registrais (livro, folha, termo). Use quando ainda não sabe onde está o registro.",
       icon: <Search className="w-5 h-5" />,
-      iconBg: "bg-[#d2a948]/15",
-      iconColor: "text-[#d2a948]",
+      iconBg: "bg-[var(--accent-primary)]/15",
+      iconColor: "text-[var(--accent-text)]",
     },
     {
       key: "desnecessario",
       label: "Marcar como desnecessário",
       desc: "Cancelar este documento — não será mais cobrado.",
       icon: <Ban className="w-5 h-5" />,
-      iconBg: "bg-[#f87171]/15",
-      iconColor: "text-[#f87171]",
+      iconBg: "bg-red-50",
+      iconColor: "text-red-700",
     },
   ]
 
@@ -249,7 +249,7 @@ function ConteudoModal({
                 <Loader2 className="w-5 h-5 animate-spin text-[var(--text-muted)]" />
               </div>
             ) : erro ? (
-              <div className="bg-[#f87171]/12 border border-[#f87171]/30 rounded-lg px-4 py-3 text-sm text-[#f87171]">
+              <div className="bg-red-50 border border-red-200 rounded-lg px-4 py-3 text-sm text-red-700">
                 ⚠ {erro}
               </div>
             ) : doc ? (
@@ -265,7 +265,7 @@ function ConteudoModal({
                         onClick={() => setTipoOperacao(op.key)}
                         className={`w-full flex items-start gap-3 px-3 py-3 rounded-lg border-2 transition-all text-left ${
                           selected
-                            ? "border-blue-500 bg-[#7dd3fc]/12"
+                            ? "border-blue-500 bg-sky-50"
                             : "border-[var(--border-default)] bg-[var(--surface-popover)] hover:border-[var(--border-strong)] hover:bg-[var(--surface-secondary)]"
                         }`}
                       >
@@ -278,7 +278,7 @@ function ConteudoModal({
                           <div className="text-sm font-semibold text-white/95">{op.label}</div>
                           <div
                             className={`text-xs mt-0.5 leading-relaxed ${
-                              op.warning ? "text-[#d2a948]" : "text-white/68"
+                              op.warning ? "text-[var(--accent-text)]" : "text-white/68"
                             }`}
                           >
                             {op.desc}
@@ -335,7 +335,7 @@ function ConteudoModal({
                         [
                           { key: "normal", label: "Normal", bgActive: "bg-[var(--app-background)] text-white", bgIdle: "bg-[var(--surface-popover)] text-white/80 border-[var(--border-default)]" },
                           { key: "urgente", label: "Urgente", bgActive: "bg-amber-500 text-white", bgIdle: "bg-[var(--surface-popover)] text-white/80 border-[var(--border-default)]" },
-                          { key: "critica", label: "⚠ Crítica", bgActive: "bg-[#f87171] text-white", bgIdle: "bg-[var(--surface-popover)] text-white/80 border-[var(--border-default)]" },
+                          { key: "critica", label: "⚠ Crítica", bgActive: "bg-red-50 text-white", bgIdle: "bg-[var(--surface-popover)] text-white/80 border-[var(--border-default)]" },
                         ] as Array<{ key: Prioridade; label: string; bgActive: string; bgIdle: string }>
                       ).map((p) => {
                         const selected = prioridade === p.key
@@ -390,8 +390,8 @@ function ConteudoModal({
               disabled={!tipoOperacao || saving}
               className={`px-4 py-2 text-sm font-semibold text-white rounded-md disabled:opacity-50 disabled:cursor-not-allowed inline-flex items-center gap-2 ${
                 tipoOperacao === "desnecessario"
-                  ? "bg-[#f87171] hover:bg-red-600"
-                  : "bg-[#7dd3fc] hover:bg-[#7dd3fc]"
+                  ? "bg-red-50 hover:bg-red-600"
+                  : "bg-sky-50 hover:bg-sky-50"
               }`}
             >
               {saving && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
@@ -416,7 +416,7 @@ function ConteudoModal({
 function SectionTitle({ num, children }: { num: number; children: React.ReactNode }) {
   return (
     <div className="flex items-center gap-2 mb-3 mt-1">
-      <span className="w-5 h-5 rounded-full bg-[var(--app-background)] text-[#fff] text-[11px] font-bold flex items-center justify-center">
+      <span className="w-5 h-5 rounded-full bg-[var(--app-background)] text-[var(--text-primary)] text-[11px] font-bold flex items-center justify-center">
         {num}
       </span>
       <h3 className="text-[11px] uppercase font-bold tracking-wider text-white/95">{children}</h3>

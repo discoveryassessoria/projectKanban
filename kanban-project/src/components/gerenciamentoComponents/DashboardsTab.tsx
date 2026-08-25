@@ -84,7 +84,7 @@ export default function DashboardsTab() {
 
       <div className={`${CARD} p-5`}>
         <h2 className="text-lg font-semibold text-white">Dashboards</h2>
-        <p className="mt-1 max-w-3xl text-sm text-white/60">
+        <p className="mt-1 max-w-3xl text-sm text-[var(--text-secondary)]">
           As composições visuais do sistema, com os números reais de configuração por trás de cada uma. Clique para
           abrir o painel — o Gerenciamento não recria gráficos, aponta para o dono do assunto.
         </p>

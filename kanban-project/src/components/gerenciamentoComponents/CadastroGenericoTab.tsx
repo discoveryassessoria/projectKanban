@@ -45,7 +45,7 @@ function authHeaders(): HeadersInit {
   return t ? { "Content-Type": "application/json", Authorization: `Bearer ${t}` } : { "Content-Type": "application/json" }
 }
 const inputCls = "w-full rounded-lg border border-[var(--border-default)] bg-[var(--surface-primary)] px-3 py-2 text-sm text-white placeholder-white/30 outline-none focus:border-white/20"
-const labelCls = "mb-1 block text-xs text-white/60"
+const labelCls = "mb-1 block text-xs text-[var(--text-secondary)]"
 const CARD = "rounded-2xl border border-[var(--border-default)] bg-[var(--surface-primary)] backdrop-blur-sm"
 const IEdit = () => (<svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 20h9" /><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z" /></svg>)
 const ITrash = () => (<svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 6h18" /><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" /></svg>)
@@ -232,7 +232,7 @@ export default function CadastroGenericoTab({ entidade }: { entidade: string }) 
   if (loading) return <div className="py-24 text-center text-[var(--text-secondary)]">Carregando…</div>
   if (!spec) {
     return (
-      <div className={`${CARD} p-8 text-center text-sm text-white/60`}>
+      <div className={`${CARD} p-8 text-center text-sm text-[var(--text-secondary)]`}>
         {erro || "Cadastro não encontrado."}
         <button onClick={() => { void load() }} className="ml-2 underline hover:text-white">Tentar de novo</button>
       </div>
@@ -252,7 +252,7 @@ export default function CadastroGenericoTab({ entidade }: { entidade: string }) 
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
             <h2 className="text-lg font-semibold text-white">{spec.titulo}</h2>
-            <p className="mt-1 max-w-3xl text-sm text-white/60">{spec.descricao}</p>
+            <p className="mt-1 max-w-3xl text-sm text-[var(--text-secondary)]">{spec.descricao}</p>
           </div>
           <button onClick={novo} className="flex-none rounded-lg bg-[var(--action-primary)] px-3 py-2 text-xs font-medium text-[var(--action-primary-ink)] hover:bg-[var(--action-primary)]">
             {spec.novoLabel}

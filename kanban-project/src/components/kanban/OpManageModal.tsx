@@ -218,7 +218,7 @@ function ConteudoModal({
             style={{
               background: "rgba(245,158,11,0.12)",
               borderColor: "rgba(245,158,11,0.30)",
-              color: "#fbbf24",
+              color: "#b45309",
             }}
           >
             {warns[mode]}

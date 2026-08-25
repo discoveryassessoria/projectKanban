@@ -232,7 +232,7 @@ export default function EditarDistribuicaoView({ obrigacaoId, receitaRef, onClos
                             <td className="px-2 py-2">
                               <div className="flex items-center gap-2">
                                 <span className="grid h-7 w-7 place-items-center rounded-full bg-[color-mix(in_srgb,var(--text-secondary)_20%,transparent)] text-[11px] font-semibold text-[var(--text-secondary)]">{iniciais(r.nome)}</span>
-                                <div><div className="text-sm text-[var(--text-primary)]">{r.nome}</div><div className="flex items-center gap-1.5 text-[11px] text-[var(--text-muted)]">{r.papel}{r.novo && <span className="rounded bg-[color-mix(in_srgb,var(--success)_15%,transparent)] px-1 text-[var(--success)]">novo</span>}{r.isMenor && <span className="rounded bg-[color-mix(in_srgb,var(--accent-primary)_15%,transparent)] px-1 text-[var(--accent-primary)]">menor</span>}{r.temPagamento && <span className="rounded bg-[color-mix(in_srgb,var(--info)_15%,transparent)] px-1 text-[var(--info)]">pago</span>}</div></div>
+                                <div><div className="text-sm text-[var(--text-primary)]">{r.nome}</div><div className="flex items-center gap-1.5 text-[11px] text-[var(--text-muted)]">{r.papel}{r.novo && <span className="rounded bg-[color-mix(in_srgb,var(--success)_15%,transparent)] px-1 text-[var(--success)]">novo</span>}{r.isMenor && <span className="rounded bg-[color-mix(in_srgb,var(--accent-primary)_15%,transparent)] px-1 text-[var(--accent-text)]">menor</span>}{r.temPagamento && <span className="rounded bg-[color-mix(in_srgb,var(--info)_15%,transparent)] px-1 text-[var(--info)]">pago</span>}</div></div>
                               </div>
                             </td>
                             <td className="px-2 py-2 text-right">{editPct && r.incluido ? <input inputMode="decimal" value={pct === 0 ? "" : String(pct)} onChange={(e) => setPct(r.key, num(e.target.value))} placeholder="0" className={`${inputCls} w-24`} /> : <span className="text-[var(--text-secondary)]">{pct.toFixed(2)}%</span>}</td>
@@ -276,7 +276,7 @@ export default function EditarDistribuicaoView({ obrigacaoId, receitaRef, onClos
                         <tr key={d.requerenteId} className="border-t border-[var(--border-default)]">
                           <td className="px-2 py-2 text-[var(--text-primary)]">{d.nome}</td>
                           <td className="px-2 py-2 text-[var(--text-secondary)]">{d.vinculo}</td>
-                          <td className="px-2 py-2 text-[var(--text-secondary)]">{d.idade ?? "—"}{d.isMenor && <span className="ml-1 rounded bg-[color-mix(in_srgb,var(--accent-primary)_15%,transparent)] px-1 text-[10px] text-[var(--accent-primary)]">menor</span>}</td>
+                          <td className="px-2 py-2 text-[var(--text-secondary)]">{d.idade ?? "—"}{d.isMenor && <span className="ml-1 rounded bg-[color-mix(in_srgb,var(--accent-primary)_15%,transparent)] px-1 text-[10px] text-[var(--accent-text)]">menor</span>}</td>
                           <td className="px-2 py-2 text-[var(--text-muted)]">Fora da distribuição</td>
                           <td className="px-2 py-2 text-right"><button onClick={() => adicionar(d)} className="inline-flex items-center gap-1 rounded-[var(--radius-sm)] border border-[var(--border-default)] px-2.5 py-1 text-xs text-[var(--info)] hover:bg-[var(--surface-hover)]"><UserPlus className="h-3.5 w-3.5" /> Adicionar</button></td>
                         </tr>

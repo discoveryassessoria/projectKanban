@@ -42,7 +42,7 @@ const ESTADO: Record<string, { cls: string; label: string }> = {
   INDISPONIVEL: { cls: "bg-red-50 text-red-700", label: "Indisponível" },
   SEM_DADOS: { cls: "bg-[var(--surface-primary)] text-[var(--text-secondary)]", label: "Sem dados" },
 }
-const estadoDe = (e: string) => ESTADO[e] ?? { cls: "bg-[var(--surface-primary)] text-white/60", label: e }
+const estadoDe = (e: string) => ESTADO[e] ?? { cls: "bg-[var(--surface-primary)] text-[var(--text-secondary)]", label: e }
 
 // rótulos amigáveis das chaves de detalhe (o resto cai no fallback legível)
 const ROTULO: Record<string, string> = {
@@ -101,7 +101,7 @@ export default function IntegracoesTab() {
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
             <h2 className="text-lg font-semibold text-white">Integrações</h2>
-            <p className="mt-1 max-w-3xl text-sm text-white/60">
+            <p className="mt-1 max-w-3xl text-sm text-[var(--text-secondary)]">
               Estado real de cada integração do sistema. As credenciais vivem em variáveis de ambiente e não são
               exibidas aqui — esta tela mostra apenas se estão definidas e qual foi o último resultado.
             </p>
@@ -129,7 +129,7 @@ export default function IntegracoesTab() {
               <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0">
                   <h3 className="font-semibold text-white">{i.nome}</h3>
-                  <p className="mt-1 text-sm text-white/60">{i.descricao}</p>
+                  <p className="mt-1 text-sm text-[var(--text-secondary)]">{i.descricao}</p>
                 </div>
                 <span className={`flex-none rounded-full px-2.5 py-1 text-[10px] font-medium ${est.cls}`}>{est.label}</span>
               </div>
@@ -153,7 +153,7 @@ export default function IntegracoesTab() {
                       <li key={j.path} className="flex flex-wrap items-baseline gap-x-2">
                         <code className="rounded bg-[var(--surface-primary)] px-1.5 py-0.5 text-[11px] text-white/70">{j.path}</code>
                         <span className="text-[var(--text-secondary)]">{j.schedule}</span>
-                        <span className="text-white/60">· {j.descricao}</span>
+                        <span className="text-[var(--text-secondary)]">· {j.descricao}</span>
                       </li>
                     ))}
                   </ul>

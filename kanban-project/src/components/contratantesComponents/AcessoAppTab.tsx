@@ -337,7 +337,7 @@ export function AcessoAppTab({ clienteId, clienteTipo, clienteEmail, clienteNome
 
                 <button
                   onClick={copiarMensagem}
-                  className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-[#fff] rounded-lg font-medium transition-colors text-sm"
+                  className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-emerald-700 hover:bg-emerald-800 text-[var(--action-primary-ink)] rounded-lg font-medium transition-colors text-sm"
                 >
                   {copiadoMsg ? (
                     <>
@@ -433,7 +433,7 @@ export function AcessoAppTab({ clienteId, clienteTipo, clienteEmail, clienteNome
                 <Button
                   onClick={gerarAcesso}
                   disabled={gerando || !email.trim()}
-                  className="w-full bg-indigo-600 hover:bg-indigo-700 text-[#fff] py-5"
+                  className="w-full bg-indigo-700 hover:bg-indigo-800 text-[var(--action-primary-ink)] py-5"
                 >
                   {gerando ? (
                     <>

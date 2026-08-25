@@ -50,7 +50,7 @@ export default function DreTab() {
       <div className="flex items-start justify-between flex-wrap gap-3">
         <div>
           <h2 className="text-lg font-bold text-white flex items-center gap-2 capitalize"><TrendingUp className="h-5 w-5" /> DRE Gerencial</h2>
-          <div className="text-xs text-white/60 mt-1 capitalize">Comparativo {d.periodoAtual} vs {d.periodoAnterior} · Análise vertical (% receita) e horizontal (variação)</div>
+          <div className="text-xs text-[var(--text-secondary)] mt-1 capitalize">Comparativo {d.periodoAtual} vs {d.periodoAnterior} · Análise vertical (% receita) e horizontal (variação)</div>
         </div>
         <div className="flex items-center gap-2">
           <GlassBtn icon={<Upload className="h-3.5 w-3.5" />}>Exportar PDF</GlassBtn>
@@ -123,7 +123,7 @@ export default function DreTab() {
     return (
       <div className="grid grid-cols-[2fr_1.2fr_1.2fr_0.8fr_0.8fr] gap-2 px-4 py-1.5 border-b border-[var(--border-subtle)] text-xs">
         <div className="pl-8 text-[var(--text-secondary)] flex items-center gap-1.5">{label}<span className="text-[9px] text-[var(--text-muted)]">prévia</span></div>
-        <div className="text-right tabular-nums text-white/60">{fmtBRL(valor)}</div>
+        <div className="text-right tabular-nums text-[var(--text-secondary)]">{fmtBRL(valor)}</div>
         <div className="text-right text-[var(--text-muted)]">—</div>
         <div className="text-right text-[var(--text-muted)]">—</div>
         <div className="text-right tabular-nums text-[var(--text-muted)]">{fmtPct(av)}</div>

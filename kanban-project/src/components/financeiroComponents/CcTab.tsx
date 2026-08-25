@@ -52,7 +52,7 @@ export default function CcTab() {
       <div className="flex items-start justify-between flex-wrap gap-3">
         <div>
           <h2 className="text-lg font-bold text-white flex items-center gap-2"><Target className="h-5 w-5" /> Centros de Custo</h2>
-          <div className="text-xs text-white/60 mt-1">{k.qtdCentros} centros · {fmtBRLshort(k.totalExecutado)} executado de {fmtBRLshort(k.totalOrcado)} orçado <span className="text-[var(--text-muted)]">·prévia</span></div>
+          <div className="text-xs text-[var(--text-secondary)] mt-1">{k.qtdCentros} centros · {fmtBRLshort(k.totalExecutado)} executado de {fmtBRLshort(k.totalOrcado)} orçado <span className="text-[var(--text-muted)]">·prévia</span></div>
         </div>
         <button className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm rounded-lg bg-[var(--action-primary)] hover:bg-[var(--action-primary-hover)] text-[var(--action-primary-ink)]"><Plus className="h-3.5 w-3.5" /> Novo CC</button>
       </div>
@@ -100,7 +100,7 @@ export default function CcTab() {
                 <div key={c.id}>
                   <div className="flex justify-between text-xs mb-1">
                     <span className="text-white/80">{c.nome}</span>
-                    <span className="text-white/60">{fmtBRLshort(c.executado)} <span className="text-[var(--text-muted)]">de {fmtBRLshort(c.orcado)}</span> · <strong className={over ? "text-red-700" : c.pctExecucao > 85 ? "text-amber-700" : "text-white/80"}>{fmtPct(c.pctExecucao)}</strong></span>
+                    <span className="text-[var(--text-secondary)]">{fmtBRLshort(c.executado)} <span className="text-[var(--text-muted)]">de {fmtBRLshort(c.orcado)}</span> · <strong className={over ? "text-red-700" : c.pctExecucao > 85 ? "text-amber-700" : "text-white/80"}>{fmtPct(c.pctExecucao)}</strong></span>
                   </div>
                   <div className="h-1.5 bg-[var(--surface-primary)] rounded-full overflow-hidden">
                     <div className="h-full rounded-full" style={{ width: `${Math.min(c.pctExecucao, 100)}%`, background: barColor }} />

@@ -16,7 +16,8 @@ import { AlertTriangle, Inbox } from "lucide-react"
 import type { NivelPrioridade } from "@/src/types/home"
 
 /** Acento dourado — mesmo token do Financeiro. */
-export const OURO = "#D2A948"
+export const OURO = 'var(--accent-primary)'
+export const OURO_TINTA = 'var(--accent-text)'
 /** Card glass — mesma composição do Financeiro. */
 export const CARD = "rounded-xl border border-[var(--border-default)] bg-[var(--surface-primary)] backdrop-blur-md"
 /**

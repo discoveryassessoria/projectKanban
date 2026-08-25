@@ -192,11 +192,11 @@ export function OperacaoAntecipadaModal({ processoId, necessidadeId, necessidade
               </select>
             </label>
           </div>
-          {erro && <div className="bg-[#f87171]/12 border border-[#f87171]/30 rounded-lg px-3 py-2 text-[12.5px] text-[#f87171]">{erro}</div>}
+          {erro && <div className="bg-red-50 border border-red-200 rounded-lg px-3 py-2 text-[12.5px] text-red-700">{erro}</div>}
         </div>
         <div className="flex justify-end gap-2 px-5 py-3 border-t border-[var(--border-default)]">
           <button disabled={enviando} onClick={onClose} className="px-3.5 py-2 text-[12.5px] font-semibold rounded-lg bg-[var(--surface-tertiary)] hover:bg-[var(--surface-tertiary)] text-white/95 disabled:opacity-50">Cancelar</button>
-          <button disabled={enviando || !necIdFinal || !operationType || faltaDoc} onClick={() => void criar()} className="inline-flex items-center gap-1.5 px-3.5 py-2 text-[12.5px] font-bold rounded-lg bg-[var(--app-background)] text-[#fff] hover:bg-[var(--surface-secondary)] disabled:opacity-50">
+          <button disabled={enviando || !necIdFinal || !operationType || faltaDoc} onClick={() => void criar()} className="inline-flex items-center gap-1.5 px-3.5 py-2 text-[12.5px] font-bold rounded-lg bg-[var(--app-background)] text-[var(--text-primary)] hover:bg-[var(--surface-secondary)] disabled:opacity-50">
             {enviando ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <ArrowLeftRight className="w-3.5 h-3.5" />} Criar operação antecipada
           </button>
         </div>

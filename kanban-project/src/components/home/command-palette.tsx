@@ -56,7 +56,7 @@ export function CommandPalette() {
       >
         <Search className="h-3.5 w-3.5" />
         <span>Buscar</span>
-        <kbd className="rounded border border-[var(--border-default)] bg-[var(--surface-primary)] px-1.5 py-0.5 text-[10px] font-medium text-white/60">
+        <kbd className="rounded border border-[var(--border-default)] bg-[var(--surface-primary)] px-1.5 py-0.5 text-[10px] font-medium text-[var(--text-secondary)]">
           ⌘K
         </kbd>
       </button>

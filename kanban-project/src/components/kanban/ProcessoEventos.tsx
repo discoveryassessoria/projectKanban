@@ -238,7 +238,7 @@ export function ProcessoEventos({ processoId, onUpdate }: ProcessoEventosProps) 
           {!showForm && pode('eventos.criar') && (
             <Button
               onClick={() => setShowForm(true)}
-              className="bg-emerald-600 hover:bg-emerald-700"
+              className="bg-emerald-700 hover:bg-emerald-800"
             >
               <Plus className="h-4 w-4 mr-1.5" />
               Novo Evento

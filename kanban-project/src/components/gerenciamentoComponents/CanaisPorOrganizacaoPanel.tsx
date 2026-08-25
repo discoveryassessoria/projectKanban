@@ -135,8 +135,8 @@ export default function CanaisPorOrganizacaoPanel() {
             <div className="min-w-0">
               <div className="truncate text-sm text-white">{o.nomeFantasia || o.name}</div>
               <div className="mt-0.5 flex flex-wrap items-center gap-1.5 text-[10px]">
-                {o.type && <span className="rounded bg-[var(--surface-primary)] px-1.5 py-0.5 text-white/60">{o.type}</span>}
-                {o.city && <span className="rounded bg-[var(--surface-primary)] px-1.5 py-0.5 text-white/60">{o.city}</span>}
+                {o.type && <span className="rounded bg-[var(--surface-primary)] px-1.5 py-0.5 text-[var(--text-secondary)]">{o.type}</span>}
+                {o.city && <span className="rounded bg-[var(--surface-primary)] px-1.5 py-0.5 text-[var(--text-secondary)]">{o.city}</span>}
                 {o.canais.length === 0
                   ? <span className="rounded bg-amber-50 px-1.5 py-0.5 text-amber-700" title="Toda subtarefa que dependa de canal fica bloqueada nesta organização.">sem canal cadastrado</span>
                   : o.canais.map((c) => (
@@ -193,7 +193,7 @@ export default function CanaisPorOrganizacaoPanel() {
                             ["exigeProtocolo", "Protocolo"], ["exigeAnexo", "Anexo"],
                             ["exigeRastreio", "Rastreio"], ["exigeObservacao", "Observação"],
                           ] as Array<[keyof Vinculo, string]>).map(([campo, rotulo]) => (
-                            <label key={String(campo)} className="flex items-center gap-2 text-xs text-white/60">
+                            <label key={String(campo)} className="flex items-center gap-2 text-xs text-[var(--text-secondary)]">
                               <input type="checkbox" checked={v[campo] === true}
                                 onChange={(e) => ajustar(t.key, { [campo]: e.target.checked ? true : null } as Partial<Vinculo>)} />
                               exige {rotulo.toLowerCase()}
@@ -209,7 +209,7 @@ export default function CanaisPorOrganizacaoPanel() {
             <div className="flex justify-end gap-2 border-t border-[var(--border-default)] px-6 py-4">
               <button onClick={() => setAberta(null)} className="rounded-lg border border-[var(--border-default)] bg-[var(--surface-primary)] px-4 py-2 text-sm text-white/70 hover:bg-[var(--surface-hover)]">Cancelar</button>
               <button onClick={salvar} disabled={salvando}
-                className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-[#fff] hover:bg-blue-500 disabled:opacity-50">
+                className="rounded-lg bg-[var(--action-primary)] px-4 py-2 text-sm font-medium text-[var(--action-primary-ink)] hover:bg-[var(--action-primary)] disabled:opacity-50">
                 {salvando ? "Salvando…" : "Salvar canais"}
               </button>
             </div>

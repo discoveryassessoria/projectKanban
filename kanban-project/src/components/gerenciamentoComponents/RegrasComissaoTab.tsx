@@ -223,17 +223,17 @@ export default function RegrasComissaoTab() {
 
             <div className="space-y-4 px-6 py-4">
               <div>
-                <label className="mb-1 block text-xs text-white/60">Nome</label>
+                <label className="mb-1 block text-xs text-[var(--text-secondary)]">Nome</label>
                 <input value={name} onChange={(e) => setName(e.target.value)} autoFocus placeholder="Ex.: Comissão vendedor 5%" className={inputCls} />
               </div>
               <div>
-                <label className="mb-1 block text-xs text-white/60">Papel</label>
+                <label className="mb-1 block text-xs text-[var(--text-secondary)]">Papel</label>
                 <input value={papel} onChange={(e) => setPapel(e.target.value)} placeholder="Ex.: Vendedor, Consultor comercial" className={inputCls} />
                 <p className="mt-1 text-[11px] text-amber-700/70">Vira seleção quando o catálogo de Papéis for portado.</p>
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="mb-1 block text-xs text-white/60">Cálculo</label>
+                  <label className="mb-1 block text-xs text-[var(--text-secondary)]">Cálculo</label>
                   <select value={modoCalculo} onChange={(e) => setModoCalculo(e.target.value)} className={inputCls}>
                     {MODOS.map(([k, label]) => <option key={k} value={k} className="bg-zinc-900">{label}</option>)}
                   </select>
@@ -241,19 +241,19 @@ export default function RegrasComissaoTab() {
                 <div>
                   {modoCalculo === 'fixed' ? (
                     <>
-                      <label className="mb-1 block text-xs text-white/60">Valor fixo</label>
+                      <label className="mb-1 block text-xs text-[var(--text-secondary)]">Valor fixo</label>
                       <input type="number" min="0" step="0.01" value={valorFixo} onChange={(e) => setValorFixo(e.target.value)} placeholder="0,00" className={inputCls} />
                     </>
                   ) : (
                     <>
-                      <label className="mb-1 block text-xs text-white/60">%</label>
+                      <label className="mb-1 block text-xs text-[var(--text-secondary)]">%</label>
                       <input type="number" min="0" step="0.01" value={percent} onChange={(e) => setPercent(e.target.value)} placeholder="0" className={inputCls} />
                     </>
                   )}
                 </div>
               </div>
               <div>
-                <label className="mb-1 block text-xs text-white/60">Momento</label>
+                <label className="mb-1 block text-xs text-[var(--text-secondary)]">Momento</label>
                 <select value={momento} onChange={(e) => setMomento(e.target.value)} className={inputCls}>
                   {MOMENTOS.map(([k, label]) => <option key={k} value={k} className="bg-zinc-900">{label}</option>)}
                 </select>
@@ -269,7 +269,7 @@ export default function RegrasComissaoTab() {
             </div>
 
             <div className="flex items-center justify-end gap-2 border-t border-[var(--border-default)] px-6 py-4">
-              <button onClick={() => setModalAberto(false)} className="rounded-lg px-4 py-2 text-sm text-white/60 transition hover:text-white">Cancelar</button>
+              <button onClick={() => setModalAberto(false)} className="rounded-lg px-4 py-2 text-sm text-[var(--text-secondary)] transition hover:text-white">Cancelar</button>
               <button onClick={salvar} disabled={salvando} className="rounded-lg bg-[var(--action-primary)] px-4 py-2 text-sm font-medium text-[var(--action-primary-ink)] transition hover:bg-[var(--action-primary)] disabled:opacity-50">
                 {salvando ? 'Salvando...' : 'Salvar'}
               </button>

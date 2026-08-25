@@ -15,7 +15,7 @@ import { useApi } from '@/src/lib/dados'
 import {
   Percent, Search, X, Check, Loader2, Settings2, CreditCard, Landmark, Banknote, Coins, ArrowLeft,
 } from 'lucide-react'
-import { OURO, GLASS, INPUT, jf } from './pagamentoUI'
+import { OURO, OURO_TINTA, GLASS, INPUT, jf } from './pagamentoUI'
 
 type FormaAgrupada = {
   formaPagamentoId: number; nome: string; code: string | null; type: string | null
@@ -60,7 +60,7 @@ export default function TaxasPagamentoTab() {
     <div className="space-y-5">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-3">
-          <div className="flex h-10 w-10 items-center justify-center rounded-xl" style={{ background: `${OURO}22`, color: OURO }}><Percent className="h-5 w-5" /></div>
+          <div className="flex h-10 w-10 items-center justify-center rounded-xl" style={{ background: `${OURO}22`, color: OURO_TINTA }}><Percent className="h-5 w-5" /></div>
           <div>
             <h2 className="text-lg font-semibold text-white">Taxas de Pagamento</h2>
             <p className="text-sm text-[var(--text-secondary)]">Uma linha por forma. Bandeira, adquirente e parcelas ficam dentro da configuração.</p>
@@ -80,7 +80,7 @@ export default function TaxasPagamentoTab() {
       ) : filtrados.length === 0 ? (
         <div className={`${GLASS} flex flex-col items-center gap-2 py-16 text-center`}>
           <Percent className="h-10 w-10 text-[var(--text-muted)]" />
-          <p className="text-white/60">Nenhuma forma com taxa configurada.</p>
+          <p className="text-[var(--text-secondary)]">Nenhuma forma com taxa configurada.</p>
         </div>
       ) : (
         <div className="space-y-2">
@@ -88,7 +88,7 @@ export default function TaxasPagamentoTab() {
             const Ic = iconForma(x.type)
             return (
               <div key={x.formaPagamentoId} className={`${GLASS} flex items-center gap-4 p-4 transition hover:border-[var(--border-strong)]`}>
-                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg" style={{ background: `${OURO}18`, color: OURO }}><Ic className="h-5 w-5" /></div>
+                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg" style={{ background: `${OURO}18`, color: OURO_TINTA }}><Ic className="h-5 w-5" /></div>
                 <div className="min-w-0 flex-1">
                   <div className="flex flex-wrap items-center gap-2">
                     <span className="truncate font-medium text-white">{x.nome}</span>
@@ -272,7 +272,7 @@ function FormaConfig({ formaId, onClose, onSalvo }: { formaId: number; onClose: 
             <>
               {/* adquirente */}
               <div className="flex flex-wrap items-center gap-3">
-                <label className="text-xs text-white/60">Adquirente</label>
+                <label className="text-xs text-[var(--text-secondary)]">Adquirente</label>
                 <select value={adqSel ?? ''} onChange={(e) => setAdqSel(Number(e.target.value) || null)} className="rounded-lg border border-[var(--border-default)] bg-black/30 px-3 py-1.5 text-sm text-white outline-none focus:border-white/25">
                   {det.adquirentes.map((a) => <option key={a.id} value={a.id} className="bg-zinc-900">{a.nome}</option>)}
                 </select>
@@ -330,5 +330,5 @@ function FormaConfig({ formaId, onClose, onSalvo }: { formaId: number; onClose: 
 }
 
 function Campo({ label, children }: { label: string; children: ReactNode }) {
-  return (<div><label className="mb-1 block text-xs text-white/60">{label}</label>{children}</div>)
+  return (<div><label className="mb-1 block text-xs text-[var(--text-secondary)]">{label}</label>{children}</div>)
 }

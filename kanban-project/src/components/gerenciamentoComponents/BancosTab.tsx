@@ -205,28 +205,28 @@ export default function BancosTab() {
             <div className="space-y-4 px-6 py-4">
               <div className="grid grid-cols-3 gap-3">
                 <div className="col-span-1">
-                  <label className="mb-1 block text-xs text-white/60">Código</label>
+                  <label className="mb-1 block text-xs text-[var(--text-secondary)]">Código</label>
                   <input value={codigo} onChange={(e) => setCodigo(e.target.value)} placeholder="341" className={inputCls} />
                 </div>
                 <div className="col-span-2">
-                  <label className="mb-1 block text-xs text-white/60">Nome</label>
+                  <label className="mb-1 block text-xs text-[var(--text-secondary)]">Nome</label>
                   <input value={nome} onChange={(e) => setNome(e.target.value)} autoFocus className={inputCls} />
                 </div>
               </div>
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="mb-1 block text-xs text-white/60">Sigla</label>
+                  <label className="mb-1 block text-xs text-[var(--text-secondary)]">Sigla</label>
                   <input value={sigla} onChange={(e) => setSigla(e.target.value)} placeholder="ITAU" className={inputCls} />
                 </div>
                 <div>
-                  <label className="mb-1 block text-xs text-white/60">País</label>
+                  <label className="mb-1 block text-xs text-[var(--text-secondary)]">País</label>
                   <input value={pais} onChange={(e) => setPais(e.target.value)} placeholder="Brasil" className={inputCls} />
                 </div>
               </div>
 
               <div>
-                <label className="mb-1 block text-xs text-white/60">Site</label>
+                <label className="mb-1 block text-xs text-[var(--text-secondary)]">Site</label>
                 <input value={website} onChange={(e) => setWebsite(e.target.value)} placeholder="https://..." className={inputCls} />
               </div>
 
@@ -241,7 +241,7 @@ export default function BancosTab() {
             </div>
 
             <div className="flex items-center justify-end gap-2 border-t border-[var(--border-default)] px-6 py-4">
-              <button onClick={() => setModalAberto(false)} className="rounded-lg px-4 py-2 text-sm text-white/60 transition hover:text-white">Cancelar</button>
+              <button onClick={() => setModalAberto(false)} className="rounded-lg px-4 py-2 text-sm text-[var(--text-secondary)] transition hover:text-white">Cancelar</button>
               <button onClick={salvar} disabled={salvando} className="rounded-lg bg-[var(--action-primary)] px-4 py-2 text-sm font-medium text-[var(--action-primary-ink)] transition hover:bg-[var(--action-primary)] disabled:opacity-50">
                 {salvando ? 'Salvando...' : 'Salvar'}
               </button>

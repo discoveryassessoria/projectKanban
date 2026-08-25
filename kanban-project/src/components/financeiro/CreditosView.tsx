@@ -83,7 +83,7 @@ export function CreditosView() {
                     <td className="py-2.5 px-2 text-sm text-right tabular-nums" style={{ color: c.revogado > 0.005 ? "var(--danger)" : "var(--text-muted)" }}>{c.revogado > 0.005 ? brl(c.revogado, c.moeda) : "—"}</td>
                     <td className="py-2.5 px-2 text-sm text-right tabular-nums font-medium" style={{ color: c.disponivel > 0.005 ? "var(--success)" : "var(--text-muted)" }}>{brl(c.disponivel, c.moeda)}</td>
                     <td className="py-2.5 px-2 text-center"><StatusBadge tone={tone(c.status)}>{c.status.toLowerCase()}</StatusBadge></td>
-                    <td className="py-2.5 px-2 text-center">{c.obrigacaoId ? <button onClick={() => window.open(`/financeiro/v3/receita/${c.obrigacaoId}`, "_blank")} title="Abrir Receita de origem (canônico)" style={{ color: "var(--accent-primary)" }}><ExternalLink className="h-4 w-4" /></button> : <span style={{ color: "var(--text-muted)" }}>—</span>}</td>
+                    <td className="py-2.5 px-2 text-center">{c.obrigacaoId ? <button onClick={() => window.open(`/financeiro/v3/receita/${c.obrigacaoId}`, "_blank")} title="Abrir Receita de origem (canônico)" style={{ color: "var(--accent-text)" }}><ExternalLink className="h-4 w-4" /></button> : <span style={{ color: "var(--text-muted)" }}>—</span>}</td>
                   </Tr>
                 ))}
               </tbody>

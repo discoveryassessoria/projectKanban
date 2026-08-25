@@ -272,7 +272,7 @@ export default function CancelamentoAvancadoModal({ receitaRef, participantes, n
                             <td className="px-2 py-1 text-[var(--text-secondary)]">{dataBR(p.vencimento)}</td>
                             <td className="px-2 py-1 text-right text-[var(--text-muted)]">{money(p.valorAntes, previsao.moeda)}</td>
                             <td className="px-2 py-1 text-right font-medium text-[var(--text-primary)]">{money(p.valorDepois, previsao.moeda)}</td>
-                            <td className="px-2 py-1"><span className={`rounded px-1.5 py-0.5 text-[10px] font-semibold ${p.statusDepois === "CANCELADA" ? "text-[var(--danger)]" : "text-[var(--accent-primary)]"}`} style={{ background: `color-mix(in srgb, ${p.statusDepois === "CANCELADA" ? "var(--danger)" : "var(--accent-primary)"} 15%, transparent)` }}>{p.statusDepois}</span></td>
+                            <td className="px-2 py-1"><span className={`rounded px-1.5 py-0.5 text-[10px] font-semibold ${p.statusDepois === "CANCELADA" ? "text-[var(--danger)]" : "text-[var(--accent-text)]"}`} style={{ background: `color-mix(in srgb, ${p.statusDepois === "CANCELADA" ? "var(--danger)" : "var(--accent-primary)"} 15%, transparent)` }}>{p.statusDepois}</span></td>
                           </tr>
                         ))}</tbody>
                       </table>
@@ -290,7 +290,7 @@ export default function CancelamentoAvancadoModal({ receitaRef, participantes, n
                     <div className="space-y-1">{previsao.impactoContabil.map((l, i) => (
                       <div key={i} className="flex items-center justify-between rounded-[var(--radius-sm)] bg-[var(--surface-secondary)] px-3 py-1.5 text-xs">
                         <span className="text-[var(--text-secondary)]">{l.conta}</span>
-                        <span className="inline-flex items-center gap-2"><span className={`rounded px-1.5 py-0.5 text-[10px] font-semibold ${l.direcao === "DEBITO" ? "text-[var(--info)]" : "text-[var(--accent-primary)]"}`} style={{ background: `color-mix(in srgb, ${l.direcao === "DEBITO" ? "var(--info)" : "var(--accent-primary)"} 15%, transparent)` }}>{l.direcao}</span><span className="font-medium text-[var(--text-primary)]">{money(l.valor, previsao.moeda)}</span></span>
+                        <span className="inline-flex items-center gap-2"><span className={`rounded px-1.5 py-0.5 text-[10px] font-semibold ${l.direcao === "DEBITO" ? "text-[var(--info)]" : "text-[var(--accent-text)]"}`} style={{ background: `color-mix(in srgb, ${l.direcao === "DEBITO" ? "var(--info)" : "var(--accent-primary)"} 15%, transparent)` }}>{l.direcao}</span><span className="font-medium text-[var(--text-primary)]">{money(l.valor, previsao.moeda)}</span></span>
                       </div>
                     ))}</div>
                   </div>

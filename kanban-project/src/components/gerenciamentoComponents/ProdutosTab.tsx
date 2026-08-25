@@ -322,7 +322,7 @@ export default function ProdutosTab() {
           placeholder="Buscar (código CFG-n, cadastro mestre, chave ou origem)..."
           className="min-w-[220px] flex-1 rounded-lg border border-[var(--border-default)] bg-[var(--surface-primary)] px-4 py-2 text-sm text-white placeholder-white/30 outline-none backdrop-blur focus:border-white/20"
         />
-        <label className="flex shrink-0 cursor-pointer items-center gap-2 text-sm text-white/60 select-none">
+        <label className="flex shrink-0 cursor-pointer items-center gap-2 text-sm text-[var(--text-secondary)] select-none">
           <input
             type="checkbox"
             checked={mostrarInativos}
@@ -369,7 +369,7 @@ export default function ProdutosTab() {
                     <div className="font-medium text-white">{nomeExibidoDoMestre(mestreDaConfiguracao(p))}</div>
                   </td>
                   <td className="px-4 py-2.5">
-                    <span className={`rounded px-2 py-0.5 text-[11px] font-medium ${p.mestre?.origem === 'servico' ? 'bg-sky-50 text-sky-700' : p.mestre?.origem === 'documento' ? 'bg-indigo-50 text-indigo-700' : 'bg-[var(--surface-primary)] text-white/60'}`}>{origemLabel(p.mestre?.origem)}</span>
+                    <span className={`rounded px-2 py-0.5 text-[11px] font-medium ${p.mestre?.origem === 'servico' ? 'bg-sky-50 text-sky-700' : p.mestre?.origem === 'documento' ? 'bg-indigo-50 text-indigo-700' : 'bg-[var(--surface-primary)] text-[var(--text-secondary)]'}`}>{origemLabel(p.mestre?.origem)}</span>
                   </td>
                   <td className="px-4 py-2.5 text-white/80">{lbl(NATUREZA_FIN, natFinDe(p.possuiCusto, p.possuiReceita))}</td>
                   <td className="px-4 py-2.5">
@@ -407,13 +407,13 @@ export default function ProdutosTab() {
               {/* Entidade mestre — a config REFERENCIA o cadastro real; nunca o recria */}
               <Secao titulo="Entidade mestre" primeira>
                 <div>
-                  <label className="mb-1 block text-xs text-white/60">Origem do cadastro</label>
+                  <label className="mb-1 block text-xs text-[var(--text-secondary)]">Origem do cadastro</label>
                   <select value={form.origem} onChange={(e) => mudarOrigem(e.target.value)} disabled={!!editando} className={inputCls + (editando ? ' opacity-60' : '')}>
                     {(editando ? ORIGENS : ORIGENS_CRIAVEIS).map(([k, label]) => <option key={k} value={k} className="bg-zinc-900">{label}</option>)}
                   </select>
                 </div>
                 <div>
-                  <label className="mb-1 block text-xs text-white/60">{lbl(ORIGENS, form.origem)} (mestre existente)</label>
+                  <label className="mb-1 block text-xs text-[var(--text-secondary)]">{lbl(ORIGENS, form.origem)} (mestre existente)</label>
                   {masterSelecionado ? (
                     <div className="flex items-center justify-between rounded-lg border border-[var(--border-default)] bg-[var(--surface-primary)] px-3 py-2 text-sm">
                       <span className="text-white">{nomeExibidoDoMestre(masterSelecionado)}</span>
@@ -441,13 +441,13 @@ export default function ProdutosTab() {
               {/* Custo e receita — valores da MESMA configuração */}
               <Secao titulo="Custo e receita">
                 <div>
-                  <label className="mb-1 block text-xs text-white/60">Moeda padrão</label>
+                  <label className="mb-1 block text-xs text-[var(--text-secondary)]">Moeda padrão</label>
                   <select value={form.moedaPadrao} onChange={(e) => set('moedaPadrao', e.target.value)} className={inputCls + ' max-w-[12rem]'}>
                     {MOEDAS.map(([k, label]) => <option key={k} value={k} className="bg-zinc-900">{label}</option>)}
                   </select>
                 </div>
                 <div>
-                  <label className="mb-1 block text-xs text-white/60">Natureza financeira</label>
+                  <label className="mb-1 block text-xs text-[var(--text-secondary)]">Natureza financeira</label>
                   <select value={form.naturezaFin} onChange={(e) => set('naturezaFin', e.target.value)} className={inputCls}>
                     {NATUREZA_FIN.map(([k, label]) => <option key={k} value={k} className="bg-zinc-900">{label}</option>)}
                   </select>
@@ -459,14 +459,14 @@ export default function ProdutosTab() {
                   Não há classificação intermediária (categoria/conta/centro de custo). */}
               <Secao titulo="Vínculos">
                 <div>
-                  <label className="mb-1 block text-xs text-white/60">Regra de comissão (quando aplicável)</label>
+                  <label className="mb-1 block text-xs text-[var(--text-secondary)]">Regra de comissão (quando aplicável)</label>
                   <select value={form.regraComissaoId} onChange={(e) => set('regraComissaoId', e.target.value)} className={inputCls}>
                     <option value="" className="bg-zinc-900">— Sem comissão —</option>
                     {comissoes.map((r) => <option key={r.id} value={r.id} className="bg-zinc-900">{r.name}</option>)}
                   </select>
                 </div>
                 <div>
-                  <label className="mb-1 block text-xs text-white/60">Fornecedor padrão (opcional)</label>
+                  <label className="mb-1 block text-xs text-[var(--text-secondary)]">Fornecedor padrão (opcional)</label>
                   <select value={form.fornecedorPadraoId} onChange={(e) => set('fornecedorPadraoId', e.target.value)} className={inputCls}>
                     <option value="" className="bg-zinc-900">— Nenhum —</option>
                     {fornecedores.map((f) => <option key={f.id} value={f.id} className="bg-zinc-900">{f.publicCode ? f.publicCode + ' — ' : ''}{f.nome}</option>)}
@@ -506,7 +506,7 @@ export default function ProdutosTab() {
             </div>
 
             <div className="flex items-center justify-end gap-2 border-t border-[var(--border-default)] px-6 py-4">
-              <button onClick={() => setModalAberto(false)} className="rounded-lg px-4 py-2 text-sm text-white/60 transition hover:text-white">Cancelar</button>
+              <button onClick={() => setModalAberto(false)} className="rounded-lg px-4 py-2 text-sm text-[var(--text-secondary)] transition hover:text-white">Cancelar</button>
               <button onClick={salvar} disabled={salvando} className="rounded-lg bg-[var(--action-primary)] px-4 py-2 text-sm font-medium text-[var(--action-primary-ink)] transition hover:bg-[var(--action-primary)] disabled:opacity-50">
                 {salvando ? 'Salvando...' : 'Salvar'}
               </button>

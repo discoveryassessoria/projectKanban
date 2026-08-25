@@ -50,7 +50,7 @@ function authHeaders(): HeadersInit {
   return t ? { "Content-Type": "application/json", Authorization: `Bearer ${t}` } : { "Content-Type": "application/json" }
 }
 const inputCls = "w-full rounded-lg border border-[var(--border-default)] bg-[var(--surface-primary)] px-3 py-2 text-sm text-white placeholder-white/30 outline-none focus:border-white/20"
-const labelCls = "mb-1 block text-xs text-white/60"
+const labelCls = "mb-1 block text-xs text-[var(--text-secondary)]"
 
 /** O conselho é um VALOR; a lista só poupa digitação. */
 const TIPOS_DE_REGISTRO_CONHECIDOS = ["OAB", "CRC", "CREA", "CRM", "JUCESP", "MTE"]
@@ -174,7 +174,7 @@ export function ProfissionaisTab() {
           className={`${inputCls} max-w-sm`} placeholder="Buscar por nome, e-mail, categoria ou número do registro"
           value={busca} onChange={(e) => { setCarregando(true); setErro(null); setBusca(e.target.value) }}
         />
-        <label className="flex items-center gap-2 text-xs text-white/60">
+        <label className="flex items-center gap-2 text-xs text-[var(--text-secondary)]">
           <input type="checkbox" checked={mostrarInativos} onChange={(e) => { setCarregando(true); setMostrarInativos(e.target.checked) }} />
           mostrar fora de circulação
         </label>
@@ -209,11 +209,11 @@ export function ProfissionaisTab() {
               {lista.map((p) => (
                 <tr key={p.id} className={`border-t border-[var(--border-subtle)] ${p.ativo ? "" : "opacity-50"}`}>
                   <td className="px-4 py-2.5 text-white/90">{p.nome}</td>
-                  <td className="px-4 py-2.5 text-white/60">{p.categoria?.nome ?? "—"}</td>
-                  <td className="px-4 py-2.5 text-white/60">
+                  <td className="px-4 py-2.5 text-[var(--text-secondary)]">{p.categoria?.nome ?? "—"}</td>
+                  <td className="px-4 py-2.5 text-[var(--text-secondary)]">
                     {p.registros.filter((r) => r.ativo !== false).map(descreverRegistro).join(" · ") || "—"}
                   </td>
-                  <td className="px-4 py-2.5 text-white/60">
+                  <td className="px-4 py-2.5 text-[var(--text-secondary)]">
                     {p.organizacao ? (p.organizacao.nomeFantasia || p.organizacao.name) : "autônomo"}
                   </td>
                   <td className="px-4 py-2.5">

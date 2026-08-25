@@ -36,7 +36,7 @@ import {
   BlocoHeader,
   CARD_FOCAL,
   EmptyState,
-  OURO,
+  OURO, OURO_TINTA,
   formatarHorario,
   nivelStyle,
   saudacao,
@@ -120,7 +120,7 @@ function LinhaFila({ fila }: { fila: FilaOperacional }) {
       <span className={`shrink-0 text-xl font-semibold tabular-nums ${fila.nivel === "critico" ? st.texto : "text-white"}`}>
         {fila.quantidade}
       </span>
-      <ChevronRight className="h-4 w-4 shrink-0 text-[var(--text-muted)] transition-transform group-hover:translate-x-0.5 group-hover:text-white/60" />
+      <ChevronRight className="h-4 w-4 shrink-0 text-[var(--text-muted)] transition-transform group-hover:translate-x-0.5 group-hover:text-[var(--text-secondary)]" />
     </Link>
   )
 }
@@ -182,7 +182,7 @@ function CardSla({ fila }: { fila: FilaOperacional }) {
         <span className={`text-2xl font-bold tabular-nums ${fila.quantidade > 0 ? st.texto : "text-[var(--text-muted)]"}`}>
           {fila.quantidade}
         </span>
-        <ChevronRight className="ml-auto h-4 w-4 shrink-0 text-[var(--text-muted)] transition-transform group-hover:translate-x-0.5 group-hover:text-white/60" />
+        <ChevronRight className="ml-auto h-4 w-4 shrink-0 text-[var(--text-muted)] transition-transform group-hover:translate-x-0.5 group-hover:text-[var(--text-secondary)]" />
       </div>
       <p className="truncate text-sm font-semibold text-white">{fila.titulo}</p>
       <p className="truncate text-xs text-[var(--text-secondary)]">{fila.descricao}</p>
@@ -268,7 +268,7 @@ function AgendaBloco({ data }: { data: HomeData }) {
           <Link
             href="/events"
             className="inline-flex items-center gap-1 text-xs font-medium transition hover:opacity-80"
-            style={{ color: OURO }}
+            style={{ color: OURO_TINTA }}
           >
             Ver agenda <ArrowRight className="h-3.5 w-3.5" />
           </Link>
@@ -390,7 +390,7 @@ function ResumoDoDia({ data }: { data: HomeData }) {
         <span className="hidden h-3.5 w-px bg-[var(--surface-primary)] sm:block" />
         {itens.map((i) => (
           <span key={i.rotulo} className="text-xs text-[var(--text-muted)]">
-            <b className="font-semibold tabular-nums text-white/60">0</b> {i.curto}
+            <b className="font-semibold tabular-nums text-[var(--text-secondary)]">0</b> {i.curto}
           </span>
         ))}
         <span className="ml-auto inline-flex items-center gap-2 text-xs font-medium text-emerald-700">

@@ -260,7 +260,7 @@ export function ProcessoDocumentos({ processo }: ProcessoDocumentosProps) {
   if (erro && !data) {
     return (
       <div className="h-full overflow-y-auto p-6">
-        <div className="bg-[#d2a948]/12 border border-[#d2a948]/30 rounded-lg px-4 py-3 text-sm text-[#d2a948]">
+        <div className="bg-[var(--accent-primary)]/12 border border-[var(--accent-primary)]/30 rounded-lg px-4 py-3 text-sm text-[var(--accent-text)]">
           ⚠ {erro}
         </div>
       </div>

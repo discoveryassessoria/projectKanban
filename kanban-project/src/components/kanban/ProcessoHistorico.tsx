@@ -31,13 +31,13 @@ interface ProcessoHistoricoProps { processoId: number; onUpdate?: () => void }
 // ── Tipos do diário (chips + ícone/cor) ─────────────────────────────────────
 type TipoKey = "workflow" | "documentos" | "tarefas" | "pessoas" | "comunicacao" | "eventos" | "alteracoes" | "arquivos"
 const TIPOS: { key: TipoKey; label: string; icon: any; cor: string }[] = [
-  { key: "workflow", label: "Workflow", icon: GitBranch, cor: "#7dd3fc" },
-  { key: "documentos", label: "Documentos", icon: FileText, cor: "#4ade80" },
-  { key: "tarefas", label: "Tarefas", icon: CheckSquare, cor: "#a78bfa" },
+  { key: "workflow", label: "Workflow", icon: GitBranch, cor: "#0369a1" },
+  { key: "documentos", label: "Documentos", icon: FileText, cor: "#15803d" },
+  { key: "tarefas", label: "Tarefas", icon: CheckSquare, cor: "#334155" },
   { key: "pessoas", label: "Pessoas", icon: Users, cor: "#2dd4bf" },
   { key: "comunicacao", label: "Comunicação", icon: Mail, cor: "#fb923c" },
-  { key: "eventos", label: "Eventos", icon: CalendarDays, cor: "#fbbf24" },
-  { key: "alteracoes", label: "Alterações", icon: Edit3, cor: "#d2a948" },
+  { key: "eventos", label: "Eventos", icon: CalendarDays, cor: "#b45309" },
+  { key: "alteracoes", label: "Alterações", icon: Edit3, cor: "var(--accent-text)" },
   { key: "arquivos", label: "Arquivos", icon: Paperclip, cor: "#94a3b8" },
 ]
 const TIPO_POR_KEY = Object.fromEntries(TIPOS.map((t) => [t.key, t]))
@@ -161,7 +161,7 @@ export function ProcessoHistorico({ processoId }: ProcessoHistoricoProps) {
 
           {/* chips por tipo */}
           <div className="mt-3 flex flex-wrap gap-2">
-            <ChipTipo ativo={tipo === "todos"} onClick={() => setTipo("todos")} icon={BarChart3} cor="#d2a948" label="Todos" n={logs.length} />
+            <ChipTipo ativo={tipo === "todos"} onClick={() => setTipo("todos")} icon={BarChart3} cor="var(--accent-text)" label="Todos" n={logs.length} />
             {TIPOS.map((t) => <ChipTipo key={t.key} ativo={tipo === t.key} onClick={() => setTipo(t.key)} icon={t.icon} cor={t.cor} label={t.label} n={contagem[t.key] ?? 0} />)}
           </div>
 
@@ -178,7 +178,7 @@ export function ProcessoHistorico({ processoId }: ProcessoHistoricoProps) {
                       const sub = l.detalhes && typeof l.detalhes === "object" ? Object.entries(l.detalhes).slice(0, 2).map(([k, v]) => `${k}: ${typeof v === "object" ? JSON.stringify(v) : v}`).join(" · ") : ""
                       return (
                         <div key={l.id} className="flex gap-3">
-                          <div className="flex w-14 shrink-0 flex-col items-end pt-2 text-right"><span className="text-[12px] tabular-nums text-white/60">{horaBR(l.criadoEm)}</span></div>
+                          <div className="flex w-14 shrink-0 flex-col items-end pt-2 text-right"><span className="text-[12px] tabular-nums text-[var(--text-secondary)]">{horaBR(l.criadoEm)}</span></div>
                           <div className="flex flex-col items-center pt-2.5"><span className="h-2.5 w-2.5 rounded-full ring-4 ring-[var(--border-default)]" style={{ background: t.cor }} />{i < g.itens.length - 1 && <span className="mt-1 w-px flex-1 bg-[var(--surface-primary)]" />}</div>
                           <div className="min-w-0 flex-1 pb-4">
                             <div className={`${CARD} flex items-start gap-3 p-3.5`}>
@@ -223,11 +223,11 @@ export function ProcessoHistorico({ processoId }: ProcessoHistoricoProps) {
           <div className={`${CARD} p-4`}>
             <div className="mb-3 text-sm font-semibold text-white">Filtros rápidos</div>
             <div className="space-y-1">
-              <FiltroRapido icon={FileText} cor="#4ade80" label="Apenas documentos" n={contagem.documentos ?? 0} onClick={() => setTipo("documentos")} />
-              <FiltroRapido icon={CheckSquare} cor="#a78bfa" label="Apenas tarefas" n={contagem.tarefas ?? 0} onClick={() => setTipo("tarefas")} />
-              <FiltroRapido icon={Edit3} cor="#d2a948" label="Só alterações" n={contagem.alteracoes ?? 0} onClick={() => setTipo("alteracoes")} />
+              <FiltroRapido icon={FileText} cor="#15803d" label="Apenas documentos" n={contagem.documentos ?? 0} onClick={() => setTipo("documentos")} />
+              <FiltroRapido icon={CheckSquare} cor="#334155" label="Apenas tarefas" n={contagem.tarefas ?? 0} onClick={() => setTipo("tarefas")} />
+              <FiltroRapido icon={Edit3} cor="var(--accent-text)" label="Só alterações" n={contagem.alteracoes ?? 0} onClick={() => setTipo("alteracoes")} />
               <FiltroRapido icon={Mail} cor="#fb923c" label="Apenas comunicação" n={contagem.comunicacao ?? 0} onClick={() => setTipo("comunicacao")} />
-              <FiltroRapido icon={GitBranch} cor="#7dd3fc" label="Apenas workflow" n={contagem.workflow ?? 0} onClick={() => setTipo("workflow")} />
+              <FiltroRapido icon={GitBranch} cor="#0369a1" label="Apenas workflow" n={contagem.workflow ?? 0} onClick={() => setTipo("workflow")} />
             </div>
           </div>
 
@@ -238,7 +238,7 @@ export function ProcessoHistorico({ processoId }: ProcessoHistoricoProps) {
                 {usuarios.map((u) => (
                   <div key={u.nome} className="flex items-center justify-between gap-2">
                     <div className="flex min-w-0 items-center gap-2"><span className="grid h-7 w-7 shrink-0 place-items-center rounded-full bg-[var(--surface-tertiary)] text-[10px] font-semibold text-white/70">{iniciais(u.nome)}</span><span className="truncate text-sm text-white/80">{u.nome}</span></div>
-                    <span className="shrink-0 rounded-full bg-[var(--surface-tertiary)] px-2 py-0.5 text-[11px] text-white/60">{u.n}</span>
+                    <span className="shrink-0 rounded-full bg-[var(--surface-tertiary)] px-2 py-0.5 text-[11px] text-[var(--text-secondary)]">{u.n}</span>
                   </div>
                 ))}
               </div>
@@ -257,10 +257,10 @@ export function ProcessoHistorico({ processoId }: ProcessoHistoricoProps) {
 
 function ChipTipo({ ativo, onClick, icon: Ic, cor, label, n }: { ativo: boolean; onClick: () => void; icon: any; cor: string; label: string; n: number }) {
   return (
-    <button onClick={onClick} className={`inline-flex items-center gap-2 rounded-lg border px-3 py-2 text-sm transition-colors ${ativo ? "border-[#d2a948]/50 bg-[#d2a948]/12" : "border-[var(--border-default)] bg-[var(--surface-popover)] hover:bg-[var(--surface-tertiary)]"}`}>
+    <button onClick={onClick} className={`inline-flex items-center gap-2 rounded-lg border px-3 py-2 text-sm transition-colors ${ativo ? "border-[var(--accent-primary)]/50 bg-[var(--accent-primary)]/12" : "border-[var(--border-default)] bg-[var(--surface-popover)] hover:bg-[var(--surface-tertiary)]"}`}>
       <Ic className="h-4 w-4" style={{ color: cor }} />
       <span className={ativo ? "text-white/90" : "text-white/70"}>{label}</span>
-      <span className="text-[11px] font-semibold" style={{ color: ativo ? "#d2a948" : "rgba(255,255,255,0.5)" }}>{n}</span>
+      <span className="text-[11px] font-semibold" style={{ color: ativo ? "var(--accent-text)" : "var(--text-muted)" }}>{n}</span>
     </button>
   )
 }
@@ -271,7 +271,7 @@ function FiltroRapido({ icon: Ic, cor, label, n, onClick }: { icon: any; cor: st
   return (
     <button onClick={onClick} className="flex w-full items-center justify-between gap-2 rounded-lg px-2 py-1.5 text-sm hover:bg-[var(--surface-tertiary)]">
       <span className="inline-flex items-center gap-2 text-white/70"><Ic className="h-4 w-4" style={{ color: cor }} /> {label}</span>
-      <span className="rounded-full bg-[var(--surface-tertiary)] px-2 py-0.5 text-[11px] text-white/60">{n}</span>
+      <span className="rounded-full bg-[var(--surface-tertiary)] px-2 py-0.5 text-[11px] text-[var(--text-secondary)]">{n}</span>
     </button>
   )
 }

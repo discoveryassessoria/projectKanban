@@ -75,7 +75,7 @@ function Casca({
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
             <h2 className="text-lg font-semibold text-white">{titulo}</h2>
-            <p className="mt-1 max-w-3xl text-sm text-white/60">{descricao}</p>
+            <p className="mt-1 max-w-3xl text-sm text-[var(--text-secondary)]">{descricao}</p>
             {dados && <p className="mt-1 text-[11px] text-[var(--text-muted)]">Apurado em {fmt(dados.geradoEm)}</p>}
           </div>
           <button onClick={() => void load()} className="flex-none rounded-lg border border-[var(--border-default)] bg-[var(--surface-primary)] px-3 py-2 text-xs text-white/80 hover:bg-[var(--surface-hover)]">
@@ -157,7 +157,7 @@ export function DiagnosticoExecutivoTab() {
           <div className="space-y-4">
             <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
               <Kpi valor={`${d.executivo.scoreGeral}%`} label="Score geral" />
-              <Kpi valor={`${prontos}/${t.length}`} label="Processos prontos" cor="#4ade80" />
+              <Kpi valor={`${prontos}/${t.length}`} label="Processos prontos" cor="#15803d" />
               <Kpi valor={bloqueados} label="Bloqueados" cor={bloqueados > 0 ? "#f87171" : "#4ade80"} />
               <Kpi valor={t.filter((x) => x.ativo).length} label="Ativos" />
             </div>
@@ -176,7 +176,7 @@ export function DiagnosticoExecutivoTab() {
                   ) : t.map((x) => (
                     <tr key={x.id} className="border-b border-[var(--border-subtle)] last:border-0">
                       <td className="px-4 py-2.5 text-white">{x.nome}</td>
-                      <td className="px-4 py-2.5 text-white/60">{x.pais}</td>
+                      <td className="px-4 py-2.5 text-[var(--text-secondary)]">{x.pais}</td>
                       <td className="px-4 py-2.5">{x.temWorkflow ? <span className="text-white/70">sim</span> : <span className="text-red-700/80">não</span>}</td>
                       <td className="px-4 py-2.5 text-white/70">{x.fases}</td>
                       <td className="px-4 py-2.5 text-white/70">{x.fasesNoKanban}</td>
@@ -228,7 +228,7 @@ export function SaudeSistemaTab() {
                       <td className="px-4 py-2.5 text-white">{x.nome}</td>
                       <td className="px-4 py-2.5"><span className={`rounded-full px-2 py-0.5 text-[10px] ${SEV[x.sev] ?? SEV.ok}`}>{SEV_LABEL[x.sev] ?? x.sev}</span></td>
                       <td className="px-4 py-2.5 text-white/70">{x.valor}</td>
-                      <td className="px-4 py-2.5 text-white/60">{x.detalhe}</td>
+                      <td className="px-4 py-2.5 text-[var(--text-secondary)]">{x.detalhe}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -261,7 +261,7 @@ export function HistoricoExecucoesTab() {
                   <tr><td colSpan={6} className="px-4 py-8 text-center text-xs text-[var(--text-muted)]">Nenhum avanço registrado.</td></tr>
                 ) : d.execucoes.advanceLogs.map((l) => (
                   <tr key={l.id} className="border-b border-[var(--border-subtle)] last:border-0">
-                    <td className="whitespace-nowrap px-4 py-2.5 text-white/60">{fmt(l.criadoEm)}</td>
+                    <td className="whitespace-nowrap px-4 py-2.5 text-[var(--text-secondary)]">{fmt(l.criadoEm)}</td>
                     <td className="px-4 py-2.5 text-white/70">#{l.processoId}</td>
                     <td className="px-4 py-2.5 text-white/70">{l.faseAtual}</td>
                     <td className="px-4 py-2.5 text-white">{l.fasePretendida ?? "—"}</td>
@@ -269,7 +269,7 @@ export function HistoricoExecucoesTab() {
                       <span className={`rounded px-1.5 py-0.5 text-[10px] ${l.resultado === "PERMITIDO" ? SEV.ok : SEV.alerta}`}>{l.resultado}</span>
                       {l.forcado && <span className="ml-1 rounded bg-amber-50 px-1.5 py-0.5 text-[10px] text-amber-700">forçado</span>}
                     </td>
-                    <td className="px-4 py-2.5 text-white/60">{l.motivoCodigo ?? "—"}</td>
+                    <td className="px-4 py-2.5 text-[var(--text-secondary)]">{l.motivoCodigo ?? "—"}</td>
                   </tr>
                 ))}
               </tbody>
@@ -287,12 +287,12 @@ export function HistoricoExecucoesTab() {
                   <tr><td colSpan={7} className="px-4 py-8 text-center text-xs text-[var(--text-muted)]">Nenhum artefato gerado.</td></tr>
                 ) : d.execucoes.artefatos.map((a) => (
                   <tr key={a.id} className="border-b border-[var(--border-subtle)] last:border-0">
-                    <td className="whitespace-nowrap px-4 py-2.5 text-white/60">{fmt(a.criadoEm)}</td>
+                    <td className="whitespace-nowrap px-4 py-2.5 text-[var(--text-secondary)]">{fmt(a.criadoEm)}</td>
                     <td className="px-4 py-2.5 text-white/70">#{a.processoId}</td>
                     <td className="px-4 py-2.5 text-white/70">{a.phaseKey}</td>
-                    <td className="px-4 py-2.5 text-white/60">{a.event}</td>
+                    <td className="px-4 py-2.5 text-[var(--text-secondary)]">{a.event}</td>
                     <td className="px-4 py-2.5 text-white">{a.ruleKind}</td>
-                    <td className="px-4 py-2.5 text-white/60">{a.targetTable}</td>
+                    <td className="px-4 py-2.5 text-[var(--text-secondary)]">{a.targetTable}</td>
                     <td className="px-4 py-2.5"><span className="rounded bg-[var(--surface-primary)] px-1.5 py-0.5 text-[10px] text-white/70">{a.status}</span></td>
                   </tr>
                 ))}

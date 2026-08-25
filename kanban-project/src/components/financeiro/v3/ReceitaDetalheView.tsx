@@ -249,7 +249,7 @@ export function ReceitaDetalheView({ refParam, onVoltar }: { refParam: string; o
 
   const alertaIcone = (sev: string) => {
     if (sev === "crit") return "text-[var(--danger)]"
-    if (sev === "warn") return "text-[var(--accent-primary)]"
+    if (sev === "warn") return "text-[var(--accent-text)]"
     return "text-[var(--info)]"
   }
 
@@ -384,7 +384,7 @@ export function ReceitaDetalheView({ refParam, onVoltar }: { refParam: string; o
               <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-5">
                 <SubCard rotulo="Valor contratado" valor={textoBrlOuOrigem(d.valorContratadoBrl, d.naoConvertido, d.moedaBase)} linhas={!semBase ? [`Base contratual: ${fmtEUR(d.valorBase)}`] : []} />
                 <SubCard rotulo={isCusto ? "Pago" : "Recebido"} valor={brl(d.recebidoBrl)} cor="text-[var(--success)]" linhas={[`${pct}% do total`, `${d.parcelasRecebidas} parcela(s) recebida(s)`]} />
-                <SubCard rotulo="A vencer" valor={brl(d.aVencerBrl)} cor="text-[var(--accent-primary)]" linhas={[`${d.parcelasAVencer} parcela(s)`, `Próximo: ${dataBR(d.proximoVencimento)}`]} />
+                <SubCard rotulo="A vencer" valor={brl(d.aVencerBrl)} cor="text-[var(--accent-text)]" linhas={[`${d.parcelasAVencer} parcela(s)`, `Próximo: ${dataBR(d.proximoVencimento)}`]} />
                 <SubCard rotulo="Vencido" valor={brl(d.vencidoBrl)} cor="text-[var(--danger)]" linhas={[`${d.parcelasVencidas} parcela(s)`, ...(d.parcelasVencidas ? [`Desde ${dataBR(d.proximoVencimento)}`] : [])]} />
                 <SubCard rotulo={voc.saldo} valor={brl(d.saldoBrl)} cor="text-[var(--info)]" linhas={[`${d.parcelas} parcela(s) em aberto`]} />
               </div>
@@ -398,7 +398,7 @@ export function ReceitaDetalheView({ refParam, onVoltar }: { refParam: string; o
         {/* ── ABAS ── */}
         <div className="mt-6 flex items-center gap-7 overflow-x-auto border-b border-[var(--border-default)]">
           {tabs.map(([id, label, Icon, badge]) => (
-            <button key={id} onClick={() => setTab(id)} className={`-mb-px flex shrink-0 items-center gap-2 border-b-2 px-1 pb-3 pt-2 text-sm ${tab === id ? "border-[var(--accent-primary)] font-medium text-[var(--accent-primary)]" : "border-transparent text-[var(--text-secondary)] hover:text-[var(--text-secondary)]"}`}>
+            <button key={id} onClick={() => setTab(id)} className={`-mb-px flex shrink-0 items-center gap-2 border-b-2 px-1 pb-3 pt-2 text-sm ${tab === id ? "border-[var(--accent-primary)] font-medium text-[var(--accent-text)]" : "border-transparent text-[var(--text-secondary)] hover:text-[var(--text-secondary)]"}`}>
               <Icon className="h-4 w-4" /> {label}{badge ? <span className="ml-1 rounded-full bg-[var(--surface-hover)] px-1.5 text-[11px] text-[var(--text-secondary)]">{badge}</span> : null}
             </button>
           ))}
@@ -561,7 +561,7 @@ export function ReceitaDetalheView({ refParam, onVoltar }: { refParam: string; o
               <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-5">
                 <SubCard rotulo="Total das cobranças" valor={brl(d.valorContratadoBrl)} linhas={[`${rp.total} parcelas`]} />
                 <SubCard rotulo={isCusto ? "Pago" : "Recebido"} valor={brl(d.resumo.recebidoBrl)} cor="text-[var(--success)]" linhas={[`${rp.pagas.qtd} parcelas pagas`]} />
-                <SubCard rotulo="A vencer" valor={brl(d.aVencerBrl)} cor="text-[var(--accent-primary)]" linhas={[`${rp.aVencer.qtd} parcelas`]} />
+                <SubCard rotulo="A vencer" valor={brl(d.aVencerBrl)} cor="text-[var(--accent-text)]" linhas={[`${rp.aVencer.qtd} parcelas`]} />
                 <SubCard rotulo="Vencido" valor={brl(d.vencidoBrl)} cor="text-[var(--danger)]" linhas={[`${rp.vencidas.qtd} parcela(s)`]} />
                 <SubCard rotulo="Inadimplência" valor={`${d.inadimplenciaPct ?? 0}%`} cor="text-[var(--danger)]" linhas={[`${rp.vencidas.qtd} parcela vencida`]} />
               </div>
@@ -615,7 +615,7 @@ export function ReceitaDetalheView({ refParam, onVoltar }: { refParam: string; o
                             </span>
                           </td>
                           <td className="whitespace-nowrap py-3.5 text-[var(--text-secondary)]">{dataBR(p.vencimento)}
-                            {p.status === "VENCIDA" ? <div className="text-xs text-[var(--danger)]">{p.diasAtraso} dias de atraso</div> : ehHoje(p.vencimento) ? <div className="text-xs text-[var(--accent-primary)]">Hoje</div> : null}
+                            {p.status === "VENCIDA" ? <div className="text-xs text-[var(--danger)]">{p.diasAtraso} dias de atraso</div> : ehHoje(p.vencimento) ? <div className="text-xs text-[var(--accent-text)]">Hoje</div> : null}
                           </td>
                           <td className="whitespace-nowrap py-3.5 font-medium text-[var(--text-primary)]">{brl(p.valorBrl)}</td>
                           <td className="whitespace-nowrap py-3.5">

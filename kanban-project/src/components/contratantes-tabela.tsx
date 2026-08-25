@@ -1078,7 +1078,7 @@ const removerDocumentoObrigatorio = async (categoria: string) => {
               podeEditar && (
                 <Button
                   onClick={() => setIsViewMode(false)}
-                  className="bg-indigo-600 hover:bg-indigo-700 text-[#fff]"
+                  className="bg-indigo-700 hover:bg-indigo-800 text-[var(--action-primary-ink)]"
                 >
                   <Edit className="h-4 w-4 mr-2" />
                   Editar
@@ -1088,7 +1088,7 @@ const removerDocumentoObrigatorio = async (categoria: string) => {
               <Button
                 onClick={onSave}
                 disabled={isLoading}
-                className="bg-emerald-600 hover:bg-emerald-700 text-[#fff]"
+                className="bg-emerald-700 hover:bg-emerald-800 text-[var(--action-primary-ink)]"
               >
                 {isLoading ? "Salvando..." : editingId ? "Salvar Alterações" : "Criar Cliente"}
               </Button>
@@ -1817,13 +1817,13 @@ style={{
                                   <div className="w-full h-full flex items-center justify-center bg-gray-100">
                                     {isWord ? (
                                       <div className="text-center">
-                                        <div className="w-12 h-14 mx-auto bg-blue-600 rounded-sm flex items-center justify-center text-[#fff] text-xs font-bold">
+                                        <div className="w-12 h-14 mx-auto bg-[var(--action-primary)] rounded-sm flex items-center justify-center text-[var(--action-primary-ink)] text-xs font-bold">
                                           DOC
                                         </div>
                                       </div>
                                     ) : isExcel ? (
                                       <div className="text-center">
-                                        <div className="w-12 h-14 mx-auto bg-green-600 rounded-sm flex items-center justify-center text-[#fff] text-xs font-bold">
+                                        <div className="w-12 h-14 mx-auto bg-green-700 rounded-sm flex items-center justify-center text-[var(--action-primary-ink)] text-xs font-bold">
                                           XLS
                                         </div>
                                       </div>
@@ -1854,7 +1854,7 @@ style={{
                                     e.preventDefault()
                                     removerAnexoExistente(anexo, index)
                                   }}
-                                  className="absolute top-1 right-1 p-1 bg-red-500 hover:bg-red-600 rounded-full text-[#fff] opacity-0 group-hover:opacity-100 transition-opacity"
+                                  className="absolute top-1 right-1 p-1 bg-red-500 hover:bg-red-800 rounded-full text-[var(--action-primary-ink)] opacity-0 group-hover:opacity-100 transition-opacity"
                                 >
                                   <X className="h-3 w-3" />
                                 </button>
@@ -1892,7 +1892,7 @@ style={{
                         type="button"
                         onClick={handleUpload}
                         disabled={isUploading}
-                        className="mt-2 w-full py-2 px-4 bg-indigo-600 hover:bg-indigo-700 disabled:bg-indigo-400 text-[#fff] rounded-lg font-medium transition-colors"
+                        className="mt-2 w-full py-2 px-4 bg-indigo-700 hover:bg-indigo-800 disabled:bg-indigo-400 text-[var(--action-primary-ink)] rounded-lg font-medium transition-colors"
                       >
                         {isUploading ? (
                           <span className="flex items-center justify-center gap-2">
@@ -2289,7 +2289,7 @@ export function ContratantesTabela({ contratantes, onRefresh, onOpenProcesso }: 
           {pode('clientes.criar') && (
             <Button
               onClick={handleNew}
-              className="bg-emerald-600 hover:bg-emerald-700 text-[#fff]"
+              className="bg-emerald-700 hover:bg-emerald-800 text-[var(--action-primary-ink)]"
             >
               <Plus className="h-4 w-4 mr-2" />
               Novo Cliente
@@ -2302,15 +2302,15 @@ export function ContratantesTabela({ contratantes, onRefresh, onOpenProcesso }: 
         <table className="w-full">
           <thead className="bg-[var(--surface-primary)]">
             <tr>
-              <th className="px-4 py-3 text-left text-xs font-medium text-white/60 uppercase">Tipo</th>
-              <th className="px-4 py-3 text-left text-xs font-medium text-white/60 uppercase">Código</th>
-              <th className="px-4 py-3 text-left text-xs font-medium text-white/60 uppercase">Nome</th>
-              <th className="px-4 py-3 text-left text-xs font-medium text-white/60 uppercase">CPF</th>
-              <th className="px-4 py-3 text-left text-xs font-medium text-white/60 uppercase">Telefone</th>
-              <th className="px-4 py-3 text-left text-xs font-medium text-white/60 uppercase">Email</th>
-              <th className="px-4 py-3 text-left text-xs font-medium text-white/60 uppercase">Processos</th>
-              <th className="px-4 py-3 text-left text-xs font-medium text-white/60 uppercase">Criado em</th>
-              <th className="px-4 py-3 text-right text-xs font-medium text-white/60 uppercase">Ações</th>
+              <th className="px-4 py-3 text-left text-xs font-medium text-[var(--text-secondary)] uppercase">Tipo</th>
+              <th className="px-4 py-3 text-left text-xs font-medium text-[var(--text-secondary)] uppercase">Código</th>
+              <th className="px-4 py-3 text-left text-xs font-medium text-[var(--text-secondary)] uppercase">Nome</th>
+              <th className="px-4 py-3 text-left text-xs font-medium text-[var(--text-secondary)] uppercase">CPF</th>
+              <th className="px-4 py-3 text-left text-xs font-medium text-[var(--text-secondary)] uppercase">Telefone</th>
+              <th className="px-4 py-3 text-left text-xs font-medium text-[var(--text-secondary)] uppercase">Email</th>
+              <th className="px-4 py-3 text-left text-xs font-medium text-[var(--text-secondary)] uppercase">Processos</th>
+              <th className="px-4 py-3 text-left text-xs font-medium text-[var(--text-secondary)] uppercase">Criado em</th>
+              <th className="px-4 py-3 text-right text-xs font-medium text-[var(--text-secondary)] uppercase">Ações</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-white/10">
@@ -2386,7 +2386,7 @@ export function ContratantesTabela({ contratantes, onRefresh, onOpenProcesso }: 
                   <td className="px-4 py-3 text-right" onClick={(e) => e.stopPropagation()}>
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" size="sm" className="text-white/60 hover:text-white hover:bg-[var(--surface-hover)]">
+                        <Button variant="ghost" size="sm" className="text-[var(--text-secondary)] hover:text-white hover:bg-[var(--surface-hover)]">
                           <MoreHorizontal className="h-4 w-4" />
                         </Button>
                       </DropdownMenuTrigger>
@@ -2437,7 +2437,7 @@ export function ContratantesTabela({ contratantes, onRefresh, onOpenProcesso }: 
               size="sm"
               onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
               disabled={currentPage === 1}
-              className="bg-transparent text-white/60 hover:text-white hover:bg-[var(--surface-hover)] disabled:opacity-30 disabled:hover:bg-transparent transition-all"
+              className="bg-transparent text-[var(--text-secondary)] hover:text-white hover:bg-[var(--surface-hover)] disabled:opacity-30 disabled:hover:bg-transparent transition-all"
             >
               <ChevronLeft className="h-4 w-4" />
             </Button>
@@ -2449,7 +2449,7 @@ export function ContratantesTabela({ contratantes, onRefresh, onOpenProcesso }: 
               size="sm"
               onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
               disabled={currentPage === totalPages}
-              className="bg-transparent text-white/60 hover:text-white hover:bg-[var(--surface-hover)] disabled:opacity-30 disabled:hover:bg-transparent transition-all"
+              className="bg-transparent text-[var(--text-secondary)] hover:text-white hover:bg-[var(--surface-hover)] disabled:opacity-30 disabled:hover:bg-transparent transition-all"
             >
               <ChevronRight className="h-4 w-4" />
             </Button>

@@ -152,9 +152,9 @@ export default function CanaisOperacionaisTab() {
                   </div>
                   <div className="mt-0.5 flex flex-wrap gap-1.5 text-[10px]">
                     {c.protocoloObrigatorio && <span className="rounded bg-sky-50 px-1.5 py-0.5 text-sky-700">protocolo no ato</span>}
-                    {c.anexoObrigatorioLabel && <span className="rounded bg-[var(--surface-primary)] px-1.5 py-0.5 text-white/60">{c.anexoObrigatorioLabel}</span>}
+                    {c.anexoObrigatorioLabel && <span className="rounded bg-[var(--surface-primary)] px-1.5 py-0.5 text-[var(--text-secondary)]">{c.anexoObrigatorioLabel}</span>}
                     {c.rastreioObrigatorio && <span className="rounded bg-amber-50 px-1.5 py-0.5 text-amber-700">rastreio</span>}
-                    {c.observacaoObrigatoria && <span className="rounded bg-[var(--surface-primary)] px-1.5 py-0.5 text-white/60">observação</span>}
+                    {c.observacaoObrigatoria && <span className="rounded bg-[var(--surface-primary)] px-1.5 py-0.5 text-[var(--text-secondary)]">observação</span>}
                   </div>
                 </div>
                 <button onClick={() => setEditando(c)} className="flex-none rounded-lg border border-[var(--border-default)] bg-[var(--surface-primary)] px-2.5 py-1 text-xs text-white/70 hover:bg-[var(--surface-hover)]">Editar</button>

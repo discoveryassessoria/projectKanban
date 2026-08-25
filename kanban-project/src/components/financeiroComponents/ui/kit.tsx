@@ -198,7 +198,7 @@ export function LinkAction({
       type="button"
       onClick={onClick}
       className={`inline-flex items-center gap-1 text-sm font-medium transition-opacity hover:opacity-80 ${center ? "mx-auto" : ""}`}
-      style={{ color: "var(--accent-primary)" }}
+      style={{ color: "var(--accent-text)" }}
     >
       {children}
     </button>
@@ -366,7 +366,7 @@ export function FilterChip({
   active, onClick, children, count, gold, dot,
 }: { active: boolean; onClick: () => void; children: React.ReactNode; count?: number; gold?: boolean; dot?: string }) {
   const activeStyle = gold
-    ? { background: "color-mix(in srgb, var(--accent-primary) 14%, transparent)", borderColor: "color-mix(in srgb, var(--accent-primary) 45%, transparent)", color: "var(--accent-primary)" }
+    ? { background: "color-mix(in srgb, var(--accent-primary) 14%, transparent)", borderColor: "color-mix(in srgb, var(--accent-primary) 45%, transparent)", color: "var(--accent-text)" }
     : { background: S.surfaceActive, borderColor: S.borderStrong, color: S.textPrimary }
   return (
     <button

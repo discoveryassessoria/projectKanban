@@ -226,8 +226,8 @@
      O muted anterior (#8a8d94) dava 3.24 e sumia em metadado, rótulo de coluna e
      texto de apoio — que é exatamente onde ele mais aparece. */
   --text-primary: #171a1f;
-  --text-secondary: #5f646b;
-  --text-muted: #6e7378;
+  --text-secondary: #585d64;
+  --text-muted: #61656b;
   --text-disabled: #a7aaae;
   --text-inverse: #ffffff;
 
@@ -241,7 +241,7 @@
   /* CHAMPAGNE COMO TEXTO precisa ser mais escuro: #b98524 sobre branco dá 3.23 e
      não passa AA. Este dá 4.59, e é o que deve ser usado quando o dourado é a
      TINTA — link, valor em destaque, rótulo institucional. */
-  --accent-text: #9a6c19;
+  --accent-text: #7d5611;
 
   /* Semânticas — usar SÓ quando houver significado real. Escurecidas para manter
      legibilidade sobre claro; o SIGNIFICADO de cada cor não muda. */
@@ -276,11 +276,11 @@
      própria, entre foto e shell. */
   --landscape-veil: linear-gradient(
     180deg,
-    rgba(247, 244, 238, 0.965) 0%,
-    rgba(247, 244, 238, 0.955) 40%,
-    rgba(247, 244, 238, 0.93) 65%,
-    rgba(247, 244, 238, 0.90) 82%,
-    rgba(247, 244, 238, 0.88) 100%
+    rgba(247, 244, 238, 0.90) 0%,
+    rgba(247, 244, 238, 0.945) 18%,
+    rgba(247, 244, 238, 0.965) 38%,
+    rgba(247, 244, 238, 0.975) 62%,
+    rgba(247, 244, 238, 0.98) 100%
   );
 
   /* Espaçamento (escala 4px) */

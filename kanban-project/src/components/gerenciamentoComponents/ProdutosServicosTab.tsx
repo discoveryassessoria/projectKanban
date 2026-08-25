@@ -397,7 +397,7 @@ export default function ProdutosServicosTab() {
 
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                 <div>
-                  <label className="mb-1 block text-xs text-white/60">Tipo</label>
+                  <label className="mb-1 block text-xs text-[var(--text-secondary)]">Tipo</label>
                   <select
                     value={tipo}
                     onChange={(e) => setTipo(e.target.value)}
@@ -409,7 +409,7 @@ export default function ProdutosServicosTab() {
                   </select>
                 </div>
                 <div>
-                  <label className="mb-1 block text-xs text-white/60">Unidade</label>
+                  <label className="mb-1 block text-xs text-[var(--text-secondary)]">Unidade</label>
                   <select value={unidade} onChange={(e) => setUnidade(e.target.value)} className={inputCls}>
                     <option value="" className="bg-zinc-900">— não definida</option>
                     {unidades.map((u) => <option key={u} value={u} className="bg-zinc-900">{u}</option>)}
@@ -418,13 +418,13 @@ export default function ProdutosServicosTab() {
               </div>
 
               <div>
-                <label className="mb-1 block text-xs text-white/60">Nome</label>
+                <label className="mb-1 block text-xs text-[var(--text-secondary)]">Nome</label>
                 <input value={name} onChange={(e) => setName(e.target.value)} autoFocus placeholder="Tradução Juramentada" className={inputCls} />
               </div>
 
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                 <div>
-                  <label className="mb-1 block text-xs text-white/60">Categoria</label>
+                  <label className="mb-1 block text-xs text-[var(--text-secondary)]">Categoria</label>
                   <select
                     value={categoriaId == null ? '' : String(categoriaId)}
                     onChange={(e) => setCategoriaId(e.target.value === '' ? null : Number(e.target.value))}
@@ -440,7 +440,7 @@ export default function ProdutosServicosTab() {
 
               {ehServico && (
                 <div>
-                  <label className="mb-1 block text-xs text-white/60">Países/Regiões aplicáveis</label>
+                  <label className="mb-1 block text-xs text-[var(--text-secondary)]">Países/Regiões aplicáveis</label>
                   <MultiSelect
                     busca
                     buscaPlaceholder="Buscar país…"
@@ -471,7 +471,7 @@ export default function ProdutosServicosTab() {
               )}
 
               <div>
-                <label className="mb-1 block text-xs text-white/60">Descrição</label>
+                <label className="mb-1 block text-xs text-[var(--text-secondary)]">Descrição</label>
                 <textarea value={descricao} onChange={(e) => setDescricao(e.target.value)} rows={2} placeholder="O que o item entrega..." className={inputCls} />
               </div>
 
@@ -481,7 +481,7 @@ export default function ProdutosServicosTab() {
               </label>
 
               {editando && editando.vinculos > 0 && (
-                <div className="rounded-lg border border-[var(--border-default)] bg-[var(--surface-primary)] p-3 text-xs text-white/60">
+                <div className="rounded-lg border border-[var(--border-default)] bg-[var(--surface-primary)] p-3 text-xs text-[var(--text-secondary)]">
                   Este item tem <b className="text-white/80">{editando.vinculos}</b> vínculo(s) em uso (configuração financeira, preço ou tipo de documento).
                   Editar o nome preserva os vínculos; para tirá-lo de circulação, desmarque <b className="text-white/80">Ativo</b> em vez de excluir.
                 </div>
@@ -493,7 +493,7 @@ export default function ProdutosServicosTab() {
             </div>
 
             <div className="flex items-center justify-end gap-2 border-t border-[var(--border-default)] px-6 py-4">
-              <button onClick={() => setModalAberto(false)} className="rounded-lg px-4 py-2 text-sm text-white/60 transition hover:text-white">Cancelar</button>
+              <button onClick={() => setModalAberto(false)} className="rounded-lg px-4 py-2 text-sm text-[var(--text-secondary)] transition hover:text-white">Cancelar</button>
               <button onClick={salvar} disabled={salvando} className="rounded-lg bg-[var(--action-primary)] px-4 py-2 text-sm font-medium text-[var(--action-primary-ink)] transition hover:bg-[var(--action-primary)] disabled:opacity-50">
                 {salvando ? 'Salvando...' : 'Salvar'}
               </button>

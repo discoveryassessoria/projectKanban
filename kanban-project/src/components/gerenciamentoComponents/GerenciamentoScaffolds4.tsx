@@ -77,7 +77,7 @@ export function FinCatalogTab() {
             className={`rounded-full border px-2.5 py-1 text-[11.5px] font-semibold transition ${
               filtro === f
                 ? 'border-blue-500/60 bg-blue-50 text-blue-700'
-                : 'border-[var(--border-default)] text-white/60 hover:bg-[var(--surface-hover)]'
+                : 'border-[var(--border-default)] text-[var(--text-secondary)] hover:bg-[var(--surface-hover)]'
             }`}
           >
             {f}

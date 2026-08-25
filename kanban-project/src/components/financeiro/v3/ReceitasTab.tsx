@@ -237,7 +237,7 @@ export function ReceitasTab({ processoId, onAbrirDetalhe }: { processoId?: numbe
         <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[var(--border-default)] px-5 pt-4">
           <div className="flex items-center gap-6">
             {ABAS.map(([id, label]) => (
-              <button key={id} onClick={() => setAba(id)} className={`-mb-px border-b-2 pb-3 text-sm ${aba === id ? "border-[var(--accent-primary)] font-medium text-[var(--accent-primary)]" : "border-transparent text-[var(--text-secondary)] hover:text-[var(--text-secondary)]"}`}>
+              <button key={id} onClick={() => setAba(id)} className={`-mb-px border-b-2 pb-3 text-sm ${aba === id ? "border-[var(--accent-primary)] font-medium text-[var(--accent-text)]" : "border-transparent text-[var(--text-secondary)] hover:text-[var(--text-secondary)]"}`}>
                 {label} ({contagem[id] ?? 0})
               </button>
             ))}
@@ -310,7 +310,7 @@ export function ReceitasTab({ processoId, onAbrirDetalhe }: { processoId?: numbe
             <span>Mostrando {Math.min((page - 1) * PAGE + 1, filtrados.length)}–{Math.min(page * PAGE, filtrados.length)} de {filtrados.length} registro{filtrados.length === 1 ? "" : "s"}</span>
             <div className="flex items-center gap-1">
               <button disabled={page <= 1} onClick={() => setPage((p) => Math.max(1, p - 1))} className="rounded border border-[var(--border-default)] p-1.5 text-[var(--text-secondary)] disabled:opacity-30"><ChevronLeft className="h-4 w-4" /></button>
-              <span className="rounded border px-2.5 py-1 text-xs" style={{ borderColor: "color-mix(in srgb, var(--accent-primary) 40%, transparent)", background: "color-mix(in srgb, var(--accent-primary) 12%, transparent)", color: "var(--accent-primary)" }}>{page} / {totalPag}</span>
+              <span className="rounded border px-2.5 py-1 text-xs" style={{ borderColor: "color-mix(in srgb, var(--accent-primary) 40%, transparent)", background: "color-mix(in srgb, var(--accent-primary) 12%, transparent)", color: "var(--accent-text)" }}>{page} / {totalPag}</span>
               <button disabled={page >= totalPag} onClick={() => setPage((p) => p + 1)} className="rounded border border-[var(--border-default)] p-1.5 text-[var(--text-secondary)] disabled:opacity-30"><ChevronRight className="h-4 w-4" /></button>
             </div>
           </div>

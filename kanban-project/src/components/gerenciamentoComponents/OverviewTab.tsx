@@ -61,7 +61,7 @@ export default function OverviewTab() {
       {/* Header */}
       <div>
         <h2 className="text-lg font-bold text-white">Painel Geral</h2>
-        <div className="text-xs text-white/60 mt-1">Visão geral dos cadastros e configurações do sistema.</div>
+        <div className="text-xs text-[var(--text-secondary)] mt-1">Visão geral dos cadastros e configurações do sistema.</div>
       </div>
 
       {/* KPI STRIP — apenas indicadores que não são cards */}

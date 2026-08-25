@@ -15,7 +15,7 @@ import { HeaderBar } from "@/src/components/header-bar"
 import { usePermissoes } from "@/src/hooks/use-permissoes"
 import { Loader2, FileText } from "lucide-react"
 import dynamic from "next/dynamic"
-import { DashboardCorporativo, OURO, type DashboardData } from "@/src/components/financeiro/dashboard-corporativo"
+import { DashboardCorporativo, OURO, OURO_TINTA, type DashboardData } from "@/src/components/financeiro/dashboard-corporativo"
 import { CentralFinanceira } from "@/src/components/financeiro/CentralFinanceira"
 import { PagamentosView } from "@/src/components/financeiro/PagamentosView"
 import { CreditosView } from "@/src/components/financeiro/CreditosView"
@@ -185,7 +185,7 @@ export default function FinanceiroPage() {
                   className={`relative px-3.5 py-2 text-sm font-medium whitespace-nowrap transition-colors -mb-px border-b-2 border-transparent ${
                     tab === t.key ? "" : "text-[var(--text-secondary)] hover:text-white"
                   }`}
-                  style={tab === t.key ? { color: OURO, borderBottomColor: OURO } : undefined}
+                  style={tab === t.key ? { color: OURO_TINTA, borderBottomColor: OURO } : undefined}
                 >
                   {t.label}
                 </button>

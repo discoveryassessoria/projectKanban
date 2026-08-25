@@ -454,7 +454,7 @@ export function ProcessoProtocolos({
             setShowForm(true)
           }}
           size="sm"
-          className={`bg-amber-600 hover:bg-amber-700 ${!podeEditar || protocolos.length === 0 ? 'hidden' : ''}`}
+          className={`bg-amber-700 hover:bg-amber-800 ${!podeEditar || protocolos.length === 0 ? 'hidden' : ''}`}
         >
           <Plus className="h-4 w-4 mr-1" />
           Registrar protocolo
@@ -685,7 +685,7 @@ export function ProcessoProtocolos({
                 <Button
                   onClick={handleSalvar}
                   disabled={salvando}
-                  className="flex-1 bg-amber-600 hover:bg-amber-700"
+                  className="flex-1 bg-amber-700 hover:bg-amber-800"
                 >
                   {salvando && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
                   {editando ? "Salvar alterações" : "Registrar protocolo"}
@@ -714,7 +714,7 @@ export function ProcessoProtocolos({
             {podeEditar && (
               <Button
                 onClick={() => setShowForm(true)}
-                className="bg-amber-600 hover:bg-amber-700"
+                className="bg-amber-700 hover:bg-amber-800"
               >
                 <Plus className="h-4 w-4 mr-2" />
                 Registrar primeiro protocolo
@@ -883,7 +883,7 @@ export function ProcessoProtocolos({
                                   ) : (
                                     <div className="w-full h-full flex items-center justify-center bg-[var(--surface-tertiary)]">
                                       {isPDF ? (
-                                        <div className="w-12 h-14 bg-red-600 rounded-sm flex items-center justify-center text-[#fff] text-xs font-bold">
+                                        <div className="w-12 h-14 bg-red-700 rounded-sm flex items-center justify-center text-[var(--action-primary-ink)] text-xs font-bold">
                                           PDF
                                         </div>
                                       ) : (
@@ -915,7 +915,7 @@ export function ProcessoProtocolos({
                                       e.preventDefault()
                                       handleExcluirAnexo(protocolo.id, anexo.id)
                                     }}
-                                    className="absolute top-1 right-1 p-1 bg-red-500 hover:bg-red-600 rounded-full text-[#fff] opacity-0 group-hover:opacity-100 transition-opacity"
+                                    className="absolute top-1 right-1 p-1 bg-red-500 hover:bg-red-800 rounded-full text-[var(--action-primary-ink)] opacity-0 group-hover:opacity-100 transition-opacity"
                                   >
                                     <X className="h-3 w-3" />
                                   </button>
@@ -954,7 +954,7 @@ export function ProcessoProtocolos({
                             type="button"
                             onClick={() => handleUpload(protocolo.id)}
                             disabled={uploadingProtocoloId !== null}
-                            className="mt-2 w-full py-2 px-4 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-[#fff] rounded-lg font-medium transition-colors"
+                            className="mt-2 w-full py-2 px-4 bg-[var(--action-primary)] hover:bg-[var(--action-primary)] disabled:bg-blue-400 text-[var(--action-primary-ink)] rounded-lg font-medium transition-colors"
                           >
                             {isUploadingThis ? (
                               <span className="flex items-center justify-center gap-2">

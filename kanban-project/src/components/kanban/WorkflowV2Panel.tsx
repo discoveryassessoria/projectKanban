@@ -168,7 +168,7 @@ export function WorkflowV2Panel({ processoId }: Props) {
           </>
         )}
         {pode("workflow.forcarAvanco") && (
-          <button onClick={forcar} disabled={acao != null || !v2} className="rounded bg-red-600 px-2 py-1 text-xs text-[#fff] hover:bg-red-700 disabled:opacity-50">
+          <button onClick={forcar} disabled={acao != null || !v2} className="rounded bg-red-700 px-2 py-1 text-xs text-[var(--action-primary-ink)] hover:bg-red-800 disabled:opacity-50">
             Forçar avanço
           </button>
         )}

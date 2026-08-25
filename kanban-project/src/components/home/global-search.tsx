@@ -164,7 +164,7 @@ export function GlobalSearch({ autoFocusRef }: { autoFocusRef?: React.RefObject<
                   <p className="truncate text-sm font-medium text-white">{r.label}</p>
                   {r.sub && <p className="truncate text-xs text-[var(--text-secondary)]">{r.sub}</p>}
                 </div>
-                <span className="shrink-0 rounded bg-[var(--surface-primary)] px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-white/60">
+                <span className="shrink-0 rounded bg-[var(--surface-primary)] px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-[var(--text-secondary)]">
                   {ROTULO[r.tipo]}
                 </span>
               </li>

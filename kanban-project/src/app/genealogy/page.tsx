@@ -475,7 +475,7 @@ export default function GenealogyPage() {
                       <button
                         onClick={handlePesquisar}
                         disabled={loading}
-                        className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-[#fff] py-2.5 px-4 rounded-lg font-medium transition flex items-center justify-center gap-2 disabled:opacity-50 text-sm"
+                        className="flex-1 bg-emerald-700 hover:bg-emerald-800 text-[var(--action-primary-ink)] py-2.5 px-4 rounded-lg font-medium transition flex items-center justify-center gap-2 disabled:opacity-50 text-sm"
                       >
                         <Search className="h-4 w-4" />
                         {loading ? 'Pesquisando...' : 'PESQUISAR'}
@@ -544,7 +544,7 @@ export default function GenealogyPage() {
                       <button
                         onClick={handlePesquisar}
                         disabled={loading}
-                        className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-[#fff] py-2.5 px-4 rounded-lg font-medium transition flex items-center justify-center gap-2 disabled:opacity-50 text-sm"
+                        className="flex-1 bg-emerald-700 hover:bg-emerald-800 text-[var(--action-primary-ink)] py-2.5 px-4 rounded-lg font-medium transition flex items-center justify-center gap-2 disabled:opacity-50 text-sm"
                       >
                         <Search className="h-4 w-4" />
                         {loading ? 'Pesquisando...' : 'PESQUISAR'}
@@ -621,7 +621,7 @@ export default function GenealogyPage() {
                                   )}
                                   
                                   {pessoa.arvoreNome && (
-                                    <p className="text-xs text-white/60 mt-1 flex items-center gap-1">
+                                    <p className="text-xs text-[var(--text-secondary)] mt-1 flex items-center gap-1">
                                       <TreePine className="h-3 w-3" />
                                       {pessoa.arvoreNome}
                                     </p>
@@ -681,7 +681,7 @@ export default function GenealogyPage() {
                                   )}
                                   
                                   {doc.arvoreNome && (
-                                    <p className="text-xs text-white/60 mt-1 flex items-center gap-1">
+                                    <p className="text-xs text-[var(--text-secondary)] mt-1 flex items-center gap-1">
                                       <TreePine className="h-3 w-3" />
                                       {doc.arvoreNome}
                                     </p>

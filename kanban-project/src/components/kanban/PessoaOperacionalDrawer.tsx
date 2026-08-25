@@ -60,18 +60,18 @@ const STATUS_LABELS: Record<string, string> = {
 
 const STATUS_PILL_CLS: Record<string, string> = {
   PENDENTE: "bg-[var(--surface-secondary)]/20 text-[var(--text-muted)]",
-  SOLICITAR: "bg-[#a78bfa]/20 text-slate-700",
-  SOLICITADO: "bg-[#a78bfa]/20 text-slate-700",
-  EM_BUSCA: "bg-[#d2a948]/20 text-amber-700",
+  SOLICITAR: "bg-slate-50 text-slate-700",
+  SOLICITADO: "bg-slate-50 text-slate-700",
+  EM_BUSCA: "bg-[var(--accent-primary)]/20 text-amber-700",
   RECEBIDO: "bg-emerald-50 text-emerald-700",
-  EM_ANALISE: "bg-[#7dd3fc]/20 text-blue-700",
+  EM_ANALISE: "bg-sky-50 text-blue-700",
   RETIFICANDO: "bg-amber-50 text-amber-700",
   EM_TRADUCAO: "bg-amber-50 text-amber-700",
   TRADUZIDO: "bg-emerald-50 text-emerald-700",
   EM_APOSTILAMENTO: "bg-amber-50 text-amber-700",
   APOSTILADO: "bg-emerald-50 text-emerald-700",
   ENTREGUE: "bg-emerald-50 text-emerald-700",
-  INVALIDO: "bg-[#f87171]/20 text-red-700",
+  INVALIDO: "bg-red-50 text-red-700",
   NAO_ENCONTRADO: "bg-[var(--surface-secondary)]0/20 text-[var(--text-muted)]",
   CANCELADO: "bg-[var(--surface-secondary)]0/20 text-[var(--text-muted)]",
 }
@@ -284,7 +284,7 @@ function ConteudoDrawer({
         )}
 
         {erro && !pessoa && (
-          <div className="flex-1 flex flex-col items-center justify-center text-white/60 gap-3 p-6">
+          <div className="flex-1 flex flex-col items-center justify-center text-[var(--text-secondary)] gap-3 p-6">
             <AlertTriangle className="w-8 h-8 text-amber-700" />
             <p className="text-sm">{erro}</p>
             <button
@@ -309,7 +309,7 @@ function ConteudoDrawer({
                 </div>
                 <button
                   onClick={onClose}
-                  className="w-[30px] h-[30px] rounded-md bg-[var(--surface-popover)]/5 hover:bg-[var(--surface-popover)]/15 flex items-center justify-center text-[#fff]"
+                  className="w-[30px] h-[30px] rounded-md bg-[var(--surface-popover)]/5 hover:bg-[var(--surface-popover)]/15 flex items-center justify-center text-[var(--text-primary)]"
                   aria-label="Fechar"
                 >
                   <X className="w-4 h-4" />
@@ -380,8 +380,8 @@ function ConteudoDrawer({
                     onClick={handleDeleteClick}
                     className={`ml-auto inline-flex items-center gap-1.5 px-2.5 py-1.5 text-[11px] font-semibold rounded-md transition-colors ${
                       confirmDelete
-                        ? "bg-[#f87171] text-white hover:bg-red-600"
-                        : "bg-[#f87171]/10 text-red-700 hover:bg-[#f87171]/20"
+                        ? "bg-red-50 text-white hover:bg-red-600"
+                        : "bg-red-50 text-red-700 hover:bg-red-50"
                     }`}
                   >
                     <Trash2 className="w-3 h-3" />
@@ -410,7 +410,7 @@ function ConteudoDrawer({
                   {t.count !== undefined && (
                     <span
                       className={`text-[9.5px] px-1.5 rounded-full font-bold ${
-                        activeTab === t.id ? "bg-[#7dd3fc]/30 text-blue-700" : "bg-[var(--surface-popover)]/10 text-white/70"
+                        activeTab === t.id ? "bg-sky-50 text-blue-700" : "bg-[var(--surface-popover)]/10 text-white/70"
                       }`}
                     >
                       {t.count}
@@ -510,7 +510,7 @@ function ActionButton({
   return (
     <button
       onClick={onClick}
-      className="inline-flex items-center gap-1.5 px-2.5 py-1.5 text-[11px] font-semibold rounded-md bg-[var(--surface-popover)]/5 text-white/85 hover:bg-[var(--surface-popover)]/12 hover:text-[#fff] transition-colors"
+      className="inline-flex items-center gap-1.5 px-2.5 py-1.5 text-[11px] font-semibold rounded-md bg-[var(--surface-popover)]/5 text-white/85 hover:bg-[var(--surface-popover)]/12 hover:text-[var(--text-primary)] transition-colors"
     >
       {icon}
       {label}
@@ -595,7 +595,7 @@ function DocCard({ doc, onClick }: { doc: Documento; onClick: () => void }) {
         <div className="mt-2.5">
           <div className="flex items-center justify-between text-[10px] text-[var(--text-secondary)] mb-1">
             <span>{progress}% concluído</span>
-            <ChevronRight className="w-3 h-3 text-[var(--text-muted)] group-hover:text-white/60 transition-colors" />
+            <ChevronRight className="w-3 h-3 text-[var(--text-muted)] group-hover:text-[var(--text-secondary)] transition-colors" />
           </div>
           <div className="h-1 bg-[var(--surface-popover)]/10 rounded-full overflow-hidden">
             <div

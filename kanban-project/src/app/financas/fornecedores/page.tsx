@@ -170,10 +170,10 @@ export default function FornecedoresPage() {
               Novo Fornecedor
             </Button>
           </DialogTrigger>
-          <DialogContent className="bg-[var(--surface-overlay)] border-[var(--border-strong)] text-[#fff] max-w-2xl max-h-[90vh] overflow-y-auto">
+          <DialogContent className="bg-[var(--surface-overlay)] border-[var(--border-strong)] text-[var(--text-primary)] max-w-2xl max-h-[90vh] overflow-y-auto">
             <DialogHeader>
               <DialogTitle>Novo Fornecedor</DialogTitle>
-              <DialogDescription className="text-white/60">
+              <DialogDescription className="text-[var(--text-secondary)]">
                 Cadastre um novo fornecedor ou prestador de serviço
               </DialogDescription>
             </DialogHeader>

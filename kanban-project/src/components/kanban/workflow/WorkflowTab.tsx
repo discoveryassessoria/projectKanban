@@ -260,7 +260,7 @@ export function WorkflowTab({ documentoId, onChange, contextoAntecipada }: Workf
         </p>
         <button
           onClick={() => { void carregar() }}
-          className="px-4 py-2 bg-blue-500 hover:bg-blue-600 text-[#fff] text-xs font-semibold rounded-md inline-flex items-center gap-1.5"
+          className="px-4 py-2 bg-[var(--action-primary)] hover:bg-[var(--action-primary)] text-[var(--action-primary-ink)] text-xs font-semibold rounded-md inline-flex items-center gap-1.5"
         >
           ↻ Recarregar
         </button>
@@ -318,16 +318,16 @@ export function WorkflowTab({ documentoId, onChange, contextoAntecipada }: Workf
           Capacidade nativa preservada INTEIRA (criar, listar, avaliar, abrir). Ela
           pertence ao ALVO deste documento e só existe aqui dentro. */}
       {contextoAntecipada && necId != null && (
-        <div className="border border-[#a78bfa]/20 rounded-lg bg-[#a78bfa]/[0.05] px-3 py-3">
+        <div className="border border-slate-200 rounded-lg bg-slate-50/[0.05] px-3 py-3">
           <div className="flex items-center justify-between gap-3 mb-2 flex-wrap">
-            <b className="text-[11px] font-extrabold uppercase tracking-wide text-[#a78bfa]">
+            <b className="text-[11px] font-extrabold uppercase tracking-wide text-slate-700">
               Operação antecipada
             </b>
             {!contextoAntecipada.readOnly && (
               <button
                 type="button"
                 onClick={() => setCriandoAntecipada(true)}
-                className="text-[11px] font-semibold text-[var(--text-secondary)] hover:text-[#a78bfa] underline decoration-dotted underline-offset-2"
+                className="text-[11px] font-semibold text-[var(--text-secondary)] hover:text-slate-700 underline decoration-dotted underline-offset-2"
               >
                 + nova operação antecipada
               </button>
@@ -579,7 +579,7 @@ function StepCard({
         {!isLockStepWait && (
           <button
             onClick={onOpenCentral}
-            className="px-2.5 py-1.5 text-[10.5px] font-semibold bg-blue-500 hover:bg-blue-600 text-[#fff] rounded transition-colors whitespace-nowrap"
+            className="px-2.5 py-1.5 text-[10.5px] font-semibold bg-[var(--action-primary)] hover:bg-[var(--action-primary)] text-[var(--action-primary-ink)] rounded transition-colors whitespace-nowrap"
           >
             Central da Etapa →
           </button>

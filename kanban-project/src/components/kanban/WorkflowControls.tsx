@@ -165,7 +165,7 @@ export function WorkflowControls({
               <button
                 onClick={handlePausar}
                 disabled={!!actionLoading}
-                className="inline-flex items-center gap-1.5 px-3 py-1.5 text-[11px] font-medium rounded-md transition-colors disabled:opacity-50 border border-[var(--border-strong)]/50 text-[#7dd3fc] bg-transparent hover:bg-[var(--action-primary)]/10"
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 text-[11px] font-medium rounded-md transition-colors disabled:opacity-50 border border-[var(--border-strong)]/50 text-sky-700 bg-transparent hover:bg-[var(--action-primary)]/10"
               >
                 {actionLoading === "pausar" ? <Loader2 className="w-3 h-3 animate-spin" /> : <Pause className="w-3 h-3" />}
                 Pausar operação
@@ -175,7 +175,7 @@ export function WorkflowControls({
               <button
                 onClick={handleRetomar}
                 disabled={!!actionLoading}
-                className="inline-flex items-center gap-1.5 px-3 py-1.5 text-[11px] font-medium rounded-md transition-colors disabled:opacity-50 border border-[#4ade80]/40 text-[#4ade80] bg-transparent hover:bg-[#4ade80]/10"
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 text-[11px] font-medium rounded-md transition-colors disabled:opacity-50 border border-green-200 text-green-700 bg-transparent hover:bg-green-50"
               >
                 {actionLoading === "retomar" ? <Loader2 className="w-3 h-3 animate-spin" /> : <Play className="w-3 h-3" />}
                 Retomar operação
@@ -193,7 +193,7 @@ export function WorkflowControls({
               <button
                 onClick={() => setConfirmAction("invalidar")}
                 disabled={!!actionLoading}
-                className="inline-flex items-center gap-1.5 px-3 py-1.5 text-[11px] font-medium rounded-md transition-colors disabled:opacity-50 border border-[#f87171]/40 text-[#f87171] bg-transparent hover:bg-[#f87171]/10"
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 text-[11px] font-medium rounded-md transition-colors disabled:opacity-50 border border-red-200 text-red-700 bg-transparent hover:bg-red-50"
               >
                 <Ban className="w-3 h-3" />
                 Invalidar operação

@@ -241,7 +241,7 @@ export default function FornecedoresTab() {
                   <td className="px-4 py-2.5">
                     <span className="rounded bg-[var(--surface-primary)] px-2 py-0.5 text-[11px] font-medium text-white/70">{catLabel(f.tipo)}</span>
                   </td>
-                  <td className="px-4 py-2.5 text-white/60">
+                  <td className="px-4 py-2.5 text-[var(--text-secondary)]">
                     {f.email || f.telefone || f.celular || '—'}
                   </td>
                   <td className="px-4 py-2.5">
@@ -277,11 +277,11 @@ export default function FornecedoresTab() {
               <Secao titulo="Identificação" primeira>
                 <div className="grid grid-cols-2 gap-3">
                   <div>
-                    <label className="mb-1 block text-xs text-white/60">Nome / Razão social</label>
+                    <label className="mb-1 block text-xs text-[var(--text-secondary)]">Nome / Razão social</label>
                     <input value={form.nome} onChange={(e) => set('nome', e.target.value)} autoFocus className={inputCls} />
                   </div>
                   <div>
-                    <label className="mb-1 block text-xs text-white/60">Tipo (categoria)</label>
+                    <label className="mb-1 block text-xs text-[var(--text-secondary)]">Tipo (categoria)</label>
                     <select value={form.tipo} onChange={(e) => set('tipo', e.target.value)} className={inputCls}>
                       <option value="" className="bg-zinc-900">— Selecione —</option>
                       {CATEGORIAS.map(([k, label]) => <option key={k} value={k} className="bg-zinc-900">{label}</option>)}
@@ -289,20 +289,20 @@ export default function FornecedoresTab() {
                   </div>
                 </div>
                 <div>
-                  <label className="mb-1 block text-xs text-white/60">Nome fantasia</label>
+                  <label className="mb-1 block text-xs text-[var(--text-secondary)]">Nome fantasia</label>
                   <input value={form.nomeFantasia} onChange={(e) => set('nomeFantasia', e.target.value)} className={inputCls} />
                 </div>
                 <div className="grid grid-cols-3 gap-3">
                   <div>
-                    <label className="mb-1 block text-xs text-white/60">CPF / CNPJ</label>
+                    <label className="mb-1 block text-xs text-[var(--text-secondary)]">CPF / CNPJ</label>
                     <input value={form.cpfCnpj} onChange={(e) => set('cpfCnpj', e.target.value)} className={inputCls} />
                   </div>
                   <div>
-                    <label className="mb-1 block text-xs text-white/60">Inscr. estadual</label>
+                    <label className="mb-1 block text-xs text-[var(--text-secondary)]">Inscr. estadual</label>
                     <input value={form.inscricaoEstadual} onChange={(e) => set('inscricaoEstadual', e.target.value)} className={inputCls} />
                   </div>
                   <div>
-                    <label className="mb-1 block text-xs text-white/60">Inscr. municipal</label>
+                    <label className="mb-1 block text-xs text-[var(--text-secondary)]">Inscr. municipal</label>
                     <input value={form.inscricaoMunicipal} onChange={(e) => set('inscricaoMunicipal', e.target.value)} className={inputCls} />
                   </div>
                 </div>
@@ -312,21 +312,21 @@ export default function FornecedoresTab() {
               <Secao titulo="Contato">
                 <div className="grid grid-cols-2 gap-3">
                   <div>
-                    <label className="mb-1 block text-xs text-white/60">Telefone</label>
+                    <label className="mb-1 block text-xs text-[var(--text-secondary)]">Telefone</label>
                     <input value={form.telefone} onChange={(e) => set('telefone', e.target.value)} className={inputCls} />
                   </div>
                   <div>
-                    <label className="mb-1 block text-xs text-white/60">Celular</label>
+                    <label className="mb-1 block text-xs text-[var(--text-secondary)]">Celular</label>
                     <input value={form.celular} onChange={(e) => set('celular', e.target.value)} className={inputCls} />
                   </div>
                 </div>
                 <div className="grid grid-cols-2 gap-3">
                   <div>
-                    <label className="mb-1 block text-xs text-white/60">E-mail</label>
+                    <label className="mb-1 block text-xs text-[var(--text-secondary)]">E-mail</label>
                     <input value={form.email} onChange={(e) => set('email', e.target.value)} className={inputCls} />
                   </div>
                   <div>
-                    <label className="mb-1 block text-xs text-white/60">Site</label>
+                    <label className="mb-1 block text-xs text-[var(--text-secondary)]">Site</label>
                     <input value={form.website} onChange={(e) => set('website', e.target.value)} placeholder="https://..." className={inputCls} />
                   </div>
                 </div>
@@ -336,39 +336,39 @@ export default function FornecedoresTab() {
               <Secao titulo="Endereço">
                 <div className="grid grid-cols-4 gap-3">
                   <div className="col-span-1">
-                    <label className="mb-1 block text-xs text-white/60">CEP</label>
+                    <label className="mb-1 block text-xs text-[var(--text-secondary)]">CEP</label>
                     <input value={form.cep} onChange={(e) => set('cep', e.target.value)} className={inputCls} />
                   </div>
                   <div className="col-span-3">
-                    <label className="mb-1 block text-xs text-white/60">Endereço</label>
+                    <label className="mb-1 block text-xs text-[var(--text-secondary)]">Endereço</label>
                     <input value={form.endereco} onChange={(e) => set('endereco', e.target.value)} className={inputCls} />
                   </div>
                 </div>
                 <div className="grid grid-cols-4 gap-3">
                   <div>
-                    <label className="mb-1 block text-xs text-white/60">Número</label>
+                    <label className="mb-1 block text-xs text-[var(--text-secondary)]">Número</label>
                     <input value={form.numero} onChange={(e) => set('numero', e.target.value)} className={inputCls} />
                   </div>
                   <div className="col-span-3">
-                    <label className="mb-1 block text-xs text-white/60">Complemento</label>
+                    <label className="mb-1 block text-xs text-[var(--text-secondary)]">Complemento</label>
                     <input value={form.complemento} onChange={(e) => set('complemento', e.target.value)} className={inputCls} />
                   </div>
                 </div>
                 <div className="grid grid-cols-4 gap-3">
                   <div>
-                    <label className="mb-1 block text-xs text-white/60">Bairro</label>
+                    <label className="mb-1 block text-xs text-[var(--text-secondary)]">Bairro</label>
                     <input value={form.bairro} onChange={(e) => set('bairro', e.target.value)} className={inputCls} />
                   </div>
                   <div>
-                    <label className="mb-1 block text-xs text-white/60">Cidade</label>
+                    <label className="mb-1 block text-xs text-[var(--text-secondary)]">Cidade</label>
                     <input value={form.cidade} onChange={(e) => set('cidade', e.target.value)} className={inputCls} />
                   </div>
                   <div>
-                    <label className="mb-1 block text-xs text-white/60">UF</label>
+                    <label className="mb-1 block text-xs text-[var(--text-secondary)]">UF</label>
                     <input value={form.estado} maxLength={2} onChange={(e) => set('estado', e.target.value.toUpperCase())} className={inputCls} />
                   </div>
                   <div>
-                    <label className="mb-1 block text-xs text-white/60">País</label>
+                    <label className="mb-1 block text-xs text-[var(--text-secondary)]">País</label>
                     <input value={form.pais} onChange={(e) => set('pais', e.target.value)} placeholder="Brasil" className={inputCls} />
                   </div>
                 </div>
@@ -378,29 +378,29 @@ export default function FornecedoresTab() {
               <Secao titulo="Dados bancários">
                 <div className="grid grid-cols-3 gap-3">
                   <div>
-                    <label className="mb-1 block text-xs text-white/60">Banco</label>
+                    <label className="mb-1 block text-xs text-[var(--text-secondary)]">Banco</label>
                     <input value={form.banco} onChange={(e) => set('banco', e.target.value)} className={inputCls} />
                   </div>
                   <div>
-                    <label className="mb-1 block text-xs text-white/60">Agência</label>
+                    <label className="mb-1 block text-xs text-[var(--text-secondary)]">Agência</label>
                     <input value={form.agencia} onChange={(e) => set('agencia', e.target.value)} className={inputCls} />
                   </div>
                   <div>
-                    <label className="mb-1 block text-xs text-white/60">Conta</label>
+                    <label className="mb-1 block text-xs text-[var(--text-secondary)]">Conta</label>
                     <input value={form.conta} onChange={(e) => set('conta', e.target.value)} className={inputCls} />
                   </div>
                 </div>
                 <div className="grid grid-cols-3 gap-3">
                   <div>
-                    <label className="mb-1 block text-xs text-white/60">Tipo de conta</label>
+                    <label className="mb-1 block text-xs text-[var(--text-secondary)]">Tipo de conta</label>
                     <input value={form.tipoConta} onChange={(e) => set('tipoConta', e.target.value)} placeholder="Corrente / Poupança" className={inputCls} />
                   </div>
                   <div>
-                    <label className="mb-1 block text-xs text-white/60">Chave Pix</label>
+                    <label className="mb-1 block text-xs text-[var(--text-secondary)]">Chave Pix</label>
                     <input value={form.chavePix} onChange={(e) => set('chavePix', e.target.value)} className={inputCls} />
                   </div>
                   <div>
-                    <label className="mb-1 block text-xs text-white/60">Tipo da chave</label>
+                    <label className="mb-1 block text-xs text-[var(--text-secondary)]">Tipo da chave</label>
                     <select value={form.tipoChavePix} onChange={(e) => set('tipoChavePix', e.target.value)} className={inputCls}>
                       <option value="" className="bg-zinc-900">—</option>
                       {TIPOS_PIX.map((t) => <option key={t} value={t} className="bg-zinc-900">{t}</option>)}
@@ -413,7 +413,7 @@ export default function FornecedoresTab() {
               <Secao titulo="Configurações">
                 <div className="grid grid-cols-2 gap-3">
                   <div>
-                    <label className="mb-1 block text-xs text-white/60">Moeda padrão</label>
+                    <label className="mb-1 block text-xs text-[var(--text-secondary)]">Moeda padrão</label>
                     <select value={form.moedaPadrao} onChange={(e) => set('moedaPadrao', e.target.value)} className={inputCls}>
                       {MOEDAS.map(([k, label]) => <option key={k} value={k} className="bg-zinc-900">{label}</option>)}
                     </select>
@@ -426,7 +426,7 @@ export default function FornecedoresTab() {
                   </div>
                 </div>
                 <div>
-                  <label className="mb-1 block text-xs text-white/60">Observações</label>
+                  <label className="mb-1 block text-xs text-[var(--text-secondary)]">Observações</label>
                   <textarea value={form.observacoes} onChange={(e) => set('observacoes', e.target.value)} rows={2} className={`${inputCls} resize-none`} />
                 </div>
               </Secao>
@@ -437,7 +437,7 @@ export default function FornecedoresTab() {
             </div>
 
             <div className="flex items-center justify-end gap-2 border-t border-[var(--border-default)] px-6 py-4">
-              <button onClick={() => setModalAberto(false)} className="rounded-lg px-4 py-2 text-sm text-white/60 transition hover:text-white">Cancelar</button>
+              <button onClick={() => setModalAberto(false)} className="rounded-lg px-4 py-2 text-sm text-[var(--text-secondary)] transition hover:text-white">Cancelar</button>
               <button onClick={salvar} disabled={salvando} className="rounded-lg bg-[var(--action-primary)] px-4 py-2 text-sm font-medium text-[var(--action-primary-ink)] transition hover:bg-[var(--action-primary)] disabled:opacity-50">
                 {salvando ? 'Salvando...' : 'Salvar'}
               </button>

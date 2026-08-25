@@ -102,7 +102,7 @@ export default function ReabrirEtapaModal({
     finally { setEnviando(false) }
   }
 
-  const inp = "w-full rounded-lg border border-[var(--border-default)] bg-[var(--surface-popover)] px-3 py-2 text-[13px] text-white/95 outline-none focus:border-[#7dd3fc]/50"
+  const inp = "w-full rounded-lg border border-[var(--border-default)] bg-[var(--surface-popover)] px-3 py-2 text-[13px] text-white/95 outline-none focus:border-sky-200"
   const rot = "text-[10px] font-bold uppercase tracking-wider text-[var(--text-muted)]"
   const atual = plano?.execucoes.find((e) => e.status !== "SUPERSEDIDO") ?? plano?.execucoes[plano.execucoes.length - 1] ?? null
   const podeConfirmar =
@@ -158,7 +158,7 @@ export default function ReabrirEtapaModal({
               </div>
 
               {!plano.podeReabrir && (
-                <div className="rounded-lg border border-[#d2a948]/40 bg-[#d2a948]/10 px-3 py-2.5 text-[12.5px] text-[#d2a948]">
+                <div className="rounded-lg border border-[var(--accent-primary)]/40 bg-[var(--accent-primary)]/10 px-3 py-2.5 text-[12.5px] text-[var(--accent-text)]">
                   {plano.motivoNaoPode}
                 </div>
               )}
@@ -189,8 +189,8 @@ export default function ReabrirEtapaModal({
                   </div>
 
                   {/* PREVIEW EXATO — o que vai acontecer, com nome e sobrenome. */}
-                  <div className="rounded-lg border border-[#d2a948]/30 bg-[#d2a948]/5 px-3 py-3 text-[12px]">
-                    <div className="text-[11px] font-bold uppercase tracking-wider text-[#d2a948]">Será criada nova execução para</div>
+                  <div className="rounded-lg border border-[var(--accent-primary)]/30 bg-[var(--accent-primary)]/5 px-3 py-3 text-[12px]">
+                    <div className="text-[11px] font-bold uppercase tracking-wider text-[var(--accent-text)]">Será criada nova execução para</div>
                     <div className="mt-1 text-white/85">
                       {plano.identidade.pessoaNome ?? "—"}
                       <div className="ml-3">→ {plano.identidade.documentoTitulo ?? "—"}</div>
@@ -198,7 +198,7 @@ export default function ReabrirEtapaModal({
                     </div>
                     {comDependentes && plano.dependentesDaMesmaUnidade.length > 0 && (
                       <>
-                        <div className="mt-2 text-[11px] font-bold uppercase tracking-wider text-[#d2a948]">Também serão afetados</div>
+                        <div className="mt-2 text-[11px] font-bold uppercase tracking-wider text-[var(--accent-text)]">Também serão afetados</div>
                         <div className="mt-1 text-white/85">
                           {plano.dependentesDaMesmaUnidade.map((d) => (
                             <div key={d.stepInstanceId} className="ml-3">→ {d.titulo}</div>
@@ -236,7 +236,7 @@ export default function ReabrirEtapaModal({
             </>
           )}
 
-          {erro && <div className="rounded-lg border border-[#f87171]/40 bg-[#f87171]/10 px-3 py-2.5 text-[12.5px] text-[#f87171]">{erro}</div>}
+          {erro && <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2.5 text-[12.5px] text-red-700">{erro}</div>}
         </div>
 
         <div className="flex items-center justify-end gap-2 border-t border-[var(--border-default)] px-5 py-4">
@@ -245,7 +245,7 @@ export default function ReabrirEtapaModal({
             Cancelar
           </button>
           <button onClick={() => void confirmar()} disabled={!podeConfirmar}
-            className="rounded-lg bg-[#d2a948] px-4 py-2 text-[12.5px] font-bold text-[#1b2027] hover:bg-[#e0bd6a] disabled:opacity-40">
+            className="rounded-lg bg-[var(--accent-primary)] px-4 py-2 text-[12.5px] font-bold text-[#1b2027] hover:bg-[#e0bd6a] disabled:opacity-40">
             {enviando ? "Reabrindo…" : "Confirmar reabertura"}
           </button>
         </div>

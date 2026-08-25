@@ -117,11 +117,11 @@ export function ProcessoEstatisticas({ processo, onNavigate }: ProcessoEstatisti
 
   const riscoValor = risco.bloqueantes || risco.graves || 'OK'
   const riscoCor =
-    risco.bloqueantes ? 'text-[#f87171]' :
-    risco.graves      ? 'text-[#fbbf24]' :
-                        'text-[#4ade80]'
+    risco.bloqueantes ? 'text-red-700' :
+    risco.graves      ? 'text-amber-700' :
+                        'text-green-700'
 
-  const protocoloCor = protocolo.apto ? 'text-[#4ade80]' : 'text-[#fbbf24]'
+  const protocoloCor = protocolo.apto ? 'text-green-700' : 'text-amber-700'
 
   // Discovery Design System — dark glass (skin only; layout preservado)
   const cardCls = "bg-[var(--surface-popover)] border border-[var(--border-default)] rounded-xl px-4 py-3.5"
@@ -212,9 +212,9 @@ export function ProcessoEstatisticas({ processo, onNavigate }: ProcessoEstatisti
           <div className="space-y-0">
             {alertas.map((a, i) => {
               const corTag =
-                a.sev === 'crit' ? 'bg-[#f87171] ring-[#f87171]/15' :
-                a.sev === 'warn' ? 'bg-[#fbbf24] ring-[#fbbf24]/15' :
-                                    'bg-[#7dd3fc] ring-[#7dd3fc]/15'
+                a.sev === 'crit' ? 'bg-red-50 border-red-200' :
+                a.sev === 'warn' ? 'bg-amber-50 border-amber-200' :
+                                    'bg-sky-50 border-sky-200'
               return (
                 <div key={i} className="flex items-center gap-2.5 text-[12.5px] text-white/95 py-1.5">
                   <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ring-[3px] ${corTag}`}></span>
@@ -228,7 +228,7 @@ export function ProcessoEstatisticas({ processo, onNavigate }: ProcessoEstatisti
 
       {/* ============== AVISO TEMPORÁRIO (endpoint pendente) ============== */}
       {!loading && !endpointDisponivel && (
-        <div className="mb-4 px-3 py-2 bg-[#fbbf24]/10 border border-[#fbbf24]/25 rounded text-[11px] text-[#fbbf24]">
+        <div className="mb-4 px-3 py-2 bg-amber-50 border border-amber-200 rounded text-[11px] text-amber-700">
           ⚠ Endpoint <code className="font-mono">/api/processos/{processo.id}/estatisticas</code> ainda não existe — cards mostrando valores zerados.
         </div>
       )}
@@ -238,7 +238,7 @@ export function ProcessoEstatisticas({ processo, onNavigate }: ProcessoEstatisti
         <Button
           variant="outline"
           size="sm"
-          className="border-[var(--border-default)] bg-transparent text-white/80 hover:bg-[var(--surface-tertiary)] hover:text-[#fff]"
+          className="border-[var(--border-default)] bg-transparent text-white/80 hover:bg-[var(--surface-tertiary)] hover:text-[var(--text-primary)]"
           onClick={() => onNavigate?.('arvore')}
         >
           → Árvore Genealógica
@@ -248,14 +248,14 @@ export function ProcessoEstatisticas({ processo, onNavigate }: ProcessoEstatisti
           size="sm"
           disabled
           title="Aba ainda não implementada"
-          className="border-[var(--border-default)] bg-transparent text-white/80 hover:bg-[var(--surface-tertiary)] hover:text-[#fff]"
+          className="border-[var(--border-default)] bg-transparent text-white/80 hover:bg-[var(--surface-tertiary)] hover:text-[var(--text-primary)]"
         >
           → Central Operacional
         </Button>
         <Button
           variant="outline"
           size="sm"
-          className="border-[var(--border-default)] bg-transparent text-white/80 hover:bg-[var(--surface-tertiary)] hover:text-[#fff]"
+          className="border-[var(--border-default)] bg-transparent text-white/80 hover:bg-[var(--surface-tertiary)] hover:text-[var(--text-primary)]"
           onClick={() => onNavigate?.('documentos')}
         >
           → Documentos

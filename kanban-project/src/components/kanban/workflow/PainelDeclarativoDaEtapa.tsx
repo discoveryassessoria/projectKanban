@@ -215,7 +215,7 @@ export default function PainelDeclarativoDaEtapa({
 
   if (!d.configuracao) {
     return (
-      <div className="rounded-lg border border-[var(--border-default)] bg-[var(--surface-primary)] p-4 text-sm text-white/60">
+      <div className="rounded-lg border border-[var(--border-default)] bg-[var(--surface-primary)] p-4 text-sm text-[var(--text-secondary)]">
         Esta etapa é anterior ao versionamento da configuração e não tem campos nem resultados cadastrados.
         Use o painel operacional da etapa.
       </div>
@@ -354,7 +354,7 @@ export default function PainelDeclarativoDaEtapa({
                         <button key={a.key} onClick={() => executar(a, st.key)}
                           disabled={enviando !== null}
                           title={a.descricao ?? undefined}
-                          className="rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-medium text-[#fff] hover:bg-blue-500 disabled:opacity-50">
+                          className="rounded-lg bg-[var(--action-primary)] px-3 py-1.5 text-xs font-medium text-[var(--action-primary-ink)] hover:bg-[var(--action-primary)] disabled:opacity-50">
                           {enviando === `${st.key}|${a.key}` ? "Executando…" : a.label}
                         </button>
                       ))}
@@ -510,7 +510,7 @@ export default function PainelDeclarativoDaEtapa({
               <div className="flex justify-end gap-2">
                 <button onClick={() => setPreview(null)} className="rounded-lg border border-[var(--border-default)] bg-[var(--surface-primary)] px-3 py-1.5 text-xs text-white/70">Cancelar</button>
                 <button onClick={() => void confirmarReexecucao()} disabled={enviando != null || justificativa.trim().length < 5}
-                  className="rounded-lg bg-amber-600 px-3 py-1.5 text-xs font-medium text-[#fff] disabled:opacity-40">
+                  className="rounded-lg bg-amber-700 px-3 py-1.5 text-xs font-medium text-[var(--action-primary-ink)] disabled:opacity-40">
                   {enviando === "__reexecutar" ? "Reexecutando…" : "Confirmar reexecução"}
                 </button>
               </div>

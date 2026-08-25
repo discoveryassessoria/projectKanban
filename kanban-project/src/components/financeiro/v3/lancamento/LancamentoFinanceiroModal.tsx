@@ -575,7 +575,7 @@ export function LancamentoFinanceiroModal({
                   </div>
                 ))}
                 {Math.abs(somaRateio - total) > 0.01 && (
-                  <p className="mt-1 text-xs text-[var(--accent-primary)]">A soma do rateio ({fmt(somaRateio, moeda)}) difere do total ({fmt(total, moeda)}).</p>
+                  <p className="mt-1 text-xs text-[var(--accent-text)]">A soma do rateio ({fmt(somaRateio, moeda)}) difere do total ({fmt(total, moeda)}).</p>
                 )}
               </div>
             )}
@@ -584,7 +584,7 @@ export function LancamentoFinanceiroModal({
             {(problemas.some((p) => p.severidade === "aviso") || (analise?.avisos.length ?? 0) > 0) && (
               <div className="mt-3 space-y-1.5" data-testid="alertas">
                 {problemas.filter((p) => p.severidade === "aviso").map((p, i) => (
-                  <p key={`v${i}`} className="flex items-start gap-1.5 text-[11px] text-[var(--accent-primary)]">
+                  <p key={`v${i}`} className="flex items-start gap-1.5 text-[11px] text-[var(--accent-text)]">
                     <AlertTriangle className="mt-0.5 h-3 w-3 shrink-0" />{p.mensagem}
                   </p>
                 ))}
@@ -659,7 +659,7 @@ function Chip({ ativo, onClick, children, icone, titulo }: { ativo: boolean; onC
     <button type="button" onClick={onClick} title={titulo} aria-pressed={ativo}
       className="inline-flex items-center gap-1.5 rounded-[var(--radius-sm)] border px-2.5 py-1 text-xs focus-visible:ring-2 focus-visible:ring-[var(--accent-primary)]"
       style={ativo
-        ? { borderColor: "color-mix(in srgb, var(--accent-primary) 50%, transparent)", background: "color-mix(in srgb, var(--accent-primary) 12%, transparent)", color: "var(--accent-primary)" }
+        ? { borderColor: "color-mix(in srgb, var(--accent-primary) 50%, transparent)", background: "color-mix(in srgb, var(--accent-primary) 12%, transparent)", color: "var(--accent-text)" }
         : { borderColor: "var(--border-strong)", color: "var(--text-secondary)" }}>
       {icone}{children}
     </button>

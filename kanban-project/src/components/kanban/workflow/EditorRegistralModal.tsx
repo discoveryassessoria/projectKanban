@@ -414,12 +414,12 @@ function ConteudoModal({
           )}
 
           {erro && !doc && (
-            <div className="flex-1 flex flex-col items-center justify-center text-white/60 gap-3 p-8">
-              <AlertTriangle className="w-8 h-8 text-[#d2a948]" />
+            <div className="flex-1 flex flex-col items-center justify-center text-[var(--text-secondary)] gap-3 p-8">
+              <AlertTriangle className="w-8 h-8 text-[var(--accent-text)]" />
               <p className="text-sm">{erro}</p>
               <button
                 onClick={onClose}
-                className="px-3 py-1.5 text-xs bg-[var(--surface-popover)]/10 hover:bg-[var(--surface-popover)]/15 rounded-md text-[#fff]"
+                className="px-3 py-1.5 text-xs bg-[var(--surface-popover)]/10 hover:bg-[var(--surface-popover)]/15 rounded-md text-[var(--text-primary)]"
               >
                 Fechar
               </button>
@@ -447,7 +447,7 @@ function ConteudoModal({
                   </div>
                   <button
                     onClick={onClose}
-                    className="w-8 h-8 rounded-md bg-[var(--surface-popover)]/5 hover:bg-[var(--surface-popover)]/15 flex items-center justify-center text-[#fff] flex-shrink-0"
+                    className="w-8 h-8 rounded-md bg-[var(--surface-popover)]/5 hover:bg-[var(--surface-popover)]/15 flex items-center justify-center text-[var(--text-primary)] flex-shrink-0"
                     aria-label="Fechar"
                   >
                     <X className="w-4 h-4" />
@@ -470,13 +470,13 @@ function ConteudoModal({
                   <div
                     className={`mb-5 p-3.5 rounded-lg border ${
                       podeConcluirEtapa
-                        ? "border-[#4ade80]/30 bg-[#4ade80]/10"
-                        : "border-[#d2a948]/30 bg-[#d2a948]/10"
+                        ? "border-green-200 bg-green-50"
+                        : "border-[var(--accent-primary)]/30 bg-[var(--accent-primary)]/10"
                     }`}
                   >
                     <div
                       className={`text-[12px] font-semibold mb-1 flex items-center gap-1.5 ${
-                        podeConcluirEtapa ? "text-[#4ade80]" : "text-[#d2a948]"
+                        podeConcluirEtapa ? "text-green-700" : "text-[var(--accent-text)]"
                       }`}
                     >
                       <AlertTriangle className="w-3.5 h-3.5" />
@@ -486,11 +486,11 @@ function ConteudoModal({
                     </div>
                     <div className="text-[11.5px] text-white/75 leading-relaxed">
                       preencha{" "}
-                      <strong className={cartorioOk ? "text-[#4ade80]" : "text-[#d2a948]"}>
+                      <strong className={cartorioOk ? "text-green-700" : "text-[var(--accent-text)]"}>
                         Cartório
                       </strong>{" "}
                       + pelo menos um de{" "}
-                      <strong className={referenciaOk ? "text-[#4ade80]" : "text-[#d2a948]"}>
+                      <strong className={referenciaOk ? "text-green-700" : "text-[var(--accent-text)]"}>
                         Livro / Folha / Termo
                       </strong>
                       . Os demais campos são opcionais aqui.
@@ -715,7 +715,7 @@ function ConteudoModal({
                       value={form.observacoes}
                       onChange={(e) => setForm({ ...form, observacoes: e.target.value })}
                       placeholder="Observações registrais…"
-                      className="w-full px-3 py-2 bg-[var(--surface-popover)]/5 border border-[var(--border-default)] rounded-md text-sm text-[#fff] placeholder-white/30 focus:outline-none focus:border-[#7dd3fc]/50 focus:ring-1 focus:ring-[#7dd3fc]/30 resize-none"
+                      className="w-full px-3 py-2 bg-[var(--surface-popover)]/5 border border-[var(--border-default)] rounded-md text-sm text-[var(--text-primary)] placeholder-white/30 focus:outline-none focus:border-sky-200 focus:ring-1 focus:border-sky-200 resize-none"
                     />
                   </Section>
                 )}
@@ -726,7 +726,7 @@ function ConteudoModal({
                 <button
                   onClick={onClose}
                   disabled={saving}
-                  className="px-4 py-2 text-[12.5px] font-semibold text-white/70 hover:text-[#fff] hover:bg-[var(--surface-popover)]/5 rounded-md transition-colors disabled:opacity-50"
+                  className="px-4 py-2 text-[12.5px] font-semibold text-white/70 hover:text-[var(--text-primary)] hover:bg-[var(--surface-popover)]/5 rounded-md transition-colors disabled:opacity-50"
                 >
                   Cancelar
                 </button>
@@ -735,7 +735,7 @@ function ConteudoModal({
                   <button
                     onClick={handleSalvar}
                     disabled={saving || !podeConcluirEtapa}
-                    className="px-5 py-2 text-[12.5px] font-semibold bg-[#f87171] hover:bg-[#f87171]/15 disabled:bg-[#f87171]/15 disabled:opacity-50 disabled:cursor-not-allowed text-[#fff] rounded-md inline-flex items-center gap-2 transition-colors"
+                    className="px-5 py-2 text-[12.5px] font-semibold bg-red-50 hover:bg-red-50 disabled:bg-red-50 disabled:opacity-50 disabled:cursor-not-allowed text-[var(--text-primary)] rounded-md inline-flex items-center gap-2 transition-colors"
                   >
                     {saving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : null}
                     Salvar e iniciar solicitação
@@ -744,7 +744,7 @@ function ConteudoModal({
                   <button
                     onClick={handleSalvar}
                     disabled={saving}
-                    className="px-5 py-2 text-[12.5px] font-semibold bg-[#7dd3fc] hover:bg-[#7dd3fc] disabled:bg-[#7dd3fc]/15 disabled:opacity-50 text-[#fff] rounded-md inline-flex items-center gap-2 transition-colors"
+                    className="px-5 py-2 text-[12.5px] font-semibold bg-sky-50 hover:bg-sky-50 disabled:bg-sky-50 disabled:opacity-50 text-[var(--text-primary)] rounded-md inline-flex items-center gap-2 transition-colors"
                   >
                     {saving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : null}
                     Salvar
@@ -788,15 +788,15 @@ function Section({
         className="w-full flex items-center justify-between gap-2 mb-2 group"
       >
         <div className="flex items-center gap-2 text-left">
-          <BookOpen className="w-3.5 h-3.5 text-[var(--text-muted)] group-hover:text-white/60" />
+          <BookOpen className="w-3.5 h-3.5 text-[var(--text-muted)] group-hover:text-[var(--text-secondary)]" />
           <h3 className="text-[11px] uppercase font-bold tracking-wider text-[var(--text-secondary)] group-hover:text-white/80">
             {title}
           </h3>
         </div>
         {open ? (
-          <ChevronUp className="w-3.5 h-3.5 text-[var(--text-muted)] group-hover:text-white/60" />
+          <ChevronUp className="w-3.5 h-3.5 text-[var(--text-muted)] group-hover:text-[var(--text-secondary)]" />
         ) : (
-          <ChevronDown className="w-3.5 h-3.5 text-[var(--text-muted)] group-hover:text-white/60" />
+          <ChevronDown className="w-3.5 h-3.5 text-[var(--text-muted)] group-hover:text-[var(--text-secondary)]" />
         )}
       </button>
 
@@ -845,8 +845,8 @@ function Field({
           <span
             className={`text-[8.5px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded ${
               isEmpty
-                ? "bg-[#d2a948]/20 text-[#d2a948] border border-[#d2a948]/40"
-                : "bg-[#4ade80]/20 text-[#4ade80] border border-[#4ade80]/40"
+                ? "bg-[var(--accent-primary)]/20 text-[var(--accent-text)] border border-[var(--accent-primary)]/40"
+                : "bg-green-50 text-green-700 border border-green-200"
             }`}
           >
             obrigatório p/ concluir
@@ -856,15 +856,15 @@ function Field({
           <span
             className={`text-[8.5px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded ${
               isEmpty
-                ? "bg-[#d2a948]/20 text-[#d2a948] border border-[#d2a948]/40"
-                : "bg-[#4ade80]/20 text-[#4ade80] border border-[#4ade80]/40"
+                ? "bg-[var(--accent-primary)]/20 text-[var(--accent-text)] border border-[var(--accent-primary)]/40"
+                : "bg-green-50 text-green-700 border border-green-200"
             }`}
           >
             obrigatório*
           </span>
         )}
         {critical && !requiredToComplete && !requiredAlt && (
-          <span className="text-[8.5px] font-semibold uppercase tracking-wider text-[#7dd3fc]/70">
+          <span className="text-[8.5px] font-semibold uppercase tracking-wider text-sky-700">
             crítico
           </span>
         )}
@@ -873,10 +873,10 @@ function Field({
         type={type}
         value={value}
         onChange={(e) => onChange(e.target.value)}
-        className={`w-full px-3 py-2 bg-[var(--surface-popover)]/5 border rounded-md text-sm text-[#fff] placeholder-white/30 focus:outline-none focus:ring-1 ${
+        className={`w-full px-3 py-2 bg-[var(--surface-popover)]/5 border rounded-md text-sm text-[var(--text-primary)] placeholder-white/30 focus:outline-none focus:ring-1 ${
           requiredEmpty || requiredAltEmpty
-            ? "border-[#d2a948]/40 focus:border-[#d2a948]/60 focus:ring-[#d2a948]/30"
-            : "border-[var(--border-default)] focus:border-[#7dd3fc]/50 focus:ring-[#7dd3fc]/30"
+            ? "border-[var(--accent-primary)]/40 focus:border-[var(--accent-primary)]/60 focus:ring-[var(--accent-primary)]/30"
+            : "border-[var(--border-default)] focus:border-sky-200 focus:border-sky-200"
         }`}
       />
     </div>

@@ -283,7 +283,7 @@ const TELAS: Record<string, React.ComponentType> = {
 }
 
 function CarregandoTela() {
-  return <div className="flex items-center justify-center py-24"><Loader2 className="h-8 w-8 animate-spin text-white/60" /></div>
+  return <div className="flex items-center justify-center py-24"><Loader2 className="h-8 w-8 animate-spin text-[var(--text-secondary)]" /></div>
 }
 
 // fallback de segurança (não deve aparecer — todas as telas estão registradas)
@@ -586,7 +586,7 @@ export default function GerenciamentoPage() {
           <section aria-label="Módulos do Gerenciamento">
             <header className="mb-6">
               <h1 className="text-[30px] font-bold tracking-tight text-white md:text-[32px]">Gerenciamento Geral</h1>
-              <p className="mt-1.5 max-w-3xl text-[15px] text-white/60">
+              <p className="mt-1.5 max-w-3xl text-[15px] text-[var(--text-secondary)]">
                 Cadastros, regras, valores, automações, permissões e configurações.
               </p>
               {/* Busca global */}
@@ -728,7 +728,7 @@ export default function GerenciamentoPage() {
                         className="flex min-w-0 items-center gap-2 text-left text-[13px] font-bold uppercase tracking-wide text-white/75 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/40"
                         title="Início do Gerenciamento"
                       >
-                        <Home className="h-4 w-4 flex-none text-white/60" />
+                        <Home className="h-4 w-4 flex-none text-[var(--text-secondary)]" />
                         <span className="truncate">Gerenciamento</span>
                       </button>
                       <button
@@ -903,12 +903,12 @@ function Breadcrumb({ trilha }: { trilha: { label: string; onClick?: () => void 
             {c.onClick && !ultimo ? (
               <button
                 onClick={c.onClick}
-                className="rounded px-0.5 text-white/60 hover:text-white hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/40"
+                className="rounded px-0.5 text-[var(--text-secondary)] hover:text-white hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/40"
               >
                 {c.label}
               </button>
             ) : (
-              <span className={ultimo ? "font-medium text-white/85" : "text-white/60"}>{c.label}</span>
+              <span className={ultimo ? "font-medium text-white/85" : "text-[var(--text-secondary)]"}>{c.label}</span>
             )}
             {!ultimo ? <ChevronRight className="h-3.5 w-3.5 text-[var(--text-muted)]" /> : null}
           </span>

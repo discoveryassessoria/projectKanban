@@ -151,9 +151,9 @@ export default function ModelosDocumentaisTab() {
       <div className="rounded-2xl border border-[var(--border-default)] bg-[var(--surface-primary)] p-5 backdrop-blur-sm">
         <div className="flex items-start justify-between gap-3">
           <div>
-            <h2 className="text-lg font-semibold text-[var(--action-primary-ink)]">Modelos</h2>
-            <p className="mt-1 max-w-3xl text-sm text-[var(--action-primary-ink)]/60">
-              Repositório oficial dos <strong className="text-[var(--action-primary-ink)]/80">templates</strong> do sistema.
+            <h2 className="text-lg font-semibold text-[var(--text-primary)]">Modelos</h2>
+            <p className="mt-1 max-w-3xl text-sm text-[var(--text-secondary)]">
+              Repositório oficial dos <strong className="text-[var(--text-secondary)]">templates</strong> do sistema.
               O modelo não é um documento: é o molde. O texto oficial mora dentro do DOCX
               versionado — o banco guarda identidade, versão, checksum e autoria.
               Todo documento inteligente do Discovery é gerado a partir daqui.
@@ -161,7 +161,7 @@ export default function ModelosDocumentaisTab() {
           </div>
           <button
             onClick={() => setForm({ codigo: "", nome: "", descricao: "", categoria: "PROCURACAO", ativo: true })}
-            className="flex-none rounded-lg bg-blue-600 px-3 py-2 text-xs font-medium text-[#fff] hover:bg-blue-500"
+            className="flex-none rounded-lg bg-[var(--action-primary)] px-3 py-2 text-xs font-medium text-[var(--action-primary-ink)] hover:bg-[var(--action-primary)]"
           >
             + Novo modelo
           </button>
@@ -177,7 +177,7 @@ export default function ModelosDocumentaisTab() {
 
       <div className="overflow-hidden rounded-2xl border border-[var(--border-default)] bg-[var(--surface-primary)] backdrop-blur-sm">
         <table className="w-full text-sm">
-          <thead className="border-b border-[var(--border-default)] text-left text-xs text-[var(--action-primary-ink)]/50">
+          <thead className="border-b border-[var(--border-default)] text-left text-xs text-[var(--text-muted)]">
             <tr>
               <th className="px-4 py-3 font-medium">Código</th>
               <th className="px-4 py-3 font-medium">Nome</th>
@@ -191,34 +191,34 @@ export default function ModelosDocumentaisTab() {
           </thead>
           <tbody>
             {lista.carregando ? (
-              <tr><td colSpan={8} className="px-4 py-8 text-center text-xs text-[var(--action-primary-ink)]/40">Carregando…</td></tr>
+              <tr><td colSpan={8} className="px-4 py-8 text-center text-xs text-[var(--text-muted)]">Carregando…</td></tr>
             ) : modelos.length === 0 ? (
-              <tr><td colSpan={8} className="px-4 py-8 text-center text-xs text-[var(--action-primary-ink)]/40">Nenhum modelo cadastrado.</td></tr>
+              <tr><td colSpan={8} className="px-4 py-8 text-center text-xs text-[var(--text-muted)]">Nenhum modelo cadastrado.</td></tr>
             ) : modelos.map((m) => (
               <tr key={m.id} className="border-b border-[var(--border-subtle)] last:border-0">
-                <td className="px-4 py-2.5 font-mono text-xs text-[var(--action-primary-ink)]/70">{m.codigo}</td>
-                <td className="px-4 py-2.5 text-[var(--action-primary-ink)]">{m.nome}</td>
-                <td className="px-4 py-2.5 text-[var(--action-primary-ink)]/70">{ROTULO_CATEGORIA[m.categoria] ?? m.categoria}</td>
-                <td className="px-4 py-2.5 text-[var(--action-primary-ink)]/70">
+                <td className="px-4 py-2.5 font-mono text-xs text-[var(--text-secondary)]">{m.codigo}</td>
+                <td className="px-4 py-2.5 text-[var(--text-primary)]">{m.nome}</td>
+                <td className="px-4 py-2.5 text-[var(--text-secondary)]">{ROTULO_CATEGORIA[m.categoria] ?? m.categoria}</td>
+                <td className="px-4 py-2.5 text-[var(--text-secondary)]">
                   {m.documentType.name}
                   {m.documentType.publicCode && (
-                    <span className="ml-1.5 rounded bg-[var(--surface-primary)] px-1.5 py-0.5 text-[9px] text-[var(--action-primary-ink)]/50">{m.documentType.publicCode}</span>
+                    <span className="ml-1.5 rounded bg-[var(--surface-primary)] px-1.5 py-0.5 text-[9px] text-[var(--text-muted)]">{m.documentType.publicCode}</span>
                   )}
                 </td>
-                <td className="px-4 py-2.5 text-[var(--action-primary-ink)]/70">
+                <td className="px-4 py-2.5 text-[var(--text-secondary)]">
                   {m.versaoPublicada ? `v${m.versaoPublicada.numero}` : <span className="text-amber-700/80">nenhuma</span>}
-                  <span className="ml-1 text-[var(--action-primary-ink)]/30">de {m.totalVersoes}</span>
+                  <span className="ml-1 text-[var(--text-muted)]">de {m.totalVersoes}</span>
                 </td>
                 <td className="px-4 py-2.5">
                   <span className={`rounded-full px-2 py-0.5 text-[10px] ${m.ativo ? "bg-green-50 text-green-700" : "bg-[var(--surface-primary)] text-[var(--action-primary-ink)]/50"}`}>
                     {m.ativo ? "Ativo" : "Inativo"}
                   </span>
                 </td>
-                <td className="px-4 py-2.5 text-xs text-[var(--action-primary-ink)]/50">
+                <td className="px-4 py-2.5 text-xs text-[var(--text-muted)]">
                   {m.ultimaPublicacao ? new Date(m.ultimaPublicacao).toLocaleDateString("pt-BR") : "—"}
                 </td>
                 <td className="px-4 py-2.5">
-                  <div className="flex items-center justify-end gap-1 text-xs text-[var(--action-primary-ink)]/50">
+                  <div className="flex items-center justify-end gap-1 text-xs text-[var(--text-muted)]">
                     <button onClick={() => setAbertoId(m.id)} className="rounded px-1.5 py-0.5 hover:bg-[var(--surface-hover)] hover:text-[var(--action-primary-ink)]">Versões</button>
                     <button onClick={() => setForm(m)} className="rounded px-1.5 py-0.5 hover:bg-[var(--surface-hover)] hover:text-[var(--action-primary-ink)]">Editar</button>
                   </div>
@@ -231,16 +231,16 @@ export default function ModelosDocumentaisTab() {
 
       {variaveis.length > 0 && (
         <div className="rounded-2xl border border-[var(--border-default)] bg-[var(--surface-primary)] p-5 backdrop-blur-sm">
-          <h3 className="text-sm font-semibold text-[var(--action-primary-ink)]">Variáveis reconhecidas</h3>
-          <p className="mt-1 text-xs text-[var(--action-primary-ink)]/50">
+          <h3 className="text-sm font-semibold text-[var(--text-primary)]">Variáveis reconhecidas</h3>
+          <p className="mt-1 text-xs text-[var(--text-muted)]">
             Use estas chaves entre chaves duplas dentro do DOCX. Qualquer outra reprova a publicação.
           </p>
           <div className="mt-3 grid gap-2 md:grid-cols-2 xl:grid-cols-3">
             {variaveis.map((v) => (
               <div key={v.chave} className="rounded-lg border border-[var(--border-default)] bg-[var(--surface-primary)] px-3 py-2">
                 <code className="text-[11px] text-blue-700">{`{{${v.chave}}}`}</code>
-                <div className="mt-0.5 text-xs text-[var(--action-primary-ink)]/70">{v.rotulo}</div>
-                <div className="text-[10px] text-[var(--action-primary-ink)]/40">
+                <div className="mt-0.5 text-xs text-[var(--text-secondary)]">{v.rotulo}</div>
+                <div className="text-[10px] text-[var(--text-muted)]">
                   {v.exigidaQuandoUsada ? "Obrigatória quando usada" : "Opcional"} · cadastro: {v.campo}
                 </div>
               </div>
@@ -283,7 +283,7 @@ function FormularioModelo({
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-[var(--overlay-modal)] p-4 backdrop-blur-sm" onClick={() => setForm(null)}>
       <div className="w-full max-w-lg rounded-2xl border border-[var(--border-default)] bg-zinc-900/95 shadow-2xl" onClick={(e) => e.stopPropagation()}>
         <div className="border-b border-[var(--border-default)] px-6 py-4">
-          <h3 className="font-semibold text-[var(--action-primary-ink)]">{form.id ? "Editar" : "Novo"} modelo</h3>
+          <h3 className="font-semibold text-[var(--text-primary)]">{form.id ? "Editar" : "Novo"} modelo</h3>
         </div>
         <div className="space-y-3 px-6 py-4">
           <div className="grid grid-cols-2 gap-3">
@@ -324,13 +324,13 @@ function FormularioModelo({
               ))}
             </select>
           </div>
-          <label className="flex items-center gap-2 text-sm text-[var(--action-primary-ink)]/70">
+          <label className="flex items-center gap-2 text-sm text-[var(--text-secondary)]">
             <input type="checkbox" checked={form.ativo ?? true} onChange={(e) => setForm({ ...form, ativo: e.target.checked })} />
             Ativo
           </label>
         </div>
         <div className="flex justify-end gap-2 border-t border-[var(--border-default)] px-6 py-4">
-          <button onClick={() => setForm(null)} className="rounded-lg border border-[var(--border-default)] bg-[var(--surface-primary)] px-4 py-2 text-sm text-[var(--action-primary-ink)]/80 hover:bg-[var(--surface-hover)]">Cancelar</button>
+          <button onClick={() => setForm(null)} className="rounded-lg border border-[var(--border-default)] bg-[var(--surface-primary)] px-4 py-2 text-sm text-[var(--text-secondary)] hover:bg-[var(--surface-hover)]">Cancelar</button>
           <button disabled={busy} onClick={salvar} className="rounded-lg bg-[var(--action-primary)] px-4 py-2 text-sm font-medium text-[var(--action-primary-ink)] hover:bg-[var(--action-primary)] disabled:opacity-50">Salvar</button>
         </div>
       </div>
@@ -405,8 +405,8 @@ function PainelVersoes({
       <div className="my-8 w-full max-w-5xl rounded-2xl border border-[var(--border-default)] bg-zinc-900/95 shadow-2xl" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-start justify-between border-b border-[var(--border-default)] px-6 py-4">
           <div>
-            <h3 className="font-semibold text-[var(--action-primary-ink)]">{modelo?.nome ?? "Modelo"}</h3>
-            <p className="text-xs text-[var(--action-primary-ink)]/50">
+            <h3 className="font-semibold text-[var(--text-primary)]">{modelo?.nome ?? "Modelo"}</h3>
+            <p className="text-xs text-[var(--text-muted)]">
               {modelo?.codigo} · {modelo ? (ROTULO_CATEGORIA[modelo.categoria] ?? modelo.categoria) : ""} ·{" "}
               {modelo?.documentType.name}
             </p>
@@ -421,37 +421,37 @@ function PainelVersoes({
             accept=".docx"
             disabled={busy}
             onChange={(e) => { const f = e.target.files?.[0]; if (f) void enviarDocx(f); e.target.value = "" }}
-            className="text-xs text-[var(--action-primary-ink)]/70 file:mr-3 file:rounded-lg file:border-0 file:bg-blue-600 file:px-3 file:py-1.5 file:text-xs file:text-[#fff] hover:file:bg-blue-500"
+            className="text-xs text-[var(--action-primary-ink)]/70 file:mr-3 file:rounded-lg file:border-0 file:bg-[var(--action-primary)] file:px-3 file:py-1.5 file:text-xs file:text-[var(--action-primary-ink)] hover:file:bg-[var(--action-primary)]"
           />
-          <p className="mt-1 text-[11px] text-[var(--action-primary-ink)]/40">
+          <p className="mt-1 text-[11px] text-[var(--text-muted)]">
             A versão nasce em rascunho. Publicada nunca é editada — alteração de redação exige versão nova.
           </p>
         </div>
 
         <div className="px-6 py-4">
           {detalhe.carregando ? (
-            <div className="py-8 text-center text-xs text-[var(--action-primary-ink)]/40">Carregando…</div>
+            <div className="py-8 text-center text-xs text-[var(--text-muted)]">Carregando…</div>
           ) : !modelo?.versoes?.length ? (
-            <div className="py-8 text-center text-xs text-[var(--action-primary-ink)]/40">Nenhuma versão enviada.</div>
+            <div className="py-8 text-center text-xs text-[var(--text-muted)]">Nenhuma versão enviada.</div>
           ) : (
             <div className="space-y-3">
               {modelo.versoes.map((v) => (
                 <div key={v.id} className="rounded-xl border border-[var(--border-default)] bg-[var(--surface-primary)] p-4">
                   <div className="flex flex-wrap items-center justify-between gap-2">
                     <div className="flex items-center gap-2">
-                      <span className="text-sm font-medium text-[var(--action-primary-ink)]">Versão {v.numero}</span>
+                      <span className="text-sm font-medium text-[var(--text-primary)]">Versão {v.numero}</span>
                       <span className={`rounded-full px-2 py-0.5 text-[10px] ${CORES_STATUS[v.status]}`}>{v.status}</span>
                       {(v._count?.geracoes ?? 0) > 0 && (
-                        <span className="rounded bg-[var(--surface-primary)] px-1.5 py-0.5 text-[10px] text-[var(--action-primary-ink)]/50">
+                        <span className="rounded bg-[var(--surface-primary)] px-1.5 py-0.5 text-[10px] text-[var(--text-muted)]">
                           {v._count!.geracoes} documento(s) gerado(s)
                         </span>
                       )}
                     </div>
-                    <div className="flex items-center gap-1 text-xs text-[var(--action-primary-ink)]/50">
+                    <div className="flex items-center gap-1 text-xs text-[var(--text-muted)]">
                       <button onClick={() => void baixar(v.id)} className="rounded px-1.5 py-0.5 hover:bg-[var(--surface-hover)] hover:text-[var(--action-primary-ink)]">Baixar</button>
                       <button disabled={busy} onClick={() => void agir(v.id, "validar")} className="rounded px-1.5 py-0.5 hover:bg-[var(--surface-hover)] hover:text-[var(--action-primary-ink)] disabled:opacity-40">Validar</button>
                       {v.status === "RASCUNHO" && (
-                        <button disabled={busy} onClick={() => void agir(v.id, "publicar")} className="rounded bg-green-600/80 px-2 py-0.5 text-[#fff] hover:bg-green-600 disabled:opacity-40">Publicar</button>
+                        <button disabled={busy} onClick={() => void agir(v.id, "publicar")} className="rounded bg-green-600/80 px-2 py-0.5 text-[var(--action-primary-ink)] hover:bg-green-800 disabled:opacity-40">Publicar</button>
                       )}
                       {v.status !== "REVOGADA" && (
                         <button disabled={busy} onClick={() => void agir(v.id, "revogar")} className="rounded px-1.5 py-0.5 text-red-700/70 hover:bg-red-50 hover:text-red-700 disabled:opacity-40">Revogar</button>
@@ -459,14 +459,14 @@ function PainelVersoes({
                     </div>
                   </div>
 
-                  <dl className="mt-3 grid gap-x-6 gap-y-1 text-xs text-[var(--action-primary-ink)]/50 sm:grid-cols-2 lg:grid-cols-4">
-                    <div><dt className="inline text-[var(--action-primary-ink)]/40">Arquivo: </dt><dd className="inline text-white/70">{v.arquivoNome}</dd></div>
-                    <div><dt className="inline text-[var(--action-primary-ink)]/40">Criada: </dt><dd className="inline text-white/70">{new Date(v.criadoEm).toLocaleString("pt-BR")}</dd></div>
-                    <div><dt className="inline text-[var(--action-primary-ink)]/40">Autor: </dt><dd className="inline text-white/70">{v.criadoPor?.nome ?? "—"}</dd></div>
-                    <div><dt className="inline text-[var(--action-primary-ink)]/40">Publicada: </dt><dd className="inline text-white/70">{v.publicadoEm ? `${new Date(v.publicadoEm).toLocaleString("pt-BR")} · ${v.publicadoPor?.nome ?? "—"}` : "—"}</dd></div>
+                  <dl className="mt-3 grid gap-x-6 gap-y-1 text-xs text-[var(--text-muted)] sm:grid-cols-2 lg:grid-cols-4">
+                    <div><dt className="inline text-[var(--text-muted)]">Arquivo: </dt><dd className="inline text-white/70">{v.arquivoNome}</dd></div>
+                    <div><dt className="inline text-[var(--text-muted)]">Criada: </dt><dd className="inline text-white/70">{new Date(v.criadoEm).toLocaleString("pt-BR")}</dd></div>
+                    <div><dt className="inline text-[var(--text-muted)]">Autor: </dt><dd className="inline text-white/70">{v.criadoPor?.nome ?? "—"}</dd></div>
+                    <div><dt className="inline text-[var(--text-muted)]">Publicada: </dt><dd className="inline text-white/70">{v.publicadoEm ? `${new Date(v.publicadoEm).toLocaleString("pt-BR")} · ${v.publicadoPor?.nome ?? "—"}` : "—"}</dd></div>
                     <div className="sm:col-span-2 lg:col-span-4">
-                      <dt className="inline text-[var(--action-primary-ink)]/40">Checksum: </dt>
-                      <dd className="inline break-all font-mono text-[10px] text-[var(--action-primary-ink)]/60">{v.checksum}</dd>
+                      <dt className="inline text-[var(--text-muted)]">Checksum: </dt>
+                      <dd className="inline break-all font-mono text-[10px] text-[var(--text-secondary)]">{v.checksum}</dd>
                     </div>
                   </dl>
 
@@ -488,27 +488,27 @@ function PainelVersoes({
                       <div className={`text-xs font-medium ${validacao.resultado.ok ? "text-green-700" : "text-red-700"}`}>
                         {validacao.resultado.ok ? "Validação aprovada — pode publicar." : "Validação reprovada."}
                       </div>
-                      <ul className="mt-2 space-y-1 text-[11px] text-[var(--action-primary-ink)]/60">
+                      <ul className="mt-2 space-y-1 text-[11px] text-[var(--text-secondary)]">
                         {validacao.resultado.achados.map((a, i) => (
                           <li key={i}>
                             <span className={a.severidade === "erro" ? "text-red-700" : "text-amber-700"}>■</span>{" "}
-                            {a.mensagem} {a.detalhe && <span className="text-[var(--action-primary-ink)]/40">{a.detalhe}</span>}
+                            {a.mensagem} {a.detalhe && <span className="text-[var(--text-muted)]">{a.detalhe}</span>}
                           </li>
                         ))}
-                        {validacao.resultado.achados.length === 0 && <li className="text-[var(--action-primary-ink)]/40">Nenhum achado.</li>}
+                        {validacao.resultado.achados.length === 0 && <li className="text-[var(--text-muted)]">Nenhum achado.</li>}
                       </ul>
 
                       {validacao.resultado.naoDeclarados.length > 0 && (
                         <div className="mt-3">
-                          <p className="text-[11px] text-[var(--action-primary-ink)]/50">
-                            Confirme quais números são <strong className="text-[var(--action-primary-ink)]/70">dados fixos do outorgado</strong> e
+                          <p className="text-[11px] text-[var(--text-muted)]">
+                            Confirme quais números são <strong className="text-[var(--text-secondary)]">dados fixos do outorgado</strong> e
                             devem permanecer no texto:
                           </p>
                           <div className="mt-1 space-y-1">
                             {validacao.resultado.naoDeclarados.map((l) => {
                               const marcado = (declarados[v.id] ?? []).includes(l.digitos)
                               return (
-                                <label key={l.digitos} className="flex items-center gap-2 text-[11px] text-[var(--action-primary-ink)]/70">
+                                <label key={l.digitos} className="flex items-center gap-2 text-[11px] text-[var(--text-secondary)]">
                                   <input
                                     type="checkbox"
                                     checked={marcado}
@@ -521,7 +521,7 @@ function PainelVersoes({
                                       }))
                                     }
                                   />
-                                  <span className="uppercase text-[var(--action-primary-ink)]/40">{l.tipo}</span> {l.valor}
+                                  <span className="uppercase text-[var(--text-muted)]">{l.tipo}</span> {l.valor}
                                 </label>
                               )
                             })}
@@ -529,7 +529,7 @@ function PainelVersoes({
                           <button
                             disabled={busy}
                             onClick={() => void agir(v.id, "validar")}
-                            className="mt-2 rounded-lg border border-[var(--border-default)] bg-[var(--surface-primary)] px-3 py-1 text-[11px] text-[var(--action-primary-ink)]/80 hover:bg-[var(--surface-hover)] disabled:opacity-40"
+                            className="mt-2 rounded-lg border border-[var(--border-default)] bg-[var(--surface-primary)] px-3 py-1 text-[11px] text-[var(--text-secondary)] hover:bg-[var(--surface-hover)] disabled:opacity-40"
                           >
                             Revalidar com as declarações
                           </button>

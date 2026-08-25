@@ -181,15 +181,15 @@ export default function MoedasTab() {
 
             <div className="space-y-4 px-6 py-4">
               <div>
-                <label className="mb-1 block text-xs text-white/60">Código *</label>
+                <label className="mb-1 block text-xs text-[var(--text-secondary)]">Código *</label>
                 <input value={code} onChange={(e) => setCode(e.target.value)} autoFocus placeholder="EUR" className={inputCls} />
               </div>
               <div>
-                <label className="mb-1 block text-xs text-white/60">Nome</label>
+                <label className="mb-1 block text-xs text-[var(--text-secondary)]">Nome</label>
                 <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Euro" className={inputCls} />
               </div>
               <div>
-                <label className="mb-1 block text-xs text-white/60">Símbolo</label>
+                <label className="mb-1 block text-xs text-[var(--text-secondary)]">Símbolo</label>
                 <input value={symbol} onChange={(e) => setSymbol(e.target.value)} placeholder="€" className={inputCls} />
               </div>
 
@@ -199,7 +199,7 @@ export default function MoedasTab() {
             </div>
 
             <div className="flex items-center justify-end gap-2 border-t border-[var(--border-default)] px-6 py-4">
-              <button onClick={() => setModalAberto(false)} className="rounded-lg px-4 py-2 text-sm text-white/60 transition hover:text-white">Cancelar</button>
+              <button onClick={() => setModalAberto(false)} className="rounded-lg px-4 py-2 text-sm text-[var(--text-secondary)] transition hover:text-white">Cancelar</button>
               <button onClick={salvar} disabled={salvando} className="rounded-lg bg-[var(--action-primary)] px-4 py-2 text-sm font-medium text-[var(--action-primary-ink)] transition hover:bg-[var(--action-primary)] disabled:opacity-50">
                 {salvando ? 'Salvando...' : 'Salvar'}
               </button>

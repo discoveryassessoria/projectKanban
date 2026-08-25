@@ -218,7 +218,7 @@ export function HeaderBar({
           {/* Horário e Data */}
           <div className="hidden lg:flex flex-col items-end">
             <span className="text-sm font-medium text-white">{currentTime}</span>
-            <span className="text-[11px] text-white/60">{currentDate}</span>
+            <span className="text-[11px] text-[var(--text-secondary)]">{currentDate}</span>
           </div>
 
           {/* Divisor */}
@@ -229,7 +229,7 @@ export function HeaderBar({
             <div className="flex items-center gap-2 px-3 py-2 rounded-full border border-[var(--border-strong)]">
               <Search className="h-4 w-4 text-white/70" />
               <input
-                className="bg-transparent text-xs outline-none placeholder:text-white/60 w-40 text-white"
+                className="bg-transparent text-xs outline-none placeholder:text-[var(--text-secondary)] w-40 text-white"
                 placeholder="Pesquisar processos..."
                 value={searchQuery}
                 onChange={(e) => handleSearch(e.target.value)}
@@ -419,7 +419,7 @@ export function HeaderBar({
             variant="outline"
             size="sm"
             onClick={onLogout}
-            className="border-[var(--border-strong)] text-xs bg-transparent hover:bg-red-50 hover:border-red-200 text-[#fff] hover:text-red-700 flex items-center justify-center gap-1.5"
+            className="border-[var(--border-strong)] text-xs bg-transparent hover:bg-red-50 hover:border-red-200 text-[var(--text-primary)] hover:text-red-700 flex items-center justify-center gap-1.5"
           >
             <LogOut className="h-3 w-3" />
             Sair

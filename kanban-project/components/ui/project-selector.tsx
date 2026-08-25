@@ -52,7 +52,7 @@ export function ProjectSelector({
           variant="outline"
           role="combobox"
           aria-expanded={open}
-          className={cn("justify-between min-h-[40px] bg-white border-gray-300 text-gray-900 hover:bg-gray-50", className)}
+          className={cn("justify-between min-h-[40px] bg-[var(--surface-primary)] border-gray-300 text-[var(--text-primary)] hover:bg-[var(--surface-secondary)]", className)}
           disabled={disabled}
         >
           <span className="truncate text-left">

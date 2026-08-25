@@ -88,7 +88,7 @@ export default function AplicabilidadeEconomicaTab() {
       : (
         <div className="overflow-hidden rounded-xl ring-1 ring-white/10">
           <table className="w-full text-sm">
-            <thead className="bg-[var(--surface-primary)] text-left text-white/60"><tr>
+            <thead className="bg-[var(--surface-primary)] text-left text-[var(--text-secondary)]"><tr>
               <th className="px-3 py-2">Fase</th><th className="px-3 py-2">Componente</th><th className="px-3 py-2">Processo</th><th className="px-3 py-2">Doc</th><th className="px-3 py-2">Custo</th><th className="px-3 py-2">Receita</th><th className="px-3 py-2">Planilha</th><th className="px-3 py-2">Status</th><th className="px-3 py-2 text-right">Ações</th>
             </tr></thead>
             <tbody>
@@ -96,8 +96,8 @@ export default function AplicabilidadeEconomicaTab() {
                 <tr key={r.id} className="border-t border-[var(--border-subtle)]">
                   <td className="px-3 py-2">{faseLabel(r.phaseKey)}</td>
                   <td className="px-3 py-2 font-medium">{r.componentName}{r.appliesTo !== 'any' && <span className="ml-1.5 text-[10px] text-[var(--text-muted)]">· {APPLIES.find(([v]) => v === r.appliesTo)?.[1]}</span>}</td>
-                  <td className="px-3 py-2 text-white/60">{procName(r.tipoProcessoId)}</td>
-                  <td className="px-3 py-2 text-white/60">{r.documentTypeCode || '—'}</td>
+                  <td className="px-3 py-2 text-[var(--text-secondary)]">{procName(r.tipoProcessoId)}</td>
+                  <td className="px-3 py-2 text-[var(--text-secondary)]">{r.documentTypeCode || '—'}</td>
                   <td className="px-3 py-2 font-mono text-xs">{r.custoProdutoCode || <span className="text-amber-700/70">[AJUSTAR]</span>}</td>
                   <td className="px-3 py-2 font-mono text-xs">{r.receitaProdutoCode || <span className="text-amber-700/70">[AJUSTAR]</span>}</td>
                   <td className="px-3 py-2">{r.participaPlanilha ? '✓' : '—'}</td>
@@ -148,7 +148,7 @@ export default function AplicabilidadeEconomicaTab() {
               <label className="flex items-center gap-2"><input type="checkbox" checked={form.ativo} onChange={e => setForm(f => f && { ...f, ativo: e.target.checked })} /> <span className="text-white/70">Ativo</span></label>
             </div>
             <div className="mt-5 flex justify-end gap-2">
-              <button onClick={() => setForm(null)} disabled={salvando} className="rounded-lg px-3 py-2 text-sm text-white/60 hover:bg-[var(--surface-hover)]">Cancelar</button>
+              <button onClick={() => setForm(null)} disabled={salvando} className="rounded-lg px-3 py-2 text-sm text-[var(--text-secondary)] hover:bg-[var(--surface-hover)]">Cancelar</button>
               <button onClick={salvar} disabled={salvando} className="rounded-lg bg-[var(--action-primary)] px-4 py-2 text-sm font-medium hover:bg-[var(--action-primary)] disabled:opacity-50">{salvando ? 'Salvando…' : 'Salvar'}</button>
             </div>
           </div>

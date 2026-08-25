@@ -102,11 +102,11 @@ export function SystemHealthTab() {
       <Section title="Saúde do Sistema" action={<button disabled title={TITULO_RASCUNHO} className={BTN_RASCUNHO}>Rodar Auditoria Executiva</button>} />
       <div className="mb-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
         <Kpi value="—" label="Score geral" />
-        <Kpi value="0" label="Erros críticos" color="#4ade80" />
-        <Kpi value="0" label="Alertas" color="#fbbf24" />
+        <Kpi value="0" label="Erros críticos" color="#15803d" />
+        <Kpi value="0" label="Alertas" color="#b45309" />
         <Kpi value="0/0" label="Tipos prontos" color="#60a5fa" />
-        <Kpi value="0" label="Tipos incompletos" color="#4ade80" />
-        <Kpi value="0" label="Regras sem contexto" color="#4ade80" />
+        <Kpi value="0" label="Tipos incompletos" color="#15803d" />
+        <Kpi value="0" label="Regras sem contexto" color="#15803d" />
         <Kpi value="0" label="Recomendações" />
         <Kpi value="—" label="Pronto p/ protótipo" />
       </div>

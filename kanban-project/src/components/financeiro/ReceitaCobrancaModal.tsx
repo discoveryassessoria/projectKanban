@@ -14,7 +14,8 @@ import { authToken } from "@/src/lib/financeiro/http"
 import { fmtMoeda as brl } from "@/src/lib/financeiro/formato"
 import { useChaveIdempotencia } from "@/src/lib/financeiro/useChaveIdempotencia"
 
-const OURO = '#D2A948'
+const OURO = 'var(--accent-primary)'
+const OURO_TINTA = 'var(--accent-text)'
 const GLASS = 'rounded-xl border border-[var(--border-default)] bg-[var(--surface-primary)] backdrop-blur-md'
 const dt = (s: any) => (s ? new Date(s).toLocaleDateString('pt-BR') : '—')
 
@@ -99,7 +100,7 @@ export function ReceitaCobrancaModal({ receitaId, onClose, onChanged }: { receit
         <div className="flex items-center justify-between border-b border-[var(--border-default)] px-6 py-4">
           <div>
             <div className="flex items-center gap-2">
-              <ReceiptText className="h-4 w-4" style={{ color: OURO }} />
+              <ReceiptText className="h-4 w-4" style={{ color: OURO_TINTA }} />
               <h3 className="text-base font-semibold">Receita {r.codigo ? `· ${r.codigo}` : ''}</h3>
             </div>
             <p className="mt-0.5 text-xs text-[var(--text-secondary)]">{r.descricao || 'Compromisso financeiro gerado pelo motor'}</p>
@@ -132,7 +133,7 @@ export function ReceitaCobrancaModal({ receitaId, onClose, onChanged }: { receit
           {cobrancas.length === 0 ? (
             <div className={`${GLASS} flex flex-col items-center px-6 py-10 text-center`}>
               <div className="mb-3 grid h-12 w-12 place-items-center rounded-full border" style={{ borderColor: `${OURO}40`, background: `${OURO}1f` }}>
-                <CreditCard className="h-6 w-6" style={{ color: OURO }} />
+                <CreditCard className="h-6 w-6" style={{ color: OURO_TINTA }} />
               </div>
               <h4 className="text-base font-semibold">Esta receita ainda não possui uma cobrança</h4>
               <p className="mx-auto mt-1 max-w-sm text-sm text-[var(--text-secondary)]">Para iniciar o processo financeiro, escolha como o cliente irá pagar esta receita.</p>
@@ -167,8 +168,8 @@ function CobrancaCard({ cobranca, moeda, onPago }: { cobranca: any; moeda: strin
   return (
     <div className={`${GLASS} p-4`}>
       <div className="mb-3 flex items-center justify-between">
-        <div className="flex items-center gap-2 text-sm font-semibold"><CalendarClock className="h-4 w-4" style={{ color: OURO }} /> Cobrança #{cobranca.id} · {parcelas.length}x</div>
-        <span className={`rounded-full border px-2 py-0.5 text-[11px] ${statusCls[cobranca.status] || 'border-[var(--border-default)] text-white/60'}`}>{cobranca.status}</span>
+        <div className="flex items-center gap-2 text-sm font-semibold"><CalendarClock className="h-4 w-4" style={{ color: OURO_TINTA }} /> Cobrança #{cobranca.id} · {parcelas.length}x</div>
+        <span className={`rounded-full border px-2 py-0.5 text-[11px] ${statusCls[cobranca.status] || 'border-[var(--border-default)] text-[var(--text-secondary)]'}`}>{cobranca.status}</span>
       </div>
       <div className="overflow-hidden rounded-lg border border-[var(--border-default)]">
         <table className="w-full text-[13px]">
@@ -366,12 +367,12 @@ function CobrancaWizard({ receitaId, valor, moeda, receita, onClose, onCriada }:
           <p className="mb-1.5 text-[11px] font-semibold uppercase tracking-wide text-[var(--text-secondary)]">Cronograma de parcelas</p>
           <div className="overflow-x-auto rounded-lg border border-[var(--border-default)]">
             <table className="w-full text-[13px]"><thead><tr className="bg-[var(--surface-primary)] text-left text-[11px] uppercase tracking-wide text-[var(--text-secondary)]"><th className="px-3 py-2">#</th><th className="px-3 py-2">Descrição</th><th className="px-3 py-2">Vencimento</th><th className="px-3 py-2 text-right">Valor ({moeda})</th>{temConv && <th className="px-3 py-2 text-right">Valor ({destino})</th>}</tr></thead><tbody>
-              {(sim.parcelas ?? []).map((p: any) => <tr key={p.numero} className="border-t border-[var(--border-subtle)]"><td className="px-3 py-1.5 text-white/60">{p.numero}</td><td className="px-3 py-1.5 text-white/70">{p.entrada ? 'Entrada' : `Parcela ${p.entrada ? '' : p.numero}`}</td><td className="px-3 py-1.5 text-white/70">{dt(p.vencimento)}</td><td className="px-3 py-1.5 text-right tabular-nums">{brl(p.valor, moeda)}</td>{temConv && <td className="px-3 py-1.5 text-right tabular-nums text-white/70">{brl(emDest(p.valor), destino!)}</td>}</tr>)}
+              {(sim.parcelas ?? []).map((p: any) => <tr key={p.numero} className="border-t border-[var(--border-subtle)]"><td className="px-3 py-1.5 text-[var(--text-secondary)]">{p.numero}</td><td className="px-3 py-1.5 text-white/70">{p.entrada ? 'Entrada' : `Parcela ${p.entrada ? '' : p.numero}`}</td><td className="px-3 py-1.5 text-white/70">{dt(p.vencimento)}</td><td className="px-3 py-1.5 text-right tabular-nums">{brl(p.valor, moeda)}</td>{temConv && <td className="px-3 py-1.5 text-right tabular-nums text-white/70">{brl(emDest(p.valor), destino!)}</td>}</tr>)}
             </tbody></table>
           </div>
         </div>
         {Array.isArray(sim.memoria) && (
-          <details className="text-[11px] text-[var(--text-secondary)]"><summary className="cursor-pointer text-white/60">Memória de cálculo</summary>
+          <details className="text-[11px] text-[var(--text-secondary)]"><summary className="cursor-pointer text-[var(--text-secondary)]">Memória de cálculo</summary>
             <div className="mt-1 space-y-0.5 rounded-lg border border-[var(--border-default)] bg-black/20 p-2">{sim.memoria.map((m: string, i: number) => <div key={i}>{m}</div>)}</div>
           </details>
         )}
@@ -385,7 +386,7 @@ function CobrancaWizard({ receitaId, valor, moeda, receita, onClose, onCriada }:
     return (
       <div className="fixed inset-0 z-[60] flex items-center justify-center bg-[var(--overlay-modal)] p-6 backdrop-blur-sm" onClick={() => onCriada()}>
         <div className="w-full max-w-md rounded-2xl border border-[var(--border-default)] bg-zinc-900/95 p-6 text-center text-white shadow-2xl" onClick={(e) => e.stopPropagation()}>
-          <div className="mx-auto mb-3 grid h-14 w-14 place-items-center rounded-full" style={{ background: `${OURO}22`, color: OURO }}><Check className="h-7 w-7" /></div>
+          <div className="mx-auto mb-3 grid h-14 w-14 place-items-center rounded-full" style={{ background: `${OURO}22`, color: OURO_TINTA }}><Check className="h-7 w-7" /></div>
           <h3 className="text-lg font-semibold">Cobrança criada com sucesso</h3>
           <p className="mt-1 text-sm text-[var(--text-secondary)]">A cobrança foi gerada e vinculada à receita.</p>
           <div className={`${GLASS} mt-4 space-y-1 p-4 text-left text-sm`}>
@@ -419,9 +420,9 @@ function CobrancaWizard({ receitaId, valor, moeda, receita, onClose, onCriada }:
         <div className="flex flex-wrap gap-2 border-b border-[var(--border-default)] px-6 py-3">
           {PASSOS.map((p) => (
             <div key={p.n} className={`flex min-w-0 flex-1 items-center gap-2 rounded-lg border px-3 py-2 ${step === p.n ? 'border-[var(--border-strong)] bg-[var(--surface-primary)]' : 'border-transparent'}`}>
-              <span className="grid h-6 w-6 shrink-0 place-items-center rounded-full border text-[11px]" style={step === p.n ? { background: OURO, borderColor: OURO, color: '#1b1508' } : step > p.n ? { borderColor: '#34d39955', background: '#34d39914', color: '#6ee7b7' } : { borderColor: 'rgba(255,255,255,0.15)', color: 'rgba(255,255,255,0.5)' }}>{step > p.n ? <Check className="h-3.5 w-3.5" /> : p.n}</span>
+              <span className="grid h-6 w-6 shrink-0 place-items-center rounded-full border text-[11px]" style={step === p.n ? { background: OURO, borderColor: OURO, color: '#1b1508' } : step > p.n ? { borderColor: '#34d39955', background: '#34d39914', color: '#6ee7b7' } : { borderColor: 'rgba(255,255,255,0.15)', color: 'var(--text-muted)' }}>{step > p.n ? <Check className="h-3.5 w-3.5" /> : p.n}</span>
               <div className="min-w-0">
-                <p className={`truncate text-[13px] font-medium ${step === p.n ? 'text-white' : 'text-white/60'}`}>{p.label}</p>
+                <p className={`truncate text-[13px] font-medium ${step === p.n ? 'text-white' : 'text-[var(--text-secondary)]'}`}>{p.label}</p>
                 <p className="truncate text-[10px] text-[var(--text-muted)]">{p.desc}</p>
               </div>
             </div>
@@ -434,7 +435,7 @@ function CobrancaWizard({ receitaId, valor, moeda, receita, onClose, onCriada }:
           {!cfg && <p className="text-sm text-[var(--text-secondary)]">Carregando configuração…</p>}
           {erro && <div className="rounded-lg border border-red-200 bg-red-50 p-2 text-sm text-red-700">{erro}</div>}
 
-          {cfg && step === 1 && (<div className="space-y-3"><div><label className="mb-1 block text-xs text-white/60">Forma de pagamento</label>
+          {cfg && step === 1 && (<div className="space-y-3"><div><label className="mb-1 block text-xs text-[var(--text-secondary)]">Forma de pagamento</label>
             <select className={sel} value={formaEfetivaId ?? ''} onChange={(e) => { const id = Number(e.target.value) || undefined; setF({ ...f, formaPagamentoId: id, adquirenteId: undefined, bandeiraId: undefined }) }}>
               <option value="" className="bg-zinc-900">Selecione</option>
               {formasDisponiveis.map((x: any) => <option key={x.id} value={x.id} className="bg-zinc-900">{x.name}{condicao?.formaPadraoId === x.id ? ' · padrão' : ''}</option>)}
@@ -443,12 +444,12 @@ function CobrancaWizard({ receitaId, valor, moeda, receita, onClose, onCriada }:
             {!!permitidas.length && <p className="mt-1 text-[11px] text-[var(--text-muted)]">Somente as formas permitidas pela condição selecionada.</p>}
             </div>
             {ehCartao && (<>
-              <div><label className="mb-1 block text-xs text-white/60">Adquirente {ehCartaoCredito ? '' : '(opcional)'}</label>
+              <div><label className="mb-1 block text-xs text-[var(--text-secondary)]">Adquirente {ehCartaoCredito ? '' : '(opcional)'}</label>
                 <select className={sel} value={f.adquirenteId ?? ''} onChange={(e) => setF({ ...f, adquirenteId: Number(e.target.value) || undefined })}>
                   <option value="" className="bg-zinc-900">Selecione</option>
                   {adqOpcoes.map((a: any) => <option key={a.id} value={a.id} className="bg-zinc-900">{a.nome}</option>)}
                 </select></div>
-              <div><label className="mb-1 block text-xs text-white/60">Bandeira do cartão *</label>
+              <div><label className="mb-1 block text-xs text-[var(--text-secondary)]">Bandeira do cartão *</label>
                 <select className={sel} value={f.bandeiraId ?? ''} onChange={(e) => setF({ ...f, bandeiraId: Number(e.target.value) || undefined })}>
                   <option value="" className="bg-zinc-900">Selecione</option>
                   {(cfg.bandeiras ?? []).map((b: any) => <option key={b.id} value={b.id} className="bg-zinc-900">{b.nome}</option>)}
@@ -458,29 +459,29 @@ function CobrancaWizard({ receitaId, valor, moeda, receita, onClose, onCriada }:
             </div>)}
 
           {cfg && step === 2 && (<div className="space-y-3">
-            <div><label className="mb-1 block text-xs text-white/60">Condição de pagamento</label>
+            <div><label className="mb-1 block text-xs text-[var(--text-secondary)]">Condição de pagamento</label>
               <select className={sel} value={f.condicaoPagamentoId ?? ''} onChange={(e) => setF({ ...f, condicaoPagamentoId: Number(e.target.value) || undefined })}>
                 <option value="" className="bg-zinc-900">Selecione</option>
                 {cfg.condicoesPagamento.filter((c: any) => c.aplicaA !== 'CUSTO').map((x: any) => <option key={x.id} value={x.id} className="bg-zinc-900">{x.name} ({x.tipoPagamento})</option>)}
               </select></div>
             {condicao && condicao.tipoPagamento === 'PARCELADO' && (
-              <div><label className="mb-1 block text-xs text-white/60">Quantidade de parcelas {condicao.parcelasMin || condicao.parcelasMax ? `(${condicao.parcelasMin ?? 1}–${condicao.parcelasMax ?? '—'})` : ''}</label>
+              <div><label className="mb-1 block text-xs text-[var(--text-secondary)]">Quantidade de parcelas {condicao.parcelasMin || condicao.parcelasMax ? `(${condicao.parcelasMin ?? 1}–${condicao.parcelasMax ?? '—'})` : ''}</label>
                 <input type="number" min={1} className={sel} value={nParcelas} placeholder={String(condicao.parcelasPadrao || 1)} onChange={(e) => setNParcelas(e.target.value === '' ? '' : Number(e.target.value))} /></div>
             )}
             {condicao?.temEntrada && (
-              <div><label className="mb-1 block text-xs text-white/60">Entrada (opcional · PIX/Transferência, à parte)</label>
+              <div><label className="mb-1 block text-xs text-[var(--text-secondary)]">Entrada (opcional · PIX/Transferência, à parte)</label>
                 <input type="number" min={0} step="0.01" className={sel} value={f.entradaValor ?? ''} placeholder="0,00" onChange={(e) => setF({ ...f, entradaValor: e.target.value === '' ? undefined : Number(e.target.value) })} />
                 <p className="mt-1 text-[11px] text-[var(--text-muted)]">A entrada é paga à parte e NÃO recebe taxa de cartão/boleto. O saldo é parcelado.</p></div>
             )}
           </div>)}
 
           {cfg && step === 3 && (<div className="space-y-3">
-            <div><label className="mb-1 block text-xs text-white/60">Carteira de recebimento</label>
+            <div><label className="mb-1 block text-xs text-[var(--text-secondary)]">Carteira de recebimento</label>
               <select className={sel} value={f.carteiraId ?? ''} onChange={(e) => setF({ ...f, carteiraId: Number(e.target.value) || undefined })}>
                 <option value="" className="bg-zinc-900">— (opcional)</option>
                 {cfg.carteiras.map((x: any) => <option key={x.id} value={x.id} className="bg-zinc-900">{x.nome}{x.contaNome ? ` · ${x.contaNome}` : ''}</option>)}
               </select></div>
-            <div><label className="mb-1 block text-xs text-white/60">Conta bancária</label>
+            <div><label className="mb-1 block text-xs text-[var(--text-secondary)]">Conta bancária</label>
               <select className={sel} value={f.contaBancariaId ?? ''} onChange={(e) => setF({ ...f, contaBancariaId: Number(e.target.value) || undefined })}>
                 <option value="" className="bg-zinc-900">— (opcional)</option>
                 {cfg.contasBancarias.map((x: any) => <option key={x.id} value={x.id} className="bg-zinc-900">{x.nome} · {x.moeda}</option>)}
@@ -488,9 +489,9 @@ function CobrancaWizard({ receitaId, valor, moeda, receita, onClose, onCriada }:
 
             {/* Moeda e cotação */}
             <div className="grid grid-cols-2 gap-3">
-              <div><label className="mb-1 block text-xs text-white/60">Moeda da cobrança</label>
+              <div><label className="mb-1 block text-xs text-[var(--text-secondary)]">Moeda da cobrança</label>
                 <input className={`${sel} opacity-60`} value={moeda} readOnly title="Vem da receita" /></div>
-              <div><label className="mb-1 block text-xs text-white/60">Moeda de recebimento</label>
+              <div><label className="mb-1 block text-xs text-[var(--text-secondary)]">Moeda de recebimento</label>
                 <select className={sel} value={f.moedaRecebimento ?? moeda} onChange={(e) => setF({ ...f, moedaRecebimento: e.target.value })}>
                   <option value={moeda} className="bg-zinc-900">{moeda} · mesma da receita</option>
                   {(cfg.moedas ?? []).filter((m: any) => m.code !== moeda).map((m: any) => <option key={m.code} value={m.code} className="bg-zinc-900">{m.code}{m.name ? ` · ${m.name}` : ''}</option>)}
@@ -533,7 +534,7 @@ function CobrancaWizard({ receitaId, valor, moeda, receita, onClose, onCriada }:
           {/* Resumo lateral persistente */}
           <aside className="w-full shrink-0 space-y-3 overflow-y-auto border-t border-[var(--border-default)] bg-black/20 px-5 py-5 lg:w-80 lg:border-l lg:border-t-0">
             <div className={`${GLASS} p-4`}>
-              <div className="flex items-center gap-2 text-sm font-semibold"><ReceiptText className="h-4 w-4" style={{ color: OURO }} /> Receita selecionada</div>
+              <div className="flex items-center gap-2 text-sm font-semibold"><ReceiptText className="h-4 w-4" style={{ color: OURO_TINTA }} /> Receita selecionada</div>
               <p className="mt-1 text-xs text-[var(--text-secondary)]">{receita?.codigo ?? `#${receitaId}`}{receita?.descricao ? ` · ${receita.descricao}` : ''}</p>
               <div className="mt-3 space-y-1 text-sm">
                 {linha('Valor contratado', brl(valor, moeda))}
@@ -571,7 +572,7 @@ function CobrancaWizard({ receitaId, valor, moeda, receita, onClose, onCriada }:
 
         {/* Footer */}
         <div className="flex items-center justify-between border-t border-[var(--border-default)] px-6 py-3">
-          <button onClick={() => (step > 1 ? setStep(step - 1) : onClose())} className="inline-flex items-center gap-1 text-sm text-white/60 hover:text-white"><ArrowLeft className="h-4 w-4" /> {step > 1 ? 'Voltar' : 'Cancelar'}</button>
+          <button onClick={() => (step > 1 ? setStep(step - 1) : onClose())} className="inline-flex items-center gap-1 text-sm text-[var(--text-secondary)] hover:text-white"><ArrowLeft className="h-4 w-4" /> {step > 1 ? 'Voltar' : 'Cancelar'}</button>
           <div className="flex items-center gap-3">
             <span className="text-xs text-[var(--text-muted)]">Etapa {step} de 4</span>
             {step < 4 ? (

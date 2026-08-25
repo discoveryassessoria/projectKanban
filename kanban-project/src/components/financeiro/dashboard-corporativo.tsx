@@ -19,7 +19,8 @@ import {
 // ============================================================
 // TOKENS DA REFERÊNCIA
 // ============================================================
-export const OURO = "#D2A948"
+export const OURO = 'var(--accent-primary)'
+export const OURO_TINTA = 'var(--accent-text)'
 const CARD = "rounded-xl border border-[var(--border-default)] bg-[var(--surface-primary)] backdrop-blur-md"
 
 // ============================================================
@@ -94,9 +95,9 @@ export function DashboardCorporativo({ dash, onGoTab, onClickProcesso }: {
       <div className="flex items-start justify-between flex-wrap gap-3">
         <div>
           <h2 className="text-lg font-bold text-white flex items-center gap-2">
-            <BarChart3 className="h-5 w-5" style={{ color: OURO }} /> Dashboard Corporativo
+            <BarChart3 className="h-5 w-5" style={{ color: OURO_TINTA }} /> Dashboard Corporativo
           </h2>
-          <div className="text-xs text-white/60 mt-1 flex items-center gap-2 flex-wrap">
+          <div className="text-xs text-[var(--text-secondary)] mt-1 flex items-center gap-2 flex-wrap">
             <span>{hoje.toLocaleDateString("pt-BR", { day: "2-digit", month: "long", year: "numeric" })}</span>
             <span className="text-[var(--text-muted)]">·</span>
             <span className="inline-flex items-center gap-1.5"><span className="w-1.5 h-1.5 rounded-full bg-sky-400" /><strong className="text-white">{k.processosAtivos}</strong> processos ativos</span>
@@ -172,9 +173,9 @@ export function DashboardCorporativo({ dash, onGoTab, onClickProcesso }: {
       <div className="grid grid-cols-1 lg:grid-cols-5 gap-3">
         <div className={`lg:col-span-3 ${CARD} p-4`}>
           <div className="flex items-center justify-between mb-3">
-            <div className="text-sm font-semibold text-white flex items-center gap-2"><Activity className="h-4 w-4" style={{ color: OURO }} /> Entradas vs Saídas · Últimos 6 meses</div>
+            <div className="text-sm font-semibold text-white flex items-center gap-2"><Activity className="h-4 w-4" style={{ color: OURO_TINTA }} /> Entradas vs Saídas · Últimos 6 meses</div>
             <div className="flex items-center gap-2">
-              <span className="inline-flex items-center gap-1 text-[11px] text-white/60 bg-[var(--surface-primary)] border border-[var(--border-default)] px-2 py-1 rounded-md">6 meses <span className="text-[var(--text-muted)]">▾</span></span>
+              <span className="inline-flex items-center gap-1 text-[11px] text-[var(--text-secondary)] bg-[var(--surface-primary)] border border-[var(--border-default)] px-2 py-1 rounded-md">6 meses <span className="text-[var(--text-muted)]">▾</span></span>
               <button type="button" aria-label="Opções do gráfico" className="text-[var(--text-muted)] hover:text-white/80 transition-colors">
                 <MoreVertical className="h-4 w-4" />
               </button>
@@ -190,21 +191,21 @@ export function DashboardCorporativo({ dash, onGoTab, onClickProcesso }: {
         <div className={`lg:col-span-2 ${CARD} p-4`}>
           <div className="flex items-center justify-between mb-3">
             <div className="text-sm font-semibold text-white flex items-center gap-2">
-              <AlertTriangle className="h-4 w-4" style={{ color: OURO }} /> Alertas e Aprovações
+              <AlertTriangle className="h-4 w-4" style={{ color: OURO_TINTA }} /> Alertas e Aprovações
               <span className={`text-[11px] font-bold px-2 py-0.5 rounded-full border ${
                 m.alertas.length === 0
                   ? "bg-[var(--surface-primary)] text-[var(--text-secondary)] border-[var(--border-default)]"
                   : "bg-red-50 text-red-700 border-red-200"
               }`}>{m.alertas.length}</span>
             </div>
-            <button onClick={() => onGoTab("auditoria")} className="text-xs text-white/60 hover:text-white">Ver todos</button>
+            <button onClick={() => onGoTab("auditoria")} className="text-xs text-[var(--text-secondary)] hover:text-white">Ver todos</button>
           </div>
           {m.alertas.length === 0 ? (
             <div className="flex flex-col items-center justify-center text-center py-10">
               <div className="h-12 w-12 rounded-full grid place-items-center bg-green-50 border border-green-200 mb-3">
                 <ShieldCheck className="h-6 w-6 text-green-700" />
               </div>
-              <p className="text-sm text-white/60">Nenhum alerta ou aprovação pendente</p>
+              <p className="text-sm text-[var(--text-secondary)]">Nenhum alerta ou aprovação pendente</p>
               <p className="text-xs text-[var(--text-muted)] mt-1">Tudo em dia!</p>
             </div>
           ) : (
@@ -217,7 +218,7 @@ export function DashboardCorporativo({ dash, onGoTab, onClickProcesso }: {
 
       {/* LINHA 1: Próximos Recebimentos · Pagamentos · Exposição Cambial · Atividade Recente (4 colunas, layout oficial) */}
       <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-3">
-        <ListCard icon={<Inbox className="h-4 w-4" style={{ color: OURO }} />} title="Próximos Recebimentos"
+        <ListCard icon={<Inbox className="h-4 w-4" style={{ color: OURO_TINTA }} />} title="Próximos Recebimentos"
           onVerTodos={() => onGoTab("receber")} empty="Nenhum recebimento em aberto."
           colLeft="Cliente" colMid="Descrição"
           rows={dash.proximosRecebimentos.map(r => ({
@@ -225,7 +226,7 @@ export function DashboardCorporativo({ dash, onGoTab, onClickProcesso }: {
             val: fmtBRL(r.valorBRL), due: fmtDate(r.vencimento), dueHint: dueText(r.vencimento),
             critical: r.atrasado, onClick: () => r.processoId && r.pais && onClickProcesso(r.processoId, r.pais),
           }))} />
-        <ListCard icon={<CreditCard className="h-4 w-4" style={{ color: OURO }} />} title="Próximos Pagamentos"
+        <ListCard icon={<CreditCard className="h-4 w-4" style={{ color: OURO_TINTA }} />} title="Próximos Pagamentos"
           onVerTodos={() => onGoTab("pagar")} empty="Nenhum pagamento em aberto."
           colLeft="Fornecedor" colMid="Vencimento"
           rows={dash.proximosPagamentos.map(p => ({
@@ -233,7 +234,7 @@ export function DashboardCorporativo({ dash, onGoTab, onClickProcesso }: {
             due: fmtDate(p.vencimento), dueHint: dueText(p.vencimento), critical: p.atrasado,
           }))} />
         <div className={`${CARD} p-4`}>
-          <div className="text-sm font-semibold text-white flex items-center gap-2 mb-3"><Globe className="h-4 w-4" style={{ color: OURO }} /> Exposição Cambial <span className="text-[10px] text-[var(--text-muted)] bg-[var(--surface-primary)] px-1.5 py-0.5 rounded">prévia</span></div>
+          <div className="text-sm font-semibold text-white flex items-center gap-2 mb-3"><Globe className="h-4 w-4" style={{ color: OURO_TINTA }} /> Exposição Cambial <span className="text-[10px] text-[var(--text-muted)] bg-[var(--surface-primary)] px-1.5 py-0.5 rounded">prévia</span></div>
           <div className="rounded-lg border border-[var(--border-default)] bg-[var(--surface-primary)] p-3 mb-2">
             <div className="flex items-center justify-between text-[11px] text-[var(--text-secondary)] font-semibold uppercase tracking-wide">
               <span>🇪🇺 EUR</span><span>@ R$ {dash.fx.EUR.toFixed(2)}</span>
@@ -251,8 +252,8 @@ export function DashboardCorporativo({ dash, onGoTab, onClickProcesso }: {
         </div>
         <div className={`${CARD} p-4`}>
           <div className="flex items-center justify-between mb-3">
-            <div className="text-sm font-semibold text-white flex items-center gap-2"><FileText className="h-4 w-4" style={{ color: OURO }} /> Atividade Recente</div>
-            <button onClick={() => onGoTab("auditoria")} className="text-xs text-white/60 hover:text-white">Ver auditoria</button>
+            <div className="text-sm font-semibold text-white flex items-center gap-2"><FileText className="h-4 w-4" style={{ color: OURO_TINTA }} /> Atividade Recente</div>
+            <button onClick={() => onGoTab("auditoria")} className="text-xs text-[var(--text-secondary)] hover:text-white">Ver auditoria</button>
           </div>
           <div className="space-y-2 max-h-[260px] overflow-y-auto pr-1">
             {dash.atividade.length === 0 ? (
@@ -271,12 +272,12 @@ export function DashboardCorporativo({ dash, onGoTab, onClickProcesso }: {
       {/* LINHA 2: Receita por País · Contas Bancárias */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
         <div className={`${CARD} p-4`}>
-          <div className="text-sm font-semibold text-white flex items-center gap-2 mb-3"><Globe className="h-4 w-4" style={{ color: OURO }} /> Receita por País · YTD <span className="text-[10px] text-[var(--text-muted)] bg-[var(--surface-primary)] px-1.5 py-0.5 rounded">prévia</span></div>
+          <div className="text-sm font-semibold text-white flex items-center gap-2 mb-3"><Globe className="h-4 w-4" style={{ color: OURO_TINTA }} /> Receita por País · YTD <span className="text-[10px] text-[var(--text-muted)] bg-[var(--surface-primary)] px-1.5 py-0.5 rounded">prévia</span></div>
           <ReceitaPaisBars data={m.receitaPorPais} />
         </div>
 
         <div className={`${CARD} p-4`}>
-          <div className="text-sm font-semibold text-white flex items-center gap-2 mb-3"><Wallet className="h-4 w-4" style={{ color: OURO }} /> Contas Bancárias</div>
+          <div className="text-sm font-semibold text-white flex items-center gap-2 mb-3"><Wallet className="h-4 w-4" style={{ color: OURO_TINTA }} /> Contas Bancárias</div>
           {dash.contas.length === 0 ? (
             <p className="text-sm text-[var(--text-muted)] py-4 text-center">Nenhuma conta bancária cadastrada.</p>
           ) : (
@@ -330,13 +331,13 @@ function FluxoChart({ serie }: { serie: DashboardData["mock"]["serie6meses"] }) 
               ticks: {
                 // evita rótulos redundantes ("R$ -0k") quando a série é toda zero
                 callback: (v: any) => "R$ " + (Object.is(Math.round(v / 1000), -0) ? 0 : Math.round(v / 1000)) + "k",
-                color: "rgba(255,255,255,0.5)", font: { size: 10.5 },
+                color: "var(--text-muted)", font: { size: 10.5 },
                 maxTicksLimit: 6,
               },
               beginAtZero: true,
-              grid: { color: "rgba(255,255,255,0.08)" },
+              grid: { color: "var(--text-muted)" },
             },
-            x: { ticks: { color: "rgba(255,255,255,0.5)", font: { size: 10.5 } }, grid: { display: false } },
+            x: { ticks: { color: "var(--text-muted)", font: { size: 10.5 } }, grid: { display: false } },
           },
         },
       })
@@ -394,7 +395,7 @@ function Kpi({ icon, label, value, sub, mock, accent }: {
           >
             {icon}
           </span>
-          <span className={`text-[11px] font-semibold text-white/60 leading-tight ${mock ? "pr-8" : ""}`}>{label}</span>
+          <span className={`text-[11px] font-semibold text-[var(--text-secondary)] leading-tight ${mock ? "pr-8" : ""}`}>{label}</span>
         </div>
         <div className="font-bold mt-2 text-xl text-white">{value}</div>
         {sub && <div className="text-[11px] text-[var(--text-muted)] mt-1">{sub}</div>}
@@ -462,7 +463,7 @@ function ListCard({ icon, title, rows, colLeft, colMid, empty, onVerTodos }: {
     <div className={`${CARD} p-4`}>
       <div className="flex items-center justify-between mb-3">
         <div className="text-sm font-semibold text-white flex items-center gap-2">{icon}{title}</div>
-        <button onClick={onVerTodos} className="text-xs text-white/60 hover:text-white">Ver todos</button>
+        <button onClick={onVerTodos} className="text-xs text-[var(--text-secondary)] hover:text-white">Ver todos</button>
       </div>
       {rows.length === 0 ? (
         <div className="flex flex-col items-center justify-center text-center py-8">

@@ -50,11 +50,11 @@ const DECISOES: Array<[string, string]> = [
 ]
 const SEV_LABEL: Record<string, string> = { baixa: "Leve", media: "Média", critica: "Crítica" }
 const SEV_STYLE: Record<string, string> = {
-  baixa: "bg-[#d2a948]/12 text-[#d2a948]",
-  media: "bg-[#d2a948]/12 text-[#d2a948]",
-  critica: "bg-[#f87171]/12 text-[#f87171]",
+  baixa: "bg-[var(--accent-primary)]/12 text-[var(--accent-text)]",
+  media: "bg-[var(--accent-primary)]/12 text-[var(--accent-text)]",
+  critica: "bg-red-50 text-red-700",
 }
-const SEV_DOT: Record<string, string> = { baixa: "bg-amber-400", media: "bg-[#d2a948]", critica: "bg-[#f87171]" }
+const SEV_DOT: Record<string, string> = { baixa: "bg-amber-400", media: "bg-[var(--accent-primary)]", critica: "bg-red-50" }
 
 const authHeaders = () => ({ Authorization: `Bearer ${localStorage.getItem("authToken")}` })
 const ini = (nome: string) => {
@@ -176,21 +176,21 @@ export function ProcessoAnalise({ processoId, onConcluido, readOnly = false }: P
               <div key={e.label} className={`flex items-start ${i < etapas.length - 1 ? "flex-1" : ""}`}>
                 <div className="flex flex-col items-center text-center w-[88px] shrink-0">
                   <div className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold ${
-                    e.st === "concluida" ? "bg-[#4ade80] text-white"
+                    e.st === "concluida" ? "bg-green-50 text-white"
                     : e.st === "em_andamento" ? "bg-[var(--action-primary)] text-white"
                     : "bg-[var(--surface-tertiary)] text-[var(--text-secondary)]"}`}>
                     {e.st === "concluida" ? <Check className="w-4 h-4" /> : i + 1}
                   </div>
                   <div className="mt-1.5 text-[11px] font-medium text-white/80 leading-tight">{e.label}</div>
                   <div className={`text-[10px] ${
-                    e.st === "concluida" ? "text-[#4ade80]"
-                    : e.st === "em_andamento" ? "text-[#7dd3fc]"
+                    e.st === "concluida" ? "text-green-700"
+                    : e.st === "em_andamento" ? "text-sky-700"
                     : "text-[var(--text-muted)]"}`}>
                     {e.st === "concluida" ? "Concluído" : e.st === "em_andamento" ? "Em andamento" : "Pendente"}
                   </div>
                 </div>
                 {i < etapas.length - 1 && (
-                  <div className={`flex-1 h-0.5 mt-3.5 ${e.st === "concluida" ? "bg-[#4ade80]" : "bg-[var(--surface-tertiary)]"}`} />
+                  <div className={`flex-1 h-0.5 mt-3.5 ${e.st === "concluida" ? "bg-green-50" : "bg-[var(--surface-tertiary)]"}`} />
                 )}
               </div>
             ))}
@@ -209,8 +209,8 @@ export function ProcessoAnalise({ processoId, onConcluido, readOnly = false }: P
         </button>
       </div>
 
-      {erro && <div className="bg-[#f87171]/12 border border-[#f87171]/30 rounded-lg px-4 py-3 text-sm text-[#f87171]">{erro}</div>}
-      {resultado && <div className="bg-[#4ade80]/12 border border-[#4ade80]/30 rounded-lg px-4 py-3 text-sm text-[#4ade80] flex items-center gap-2"><CheckCircle2 className="w-4 h-4" />{resultado}</div>}
+      {erro && <div className="bg-red-50 border border-red-200 rounded-lg px-4 py-3 text-sm text-red-700">{erro}</div>}
+      {resultado && <div className="bg-green-50 border border-green-200 rounded-lg px-4 py-3 text-sm text-green-700 flex items-center gap-2"><CheckCircle2 className="w-4 h-4" />{resultado}</div>}
 
       {!analise ? (
         <div className="rounded-xl border border-dashed border-[var(--border-default)] p-8 text-center text-sm text-[var(--text-secondary)]">A análise ainda não foi rodada. Clique em <b>Rodar análise IA</b>.</div>
@@ -248,7 +248,7 @@ export function ProcessoAnalise({ processoId, onConcluido, readOnly = false }: P
                     <td className="px-3 py-2.5"><span className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs font-semibold ${SEV_STYLE[d.severidade] || "bg-[var(--surface-tertiary)] text-white/80"}`}><span className={`w-1.5 h-1.5 rounded-full ${SEV_DOT[d.severidade] || "bg-[var(--surface-secondary)]"}`} />{SEV_LABEL[d.severidade] || d.severidade}</span></td>
                     <td className="px-3 py-2.5 text-xs text-white/68 max-w-[200px]">{d.sugestaoIA || "—"}</td>
                     <td className="px-3 py-2.5">
-                      <select value={d.status} onChange={(e) => decidir(d.id, e.target.value)} className={`text-xs border rounded-md px-2 py-1.5 bg-[var(--surface-popover)] focus:outline-none ${d.status === "retificacao" ? "border-[#f87171]/30 text-[#f87171]" : d.status === "aceita" ? "border-[#4ade80]/30 text-[#4ade80]" : d.status === "pendente" ? "border-[var(--border-default)] text-white/68" : "border-[#d2a948]/30 text-[#d2a948]"}`}>
+                      <select value={d.status} onChange={(e) => decidir(d.id, e.target.value)} className={`text-xs border rounded-md px-2 py-1.5 bg-[var(--surface-popover)] focus:outline-none ${d.status === "retificacao" ? "border-red-200 text-red-700" : d.status === "aceita" ? "border-green-200 text-green-700" : d.status === "pendente" ? "border-[var(--border-default)] text-white/68" : "border-[var(--accent-primary)]/30 text-[var(--accent-text)]"}`}>
                         {DECISOES.map(([v, l]) => <option key={v} value={v}>{l}</option>)}
                       </select>
                     </td>
@@ -267,17 +267,17 @@ export function ProcessoAnalise({ processoId, onConcluido, readOnly = false }: P
         <div className="flex items-center justify-between gap-3 rounded-xl border border-[var(--border-default)] p-4">
           <div className="text-xs text-white/68">
             {pend > 0
-              ? <span className="inline-flex items-center gap-1.5 text-[#d2a948]"><AlertTriangle className="w-4 h-4" />Faltam {pend} decisão(ões) antes de concluir.</span>
+              ? <span className="inline-flex items-center gap-1.5 text-[var(--accent-text)]"><AlertTriangle className="w-4 h-4" />Faltam {pend} decisão(ões) antes de concluir.</span>
               : <>O destino depende das decisões: alguma marcada <b>“Enviar para retificação”</b> → Retificação; nenhuma → Tradução.</>}
           </div>
-          <button onClick={concluir} disabled={!podeConcluir || concluding} className="px-4 py-2 text-sm font-semibold text-[#fff] bg-[var(--app-background)] hover:bg-[var(--surface-secondary)] rounded-md inline-flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed flex-shrink-0">
+          <button onClick={concluir} disabled={!podeConcluir || concluding} className="px-4 py-2 text-sm font-semibold text-[var(--text-primary)] bg-[var(--app-background)] hover:bg-[var(--surface-secondary)] rounded-md inline-flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed flex-shrink-0">
             {concluding ? <Loader2 className="w-4 h-4 animate-spin" /> : <ArrowRight className="w-4 h-4" />} Concluir análise
           </button>
         </div>
       )}
 
       {analise?.status === "concluida" && (
-        <div className="rounded-xl border border-[#4ade80]/30 bg-[#4ade80]/12 p-4 text-sm text-[#4ade80] flex items-center gap-2"><CheckCircle2 className="w-4 h-4" />Análise concluída {analise.decisaoJuridica === "com_retificacao" ? "com retificação" : "sem retificação"}.</div>
+        <div className="rounded-xl border border-green-200 bg-green-50 p-4 text-sm text-green-700 flex items-center gap-2"><CheckCircle2 className="w-4 h-4" />Análise concluída {analise.decisaoJuridica === "com_retificacao" ? "com retificação" : "sem retificação"}.</div>
       )}
 
       {drawerDiv && (
@@ -295,7 +295,7 @@ export function ProcessoAnalise({ processoId, onConcluido, readOnly = false }: P
 function Stat({ label, value, danger }: { label: string; value: number; danger?: boolean }) {
   return (
     <div className="rounded-lg border border-[var(--border-default)] bg-[var(--surface-popover)] px-3 py-2">
-      <div className={`text-xl font-bold ${danger ? "text-[#f87171]" : "text-white/95"}`}>{value}</div>
+      <div className={`text-xl font-bold ${danger ? "text-red-700" : "text-white/95"}`}>{value}</div>
       <div className="text-[11px] text-[var(--text-secondary)]">{label}</div>
     </div>
   )

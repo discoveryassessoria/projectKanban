@@ -368,7 +368,7 @@ export default function RegistrarPagamentoView({ obrigacaoId, receitaRef, escopo
                                   <select value={l.parcelas} onChange={(e) => setLinha(l._id, { parcelas: Number(e.target.value) })} className={`${inputCls} !py-1 text-xs`}>{Array.from({ length: Math.max(1, formaDe(l)?.maxParcelas ?? 12) }, (_, i) => i + 1).map((n) => <option key={n} value={n}>{n}x</option>)}</select>
                                 )}
                                 {l.adquirenteId ? (tarifaDe(l) > 0
-                                  ? <p className="text-[10px] text-[var(--text-muted)]">Taxa: <span className="text-[var(--accent-primary)]">{brl(tarifaDe(l))}</span> · líquido <span className="text-[var(--success)]">{brl(Math.max(0, num(l.valor) - tarifaDe(l)))}</span></p>
+                                  ? <p className="text-[10px] text-[var(--text-muted)]">Taxa: <span className="text-[var(--accent-text)]">{brl(tarifaDe(l))}</span> · líquido <span className="text-[var(--success)]">{brl(Math.max(0, num(l.valor) - tarifaDe(l)))}</span></p>
                                   : <p className="text-[10px] text-[var(--text-muted)]">Sem taxa cadastrada para esta combinação.</p>) : null}
                               </div>
                             )}
@@ -428,7 +428,7 @@ export default function RegistrarPagamentoView({ obrigacaoId, receitaRef, escopo
                 <div className="mt-4 grid grid-cols-2 gap-3 rounded-[var(--radius-sm)] bg-[var(--surface-secondary)] px-4 py-3 text-center sm:grid-cols-6">
                   <Mini label="Valor Original">{brl(saldoCobranca)}</Mini>
                   <Mini label="− Descontos" cls="text-[var(--success)]">{brl(desconto)}</Mini>
-                  <Mini label="+ Acréscimos" cls="text-[var(--accent-primary)]">{brl(acrescimos)}</Mini>
+                  <Mini label="+ Acréscimos" cls="text-[var(--accent-text)]">{brl(acrescimos)}</Mini>
                   <Mini label="= Valor Líquido">{brl(liquidoAReceber)}</Mini>
                   <Mini label="Recebido" cls="text-[var(--info)]">{brl(recebido)}</Mini>
                   <Mini label="= Saldo Restante" cls={saldoRestante > 0.005 ? "text-[var(--danger)]" : "text-[var(--success)]"}>{brl(saldoRestante)}</Mini>
@@ -526,9 +526,9 @@ export default function RegistrarPagamentoView({ obrigacaoId, receitaRef, escopo
                   <Row k="Valor da Cobrança">{brl(saldoCobranca)}</Row>
                   <Row k="Total Informado">{brl(totalInformado)}</Row>
                   <Row k="Descontos" cls="text-[var(--success)]">− {brl(desconto)}</Row>
-                  <Row k="Juros" cls="text-[var(--accent-primary)]">+ {brl(juros)}</Row>
-                  <Row k="Multas" cls="text-[var(--accent-primary)]">+ {brl(multa)}</Row>
-                  <Row k="Acréscimos" cls="text-[var(--accent-primary)]">+ {brl(acrescimo)}</Row>
+                  <Row k="Juros" cls="text-[var(--accent-text)]">+ {brl(juros)}</Row>
+                  <Row k="Multas" cls="text-[var(--accent-text)]">+ {brl(multa)}</Row>
+                  <Row k="Acréscimos" cls="text-[var(--accent-text)]">+ {brl(acrescimo)}</Row>
                   {totalTarifas > 0.005 && <Row k="Taxas (cartão)" cls="text-[var(--danger)]">− {brl(totalTarifas)}</Row>}
                   <div className="my-2 border-t border-[var(--border-default)]" />
                   {totalTarifas > 0.005 && <Row k="Líquido em caixa" cls="text-[var(--text-secondary)]">{brl(Math.max(0, totalInformado - totalTarifas))}</Row>}
@@ -554,7 +554,7 @@ export default function RegistrarPagamentoView({ obrigacaoId, receitaRef, escopo
                   {situacao === "PARCIAL" ? <Impact icon={InfoIcon} cls="text-[var(--info)]">Esta cobrança ficará com saldo de {brl(saldoRestante)}.</Impact> : <Impact icon={CheckCircle2} cls="text-[var(--success)]">Esta cobrança será quitada.</Impact>}
                   {situacao === "PARCIAL" && parcialTrat === "MANTER" && <Impact icon={InfoIcon} cls="text-[var(--text-muted)]">Será mantida aberta para novos recebimentos.</Impact>}
                   {situacao === "PARCIAL" && parcialTrat === "GERAR_COBRANCA" && <Impact icon={InfoIcon} cls="text-[var(--text-muted)]">Será criada uma nova cobrança para o saldo.</Impact>}
-                  {situacao === "EXCEDENTE" && <Impact icon={AlertTriangle} cls="text-[var(--accent-primary)]">Excedente de {brl(excedente)} → {excedenteTrat === "CREDITO" ? "crédito financeiro" : excedenteTrat === "ABATER_PROXIMAS" ? "abater próximas" : excedenteTrat === "ADIANTAMENTO" ? "adiantamento" : "devolução"}.</Impact>}
+                  {situacao === "EXCEDENTE" && <Impact icon={AlertTriangle} cls="text-[var(--accent-text)]">Excedente de {brl(excedente)} → {excedenteTrat === "CREDITO" ? "crédito financeiro" : excedenteTrat === "ABATER_PROXIMAS" ? "abater próximas" : excedenteTrat === "ADIANTAMENTO" ? "adiantamento" : "devolução"}.</Impact>}
                   <Impact icon={CheckCircle2} cls="text-[var(--success)]">Nenhum pagamento anterior será alterado.</Impact>
                 </ul>
                 )}

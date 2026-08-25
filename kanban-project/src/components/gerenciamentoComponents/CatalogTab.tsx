@@ -145,13 +145,13 @@ export default function CatalogTab({ catalogKey }: { catalogKey: string }) {
             <div className="flex items-center justify-end gap-2 border-t border-[var(--border-default)] px-5 py-3.5">
               <button
                 onClick={() => setModalOpen(false)}
-                className="rounded-lg px-4 py-2 text-sm text-white/60 transition hover:text-white"
+                className="rounded-lg px-4 py-2 text-sm text-[var(--text-secondary)] transition hover:text-white"
               >
                 Cancelar
               </button>
               <button
                 onClick={salvar}
-                className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-[#fff] transition hover:bg-blue-500"
+                className="rounded-lg bg-[var(--action-primary)] px-4 py-2 text-sm font-semibold text-[var(--action-primary-ink)] transition hover:bg-[var(--action-primary)]"
               >
                 Salvar
               </button>
@@ -230,7 +230,7 @@ function Field({
 
   return (
     <div>
-      <label className="mb-1 block text-[11px] text-white/60">
+      <label className="mb-1 block text-[11px] text-[var(--text-secondary)]">
         {field.label}
         {field.required ? ' *' : ''}
       </label>

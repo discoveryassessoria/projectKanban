@@ -87,7 +87,7 @@ export function ExclusaoDefinitivaModal({ titulo, previewUrl, deleteUrl, entidad
           <div className={`text-[15px] font-extrabold ${excluido ? "text-red-700" : "text-amber-700"}`}>
             {excluido ? `${entidadeLabel} excluído definitivamente` : `${entidadeLabel} inativado`}
           </div>
-          <p className="text-[12.5px] text-white/60 mt-1">
+          <p className="text-[12.5px] text-[var(--text-secondary)] mt-1">
             {excluido
               ? "O cadastro e as suas configurações exclusivas foram apagados. Cadastros compartilhados foram apenas desvinculados e continuam existindo."
               : "O histórico foi preservado integralmente. O registro continua existindo, apenas inativo."}
@@ -191,7 +191,7 @@ export function ExclusaoDefinitivaModal({ titulo, previewUrl, deleteUrl, entidad
               <button disabled={executando} onClick={() => void inativar()} className="px-3.5 py-2 text-[12.5px] font-semibold rounded-lg bg-[var(--surface-primary)] hover:bg-[var(--surface-hover)] disabled:opacity-50">Só inativar</button>
             )}
             {analise?.deletionAllowed && (
-              <button disabled={executando || !fraseOk} onClick={() => void excluirDefinitivo()} className="px-3.5 py-2 text-[12.5px] font-bold rounded-lg bg-red-600 text-[#fff] hover:bg-red-500 disabled:opacity-40">Excluir definitivamente</button>
+              <button disabled={executando || !fraseOk} onClick={() => void excluirDefinitivo()} className="px-3.5 py-2 text-[12.5px] font-bold rounded-lg bg-red-700 text-[var(--action-primary-ink)] hover:bg-red-500 disabled:opacity-40">Excluir definitivamente</button>
             )}
           </div>
         </div>

@@ -266,11 +266,11 @@ export function SettingsTab() {
       <Section title="Configurações Gerais" action={<button disabled title={TITULO_RASCUNHO} className={BTN_RASCUNHO}>Salvar</button>} />
       <div className={`${CARD} grid grid-cols-1 gap-3 p-4 sm:grid-cols-2`}>
         <div>
-          <label className="mb-1 block text-[11px] text-white/60">Empresa</label>
+          <label className="mb-1 block text-[11px] text-[var(--text-secondary)]">Empresa</label>
           <input className={INPUT} value={cfg.company} onChange={(e) => set('company', e.target.value)} />
         </div>
         <div>
-          <label className="mb-1 block text-[11px] text-white/60">Moeda padrão</label>
+          <label className="mb-1 block text-[11px] text-[var(--text-secondary)]">Moeda padrão</label>
           <select className={INPUT} value={cfg.currency} onChange={(e) => set('currency', e.target.value)}>
             {['EUR', 'BRL', 'USD'].map((x) => (
               <option key={x} value={x} className="bg-zinc-900">{x}</option>
@@ -278,11 +278,11 @@ export function SettingsTab() {
           </select>
         </div>
         <div>
-          <label className="mb-1 block text-[11px] text-white/60">Idioma</label>
+          <label className="mb-1 block text-[11px] text-[var(--text-secondary)]">Idioma</label>
           <input className={INPUT} value={cfg.lang} onChange={(e) => set('lang', e.target.value)} />
         </div>
         <div>
-          <label className="mb-1 block text-[11px] text-white/60">Fuso</label>
+          <label className="mb-1 block text-[11px] text-[var(--text-secondary)]">Fuso</label>
           <input className={INPUT} value={cfg.tz} onChange={(e) => set('tz', e.target.value)} />
         </div>
         <div className="border-t border-[var(--border-default)] pt-3 sm:col-span-2">

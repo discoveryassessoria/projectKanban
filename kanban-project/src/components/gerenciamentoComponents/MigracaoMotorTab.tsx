@@ -13,7 +13,7 @@ function authHeaders(): HeadersInit {
   return t ? { "Content-Type": "application/json", Authorization: `Bearer ${t}` } : { "Content-Type": "application/json" }
 }
 const inputCls = "w-full rounded-lg border border-[var(--border-default)] bg-[var(--surface-primary)] px-3 py-2 text-sm text-white outline-none focus:border-white/20"
-const labelCls = "mb-1 block text-xs text-white/60"
+const labelCls = "mb-1 block text-xs text-[var(--text-secondary)]"
 const opt = "bg-zinc-900"
 
 /** Panorama da migração, como o endpoint devolve. */
@@ -93,7 +93,7 @@ export default function MigracaoMotorTab() {
 
       <div className="rounded-2xl border border-[var(--border-default)] bg-[var(--surface-primary)] p-5 backdrop-blur-sm">
         <h2 className="text-lg font-semibold text-white">Conectar Processos ao Motor</h2>
-        <p className="mt-1 text-sm text-white/60">Liga vários processos a um Tipo do motor de uma vez. Só preenche um campo — <span className="text-green-700/80">nada é apagado e dá pra desconectar.</span></p>
+        <p className="mt-1 text-sm text-[var(--text-secondary)]">Liga vários processos a um Tipo do motor de uma vez. Só preenche um campo — <span className="text-green-700/80">nada é apagado e dá pra desconectar.</span></p>
 
         {/* números atuais */}
         <div className="mt-4 grid grid-cols-3 gap-3">
@@ -172,7 +172,7 @@ export default function MigracaoMotorTab() {
             <div className="rounded-xl border border-amber-200 bg-amber-50 p-4">
               <div className="text-sm text-amber-100">Desconectar <b>todos</b> os processos de <b>{paisNome}</b> do motor? (Não apaga nada, só desliga o vínculo.)</div>
               <div className="mt-3 flex gap-2">
-                <button disabled={busy} onClick={desconectar} className="rounded-lg bg-amber-600 px-4 py-2 text-sm font-medium text-[#fff] hover:bg-amber-500 disabled:opacity-50">{busy ? "Desconectando…" : "Sim, desconectar"}</button>
+                <button disabled={busy} onClick={desconectar} className="rounded-lg bg-amber-700 px-4 py-2 text-sm font-medium text-[var(--action-primary-ink)] hover:bg-amber-500 disabled:opacity-50">{busy ? "Desconectando…" : "Sim, desconectar"}</button>
                 <button disabled={busy} onClick={() => setConfirmandoDesc(false)} className="rounded-lg border border-[var(--border-default)] px-4 py-2 text-sm text-white/70 hover:bg-[var(--surface-hover)]">Cancelar</button>
               </div>
             </div>

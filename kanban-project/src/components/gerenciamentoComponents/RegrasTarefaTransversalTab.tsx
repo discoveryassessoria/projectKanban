@@ -73,7 +73,7 @@ function novoForm(): any {
 }
 
 const inputCls = "w-full rounded-lg border border-[var(--border-default)] bg-[var(--surface-primary)] px-3 py-2 text-sm text-white placeholder-white/30 outline-none focus:border-white/20"
-const labelCls = "mb-1 block text-xs text-white/60"
+const labelCls = "mb-1 block text-xs text-[var(--text-secondary)]"
 
 function authHeaders(): Record<string, string> {
   const t = typeof window !== "undefined" ? localStorage.getItem("authToken") : null
@@ -205,7 +205,7 @@ export default function RegrasTarefaTransversalTab() {
     <div className="space-y-5">
       <div>
         <h2 className="text-lg font-semibold text-white">Regras de Tarefas Transversais</h2>
-        <p className="mt-1 text-sm text-white/60">
+        <p className="mt-1 text-sm text-[var(--text-secondary)]">
           Quando cada tarefa transversal deve aparecer sozinha — gatilho + condição por fase.
           Ex.: faltou local de nascimento na Genealogia → sugerir uma emissão investigativa.
         </p>
@@ -254,13 +254,13 @@ export default function RegrasTarefaTransversalTab() {
                   <div className="flex flex-wrap gap-1">
                     {r.autoCreate
                       ? <span className="rounded bg-amber-50 px-1.5 py-0.5 text-[10px] text-amber-700">cria automático</span>
-                      : <span className="rounded bg-[var(--surface-primary)] px-1.5 py-0.5 text-[10px] text-white/60">sugere</span>}
-                    {r.mandatory && <span className="rounded bg-[var(--surface-primary)] px-1.5 py-0.5 text-[10px] text-white/60">obrigatória</span>}
+                      : <span className="rounded bg-[var(--surface-primary)] px-1.5 py-0.5 text-[10px] text-[var(--text-secondary)]">sugere</span>}
+                    {r.mandatory && <span className="rounded bg-[var(--surface-primary)] px-1.5 py-0.5 text-[10px] text-[var(--text-secondary)]">obrigatória</span>}
                   </div>
                 </td>
                 <td className="px-3 py-2.5">
                   {r.arquivado
-                    ? <span className="rounded bg-[var(--surface-primary)] px-1.5 py-0.5 text-[10px] text-white/60">arquivado</span>
+                    ? <span className="rounded bg-[var(--surface-primary)] px-1.5 py-0.5 text-[10px] text-[var(--text-secondary)]">arquivado</span>
                     : <span className="rounded bg-green-50 px-1.5 py-0.5 text-[10px] text-green-700">ativo</span>}
                 </td>
                 <td className="px-3 py-2.5">
@@ -423,7 +423,7 @@ function Chk({ label, checked, onChange }: { label: string; checked: boolean; on
 function IconBtn({ children, title, onClick, danger }: { children: ReactNode; title: string; onClick: () => void; danger?: boolean }) {
   return (
     <button title={title} aria-label={title} onClick={onClick}
-      className={`rounded-md p-1.5 hover:bg-[var(--surface-hover)] ${danger ? "text-red-700/80 hover:text-red-700" : "text-white/60 hover:text-white"}`}>
+      className={`rounded-md p-1.5 hover:bg-[var(--surface-hover)] ${danger ? "text-red-700/80 hover:text-red-700" : "text-[var(--text-secondary)] hover:text-white"}`}>
       {children}
     </button>
   )

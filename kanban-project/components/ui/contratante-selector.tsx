@@ -171,7 +171,7 @@ export function ContratanteSelector({
                   key={contratante.id}
                   value={`${contratante.nome} ${contratante.cpf || ''}`}
                   onSelect={mode === 'single' ? () => handleSelect(contratante.id.toString()) : undefined}
-                  className="cursor-pointer relative hover:bg-gray-100 dark:hover:bg-gray-800"
+                  className="cursor-pointer relative hover:bg-[var(--surface-tertiary)] dark:hover:bg-[var(--action-primary)]"
                   onClick={mode === 'checkbox' ? (e) => {
                     e.preventDefault()
                     e.stopPropagation()
@@ -213,7 +213,7 @@ export function ContratanteSelector({
                     <Button
                       variant="ghost"
                       size="sm"
-                      className="h-7 w-7 p-0 ml-auto hover:bg-gray-200 dark:hover:bg-gray-700"
+                      className="h-7 w-7 p-0 ml-auto hover:bg-[var(--surface-tertiary)] dark:hover:bg-[var(--action-primary)]"
                       onClick={(e) => handleEdit(e, contratante)}
                     >
                       <Pencil className="h-3.5 w-3.5" />
@@ -227,7 +227,7 @@ export function ContratanteSelector({
           <div className="border-t p-2">
             <Button
               variant="ghost"
-              className="w-full justify-start text-primary font-medium hover:bg-gray-100 dark:hover:bg-gray-800"
+              className="w-full justify-start text-primary font-medium hover:bg-[var(--surface-tertiary)] dark:hover:bg-[var(--action-primary)]"
               onClick={() => {
                 onAdd?.()
                 setOpen(false)

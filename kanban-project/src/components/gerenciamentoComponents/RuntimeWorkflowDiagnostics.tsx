@@ -24,7 +24,7 @@ export default function RuntimeWorkflowDiagnostics() {
     <div className="space-y-5">
       <div className="rounded-2xl border border-[var(--border-default)] bg-[var(--surface-primary)] p-5 backdrop-blur-sm">
         <h2 className="text-lg font-semibold text-white">Diagnóstico do Runtime</h2>
-        <p className="mt-1 text-sm text-white/60">
+        <p className="mt-1 text-sm text-[var(--text-secondary)]">
           Área técnica do Motor: runtime atual, gate global, readiness/pré-requisitos, versões macro/interna
           e ações de avanço (simular/avançar/forçar) por processo. Estas informações NÃO aparecem na Central Operacional.
         </p>

@@ -8,7 +8,8 @@ import * as React from 'react'
 import { createPortal } from 'react-dom'
 import { Check, ChevronDown, X } from 'lucide-react'
 
-export const OURO = '#D2A948'
+export const OURO = 'var(--accent-primary)'
+export const OURO_TINTA = 'var(--accent-text)'
 export const GLASS = 'rounded-xl border border-[var(--border-default)] bg-[var(--surface-primary)] backdrop-blur-md'
 export const INPUT = 'w-full rounded-lg border border-[var(--border-default)] bg-[var(--surface-primary)] px-3 py-2 text-sm text-white placeholder:text-[var(--text-muted)] outline-none focus:border-white/30'
 
@@ -25,7 +26,7 @@ export function toggleArr<T>(arr: T[], v: T): T[] { return arr.includes(v) ? arr
 export function Secao({ icon: Ic, titulo, dica, children }: { icon?: any; titulo: string; dica?: string; children: React.ReactNode }) {
   return (
     <div className={`${GLASS} p-4`}>
-      <div className="mb-1 flex items-center gap-2">{Ic && <Ic className="h-4 w-4" style={{ color: OURO }} />}<h4 className="text-sm font-semibold text-white">{titulo}</h4></div>
+      <div className="mb-1 flex items-center gap-2">{Ic && <Ic className="h-4 w-4" style={{ color: OURO_TINTA }} />}<h4 className="text-sm font-semibold text-white">{titulo}</h4></div>
       {dica && <p className="mb-3 text-[11px] text-[var(--text-muted)]">{dica}</p>}
       <div className={dica ? '' : 'mt-2'}>{children}</div>
     </div>
@@ -33,7 +34,7 @@ export function Secao({ icon: Ic, titulo, dica, children }: { icon?: any; titulo
 }
 
 export function Campo({ label, wide, children }: { label: string; wide?: boolean; children: React.ReactNode }) {
-  return <div className={wide ? 'sm:col-span-2' : ''}><label className="mb-1 block text-xs text-white/60">{label}</label>{children}</div>
+  return <div className={wide ? 'sm:col-span-2' : ''}><label className="mb-1 block text-xs text-[var(--text-secondary)]">{label}</label>{children}</div>
 }
 
 export function Select({ value, onChange, options }: { value: string; onChange: (v: string) => void; options: [string, string][] }) {
@@ -61,7 +62,7 @@ export function ChipsMulti({ items, selecionados, onToggle }: { items: { id: str
       {items.map((it) => {
         const on = selecionados.includes(it.id)
         return (
-          <button key={String(it.id)} type="button" onClick={() => onToggle(it.id)} className={`inline-flex items-center gap-1 rounded-lg border px-2.5 py-1 text-xs transition ${on ? 'text-[#1b1508]' : 'border-[var(--border-default)] text-white/60 hover:text-white'}`} style={on ? { background: OURO, borderColor: OURO } : undefined}>
+          <button key={String(it.id)} type="button" onClick={() => onToggle(it.id)} className={`inline-flex items-center gap-1 rounded-lg border px-2.5 py-1 text-xs transition ${on ? 'text-[#1b1508]' : 'border-[var(--border-default)] text-[var(--text-secondary)] hover:text-white'}`} style={on ? { background: OURO, borderColor: OURO } : undefined}>
             {on && <Check className="h-3 w-3" />}{it.label}
           </button>
         )
@@ -260,9 +261,9 @@ export function MultiSelect({
       )}
       {acoes && (
         <div className="flex shrink-0 items-center gap-2 border-b border-[var(--border-default)] px-2 py-1.5 text-[11px]">
-          <button type="button" onClick={() => onChange(Array.from(new Set([...selecionados, ...visiveis.map((o) => o.id)])))} className="text-white/60 transition hover:text-white">Selecionar todas</button>
+          <button type="button" onClick={() => onChange(Array.from(new Set([...selecionados, ...visiveis.map((o) => o.id)])))} className="text-[var(--text-secondary)] transition hover:text-white">Selecionar todas</button>
           <span className="text-[var(--text-muted)]">·</span>
-          <button type="button" onClick={() => onChange([])} className="text-white/60 transition hover:text-white">Limpar seleção</button>
+          <button type="button" onClick={() => onChange([])} className="text-[var(--text-secondary)] transition hover:text-white">Limpar seleção</button>
         </div>
       )}
       {especial && (
@@ -329,7 +330,7 @@ export function MultiSelect({
       {/* A opção especial ocupa o lugar dos chips: ligada, ela É a seleção. */}
       {especial?.ativa ? (
         <div className="mt-2 flex flex-wrap gap-1.5">
-          <span className="inline-flex items-center gap-1 rounded-md border px-2 py-0.5 text-xs" style={{ background: `${OURO}1f`, borderColor: `${OURO}55`, color: OURO }}>
+          <span className="inline-flex items-center gap-1 rounded-md border px-2 py-0.5 text-xs" style={{ background: `${OURO}1f`, borderColor: `${OURO}55`, color: OURO_TINTA }}>
             {especial.label}
             <button type="button" aria-label={`Remover ${especial.label}`} onClick={especial.onToggle} className="opacity-70 transition hover:opacity-100">
               <X className="h-3 w-3" />
@@ -339,7 +340,7 @@ export function MultiSelect({
       ) : escolhidos.length > 0 ? (
         <div className="mt-2 flex flex-wrap gap-1.5">
           {escolhidos.map((o) => (
-            <span key={o.id} className="inline-flex items-center gap-1 rounded-md border px-2 py-0.5 text-xs" style={{ background: `${OURO}1f`, borderColor: `${OURO}55`, color: OURO }}>
+            <span key={o.id} className="inline-flex items-center gap-1 rounded-md border px-2 py-0.5 text-xs" style={{ background: `${OURO}1f`, borderColor: `${OURO}55`, color: OURO_TINTA }}>
               {o.label}
               <button type="button" aria-label={`Remover ${o.label}`} onClick={() => alternar(o.id)} className="opacity-70 transition hover:opacity-100">
                 <X className="h-3 w-3" />

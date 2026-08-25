@@ -163,10 +163,10 @@ export default function ContasPagarPage() {
               Nova Despesa
             </Button>
           </DialogTrigger>
-          <DialogContent className="bg-[var(--surface-overlay)] border-[var(--border-strong)] text-[#fff] max-w-lg">
+          <DialogContent className="bg-[var(--surface-overlay)] border-[var(--border-strong)] text-[var(--text-primary)] max-w-lg">
             <DialogHeader>
               <DialogTitle>Nova Conta a Pagar</DialogTitle>
-              <DialogDescription className="text-white/60">
+              <DialogDescription className="text-[var(--text-secondary)]">
                 Adicione uma nova despesa ou conta a pagar
               </DialogDescription>
             </DialogHeader>

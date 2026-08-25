@@ -120,7 +120,7 @@ export default function ParticipanteContaView({ obrigacaoId, nome, onClose, onRe
           {/* Abas */}
           <div className="flex items-center gap-5 overflow-x-auto border-b border-[var(--border-default)] px-5">
             {abas.map(([id, label, Icon, badge]) => (
-              <button key={id} onClick={() => setAba(id)} className={`-mb-px flex shrink-0 items-center gap-1.5 border-b-2 px-1 pb-2.5 pt-2 text-sm ${aba === id ? "border-[var(--accent-primary)] font-medium text-[var(--accent-primary)]" : "border-transparent text-[var(--text-secondary)] hover:text-[var(--text-primary)]"}`}>
+              <button key={id} onClick={() => setAba(id)} className={`-mb-px flex shrink-0 items-center gap-1.5 border-b-2 px-1 pb-2.5 pt-2 text-sm ${aba === id ? "border-[var(--accent-primary)] font-medium text-[var(--accent-text)]" : "border-transparent text-[var(--text-secondary)] hover:text-[var(--text-primary)]"}`}>
                 <Icon className="h-4 w-4" /> {label}{badge ? <span className="ml-0.5 rounded-full bg-[var(--surface-hover)] px-1.5 text-[10px] text-[var(--text-secondary)]">{badge}</span> : null}
               </button>
             ))}
@@ -141,7 +141,7 @@ export default function ParticipanteContaView({ obrigacaoId, nome, onClose, onRe
                       <ResumoCard rotulo="Contratado" valor={brl(r.valorContratadoBrl)} />
                       <ResumoCard rotulo="Recebido" valor={brl(r.recebidoBrl)} cor="text-[var(--success)]" />
                       <ResumoCard rotulo="Saldo" valor={brl(r.saldoBrl)} cor="text-[var(--info)]" />
-                      <ResumoCard rotulo="A vencer" valor={brl(r.aVencerBrl)} cor="text-[var(--accent-primary)]" />
+                      <ResumoCard rotulo="A vencer" valor={brl(r.aVencerBrl)} cor="text-[var(--accent-text)]" />
                       <ResumoCard rotulo="Vencido" valor={brl(r.vencidoBrl)} cor="text-[var(--danger)]" />
                       <ResumoCard rotulo="Aging" valor={r.statusAging} />
                     </div>

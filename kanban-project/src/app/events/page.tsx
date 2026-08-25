@@ -399,8 +399,8 @@ const handleSubmit = async () => {
             {/* Toggle Lista/Calendário */}
             <Tabs value={viewMode} onValueChange={(v) => setViewMode(v as "lista" | "calendario")}>
               <TabsList className="bg-transparent border border-[var(--border-default)]">
-                <TabsTrigger value="lista" className="text-white/60 data-[state=active]:bg-[#d2a948]/15 data-[state=active]:text-[#d2a948]">Lista</TabsTrigger>
-                <TabsTrigger value="calendario" className="text-white/60 data-[state=active]:bg-[#d2a948]/15 data-[state=active]:text-[#d2a948]">Calendário</TabsTrigger>
+                <TabsTrigger value="lista" className="text-[var(--text-secondary)] data-[state=active]:bg-[var(--accent-primary)]/15 data-[state=active]:text-[var(--accent-text)]">Lista</TabsTrigger>
+                <TabsTrigger value="calendario" className="text-[var(--text-secondary)] data-[state=active]:bg-[var(--accent-primary)]/15 data-[state=active]:text-[var(--accent-text)]">Calendário</TabsTrigger>
               </TabsList>
             </Tabs>
               {pode('eventos.criar') && (
@@ -436,7 +436,7 @@ const handleSubmit = async () => {
                       onClick={resetForm}
                       className="p-2 hover:bg-[var(--surface-hover)] rounded-lg transition-colors"
                     >
-                      <X className="h-5 w-5 text-white/60" />
+                      <X className="h-5 w-5 text-[var(--text-secondary)]" />
                     </button>
                   </div>
 
@@ -465,7 +465,7 @@ const handleSubmit = async () => {
                               className={`p-2 rounded-lg border text-sm flex flex-col items-center gap-1 transition-colors ${
                                 tipo === t.value
                                   ? "border-[var(--border-default)] bg-[var(--surface-secondary)] text-white"
-                                  : "border-[var(--border-strong)] hover:border-[var(--border-strong)] text-white/60"
+                                  : "border-[var(--border-strong)] hover:border-[var(--border-strong)] text-[var(--text-secondary)]"
                               }`}
                             >
                               <Icon className="h-4 w-4" style={{ color: t.cor }} />
@@ -581,7 +581,7 @@ const handleSubmit = async () => {
                     <Button
                       onClick={handleSubmit}
                       disabled={isSaving}
-                      className="bg-emerald-600 hover:bg-emerald-700 text-[#fff]"
+                      className="bg-emerald-700 hover:bg-emerald-800 text-[var(--action-primary-ink)]"
                     >
                       <Check className="h-4 w-4 mr-1.5" />
                       {isSaving ? "Salvando..." : editingId ? "Salvar" : "Criar Evento"}
@@ -698,7 +698,7 @@ const handleSubmit = async () => {
                     <div className="flex items-center gap-2">
                       <button
                         onClick={() => navegarMes(-1)}
-                        className="p-2 rounded-lg hover:bg-[var(--surface-hover)] text-white/60 hover:text-white transition-colors"
+                        className="p-2 rounded-lg hover:bg-[var(--surface-hover)] text-[var(--text-secondary)] hover:text-white transition-colors"
                       >
                         <ChevronLeft className="h-5 w-5" />
                       </button>
@@ -710,7 +710,7 @@ const handleSubmit = async () => {
                       </button>
                       <button
                         onClick={() => navegarMes(1)}
-                        className="p-2 rounded-lg hover:bg-[var(--surface-hover)] text-white/60 hover:text-white transition-colors"
+                        className="p-2 rounded-lg hover:bg-[var(--surface-hover)] text-[var(--text-secondary)] hover:text-white transition-colors"
                       >
                         <ChevronRight className="h-5 w-5" />
                       </button>

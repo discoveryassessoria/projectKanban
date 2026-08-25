@@ -106,7 +106,7 @@ function Consulta({
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
             <h2 className="text-lg font-semibold text-white">{titulo}</h2>
-            <p className="mt-1 max-w-3xl text-sm text-white/60">{descricao}</p>
+            <p className="mt-1 max-w-3xl text-sm text-[var(--text-secondary)]">{descricao}</p>
           </div>
           <span className="flex-none rounded-lg border border-[var(--border-default)] bg-[var(--surface-primary)] px-3 py-1.5 text-[11px] text-[var(--text-secondary)]">
             Somente leitura · edite em {onde}
@@ -115,7 +115,7 @@ function Consulta({
 
         {seletor && (
           <div className="mt-4 flex flex-wrap items-center gap-3 border-t border-[var(--border-default)] pt-4">
-            <label className="text-sm text-white/60">Processo:</label>
+            <label className="text-sm text-[var(--text-secondary)]">Processo:</label>
             <select
               value={tipoIdEfetivo ?? ""}
               onChange={(e) => setTipoId(e.target.value ? Number(e.target.value) : null)}
@@ -195,9 +195,9 @@ export function SLAConfiguracaoTab() {
                       <td className="px-4 py-2.5 text-[var(--text-secondary)]">{f.ordem}</td>
                       <td className="px-4 py-2.5 text-white">{f.label}</td>
                       <td className="px-4 py-2.5 text-white/80">{f.slaDays} d</td>
-                      <td className="px-4 py-2.5 text-white/60">{f.required ? `${acumulado} d` : "—"}</td>
-                      <td className="px-4 py-2.5 text-white/60">{passos.length || "—"}</td>
-                      <td className="px-4 py-2.5 text-white/60">{maiorPasso ? `${maiorPasso} d` : "—"}</td>
+                      <td className="px-4 py-2.5 text-[var(--text-secondary)]">{f.required ? `${acumulado} d` : "—"}</td>
+                      <td className="px-4 py-2.5 text-[var(--text-secondary)]">{passos.length || "—"}</td>
+                      <td className="px-4 py-2.5 text-[var(--text-secondary)]">{maiorPasso ? `${maiorPasso} d` : "—"}</td>
                       <td className="px-4 py-2.5">
                         <div className="flex flex-wrap gap-1 text-[10px]">
                           {f.required
@@ -214,7 +214,7 @@ export function SLAConfiguracaoTab() {
                   <td className="px-4 py-3 font-medium text-white">Prazo total (fases obrigatórias)</td>
                   <td className="px-4 py-3" />
                   <td className="px-4 py-3 font-semibold text-white">{acumulado} d</td>
-                  <td className="px-4 py-3 text-white/60">{tipo.contagens.passos}</td>
+                  <td className="px-4 py-3 text-[var(--text-secondary)]">{tipo.contagens.passos}</td>
                   <td className="px-4 py-3" />
                   <td className="px-4 py-3" />
                 </tr>
@@ -245,12 +245,12 @@ export function VersoesConfiguracaoTab() {
                 <div>
                   <div className="text-[11px] uppercase tracking-wide text-[var(--text-secondary)]">Workflow Macro</div>
                   <div className="mt-1 text-white">{tipo.macro.name}</div>
-                  <div className="mt-0.5 text-sm text-white/60">versão {tipo.macro.versao} · {tipo.macro.ativo ? "ativo" : "inativo"}</div>
+                  <div className="mt-0.5 text-sm text-[var(--text-secondary)]">versão {tipo.macro.versao} · {tipo.macro.ativo ? "ativo" : "inativo"}</div>
                 </div>
                 <div>
                   <div className="text-[11px] uppercase tracking-wide text-[var(--text-secondary)]">Fases</div>
                   <div className="mt-1 text-white">{tipo.contagens.fases}</div>
-                  <div className="mt-0.5 text-sm text-white/60">{tipo.contagens.fasesComInterno} com workflow interno</div>
+                  <div className="mt-0.5 text-sm text-[var(--text-secondary)]">{tipo.contagens.fasesComInterno} com workflow interno</div>
                 </div>
                 <div>
                   <div className="text-[11px] uppercase tracking-wide text-[var(--text-secondary)]">Última alteração do tipo</div>
@@ -283,7 +283,7 @@ export function VersoesConfiguracaoTab() {
                           : <span className="text-[var(--text-muted)]">—</span>}
                       </td>
                       <td className="px-4 py-2.5 text-white/70">{f.interno ? `v${f.interno.versao}` : "—"}</td>
-                      <td className="px-4 py-2.5 text-white/60">{f.interno?.passos.length ?? "—"}</td>
+                      <td className="px-4 py-2.5 text-[var(--text-secondary)]">{f.interno?.passos.length ?? "—"}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -327,9 +327,9 @@ export function ConfiguracoesGeraisProcessoTab() {
                   <td className="px-4 py-2.5 text-white">{t.name}</td>
                   <td className="px-4 py-2.5 text-white/70">{t.countryLabel} · {t.nationalityLabel}</td>
                   <td className="px-4 py-2.5 text-white/70">{t.modalityLabel}</td>
-                  <td className="px-4 py-2.5 text-white/60">{t.processFamily}</td>
-                  <td className="px-4 py-2.5 text-white/60">{t.serviceNature}</td>
-                  <td className="px-4 py-2.5 text-white/60">
+                  <td className="px-4 py-2.5 text-[var(--text-secondary)]">{t.processFamily}</td>
+                  <td className="px-4 py-2.5 text-[var(--text-secondary)]">{t.serviceNature}</td>
+                  <td className="px-4 py-2.5 text-[var(--text-secondary)]">
                     {t.macro ? `${t.contagens.fases} fase(s) · v${t.macro.versao}` : <span className="text-amber-700/80">sem workflow</span>}
                   </td>
                   <td className="px-4 py-2.5">
@@ -389,8 +389,8 @@ export function TransicoesTab() {
                           {f.conditional && <span className="rounded bg-amber-50 px-1.5 py-0.5 text-amber-700">condicional</span>}
                         </div>
                       </td>
-                      <td className="px-4 py-2.5 text-white/60">{f.slaDays} d</td>
-                      <td className="px-4 py-2.5 text-white/60">{f.showInKanban ? "sim" : "não"}</td>
+                      <td className="px-4 py-2.5 text-[var(--text-secondary)]">{f.slaDays} d</td>
+                      <td className="px-4 py-2.5 text-[var(--text-secondary)]">{f.showInKanban ? "sim" : "não"}</td>
                     </tr>
                   )
                 })}

@@ -251,7 +251,7 @@ export function MovimentarFaseModal({
                 <ArrowRight className="w-4 h-4 text-[var(--text-muted)] flex-none" />
                 <div className="min-w-0 flex-1">
                   <div className="text-[10px] font-bold uppercase tracking-wider text-[var(--text-muted)]">Para</div>
-                  <div className="text-[13px] font-bold text-[#7dd3fc] truncate">{destino?.label ?? "Selecione a fase"}</div>
+                  <div className="text-[13px] font-bold text-sky-700 truncate">{destino?.label ?? "Selecione a fase"}</div>
                 </div>
               </div>
 
@@ -262,7 +262,7 @@ export function MovimentarFaseModal({
                   value={faseAlvo}
                   onChange={(e) => setFaseAlvo(e.target.value)}
                   disabled={enviando}
-                  className="mt-1 w-full text-[13px] rounded-lg border border-[var(--border-default)] bg-[var(--surface-popover)] text-white/95 px-3 py-2 focus:outline-none focus:border-[#7dd3fc]/50"
+                  className="mt-1 w-full text-[13px] rounded-lg border border-[var(--border-default)] bg-[var(--surface-popover)] text-white/95 px-3 py-2 focus:outline-none focus:border-sky-200"
                 >
                   <option value="">Selecione…</option>
                   {(ctx?.fases ?? []).filter((f) => !f.atual).map((f) => (
@@ -274,15 +274,15 @@ export function MovimentarFaseModal({
               </label>
 
               {/* AVISOS — o que esta ação faz e o que ela NÃO faz */}
-              <div className="rounded-xl border border-[#d2a948]/30 bg-[#d2a948]/10 px-4 py-3 space-y-1.5">
-                <div className="flex items-center gap-2 text-[12px] font-bold text-[#d2a948]">
+              <div className="rounded-xl border border-[var(--accent-primary)]/30 bg-[var(--accent-primary)]/10 px-4 py-3 space-y-1.5">
+                <div className="flex items-center gap-2 text-[12px] font-bold text-[var(--accent-text)]">
                   <AlertTriangle className="w-3.5 h-3.5 flex-none" /> Esta ação não passa pelo fluxo automático
                 </div>
-                <p className="text-[11.5px] text-[#d2a948]/90 leading-relaxed">
+                <p className="text-[11.5px] text-[var(--accent-text)]/90 leading-relaxed">
                   Esta movimentação altera apenas a fase operacional do processo. Tarefas e
                   obrigações das demais fases permanecerão pendentes até serem concluídas.
                 </p>
-                <ul className="text-[11.5px] text-[#d2a948]/90 leading-relaxed list-disc pl-5">
+                <ul className="text-[11.5px] text-[var(--accent-text)]/90 leading-relaxed list-disc pl-5">
                   <li>Não conclui as tarefas da fase atual, nem marca a fase como concluída.</li>
                   <li>Não conclui, cancela nem dispensa tarefas de nenhuma outra fase — inclusive das fases atravessadas.</li>
                   <li>Todo o histórico é preservado: tarefas, passos e ciclos anteriores continuam existindo.</li>
@@ -302,7 +302,7 @@ export function MovimentarFaseModal({
                   value={motivoCodigo}
                   onChange={(e) => setMotivoCodigo(e.target.value)}
                   disabled={enviando}
-                  className="mt-1 w-full text-[13px] rounded-lg border border-[var(--border-default)] bg-[var(--surface-popover)] text-white/95 px-3 py-2 focus:outline-none focus:border-[#7dd3fc]/50"
+                  className="mt-1 w-full text-[13px] rounded-lg border border-[var(--border-default)] bg-[var(--surface-popover)] text-white/95 px-3 py-2 focus:outline-none focus:border-sky-200"
                 >
                   <option value="">Selecione o motivo…</option>
                   {(ctx?.motivos ?? []).map((m) => (
@@ -327,7 +327,7 @@ export function MovimentarFaseModal({
                   disabled={enviando}
                   rows={3}
                   placeholder="Explique por que este processo está sendo reposicionado."
-                  className="mt-1 w-full text-[13px] rounded-lg border border-[var(--border-default)] bg-[var(--surface-popover)] text-white/95 px-3 py-2 resize-y focus:outline-none focus:border-[#7dd3fc]/50"
+                  className="mt-1 w-full text-[13px] rounded-lg border border-[var(--border-default)] bg-[var(--surface-popover)] text-white/95 px-3 py-2 resize-y focus:outline-none focus:border-sky-200"
                 />
               </label>
 
@@ -341,8 +341,8 @@ export function MovimentarFaseModal({
                 </div>
               )}
               {plano?.ehRetrocesso && (
-                <div className="rounded-lg border border-[#d2a948]/30 bg-[#d2a948]/5 px-3 py-3">
-                  <div className="text-[11px] font-bold uppercase tracking-wider text-[#d2a948]">
+                <div className="rounded-lg border border-[var(--accent-primary)]/30 bg-[var(--accent-primary)]/5 px-3 py-3">
+                  <div className="text-[11px] font-bold uppercase tracking-wider text-[var(--accent-text)]">
                     O que existe em {plano.faseDestinoLabel}
                   </div>
                   <p className="mt-1 text-[12px] text-white/70">
@@ -362,7 +362,7 @@ export function MovimentarFaseModal({
               )}
 
               {erro && (
-                <div className="rounded-lg border border-[#f87171]/40 bg-[#f87171]/10 px-3 py-2.5 text-[12.5px] text-[#f87171]">
+                <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2.5 text-[12.5px] text-red-700">
                   {erro}
                 </div>
               )}

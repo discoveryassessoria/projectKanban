@@ -172,8 +172,8 @@ export default function CambioTab() {
                 <tr key={c.id} className="border-b border-[var(--border-subtle)] last:border-0 hover:bg-[var(--surface-primary)]">
                   <td className="px-4 py-2.5 font-medium text-white">{c.moedaDe} → {c.moedaPara}</td>
                   <td className="px-4 py-2.5 text-right tabular-nums text-white/80">{Number(c.taxa).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 6 })}</td>
-                  <td className="px-4 py-2.5 text-white/60">{fmtData(c.data)}</td>
-                  <td className="px-4 py-2.5 text-white/60">{c.fonte || '—'}</td>
+                  <td className="px-4 py-2.5 text-[var(--text-secondary)]">{fmtData(c.data)}</td>
+                  <td className="px-4 py-2.5 text-[var(--text-secondary)]">{c.fonte || '—'}</td>
                   <td className="px-4 py-2.5">
                     <span className={`rounded px-2 py-0.5 text-[11px] font-medium ${c.ativo ? 'bg-green-50 text-green-700' : 'bg-[var(--surface-primary)] text-[var(--text-secondary)]'}`}>
                       {c.ativo ? 'Ativo' : 'Inativo'}
@@ -203,30 +203,30 @@ export default function CambioTab() {
             <div className="space-y-4 px-6 py-4">
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="mb-1 block text-xs text-white/60">De</label>
+                  <label className="mb-1 block text-xs text-[var(--text-secondary)]">De</label>
                   <select value={moedaDe} onChange={(e) => setMoedaDe(e.target.value)} className={inputCls}>
                     {MOEDAS.map((m) => <option key={m} value={m} className="bg-zinc-900">{m}</option>)}
                   </select>
                 </div>
                 <div>
-                  <label className="mb-1 block text-xs text-white/60">Para</label>
+                  <label className="mb-1 block text-xs text-[var(--text-secondary)]">Para</label>
                   <select value={moedaPara} onChange={(e) => setMoedaPara(e.target.value)} className={inputCls}>
                     {MOEDAS.map((m) => <option key={m} value={m} className="bg-zinc-900">{m}</option>)}
                   </select>
                 </div>
               </div>
               <div>
-                <label className="mb-1 block text-xs text-white/60">Taxa</label>
+                <label className="mb-1 block text-xs text-[var(--text-secondary)]">Taxa</label>
                 <input type="number" step="0.000001" value={taxa} onChange={(e) => setTaxa(e.target.value)} placeholder="Ex.: 6.25" className={inputCls} />
                 <p className="mt-1 text-[11px] text-[var(--text-muted)]">1 {moedaDe} = {taxa || '?'} {moedaPara}</p>
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="mb-1 block text-xs text-white/60">Data</label>
+                  <label className="mb-1 block text-xs text-[var(--text-secondary)]">Data</label>
                   <input type="date" value={data} onChange={(e) => setData(e.target.value)} className={inputCls} />
                 </div>
                 <div>
-                  <label className="mb-1 block text-xs text-white/60">Fonte</label>
+                  <label className="mb-1 block text-xs text-[var(--text-secondary)]">Fonte</label>
                   <input value={fonte} onChange={(e) => setFonte(e.target.value)} placeholder="Ex.: BCB, Wise" className={inputCls} />
                 </div>
               </div>
@@ -241,7 +241,7 @@ export default function CambioTab() {
             </div>
 
             <div className="flex items-center justify-end gap-2 border-t border-[var(--border-default)] px-6 py-4">
-              <button onClick={() => setModalAberto(false)} className="rounded-lg px-4 py-2 text-sm text-white/60 transition hover:text-white">Cancelar</button>
+              <button onClick={() => setModalAberto(false)} className="rounded-lg px-4 py-2 text-sm text-[var(--text-secondary)] transition hover:text-white">Cancelar</button>
               <button onClick={salvar} disabled={salvando} className="rounded-lg bg-[var(--action-primary)] px-4 py-2 text-sm font-medium text-[var(--action-primary-ink)] transition hover:bg-[var(--action-primary)] disabled:opacity-50">
                 {salvando ? 'Salvando...' : 'Salvar'}
               </button>

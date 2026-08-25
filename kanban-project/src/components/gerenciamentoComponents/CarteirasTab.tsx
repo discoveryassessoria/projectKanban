@@ -237,26 +237,26 @@ export default function CarteirasTab() {
 
             <div className="space-y-4 px-6 py-4">
               <div>
-                <label className="mb-1 block text-xs text-white/60">Nome</label>
+                <label className="mb-1 block text-xs text-[var(--text-secondary)]">Nome</label>
                 <input value={nome} onChange={(e) => setNome(e.target.value)} autoFocus placeholder="Ex.: Pix Itaú, Stripe, Boleto" className={inputCls} />
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="mb-1 block text-xs text-white/60">Tipo</label>
+                  <label className="mb-1 block text-xs text-[var(--text-secondary)]">Tipo</label>
                   <select value={tipo} onChange={(e) => setTipo(e.target.value)} className={inputCls}>
                     <option value="" className="bg-zinc-900">—</option>
                     {TIPOS.map(([k, label]) => <option key={k} value={k} className="bg-zinc-900">{label}</option>)}
                   </select>
                 </div>
                 <div>
-                  <label className="mb-1 block text-xs text-white/60">Moeda</label>
+                  <label className="mb-1 block text-xs text-[var(--text-secondary)]">Moeda</label>
                   <select value={moeda} onChange={(e) => setMoeda(e.target.value)} className={inputCls}>
                     {MOEDAS.map(([k, label]) => <option key={k} value={k} className="bg-zinc-900">{label}</option>)}
                   </select>
                 </div>
               </div>
               <div>
-                <label className="mb-1 block text-xs text-white/60">Conta vinculada</label>
+                <label className="mb-1 block text-xs text-[var(--text-secondary)]">Conta vinculada</label>
                 <select value={contaBancariaId} onChange={(e) => setContaBancariaId(e.target.value)} className={inputCls}>
                   <option value="" className="bg-zinc-900">— Nenhuma —</option>
                   {contas.map((c) => <option key={c.id} value={c.id} className="bg-zinc-900">{c.nome}</option>)}
@@ -264,7 +264,7 @@ export default function CarteirasTab() {
                 {contas.length === 0 && <p className="mt-1 text-[11px] text-amber-700/70">Cadastre Contas primeiro para vincular.</p>}
               </div>
               <div>
-                <label className="mb-1 block text-xs text-white/60">Dias para liquidação</label>
+                <label className="mb-1 block text-xs text-[var(--text-secondary)]">Dias para liquidação</label>
                 <input type="number" min="0" step="1" value={diasLiquidacao} onChange={(e) => setDiasLiquidacao(e.target.value)} placeholder="0" className={`${inputCls} max-w-[160px]`} />
               </div>
               <div className="flex flex-wrap items-center gap-x-6 gap-y-2">
@@ -284,7 +284,7 @@ export default function CarteirasTab() {
             </div>
 
             <div className="flex items-center justify-end gap-2 border-t border-[var(--border-default)] px-6 py-4">
-              <button onClick={() => setModalAberto(false)} className="rounded-lg px-4 py-2 text-sm text-white/60 transition hover:text-white">Cancelar</button>
+              <button onClick={() => setModalAberto(false)} className="rounded-lg px-4 py-2 text-sm text-[var(--text-secondary)] transition hover:text-white">Cancelar</button>
               <button onClick={salvar} disabled={salvando} className="rounded-lg bg-[var(--action-primary)] px-4 py-2 text-sm font-medium text-[var(--action-primary-ink)] transition hover:bg-[var(--action-primary)] disabled:opacity-50">
                 {salvando ? 'Salvando...' : 'Salvar'}
               </button>

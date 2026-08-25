@@ -193,10 +193,10 @@ export default function CapacidadeOperacionalTab() {
                     </div>
                   )}
                 </td>
-                <td className="px-3 py-2 text-[11px] text-white/60">
+                <td className="px-3 py-2 text-[11px] text-[var(--text-secondary)]">
                   {l.equipes.length ? l.equipes.map((e) => e.nome).join(", ") : <span className="text-[var(--text-muted)]">—</span>}
                 </td>
-                <td className="max-w-[220px] px-3 py-2 text-[11px] text-white/60">
+                <td className="max-w-[220px] px-3 py-2 text-[11px] text-[var(--text-secondary)]">
                   {l.aptidoesDetalhadas.length
                     ? l.aptidoesDetalhadas.map((a) => a.nome).join(", ")
                     : <span className="text-[var(--text-muted)]">nenhuma declarada</span>}
@@ -213,7 +213,7 @@ export default function CapacidadeOperacionalTab() {
                     <span className="text-emerald-700/70">disponível</span>
                   )}
                 </td>
-                <td className="px-3 py-2 text-[11px] tabular-nums text-white/60">
+                <td className="px-3 py-2 text-[11px] tabular-nums text-[var(--text-secondary)]">
                   {l.limiteExecutaveis == null ? <span className="text-[var(--text-muted)]">sem teto</span> : `${l.limiteExecutaveis} executáveis`}
                 </td>
                 <td className="px-3 py-2 text-[11px] tabular-nums text-white/70">{l.carga.ativas}</td>
@@ -223,7 +223,7 @@ export default function CapacidadeOperacionalTab() {
                 <td className="px-3 py-2 text-right">
                   <button
                     onClick={() => setAberta(l.usuarioId)}
-                    className="rounded border border-[var(--border-default)] px-2 py-1 text-[10px] text-white/60 transition-colors hover:bg-[var(--surface-primary)] hover:text-white/90"
+                    className="rounded border border-[var(--border-default)] px-2 py-1 text-[10px] text-[var(--text-secondary)] transition-colors hover:bg-[var(--surface-primary)] hover:text-white/90"
                   >
                     Configurar
                   </button>
@@ -388,7 +388,7 @@ function PainelConfiguracao({
                         <button
                           disabled={ocupado}
                           onClick={() => aoSalvar({ acao: "encerrar_indisponibilidade", usuarioId: linha.usuarioId, indisponibilidadeId: i.id })}
-                          className="ml-auto rounded border border-[var(--border-default)] px-2 py-0.5 text-[10px] text-white/60 hover:text-white/90 disabled:opacity-40"
+                          className="ml-auto rounded border border-[var(--border-default)] px-2 py-0.5 text-[10px] text-[var(--text-secondary)] hover:text-white/90 disabled:opacity-40"
                         >
                           Encerrar agora
                         </button>

@@ -344,7 +344,7 @@ export function KanbanBoard({
         {pode('processos.criar') && (
           <Button
             onClick={abrirCriar}
-            className="bg-blue-600 hover:bg-blue-500 text-[#fff]"
+            className="bg-[var(--action-primary)] hover:bg-[var(--action-primary)] text-[var(--action-primary-ink)]"
           >
             <Plus className="mr-1.5 h-4 w-4" /> Novo processo
           </Button>
@@ -420,7 +420,7 @@ export function KanbanBoard({
 
             <div className="space-y-4 px-6 py-4">
               <div>
-                <label className="mb-1 block text-xs text-white/60">Nome *</label>
+                <label className="mb-1 block text-xs text-[var(--text-secondary)]">Nome *</label>
                 <input
                   autoFocus
                   value={criarNome}
@@ -442,11 +442,11 @@ export function KanbanBoard({
             </div>
 
             <div className="flex items-center justify-end gap-2 border-t border-[var(--border-default)] px-6 py-4">
-              <button onClick={() => setCriarModal(false)} className="rounded-lg px-4 py-2 text-sm text-white/60 transition hover:text-white">Cancelar</button>
+              <button onClick={() => setCriarModal(false)} className="rounded-lg px-4 py-2 text-sm text-[var(--text-secondary)] transition hover:text-white">Cancelar</button>
               <button
                 onClick={confirmarCriarProcesso}
                 disabled={salvandoCriar}
-                className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-[#fff] transition hover:bg-blue-500 disabled:opacity-50"
+                className="rounded-lg bg-[var(--action-primary)] px-4 py-2 text-sm font-medium text-[var(--action-primary-ink)] transition hover:bg-[var(--action-primary)] disabled:opacity-50"
               >
                 {salvandoCriar ? "Criando..." : "Criar processo"}
               </button>

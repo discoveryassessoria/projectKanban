@@ -29,7 +29,7 @@ function authHeaders(): HeadersInit {
   return t ? { "Content-Type": "application/json", Authorization: `Bearer ${t}` } : { "Content-Type": "application/json" }
 }
 const inputCls = "w-full rounded-lg border border-[var(--border-default)] bg-[var(--surface-primary)] px-3 py-2 text-sm text-white placeholder-white/30 outline-none focus:border-white/20"
-const labelCls = "mb-1 block text-xs text-white/60"
+const labelCls = "mb-1 block text-xs text-[var(--text-secondary)]"
 const CARD = "rounded-2xl border border-[var(--border-default)] bg-[var(--surface-primary)] backdrop-blur-sm"
 
 const SEM_VALORES: Record<string, string> = {}
@@ -116,7 +116,7 @@ function FormularioConfig({
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
             <h2 className="text-lg font-semibold text-white">{titulo}</h2>
-            <p className="mt-1 max-w-3xl text-sm text-white/60">{descricao}</p>
+            <p className="mt-1 max-w-3xl text-sm text-[var(--text-secondary)]">{descricao}</p>
             {atualizadoEm && (
               <p className="mt-1 text-[11px] text-[var(--text-muted)]">Última alteração: {new Date(atualizadoEm).toLocaleString("pt-BR")}</p>
             )}
@@ -125,7 +125,7 @@ function FormularioConfig({
             {sujo && <span className="text-xs text-amber-700/80">alterações não salvas</span>}
             <button
               onClick={salvar} disabled={busy || !sujo}
-              className="rounded-lg bg-blue-600 px-4 py-2 text-xs font-medium text-[#fff] hover:bg-blue-500 disabled:opacity-40"
+              className="rounded-lg bg-[var(--action-primary)] px-4 py-2 text-xs font-medium text-[var(--action-primary-ink)] hover:bg-[var(--action-primary)] disabled:opacity-40"
               title={sujo ? "" : "Nada alterado"}
             >
               {busy ? "Salvando…" : "Salvar"}

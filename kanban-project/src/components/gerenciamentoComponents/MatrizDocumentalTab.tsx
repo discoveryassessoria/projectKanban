@@ -33,7 +33,7 @@ function authHeaders(): HeadersInit {
   return t ? { "Content-Type": "application/json", Authorization: `Bearer ${t}` } : { "Content-Type": "application/json" }
 }
 const inputCls = "w-full rounded-lg border border-[var(--border-default)] bg-[var(--surface-primary)] px-3 py-2 text-sm text-white placeholder-white/30 outline-none focus:border-white/20"
-const labelCls = "mb-1 block text-xs text-white/60"
+const labelCls = "mb-1 block text-xs text-[var(--text-secondary)]"
 const opt = "bg-zinc-900"
 const IEdit = () => (<svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 20h9" /><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z" /></svg>)
 const ICopy = () => (<svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" /><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" /></svg>)
@@ -139,7 +139,7 @@ export default function MatrizDocumentalTab() {
       {/* cabeçalho + seletor */}
       <div className="rounded-2xl border border-[var(--border-default)] bg-[var(--surface-primary)] p-5 backdrop-blur-sm">
         <h2 className="text-lg font-semibold text-white">Matriz Documental</h2>
-        <p className="mt-1 text-sm text-white/60">Quais documentos são exigidos por processo, fase, alvo e regra de geração. Define se cria tarefa/custo/receita e se bloqueia a conclusão da fase. <span className="text-[var(--text-muted)]">A execução real vem na Fase 4.</span></p>
+        <p className="mt-1 text-sm text-[var(--text-secondary)]">Quais documentos são exigidos por processo, fase, alvo e regra de geração. Define se cria tarefa/custo/receita e se bloqueia a conclusão da fase. <span className="text-[var(--text-muted)]">A execução real vem na Fase 4.</span></p>
         <div className="mt-4 max-w-md">
           <label className={labelCls}>Processo de Nacionalidade</label>
           <select value={ptId ?? ""} onChange={e => { setPtId(Number(e.target.value)); setShowArchived(false) }} className={inputCls}>
@@ -154,7 +154,7 @@ export default function MatrizDocumentalTab() {
           <div className="mb-3 flex flex-wrap items-center gap-2">
             <button onClick={() => setForm(blankForm(proc.id))} className="rounded-lg bg-[var(--action-primary)] px-3 py-1.5 text-xs font-medium text-[var(--action-primary-ink)] hover:bg-[var(--action-primary)]">+ Nova regra documental</button>
             {arquivadasCount > 0 && (
-              <button onClick={() => setShowArchived(v => !v)} className={`ml-auto rounded-lg border px-3 py-1.5 text-xs ${showArchived ? "border-blue-200 bg-blue-50 text-blue-700" : "border-[var(--border-default)] bg-[var(--surface-primary)] text-white/60 hover:bg-[var(--surface-hover)]"}`}>
+              <button onClick={() => setShowArchived(v => !v)} className={`ml-auto rounded-lg border px-3 py-1.5 text-xs ${showArchived ? "border-blue-200 bg-blue-50 text-blue-700" : "border-[var(--border-default)] bg-[var(--surface-primary)] text-[var(--text-secondary)] hover:bg-[var(--surface-hover)]"}`}>
                 {showArchived ? "Ocultar arquivadas" : `Mostrar arquivadas (${arquivadasCount})`}
               </button>
             )}

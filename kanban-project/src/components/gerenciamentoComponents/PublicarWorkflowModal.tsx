@@ -145,7 +145,7 @@ export default function PublicarWorkflowModal({
               <ul className="mt-1.5 space-y-1">
                 {porArea.get(area)!.map((m, i) => (
                   <li key={i} className="flex flex-wrap items-start gap-x-2 gap-y-0.5 text-xs">
-                    <span className={`mt-0.5 flex-none rounded px-1.5 py-0.5 text-[10px] ${COR_DO_TIPO[m.tipo] ?? "bg-[var(--surface-primary)] text-white/60"}`}>
+                    <span className={`mt-0.5 flex-none rounded px-1.5 py-0.5 text-[10px] ${COR_DO_TIPO[m.tipo] ?? "bg-[var(--surface-primary)] text-[var(--text-secondary)]"}`}>
                       {m.tipo.toLowerCase()}
                     </span>
                     <span className="text-white/80">{m.alvo}</span>
@@ -165,7 +165,7 @@ export default function PublicarWorkflowModal({
         <div className="flex justify-end gap-2 border-t border-[var(--border-default)] px-6 py-4">
           <button onClick={onFechar} className="rounded-lg border border-[var(--border-default)] bg-[var(--surface-primary)] px-4 py-2 text-sm text-white/70 hover:bg-[var(--surface-hover)]">Fechar</button>
           <button onClick={publicar} disabled={!preview || !preview.podePublicar || publicando}
-            className="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-medium text-[#fff] hover:bg-emerald-500 disabled:opacity-40">
+            className="rounded-lg bg-emerald-700 px-4 py-2 text-sm font-medium text-[var(--action-primary-ink)] hover:bg-emerald-500 disabled:opacity-40">
             {publicando ? "Publicando…" : `Publicar versão ${preview?.versaoNova ?? ""}`}
           </button>
         </div>

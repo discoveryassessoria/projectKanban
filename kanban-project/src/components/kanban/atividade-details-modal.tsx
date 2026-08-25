@@ -588,8 +588,8 @@ function ConteudoModal({
               className={`
                 px-4 py-3 text-sm font-medium border-b-2 transition-colors
                 ${activeTab === tab.id
-                  ? (finDark ? 'border-[#d2a948] text-[#d2a948]' : 'border-[var(--border-strong)] text-white')
-                  : (finDark ? 'border-transparent text-white/60 hover:text-white' : 'border-transparent text-gray-500 hover:text-gray-700')}
+                  ? (finDark ? 'border-[var(--accent-primary)] text-[var(--accent-text)]' : 'border-[var(--border-strong)] text-white')
+                  : (finDark ? 'border-transparent text-[var(--text-secondary)] hover:text-white' : 'border-transparent text-gray-500 hover:text-gray-700')}
               `}
             >
               {tab.label}
@@ -611,7 +611,7 @@ function ConteudoModal({
                     pode('processos.editar') && (
                       <button
                         onClick={() => setIsEditing(true)}
-                        className="text-sm text-[#7dd3fc] hover:text-[#a5e0fc]"
+                        className="text-sm text-sky-700 hover:text-sky-700"
                       >
                         editar
                       </button>
@@ -688,7 +688,7 @@ function ConteudoModal({
                                     estado={cont.estado}
                                     cep={cont.cep}
                                   >
-                                    <div className="flex items-start gap-2 cursor-pointer hover:text-[#7dd3fc]">
+                                    <div className="flex items-start gap-2 cursor-pointer hover:text-sky-700">
                                       <MapPin className="h-4 w-4 mt-0.5" />
                                       <div className="underline decoration-dotted underline-offset-2">
                                         <p>{cont.endereco}{cont.numero && `, ${cont.numero}`}</p>
@@ -702,13 +702,13 @@ function ConteudoModal({
                               )}
 
                               <div className="flex gap-2 mt-3" onClick={(e) => e.stopPropagation()}>
-                                <Button variant="outline" size="sm" className="border-[var(--border-default)] bg-transparent text-white/70 hover:bg-[var(--surface-tertiary)] hover:text-[#fff]">
+                                <Button variant="outline" size="sm" className="border-[var(--border-default)] bg-transparent text-white/70 hover:bg-[var(--surface-tertiary)] hover:text-[var(--text-primary)]">
                                   <Phone className="h-4 w-4" />
                                 </Button>
-                                <Button variant="outline" size="sm" className="border-[var(--border-default)] bg-transparent text-white/70 hover:bg-[var(--surface-tertiary)] hover:text-[#fff]">
+                                <Button variant="outline" size="sm" className="border-[var(--border-default)] bg-transparent text-white/70 hover:bg-[var(--surface-tertiary)] hover:text-[var(--text-primary)]">
                                   <Mail className="h-4 w-4" />
                                 </Button>
-                                <Button variant="outline" size="sm" className="border-[var(--border-default)] bg-transparent text-white/70 hover:bg-[var(--surface-tertiary)] hover:text-[#fff]">
+                                <Button variant="outline" size="sm" className="border-[var(--border-default)] bg-transparent text-white/70 hover:bg-[var(--surface-tertiary)] hover:text-[var(--text-primary)]">
                                   <MessageSquare className="h-4 w-4" />
                                 </Button>
                               </div>
@@ -757,7 +757,7 @@ function ConteudoModal({
                                     estado={req.estado}
                                     cep={req.cep}
                                   >
-                                    <div className="flex items-start gap-2 cursor-pointer hover:text-[#7dd3fc]">
+                                    <div className="flex items-start gap-2 cursor-pointer hover:text-sky-700">
                                       <MapPin className="h-3 w-3 mt-0.5" />
                                       <div className="underline decoration-dotted underline-offset-2">
                                         <p>{req.endereco}{req.numero && `, ${req.numero}`}</p>
@@ -804,7 +804,7 @@ function ConteudoModal({
                               </div>
                               <button
                                 onClick={() => removeContratante(cont.id)}
-                                className="text-[var(--text-muted)] hover:text-[#f87171]"
+                                className="text-[var(--text-muted)] hover:text-red-700"
                               >
                                 <Trash2 className="h-4 w-4" />
                               </button>
@@ -816,7 +816,7 @@ function ConteudoModal({
                       <div className="relative">
                         <button
                           onClick={() => setShowContratanteDropdown(!showContratanteDropdown)}
-                          className="w-full flex items-center gap-2 px-3 py-2 text-sm text-[#7dd3fc] hover:bg-[var(--surface-tertiary)] rounded-md transition-colors"
+                          className="w-full flex items-center gap-2 px-3 py-2 text-sm text-sky-700 hover:bg-[var(--surface-tertiary)] rounded-md transition-colors"
                         >
                           <Plus className="h-4 w-4" />
                           Adicionar contratante
@@ -841,8 +841,8 @@ function ConteudoModal({
                                     onClick={() => addContratante(c)}
                                     className="w-full px-4 py-2 text-left hover:bg-[var(--surface-tertiary)] flex items-center gap-3"
                                   >
-                                    <div className="w-8 h-8 bg-[#7dd3fc]/15 rounded-full flex items-center justify-center">
-                                      <User className="h-4 w-4 text-[#7dd3fc]" />
+                                    <div className="w-8 h-8 bg-sky-50 rounded-full flex items-center justify-center">
+                                      <User className="h-4 w-4 text-sky-700" />
                                     </div>
                                     <div>
                                       <p className="font-medium text-white/95 text-sm">{nomePessoa(c)}</p>
@@ -870,12 +870,12 @@ function ConteudoModal({
                           {[...requerentesSelecionados].sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR')).map((req) => (
                             <div key={req.id} className="flex items-center justify-between p-2 bg-[var(--surface-popover)] border border-[var(--border-default)] rounded-xl">
                               <div className="flex items-center gap-2">
-                                <User className="h-4 w-4 text-[#7dd3fc]" />
+                                <User className="h-4 w-4 text-sky-700" />
                                 <span className="text-white/95 text-sm">{nomePessoa(req)}</span>
                               </div>
                               <button
                                 onClick={() => removeRequerente(req.id)}
-                                className="text-[var(--text-muted)] hover:text-[#f87171]"
+                                className="text-[var(--text-muted)] hover:text-red-700"
                               >
                                 <Trash2 className="h-4 w-4" />
                               </button>
@@ -887,7 +887,7 @@ function ConteudoModal({
                       <div className="relative">
                         <button
                           onClick={() => setShowRequerenteDropdown(!showRequerenteDropdown)}
-                          className="w-full flex items-center gap-2 px-3 py-2 text-sm text-[#7dd3fc] hover:bg-[var(--surface-tertiary)] rounded-md transition-colors"
+                          className="w-full flex items-center gap-2 px-3 py-2 text-sm text-sky-700 hover:bg-[var(--surface-tertiary)] rounded-md transition-colors"
                         >
                           <Plus className="h-4 w-4" />
                           Adicionar requerente
@@ -912,8 +912,8 @@ function ConteudoModal({
                                     onClick={() => addRequerente(r)}
                                     className="w-full px-4 py-2 text-left hover:bg-[var(--surface-tertiary)] flex items-center gap-3"
                                   >
-                                    <div className="w-8 h-8 bg-[#4ade80]/15 rounded-full flex items-center justify-center">
-                                      <User className="h-4 w-4 text-[#4ade80]" />
+                                    <div className="w-8 h-8 bg-green-50 rounded-full flex items-center justify-center">
+                                      <User className="h-4 w-4 text-green-700" />
                                     </div>
                                     <div>
                                       <p className="font-medium text-white/95 text-sm">{nomePessoa(r)}</p>
@@ -934,10 +934,10 @@ function ConteudoModal({
 
                     {/* Botões salvar/cancelar */}
                     <div className="flex gap-3 pt-4 border-t border-[var(--border-default)]">
-                      <Button onClick={handleSaveEdit} className="bg-[#d2a948] hover:bg-[#e0b957] text-[#1b1508]">
+                      <Button onClick={handleSaveEdit} className="bg-[var(--accent-primary)] hover:bg-[#e0b957] text-[#1b1508]">
                         Salvar
                       </Button>
-                      <Button variant="outline" onClick={handleCancelEdit} className="border-[var(--border-default)] bg-transparent text-white/80 hover:bg-[var(--surface-tertiary)] hover:text-[#fff]">
+                      <Button variant="outline" onClick={handleCancelEdit} className="border-[var(--border-default)] bg-transparent text-white/80 hover:bg-[var(--surface-tertiary)] hover:text-[var(--text-primary)]">
                         Cancelar
                       </Button>
                     </div>

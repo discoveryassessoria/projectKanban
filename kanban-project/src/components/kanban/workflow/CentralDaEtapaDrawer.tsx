@@ -165,11 +165,11 @@ const STATUS_LABEL: Record<StatusStep, string> = {
 
 const STATUS_PILL_CLS: Record<StatusStep, string> = {
   nao_iniciada: "bg-[var(--surface-secondary)]0/20 text-[var(--text-muted)] border-[var(--border-default)]",
-  bloqueada: "bg-[#f87171]/20 text-[#f87171] border-[#f87171]/50",
-  em_andamento: "bg-[#7dd3fc]/20 text-[#7dd3fc] border-[#7dd3fc]/50",
-  aguardando_terceiro: "bg-[#d2a948]/20 text-[#d2a948] border-[#d2a948]/50",
-  atrasada: "bg-[#fbbf24]/20 text-[#fbbf24] border-[#fbbf24]/50",
-  concluida: "bg-[#4ade80]/20 text-[#4ade80] border-[#4ade80]/50",
+  bloqueada: "bg-red-50 text-red-700 border-red-200",
+  em_andamento: "bg-sky-50 text-sky-700 border-sky-200",
+  aguardando_terceiro: "bg-[var(--accent-primary)]/20 text-[var(--accent-text)] border-[var(--accent-primary)]/50",
+  atrasada: "bg-amber-50 text-amber-700 border-amber-200",
+  concluida: "bg-green-50 text-green-700 border-green-200",
   cancelada: "bg-[var(--surface-secondary)]0/20 text-[var(--text-muted)] border-[var(--border-default)]",
 }
 
@@ -445,8 +445,8 @@ function ConteudoDrawer({
         )}
 
         {erro && !step && (
-          <div className="flex-1 flex flex-col items-center justify-center text-white/60 gap-3 p-6">
-            <AlertTriangle className="w-8 h-8 text-[#d2a948]" />
+          <div className="flex-1 flex flex-col items-center justify-center text-[var(--text-secondary)] gap-3 p-6">
+            <AlertTriangle className="w-8 h-8 text-[var(--accent-text)]" />
             <p className="text-sm">{erro}</p>
             <button
               onClick={onClose}
@@ -470,7 +470,7 @@ function ConteudoDrawer({
                 </div>
                 <button
                   onClick={onClose}
-                  className="w-[30px] h-[30px] rounded-md bg-[var(--surface-popover)]/5 hover:bg-[var(--surface-popover)]/15 flex items-center justify-center text-[#fff]"
+                  className="w-[30px] h-[30px] rounded-md bg-[var(--surface-popover)]/5 hover:bg-[var(--surface-popover)]/15 flex items-center justify-center text-[var(--text-primary)]"
                   aria-label="Fechar"
                 >
                   <X className="w-4 h-4" />
@@ -514,7 +514,7 @@ function ConteudoDrawer({
                   <button
                     onClick={() => setEditorAberto(true)}
                     disabled={!!saving}
-                    className="inline-flex items-center gap-1.5 px-3 py-2 text-[12px] font-semibold bg-[var(--surface-popover)]/10 hover:bg-[var(--surface-popover)]/15 disabled:opacity-50 text-[#fff] rounded-md transition-colors border border-[var(--border-default)]"
+                    className="inline-flex items-center gap-1.5 px-3 py-2 text-[12px] font-semibold bg-[var(--surface-popover)]/10 hover:bg-[var(--surface-popover)]/15 disabled:opacity-50 text-[var(--text-primary)] rounded-md transition-colors border border-[var(--border-default)]"
                   >
                     <FileText className="w-3.5 h-3.5" />
                     Ver campos preenchidos
@@ -523,7 +523,7 @@ function ConteudoDrawer({
                     <button
                       onClick={() => setReabrindoModal(true)}
                       disabled={!!saving}
-                      className="inline-flex items-center gap-1.5 px-3 py-2 text-[12px] font-semibold bg-[var(--surface-popover)]/10 hover:bg-[var(--surface-popover)]/15 disabled:opacity-50 text-[#fff] rounded-md transition-colors border border-[var(--border-default)]"
+                      className="inline-flex items-center gap-1.5 px-3 py-2 text-[12px] font-semibold bg-[var(--surface-popover)]/10 hover:bg-[var(--surface-popover)]/15 disabled:opacity-50 text-[var(--text-primary)] rounded-md transition-colors border border-[var(--border-default)]"
                     >
                       ↻ Reabrir etapa
                     </button>
@@ -531,11 +531,11 @@ function ConteudoDrawer({
                   <button
                     onClick={onClose}
                     disabled={!!saving}
-                    className="inline-flex items-center gap-1.5 px-3 py-2 text-[12px] font-semibold bg-[#f87171]/15 hover:bg-[#f87171]/25 disabled:opacity-50 text-[#f87171] border border-[#f87171]/30 rounded-md transition-colors"
+                    className="inline-flex items-center gap-1.5 px-3 py-2 text-[12px] font-semibold bg-red-50 hover:bg-red-50 disabled:opacity-50 text-red-700 border border-red-200 rounded-md transition-colors"
                   >
                     Fechar
                   </button>
-                  <div className="ml-auto text-[11px] text-[#4ade80]/80">
+                  <div className="ml-auto text-[11px] text-green-700">
                     Concluída por <strong>{step.completedBy?.nome || "—"}</strong> em{" "}
                     {fmtDateTime(step.completedAt)}
                   </div>
@@ -551,7 +551,7 @@ function ConteudoDrawer({
                     <button
                       onClick={handleConcluir}
                       disabled={!!saving}
-                      className="inline-flex items-center gap-1.5 px-3 py-2 text-[12px] font-semibold bg-[#4ade80]/15 hover:bg-[#4ade80]/15 disabled:bg-[#4ade80]/15 disabled:opacity-50 disabled:cursor-not-allowed text-[#fff] rounded-md transition-colors"
+                      className="inline-flex items-center gap-1.5 px-3 py-2 text-[12px] font-semibold bg-green-50 hover:bg-green-50 disabled:bg-green-50 disabled:opacity-50 disabled:cursor-not-allowed text-[var(--text-primary)] rounded-md transition-colors"
                     >
                       <Check className="w-3.5 h-3.5" />
                       Concluir etapa
@@ -562,7 +562,7 @@ function ConteudoDrawer({
                   <button
                     onClick={() => setEditorAberto(true)}
                     disabled={!!saving}
-                    className="inline-flex items-center gap-1.5 px-3 py-2 text-[12px] font-semibold bg-[var(--surface-popover)]/10 hover:bg-[var(--surface-popover)]/15 disabled:opacity-50 text-[#fff] rounded-md transition-colors"
+                    className="inline-flex items-center gap-1.5 px-3 py-2 text-[12px] font-semibold bg-[var(--surface-popover)]/10 hover:bg-[var(--surface-popover)]/15 disabled:opacity-50 text-[var(--text-primary)] rounded-md transition-colors"
                   >
                     <FileText className="w-3.5 h-3.5" />
                     Abrir editor
@@ -573,7 +573,7 @@ function ConteudoDrawer({
                     <button
                       onClick={handleDesbloquear}
                       disabled={!!saving}
-                      className="inline-flex items-center gap-1.5 px-3 py-2 text-[12px] font-semibold bg-[#7dd3fc] hover:bg-[#7dd3fc] disabled:opacity-50 text-[#fff] rounded-md transition-colors"
+                      className="inline-flex items-center gap-1.5 px-3 py-2 text-[12px] font-semibold bg-sky-50 hover:bg-sky-50 disabled:opacity-50 text-[var(--text-primary)] rounded-md transition-colors"
                     >
                       {saving === "desbloqueando" ? "Desbloqueando…" : "Desbloquear"}
                     </button>
@@ -585,7 +585,7 @@ function ConteudoDrawer({
                         setShowForceForm(false)
                       }}
                       disabled={!!saving}
-                      className="inline-flex items-center gap-1.5 px-3 py-2 text-[12px] font-semibold bg-[var(--surface-popover)]/10 hover:bg-[var(--surface-popover)]/15 disabled:opacity-50 text-[#fff] rounded-md transition-colors"
+                      className="inline-flex items-center gap-1.5 px-3 py-2 text-[12px] font-semibold bg-[var(--surface-popover)]/10 hover:bg-[var(--surface-popover)]/15 disabled:opacity-50 text-[var(--text-primary)] rounded-md transition-colors"
                     >
                       <Lock className="w-3.5 h-3.5" />
                       Bloquear
@@ -601,7 +601,7 @@ function ConteudoDrawer({
                         setShowForceForm(false)
                       }}
                       disabled={!!saving}
-                      className="inline-flex items-center gap-1.5 px-3 py-2 text-[12px] font-semibold bg-[var(--surface-popover)]/10 hover:bg-[var(--surface-popover)]/15 disabled:opacity-50 text-[#fff] rounded-md transition-colors"
+                      className="inline-flex items-center gap-1.5 px-3 py-2 text-[12px] font-semibold bg-[var(--surface-popover)]/10 hover:bg-[var(--surface-popover)]/15 disabled:opacity-50 text-[var(--text-primary)] rounded-md transition-colors"
                     >
                       <ArrowLeftRight className="w-3.5 h-3.5" />
                       Alterar executor
@@ -618,7 +618,7 @@ function ConteudoDrawer({
                         setShowTransferForm(false)
                       }}
                       disabled={!!saving}
-                      className="inline-flex items-center gap-1.5 px-3 py-2 text-[12px] font-semibold bg-[#d2a948]/20 hover:bg-[#d2a948]/30 disabled:opacity-50 text-[#d2a948] border border-[#d2a948]/30 rounded-md transition-colors"
+                      className="inline-flex items-center gap-1.5 px-3 py-2 text-[12px] font-semibold bg-[var(--accent-primary)]/20 hover:bg-[var(--accent-primary)]/30 disabled:opacity-50 text-[var(--accent-text)] border border-[var(--accent-primary)]/30 rounded-md transition-colors"
                       title="Conclusão administrativa auditada — exige motivo e justificativa"
                     >
                       <Zap className="w-3.5 h-3.5" />
@@ -630,7 +630,7 @@ function ConteudoDrawer({
                   <button
                     onClick={onClose}
                     disabled={!!saving}
-                    className="ml-auto inline-flex items-center gap-1.5 px-3 py-2 text-[12px] font-semibold text-white/70 hover:text-[#fff] hover:bg-[var(--surface-popover)]/5 rounded-md transition-colors"
+                    className="ml-auto inline-flex items-center gap-1.5 px-3 py-2 text-[12px] font-semibold text-white/70 hover:text-[var(--text-primary)] hover:bg-[var(--surface-popover)]/5 rounded-md transition-colors"
                   >
                     Fechar
                   </button>
@@ -639,8 +639,8 @@ function ConteudoDrawer({
 
               {/* Form inline: Bloquear */}
               {showBlockForm && (
-                <div className="mt-3 p-3 rounded-md border border-[#f87171]/30 bg-[#f87171]/10">
-                  <label className="block text-[10px] uppercase font-semibold tracking-wider text-[#f87171]/80 mb-1.5">
+                <div className="mt-3 p-3 rounded-md border border-red-200 bg-red-50">
+                  <label className="block text-[10px] uppercase font-semibold tracking-wider text-red-700 mb-1.5">
                     Motivo do bloqueio
                   </label>
                   <input
@@ -648,14 +648,14 @@ function ConteudoDrawer({
                     value={blockReason}
                     onChange={(e) => setBlockReason(e.target.value)}
                     placeholder="ex: aguardando cliente confirmar dados"
-                    className="w-full px-2.5 py-1.5 bg-[var(--surface-popover)]/5 border border-[var(--border-default)] rounded text-[12px] text-[#fff] placeholder-white/30 focus:outline-none focus:border-[#f87171]/50"
+                    className="w-full px-2.5 py-1.5 bg-[var(--surface-popover)]/5 border border-[var(--border-default)] rounded text-[12px] text-[var(--text-primary)] placeholder-white/30 focus:outline-none focus:border-red-200"
                     autoFocus
                   />
                   <div className="flex gap-2 mt-2">
                     <button
                       onClick={handleBloquear}
                       disabled={!!saving || !blockReason.trim()}
-                      className="px-3 py-1.5 text-[11px] font-semibold bg-[#f87171] hover:bg-[#f87171]/15 disabled:opacity-50 disabled:cursor-not-allowed text-[#fff] rounded"
+                      className="px-3 py-1.5 text-[11px] font-semibold bg-red-50 hover:bg-red-50 disabled:opacity-50 disabled:cursor-not-allowed text-[var(--text-primary)] rounded"
                     >
                       {saving === "bloqueando" ? "Bloqueando…" : "Confirmar bloqueio"}
                     </button>
@@ -674,8 +674,8 @@ function ConteudoDrawer({
 
               {/* Form inline: executor DA ETAPA — o dono da tarefa não muda aqui */}
               {showTransferForm && (
-                <div className="mt-3 p-3 rounded-md border border-[#7dd3fc]/30 bg-[#7dd3fc]/10">
-                  <label className="block text-[10px] uppercase font-semibold tracking-wider text-[#7dd3fc]/80 mb-1.5">
+                <div className="mt-3 p-3 rounded-md border border-sky-200 bg-sky-50">
+                  <label className="block text-[10px] uppercase font-semibold tracking-wider text-sky-700 mb-1.5">
                     Quem executa esta etapa
                   </label>
                   <select
@@ -683,7 +683,7 @@ function ConteudoDrawer({
                     onChange={(e) =>
                       setTransferUserId(e.target.value ? Number(e.target.value) : null)
                     }
-                    className="w-full px-2.5 py-1.5 bg-[var(--surface-popover)]/5 border border-[var(--border-default)] rounded text-[12px] text-[#fff] focus:outline-none focus:border-[#7dd3fc]/50"
+                    className="w-full px-2.5 py-1.5 bg-[var(--surface-popover)]/5 border border-[var(--border-default)] rounded text-[12px] text-[var(--text-primary)] focus:outline-none focus:border-sky-200"
                   >
                     <option value="" className="bg-[var(--surface-secondary)]">
                       — Selecione quem executa —
@@ -698,7 +698,7 @@ function ConteudoDrawer({
                     <button
                       onClick={handleAlterarExecutor}
                       disabled={!!saving || !transferUserId}
-                      className="px-3 py-1.5 text-[11px] font-semibold bg-[#7dd3fc] hover:bg-[#7dd3fc] disabled:opacity-50 disabled:cursor-not-allowed text-[#fff] rounded"
+                      className="px-3 py-1.5 text-[11px] font-semibold bg-sky-50 hover:bg-sky-50 disabled:opacity-50 disabled:cursor-not-allowed text-[var(--text-primary)] rounded"
                     >
                       {saving === "transferindo" ? "Alterando…" : "Confirmar"}
                     </button>
@@ -717,12 +717,12 @@ function ConteudoDrawer({
 
               {/* Form inline: Forçar (motivo + justificativa obrigatórios) */}
               {showForceForm && (
-                <div className="mt-3 p-3 rounded-md border border-[#d2a948]/30 bg-[#d2a948]/10">
-                  <div className="text-[11px] text-[#d2a948] mb-2 leading-relaxed">
+                <div className="mt-3 p-3 rounded-md border border-[var(--accent-primary)]/30 bg-[var(--accent-primary)]/10">
+                  <div className="text-[11px] text-[var(--accent-text)] mb-2 leading-relaxed">
                     Conclusão <strong>administrativa</strong>: marca a etapa como concluída sem a
                     execução normal. Fica registrada na auditoria com o seu usuário.
                   </div>
-                  <label className="block text-[10px] uppercase font-semibold tracking-wider text-[#d2a948]/80 mb-1.5">
+                  <label className="block text-[10px] uppercase font-semibold tracking-wider text-[var(--accent-text)]/80 mb-1.5">
                     Motivo
                   </label>
                   <input
@@ -730,10 +730,10 @@ function ConteudoDrawer({
                     value={forceMotivo}
                     onChange={(e) => setForceMotivo(e.target.value)}
                     placeholder="ex: etapa executada fora do sistema"
-                    className="w-full px-2.5 py-1.5 bg-[var(--surface-popover)]/5 border border-[var(--border-default)] rounded text-[12px] text-[#fff] placeholder-white/30 focus:outline-none focus:border-[#d2a948]/50"
+                    className="w-full px-2.5 py-1.5 bg-[var(--surface-popover)]/5 border border-[var(--border-default)] rounded text-[12px] text-[var(--text-primary)] placeholder-white/30 focus:outline-none focus:border-[var(--accent-primary)]/50"
                     autoFocus
                   />
-                  <label className="block text-[10px] uppercase font-semibold tracking-wider text-[#d2a948]/80 mb-1.5 mt-2">
+                  <label className="block text-[10px] uppercase font-semibold tracking-wider text-[var(--accent-text)]/80 mb-1.5 mt-2">
                     Justificativa
                   </label>
                   <textarea
@@ -741,13 +741,13 @@ function ConteudoDrawer({
                     value={forceJustificativa}
                     onChange={(e) => setForceJustificativa(e.target.value)}
                     placeholder="Explique por que a etapa está sendo concluída assim."
-                    className="w-full px-2.5 py-1.5 bg-[var(--surface-popover)]/5 border border-[var(--border-default)] rounded text-[12px] text-[#fff] placeholder-white/30 focus:outline-none focus:border-[#d2a948]/50 resize-none"
+                    className="w-full px-2.5 py-1.5 bg-[var(--surface-popover)]/5 border border-[var(--border-default)] rounded text-[12px] text-[var(--text-primary)] placeholder-white/30 focus:outline-none focus:border-[var(--accent-primary)]/50 resize-none"
                   />
                   <div className="flex gap-2 mt-2">
                     <button
                       onClick={handleForcar}
                       disabled={!!saving || !forceMotivo.trim() || !forceJustificativa.trim()}
-                      className="px-3 py-1.5 text-[11px] font-semibold bg-[#d2a948] hover:bg-[#d2a948]/80 disabled:opacity-50 disabled:cursor-not-allowed text-[#161b22] rounded"
+                      className="px-3 py-1.5 text-[11px] font-semibold bg-[var(--accent-primary)] hover:bg-[var(--accent-primary)]/80 disabled:opacity-50 disabled:cursor-not-allowed text-[#161b22] rounded"
                     >
                       {saving === "forcando" ? "Forçando…" : "Confirmar conclusão forçada"}
                     </button>
@@ -767,14 +767,14 @@ function ConteudoDrawer({
 
               {/* Erro estruturado da última ação */}
               {erroAcao && (
-                <div className="mt-3 p-2.5 rounded-md border border-[#f87171]/30 bg-[#f87171]/10 text-[12px] text-[#f87171]">
+                <div className="mt-3 p-2.5 rounded-md border border-red-200 bg-red-50 text-[12px] text-red-700">
                   {erroAcao}
                 </div>
               )}
 
               {/* Banner motivoBloqueio */}
               {step.status === "bloqueada" && step.motivoBloqueio && (
-                <div className="mt-3 p-2.5 rounded-md border border-[#f87171]/30 bg-[#f87171]/10 text-[12px] text-[#f87171]">
+                <div className="mt-3 p-2.5 rounded-md border border-red-200 bg-red-50 text-[12px] text-red-700">
                   <strong className="font-semibold">Bloqueado:</strong> {step.motivoBloqueio}
                 </div>
               )}
@@ -797,7 +797,7 @@ function ConteudoDrawer({
                   onClick={() => setActiveTab(t.id)}
                   className={`flex-shrink-0 inline-flex items-center gap-1.5 px-4 py-2.5 text-[11.5px] font-semibold border-b-2 transition-colors -mb-px ${
                     activeTab === t.id
-                      ? "text-white border-[#7dd3fc]"
+                      ? "text-white border-sky-200"
                       : "text-[var(--text-secondary)] hover:text-white border-transparent"
                   }`}
                 >
@@ -806,7 +806,7 @@ function ConteudoDrawer({
                     <span
                       className={`text-[9.5px] px-1.5 rounded-full font-bold ${
                         activeTab === t.id
-                          ? "bg-[#7dd3fc]/30 text-[#7dd3fc]"
+                          ? "bg-sky-50 text-sky-700"
                           : "bg-[var(--surface-popover)]/10 text-white/70"
                       }`}
                     >
@@ -938,7 +938,7 @@ function TabTimeline({ step }: { step: WorkflowStep }) {
             key={i}
             className="flex items-start gap-3 p-3 rounded-md bg-[var(--surface-popover)]/5 border border-[var(--border-default)]"
           >
-            <div className="w-2 h-2 rounded-full bg-[#7dd3fc]/15 mt-1.5 flex-shrink-0" />
+            <div className="w-2 h-2 rounded-full bg-sky-50 mt-1.5 flex-shrink-0" />
             <div className="flex-1 min-w-0">
               <div className="text-sm text-white">{e.label}</div>
               {e.sublabel && (

@@ -50,18 +50,18 @@ export const LABEL_RESULTADO: Record<ResultadoContato, string> = {
 
 const PILL_RESULTADO: Record<ResultadoContato, string> = {
   SEM_RESPOSTA: "bg-[var(--surface-secondary)] text-white/70 border-[var(--border-default)]",
-  EM_ANALISE: "bg-[#7dd3fc]/20 text-[#7dd3fc] border-[#7dd3fc]/30",
-  PRAZO_INFORMADO: "bg-[#d2a948]/20 text-[#d2a948] border-[#d2a948]/30",
-  EXIGENCIA: "bg-[#f87171]/20 text-[#f87171] border-[#f87171]/30",
-  PRONTO_PARA_RETIRADA: "bg-[#4ade80]/20 text-[#4ade80] border-[#4ade80]/30",
-  RETORNO_RECEBIDO: "bg-[#4ade80]/20 text-[#4ade80] border-[#4ade80]/30",
+  EM_ANALISE: "bg-sky-50 text-sky-700 border-sky-200",
+  PRAZO_INFORMADO: "bg-[var(--accent-primary)]/20 text-[var(--accent-text)] border-[var(--accent-primary)]/30",
+  EXIGENCIA: "bg-red-50 text-red-700 border-red-200",
+  PRONTO_PARA_RETIRADA: "bg-green-50 text-green-700 border-green-200",
+  RETORNO_RECEBIDO: "bg-green-50 text-green-700 border-green-200",
   OUTRO: "bg-[var(--surface-secondary)] text-white/70 border-[var(--border-default)]",
 }
 
 // Mesmos tokens visuais dos editores existentes — o painel entra no modal aprovado
 // sem alterar largura, altura, densidade ou paleta.
 export const campoCls =
-  "w-full px-3 py-2 bg-[var(--surface-overlay)] border border-[var(--border-default)] rounded-md text-sm text-white placeholder-white/30 focus:outline-none focus:border-[#7dd3fc]/50 focus:ring-1 focus:ring-[#7dd3fc]/30"
+  "w-full px-3 py-2 bg-[var(--surface-overlay)] border border-[var(--border-default)] rounded-md text-sm text-white placeholder-white/30 focus:outline-none focus:border-sky-200 focus:ring-1 focus:border-sky-200"
 
 export function Rotulo({ children }: { children: React.ReactNode }) {
   return (
@@ -317,7 +317,7 @@ export function BlocoContatos({
           {emOrdem.map((c) => (
             <div key={c.chave} className="rounded-md border border-[var(--border-default)] bg-[var(--surface-overlay)] p-2.5">
               <div className="flex items-center gap-2 mb-1 flex-wrap">
-                <span className="text-[10.5px] font-semibold px-2 py-0.5 rounded border bg-[#7dd3fc]/15 text-[#7dd3fc] border-[#7dd3fc]/25">
+                <span className="text-[10.5px] font-semibold px-2 py-0.5 rounded border bg-sky-50 text-sky-700 border-sky-200">
                   {LABEL_CANAL[c.canal]}
                 </span>
                 <span
@@ -325,17 +325,17 @@ export function BlocoContatos({
                 >
                   {LABEL_RESULTADO[c.resultado]}
                 </span>
-                <span className="text-[10.5px] text-white/60 font-mono">{fmtDataHora(c.ocorridoEm)}</span>
+                <span className="text-[10.5px] text-[var(--text-secondary)] font-mono">{fmtDataHora(c.ocorridoEm)}</span>
                 <span className="text-[10px] text-[var(--text-muted)]">por {nomeAutor(c.autorId, usuarios)}</span>
               </div>
               {c.destinatario && (
-                <div className="text-[11px] text-white/60 mb-0.5">Com: {c.destinatario}</div>
+                <div className="text-[11px] text-[var(--text-secondary)] mb-0.5">Com: {c.destinatario}</div>
               )}
               {c.observacao && (
                 <div className="text-[12.5px] text-white/85 leading-snug whitespace-pre-wrap">{c.observacao}</div>
               )}
               {c.proximoAcompanhamento && (
-                <div className="text-[10.5px] text-[#d2a948] mt-1">
+                <div className="text-[10.5px] text-[var(--accent-text)] mt-1">
                   Próximo acompanhamento: {fmtData(c.proximoAcompanhamento)}
                 </div>
               )}
@@ -344,7 +344,7 @@ export function BlocoContatos({
                   href={c.anexoUrl}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="text-[11px] text-[#7dd3fc] hover:underline inline-flex items-center gap-1 mt-1"
+                  className="text-[11px] text-sky-700 hover:underline inline-flex items-center gap-1 mt-1"
                 >
                   {c.anexoNome || "anexo"}
                   <ExternalLink className="w-3 h-3" />

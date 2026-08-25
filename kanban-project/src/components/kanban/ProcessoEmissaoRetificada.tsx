@@ -130,7 +130,7 @@ interface Props {
 
 const authHeaders = () => ({ Authorization: `Bearer ${localStorage.getItem("authToken")}` })
 const jsonHeaders = () => ({ "Content-Type": "application/json", ...authHeaders() })
-const EC = "w-full text-sm border border-[var(--border-default)] rounded-md px-3 py-2 focus:outline-none focus:ring-1 focus:ring-[#7dd3fc]/25 focus:border-[#7dd3fc]/50"
+const EC = "w-full text-sm border border-[var(--border-default)] rounded-md px-3 py-2 focus:outline-none focus:ring-1 focus:border-sky-200 focus:border-sky-200"
 const ini = (nome: string) => {
   const p = (nome || "").trim().split(/\s+/)
   return ((p[0]?.[0] || "") + (p.length > 1 ? p[p.length - 1][0] : "")).toUpperCase() || "—"
@@ -239,8 +239,8 @@ export function ProcessoEmissaoRetificada({ processoId, onConcluido }: Props) {
         <div className="flex items-center gap-2 shrink-0">
           <Stat label="Documentos validados" value={`${k.valid} / ${k.total}`} ok={k.valid > 0} />
           <Stat label="Progresso da fase" value={`${pct}%`} />
-          <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold ${pct >= 100 ? "bg-[#4ade80]/12 text-[#4ade80]" : "bg-sky-50 text-sky-700"}`}>
-            <span className={`w-1.5 h-1.5 rounded-full ${pct >= 100 ? "bg-[#4ade80]" : "bg-sky-400"}`} />
+          <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold ${pct >= 100 ? "bg-green-50 text-green-700" : "bg-sky-50 text-sky-700"}`}>
+            <span className={`w-1.5 h-1.5 rounded-full ${pct >= 100 ? "bg-green-50" : "bg-sky-400"}`} />
             {pct >= 100 ? "Concluída" : "Em andamento"}
           </span>
         </div>
@@ -259,11 +259,11 @@ export function ProcessoEmissaoRetificada({ processoId, onConcluido }: Props) {
                   return (
                     <div key={s.id} className={`flex items-start ${i < foco.workflow.length - 1 ? "flex-1" : ""}`}>
                       <div className="flex flex-col items-center text-center w-[100px] shrink-0">
-                        <div className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold ${done ? "bg-[#4ade80] text-white" : active ? "bg-[var(--action-primary)] text-white" : "bg-[var(--surface-tertiary)] text-[var(--text-secondary)]"}`}>{done ? <Check className="w-4 h-4" /> : i + 1}</div>
+                        <div className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold ${done ? "bg-green-50 text-white" : active ? "bg-[var(--action-primary)] text-white" : "bg-[var(--surface-tertiary)] text-[var(--text-secondary)]"}`}>{done ? <Check className="w-4 h-4" /> : i + 1}</div>
                         <div className="mt-1.5 text-[11px] font-medium text-white/80 leading-tight">{RE_SHORT[i]}</div>
-                        <div className={`text-[10px] ${done ? "text-[#4ade80]" : active ? "text-[#7dd3fc]" : "text-[var(--text-muted)]"}`}>{done ? "Concluída" : active ? "Atual" : "Pendente"}</div>
+                        <div className={`text-[10px] ${done ? "text-green-700" : active ? "text-sky-700" : "text-[var(--text-muted)]"}`}>{done ? "Concluída" : active ? "Atual" : "Pendente"}</div>
                       </div>
-                      {i < foco.workflow.length - 1 && <div className={`flex-1 h-0.5 mt-3.5 ${done ? "bg-[#4ade80]" : "bg-[var(--surface-tertiary)]"}`} />}
+                      {i < foco.workflow.length - 1 && <div className={`flex-1 h-0.5 mt-3.5 ${done ? "bg-green-50" : "bg-[var(--surface-tertiary)]"}`} />}
                     </div>
                   )
                 })}
@@ -319,12 +319,12 @@ export function ProcessoEmissaoRetificada({ processoId, onConcluido }: Props) {
                         <td className="px-3 py-2.5"><div className="font-medium text-white/95">{d.documentoTitulo}</div><div className="text-[11px] text-[var(--text-secondary)]">Inteiro teor</div></td>
                         <td className="px-3 py-2.5">
                           <div className="text-[11px] text-[var(--text-secondary)]">{d.correcao.campo}</div>
-                          <div className="text-xs"><s className="text-[#f87171]">{d.correcao.old}</s> → <b className="text-[#4ade80]">{d.correcao.novo}</b></div>
+                          <div className="text-xs"><s className="text-red-700">{d.correcao.old}</s> → <b className="text-green-700">{d.correcao.novo}</b></div>
                         </td>
                         <td className="px-3 py-2.5"><RePill status={d.status} /></td>
                         <td className="px-3 py-2.5 text-white/68">{d.nextAction}</td>
                         <td className="px-3 py-2.5 text-right">
-                          <button onClick={(e) => { e.stopPropagation(); setDrawerId(d.id); setDrawerTab(reDone(d) ? "Workflow" : "Operação") }} className={`text-xs font-semibold rounded-md px-2.5 py-1.5 border ${reDone(d) ? "border-[#4ade80]/30 text-[#4ade80]" : "border-[var(--border-default)] bg-[var(--surface-secondary)] text-white hover:bg-[var(--surface-tertiary)]"}`}>{reDone(d) ? "Ver workflow" : "Abrir operação"}</button>
+                          <button onClick={(e) => { e.stopPropagation(); setDrawerId(d.id); setDrawerTab(reDone(d) ? "Workflow" : "Operação") }} className={`text-xs font-semibold rounded-md px-2.5 py-1.5 border ${reDone(d) ? "border-green-200 text-green-700" : "border-[var(--border-default)] bg-[var(--surface-secondary)] text-white hover:bg-[var(--surface-tertiary)]"}`}>{reDone(d) ? "Ver workflow" : "Abrir operação"}</button>
                         </td>
                       </tr>
                     ))}
@@ -348,15 +348,15 @@ export function ProcessoEmissaoRetificada({ processoId, onConcluido }: Props) {
           <div className="rounded-xl border border-[var(--border-default)] bg-[var(--surface-popover)] p-4">
             <h3 className="text-sm font-semibold text-white/95 mb-2.5">Alertas</h3>
             <div className="space-y-2 text-xs">
-              {k.bloq > 0 && <div className="flex items-center gap-2 text-[#d2a948] bg-[#d2a948]/12 border border-[#d2a948]/25 rounded-lg px-3 py-2"><AlertTriangle className="w-4 h-4 shrink-0" /> {k.bloq} documento(s) com divergência pós-retificação</div>}
-              <div className="flex items-center gap-2 text-[#d2a948] bg-[#d2a948]/12 rounded-lg px-3 py-2"><AlertTriangle className="w-4 h-4 shrink-0" /> {k.total - k.valid} certidão(ões) retificada(s) pendente(s)</div>
-              <div className="flex items-center gap-2 text-[#4ade80] bg-[#4ade80]/12 rounded-lg px-3 py-2"><CheckCircle2 className="w-4 h-4 shrink-0" /> {k.valid} validada(s)</div>
+              {k.bloq > 0 && <div className="flex items-center gap-2 text-[var(--accent-text)] bg-[var(--accent-primary)]/12 border border-[var(--accent-primary)]/25 rounded-lg px-3 py-2"><AlertTriangle className="w-4 h-4 shrink-0" /> {k.bloq} documento(s) com divergência pós-retificação</div>}
+              <div className="flex items-center gap-2 text-[var(--accent-text)] bg-[var(--accent-primary)]/12 rounded-lg px-3 py-2"><AlertTriangle className="w-4 h-4 shrink-0" /> {k.total - k.valid} certidão(ões) retificada(s) pendente(s)</div>
+              <div className="flex items-center gap-2 text-green-700 bg-green-50 rounded-lg px-3 py-2"><CheckCircle2 className="w-4 h-4 shrink-0" /> {k.valid} validada(s)</div>
             </div>
           </div>
         </aside>
       </div>
 
-      {erro && <div className="bg-[#f87171]/12 border border-[#f87171]/30 rounded-lg px-4 py-3 text-sm text-[#f87171]">{erro}</div>}
+      {erro && <div className="bg-red-50 border border-red-200 rounded-lg px-4 py-3 text-sm text-red-700">{erro}</div>}
       {aviso && <div className="bg-sky-50 border border-sky-200 rounded-lg px-4 py-3 text-sm text-sky-700">{aviso}</div>}
 
       {/* Drawer do documento */}
@@ -390,23 +390,23 @@ function calcProgress(docs: ReDoc[]): number {
 // ============================================================
 
 function Stat({ label, value, ok }: { label: string; value: string; ok?: boolean }) {
-  return <div className="rounded-lg border border-[var(--border-default)] bg-[var(--surface-popover)] px-3 py-2 text-center"><div className={`text-lg font-bold ${ok ? "text-[#4ade80]" : "text-white/95"}`}>{value}</div><div className="text-[11px] text-[var(--text-secondary)] whitespace-nowrap">{label}</div></div>
+  return <div className="rounded-lg border border-[var(--border-default)] bg-[var(--surface-popover)] px-3 py-2 text-center"><div className={`text-lg font-bold ${ok ? "text-green-700" : "text-white/95"}`}>{value}</div><div className="text-[11px] text-[var(--text-secondary)] whitespace-nowrap">{label}</div></div>
 }
 function QBtn({ icon, onClick, children }: { icon: ReactNode; onClick: () => void; children: ReactNode }) {
   return <button onClick={onClick} className="w-full text-left text-sm text-white/80 hover:bg-[var(--surface-secondary)] border border-[var(--border-default)] rounded-lg px-3 py-2 inline-flex items-center gap-2">{icon} {children}</button>
 }
 function RePill({ status }: { status: string }) {
   const map: Record<string, string> = {
-    validada: "bg-[#4ade80]/12 text-[#4ade80]",
-    divergente: "bg-[#f87171]/12 text-[#f87171]",
-    bloqueada: "bg-[#f87171]/12 text-[#f87171]",
+    validada: "bg-green-50 text-green-700",
+    divergente: "bg-red-50 text-red-700",
+    bloqueada: "bg-red-50 text-red-700",
     pendente_averbacao: "bg-[var(--surface-tertiary)] text-white/68",
     nova_via: "bg-[var(--surface-tertiary)] text-white/68",
-    reabrir_averbacao: "bg-[#d2a948]/12 text-[#d2a948]",
+    reabrir_averbacao: "bg-[var(--accent-primary)]/12 text-[var(--accent-text)]",
   }
-  const dot: Record<string, string> = { validada: "bg-[#4ade80]", divergente: "bg-[#f87171]", bloqueada: "bg-[#f87171]" }
+  const dot: Record<string, string> = { validada: "bg-green-50", divergente: "bg-red-50", bloqueada: "bg-red-50" }
   return (
-    <span className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs font-semibold ${map[status] || "bg-[#d2a948]/12 text-[#d2a948]"}`}>
+    <span className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs font-semibold ${map[status] || "bg-[var(--accent-primary)]/12 text-[var(--accent-text)]"}`}>
       <span className={`w-1.5 h-1.5 rounded-full ${dot[status] || "bg-amber-400"}`} />{RE_LABEL[status] || status}
     </span>
   )
@@ -437,15 +437,15 @@ function DocDrawer({ pk, tab, onTab, onClose, onAbrirEtapa }: {
         {/* Header */}
         <div className="px-5 py-4 border-b border-[var(--border-default)]">
           <button onClick={onClose} className="text-[var(--text-muted)] hover:text-white/80 float-right p-1"><X className="w-5 h-5" /></button>
-          <div className="text-[11px] font-semibold uppercase tracking-wider text-[#7dd3fc]">Emissão documental retificada · {pk.pessoaNome}</div>
+          <div className="text-[11px] font-semibold uppercase tracking-wider text-sky-700">Emissão documental retificada · {pk.pessoaNome}</div>
           <h3 className="text-base font-bold text-white/95 mt-0.5">{pk.documentoTitulo} retificada</h3>
           <div className="text-xs text-[var(--text-secondary)]">{pk.pessoaNome} · documento pós-retificação</div>
           <div className="grid grid-cols-3 gap-2 mt-3">
-            <MetaCell k="Status"><span className={`inline-flex items-center gap-1 text-xs font-semibold ${green ? "text-[#4ade80]" : "text-[#d2a948]"}`}>● {RE_LABEL[pk.status] || pk.status}</span></MetaCell>
+            <MetaCell k="Status"><span className={`inline-flex items-center gap-1 text-xs font-semibold ${green ? "text-green-700" : "text-[var(--accent-text)]"}`}>● {RE_LABEL[pk.status] || pk.status}</span></MetaCell>
             <MetaCell k="Responsável"><b className="text-white/95 text-xs">Equipe Documental</b></MetaCell>
             <MetaCell k="Próxima ação"><b className="text-white/95 text-xs">{pk.nextAction}</b></MetaCell>
           </div>
-          <div className="mt-3 h-1.5 bg-[var(--surface-tertiary)] rounded-full overflow-hidden"><div className="h-full bg-[#7dd3fc]" style={{ width: `${prog}%` }} /></div>
+          <div className="mt-3 h-1.5 bg-[var(--surface-tertiary)] rounded-full overflow-hidden"><div className="h-full bg-sky-50" style={{ width: `${prog}%` }} /></div>
           <div className="flex justify-between text-[11px] text-[var(--text-secondary)] mt-1"><span>Progresso operacional</span><span>{prog}% · workflow retificado</span></div>
         </div>
 
@@ -460,8 +460,8 @@ function DocDrawer({ pk, tab, onTab, onClose, onAbrirEtapa }: {
         <div className="p-5 flex-1">
           {tab === "Operação" && (
             green ? (
-              <div className="rounded-lg border border-[#4ade80]/30 bg-[#4ade80]/12 p-4 text-center">
-                <div className="w-9 h-9 mx-auto rounded-full bg-[#4ade80] text-[#fff] flex items-center justify-center mb-2"><Check className="w-5 h-5" /></div>
+              <div className="rounded-lg border border-green-200 bg-green-50 p-4 text-center">
+                <div className="w-9 h-9 mx-auto rounded-full bg-green-50 text-[var(--text-primary)] flex items-center justify-center mb-2"><Check className="w-5 h-5" /></div>
                 <h4 className="text-sm font-bold text-white/95">Certidão retificada validada</h4>
                 <p className="text-xs text-white/68">Workflow concluído (100%). Documento corrigido e validado.</p>
               </div>
@@ -484,9 +484,9 @@ function DocDrawer({ pk, tab, onTab, onClose, onAbrirEtapa }: {
                 const meta = isDone ? `concluída${s.doneAt ? " em " + s.doneAt : ""}` : active ? "etapa atual" : "bloqueada · conclua a anterior"
                 return (
                   <div key={s.id} className="flex items-center gap-3 border border-[var(--border-default)] rounded-lg px-3 py-2.5">
-                    <span className={`w-6 h-6 rounded-full flex items-center justify-center text-[11px] font-bold ${isDone ? "bg-[#4ade80]/15 text-[#4ade80]" : active ? "bg-[var(--action-primary)] text-white" : "bg-[var(--surface-tertiary)] text-[var(--text-muted)]"}`}>{isDone ? "✓" : i + 1}</span>
+                    <span className={`w-6 h-6 rounded-full flex items-center justify-center text-[11px] font-bold ${isDone ? "bg-green-50 text-green-700" : active ? "bg-[var(--action-primary)] text-white" : "bg-[var(--surface-tertiary)] text-[var(--text-muted)]"}`}>{isDone ? "✓" : i + 1}</span>
                     <div className="flex-1 min-w-0"><div className="text-sm font-medium text-white/95">{i + 1}. {s.title}</div><div className="text-[11px] text-[var(--text-secondary)]">{meta}</div></div>
-                    {active && <button onClick={() => onAbrirEtapa(s.id)} className="text-xs font-semibold text-[#fff] bg-[var(--surface-secondary)] border border-[var(--border-default)] hover:bg-[var(--surface-tertiary)] rounded-md px-2.5 py-1.5">Central da etapa</button>}
+                    {active && <button onClick={() => onAbrirEtapa(s.id)} className="text-xs font-semibold text-[var(--text-primary)] bg-[var(--surface-secondary)] border border-[var(--border-default)] hover:bg-[var(--surface-tertiary)] rounded-md px-2.5 py-1.5">Central da etapa</button>}
                   </div>
                 )
               })}
@@ -520,8 +520,8 @@ function DocDrawer({ pk, tab, onTab, onClose, onAbrirEtapa }: {
               <div className="rounded-lg border border-[var(--border-default)] bg-[var(--surface-secondary)] p-3 text-sm">
                 <div className="text-[11px] font-semibold uppercase text-[var(--text-secondary)] mb-1.5">Correção esperada</div>
                 <div className="flex justify-between py-0.5"><span className="text-[var(--text-secondary)]">Campo</span><b className="text-white/95">{pk.correcao.campo}</b></div>
-                <div className="flex justify-between py-0.5"><span className="text-[var(--text-secondary)]">Valor antigo</span><b className="text-[#f87171]">{pk.correcao.old}</b></div>
-                <div className="flex justify-between py-0.5"><span className="text-[var(--text-secondary)]">Valor correto</span><b className="text-[#4ade80]">{pk.correcao.novo}</b></div>
+                <div className="flex justify-between py-0.5"><span className="text-[var(--text-secondary)]">Valor antigo</span><b className="text-red-700">{pk.correcao.old}</b></div>
+                <div className="flex justify-between py-0.5"><span className="text-[var(--text-secondary)]">Valor correto</span><b className="text-green-700">{pk.correcao.novo}</b></div>
               </div>
               <div className="mt-3"><Meta>{Object.keys(pk.conference).length ? "Conferência registrada." : "Conferência ainda não realizada."}</Meta></div>
             </>
@@ -711,15 +711,15 @@ function EtapaModal({ stepId, doc, posting, erro, onClose, onSubmit }: {
             <div className="rounded-lg border border-[var(--border-default)] bg-[var(--surface-secondary)] p-3 text-sm">
               <div className="text-[11px] font-semibold uppercase text-[var(--text-secondary)] mb-1.5">Correção esperada</div>
               <div className="flex justify-between py-0.5"><span className="text-[var(--text-secondary)]">Campo</span><b className="text-white/95">{cor.campo}</b></div>
-              <div className="flex justify-between py-0.5"><span className="text-[var(--text-secondary)]">Valor antigo</span><b className="text-[#f87171]">{cor.old}</b></div>
-              <div className="flex justify-between py-0.5"><span className="text-[var(--text-secondary)]">Valor correto</span><b className="text-[#4ade80]">{cor.novo}</b></div>
+              <div className="flex justify-between py-0.5"><span className="text-[var(--text-secondary)]">Valor antigo</span><b className="text-red-700">{cor.old}</b></div>
+              <div className="flex justify-between py-0.5"><span className="text-[var(--text-secondary)]">Valor correto</span><b className="text-green-700">{cor.novo}</b></div>
             </div>
             <Field label="Nome do titular (como aparece no documento)"><input className={EC} placeholder={doc.pessoaNome} /></Field>
             <Sec>Checklist de conferência</Sec>
             <div className="flex flex-wrap gap-1.5">
               {CONF_CHK.map(([key, label]) => (
-                <button key={key} type="button" onClick={() => setCfChk((p) => ({ ...p, [key]: !p[key] }))} className={`inline-flex items-center gap-1.5 text-[11px] font-semibold rounded-md border px-2 py-1 ${cfChk[key] ? "border-[#4ade80]/25 bg-[#4ade80]/12 text-[#4ade80]" : "border-[var(--border-default)] text-white/68"}`}>
-                  <span className={`w-3.5 h-3.5 rounded flex items-center justify-center ${cfChk[key] ? "bg-[#4ade80] text-white" : "border border-[var(--border-default)]"}`}>{cfChk[key] && <Check className="w-2.5 h-2.5" />}</span>{label}
+                <button key={key} type="button" onClick={() => setCfChk((p) => ({ ...p, [key]: !p[key] }))} className={`inline-flex items-center gap-1.5 text-[11px] font-semibold rounded-md border px-2 py-1 ${cfChk[key] ? "border-green-200 bg-green-50 text-green-700" : "border-[var(--border-default)] text-white/68"}`}>
+                  <span className={`w-3.5 h-3.5 rounded flex items-center justify-center ${cfChk[key] ? "bg-green-50 text-white" : "border border-[var(--border-default)]"}`}>{cfChk[key] && <Check className="w-2.5 h-2.5" />}</span>{label}
                 </button>
               ))}
             </div>
@@ -727,7 +727,7 @@ function EtapaModal({ stepId, doc, posting, erro, onClose, onSubmit }: {
             <div className="grid grid-cols-3 gap-2">
               {CONF_RES.map(([v, l, hint, tone]) => {
                 const sel = cfRes === v
-                const cls = !sel ? "border-[var(--border-default)] text-white/80" : tone === "ok" ? "border-[#4ade80]/25 bg-[#4ade80]/12 text-[#4ade80]" : tone === "warn" ? "border-[#f87171]/25 bg-[#f87171]/12 text-[#f87171]" : "border-[var(--border-strong)] bg-[var(--surface-secondary)] text-white/80"
+                const cls = !sel ? "border-[var(--border-default)] text-white/80" : tone === "ok" ? "border-green-200 bg-green-50 text-green-700" : tone === "warn" ? "border-red-200 bg-red-50 text-red-700" : "border-[var(--border-strong)] bg-[var(--surface-secondary)] text-white/80"
                 return <button key={v} type="button" onClick={() => setCfRes(v)} className={`border rounded-lg px-2 py-2 text-center ${cls}`}><div className="text-xs font-semibold">{l}</div><div className="text-[10px] text-[var(--text-secondary)]">{hint}</div></button>
               })}
             </div>
@@ -740,12 +740,12 @@ function EtapaModal({ stepId, doc, posting, erro, onClose, onSubmit }: {
           <>
             <div className="rounded-lg border border-[var(--border-default)] bg-[var(--surface-secondary)] p-3 text-sm">
               <div className="text-[11px] font-semibold uppercase text-[var(--text-secondary)] mb-1.5">Correção aplicada</div>
-              <div className="flex justify-between py-0.5"><span className="text-[var(--text-secondary)]">{cor.campo}</span><b><s className="text-[#f87171]">{cor.old}</s> → <span className="text-[#4ade80]">{cor.novo}</span></b></div>
+              <div className="flex justify-between py-0.5"><span className="text-[var(--text-secondary)]">{cor.campo}</span><b><s className="text-red-700">{cor.old}</s> → <span className="text-green-700">{cor.novo}</span></b></div>
             </div>
             <Sec>Decisão final</Sec>
             <div className="space-y-2">
               {VAL_DECS.map(([v, l, sub, tone]) => (
-                <button key={v} type="button" onClick={() => setVlDec(v)} className={`w-full text-left border rounded-lg px-3 py-2.5 ${vlDec === v ? (tone === "ok" ? "border-[#4ade80]/25 bg-[#4ade80]/12" : "border-[var(--border-strong)] bg-[var(--surface-secondary)]") : "border-[var(--border-default)]"}`}>
+                <button key={v} type="button" onClick={() => setVlDec(v)} className={`w-full text-left border rounded-lg px-3 py-2.5 ${vlDec === v ? (tone === "ok" ? "border-green-200 bg-green-50" : "border-[var(--border-strong)] bg-[var(--surface-secondary)]") : "border-[var(--border-default)]"}`}>
                   <div className="text-sm font-semibold text-white/95">{l}</div><div className="text-[11px] text-[var(--text-secondary)]">{sub}</div>
                 </button>
               ))}
@@ -754,7 +754,7 @@ function EtapaModal({ stepId, doc, posting, erro, onClose, onSubmit }: {
           </>
         )}
 
-        {erro && <div className="bg-[#f87171]/12 border border-[#f87171]/30 rounded-lg px-3 py-2 text-sm text-[#f87171]">{erro}</div>}
+        {erro && <div className="bg-red-50 border border-red-200 rounded-lg px-3 py-2 text-sm text-red-700">{erro}</div>}
       </div>
 
       <div className="border-t border-[var(--border-default)] px-5 py-3 -mx-5 -mb-5 mt-4 flex justify-end gap-2">
@@ -787,7 +787,7 @@ function ModalShell({ children, onClose, title, sub, eyebrow, danger, maxW = "ma
       <div className={`relative w-full ${maxW} bg-[var(--surface-popover)] rounded-xl shadow-xl max-h-[85vh] flex flex-col`}>
         <div className={`flex items-start justify-between px-5 py-4 border-b ${danger ? "border-[var(--border-default)]" : "border-[var(--border-default)]"}`}>
           <div>
-            {eyebrow && <div className={`text-[11px] font-semibold uppercase tracking-wider ${danger ? "text-[#f87171]" : "text-[#7dd3fc]"}`}>{eyebrow}</div>}
+            {eyebrow && <div className={`text-[11px] font-semibold uppercase tracking-wider ${danger ? "text-red-700" : "text-sky-700"}`}>{eyebrow}</div>}
             <h3 className="text-base font-bold text-white/95 mt-0.5">{title}</h3>
             {sub && <p className="text-xs text-[var(--text-secondary)] mt-0.5">{sub}</p>}
           </div>
@@ -805,7 +805,7 @@ function Sec({ children }: { children: ReactNode }) {
 function Field({ label, required, children }: { label: string; required?: boolean; children: ReactNode }) {
   return (
     <div>
-      <label className="text-xs font-semibold text-white/80 flex items-center gap-1.5 mb-1">{label}{required && <span className="text-[10px] font-bold text-[#f87171] bg-[#f87171]/12 rounded px-1.5 py-0.5">Obrigatório</span>}</label>
+      <label className="text-xs font-semibold text-white/80 flex items-center gap-1.5 mb-1">{label}{required && <span className="text-[10px] font-bold text-red-700 bg-red-50 rounded px-1.5 py-0.5">Obrigatório</span>}</label>
       {children}
     </div>
   )
@@ -824,7 +824,7 @@ function Chips({ opts, value, onChange }: { opts: Array<[string, string]>; value
 }
 function FakeFile({ ok, onClick, label, okLabel }: { ok: boolean; onClick: () => void; label: string; okLabel: string }) {
   return (
-    <button type="button" onClick={onClick} className={`w-full inline-flex items-center gap-2 text-sm font-semibold rounded-md border px-3 py-2.5 ${ok ? "border-[#4ade80]/25 bg-[#4ade80]/12 text-[#4ade80]" : "border-[var(--border-default)] text-white/80"}`}>
+    <button type="button" onClick={onClick} className={`w-full inline-flex items-center gap-2 text-sm font-semibold rounded-md border px-3 py-2.5 ${ok ? "border-green-200 bg-green-50 text-green-700" : "border-[var(--border-default)] text-white/80"}`}>
       {ok ? <Check className="w-4 h-4" /> : <Upload className="w-4 h-4" />}{ok ? okLabel : label}
     </button>
   )

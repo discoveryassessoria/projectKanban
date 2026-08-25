@@ -81,7 +81,7 @@ export default function EditorDePecasDoPasso({
             <button onClick={() => delLista("campos", i)} className="rounded-lg border border-[var(--border-default)] px-2 py-2 text-xs text-red-700 hover:bg-red-50">Remover</button>
           </div>
           <div className="mt-2 flex flex-wrap items-center gap-4">
-            <label className="flex items-center gap-2 text-xs text-white/60">
+            <label className="flex items-center gap-2 text-xs text-[var(--text-secondary)]">
               <input type="checkbox" checked={!!c.obrigatorio} onChange={(e) => setLista("campos", i, { obrigatorio: e.target.checked })} /> Obrigatório
             </label>
             <code className="text-[11px] text-[var(--text-muted)]" title="Chave gravada nas execuções — não muda.">{c.key ?? chaveDe(c.label)}</code>
@@ -141,7 +141,7 @@ export default function EditorDePecasDoPasso({
                   <input className={inp} value={o.label}
                     onChange={(e) => opcaoSet(i, k, { label: e.target.value, key: o.key ?? chaveDe(e.target.value) })} />
                   <code className="truncate text-[11px] text-[var(--text-muted)]">{o.key ?? chaveDe(o.label)}</code>
-                  <label className="flex items-center gap-1.5 whitespace-nowrap text-[11px] text-white/60">
+                  <label className="flex items-center gap-1.5 whitespace-nowrap text-[11px] text-[var(--text-secondary)]">
                     <input type="checkbox" checked={o.ativo !== false} onChange={(e) => opcaoSet(i, k, { ativo: e.target.checked })} />
                     disponível
                   </label>
@@ -152,7 +152,7 @@ export default function EditorDePecasDoPasso({
         </div>
       ))}
       <button onClick={() => aoMudar({ campos: [...pecas.campos, { label: "Novo campo", tipo: tiposDeCampo[0] ?? "texto" }] })}
-        className="rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-medium text-[#fff] hover:bg-blue-500">+ Campo</button>
+        className="rounded-lg bg-[var(--action-primary)] px-3 py-1.5 text-xs font-medium text-[var(--action-primary-ink)] hover:bg-[var(--action-primary)]">+ Campo</button>
     </>
   )
 
@@ -211,7 +211,7 @@ export default function EditorDePecasDoPasso({
               <label className={lbl}>Explicação para o operador</label>
               <input className={inp} value={a.descricao ?? ""} onChange={(e) => setLista("acoes", i, { descricao: e.target.value })} />
             </div>
-            <label className="mt-2 flex items-center gap-2 text-xs text-white/60">
+            <label className="mt-2 flex items-center gap-2 text-xs text-[var(--text-secondary)]">
               <input type="checkbox" checked={a.ativo !== false} onChange={(e) => setLista("acoes", i, { ativo: e.target.checked })} />
               Ativa (desmarcar tira das versões novas; o histórico continua legível)
             </label>
@@ -220,7 +220,7 @@ export default function EditorDePecasDoPasso({
       })}
       <button disabled={efeitosOfertados.length === 0}
         onClick={() => aoMudar({ acoes: [...pecas.acoes, { label: "Novo resultado", effectKey: efeitosOfertados[0]?.key ?? "REGISTER_ONLY" }] })}
-        className="rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-medium text-[#fff] hover:bg-blue-500 disabled:opacity-40">+ Resultado</button>
+        className="rounded-lg bg-[var(--action-primary)] px-3 py-1.5 text-xs font-medium text-[var(--action-primary-ink)] hover:bg-[var(--action-primary)] disabled:opacity-40">+ Resultado</button>
       {efeitosOfertados.length === 0 && (
         <p className="text-[11px] text-amber-700/70">
           Nenhum efeito disponível: a fase não declarou competência compatível com o executor escolhido.
@@ -249,14 +249,14 @@ export default function EditorDePecasDoPasso({
             <button onClick={() => delLista("checkItens", i)} className="rounded-lg border border-[var(--border-default)] px-2 py-2 text-xs text-red-700 hover:bg-red-50">Remover</button>
           </div>
           <input className={`${inp} mt-2`} placeholder="Explicação (opcional)" value={k.descricao ?? ""} onChange={(e) => setLista("checkItens", i, { descricao: e.target.value })} />
-          <label className="mt-2 flex items-center gap-2 text-xs text-white/60">
+          <label className="mt-2 flex items-center gap-2 text-xs text-[var(--text-secondary)]">
             <input type="checkbox" checked={k.obrigatorio !== false} onChange={(e) => setLista("checkItens", i, { obrigatorio: e.target.checked })} />
             Obrigatório
           </label>
         </div>
       ))}
       <button onClick={() => aoMudar({ checkItens: [...pecas.checkItens, { label: "Novo item" }] })}
-        className="rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-medium text-[#fff] hover:bg-blue-500">+ Item</button>
+        className="rounded-lg bg-[var(--action-primary)] px-3 py-1.5 text-xs font-medium text-[var(--action-primary-ink)] hover:bg-[var(--action-primary)]">+ Item</button>
     </>
   )
 
@@ -348,11 +348,11 @@ export default function EditorDePecasDoPasso({
               </div>
             )}
             <div className="mt-2 flex flex-wrap items-center gap-4">
-              <label className="flex items-center gap-2 text-xs text-white/60">
+              <label className="flex items-center gap-2 text-xs text-[var(--text-secondary)]">
                 <input type="checkbox" checked={r.obrigatorio !== false} onChange={(e) => setLista("requisitos", i, { obrigatorio: e.target.checked })} />
                 Bloqueia a conclusão (desmarcado: só avisa)
               </label>
-              <div className="flex items-center gap-2 text-xs text-white/60">
+              <div className="flex items-center gap-2 text-xs text-[var(--text-secondary)]">
                 <span>Só na ação:</span>
                 <select className="rounded-lg border border-[var(--border-default)] bg-[var(--surface-primary)] px-2 py-1 text-xs text-white"
                   value={r.acaoKey ?? ""} onChange={(e) => setLista("requisitos", i, { acaoKey: e.target.value || null })}>
@@ -370,7 +370,7 @@ export default function EditorDePecasDoPasso({
             ? { label: "Nova evidência", tipo: "EVIDENCIA_ANEXADA", obrigatorio: true, minimo: 1, momento: "AO_CONCLUIR" }
             : { label: "Novo requisito", tipo: "CAMPO_PREENCHIDO", obrigatorio: true }],
         })}
-        className="rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-medium text-[#fff] hover:bg-blue-500">
+        className="rounded-lg bg-[var(--action-primary)] px-3 py-1.5 text-xs font-medium text-[var(--action-primary-ink)] hover:bg-[var(--action-primary)]">
         {soEvidencia ? "+ Evidência" : "+ Requisito"}
       </button>
     </>

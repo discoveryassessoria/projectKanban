@@ -35,7 +35,7 @@ async function jsonFetch(url: string, options: RequestInit = {}) {
 }
 
 const inputCls = "w-full rounded-lg border border-[var(--border-default)] bg-[var(--surface-primary)] px-3 py-2 text-sm text-white placeholder-white/30 outline-none focus:border-white/20"
-const labelCls = "mb-1 block text-xs text-white/60"
+const labelCls = "mb-1 block text-xs text-[var(--text-secondary)]"
 const IEdit = () => (<svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 20h9" /><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z" /></svg>)
 const ITrash = () => (<svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 6h18" /><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" /></svg>)
 
@@ -149,7 +149,7 @@ export default function PaisesRegioesTab() {
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
             <h2 className="text-lg font-semibold text-white">Países e Regiões</h2>
-            <p className="mt-1 max-w-3xl text-sm text-white/60">
+            <p className="mt-1 max-w-3xl text-sm text-[var(--text-secondary)]">
               Países/nacionalidades atendidos, com bandeira, prefixo de código e moeda padrão. As modalidades de
               cada país são geridas em <span className="text-white/80">Processos › Cadastros › Modalidades</span>.
             </p>
@@ -184,7 +184,7 @@ export default function PaisesRegioesTab() {
                 <td className="px-4 py-2.5"><code className="rounded bg-[var(--surface-primary)] px-1.5 py-0.5 text-[11px] text-white/70">{p.countryKey}</code></td>
                 <td className="px-4 py-2.5 text-white/70">{p.codePrefix || "—"}</td>
                 <td className="px-4 py-2.5 text-white/70">{p.defaultCurrency || "—"}</td>
-                <td className="px-4 py-2.5 text-white/60">{p.tiposCount ?? 0}</td>
+                <td className="px-4 py-2.5 text-[var(--text-secondary)]">{p.tiposCount ?? 0}</td>
                 <td className="px-4 py-2.5">
                   <button
                     onClick={() => toggleAtivo(p)}

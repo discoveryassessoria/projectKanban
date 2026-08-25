@@ -675,7 +675,7 @@ export function ProcessoFaturas({ processoId, nomeFamilia, onUpdate }: ProcessoF
                     setShowNovaFatura(true)
                   }}
                   size="sm"
-                  className="bg-emerald-600 hover:bg-emerald-700"
+                  className="bg-emerald-700 hover:bg-emerald-800"
                 >
                   <Plus className="h-4 w-4 mr-1" />
                   Nova Fatura
@@ -1161,7 +1161,7 @@ export function ProcessoFaturas({ processoId, nomeFamilia, onUpdate }: ProcessoF
                                   e.stopPropagation()
                                   abrirModalPagamento(fatura)
                                 }}
-                                className="bg-green-600 hover:bg-green-700"
+                                className="bg-green-700 hover:bg-green-800"
                               >
                                 <Check className="h-4 w-4 mr-1" />
                                 {fatura.status === 'PARCIAL' ? 'Registrar Pagamento' : 'Marcar como Pago'}
@@ -1257,7 +1257,7 @@ export function ProcessoFaturas({ processoId, nomeFamilia, onUpdate }: ProcessoF
               <Button
                 onClick={handleMarcarParcelaPaga}
                 disabled={salvandoParcela}
-                className="flex-1 bg-green-600 hover:bg-green-700 gap-2"
+                className="flex-1 bg-green-700 hover:bg-green-800 gap-2"
               >
                 {salvandoParcela && (
                   <div className="w-4 h-4 border-2 border-[var(--border-strong)] border-t-white rounded-full animate-spin" />
@@ -1492,7 +1492,7 @@ export function ProcessoFaturas({ processoId, nomeFamilia, onUpdate }: ProcessoF
               <Button
                 onClick={handlePagar}
                 disabled={salvando || !pagarValorNumerico}
-                className="bg-green-600 hover:bg-green-700 min-w-[200px] gap-2"
+                className="bg-green-700 hover:bg-green-800 min-w-[200px] gap-2"
               >
                 {salvando && (
                   <div className="w-4 h-4 border-2 border-[var(--border-strong)] border-t-white rounded-full animate-spin" />
@@ -1773,7 +1773,7 @@ export function ProcessoFaturas({ processoId, nomeFamilia, onUpdate }: ProcessoF
                   <Button
                     onClick={salvarEdicaoPagamento}
                     disabled={salvandoEdicao}
-                    className="bg-green-600 hover:bg-green-700 min-w-[200px] gap-2"
+                    className="bg-green-700 hover:bg-green-800 min-w-[200px] gap-2"
                   >
                     {salvandoEdicao && (
                       <div className="w-4 h-4 border-2 border-[var(--border-strong)] border-t-white rounded-full animate-spin" />
@@ -1797,7 +1797,7 @@ export function ProcessoFaturas({ processoId, nomeFamilia, onUpdate }: ProcessoF
                   {pode('financeiro.pagamento_editar') && (
                     <Button
                       onClick={iniciarEdicaoPagamento}
-                      className="bg-green-600 hover:bg-green-700"
+                      className="bg-green-700 hover:bg-green-800"
                     >
                       <Pencil className="h-4 w-4 mr-2" />
                       Editar

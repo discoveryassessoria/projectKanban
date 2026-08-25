@@ -34,9 +34,9 @@ const CELL_LABEL: Record<CellStatus, string> = {
 }
 
 const CELL_DOT: Record<CellStatus, string> = {
-  validada: "bg-[#4ade80]",
-  recebida: "bg-[#7dd3fc]",
-  pendente: "bg-[#d2a948]/15",
+  validada: "bg-green-50",
+  recebida: "bg-sky-50",
+  pendente: "bg-[var(--accent-primary)]/15",
   nao_aplica: "bg-[var(--surface-secondary)]",
 }
 
@@ -74,10 +74,10 @@ function ConteudoDrawer({ item, context, onClose }: Props) {
 
   const badge =
     item.finalStatus === "pronta_protocolo"
-      ? { txt: "Pronto", cls: "bg-[#4ade80]/12 text-[#4ade80] border-[#4ade80]/30" }
+      ? { txt: "Pronto", cls: "bg-green-50 text-green-700 border-green-200" }
       : item.finalStatus === "aguardando"
-      ? { txt: "Aguardando", cls: "bg-[#d2a948]/12 text-[#d2a948] border-[#d2a948]/30" }
-      : { txt: "Pendente", cls: "bg-[#d2a948]/12 text-[#d2a948] border-[#d2a948]/30" }
+      ? { txt: "Aguardando", cls: "bg-[var(--accent-primary)]/12 text-[var(--accent-text)] border-[var(--accent-primary)]/30" }
+      : { txt: "Pendente", cls: "bg-[var(--accent-primary)]/12 text-[var(--accent-text)] border-[var(--accent-primary)]/30" }
 
   return (
     <>
@@ -138,7 +138,7 @@ function ConteudoDrawer({ item, context, onClose }: Props) {
                 onClick={() => setTab(t)}
                 className={`whitespace-nowrap text-[12.5px] font-semibold pb-2.5 border-b-2 transition-colors ${
                   t === tab
-                    ? "border-[#7dd3fc] text-[#7dd3fc]"
+                    ? "border-sky-200 text-sky-700"
                     : "border-transparent text-[var(--text-secondary)] hover:text-white/80"
                 }`}
               >
@@ -236,15 +236,15 @@ function Overview({
               <span
                 className={`relative z-10 w-[26px] h-[26px] rounded-full border-2 grid place-items-center bg-[var(--surface-popover)] ${
                   n.tone === "ok"
-                    ? "border-[#4ade80]/30"
+                    ? "border-green-200"
                     : n.tone === "na"
                     ? "border-[var(--border-default)]"
-                    : "border-[#d2a948]/30"
+                    : "border-[var(--accent-primary)]/30"
                 }`}
               >
                 <span
                   className={`w-2 h-2 rounded-full ${
-                    n.tone === "ok" ? "bg-[#4ade80]" : n.tone === "na" ? "bg-[var(--surface-secondary)]" : "bg-[#d2a948]/15"
+                    n.tone === "ok" ? "bg-green-50" : n.tone === "na" ? "bg-[var(--surface-secondary)]" : "bg-[var(--accent-primary)]/15"
                   }`}
                 />
               </span>
@@ -289,8 +289,8 @@ function Overview({
       </div>
 
       {/* Próxima ação sugerida */}
-      <div className="flex items-start gap-3 border border-[#7dd3fc]/30 bg-[#7dd3fc]/12/50 rounded-xl p-4">
-        <Clock className="w-[18px] h-[18px] text-[#7dd3fc] flex-none mt-0.5" />
+      <div className="flex items-start gap-3 border border-sky-200 bg-sky-50/50 rounded-xl p-4">
+        <Clock className="w-[18px] h-[18px] text-sky-700 flex-none mt-0.5" />
         <div>
           <b className="text-[12.5px] text-white/95 block">Próxima ação sugerida</b>
           <span className="text-[12px] text-white/68">{nextAction}</span>
@@ -299,7 +299,7 @@ function Overview({
 
       <button
         onClick={onGoToDados}
-        className="inline-flex items-center gap-1.5 text-[12.5px] font-semibold text-[#7dd3fc] hover:text-[#7dd3fc] self-start"
+        className="inline-flex items-center gap-1.5 text-[12.5px] font-semibold text-sky-700 hover:text-sky-700 self-start"
       >
         Ver dados registrais completos <ArrowRight className="w-[14px] h-[14px]" />
       </button>
@@ -348,7 +348,7 @@ function FileLine({ label, available }: { label: string; available: boolean }) {
   return (
     <div className="flex items-center justify-between gap-3 text-[12px]">
       <span className="font-semibold text-white/95">{label}</span>
-      <span className={available ? "text-[#4ade80] text-[11px] font-semibold flex-none" : "text-[var(--text-muted)] text-[11px] flex-none"}>
+      <span className={available ? "text-green-700 text-[11px] font-semibold flex-none" : "text-[var(--text-muted)] text-[11px] flex-none"}>
         {available ? "Disponível" : "Ainda não disponível"}
       </span>
     </div>

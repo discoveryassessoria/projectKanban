@@ -99,7 +99,7 @@ export function GenealogyDatePicker({
 
           <div className="grid grid-cols-3 gap-2 min-w-[280px]">
             <div>
-              <label className="text-xs text-[#9AA0A6] mb-1 block">Ano *</label>
+              <label className="text-xs text-[var(--text-muted)] mb-1 block">Ano *</label>
               <Select value={year} onValueChange={setYear}>
                 <SelectTrigger className="h-9">
                   <SelectValue placeholder="Ano" />
@@ -115,7 +115,7 @@ export function GenealogyDatePicker({
             </div>
 
             <div>
-              <label className="text-xs text-[#9AA0A6] mb-1 block">Mês</label>
+              <label className="text-xs text-[var(--text-muted)] mb-1 block">Mês</label>
               <Select value={month} onValueChange={setMonth} disabled={!year}>
                 <SelectTrigger className="h-9">
                   <SelectValue placeholder="Mês" />
@@ -131,7 +131,7 @@ export function GenealogyDatePicker({
             </div>
 
             <div>
-              <label className="text-xs text-[#9AA0A6] mb-1 block">Dia</label>
+              <label className="text-xs text-[var(--text-muted)] mb-1 block">Dia</label>
               <Select value={day} onValueChange={setDay} disabled={!year || !month}>
                 <SelectTrigger className="h-9">
                   <SelectValue placeholder="Dia" />
@@ -147,7 +147,7 @@ export function GenealogyDatePicker({
             </div>
           </div>
 
-          <div className="text-xs text-[#9AA0A6]">
+          <div className="text-xs text-[var(--text-muted)]">
             * Apenas o ano é obrigatório. Deixe mês e dia em branco se não souber.
           </div>
 

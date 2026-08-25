@@ -136,7 +136,7 @@ export default function RegistrarPagamentoModal({ obrigacaoId, moeda = "BRL", sa
             <div>
               <label className={lbl}>Valor ({moeda}) *</label>
               <input value={valor} onChange={(e) => setValor(e.target.value)} inputMode="decimal" placeholder="0,00" className={inp} autoFocus />
-              {parcial && <div className="mt-1 text-[11px] text-[var(--accent-primary)]">Pagamento parcial — restará {fmt(saldo! - valorNum, moeda)}.</div>}
+              {parcial && <div className="mt-1 text-[11px] text-[var(--accent-text)]">Pagamento parcial — restará {fmt(saldo! - valorNum, moeda)}.</div>}
             </div>
             <div>
               <label className={lbl}>Data *</label>

@@ -59,7 +59,7 @@ function AvisoSessao({
       <div className="w-full max-w-sm rounded-[var(--radius-md)] border border-[var(--border-default)] bg-[var(--surface-overlay)] p-5 shadow-lg">
         <div className="flex items-start gap-3">
           <span className="mt-0.5 grid h-9 w-9 shrink-0 place-items-center rounded-full"
-            style={{ background: "color-mix(in srgb, var(--accent-primary) 12%, transparent)", color: "var(--accent-primary)" }}>
+            style={{ background: "color-mix(in srgb, var(--accent-primary) 12%, transparent)", color: "var(--accent-text)" }}>
             <Clock className="h-4.5 w-4.5" />
           </span>
           <div className="min-w-0">

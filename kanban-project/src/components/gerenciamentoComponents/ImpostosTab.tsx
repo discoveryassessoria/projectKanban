@@ -207,7 +207,7 @@ export default function ImpostosTab() {
                   </td>
                   <td className="px-4 py-2.5 text-white/70">{lbl(TIPOS, i.tipo)}</td>
                   <td className="px-4 py-2.5 text-right tabular-nums text-white/80">{valorImposto(i)}</td>
-                  <td className="px-4 py-2.5 text-white/60">{lbl(APLICA, i.aplicaA)}</td>
+                  <td className="px-4 py-2.5 text-[var(--text-secondary)]">{lbl(APLICA, i.aplicaA)}</td>
                   <td className="px-4 py-2.5">
                     <span className={`rounded px-2 py-0.5 text-[11px] font-medium ${i.ativo ? 'bg-green-50 text-green-700' : 'bg-[var(--surface-primary)] text-[var(--text-secondary)]'}`}>
                       {i.ativo ? 'Ativo' : 'Inativo'}
@@ -237,25 +237,25 @@ export default function ImpostosTab() {
             <div className="space-y-4 px-6 py-4">
               <div className="grid grid-cols-3 gap-3">
                 <div className="col-span-1">
-                  <label className="mb-1 block text-xs text-white/60">Código</label>
+                  <label className="mb-1 block text-xs text-[var(--text-secondary)]">Código</label>
                   <input value={codigo} onChange={(e) => setCodigo(e.target.value)} placeholder="ISS" className={inputCls} />
                 </div>
                 <div className="col-span-2">
-                  <label className="mb-1 block text-xs text-white/60">Nome</label>
+                  <label className="mb-1 block text-xs text-[var(--text-secondary)]">Nome</label>
                   <input value={nome} onChange={(e) => setNome(e.target.value)} autoFocus className={inputCls} />
                 </div>
               </div>
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="mb-1 block text-xs text-white/60">Tipo</label>
+                  <label className="mb-1 block text-xs text-[var(--text-secondary)]">Tipo</label>
                   <select value={tipo} onChange={(e) => setTipo(e.target.value)} className={inputCls}>
                     <option value="" className="bg-zinc-900">—</option>
                     {TIPOS.map(([k, label]) => <option key={k} value={k} className="bg-zinc-900">{label}</option>)}
                   </select>
                 </div>
                 <div>
-                  <label className="mb-1 block text-xs text-white/60">Cálculo</label>
+                  <label className="mb-1 block text-xs text-[var(--text-secondary)]">Cálculo</label>
                   <select value={modoCalculo} onChange={(e) => setModoCalculo(e.target.value)} className={inputCls}>
                     {MODOS.map(([k, label]) => <option key={k} value={k} className="bg-zinc-900">{label}</option>)}
                   </select>
@@ -264,17 +264,17 @@ export default function ImpostosTab() {
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="mb-1 block text-xs text-white/60">Percentual (%)</label>
+                  <label className="mb-1 block text-xs text-[var(--text-secondary)]">Percentual (%)</label>
                   <input type="number" step="0.0001" value={percentual} onChange={(e) => setPercentual(e.target.value)} placeholder="Ex.: 5" className={inputCls} />
                 </div>
                 <div>
-                  <label className="mb-1 block text-xs text-white/60">Valor fixo (R$)</label>
+                  <label className="mb-1 block text-xs text-[var(--text-secondary)]">Valor fixo (R$)</label>
                   <input type="number" step="0.01" value={valorFixo} onChange={(e) => setValorFixo(e.target.value)} placeholder="0,00" className={inputCls} />
                 </div>
               </div>
 
               <div>
-                <label className="mb-1 block text-xs text-white/60">Aplica a</label>
+                <label className="mb-1 block text-xs text-[var(--text-secondary)]">Aplica a</label>
                 <select value={aplicaA} onChange={(e) => setAplicaA(e.target.value)} className={`${inputCls} max-w-[240px]`}>
                   <option value="" className="bg-zinc-900">—</option>
                   {APLICA.map(([k, label]) => <option key={k} value={k} className="bg-zinc-900">{label}</option>)}
@@ -292,7 +292,7 @@ export default function ImpostosTab() {
             </div>
 
             <div className="flex items-center justify-end gap-2 border-t border-[var(--border-default)] px-6 py-4">
-              <button onClick={() => setModalAberto(false)} className="rounded-lg px-4 py-2 text-sm text-white/60 transition hover:text-white">Cancelar</button>
+              <button onClick={() => setModalAberto(false)} className="rounded-lg px-4 py-2 text-sm text-[var(--text-secondary)] transition hover:text-white">Cancelar</button>
               <button onClick={salvar} disabled={salvando} className="rounded-lg bg-[var(--action-primary)] px-4 py-2 text-sm font-medium text-[var(--action-primary-ink)] transition hover:bg-[var(--action-primary)] disabled:opacity-50">
                 {salvando ? 'Salvando...' : 'Salvar'}
               </button>

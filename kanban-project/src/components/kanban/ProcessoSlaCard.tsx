@@ -135,7 +135,7 @@ export function ProcessoSlaCard({ processoId }: { processoId: number }) {
   return (
     <section className="rounded-xl border border-[var(--border-default)] bg-[var(--surface-primary)] p-4">
       <div className="mb-3 flex items-center justify-between gap-3">
-        <h3 className="flex items-center gap-2 text-sm font-semibold uppercase tracking-wide text-white/60">
+        <h3 className="flex items-center gap-2 text-sm font-semibold uppercase tracking-wide text-[var(--text-secondary)]">
           <CalendarClock className="h-4 w-4" /> SLA
         </h3>
         {dados && <SlaBadge status={dados.status} rotulo={dados.rotuloStatus} />}

@@ -64,12 +64,12 @@ const STATUS_LABELS: Record<string, string> = {
 // Recebido/Entregue = verde, Inválido/Não encontrado = vermelho, restante neutro.
 const STATUS_NEUTRAL_PILL = "bg-[var(--surface-primary)] text-[var(--text-secondary)]"
 const STATUS_PILL_CLS: Record<string, string> = {
-  SOLICITADO: "bg-[#d2a948]/15 text-[#d2a948]",
-  SOLICITAR: "bg-[#d2a948]/15 text-[#d2a948]",
-  RECEBIDO: "bg-[#4ade80]/15 text-[#4ade80]",
-  ENTREGUE: "bg-[#4ade80]/15 text-[#4ade80]",
-  INVALIDO: "bg-[#f87171]/15 text-[#f87171]",
-  NAO_ENCONTRADO: "bg-[#f87171]/15 text-[#f87171]",
+  SOLICITADO: "bg-[var(--accent-primary)]/15 text-[var(--accent-text)]",
+  SOLICITAR: "bg-[var(--accent-primary)]/15 text-[var(--accent-text)]",
+  RECEBIDO: "bg-green-50 text-green-700",
+  ENTREGUE: "bg-green-50 text-green-700",
+  INVALIDO: "bg-red-50 text-red-700",
+  NAO_ENCONTRADO: "bg-red-50 text-red-700",
 }
 
 // ============================================================
@@ -464,7 +464,7 @@ function ConteudoDrawer({
   const sla = tarefa
     ? {
         text: tarefa.rotuloDoPrazo,
-        cls: tarefa.atrasado ? "text-[#f87171]" : tarefa.venceHoje ? "text-[#d2a948]" : "text-[#4ade80]",
+        cls: tarefa.atrasado ? "text-red-700" : tarefa.venceHoje ? "text-[var(--accent-text)]" : "text-green-700",
       }
     : { text: "Sem tarefa nesta fase", cls: "text-[var(--text-secondary)]" }
   const statusCls = doc ? (STATUS_PILL_CLS[doc.status] || STATUS_NEUTRAL_PILL) : ""
@@ -516,7 +516,7 @@ function ConteudoDrawer({
 
         {/* ERROR — estado terminal fechável (falha ou documentoId inválido). */}
         {opState === "ERROR" && (
-          <div className="flex-1 flex flex-col items-center justify-center text-white/60 gap-3 p-6">
+          <div className="flex-1 flex flex-col items-center justify-center text-[var(--text-secondary)] gap-3 p-6">
             <AlertTriangle className="w-8 h-8 text-amber-700" />
             <p className="text-sm">{erro || "Não foi possível abrir a operação."}</p>
             <button
@@ -540,20 +540,20 @@ function ConteudoDrawer({
                 {onBack ? (
                   <button
                     onClick={onBack}
-                    className="inline-flex items-center gap-1.5 text-[11px] font-semibold text-white/70 hover:text-[#fff] transition-colors -ml-1 px-1 py-0.5 rounded hover:bg-[var(--surface-secondary)]"
+                    className="inline-flex items-center gap-1.5 text-[11px] font-semibold text-white/70 hover:text-[var(--text-primary)] transition-colors -ml-1 px-1 py-0.5 rounded hover:bg-[var(--surface-secondary)]"
                   >
                     <span className="text-[14px] leading-none">←</span>
                     {backLabel || nomeCompleto(doc.pessoa)}
                   </button>
                 ) : (
                   <div className="text-[10px] uppercase tracking-wide">
-                    <span className="font-bold text-[#7dd3fc]">Central Operacional</span>
+                    <span className="font-bold text-sky-700">Central Operacional</span>
                     <span className="text-[var(--text-secondary)]"> · {nomeCompleto(doc.pessoa)}</span>
                   </div>
                 )}
                 <button
                   onClick={onClose}
-                  className="w-[30px] h-[30px] rounded-md bg-[var(--surface-secondary)] hover:bg-[var(--surface-tertiary)] flex items-center justify-center text-[#fff]"
+                  className="w-[30px] h-[30px] rounded-md bg-[var(--surface-secondary)] hover:bg-[var(--surface-tertiary)] flex items-center justify-center text-[var(--text-primary)]"
                 >
                   <X className="w-4 h-4" />
                 </button>
@@ -562,7 +562,7 @@ function ConteudoDrawer({
               {/* Identidade do documento: tile de ícone + título + pessoa */}
               <div className="flex items-center gap-3.5 mb-4">
                 <div className="w-11 h-11 rounded-lg bg-[var(--surface-secondary)] border border-[var(--border-default)] flex items-center justify-center flex-shrink-0">
-                  <FileText className="w-5 h-5 text-white/60" />
+                  <FileText className="w-5 h-5 text-[var(--text-secondary)]" />
                 </div>
                 <div className="min-w-0">
                   <div className="text-[22px] font-bold tracking-tight leading-tight text-white truncate">
@@ -575,7 +575,7 @@ function ConteudoDrawer({
               </div>
 
               {bannerAntecipada && (
-                <div className="mb-4 rounded-lg border border-slate-200 bg-[#a78bfa]/15 px-3 py-2 text-[12px] text-slate-100 flex items-start gap-2">
+                <div className="mb-4 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-[12px] text-slate-100 flex items-start gap-2">
                   <span className="text-[13px] leading-none mt-0.5">⇄</span>
                   <span>{bannerAntecipada}</span>
                 </div>
@@ -590,7 +590,7 @@ function ConteudoDrawer({
                   </div>
                   <div>
                     <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10.5px] font-bold uppercase tracking-wider ${
-                      tarefa ? "bg-[#7dd3fc]/15 text-[#7dd3fc]" : STATUS_NEUTRAL_PILL
+                      tarefa ? "bg-sky-50 text-sky-700" : STATUS_NEUTRAL_PILL
                     }`}>
                       <span className="w-1.5 h-1.5 rounded-full bg-current" />
                       {statusLabel}
@@ -623,7 +623,7 @@ function ConteudoDrawer({
                         setDelegandoResp(false)
                       }}
                       onBlur={() => setDelegandoResp(false)}
-                      className="self-start rounded-md border border-[var(--border-default)] bg-[var(--app-background)] px-1.5 py-1 text-[12px] text-white/85 focus:outline-none focus:border-[#7dd3fc]/50 focus:ring-1 focus:ring-[#7dd3fc]/25 disabled:opacity-50"
+                      className="self-start rounded-md border border-[var(--border-default)] bg-[var(--app-background)] px-1.5 py-1 text-[12px] text-white/85 focus:outline-none focus:border-sky-200 focus:ring-1 focus:border-sky-200 disabled:opacity-50"
                     >
                       <option value="" className="bg-[var(--surface-secondary)]">— selecione —</option>
                       {usuarios.map((u) => (
@@ -641,7 +641,7 @@ function ConteudoDrawer({
                       onClick={() => tarefa && setDelegandoResp(true)}
                       disabled={!tarefa || salvando}
                       title={tarefa ? "Transferir a tarefa deste documento" : "Sem tarefa nesta fase para delegar"}
-                      className="self-start text-[#7dd3fc] text-[12px] hover:underline disabled:text-[var(--text-muted)] disabled:no-underline disabled:cursor-not-allowed"
+                      className="self-start text-sky-700 text-[12px] hover:underline disabled:text-[var(--text-muted)] disabled:no-underline disabled:cursor-not-allowed"
                     >
                       Delegar
                     </button>
@@ -696,7 +696,7 @@ function ConteudoDrawer({
                   </div>
                 ) : (
                   <div className="mt-3 p-2.5 rounded-md border border-[var(--border-default)] bg-[var(--surface-primary)] text-[11.5px] text-[var(--text-secondary)]">
-                    <strong className="font-semibold text-white/60">Registro anterior:</strong> {doc.motivoBloqueio}
+                    <strong className="font-semibold text-[var(--text-secondary)]">Registro anterior:</strong> {doc.motivoBloqueio}
                     <span className="block text-[10.5px] text-[var(--text-muted)] mt-0.5">
                       Refere-se a uma operação encerrada — não impede o trabalho atual.
                     </span>
@@ -723,14 +723,14 @@ function ConteudoDrawer({
                   onClick={() => setActiveTab(t.id)}
                   className={`inline-flex items-center gap-1.5 px-3.5 py-2.5 text-[11.5px] font-semibold whitespace-nowrap border-b-2 transition-colors -mb-px ${
                     activeTab === t.id
-                      ? "text-[#7dd3fc] border-[#7dd3fc]"
+                      ? "text-sky-700 border-sky-200"
                       : "text-[var(--text-secondary)] hover:text-white/80 border-transparent"
                   }`}
                 >
                   {t.label}
                   {t.count !== undefined && (
                     <span className={`text-[9.5px] px-1.5 rounded-full font-bold ${
-                      activeTab === t.id ? "bg-[#7dd3fc]/30 text-blue-700" : "bg-[var(--surface-secondary)] text-white/70"
+                      activeTab === t.id ? "bg-sky-50 text-blue-700" : "bg-[var(--surface-secondary)] text-white/70"
                     }`}>
                       {t.count}
                     </span>

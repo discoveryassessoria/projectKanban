@@ -462,14 +462,14 @@ export default function TipoProcessoTab() {
             <div className="space-y-4 px-6 py-4">
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                 <div>
-                  <label className="mb-1 block text-xs text-white/60">País *</label>
+                  <label className="mb-1 block text-xs text-[var(--text-secondary)]">País *</label>
                   <select value={countryKey} onChange={(e) => trocarPais(e.target.value)} className={inputCls}>
                     <option value="" className="bg-zinc-900">— selecione —</option>
                     {paises.map((p) => <option key={p.countryKey} value={p.countryKey} className="bg-zinc-900">{p.flag ? p.flag + ' ' : ''}{p.countryLabel}</option>)}
                   </select>
                 </div>
                 <div>
-                  <label className="mb-1 block text-xs text-white/60">Modalidade *</label>
+                  <label className="mb-1 block text-xs text-[var(--text-secondary)]">Modalidade *</label>
                   <select value={modalityKey} onChange={(e) => setModalityKey(e.target.value)} disabled={!countryKey} className={inputCls + (!countryKey ? ' opacity-50' : '')}>
                     <option value="" className="bg-zinc-900">{countryKey ? '— selecione —' : 'escolha o país primeiro'}</option>
                     {modsAtivasDoPais.map((m) => <option key={m.modalityKey} value={m.modalityKey} className="bg-zinc-900">{m.modalityLabel}</option>)}
@@ -479,12 +479,12 @@ export default function TipoProcessoTab() {
 
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                 <div>
-                  <label className="mb-1 block text-xs text-white/60">Código *</label>
+                  <label className="mb-1 block text-xs text-[var(--text-secondary)]">Código *</label>
                   <input value={code} onChange={(e) => { setCode(e.target.value); setCodeTouched(true) }} placeholder="ITA-JUD" className={inputCls + ' font-mono'} />
                   {!codeTouched && sugCode && <p className="mt-1 text-[11px] text-[var(--text-muted)]">Sugerido automaticamente — pode editar.</p>}
                 </div>
                 <div>
-                  <label className="mb-1 block text-xs text-white/60">Nome *</label>
+                  <label className="mb-1 block text-xs text-[var(--text-secondary)]">Nome *</label>
                   <input value={name} onChange={(e) => { setName(e.target.value); setNameTouched(true) }} placeholder="Nacionalidade Italiana · Judicial" className={inputCls} />
                 </div>
               </div>
@@ -498,7 +498,7 @@ export default function TipoProcessoTab() {
             </div>
 
             <div className="flex items-center justify-end gap-2 border-t border-[var(--border-default)] px-6 py-4">
-              <button onClick={() => setModalAberto(false)} className="rounded-lg px-4 py-2 text-sm text-white/60 transition hover:text-white">Cancelar</button>
+              <button onClick={() => setModalAberto(false)} className="rounded-lg px-4 py-2 text-sm text-[var(--text-secondary)] transition hover:text-white">Cancelar</button>
               <button onClick={salvar} disabled={salvando} className="rounded-lg bg-[var(--action-primary)] px-4 py-2 text-sm font-medium text-[var(--action-primary-ink)] transition hover:bg-[var(--action-primary)] disabled:opacity-50">
                 {salvando ? 'Salvando...' : 'Salvar'}
               </button>
@@ -584,28 +584,28 @@ export default function TipoProcessoTab() {
                 <div className="space-y-4 px-6 py-4">
                   <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
                     <div className="sm:col-span-2">
-                      <label className="mb-1 block text-xs text-white/60">Nome do país *</label>
+                      <label className="mb-1 block text-xs text-[var(--text-secondary)]">Nome do país *</label>
                       <input value={pLabel} onChange={(e) => setPLabel(e.target.value)} placeholder="França" className={inputCls} />
                     </div>
                     <div>
-                      <label className="mb-1 block text-xs text-white/60">Bandeira</label>
+                      <label className="mb-1 block text-xs text-[var(--text-secondary)]">Bandeira</label>
                       <input value={pFlag} onChange={(e) => setPFlag(e.target.value)} placeholder="🇫🇷" className={inputCls} />
                     </div>
                   </div>
 
                   <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
                     <div className="sm:col-span-2">
-                      <label className="mb-1 block text-xs text-white/60">Nacionalidade *</label>
+                      <label className="mb-1 block text-xs text-[var(--text-secondary)]">Nacionalidade *</label>
                       <input value={pNat} onChange={(e) => setPNat(e.target.value)} placeholder="Francesa" className={inputCls} />
                     </div>
                     <div>
-                      <label className="mb-1 block text-xs text-white/60">Prefixo do código</label>
+                      <label className="mb-1 block text-xs text-[var(--text-secondary)]">Prefixo do código</label>
                       <input value={pPrefix} onChange={(e) => setPPrefix(e.target.value)} placeholder="FRA" className={inputCls + ' font-mono'} />
                     </div>
                   </div>
 
                   <div>
-                    <label className="mb-1 block text-xs text-white/60">Moeda padrão</label>
+                    <label className="mb-1 block text-xs text-[var(--text-secondary)]">Moeda padrão</label>
                     <select value={pMoeda} onChange={(e) => setPMoeda(e.target.value)} className={inputCls}>
                       <option value="EUR" className="bg-zinc-900">EUR</option>
                       <option value="USD" className="bg-zinc-900">USD</option>
@@ -615,7 +615,7 @@ export default function TipoProcessoTab() {
 
                   {!editandoPais && (
                     <div>
-                      <label className="mb-1 block text-xs text-white/60">Modalidades</label>
+                      <label className="mb-1 block text-xs text-[var(--text-secondary)]">Modalidades</label>
                       <div className="space-y-2 rounded-lg border border-[var(--border-default)] bg-[var(--surface-primary)] p-3">
                         <label className="flex items-center gap-2 text-sm text-white/80">
                           <input type="checkbox" checked={pJud} onChange={(e) => setPJud(e.target.checked)} className="h-4 w-4 accent-blue-500" />
@@ -634,7 +634,7 @@ export default function TipoProcessoTab() {
                 </div>
 
                 <div className="flex items-center justify-between gap-2 border-t border-[var(--border-default)] px-6 py-4">
-                  <button onClick={() => { setVisao('lista'); setErroPais(null) }} className="rounded-lg px-4 py-2 text-sm text-white/60 transition hover:text-white">← Voltar</button>
+                  <button onClick={() => { setVisao('lista'); setErroPais(null) }} className="rounded-lg px-4 py-2 text-sm text-[var(--text-secondary)] transition hover:text-white">← Voltar</button>
                   <button onClick={salvarPais} disabled={salvandoPais} className="rounded-lg bg-[var(--action-primary)] px-4 py-2 text-sm font-medium text-[var(--action-primary-ink)] transition hover:bg-[var(--action-primary)] disabled:opacity-50">
                     {salvandoPais ? 'Salvando...' : editandoPais ? 'Salvar alterações' : 'Criar país'}
                   </button>
@@ -664,7 +664,7 @@ export default function TipoProcessoTab() {
               <div className="space-y-3 px-6 py-4">
                 <div className="flex flex-wrap items-end justify-between gap-3">
                   <div className="min-w-[220px] flex-1">
-                    <label className="mb-1 block text-xs text-white/60">País</label>
+                    <label className="mb-1 block text-xs text-[var(--text-secondary)]">País</label>
                     <select value={modCountryKey} onChange={(e) => trocarPaisMods(e.target.value)} className={inputCls}>
                       {paises.map((p) => <option key={p.countryKey} value={p.countryKey} className="bg-zinc-900">{p.flag ? p.flag + ' ' : ''}{p.countryLabel}</option>)}
                     </select>
@@ -732,11 +732,11 @@ export default function TipoProcessoTab() {
                 <div className="space-y-4 px-6 py-4">
                   <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
                     <div className="sm:col-span-2">
-                      <label className="mb-1 block text-xs text-white/60">Nome da modalidade *</label>
+                      <label className="mb-1 block text-xs text-[var(--text-secondary)]">Nome da modalidade *</label>
                       <input value={mLabel} onChange={(e) => setMLabel(e.target.value)} placeholder="Judicial" className={inputCls} />
                     </div>
                     <div>
-                      <label className="mb-1 block text-xs text-white/60">Sufixo do código</label>
+                      <label className="mb-1 block text-xs text-[var(--text-secondary)]">Sufixo do código</label>
                       <input value={mSuffix} onChange={(e) => setMSuffix(e.target.value)} placeholder="JUD" className={inputCls + ' font-mono'} />
                     </div>
                   </div>
@@ -748,7 +748,7 @@ export default function TipoProcessoTab() {
                 </div>
 
                 <div className="flex items-center justify-between gap-2 border-t border-[var(--border-default)] px-6 py-4">
-                  <button onClick={() => { setVisaoMod('lista'); setErroMod(null) }} className="rounded-lg px-4 py-2 text-sm text-white/60 transition hover:text-white">← Voltar</button>
+                  <button onClick={() => { setVisaoMod('lista'); setErroMod(null) }} className="rounded-lg px-4 py-2 text-sm text-[var(--text-secondary)] transition hover:text-white">← Voltar</button>
                   <button onClick={salvarMod} disabled={salvandoMod} className="rounded-lg bg-[var(--action-primary)] px-4 py-2 text-sm font-medium text-[var(--action-primary-ink)] transition hover:bg-[var(--action-primary)] disabled:opacity-50">
                     {salvandoMod ? 'Salvando...' : editandoMod ? 'Salvar alterações' : 'Criar modalidade'}
                   </button>

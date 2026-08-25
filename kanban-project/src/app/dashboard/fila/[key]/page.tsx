@@ -18,7 +18,7 @@ import {
   BlocoCard,
   EmptyState,
   ErrorState,
-  OURO,
+  OURO, OURO_TINTA,
   formatarPrazo,
   nivelStyle,
 } from "@/src/components/home/home-primitives"
@@ -43,7 +43,7 @@ export default function FilaPage({ params }: { params: Promise<{ key: string }> 
       <div className="mx-auto w-full max-w-[1200px] space-y-4 px-4 py-5 md:px-6">
         <button
           onClick={() => router.push("/dashboard")}
-          className="inline-flex items-center gap-1.5 text-xs font-medium text-white/60 transition hover:text-white"
+          className="inline-flex items-center gap-1.5 text-xs font-medium text-[var(--text-secondary)] transition hover:text-white"
         >
           <ArrowLeft className="h-3.5 w-3.5" /> Voltar ao Centro Operacional
         </button>
@@ -106,7 +106,7 @@ export default function FilaPage({ params }: { params: Promise<{ key: string }> 
 
               {data.truncado && (
                 <p className="mt-3 flex items-center gap-1.5 text-xs text-[var(--text-secondary)]">
-                  <Flag className="h-3.5 w-3.5" style={{ color: OURO }} />
+                  <Flag className="h-3.5 w-3.5" style={{ color: OURO_TINTA }} />
                   Mostrando os {data.itens.length} itens mais urgentes de {data.quantidade}.
                 </p>
               )}

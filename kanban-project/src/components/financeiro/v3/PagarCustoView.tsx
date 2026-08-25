@@ -363,7 +363,7 @@ export default function PagarCustoView({ obrigacaoId, fornecedor, onClose, onDon
 
               {pendencias.length > 0 && (
                 <div className="rounded-[var(--radius-md)] border p-3 text-xs" style={{ borderColor: "color-mix(in srgb, var(--accent-primary) 30%, transparent)", background: "color-mix(in srgb, var(--accent-primary) 6%, transparent)" }}>
-                  <div className="mb-1 flex items-center gap-1.5 font-medium text-[var(--text-secondary)]"><AlertTriangle className="h-3.5 w-3.5" style={{ color: "var(--accent-primary)" }} /> Falta preencher</div>
+                  <div className="mb-1 flex items-center gap-1.5 font-medium text-[var(--text-secondary)]"><AlertTriangle className="h-3.5 w-3.5" style={{ color: "var(--accent-text)" }} /> Falta preencher</div>
                   <ul className="list-inside list-disc space-y-0.5 text-[var(--text-muted)]">{pendencias.map((p, i) => <li key={i}>{p}</li>)}</ul>
                 </div>
               )}

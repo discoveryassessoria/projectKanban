@@ -440,7 +440,7 @@ export default function TabelaValoresTab() {
                   <tr key={linha.configId} className="border-b border-[var(--border-subtle)] last:border-0 hover:bg-[var(--surface-primary)]">
                     <td className="px-3 py-2.5 font-mono text-[12px] text-white/70">{om.codigo ?? '—'}</td>
                     <td className="px-3 py-2.5 font-medium text-white">{om.mestre}</td>
-                    <td className="px-3 py-2.5 text-white/60">{om.origem}</td>
+                    <td className="px-3 py-2.5 text-[var(--text-secondary)]">{om.origem}</td>
                     <CelulaDimensao dim={linha.custo} onEditar={abrirEditar} onExcluir={excluir} />
                     <CelulaDimensao dim={linha.venda} onEditar={abrirEditar} onExcluir={excluir} />
                     <td className="px-3 py-2.5"><span className={`rounded px-2 py-0.5 text-[11px] font-medium ${ativo ? 'bg-green-50 text-green-700' : 'bg-[var(--surface-primary)] text-[var(--text-secondary)]'}`}>{ativo ? 'Ativo' : 'Inativo'}</span></td>
@@ -481,7 +481,7 @@ export default function TabelaValoresTab() {
                   do item (filtro de navegação); Item = o id canônico gravado. */}
               <div className="grid grid-cols-[35fr_65fr] gap-3">
                 <div>
-                  <label className="mb-1 block text-xs text-white/60">Tipo de item *</label>
+                  <label className="mb-1 block text-xs text-[var(--text-secondary)]">Tipo de item *</label>
                   <select
                     aria-label="Tipo de item"
                     value={form.categoria}
@@ -498,7 +498,7 @@ export default function TabelaValoresTab() {
                   </select>
                 </div>
                 <div>
-                  <label className="mb-1 block text-xs text-white/60">Item *</label>
+                  <label className="mb-1 block text-xs text-[var(--text-secondary)]">Item *</label>
                   {/* Busca só reduz a lista — o vínculo continua sendo por id. */}
                   {form.categoria && !editando && (
                     <input
@@ -550,7 +550,7 @@ export default function TabelaValoresTab() {
                   Habilitadas assim que existe item vinculado: quem diz o que o item admite
                   é o próprio item (a config, quando ainda não existe, nasce ao salvar). */}
               <div>
-                <label className="mb-1 block text-xs text-white/60">Natureza do preço *</label>
+                <label className="mb-1 block text-xs text-[var(--text-secondary)]">Natureza do preço *</label>
                 <div className="flex flex-wrap gap-x-6 gap-y-2">
                   <label className={`flex items-center gap-2 text-sm ${(!itemVinculado || editando || !podeCusto) ? 'cursor-not-allowed text-[var(--text-muted)]' : 'text-white/80'}`}>
                     <input type="checkbox" checked={form.precoCusto}
@@ -576,7 +576,7 @@ export default function TabelaValoresTab() {
                   combinação válida é permitida (nunca condicionada ao nome do serviço). */}
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="mb-1 block text-xs text-white/60">Estratégia de cálculo *</label>
+                  <label className="mb-1 block text-xs text-[var(--text-secondary)]">Estratégia de cálculo *</label>
                   <select value={form.modoCalculo} onChange={(e) => {
                     const modo = e.target.value
                     setForm((f) => ({
@@ -590,7 +590,7 @@ export default function TabelaValoresTab() {
                   </select>
                 </div>
                 <div>
-                  <label className="mb-1 block text-xs text-white/60">
+                  <label className="mb-1 block text-xs text-[var(--text-secondary)]">
                     Unidade de cobrança {estrategiaDoModo(form.modoCalculo) === 'fixo' ? <span className="text-[var(--text-muted)]">(referência)</span> : '*'}
                   </label>
                   <select value={form.unidade} onChange={(e) => set('unidade', e.target.value)} className={inputCls}>
@@ -607,14 +607,14 @@ export default function TabelaValoresTab() {
                   <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-amber-700/80">Preço de Custo</div>
                   <div className="grid grid-cols-3 gap-3">
                     <div>
-                      <label className="mb-1 block text-xs text-white/60">Fornecedor</label>
+                      <label className="mb-1 block text-xs text-[var(--text-secondary)]">Fornecedor</label>
                       <select value={form.fornecedorId} onChange={(e) => set('fornecedorId', e.target.value)} className={inputCls}>
                         <option value="" className="bg-zinc-900">— Nenhum —</option>
                         {fornecedores.map((f) => <option key={f.id} value={f.id} className="bg-zinc-900">{f.publicCode ? f.publicCode + ' — ' : ''}{f.nome}</option>)}
                       </select>
                     </div>
                     <div>
-                      <label className="mb-1 block text-xs text-white/60">Moeda do custo *</label>
+                      <label className="mb-1 block text-xs text-[var(--text-secondary)]">Moeda do custo *</label>
                       <select value={form.moeda} onChange={(e) => set('moeda', e.target.value)} className={inputCls}>
                         <option value="" className="bg-zinc-900">—</option>
                         {MOEDAS.map(([k, label]) => <option key={k} value={k} className="bg-zinc-900">{label}</option>)}
@@ -623,17 +623,17 @@ export default function TabelaValoresTab() {
                     {estrategiaUsaPrimeiroAdicional(form.modoCalculo) ? (
                       <div className="col-span-3 grid grid-cols-2 gap-3">
                         <div>
-                          <label className="mb-1 block text-xs text-white/60">{rotuloPrimeiro(form.unidade)} *</label>
+                          <label className="mb-1 block text-xs text-[var(--text-secondary)]">{rotuloPrimeiro(form.unidade)} *</label>
                           <input type="number" min="0" step="0.01" value={form.valorBase} onChange={(e) => set('valorBase', e.target.value)} placeholder="0,00" className={inputCls} />
                         </div>
                         <div>
-                          <label className="mb-1 block text-xs text-white/60">{rotuloAdicional(form.unidade)} *</label>
+                          <label className="mb-1 block text-xs text-[var(--text-secondary)]">{rotuloAdicional(form.unidade)} *</label>
                           <input type="number" min="0" step="0.01" value={form.valorAdicional} onChange={(e) => set('valorAdicional', e.target.value)} placeholder="0,00" className={inputCls} />
                         </div>
                       </div>
                     ) : (
                       <div>
-                        <label className="mb-1 block text-xs text-white/60">{rotuloValorUnico(form.modoCalculo, form.unidade)} *</label>
+                        <label className="mb-1 block text-xs text-[var(--text-secondary)]">{rotuloValorUnico(form.modoCalculo, form.unidade)} *</label>
                         <input type="number" min="0" step="0.01" value={form.valor} onChange={(e) => set('valor', e.target.value)} placeholder="0,00" className={inputCls} />
                       </div>
                     )}
@@ -647,7 +647,7 @@ export default function TabelaValoresTab() {
                   <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-emerald-700/80">Preço de Venda</div>
                   <div className="grid grid-cols-2 gap-3">
                     <div>
-                      <label className="mb-1 block text-xs text-white/60">Moeda da venda *</label>
+                      <label className="mb-1 block text-xs text-[var(--text-secondary)]">Moeda da venda *</label>
                       <select value={form.moedaVenda} onChange={(e) => set('moedaVenda', e.target.value)} className={inputCls}>
                         <option value="" className="bg-zinc-900">—</option>
                         {MOEDAS.map(([k, label]) => <option key={k} value={k} className="bg-zinc-900">{label}</option>)}
@@ -656,17 +656,17 @@ export default function TabelaValoresTab() {
                     {estrategiaUsaPrimeiroAdicional(form.modoCalculo) ? (
                       <div className="col-span-2 grid grid-cols-2 gap-3">
                         <div>
-                          <label className="mb-1 block text-xs text-white/60">{rotuloPrimeiro(form.unidade)} *</label>
+                          <label className="mb-1 block text-xs text-[var(--text-secondary)]">{rotuloPrimeiro(form.unidade)} *</label>
                           <input type="number" min="0" step="0.01" value={form.valorBaseVenda} onChange={(e) => set('valorBaseVenda', e.target.value)} placeholder="0,00" className={inputCls} />
                         </div>
                         <div>
-                          <label className="mb-1 block text-xs text-white/60">{rotuloAdicional(form.unidade)} *</label>
+                          <label className="mb-1 block text-xs text-[var(--text-secondary)]">{rotuloAdicional(form.unidade)} *</label>
                           <input type="number" min="0" step="0.01" value={form.valorAdicionalVenda} onChange={(e) => set('valorAdicionalVenda', e.target.value)} placeholder="0,00" className={inputCls} />
                         </div>
                       </div>
                     ) : (
                       <div>
-                        <label className="mb-1 block text-xs text-white/60">{rotuloValorUnico(form.modoCalculo, form.unidade)} *</label>
+                        <label className="mb-1 block text-xs text-[var(--text-secondary)]">{rotuloValorUnico(form.modoCalculo, form.unidade)} *</label>
                         <input type="number" min="0" step="0.01" value={form.valorVenda} onChange={(e) => set('valorVenda', e.target.value)} placeholder="0,00" className={inputCls} />
                       </div>
                     )}
@@ -679,11 +679,11 @@ export default function TabelaValoresTab() {
               {estrategiaUsaFaixaQuantidade(form.modoCalculo) && (
                 <div className="grid grid-cols-2 gap-3">
                   <div>
-                    <label className="mb-1 block text-xs text-white/60">Qtd mín.</label>
+                    <label className="mb-1 block text-xs text-[var(--text-secondary)]">Qtd mín.</label>
                     <input type="number" min="0" value={form.quantidadeMinima} onChange={(e) => set('quantidadeMinima', e.target.value)} className={inputCls} />
                   </div>
                   <div>
-                    <label className="mb-1 block text-xs text-white/60">Qtd máx.</label>
+                    <label className="mb-1 block text-xs text-[var(--text-secondary)]">Qtd máx.</label>
                     <input type="number" min="0" value={form.quantidadeMaxima} onChange={(e) => set('quantidadeMaxima', e.target.value)} className={inputCls} />
                   </div>
                 </div>
@@ -702,7 +702,7 @@ export default function TabelaValoresTab() {
               {erroModal && <div className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700">{erroModal}</div>}
             </div>
             <div className="flex items-center justify-end gap-2 border-t border-[var(--border-default)] px-6 py-4">
-              <button onClick={() => setModalAberto(false)} className="rounded-lg px-4 py-2 text-sm text-white/60 transition hover:text-white">Cancelar</button>
+              <button onClick={() => setModalAberto(false)} className="rounded-lg px-4 py-2 text-sm text-[var(--text-secondary)] transition hover:text-white">Cancelar</button>
               {/* Sem item oficial vinculado não há o que salvar — o botão diz
                   isso antes do clique, em vez de deixar o operador descobrir no erro.
                   A condição é a MESMA do vínculo: um único campo canônico. */}
@@ -710,7 +710,7 @@ export default function TabelaValoresTab() {
                 onClick={salvar}
                 disabled={salvando || !form.itemCatalogoId}
                 title={!form.itemCatalogoId ? 'Selecione o tipo e o item primeiro' : undefined}
-                className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-[#fff] transition hover:bg-blue-500 disabled:opacity-50"
+                className="rounded-lg bg-[var(--action-primary)] px-4 py-2 text-sm font-medium text-[var(--action-primary-ink)] transition hover:bg-[var(--action-primary)] disabled:opacity-50"
               >{salvando ? 'Salvando...' : 'Salvar'}</button>
             </div>
           </div>
@@ -752,7 +752,7 @@ function CelulaDimensao({
         <span className="text-[11px] text-[var(--text-muted)]">{rotuloEstrategia(i.modoCalculo)}</span>
         {dim.fornecedor && <span className="text-[11px] text-[var(--text-muted)]">{dim.fornecedor}</span>}
         <span className="mt-0.5 hidden gap-2 group-hover:flex">
-          <button onClick={() => onEditar(i)} className="text-[11px] text-white/60 underline-offset-2 hover:text-white hover:underline">Editar</button>
+          <button onClick={() => onEditar(i)} className="text-[11px] text-[var(--text-secondary)] underline-offset-2 hover:text-white hover:underline">Editar</button>
           <button onClick={() => onExcluir(i)} className="text-[11px] text-red-700/70 underline-offset-2 hover:text-red-700 hover:underline">Excluir</button>
         </span>
       </div>

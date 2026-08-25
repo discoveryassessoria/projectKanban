@@ -173,7 +173,7 @@ export function PainelDaFase({
           </div>
           <button
             onClick={onAbrirPainelCompleto}
-            className="inline-flex items-center gap-1.5 border-[1.5px] border-[var(--border-default)] bg-[var(--surface-popover)] text-white/80 text-[12.5px] font-semibold px-3.5 py-2 rounded-lg whitespace-nowrap hover:border-[var(--border-strong)] hover:text-[#fff] transition-colors"
+            className="inline-flex items-center gap-1.5 border-[1.5px] border-[var(--border-default)] bg-[var(--surface-popover)] text-white/80 text-[12.5px] font-semibold px-3.5 py-2 rounded-lg whitespace-nowrap hover:border-[var(--border-strong)] hover:text-[var(--text-primary)] transition-colors"
           >
             <ExternalLink className="w-3.5 h-3.5" />
             Abrir painel da fase
@@ -202,13 +202,13 @@ export function PainelDaFase({
       <div className="bg-[var(--surface-popover)] border border-[var(--border-default)] border-t-0 rounded-b-2xl px-5 py-5">
 
         {modoReestruturacao ? (
-          <div className="bg-[#d2a948]/12 border border-[#d2a948]/30 rounded-xl px-5 py-4 mb-5">
-            <div className="text-[13px] font-bold text-[#d2a948] mb-1">Fase em reestruturação</div>
-            <div className="text-[12.5px] text-[#d2a948] leading-relaxed">
+          <div className="bg-[var(--accent-primary)]/12 border border-[var(--accent-primary)]/30 rounded-xl px-5 py-4 mb-5">
+            <div className="text-[13px] font-bold text-[var(--accent-text)] mb-1">Fase em reestruturação</div>
+            <div className="text-[12.5px] text-[var(--accent-text)] leading-relaxed">
               {avisoReestruturacao ||
                 "A definição documental da Genealogia está em reestruturação. Nenhum progresso automático é calculado nesta etapa."}
             </div>
-            <div className="text-[11.5px] text-[#d2a948]/80 mt-2">
+            <div className="text-[11.5px] text-[var(--accent-text)]/80 mt-2">
               A árvore e os dados civis continuam disponíveis. Documentos exibidos são
               registros operacionais existentes — não representam obrigatoriedade nem validação.
             </div>
@@ -220,9 +220,9 @@ export function PainelDaFase({
           <div className="grid gap-2.5 mb-4" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(132px, 1fr))" }}>
             {kpis.map((k, i) => {
               const cor =
-                k.tone === "ok" ? "text-[#4ade80]"
-                : k.tone === "busca" ? "text-[#d2a948]"
-                : k.tone === "late" ? "text-[#f87171]"
+                k.tone === "ok" ? "text-green-700"
+                : k.tone === "busca" ? "text-[var(--accent-text)]"
+                : k.tone === "late" ? "text-red-700"
                 : "text-white/95"
               // UM CONTADOR QUE VIRA FILTRO. "Pendentes: 137" e depois procurar
               // os 137 na mão é um número que informa e não ajuda; clicar nele é
@@ -230,7 +230,7 @@ export function PainelDaFase({
               const alvo = recorteDoKpi(k.label)
               const ativo = alvo != null && recorte.rapido === alvo
               const classe = `bg-[var(--surface-popover)] border rounded-[10px] px-4 py-3 text-left transition-colors ${
-                ativo ? "border-[#7dd3fc]/60 ring-1 ring-inset ring-[#7dd3fc]/25" : "border-[var(--border-default)]"
+                ativo ? "border-sky-200 ring-1 ring-inset border-sky-200" : "border-[var(--border-default)]"
               } ${alvo != null ? "hover:border-[var(--border-strong)] cursor-pointer" : ""}`
               const conteudo = (
                 <>
@@ -273,7 +273,7 @@ export function PainelDaFase({
               <div className="text-[13px] text-[var(--text-secondary)]">{progressoConcluidos} de {progressoTotal} documentos validados</div>
             </div>
             <div className="h-1.5 bg-[var(--surface-tertiary)] rounded-full overflow-hidden mt-3">
-              <div className="h-full bg-[#7dd3fc] transition-all duration-500" style={{ width: `${progressoPct}%` }} />
+              <div className="h-full bg-sky-50 transition-all duration-500" style={{ width: `${progressoPct}%` }} />
             </div>
             <div className="text-center text-[12.5px] text-[var(--text-muted)] mt-3">{progressoTexto}</div>
             {/* A FASE PAROU E O SISTEMA SABE POR QUÊ. Dizer isso em lista, com o verbo
@@ -716,7 +716,7 @@ function IndiceView({
         <button
           type="button"
           onClick={() => setRecorte?.(RECORTE_VAZIO)}
-          className="mt-3 text-[12px] font-semibold text-[#7dd3fc] hover:underline underline-offset-2"
+          className="mt-3 text-[12px] font-semibold text-sky-700 hover:underline underline-offset-2"
         >
           Limpar filtros
         </button>
@@ -747,7 +747,7 @@ function IndiceView({
       <div className="mb-5 last:mb-0">
         <div className="flex items-center gap-2.5 mb-2.5">
           <span className={`w-[22px] h-[22px] rounded-lg grid place-items-center flex-none ${
-            tone === "pendente" ? "bg-[#d2a948]/20 text-[#d2a948]" : tone === "fora" ? "bg-[var(--surface-tertiary)] text-[var(--text-muted)]" : "bg-[var(--surface-tertiary)] text-[var(--text-secondary)]"
+            tone === "pendente" ? "bg-[var(--accent-primary)]/20 text-[var(--accent-text)]" : tone === "fora" ? "bg-[var(--surface-tertiary)] text-[var(--text-muted)]" : "bg-[var(--surface-tertiary)] text-[var(--text-secondary)]"
           }`}>
             {icone}
           </span>
@@ -795,10 +795,10 @@ function IndiceView({
       {/* DOCUMENTO SEM PESSOA NO ROSTER — cadastro inconsistente. Fica VISÍVEL:
           sumir seria esconder trabalho real que ninguém veria de novo. */}
       {indice.semDono.length > 0 && (
-        <div className="rounded-xl border border-[#d2a948]/30 bg-[#d2a948]/[0.07] overflow-hidden">
-          <div className="flex items-center gap-2.5 px-4 py-2.5 border-b border-[#d2a948]/20">
-            <AlertTriangle className="w-3.5 h-3.5 text-[#d2a948] flex-none" />
-            <b className="text-[11.5px] font-extrabold tracking-wide uppercase text-[#d2a948]">
+        <div className="rounded-xl border border-[var(--accent-primary)]/30 bg-[var(--accent-primary)]/[0.07] overflow-hidden">
+          <div className="flex items-center gap-2.5 px-4 py-2.5 border-b border-[var(--accent-primary)]/20">
+            <AlertTriangle className="w-3.5 h-3.5 text-[var(--accent-text)] flex-none" />
+            <b className="text-[11.5px] font-extrabold tracking-wide uppercase text-[var(--accent-text)]">
               Sem pessoa vinculada · revisar cadastro do registro
             </b>
           </div>
@@ -838,10 +838,10 @@ function PessoaCard({
 
   const transmissao =
     p.classificacao === "LINHA_PRINCIPAL"
-      ? { cor: "text-[#4ade80]", dot: "bg-[#4ade80]", label: "Na linha de transmissão" }
+      ? { cor: "text-green-700", dot: "bg-green-50", label: "Na linha de transmissão" }
       : p.classificacao === "FORA_DA_LINHAGEM"
         ? { cor: "text-[var(--text-muted)]", dot: "bg-[var(--surface-secondary)]", label: "Fora da linha" }
-        : { cor: "text-[#f87171]", dot: "bg-[#f87171]", label: "Classificação pendente" }
+        : { cor: "text-red-700", dot: "bg-red-50", label: "Classificação pendente" }
 
   return (
     <div className="rounded-xl border border-[var(--border-default)] bg-[var(--surface-popover)] overflow-hidden">
@@ -851,7 +851,7 @@ function PessoaCard({
         disabled={!podeAbrir}
         className={`w-full text-left flex items-center gap-4 px-4 py-3.5 transition-colors ${podeAbrir ? "hover:bg-[var(--surface-secondary)]" : "cursor-default"}`}
       >
-        <span className="w-10 h-10 rounded-full grid place-items-center text-[#fff] font-extrabold text-[13px] flex-none bg-[var(--surface-tertiary)]">
+        <span className="w-10 h-10 rounded-full grid place-items-center text-[var(--text-primary)] font-extrabold text-[13px] flex-none bg-[var(--surface-tertiary)]">
           {p.iniciais}
         </span>
 
@@ -870,7 +870,7 @@ function PessoaCard({
             </span>
           </span>
           {p.pendencia && (
-            <span className="text-[11px] text-[#d2a948] font-semibold flex items-start gap-1.5 leading-snug mt-1">
+            <span className="text-[11px] text-[var(--accent-text)] font-semibold flex items-start gap-1.5 leading-snug mt-1">
               <AlertTriangle className="w-3 h-3 flex-none mt-px" />
               {p.pendencia}
             </span>
@@ -911,7 +911,7 @@ function PessoaCard({
 
 function Pilula({ valor, rotulo, tone }: { valor: number; rotulo: string; tone?: "ok" | "busca" | "late" }) {
   const cor =
-    tone === "ok" ? "text-[#4ade80]" : tone === "busca" ? "text-[#d2a948]" : tone === "late" ? "text-[#f87171]" : "text-white/95"
+    tone === "ok" ? "text-green-700" : tone === "busca" ? "text-[var(--accent-text)]" : tone === "late" ? "text-red-700" : "text-white/95"
   return (
     <span className="text-center block">
       <b className={`text-[16px] font-extrabold block leading-none ${cor}`}>{valor}</b>
@@ -1004,11 +1004,11 @@ function TabelaDocumentos({
 }
 
 const CLS_ARTEFATO: Record<StatusResumo, string> = {
-  PRONTO: "text-[#4ade80]",
-  EM_ANDAMENTO: "text-[#7dd3fc]",
+  PRONTO: "text-green-700",
+  EM_ANDAMENTO: "text-sky-700",
   PENDENTE: "text-white/68",
-  DIVERGENTE: "text-[#f87171]",
-  INVALIDADO: "text-[#f87171]",
+  DIVERGENTE: "text-red-700",
+  INVALIDADO: "text-red-700",
   NAO_APLICAVEL: "text-[var(--text-muted)]",
 }
 
@@ -1037,7 +1037,7 @@ function CelulaProgresso({ p }: { p: DocumentoDoIndice["naFase"]["progresso"] })
   return (
     <div title={detalhe}>
       <div className="flex items-baseline gap-1.5">
-        <b className={`text-[12.5px] font-bold tabular-nums ${completo ? "text-[#4ade80]" : "text-white/90"}`}>
+        <b className={`text-[12.5px] font-bold tabular-nums ${completo ? "text-green-700" : "text-white/90"}`}>
           {p.pct}%
         </b>
         {p.total > 0 && (
@@ -1046,7 +1046,7 @@ function CelulaProgresso({ p }: { p: DocumentoDoIndice["naFase"]["progresso"] })
       </div>
       <div className="h-1.5 bg-[var(--surface-tertiary)] rounded-full overflow-hidden mt-1.5">
         <div
-          className={`h-full transition-all duration-500 ${completo ? "bg-[#4ade80]" : "bg-[#7dd3fc]"}`}
+          className={`h-full transition-all duration-500 ${completo ? "bg-green-50" : "bg-sky-50"}`}
           style={{ width: `${p.pct}%` }}
         />
       </div>
@@ -1056,10 +1056,10 @@ function CelulaProgresso({ p }: { p: DocumentoDoIndice["naFase"]["progresso"] })
 
 const CLS_ESTADO: Record<EstadoOperacionalDaLinha, string> = {
   A_FAZER: "bg-[var(--surface-tertiary)] text-white/68",
-  EM_ANDAMENTO: "bg-[#7dd3fc]/15 text-[#7dd3fc]",
-  AGUARDANDO_TERCEIRO: "bg-[#d2a948]/15 text-[#d2a948]",
-  BLOQUEADA: "bg-[#f87171]/15 text-[#f87171]",
-  CONCLUIDA: "bg-[#4ade80]/15 text-[#4ade80]",
+  EM_ANDAMENTO: "bg-sky-50 text-sky-700",
+  AGUARDANDO_TERCEIRO: "bg-[var(--accent-primary)]/15 text-[var(--accent-text)]",
+  BLOQUEADA: "bg-red-50 text-red-700",
+  CONCLUIDA: "bg-green-50 text-green-700",
 }
 
 /**
@@ -1080,7 +1080,7 @@ function CelulaPrazo({ f }: { f: DocumentoDoIndice["naFase"] }) {
   // dias", "Vence amanhã" e "1 dia restante" para o mesmo prazo — e, pior, réguas
   // diferentes por trás das frases.
   const texto = f.rotuloDoPrazo
-  const cor = f.atrasado ? "text-[#f87171]" : f.venceHoje ? "text-[#d2a948]" : "text-white/68"
+  const cor = f.atrasado ? "text-red-700" : f.venceHoje ? "text-[var(--accent-text)]" : "text-white/68"
   return (
     <div>
       <div className={`text-[11.5px] font-semibold ${cor}`}>{texto}</div>
@@ -1150,7 +1150,7 @@ function CelulaResponsavel({
     ? <span className="text-white/80 truncate">{f.responsavelNome}</span>
     : f.estado === "CONCLUIDA"
       ? <span className="text-[var(--text-muted)]">—</span>
-      : <span className="text-[#d2a948]">Sem responsável</span>
+      : <span className="text-[var(--accent-text)]">Sem responsável</span>
 
   if (!podeGerir) return <div className="min-w-0 text-[11.5px] truncate">{nome}</div>
 
@@ -1169,7 +1169,7 @@ function CelulaResponsavel({
             else await gestao!.onAtribuirResponsavel!(taskId!, Number(v))
           }}
           onBlur={() => setEditando(false)}
-          className="w-full rounded border border-[var(--border-default)] bg-[var(--app-background)] px-1.5 py-1 text-[11.5px] text-white/85 focus:outline-none focus:border-[#7dd3fc]/50 disabled:opacity-50"
+          className="w-full rounded border border-[var(--border-default)] bg-[var(--app-background)] px-1.5 py-1 text-[11.5px] text-white/85 focus:outline-none focus:border-sky-200 disabled:opacity-50"
         >
           <option value="" className="bg-[var(--surface-secondary)]">
             {f.responsavelId != null ? "— retirar responsável —" : "— selecione —"}
@@ -1189,7 +1189,7 @@ function CelulaResponsavel({
         type="button"
         disabled={salvando}
         onClick={() => setEditando(true)}
-        className="text-[10.5px] text-[#7dd3fc]/80 hover:text-[#7dd3fc] hover:underline disabled:opacity-40"
+        className="text-[10.5px] text-sky-700 hover:text-sky-700 hover:underline disabled:opacity-40"
       >
         {salvando ? "salvando…" : f.responsavelId != null ? "alterar" : "atribuir"}
       </button>
@@ -1242,7 +1242,7 @@ function LinhaDocumento({
             espaço em TODAS as linhas para informar sobre pouquíssimas. */}
         {(doc.statusFinal === "DIVERGENTE" || doc.statusFinal === "INVALIDADO") && (
           <span
-            className="flex-none text-[10px] font-bold px-1.5 py-0.5 rounded bg-[#f87171]/15 text-[#f87171]"
+            className="flex-none text-[10px] font-bold px-1.5 py-0.5 rounded bg-red-50 text-red-700"
             title={doc.statusFinalLabel}
           >
             {doc.statusFinal === "INVALIDADO" ? "Invalidado" : "Divergente"}
@@ -1257,7 +1257,7 @@ function LinhaDocumento({
           {doc.naFase.etapaAtual ?? "—"}
         </div>
         {doc.naFase.motivoBloqueio && (
-          <div className="text-[10.5px] text-[#f87171]/80 truncate" title={doc.naFase.motivoBloqueio}>
+          <div className="text-[10.5px] text-red-700 truncate" title={doc.naFase.motivoBloqueio}>
             {doc.naFase.motivoBloqueio}
           </div>
         )}
@@ -1281,7 +1281,7 @@ function LinhaDocumento({
           </span>
           {/* ATRASADA NÃO É STATUS — é uma condição que acompanha o status. */}
           {doc.naFase.atrasado && (
-            <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-[#f87171]/15 text-[#f87171] whitespace-nowrap">
+            <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-red-50 text-red-700 whitespace-nowrap">
               Atrasada
             </span>
           )}
@@ -1308,7 +1308,7 @@ function LinhaDocumento({
         ) : (
           // Sem executor configurado: o documento CONTINUA visível e o que falta é
           // dito em texto. Esconder a linha seria mentir sobre o trabalho.
-          <span className="text-[11px] font-semibold text-[#d2a948] text-right leading-snug" title={doc.impedimento ?? undefined}>
+          <span className="text-[11px] font-semibold text-[var(--accent-text)] text-right leading-snug" title={doc.impedimento ?? undefined}>
             {readOnly ? "Somente leitura" : "Sem executor"}
           </span>
         )}

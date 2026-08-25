@@ -15,7 +15,7 @@ export function CodigoPublicoField({
 }) {
   return (
     <div className={className}>
-      <label className="mb-1 block text-xs text-white/60">Código</label>
+      <label className="mb-1 block text-xs text-[var(--text-secondary)]">Código</label>
       {codigo ? (
         <div className="rounded-lg border border-[var(--border-default)] bg-[var(--surface-primary)] px-3 py-2 font-mono text-sm font-bold text-white/80">
           {codigo}

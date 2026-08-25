@@ -68,7 +68,7 @@ export default function AuditoriaTab() {
       <div className="flex items-start justify-between flex-wrap gap-3">
         <div>
           <h2 className="text-lg font-bold text-white flex items-center gap-2"><ShieldCheck className="h-5 w-5" /> Auditoria e Logs</h2>
-          <div className="text-xs text-white/60 mt-1">{k.total} eventos registrados · trilha de mudanças financeiras</div>
+          <div className="text-xs text-[var(--text-secondary)] mt-1">{k.total} eventos registrados · trilha de mudanças financeiras</div>
         </div>
         <div className="flex items-center gap-2">
           <GlassBtn icon={<Search className="h-3.5 w-3.5" />}>Consulta avançada</GlassBtn>
@@ -91,7 +91,7 @@ export default function AuditoriaTab() {
           const active = chip === c.key
           return (
             <button key={c.key} onClick={() => setChip(c.key)}
-              className={`inline-flex items-center gap-1.5 px-2.5 py-1 text-xs rounded-full border transition-colors ${active ? "bg-[var(--surface-secondary)] border-[var(--border-strong)] text-white" : "bg-[var(--surface-primary)] border-[var(--border-default)] text-white/60 hover:text-white"}`}>
+              className={`inline-flex items-center gap-1.5 px-2.5 py-1 text-xs rounded-full border transition-colors ${active ? "bg-[var(--surface-secondary)] border-[var(--border-strong)] text-white" : "bg-[var(--surface-primary)] border-[var(--border-default)] text-[var(--text-secondary)] hover:text-white"}`}>
               {c.label}<span className="text-[10px] bg-[var(--surface-primary)] px-1.5 rounded-full">{count}</span>
             </button>
           )
@@ -123,7 +123,7 @@ export default function AuditoriaTab() {
                   </td>
                   <td className="py-2">
                     {l.usuario === "Sistema" ? (
-                      <span className="text-[11px] px-2 py-0.5 rounded-full bg-[var(--surface-primary)] text-white/60 border border-[var(--border-strong)]">Sistema</span>
+                      <span className="text-[11px] px-2 py-0.5 rounded-full bg-[var(--surface-primary)] text-[var(--text-secondary)] border border-[var(--border-strong)]">Sistema</span>
                     ) : (
                       <span className="inline-flex items-center gap-1.5">
                         <span className="w-5 h-5 rounded-full bg-blue-500/30 text-blue-700 text-[9px] font-bold flex items-center justify-center">{iniciais(l.usuario)}</span>
@@ -132,7 +132,7 @@ export default function AuditoriaTab() {
                     )}
                   </td>
                   <td className="py-2 text-white/90 font-medium">{l.acao}</td>
-                  <td className="py-2 text-white/60">{l.entidade}</td>
+                  <td className="py-2 text-[var(--text-secondary)]">{l.entidade}</td>
                   <td className="py-2 text-[var(--text-secondary)] max-w-[260px] truncate" title={l.descricao}>{l.descricao || "—"}</td>
                   <td className="py-2 text-center">{sevBadge(l.severidade)}</td>
                 </tr>
@@ -152,7 +152,7 @@ function GlassBtn({ icon, children }: { icon: React.ReactNode; children: React.R
 function Kpi({ icon, label, value, sub, valueColor = "text-white" }: { icon?: React.ReactNode; label: string; value: string; sub?: string; valueColor?: string }) {
   return (
     <div className="rounded-xl border border-[var(--border-default)] bg-[var(--surface-primary)] backdrop-blur-sm p-4">
-      <div className="flex items-center gap-1.5 text-[var(--text-secondary)] text-xs font-medium">{icon && <span className="text-white/60">{icon}</span>}{label}</div>
+      <div className="flex items-center gap-1.5 text-[var(--text-secondary)] text-xs font-medium">{icon && <span className="text-[var(--text-secondary)]">{icon}</span>}{label}</div>
       <div className={`font-bold mt-1.5 text-xl ${valueColor}`}>{value}</div>
       {sub && <div className="text-[11px] text-[var(--text-muted)] mt-1">{sub}</div>}
     </div>

@@ -86,7 +86,7 @@ export function Header({
             <div className="flex items-center gap-2 px-3 py-2 rounded-full border border-[var(--border-strong)]">
               <Search className="h-4 w-4 text-white/70" />
               <input
-                className="bg-transparent text-xs outline-none placeholder:text-white/60 w-40 text-white"
+                className="bg-transparent text-xs outline-none placeholder:text-[var(--text-secondary)] w-40 text-white"
                 placeholder={searchPlaceholder}
                 value={searchQuery}
                 onChange={(e) => handleSearchChange(e.target.value)}
@@ -184,7 +184,7 @@ export function Header({
             variant="outline"
             size="sm"
             onClick={handleLogout}
-            className="border-[var(--border-strong)] text-xs bg-transparent hover:bg-red-50 hover:border-red-200 text-[#fff] hover:text-red-700 flex items-center justify-center gap-1.5"
+            className="border-[var(--border-strong)] text-xs bg-transparent hover:bg-red-50 hover:border-red-200 text-[var(--text-primary)] hover:text-red-700 flex items-center justify-center gap-1.5"
           >
             <LogOut className="h-3 w-3" />
             Sair

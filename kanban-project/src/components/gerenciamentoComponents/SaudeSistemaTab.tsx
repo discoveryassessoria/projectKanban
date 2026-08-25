@@ -217,7 +217,7 @@ export function SaudeSistemaTab() {
             <div className="flex items-center gap-2">
               <span className={`h-2.5 w-2.5 rounded-full ${cor.ponto}`} />
               <h2 className={`text-xl font-semibold ${cor.texto}`}>{rot.estados[estado] ?? estado}</h2>
-              <span className="rounded bg-[var(--surface-primary)] px-1.5 py-0.5 text-[10px] text-white/60">catálogo v{dados.versaoCatalogo}</span>
+              <span className="rounded bg-[var(--surface-primary)] px-1.5 py-0.5 text-[10px] text-[var(--text-secondary)]">catálogo v{dados.versaoCatalogo}</span>
             </div>
             <p className="mt-1 max-w-3xl text-sm text-white/70">{dados.motivoEstado}</p>
             <p className="mt-1 text-xs text-[var(--text-secondary)]">
@@ -232,7 +232,7 @@ export function SaudeSistemaTab() {
               Diagnóstico rápido
             </button>
             <button disabled={executando} onClick={() => executar("COMPLETO")}
-              className="rounded-lg bg-blue-600 px-3 py-2 text-xs font-medium text-[#fff] hover:bg-blue-500 disabled:opacity-50">
+              className="rounded-lg bg-[var(--action-primary)] px-3 py-2 text-xs font-medium text-[var(--action-primary-ink)] hover:bg-[var(--action-primary)] disabled:opacity-50">
               Executar diagnóstico completo
             </button>
             <button disabled={executando} onClick={() => executar("PROFUNDO")}
@@ -249,7 +249,7 @@ export function SaudeSistemaTab() {
         <Kpi valor={e?.criticos ?? "—"} label="Críticos" cor={(e?.criticos ?? 0) > 0 ? "#f87171" : "#4ade80"} destaque={(e?.criticos ?? 0) > 0} />
         <Kpi valor={e?.erros ?? "—"} label="Erros" cor={(e?.erros ?? 0) > 0 ? "#fb923c" : "#4ade80"} />
         <Kpi valor={e?.alertas ?? "—"} label="Alertas" cor={(e?.alertas ?? 0) > 0 ? "#fbbf24" : "#4ade80"} />
-        <Kpi valor={e?.informativos ?? "—"} label="Informativos" cor="#7dd3fc" />
+        <Kpi valor={e?.informativos ?? "—"} label="Informativos" cor="#0369a1" />
         <Kpi valor={`${e?.coberturaPercentual ?? 0}%`} label="Cobertura" cor={(e?.coberturaPercentual ?? 0) === 100 ? "#4ade80" : "#fbbf24"} />
         <Kpi valor={e?.naoExecutadas ?? "—"} label="Não executadas" cor={(e?.naoExecutadas ?? 0) > 0 ? "#c4b5fd" : "#4ade80"} />
         <Kpi valor={e?.falhasTecnicas ?? "—"} label="Falha técnica" cor={(e?.falhasTecnicas ?? 0) > 0 ? "#f87171" : "#4ade80"} />
@@ -314,7 +314,7 @@ export function SaudeSistemaTab() {
           )}
           {dados.achados.slice(0, 8).map((a) => <LinhaAchado key={a.id} a={a} rot={rot} onCorrigir={corrigir} corrigindo={corrigindo === a.chave} />)}
           {dados.achados.length === 0 && e && (
-            <div className={`${CARD} px-4 py-6 text-center text-sm text-white/60`}>
+            <div className={`${CARD} px-4 py-6 text-center text-sm text-[var(--text-secondary)]`}>
               Nenhum problema aberto nas verificações executadas.
             </div>
           )}
@@ -387,7 +387,7 @@ export function SaudeSistemaTab() {
               </div>
               <div className="mt-1 text-xs text-[var(--text-muted)]">Exige: {c.requisitos.join(" · ")}</div>
               {c.incompletos.slice(0, 8).map((i) => (
-                <div key={i.id} className="mt-1 text-xs text-white/60">
+                <div key={i.id} className="mt-1 text-xs text-[var(--text-secondary)]">
                   <span className="text-white/80">{i.rotulo}</span> — falta {i.faltando.join(", ")}
                 </div>
               ))}
@@ -395,7 +395,7 @@ export function SaudeSistemaTab() {
             </div>
           ))}
           {dados.plano.length === 0 && dados.contratos.every((c) => !c.incompletos.length) && (
-            <div className={`${CARD} px-4 py-6 text-center text-sm text-white/60`}>
+            <div className={`${CARD} px-4 py-6 text-center text-sm text-[var(--text-secondary)]`}>
               Nenhuma lacuna de configuração detectada nas capacidades declaradas.
             </div>
           )}
@@ -430,7 +430,7 @@ export function SaudeSistemaTab() {
             </div>
           ))}
           {dados.plano.length === 0 && (
-            <div className={`${CARD} px-4 py-6 text-center text-sm text-white/60`}>Nada pendente no plano de correção.</div>
+            <div className={`${CARD} px-4 py-6 text-center text-sm text-[var(--text-secondary)]`}>Nada pendente no plano de correção.</div>
           )}
         </div>
       )}
@@ -482,7 +482,7 @@ export function SaudeSistemaTab() {
           </div>
           {achadosFiltrados.map((a) => <LinhaAchado key={a.id} a={a} rot={rot} detalhado onCorrigir={corrigir} corrigindo={corrigindo === a.chave} />)}
           {achadosFiltrados.length === 0 && (
-            <div className={`${CARD} px-4 py-6 text-center text-sm text-white/60`}>Nenhum problema com estes filtros.</div>
+            <div className={`${CARD} px-4 py-6 text-center text-sm text-[var(--text-secondary)]`}>Nenhum problema com estes filtros.</div>
           )}
         </div>
       )}
@@ -566,13 +566,13 @@ export function SaudeSistemaTab() {
           {(() => {
             const h = historicoReq.dados
             if (historicoReq.carregando) return <div className="py-10 text-center text-[var(--text-secondary)]">Carregando histórico…</div>
-            if (!h) return <div className={`${CARD} px-4 py-6 text-center text-sm text-white/60`}>Sem histórico disponível.</div>
+            if (!h) return <div className={`${CARD} px-4 py-6 text-center text-sm text-[var(--text-secondary)]`}>Sem histórico disponível.</div>
             return (
               <>
                 <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
                   <Kpi valor={h.tendencia.totalAchados} label="Achados no histórico" />
                   <Kpi valor={h.tendencia.abertos} label="Abertos" cor={h.tendencia.abertos > 0 ? "#fbbf24" : "#4ade80"} />
-                  <Kpi valor={h.tendencia.resolvidos} label="Resolvidos" cor="#4ade80" />
+                  <Kpi valor={h.tendencia.resolvidos} label="Resolvidos" cor="#15803d" />
                   <Kpi valor={h.tendencia.recorrentes} label="Recorrentes" />
                   <Kpi valor={h.tendencia.reincidentes} label="Reincidentes" cor={h.tendencia.reincidentes > 0 ? "#f87171" : undefined} />
                   <Kpi valor={h.tendencia.tempoMedioResolucaoHoras != null ? `${h.tendencia.tempoMedioResolucaoHoras}h` : "—"} label="Tempo médio de resolução" />
@@ -590,9 +590,9 @@ export function SaudeSistemaTab() {
                         return (
                           <tr key={x.id} className="border-b border-[var(--border-subtle)] last:border-0">
                             <td className="px-4 py-2.5 text-white/70">{fmtData(x.criadoEm)}</td>
-                            <td className="px-4 py-2.5 text-white/60">{x.modo.toLowerCase()}</td>
+                            <td className="px-4 py-2.5 text-[var(--text-secondary)]">{x.modo.toLowerCase()}</td>
                             <td className="px-4 py-2.5"><span className={`rounded px-1.5 py-0.5 text-[10px] ${c.texto}`}>{rot.estados[x.estado] ?? x.estado}</span></td>
-                            <td className="px-4 py-2.5 text-white/60">{x.coberturaPercentual}%</td>
+                            <td className="px-4 py-2.5 text-[var(--text-secondary)]">{x.coberturaPercentual}%</td>
                             <td className="px-4 py-2.5 text-white/70">{x.criticos}C · {x.erros}E · {x.alertas}A{x.falhasTecnicas ? ` · ${x.falhasTecnicas} falha(s)` : ""}</td>
                             <td className="px-4 py-2.5 text-[var(--text-secondary)]">{fmtDur(x.duracaoMs)}</td>
                           </tr>
@@ -646,7 +646,7 @@ export function SaudeSistemaTab() {
                       <div className="text-white">{meta?.nome ?? "—"}</div>
                     </td>
                     <td className="px-4 py-2.5"><span className={`rounded px-1.5 py-0.5 text-[10px] ${cores}`}>{x.status.replace("_", " ").toLowerCase()}</span></td>
-                    <td className="px-4 py-2.5 text-white/60">{fmtDur(x.duracaoMs)}</td>
+                    <td className="px-4 py-2.5 text-[var(--text-secondary)]">{fmtDur(x.duracaoMs)}</td>
                     <td className="px-4 py-2.5 text-white/70">
                       {x.erro ? <span className="text-red-700">{x.erro}</span> : x.achados > 0 ? `${x.achados} achado(s)` : (x.resumo ?? "sem achados")}
                     </td>
@@ -673,7 +673,7 @@ function LinhaAchado({ a, rot, detalhado, onCorrigir, corrigindo }: {
         <span className={`mt-0.5 flex-none rounded border px-1.5 py-0.5 text-[10px] ${CORES_SEV[a.severidade]}`}>{rot.severidades[a.severidade]}</span>
         <span className="min-w-0 flex-1">
           <span className="block text-sm font-medium text-white">{a.titulo}</span>
-          <span className="mt-0.5 block text-xs text-white/60">{a.descricao}</span>
+          <span className="mt-0.5 block text-xs text-[var(--text-secondary)]">{a.descricao}</span>
           <span className="mt-1 flex flex-wrap items-center gap-2 text-[11px] text-[var(--text-muted)]">
             <span className="font-mono">{a.codigo}</span>
             <span>{rot.dominios[a.dominio] ?? a.dominio}</span>
@@ -706,7 +706,7 @@ function LinhaAchado({ a, rot, detalhado, onCorrigir, corrigindo }: {
             )}
           </div>
           {a.evidencia != null && (
-            <pre className="mt-2 max-h-40 overflow-auto rounded-lg border border-[var(--border-default)] bg-black/30 p-2 text-[11px] text-white/60">
+            <pre className="mt-2 max-h-40 overflow-auto rounded-lg border border-[var(--border-default)] bg-black/30 p-2 text-[11px] text-[var(--text-secondary)]">
               {JSON.stringify(a.evidencia, null, 2)}
             </pre>
           )}

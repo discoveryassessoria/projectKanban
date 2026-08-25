@@ -235,7 +235,7 @@ function Step1TypeSelector({
           disabled={!selectedType}
           className={`w-full py-3.5 rounded-lg font-semibold text-sm tracking-wide transition-all ${
             selectedType
-              ? "bg-amber-600 text-white hover:bg-amber-700 hover:shadow-lg"
+              ? "bg-amber-700 text-white hover:bg-amber-800 hover:shadow-lg"
               : "bg-gray-200 text-gray-500 cursor-not-allowed"
           }`}
         >
@@ -500,7 +500,7 @@ function Step2PersonForm({
                 disabled={!canSubmit || saving}
                 className={`flex-1 py-3 rounded-lg font-semibold text-sm tracking-wide transition-all flex items-center justify-center gap-2 ${
                   canSubmit
-                    ? "bg-amber-600 text-white hover:bg-amber-700 hover:shadow-lg"
+                    ? "bg-amber-700 text-white hover:bg-amber-800 hover:shadow-lg"
                     : "bg-gray-200 text-gray-500 cursor-not-allowed"
                 }`}
               >

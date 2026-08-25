@@ -22,7 +22,7 @@ export function OrigemBadge({ origem }: { origem: string | null | undefined }) {
   const proc = origem === "PROCESSO"
   const desconhecida = origem === "ORIGEM_DESCONHECIDA"
   return (
-    <span className={`inline-flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded-full border ${proc ? "bg-blue-50 text-blue-700 border-blue-200" : desconhecida ? "bg-amber-50 text-amber-700 border-amber-200" : "bg-[var(--surface-primary)] text-white/60 border-[var(--border-default)]"}`}>
+    <span className={`inline-flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded-full border ${proc ? "bg-blue-50 text-blue-700 border-blue-200" : desconhecida ? "bg-amber-50 text-amber-700 border-amber-200" : "bg-[var(--surface-primary)] text-[var(--text-secondary)] border-[var(--border-default)]"}`}>
       {proc ? <Workflow className="h-2.5 w-2.5" /> : <Building2 className="h-2.5 w-2.5" />}
       {proc ? "Processo" : desconhecida ? "Origem?" : "Corporativo"}
     </span>
@@ -128,13 +128,13 @@ export function CancelarEstornarModal({ acao, tipo, id, resumo, onClose, onDone 
           <div className="text-white/80">{resumo.item}</div>
           <div className="text-[var(--text-secondary)] text-xs">{resumo.processo ?? "—"} · <b className="text-white/80">{resumo.valor}</b></div>
         </div>
-        <p className="text-xs text-white/60">
+        <p className="text-xs text-[var(--text-secondary)]">
           {estorno
             ? "O lançamento original será PRESERVADO e um MOVIMENTO INVERSO será criado, revertendo o impacto financeiro. Estorno repetido não duplica."
             : "O histórico será PRESERVADO: o lançamento passa a CANCELADO, sai dos totais ativos e não pode ser recriado pelo mesmo evento. Liquidados não podem ser cancelados (use estorno)."}
         </p>
         <div>
-          <label className="block text-xs text-white/60 mb-1">Motivo *</label>
+          <label className="block text-xs text-[var(--text-secondary)] mb-1">Motivo *</label>
           <textarea value={motivo} onChange={(e) => setMotivo(e.target.value)} rows={2}
             className="w-full rounded-lg bg-[var(--surface-primary)] border border-[var(--border-default)] px-3 py-2 text-sm text-white outline-none focus:border-white/30" placeholder="Descreva o motivo…" />
         </div>

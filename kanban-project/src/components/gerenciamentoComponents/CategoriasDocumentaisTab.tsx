@@ -14,7 +14,7 @@ function authHeaders(): HeadersInit {
   return t ? { "Content-Type": "application/json", Authorization: `Bearer ${t}` } : { "Content-Type": "application/json" }
 }
 const inputCls = "w-full rounded-lg border border-[var(--border-default)] bg-[var(--surface-primary)] px-3 py-2 text-sm text-white placeholder-white/30 outline-none focus:border-white/20"
-const labelCls = "mb-1 block text-xs text-white/60"
+const labelCls = "mb-1 block text-xs text-[var(--text-secondary)]"
 
 // Identidade estável para a ausência de dados (evita recomputar memos).
 const SEM_ITENS: never[] = Object.freeze([]) as never[]
@@ -71,7 +71,7 @@ export default function CategoriasDocumentaisTab() {
         <div className="flex items-start justify-between gap-3">
           <div>
             <h2 className="text-lg font-semibold text-white">Categorias Documentais</h2>
-            <p className="mt-1 text-sm text-white/60">Cadastro mestre que <strong className="text-white/80">apenas classifica</strong> os Tipos de Documento. Não configura processo, fase, workflow, financeiro nem aplicabilidade.</p>
+            <p className="mt-1 text-sm text-[var(--text-secondary)]">Cadastro mestre que <strong className="text-white/80">apenas classifica</strong> os Tipos de Documento. Não configura processo, fase, workflow, financeiro nem aplicabilidade.</p>
           </div>
           <button onClick={() => setForm({ code: "", name: "", description: "", ordem: 0, ativo: true })} className="flex-none rounded-lg bg-[var(--action-primary)] px-3 py-2 text-xs font-medium text-[var(--action-primary-ink)] hover:bg-[var(--action-primary)]">+ Nova categoria</button>
         </div>
@@ -79,7 +79,7 @@ export default function CategoriasDocumentaisTab() {
           <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Buscar código ou nome…" className="w-56 rounded-lg border border-[var(--border-default)] bg-[var(--surface-primary)] px-3 py-1.5 text-xs text-white placeholder-white/40 outline-none focus:border-white/20" />
           <div className="inline-flex overflow-hidden rounded-lg border border-[var(--border-default)] text-xs">
             {(["ativas", "inativas", "todas"] as const).map((s) => (
-              <button key={s} onClick={() => setStatus(s)} aria-pressed={status === s} className={`px-3 py-1.5 capitalize ${status === s ? "bg-[var(--surface-secondary)] font-medium text-white" : "text-white/60 hover:bg-[var(--surface-hover)]"}`}>{s}</button>
+              <button key={s} onClick={() => setStatus(s)} aria-pressed={status === s} className={`px-3 py-1.5 capitalize ${status === s ? "bg-[var(--surface-secondary)] font-medium text-white" : "text-[var(--text-secondary)] hover:bg-[var(--surface-hover)]"}`}>{s}</button>
             ))}
           </div>
         </div>

@@ -113,7 +113,7 @@ export function TarefaTransversalModal({ processoId, necessidadeId, necessidadeL
           ) : (
             <label className="block">
               <span className="block text-[11.5px] font-semibold text-white/68 mb-1">Necessidade a atender</span>
-              <select value={necSel} onChange={(e) => setNecSel(e.target.value)} className="w-full text-[13px] rounded-lg border border-[var(--border-default)] px-2.5 py-2 bg-[var(--surface-popover)] focus:outline-none focus:border-[#7dd3fc]/50 focus:ring-1 focus:ring-[#7dd3fc]/25">
+              <select value={necSel} onChange={(e) => setNecSel(e.target.value)} className="w-full text-[13px] rounded-lg border border-[var(--border-default)] px-2.5 py-2 bg-[var(--surface-popover)] focus:outline-none focus:border-sky-200 focus:ring-1 focus:border-sky-200">
                 <option value="">— selecione —</option>
                 {necessidades.map((n) => <option key={n.id} value={n.id}>{n.label}</option>)}
               </select>
@@ -123,14 +123,14 @@ export function TarefaTransversalModal({ processoId, necessidadeId, necessidadeL
           <div className="grid grid-cols-2 gap-2">
             <label className="block">
               <span className="block text-[11.5px] font-semibold text-white/68 mb-1">Fase da operação oficial</span>
-              <select value={faseRef} onChange={(e) => { setFaseRef(e.target.value); setAcaoStepKey("") }} className="w-full text-[13px] rounded-lg border border-[var(--border-default)] px-2.5 py-2 bg-[var(--surface-popover)] focus:outline-none focus:border-[#7dd3fc]/50 focus:ring-1 focus:ring-[#7dd3fc]/25">
+              <select value={faseRef} onChange={(e) => { setFaseRef(e.target.value); setAcaoStepKey("") }} className="w-full text-[13px] rounded-lg border border-[var(--border-default)] px-2.5 py-2 bg-[var(--surface-popover)] focus:outline-none focus:border-sky-200 focus:ring-1 focus:border-sky-200">
                 <option value="">— selecione —</option>
                 {fases.map((f) => <option key={f.faseCode} value={f.faseCode}>{f.faseLabel}</option>)}
               </select>
             </label>
             <label className="block">
               <span className="block text-[11.5px] font-semibold text-white/68 mb-1">Ação oficial referenciada</span>
-              <select value={acaoStepKey} onChange={(e) => setAcaoStepKey(e.target.value)} disabled={!faseRef} className="w-full text-[13px] rounded-lg border border-[var(--border-default)] px-2.5 py-2 bg-[var(--surface-popover)] focus:outline-none focus:border-[#7dd3fc]/50 focus:ring-1 focus:ring-[#7dd3fc]/25 disabled:opacity-50">
+              <select value={acaoStepKey} onChange={(e) => setAcaoStepKey(e.target.value)} disabled={!faseRef} className="w-full text-[13px] rounded-lg border border-[var(--border-default)] px-2.5 py-2 bg-[var(--surface-popover)] focus:outline-none focus:border-sky-200 focus:ring-1 focus:border-sky-200 disabled:opacity-50">
                 <option value="">— selecione —</option>
                 {acoesDaFase.map((a) => <option key={a.stepKey} value={a.stepKey}>{a.title}</option>)}
               </select>
@@ -139,23 +139,23 @@ export function TarefaTransversalModal({ processoId, necessidadeId, necessidadeL
 
           <label className="block">
             <span className="block text-[11.5px] font-semibold text-white/68 mb-1">Objetivo</span>
-            <input value={objetivo} onChange={(e) => setObjetivo(e.target.value)} placeholder="Ex.: antecipar tradução da certidão" className="w-full text-[13px] rounded-lg border border-[var(--border-default)] px-2.5 py-2 bg-[var(--surface-popover)] focus:outline-none focus:border-[#7dd3fc]/50 focus:ring-1 focus:ring-[#7dd3fc]/25" />
+            <input value={objetivo} onChange={(e) => setObjetivo(e.target.value)} placeholder="Ex.: antecipar tradução da certidão" className="w-full text-[13px] rounded-lg border border-[var(--border-default)] px-2.5 py-2 bg-[var(--surface-popover)] focus:outline-none focus:border-sky-200 focus:ring-1 focus:border-sky-200" />
           </label>
           <label className="block">
             <span className="block text-[11.5px] font-semibold text-white/68 mb-1">Resultado esperado (opcional)</span>
-            <input value={resultadoEsperado} onChange={(e) => setResultadoEsperado(e.target.value)} className="w-full text-[13px] rounded-lg border border-[var(--border-default)] px-2.5 py-2 bg-[var(--surface-popover)] focus:outline-none focus:border-[#7dd3fc]/50 focus:ring-1 focus:ring-[#7dd3fc]/25" />
+            <input value={resultadoEsperado} onChange={(e) => setResultadoEsperado(e.target.value)} className="w-full text-[13px] rounded-lg border border-[var(--border-default)] px-2.5 py-2 bg-[var(--surface-popover)] focus:outline-none focus:border-sky-200 focus:ring-1 focus:border-sky-200" />
           </label>
           {usuarios && usuarios.length > 0 && (
             <label className="block">
               <span className="block text-[11.5px] font-semibold text-white/68 mb-1">Responsável (opcional)</span>
-              <select value={responsavelId} onChange={(e) => setResponsavelId(e.target.value)} className="w-full text-[13px] rounded-lg border border-[var(--border-default)] px-2.5 py-2 bg-[var(--surface-popover)] focus:outline-none focus:border-[#7dd3fc]/50 focus:ring-1 focus:ring-[#7dd3fc]/25">
+              <select value={responsavelId} onChange={(e) => setResponsavelId(e.target.value)} className="w-full text-[13px] rounded-lg border border-[var(--border-default)] px-2.5 py-2 bg-[var(--surface-popover)] focus:outline-none focus:border-sky-200 focus:ring-1 focus:border-sky-200">
                 <option value="">— sem responsável —</option>
                 {usuarios.map((u) => <option key={u.id} value={u.id}>{nomePessoa(u)}</option>)}
               </select>
             </label>
           )}
 
-          {erro && <div className="text-[12px] text-[#f87171] bg-[#f87171]/12 rounded-lg px-3 py-2">{erro}</div>}
+          {erro && <div className="text-[12px] text-red-700 bg-red-50 rounded-lg px-3 py-2">{erro}</div>}
         </div>
         <div className="flex items-center justify-end gap-2 px-5 pb-4">
           <button onClick={onClose} disabled={enviando} className="text-[13px] font-semibold px-3.5 py-2 rounded-lg text-white/68 hover:bg-[var(--surface-tertiary)]">Cancelar</button>

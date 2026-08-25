@@ -776,7 +776,7 @@ export function TabelaCustos({ processoId, nomeFamilia, onTotaisChange }: Tabela
           {temSelecao && (
             <button
               onClick={() => exportarPDF(true)}
-              className="flex items-center gap-2 px-4 py-2 text-[#fff] bg-blue-600 rounded-lg hover:bg-blue-700 transition"
+              className="flex items-center gap-2 px-4 py-2 text-[var(--action-primary-ink)] bg-[var(--action-primary)] rounded-lg hover:bg-[var(--action-primary)] transition"
             >
               <FileDown className="w-4 h-4" />
               Exportar Selecionados ({linhasSelecionadas.size})
@@ -799,7 +799,7 @@ export function TabelaCustos({ processoId, nomeFamilia, onTotaisChange }: Tabela
       <div ref={tabelaRef} className="overflow-x-auto border border-gray-200 rounded-lg shadow-sm">
         <table className="w-full text-xs">
           <thead>
-            <tr className="bg-[var(--surface-secondary)] text-[#fff]">
+            <tr className="bg-[var(--surface-secondary)] text-[var(--text-primary)]">
               <th className="px-2 py-2 text-center font-semibold border-r border-[var(--border-default)] w-10">
                 <button
                   onClick={todasSelecionadas ? limparSelecao : selecionarTodas}
@@ -831,7 +831,7 @@ export function TabelaCustos({ processoId, nomeFamilia, onTotaisChange }: Tabela
                   <span className="truncate" title={servico.nome}>{servico.nome}</span>
                 </th>
               ))}
-              <th className="px-3 py-2 text-right font-semibold bg-amber-600 min-w-[100px]">Total</th>
+              <th className="px-3 py-2 text-right font-semibold bg-amber-700 min-w-[100px]">Total</th>
             </tr>
           </thead>
           <tbody>
@@ -1004,7 +1004,7 @@ export function TabelaCustos({ processoId, nomeFamilia, onTotaisChange }: Tabela
                   {formatarMoeda(calcularTotalServico(servico.id))}
                 </td>
               ))}
-              <td className="px-3 py-2 text-right text-lg text-[#fff] bg-amber-600 font-bold">
+              <td className="px-3 py-2 text-right text-lg text-[var(--action-primary-ink)] bg-amber-700 font-bold">
                 {formatarMoeda(calcularTotalGeral())}
               </td>
             </tr>

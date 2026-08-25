@@ -24,7 +24,7 @@ export function ComprovanteModal({ url, nome, onClose }: Props) {
       footer={
         <>
           {url && (
-            <a href={url} download={nome} className="px-4 py-2 bg-green-600 hover:bg-green-700 text-[#fff] rounded-lg text-sm">
+            <a href={url} download={nome} className="px-4 py-2 bg-green-700 hover:bg-green-800 text-[var(--action-primary-ink)] rounded-lg text-sm">
               ⬇ Baixar
             </a>
           )}

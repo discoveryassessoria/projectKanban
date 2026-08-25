@@ -44,7 +44,7 @@ function authHeaders(): HeadersInit {
   return t ? { "Content-Type": "application/json", Authorization: `Bearer ${t}` } : { "Content-Type": "application/json" }
 }
 const inputCls = "w-full rounded-lg border border-[var(--border-default)] bg-[var(--surface-primary)] px-3 py-2 text-sm text-white placeholder-white/30 outline-none focus:border-white/20"
-const labelCls = "mb-1 block text-xs text-white/60"
+const labelCls = "mb-1 block text-xs text-[var(--text-secondary)]"
 const IEdit = () => (<svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 20h9" /><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z" /></svg>)
 const ITrash = () => (<svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 6h18" /><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" /></svg>)
 
@@ -152,14 +152,14 @@ export default function TiposDocumentoTab() {
         <div className="flex items-start justify-between gap-3">
           <div>
             <h2 className="text-lg font-semibold text-white">Tipos de Documento</h2>
-            <p className="mt-1 text-sm text-white/60">Cadastro <strong className="text-white/80">mestre</strong> de tipos documentais — inclui certidões, identidades, judiciais, etc. Certidões são criadas aqui (não há cadastro separado).</p>
+            <p className="mt-1 text-sm text-[var(--text-secondary)]">Cadastro <strong className="text-white/80">mestre</strong> de tipos documentais — inclui certidões, identidades, judiciais, etc. Certidões são criadas aqui (não há cadastro separado).</p>
           </div>
           <button onClick={() => setForm(formVazio())} className="flex-none rounded-lg bg-[var(--action-primary)] px-3 py-2 text-xs font-medium text-[var(--action-primary-ink)] hover:bg-[var(--action-primary)]">+ Novo tipo de documento</button>
         </div>
         {/* Filtro rápido — consolidação de "Tipos de Certidão" */}
         <div className="mt-4 inline-flex overflow-hidden rounded-lg border border-[var(--border-default)] text-xs">
-          <button onClick={() => setFiltro("todos")} aria-pressed={filtro === "todos"} className={`px-3 py-1.5 ${filtro === "todos" ? "bg-[var(--surface-secondary)] font-medium text-white" : "text-white/60 hover:bg-[var(--surface-hover)]"}`}>Todos ({rows.length})</button>
-          <button onClick={() => setFiltro("certidoes")} aria-pressed={filtro === "certidoes"} className={`px-3 py-1.5 ${filtro === "certidoes" ? "bg-[var(--surface-secondary)] font-medium text-white" : "text-white/60 hover:bg-[var(--surface-hover)]"}`}>Certidões ({totalCertidoes})</button>
+          <button onClick={() => setFiltro("todos")} aria-pressed={filtro === "todos"} className={`px-3 py-1.5 ${filtro === "todos" ? "bg-[var(--surface-secondary)] font-medium text-white" : "text-[var(--text-secondary)] hover:bg-[var(--surface-hover)]"}`}>Todos ({rows.length})</button>
+          <button onClick={() => setFiltro("certidoes")} aria-pressed={filtro === "certidoes"} className={`px-3 py-1.5 ${filtro === "certidoes" ? "bg-[var(--surface-secondary)] font-medium text-white" : "text-[var(--text-secondary)] hover:bg-[var(--surface-hover)]"}`}>Certidões ({totalCertidoes})</button>
         </div>
         {filtro === "certidoes" && (
           <p className="mt-2 text-[11px] text-[var(--text-muted)]">Cobertura: {certPorNature} por natureza estruturada · {certPorTexto} por fallback textual{certPorTexto > 0 ? " (migrar `nature` para eliminar)" : ""}.</p>

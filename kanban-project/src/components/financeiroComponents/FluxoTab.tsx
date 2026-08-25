@@ -50,7 +50,7 @@ export default function FluxoTab() {
       <div className="flex items-start justify-between flex-wrap gap-3">
         <div>
           <h2 className="text-lg font-bold text-white flex items-center gap-2"><Activity className="h-5 w-5" /> Fluxo de Caixa</h2>
-          <div className="text-xs text-white/60 mt-1">Previsto vs Realizado · 90 dias passados + 90 dias futuros</div>
+          <div className="text-xs text-[var(--text-secondary)] mt-1">Previsto vs Realizado · 90 dias passados + 90 dias futuros</div>
         </div>
         <div className="flex items-center gap-2">
           <GlassBtn icon={<Upload className="h-3.5 w-3.5" />}>Exportar</GlassBtn>
@@ -69,7 +69,7 @@ export default function FluxoTab() {
       <div className="bg-[var(--surface-primary)] backdrop-blur-sm border border-[var(--border-default)] rounded-xl p-4">
         <div className="flex items-center justify-between mb-3">
           <div className="text-sm font-semibold text-white flex items-center gap-2"><Activity className="h-4 w-4" /> Fluxo Previsto vs Realizado</div>
-          <div className="flex gap-3 text-xs text-white/60">
+          <div className="flex gap-3 text-xs text-[var(--text-secondary)]">
             <span className="inline-flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full bg-green-500" /> Entradas</span>
             <span className="inline-flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full bg-red-500" /> Saídas</span>
             <span className="inline-flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full bg-sky-300" /> Saldo</span>
@@ -112,7 +112,7 @@ export default function FluxoTab() {
               )
             })}
           </div>
-          <div className="flex gap-4 mt-3 justify-center text-[11px] text-white/60">
+          <div className="flex gap-4 mt-3 justify-center text-[11px] text-[var(--text-secondary)]">
             <span className="inline-flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-green-500" /> Entrada</span>
             <span className="inline-flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-red-500" /> Saída</span>
             <span className="inline-flex items-center gap-1.5"><span className="w-3.5 h-2 rounded" style={{ background: "linear-gradient(90deg,#22c55e 50%,#ef4444 50%)" }} /> Ambos</span>
@@ -173,9 +173,9 @@ function FluxoChart({ serie }: { serie: FluxoData["serie"] }) {
           responsive: true, maintainAspectRatio: false,
           plugins: { legend: { display: false } },
           scales: {
-            y: { ticks: { callback: (v: any) => "R$ " + (v / 1000).toFixed(0) + "k", color: "rgba(255,255,255,0.5)", font: { size: 10.5 } }, grid: { color: "rgba(255,255,255,0.08)" } },
+            y: { ticks: { callback: (v: any) => "R$ " + (v / 1000).toFixed(0) + "k", color: "var(--text-muted)", font: { size: 10.5 } }, grid: { color: "var(--text-muted)" } },
             y1: { position: "right", ticks: { callback: (v: any) => "R$ " + (v / 1000).toFixed(0) + "k", color: "rgba(125,211,252,0.7)", font: { size: 10 } }, grid: { display: false } },
-            x: { ticks: { color: "rgba(255,255,255,0.5)", font: { size: 10 }, maxTicksLimit: 14 }, grid: { display: false } },
+            x: { ticks: { color: "var(--text-muted)", font: { size: 10 }, maxTicksLimit: 14 }, grid: { display: false } },
           },
         },
       })

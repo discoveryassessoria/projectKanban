@@ -32,7 +32,7 @@ interface ImpostosData {
 
 function statusBadge(status: string) {
   if (status === "pago") return <span className="text-[11px] px-2 py-0.5 rounded-full bg-green-50 text-green-700 border border-green-200">Pago</span>
-  if (status === "previsto") return <span className="text-[11px] px-2 py-0.5 rounded-full bg-[var(--surface-primary)] text-white/60 border border-[var(--border-strong)]">Previsto</span>
+  if (status === "previsto") return <span className="text-[11px] px-2 py-0.5 rounded-full bg-[var(--surface-primary)] text-[var(--text-secondary)] border border-[var(--border-strong)]">Previsto</span>
   return <span className="text-[11px] px-2 py-0.5 rounded-full bg-amber-50 text-amber-700 border border-amber-200">A pagar</span>
 }
 
@@ -57,7 +57,7 @@ export default function ImpostosTab() {
       <div className="flex items-start justify-between flex-wrap gap-3">
         <div>
           <h2 className="text-lg font-bold text-white flex items-center gap-2"><Receipt className="h-5 w-5" /> Impostos e Tributos <span className="text-[10px] text-[var(--text-muted)] bg-[var(--surface-primary)] px-1.5 py-0.5 rounded font-normal">prévia</span></h2>
-          <div className="text-xs text-white/60 mt-1">Provisão automática · {k.qtdPendentes} guias em aberto · regime Simples Nacional</div>
+          <div className="text-xs text-[var(--text-secondary)] mt-1">Provisão automática · {k.qtdPendentes} guias em aberto · regime Simples Nacional</div>
         </div>
         <div className="flex items-center gap-2">
           <GlassBtn icon={<BarChart3 className="h-3.5 w-3.5" />}>Relatório fiscal</GlassBtn>
@@ -105,7 +105,7 @@ export default function ImpostosTab() {
             {d.cargaTributaria.map((c, i) => (
               <div key={i}>
                 <div className="flex justify-between text-sm mb-1">
-                  <span className="text-white/60">{c.mes}</span>
+                  <span className="text-[var(--text-secondary)]">{c.mes}</span>
                   <strong className="text-white">{fmtPct(c.pct)}</strong>
                 </div>
                 <div className="h-1.5 bg-[var(--surface-primary)] rounded-full overflow-hidden">
@@ -139,7 +139,7 @@ export default function ImpostosTab() {
             {d.tributos.map(t => (
               <tr key={t.id} className="border-b border-[var(--border-subtle)] last:border-0 hover:bg-[var(--surface-hover)]">
                 <td className="py-2 text-white/90 font-medium">{t.tipo}</td>
-                <td className="py-2 text-white/60 capitalize">{fmtMonth(t.competencia)}</td>
+                <td className="py-2 text-[var(--text-secondary)] capitalize">{fmtMonth(t.competencia)}</td>
                 <td className="py-2 text-right text-white/70 tabular-nums">{fmtBRL(t.base)}</td>
                 <td className="py-2 text-right text-white/70 tabular-nums">{t.aliquota.toFixed(1)}%</td>
                 <td className="py-2 text-right text-white font-medium tabular-nums">{fmtBRL(t.provisao)}</td>

@@ -110,7 +110,7 @@ export default function ContasReceberPage() {
           <p className="text-white/70">Gerencie as cobranças dos processos</p>
         </div>
         <Link href="/financas/contas-receber/nova">
-          <Button className="bg-green-600 hover:bg-green-700">
+          <Button className="bg-green-700 hover:bg-green-800 text-[var(--action-primary-ink)]">
             <Plus className="h-4 w-4 mr-2" />
             Nova Cobrança
           </Button>
@@ -169,7 +169,7 @@ export default function ContasReceberPage() {
             <SelectItem value="CANCELADO">Cancelado</SelectItem>
           </SelectContent>
         </Select>
-        <Button variant="outline" className="border-[var(--border-strong)] text-white hover:bg-[var(--surface-hover)]">
+        <Button variant="outline" className="border-[var(--border-strong)] text-[var(--text-primary)] hover:bg-[var(--surface-hover)]">
           <Download className="h-4 w-4 mr-2" />
           Exportar
         </Button>

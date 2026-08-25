@@ -15,7 +15,7 @@ import {
   CalendarClock, Search, Plus, X, Check, ArrowRight, ArrowLeft, Loader2, Pencil, Trash2,
   Tag, Filter, Layers, CalendarRange, CreditCard, Percent, Coins, Scale, Sparkles, GitBranch,
 } from 'lucide-react'
-import { OURO, GLASS, INPUT, jf, toggleArr, Secao, Campo, Select, Toggle, ChipsMulti, MultiSelect, ModalWizard, Stepper, fecharTodosMultiSelects } from './pagamentoUI'
+import { OURO, OURO_TINTA, GLASS, INPUT, jf, toggleArr, Secao, Campo, Select, Toggle, ChipsMulti, MultiSelect, ModalWizard, Stepper, fecharTodosMultiSelects } from './pagamentoUI'
 import {
   POLITICAS_TAXAS, POLITICAS_TAXAS_LABEL, POLITICAS_CAMBIO, POLITICAS_CAMBIO_LABEL,
   APLICA_A, APLICA_A_LABEL, TIPOS_PAGAMENTO, TIPOS_PAGAMENTO_LABEL, PERIODICIDADES, PERIODICIDADES_LABEL,
@@ -104,7 +104,7 @@ export default function CondicoesPagamentoTab() {
     <div className="space-y-5">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-3">
-          <div className="flex h-10 w-10 items-center justify-center rounded-xl" style={{ background: `${OURO}22`, color: OURO }}><CalendarClock className="h-5 w-5" /></div>
+          <div className="flex h-10 w-10 items-center justify-center rounded-xl" style={{ background: `${OURO}22`, color: OURO_TINTA }}><CalendarClock className="h-5 w-5" /></div>
           <div>
             <h2 className="text-lg font-semibold text-white">Condições de Pagamento</h2>
             <p className="text-sm text-[var(--text-secondary)]">Regra reutilizável do motor. Só sugere/parametriza — a Cobrança decide.</p>
@@ -127,7 +127,7 @@ export default function CondicoesPagamentoTab() {
       ) : filtrados.length === 0 ? (
         <div className={`${GLASS} flex flex-col items-center gap-2 py-16 text-center`}>
           <CalendarClock className="h-10 w-10 text-[var(--text-muted)]" />
-          <p className="text-white/60">{busca ? 'Nenhuma condição encontrada.' : 'Nenhuma condição cadastrada.'}</p>
+          <p className="text-[var(--text-secondary)]">{busca ? 'Nenhuma condição encontrada.' : 'Nenhuma condição cadastrada.'}</p>
         </div>
       ) : (
         <div className="space-y-2">
@@ -135,11 +135,11 @@ export default function CondicoesPagamentoTab() {
             const usoReal = (x._count?.receitas || 0) + (x._count?.custos || 0) + (x._count?.configuracoes || 0)
             return (
               <div key={x.id} className={`${GLASS} flex items-center gap-4 p-4 transition hover:border-[var(--border-strong)]`}>
-                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg" style={{ background: `${OURO}18`, color: OURO }}><CalendarClock className="h-5 w-5" /></div>
+                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg" style={{ background: `${OURO}18`, color: OURO_TINTA }}><CalendarClock className="h-5 w-5" /></div>
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-2">
                     <span className="truncate font-medium text-white">{x.name}</span>
-                    {x.codigo && <span className="shrink-0 rounded-md border border-[var(--border-default)] px-2 py-0.5 text-[11px] text-white/60">v{x.versao} · {x.codigo}</span>}
+                    {x.codigo && <span className="shrink-0 rounded-md border border-[var(--border-default)] px-2 py-0.5 text-[11px] text-[var(--text-secondary)]">v{x.versao} · {x.codigo}</span>}
                     {!x.ativo && <span className="shrink-0 rounded-md border border-[var(--border-default)] px-2 py-0.5 text-[11px] text-[var(--text-muted)]">inativa</span>}
                   </div>
                   <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-[var(--text-secondary)]">
@@ -214,14 +214,14 @@ function CondicaoWizard({ editando, carteiras, formas, taxas, servicos, moedas, 
       onClose={onClose}
       header={<>
         <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2"><Sparkles className="h-4 w-4" style={{ color: OURO }} /><h3 className="text-base font-semibold">{editando ? 'Editar condição' : 'Nova condição de pagamento'}</h3></div>
+          <div className="flex items-center gap-2"><Sparkles className="h-4 w-4" style={{ color: OURO_TINTA }} /><h3 className="text-base font-semibold">{editando ? 'Editar condição' : 'Nova condição de pagamento'}</h3></div>
           <button onClick={() => { fecharTodosMultiSelects(); onClose() }} className="text-[var(--text-muted)] transition hover:text-white"><X className="h-4 w-4" /></button>
         </div>
         <div className="mt-3"><Stepper passos={PASSOS} atual={step} /></div>
       </>}
       footer={
         <div className="flex items-center justify-between">
-          <button onClick={() => (step > 1 ? irPara(step - 1) : (fecharTodosMultiSelects(), onClose()))} className="inline-flex items-center gap-1 text-sm text-white/60 transition hover:text-white"><ArrowLeft className="h-4 w-4" /> {step > 1 ? 'Voltar' : 'Cancelar'}</button>
+          <button onClick={() => (step > 1 ? irPara(step - 1) : (fecharTodosMultiSelects(), onClose()))} className="inline-flex items-center gap-1 text-sm text-[var(--text-secondary)] transition hover:text-white"><ArrowLeft className="h-4 w-4" /> {step > 1 ? 'Voltar' : 'Cancelar'}</button>
           {step < PASSOS.length ? (
             <button onClick={() => { fecharTodosMultiSelects(); if (step === 1 && !f.name.trim()) { setErro('Informe o nome.'); return } setErro(null); setStep(step + 1) }} className="inline-flex items-center gap-1 rounded-lg px-4 py-2 text-sm font-semibold text-[#1b1508] transition" style={{ background: OURO }}>Próximo <ArrowRight className="h-4 w-4" /></button>
           ) : (

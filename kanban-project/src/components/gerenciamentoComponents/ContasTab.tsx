@@ -284,12 +284,12 @@ export default function ContasTab() {
               {/* Identificação */}
               <Secao titulo="Identificação" primeira>
                 <div>
-                  <label className="mb-1 block text-xs text-white/60">Nome da conta</label>
+                  <label className="mb-1 block text-xs text-[var(--text-secondary)]">Nome da conta</label>
                   <input value={nome} onChange={(e) => setNome(e.target.value)} autoFocus placeholder="Ex.: Itaú PJ, Caixa, Wise EUR" className={inputCls} />
                 </div>
                 <div className="grid grid-cols-2 gap-3">
                   <div>
-                    <label className="mb-1 block text-xs text-white/60">Banco</label>
+                    <label className="mb-1 block text-xs text-[var(--text-secondary)]">Banco</label>
                     <select value={bankId} onChange={(e) => setBankId(e.target.value)} className={inputCls}>
                       <option value="" className="bg-zinc-900">— Nenhum —</option>
                       {bancos.map((b) => <option key={b.id} value={b.id} className="bg-zinc-900">{b.nome}{b.sigla ? ` (${b.sigla})` : ''}</option>)}
@@ -297,7 +297,7 @@ export default function ContasTab() {
                     {bancos.length === 0 && <p className="mt-1 text-[11px] text-amber-700/70">Cadastre Bancos primeiro para vincular.</p>}
                   </div>
                   <div>
-                    <label className="mb-1 block text-xs text-white/60">Tipo</label>
+                    <label className="mb-1 block text-xs text-[var(--text-secondary)]">Tipo</label>
                     <select value={tipoConta} onChange={(e) => setTipoConta(e.target.value)} className={inputCls}>
                       <option value="" className="bg-zinc-900">—</option>
                       {TIPOS_CONTA.map(([k, label]) => <option key={k} value={k} className="bg-zinc-900">{label}</option>)}
@@ -306,13 +306,13 @@ export default function ContasTab() {
                 </div>
                 <div className="grid grid-cols-2 gap-3">
                   <div>
-                    <label className="mb-1 block text-xs text-white/60">Moeda</label>
+                    <label className="mb-1 block text-xs text-[var(--text-secondary)]">Moeda</label>
                     <select value={moeda} onChange={(e) => setMoeda(e.target.value)} className={inputCls}>
                       {MOEDAS.map(([k, label]) => <option key={k} value={k} className="bg-zinc-900">{label}</option>)}
                     </select>
                   </div>
                   <div>
-                    <label className="mb-1 block text-xs text-white/60">Cor</label>
+                    <label className="mb-1 block text-xs text-[var(--text-secondary)]">Cor</label>
                     <div className="flex items-center gap-1.5 pt-1">
                       {CORES.map((c) => (
                         <button key={c} type="button" onClick={() => setCor(c)} className={`h-6 w-6 rounded-full transition ${cor === c ? 'ring-2 ring-white ring-offset-2 ring-offset-zinc-900' : ''}`} style={{ backgroundColor: c }} />
@@ -326,16 +326,16 @@ export default function ContasTab() {
               <Secao titulo="Dados bancários">
                 <div className="grid grid-cols-2 gap-3">
                   <div>
-                    <label className="mb-1 block text-xs text-white/60">Agência</label>
+                    <label className="mb-1 block text-xs text-[var(--text-secondary)]">Agência</label>
                     <input value={agencia} onChange={(e) => setAgencia(e.target.value)} className={inputCls} />
                   </div>
                   <div>
-                    <label className="mb-1 block text-xs text-white/60">Número da conta</label>
+                    <label className="mb-1 block text-xs text-[var(--text-secondary)]">Número da conta</label>
                     <input value={conta} onChange={(e) => setConta(e.target.value)} className={inputCls} />
                   </div>
                 </div>
                 <div>
-                  <label className="mb-1 block text-xs text-white/60">Chave Pix</label>
+                  <label className="mb-1 block text-xs text-[var(--text-secondary)]">Chave Pix</label>
                   <input value={chavePix} onChange={(e) => setChavePix(e.target.value)} className={inputCls} />
                 </div>
               </Secao>
@@ -344,11 +344,11 @@ export default function ContasTab() {
               <Secao titulo="Internacional">
                 <div className="grid grid-cols-2 gap-3">
                   <div>
-                    <label className="mb-1 block text-xs text-white/60">IBAN</label>
+                    <label className="mb-1 block text-xs text-[var(--text-secondary)]">IBAN</label>
                     <input value={iban} onChange={(e) => setIban(e.target.value)} className={inputCls} />
                   </div>
                   <div>
-                    <label className="mb-1 block text-xs text-white/60">SWIFT / BIC</label>
+                    <label className="mb-1 block text-xs text-[var(--text-secondary)]">SWIFT / BIC</label>
                     <input value={swift} onChange={(e) => setSwift(e.target.value)} className={inputCls} />
                   </div>
                 </div>
@@ -357,7 +357,7 @@ export default function ContasTab() {
               {/* Configurações */}
               <Secao titulo="Configurações">
                 <div>
-                  <label className="mb-1 block text-xs text-white/60">Saldo inicial</label>
+                  <label className="mb-1 block text-xs text-[var(--text-secondary)]">Saldo inicial</label>
                   <input type="number" step="0.01" value={saldoInicial} onChange={(e) => setSaldoInicial(e.target.value)} placeholder="0,00" className={`${inputCls} max-w-[200px]`} />
                   {editando && (
                     <p className="mt-1 text-[11px] text-[var(--text-muted)]">Saldo atual ({fmtMoney(editando.saldoAtual, editando.moeda)}) é atualizado pelos lançamentos.</p>
@@ -385,7 +385,7 @@ export default function ContasTab() {
             </div>
 
             <div className="flex items-center justify-end gap-2 border-t border-[var(--border-default)] px-6 py-4">
-              <button onClick={() => setModalAberto(false)} className="rounded-lg px-4 py-2 text-sm text-white/60 transition hover:text-white">Cancelar</button>
+              <button onClick={() => setModalAberto(false)} className="rounded-lg px-4 py-2 text-sm text-[var(--text-secondary)] transition hover:text-white">Cancelar</button>
               <button onClick={salvar} disabled={salvando} className="rounded-lg bg-[var(--action-primary)] px-4 py-2 text-sm font-medium text-[var(--action-primary-ink)] transition hover:bg-[var(--action-primary)] disabled:opacity-50">
                 {salvando ? 'Salvando...' : 'Salvar'}
               </button>

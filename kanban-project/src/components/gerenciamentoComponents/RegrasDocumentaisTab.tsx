@@ -77,7 +77,7 @@ const formParaRegra = (f: RegraForm): RegraDocumental => ({
 })
 
 const input = "w-full rounded-lg border border-[var(--border-default)] bg-[var(--surface-primary)] px-3 py-2 text-sm text-white placeholder-white/30 outline-none focus:border-white/20"
-const label = "mb-1 block text-xs text-white/60"
+const label = "mb-1 block text-xs text-[var(--text-secondary)]"
 const opt = "bg-zinc-900"
 const btnP = "rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-blue-500 disabled:opacity-50"
 const btnG = "rounded-lg border border-[var(--border-default)] bg-[var(--surface-primary)] px-3 py-1.5 text-xs text-white/80 hover:bg-[var(--surface-hover)]"
@@ -86,7 +86,7 @@ function authHeaders(): HeadersInit {
   return t ? { "Content-Type": "application/json", Authorization: `Bearer ${t}` } : { "Content-Type": "application/json" }
 }
 const STATUS_STYLE: Record<string, string> = {
-  RASCUNHO: "bg-[var(--surface-primary)] text-white/60", PUBLICADA: "bg-green-50 text-green-700",
+  RASCUNHO: "bg-[var(--surface-primary)] text-[var(--text-secondary)]", PUBLICADA: "bg-green-50 text-green-700",
   INATIVA: "bg-amber-50 text-amber-700", ARQUIVADA: "bg-[var(--surface-primary)] text-[var(--text-muted)]",
 }
 const ETAPAS = ["Identificação", "Aplicabilidade", "Requisito e documentos", "Público-alvo", "Condições", "Fases e bloqueio", "Validade", "Revisão final"]
@@ -183,7 +183,7 @@ export default function RegrasDocumentaisTab() {
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
             <h2 className="text-lg font-semibold text-white">Regras Documentais</h2>
-            <p className="mt-1 max-w-2xl text-sm text-white/60">Fonte única e configurável dos documentos exigidos: para quem, sob quais condições, em qual fase começam a ser exigidos, qual fase bloqueiam, obrigatoriedade e validade. <span className="text-[var(--text-muted)]">Configuração apenas — nenhum documento ou tarefa é criado aqui.</span></p>
+            <p className="mt-1 max-w-2xl text-sm text-[var(--text-secondary)]">Fonte única e configurável dos documentos exigidos: para quem, sob quais condições, em qual fase começam a ser exigidos, qual fase bloqueiam, obrigatoriedade e validade. <span className="text-[var(--text-muted)]">Configuração apenas — nenhum documento ou tarefa é criado aqui.</span></p>
           </div>
           <div className="flex gap-2">
             <button className={btnG} onClick={() => setSimOpen(true)}>Simular regras</button>
@@ -231,13 +231,13 @@ export default function RegrasDocumentaisTab() {
                     <td className="px-2 py-2 font-medium text-white">{r.nome ?? "—"}</td>
                     <td className="px-2 py-2 text-[11px] text-[var(--text-secondary)]">{r.aplicaTodosProcessos ? "Todos" : `${(r.tipoProcessoIds.length || 1)} tipo(s)`}</td>
                     <td className="px-2 py-2 text-xs text-white/80">{r.requisitoNome ?? docName(r.documentTypeCode)}<span className="text-[var(--text-muted)]"> · {(r.documentosAceitos.length || 1)} doc{r.modoSatisfacao === "TODOS_SAO_EXIGIDOS" ? " (todos)" : ""}</span></td>
-                    <td className="px-2 py-2 text-[11px] text-white/60">{(r.publicosAlvo.length ? r.publicosAlvo : [r.publicoAlvo]).map((p) => PUBLICO_ALVO_LABEL[p]).join(", ")}</td>
+                    <td className="px-2 py-2 text-[11px] text-[var(--text-secondary)]">{(r.publicosAlvo.length ? r.publicosAlvo : [r.publicoAlvo]).map((p) => PUBLICO_ALVO_LABEL[p]).join(", ")}</td>
                     <td className="px-2 py-2 text-[11px] text-[var(--text-secondary)]">{r.condicoes && r.condicoes.regras.length ? justificativaDoConjunto(r.condicoes) : "—"}</td>
-                    <td className="px-2 py-2 text-xs text-white/60">{faseName(r.faseExigencia)}</td>
+                    <td className="px-2 py-2 text-xs text-[var(--text-secondary)]">{faseName(r.faseExigencia)}</td>
                     <td className="px-2 py-2 text-xs">{r.bloqueiaConclusaoFase ? <span className="rounded bg-red-50 px-1.5 py-0.5 text-[10px] text-red-700">{faseName(r.faseBloqueio)}</span> : <span className="text-[var(--text-muted)]">—</span>}</td>
                     <td className="px-2 py-2 text-xs"><span className={`rounded px-1.5 py-0.5 text-[10px] ${r.obrigatoriedade === "OBRIGATORIA" ? "bg-amber-50 text-amber-700" : "bg-[var(--surface-primary)] text-[var(--text-secondary)]"}`}>{r.obrigatoriedade === "OBRIGATORIA" ? "obrig." : "opc."}</span></td>
                     <td className="px-2 py-2 text-[11px] text-[var(--text-secondary)]">{r.possuiValidade ? `${r.validadeDias ?? "?"}d${r.renovarQuandoExpirado ? " ↻" : ""}` : "—"}</td>
-                    <td className="px-2 py-2 text-xs text-white/60">v{r.versao}</td>
+                    <td className="px-2 py-2 text-xs text-[var(--text-secondary)]">v{r.versao}</td>
                     <td className="px-2 py-2"><span className={`rounded px-1.5 py-0.5 text-[10px] ${STATUS_STYLE[r.status]}`}>{r.status.toLowerCase()}</span></td>
                     <td className="px-2 py-2">
                       <div className="flex flex-wrap items-center justify-end gap-1 text-[11px]">

@@ -255,8 +255,8 @@ function DecisaoSobreCausa({
   }
 
   return (
-    <div className="mb-4 rounded-lg border border-[#d2a948]/30 bg-[#d2a948]/10 p-4">
-      <div className="text-sm font-semibold text-[#d2a948]">Esta tarefa perdeu a causa · requer decisão</div>
+    <div className="mb-4 rounded-lg border border-[var(--accent-primary)]/30 bg-[var(--accent-primary)]/10 p-4">
+      <div className="text-sm font-semibold text-[var(--accent-text)]">Esta tarefa perdeu a causa · requer decisão</div>
       <p className="mt-1 text-xs text-white/70">
         <span className="text-white/90">{titulo}</span>
         {motivo ? ` — ${motivo}` : ""}
@@ -804,11 +804,11 @@ export function ProcessoCentralOperacional({
   if (erro && !data) {
     return (
       <div className="h-full overflow-y-auto p-6">
-        <div className="bg-[#d2a948]/12 border border-[#d2a948]/30 rounded-lg px-4 py-3 text-sm text-[#d2a948]">
+        <div className="bg-[var(--accent-primary)]/12 border border-[var(--accent-primary)]/30 rounded-lg px-4 py-3 text-sm text-[var(--accent-text)]">
           <div>⚠ {erro}</div>
           <button
             onClick={() => { setErro(null); carregar() }}
-            className="mt-2 rounded-md border border-[#d2a948]/40 px-3 py-1 text-xs transition hover:bg-[#d2a948]/15"
+            className="mt-2 rounded-md border border-[var(--accent-primary)]/40 px-3 py-1 text-xs transition hover:bg-[var(--accent-primary)]/15"
           >
             Tentar novamente
           </button>
@@ -824,7 +824,7 @@ export function ProcessoCentralOperacional({
   if (!data) {
     return (
       <div className="h-full overflow-y-auto p-6">
-        <div className="rounded-lg border border-[var(--border-default)] bg-[var(--surface-primary)] px-4 py-6 text-center text-sm text-white/60">
+        <div className="rounded-lg border border-[var(--border-default)] bg-[var(--surface-primary)] px-4 py-6 text-center text-sm text-[var(--text-secondary)]">
           <div className="text-white/80">Nenhuma operação materializada para este processo.</div>
           <div className="mt-1 text-xs text-[var(--text-secondary)]">
             A Central aparece quando o processo tem fase e workflow ativos.
@@ -974,9 +974,9 @@ export function ProcessoCentralOperacional({
 
         {/* ===== Cabeçalho do MODO CONSULTA (fase passada) — MESMA casca, só leitura ===== */}
         {isView && (
-          <div className="mb-4 flex items-start justify-between gap-4 flex-wrap bg-[#d2a948]/12 border border-[#d2a948]/30 rounded-xl px-4 py-3">
+          <div className="mb-4 flex items-start justify-between gap-4 flex-wrap bg-[var(--accent-primary)]/12 border border-[var(--accent-primary)]/30 rounded-xl px-4 py-3">
             <div className="flex items-center gap-2 flex-wrap">
-              <span className="inline-flex items-center gap-1.5 text-[11.5px] font-bold px-3 py-1 rounded-full bg-[#d2a948]/15 text-[#d2a948]">
+              <span className="inline-flex items-center gap-1.5 text-[11.5px] font-bold px-3 py-1 rounded-full bg-[var(--accent-primary)]/15 text-[var(--accent-text)]">
                 <Eye className="w-3.5 h-3.5" /> Somente leitura
               </span>
               <span className="text-[13px] font-semibold text-white/80">
@@ -987,7 +987,7 @@ export function ProcessoCentralOperacional({
             <div className="flex items-center gap-2">
               <button
                 onClick={() => setSelectedPhaseKey(null)}
-                className="inline-flex items-center gap-1.5 border-[1.5px] border-[var(--border-default)] bg-[var(--surface-popover)] text-white/80 text-[12.5px] font-semibold px-3.5 py-2 rounded-lg hover:border-[var(--border-strong)] hover:text-[#fff] transition-colors"
+                className="inline-flex items-center gap-1.5 border-[1.5px] border-[var(--border-default)] bg-[var(--surface-popover)] text-white/80 text-[12.5px] font-semibold px-3.5 py-2 rounded-lg hover:border-[var(--border-strong)] hover:text-[var(--text-primary)] transition-colors"
               >
                 <ArrowLeft className="w-3.5 h-3.5" /> Voltar à fase ativa
               </button>
@@ -1016,7 +1016,7 @@ export function ProcessoCentralOperacional({
           // Consultando fase passada e os dados ainda NÃO chegaram (loading/erro): mostra
           // spinner/erro — NUNCA o corpo, que cairia nos dados da fase ativa.
           viewErro
-            ? <div className="bg-[#d2a948]/12 border border-[#d2a948]/30 rounded-lg px-4 py-3 text-sm text-[#d2a948]">⚠ {viewErro}</div>
+            ? <div className="bg-[var(--accent-primary)]/12 border border-[var(--accent-primary)]/30 rounded-lg px-4 py-3 text-sm text-[var(--accent-text)]">⚠ {viewErro}</div>
             : <div className="flex items-center justify-center py-16 text-[var(--text-muted)]"><Loader2 className="w-6 h-6 animate-spin" /></div>
         ) : !isView && ehAnalise ? (
           <ProcessoAnalise processoId={processo.id} onConcluido={() => carregar(true)} />

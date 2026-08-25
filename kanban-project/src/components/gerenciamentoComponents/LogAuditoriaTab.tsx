@@ -81,7 +81,7 @@ export default function LogAuditoriaTab({ escopo }: { escopo?: string }) {
         <div className="flex items-start justify-between gap-3">
           <div>
             <h2 className="text-lg font-semibold text-white">{cfg?.titulo ?? "Logs / Auditoria"}</h2>
-            <p className="mt-1 max-w-3xl text-sm text-white/60">
+            <p className="mt-1 max-w-3xl text-sm text-[var(--text-secondary)]">
               {cfg?.descricao ?? "Registro das ações no sistema."} Mostrando {logsEscopo.length} de {logs.length} registros recentes.
             </p>
           </div>
@@ -111,7 +111,7 @@ export default function LogAuditoriaTab({ escopo }: { escopo?: string }) {
             ) : filtered.map(l => (
               <Fragment key={l.id}>
                 <tr className={`border-b border-[var(--border-subtle)] last:border-0 ${l.detalhes ? "cursor-pointer hover:bg-[var(--surface-hover)]" : ""}`} onClick={() => l.detalhes && setAberto(aberto === l.id ? null : l.id)}>
-                  <td className="whitespace-nowrap px-4 py-2.5 text-white/60">{fmt(l.criadoEm)}</td>
+                  <td className="whitespace-nowrap px-4 py-2.5 text-[var(--text-secondary)]">{fmt(l.criadoEm)}</td>
                   <td className="px-4 py-2.5"><span className="rounded bg-sky-50 px-1.5 py-0.5 text-[10px] text-sky-700">{l.acao}</span></td>
                   <td className="px-4 py-2.5 text-white/70">{l.entidade}{l.entidadeId != null && <span className="text-[var(--text-muted)]"> #{l.entidadeId}</span>}</td>
                   <td className="px-4 py-2.5 text-white">{l.descricao}{l.detalhes ? <span className="ml-1 text-[10px] text-[var(--text-muted)]">(detalhes)</span> : null}</td>

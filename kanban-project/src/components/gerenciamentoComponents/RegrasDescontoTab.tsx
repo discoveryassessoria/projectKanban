@@ -199,16 +199,16 @@ export default function RegrasDescontoTab() {
 
             <div className="space-y-4 px-6 py-4">
               <div>
-                <label className="mb-1 block text-xs text-white/60">Nome</label>
+                <label className="mb-1 block text-xs text-[var(--text-secondary)]">Nome</label>
                 <input value={name} onChange={(e) => setName(e.target.value)} autoFocus placeholder="Ex.: Desconto comercial padrão" className={inputCls} />
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="mb-1 block text-xs text-white/60">% máx s/ aprovação</label>
+                  <label className="mb-1 block text-xs text-[var(--text-secondary)]">% máx s/ aprovação</label>
                   <input type="number" min="0" step="0.01" value={maxPercent} onChange={(e) => setMaxPercent(e.target.value)} placeholder="0" className={inputCls} />
                 </div>
                 <div>
-                  <label className="mb-1 block text-xs text-white/60">Valor máx s/ aprovação</label>
+                  <label className="mb-1 block text-xs text-[var(--text-secondary)]">Valor máx s/ aprovação</label>
                   <input type="number" min="0" step="0.01" value={maxValor} onChange={(e) => setMaxValor(e.target.value)} placeholder="0,00" className={inputCls} />
                 </div>
               </div>
@@ -229,7 +229,7 @@ export default function RegrasDescontoTab() {
             </div>
 
             <div className="flex items-center justify-end gap-2 border-t border-[var(--border-default)] px-6 py-4">
-              <button onClick={() => setModalAberto(false)} className="rounded-lg px-4 py-2 text-sm text-white/60 transition hover:text-white">Cancelar</button>
+              <button onClick={() => setModalAberto(false)} className="rounded-lg px-4 py-2 text-sm text-[var(--text-secondary)] transition hover:text-white">Cancelar</button>
               <button onClick={salvar} disabled={salvando} className="rounded-lg bg-[var(--action-primary)] px-4 py-2 text-sm font-medium text-[var(--action-primary-ink)] transition hover:bg-[var(--action-primary)] disabled:opacity-50">
                 {salvando ? 'Salvando...' : 'Salvar'}
               </button>

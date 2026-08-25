@@ -86,12 +86,12 @@ export function PagamentosView() {
                       <td className="py-2.5 px-2 text-sm" style={{ color: "var(--text-secondary)" }}>{p.forma ?? "—"}</td>
                       <td className="py-2.5 px-2 text-sm" style={{ color: "var(--text-secondary)" }}>{p.conta ?? "—"}</td>
                       <td className="py-2.5 px-2 text-sm" style={{ color: "var(--text-secondary)" }}>{p.referencia ?? "—"}</td>
-                      <td className="py-2.5 px-2 text-center">{p.temComprovante ? (p.comprovanteUrl ? <a href={p.comprovanteUrl} target="_blank" rel="noreferrer" onClick={(e) => e.stopPropagation()} title="Ver comprovante" style={{ color: "var(--accent-primary)" }}><Paperclip className="inline h-4 w-4" /></a> : <Paperclip className="inline h-4 w-4" style={{ color: "var(--success)" }} />) : <span style={{ color: "var(--text-muted)" }}>—</span>}</td>
+                      <td className="py-2.5 px-2 text-center">{p.temComprovante ? (p.comprovanteUrl ? <a href={p.comprovanteUrl} target="_blank" rel="noreferrer" onClick={(e) => e.stopPropagation()} title="Ver comprovante" style={{ color: "var(--accent-text)" }}><Paperclip className="inline h-4 w-4" /></a> : <Paperclip className="inline h-4 w-4" style={{ color: "var(--success)" }} />) : <span style={{ color: "var(--text-muted)" }}>—</span>}</td>
                       <td className="py-2.5 px-2 text-center"><StatusBadge tone={estornadoTot ? (p.saldoEstornavel <= 0.005 ? "danger" : "warning") : "success"}>{estornadoTot ? (p.saldoEstornavel <= 0.005 ? "estornado" : "parcial") : "confirmado"}</StatusBadge></td>
                       <td className="py-2.5 px-2 text-sm" style={{ color: "var(--text-secondary)" }}>{p.responsavel ?? "—"}</td>
                       <td className="py-2.5 px-2 text-center">
                         <div className="inline-flex items-center gap-2">
-                          <button onClick={() => abrirDetalhe(p)} title="Abrir Receita (fluxo canônico)" style={{ color: "var(--accent-primary)" }}><ExternalLink className="h-4 w-4" /></button>
+                          <button onClick={() => abrirDetalhe(p)} title="Abrir Receita (fluxo canônico)" style={{ color: "var(--accent-text)" }}><ExternalLink className="h-4 w-4" /></button>
                           <button onClick={() => abrirDetalhe(p)} title="Estornar no fluxo canônico (detalhe da Receita → Pagamentos)" style={{ color: "var(--info)" }} disabled={p.saldoEstornavel <= 0.005}><RotateCcw className="h-4 w-4" style={{ opacity: p.saldoEstornavel <= 0.005 ? 0.35 : 1 }} /></button>
                         </div>
                       </td>

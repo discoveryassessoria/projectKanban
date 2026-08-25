@@ -415,7 +415,7 @@ export function DocumentosGeradosTab({
               <button
                 onClick={() => void gerar()}
                 disabled={!podeGerar || ocupado != null}
-                className="inline-flex items-center gap-2 rounded-xl bg-indigo-600 px-4 py-2 text-sm font-medium text-[#fff] hover:bg-indigo-700 disabled:opacity-50"
+                className="inline-flex items-center gap-2 rounded-xl bg-indigo-700 px-4 py-2 text-sm font-medium text-[var(--action-primary-ink)] hover:bg-indigo-800 disabled:opacity-50"
               >
                 {ocupado === "gerando" && <Loader2 className="h-4 w-4 animate-spin" />}
                 Gerar DOCX e PDF

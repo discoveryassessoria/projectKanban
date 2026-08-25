@@ -126,7 +126,7 @@ function Linha({
         <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-[var(--text-muted)]">
           {l.etapaAtual && (
             <span>
-              <span className="text-[var(--text-muted)]">Etapa atual:</span> <span className="text-white/60">{l.etapaAtual}</span>
+              <span className="text-[var(--text-muted)]">Etapa atual:</span> <span className="text-[var(--text-secondary)]">{l.etapaAtual}</span>
             </span>
           )}
           {rotularFase(l.faseMacroKey) && <span className="text-[var(--text-muted)]">{rotularFase(l.faseMacroKey)}</span>}
@@ -243,7 +243,7 @@ function CartaoDaFila({
             {l.etapaAtual && (
               <>
                 <span className="text-[var(--text-muted)]">›</span>
-                <span className="text-white/60">{l.etapaAtual}</span>
+                <span className="text-[var(--text-secondary)]">{l.etapaAtual}</span>
               </>
             )}
             {rotularFase(l.faseMacroKey) && (
@@ -484,7 +484,7 @@ export function CentralTarefas({ podeDistribuir }: { podeDistribuir: boolean }) 
                 key={m}
                 onClick={() => setModo(m)}
                 className={`rounded px-2 py-0.5 text-[10px] transition-colors ${
-                  modo === m ? "bg-[var(--surface-primary)] text-white/80" : "text-[var(--text-muted)] hover:text-white/60"
+                  modo === m ? "bg-[var(--surface-primary)] text-white/80" : "text-[var(--text-muted)] hover:text-[var(--text-secondary)]"
                 }`}
               >
                 {m === "lista" ? "Lista" : "Calendário"}

@@ -332,7 +332,7 @@ function EditorShell({
               </div>
               <button
                 onClick={onClose}
-                className="w-8 h-8 rounded-md bg-[var(--surface-overlay)] hover:bg-[var(--surface-tertiary)] flex items-center justify-center text-[#fff] flex-shrink-0"
+                className="w-8 h-8 rounded-md bg-[var(--surface-overlay)] hover:bg-[var(--surface-tertiary)] flex items-center justify-center text-[var(--text-primary)] flex-shrink-0"
                 aria-label="Fechar"
               >
                 <X className="w-4 h-4" />
@@ -370,22 +370,22 @@ function Label({
   return (
     <label className="block text-[10px] uppercase font-semibold tracking-wider text-[var(--text-secondary)] mb-1.5">
       {children}
-      {required && <span className="text-[#d2a948] ml-1">*</span>}
+      {required && <span className="text-[var(--accent-text)] ml-1">*</span>}
     </label>
   )
 }
 
 const inputCls =
-  "w-full px-3 py-2 bg-[var(--surface-overlay)] border border-[var(--border-default)] rounded-md text-sm text-white placeholder-white/30 focus:outline-none focus:border-[#7dd3fc]/50 focus:ring-1 focus:ring-[#7dd3fc]/30"
+  "w-full px-3 py-2 bg-[var(--surface-overlay)] border border-[var(--border-default)] rounded-md text-sm text-white placeholder-white/30 focus:outline-none focus:border-sky-200 focus:ring-1 focus:border-sky-200"
 
 const inputClsInvalid =
-  "w-full px-3 py-2 bg-[var(--surface-overlay)] border border-[#d2a948]/40 rounded-md text-sm text-white placeholder-white/30 focus:outline-none focus:border-[#d2a948]/60 focus:ring-1 focus:ring-[#d2a948]/30"
+  "w-full px-3 py-2 bg-[var(--surface-overlay)] border border-[var(--accent-primary)]/40 rounded-md text-sm text-white placeholder-white/30 focus:outline-none focus:border-[var(--accent-primary)]/60 focus:ring-1 focus:ring-[var(--accent-primary)]/30"
 
 function ReadOnlyBanner({ stepStatus }: { stepStatus: string }) {
   if (stepStatus !== "concluida") return null
   return (
     <div className="mb-5 p-3 rounded-lg border border-[var(--border-default)] bg-[var(--surface-overlay)]">
-      <div className="text-[12px] font-semibold text-[#7dd3fc] mb-0.5 flex items-center gap-1.5">
+      <div className="text-[12px] font-semibold text-sky-700 mb-0.5 flex items-center gap-1.5">
         <AlertCircle className="w-3.5 h-3.5" />
         Etapa já concluída
       </div>
@@ -919,7 +919,7 @@ function FormSolicitarCertidao({
   }
 
   const bannerErro = erroServidor ? (
-    <div className="mb-4 rounded-md border border-[#f87171]/30 bg-[#f87171]/10 px-3 py-2 text-[12px] text-[#f87171]">
+    <div className="mb-4 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-[12px] text-red-700">
       {erroServidor}
     </div>
   ) : null
@@ -964,7 +964,7 @@ function FormSolicitarCertidao({
           <button
             onClick={onClose}
             disabled={saving}
-            className="px-4 py-2 text-[12.5px] font-semibold text-white/70 hover:text-[#fff] hover:bg-[var(--surface-overlay)] rounded-md disabled:opacity-50"
+            className="px-4 py-2 text-[12.5px] font-semibold text-white/70 hover:text-[var(--text-primary)] hover:bg-[var(--surface-overlay)] rounded-md disabled:opacity-50"
           >
             Cancelar
           </button>
@@ -995,7 +995,7 @@ function FormSolicitarCertidao({
           <div className="mb-5 rounded-xl border border-[var(--border-default)] bg-[var(--surface-overlay)] overflow-hidden">
             <div className="px-4 py-2.5 border-b border-[var(--border-default)] bg-[var(--surface-popover)] flex items-center gap-2">
               <span className="text-[16px]">📋</span>
-              <span className="text-[12px] uppercase font-bold tracking-wider text-white/60">
+              <span className="text-[12px] uppercase font-bold tracking-wider text-[var(--text-secondary)]">
                 Resumo do pedido
               </span>
             </div>
@@ -1006,7 +1006,7 @@ function FormSolicitarCertidao({
                 <div className="text-[13px] font-semibold text-white leading-tight">
                   {tipoLabel}
                 </div>
-                <div className="text-[11px] text-white/60 mt-1">
+                <div className="text-[11px] text-[var(--text-secondary)] mt-1">
                   Custo estimado:{" "}
                   <strong className="text-white/85">{fmtBRL(custoEstimado)}</strong>
                 </div>
@@ -1017,7 +1017,7 @@ function FormSolicitarCertidao({
                 <div className="text-[13px] font-semibold text-white leading-tight">
                   {pessoaNome}
                 </div>
-                <div className="text-[11px] text-white/60 mt-1">
+                <div className="text-[11px] text-[var(--text-secondary)] mt-1">
                   Sujeito do registro
                 </div>
               </ResumoCard>
@@ -1027,7 +1027,7 @@ function FormSolicitarCertidao({
                 <div className="text-[13px] font-semibold text-white leading-tight">
                   {doc.cartorio || "—"}
                 </div>
-                <div className="text-[11px] text-white/60 mt-1">
+                <div className="text-[11px] text-[var(--text-secondary)] mt-1">
                   SLA típico: <strong className="text-white/85">~30d</strong>
                 </div>
               </ResumoCard>
@@ -1050,7 +1050,7 @@ function FormSolicitarCertidao({
                     )}
                   </>
                 ) : (
-                  <div className="text-[12px] text-[#d2a948]/85 italic">
+                  <div className="text-[12px] text-[var(--accent-text)]/85 italic">
                     Não localizados na etapa anterior
                   </div>
                 )}
@@ -1084,7 +1084,7 @@ function FormSolicitarCertidao({
                   {!readOnly && form.canal !== recomendacao.canal && (
                     <button
                       onClick={() => setForm({ ...form, canal: recomendacao.canal })}
-                      className="text-[10.5px] font-semibold px-2 py-1 bg-[#d2a948]/20 hover:bg-[#d2a948]/30 text-[#d2a948] rounded border border-[#d2a948]/30 whitespace-nowrap"
+                      className="text-[10.5px] font-semibold px-2 py-1 bg-[var(--accent-primary)]/20 hover:bg-[var(--accent-primary)]/30 text-[var(--accent-text)] rounded border border-[var(--accent-primary)]/30 whitespace-nowrap"
                     >
                       Usar este
                     </button>
@@ -1115,16 +1115,16 @@ function FormSolicitarCertidao({
                   disabled={readOnly}
                   className={`px-3 py-2.5 rounded-md border text-left transition-all disabled:cursor-not-allowed ${
                     isSelected
-                      ? "border-[#7dd3fc]/60 bg-[#7dd3fc]/15 ring-1 ring-[#7dd3fc]/40"
+                      ? "border-sky-200 bg-sky-50 ring-1 border-sky-200"
                       : "border-[var(--border-default)] bg-[var(--surface-overlay)] hover:bg-[var(--surface-secondary)]"
                   }`}
                 >
                   <div className="flex items-center gap-2 mb-0.5">
-                    <Icon className={`w-3.5 h-3.5 ${isSelected ? "text-[#7dd3fc]" : "text-white/60"}`} />
+                    <Icon className={`w-3.5 h-3.5 ${isSelected ? "text-sky-700" : "text-[var(--text-secondary)]"}`} />
                     <span className={`text-[12px] font-semibold ${isSelected ? "text-white" : "text-white/80"}`}>
                       {canal.label}
                     </span>
-                    {isSelected && <Check className="w-3 h-3 text-[#7dd3fc] ml-auto" />}
+                    {isSelected && <Check className="w-3 h-3 text-sky-700 ml-auto" />}
                   </div>
                   <div className="text-[10px] text-[var(--text-secondary)] leading-snug">{canal.desc}</div>
                 </button>
@@ -1202,7 +1202,7 @@ function FormSolicitarCertidao({
                       <label className="text-[10px] uppercase font-semibold tracking-wider text-[var(--text-secondary)]">
                         🏷 Número do protocolo
                       </label>
-                      <span className="text-[8.5px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded bg-[#d2a948]/20 text-[#d2a948] border border-[#d2a948]/40">
+                      <span className="text-[8.5px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded bg-[var(--accent-primary)]/20 text-[var(--accent-text)] border border-[var(--accent-primary)]/40">
                         obrigatório
                       </span>
                     </div>
@@ -1224,7 +1224,7 @@ function FormSolicitarCertidao({
                       <label className="text-[10px] uppercase font-semibold tracking-wider text-[var(--text-secondary)]">
                         📦 Código de rastreio
                       </label>
-                      <span className="text-[8.5px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded bg-[#d2a948]/20 text-[#d2a948] border border-[#d2a948]/40">
+                      <span className="text-[8.5px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded bg-[var(--accent-primary)]/20 text-[var(--accent-text)] border border-[var(--accent-primary)]/40">
                         obrigatório
                       </span>
                     </div>
@@ -1246,7 +1246,7 @@ function FormSolicitarCertidao({
                       📝 Observação
                     </label>
                     {canalConfig.requires.observation ? (
-                      <span className="text-[8.5px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded bg-[#d2a948]/20 text-[#d2a948] border border-[#d2a948]/40">
+                      <span className="text-[8.5px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded bg-[var(--accent-primary)]/20 text-[var(--accent-text)] border border-[var(--accent-primary)]/40">
                         obrigatória
                       </span>
                     ) : (
@@ -1614,7 +1614,7 @@ function FormAguardarRetorno({
           <button
             onClick={onClose}
             disabled={salvando || concluindo}
-            className="px-4 py-2 text-[12.5px] font-semibold text-white/70 hover:text-[#fff] hover:bg-[var(--surface-overlay)] rounded-md disabled:opacity-50"
+            className="px-4 py-2 text-[12.5px] font-semibold text-white/70 hover:text-[var(--text-primary)] hover:bg-[var(--surface-overlay)] rounded-md disabled:opacity-50"
           >
             Fechar
           </button>
@@ -1622,7 +1622,7 @@ function FormAguardarRetorno({
             <button
               onClick={salvarAndamento}
               disabled={salvando || concluindo}
-              className="px-4 py-2 text-[12.5px] font-semibold bg-[var(--surface-secondary)] hover:bg-[var(--surface-tertiary)] disabled:opacity-50 text-[#fff] rounded-md inline-flex items-center gap-2"
+              className="px-4 py-2 text-[12.5px] font-semibold bg-[var(--surface-secondary)] hover:bg-[var(--surface-tertiary)] disabled:opacity-50 text-[var(--text-primary)] rounded-md inline-flex items-center gap-2"
             >
               {salvando && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
               Salvar andamento
@@ -1650,7 +1650,7 @@ function FormAguardarRetorno({
       ) : (
         <div className="space-y-5">
           {(erro || falha) && (
-            <div className="rounded-md border border-[#f87171]/30 bg-[#f87171]/10 px-3 py-2 text-[12px] text-[#f87171]">
+            <div className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-[12px] text-red-700">
               {falha || erro}
             </div>
           )}
@@ -1658,8 +1658,8 @@ function FormAguardarRetorno({
           {/* 1. SITUAÇÃO DA ESPERA */}
           <div className="rounded-lg border border-[var(--border-default)] bg-[var(--surface-overlay)] overflow-hidden">
             <div className="px-3.5 py-2 bg-[var(--surface-popover)] border-b border-[var(--border-default)] flex items-center gap-2">
-              <Clock className="w-3.5 h-3.5 text-[#7dd3fc]" />
-              <span className="text-[11px] font-bold uppercase tracking-wider text-white/60">
+              <Clock className="w-3.5 h-3.5 text-sky-700" />
+              <span className="text-[11px] font-bold uppercase tracking-wider text-[var(--text-secondary)]">
                 Situação da espera
               </span>
             </div>
@@ -1693,7 +1693,7 @@ function FormAguardarRetorno({
               <SummaryField label="Prazo da etapa (SLA)" value={fmtPrazoSla(textoOuNulo(etapa?.dueAt), agoraRef)} />
             </div>
             {andamento.semRetornoDesde && (
-              <div className="px-3.5 py-2 border-t border-[#d2a948]/20 text-[11px] text-[#d2a948] bg-[#d2a948]/5 flex items-center gap-1.5">
+              <div className="px-3.5 py-2 border-t border-[var(--accent-primary)]/20 text-[11px] text-[var(--accent-text)] bg-[var(--accent-primary)]/5 flex items-center gap-1.5">
                 <AlertTriangle className="w-3 h-3 flex-shrink-0" />
                 Ausência de retorno registrada desde {fmtData(andamento.semRetornoDesde)}.
               </div>
@@ -1703,8 +1703,8 @@ function FormAguardarRetorno({
           {/* 2. PROTOCOLO DA SOLICITAÇÃO (somente leitura — não duplica nada) */}
           <div className="rounded-lg border border-[var(--border-default)] bg-[var(--surface-overlay)] overflow-hidden">
             <div className="px-3.5 py-2 bg-[var(--surface-popover)] border-b border-[var(--border-default)] flex items-center gap-2">
-              <Send className="w-3.5 h-3.5 text-[#7dd3fc]" />
-              <span className="text-[11px] font-bold uppercase tracking-wider text-white/60">
+              <Send className="w-3.5 h-3.5 text-sky-700" />
+              <span className="text-[11px] font-bold uppercase tracking-wider text-[var(--text-secondary)]">
                 Protocolo da solicitação
               </span>
               <span className="ml-auto text-[10px] uppercase tracking-wider text-[var(--text-muted)]">somente leitura</span>
@@ -1742,7 +1742,7 @@ function FormAguardarRetorno({
                     href={solicit.requerimentoUrl}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="text-[12px] text-[#7dd3fc] hover:underline inline-flex items-center gap-1 break-all"
+                    className="text-[12px] text-sky-700 hover:underline inline-flex items-center gap-1 break-all"
                   >
                     <Paperclip className="w-3 h-3 flex-shrink-0" />
                     {solicitacao?.arquivos.find((a) => a.tipo === "REQUERIMENTO_ENVIADO")?.nome ?? solicit.requerimentoUrl}
@@ -1759,7 +1759,7 @@ function FormAguardarRetorno({
                     href={solicit.link}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="text-[12px] text-[#7dd3fc] hover:underline inline-flex items-center gap-1 break-all"
+                    className="text-[12px] text-sky-700 hover:underline inline-flex items-center gap-1 break-all"
                   >
                     {solicit.link}
                     <ExternalLink className="w-3 h-3 flex-shrink-0" />
@@ -1776,7 +1776,7 @@ function FormAguardarRetorno({
               )}
             </div>
             {semProtocolo && (
-              <div className="px-3.5 py-2 border-t border-[#d2a948]/20 text-[11px] text-[#d2a948] bg-[#d2a948]/5 flex items-center gap-1.5">
+              <div className="px-3.5 py-2 border-t border-[var(--accent-primary)]/20 text-[11px] text-[var(--accent-text)] bg-[var(--accent-primary)]/5 flex items-center gap-1.5">
                 <AlertTriangle className="w-3 h-3 flex-shrink-0" />
                 A solicitação ainda não foi preenchida. Reabra a etapa anterior para registrar o protocolo.
               </div>
@@ -1869,7 +1869,7 @@ function FormAguardarRetorno({
                     type="checkbox"
                     checked={semRetorno}
                     onChange={(e) => setSemRetorno(e.target.checked)}
-                    className="accent-[#d2a948]"
+                    className="accent-[var(--accent-primary)]"
                   />
                   Registrar AUSÊNCIA de retorno (cartório não respondeu no prazo informado)
                 </label>
@@ -1977,7 +1977,7 @@ function InformarProtocoloInline({
             onChange={(e) => setNumero(e.target.value)}
             placeholder="Número devolvido pelo cartório"
             autoFocus
-            className="flex-1 px-2.5 py-1.5 bg-[var(--app-background)] border border-[var(--border-default)] rounded text-[12px] text-[#fff] placeholder-white/30 focus:outline-none focus:border-[#7dd3fc]/50 font-mono"
+            className="flex-1 px-2.5 py-1.5 bg-[var(--app-background)] border border-[var(--border-default)] rounded text-[12px] text-[var(--text-primary)] placeholder-white/30 focus:outline-none focus:border-sky-200 font-mono"
           />
           <button
             onClick={registrar}
@@ -1989,13 +1989,13 @@ function InformarProtocoloInline({
           </button>
           <button
             onClick={() => { setAberto(false); setNumero(""); setErro(null) }}
-            className="px-2 py-1.5 text-[11px] text-white/60 hover:text-white"
+            className="px-2 py-1.5 text-[11px] text-[var(--text-secondary)] hover:text-white"
           >
             Cancelar
           </button>
         </div>
       )}
-      {erro && <div className="mt-1.5 text-[11px] text-[#f87171]">{erro}</div>}
+      {erro && <div className="mt-1.5 text-[11px] text-red-700">{erro}</div>}
     </div>
   )
 }
@@ -2235,7 +2235,7 @@ function FormReceberCertidao({
    * ninguém soubesse. Falso sucesso é pior que silêncio.
    */
   const bannerErro = erroServidor ? (
-    <div className="mb-4 rounded-md border border-[#f87171]/30 bg-[#f87171]/10 px-3 py-2 text-[12px] text-[#f87171]">
+    <div className="mb-4 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-[12px] text-red-700">
       {erroServidor}
     </div>
   ) : null
@@ -2251,7 +2251,7 @@ function FormReceberCertidao({
           <button
             onClick={onClose}
             disabled={saving}
-            className="px-4 py-2 text-[12.5px] font-semibold text-white/70 hover:text-[#fff] hover:bg-[var(--surface-overlay)] rounded-md disabled:opacity-50"
+            className="px-4 py-2 text-[12.5px] font-semibold text-white/70 hover:text-[var(--text-primary)] hover:bg-[var(--surface-overlay)] rounded-md disabled:opacity-50"
           >
             Cancelar
           </button>
@@ -2312,7 +2312,7 @@ function FormReceberCertidao({
               <div className="text-[10px] uppercase font-bold tracking-wider text-[var(--text-secondary)]">
                 2. Tipo de mídia
               </div>
-              <span className="text-[8.5px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded bg-[#d2a948]/20 text-[#d2a948] border border-[#d2a948]/40">
+              <span className="text-[8.5px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded bg-[var(--accent-primary)]/20 text-[var(--accent-text)] border border-[var(--accent-primary)]/40">
                 obrigatório
               </span>
             </div>
@@ -2330,7 +2330,7 @@ function FormReceberCertidao({
                     disabled={readOnly}
                     className={`text-left px-3.5 py-2.5 rounded-md border transition-all disabled:cursor-not-allowed ${
                       ativo
-                        ? "border-[#4ade80]/60 bg-[#4ade80]/10 ring-1 ring-[#4ade80]/30"
+                        ? "border-green-200 bg-green-50 ring-1 border-green-200"
                         : "border-[var(--border-default)] bg-[var(--surface-overlay)] hover:bg-[var(--surface-secondary)]"
                     }`}
                   >
@@ -2338,7 +2338,7 @@ function FormReceberCertidao({
                       <div
                         className={`w-5 h-5 rounded-full border-2 flex items-center justify-center flex-shrink-0 mt-0.5 ${
                           ativo
-                            ? "border-[#4ade80]/30 bg-[#4ade80]/15"
+                            ? "border-green-200 bg-green-50"
                             : "border-[var(--border-strong)] bg-transparent"
                         }`}
                       >
@@ -2349,7 +2349,7 @@ function FormReceberCertidao({
                       <div className="flex-1 min-w-0">
                         <div
                           className={`text-[12.5px] font-semibold flex items-center gap-1.5 ${
-                            ativo ? "text-[#4ade80]" : "text-white/85"
+                            ativo ? "text-green-700" : "text-white/85"
                           }`}
                         >
                           <span>{opt.icon}</span>
@@ -2697,7 +2697,7 @@ function FormConferirCertidao({
    * ninguém soubesse. Falso sucesso é pior que silêncio.
    */
   const bannerErro = erroServidor ? (
-    <div className="mb-4 rounded-md border border-[#f87171]/30 bg-[#f87171]/10 px-3 py-2 text-[12px] text-[#f87171]">
+    <div className="mb-4 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-[12px] text-red-700">
       {erroServidor}
     </div>
   ) : null
@@ -2713,7 +2713,7 @@ function FormConferirCertidao({
           <button
             onClick={onClose}
             disabled={saving}
-            className="px-4 py-2 text-[12.5px] font-semibold text-white/70 hover:text-[#fff] hover:bg-[var(--surface-overlay)] rounded-md disabled:opacity-50"
+            className="px-4 py-2 text-[12.5px] font-semibold text-white/70 hover:text-[var(--text-primary)] hover:bg-[var(--surface-overlay)] rounded-md disabled:opacity-50"
           >
             Cancelar
           </button>
@@ -2724,7 +2724,7 @@ function FormConferirCertidao({
               resultado === "aprovado"
                 ? "bg-[var(--action-primary)] hover:bg-[var(--action-primary-hover)] disabled:bg-[var(--action-primary)]/40"
                 : resultado === "divergente"
-                ? "bg-[#d2a948] hover:bg-[#d2a948]/15 disabled:bg-[#d2a948]/15"
+                ? "bg-[var(--accent-primary)] hover:bg-[var(--accent-primary)]/15 disabled:bg-[var(--accent-primary)]/15"
                 : resultado === "nova_via"
                 ? "bg-rose-500 hover:bg-rose-600 disabled:bg-rose-900"
                 : "bg-[var(--surface-secondary)]0 disabled:bg-[var(--surface-secondary)]"
@@ -2748,14 +2748,14 @@ function FormConferirCertidao({
           {/* Anexo da certidão (link) */}
           {arquivoUrl && (
             <div className="px-3 py-2 rounded-md border border-[var(--border-default)] bg-[var(--surface-overlay)] flex items-center gap-2">
-              <FileCheck className="w-3.5 h-3.5 text-[#7dd3fc] flex-shrink-0" />
+              <FileCheck className="w-3.5 h-3.5 text-sky-700 flex-shrink-0" />
               <div className="flex-1 min-w-0">
                 <div className="text-[11px] text-white/70">Anexo recebido</div>
                 <a
                   href={arquivoUrl}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="text-[12px] text-[#7dd3fc] hover:text-[#7dd3fc] hover:underline inline-flex items-center gap-1"
+                  className="text-[12px] text-sky-700 hover:text-sky-700 hover:underline inline-flex items-center gap-1"
                 >
                   {arquivoNome || "Abrir arquivo"}
                   <ExternalLink className="w-2.5 h-2.5" />
@@ -2778,8 +2778,8 @@ function FormConferirCertidao({
 
             {/* Hint árvore */}
             {treeRef && (
-              <div className="px-3 py-2 rounded-md bg-[#7dd3fc]/8 border border-[#7dd3fc]/20 mb-3">
-                <div className="text-[10px] uppercase font-semibold tracking-wider text-[#7dd3fc] mb-1">
+              <div className="px-3 py-2 rounded-md bg-sky-50 border border-sky-200 mb-3">
+                <div className="text-[10px] uppercase font-semibold tracking-wider text-sky-700 mb-1">
                   Nomes na árvore (referência)
                 </div>
                 <div className="text-[11.5px] text-white/75 leading-snug">{treeRef}</div>
@@ -2884,7 +2884,7 @@ function FormConferirCertidao({
                     disabled={readOnly}
                     className={`w-full text-left px-3 py-2.5 rounded-md border transition-all disabled:cursor-not-allowed ${
                       isChecked
-                        ? "border-[#4ade80]/40 bg-[#4ade80]/10"
+                        ? "border-green-200 bg-green-50"
                         : "border-[var(--border-default)] bg-[var(--surface-overlay)] hover:bg-[var(--surface-secondary)]"
                     }`}
                   >
@@ -2892,7 +2892,7 @@ function FormConferirCertidao({
                       <div
                         className={`w-5 h-5 rounded border-2 flex items-center justify-center flex-shrink-0 mt-0.5 ${
                           isChecked
-                            ? "border-[#4ade80]/30 bg-[#4ade80]/15"
+                            ? "border-green-200 bg-green-50"
                             : "border-[var(--border-strong)] bg-transparent"
                         }`}
                       >
@@ -2903,7 +2903,7 @@ function FormConferirCertidao({
                       <div className="flex-1 min-w-0">
                         <div
                           className={`text-[12.5px] font-semibold ${
-                            isChecked ? "text-[#4ade80]" : "text-white/85"
+                            isChecked ? "text-green-700" : "text-white/85"
                           }`}
                         >
                           {item.label}
@@ -3009,16 +3009,16 @@ function ResultadoBtn({
 }) {
   const colorMap = {
     emerald: {
-      ativo: "border-[#4ade80]/60 bg-[#4ade80]/15 text-[#4ade80]",
-      icon: "text-[#4ade80]",
+      ativo: "border-green-200 bg-green-50 text-green-700",
+      icon: "text-green-700",
     },
     amber: {
-      ativo: "border-[#d2a948]/60 bg-[#d2a948]/15 text-[#d2a948]",
-      icon: "text-[#d2a948]",
+      ativo: "border-[var(--accent-primary)]/60 bg-[var(--accent-primary)]/15 text-[var(--accent-text)]",
+      icon: "text-[var(--accent-text)]",
     },
     red: {
-      ativo: "border-[#f87171]/60 bg-[#f87171]/15 text-[#f87171]",
-      icon: "text-[#f87171]",
+      ativo: "border-red-200 bg-red-50 text-red-700",
+      icon: "text-red-700",
     },
   }
   const cls = colorMap[cor]
@@ -3030,7 +3030,7 @@ function ResultadoBtn({
         ativo ? cls.ativo + " ring-1 ring-current/40" : "border-[var(--border-default)] bg-[var(--surface-overlay)] hover:bg-[var(--surface-secondary)] text-white/80"
       }`}
     >
-      <div className={`flex justify-center mb-1.5 ${ativo ? cls.icon : "text-white/60"}`}>{icon}</div>
+      <div className={`flex justify-center mb-1.5 ${ativo ? cls.icon : "text-[var(--text-secondary)]"}`}>{icon}</div>
       <div className="text-[12.5px] font-semibold mb-0.5">{label}</div>
       <div className={`text-[10px] ${ativo ? "opacity-90" : "text-[var(--text-secondary)]"}`}>{desc}</div>
     </button>
@@ -3320,7 +3320,7 @@ function FormValidarCertidao({
    * ninguém soubesse. Falso sucesso é pior que silêncio.
    */
   const bannerErro = erroServidor ? (
-    <div className="mb-4 rounded-md border border-[#f87171]/30 bg-[#f87171]/10 px-3 py-2 text-[12px] text-[#f87171]">
+    <div className="mb-4 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-[12px] text-red-700">
       {erroServidor}
     </div>
   ) : null
@@ -3337,7 +3337,7 @@ function FormValidarCertidao({
           <button
             onClick={onClose}
             disabled={saving}
-            className="px-4 py-2 text-[12.5px] font-semibold text-white/70 hover:text-[#fff] hover:bg-[var(--surface-overlay)] rounded-md disabled:opacity-50"
+            className="px-4 py-2 text-[12.5px] font-semibold text-white/70 hover:text-[var(--text-primary)] hover:bg-[var(--surface-overlay)] rounded-md disabled:opacity-50"
           >
             Cancelar
           </button>
@@ -3348,9 +3348,9 @@ function FormValidarCertidao({
               decisao === "aprovado"
                 ? "bg-[var(--action-primary)] hover:bg-[var(--action-primary-hover)] disabled:bg-[var(--action-primary)]/40"
                 : decisao === "aprovado_ressalvas"
-                ? "bg-[#7dd3fc] hover:bg-[#7dd3fc] disabled:bg-[#7dd3fc]/15"
+                ? "bg-sky-50 hover:bg-sky-50 disabled:bg-sky-50"
                 : decisao === "nova_via"
-                ? "bg-[#d2a948] hover:bg-[#d2a948]/15 disabled:bg-[#d2a948]/15"
+                ? "bg-[var(--accent-primary)] hover:bg-[var(--accent-primary)]/15 disabled:bg-[var(--accent-primary)]/15"
                 : decisao === "rejeitado"
                 ? "bg-[var(--action-primary)] hover:bg-[var(--action-primary-hover)] disabled:bg-[var(--action-primary)]/40"
                 : "bg-[var(--surface-secondary)]0 disabled:bg-[var(--surface-secondary)]"
@@ -3376,8 +3376,8 @@ function FormValidarCertidao({
              ═══════════════════════════════════════════════════════ */}
           <div className="rounded-lg border border-[var(--border-default)] bg-[var(--surface-overlay)] overflow-hidden">
             <div className="px-3.5 py-2 bg-[var(--surface-popover)] border-b border-[var(--border-default)] flex items-center gap-2">
-              <Scale className="w-3.5 h-3.5 text-[#d2a948]" />
-              <span className="text-[11px] font-bold uppercase tracking-wider text-[#d2a948]">
+              <Scale className="w-3.5 h-3.5 text-[var(--accent-text)]" />
+              <span className="text-[11px] font-bold uppercase tracking-wider text-[var(--accent-text)]">
                 Contexto da decisão
               </span>
             </div>
@@ -3402,7 +3402,7 @@ function FormValidarCertidao({
                     href={arquivoUrl}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="text-[12px] text-[#7dd3fc] hover:text-[#7dd3fc] hover:underline inline-flex items-center gap-1 truncate"
+                    className="text-[12px] text-sky-700 hover:text-sky-700 hover:underline inline-flex items-center gap-1 truncate"
                   >
                     📎 {arquivoNome || "Abrir"}
                     <ExternalLink className="w-2.5 h-2.5 flex-shrink-0" />
@@ -3446,22 +3446,22 @@ function FormValidarCertidao({
               {DECISAO_OPTIONS.map((opt) => {
                 const ativo = decisao === opt.value
                 const colorMap = {
-                  emerald: ativo ? "border-[#4ade80]/60 bg-[#4ade80]/10 ring-1 ring-[#4ade80]/30" : "",
-                  blue: ativo ? "border-[#7dd3fc]/60 bg-[#7dd3fc]/10 ring-1 ring-[#7dd3fc]/30" : "",
-                  amber: ativo ? "border-[#d2a948]/60 bg-[#d2a948]/10 ring-1 ring-[#d2a948]/30" : "",
-                  red: ativo ? "border-[#f87171]/60 bg-[#f87171]/10 ring-1 ring-[#f87171]/30" : "",
+                  emerald: ativo ? "border-green-200 bg-green-50 ring-1 border-green-200" : "",
+                  blue: ativo ? "border-sky-200 bg-sky-50 ring-1 border-sky-200" : "",
+                  amber: ativo ? "border-[var(--accent-primary)]/60 bg-[var(--accent-primary)]/10 ring-1 ring-[var(--accent-primary)]/30" : "",
+                  red: ativo ? "border-red-200 bg-red-50 ring-1 border-red-200" : "",
                 }
                 const iconColorMap = {
-                  emerald: ativo ? "text-[#4ade80]" : "text-white/60",
-                  blue: ativo ? "text-[#7dd3fc]" : "text-white/60",
-                  amber: ativo ? "text-[#d2a948]" : "text-white/60",
-                  red: ativo ? "text-[#f87171]" : "text-white/60",
+                  emerald: ativo ? "text-green-700" : "text-[var(--text-secondary)]",
+                  blue: ativo ? "text-sky-700" : "text-[var(--text-secondary)]",
+                  amber: ativo ? "text-[var(--accent-text)]" : "text-[var(--text-secondary)]",
+                  red: ativo ? "text-red-700" : "text-[var(--text-secondary)]",
                 }
                 const textColorMap = {
-                  emerald: ativo ? "text-[#4ade80]" : "text-white/85",
-                  blue: ativo ? "text-[#7dd3fc]" : "text-white/85",
-                  amber: ativo ? "text-[#d2a948]" : "text-white/85",
-                  red: ativo ? "text-[#f87171]" : "text-white/85",
+                  emerald: ativo ? "text-green-700" : "text-white/85",
+                  blue: ativo ? "text-sky-700" : "text-white/85",
+                  amber: ativo ? "text-[var(--accent-text)]" : "text-white/85",
+                  red: ativo ? "text-red-700" : "text-white/85",
                 }
                 return (
                   <button
@@ -3510,7 +3510,7 @@ function FormValidarCertidao({
                 Parecer jurídico
               </Label>
               {precisaParecer && (
-                <span className="text-[8.5px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded bg-[#d2a948]/20 text-[#d2a948] border border-[#d2a948]/40">
+                <span className="text-[8.5px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded bg-[var(--accent-primary)]/20 text-[var(--accent-text)] border border-[var(--accent-primary)]/40">
                   obrigatório
                 </span>
               )}
@@ -3539,7 +3539,7 @@ function FormValidarCertidao({
               } resize-none`}
             />
             {precisaParecer && parecer.trim().length > 0 && parecer.trim().length < 5 && (
-              <div className="text-[10.5px] text-[#d2a948] mt-1 italic">
+              <div className="text-[10.5px] text-[var(--accent-text)] mt-1 italic">
                 Parecer muito curto. Mínimo 5 caracteres.
               </div>
             )}
@@ -3684,7 +3684,7 @@ function FileUploadField({
           {label}
         </label>
         {required && (
-          <span className="text-[8.5px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded bg-[#d2a948]/20 text-[#d2a948] border border-[#d2a948]/40">
+          <span className="text-[8.5px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded bg-[var(--accent-primary)]/20 text-[var(--accent-text)] border border-[var(--accent-primary)]/40">
             obrigatório
           </span>
         )}
@@ -3703,9 +3703,9 @@ function FileUploadField({
       {/* Estados */}
       {uploading ? (
         // 1. SUBINDO
-        <div className="px-3 py-2.5 bg-[var(--surface-overlay)] border border-[#7dd3fc]/40 rounded-md">
+        <div className="px-3 py-2.5 bg-[var(--surface-overlay)] border border-sky-200 rounded-md">
           <div className="flex items-center gap-2.5 mb-2">
-            <Loader2 className="w-3.5 h-3.5 animate-spin text-[#7dd3fc] flex-shrink-0" />
+            <Loader2 className="w-3.5 h-3.5 animate-spin text-sky-700 flex-shrink-0" />
             <div className="flex-1 min-w-0">
               <div className="text-[12px] text-white truncate">{fileName}</div>
               <div className="text-[10px] text-[var(--text-secondary)]">
@@ -3722,9 +3722,9 @@ function FileUploadField({
         </div>
       ) : value ? (
         // 2. ARQUIVO CARREGADO
-        <div className="px-3 py-2.5 bg-[#4ade80]/5 border border-[#4ade80]/30 rounded-md">
+        <div className="px-3 py-2.5 bg-green-50 border border-green-200 rounded-md">
           <div className="flex items-center gap-2.5">
-            <FileCheck className="w-4 h-4 text-[#4ade80] flex-shrink-0" />
+            <FileCheck className="w-4 h-4 text-green-700 flex-shrink-0" />
             <div className="flex-1 min-w-0">
               <div className="text-[12px] text-white truncate font-medium">
                 {displayName || "Arquivo enviado"}
@@ -3735,7 +3735,7 @@ function FileUploadField({
                   href={value}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="text-[#7dd3fc] hover:text-[#7dd3fc] hover:underline inline-flex items-center gap-0.5"
+                  className="text-sky-700 hover:text-sky-700 hover:underline inline-flex items-center gap-0.5"
                 >
                   Abrir <ExternalLink className="w-2.5 h-2.5" />
                 </a>
@@ -3746,14 +3746,14 @@ function FileUploadField({
                 <button
                   type="button"
                   onClick={openPicker}
-                  className="text-[10.5px] font-semibold px-2 py-1 bg-[var(--surface-secondary)] hover:bg-[var(--surface-tertiary)] rounded text-[#fff]"
+                  className="text-[10.5px] font-semibold px-2 py-1 bg-[var(--surface-secondary)] hover:bg-[var(--surface-tertiary)] rounded text-[var(--text-primary)]"
                 >
                   Trocar
                 </button>
                 <button
                   type="button"
                   onClick={handleRemove}
-                  className="text-[10.5px] font-semibold px-2 py-1 bg-[#f87171]/15 hover:bg-[#f87171]/25 rounded text-[#f87171] inline-flex items-center gap-1"
+                  className="text-[10.5px] font-semibold px-2 py-1 bg-red-50 hover:bg-red-50 rounded text-red-700 inline-flex items-center gap-1"
                   title="Remover anexo"
                 >
                   <Trash2 className="w-3 h-3" />
@@ -3769,11 +3769,11 @@ function FileUploadField({
           onClick={openPicker}
           disabled={disabled}
           className={`w-full px-3 py-3.5 bg-[var(--surface-overlay)] border border-dashed rounded-md text-left hover:bg-[var(--surface-secondary)] transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${
-            invalid ? "border-[#d2a948]/40" : "border-[var(--border-default)]"
+            invalid ? "border-[var(--accent-primary)]/40" : "border-[var(--border-default)]"
           }`}
         >
           <div className="flex items-center gap-2.5">
-            <Upload className={`w-4 h-4 ${invalid ? "text-[#d2a948]" : "text-white/60"}`} />
+            <Upload className={`w-4 h-4 ${invalid ? "text-[var(--accent-text)]" : "text-[var(--text-secondary)]"}`} />
             <div className="flex-1">
               <div className="text-[12px] text-white/85 font-medium">
                 Selecionar arquivo
@@ -3884,7 +3884,7 @@ function FormPadrao({
         <div className="flex items-center justify-end gap-3">
           <button
             onClick={onClose}
-            className="px-4 py-2 text-[12.5px] font-semibold text-white/70 hover:text-[#fff] hover:bg-[var(--surface-overlay)] rounded-md"
+            className="px-4 py-2 text-[12.5px] font-semibold text-white/70 hover:text-[var(--text-primary)] hover:bg-[var(--surface-overlay)] rounded-md"
           >
             Fechar
           </button>
@@ -3912,7 +3912,7 @@ function FormPadrao({
           <SituacaoDaEtapa etapa={etapa} usuarios={usuarios} />
 
           {(erro || falha) && (
-            <div className="rounded-md border border-[#f87171]/30 bg-[#f87171]/10 px-3 py-2 text-[12px] text-[#f87171]">
+            <div className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-[12px] text-red-700">
               {falha || erro}
             </div>
           )}
@@ -3967,8 +3967,8 @@ function SituacaoDaEtapa({
   return (
     <div className="rounded-lg border border-[var(--border-default)] bg-[var(--surface-overlay)] overflow-hidden">
       <div className="px-3.5 py-2 bg-[var(--surface-popover)] border-b border-[var(--border-default)] flex items-center gap-2">
-        <Clock className="w-3.5 h-3.5 text-[#7dd3fc]" />
-        <span className="text-[11px] font-bold uppercase tracking-wider text-white/60">Situação atual</span>
+        <Clock className="w-3.5 h-3.5 text-sky-700" />
+        <span className="text-[11px] font-bold uppercase tracking-wider text-[var(--text-secondary)]">Situação atual</span>
       </div>
       <div className="p-3.5 grid grid-cols-2 gap-x-4 gap-y-2.5 text-[12px]">
         <SummaryField label="Responsável" value={responsavel} />

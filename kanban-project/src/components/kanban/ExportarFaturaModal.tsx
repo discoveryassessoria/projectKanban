@@ -539,7 +539,7 @@ export function ExportarFaturaModal({ faturas, requerentes, onClose }: ExportarF
             <Button
               onClick={() => handleExportar(false)}
               disabled={gerando || !destinatarioSelecionado || faturasParaExportar.length === 0}
-              className="bg-blue-600 hover:bg-blue-700 gap-2"
+              className="bg-[var(--action-primary)] hover:bg-[var(--action-primary)] gap-2"
             >
               {gerando ? (
                 <div className="w-4 h-4 border-2 border-[var(--border-strong)] border-t-white rounded-full animate-spin" />

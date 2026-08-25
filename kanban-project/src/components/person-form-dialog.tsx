@@ -214,7 +214,7 @@ function ConteudoDialog({
     <DialogContent className="sm:max-w-[500px] max-h-[90vh] overflow-y-auto">
       <DialogHeader>
         <DialogTitle className="text-[#123C73]">{title}</DialogTitle>
-        <DialogDescription className="text-[#9AA0A6]">{description}</DialogDescription>
+        <DialogDescription className="text-[var(--text-muted)]">{description}</DialogDescription>
       </DialogHeader>
 
       {canUseExistingPerson ? (

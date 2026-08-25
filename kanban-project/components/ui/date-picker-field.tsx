@@ -327,14 +327,14 @@ export function DatePickerField({
           onFocus={handleInputFocus}
           placeholder={placeholder}
           disabled={disabled}
-          className={`pr-10 h-[42px] rounded-lg text-sm ${className || "bg-white border-gray-300 text-gray-900 placeholder:text-gray-400 disabled:bg-gray-100"}`}
+          className={`pr-10 h-[42px] rounded-lg text-sm ${className || "bg-[var(--surface-primary)] border-gray-300 text-[var(--text-primary)] placeholder:text-[var(--text-muted)] disabled:bg-[var(--surface-tertiary)]"}`}
         />
         <PopoverTrigger asChild>
           <button
             type="button"
             disabled={disabled}
             aria-label="Abrir calendário"
-            className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            className="absolute right-3 top-1/2 -translate-y-1/2 text-[var(--text-muted)] hover:text-[var(--text-secondary)] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             onClick={() => setOpen(true)}
           >
             <CalendarIcon className="h-4 w-4" />
@@ -356,7 +356,7 @@ export function DatePickerField({
             type="button"
             onClick={handlePrevMonth}
             aria-label="Mês anterior"
-            className="p-1.5 hover:bg-gray-100 rounded-md transition-colors text-gray-500 hover:text-gray-700"
+            className="p-1.5 hover:bg-[var(--surface-tertiary)] rounded-md transition-colors text-[var(--text-secondary)] hover:text-[var(--text-secondary)]"
           >
             <ChevronLeft className="h-4 w-4" />
           </button>
@@ -365,7 +365,7 @@ export function DatePickerField({
             <select
               value={viewMonth}
               onChange={handleMonthChange}
-              className="py-1.5 text-sm bg-transparent border-0 text-gray-700 font-normal focus:outline-none focus:ring-0 cursor-pointer hover:bg-gray-50 rounded text-center w-24"
+              className="py-1.5 text-sm bg-transparent border-0 text-[var(--text-secondary)] font-normal focus:outline-none focus:ring-0 cursor-pointer hover:bg-[var(--surface-secondary)] rounded text-center w-24"
               style={{ textAlignLast: 'center' }}
             >
               {MESES.map((mes, idx) => (
@@ -376,7 +376,7 @@ export function DatePickerField({
             <select
               value={viewYear}
               onChange={handleYearChange}
-              className="py-1.5 text-sm bg-transparent border-0 text-gray-700 font-normal focus:outline-none focus:ring-0 cursor-pointer hover:bg-gray-50 rounded text-center w-20"
+              className="py-1.5 text-sm bg-transparent border-0 text-[var(--text-secondary)] font-normal focus:outline-none focus:ring-0 cursor-pointer hover:bg-[var(--surface-secondary)] rounded text-center w-20"
               style={{ textAlignLast: 'center' }}
             >
               {years.map(year => (
@@ -389,7 +389,7 @@ export function DatePickerField({
             type="button"
             onClick={handleNextMonth}
             aria-label="Mês seguinte"
-            className="p-1.5 hover:bg-gray-100 rounded-md transition-colors text-gray-500 hover:text-gray-700"
+            className="p-1.5 hover:bg-[var(--surface-tertiary)] rounded-md transition-colors text-[var(--text-secondary)] hover:text-[var(--text-secondary)]"
           >
             <ChevronRight className="h-4 w-4" />
           </button>
@@ -398,7 +398,7 @@ export function DatePickerField({
         {/* Weekday headers */}
         <div className="grid grid-cols-7 mb-1">
           {DIAS_SEMANA.map(dia => (
-            <div key={dia} className="text-center text-xs text-gray-400 py-1 font-normal">
+            <div key={dia} className="text-center text-xs text-[var(--text-muted)] py-1 font-normal">
               {dia}
             </div>
           ))}
@@ -414,12 +414,12 @@ export function DatePickerField({
                 className={`
                   w-full h-full flex items-center justify-center text-sm rounded transition-colors
                   ${isSelectedDay(calDay) 
-                    ? 'bg-gray-900 text-white' 
+                    ? 'bg-[var(--action-primary)] text-white' 
                     : isToday(calDay)
-                      ? 'bg-gray-100 text-gray-900 font-medium'
+                      ? 'bg-[var(--surface-tertiary)] text-[var(--text-primary)] font-medium'
                       : calDay.isCurrentMonth
-                        ? 'text-gray-700 hover:bg-gray-100'
-                        : 'text-gray-300 hover:bg-gray-50'
+                        ? 'text-[var(--text-secondary)] hover:bg-[var(--surface-tertiary)]'
+                        : 'text-[var(--text-muted)] hover:bg-[var(--surface-secondary)]'
                   }
                 `}
               >

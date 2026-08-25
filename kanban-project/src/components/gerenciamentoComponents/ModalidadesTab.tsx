@@ -36,7 +36,7 @@ async function jsonFetch(url: string, options: RequestInit = {}) {
 }
 
 const inputCls = "w-full rounded-lg border border-[var(--border-default)] bg-[var(--surface-primary)] px-3 py-2 text-sm text-white placeholder-white/30 outline-none focus:border-white/20"
-const labelCls = "mb-1 block text-xs text-white/60"
+const labelCls = "mb-1 block text-xs text-[var(--text-secondary)]"
 const IEdit = () => (<svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 20h9" /><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z" /></svg>)
 const ITrash = () => (<svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 6h18" /><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" /></svg>)
 
@@ -138,7 +138,7 @@ export default function ModalidadesTab() {
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
             <h2 className="text-lg font-semibold text-white">Modalidades</h2>
-            <p className="mt-1 max-w-3xl text-sm text-white/60">
+            <p className="mt-1 max-w-3xl text-sm text-[var(--text-secondary)]">
               Modalidades (via judicial, administrativa, recurso…) de cada país. Elas alimentam o cadastro de
               Tipos de Processo — inativar tira do seletor sem apagar nada.
             </p>
@@ -146,7 +146,7 @@ export default function ModalidadesTab() {
           <button
             onClick={() => { setErro(null); setForm({ editando: null, modalityLabel: "", codeSuffix: "" }) }}
             disabled={!countryKey}
-            className="flex-none rounded-lg bg-blue-600 px-3 py-2 text-xs font-medium text-[#fff] hover:bg-blue-500 disabled:opacity-40"
+            className="flex-none rounded-lg bg-[var(--action-primary)] px-3 py-2 text-xs font-medium text-[var(--action-primary-ink)] hover:bg-[var(--action-primary)] disabled:opacity-40"
             title={countryKey ? "" : "Cadastre um país primeiro (Processos › Cadastros › Países e Regiões)."}
           >
             + Nova modalidade
@@ -154,7 +154,7 @@ export default function ModalidadesTab() {
         </div>
 
         <div className="mt-4 flex flex-wrap items-center gap-3 border-t border-[var(--border-default)] pt-4">
-          <label className="text-sm text-white/60">País:</label>
+          <label className="text-sm text-[var(--text-secondary)]">País:</label>
           <select value={countryKey} onChange={e => trocarPais(e.target.value)} className={`${inputCls} max-w-xs`}>
             {paises.length === 0 && <option value="" className="bg-zinc-900">— nenhum país cadastrado —</option>}
             {paises.map(p => (
@@ -191,11 +191,11 @@ export default function ModalidadesTab() {
                 <tr><td colSpan={7} className="px-4 py-10 text-center text-xs text-[var(--text-muted)]">Nenhuma modalidade neste país. Crie em “+ Nova modalidade”.</td></tr>
               ) : rows.map(m => (
                 <tr key={m.modalityKey} className="border-b border-[var(--border-subtle)] last:border-0">
-                  <td className="px-4 py-2.5 text-white/60">{m.ordem}</td>
+                  <td className="px-4 py-2.5 text-[var(--text-secondary)]">{m.ordem}</td>
                   <td className="px-4 py-2.5 text-white">{m.modalityLabel}</td>
                   <td className="px-4 py-2.5"><code className="rounded bg-[var(--surface-primary)] px-1.5 py-0.5 text-[11px] text-white/70">{m.modalityKey}</code></td>
                   <td className="px-4 py-2.5 text-white/70">{m.codeSuffix || "—"}</td>
-                  <td className="px-4 py-2.5 text-white/60">{m.tiposCount ?? 0}</td>
+                  <td className="px-4 py-2.5 text-[var(--text-secondary)]">{m.tiposCount ?? 0}</td>
                   <td className="px-4 py-2.5">
                     <button
                       onClick={() => toggleAtivo(m)}

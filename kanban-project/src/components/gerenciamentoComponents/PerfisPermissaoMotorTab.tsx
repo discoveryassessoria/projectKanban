@@ -36,7 +36,7 @@ function novoForm(): any {
 }
 
 const inputCls = "w-full rounded-lg border border-[var(--border-default)] bg-[var(--surface-primary)] px-3 py-2 text-sm text-white placeholder-white/30 outline-none focus:border-white/20"
-const labelCls = "mb-1 block text-xs text-white/60"
+const labelCls = "mb-1 block text-xs text-[var(--text-secondary)]"
 
 function authHeaders(): Record<string, string> {
   const t = typeof window !== "undefined" ? localStorage.getItem("authToken") : null
@@ -131,7 +131,7 @@ export default function PerfisPermissaoMotorTab() {
     <div className="space-y-5">
       <div>
         <h2 className="text-lg font-semibold text-white">Usuários e Permissões</h2>
-        <p className="mt-1 text-sm text-white/60">
+        <p className="mt-1 text-sm text-[var(--text-secondary)]">
           Perfis de permissão para ações críticas do Gerenciamento. Marque o que cada perfil pode fazer.
         </p>
       </div>
@@ -169,17 +169,17 @@ export default function PerfisPermissaoMotorTab() {
                 <td className="px-3 py-2.5">
                   <div className="flex items-center gap-2">
                     <span className="font-medium text-white">{p.nome}</span>
-                    {p.isSystemTemplate && <span className="rounded bg-[var(--surface-primary)] px-1.5 py-0.5 text-[10px] text-white/60">padrão</span>}
+                    {p.isSystemTemplate && <span className="rounded bg-[var(--surface-primary)] px-1.5 py-0.5 text-[10px] text-[var(--text-secondary)]">padrão</span>}
                   </div>
                   {p.chave && <div className="text-xs text-[var(--text-muted)]">{p.chave}</div>}
                 </td>
                 <td className="px-3 py-2.5 text-white/70">{contaOn(p)} de {PERMISSOES.length} permissões</td>
                 <td className="px-3 py-2.5">
                   {p.arquivado
-                    ? <span className="rounded bg-[var(--surface-primary)] px-1.5 py-0.5 text-[10px] text-white/60">arquivado</span>
+                    ? <span className="rounded bg-[var(--surface-primary)] px-1.5 py-0.5 text-[10px] text-[var(--text-secondary)]">arquivado</span>
                     : <span className="rounded bg-green-50 px-1.5 py-0.5 text-[10px] text-green-700">ativo</span>}
                 </td>
-                <td className="px-3 py-2.5 text-center text-white/60">{p.usedByCount || 0}</td>
+                <td className="px-3 py-2.5 text-center text-[var(--text-secondary)]">{p.usedByCount || 0}</td>
                 <td className="px-3 py-2.5">
                   <div className="flex items-center justify-end gap-1">
                     <IconBtn title="Editar" onClick={() => abrirEditar(p)}><PencilIcon /></IconBtn>
@@ -217,11 +217,11 @@ export default function PerfisPermissaoMotorTab() {
 
               <div className="col-span-2">
                 <div className="mb-1 flex items-center justify-between">
-                  <label className="text-xs text-white/60">Permissões</label>
+                  <label className="text-xs text-[var(--text-secondary)]">Permissões</label>
                   <div className="flex gap-2 text-[11px]">
-                    <button type="button" onClick={() => marcarTodas(true)} className="text-white/60 hover:text-white">marcar todas</button>
+                    <button type="button" onClick={() => marcarTodas(true)} className="text-[var(--text-secondary)] hover:text-white">marcar todas</button>
                     <span className="text-[var(--text-muted)]">·</span>
-                    <button type="button" onClick={() => marcarTodas(false)} className="text-white/60 hover:text-white">limpar</button>
+                    <button type="button" onClick={() => marcarTodas(false)} className="text-[var(--text-secondary)] hover:text-white">limpar</button>
                   </div>
                 </div>
                 <div className="grid grid-cols-1 gap-1 rounded-lg border border-[var(--border-default)] bg-[var(--surface-primary)] p-3 sm:grid-cols-2">
@@ -251,7 +251,7 @@ export default function PerfisPermissaoMotorTab() {
 function IconBtn({ children, title, onClick, danger }: { children: ReactNode; title: string; onClick: () => void; danger?: boolean }) {
   return (
     <button title={title} aria-label={title} onClick={onClick}
-      className={`rounded-md p-1.5 hover:bg-[var(--surface-hover)] ${danger ? "text-red-700/80 hover:text-red-700" : "text-white/60 hover:text-white"}`}>
+      className={`rounded-md p-1.5 hover:bg-[var(--surface-hover)] ${danger ? "text-red-700/80 hover:text-red-700" : "text-[var(--text-secondary)] hover:text-white"}`}>
       {children}
     </button>
   )

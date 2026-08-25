@@ -221,15 +221,15 @@ export default function UsersTab() {
       <div className="flex items-start justify-between flex-wrap gap-3">
         <div>
           <h2 className="text-lg font-bold text-white flex items-center gap-2"><Shield className="h-5 w-5" /> Usuários</h2>
-          <div className="text-xs text-white/60 mt-1">{usuarios.length} {usuarios.length === 1 ? "usuário cadastrado" : "usuários cadastrados"}</div>
+          <div className="text-xs text-[var(--text-secondary)] mt-1">{usuarios.length} {usuarios.length === 1 ? "usuário cadastrado" : "usuários cadastrados"}</div>
         </div>
         {pode("usuarios.criar") && (
           <Button onClick={handleCreate} className="gap-2 bg-[var(--action-primary)] hover:bg-[var(--action-primary-hover)] text-[var(--action-primary-ink)]"><UserPlus className="h-4 w-4" /> Novo Usuário</Button>
         )}
       </div>
 
-      {error && <Alert className="bg-red-50 border-red-200 text-[#fff]"><AlertDescription className="text-white">{error}</AlertDescription></Alert>}
-      {success && <Alert className="border-green-200 bg-green-50 text-[#fff]"><AlertDescription className="text-white">{success}</AlertDescription></Alert>}
+      {error && <Alert className="bg-red-50 border-red-200 text-[var(--text-primary)]"><AlertDescription className="text-white">{error}</AlertDescription></Alert>}
+      {success && <Alert className="border-green-200 bg-green-50 text-[var(--text-primary)]"><AlertDescription className="text-white">{success}</AlertDescription></Alert>}
 
       {/* Busca */}
       <div className="relative">
@@ -410,7 +410,7 @@ export default function UsersTab() {
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel disabled={isSubmitting}>Cancelar</AlertDialogCancel>
-            <AlertDialogAction onClick={confirmDelete} disabled={isSubmitting} className="bg-red-600 hover:bg-red-700 text-[#fff]">{isSubmitting ? "Deletando..." : "Deletar"}</AlertDialogAction>
+            <AlertDialogAction onClick={confirmDelete} disabled={isSubmitting} className="bg-red-700 hover:bg-red-800 text-[var(--action-primary-ink)]">{isSubmitting ? "Deletando..." : "Deletar"}</AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>

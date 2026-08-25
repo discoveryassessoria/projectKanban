@@ -295,7 +295,7 @@ export function KanbanContent() {
                   className={`
                     px-4 py-2 rounded-lg font-medium transition-all duration-200
                     ${tabPrincipal === "processos"
-                      ? "bg-indigo-600 text-white shadow-lg"
+                      ? "bg-[var(--action-primary)] text-[var(--action-primary-ink)] shadow-lg"
                       : "bg-[var(--surface-primary)] text-white/70 hover:bg-[var(--surface-hover)] hover:text-white"
                     }
                   `}
@@ -308,7 +308,7 @@ export function KanbanContent() {
                   className={`
                     px-4 py-2 rounded-lg font-medium transition-all duration-200
                     ${tabPrincipal === "contratantes"
-                      ? "bg-indigo-600 text-white shadow-lg"
+                      ? "bg-[var(--action-primary)] text-[var(--action-primary-ink)] shadow-lg"
                       : "bg-[var(--surface-primary)] text-white/70 hover:bg-[var(--surface-hover)] hover:text-white"
                     }
                   `}
@@ -327,7 +327,7 @@ export function KanbanContent() {
                       px-3 py-1.5 rounded-md text-sm font-medium transition-all duration-200
                       ${subTab === "kanban"
                         ? "bg-[var(--surface-secondary)] text-white"
-                        : "text-white/60 hover:text-white hover:bg-[var(--surface-hover)]"
+                        : "text-[var(--text-secondary)] hover:text-white hover:bg-[var(--surface-hover)]"
                       }
                     `}
                   >
@@ -339,7 +339,7 @@ export function KanbanContent() {
                       px-3 py-1.5 rounded-md text-sm font-medium transition-all duration-200
                       ${subTab === "lista"
                         ? "bg-[var(--surface-secondary)] text-white"
-                        : "text-white/60 hover:text-white hover:bg-[var(--surface-hover)]"
+                        : "text-[var(--text-secondary)] hover:text-white hover:bg-[var(--surface-hover)]"
                       }
                     `}
                   >
@@ -355,7 +355,7 @@ export function KanbanContent() {
                     <span className="text-2xl font-bold text-white">
                       {processos.length}
                     </span>
-                    <span className="text-xs text-white/60">processo(s)</span>
+                    <span className="text-xs text-[var(--text-secondary)]">processo(s)</span>
                   </div>
                   <PaisTabs
                     paises={paisesDisponiveis}
@@ -371,7 +371,7 @@ export function KanbanContent() {
                   <span className="text-2xl font-bold text-white">
                     {contratantes.length + requerentes.length}
                   </span>
-                  <span className="text-xs text-white/60">cliente(s)</span>
+                  <span className="text-xs text-[var(--text-secondary)]">cliente(s)</span>
                 </div>
               )}
             </div>
@@ -387,7 +387,7 @@ export function KanbanContent() {
                       px-3 py-1.5 rounded-md text-sm font-medium transition-all duration-200
                       ${tipoSelecionado?.id === t.id
                         ? "bg-[var(--surface-secondary)] text-white"
-                        : "text-white/60 hover:text-white hover:bg-[var(--surface-hover)]"
+                        : "text-[var(--text-secondary)] hover:text-white hover:bg-[var(--surface-hover)]"
                       }
                     `}
                   >
@@ -430,7 +430,7 @@ export function KanbanContent() {
                   />
                 )
               ) : (
-                <div className="flex flex-col items-center justify-center py-20 text-white/60">
+                <div className="flex flex-col items-center justify-center py-20 text-[var(--text-secondary)]">
                   <Shield className="h-12 w-12 mb-4 text-[var(--text-muted)]" />
                   <p className="text-lg font-medium">Sem permissão para visualizar processos</p>
                   <p className="text-sm mt-1">Solicite acesso ao administrador</p>
@@ -447,7 +447,7 @@ export function KanbanContent() {
                   onRefresh={handleRefresh}
                 />
               ) : (
-                <div className="flex flex-col items-center justify-center py-20 text-white/60">
+                <div className="flex flex-col items-center justify-center py-20 text-[var(--text-secondary)]">
                   <Shield className="h-12 w-12 mb-4 text-[var(--text-muted)]" />
                   <p className="text-lg font-medium">Sem permissão para visualizar processos</p>
                   <p className="text-sm mt-1">Solicite acesso ao administrador</p>

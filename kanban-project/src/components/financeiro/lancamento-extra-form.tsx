@@ -13,7 +13,8 @@ import { X, Plus, Trash2 } from "lucide-react"
 import { authToken } from "@/src/lib/financeiro/http"
 import { fmtMoeda as fmt } from "@/src/lib/financeiro/formato"
 
-const OURO = "#C6A15B"
+const OURO = 'var(--accent-primary)'
+const OURO_TINTA = 'var(--accent-text)'
 const NATUREZAS = ["RECEITA_EXTRA", "DESCONTO", "JUROS", "MULTA", "REEMBOLSO", "CREDITO", "AJUSTE"]
 const MOEDAS = ["BRL", "EUR", "USD"]
 const cent = (v: number) => Math.round((Number(v) || 0) * 100) / 100
@@ -102,7 +103,7 @@ export function LancamentoExtraForm({ processoIdInicial, onClose, onDone }: { pr
     <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-[var(--overlay-modal)] p-4">
       <div className="my-8 w-full max-w-2xl rounded-xl border border-neutral-700 bg-neutral-950 p-6">
         <div className="mb-5 flex items-center justify-between">
-          <h2 className="text-lg font-semibold" style={{ color: OURO }}>Novo lançamento extra</h2>
+          <h2 className="text-lg font-semibold" style={{ color: OURO_TINTA }}>Novo lançamento extra</h2>
           <button onClick={onClose} className="text-neutral-500 hover:text-[var(--text-muted)]"><X className="h-5 w-5" /></button>
         </div>
 

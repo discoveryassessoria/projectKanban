@@ -127,8 +127,8 @@ export function HealthTab() {
       />
       <div className="mb-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
         <Kpi value="—" label="Score" />
-        <Kpi value="0" label="Erros críticos" color="#4ade80" />
-        <Kpi value="0" label="Alertas" color="#fbbf24" />
+        <Kpi value="0" label="Erros críticos" color="#15803d" />
+        <Kpi value="0" label="Alertas" color="#b45309" />
         <Kpi value="—" label="Pronto" />
       </div>
       <div className={`${CARD} p-5 text-sm font-medium text-green-700`}>
