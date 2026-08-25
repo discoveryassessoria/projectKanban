@@ -146,7 +146,7 @@ export function WorkflowControls({
 
         {/* Banner de status */}
         {isPausado && (
-          <div className="mt-3 px-3 py-2 bg-[var(--surface-secondary)] border border-[var(--border-default)] rounded-md text-[11px] text-amber-700 flex items-center gap-2">
+          <div className="mt-3 px-3 py-2 bg-[var(--surface-secondary)] border border-[var(--border-default)] rounded-md text-[11px] text-amber-800 flex items-center gap-2">
             <Pause className="w-3 h-3 flex-shrink-0" />
             <span><strong>Operação PAUSADA</strong> · use Retomar quando estiver pronto pra continuar</span>
           </div>
@@ -175,7 +175,7 @@ export function WorkflowControls({
               <button
                 onClick={handleRetomar}
                 disabled={!!actionLoading}
-                className="inline-flex items-center gap-1.5 px-3 py-1.5 text-[11px] font-medium rounded-md transition-colors disabled:opacity-50 border border-[var(--border-default)] text-green-700 bg-transparent hover:bg-[var(--surface-secondary)]"
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 text-[11px] font-medium rounded-md transition-colors disabled:opacity-50 border border-[var(--border-default)] text-green-800 bg-transparent hover:bg-[var(--surface-secondary)]"
               >
                 {actionLoading === "retomar" ? <Loader2 className="w-3 h-3 animate-spin" /> : <Play className="w-3 h-3" />}
                 Retomar operação

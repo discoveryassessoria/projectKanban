@@ -31,9 +31,9 @@ interface ImpostosData {
 }
 
 function statusBadge(status: string) {
-  if (status === "pago") return <span className="text-[11px] px-2 py-0.5 rounded-full bg-[var(--surface-secondary)] text-green-700 border border-[var(--border-default)]">Pago</span>
+  if (status === "pago") return <span className="text-[11px] px-2 py-0.5 rounded-full bg-[var(--surface-secondary)] text-green-800 border border-[var(--border-default)]">Pago</span>
   if (status === "previsto") return <span className="text-[11px] px-2 py-0.5 rounded-full bg-[var(--surface-primary)] text-[var(--text-secondary)] border border-[var(--border-strong)]">Previsto</span>
-  return <span className="text-[11px] px-2 py-0.5 rounded-full bg-[var(--surface-secondary)] text-amber-700 border border-[var(--border-default)]">A pagar</span>
+  return <span className="text-[11px] px-2 py-0.5 rounded-full bg-[var(--surface-secondary)] text-amber-800 border border-[var(--border-default)]">A pagar</span>
 }
 
 export default function ImpostosTab() {
@@ -67,9 +67,9 @@ export default function ImpostosTab() {
 
       {/* KPIs */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-        <Kpi label="Provisão do mês" value={fmtBRL(k.provisaoMes)} valueColor="text-amber-700" sub={`${k.qtdGuias} guias a vencer`} />
+        <Kpi label="Provisão do mês" value={fmtBRL(k.provisaoMes)} valueColor="text-amber-800" sub={`${k.qtdGuias} guias a vencer`} />
         <Kpi label="Total A Pagar" value={fmtBRL(k.aPagar)} sub={`${k.qtdPendentes} tributos pendentes`} />
-        <Kpi label="Pago no mês" value={fmtBRL(k.pagosMes)} valueColor="text-green-700" sub="IRRF · Folha" />
+        <Kpi label="Pago no mês" value={fmtBRL(k.pagosMes)} valueColor="text-green-800" sub="IRRF · Folha" />
         <Kpi label="Em Atraso" value={`${k.atrasados}`} valueColor={k.atrasados > 0 ? "text-red-700" : "text-white"} sub={k.atrasados > 0 ? fmtBRL(k.totalAtrasado) : "Nenhum atraso"} />
       </div>
 
@@ -89,7 +89,7 @@ export default function ImpostosTab() {
                   <div className="text-[10px] text-[var(--text-muted)]">{fmtDate(c.date)} · {c.dueText}</div>
                   <div className="flex justify-between items-center mt-0.5">
                     <span className="text-sm text-white/80 font-medium">{c.tipo}</span>
-                    <span className={`text-sm font-bold tabular-nums ${c.status === "pago" ? "text-green-700" : "text-white"}`}>{fmtBRL(c.valor)}</span>
+                    <span className={`text-sm font-bold tabular-nums ${c.status === "pago" ? "text-green-800" : "text-white"}`}>{fmtBRL(c.valor)}</span>
                   </div>
                   <div className="mt-1">{statusBadge(c.status)}</div>
                 </div>

@@ -137,7 +137,7 @@ export function ReceitaCobrancaModal({ receitaId, onClose, onChanged }: { receit
               </div>
               <h4 className="text-base font-semibold">Esta receita ainda não possui uma cobrança</h4>
               <p className="mx-auto mt-1 max-w-sm text-sm text-[var(--text-secondary)]">Para iniciar o processo financeiro, escolha como o cliente irá pagar esta receita.</p>
-              <button onClick={() => setWizard(true)} className="mt-4 inline-flex items-center gap-1.5 rounded-lg px-4 py-2 text-sm font-semibold text-[#1b1508] transition" style={{ background: OURO }} onMouseEnter={(e) => (e.currentTarget.style.background = '#e0b957')} onMouseLeave={(e) => (e.currentTarget.style.background = OURO)}>
+              <button onClick={() => setWizard(true)} className="mt-4 inline-flex items-center gap-1.5 rounded-lg px-4 py-2 text-sm font-semibold text-[var(--accent-ink)] transition" style={{ background: OURO }} onMouseEnter={(e) => (e.currentTarget.style.background = '#e0b957')} onMouseLeave={(e) => (e.currentTarget.style.background = OURO)}>
                 <Sparkles className="h-4 w-4" /> Cadastrar Cobrança
               </button>
             </div>
@@ -159,7 +159,7 @@ export function ReceitaCobrancaModal({ receitaId, onClose, onChanged }: { receit
 function CobrancaCard({ cobranca, moeda, onPago }: { cobranca: any; moeda: string; onPago: () => void }) {
   const [pagando, setPagando] = React.useState<number | null>(null)
   const parcelas = (cobranca.parcelas || []).slice().sort((a: any, b: any) => a.numero - b.numero)
-  const statusCls: Record<string, string> = { ABERTA: 'bg-[var(--surface-secondary)] text-[var(--text-secondary)] border-[var(--border-default)]', PARCIAL: 'bg-[var(--surface-secondary)] text-amber-700 border-[var(--border-default)]', QUITADA: 'bg-[var(--surface-secondary)] text-green-700 border-[var(--border-default)]', CANCELADA: 'bg-[var(--surface-primary)] text-[var(--text-secondary)] border-[var(--border-default)]' }
+  const statusCls: Record<string, string> = { ABERTA: 'bg-[var(--surface-secondary)] text-[var(--text-secondary)] border-[var(--border-default)]', PARCIAL: 'bg-[var(--surface-secondary)] text-amber-800 border-[var(--border-default)]', QUITADA: 'bg-[var(--surface-secondary)] text-green-800 border-[var(--border-default)]', CANCELADA: 'bg-[var(--surface-primary)] text-[var(--text-secondary)] border-[var(--border-default)]' }
   async function pagar(parcelaId: number, valor: number) {
     setPagando(parcelaId)
     try { await jf(`/api/financeiro/cobrancas/${cobranca.id}/pagamentos`, { method: 'POST', body: JSON.stringify({ parcelaId, valor }) }); onPago() }
@@ -184,7 +184,7 @@ function CobrancaCard({ cobranca, moeda, onPago }: { cobranca: any; moeda: strin
                   <td className="px-3 py-2 tabular-nums text-white/70">{p.numero}</td>
                   <td className="px-3 py-2 text-white/70">{dt(p.vencimento)}</td>
                   <td className="px-3 py-2 tabular-nums">{brl(p.valor, moeda)}</td>
-                  <td className="px-3 py-2">{quit ? <span className="text-green-700">recebida</span> : <span className="text-[var(--text-secondary)]">pendente</span>}</td>
+                  <td className="px-3 py-2">{quit ? <span className="text-green-800">recebida</span> : <span className="text-[var(--text-secondary)]">pendente</span>}</td>
                   <td className="px-3 py-2 text-right">
                     {!quit && <button disabled title="Registrar pagamento é feito no Financeiro do processo (fluxo canônico único)." className="rounded-md border border-[var(--border-strong)] px-2.5 py-1 text-xs text-white/80 cursor-not-allowed opacity-40">Registrar pagamento</button>}
                   </td>
@@ -342,7 +342,7 @@ function CobrancaWizard({ receitaId, valor, moeda, receita, onClose, onCriada }:
           {precisaEscolha && (
             <div className="mt-2 flex flex-wrap gap-2">
               {['IGNORAR', 'REPASSAR', 'ABSORVER'].map((p) => (
-                <button key={p} onClick={() => setPoliticaEscolha(p)} className={`rounded-md border px-2.5 py-1 text-xs ${politicaEscolha === p ? 'text-[#1b1508]' : 'border-[var(--border-strong)] text-white/80 hover:bg-[var(--surface-hover)]'}`} style={politicaEscolha === p ? { background: OURO, borderColor: OURO } : undefined}>{POL_LABEL[p]}</button>
+                <button key={p} onClick={() => setPoliticaEscolha(p)} className={`rounded-md border px-2.5 py-1 text-xs ${politicaEscolha === p ? 'text-[var(--accent-ink)]' : 'border-[var(--border-strong)] text-white/80 hover:bg-[var(--surface-hover)]'}`} style={politicaEscolha === p ? { background: OURO, borderColor: OURO } : undefined}>{POL_LABEL[p]}</button>
               ))}
             </div>
           )}
@@ -397,7 +397,7 @@ function CobrancaWizard({ receitaId, valor, moeda, receita, onClose, onCriada }:
             {sucesso.idempotente && linha('Idempotência', 'requisição reaproveitada')}
           </div>
           <div className="mt-4 flex justify-center gap-2">
-            <button onClick={() => onCriada()} className="rounded-lg px-4 py-2 text-sm font-semibold text-[#1b1508]" style={{ background: OURO }}>Ver cobrança</button>
+            <button onClick={() => onCriada()} className="rounded-lg px-4 py-2 text-sm font-semibold text-[var(--accent-ink)]" style={{ background: OURO }}>Ver cobrança</button>
             <button onClick={onClose} className="rounded-lg border border-[var(--border-default)] px-4 py-2 text-sm text-white/80 hover:bg-[var(--surface-hover)]">Voltar para receita</button>
           </div>
         </div>
@@ -440,7 +440,7 @@ function CobrancaWizard({ receitaId, valor, moeda, receita, onClose, onCriada }:
               <option value="" className="bg-zinc-900">Selecione</option>
               {formasDisponiveis.map((x: any) => <option key={x.id} value={x.id} className="bg-zinc-900">{x.name}{condicao?.formaPadraoId === x.id ? ' · padrão' : ''}</option>)}
             </select>
-            {avisoForma && <p className="mt-1 text-[11px] text-amber-700/80">{avisoForma}</p>}
+            {avisoForma && <p className="mt-1 text-[11px] text-amber-800/80">{avisoForma}</p>}
             {!!permitidas.length && <p className="mt-1 text-[11px] text-[var(--text-muted)]">Somente as formas permitidas pela condição selecionada.</p>}
             </div>
             {ehCartao && (<>
@@ -506,7 +506,7 @@ function CobrancaWizard({ receitaId, valor, moeda, receita, onClose, onCriada }:
                     <span className="text-[11px] text-[var(--text-secondary)]">{sim.cambio.fonte ?? '—'}{sim.cambio.data ? ` · ${dt(sim.cambio.data)}` : ''} · {(sim.cambio.tipo || '').toLowerCase() || (sim.cambio.estimado ? 'estimada' : 'congelada')}</span>
                   </div>
                 ) : (
-                  <p className="text-[12px] text-amber-700/80">Sem cotação automática vigente para {moeda}→{f.moedaRecebimento}. Informe uma cotação manual (requer permissão).</p>
+                  <p className="text-[12px] text-amber-800/80">Sem cotação automática vigente para {moeda}→{f.moedaRecebimento}. Informe uma cotação manual (requer permissão).</p>
                 )}
                 <label className="flex items-center gap-2 text-[12px] text-white/70">
                   <input type="checkbox" checked={!!f.cotacaoManualAtiva} onChange={(e) => setF({ ...f, cotacaoManualAtiva: e.target.checked })} />
@@ -576,9 +576,9 @@ function CobrancaWizard({ receitaId, valor, moeda, receita, onClose, onCriada }:
           <div className="flex items-center gap-3">
             <span className="text-xs text-[var(--text-muted)]">Etapa {step} de 4</span>
             {step < 4 ? (
-              <button disabled={(step === 1 && (!f.formaPagamentoId || (ehCartaoCredito && !f.bandeiraId))) || (step === 2 && !f.condicaoPagamentoId)} onClick={() => setStep(step + 1)} className="inline-flex items-center gap-1 rounded-lg px-4 py-2 text-sm font-semibold text-[#1b1508] transition disabled:opacity-40" style={{ background: OURO }}>Próximo <ArrowRight className="h-4 w-4" /></button>
+              <button disabled={(step === 1 && (!f.formaPagamentoId || (ehCartaoCredito && !f.bandeiraId))) || (step === 2 && !f.condicaoPagamentoId)} onClick={() => setStep(step + 1)} className="inline-flex items-center gap-1 rounded-lg px-4 py-2 text-sm font-semibold text-[var(--accent-ink)] transition disabled:opacity-40" style={{ background: OURO }}>Próximo <ArrowRight className="h-4 w-4" /></button>
             ) : (
-              <button disabled={salvando || !podeConfirmar} onClick={confirmar} className="inline-flex items-center gap-1.5 rounded-lg px-5 py-2 text-sm font-semibold text-[#1b1508] transition disabled:opacity-50" style={{ background: OURO }}>{salvando ? 'Gerando…' : 'Confirmar e gerar cobrança'} <Check className="h-4 w-4" /></button>
+              <button disabled={salvando || !podeConfirmar} onClick={confirmar} className="inline-flex items-center gap-1.5 rounded-lg px-5 py-2 text-sm font-semibold text-[var(--accent-ink)] transition disabled:opacity-50" style={{ background: OURO }}>{salvando ? 'Gerando…' : 'Confirmar e gerar cobrança'} <Check className="h-4 w-4" /></button>
             )}
           </div>
         </div>

@@ -104,7 +104,7 @@ export function DashboardCorporativo({ dash, onGoTab, onClickProcesso }: {
             <span className="text-[var(--text-muted)]">·</span>
             <span className="inline-flex items-center gap-1.5"><span className="w-1.5 h-1.5 rounded-full" style={{ background: OURO }} /><strong className="text-white">{m.colaboradores}</strong> colaboradores</span>
             <span className="text-[var(--text-muted)]">·</span>
-            <span className="inline-flex items-center gap-1.5"><span className="w-1.5 h-1.5 rounded-full bg-green-600" /> Contas em dia</span>
+            <span className="inline-flex items-center gap-1.5"><span className="w-1.5 h-1.5 rounded-full bg-[var(--action-primary)]" /> Contas em dia</span>
           </div>
         </div>
         <div className="flex items-center gap-2">
@@ -113,7 +113,7 @@ export function DashboardCorporativo({ dash, onGoTab, onClickProcesso }: {
           <button
             disabled
             title="Lançamento financeiro é feito dentro de um processo (Processo › Financeiro)"
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-semibold rounded-lg text-[#1b1508] transition-colors disabled:cursor-not-allowed disabled:opacity-40"
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-semibold rounded-lg text-[var(--accent-ink)] transition-colors disabled:cursor-not-allowed disabled:opacity-40"
             style={{ background: OURO }}
           >
             <Plus className="h-3.5 w-3.5" /> Novo Lançamento
@@ -183,7 +183,7 @@ export function DashboardCorporativo({ dash, onGoTab, onClickProcesso }: {
           </div>
           <FluxoChart serie={m.serie6meses} />
           <div className="flex gap-5 mt-3 text-xs text-white/70 flex-wrap">
-            <span className="inline-flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full bg-green-600" /> Entradas · <strong className="text-white">{fmtBRL(m.serie6meses.totalEntradas)}</strong></span>
+            <span className="inline-flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full bg-[var(--action-primary)]" /> Entradas · <strong className="text-white">{fmtBRL(m.serie6meses.totalEntradas)}</strong></span>
             <span className="inline-flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full bg-red-600" /> Saídas · <strong className="text-white">{fmtBRL(m.serie6meses.totalSaidas)}</strong></span>
             <span className="inline-flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full bg-[var(--surface-secondary)]" /> Saldo · <strong className="text-white">{fmtBRL(m.serie6meses.totalSaldo)}</strong></span>
           </div>
@@ -203,7 +203,7 @@ export function DashboardCorporativo({ dash, onGoTab, onClickProcesso }: {
           {m.alertas.length === 0 ? (
             <div className="flex flex-col items-center justify-center text-center py-10">
               <div className="h-12 w-12 rounded-full grid place-items-center bg-[var(--surface-secondary)] border border-[var(--border-default)] mb-3">
-                <ShieldCheck className="h-6 w-6 text-green-700" />
+                <ShieldCheck className="h-6 w-6 text-green-800" />
               </div>
               <p className="text-sm text-[var(--text-secondary)]">Nenhum alerta ou aprovação pendente</p>
               <p className="text-xs text-[var(--text-muted)] mt-1">Tudo em dia!</p>
@@ -418,9 +418,9 @@ function Mini({ label, value, hint, mock, last }: { label: string; value: string
 function AlertCard({ tipo, titulo, texto, meta }: { tipo: string; titulo: string; texto: string; meta: string }) {
   const styles: Record<string, { border: string; icon: React.ReactNode }> = {
     critical: { border: "border-l-red-400", icon: <AlertTriangle className="h-4 w-4 text-red-700" /> },
-    warning: { border: "border-l-amber-400", icon: <Bell className="h-4 w-4 text-amber-700" /> },
+    warning: { border: "border-l-amber-400", icon: <Bell className="h-4 w-4 text-amber-800" /> },
     info: { border: "border-l-sky-400", icon: <Calendar className="h-4 w-4 text-[var(--text-secondary)]" /> },
-    success: { border: "border-l-green-400", icon: <CheckCircle className="h-4 w-4 text-green-700" /> },
+    success: { border: "border-l-green-400", icon: <CheckCircle className="h-4 w-4 text-green-800" /> },
   }
   const s = styles[tipo] || styles.info
   return (

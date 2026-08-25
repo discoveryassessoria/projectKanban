@@ -62,15 +62,15 @@ const STATUS_PILL_CLS: Record<string, string> = {
   PENDENTE: "bg-[var(--surface-secondary)]/20 text-[var(--text-muted)]",
   SOLICITAR: "bg-[var(--surface-secondary)] text-[var(--text-secondary)]",
   SOLICITADO: "bg-[var(--surface-secondary)] text-[var(--text-secondary)]",
-  EM_BUSCA: "bg-[var(--accent-primary)]/20 text-amber-700",
-  RECEBIDO: "bg-[var(--surface-secondary)] text-green-700",
+  EM_BUSCA: "bg-[var(--accent-primary)]/20 text-amber-800",
+  RECEBIDO: "bg-[var(--surface-secondary)] text-green-800",
   EM_ANALISE: "bg-[var(--surface-secondary)] text-[var(--text-secondary)]",
-  RETIFICANDO: "bg-[var(--surface-secondary)] text-amber-700",
-  EM_TRADUCAO: "bg-[var(--surface-secondary)] text-amber-700",
-  TRADUZIDO: "bg-[var(--surface-secondary)] text-green-700",
-  EM_APOSTILAMENTO: "bg-[var(--surface-secondary)] text-amber-700",
-  APOSTILADO: "bg-[var(--surface-secondary)] text-green-700",
-  ENTREGUE: "bg-[var(--surface-secondary)] text-green-700",
+  RETIFICANDO: "bg-[var(--surface-secondary)] text-amber-800",
+  EM_TRADUCAO: "bg-[var(--surface-secondary)] text-amber-800",
+  TRADUZIDO: "bg-[var(--surface-secondary)] text-green-800",
+  EM_APOSTILAMENTO: "bg-[var(--surface-secondary)] text-amber-800",
+  APOSTILADO: "bg-[var(--surface-secondary)] text-green-800",
+  ENTREGUE: "bg-[var(--surface-secondary)] text-green-800",
   INVALIDO: "bg-[var(--surface-secondary)] text-red-700",
   NAO_ENCONTRADO: "bg-[var(--surface-secondary)]0/20 text-[var(--text-muted)]",
   CANCELADO: "bg-[var(--surface-secondary)]0/20 text-[var(--text-muted)]",
@@ -285,7 +285,7 @@ function ConteudoDrawer({
 
         {erro && !pessoa && (
           <div className="flex-1 flex flex-col items-center justify-center text-[var(--text-secondary)] gap-3 p-6">
-            <AlertTriangle className="w-8 h-8 text-amber-700" />
+            <AlertTriangle className="w-8 h-8 text-amber-800" />
             <p className="text-sm">{erro}</p>
             <button
               onClick={onClose}
@@ -337,7 +337,7 @@ function ConteudoDrawer({
                   <span>Progresso documental</span>
                   <span>
                     {progresso}% · SLA crítico:{" "}
-                    <span className={slaCritico ? "text-red-700" : "text-green-700"}>
+                    <span className={slaCritico ? "text-red-700" : "text-green-800"}>
                       {slaCritico ? "SIM" : "NÃO"}
                     </span>
                   </span>
@@ -481,9 +481,9 @@ function StatCard({
     tone === "alert"
       ? "text-red-700"
       : tone === "warn"
-      ? "text-amber-700"
+      ? "text-amber-800"
       : tone === "ok"
-      ? "text-green-700"
+      ? "text-green-800"
       : "text-white"
 
   return (

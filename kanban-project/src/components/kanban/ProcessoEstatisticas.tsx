@@ -118,10 +118,10 @@ export function ProcessoEstatisticas({ processo, onNavigate }: ProcessoEstatisti
   const riscoValor = risco.bloqueantes || risco.graves || 'OK'
   const riscoCor =
     risco.bloqueantes ? 'text-red-700' :
-    risco.graves      ? 'text-amber-700' :
-                        'text-green-700'
+    risco.graves      ? 'text-amber-800' :
+                        'text-green-800'
 
-  const protocoloCor = protocolo.apto ? 'text-green-700' : 'text-amber-700'
+  const protocoloCor = protocolo.apto ? 'text-green-800' : 'text-amber-800'
 
   // Discovery Design System — dark glass (skin only; layout preservado)
   const cardCls = "bg-[var(--surface-popover)] border border-[var(--border-default)] rounded-xl px-4 py-3.5"
@@ -228,7 +228,7 @@ export function ProcessoEstatisticas({ processo, onNavigate }: ProcessoEstatisti
 
       {/* ============== AVISO TEMPORÁRIO (endpoint pendente) ============== */}
       {!loading && !endpointDisponivel && (
-        <div className="mb-4 px-3 py-2 bg-[var(--surface-secondary)] border border-[var(--border-default)] rounded text-[11px] text-amber-700">
+        <div className="mb-4 px-3 py-2 bg-[var(--surface-secondary)] border border-[var(--border-default)] rounded text-[11px] text-amber-800">
           ⚠ Endpoint <code className="font-mono">/api/processos/{processo.id}/estatisticas</code> ainda não existe — cards mostrando valores zerados.
         </div>
       )}

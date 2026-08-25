@@ -224,9 +224,9 @@ export function ImportarArvoreModal({ arvoreId, aberto, onFechar, onImportado }:
               </div>
 
               {extracao.avisos.length > 0 && (
-                <div className="rounded-lg border border-[var(--border-default)] bg-[var(--surface-secondary)] px-4 py-3 text-sm text-amber-700">
+                <div className="rounded-lg border border-[var(--border-default)] bg-[var(--surface-secondary)] px-4 py-3 text-sm text-amber-800">
                   <p className="mb-1 font-medium">Pontos de atenção da leitura</p>
-                  <ul className="list-inside list-disc space-y-0.5 text-amber-700/80">
+                  <ul className="list-inside list-disc space-y-0.5 text-amber-800/80">
                     {extracao.avisos.map((a, i) => <li key={i}>{a}</li>)}
                   </ul>
                 </div>

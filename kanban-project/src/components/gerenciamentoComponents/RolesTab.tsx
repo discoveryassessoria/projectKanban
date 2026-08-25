@@ -264,7 +264,7 @@ export default function RolesTab() {
                     <div className="flex items-center gap-2">
                       <h3 className="truncate font-medium text-white">{p.nome}</h3>
                       {bloqueado ? (
-                        <span className="shrink-0 rounded bg-[var(--surface-secondary)] px-1.5 py-0.5 text-[10px] font-medium text-amber-700">
+                        <span className="shrink-0 rounded bg-[var(--surface-secondary)] px-1.5 py-0.5 text-[10px] font-medium text-amber-800">
                           Protegido
                         </span>
                       ) : p.sistema ? (
@@ -336,7 +336,7 @@ export default function RolesTab() {
             {/* corpo rolável */}
             <div className="flex-1 overflow-y-auto px-6 py-4">
               {somenteLeitura && (
-                <div className="mb-4 rounded-lg border border-[var(--border-default)] bg-[var(--surface-secondary)] p-3 text-xs text-amber-700">
+                <div className="mb-4 rounded-lg border border-[var(--border-default)] bg-[var(--surface-secondary)] p-3 text-xs text-amber-800">
                   O perfil <strong>Administrador</strong> não pode ser editado. Use <strong>Duplicar</strong> para criar uma versão editável.
                 </div>
               )}

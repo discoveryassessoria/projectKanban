@@ -119,10 +119,10 @@ export default function FinancasDashboard() {
         <Card className="bg-[var(--surface-primary)] border-[var(--border-strong)] backdrop-blur-sm">
           <CardHeader className="flex flex-row items-center justify-between pb-2">
             <CardTitle className="text-sm font-medium text-white/70">A Receber</CardTitle>
-            <Receipt className="h-4 w-4 text-green-700" />
+            <Receipt className="h-4 w-4 text-green-800" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-green-700">{formatCurrency(resumo.totalReceber)}</div>
+            <div className="text-2xl font-bold text-green-800">{formatCurrency(resumo.totalReceber)}</div>
             {resumo.totalReceberVencido > 0 && (
               <p className="text-xs text-red-700 mt-1 flex items-center gap-1">
                 <AlertTriangle className="h-3 w-3" />
@@ -154,17 +154,17 @@ export default function FinancasDashboard() {
           <CardHeader className="flex flex-row items-center justify-between pb-2">
             <CardTitle className="text-sm font-medium text-white/70">Saldo do Mês</CardTitle>
             {resumo.saldoMes >= 0 ? (
-              <TrendingUp className="h-4 w-4 text-green-700" />
+              <TrendingUp className="h-4 w-4 text-green-800" />
             ) : (
               <TrendingDown className="h-4 w-4 text-red-700" />
             )}
           </CardHeader>
           <CardContent>
-            <div className={`text-2xl font-bold ${resumo.saldoMes >= 0 ? 'text-green-700' : 'text-red-700'}`}>
+            <div className={`text-2xl font-bold ${resumo.saldoMes >= 0 ? 'text-green-800' : 'text-red-700'}`}>
               {formatCurrency(resumo.saldoMes)}
             </div>
             <div className="flex gap-4 mt-1">
-              <span className="text-xs text-green-700 flex items-center gap-0.5">
+              <span className="text-xs text-green-800 flex items-center gap-0.5">
                 <ArrowUpRight className="h-3 w-3" />
                 {formatCurrency(resumo.entradasMes)}
               </span>
@@ -183,7 +183,7 @@ export default function FinancasDashboard() {
         <Card className="bg-[var(--surface-primary)] border-[var(--border-strong)] backdrop-blur-sm">
           <CardHeader>
             <CardTitle className="text-white flex items-center gap-2">
-              <AlertTriangle className="h-5 w-5 text-amber-700" />
+              <AlertTriangle className="h-5 w-5 text-amber-800" />
               Próximos Vencimentos
             </CardTitle>
             <CardDescription className="text-[var(--text-secondary)]">
@@ -200,7 +200,7 @@ export default function FinancasDashboard() {
                   <div className="flex items-center gap-3">
                     {conta.tipo === 'receber' ? (
                       <div className="p-2 rounded-full bg-[var(--surface-secondary)]">
-                        <ArrowUpRight className="h-4 w-4 text-green-700" />
+                        <ArrowUpRight className="h-4 w-4 text-green-800" />
                       </div>
                     ) : (
                       <div className="p-2 rounded-full bg-[var(--surface-secondary)]">
@@ -213,7 +213,7 @@ export default function FinancasDashboard() {
                     </div>
                   </div>
                   <div className="text-right">
-                    <p className={`font-semibold ${conta.tipo === 'receber' ? 'text-green-700' : 'text-red-700'}`}>
+                    <p className={`font-semibold ${conta.tipo === 'receber' ? 'text-green-800' : 'text-red-700'}`}>
                       {conta.tipo === 'receber' ? '+' : '-'} {formatCurrency(conta.valor)}
                     </p>
                   </div>
@@ -240,7 +240,7 @@ export default function FinancasDashboard() {
               <Link href="/financas/contas-receber/nova">
                 <Button 
                   variant="outline" 
-                  className="w-full h-20 flex-col gap-2 border-[var(--border-default)] text-green-700 hover:bg-[var(--surface-secondary)] hover:border-[var(--border-default)]"
+                  className="w-full h-20 flex-col gap-2 border-[var(--border-default)] text-green-800 hover:bg-[var(--surface-secondary)] hover:border-[var(--border-default)]"
                 >
                   <Receipt className="h-5 w-5" />
                   <span className="text-xs">Nova Cobrança</span>

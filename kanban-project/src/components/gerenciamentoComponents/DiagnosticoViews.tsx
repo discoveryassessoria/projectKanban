@@ -42,8 +42,8 @@ function authHeaders(): HeadersInit {
 const CARD = "rounded-2xl border border-[var(--border-default)] bg-[var(--surface-primary)] backdrop-blur-sm"
 const TH = "px-4 py-3 font-medium"
 const SEV: Record<string, string> = {
-  ok: "bg-[var(--surface-secondary)] text-green-700",
-  alerta: "bg-[var(--surface-secondary)] text-amber-700",
+  ok: "bg-[var(--surface-secondary)] text-green-800",
+  alerta: "bg-[var(--surface-secondary)] text-amber-800",
   erro: "bg-[var(--surface-secondary)] text-red-700",
 }
 const SEV_LABEL: Record<string, string> = { ok: "OK", alerta: "Atenção", erro: "Crítico" }
@@ -267,7 +267,7 @@ export function HistoricoExecucoesTab() {
                     <td className="px-4 py-2.5 text-white">{l.fasePretendida ?? "—"}</td>
                     <td className="px-4 py-2.5">
                       <span className={`rounded px-1.5 py-0.5 text-[10px] ${l.resultado === "PERMITIDO" ? SEV.ok : SEV.alerta}`}>{l.resultado}</span>
-                      {l.forcado && <span className="ml-1 rounded bg-[var(--surface-secondary)] px-1.5 py-0.5 text-[10px] text-amber-700">forçado</span>}
+                      {l.forcado && <span className="ml-1 rounded bg-[var(--surface-secondary)] px-1.5 py-0.5 text-[10px] text-amber-800">forçado</span>}
                     </td>
                     <td className="px-4 py-2.5 text-[var(--text-secondary)]">{l.motivoCodigo ?? "—"}</td>
                   </tr>

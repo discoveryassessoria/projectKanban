@@ -406,7 +406,7 @@ const handleSubmit = async () => {
               {pode('eventos.criar') && (
                 <Button
                   onClick={() => setShowForm(true)}
-                  className="text-[#1b1508] hover:opacity-90 font-semibold"
+                  className="text-[var(--accent-ink)] hover:opacity-90 font-semibold"
                   style={{ background: "var(--accent-primary)" }}
                 >
                   <Plus className="h-4 w-4 mr-1.5" />
@@ -581,7 +581,7 @@ const handleSubmit = async () => {
                     <Button
                       onClick={handleSubmit}
                       disabled={isSaving}
-                      className="bg-green-700 hover:bg-green-800 text-[var(--action-primary-ink)]"
+                      className="bg-[var(--action-primary)] hover:bg-[var(--action-primary)] text-[var(--action-primary-ink)]"
                     >
                       <Check className="h-4 w-4 mr-1.5" />
                       {isSaving ? "Salvando..." : editingId ? "Salvar" : "Criar Evento"}
@@ -750,7 +750,7 @@ const handleSubmit = async () => {
                         >
                           <div
                             className={`text-sm font-medium mb-1 ${
-                              ehHoje ? "text-green-700" : "text-white/70"
+                              ehHoje ? "text-green-800" : "text-white/70"
                             }`}
                           >
                             {dia}

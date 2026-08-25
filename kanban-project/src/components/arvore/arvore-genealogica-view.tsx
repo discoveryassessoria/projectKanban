@@ -1709,7 +1709,7 @@ function AddPersonModal({
 
           <div className="flex justify-end gap-3 pt-4 border-t border-gray-100">
             <button type="button" onClick={onClose} className="px-4 py-2 text-gray-600 hover:text-gray-800 transition-colors">Cancelar</button>
-            <button type="submit" disabled={saving || !nome.trim()} className="px-6 py-2 bg-amber-700 text-[var(--action-primary-ink)] rounded-lg hover:bg-amber-800 transition-colors disabled:opacity-50">
+            <button type="submit" disabled={saving || !nome.trim()} className="px-6 py-2 bg-[var(--action-primary)] text-[var(--action-primary-ink)] rounded-lg hover:bg-[var(--action-primary)] transition-colors disabled:opacity-50">
               {saving ? 'Salvando...' : 'Adicionar'}
             </button>
           </div>
@@ -2140,7 +2140,7 @@ function EditPersonModal({
 
           <div className="flex justify-end gap-3 pt-4 border-t border-gray-100">
             <button type="button" onClick={onClose} className="px-4 py-2 text-gray-600 hover:text-gray-800 transition-colors">Cancelar</button>
-            <button type="submit" disabled={saving || !nome.trim()} className="px-6 py-2 bg-amber-700 text-[var(--action-primary-ink)] rounded-lg hover:bg-amber-800 transition-colors disabled:opacity-50">
+            <button type="submit" disabled={saving || !nome.trim()} className="px-6 py-2 bg-[var(--action-primary)] text-[var(--action-primary-ink)] rounded-lg hover:bg-[var(--action-primary)] transition-colors disabled:opacity-50">
               {saving ? 'Salvando...' : 'Salvar'}
             </button>
           </div>

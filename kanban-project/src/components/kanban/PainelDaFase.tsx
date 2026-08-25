@@ -220,7 +220,7 @@ export function PainelDaFase({
           <div className="grid gap-2.5 mb-4" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(132px, 1fr))" }}>
             {kpis.map((k, i) => {
               const cor =
-                k.tone === "ok" ? "text-green-700"
+                k.tone === "ok" ? "text-green-800"
                 : k.tone === "busca" ? "text-[var(--accent-text)]"
                 : k.tone === "late" ? "text-red-700"
                 : "text-white/95"
@@ -283,7 +283,7 @@ export function PainelDaFase({
               <ul className="mt-3 space-y-1.5 rounded-lg border border-[var(--border-default)] bg-[var(--surface-secondary)] px-4 py-3">
                 {oQueFazer!.map((m) => (
                   <li key={m.code} className="flex gap-2 text-[12.5px] leading-snug text-amber-100/80">
-                    <span aria-hidden className="text-amber-700/60">·</span>
+                    <span aria-hidden className="text-amber-800/60">·</span>
                     <span>{m.message}</span>
                   </li>
                 ))}
@@ -838,7 +838,7 @@ function PessoaCard({
 
   const transmissao =
     p.classificacao === "LINHA_PRINCIPAL"
-      ? { cor: "text-green-700", dot: "bg-[var(--surface-secondary)]", label: "Na linha de transmissão" }
+      ? { cor: "text-green-800", dot: "bg-[var(--surface-secondary)]", label: "Na linha de transmissão" }
       : p.classificacao === "FORA_DA_LINHAGEM"
         ? { cor: "text-[var(--text-muted)]", dot: "bg-[var(--surface-secondary)]", label: "Fora da linha" }
         : { cor: "text-red-700", dot: "bg-[var(--surface-secondary)]", label: "Classificação pendente" }
@@ -911,7 +911,7 @@ function PessoaCard({
 
 function Pilula({ valor, rotulo, tone }: { valor: number; rotulo: string; tone?: "ok" | "busca" | "late" }) {
   const cor =
-    tone === "ok" ? "text-green-700" : tone === "busca" ? "text-[var(--accent-text)]" : tone === "late" ? "text-red-700" : "text-white/95"
+    tone === "ok" ? "text-green-800" : tone === "busca" ? "text-[var(--accent-text)]" : tone === "late" ? "text-red-700" : "text-white/95"
   return (
     <span className="text-center block">
       <b className={`text-[16px] font-extrabold block leading-none ${cor}`}>{valor}</b>
@@ -1004,7 +1004,7 @@ function TabelaDocumentos({
 }
 
 const CLS_ARTEFATO: Record<StatusResumo, string> = {
-  PRONTO: "text-green-700",
+  PRONTO: "text-green-800",
   EM_ANDAMENTO: "text-[var(--text-secondary)]",
   PENDENTE: "text-white/68",
   DIVERGENTE: "text-red-700",
@@ -1037,7 +1037,7 @@ function CelulaProgresso({ p }: { p: DocumentoDoIndice["naFase"]["progresso"] })
   return (
     <div title={detalhe}>
       <div className="flex items-baseline gap-1.5">
-        <b className={`text-[12.5px] font-bold tabular-nums ${completo ? "text-green-700" : "text-white/90"}`}>
+        <b className={`text-[12.5px] font-bold tabular-nums ${completo ? "text-green-800" : "text-white/90"}`}>
           {p.pct}%
         </b>
         {p.total > 0 && (
@@ -1059,7 +1059,7 @@ const CLS_ESTADO: Record<EstadoOperacionalDaLinha, string> = {
   EM_ANDAMENTO: "bg-[var(--surface-secondary)] text-[var(--text-secondary)]",
   AGUARDANDO_TERCEIRO: "bg-[var(--accent-primary)]/15 text-[var(--accent-text)]",
   BLOQUEADA: "bg-[var(--surface-secondary)] text-red-700",
-  CONCLUIDA: "bg-[var(--surface-secondary)] text-green-700",
+  CONCLUIDA: "bg-[var(--surface-secondary)] text-green-800",
 }
 
 /**

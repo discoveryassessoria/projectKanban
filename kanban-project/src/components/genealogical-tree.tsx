@@ -135,7 +135,7 @@ const PersonNode = ({ data }: { data: TreeNode["data"] }) => {
         type="source"
         position={Position.Bottom}
         id="bottom"
-        className="w-3 h-3 bg-green-600 border-2 border-[var(--border-default)] shadow-[var(--elev-2)]"
+        className="w-3 h-3 bg-[var(--action-primary)] border-2 border-[var(--border-default)] shadow-[var(--elev-2)]"
       />
       <Handle
         type="source"
@@ -154,7 +154,7 @@ const PersonNode = ({ data }: { data: TreeNode["data"] }) => {
         <Button
           size="sm"
           variant="outline"
-          className="h-7 w-7 p-0 bg-[var(--surface-primary)] shadow-[var(--elev-2)] hover:bg-green-600 hover:text-[var(--text-primary)] border-[var(--border-default)]"
+          className="h-7 w-7 p-0 bg-[var(--surface-primary)] shadow-[var(--elev-2)] hover:bg-[var(--action-primary)] hover:text-[var(--text-primary)] border-[var(--border-default)]"
           onClick={() => onAddChild(pessoa.id)}
           title="Adicionar Filho"
         >
@@ -192,7 +192,7 @@ const PersonNode = ({ data }: { data: TreeNode["data"] }) => {
         <Button
           size="sm"
           variant="outline"
-          className="h-7 w-7 p-0 bg-[var(--surface-primary)] shadow-[var(--elev-2)] hover:bg-amber-600 hover:text-white border-[var(--border-default)]"
+          className="h-7 w-7 p-0 bg-[var(--surface-primary)] shadow-[var(--elev-2)] hover:bg-[var(--action-primary)] hover:text-white border-[var(--border-default)]"
           onClick={() => onEdit(pessoa)}
           title="Editar"
         >
@@ -285,7 +285,7 @@ const CommentNode = ({ data }: { data: { comment: string; onCommentChange: (comm
             Comentário
           </h4>
           <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => setIsEditing(!isEditing)}>
-            <Edit3 className="h-3 w-3 text-amber-700" />
+            <Edit3 className="h-3 w-3 text-amber-800" />
           </Button>
         </div>
         {isEditing ? (

@@ -53,8 +53,8 @@ const PILL_RESULTADO: Record<ResultadoContato, string> = {
   EM_ANALISE: "bg-[var(--surface-secondary)] text-[var(--text-secondary)] border-[var(--border-default)]",
   PRAZO_INFORMADO: "bg-[var(--accent-primary)]/20 text-[var(--accent-text)] border-[var(--accent-primary)]/30",
   EXIGENCIA: "bg-[var(--surface-secondary)] text-red-700 border-[var(--border-default)]",
-  PRONTO_PARA_RETIRADA: "bg-[var(--surface-secondary)] text-green-700 border-[var(--border-default)]",
-  RETORNO_RECEBIDO: "bg-[var(--surface-secondary)] text-green-700 border-[var(--border-default)]",
+  PRONTO_PARA_RETIRADA: "bg-[var(--surface-secondary)] text-green-800 border-[var(--border-default)]",
+  RETORNO_RECEBIDO: "bg-[var(--surface-secondary)] text-green-800 border-[var(--border-default)]",
   OUTRO: "bg-[var(--surface-secondary)] text-white/70 border-[var(--border-default)]",
 }
 

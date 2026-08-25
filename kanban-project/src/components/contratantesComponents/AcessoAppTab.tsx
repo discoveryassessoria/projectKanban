@@ -240,7 +240,7 @@ export function AcessoAppTab({ clienteId, clienteTipo, clienteEmail, clienteNome
       <div className="bg-[var(--surface-primary)] rounded-xl p-6 shadow-[var(--elev-1)] border border-gray-200">
         <div className="flex items-center gap-3 p-4 bg-[var(--surface-secondary)] border border-[var(--border-default)] rounded-lg">
           <AlertTriangle className="h-5 w-5 text-amber-500 flex-shrink-0" />
-          <p className="text-sm text-amber-700">
+          <p className="text-sm text-amber-800">
             Salve o cliente primeiro para poder gerar acesso ao app.
           </p>
         </div>
@@ -281,12 +281,12 @@ export function AcessoAppTab({ clienteId, clienteTipo, clienteEmail, clienteNome
                 </div>
               </div>
               {acesso.primeiroAcesso && (
-                <span className="px-3 py-1 bg-[var(--surface-secondary)] text-amber-700 rounded-full text-xs font-medium">
+                <span className="px-3 py-1 bg-[var(--surface-secondary)] text-amber-800 rounded-full text-xs font-medium">
                   Aguardando primeiro login
                 </span>
               )}
               {!acesso.primeiroAcesso && (
-                <span className="px-3 py-1 bg-[var(--surface-secondary)] text-green-700 rounded-full text-xs font-medium">
+                <span className="px-3 py-1 bg-[var(--surface-secondary)] text-green-800 rounded-full text-xs font-medium">
                   Já acessou o app
                 </span>
               )}
@@ -337,7 +337,7 @@ export function AcessoAppTab({ clienteId, clienteTipo, clienteEmail, clienteNome
 
                 <button
                   onClick={copiarMensagem}
-                  className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-green-700 hover:bg-green-800 text-[var(--action-primary-ink)] rounded-lg font-medium transition-colors text-sm"
+                  className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-[var(--action-primary)] hover:bg-[var(--action-primary)] text-[var(--action-primary-ink)] rounded-lg font-medium transition-colors text-sm"
                 >
                   {copiadoMsg ? (
                     <>
@@ -365,7 +365,7 @@ export function AcessoAppTab({ clienteId, clienteTipo, clienteEmail, clienteNome
                   onClick={resetarSenha}
                   disabled={resetando}
                   variant="outline"
-                  className="flex-1 border-[var(--border-default)] text-amber-700 hover:bg-[var(--surface-secondary)]"
+                  className="flex-1 border-[var(--border-default)] text-amber-800 hover:bg-[var(--surface-secondary)]"
                 >
                   {resetando ? (
                     <Loader2 className="h-4 w-4 animate-spin mr-2" />

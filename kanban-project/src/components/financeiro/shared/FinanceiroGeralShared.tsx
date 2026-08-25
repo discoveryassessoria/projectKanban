@@ -22,7 +22,7 @@ export function OrigemBadge({ origem }: { origem: string | null | undefined }) {
   const proc = origem === "PROCESSO"
   const desconhecida = origem === "ORIGEM_DESCONHECIDA"
   return (
-    <span className={`inline-flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded-full border ${proc ? "bg-[var(--surface-secondary)] text-[var(--text-secondary)] border-[var(--border-default)]" : desconhecida ? "bg-[var(--surface-secondary)] text-amber-700 border-[var(--border-default)]" : "bg-[var(--surface-primary)] text-[var(--text-secondary)] border-[var(--border-default)]"}`}>
+    <span className={`inline-flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded-full border ${proc ? "bg-[var(--surface-secondary)] text-[var(--text-secondary)] border-[var(--border-default)]" : desconhecida ? "bg-[var(--surface-secondary)] text-amber-800 border-[var(--border-default)]" : "bg-[var(--surface-primary)] text-[var(--text-secondary)] border-[var(--border-default)]"}`}>
       {proc ? <Workflow className="h-2.5 w-2.5" /> : <Building2 className="h-2.5 w-2.5" />}
       {proc ? "Processo" : desconhecida ? "Origem?" : "Corporativo"}
     </span>

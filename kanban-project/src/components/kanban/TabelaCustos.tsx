@@ -831,7 +831,7 @@ export function TabelaCustos({ processoId, nomeFamilia, onTotaisChange }: Tabela
                   <span className="truncate" title={servico.nome}>{servico.nome}</span>
                 </th>
               ))}
-              <th className="px-3 py-2 text-right font-semibold bg-amber-700 min-w-[100px]">Total</th>
+              <th className="px-3 py-2 text-right font-semibold bg-[var(--action-primary)] min-w-[100px]">Total</th>
             </tr>
           </thead>
           <tbody>
@@ -911,7 +911,7 @@ export function TabelaCustos({ processoId, nomeFamilia, onTotaisChange }: Tabela
                       <td className="px-2 py-1.5 text-center border-r border-gray-200">
                         <span className={`
                           inline-block px-2 py-0.5 rounded text-xs font-medium
-                          ${linha.tipoRegistro === 'Nascimento' ? 'bg-[var(--surface-secondary)] text-green-700' : ''}
+                          ${linha.tipoRegistro === 'Nascimento' ? 'bg-[var(--surface-secondary)] text-green-800' : ''}
                           ${linha.tipoRegistro === 'Casamento' ? 'bg-[var(--surface-secondary)] text-[var(--text-secondary)]' : ''}
                           ${linha.tipoRegistro === 'Óbito' ? 'bg-gray-200 text-gray-700' : ''}
                           ${linha.tipoRegistro === '-' ? 'text-[var(--text-muted)]' : ''}
@@ -986,7 +986,7 @@ export function TabelaCustos({ processoId, nomeFamilia, onTotaisChange }: Tabela
                   })}
                   
                   {/* Total da Linha */}
-                  <td className="px-3 py-1.5 text-right font-semibold text-amber-700 bg-[var(--surface-secondary)]">
+                  <td className="px-3 py-1.5 text-right font-semibold text-amber-800 bg-[var(--surface-secondary)]">
                     {formatarMoeda(calcularTotalLinha(linha.pessoaId, linha.tipoRegistro))}
                   </td>
                 </tr>
@@ -1004,7 +1004,7 @@ export function TabelaCustos({ processoId, nomeFamilia, onTotaisChange }: Tabela
                   {formatarMoeda(calcularTotalServico(servico.id))}
                 </td>
               ))}
-              <td className="px-3 py-2 text-right text-lg text-[var(--action-primary-ink)] bg-amber-700 font-bold">
+              <td className="px-3 py-2 text-right text-lg text-[var(--action-primary-ink)] bg-[var(--action-primary)] font-bold">
                 {formatarMoeda(calcularTotalGeral())}
               </td>
             </tr>

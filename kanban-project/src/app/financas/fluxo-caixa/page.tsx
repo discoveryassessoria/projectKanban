@@ -198,9 +198,9 @@ export default function FluxoCaixaPage() {
           <CardContent className="pt-4">
             <div className="flex items-center justify-between">
               <p className="text-sm text-white/70">Entradas</p>
-              <ArrowUpRight className="h-4 w-4 text-green-700" />
+              <ArrowUpRight className="h-4 w-4 text-green-800" />
             </div>
-            <p className="text-xl font-bold text-green-700 mt-1">+ {formatCurrency(resumo.entradas)}</p>
+            <p className="text-xl font-bold text-green-800 mt-1">+ {formatCurrency(resumo.entradas)}</p>
           </CardContent>
         </Card>
         
@@ -219,12 +219,12 @@ export default function FluxoCaixaPage() {
             <div className="flex items-center justify-between">
               <p className="text-sm text-white/70">Saldo Atual</p>
               {resumo.saldoAtual >= resumo.saldoAnterior ? (
-                <TrendingUp className="h-4 w-4 text-green-700" />
+                <TrendingUp className="h-4 w-4 text-green-800" />
               ) : (
                 <TrendingDown className="h-4 w-4 text-red-700" />
               )}
             </div>
-            <p className={`text-xl font-bold mt-1 ${resumo.saldoAtual >= resumo.saldoAnterior ? 'text-green-700' : 'text-red-700'}`}>
+            <p className={`text-xl font-bold mt-1 ${resumo.saldoAtual >= resumo.saldoAnterior ? 'text-green-800' : 'text-red-700'}`}>
               {formatCurrency(resumo.saldoAtual)}
             </p>
           </CardContent>
@@ -279,7 +279,7 @@ export default function FluxoCaixaPage() {
                     </CardTitle>
                     <div className="flex gap-4 text-sm">
                       {totalEntradas > 0 && (
-                        <span className="text-green-700">+ {formatCurrency(totalEntradas)}</span>
+                        <span className="text-green-800">+ {formatCurrency(totalEntradas)}</span>
                       )}
                       {totalSaidas > 0 && (
                         <span className="text-red-700">- {formatCurrency(totalSaidas)}</span>
@@ -297,7 +297,7 @@ export default function FluxoCaixaPage() {
                         <div className="flex items-center gap-3">
                           {transacao.tipo === 'ENTRADA' ? (
                             <div className="p-2 rounded-full bg-[var(--surface-secondary)]">
-                              <ArrowUpRight className="h-4 w-4 text-green-700" />
+                              <ArrowUpRight className="h-4 w-4 text-green-800" />
                             </div>
                           ) : (
                             <div className="p-2 rounded-full bg-[var(--surface-secondary)]">
@@ -316,7 +316,7 @@ export default function FluxoCaixaPage() {
                             </div>
                           </div>
                         </div>
-                        <p className={`font-semibold ${transacao.tipo === 'ENTRADA' ? 'text-green-700' : 'text-red-700'}`}>
+                        <p className={`font-semibold ${transacao.tipo === 'ENTRADA' ? 'text-green-800' : 'text-red-700'}`}>
                           {transacao.tipo === 'ENTRADA' ? '+' : '-'} {formatCurrency(transacao.valor)}
                         </p>
                       </div>

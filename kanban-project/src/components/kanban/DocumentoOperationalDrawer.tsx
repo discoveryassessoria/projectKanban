@@ -66,8 +66,8 @@ const STATUS_NEUTRAL_PILL = "bg-[var(--surface-primary)] text-[var(--text-second
 const STATUS_PILL_CLS: Record<string, string> = {
   SOLICITADO: "bg-[var(--accent-primary)]/15 text-[var(--accent-text)]",
   SOLICITAR: "bg-[var(--accent-primary)]/15 text-[var(--accent-text)]",
-  RECEBIDO: "bg-[var(--surface-secondary)] text-green-700",
-  ENTREGUE: "bg-[var(--surface-secondary)] text-green-700",
+  RECEBIDO: "bg-[var(--surface-secondary)] text-green-800",
+  ENTREGUE: "bg-[var(--surface-secondary)] text-green-800",
   INVALIDO: "bg-[var(--surface-secondary)] text-red-700",
   NAO_ENCONTRADO: "bg-[var(--surface-secondary)] text-red-700",
 }
@@ -464,7 +464,7 @@ function ConteudoDrawer({
   const sla = tarefa
     ? {
         text: tarefa.rotuloDoPrazo,
-        cls: tarefa.atrasado ? "text-red-700" : tarefa.venceHoje ? "text-[var(--accent-text)]" : "text-green-700",
+        cls: tarefa.atrasado ? "text-red-700" : tarefa.venceHoje ? "text-[var(--accent-text)]" : "text-green-800",
       }
     : { text: "Sem tarefa nesta fase", cls: "text-[var(--text-secondary)]" }
   const statusCls = doc ? (STATUS_PILL_CLS[doc.status] || STATUS_NEUTRAL_PILL) : ""
@@ -517,7 +517,7 @@ function ConteudoDrawer({
         {/* ERROR — estado terminal fechável (falha ou documentoId inválido). */}
         {opState === "ERROR" && (
           <div className="flex-1 flex flex-col items-center justify-center text-[var(--text-secondary)] gap-3 p-6">
-            <AlertTriangle className="w-8 h-8 text-amber-700" />
+            <AlertTriangle className="w-8 h-8 text-amber-800" />
             <p className="text-sm">{erro || "Não foi possível abrir a operação."}</p>
             <button
               onClick={onClose}
@@ -691,7 +691,7 @@ function ConteudoDrawer({
                   o que aconteceu — mas dito como o que é: registro anterior. */}
               {doc.motivoBloqueio && (
                 tarefa?.statusTarefa === "BLOQUEADA" ? (
-                  <div className="mt-3 p-2.5 rounded-md border border-[var(--border-default)] bg-[var(--surface-secondary)] text-[11.5px] text-amber-700">
+                  <div className="mt-3 p-2.5 rounded-md border border-[var(--border-default)] bg-[var(--surface-secondary)] text-[11.5px] text-amber-800">
                     <strong className="font-semibold">Bloqueado:</strong> {doc.motivoBloqueio}
                   </div>
                 ) : (

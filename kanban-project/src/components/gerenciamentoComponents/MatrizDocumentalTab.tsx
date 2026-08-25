@@ -134,7 +134,7 @@ export default function MatrizDocumentalTab() {
 
   return (
     <div className="space-y-5">
-      {flash && <div className="rounded-xl border border-[var(--border-default)] bg-[var(--surface-secondary)] px-4 py-3 text-sm text-green-700">{flash}</div>}
+      {flash && <div className="rounded-xl border border-[var(--border-default)] bg-[var(--surface-secondary)] px-4 py-3 text-sm text-green-800">{flash}</div>}
 
       {/* cabeçalho + seletor */}
       <div className="rounded-2xl border border-[var(--border-default)] bg-[var(--surface-primary)] p-5 backdrop-blur-sm">
@@ -175,7 +175,7 @@ export default function MatrizDocumentalTab() {
                     <td className="px-3 py-2 text-xs text-white/70">{TARGETS[m.target] || m.target}</td>
                     <td className="px-3 py-2 text-[11px] text-[var(--text-secondary)]">{GENRULES[m.generationRule] || m.generationRule}</td>
                     <td className="px-3 py-2">
-                      <span className={`rounded px-1.5 py-0.5 text-[10px] ${m.required ? "bg-[var(--surface-secondary)] text-amber-700" : "bg-[var(--surface-primary)] text-[var(--text-secondary)]"}`}>{m.required ? "obrigatório" : "opcional"}</span>
+                      <span className={`rounded px-1.5 py-0.5 text-[10px] ${m.required ? "bg-[var(--surface-secondary)] text-amber-800" : "bg-[var(--surface-primary)] text-[var(--text-secondary)]"}`}>{m.required ? "obrigatório" : "opcional"}</span>
                       {m.blocksPhaseCompletion && <span className="ml-1 rounded bg-[var(--surface-secondary)] px-1.5 py-0.5 text-[10px] text-red-700">bloqueia fase</span>}
                     </td>
                     <td className="px-3 py-2 text-[10px] text-[var(--text-secondary)]">{[m.createsTask && "tarefa", m.createsCost && "custo", m.createsRevenue && "receita"].filter(Boolean).join(" · ") || "—"}</td>
@@ -183,7 +183,7 @@ export default function MatrizDocumentalTab() {
                       <div className="flex items-center justify-end gap-0.5 text-[var(--text-secondary)]">
                         {m.arquivado ? (
                           <>
-                            <button title="Reativar" aria-label="Reativar" onClick={() => setArquivado(m, false)} className="rounded p-1 text-green-700/80 hover:bg-[var(--surface-hover)] hover:text-green-700"><IUnarch /></button>
+                            <button title="Reativar" aria-label="Reativar" onClick={() => setArquivado(m, false)} className="rounded p-1 text-green-800/80 hover:bg-[var(--surface-hover)] hover:text-green-800"><IUnarch /></button>
                             {(m.usedByCount || 0) === 0 && <button title="Excluir" aria-label="Excluir" onClick={() => del(m)} className="rounded p-1 text-red-700/70 hover:bg-[var(--surface-secondary)] hover:text-red-700"><ITrash /></button>}
                           </>
                         ) : (

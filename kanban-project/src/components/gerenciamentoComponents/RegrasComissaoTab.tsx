@@ -196,7 +196,7 @@ export default function RegrasComissaoTab() {
                     {r.modoCalculo === 'fixed' ? fmtNum(r.valorFixo) : (r.percent != null ? `${Number(r.percent)}%` : '—')}
                   </td>
                   <td className="px-4 py-2.5">
-                    <span className={`rounded px-2 py-0.5 text-[11px] font-medium ${r.ativo ? 'bg-[var(--surface-secondary)] text-green-700' : 'bg-[var(--surface-primary)] text-[var(--text-secondary)]'}`}>
+                    <span className={`rounded px-2 py-0.5 text-[11px] font-medium ${r.ativo ? 'bg-[var(--surface-secondary)] text-green-800' : 'bg-[var(--surface-primary)] text-[var(--text-secondary)]'}`}>
                       {r.ativo ? 'Ativo' : 'Inativo'}
                     </span>
                   </td>
@@ -229,7 +229,7 @@ export default function RegrasComissaoTab() {
               <div>
                 <label className="mb-1 block text-xs text-[var(--text-secondary)]">Papel</label>
                 <input value={papel} onChange={(e) => setPapel(e.target.value)} placeholder="Ex.: Vendedor, Consultor comercial" className={inputCls} />
-                <p className="mt-1 text-[11px] text-amber-700/70">Vira seleção quando o catálogo de Papéis for portado.</p>
+                <p className="mt-1 text-[11px] text-amber-800/70">Vira seleção quando o catálogo de Papéis for portado.</p>
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div>

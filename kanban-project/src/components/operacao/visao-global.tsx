@@ -167,7 +167,7 @@ const INDICADORES: Array<{ chave: keyof Indicadores; rotulo: string; filtro: Par
   { chave: "aguardandoTerceiro", rotulo: "Aguardando terceiro", filtro: {}, tom: "text-white/80" },
   { chave: "bloqueadas", rotulo: "Bloqueadas", filtro: {}, tom: "text-white/80" },
   { chave: "atrasadas", rotulo: "Atrasadas", filtro: { atrasadas: true }, tom: "text-red-700/90" },
-  { chave: "venceHoje", rotulo: "Vence hoje", filtro: { venceHoje: true }, tom: "text-amber-700/90" },
+  { chave: "venceHoje", rotulo: "Vence hoje", filtro: { venceHoje: true }, tom: "text-amber-800/90" },
 ]
 
 export function VisaoGlobal() {
@@ -424,7 +424,7 @@ export function VisaoGlobal() {
       {(erroComando || aviso) && (
         <div
           className={`border-b px-4 py-2 text-[11px] ${
-            erroComando ? "border-[var(--border-default)] bg-[var(--surface-secondary)] text-red-700/90" : "border-[var(--border-default)] bg-[var(--surface-secondary)] text-green-700/90"
+            erroComando ? "border-[var(--border-default)] bg-[var(--surface-secondary)] text-red-700/90" : "border-[var(--border-default)] bg-[var(--surface-secondary)] text-green-800/90"
           }`}
         >
           {erroComando ?? aviso}
@@ -777,7 +777,7 @@ function Card({
           {/* HÁ QUANTO TEMPO ESPERA — sem isso, "aguardando terceiro" é um
               estado onde o trabalho envelhece sem ninguém notar. */}
           {l.esperandoHaDias != null && (
-            <p className={l.esperandoHaDias >= 15 ? "text-amber-700/70" : ""}>
+            <p className={l.esperandoHaDias >= 15 ? "text-amber-800/70" : ""}>
               Aguardando {l.esperandoDe === "cliente" ? "o cliente" : "terceiro"} há {l.esperandoHaDias} dia
               {l.esperandoHaDias === 1 ? "" : "s"}
             </p>
@@ -863,7 +863,7 @@ function PainelSugestao({
                 {s.recomendado ? (
                   <>
                     <div className="flex items-baseline gap-2">
-                      <span className="grid h-7 w-7 shrink-0 place-items-center rounded-full bg-[var(--surface-secondary)] text-[10px] font-medium text-green-700/90">
+                      <span className="grid h-7 w-7 shrink-0 place-items-center rounded-full bg-[var(--surface-secondary)] text-[10px] font-medium text-green-800/90">
                         {iniciais(s.recomendado.nome)}
                       </span>
                       <span className="text-[15px] font-medium text-white/95">{s.recomendado.nome}</span>
@@ -872,7 +872,7 @@ function PainelSugestao({
                     <ul className="mt-2.5 space-y-1">
                       {s.explicacao.map((linha, i) => (
                         <li key={i} className={`text-[11px] leading-4 ${
-                          linha.startsWith("⚠") ? "text-amber-700/80" : linha.startsWith("ℹ") ? "text-[var(--text-secondary)]" : "text-white/65"
+                          linha.startsWith("⚠") ? "text-amber-800/80" : linha.startsWith("ℹ") ? "text-[var(--text-secondary)]" : "text-white/65"
                         }`}>
                           {linha}
                         </li>
@@ -882,7 +882,7 @@ function PainelSugestao({
                 ) : (
                   <>
                     {/* A ABSTENÇÃO É UMA RESPOSTA — com motivo, nunca um nome inventado. */}
-                    <p className="text-[13px] font-medium text-amber-700/90">Sem recomendação automática</p>
+                    <p className="text-[13px] font-medium text-amber-800/90">Sem recomendação automática</p>
                     <p className="mt-1 text-[11px] leading-4 text-[var(--text-secondary)]">{s.abstencao?.texto}</p>
                     <p className="mt-1.5 text-[10px] text-[var(--text-muted)]">
                       Código: {s.abstencao?.codigo}. A decisão continua sendo sua — atribuir manualmente segue disponível.
@@ -901,7 +901,7 @@ function PainelSugestao({
                     {elegiveis.map((a) => (
                       <div key={a.usuarioId} className="rounded border border-white/[0.07] px-2.5 py-2">
                         <div className="flex items-baseline justify-between gap-2">
-                          <span className={`text-[12px] ${a.usuarioId === s.recomendado?.usuarioId ? "text-green-700/90" : "text-white/80"}`}>
+                          <span className={`text-[12px] ${a.usuarioId === s.recomendado?.usuarioId ? "text-green-800/90" : "text-white/80"}`}>
                             {a.nome}
                           </span>
                           <span className="text-[11px] tabular-nums text-[var(--text-secondary)]">custo {a.score}</span>

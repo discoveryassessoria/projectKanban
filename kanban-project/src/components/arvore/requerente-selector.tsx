@@ -180,7 +180,7 @@ export function RequerenteSelector({
               <AlertCircle className="w-5 h-5 text-amber-600 flex-shrink-0 mt-0.5" />
               <div>
                 <p className="text-sm font-medium text-amber-900">Nenhum requerente vinculado.</p>
-                <p className="text-sm text-amber-700 mt-1">
+                <p className="text-sm text-amber-800 mt-1">
                   Adicione um requerente ao processo na aba <strong>Informações</strong> antes de
                   incluí-lo na árvore. A árvore não cria requerentes.
                 </p>
@@ -228,7 +228,7 @@ export function RequerenteSelector({
                           <User className="w-4 h-4 text-[var(--text-muted)]" />
                           {r.nome}
                           {faixa && (
-                            <span className={`text-[11px] font-medium px-1.5 py-0.5 rounded-full ${faixa === "Menor" ? "bg-[var(--surface-secondary)] text-amber-700" : "bg-gray-100 text-gray-600"}`}>
+                            <span className={`text-[11px] font-medium px-1.5 py-0.5 rounded-full ${faixa === "Menor" ? "bg-[var(--surface-secondary)] text-amber-800" : "bg-gray-100 text-gray-600"}`}>
                               {faixa}
                             </span>
                           )}

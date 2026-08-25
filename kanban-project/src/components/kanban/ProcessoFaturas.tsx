@@ -147,12 +147,12 @@ type MetodoPagamento = 'PIX' | 'BOLETO' | 'TRANSFERENCIA' | 'CARTAO_CREDITO' | '
 const STATUS_CONFIG = {
   PENDENTE: { 
     label: 'Pendente', 
-    color: 'bg-[var(--surface-secondary)] text-amber-700 border-[var(--border-default)]',
+    color: 'bg-[var(--surface-secondary)] text-amber-800 border-[var(--border-default)]',
     icon: Clock 
   },
   PAGO: { 
     label: 'Pago', 
-    color: 'bg-[var(--surface-secondary)] text-green-700 border-[var(--border-default)]',
+    color: 'bg-[var(--surface-secondary)] text-green-800 border-[var(--border-default)]',
     icon: Check 
   },
   VENCIDO: { 
@@ -162,7 +162,7 @@ const STATUS_CONFIG = {
   },
   PARCIAL: { 
     label: 'Parcial', 
-    color: 'bg-[var(--surface-secondary)] text-amber-700 border-[var(--border-default)]',
+    color: 'bg-[var(--surface-secondary)] text-amber-800 border-[var(--border-default)]',
     icon: TrendingDown 
   },
 }
@@ -675,7 +675,7 @@ export function ProcessoFaturas({ processoId, nomeFamilia, onUpdate }: ProcessoF
                     setShowNovaFatura(true)
                   }}
                   size="sm"
-                  className="bg-green-700 hover:bg-green-800"
+                  className="bg-[var(--action-primary)] hover:bg-[var(--action-primary)]"
                 >
                   <Plus className="h-4 w-4 mr-1" />
                   Nova Fatura
@@ -701,7 +701,7 @@ export function ProcessoFaturas({ processoId, nomeFamilia, onUpdate }: ProcessoF
                     bg: 'bg-[var(--surface-secondary)]',
                     border: 'border-[var(--border-default)]',
                     label: 'text-green-600',
-                    value: 'text-green-700'
+                    value: 'text-green-800'
                   },
                   USD: {
                     bg: 'bg-[var(--surface-secondary)]',
@@ -713,7 +713,7 @@ export function ProcessoFaturas({ processoId, nomeFamilia, onUpdate }: ProcessoF
                     bg: 'bg-[var(--surface-secondary)]',
                     border: 'border-[var(--border-default)]',
                     label: 'text-amber-600',
-                    value: 'text-amber-700'
+                    value: 'text-amber-800'
                   }
                 }
                 
@@ -974,7 +974,7 @@ export function ProcessoFaturas({ processoId, nomeFamilia, onUpdate }: ProcessoF
                                           )}
                                           <span className={`
                                             font-medium
-                                            ${parcela.pago ? 'text-green-700' : vencida ? 'text-red-700' : 'text-gray-700'}
+                                            ${parcela.pago ? 'text-green-800' : vencida ? 'text-red-700' : 'text-gray-700'}
                                           `}>
                                             {parcela.numero}/{fatura.parcelas}
                                           </span>
@@ -982,7 +982,7 @@ export function ProcessoFaturas({ processoId, nomeFamilia, onUpdate }: ProcessoF
 
                                         <div>
                                           <span className={`
-                                            ${parcela.pago ? 'text-green-700' : vencida ? 'text-red-700 font-medium' : 'text-gray-700'}
+                                            ${parcela.pago ? 'text-green-800' : vencida ? 'text-red-700 font-medium' : 'text-gray-700'}
                                           `}>
                                             {formatarData(parcela.dataVencimento)}
                                           </span>
@@ -1000,7 +1000,7 @@ export function ProcessoFaturas({ processoId, nomeFamilia, onUpdate }: ProcessoF
 
                                         <div className={`
                                           text-right font-medium
-                                          ${parcela.pago ? 'text-green-700' : vencida ? 'text-red-700' : 'text-gray-900'}
+                                          ${parcela.pago ? 'text-green-800' : vencida ? 'text-red-700' : 'text-gray-900'}
                                         `}>
                                           {formatarMoeda(parcela.valor)}
                                         </div>
@@ -1030,7 +1030,7 @@ export function ProcessoFaturas({ processoId, nomeFamilia, onUpdate }: ProcessoF
                                                     text-xs h-8
                                                     ${vencida 
                                                       ? 'border-[var(--border-default)] text-red-700 hover:bg-[var(--surface-secondary)]' 
-                                                      : 'border-[var(--border-default)] text-green-700 hover:bg-[var(--surface-secondary)]'
+                                                      : 'border-[var(--border-default)] text-green-800 hover:bg-[var(--surface-secondary)]'
                                                     }
                                                   `}
                                                 >
@@ -1048,7 +1048,7 @@ export function ProcessoFaturas({ processoId, nomeFamilia, onUpdate }: ProcessoF
                                 <div className="grid grid-cols-2 gap-4 p-3 bg-gray-100 border-t">
                                   <div className="text-sm">
                                     <span className="text-gray-600">Pagas: </span>
-                                    <span className="font-medium text-green-700">
+                                    <span className="font-medium text-green-800">
                                       {fatura.parcelasBoleto!.filter(p => p.pago).length} de {fatura.parcelas}
                                     </span>
                                   </div>
@@ -1161,7 +1161,7 @@ export function ProcessoFaturas({ processoId, nomeFamilia, onUpdate }: ProcessoF
                                   e.stopPropagation()
                                   abrirModalPagamento(fatura)
                                 }}
-                                className="bg-green-700 hover:bg-green-800"
+                                className="bg-[var(--action-primary)] hover:bg-[var(--action-primary)]"
                               >
                                 <Check className="h-4 w-4 mr-1" />
                                 {fatura.status === 'PARCIAL' ? 'Registrar Pagamento' : 'Marcar como Pago'}
@@ -1257,7 +1257,7 @@ export function ProcessoFaturas({ processoId, nomeFamilia, onUpdate }: ProcessoF
               <Button
                 onClick={handleMarcarParcelaPaga}
                 disabled={salvandoParcela}
-                className="flex-1 bg-green-700 hover:bg-green-800 gap-2"
+                className="flex-1 bg-[var(--action-primary)] hover:bg-[var(--action-primary)] gap-2"
               >
                 {salvandoParcela && (
                   <div className="w-4 h-4 border-2 border-[var(--border-strong)] border-t-white rounded-full animate-spin" />
@@ -1427,7 +1427,7 @@ export function ProcessoFaturas({ processoId, nomeFamilia, onUpdate }: ProcessoF
                         <button
                           type="button"
                           onClick={selectAllPagarDestinatarios}
-                          className="text-xs text-green-600 hover:text-green-700 font-medium"
+                          className="text-xs text-green-600 hover:text-green-800 font-medium"
                         >
                           {pagarDestinatarioIds.length === requerentes.length ? 'Desmarcar todos' : 'Selecionar todos'}
                         </button>
@@ -1492,7 +1492,7 @@ export function ProcessoFaturas({ processoId, nomeFamilia, onUpdate }: ProcessoF
               <Button
                 onClick={handlePagar}
                 disabled={salvando || !pagarValorNumerico}
-                className="bg-green-700 hover:bg-green-800 min-w-[200px] gap-2"
+                className="bg-[var(--action-primary)] hover:bg-[var(--action-primary)] min-w-[200px] gap-2"
               >
                 {salvando && (
                   <div className="w-4 h-4 border-2 border-[var(--border-strong)] border-t-white rounded-full animate-spin" />
@@ -1696,7 +1696,7 @@ export function ProcessoFaturas({ processoId, nomeFamilia, onUpdate }: ProcessoF
                     <div className="space-y-4">
                       <div className="bg-[var(--surface-secondary)] rounded-xl p-4 border border-[var(--border-default)]">
                         <p className="text-xs text-green-600 uppercase font-medium">Valor</p>
-                        <p className="text-2xl font-bold text-green-700">
+                        <p className="text-2xl font-bold text-green-800">
                           {formatarMoeda(pagamentoSelecionado.pagamento.valor, pagamentoSelecionado.fatura.moeda)}
                         </p>
                         {pagamentoSelecionado.fatura.moeda !== 'BRL' && pagamentoSelecionado.pagamento.valorOriginal && (
@@ -1773,7 +1773,7 @@ export function ProcessoFaturas({ processoId, nomeFamilia, onUpdate }: ProcessoF
                   <Button
                     onClick={salvarEdicaoPagamento}
                     disabled={salvandoEdicao}
-                    className="bg-green-700 hover:bg-green-800 min-w-[200px] gap-2"
+                    className="bg-[var(--action-primary)] hover:bg-[var(--action-primary)] min-w-[200px] gap-2"
                   >
                     {salvandoEdicao && (
                       <div className="w-4 h-4 border-2 border-[var(--border-strong)] border-t-white rounded-full animate-spin" />
@@ -1797,7 +1797,7 @@ export function ProcessoFaturas({ processoId, nomeFamilia, onUpdate }: ProcessoF
                   {pode('financeiro.pagamento_editar') && (
                     <Button
                       onClick={iniciarEdicaoPagamento}
-                      className="bg-green-700 hover:bg-green-800"
+                      className="bg-[var(--action-primary)] hover:bg-[var(--action-primary)]"
                     >
                       <Pencil className="h-4 w-4 mr-2" />
                       Editar

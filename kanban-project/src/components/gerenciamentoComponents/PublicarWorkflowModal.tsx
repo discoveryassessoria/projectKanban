@@ -45,9 +45,9 @@ const AREA_DO_ESCOPO: Record<string, string> = {
 const ORDEM_DAS_AREAS = ["Geral", "Execução", "Conclusão", "Resultados", "Avançado"]
 
 const COR_DO_TIPO: Record<string, string> = {
-  ACRESCENTADO: "bg-[var(--surface-secondary)] text-green-700",
+  ACRESCENTADO: "bg-[var(--surface-secondary)] text-green-800",
   REMOVIDO: "bg-[var(--surface-secondary)] text-red-700",
-  ALTERADO: "bg-[var(--surface-secondary)] text-amber-700",
+  ALTERADO: "bg-[var(--surface-secondary)] text-amber-800",
 }
 
 export default function PublicarWorkflowModal({
@@ -165,7 +165,7 @@ export default function PublicarWorkflowModal({
         <div className="flex justify-end gap-2 border-t border-[var(--border-default)] px-6 py-4">
           <button onClick={onFechar} className="rounded-lg border border-[var(--border-default)] bg-[var(--surface-primary)] px-4 py-2 text-sm text-white/70 hover:bg-[var(--surface-hover)]">Fechar</button>
           <button onClick={publicar} disabled={!preview || !preview.podePublicar || publicando}
-            className="rounded-lg bg-green-700 px-4 py-2 text-sm font-medium text-[var(--action-primary-ink)] hover:bg-green-600 disabled:opacity-40">
+            className="rounded-lg bg-[var(--action-primary)] px-4 py-2 text-sm font-medium text-[var(--action-primary-ink)] hover:bg-[var(--action-primary)] disabled:opacity-40">
             {publicando ? "Publicando…" : `Publicar versão ${preview?.versaoNova ?? ""}`}
           </button>
         </div>

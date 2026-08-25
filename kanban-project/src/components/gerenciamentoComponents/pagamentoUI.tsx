@@ -62,7 +62,7 @@ export function ChipsMulti({ items, selecionados, onToggle }: { items: { id: str
       {items.map((it) => {
         const on = selecionados.includes(it.id)
         return (
-          <button key={String(it.id)} type="button" onClick={() => onToggle(it.id)} className={`inline-flex items-center gap-1 rounded-lg border px-2.5 py-1 text-xs transition ${on ? 'text-[#1b1508]' : 'border-[var(--border-default)] text-[var(--text-secondary)] hover:text-white'}`} style={on ? { background: OURO, borderColor: OURO } : undefined}>
+          <button key={String(it.id)} type="button" onClick={() => onToggle(it.id)} className={`inline-flex items-center gap-1 rounded-lg border px-2.5 py-1 text-xs transition ${on ? 'text-[var(--accent-ink)]' : 'border-[var(--border-default)] text-[var(--text-secondary)] hover:text-white'}`} style={on ? { background: OURO, borderColor: OURO } : undefined}>
             {on && <Check className="h-3 w-3" />}{it.label}
           </button>
         )
@@ -275,7 +275,7 @@ export function MultiSelect({
             className={`flex w-full cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm transition hover:bg-[var(--surface-hover)] ${especial.ativa ? 'text-white' : 'text-white/70'}`}
           >
             <span className="grid h-4 w-4 shrink-0 place-items-center rounded border" style={especial.ativa ? { background: OURO, borderColor: OURO } : { borderColor: 'rgba(255,255,255,0.25)' }}>
-              {especial.ativa && <Check className="h-3 w-3 text-[#1b1508]" />}
+              {especial.ativa && <Check className="h-3 w-3 text-[var(--accent-ink)]" />}
             </span>
             <span className="truncate font-medium">{especial.label}</span>
             {especial.hint && <span className="ml-auto shrink-0 text-[10px] text-[var(--text-muted)]">{especial.hint}</span>}
@@ -298,7 +298,7 @@ export function MultiSelect({
               className={`flex cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 text-sm transition ${foco === i ? 'bg-[var(--surface-primary)]' : ''} ${on ? 'text-white' : 'text-white/70'} ${especial?.ativa ? 'opacity-45' : ''}`}
             >
               <span className="grid h-4 w-4 shrink-0 place-items-center rounded border" style={on ? { background: OURO, borderColor: OURO } : { borderColor: 'rgba(255,255,255,0.25)' }}>
-                {on && <Check className="h-3 w-3 text-[#1b1508]" />}
+                {on && <Check className="h-3 w-3 text-[var(--accent-ink)]" />}
               </span>
               <span className="truncate">{o.label}</span>
               {o.hint && <span className="ml-auto shrink-0 text-[10px] text-[var(--text-muted)]">{o.hint}</span>}
@@ -391,7 +391,7 @@ export function Stepper({ passos, atual }: { passos: string[]; atual: number }) 
       {passos.map((label, i) => {
         const n = i + 1
         return (
-          <div key={label} className={`flex items-center gap-1.5 text-xs ${atual === n ? 'text-white' : atual > n ? 'text-green-700' : 'text-[var(--text-muted)]'}`}>
+          <div key={label} className={`flex items-center gap-1.5 text-xs ${atual === n ? 'text-white' : atual > n ? 'text-green-800' : 'text-[var(--text-muted)]'}`}>
             <span className={`grid h-5 w-5 place-items-center rounded-full border text-[10px] ${atual === n ? 'border-[var(--border-strong)]' : atual > n ? 'border-[var(--border-default)] bg-[var(--surface-secondary)]' : 'border-[var(--border-default)]'}`}>{atual > n ? <Check className="h-3 w-3" /> : n}</span>
             {label}
           </div>

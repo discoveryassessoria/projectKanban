@@ -148,7 +148,7 @@ export default function CatalogoFasesTab() {
 
   return (
     <div className="space-y-5">
-      {flash && <div className="rounded-xl border border-[var(--border-default)] bg-[var(--surface-secondary)] px-4 py-3 text-sm text-green-700">{flash}</div>}
+      {flash && <div className="rounded-xl border border-[var(--border-default)] bg-[var(--surface-secondary)] px-4 py-3 text-sm text-green-800">{flash}</div>}
       {erro && (
         <div className="rounded-xl border border-[var(--border-default)] bg-[var(--surface-secondary)] px-4 py-3 text-sm text-red-700">
           {erro} <button onClick={() => { void load() }} className="ml-2 underline hover:text-white">Tentar de novo</button>
@@ -198,7 +198,7 @@ export default function CatalogoFasesTab() {
                 <td className="px-4 py-2.5">
                   <div className="flex flex-wrap gap-1 text-[10px]">
                     {f.requiredPadrao && <span className="rounded bg-[var(--surface-primary)] px-1.5 py-0.5 text-white/70">obrigatória</span>}
-                    {f.conditionalPadrao && <span className="rounded bg-[var(--surface-secondary)] px-1.5 py-0.5 text-amber-700">condicional</span>}
+                    {f.conditionalPadrao && <span className="rounded bg-[var(--surface-secondary)] px-1.5 py-0.5 text-amber-800">condicional</span>}
                     {!f.requiredPadrao && !f.conditionalPadrao && <span className="text-[var(--text-muted)]">—</span>}
                   </div>
                 </td>
@@ -208,7 +208,7 @@ export default function CatalogoFasesTab() {
                   <button
                     onClick={() => toggleAtivo(f)}
                     title={f.ativo ? "Inativar (some do seletor de fases, sem apagar)" : "Ativar"}
-                    className={`rounded-full px-2 py-0.5 text-[10px] ${f.ativo ? "bg-[var(--surface-secondary)] text-green-700" : "bg-[var(--surface-primary)] text-[var(--text-secondary)]"}`}
+                    className={`rounded-full px-2 py-0.5 text-[10px] ${f.ativo ? "bg-[var(--surface-secondary)] text-green-800" : "bg-[var(--surface-primary)] text-[var(--text-secondary)]"}`}
                   >
                     {f.ativo ? "Ativa" : "Inativa"}
                   </button>

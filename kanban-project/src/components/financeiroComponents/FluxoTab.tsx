@@ -60,9 +60,9 @@ export default function FluxoTab() {
       {/* KPIs */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         <Kpi icon={<Wallet className="h-3.5 w-3.5" />} label="Saldo Atual" value={fmtBRL(k.saldoAtual)} sub="Caixa consolidado" />
-        <Kpi icon={<Download className="h-3.5 w-3.5" />} label="Entradas · 30 dias" value={fmtBRL(k.entradas30)} valueColor="text-green-700" sub={`${k.qtdEntradas30} eventos previstos`} />
+        <Kpi icon={<Download className="h-3.5 w-3.5" />} label="Entradas · 30 dias" value={fmtBRL(k.entradas30)} valueColor="text-green-800" sub={`${k.qtdEntradas30} eventos previstos`} />
         <Kpi icon={<Upload className="h-3.5 w-3.5" />} label="Saídas · 30 dias" value={fmtBRL(k.saidas30)} valueColor="text-red-700" sub={`${k.qtdSaidas30} pagamentos`} />
-        <Kpi icon={<Activity className="h-3.5 w-3.5" />} label="Saldo Projetado · 30d" value={fmtBRL(k.saldoProjetado30)} valueColor={k.net30 >= 0 ? "text-green-700" : "text-red-700"} sub={`Variação: ${k.net30 >= 0 ? "+" : ""}${fmtBRLshort(k.net30)}`} />
+        <Kpi icon={<Activity className="h-3.5 w-3.5" />} label="Saldo Projetado · 30d" value={fmtBRL(k.saldoProjetado30)} valueColor={k.net30 >= 0 ? "text-green-800" : "text-red-700"} sub={`Variação: ${k.net30 >= 0 ? "+" : ""}${fmtBRLshort(k.net30)}`} />
       </div>
 
       {/* GRÁFICO */}
@@ -70,7 +70,7 @@ export default function FluxoTab() {
         <div className="flex items-center justify-between mb-3">
           <div className="text-sm font-semibold text-white flex items-center gap-2"><Activity className="h-4 w-4" /> Fluxo Previsto vs Realizado</div>
           <div className="flex gap-3 text-xs text-[var(--text-secondary)]">
-            <span className="inline-flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full bg-green-600" /> Entradas</span>
+            <span className="inline-flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full bg-[var(--action-primary)]" /> Entradas</span>
             <span className="inline-flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full bg-red-600" /> Saídas</span>
             <span className="inline-flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full bg-[var(--surface-secondary)]" /> Saldo</span>
           </div>
@@ -113,7 +113,7 @@ export default function FluxoTab() {
             })}
           </div>
           <div className="flex gap-4 mt-3 justify-center text-[11px] text-[var(--text-secondary)]">
-            <span className="inline-flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-green-600" /> Entrada</span>
+            <span className="inline-flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-[var(--action-primary)]" /> Entrada</span>
             <span className="inline-flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-red-600" /> Saída</span>
             <span className="inline-flex items-center gap-1.5"><span className="w-3.5 h-2 rounded" style={{ background: "linear-gradient(90deg,#22c55e 50%,#ef4444 50%)" }} /> Ambos</span>
           </div>
@@ -133,7 +133,7 @@ export default function FluxoTab() {
                     <div className="text-[10px] text-[var(--text-muted)]">{fmtDate(t.date)} · {t.past || t.realizado ? "realizado" : "previsto"}</div>
                     <div className="text-sm text-white/80">{t.desc}</div>
                     <div className="flex gap-3 text-xs mt-0.5 tabular-nums">
-                      {t.entrada > 0 && <span className="text-green-700 font-semibold">+{fmtBRL(t.entrada)}</span>}
+                      {t.entrada > 0 && <span className="text-green-800 font-semibold">+{fmtBRL(t.entrada)}</span>}
                       {t.saida > 0 && <span className="text-red-700 font-semibold">−{fmtBRL(t.saida)}</span>}
                     </div>
                   </div>

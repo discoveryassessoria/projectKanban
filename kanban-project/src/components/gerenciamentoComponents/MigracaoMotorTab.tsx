@@ -89,11 +89,11 @@ export default function MigracaoMotorTab() {
 
   return (
     <div className="space-y-5">
-      {flash && <div className="rounded-xl border border-[var(--border-default)] bg-[var(--surface-secondary)] px-4 py-2.5 text-sm text-green-700">{flash}</div>}
+      {flash && <div className="rounded-xl border border-[var(--border-default)] bg-[var(--surface-secondary)] px-4 py-2.5 text-sm text-green-800">{flash}</div>}
 
       <div className="rounded-2xl border border-[var(--border-default)] bg-[var(--surface-primary)] p-5 backdrop-blur-sm">
         <h2 className="text-lg font-semibold text-white">Conectar Processos ao Motor</h2>
-        <p className="mt-1 text-sm text-[var(--text-secondary)]">Liga vários processos a um Tipo do motor de uma vez. Só preenche um campo — <span className="text-green-700/80">nada é apagado e dá pra desconectar.</span></p>
+        <p className="mt-1 text-sm text-[var(--text-secondary)]">Liga vários processos a um Tipo do motor de uma vez. Só preenche um campo — <span className="text-green-800/80">nada é apagado e dá pra desconectar.</span></p>
 
         {/* números atuais */}
         <div className="mt-4 grid grid-cols-3 gap-3">
@@ -102,7 +102,7 @@ export default function MigracaoMotorTab() {
             <div className="text-xs text-[var(--text-secondary)]">processos</div>
           </div>
           <div className="rounded-xl border border-[var(--border-default)] bg-[var(--surface-secondary)] p-3 text-center">
-            <div className="text-2xl font-bold text-green-700">{conectados}</div>
+            <div className="text-2xl font-bold text-green-800">{conectados}</div>
             <div className="text-xs text-[var(--text-secondary)]">conectados</div>
           </div>
           <div className="rounded-xl border border-[var(--border-default)] bg-[var(--surface-primary)] p-3 text-center">
@@ -172,7 +172,7 @@ export default function MigracaoMotorTab() {
             <div className="rounded-xl border border-[var(--border-default)] bg-[var(--surface-secondary)] p-4">
               <div className="text-sm text-amber-100">Desconectar <b>todos</b> os processos de <b>{paisNome}</b> do motor? (Não apaga nada, só desliga o vínculo.)</div>
               <div className="mt-3 flex gap-2">
-                <button disabled={busy} onClick={desconectar} className="rounded-lg bg-amber-700 px-4 py-2 text-sm font-medium text-[var(--action-primary-ink)] hover:bg-amber-600 disabled:opacity-50">{busy ? "Desconectando…" : "Sim, desconectar"}</button>
+                <button disabled={busy} onClick={desconectar} className="rounded-lg bg-[var(--action-primary)] px-4 py-2 text-sm font-medium text-[var(--action-primary-ink)] hover:bg-[var(--action-primary)] disabled:opacity-50">{busy ? "Desconectando…" : "Sim, desconectar"}</button>
                 <button disabled={busy} onClick={() => setConfirmandoDesc(false)} className="rounded-lg border border-[var(--border-default)] px-4 py-2 text-sm text-white/70 hover:bg-[var(--surface-hover)]">Cancelar</button>
               </div>
             </div>

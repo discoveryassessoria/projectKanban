@@ -30,21 +30,21 @@ export const CORES_SLA = {
     aro: "ring-[var(--border-strong)]",
   },
   hoje: {
-    chip: "bg-[var(--surface-secondary)] text-amber-700 border-[var(--border-default)]",
+    chip: "bg-[var(--surface-secondary)] text-amber-800 border-[var(--border-default)]",
     ponto: "bg-amber-600",
-    texto: "text-amber-700",
+    texto: "text-amber-800",
     aro: "ring-[var(--border-strong)]",
   },
   atencao: {
-    chip: "bg-[var(--surface-secondary)] text-amber-700 border-[var(--border-default)]",
+    chip: "bg-[var(--surface-secondary)] text-amber-800 border-[var(--border-default)]",
     ponto: "bg-amber-600",
-    texto: "text-amber-700",
+    texto: "text-amber-800",
     aro: "ring-[var(--border-strong)]",
   },
   ok: {
-    chip: "bg-[var(--surface-secondary)] text-green-700 border-[var(--border-default)]",
+    chip: "bg-[var(--surface-secondary)] text-green-800 border-[var(--border-default)]",
     ponto: "bg-green-600",
-    texto: "text-green-700",
+    texto: "text-green-800",
     aro: "ring-[var(--border-strong)]",
   },
   neutro: {

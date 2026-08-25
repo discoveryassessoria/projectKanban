@@ -265,8 +265,8 @@ export default function UsersTab() {
                     <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium ${
                       u.tipo === "admin" ? "bg-[var(--surface-secondary)] text-[var(--text-secondary)] border border-[var(--border-default)]" :
                       u.tipo === "gerente" ? "bg-[var(--surface-secondary)] text-[var(--text-secondary)] border border-[var(--border-default)]" :
-                      u.tipo === "estagiario" ? "bg-[var(--surface-secondary)] text-amber-700 border border-[var(--border-default)]" :
-                      "bg-[var(--surface-secondary)] text-green-700 border border-[var(--border-default)]"}`}>
+                      u.tipo === "estagiario" ? "bg-[var(--surface-secondary)] text-amber-800 border border-[var(--border-default)]" :
+                      "bg-[var(--surface-secondary)] text-green-800 border border-[var(--border-default)]"}`}>
                       {userTypeLabels[u.tipo as UserType] ?? u.tipo}
                     </span>
                   </td>
@@ -332,13 +332,13 @@ export default function UsersTab() {
                 <Lock className="h-4 w-4" />
                 {showPermissoes ? "Ocultar permissões detalhadas" : "Personalizar permissões"}
                 {showPermissoes ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
-                {totalOverrides > 0 && <span className="bg-[var(--surface-secondary)] text-amber-700 text-[10px] font-medium px-1.5 py-0.5 rounded-full">{totalOverrides} {totalOverrides === 1 ? "ajuste" : "ajustes"}</span>}
+                {totalOverrides > 0 && <span className="bg-[var(--surface-secondary)] text-amber-800 text-[10px] font-medium px-1.5 py-0.5 rounded-full">{totalOverrides} {totalOverrides === 1 ? "ajuste" : "ajustes"}</span>}
               </button>
 
               {showPermissoes && (
                 <div className="space-y-3 bg-gray-50 rounded-lg p-4 border border-gray-200">
                   <div className="flex items-center justify-between">
-                    <p className="text-xs text-gray-500">Toggle individual sobrescreve o perfil. Indicador <span className="inline-block w-2 h-2 rounded-full bg-amber-600 mx-0.5" /> = personalizado</p>
+                    <p className="text-xs text-gray-500">Toggle individual sobrescreve o perfil. Indicador <span className="inline-block w-2 h-2 rounded-full bg-[var(--action-primary)] mx-0.5" /> = personalizado</p>
                     {totalOverrides > 0 && <button type="button" onClick={resetarCustom} className="flex items-center gap-1 text-xs text-gray-500 hover:text-gray-700"><RotateCcw className="h-3 w-3" /> Resetar ajustes</button>}
                   </div>
                   {MODULOS_PERMISSOES.map(modulo => {
@@ -351,7 +351,7 @@ export default function UsersTab() {
                           <div className="flex items-center gap-2">
                             <span className="text-sm">{modulo.icone}</span>
                             <span className="text-sm font-medium text-gray-800">{modulo.modulo}</span>
-                            {temOverrides && <span className="w-2 h-2 rounded-full bg-amber-600" />}
+                            {temOverrides && <span className="w-2 h-2 rounded-full bg-[var(--action-primary)]" />}
                           </div>
                           <div className="flex items-center gap-2">
                             <Switch checked={todasAtivas} onCheckedChange={() => toggleModulo(modulo)} onClick={(e: React.MouseEvent) => e.stopPropagation()} className="scale-75" />
@@ -366,7 +366,7 @@ export default function UsersTab() {
                               return (
                                 <div key={perm.chave} className={`flex items-center justify-between py-1.5 px-2 rounded ${override ? "bg-[var(--surface-secondary)]" : ""}`}>
                                   <div className="flex items-center gap-2">
-                                    {override && <span className="w-1.5 h-1.5 rounded-full bg-amber-600 flex-shrink-0" />}
+                                    {override && <span className="w-1.5 h-1.5 rounded-full bg-[var(--action-primary)] flex-shrink-0" />}
                                     <span className={`text-xs ${ativa ? "text-gray-700" : "text-[var(--text-muted)]"}`}>{perm.label}</span>
                                   </div>
                                   <Switch checked={ativa} onCheckedChange={() => togglePermissao(perm.chave)} className="scale-75" />

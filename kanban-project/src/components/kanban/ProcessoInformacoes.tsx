@@ -417,7 +417,7 @@ export function ProcessoInformacoes({
                 <Button
                   onClick={handleSalvar}
                   disabled={salvando}
-                  className="flex-1 bg-green-700 hover:bg-green-800"
+                  className="flex-1 bg-[var(--action-primary)] hover:bg-[var(--action-primary)]"
                 >
                   {salvando && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
                   {editando ? "Salvar Alterações" : "Cadastrar"}
@@ -446,7 +446,7 @@ export function ProcessoInformacoes({
             {podeEditar && (
               <Button
                 onClick={() => setShowForm(true)}
-                className="bg-green-700 hover:bg-green-800"
+                className="bg-[var(--action-primary)] hover:bg-[var(--action-primary)]"
               >
                 <Plus className="h-4 w-4 mr-2" />
                 Cadastrar Informações
@@ -461,7 +461,7 @@ export function ProcessoInformacoes({
               <div className="bg-gradient-to-r from-green-50 to-emerald-50 px-6 py-4 border-b border-gray-200">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 bg-green-700 rounded-lg flex items-center justify-center">
+                    <div className="w-10 h-10 bg-[var(--action-primary)] rounded-lg flex items-center justify-center">
                       <Gavel className="h-5 w-5 text-white" />
                     </div>
                     <div>

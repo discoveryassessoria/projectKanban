@@ -195,7 +195,7 @@ function InfoItem({
         ) : onAdd ? (
           <button 
             onClick={onAdd}
-            className="flex items-center gap-1 text-amber-600 hover:text-amber-700 text-sm mt-0.5"
+            className="flex items-center gap-1 text-amber-600 hover:text-amber-800 text-sm mt-0.5"
           >
             <Plus className="w-3 h-3" />
             Adicionar
@@ -327,7 +327,7 @@ function Numero({
   return (
     <div className="rounded-md bg-[var(--surface-primary)] px-1 py-1.5 ring-1 ring-[var(--border-default)]">
       <p
-        className={`text-sm font-semibold tabular-nums ${destaque ? "text-amber-700" : "text-[var(--text-secondary)]"}`}
+        className={`text-sm font-semibold tabular-nums ${destaque ? "text-amber-800" : "text-[var(--text-secondary)]"}`}
       >
         {valor}
       </p>
@@ -473,7 +473,7 @@ function DocumentoCard({
       {/* Badges e links de arquivos */}
       <div className="flex items-center gap-2 mt-2 flex-wrap">
         {documento.traduzido && (
-          <span className="px-1.5 py-0.5 text-[10px] font-medium rounded bg-[var(--surface-secondary)] text-amber-700">
+          <span className="px-1.5 py-0.5 text-[10px] font-medium rounded bg-[var(--surface-secondary)] text-amber-800">
             Traduzido
           </span>
         )}
@@ -493,7 +493,7 @@ function DocumentoCard({
               target="_blank" 
               rel="noopener noreferrer"
               onClick={(e) => e.stopPropagation()}
-              className="flex items-center gap-1 text-[10px] text-amber-600 hover:text-amber-700 font-medium"
+              className="flex items-center gap-1 text-[10px] text-amber-600 hover:text-amber-800 font-medium"
             >
               <FileText className="w-3 h-3" />
               Original
@@ -505,7 +505,7 @@ function DocumentoCard({
               target="_blank" 
               rel="noopener noreferrer"
               onClick={(e) => e.stopPropagation()}
-              className="flex items-center gap-1 text-[10px] text-amber-600 hover:text-amber-700 font-medium"
+              className="flex items-center gap-1 text-[10px] text-amber-600 hover:text-amber-800 font-medium"
             >
               <FileText className="w-3 h-3" />
               Tradução
@@ -550,7 +550,7 @@ function FamiliarCard({
     >
       <PersonAvatar pessoa={familiar} size={40} />
       <div className="flex-1 min-w-0">
-        <p className="font-medium text-[var(--text-secondary)] text-sm group-hover:text-amber-700 transition-colors">
+        <p className="font-medium text-[var(--text-secondary)] text-sm group-hover:text-amber-800 transition-colors">
           {familiar.nome} {familiar.sobrenome}
         </p>
         <p className="text-xs text-[var(--text-secondary)]">{relacao}</p>
@@ -658,7 +658,7 @@ function ConteudoSidebar({
                   Falecido
                 </span>
               ) : (
-                <span className="inline-flex items-center px-2 py-0.5 text-xs font-medium rounded-md bg-[var(--surface-secondary)] text-green-700">
+                <span className="inline-flex items-center px-2 py-0.5 text-xs font-medium rounded-md bg-[var(--surface-secondary)] text-green-800">
                   Vivo
                 </span>
               )}
@@ -677,7 +677,7 @@ function ConteudoSidebar({
             {onEdit && (
               <button 
                 onClick={() => onEdit(pessoa)}
-                className="flex-1 flex items-center justify-center gap-2 px-3 py-2 bg-[var(--surface-secondary)] text-amber-700 rounded-lg hover:bg-[var(--surface-secondary)] transition-colors"
+                className="flex-1 flex items-center justify-center gap-2 px-3 py-2 bg-[var(--surface-secondary)] text-amber-800 rounded-lg hover:bg-[var(--surface-secondary)] transition-colors"
               >
                 <Pencil className="h-4 w-4" />
                 <span className="text-sm font-medium">Editar</span>
@@ -716,7 +716,7 @@ function ConteudoSidebar({
           <User className="h-4 w-4" />
           {dossie ? "Info" : "Informações"}
           {activeTab === "info" && (
-            <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-amber-600" />
+            <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-[var(--action-primary)]" />
           )}
         </button>
         <button
@@ -730,7 +730,7 @@ function ConteudoSidebar({
           <GitBranch className="h-4 w-4" />
           Família
           {activeTab === "familia" && (
-            <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-amber-600" />
+            <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-[var(--action-primary)]" />
           )}
         </button>
         <button
@@ -744,12 +744,12 @@ function ConteudoSidebar({
           <FileText className="h-4 w-4" />
           {dossie ? "Docs" : "Documentos"}
           {documentos.length > 0 && (
-            <span className="px-1.5 py-0.5 text-[10px] font-medium rounded-full bg-[var(--surface-secondary)] text-amber-700">
+            <span className="px-1.5 py-0.5 text-[10px] font-medium rounded-full bg-[var(--surface-secondary)] text-amber-800">
               {documentos.length}
             </span>
           )}
           {activeTab === "docs" && (
-            <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-amber-600" />
+            <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-[var(--action-primary)]" />
           )}
         </button>
         {dossie && (
@@ -764,12 +764,12 @@ function ConteudoSidebar({
             <ListChecks className="h-4 w-4" />
             Operação
             {dossie.tarefasAbertas.length > 0 && (
-              <span className="px-1.5 py-0.5 text-[10px] font-medium rounded-full bg-[var(--surface-secondary)] text-amber-700">
+              <span className="px-1.5 py-0.5 text-[10px] font-medium rounded-full bg-[var(--surface-secondary)] text-amber-800">
                 {dossie.tarefasAbertas.length}
               </span>
             )}
             {activeTab === "operacao" && (
-              <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-amber-600" />
+              <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-[var(--action-primary)]" />
             )}
           </button>
         )}
@@ -951,7 +951,7 @@ function ConteudoSidebar({
                       <div className="flex items-center gap-3">
                         <PersonAvatar pessoa={conjuge} size={40} />
                         <div className="flex-1 min-w-0">
-                          <p className="font-medium text-[var(--text-secondary)] text-sm group-hover:text-amber-700 transition-colors">
+                          <p className="font-medium text-[var(--text-secondary)] text-sm group-hover:text-amber-800 transition-colors">
                             {conjuge.nome} {conjuge.sobrenome}
                           </p>
                           {casamento?.data_inicio && (
@@ -1042,7 +1042,7 @@ function ConteudoSidebar({
             
             {pode('arvore.criar_documento') && onAddDocumento && <button 
               onClick={() => onAddDocumento(pessoa.id)}
-              className="w-full mt-4 flex items-center justify-center gap-2 p-3 bg-[var(--surface-secondary)] text-amber-700 rounded-lg hover:bg-[var(--surface-secondary)] transition-colors"
+              className="w-full mt-4 flex items-center justify-center gap-2 p-3 bg-[var(--surface-secondary)] text-amber-800 rounded-lg hover:bg-[var(--surface-secondary)] transition-colors"
             >
               <Plus className="w-4 h-4" />
               <span className="text-sm font-medium">Adicionar documento</span>

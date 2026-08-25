@@ -476,7 +476,7 @@ function ConteudoModal({
                   >
                     <div
                       className={`text-[12px] font-semibold mb-1 flex items-center gap-1.5 ${
-                        podeConcluirEtapa ? "text-green-700" : "text-[var(--accent-text)]"
+                        podeConcluirEtapa ? "text-green-800" : "text-[var(--accent-text)]"
                       }`}
                     >
                       <AlertTriangle className="w-3.5 h-3.5" />
@@ -486,11 +486,11 @@ function ConteudoModal({
                     </div>
                     <div className="text-[11.5px] text-white/75 leading-relaxed">
                       preencha{" "}
-                      <strong className={cartorioOk ? "text-green-700" : "text-[var(--accent-text)]"}>
+                      <strong className={cartorioOk ? "text-green-800" : "text-[var(--accent-text)]"}>
                         Cartório
                       </strong>{" "}
                       + pelo menos um de{" "}
-                      <strong className={referenciaOk ? "text-green-700" : "text-[var(--accent-text)]"}>
+                      <strong className={referenciaOk ? "text-green-800" : "text-[var(--accent-text)]"}>
                         Livro / Folha / Termo
                       </strong>
                       . Os demais campos são opcionais aqui.
@@ -846,7 +846,7 @@ function Field({
             className={`text-[8.5px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded ${
               isEmpty
                 ? "bg-[var(--accent-primary)]/20 text-[var(--accent-text)] border border-[var(--accent-primary)]/40"
-                : "bg-[var(--surface-secondary)] text-green-700 border border-[var(--border-default)]"
+                : "bg-[var(--surface-secondary)] text-green-800 border border-[var(--border-default)]"
             }`}
           >
             obrigatório p/ concluir
@@ -857,7 +857,7 @@ function Field({
             className={`text-[8.5px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded ${
               isEmpty
                 ? "bg-[var(--accent-primary)]/20 text-[var(--accent-text)] border border-[var(--accent-primary)]/40"
-                : "bg-[var(--surface-secondary)] text-green-700 border border-[var(--border-default)]"
+                : "bg-[var(--surface-secondary)] text-green-800 border border-[var(--border-default)]"
             }`}
           >
             obrigatório*

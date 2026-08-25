@@ -454,7 +454,7 @@ export function ProcessoProtocolos({
             setShowForm(true)
           }}
           size="sm"
-          className={`bg-amber-700 hover:bg-amber-800 ${!podeEditar || protocolos.length === 0 ? 'hidden' : ''}`}
+          className={`bg-[var(--action-primary)] hover:bg-[var(--action-primary)] ${!podeEditar || protocolos.length === 0 ? 'hidden' : ''}`}
         >
           <Plus className="h-4 w-4 mr-1" />
           Registrar protocolo
@@ -685,7 +685,7 @@ export function ProcessoProtocolos({
                 <Button
                   onClick={handleSalvar}
                   disabled={salvando}
-                  className="flex-1 bg-amber-700 hover:bg-amber-800"
+                  className="flex-1 bg-[var(--action-primary)] hover:bg-[var(--action-primary)]"
                 >
                   {salvando && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
                   {editando ? "Salvar alterações" : "Registrar protocolo"}
@@ -714,7 +714,7 @@ export function ProcessoProtocolos({
             {podeEditar && (
               <Button
                 onClick={() => setShowForm(true)}
-                className="bg-amber-700 hover:bg-amber-800"
+                className="bg-[var(--action-primary)] hover:bg-[var(--action-primary)]"
               >
                 <Plus className="h-4 w-4 mr-2" />
                 Registrar primeiro protocolo
@@ -752,7 +752,7 @@ export function ProcessoProtocolos({
                             </span>
                           )}
                           {rotuloTipo(protocolo.tipoProtocolo) && (
-                            <span className="text-xs px-2 py-0.5 bg-[var(--surface-secondary)] text-amber-700 rounded">
+                            <span className="text-xs px-2 py-0.5 bg-[var(--surface-secondary)] text-amber-800 rounded">
                               {rotuloTipo(protocolo.tipoProtocolo)}
                             </span>
                           )}

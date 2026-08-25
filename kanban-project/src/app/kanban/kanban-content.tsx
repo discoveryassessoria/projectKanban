@@ -404,11 +404,11 @@ export function KanbanContent() {
             {tabPrincipal === "processos" && subTab === "kanban" && (
               pode('processos.ver') ? (
                 paisesDisponiveis.length === 0 ? (
-                  <div className="rounded-lg border border-[var(--border-default)] bg-[var(--surface-secondary)] p-6 text-center text-sm text-amber-700">
+                  <div className="rounded-lg border border-[var(--border-default)] bg-[var(--surface-secondary)] p-6 text-center text-sm text-amber-800">
                     Nenhum país ativo no catálogo. Cadastre em Gerenciamento → Processos de Nacionalidade → + Novo país.
                   </div>
                 ) : !paisObj ? null : !tipoSelecionado ? (
-                  <div className="rounded-lg border border-[var(--border-default)] bg-[var(--surface-secondary)] p-6 text-center text-sm text-amber-700">
+                  <div className="rounded-lg border border-[var(--border-default)] bg-[var(--surface-secondary)] p-6 text-center text-sm text-amber-800">
                     {paisObj.countryLabel} ainda não tem tipo de processo cadastrado.
                     Crie em Gerenciamento → Processos de Nacionalidade.
                   </div>

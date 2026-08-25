@@ -284,7 +284,7 @@ function PersonGroup({
           <span className="inline-flex items-center gap-1.5 text-[12px] font-semibold text-[var(--text-secondary)] bg-[var(--surface-secondary)] border border-[var(--border-default)] rounded-lg px-[11px] py-1.5">
             <FileText className="w-3.5 h-3.5" /> {g.stats.totalDocuments} documentos
           </span>
-          <span className="inline-flex items-center gap-1.5 text-[12px] font-semibold text-green-700 bg-[var(--surface-secondary)] border border-[var(--border-default)] rounded-lg px-[11px] py-1.5">
+          <span className="inline-flex items-center gap-1.5 text-[12px] font-semibold text-green-800 bg-[var(--surface-secondary)] border border-[var(--border-default)] rounded-lg px-[11px] py-1.5">
             <CheckCircle2 className="w-3.5 h-3.5" /> {g.stats.readyForProtocol} pronto{g.stats.readyForProtocol === 1 ? "" : "s"}
           </span>
           <span className="inline-flex items-center gap-1.5 text-[12px] font-semibold text-[var(--accent-text)] bg-[var(--accent-primary)]/12 border border-[var(--accent-primary)]/30 rounded-lg px-[11px] py-1.5">
@@ -322,7 +322,7 @@ function PersonGroup({
 
 function DocRow({ it, onAbrirDetalhes }: { it: BibDocItem; onAbrirDetalhes: (docId: number) => void }) {
   const finalCls =
-    it.finalStatus === "pronta_protocolo" ? "text-green-700"
+    it.finalStatus === "pronta_protocolo" ? "text-green-800"
     : "text-[var(--accent-text)]"
 
   return (
@@ -370,7 +370,7 @@ function StatusCell({ st, date }: { st: CellStatus; date?: string | null }) {
   if (st === "nao_aplica") return <span className="text-[11.5px] text-[var(--text-muted)]">Não se aplica</span>
 
   const cls =
-    st === "validada" ? "text-green-700"
+    st === "validada" ? "text-green-800"
     : st === "recebida" ? "text-[var(--text-secondary)]"
     : "text-[var(--accent-text)]"
   const txt =

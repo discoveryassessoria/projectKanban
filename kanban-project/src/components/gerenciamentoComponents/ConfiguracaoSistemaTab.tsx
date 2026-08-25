@@ -105,7 +105,7 @@ function FormularioConfig({
 
   return (
     <div className="space-y-5">
-      {flash && <div className="rounded-xl border border-[var(--border-default)] bg-[var(--surface-secondary)] px-4 py-3 text-sm text-green-700">{flash}</div>}
+      {flash && <div className="rounded-xl border border-[var(--border-default)] bg-[var(--surface-secondary)] px-4 py-3 text-sm text-green-800">{flash}</div>}
       {erro && (
         <div className="rounded-xl border border-[var(--border-default)] bg-[var(--surface-secondary)] px-4 py-3 text-sm text-red-700">
           {erro} <button onClick={() => { setErro(null); void load() }} className="ml-2 underline hover:text-white">Recarregar</button>
@@ -122,7 +122,7 @@ function FormularioConfig({
             )}
           </div>
           <div className="flex flex-none items-center gap-2">
-            {sujo && <span className="text-xs text-amber-700/80">alterações não salvas</span>}
+            {sujo && <span className="text-xs text-amber-800/80">alterações não salvas</span>}
             <button
               onClick={salvar} disabled={busy || !sujo}
               className="rounded-lg bg-[var(--action-primary)] px-4 py-2 text-xs font-medium text-[var(--action-primary-ink)] hover:bg-[var(--action-primary)] disabled:opacity-40"

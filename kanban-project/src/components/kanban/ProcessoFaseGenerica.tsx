@@ -51,7 +51,7 @@ export function ProcessoFaseGenerica({ processoId, faseCode, onConcluido }: Prop
         <p className="text-sm text-[var(--text-secondary)]">Conclua as etapas abaixo e avance o processo para a próxima fase.</p>
       </div>
 
-      {resultado && <div className="bg-[var(--surface-secondary)] border border-[var(--border-default)] rounded-lg px-4 py-3 text-sm text-green-700 flex items-center gap-2"><CheckCircle2 className="w-4 h-4" />{resultado}</div>}
+      {resultado && <div className="bg-[var(--surface-secondary)] border border-[var(--border-default)] rounded-lg px-4 py-3 text-sm text-green-800 flex items-center gap-2"><CheckCircle2 className="w-4 h-4" />{resultado}</div>}
       {erro && <div className="bg-[var(--surface-secondary)] border border-[var(--border-default)] rounded-lg px-4 py-3 text-sm text-red-700">{erro}</div>}
 
       <div className="rounded-xl border border-[var(--border-default)] divide-y divide-white/10 overflow-hidden">
@@ -81,7 +81,7 @@ export function ProcessoFaseGenerica({ processoId, faseCode, onConcluido }: Prop
           </button>
         </div>
       ) : (
-        <div className="rounded-xl border border-[var(--border-default)] bg-[var(--surface-secondary)] p-4 text-sm text-green-700 flex items-center gap-2"><CheckCircle2 className="w-4 h-4" />Esta é a última fase do processo.</div>
+        <div className="rounded-xl border border-[var(--border-default)] bg-[var(--surface-secondary)] p-4 text-sm text-green-800 flex items-center gap-2"><CheckCircle2 className="w-4 h-4" />Esta é a última fase do processo.</div>
       )}
     </div>
   )

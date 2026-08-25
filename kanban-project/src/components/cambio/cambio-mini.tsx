@@ -55,7 +55,7 @@ export function CambioMini() {
         <span className="font-semibold tabular-nums">{fmt(usd?.valor ?? null)}</span>
       </span>
       <span className="flex items-center gap-1 text-[10px] text-[var(--text-muted)]">
-        {defasado && <AlertTriangle className="h-3 w-3 text-amber-700" />}
+        {defasado && <AlertTriangle className="h-3 w-3 text-amber-800" />}
         {atualizacao
           ? new Date(atualizacao).toLocaleString("pt-BR", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" })
           : "—"}

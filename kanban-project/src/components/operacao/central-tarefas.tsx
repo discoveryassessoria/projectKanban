@@ -267,7 +267,7 @@ function CartaoDaFila({
           {/* PRAZO OPERACIONAL: o que ele significa vem primeiro; a data, depois. */}
           <div className="text-right">
             <div className={`text-[11px] font-medium ${
-              u.tom === "critico" ? "text-red-700/90" : u.tom === "alerta" ? "text-amber-700/90" : "text-[var(--text-secondary)]"
+              u.tom === "critico" ? "text-red-700/90" : u.tom === "alerta" ? "text-amber-800/90" : "text-[var(--text-secondary)]"
             }`}>
               {u.texto}
             </div>

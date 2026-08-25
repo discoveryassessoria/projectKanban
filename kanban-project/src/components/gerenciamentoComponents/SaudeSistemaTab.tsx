@@ -90,27 +90,27 @@ interface Resposta {
 }
 
 const CORES_PRONTIDAO: Record<EstadoProntidao, string> = {
-  PRONTO: "bg-[var(--surface-secondary)] text-green-700 border-[var(--border-default)]",
-  PARCIALMENTE_PRONTO: "bg-[var(--surface-secondary)] text-amber-700 border-[var(--border-default)]",
-  NAO_CONFIGURADO: "bg-[var(--surface-secondary)] text-amber-700 border-[var(--border-default)]",
-  CONFIGURACAO_INVALIDA: "bg-[var(--surface-secondary)] text-amber-700 border-[var(--border-default)]",
+  PRONTO: "bg-[var(--surface-secondary)] text-green-800 border-[var(--border-default)]",
+  PARCIALMENTE_PRONTO: "bg-[var(--surface-secondary)] text-amber-800 border-[var(--border-default)]",
+  NAO_CONFIGURADO: "bg-[var(--surface-secondary)] text-amber-800 border-[var(--border-default)]",
+  CONFIGURACAO_INVALIDA: "bg-[var(--surface-secondary)] text-amber-800 border-[var(--border-default)]",
   BLOQUEADO: "bg-[var(--surface-secondary)] text-red-700 border-[var(--border-default)]",
   DIAGNOSTICO_INCOMPLETO: "bg-[var(--surface-secondary)] text-[var(--text-secondary)] border-[var(--border-default)]",
 }
 
 const CARD = "rounded-2xl border border-[var(--border-default)] bg-[var(--surface-primary)] backdrop-blur-sm"
 const CORES_ESTADO: Record<Estado, { fundo: string; texto: string; ponto: string }> = {
-  SAUDAVEL: { fundo: "bg-[var(--surface-secondary)] border-[var(--border-default)]", texto: "text-green-700", ponto: "bg-green-600" },
-  ATENCAO: { fundo: "bg-[var(--surface-secondary)] border-[var(--border-default)]", texto: "text-amber-700", ponto: "bg-amber-600" },
-  DEGRADADO: { fundo: "bg-[var(--surface-secondary)] border-[var(--border-default)]", texto: "text-amber-700", ponto: "bg-amber-600" },
+  SAUDAVEL: { fundo: "bg-[var(--surface-secondary)] border-[var(--border-default)]", texto: "text-green-800", ponto: "bg-green-600" },
+  ATENCAO: { fundo: "bg-[var(--surface-secondary)] border-[var(--border-default)]", texto: "text-amber-800", ponto: "bg-amber-600" },
+  DEGRADADO: { fundo: "bg-[var(--surface-secondary)] border-[var(--border-default)]", texto: "text-amber-800", ponto: "bg-amber-600" },
   CRITICO: { fundo: "bg-[var(--surface-secondary)] border-[var(--border-default)]", texto: "text-red-700", ponto: "bg-red-600" },
   DIAGNOSTICO_INCOMPLETO: { fundo: "bg-[var(--surface-secondary)] border-[var(--border-default)]", texto: "text-[var(--text-secondary)]", ponto: "bg-[var(--surface-secondary)]" },
   INDISPONIVEL: { fundo: "bg-[var(--surface-primary)] border-[var(--border-strong)]", texto: "text-white/70", ponto: "bg-[var(--surface-elevated)]" },
 }
 const CORES_SEV: Record<Severidade, string> = {
   CRITICO: "bg-[var(--surface-secondary)] text-red-700 border-[var(--border-default)]",
-  ERRO: "bg-[var(--surface-secondary)] text-amber-700 border-[var(--border-default)]",
-  ALERTA: "bg-[var(--surface-secondary)] text-amber-700 border-[var(--border-default)]",
+  ERRO: "bg-[var(--surface-secondary)] text-amber-800 border-[var(--border-default)]",
+  ALERTA: "bg-[var(--surface-secondary)] text-amber-800 border-[var(--border-default)]",
   INFORMATIVO: "bg-[var(--surface-secondary)] text-[var(--text-secondary)] border-[var(--border-default)]",
 }
 const fmtData = (iso?: string | null) =>
@@ -338,7 +338,7 @@ export function SaudeSistemaTab() {
               <div className="mt-2 grid gap-1">
                 {c.dependencias.map((d) => (
                   <div key={d.codigo} className="flex items-start gap-2 text-xs">
-                    <span className={d.indeterminada ? "text-[var(--text-secondary)]" : d.ok ? "text-green-700" : d.obrigatoria ? "text-red-700" : "text-amber-700"}>
+                    <span className={d.indeterminada ? "text-[var(--text-secondary)]" : d.ok ? "text-green-800" : d.obrigatoria ? "text-red-700" : "text-amber-800"}>
                       {d.indeterminada ? "?" : d.ok ? "✓" : "✕"}
                     </span>
                     <span className="text-[var(--text-secondary)]">{rot.dependencias[d.tipo] ?? d.tipo}</span>
@@ -382,8 +382,8 @@ export function SaudeSistemaTab() {
                 <span className="font-medium text-white">{c.rotulo}</span>
                 <span className="text-xs text-[var(--text-muted)]">{c.totalAtivos} ativo(s)</span>
                 {c.incompletos.length === 0
-                  ? <span className="rounded bg-[var(--surface-secondary)] px-1.5 py-0.5 text-[10px] text-green-700">contrato mínimo cumprido</span>
-                  : <span className="rounded bg-[var(--surface-secondary)] px-1.5 py-0.5 text-[10px] text-amber-700">{c.incompletos.length} incompleto(s)</span>}
+                  ? <span className="rounded bg-[var(--surface-secondary)] px-1.5 py-0.5 text-[10px] text-green-800">contrato mínimo cumprido</span>
+                  : <span className="rounded bg-[var(--surface-secondary)] px-1.5 py-0.5 text-[10px] text-amber-800">{c.incompletos.length} incompleto(s)</span>}
               </div>
               <div className="mt-1 text-xs text-[var(--text-muted)]">Exige: {c.requisitos.join(" · ")}</div>
               {c.incompletos.slice(0, 8).map((i) => (
@@ -529,8 +529,8 @@ export function SaudeSistemaTab() {
                     {m.capacidades === 0
                       ? <span className="rounded bg-[var(--surface-secondary)] px-1.5 py-0.5 text-[10px] text-[var(--text-secondary)]">sem capacidade declarada</span>
                       : m.capacidadesProntas === m.capacidades
-                        ? <span className="rounded bg-[var(--surface-secondary)] px-1.5 py-0.5 text-[10px] text-green-700">operacional</span>
-                        : <span className="rounded bg-[var(--surface-secondary)] px-1.5 py-0.5 text-[10px] text-amber-700">parcial</span>}
+                        ? <span className="rounded bg-[var(--surface-secondary)] px-1.5 py-0.5 text-[10px] text-green-800">operacional</span>
+                        : <span className="rounded bg-[var(--surface-secondary)] px-1.5 py-0.5 text-[10px] text-amber-800">parcial</span>}
                   </td>
                 </tr>
               ))}
@@ -550,7 +550,7 @@ export function SaudeSistemaTab() {
                   <td className="px-4 py-2.5 text-white/70">{c.obrigatorias}</td>
                   <td className="px-4 py-2.5">
                     {c.ativas > 0
-                      ? <span className="rounded bg-[var(--surface-secondary)] px-1.5 py-0.5 text-[10px] text-green-700">coberto</span>
+                      ? <span className="rounded bg-[var(--surface-secondary)] px-1.5 py-0.5 text-[10px] text-green-800">coberto</span>
                       : <span className="rounded bg-[var(--surface-secondary)] px-1.5 py-0.5 text-[10px] text-[var(--text-secondary)]">sem cobertura</span>}
                   </td>
                 </tr>
@@ -635,8 +635,8 @@ export function SaudeSistemaTab() {
             <tbody>
               {(e?.execucoes ?? []).map((x) => {
                 const meta = dados.catalogo.find((v) => v.codigo === x.codigo)
-                const cores = x.status === "APROVADA" ? "bg-[var(--surface-secondary)] text-green-700"
-                  : x.status === "COM_ACHADOS" ? "bg-[var(--surface-secondary)] text-amber-700"
+                const cores = x.status === "APROVADA" ? "bg-[var(--surface-secondary)] text-green-800"
+                  : x.status === "COM_ACHADOS" ? "bg-[var(--surface-secondary)] text-amber-800"
                   : x.status === "NAO_EXECUTADA" ? "bg-[var(--surface-secondary)] text-[var(--text-secondary)]"
                   : "bg-[var(--surface-secondary)] text-red-700"
                 return (
@@ -678,7 +678,7 @@ function LinhaAchado({ a, rot, detalhado, onCorrigir, corrigindo }: {
             <span className="font-mono">{a.codigo}</span>
             <span>{rot.dominios[a.dominio] ?? a.dominio}</span>
             <span>{a.modulo}</span>
-            {a.recorrencias > 1 && <span className="rounded bg-[var(--surface-secondary)] px-1.5 text-amber-700">recorrente ({a.recorrencias}×)</span>}
+            {a.recorrencias > 1 && <span className="rounded bg-[var(--surface-secondary)] px-1.5 text-amber-800">recorrente ({a.recorrencias}×)</span>}
             {a.recorrencias <= 1 && <span className="rounded bg-[var(--surface-secondary)] px-1.5 text-[var(--text-secondary)]">novo</span>}
             <span>detectado em {fmtData(a.primeiraDeteccao)}</span>
           </span>
@@ -695,7 +695,7 @@ function LinhaAchado({ a, rot, detalhado, onCorrigir, corrigindo }: {
             <span>Última detecção: <span className="text-white/85">{fmtData(a.ultimaDeteccao)}</span></span>
             {a.correcaoAutomatica && onCorrigir && (
               <button disabled={corrigindo} onClick={() => onCorrigir(a)}
-                className="rounded-lg border border-[var(--border-default)] bg-[var(--surface-secondary)] px-2 py-1 font-medium text-green-700 hover:bg-[var(--surface-secondary)] disabled:opacity-50">
+                className="rounded-lg border border-[var(--border-default)] bg-[var(--surface-secondary)] px-2 py-1 font-medium text-green-800 hover:bg-[var(--surface-secondary)] disabled:opacity-50">
                 {corrigindo ? "Corrigindo…" : "Corrigir automaticamente"}
               </button>
             )}

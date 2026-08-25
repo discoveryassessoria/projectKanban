@@ -86,8 +86,8 @@ function authHeaders(): HeadersInit {
   return t ? { "Content-Type": "application/json", Authorization: `Bearer ${t}` } : { "Content-Type": "application/json" }
 }
 const STATUS_STYLE: Record<string, string> = {
-  RASCUNHO: "bg-[var(--surface-primary)] text-[var(--text-secondary)]", PUBLICADA: "bg-[var(--surface-secondary)] text-green-700",
-  INATIVA: "bg-[var(--surface-secondary)] text-amber-700", ARQUIVADA: "bg-[var(--surface-primary)] text-[var(--text-muted)]",
+  RASCUNHO: "bg-[var(--surface-primary)] text-[var(--text-secondary)]", PUBLICADA: "bg-[var(--surface-secondary)] text-green-800",
+  INATIVA: "bg-[var(--surface-secondary)] text-amber-800", ARQUIVADA: "bg-[var(--surface-primary)] text-[var(--text-muted)]",
 }
 const ETAPAS = ["Identificação", "Aplicabilidade", "Requisito e documentos", "Público-alvo", "Condições", "Fases e bloqueio", "Validade", "Revisão final"]
 
@@ -235,7 +235,7 @@ export default function RegrasDocumentaisTab() {
                     <td className="px-2 py-2 text-[11px] text-[var(--text-secondary)]">{r.condicoes && r.condicoes.regras.length ? justificativaDoConjunto(r.condicoes) : "—"}</td>
                     <td className="px-2 py-2 text-xs text-[var(--text-secondary)]">{faseName(r.faseExigencia)}</td>
                     <td className="px-2 py-2 text-xs">{r.bloqueiaConclusaoFase ? <span className="rounded bg-[var(--surface-secondary)] px-1.5 py-0.5 text-[10px] text-red-700">{faseName(r.faseBloqueio)}</span> : <span className="text-[var(--text-muted)]">—</span>}</td>
-                    <td className="px-2 py-2 text-xs"><span className={`rounded px-1.5 py-0.5 text-[10px] ${r.obrigatoriedade === "OBRIGATORIA" ? "bg-[var(--surface-secondary)] text-amber-700" : "bg-[var(--surface-primary)] text-[var(--text-secondary)]"}`}>{r.obrigatoriedade === "OBRIGATORIA" ? "obrig." : "opc."}</span></td>
+                    <td className="px-2 py-2 text-xs"><span className={`rounded px-1.5 py-0.5 text-[10px] ${r.obrigatoriedade === "OBRIGATORIA" ? "bg-[var(--surface-secondary)] text-amber-800" : "bg-[var(--surface-primary)] text-[var(--text-secondary)]"}`}>{r.obrigatoriedade === "OBRIGATORIA" ? "obrig." : "opc."}</span></td>
                     <td className="px-2 py-2 text-[11px] text-[var(--text-secondary)]">{r.possuiValidade ? `${r.validadeDias ?? "?"}d${r.renovarQuandoExpirado ? " ↻" : ""}` : "—"}</td>
                     <td className="px-2 py-2 text-xs text-[var(--text-secondary)]">v{r.versao}</td>
                     <td className="px-2 py-2"><span className={`rounded px-1.5 py-0.5 text-[10px] ${STATUS_STYLE[r.status]}`}>{r.status.toLowerCase()}</span></td>
@@ -546,12 +546,12 @@ function Simulador({ data, ptId, onClose }: { data: Data; ptId: number | null; o
         {res && (
           <div className="grid grid-cols-2 gap-3 px-6 py-4">
             <div>
-              <div className="mb-1 text-xs font-semibold text-green-700">Aplicáveis ({res.aplicaveis.length})</div>
+              <div className="mb-1 text-xs font-semibold text-green-800">Aplicáveis ({res.aplicaveis.length})</div>
               <div className="space-y-1.5">
                 {res.aplicaveis.length === 0 && <div className="text-xs text-[var(--text-muted)]">Nenhum.</div>}
                 {res.aplicaveis.map((a) => (
                   <div key={a.regraId} className="rounded-lg border border-[var(--border-default)] bg-[var(--surface-secondary)] px-3 py-2 text-xs">
-                    <div className="font-medium text-white">{a.requisitoNome ?? docName(a.documentTypeCode)} <span className={`ml-1 rounded px-1 py-0.5 text-[9px] ${a.obrigatoriedade === "OBRIGATORIA" ? "bg-[var(--surface-secondary)] text-amber-700" : "bg-[var(--surface-primary)] text-[var(--text-secondary)]"}`}>{a.obrigatoriedade === "OBRIGATORIA" ? "obrig." : "opc."}</span></div>
+                    <div className="font-medium text-white">{a.requisitoNome ?? docName(a.documentTypeCode)} <span className={`ml-1 rounded px-1 py-0.5 text-[9px] ${a.obrigatoriedade === "OBRIGATORIA" ? "bg-[var(--surface-secondary)] text-amber-800" : "bg-[var(--surface-primary)] text-[var(--text-secondary)]"}`}>{a.obrigatoriedade === "OBRIGATORIA" ? "obrig." : "opc."}</span></div>
                     <div className="text-[var(--text-secondary)]">Atende: {a.documentosAceitos.map(docName).join(a.modoSatisfacao === "TODOS_SAO_EXIGIDOS" ? " + " : " ou ")}</div>
                     <div className="text-[var(--text-secondary)]">Motivo: {a.justificativa}</div>
                     {a.bloqueiaConclusaoFase && <div className="text-red-700/80">Bloqueia: {a.faseBloqueio}</div>}

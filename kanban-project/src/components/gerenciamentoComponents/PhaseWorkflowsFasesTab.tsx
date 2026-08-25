@@ -320,12 +320,12 @@ export default function PhaseWorkflowsFasesTab() {
   return (
     <div className="space-y-5">
       {/* aviso — escopo desta área */}
-      <div className="rounded-xl border border-[var(--border-default)] bg-[var(--surface-secondary)] px-4 py-3 text-sm text-amber-700">
+      <div className="rounded-xl border border-[var(--border-default)] bg-[var(--surface-secondary)] px-4 py-3 text-sm text-amber-800">
         Aqui você define os <strong>PASSOS</strong> e a <strong>CONDIÇÃO DE CONCLUSÃO</strong> da fase. Quando todos os requisitos obrigatórios forem atendidos e não houver bloqueios, o sistema conclui a fase e segue a <strong>ORDEM</strong> do Workflow Macro. Esta área <strong>NÃO</strong> escolhe a próxima fase.
       </div>
 
       {flash && (
-        <div className="rounded-xl border border-[var(--border-default)] bg-[var(--surface-secondary)] px-4 py-3 text-sm text-green-700">{flash}</div>
+        <div className="rounded-xl border border-[var(--border-default)] bg-[var(--surface-secondary)] px-4 py-3 text-sm text-green-800">{flash}</div>
       )}
 
       {/* cabeçalho */}
@@ -405,7 +405,7 @@ export default function PhaseWorkflowsFasesTab() {
                     UNIDADE DE TRABALHO (a cardinalidade — por documento, por pessoa,
                     por processo), nunca a quantidade de passos. */}
                 {wf
-                  ? <div className="mt-0.5 text-xs text-green-700/80">
+                  ? <div className="mt-0.5 text-xs text-green-800/80">
                       {wf.passos.length} etapa(s) · 1 tarefa por {UNIDADE_LABEL[unidadeDoWorkflow(wf.passos)] ?? "unidade de trabalho"}
                     </div>
                   : <div className="mt-0.5 text-xs text-[var(--text-muted)]">Sem workflow interno configurado.</div>}
@@ -427,11 +427,11 @@ export default function PhaseWorkflowsFasesTab() {
                     <span className="rounded bg-[var(--surface-primary)] px-1.5 py-0.5 text-white/70">
                       {CARDINALIDADE_LABEL[wf.escopoExecucao] ?? wf.escopoExecucao}
                     </span>
-                    {wf.exigeDocumento && <span className="rounded bg-[var(--surface-secondary)] px-1.5 py-0.5 text-green-700">exige documento</span>}
-                    {wf.exigePessoa && <span className="rounded bg-[var(--surface-secondary)] px-1.5 py-0.5 text-green-700">exige pessoa</span>}
+                    {wf.exigeDocumento && <span className="rounded bg-[var(--surface-secondary)] px-1.5 py-0.5 text-green-800">exige documento</span>}
+                    {wf.exigePessoa && <span className="rounded bg-[var(--surface-secondary)] px-1.5 py-0.5 text-green-800">exige pessoa</span>}
                     {wf.versao != null && <span className="rounded bg-[var(--surface-primary)] px-1.5 py-0.5 text-[var(--text-secondary)]">v{wf.versao}</span>}
                     {wf.rascunhoAlteradoEm && (
-                      <span className="rounded bg-[var(--surface-secondary)] px-1.5 py-0.5 text-amber-700" title="Há alterações salvas que ainda não valem para os processos.">
+                      <span className="rounded bg-[var(--surface-secondary)] px-1.5 py-0.5 text-amber-800" title="Há alterações salvas que ainda não valem para os processos.">
                         rascunho não publicado
                       </span>
                     )}
@@ -475,7 +475,7 @@ export default function PhaseWorkflowsFasesTab() {
                             primeiro o que o passo É, depois o que ele CONTÉM. Antes
                             eram nove selos misturando as duas coisas. */}
                         {st.required
-                          ? <span className="rounded bg-[var(--surface-secondary)] px-1.5 py-0.5 text-amber-700">obrigatório</span>
+                          ? <span className="rounded bg-[var(--surface-secondary)] px-1.5 py-0.5 text-amber-800">obrigatório</span>
                           : <span className="rounded bg-[var(--surface-primary)] px-1.5 py-0.5 text-[var(--text-secondary)]">opcional</span>}
                         <span className="rounded bg-[var(--surface-secondary)] px-1.5 py-0.5 text-[var(--text-secondary)]">{CARDINALIDADE_LABEL[st.cardinalidade || ""] ?? st.cardinalidade}</span>
                         {!!st.slaDays && st.slaDays > 0 && <span className="rounded bg-[var(--surface-primary)] px-1.5 py-0.5 text-[var(--text-secondary)]">prazo {st.slaDays}d</span>}
@@ -568,7 +568,7 @@ export default function PhaseWorkflowsFasesTab() {
                     <div className="min-w-0">
                       <div className="flex items-center gap-2">
                         <span className="text-sm font-medium text-white">{m.name}</span>
-                        {rec && <span className="rounded-full bg-[var(--surface-secondary)] px-2 py-0.5 text-[10px] text-green-700">recomendado</span>}
+                        {rec && <span className="rounded-full bg-[var(--surface-secondary)] px-2 py-0.5 text-[10px] text-green-800">recomendado</span>}
                       </div>
                       <div className="mt-0.5 text-xs text-[var(--text-secondary)]">{m.passos.length} passo(s){m.description ? " · " + m.description : ""}</div>
                     </div>

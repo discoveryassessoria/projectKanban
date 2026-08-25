@@ -278,7 +278,7 @@ export function PreviewImpactoModal({ proposta, onCancelar, onConfirmar }: Props
                       </li>
                     )}
                     {op!.bloqueiosRemovidos > 0 && (
-                      <li className="text-[13px] text-green-700">
+                      <li className="text-[13px] text-green-800">
                         Bloqueios resolvidos: −{op!.bloqueiosRemovidos}
                       </li>
                     )}
@@ -347,7 +347,7 @@ export function PreviewImpactoModal({ proposta, onCancelar, onConfirmar }: Props
  * pintaria os dois igual.
  */
 const COR_DIRECAO: Record<LinhaComparacao["direcao"], string> = {
-  melhora: "text-green-700",
+  melhora: "text-green-800",
   piora: "text-red-700",
   igual: "text-gray-500",
 }

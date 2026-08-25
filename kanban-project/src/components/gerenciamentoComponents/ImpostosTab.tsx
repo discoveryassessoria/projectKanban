@@ -209,7 +209,7 @@ export default function ImpostosTab() {
                   <td className="px-4 py-2.5 text-right tabular-nums text-white/80">{valorImposto(i)}</td>
                   <td className="px-4 py-2.5 text-[var(--text-secondary)]">{lbl(APLICA, i.aplicaA)}</td>
                   <td className="px-4 py-2.5">
-                    <span className={`rounded px-2 py-0.5 text-[11px] font-medium ${i.ativo ? 'bg-[var(--surface-secondary)] text-green-700' : 'bg-[var(--surface-primary)] text-[var(--text-secondary)]'}`}>
+                    <span className={`rounded px-2 py-0.5 text-[11px] font-medium ${i.ativo ? 'bg-[var(--surface-secondary)] text-green-800' : 'bg-[var(--surface-primary)] text-[var(--text-secondary)]'}`}>
                       {i.ativo ? 'Ativo' : 'Inativo'}
                     </span>
                   </td>

@@ -256,10 +256,10 @@
 
   /* Semânticas — usar SÓ quando houver significado real. Escurecidas para manter
      legibilidade sobre claro; o SIGNIFICADO de cada cor não muda. */
-  --success: #15803d;
-  --warning: #b45309;
+  --success: #166534;
+  --warning: #92400e;
   --danger: #b91c1c;
-  --info: #1d4ed8;
+  --info: #585d64;      /* informativo = neutro; azul saiu do contrato */
 
   /* Raio */
   --radius-sm: 8px;

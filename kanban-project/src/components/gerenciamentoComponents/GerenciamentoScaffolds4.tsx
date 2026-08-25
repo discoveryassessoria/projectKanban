@@ -139,7 +139,7 @@ function PhaseCard({ nome }: { nome: string }) {
       <div className="mb-2.5 grid grid-cols-3 gap-1.5 text-center">
         <div><div className="text-lg font-extrabold text-[var(--text-secondary)]">0</div><div className="text-[9px] text-[var(--text-secondary)]">Disparos</div></div>
         <div><div className="text-lg font-extrabold text-[var(--text-secondary)]">0</div><div className="text-[9px] text-[var(--text-secondary)]">Operac.</div></div>
-        <div><div className="text-lg font-extrabold text-amber-700">0</div><div className="text-[9px] text-[var(--text-secondary)]">Alertas</div></div>
+        <div><div className="text-lg font-extrabold text-amber-800">0</div><div className="text-[9px] text-[var(--text-secondary)]">Alertas</div></div>
       </div>
       <div className="mb-0.5 text-[10px] font-bold uppercase tracking-wide text-[var(--text-muted)]">Itens financeiros (disparo)</div>
       <div className="text-[11px] text-[var(--text-muted)]">— nenhuma —</div>
@@ -177,7 +177,7 @@ function DiagBlock({ title, tone }: { title: string; tone: 'danger' | 'warn' | '
   return (
     <div className={`mb-2.5 ${CARD} p-3.5`} style={{ borderLeft: `3px solid ${border}` }}>
       <div className="mb-1.5 text-[11px] font-extrabold uppercase tracking-wide text-[var(--text-secondary)]">{title} (0)</div>
-      <div className="text-[12.5px] text-green-700">✓ Nada a reportar.</div>
+      <div className="text-[12.5px] text-green-800">✓ Nada a reportar.</div>
     </div>
   )
 }
@@ -187,7 +187,7 @@ export function DiagnosticsTab() {
       <AvisoRascunho />
       <Section title="Diagnóstico do Sistema" action={<button disabled title={TITULO_RASCUNHO} className={BTN_RASCUNHO}>Reexecutar</button>} />
       <div className={`mb-2.5 ${CARD} p-3.5 text-center`}>
-        <div className="text-xl font-extrabold text-green-700">Sistema OK</div>
+        <div className="text-xl font-extrabold text-green-800">Sistema OK</div>
       </div>
       <DiagBlock title="Erros" tone="danger" />
       <DiagBlock title="Avisos" tone="warn" />

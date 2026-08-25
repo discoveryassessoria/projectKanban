@@ -913,7 +913,7 @@ function ConteudoModal({
                                     className="w-full px-4 py-2 text-left hover:bg-[var(--surface-tertiary)] flex items-center gap-3"
                                   >
                                     <div className="w-8 h-8 bg-[var(--surface-secondary)] rounded-full flex items-center justify-center">
-                                      <User className="h-4 w-4 text-green-700" />
+                                      <User className="h-4 w-4 text-green-800" />
                                     </div>
                                     <div>
                                       <p className="font-medium text-white/95 text-sm">{nomePessoa(r)}</p>
@@ -934,7 +934,7 @@ function ConteudoModal({
 
                     {/* Botões salvar/cancelar */}
                     <div className="flex gap-3 pt-4 border-t border-[var(--border-default)]">
-                      <Button onClick={handleSaveEdit} className="bg-[var(--accent-primary)] hover:bg-[#e0b957] text-[#1b1508]">
+                      <Button onClick={handleSaveEdit} className="bg-[var(--accent-primary)] hover:bg-[#e0b957] text-[var(--accent-ink)]">
                         Salvar
                       </Button>
                       <Button variant="outline" onClick={handleCancelEdit} className="border-[var(--border-default)] bg-transparent text-white/80 hover:bg-[var(--surface-tertiary)] hover:text-[var(--text-primary)]">

@@ -253,7 +253,7 @@ export default function RegrasTarefaTransversalTab() {
                 <td className="px-3 py-2.5">
                   <div className="flex flex-wrap gap-1">
                     {r.autoCreate
-                      ? <span className="rounded bg-[var(--surface-secondary)] px-1.5 py-0.5 text-[10px] text-amber-700">cria automático</span>
+                      ? <span className="rounded bg-[var(--surface-secondary)] px-1.5 py-0.5 text-[10px] text-amber-800">cria automático</span>
                       : <span className="rounded bg-[var(--surface-primary)] px-1.5 py-0.5 text-[10px] text-[var(--text-secondary)]">sugere</span>}
                     {r.mandatory && <span className="rounded bg-[var(--surface-primary)] px-1.5 py-0.5 text-[10px] text-[var(--text-secondary)]">obrigatória</span>}
                   </div>
@@ -261,7 +261,7 @@ export default function RegrasTarefaTransversalTab() {
                 <td className="px-3 py-2.5">
                   {r.arquivado
                     ? <span className="rounded bg-[var(--surface-primary)] px-1.5 py-0.5 text-[10px] text-[var(--text-secondary)]">arquivado</span>
-                    : <span className="rounded bg-[var(--surface-secondary)] px-1.5 py-0.5 text-[10px] text-green-700">ativo</span>}
+                    : <span className="rounded bg-[var(--surface-secondary)] px-1.5 py-0.5 text-[10px] text-green-800">ativo</span>}
                 </td>
                 <td className="px-3 py-2.5">
                   <div className="flex items-center justify-end gap-1">

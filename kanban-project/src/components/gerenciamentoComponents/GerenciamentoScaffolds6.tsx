@@ -110,7 +110,7 @@ export function SystemHealthTab() {
         <Kpi value="0" label="Recomendações" />
         <Kpi value="—" label="Pronto p/ protótipo" />
       </div>
-      <div className={`${CARD} p-5 text-sm font-medium text-green-700`}>✅ Nenhum problema estrutural detectado.</div>
+      <div className={`${CARD} p-5 text-sm font-medium text-green-800`}>✅ Nenhum problema estrutural detectado.</div>
     </div>
   )
 }

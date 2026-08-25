@@ -30,14 +30,14 @@ const CARD = "rounded-2xl border border-[var(--border-default)] bg-[var(--surfac
 
 // estados vindos do backend → cor e rótulo em português
 const ESTADO: Record<string, { cls: string; label: string }> = {
-  ATUALIZADO: { cls: "bg-[var(--surface-secondary)] text-green-700", label: "Atualizado" },
-  ATIVO: { cls: "bg-[var(--surface-secondary)] text-green-700", label: "Ativo" },
-  DECLARADO: { cls: "bg-[var(--surface-secondary)] text-green-700", label: "Declarado" },
-  RUNTIME_V2_HABILITADO: { cls: "bg-[var(--surface-secondary)] text-green-700", label: "Runtime v2 habilitado" },
-  RUNTIME_V2_DESABILITADO: { cls: "bg-[var(--surface-secondary)] text-amber-700", label: "Runtime v2 desabilitado" },
-  SEM_NOVA_PUBLICACAO: { cls: "bg-[var(--surface-secondary)] text-amber-700", label: "Sem nova publicação" },
-  DESATUALIZADO: { cls: "bg-[var(--surface-secondary)] text-amber-700", label: "Desatualizado" },
-  SEGREDO_PENDENTE: { cls: "bg-[var(--surface-secondary)] text-amber-700", label: "Segredo pendente" },
+  ATUALIZADO: { cls: "bg-[var(--surface-secondary)] text-green-800", label: "Atualizado" },
+  ATIVO: { cls: "bg-[var(--surface-secondary)] text-green-800", label: "Ativo" },
+  DECLARADO: { cls: "bg-[var(--surface-secondary)] text-green-800", label: "Declarado" },
+  RUNTIME_V2_HABILITADO: { cls: "bg-[var(--surface-secondary)] text-green-800", label: "Runtime v2 habilitado" },
+  RUNTIME_V2_DESABILITADO: { cls: "bg-[var(--surface-secondary)] text-amber-800", label: "Runtime v2 desabilitado" },
+  SEM_NOVA_PUBLICACAO: { cls: "bg-[var(--surface-secondary)] text-amber-800", label: "Sem nova publicação" },
+  DESATUALIZADO: { cls: "bg-[var(--surface-secondary)] text-amber-800", label: "Desatualizado" },
+  SEGREDO_PENDENTE: { cls: "bg-[var(--surface-secondary)] text-amber-800", label: "Segredo pendente" },
   CONFIGURACAO_PENDENTE: { cls: "bg-[var(--surface-secondary)] text-red-700", label: "Configuração pendente" },
   INDISPONIVEL: { cls: "bg-[var(--surface-secondary)] text-red-700", label: "Indisponível" },
   SEM_DADOS: { cls: "bg-[var(--surface-primary)] text-[var(--text-secondary)]", label: "Sem dados" },

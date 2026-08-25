@@ -443,7 +443,7 @@ export default function TabelaValoresTab() {
                     <td className="px-3 py-2.5 text-[var(--text-secondary)]">{om.origem}</td>
                     <CelulaDimensao dim={linha.custo} onEditar={abrirEditar} onExcluir={excluir} />
                     <CelulaDimensao dim={linha.venda} onEditar={abrirEditar} onExcluir={excluir} />
-                    <td className="px-3 py-2.5"><span className={`rounded px-2 py-0.5 text-[11px] font-medium ${ativo ? 'bg-[var(--surface-secondary)] text-green-700' : 'bg-[var(--surface-primary)] text-[var(--text-secondary)]'}`}>{ativo ? 'Ativo' : 'Inativo'}</span></td>
+                    <td className="px-3 py-2.5"><span className={`rounded px-2 py-0.5 text-[11px] font-medium ${ativo ? 'bg-[var(--surface-secondary)] text-green-800' : 'bg-[var(--surface-primary)] text-[var(--text-secondary)]'}`}>{ativo ? 'Ativo' : 'Inativo'}</span></td>
                     <td className="px-3 py-2.5 text-right text-[11px] text-[var(--text-muted)]">
                       {/* VARIAÇÃO ≠ SEM PAPEL. O preço de um fornecedor específico
                           convivendo com o genérico é cadastro correto — é a régua
@@ -537,7 +537,7 @@ export default function TabelaValoresTab() {
                   </select>
                   {/* Confirmação do VÍNCULO — o que a tela mostra é o item resolvido pelo id. */}
                   {itemVinculado && rotuloItemVinculado && (
-                    <p className="mt-1 text-[11px] text-green-700/80">Item vinculado: {rotuloItemVinculado}</p>
+                    <p className="mt-1 text-[11px] text-green-800/80">Item vinculado: {rotuloItemVinculado}</p>
                   )}
                   {form.categoria && !editando && itensDaCategoria.length === 0 && (
                     <p className="mt-1 text-[11px] text-[var(--text-muted)]">Nenhum item nesta categoria. Cadastre a Configuração Financeira do mestre.</p>
@@ -567,7 +567,7 @@ export default function TabelaValoresTab() {
                 </div>
                 {!itemVinculado && <p className="mt-1 text-[11px] text-[var(--text-muted)]">Selecione um item para escolher as naturezas.</p>}
                 {itemVinculado && itemSelecionado && !podeCusto && !podeVenda && (
-                  <p className="mt-1 text-[11px] text-amber-700/80">Esta configuração não habilita custo nem venda. Ajuste a Natureza Financeira em Configurações Financeiras.</p>
+                  <p className="mt-1 text-[11px] text-amber-800/80">Esta configuração não habilita custo nem venda. Ajuste a Natureza Financeira em Configurações Financeiras.</p>
                 )}
               </div>
 
@@ -604,7 +604,7 @@ export default function TabelaValoresTab() {
               {/* Bloco PREÇO DE CUSTO — Fornecedor + Moeda + Valor */}
               {form.precoCusto && (
                 <div className="rounded-lg border border-[var(--border-default)] bg-[var(--surface-secondary)] p-3">
-                  <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-amber-700/80">Preço de Custo</div>
+                  <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-amber-800/80">Preço de Custo</div>
                   <div className="grid grid-cols-3 gap-3">
                     <div>
                       <label className="mb-1 block text-xs text-[var(--text-secondary)]">Fornecedor</label>
@@ -644,7 +644,7 @@ export default function TabelaValoresTab() {
               {/* Bloco PREÇO DE VENDA — Moeda + Valor (sem fornecedor) */}
               {form.precoVenda && (
                 <div className="rounded-lg border border-[var(--border-default)] bg-[var(--surface-secondary)] p-3">
-                  <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-green-700/80">Preço de Venda</div>
+                  <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-green-800/80">Preço de Venda</div>
                   <div className="grid grid-cols-2 gap-3">
                     <div>
                       <label className="mb-1 block text-xs text-[var(--text-secondary)]">Moeda da venda *</label>

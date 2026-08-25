@@ -74,7 +74,7 @@ function ConteudoDrawer({ item, context, onClose }: Props) {
 
   const badge =
     item.finalStatus === "pronta_protocolo"
-      ? { txt: "Pronto", cls: "bg-[var(--surface-secondary)] text-green-700 border-[var(--border-default)]" }
+      ? { txt: "Pronto", cls: "bg-[var(--surface-secondary)] text-green-800 border-[var(--border-default)]" }
       : item.finalStatus === "aguardando"
       ? { txt: "Aguardando", cls: "bg-[var(--accent-primary)]/12 text-[var(--accent-text)] border-[var(--accent-primary)]/30" }
       : { txt: "Pendente", cls: "bg-[var(--accent-primary)]/12 text-[var(--accent-text)] border-[var(--accent-primary)]/30" }
@@ -348,7 +348,7 @@ function FileLine({ label, available }: { label: string; available: boolean }) {
   return (
     <div className="flex items-center justify-between gap-3 text-[12px]">
       <span className="font-semibold text-white/95">{label}</span>
-      <span className={available ? "text-green-700 text-[11px] font-semibold flex-none" : "text-[var(--text-muted)] text-[11px] flex-none"}>
+      <span className={available ? "text-green-800 text-[11px] font-semibold flex-none" : "text-[var(--text-muted)] text-[11px] flex-none"}>
         {available ? "Disponível" : "Ainda não disponível"}
       </span>
     </div>

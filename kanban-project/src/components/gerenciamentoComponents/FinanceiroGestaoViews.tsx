@@ -115,7 +115,7 @@ export function CreditoTab() {
                     <td className="px-4 py-2.5 text-white">{dinheiro(c.disponivel, c.moeda)}</td>
                     <td className="px-4 py-2.5 text-white/70">{dinheiro(c.utilizado, c.moeda)}</td>
                     <td className="px-4 py-2.5">
-                      <span className={`rounded-full px-2 py-0.5 text-[10px] ${c.status === "ABERTO" ? "bg-[var(--surface-secondary)] text-green-700" : "bg-[var(--surface-primary)] text-[var(--text-secondary)]"}`}>{c.status}</span>
+                      <span className={`rounded-full px-2 py-0.5 text-[10px] ${c.status === "ABERTO" ? "bg-[var(--surface-secondary)] text-green-800" : "bg-[var(--surface-primary)] text-[var(--text-secondary)]"}`}>{c.status}</span>
                     </td>
                   </tr>
                 ))}

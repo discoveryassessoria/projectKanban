@@ -98,10 +98,10 @@ export default function AplicabilidadeEconomicaTab() {
                   <td className="px-3 py-2 font-medium">{r.componentName}{r.appliesTo !== 'any' && <span className="ml-1.5 text-[10px] text-[var(--text-muted)]">· {APPLIES.find(([v]) => v === r.appliesTo)?.[1]}</span>}</td>
                   <td className="px-3 py-2 text-[var(--text-secondary)]">{procName(r.tipoProcessoId)}</td>
                   <td className="px-3 py-2 text-[var(--text-secondary)]">{r.documentTypeCode || '—'}</td>
-                  <td className="px-3 py-2 font-mono text-xs">{r.custoProdutoCode || <span className="text-amber-700/70">[AJUSTAR]</span>}</td>
-                  <td className="px-3 py-2 font-mono text-xs">{r.receitaProdutoCode || <span className="text-amber-700/70">[AJUSTAR]</span>}</td>
+                  <td className="px-3 py-2 font-mono text-xs">{r.custoProdutoCode || <span className="text-amber-800/70">[AJUSTAR]</span>}</td>
+                  <td className="px-3 py-2 font-mono text-xs">{r.receitaProdutoCode || <span className="text-amber-800/70">[AJUSTAR]</span>}</td>
                   <td className="px-3 py-2">{r.participaPlanilha ? '✓' : '—'}</td>
-                  <td className="px-3 py-2">{r.ativo ? <span className="text-green-700">Ativo</span> : <span className="text-[var(--text-muted)]">Inativo</span>}</td>
+                  <td className="px-3 py-2">{r.ativo ? <span className="text-green-800">Ativo</span> : <span className="text-[var(--text-muted)]">Inativo</span>}</td>
                   <td className="px-3 py-2 text-right whitespace-nowrap">
                     <button onClick={() => setForm({ ...r })} className="text-[var(--text-secondary)] hover:underline">Editar</button>
                     <button onClick={() => excluir(r)} className="ml-3 text-red-700 hover:underline">Excluir</button>

@@ -112,7 +112,7 @@ export function rotularFase(k: string | null): string | null {
 export function Etiqueta({ tom, children }: { tom: "neutro" | "alerta" | "critico" | "acento"; children: React.ReactNode }) {
   const cores = {
     neutro: "bg-[var(--surface-primary)] text-[var(--text-secondary)] border-[var(--border-default)]",
-    alerta: "bg-[var(--surface-secondary)] text-amber-700/90 border-[var(--border-default)]",
+    alerta: "bg-[var(--surface-secondary)] text-amber-800/90 border-[var(--border-default)]",
     critico: "bg-[var(--surface-secondary)] text-red-700/90 border-[var(--border-default)]",
     acento: "bg-[var(--surface-secondary)] text-[var(--text-secondary)]/90 border-[var(--border-default)]",
   }[tom]

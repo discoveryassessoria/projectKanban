@@ -49,7 +49,7 @@ export function nivelStyle(nivel: NivelPrioridade | "critico" | "alto"): NivelSt
       return {
         chip: "bg-[var(--surface-secondary)] text-[var(--text-secondary)] border-[var(--border-default)]",
         ponto: "bg-amber-600",
-        texto: "text-amber-700",
+        texto: "text-amber-800",
         aro: "ring-[var(--border-strong)]",
       }
     case "medio":

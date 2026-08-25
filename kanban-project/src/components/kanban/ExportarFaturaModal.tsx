@@ -345,7 +345,7 @@ export function ExportarFaturaModal({ faturas, requerentes, onClose }: ExportarF
             
             {requerentes.length === 0 ? (
               <div className="p-4 bg-[var(--surface-secondary)] border border-[var(--border-default)] rounded-xl text-center">
-                <p className="text-amber-700 text-sm">
+                <p className="text-amber-800 text-sm">
                   Nenhum requerente cadastrado no processo.
                 </p>
               </div>

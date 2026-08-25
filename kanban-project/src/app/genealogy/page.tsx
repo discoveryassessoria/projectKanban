@@ -475,7 +475,7 @@ export default function GenealogyPage() {
                       <button
                         onClick={handlePesquisar}
                         disabled={loading}
-                        className="flex-1 bg-green-700 hover:bg-green-800 text-[var(--action-primary-ink)] py-2.5 px-4 rounded-lg font-medium transition flex items-center justify-center gap-2 disabled:opacity-50 text-sm"
+                        className="flex-1 bg-[var(--action-primary)] hover:bg-[var(--action-primary)] text-[var(--action-primary-ink)] py-2.5 px-4 rounded-lg font-medium transition flex items-center justify-center gap-2 disabled:opacity-50 text-sm"
                       >
                         <Search className="h-4 w-4" />
                         {loading ? 'Pesquisando...' : 'PESQUISAR'}
@@ -544,7 +544,7 @@ export default function GenealogyPage() {
                       <button
                         onClick={handlePesquisar}
                         disabled={loading}
-                        className="flex-1 bg-green-700 hover:bg-green-800 text-[var(--action-primary-ink)] py-2.5 px-4 rounded-lg font-medium transition flex items-center justify-center gap-2 disabled:opacity-50 text-sm"
+                        className="flex-1 bg-[var(--action-primary)] hover:bg-[var(--action-primary)] text-[var(--action-primary-ink)] py-2.5 px-4 rounded-lg font-medium transition flex items-center justify-center gap-2 disabled:opacity-50 text-sm"
                       >
                         <Search className="h-4 w-4" />
                         {loading ? 'Pesquisando...' : 'PESQUISAR'}
@@ -666,8 +666,8 @@ export default function GenealogyPage() {
                                   </h3>
                                   
                                   <span className={`inline-block text-xs px-2 py-0.5 rounded mt-1 ${
-                                    doc.status === 'RECEBIDO' ? 'bg-[var(--surface-secondary)] text-green-700' :
-                                    doc.status === 'SOLICITADO' ? 'bg-[var(--surface-secondary)] text-amber-700' :
+                                    doc.status === 'RECEBIDO' ? 'bg-[var(--surface-secondary)] text-green-800' :
+                                    doc.status === 'SOLICITADO' ? 'bg-[var(--surface-secondary)] text-amber-800' :
                                     'bg-[var(--surface-primary)] text-[var(--text-secondary)]'
                                   }`}>
                                     {doc.status}

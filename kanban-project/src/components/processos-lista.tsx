@@ -186,7 +186,7 @@ export function ProcessosLista({
                         processo.sla?.status === "atrasado"
                           ? "text-red-700"
                           : processo.sla?.status === "proximo_vencimento"
-                            ? "text-amber-700"
+                            ? "text-amber-800"
                             : "text-white/70"
                       }`}
                     >

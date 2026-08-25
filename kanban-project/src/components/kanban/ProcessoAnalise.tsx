@@ -183,7 +183,7 @@ export function ProcessoAnalise({ processoId, onConcluido, readOnly = false }: P
                   </div>
                   <div className="mt-1.5 text-[11px] font-medium text-white/80 leading-tight">{e.label}</div>
                   <div className={`text-[10px] ${
-                    e.st === "concluida" ? "text-green-700"
+                    e.st === "concluida" ? "text-green-800"
                     : e.st === "em_andamento" ? "text-[var(--text-secondary)]"
                     : "text-[var(--text-muted)]"}`}>
                     {e.st === "concluida" ? "Concluído" : e.st === "em_andamento" ? "Em andamento" : "Pendente"}
@@ -210,7 +210,7 @@ export function ProcessoAnalise({ processoId, onConcluido, readOnly = false }: P
       </div>
 
       {erro && <div className="bg-[var(--surface-secondary)] border border-[var(--border-default)] rounded-lg px-4 py-3 text-sm text-red-700">{erro}</div>}
-      {resultado && <div className="bg-[var(--surface-secondary)] border border-[var(--border-default)] rounded-lg px-4 py-3 text-sm text-green-700 flex items-center gap-2"><CheckCircle2 className="w-4 h-4" />{resultado}</div>}
+      {resultado && <div className="bg-[var(--surface-secondary)] border border-[var(--border-default)] rounded-lg px-4 py-3 text-sm text-green-800 flex items-center gap-2"><CheckCircle2 className="w-4 h-4" />{resultado}</div>}
 
       {!analise ? (
         <div className="rounded-xl border border-dashed border-[var(--border-default)] p-8 text-center text-sm text-[var(--text-secondary)]">A análise ainda não foi rodada. Clique em <b>Rodar análise IA</b>.</div>
@@ -248,7 +248,7 @@ export function ProcessoAnalise({ processoId, onConcluido, readOnly = false }: P
                     <td className="px-3 py-2.5"><span className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs font-semibold ${SEV_STYLE[d.severidade] || "bg-[var(--surface-tertiary)] text-white/80"}`}><span className={`w-1.5 h-1.5 rounded-full ${SEV_DOT[d.severidade] || "bg-[var(--surface-secondary)]"}`} />{SEV_LABEL[d.severidade] || d.severidade}</span></td>
                     <td className="px-3 py-2.5 text-xs text-white/68 max-w-[200px]">{d.sugestaoIA || "—"}</td>
                     <td className="px-3 py-2.5">
-                      <select value={d.status} onChange={(e) => decidir(d.id, e.target.value)} className={`text-xs border rounded-md px-2 py-1.5 bg-[var(--surface-popover)] focus:outline-none ${d.status === "retificacao" ? "border-[var(--border-default)] text-red-700" : d.status === "aceita" ? "border-[var(--border-default)] text-green-700" : d.status === "pendente" ? "border-[var(--border-default)] text-white/68" : "border-[var(--accent-primary)]/30 text-[var(--accent-text)]"}`}>
+                      <select value={d.status} onChange={(e) => decidir(d.id, e.target.value)} className={`text-xs border rounded-md px-2 py-1.5 bg-[var(--surface-popover)] focus:outline-none ${d.status === "retificacao" ? "border-[var(--border-default)] text-red-700" : d.status === "aceita" ? "border-[var(--border-default)] text-green-800" : d.status === "pendente" ? "border-[var(--border-default)] text-white/68" : "border-[var(--accent-primary)]/30 text-[var(--accent-text)]"}`}>
                         {DECISOES.map(([v, l]) => <option key={v} value={v}>{l}</option>)}
                       </select>
                     </td>
@@ -277,7 +277,7 @@ export function ProcessoAnalise({ processoId, onConcluido, readOnly = false }: P
       )}
 
       {analise?.status === "concluida" && (
-        <div className="rounded-xl border border-[var(--border-default)] bg-[var(--surface-secondary)] p-4 text-sm text-green-700 flex items-center gap-2"><CheckCircle2 className="w-4 h-4" />Análise concluída {analise.decisaoJuridica === "com_retificacao" ? "com retificação" : "sem retificação"}.</div>
+        <div className="rounded-xl border border-[var(--border-default)] bg-[var(--surface-secondary)] p-4 text-sm text-green-800 flex items-center gap-2"><CheckCircle2 className="w-4 h-4" />Análise concluída {analise.decisaoJuridica === "com_retificacao" ? "com retificação" : "sem retificação"}.</div>
       )}
 
       {drawerDiv && (

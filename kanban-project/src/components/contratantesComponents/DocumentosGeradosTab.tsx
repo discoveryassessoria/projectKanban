@@ -97,7 +97,7 @@ const SEM_MODELOS: ModeloDisponivel[] = []
 const SEM_DOCUMENTOS: DocumentoGerado[] = []
 
 const CORES_VERSAO: Record<VersaoGerada["status"], string> = {
-  VIGENTE: "bg-[var(--surface-secondary)] text-green-700",
+  VIGENTE: "bg-[var(--surface-secondary)] text-green-800",
   GERADA: "bg-[var(--surface-secondary)] text-[var(--text-secondary)]",
   SUBSTITUIDA: "bg-gray-100 text-gray-600",
   INVALIDADA: "bg-[var(--surface-secondary)] text-red-700",
@@ -365,7 +365,7 @@ export function DocumentosGeradosTab({
                   <h4 className="text-xs font-semibold uppercase tracking-wide text-gray-500">
                     Dados obrigatórios
                   </h4>
-                  <span className={`text-xs font-medium ${podeGerarAgora ? "text-green-700" : "text-red-600"}`}>
+                  <span className={`text-xs font-medium ${podeGerarAgora ? "text-green-800" : "text-red-600"}`}>
                     {podeGerarAgora ? "Tudo pronto para gerar" : "Há pendências no cadastro"}
                   </span>
                 </div>

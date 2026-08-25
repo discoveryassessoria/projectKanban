@@ -101,7 +101,7 @@ export default function TaxasPagamentoTab() {
                     <span>{x.quantidadeConfiguracoes} config.</span>
                   </div>
                 </div>
-                <button onClick={() => setConfigId(x.formaPagamentoId)} className="inline-flex shrink-0 items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm font-semibold text-[#1b1508] transition" style={{ background: OURO }}>
+                <button onClick={() => setConfigId(x.formaPagamentoId)} className="inline-flex shrink-0 items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm font-semibold text-[var(--accent-ink)] transition" style={{ background: OURO }}>
                   <Settings2 className="h-4 w-4" /> Configurar
                 </button>
               </div>
@@ -320,7 +320,7 @@ function FormaConfig({ formaId, onClose, onSalvo }: { formaId: number; onClose: 
 
         <div className="sticky bottom-0 flex items-center justify-end gap-2 border-t border-[var(--border-default)] bg-zinc-900/95 px-6 py-3">
           <button onClick={onClose} className="rounded-lg border border-[var(--border-default)] px-4 py-2 text-sm text-white/80 hover:bg-[var(--surface-hover)]">Cancelar</button>
-          <button onClick={salvar} disabled={salvando || !det} className="inline-flex items-center gap-1.5 rounded-lg px-4 py-2 text-sm font-semibold text-[#1b1508] transition disabled:opacity-50" style={{ background: OURO }}>
+          <button onClick={salvar} disabled={salvando || !det} className="inline-flex items-center gap-1.5 rounded-lg px-4 py-2 text-sm font-semibold text-[var(--accent-ink)] transition disabled:opacity-50" style={{ background: OURO }}>
             {salvando ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />}{salvando ? 'Salvando…' : 'Salvar configuração'}
           </button>
         </div>

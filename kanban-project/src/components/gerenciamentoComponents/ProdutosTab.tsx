@@ -139,7 +139,7 @@ function Secao({ titulo, children, primeira }: { titulo: string; children: React
 }
 
 const Check = ({ ok }: { ok: boolean }) =>
-  ok ? <span className="text-green-700">✓</span> : <span className="text-[var(--text-muted)]">—</span>
+  ok ? <span className="text-green-800">✓</span> : <span className="text-[var(--text-muted)]">—</span>
 
 export default function ProdutosTab() {
   // Duas leituras pela camada oficial. A lista de regras de comissão é de APOIO ao
@@ -374,12 +374,12 @@ export default function ProdutosTab() {
                   <td className="px-4 py-2.5 text-white/80">{lbl(NATUREZA_FIN, natFinDe(p.possuiCusto, p.possuiReceita))}</td>
                   <td className="px-4 py-2.5">
                     <div className="flex flex-wrap items-center gap-1.5">
-                      <span className={`rounded px-2 py-0.5 text-[11px] font-medium ${p.ativo ? 'bg-[var(--surface-secondary)] text-green-700' : 'bg-[var(--surface-primary)] text-[var(--text-secondary)]'}`}>
+                      <span className={`rounded px-2 py-0.5 text-[11px] font-medium ${p.ativo ? 'bg-[var(--surface-secondary)] text-green-800' : 'bg-[var(--surface-primary)] text-[var(--text-secondary)]'}`}>
                         {p.ativo ? 'Ativo' : 'Inativo'}
                       </span>
                       {p.cobravelDoCliente && <span className="rounded px-2 py-0.5 text-[11px] font-medium bg-[var(--surface-secondary)] text-[var(--text-secondary)]">Cobrável</span>}
                       {p.repasse && <span className="rounded px-2 py-0.5 text-[11px] font-medium bg-[var(--surface-secondary)] text-[var(--text-secondary)]">Repasse</span>}
-                      {p.reembolsavel && <span className="rounded px-2 py-0.5 text-[11px] font-medium bg-[var(--surface-secondary)] text-amber-700">Reembolsável</span>}
+                      {p.reembolsavel && <span className="rounded px-2 py-0.5 text-[11px] font-medium bg-[var(--surface-secondary)] text-amber-800">Reembolsável</span>}
                     </div>
                   </td>
                   <td className="px-4 py-2.5">

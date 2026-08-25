@@ -241,7 +241,7 @@ export default function CadastroGenericoTab({ entidade }: { entidade: string }) 
 
   return (
     <div className="space-y-5">
-      {flash && <div className="rounded-xl border border-[var(--border-default)] bg-[var(--surface-secondary)] px-4 py-3 text-sm text-green-700">{flash}</div>}
+      {flash && <div className="rounded-xl border border-[var(--border-default)] bg-[var(--surface-secondary)] px-4 py-3 text-sm text-green-800">{flash}</div>}
       {erro && !form && (
         <div className="rounded-xl border border-[var(--border-default)] bg-[var(--surface-secondary)] px-4 py-3 text-sm text-red-700">
           {erro} <button onClick={() => { setErro(null); load() }} className="ml-2 underline hover:text-white">Recarregar</button>
@@ -335,7 +335,7 @@ export default function CadastroGenericoTab({ entidade }: { entidade: string }) 
                   <button
                     onClick={() => alternarAtivo(r)}
                     title={r.ativo ? "Inativar (some dos seletores, sem apagar)" : "Ativar"}
-                    className={`rounded-full px-2 py-0.5 text-[10px] ${r.ativo ? "bg-[var(--surface-secondary)] text-green-700" : "bg-[var(--surface-primary)] text-[var(--text-secondary)]"}`}
+                    className={`rounded-full px-2 py-0.5 text-[10px] ${r.ativo ? "bg-[var(--surface-secondary)] text-green-800" : "bg-[var(--surface-primary)] text-[var(--text-secondary)]"}`}
                   >
                     {r.ativo ? "Ativo" : "Inativo"}
                   </button>

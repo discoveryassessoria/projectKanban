@@ -96,7 +96,7 @@ export default function SimulacaoFaseTab() {
       {/* cabeçalho + seletores */}
       <div className="rounded-2xl border border-[var(--border-default)] bg-[var(--surface-primary)] p-5 backdrop-blur-sm">
         <h2 className="text-lg font-semibold text-white">Simulação de Fase</h2>
-        <p className="mt-1 text-sm text-[var(--text-secondary)]">Mostra <b>o que o motor faria</b> quando um processo deste tipo dispara o evento da fase — tarefas, lançamentos, alertas. <span className="text-green-700/80">É só uma prévia: nada é criado.</span></p>
+        <p className="mt-1 text-sm text-[var(--text-secondary)]">Mostra <b>o que o motor faria</b> quando um processo deste tipo dispara o evento da fase — tarefas, lançamentos, alertas. <span className="text-green-800/80">É só uma prévia: nada é criado.</span></p>
 
         <div className="mt-4 grid gap-3 sm:grid-cols-3">
           <div>
@@ -139,7 +139,7 @@ export default function SimulacaoFaseTab() {
               {report.receitas.map((a, i) => (
                 <Linha key={i}>
                   <span className="text-white">{a.name}</span>
-                  <span className="text-green-700">{money(a.amount, a.currency)}</span>
+                  <span className="text-green-800">{money(a.amount, a.currency)}</span>
                   <span className="text-[var(--text-muted)]">({a.source})</span>{a.condicional && <CondBadge nota={a.condicaoNota} />}
                 </Linha>
               ))}
@@ -149,7 +149,7 @@ export default function SimulacaoFaseTab() {
               {report.custos.map((a, i) => (
                 <Linha key={i}>
                   <span className="text-white">{a.name}</span>
-                  <span className="text-amber-700">{money(a.amount, a.currency)}</span>
+                  <span className="text-amber-800">{money(a.amount, a.currency)}</span>
                   <span className="text-[var(--text-muted)]">({a.source})</span>{a.condicional && <CondBadge nota={a.condicaoNota} />}
                 </Linha>
               ))}
@@ -173,7 +173,7 @@ export default function SimulacaoFaseTab() {
 
             <Secao titulo="Ignoradas" count={report.ignoradas.length} tone="neutral">
               {report.ignoradas.map((a, i) => (
-                <Linha key={i}><span className="text-white/70">{a.name}</span><span className="text-amber-700/80">— {a.reason}</span></Linha>
+                <Linha key={i}><span className="text-white/70">{a.name}</span><span className="text-amber-800/80">— {a.reason}</span></Linha>
               ))}
             </Secao>
 

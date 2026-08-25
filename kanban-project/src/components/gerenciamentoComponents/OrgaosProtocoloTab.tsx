@@ -230,7 +230,7 @@ export default function OrgaosProtocoloTab() {
 
   return (
     <div className="space-y-5">
-      {flash && <div className="rounded-xl border border-[var(--border-default)] bg-[var(--surface-secondary)] px-4 py-3 text-sm text-green-700">{flash}</div>}
+      {flash && <div className="rounded-xl border border-[var(--border-default)] bg-[var(--surface-secondary)] px-4 py-3 text-sm text-green-800">{flash}</div>}
 
       <div className="rounded-2xl border border-[var(--border-default)] bg-[var(--surface-primary)] p-5 backdrop-blur-sm">
         <div className="flex items-start justify-between gap-3">
@@ -282,7 +282,7 @@ export default function OrgaosProtocoloTab() {
                 <td className="px-4 py-2.5">
                   <div className="flex flex-wrap gap-1">
                     {(d.funcoes ?? []).map(f => (
-                      <span key={f} className={`rounded px-1.5 py-0.5 text-[10px] ${f === 'FORNECEDOR' ? 'bg-[var(--surface-secondary)] text-amber-700' : f === 'ORGAO' ? 'bg-[var(--surface-secondary)] text-[var(--text-secondary)]' : 'bg-[var(--surface-secondary)] text-[var(--text-secondary)]'}`}>{funcaoLabel(f)}</span>
+                      <span key={f} className={`rounded px-1.5 py-0.5 text-[10px] ${f === 'FORNECEDOR' ? 'bg-[var(--surface-secondary)] text-amber-800' : f === 'ORGAO' ? 'bg-[var(--surface-secondary)] text-[var(--text-secondary)]' : 'bg-[var(--surface-secondary)] text-[var(--text-secondary)]'}`}>{funcaoLabel(f)}</span>
                     ))}
                   </div>
                 </td>
@@ -298,7 +298,7 @@ export default function OrgaosProtocoloTab() {
                 <td className="px-4 py-2.5 text-white/70">{d.country || "—"}</td>
                 <td className="px-4 py-2.5 text-white/70">{d.city || "—"}</td>
                 <td className="px-4 py-2.5 text-[var(--text-secondary)]">{d.provincia || "—"}</td>
-                <td className="px-4 py-2.5"><span className={`rounded-full px-2 py-0.5 text-[10px] ${d.ativo ? "bg-[var(--surface-secondary)] text-green-700" : "bg-[var(--surface-primary)] text-[var(--text-secondary)]"}`}>{d.ativo ? "Ativo" : "Inativo"}</span></td>
+                <td className="px-4 py-2.5"><span className={`rounded-full px-2 py-0.5 text-[10px] ${d.ativo ? "bg-[var(--surface-secondary)] text-green-800" : "bg-[var(--surface-primary)] text-[var(--text-secondary)]"}`}>{d.ativo ? "Ativo" : "Inativo"}</span></td>
                 <td className="px-4 py-2.5">
                   <div className="flex items-center justify-end gap-0.5 text-[var(--text-secondary)]">
                     <button title="Editar" aria-label="Editar" onClick={() => abrirForm(daLinha(d))} className="rounded p-1 hover:bg-[var(--surface-hover)] hover:text-white"><IEdit /></button>
@@ -323,7 +323,7 @@ export default function OrgaosProtocoloTab() {
               {existente && (
                 <div className="col-span-2 rounded-xl border border-[var(--border-default)] bg-[var(--surface-secondary)] px-4 py-3 text-sm text-amber-100">
                   Esta organização <b>já existe</b>: <span className="font-mono">{existente.publicCode ?? `#${existente.id}`}</span> — {existente.name}.
-                  <div className="mt-1 text-xs text-amber-700/80">Salvar vai <b>acrescentar as funções e categorias</b> ao cadastro existente, sem duplicar.</div>
+                  <div className="mt-1 text-xs text-amber-800/80">Salvar vai <b>acrescentar as funções e categorias</b> ao cadastro existente, sem duplicar.</div>
                 </div>
               )}
               {!existente && suspeitas.length > 0 && (

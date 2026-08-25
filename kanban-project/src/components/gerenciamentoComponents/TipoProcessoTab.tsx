@@ -383,7 +383,7 @@ export default function TipoProcessoTab() {
       </div>
 
       {!loading && !erroLista && paises.length === 0 && (
-        <div className="rounded-lg border border-[var(--border-default)] bg-[var(--surface-secondary)] p-3 text-sm text-amber-700">
+        <div className="rounded-lg border border-[var(--border-default)] bg-[var(--surface-secondary)] p-3 text-sm text-amber-800">
           Nenhum país ativo no catálogo. Crie ou reative um em "Gerenciar países".
         </div>
       )}
@@ -433,7 +433,7 @@ export default function TipoProcessoTab() {
                     <td className="px-4 py-2.5 text-white/70">{t.modalityLabel}</td>
                     <td className="px-4 py-2.5">
                       {t.ativo
-                        ? <span className="rounded-md bg-[var(--surface-secondary)] px-2 py-0.5 text-[11px] font-medium text-green-700">ativo</span>
+                        ? <span className="rounded-md bg-[var(--surface-secondary)] px-2 py-0.5 text-[11px] font-medium text-green-800">ativo</span>
                         : <span className="rounded-md bg-[var(--surface-primary)] px-2 py-0.5 text-[11px] font-medium text-[var(--text-secondary)]">inativo</span>}
                     </td>
                     <td className="px-4 py-2.5">
@@ -552,7 +552,7 @@ export default function TipoProcessoTab() {
                             <td className="px-3 py-2 text-white/70">{p.tiposCount ?? 0}</td>
                             <td className="px-3 py-2">
                               {p.ativo
-                                ? <span className="rounded-md bg-[var(--surface-secondary)] px-2 py-0.5 text-[11px] font-medium text-green-700">ativo</span>
+                                ? <span className="rounded-md bg-[var(--surface-secondary)] px-2 py-0.5 text-[11px] font-medium text-green-800">ativo</span>
                                 : <span className="rounded-md bg-[var(--surface-primary)] px-2 py-0.5 text-[11px] font-medium text-[var(--text-secondary)]">inativo</span>}
                             </td>
                             <td className="px-3 py-2">
@@ -700,7 +700,7 @@ export default function TipoProcessoTab() {
                             <td className="px-3 py-2 text-white/70">{m.tiposCount ?? 0}</td>
                             <td className="px-3 py-2">
                               {(m.ativo ?? true)
-                                ? <span className="rounded-md bg-[var(--surface-secondary)] px-2 py-0.5 text-[11px] font-medium text-green-700">ativa</span>
+                                ? <span className="rounded-md bg-[var(--surface-secondary)] px-2 py-0.5 text-[11px] font-medium text-green-800">ativa</span>
                                 : <span className="rounded-md bg-[var(--surface-primary)] px-2 py-0.5 text-[11px] font-medium text-[var(--text-secondary)]">inativa</span>}
                             </td>
                             <td className="px-3 py-2">

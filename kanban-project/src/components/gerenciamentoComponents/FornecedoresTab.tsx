@@ -245,7 +245,7 @@ export default function FornecedoresTab() {
                     {f.email || f.telefone || f.celular || '—'}
                   </td>
                   <td className="px-4 py-2.5">
-                    <span className={`rounded px-2 py-0.5 text-[11px] font-medium ${f.ativo ? 'bg-[var(--surface-secondary)] text-green-700' : 'bg-[var(--surface-primary)] text-[var(--text-secondary)]'}`}>
+                    <span className={`rounded px-2 py-0.5 text-[11px] font-medium ${f.ativo ? 'bg-[var(--surface-secondary)] text-green-800' : 'bg-[var(--surface-primary)] text-[var(--text-secondary)]'}`}>
                       {f.ativo ? 'Ativo' : 'Inativo'}
                     </span>
                   </td>

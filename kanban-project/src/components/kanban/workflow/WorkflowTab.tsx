@@ -131,12 +131,12 @@ const fmtDate = (iso: string | null): string => {
 }
 
 const fmtSla = (dueAt: string | null) => {
-  if (!dueAt) return { label: "no prazo", cls: "text-green-700 bg-[var(--surface-secondary)]" }
+  if (!dueAt) return { label: "no prazo", cls: "text-green-800 bg-[var(--surface-secondary)]" }
   const diff = (new Date(dueAt).getTime() - Date.now()) / 86400000
   if (diff < -5) return { label: `${Math.abs(Math.floor(diff))}d crítico`, cls: "text-red-700 bg-[var(--surface-secondary)]" }
-  if (diff < 0) return { label: `${Math.abs(Math.floor(diff))}d atrasado`, cls: "text-amber-700 bg-[var(--surface-secondary)]" }
-  if (diff < 1) return { label: "vence hoje", cls: "text-amber-700 bg-[var(--surface-secondary)]" }
-  return { label: `${Math.ceil(diff)} dia(s)`, cls: "text-green-700 bg-[var(--surface-secondary)]" }
+  if (diff < 0) return { label: `${Math.abs(Math.floor(diff))}d atrasado`, cls: "text-amber-800 bg-[var(--surface-secondary)]" }
+  if (diff < 1) return { label: "vence hoje", cls: "text-amber-800 bg-[var(--surface-secondary)]" }
+  return { label: `${Math.ceil(diff)} dia(s)`, cls: "text-green-800 bg-[var(--surface-secondary)]" }
 }
 
 const STATUS_LABEL: Record<StatusStep, string> = {
@@ -414,14 +414,14 @@ function StepCard({
         onClick={onOpenCentral}
         className="bg-[var(--surface-secondary)]/30 border border-green-900/60 rounded-md px-3 py-2 flex items-center gap-3 cursor-pointer hover:bg-[var(--surface-secondary)]/50 transition-colors"
       >
-        <div className="w-6 h-6 rounded-full bg-green-600 flex items-center justify-center flex-shrink-0">
+        <div className="w-6 h-6 rounded-full bg-[var(--action-primary)] flex items-center justify-center flex-shrink-0">
           <Check className="w-3.5 h-3.5 text-white" />
         </div>
         <div className="flex-1 min-w-0">
-          <div className="text-[12.5px] font-semibold text-green-700">
+          <div className="text-[12.5px] font-semibold text-green-800">
             {step.ordem}. {step.title}
           </div>
-          <div className="text-[10.5px] text-green-700/80 mt-0.5">
+          <div className="text-[10.5px] text-green-800/80 mt-0.5">
             concluída por <strong>{completedByName}</strong> em {fmtDateTime(step.completedAt)} · peso {step.weight}%
           </div>
         </div>
@@ -477,13 +477,13 @@ function StepCard({
 
   // Badge de status (texto e cor)
   const statusBadgeCls = isLockStepWait
-    ? "bg-[var(--surface-secondary)] text-amber-700 border-amber-800"
+    ? "bg-[var(--surface-secondary)] text-amber-800 border-amber-800"
     : isBloqueioManual
     ? "bg-[var(--surface-secondary)] text-red-700 border-red-800"
     : step.status === "aguardando_terceiro"
-    ? "bg-[var(--surface-secondary)] text-amber-700 border-amber-800"
+    ? "bg-[var(--surface-secondary)] text-amber-800 border-amber-800"
     : step.status === "atrasada"
-    ? "bg-[var(--surface-secondary)] text-amber-700 border-amber-800"
+    ? "bg-[var(--surface-secondary)] text-amber-800 border-amber-800"
     : "bg-[var(--surface-secondary)] text-[var(--text-secondary)] border-[var(--border-default)]"
 
   const statusLabel = isLockStepWait
@@ -549,11 +549,11 @@ function StepCard({
 
           {/* Banner LOCK-STEP — amigável, âmbar */}
           {isLockStepWait && (
-            <div className="mt-2 px-2.5 py-2 bg-amber-950/40 border border-amber-900/50 rounded text-[11.5px] text-amber-700 flex items-start gap-2">
-              <Lock className="w-3.5 h-3.5 flex-shrink-0 mt-0.5 text-amber-700" />
+            <div className="mt-2 px-2.5 py-2 bg-amber-950/40 border border-amber-900/50 rounded text-[11.5px] text-amber-800 flex items-start gap-2">
+              <Lock className="w-3.5 h-3.5 flex-shrink-0 mt-0.5 text-amber-800" />
               <div>
                 <strong className="font-semibold">Aguardando outros documentos chegarem nesta etapa.</strong>
-                <div className="text-[10.5px] text-amber-700/80 mt-0.5">
+                <div className="text-[10.5px] text-amber-800/80 mt-0.5">
                   Libera automaticamente quando todos os documentos do processo concluírem a etapa anterior.
                 </div>
               </div>

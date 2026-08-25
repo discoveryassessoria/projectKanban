@@ -230,7 +230,7 @@ export function KpiCard({
           className="h-9 w-9 shrink-0 grid place-items-center rounded-[var(--radius-sm)] border"
           style={
             iconVariant === "filled"
-              ? { background: iconTone === "neutral" ? S.surface2 : c, borderColor: "transparent", color: iconTone === "neutral" ? S.textSecondary : "var(--app-background)" }
+              ? { background: S.surface2, borderColor: "transparent", color: c }
               : { background: S.surface2, borderColor: S.border, color: c }
           }
         >{icon}</span>

@@ -175,7 +175,7 @@ export default function CambioTab() {
                   <td className="px-4 py-2.5 text-[var(--text-secondary)]">{fmtData(c.data)}</td>
                   <td className="px-4 py-2.5 text-[var(--text-secondary)]">{c.fonte || '—'}</td>
                   <td className="px-4 py-2.5">
-                    <span className={`rounded px-2 py-0.5 text-[11px] font-medium ${c.ativo ? 'bg-[var(--surface-secondary)] text-green-700' : 'bg-[var(--surface-primary)] text-[var(--text-secondary)]'}`}>
+                    <span className={`rounded px-2 py-0.5 text-[11px] font-medium ${c.ativo ? 'bg-[var(--surface-secondary)] text-green-800' : 'bg-[var(--surface-primary)] text-[var(--text-secondary)]'}`}>
                       {c.ativo ? 'Ativo' : 'Inativo'}
                     </span>
                   </td>

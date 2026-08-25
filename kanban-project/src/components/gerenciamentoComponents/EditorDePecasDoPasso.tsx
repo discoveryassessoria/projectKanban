@@ -112,7 +112,7 @@ export default function EditorDePecasDoPasso({
                     aparece aqui sem regravar nada.
                   </p>
                 ) : (
-                  <p className="mt-1 text-[11px] text-amber-700/70">
+                  <p className="mt-1 text-[11px] text-amber-800/70">
                     Referência sem cadastro escolhido não deixa escolher nada — a publicação recusa.
                   </p>
                 )
@@ -132,7 +132,7 @@ export default function EditorDePecasDoPasso({
                 de circulação, desmarque &quot;disponível&quot;.
               </p>
               {(c.opcoesCadastradas ?? []).length === 0 && (
-                <p className="mt-2 text-[11px] text-amber-700/70">
+                <p className="mt-2 text-[11px] text-amber-800/70">
                   Campo de escolha sem opção não deixa escolher nada — a publicação recusa.
                 </p>
               )}
@@ -197,7 +197,7 @@ export default function EditorDePecasDoPasso({
                   problema é a competência da fase ou o executor escolhido — e são
                   correções diferentes. */}
               {!efeitosOfertados.some((e) => e.key === a.effectKey) && (
-                <p className="mt-1 text-[11px] text-amber-700/80">
+                <p className="mt-1 text-[11px] text-amber-800/80">
                   {indisponivel
                     ? indisponivel.permitidoNestaFase
                       ? `O executor configurado para este passo não sabe disparar "${indisponivel.label}". Troque o executor em Avançado ou escolha outro resultado.`
@@ -222,7 +222,7 @@ export default function EditorDePecasDoPasso({
         onClick={() => aoMudar({ acoes: [...pecas.acoes, { label: "Novo resultado", effectKey: efeitosOfertados[0]?.key ?? "REGISTER_ONLY" }] })}
         className="rounded-lg bg-[var(--action-primary)] px-3 py-1.5 text-xs font-medium text-[var(--action-primary-ink)] hover:bg-[var(--action-primary)] disabled:opacity-40">+ Resultado</button>
       {efeitosOfertados.length === 0 && (
-        <p className="text-[11px] text-amber-700/70">
+        <p className="text-[11px] text-amber-800/70">
           Nenhum efeito disponível: a fase não declarou competência compatível com o executor escolhido.
         </p>
       )}
@@ -233,7 +233,7 @@ export default function EditorDePecasDoPasso({
   if (aba === "checklist") return (
     <>
       <p className="text-xs text-[var(--text-secondary)]">Itens de conferência.</p>
-      {avisoDoExecutor && <p className="text-[11px] text-amber-700/70">{avisoDoExecutor}</p>}
+      {avisoDoExecutor && <p className="text-[11px] text-amber-800/70">{avisoDoExecutor}</p>}
       {pecas.checkItens.length === 0 && (
         <p className="rounded-lg border border-dashed border-[var(--border-default)] p-4 text-center text-xs text-[var(--text-muted)]">
           Nenhum item de conferência.

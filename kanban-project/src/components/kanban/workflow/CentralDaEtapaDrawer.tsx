@@ -168,8 +168,8 @@ const STATUS_PILL_CLS: Record<StatusStep, string> = {
   bloqueada: "bg-[var(--surface-secondary)] text-red-700 border-[var(--border-default)]",
   em_andamento: "bg-[var(--surface-secondary)] text-[var(--text-secondary)] border-[var(--border-default)]",
   aguardando_terceiro: "bg-[var(--accent-primary)]/20 text-[var(--accent-text)] border-[var(--accent-primary)]/50",
-  atrasada: "bg-[var(--surface-secondary)] text-amber-700 border-[var(--border-default)]",
-  concluida: "bg-[var(--surface-secondary)] text-green-700 border-[var(--border-default)]",
+  atrasada: "bg-[var(--surface-secondary)] text-amber-800 border-[var(--border-default)]",
+  concluida: "bg-[var(--surface-secondary)] text-green-800 border-[var(--border-default)]",
   cancelada: "bg-[var(--surface-secondary)]0/20 text-[var(--text-muted)] border-[var(--border-default)]",
 }
 
@@ -535,7 +535,7 @@ function ConteudoDrawer({
                   >
                     Fechar
                   </button>
-                  <div className="ml-auto text-[11px] text-green-700">
+                  <div className="ml-auto text-[11px] text-green-800">
                     Concluída por <strong>{step.completedBy?.nome || "—"}</strong> em{" "}
                     {fmtDateTime(step.completedAt)}
                   </div>

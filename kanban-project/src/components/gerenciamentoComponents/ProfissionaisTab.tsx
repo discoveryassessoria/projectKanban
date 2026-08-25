@@ -184,7 +184,7 @@ export function ProfissionaisTab() {
         >+ Novo profissional</button>
       </div>
 
-      {erro && <div className="rounded-lg border border-[var(--border-default)] bg-[var(--surface-secondary)] px-4 py-3 text-sm text-amber-700">{erro}</div>}
+      {erro && <div className="rounded-lg border border-[var(--border-default)] bg-[var(--surface-secondary)] px-4 py-3 text-sm text-amber-800">{erro}</div>}
 
       {carregando ? (
         <p className="py-10 text-center text-sm text-[var(--text-muted)]">Carregando…</p>
@@ -217,7 +217,7 @@ export function ProfissionaisTab() {
                     {p.organizacao ? (p.organizacao.nomeFantasia || p.organizacao.name) : "autônomo"}
                   </td>
                   <td className="px-4 py-2.5">
-                    <span className={p.ativo ? "text-green-700/80" : "text-[var(--text-muted)]"}>
+                    <span className={p.ativo ? "text-green-800/80" : "text-[var(--text-muted)]"}>
                       {p.ativo ? "em circulação" : "fora de circulação"}
                     </span>
                     {p._count.retificacoes > 0 && (

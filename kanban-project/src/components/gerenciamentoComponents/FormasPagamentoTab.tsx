@@ -130,7 +130,7 @@ export default function FormasPagamentoTab() {
             <p className="text-sm text-[var(--text-secondary)]">Capacidades técnicas do meio. Regra comercial pertence à Condição.</p>
           </div>
         </div>
-        <button onClick={abrirNovo} className="inline-flex items-center gap-1.5 rounded-lg px-4 py-2 text-sm font-semibold text-[#1b1508] transition" style={{ background: OURO }}>
+        <button onClick={abrirNovo} className="inline-flex items-center gap-1.5 rounded-lg px-4 py-2 text-sm font-semibold text-[var(--accent-ink)] transition" style={{ background: OURO }}>
           <Plus className="h-4 w-4" /> Nova forma
         </button>
       </div>
@@ -220,7 +220,7 @@ function FormaPanel({ f, set, editId, moedas, carteiras, contas, salvando, erro,
 
           {/* Moedas */}
           <Secao icon={Coins} titulo="Moedas aceitas" dica="A forma pode aceitar uma ou várias moedas. Consome o cadastro de Moedas.">
-            {moedas.length === 0 ? <p className="text-[11px] text-amber-700/70">Cadastre moedas em “Moedas” para escolher aqui.</p> : (
+            {moedas.length === 0 ? <p className="text-[11px] text-amber-800/70">Cadastre moedas em “Moedas” para escolher aqui.</p> : (
               <ChipsMulti items={moedas.map((m) => ({ id: m.code, label: m.code + (m.name ? ` · ${m.name}` : '') }))} selecionados={f.moedasAceitas} onToggle={(code) => set('moedasAceitas', toggle(f.moedasAceitas, String(code)))} />
             )}
           </Secao>
@@ -314,7 +314,7 @@ function FormaPanel({ f, set, editId, moedas, carteiras, contas, salvando, erro,
 
         <div className="sticky bottom-0 flex items-center justify-end gap-2 border-t border-[var(--border-default)] bg-zinc-900/95 px-6 py-4">
           <button onClick={onClose} className="rounded-lg px-4 py-2 text-sm text-[var(--text-secondary)] transition hover:text-white">Cancelar</button>
-          <button onClick={onSalvar} disabled={salvando} className="inline-flex items-center gap-1.5 rounded-lg px-4 py-2 text-sm font-semibold text-[#1b1508] transition disabled:opacity-50" style={{ background: OURO }}>{salvando ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />}{salvando ? 'Salvando…' : 'Salvar'}</button>
+          <button onClick={onSalvar} disabled={salvando} className="inline-flex items-center gap-1.5 rounded-lg px-4 py-2 text-sm font-semibold text-[var(--accent-ink)] transition disabled:opacity-50" style={{ background: OURO }}>{salvando ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />}{salvando ? 'Salvando…' : 'Salvar'}</button>
         </div>
       </div>
     </div>
@@ -359,7 +359,7 @@ function ChipsMulti({ items, selecionados, onToggle }: { items: { id: string | n
       {items.map((it) => {
         const on = selecionados.includes(it.id)
         return (
-          <button key={String(it.id)} type="button" onClick={() => onToggle(it.id)} className={`inline-flex items-center gap-1 rounded-lg border px-2.5 py-1 text-xs transition ${on ? 'text-[#1b1508]' : 'border-[var(--border-default)] text-[var(--text-secondary)] hover:text-white'}`} style={on ? { background: OURO, borderColor: OURO } : undefined}>
+          <button key={String(it.id)} type="button" onClick={() => onToggle(it.id)} className={`inline-flex items-center gap-1 rounded-lg border px-2.5 py-1 text-xs transition ${on ? 'text-[var(--accent-ink)]' : 'border-[var(--border-default)] text-[var(--text-secondary)] hover:text-white'}`} style={on ? { background: OURO, borderColor: OURO } : undefined}>
             {on && <Check className="h-3 w-3" />}{it.label}
           </button>
         )

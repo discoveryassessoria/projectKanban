@@ -43,9 +43,9 @@ const CHIPS = [
 ] as const
 
 function statusBadge(status: string) {
-  if (status === "paga") return <span className="text-[11px] px-2 py-0.5 rounded-full bg-[var(--surface-secondary)] text-green-700 border border-[var(--border-default)]">Paga</span>
+  if (status === "paga") return <span className="text-[11px] px-2 py-0.5 rounded-full bg-[var(--surface-secondary)] text-green-800 border border-[var(--border-default)]">Paga</span>
   if (status === "prevista") return <span className="text-[11px] px-2 py-0.5 rounded-full bg-[var(--surface-primary)] text-[var(--text-secondary)] border border-[var(--border-strong)]">Prevista</span>
-  return <span className="text-[11px] px-2 py-0.5 rounded-full bg-[var(--surface-secondary)] text-amber-700 border border-[var(--border-default)]">A pagar</span>
+  return <span className="text-[11px] px-2 py-0.5 rounded-full bg-[var(--surface-secondary)] text-amber-800 border border-[var(--border-default)]">A pagar</span>
 }
 
 export default function ComissoesTab() {
@@ -88,9 +88,9 @@ export default function ComissoesTab() {
 
       {/* KPIs */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-        <Kpi label="A Pagar (este mês)" value={fmtBRL(k.aPagar)} valueColor="text-amber-700" sub={`${k.qtdAPagar} comissões liberadas`} />
+        <Kpi label="A Pagar (este mês)" value={fmtBRL(k.aPagar)} valueColor="text-amber-800" sub={`${k.qtdAPagar} comissões liberadas`} />
         <Kpi label="Previstas (futuro)" value={fmtBRL(k.previstas)} sub={`${k.qtdPrevistas} aguardando triggers`} />
-        <Kpi label="Pagas (YTD)" value={fmtBRL(k.pagas)} valueColor="text-green-700" sub={`${k.qtdPagas} liquidadas`} />
+        <Kpi label="Pagas (YTD)" value={fmtBRL(k.pagas)} valueColor="text-green-800" sub={`${k.qtdPagas} liquidadas`} />
         <Kpi label="Vendedor Destaque" value={k.destaque} valueSize="text-base" sub={`${fmtBRL(k.totalDestaque)} · ${k.qtdDestaque} comissões`} />
       </div>
 
@@ -121,7 +121,7 @@ export default function ComissoesTab() {
                 <td className="py-2 text-white/70">{r.base}</td>
                 <td className="py-2 text-right text-white font-medium">{r.valor}</td>
                 <td className="py-2 text-[var(--text-secondary)]">{r.aplicacao}</td>
-                <td className="py-2 text-center">{r.ativa ? <span className="text-[11px] px-2 py-0.5 rounded-full bg-[var(--surface-secondary)] text-green-700 border border-[var(--border-default)]">Ativa</span> : <span className="text-[11px] px-2 py-0.5 rounded-full bg-[var(--surface-primary)] text-[var(--text-secondary)]">Inativa</span>}</td>
+                <td className="py-2 text-center">{r.ativa ? <span className="text-[11px] px-2 py-0.5 rounded-full bg-[var(--surface-secondary)] text-green-800 border border-[var(--border-default)]">Ativa</span> : <span className="text-[11px] px-2 py-0.5 rounded-full bg-[var(--surface-primary)] text-[var(--text-secondary)]">Inativa</span>}</td>
               </tr>
             ))}
           </tbody>
@@ -176,9 +176,9 @@ export default function ComissoesTab() {
                 <td className="py-2 text-center">{statusBadge(c.status)}</td>
                 <td className="py-2 text-center">
                   {c.status === "a_pagar" ? (
-                    <button className="inline-flex items-center gap-1 px-2 py-1 text-[11px] rounded bg-[var(--surface-secondary)] hover:bg-green-800 text-[var(--action-primary-ink)]"><Check className="h-3 w-3" /> Pagar</button>
+                    <button className="inline-flex items-center gap-1 px-2 py-1 text-[11px] rounded bg-[var(--surface-secondary)] hover:bg-[var(--action-primary)] text-[var(--action-primary-ink)]"><Check className="h-3 w-3" /> Pagar</button>
                   ) : c.status === "paga" ? (
-                    <span className="text-[11px] text-green-700">✓ Paga</span>
+                    <span className="text-[11px] text-green-800">✓ Paga</span>
                   ) : (
                     <span className="text-[11px] text-[var(--text-muted)]">prevista</span>
                   )}

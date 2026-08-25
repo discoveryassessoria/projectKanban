@@ -66,7 +66,7 @@ const TR_DOC_LABEL: Record<string, string> = {
   bloqueado: "Bloqueado",
 }
 const PILL: Record<string, string> = {
-  validado: "bg-[var(--surface-secondary)] text-green-700",
+  validado: "bg-[var(--surface-secondary)] text-green-800",
   bloqueado: "bg-[var(--surface-secondary)] text-red-700",
   correcao_solicitada: "bg-[var(--surface-secondary)] text-red-700",
   pendente: "bg-[var(--surface-tertiary)] text-white/68",
@@ -206,7 +206,7 @@ export function ProcessoTraducao({ processoId, onConcluido }: Props) {
           <Stat label="Documentos validados" value={`${k.valid} / ${k.total}`} ok={k.valid > 0} />
           <Stat label="Progresso da fase" value={`${progress}%`} />
           <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold ${
-            concluida ? "bg-[var(--surface-secondary)] text-green-700" : "bg-[var(--surface-secondary)] text-[var(--text-secondary)]"}`}>
+            concluida ? "bg-[var(--surface-secondary)] text-green-800" : "bg-[var(--surface-secondary)] text-[var(--text-secondary)]"}`}>
             <span className={`w-1.5 h-1.5 rounded-full ${concluida ? "bg-[var(--surface-secondary)]" : "bg-[var(--surface-secondary)]"}`} />
             {concluida ? "Concluída" : "Em andamento"}
           </span>
@@ -238,7 +238,7 @@ export function ProcessoTraducao({ processoId, onConcluido }: Props) {
                       </div>
                       <div className="mt-1.5 text-[11px] font-medium text-white/80 leading-tight">{TR_SHORT[i]}</div>
                       <div className={`text-[10px] ${
-                        done ? "text-green-700" : active ? "text-[var(--text-secondary)]" : "text-[var(--text-muted)]"}`}>
+                        done ? "text-green-800" : active ? "text-[var(--text-secondary)]" : "text-[var(--text-muted)]"}`}>
                         {done ? "Concluído" : active ? "Em andamento" : "Pendente"}
                       </div>
                     </button>
@@ -373,7 +373,7 @@ export function ProcessoTraducao({ processoId, onConcluido }: Props) {
                   <AlertTriangle className="w-4 h-4 shrink-0" /> {k.corr} correção(ões) solicitada(s)
                 </div>
               )}
-              <div className="flex items-center gap-2 text-green-700 bg-[var(--surface-secondary)] rounded-lg px-3 py-2">
+              <div className="flex items-center gap-2 text-green-800 bg-[var(--surface-secondary)] rounded-lg px-3 py-2">
                 <CheckCircle2 className="w-4 h-4 shrink-0" /> {k.valid} validado(s)
               </div>
             </div>
@@ -407,7 +407,7 @@ export function ProcessoTraducao({ processoId, onConcluido }: Props) {
 function Stat({ label, value, ok }: { label: string; value: string; ok?: boolean }) {
   return (
     <div className="rounded-lg border border-[var(--border-default)] bg-[var(--surface-popover)] px-3 py-2 text-center">
-      <div className={`text-lg font-bold ${ok ? "text-green-700" : "text-white/95"}`}>{value}</div>
+      <div className={`text-lg font-bold ${ok ? "text-green-800" : "text-white/95"}`}>{value}</div>
       <div className="text-[11px] text-[var(--text-secondary)] whitespace-nowrap">{label}</div>
     </div>
   )
@@ -553,7 +553,7 @@ function EtapaModal({ stepId, pasta, posting, erro, onClose, onSubmit }: {
               <div className="space-y-2">
                 {MONTAR_CHK.map(([key, label]) => (
                   <button key={key} type="button" onClick={() => setMontarChk((p) => ({ ...p, [key]: !p[key] }))}
-                    className={`w-full flex items-center gap-2 border rounded-lg px-3 py-2 text-sm text-left ${montarChk[key] ? "border-[var(--border-default)] bg-[var(--surface-secondary)] text-green-700" : "border-[var(--border-default)] text-white/80"}`}>
+                    className={`w-full flex items-center gap-2 border rounded-lg px-3 py-2 text-sm text-left ${montarChk[key] ? "border-[var(--border-default)] bg-[var(--surface-secondary)] text-green-800" : "border-[var(--border-default)] text-white/80"}`}>
                     <span className={`w-4 h-4 rounded flex items-center justify-center ${montarChk[key] ? "bg-[var(--surface-secondary)] text-white" : "border border-[var(--border-default)]"}`}>
                       {montarChk[key] && <Check className="w-3 h-3" />}
                     </span>
@@ -622,7 +622,7 @@ function EtapaModal({ stepId, pasta, posting, erro, onClose, onSubmit }: {
                       <div className="text-[11px] text-[var(--text-secondary)]">{d.pessoaNome}</div>
                     </div>
                     <button type="button" onClick={() => setFiles((p) => ({ ...p, [d.documentoId]: `traducao_${d.documentoId}.pdf` }))}
-                      className={`inline-flex items-center gap-1.5 text-xs font-semibold rounded-md border px-3 py-1.5 ${files[d.documentoId] ? "border-[var(--border-default)] bg-[var(--surface-secondary)] text-green-700" : "border-[var(--border-default)] text-white/80"}`}>
+                      className={`inline-flex items-center gap-1.5 text-xs font-semibold rounded-md border px-3 py-1.5 ${files[d.documentoId] ? "border-[var(--border-default)] bg-[var(--surface-secondary)] text-green-800" : "border-[var(--border-default)] text-white/80"}`}>
                       {files[d.documentoId] ? <Check className="w-3.5 h-3.5" /> : <Upload className="w-3.5 h-3.5" />}
                       {files[d.documentoId] ? "Anexada" : "Anexar tradução"}
                     </button>
@@ -652,7 +652,7 @@ function EtapaModal({ stepId, pasta, posting, erro, onClose, onSubmit }: {
                       const on = confChk[key]
                       return (
                         <button key={ci} type="button" onClick={() => setConfChk((p) => ({ ...p, [key]: !p[key] }))}
-                          className={`inline-flex items-center gap-1.5 text-[11px] font-semibold rounded-md border px-2 py-1 ${on ? "border-[var(--border-default)] bg-[var(--surface-secondary)] text-green-700" : "border-[var(--border-default)] text-white/68"}`}>
+                          className={`inline-flex items-center gap-1.5 text-[11px] font-semibold rounded-md border px-2 py-1 ${on ? "border-[var(--border-default)] bg-[var(--surface-secondary)] text-green-800" : "border-[var(--border-default)] text-white/68"}`}>
                           <span className={`w-3.5 h-3.5 rounded flex items-center justify-center ${on ? "bg-[var(--surface-secondary)] text-white" : "border border-[var(--border-default)]"}`}>{on && <Check className="w-2.5 h-2.5" />}</span>
                           {c}
                         </button>
@@ -663,7 +663,7 @@ function EtapaModal({ stepId, pasta, posting, erro, onClose, onSubmit }: {
                     {CONF_RES.map(([v, l, tone]) => {
                       const sel = confRes[d.documentoId] === v
                       const selCls = !sel ? "border-[var(--border-default)] text-white/80"
-                        : tone === "ok" ? "border-[var(--border-default)] bg-[var(--surface-secondary)] text-green-700"
+                        : tone === "ok" ? "border-[var(--border-default)] bg-[var(--surface-secondary)] text-green-800"
                           : tone === "warn" ? "border-[var(--accent-primary)]/25 bg-[var(--accent-primary)]/12 text-[var(--accent-text)]"
                             : tone === "crit" ? "border-[var(--border-default)] bg-[var(--surface-secondary)] text-red-700"
                               : "border-[var(--border-strong)] bg-[var(--surface-secondary)] text-white"

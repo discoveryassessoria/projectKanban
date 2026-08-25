@@ -130,8 +130,8 @@ export function WorkflowMacroTrilha({
 
   const decLabel = (() => {
     // "Decisão da Análise Documental"
-    if (needsRectification === true) return { txt: "Precisa retificação", cls: "bg-[var(--surface-secondary)] text-green-700" }
-    if (needsRectification === false) return { txt: "Sem retificação", cls: "bg-[var(--surface-secondary)] text-green-700" }
+    if (needsRectification === true) return { txt: "Precisa retificação", cls: "bg-[var(--surface-secondary)] text-green-800" }
+    if (needsRectification === false) return { txt: "Sem retificação", cls: "bg-[var(--surface-secondary)] text-green-800" }
     return { txt: "Não definida", cls: "bg-[var(--surface-tertiary)] text-[var(--text-secondary)]" }
   })()
 
@@ -160,7 +160,7 @@ export function WorkflowMacroTrilha({
           const conditional = RETIF_PHASES.includes(title)
 
           const dotCls =
-            st === "concluida" ? "bg-[var(--surface-secondary)] text-green-700 border border-[var(--border-default)]"
+            st === "concluida" ? "bg-[var(--surface-secondary)] text-green-800 border border-[var(--border-default)]"
             : st === "atual" ? "bg-[var(--surface-tertiary)] text-white/95 border border-[var(--border-default)]"
             : st === "pulada" ? "bg-[var(--surface-tertiary)] text-[var(--text-muted)]"
             : st === "condicional" ? "bg-[var(--surface-secondary)] text-[var(--text-secondary)]"
@@ -168,7 +168,7 @@ export function WorkflowMacroTrilha({
             : "border-2 border-[var(--border-default)] bg-[var(--surface-popover)] text-[var(--text-muted)]"
 
           const badgeCls =
-            st === "concluida" ? "bg-[var(--surface-secondary)] text-green-700"
+            st === "concluida" ? "bg-[var(--surface-secondary)] text-green-800"
             : st === "atual" ? "bg-[var(--surface-secondary)] text-[var(--text-secondary)] border border-[var(--border-default)]"
             : st === "pulada" ? "bg-[var(--surface-tertiary)] text-[var(--text-secondary)]"
             : st === "condicional" ? "bg-[var(--surface-secondary)] text-[var(--text-secondary)]"
@@ -189,7 +189,7 @@ export function WorkflowMacroTrilha({
             : st === "pulada" ? "#cbd5e1"
             : "#d1d5db"
           const pctColor =
-            st === "concluida" ? "text-green-700"
+            st === "concluida" ? "text-green-800"
             : st === "atual" ? "text-[var(--text-secondary)]"
             : "text-[var(--text-muted)]"
 
@@ -257,7 +257,7 @@ export function WorkflowMacroTrilha({
 
       {/* Legenda */}
       <div className="flex flex-wrap gap-3.5 pt-3 mt-2.5 border-t border-[var(--border-default)] text-[11px] text-[var(--text-secondary)]">
-        <span className="flex items-center gap-1.5"><span className="w-3.5 h-3.5 rounded-full bg-[var(--surface-secondary)] text-green-700 border border-[var(--border-default)] grid place-items-center"><Check className="w-2 h-2" strokeWidth={3} /></span>Concluída</span>
+        <span className="flex items-center gap-1.5"><span className="w-3.5 h-3.5 rounded-full bg-[var(--surface-secondary)] text-green-800 border border-[var(--border-default)] grid place-items-center"><Check className="w-2 h-2" strokeWidth={3} /></span>Concluída</span>
         <span className="flex items-center gap-1.5"><span className="w-3.5 h-3.5 rounded-full bg-[var(--surface-secondary)]" />Atual (fase real)</span>
         <span className="flex items-center gap-1.5"><span className="w-3.5 h-3.5 rounded-full border-2 border-[var(--border-default)] bg-[var(--surface-popover)]" />Futura</span>
         <span className="flex items-center gap-1.5"><span className="w-3.5 h-3.5 rounded-full bg-[var(--surface-secondary)] text-[var(--text-secondary)] grid place-items-center text-[8px]">?</span>Condicional</span>
@@ -377,12 +377,12 @@ export function MacroSidebar({
             const st = getPhaseStatus(title, currentPhase, completedPhases, path, needsRectification)
             const prog = progressOf(title)
             const icCls =
-              st === "concluida" ? "bg-[var(--surface-secondary)] text-green-700 border border-[var(--border-default)]"
+              st === "concluida" ? "bg-[var(--surface-secondary)] text-green-800 border border-[var(--border-default)]"
               : st === "atual" ? "bg-[var(--surface-secondary)]"
               : st === "pulada" ? "bg-[var(--surface-tertiary)] text-[var(--text-muted)]"
               : "border-[1.5px] border-[var(--border-default)] bg-[var(--surface-popover)]"
             const pctCls =
-              st === "concluida" ? "text-green-700"
+              st === "concluida" ? "text-green-800"
               : st === "atual" ? "text-[var(--text-secondary)]"
               : "text-[var(--text-muted)]"
             return (

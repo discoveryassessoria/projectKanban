@@ -146,7 +146,7 @@ export default function TiposDocumentoTab() {
 
   return (
     <div className="space-y-5">
-      {flash && <div className="rounded-xl border border-[var(--border-default)] bg-[var(--surface-secondary)] px-4 py-3 text-sm text-green-700">{flash}</div>}
+      {flash && <div className="rounded-xl border border-[var(--border-default)] bg-[var(--surface-secondary)] px-4 py-3 text-sm text-green-800">{flash}</div>}
 
       <div className="rounded-2xl border border-[var(--border-default)] bg-[var(--surface-primary)] p-5 backdrop-blur-sm">
         <div className="flex items-start justify-between gap-3">
@@ -179,7 +179,7 @@ export default function TiposDocumentoTab() {
                 <td className="px-4 py-2.5 font-mono text-[12px] font-bold text-white/80">{d.publicCode ?? "—"}</td>
                 <td className="px-4 py-2.5 text-white">{d.name}</td>
                 <td className="px-4 py-2.5 text-white/70">{d.categoriaDocumental?.name ?? (d.category || "—")}</td>
-                <td className="px-4 py-2.5"><span className={`rounded-full px-2 py-0.5 text-[10px] ${d.ativo ? "bg-[var(--surface-secondary)] text-green-700" : "bg-[var(--surface-primary)] text-[var(--text-secondary)]"}`}>{d.ativo ? "Ativo" : "Inativo"}</span></td>
+                <td className="px-4 py-2.5"><span className={`rounded-full px-2 py-0.5 text-[10px] ${d.ativo ? "bg-[var(--surface-secondary)] text-green-800" : "bg-[var(--surface-primary)] text-[var(--text-secondary)]"}`}>{d.ativo ? "Ativo" : "Inativo"}</span></td>
                 <td className="px-4 py-2.5">
                   <div className="flex items-center justify-end gap-0.5 text-[var(--text-secondary)]">
                     <button title="Editar" aria-label="Editar" onClick={() => setForm({ id: d.id, publicCode: d.publicCode ?? null, code: d.code || "", name: d.name, category: d.category || "", categoriaDocumentalId: d.categoriaDocumentalId ?? null, currentCat: d.categoriaDocumental ?? null, ativo: d.ativo, familiaDocumentalId: d.familiaDocumentalId ?? null, naturezaOperacionalId: d.naturezaOperacionalId ?? null, perfilOperacionalId: d.perfilOperacionalId ?? null })} className="rounded p-1 hover:bg-[var(--surface-hover)] hover:text-white"><IEdit /></button>
@@ -246,7 +246,7 @@ export default function TiposDocumentoTab() {
                 <div>
                   <label className={labelCls}>
                     Perfil operacional
-                    {exigePerfil && <span className="ml-1 text-amber-700">· obrigatório para esta natureza</span>}
+                    {exigePerfil && <span className="ml-1 text-amber-800">· obrigatório para esta natureza</span>}
                   </label>
                   <select
                     value={form.perfilOperacionalId ?? ""}

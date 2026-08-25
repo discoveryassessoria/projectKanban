@@ -118,7 +118,7 @@ export function PaletaComandos({ indice, aberto, onFechar, onEscolher, contextoD
               </span>
               <span className="flex shrink-0 items-center gap-2">
                 {r.naLinha && (
-                  <span className="rounded-full bg-[var(--surface-secondary)] px-2 py-0.5 text-[10px] font-medium text-green-700">
+                  <span className="rounded-full bg-[var(--surface-secondary)] px-2 py-0.5 text-[10px] font-medium text-green-800">
                     linha
                   </span>
                 )}

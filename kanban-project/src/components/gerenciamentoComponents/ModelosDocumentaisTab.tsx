@@ -96,8 +96,8 @@ const labelCls = "mb-1 block text-xs text-[var(--action-primary-ink)]/60"
 const SEM_ITENS: never[] = Object.freeze([]) as never[]
 
 const CORES_STATUS: Record<StatusVersao, string> = {
-  RASCUNHO: "bg-[var(--surface-secondary)] text-amber-700",
-  PUBLICADA: "bg-[var(--surface-secondary)] text-green-700",
+  RASCUNHO: "bg-[var(--surface-secondary)] text-amber-800",
+  PUBLICADA: "bg-[var(--surface-secondary)] text-green-800",
   REVOGADA: "bg-[var(--surface-primary)] text-[var(--action-primary-ink)]/50",
 }
 
@@ -206,11 +206,11 @@ export default function ModelosDocumentaisTab() {
                   )}
                 </td>
                 <td className="px-4 py-2.5 text-[var(--text-secondary)]">
-                  {m.versaoPublicada ? `v${m.versaoPublicada.numero}` : <span className="text-amber-700/80">nenhuma</span>}
+                  {m.versaoPublicada ? `v${m.versaoPublicada.numero}` : <span className="text-amber-800/80">nenhuma</span>}
                   <span className="ml-1 text-[var(--text-muted)]">de {m.totalVersoes}</span>
                 </td>
                 <td className="px-4 py-2.5">
-                  <span className={`rounded-full px-2 py-0.5 text-[10px] ${m.ativo ? "bg-[var(--surface-secondary)] text-green-700" : "bg-[var(--surface-primary)] text-[var(--action-primary-ink)]/50"}`}>
+                  <span className={`rounded-full px-2 py-0.5 text-[10px] ${m.ativo ? "bg-[var(--surface-secondary)] text-green-800" : "bg-[var(--surface-primary)] text-[var(--action-primary-ink)]/50"}`}>
                     {m.ativo ? "Ativo" : "Inativo"}
                   </span>
                 </td>
@@ -451,7 +451,7 @@ function PainelVersoes({
                       <button onClick={() => void baixar(v.id)} className="rounded px-1.5 py-0.5 hover:bg-[var(--surface-hover)] hover:text-[var(--action-primary-ink)]">Baixar</button>
                       <button disabled={busy} onClick={() => void agir(v.id, "validar")} className="rounded px-1.5 py-0.5 hover:bg-[var(--surface-hover)] hover:text-[var(--action-primary-ink)] disabled:opacity-40">Validar</button>
                       {v.status === "RASCUNHO" && (
-                        <button disabled={busy} onClick={() => void agir(v.id, "publicar")} className="rounded bg-[var(--surface-secondary)] px-2 py-0.5 text-[var(--action-primary-ink)] hover:bg-green-800 disabled:opacity-40">Publicar</button>
+                        <button disabled={busy} onClick={() => void agir(v.id, "publicar")} className="rounded bg-[var(--surface-secondary)] px-2 py-0.5 text-[var(--action-primary-ink)] hover:bg-[var(--action-primary)] disabled:opacity-40">Publicar</button>
                       )}
                       {v.status !== "REVOGADA" && (
                         <button disabled={busy} onClick={() => void agir(v.id, "revogar")} className="rounded px-1.5 py-0.5 text-red-700/70 hover:bg-[var(--surface-secondary)] hover:text-red-700 disabled:opacity-40">Revogar</button>
@@ -485,13 +485,13 @@ function PainelVersoes({
 
                   {validacao?.versaoId === v.id && (
                     <div className="mt-3 rounded-lg border border-[var(--border-default)] bg-black/30 p-3">
-                      <div className={`text-xs font-medium ${validacao.resultado.ok ? "text-green-700" : "text-red-700"}`}>
+                      <div className={`text-xs font-medium ${validacao.resultado.ok ? "text-green-800" : "text-red-700"}`}>
                         {validacao.resultado.ok ? "Validação aprovada — pode publicar." : "Validação reprovada."}
                       </div>
                       <ul className="mt-2 space-y-1 text-[11px] text-[var(--text-secondary)]">
                         {validacao.resultado.achados.map((a, i) => (
                           <li key={i}>
-                            <span className={a.severidade === "erro" ? "text-red-700" : "text-amber-700"}>■</span>{" "}
+                            <span className={a.severidade === "erro" ? "text-red-700" : "text-amber-800"}>■</span>{" "}
                             {a.mensagem} {a.detalhe && <span className="text-[var(--text-muted)]">{a.detalhe}</span>}
                           </li>
                         ))}

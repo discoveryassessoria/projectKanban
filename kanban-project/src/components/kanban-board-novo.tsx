@@ -352,7 +352,7 @@ export function KanbanBoard({
       </div>
 
       {fases.length === 0 ? (
-        <div className="rounded-lg border border-[var(--border-default)] bg-[var(--surface-secondary)] p-6 text-center text-sm text-amber-700">
+        <div className="rounded-lg border border-[var(--border-default)] bg-[var(--surface-secondary)] p-6 text-center text-sm text-amber-800">
           Este tipo de processo ainda não tem fases configuradas.
           Monte o workflow em Gerenciamento → Workflows e Fases → Workflow Macro.
         </div>

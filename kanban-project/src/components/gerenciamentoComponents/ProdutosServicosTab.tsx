@@ -348,7 +348,7 @@ export default function ProdutosServicosTab() {
                       <div className="text-[11px] text-[var(--text-muted)]">Referência ao Documento Mestre · Documentos e Protocolos</div>
                     )}
                     {l.documentoMestreVinculado === false && (
-                      <div className="text-[11px] text-amber-700/70">Sem vínculo com Documentos e Protocolos — cadastre o documento oficial lá e vincule</div>
+                      <div className="text-[11px] text-amber-800/70">Sem vínculo com Documentos e Protocolos — cadastre o documento oficial lá e vincule</div>
                     )}
                   </td>
                   <td className="px-4 py-2.5">
@@ -365,7 +365,7 @@ export default function ProdutosServicosTab() {
                       : <span className="text-[var(--text-muted)]">—</span>}
                   </td>
                   <td className="px-4 py-2.5">
-                    <span className={`rounded px-2 py-0.5 text-[11px] font-medium ${l.ativo ? 'bg-[var(--surface-secondary)] text-green-700' : 'bg-[var(--surface-primary)] text-[var(--text-secondary)]'}`}>
+                    <span className={`rounded px-2 py-0.5 text-[11px] font-medium ${l.ativo ? 'bg-[var(--surface-secondary)] text-green-800' : 'bg-[var(--surface-primary)] text-[var(--text-secondary)]'}`}>
                       {l.ativo ? 'Ativo' : 'Inativo'}
                     </span>
                   </td>

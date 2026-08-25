@@ -333,7 +333,7 @@ export function HeaderBar({
                     {notificacoes.hoje.length > 0 && (
                       <div>
                         <div className="px-3 py-2 bg-[var(--surface-secondary)] text-[10px] uppercase tracking-wide text-amber-600 font-medium flex items-center gap-1 sticky top-0">
-                          <span className="h-2 w-2 rounded-full bg-amber-600"></span>
+                          <span className="h-2 w-2 rounded-full bg-[var(--action-primary)]"></span>
                           Vencem hoje ({notificacoes.hoje.length})
                         </div>
                         {notificacoes.hoje.map(tarefa => (
@@ -353,7 +353,7 @@ export function HeaderBar({
                     {notificacoes.proximos3Dias.length > 0 && (
                       <div>
                         <div className="px-3 py-2 bg-[var(--surface-secondary)] text-[10px] uppercase tracking-wide text-amber-600 font-medium flex items-center gap-1 sticky top-0">
-                          <span className="h-2 w-2 rounded-full bg-amber-600"></span>
+                          <span className="h-2 w-2 rounded-full bg-[var(--action-primary)]"></span>
                           Próximos 3 dias ({notificacoes.proximos3Dias.length})
                         </div>
                         {notificacoes.proximos3Dias.map(tarefa => (

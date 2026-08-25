@@ -77,7 +77,7 @@ export function WorkflowV2AtivacaoPanel({ processoId }: Props) {
       <div className="mb-2 flex items-center gap-2">
         <ShieldCheck className="h-4 w-4 text-[var(--text-secondary)]" />
         <span className="font-semibold text-gray-800">Ativação controlada do runtime v2</span>
-        <span className={`rounded px-2 py-0.5 text-xs ${prep.killSwitchGlobal ? "bg-[var(--surface-secondary)] text-green-700" : "bg-gray-200 text-gray-600"}`}>
+        <span className={`rounded px-2 py-0.5 text-xs ${prep.killSwitchGlobal ? "bg-[var(--surface-secondary)] text-green-800" : "bg-gray-200 text-gray-600"}`}>
           kill switch {prep.killSwitchGlobal ? "ON" : "OFF"}
         </span>
       </div>

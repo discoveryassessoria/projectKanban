@@ -41,7 +41,7 @@ export default function DreTab() {
 
   const d = data
   const k = d.kpis
-  const ahColor = (v: number) => v > 0 ? "text-green-700" : v < 0 ? "text-red-700" : "text-[var(--text-muted)]"
+  const ahColor = (v: number) => v > 0 ? "text-green-800" : v < 0 ? "text-red-700" : "text-[var(--text-muted)]"
   const ah = (cur: number, prev: number) => prev !== 0 ? ((cur - prev) / Math.abs(prev)) * 100 : 0
 
   return (
@@ -60,9 +60,9 @@ export default function DreTab() {
       {/* KPIs */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         <Kpi label="Receita Bruta" value={fmtBRL(k.receitaBruta)} sub={<>vs {fmtBRL(k.receitaBrutaPrev)} · <span className={ahColor(k.ahReceita)}>{fmtPct(k.ahReceita)}</span></>} />
-        <Kpi label="Lucro Bruto" value={fmtBRL(k.lucroBruto)} valueColor={k.lucroBruto >= 0 ? "text-green-700" : "text-red-700"} sub={<>Margem: <strong className="text-white">{fmtPct(k.margemBruta)}</strong></>} />
-        <Kpi label="Lucro Operacional" value={fmtBRL(k.lucroOperacional)} valueColor={k.lucroOperacional >= 0 ? "text-green-700" : "text-red-700"} sub={<>Margem: <strong className="text-white">{fmtPct(k.margemOper)}</strong></>} />
-        <Kpi label="Lucro Líquido" value={fmtBRL(k.lucroLiquido)} valueColor={k.lucroLiquido >= 0 ? "text-green-700" : "text-red-700"} sub={<>Margem: <strong className="text-white">{fmtPct(k.margemLiq)}</strong></>} />
+        <Kpi label="Lucro Bruto" value={fmtBRL(k.lucroBruto)} valueColor={k.lucroBruto >= 0 ? "text-green-800" : "text-red-700"} sub={<>Margem: <strong className="text-white">{fmtPct(k.margemBruta)}</strong></>} />
+        <Kpi label="Lucro Operacional" value={fmtBRL(k.lucroOperacional)} valueColor={k.lucroOperacional >= 0 ? "text-green-800" : "text-red-700"} sub={<>Margem: <strong className="text-white">{fmtPct(k.margemOper)}</strong></>} />
+        <Kpi label="Lucro Líquido" value={fmtBRL(k.lucroLiquido)} valueColor={k.lucroLiquido >= 0 ? "text-green-800" : "text-red-700"} sub={<>Margem: <strong className="text-white">{fmtPct(k.margemLiq)}</strong></>} />
       </div>
 
       {/* TABELA DRE */}
@@ -105,7 +105,7 @@ export default function DreTab() {
     const ahVal = ah(l.valor, l.prev)
     const bg = total ? "bg-[var(--surface-primary)]" : margem ? "bg-[var(--surface-primary)]" : grupo ? "bg-[var(--surface-primary)]" : ""
     const weight = total || margem || grupo ? "font-bold" : "font-normal"
-    const valColor = total ? (l.valor >= 0 ? "text-green-700" : "text-red-700") : deduct ? "text-red-700/80" : "text-white"
+    const valColor = total ? (l.valor >= 0 ? "text-green-800" : "text-red-700") : deduct ? "text-red-700/80" : "text-white"
     return (
       <div className={`grid grid-cols-[2fr_1.2fr_1.2fr_0.8fr_0.8fr] gap-2 px-4 py-2 border-b border-[var(--border-subtle)] text-sm ${bg}`}>
         <div className={`${weight} text-white/90 ${indent ? "pl-4" : ""} flex items-center gap-1.5`}>

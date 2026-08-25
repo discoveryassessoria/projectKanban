@@ -188,7 +188,7 @@ export default function MacroKanbanTab() {
       </div>
 
       {salvoMsg && (
-        <div className="rounded-lg border border-[var(--border-default)] bg-[var(--surface-secondary)] px-4 py-2.5 text-sm text-green-700">
+        <div className="rounded-lg border border-[var(--border-default)] bg-[var(--surface-secondary)] px-4 py-2.5 text-sm text-green-800">
           ✓ {salvoMsg}
         </div>
       )}
@@ -201,7 +201,7 @@ export default function MacroKanbanTab() {
       )}
 
       {!loading && !erro && tipos.length === 0 && (
-        <div className="rounded-lg border border-[var(--border-default)] bg-[var(--surface-secondary)] p-3 text-sm text-amber-700">
+        <div className="rounded-lg border border-[var(--border-default)] bg-[var(--surface-secondary)] p-3 text-sm text-amber-800">
           Nenhum tipo de processo ainda. Crie em <span className="font-medium">Processos de Nacionalidade</span> primeiro.
         </div>
       )}
@@ -272,7 +272,7 @@ export default function MacroKanbanTab() {
                       </div>
                       <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-[var(--surface-primary)] text-xs font-semibold text-white/70">{f.ordem}</div>
                       <input value={f.label} onChange={(e) => patch(idx, { label: e.target.value })} className="flex-1 rounded-lg border border-[var(--border-default)] bg-[var(--surface-primary)] px-3 py-1.5 text-sm text-white outline-none focus:border-white/20" />
-                      {f.conditional && <span className="rounded-md bg-[var(--surface-secondary)] px-2 py-0.5 text-[11px] font-medium text-amber-700">condicional</span>}
+                      {f.conditional && <span className="rounded-md bg-[var(--surface-secondary)] px-2 py-0.5 text-[11px] font-medium text-amber-800">condicional</span>}
                       <button onClick={() => remover(idx)} className="rounded-md border border-[var(--border-default)] px-2 py-1 text-xs text-red-700/80 transition hover:bg-[var(--surface-secondary)] hover:text-red-700">Remover</button>
                     </div>
                     <div className="mt-2 flex flex-wrap items-center gap-x-5 gap-y-2 pl-[68px] text-xs text-[var(--text-secondary)]">
@@ -325,7 +325,7 @@ export default function MacroKanbanTab() {
               <div className="flex items-center justify-between gap-3 border-t border-[var(--border-default)] pt-4">
                 <button onClick={excluirWorkflow} className="text-xs text-red-700/70 transition hover:text-red-700">Excluir workflow</button>
                 <div className="flex items-center gap-3">
-                  {dirty && <span className="text-xs text-amber-700/80">alterações não salvas</span>}
+                  {dirty && <span className="text-xs text-amber-800/80">alterações não salvas</span>}
                   <button onClick={salvar} disabled={salvando || !dirty} className="rounded-lg bg-[var(--action-primary)] px-4 py-2 text-sm font-medium text-[var(--action-primary-ink)] transition hover:bg-[var(--action-primary)] disabled:opacity-50">
                     {salvando ? 'Salvando...' : 'Salvar workflow'}
                   </button>

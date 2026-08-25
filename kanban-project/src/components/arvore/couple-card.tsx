@@ -145,7 +145,7 @@ function PersonMiniCard({
             <span className="text-[8px] text-gray-500">{dateRange || 'Falecido'}</span>
           ) : (
             <span className="text-[8px] text-green-600 flex items-center gap-0.5">
-              <span className="w-1.5 h-1.5 rounded-full bg-green-600"></span>
+              <span className="w-1.5 h-1.5 rounded-full bg-[var(--action-primary)]"></span>
               {dateRange ? `${dateRange}-Vivo` : 'Vivo'}
             </span>
           )}
@@ -517,7 +517,7 @@ export function PersonCardFS({
                 <span className="text-[8px] text-gray-500">{dateRange || 'Falecido'}</span>
               ) : (
                 <span className="text-[8px] text-green-600 flex items-center gap-0.5">
-                  <span className="w-1.5 h-1.5 rounded-full bg-green-600"></span>
+                  <span className="w-1.5 h-1.5 rounded-full bg-[var(--action-primary)]"></span>
                   Vivo
                 </span>
               )}
@@ -593,7 +593,7 @@ export function PersonCardFS({
             <span className="text-[8px] text-gray-500">{dateRange || 'Falecido'}</span>
           ) : (
             <span className="text-[8px] text-green-600 flex items-center gap-0.5">
-              <span className="w-1.5 h-1.5 rounded-full bg-green-600"></span>
+              <span className="w-1.5 h-1.5 rounded-full bg-[var(--action-primary)]"></span>
               {dateRange ? `${dateRange}-Vivo` : 'Vivo'}
             </span>
           )}

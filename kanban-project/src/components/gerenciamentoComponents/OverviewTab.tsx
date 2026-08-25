@@ -95,7 +95,7 @@ export default function OverviewTab() {
           <AlertTriangle className="h-3.5 w-3.5" /> Alertas de configuração
         </div>
         {d.alertas.length === 0 ? (
-          <div className="text-sm text-green-700">✓ Nenhum alerta. Tudo configurado.</div>
+          <div className="text-sm text-green-800">✓ Nenhum alerta. Tudo configurado.</div>
         ) : (
           <div className="space-y-1">
             {d.alertas.map((a, i) => (

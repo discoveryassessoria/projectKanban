@@ -131,7 +131,7 @@ export function HealthTab() {
         <Kpi value="0" label="Alertas" color="#b45309" />
         <Kpi value="—" label="Pronto" />
       </div>
-      <div className={`${CARD} p-5 text-sm font-medium text-green-700`}>
+      <div className={`${CARD} p-5 text-sm font-medium text-green-800`}>
         ✅ Nenhum problema estrutural no Gerenciamento.
       </div>
     </div>

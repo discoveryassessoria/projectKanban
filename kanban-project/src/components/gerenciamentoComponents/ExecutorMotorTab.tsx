@@ -140,16 +140,16 @@ export default function ExecutorMotorTab() {
 
   return (
     <div className="space-y-5">
-      {flash && <div className="rounded-xl border border-[var(--border-default)] bg-[var(--surface-secondary)] px-4 py-2.5 text-sm text-green-700">{flash}</div>}
+      {flash && <div className="rounded-xl border border-[var(--border-default)] bg-[var(--surface-secondary)] px-4 py-2.5 text-sm text-green-800">{flash}</div>}
 
       {/* chave liga/desliga do gatilho automático */}
       <div className="flex items-center justify-between gap-4 rounded-2xl border border-[var(--border-default)] bg-[var(--surface-primary)] p-4 backdrop-blur-sm">
         <div>
           <div className="flex items-center gap-2 text-sm font-medium text-white">
             Gatilho automático
-            <span className={`rounded-full px-2 py-0.5 text-[10px] ${autoExecutar ? "bg-[var(--surface-secondary)] text-green-700" : "bg-[var(--surface-primary)] text-[var(--text-secondary)]"}`}>{autoExecutar ? "LIGADO" : "desligado"}</span>
+            <span className={`rounded-full px-2 py-0.5 text-[10px] ${autoExecutar ? "bg-[var(--surface-secondary)] text-green-800" : "bg-[var(--surface-primary)] text-[var(--text-secondary)]"}`}>{autoExecutar ? "LIGADO" : "desligado"}</span>
           </div>
-          <div className="mt-0.5 text-xs text-[var(--text-secondary)]">Ligado: o motor roda sozinho ao <b>avançar a fase</b> de um processo conectado. Desligado: só pelo botão abaixo. {autoExecutar && <span className="text-amber-700/80">Cuidado — cria artefatos automaticamente.</span>}</div>
+          <div className="mt-0.5 text-xs text-[var(--text-secondary)]">Ligado: o motor roda sozinho ao <b>avançar a fase</b> de um processo conectado. Desligado: só pelo botão abaixo. {autoExecutar && <span className="text-amber-800/80">Cuidado — cria artefatos automaticamente.</span>}</div>
         </div>
         <button onClick={toggleAuto} role="switch" aria-checked={autoExecutar} aria-label="Gatilho automático" className={`relative inline-flex h-6 w-11 flex-none items-center rounded-full transition-colors ${autoExecutar ? "bg-green-700" : "bg-[var(--surface-secondary)]"}`}>
           <span className={`inline-block h-4 w-4 rounded-full bg-[var(--surface-primary)] shadow transition-transform ${autoExecutar ? "translate-x-6" : "translate-x-1"}`} />
@@ -158,7 +158,7 @@ export default function ExecutorMotorTab() {
 
       <div className="rounded-2xl border border-[var(--border-default)] bg-[var(--surface-primary)] p-5 backdrop-blur-sm">
         <h2 className="text-lg font-semibold text-white">Executor do Motor</h2>
-        <p className="mt-1 text-sm text-[var(--text-secondary)]">Roda as automações de uma fase e <b className="text-amber-700/90">cria os artefatos de verdade</b> no processo: <b>tarefas</b>, <b>lançamentos financeiros</b>, <b>eventos</b> e <b>protocolos</b>. Tudo dá pra desfazer.</p>
+        <p className="mt-1 text-sm text-[var(--text-secondary)]">Roda as automações de uma fase e <b className="text-amber-800/90">cria os artefatos de verdade</b> no processo: <b>tarefas</b>, <b>lançamentos financeiros</b>, <b>eventos</b> e <b>protocolos</b>. Tudo dá pra desfazer.</p>
 
         <div className="mt-4">
           <label className={labelCls}>Processo (do operacional)</label>
@@ -187,7 +187,7 @@ export default function ExecutorMotorTab() {
         {proc && tipoAtual && (
           <>
             <div className="mt-4 flex items-center gap-2 text-sm text-white/70">
-              <span className="rounded-full bg-[var(--surface-secondary)] px-2.5 py-0.5 text-xs text-green-700">✓ conectado</span>
+              <span className="rounded-full bg-[var(--surface-secondary)] px-2.5 py-0.5 text-xs text-green-800">✓ conectado</span>
               <span>Tipo: <b className="text-white">{tipoAtual.name}</b></span>
               <button onClick={() => conectar(null)} className="ml-2 text-xs text-[var(--text-muted)] underline hover:text-white/70">desconectar</button>
             </div>
@@ -209,12 +209,12 @@ export default function ExecutorMotorTab() {
             </div>
 
             {!confirming ? (
-              <button disabled={running || !phaseKey} onClick={() => setConfirming(true)} className="mt-4 rounded-lg bg-amber-700 px-4 py-2 text-sm font-medium text-[var(--action-primary-ink)] hover:bg-amber-600 disabled:opacity-50">Executar automações da fase</button>
+              <button disabled={running || !phaseKey} onClick={() => setConfirming(true)} className="mt-4 rounded-lg bg-[var(--action-primary)] px-4 py-2 text-sm font-medium text-[var(--action-primary-ink)] hover:bg-[var(--action-primary)] disabled:opacity-50">Executar automações da fase</button>
             ) : (
               <div className="mt-4 rounded-xl border border-[var(--border-default)] bg-[var(--surface-secondary)] p-4">
                 <div className="text-sm text-amber-100">Isso vai <b>criar tarefas e lançamentos reais</b> no processo <b>{proc.nome}</b>. Pode desfazer depois. Confirma?</div>
                 <div className="mt-3 flex gap-2">
-                  <button disabled={running} onClick={executar} className="rounded-lg bg-amber-700 px-4 py-2 text-sm font-medium text-[var(--action-primary-ink)] hover:bg-amber-600 disabled:opacity-50">{running ? "Executando…" : "Sim, executar"}</button>
+                  <button disabled={running} onClick={executar} className="rounded-lg bg-[var(--action-primary)] px-4 py-2 text-sm font-medium text-[var(--action-primary-ink)] hover:bg-[var(--action-primary)] disabled:opacity-50">{running ? "Executando…" : "Sim, executar"}</button>
                   <button disabled={running} onClick={() => setConfirming(false)} className="rounded-lg border border-[var(--border-default)] px-4 py-2 text-sm text-white/70 hover:bg-[var(--surface-hover)]">Cancelar</button>
                 </div>
               </div>
@@ -230,7 +230,7 @@ export default function ExecutorMotorTab() {
         <div className="rounded-2xl border border-[var(--border-default)] bg-[var(--surface-primary)] p-4 backdrop-blur-sm">
           <div className="mb-2 text-sm text-white/80"><b>{result.totalCriado}</b> item(ns) criado(s){result.skipped.length > 0 && <> · {result.skipped.length} pulado(s)</>}{result.errors.length > 0 && <> · <span className="text-red-700">{result.errors.length} erro(s)</span></>}.</div>
           {result.created.map((c, i) => (
-            <div key={i} className="flex flex-wrap items-center gap-1.5 text-sm text-green-700">
+            <div key={i} className="flex flex-wrap items-center gap-1.5 text-sm text-green-800">
               <span className="rounded bg-[var(--surface-primary)] px-1.5 py-0.5 text-[10px] text-[var(--text-secondary)]">{TABLE_LABEL[c.targetTable] || c.targetTable}</span>
               <span>+ {c.name}</span>
               {c.amount != null && <span className="text-[var(--text-secondary)]">— {money(c.amount, c.currency || "EUR")}</span>}

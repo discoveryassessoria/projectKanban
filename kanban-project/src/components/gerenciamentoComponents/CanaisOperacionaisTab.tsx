@@ -153,7 +153,7 @@ export default function CanaisOperacionaisTab() {
                   <div className="mt-0.5 flex flex-wrap gap-1.5 text-[10px]">
                     {c.protocoloObrigatorio && <span className="rounded bg-[var(--surface-secondary)] px-1.5 py-0.5 text-[var(--text-secondary)]">protocolo no ato</span>}
                     {c.anexoObrigatorioLabel && <span className="rounded bg-[var(--surface-primary)] px-1.5 py-0.5 text-[var(--text-secondary)]">{c.anexoObrigatorioLabel}</span>}
-                    {c.rastreioObrigatorio && <span className="rounded bg-[var(--surface-secondary)] px-1.5 py-0.5 text-amber-700">rastreio</span>}
+                    {c.rastreioObrigatorio && <span className="rounded bg-[var(--surface-secondary)] px-1.5 py-0.5 text-amber-800">rastreio</span>}
                     {c.observacaoObrigatoria && <span className="rounded bg-[var(--surface-primary)] px-1.5 py-0.5 text-[var(--text-secondary)]">observação</span>}
                   </div>
                 </div>

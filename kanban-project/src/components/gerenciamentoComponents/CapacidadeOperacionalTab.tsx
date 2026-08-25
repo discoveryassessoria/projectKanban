@@ -188,7 +188,7 @@ export default function CapacidadeOperacionalTab() {
                   <div className="text-[10px] text-[var(--text-muted)]">{l.perfil}</div>
                   {/* A permissão vem primeiro porque sem ela o resto é decorativo. */}
                   {!l.podeExecutar && (
-                    <div className="mt-1 inline-flex rounded border border-[var(--border-default)] bg-[var(--surface-secondary)] px-1.5 py-[1px] text-[9px] text-amber-700/90">
+                    <div className="mt-1 inline-flex rounded border border-[var(--border-default)] bg-[var(--surface-secondary)] px-1.5 py-[1px] text-[9px] text-amber-800/90">
                       não executa tarefas
                     </div>
                   )}
@@ -203,14 +203,14 @@ export default function CapacidadeOperacionalTab() {
                 </td>
                 <td className="px-3 py-2 text-[11px]">
                   {l.indisponivelPor ? (
-                    <span className="text-amber-700/85">
+                    <span className="text-amber-800/85">
                       {ROTULO_TIPO[l.indisponivelPor.tipo] ?? l.indisponivelPor.tipo}
                       <span className="text-[var(--text-muted)]">
                         {l.indisponivelPor.fim ? ` até ${dataCurta(l.indisponivelPor.fim)}` : " (sem retorno)"}
                       </span>
                     </span>
                   ) : (
-                    <span className="text-green-700/70">disponível</span>
+                    <span className="text-green-800/70">disponível</span>
                   )}
                 </td>
                 <td className="px-3 py-2 text-[11px] tabular-nums text-[var(--text-secondary)]">
@@ -278,7 +278,7 @@ function PainelConfiguracao({
             {linha.equipes.length > 0 && ` · ${linha.equipes.map((e) => e.nome).join(", ")}`}
           </p>
           {!linha.podeExecutar && (
-            <p className="mt-1.5 rounded border border-[var(--border-default)] bg-[var(--surface-secondary)] px-2 py-1 text-[10px] leading-4 text-amber-700/85">
+            <p className="mt-1.5 rounded border border-[var(--border-default)] bg-[var(--surface-secondary)] px-2 py-1 text-[10px] leading-4 text-amber-800/85">
               Esta pessoa não tem permissão de executar tarefa. Nada configurado aqui a torna elegível —
               a permissão se concede em Perfis e Permissões.
             </p>
@@ -295,7 +295,7 @@ function PainelConfiguracao({
               ninguém for declarado apto para uma unidade, ela não restringe ninguém — a primeira declaração liga a regra.
             </p>
             {unidades.length === 0 ? (
-              <p className="mt-2 rounded border border-[var(--border-default)] bg-[var(--surface-secondary)] px-2 py-1.5 text-[10px] leading-4 text-amber-700/80">
+              <p className="mt-2 rounded border border-[var(--border-default)] bg-[var(--surface-secondary)] px-2 py-1.5 text-[10px] leading-4 text-amber-800/80">
                 Nenhuma unidade de trabalho cadastrada. Elas vêm dos Perfis Operacionais do Cadastro Mestre —
                 cadastre-os em Gerenciamento › Documentos e Protocolos para que apareçam aqui.
               </p>
@@ -377,7 +377,7 @@ function PainelConfiguracao({
                     <div key={i.id} className={`flex items-center gap-2 rounded border px-2 py-1.5 text-[11px] ${
                       vigente ? "border-[var(--border-default)] bg-[var(--surface-secondary)]" : "border-white/[0.07]"
                     }`}>
-                      <span className={vigente ? "text-amber-700/90" : "text-[var(--text-secondary)]"}>
+                      <span className={vigente ? "text-amber-800/90" : "text-[var(--text-secondary)]"}>
                         {ROTULO_TIPO[i.tipo] ?? i.tipo}
                       </span>
                       <span className="text-[var(--text-muted)]">

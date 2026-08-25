@@ -146,7 +146,7 @@ function CentralOperacional({ data }: { data: HomeData }) {
         // Vazio aqui é CONQUISTA, não buraco: some o ícone apagado e entra a
         // confirmação de que a fila está limpa.
         <div className="flex flex-1 flex-col items-center justify-center gap-3 px-5 pb-10 pt-2 text-center">
-          <span className="flex h-[52px] w-[52px] items-center justify-center rounded-full border border-[var(--border-default)] bg-[var(--surface-secondary)] text-green-700">
+          <span className="flex h-[52px] w-[52px] items-center justify-center rounded-full border border-[var(--border-default)] bg-[var(--surface-secondary)] text-green-800">
             <CheckCircle2 className="h-6 w-6" />
           </span>
           <p className="text-[15px] font-medium text-[var(--text-primary)]">Tudo limpo por aqui</p>
@@ -393,8 +393,8 @@ function ResumoDoDia({ data }: { data: HomeData }) {
             <b className="font-semibold tabular-nums text-[var(--text-secondary)]">0</b> {i.curto}
           </span>
         ))}
-        <span className="ml-auto inline-flex items-center gap-2 text-xs font-medium text-green-700">
-          <span className="h-1.5 w-1.5 rounded-full bg-green-600" />
+        <span className="ml-auto inline-flex items-center gap-2 text-xs font-medium text-green-800">
+          <span className="h-1.5 w-1.5 rounded-full bg-[var(--action-primary)]" />
           Sem pendências no dia
         </span>
       </BlocoCard>

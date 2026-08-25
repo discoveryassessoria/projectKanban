@@ -172,7 +172,7 @@ export default function RegrasDescontoTab() {
                   <td className="px-4 py-2.5 text-right tabular-nums text-white/70">{fmtPct(r.maxPercentSemAprovacao)}</td>
                   <td className="px-4 py-2.5 text-right tabular-nums text-white/70">{fmtNum(r.maxValorSemAprovacao)}</td>
                   <td className="px-4 py-2.5">
-                    <span className={`rounded px-2 py-0.5 text-[11px] font-medium ${r.ativo ? 'bg-[var(--surface-secondary)] text-green-700' : 'bg-[var(--surface-primary)] text-[var(--text-secondary)]'}`}>
+                    <span className={`rounded px-2 py-0.5 text-[11px] font-medium ${r.ativo ? 'bg-[var(--surface-secondary)] text-green-800' : 'bg-[var(--surface-primary)] text-[var(--text-secondary)]'}`}>
                       {r.ativo ? 'Ativo' : 'Inativo'}
                     </span>
                   </td>

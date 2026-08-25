@@ -177,7 +177,7 @@ export default function BancosTab() {
                   </td>
                   <td className="px-4 py-2.5 text-white/70">{b.pais || '—'}</td>
                   <td className="px-4 py-2.5">
-                    <span className={`rounded px-2 py-0.5 text-[11px] font-medium ${b.ativo ? 'bg-[var(--surface-secondary)] text-green-700' : 'bg-[var(--surface-primary)] text-[var(--text-secondary)]'}`}>
+                    <span className={`rounded px-2 py-0.5 text-[11px] font-medium ${b.ativo ? 'bg-[var(--surface-secondary)] text-green-800' : 'bg-[var(--surface-primary)] text-[var(--text-secondary)]'}`}>
                       {b.ativo ? 'Ativo' : 'Inativo'}
                     </span>
                   </td>

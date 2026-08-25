@@ -68,7 +68,7 @@ export default function CcTab() {
             <div className={`h-full rounded-full ${k.pctExecucaoTotal > 90 ? "bg-red-600" : k.pctExecucaoTotal > 75 ? "bg-amber-600" : "bg-green-600"}`} style={{ width: `${Math.min(k.pctExecucaoTotal, 100)}%` }} />
           </div>
         </div>
-        <Kpi label="Orçamento Disponível" value={fmtBRL(k.disponivel)} valueColor="text-green-700" sub="Saldo restante" mock />
+        <Kpi label="Orçamento Disponível" value={fmtBRL(k.disponivel)} valueColor="text-green-800" sub="Saldo restante" mock />
         <Kpi label="Maior CC" value={k.maiorCC?.nome ?? "—"} sub={k.maiorCC ? `${fmtBRLshort(k.maiorCC.executado)} · ${fmtPct(k.maiorCC.pct)}` : ""} mock />
         <Kpi label="Estouros (orçamento)" value={`${k.qtdEstouros}`} valueColor={k.qtdEstouros > 0 ? "text-red-700" : "text-white"} sub={k.nomesEstouros.join(", ") || "Nenhum estouro"} mock />
       </div>
@@ -100,7 +100,7 @@ export default function CcTab() {
                 <div key={c.id}>
                   <div className="flex justify-between text-xs mb-1">
                     <span className="text-white/80">{c.nome}</span>
-                    <span className="text-[var(--text-secondary)]">{fmtBRLshort(c.executado)} <span className="text-[var(--text-muted)]">de {fmtBRLshort(c.orcado)}</span> · <strong className={over ? "text-red-700" : c.pctExecucao > 85 ? "text-amber-700" : "text-white/80"}>{fmtPct(c.pctExecucao)}</strong></span>
+                    <span className="text-[var(--text-secondary)]">{fmtBRLshort(c.executado)} <span className="text-[var(--text-muted)]">de {fmtBRLshort(c.orcado)}</span> · <strong className={over ? "text-red-700" : c.pctExecucao > 85 ? "text-amber-800" : "text-white/80"}>{fmtPct(c.pctExecucao)}</strong></span>
                   </div>
                   <div className="h-1.5 bg-[var(--surface-primary)] rounded-full overflow-hidden">
                     <div className="h-full rounded-full" style={{ width: `${Math.min(c.pctExecucao, 100)}%`, background: barColor }} />
@@ -134,11 +134,11 @@ export default function CcTab() {
                   <td className="py-2 text-right text-white/70 tabular-nums">{fmtBRL(c.orcado)}</td>
                   <td className="py-2 text-right text-white font-medium tabular-nums">{fmtBRL(c.executado)}</td>
                   <td className={`py-2 text-right tabular-nums ${over ? "text-red-700" : "text-white/70"}`}>{fmtBRL(c.disponivel)}</td>
-                  <td className={`py-2 text-right tabular-nums font-medium ${over ? "text-red-700" : c.pctExecucao > 85 ? "text-amber-700" : "text-green-700"}`}>{fmtPct(c.pctExecucao)}</td>
+                  <td className={`py-2 text-right tabular-nums font-medium ${over ? "text-red-700" : c.pctExecucao > 85 ? "text-amber-800" : "text-green-800"}`}>{fmtPct(c.pctExecucao)}</td>
                   <td className="py-2 text-center">
                     {c.status === "estourou" ? <span className="text-[11px] px-2 py-0.5 rounded-full bg-[var(--surface-secondary)] text-red-700 border border-[var(--border-default)]">Estourou</span>
-                      : c.status === "atencao" ? <span className="text-[11px] px-2 py-0.5 rounded-full bg-[var(--surface-secondary)] text-amber-700 border border-[var(--border-default)]">Atenção</span>
-                      : <span className="text-[11px] px-2 py-0.5 rounded-full bg-[var(--surface-secondary)] text-green-700 border border-[var(--border-default)]">OK</span>}
+                      : c.status === "atencao" ? <span className="text-[11px] px-2 py-0.5 rounded-full bg-[var(--surface-secondary)] text-amber-800 border border-[var(--border-default)]">Atenção</span>
+                      : <span className="text-[11px] px-2 py-0.5 rounded-full bg-[var(--surface-secondary)] text-green-800 border border-[var(--border-default)]">OK</span>}
                   </td>
                 </tr>
               )

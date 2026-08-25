@@ -239,7 +239,7 @@ export function ProcessoEmissaoRetificada({ processoId, onConcluido }: Props) {
         <div className="flex items-center gap-2 shrink-0">
           <Stat label="Documentos validados" value={`${k.valid} / ${k.total}`} ok={k.valid > 0} />
           <Stat label="Progresso da fase" value={`${pct}%`} />
-          <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold ${pct >= 100 ? "bg-[var(--surface-secondary)] text-green-700" : "bg-[var(--surface-secondary)] text-[var(--text-secondary)]"}`}>
+          <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold ${pct >= 100 ? "bg-[var(--surface-secondary)] text-green-800" : "bg-[var(--surface-secondary)] text-[var(--text-secondary)]"}`}>
             <span className={`w-1.5 h-1.5 rounded-full ${pct >= 100 ? "bg-[var(--surface-secondary)]" : "bg-[var(--surface-secondary)]"}`} />
             {pct >= 100 ? "Concluída" : "Em andamento"}
           </span>
@@ -261,7 +261,7 @@ export function ProcessoEmissaoRetificada({ processoId, onConcluido }: Props) {
                       <div className="flex flex-col items-center text-center w-[100px] shrink-0">
                         <div className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold ${done ? "bg-[var(--surface-secondary)] text-white" : active ? "bg-[var(--action-primary)] text-white" : "bg-[var(--surface-tertiary)] text-[var(--text-secondary)]"}`}>{done ? <Check className="w-4 h-4" /> : i + 1}</div>
                         <div className="mt-1.5 text-[11px] font-medium text-white/80 leading-tight">{RE_SHORT[i]}</div>
-                        <div className={`text-[10px] ${done ? "text-green-700" : active ? "text-[var(--text-secondary)]" : "text-[var(--text-muted)]"}`}>{done ? "Concluída" : active ? "Atual" : "Pendente"}</div>
+                        <div className={`text-[10px] ${done ? "text-green-800" : active ? "text-[var(--text-secondary)]" : "text-[var(--text-muted)]"}`}>{done ? "Concluída" : active ? "Atual" : "Pendente"}</div>
                       </div>
                       {i < foco.workflow.length - 1 && <div className={`flex-1 h-0.5 mt-3.5 ${done ? "bg-[var(--surface-secondary)]" : "bg-[var(--surface-tertiary)]"}`} />}
                     </div>
@@ -319,12 +319,12 @@ export function ProcessoEmissaoRetificada({ processoId, onConcluido }: Props) {
                         <td className="px-3 py-2.5"><div className="font-medium text-white/95">{d.documentoTitulo}</div><div className="text-[11px] text-[var(--text-secondary)]">Inteiro teor</div></td>
                         <td className="px-3 py-2.5">
                           <div className="text-[11px] text-[var(--text-secondary)]">{d.correcao.campo}</div>
-                          <div className="text-xs"><s className="text-red-700">{d.correcao.old}</s> → <b className="text-green-700">{d.correcao.novo}</b></div>
+                          <div className="text-xs"><s className="text-red-700">{d.correcao.old}</s> → <b className="text-green-800">{d.correcao.novo}</b></div>
                         </td>
                         <td className="px-3 py-2.5"><RePill status={d.status} /></td>
                         <td className="px-3 py-2.5 text-white/68">{d.nextAction}</td>
                         <td className="px-3 py-2.5 text-right">
-                          <button onClick={(e) => { e.stopPropagation(); setDrawerId(d.id); setDrawerTab(reDone(d) ? "Workflow" : "Operação") }} className={`text-xs font-semibold rounded-md px-2.5 py-1.5 border ${reDone(d) ? "border-[var(--border-default)] text-green-700" : "border-[var(--border-default)] bg-[var(--surface-secondary)] text-white hover:bg-[var(--surface-tertiary)]"}`}>{reDone(d) ? "Ver workflow" : "Abrir operação"}</button>
+                          <button onClick={(e) => { e.stopPropagation(); setDrawerId(d.id); setDrawerTab(reDone(d) ? "Workflow" : "Operação") }} className={`text-xs font-semibold rounded-md px-2.5 py-1.5 border ${reDone(d) ? "border-[var(--border-default)] text-green-800" : "border-[var(--border-default)] bg-[var(--surface-secondary)] text-white hover:bg-[var(--surface-tertiary)]"}`}>{reDone(d) ? "Ver workflow" : "Abrir operação"}</button>
                         </td>
                       </tr>
                     ))}
@@ -350,7 +350,7 @@ export function ProcessoEmissaoRetificada({ processoId, onConcluido }: Props) {
             <div className="space-y-2 text-xs">
               {k.bloq > 0 && <div className="flex items-center gap-2 text-[var(--accent-text)] bg-[var(--accent-primary)]/12 border border-[var(--accent-primary)]/25 rounded-lg px-3 py-2"><AlertTriangle className="w-4 h-4 shrink-0" /> {k.bloq} documento(s) com divergência pós-retificação</div>}
               <div className="flex items-center gap-2 text-[var(--accent-text)] bg-[var(--accent-primary)]/12 rounded-lg px-3 py-2"><AlertTriangle className="w-4 h-4 shrink-0" /> {k.total - k.valid} certidão(ões) retificada(s) pendente(s)</div>
-              <div className="flex items-center gap-2 text-green-700 bg-[var(--surface-secondary)] rounded-lg px-3 py-2"><CheckCircle2 className="w-4 h-4 shrink-0" /> {k.valid} validada(s)</div>
+              <div className="flex items-center gap-2 text-green-800 bg-[var(--surface-secondary)] rounded-lg px-3 py-2"><CheckCircle2 className="w-4 h-4 shrink-0" /> {k.valid} validada(s)</div>
             </div>
           </div>
         </aside>
@@ -390,14 +390,14 @@ function calcProgress(docs: ReDoc[]): number {
 // ============================================================
 
 function Stat({ label, value, ok }: { label: string; value: string; ok?: boolean }) {
-  return <div className="rounded-lg border border-[var(--border-default)] bg-[var(--surface-popover)] px-3 py-2 text-center"><div className={`text-lg font-bold ${ok ? "text-green-700" : "text-white/95"}`}>{value}</div><div className="text-[11px] text-[var(--text-secondary)] whitespace-nowrap">{label}</div></div>
+  return <div className="rounded-lg border border-[var(--border-default)] bg-[var(--surface-popover)] px-3 py-2 text-center"><div className={`text-lg font-bold ${ok ? "text-green-800" : "text-white/95"}`}>{value}</div><div className="text-[11px] text-[var(--text-secondary)] whitespace-nowrap">{label}</div></div>
 }
 function QBtn({ icon, onClick, children }: { icon: ReactNode; onClick: () => void; children: ReactNode }) {
   return <button onClick={onClick} className="w-full text-left text-sm text-white/80 hover:bg-[var(--surface-secondary)] border border-[var(--border-default)] rounded-lg px-3 py-2 inline-flex items-center gap-2">{icon} {children}</button>
 }
 function RePill({ status }: { status: string }) {
   const map: Record<string, string> = {
-    validada: "bg-[var(--surface-secondary)] text-green-700",
+    validada: "bg-[var(--surface-secondary)] text-green-800",
     divergente: "bg-[var(--surface-secondary)] text-red-700",
     bloqueada: "bg-[var(--surface-secondary)] text-red-700",
     pendente_averbacao: "bg-[var(--surface-tertiary)] text-white/68",
@@ -441,7 +441,7 @@ function DocDrawer({ pk, tab, onTab, onClose, onAbrirEtapa }: {
           <h3 className="text-base font-bold text-white/95 mt-0.5">{pk.documentoTitulo} retificada</h3>
           <div className="text-xs text-[var(--text-secondary)]">{pk.pessoaNome} · documento pós-retificação</div>
           <div className="grid grid-cols-3 gap-2 mt-3">
-            <MetaCell k="Status"><span className={`inline-flex items-center gap-1 text-xs font-semibold ${green ? "text-green-700" : "text-[var(--accent-text)]"}`}>● {RE_LABEL[pk.status] || pk.status}</span></MetaCell>
+            <MetaCell k="Status"><span className={`inline-flex items-center gap-1 text-xs font-semibold ${green ? "text-green-800" : "text-[var(--accent-text)]"}`}>● {RE_LABEL[pk.status] || pk.status}</span></MetaCell>
             <MetaCell k="Responsável"><b className="text-white/95 text-xs">Equipe Documental</b></MetaCell>
             <MetaCell k="Próxima ação"><b className="text-white/95 text-xs">{pk.nextAction}</b></MetaCell>
           </div>
@@ -484,7 +484,7 @@ function DocDrawer({ pk, tab, onTab, onClose, onAbrirEtapa }: {
                 const meta = isDone ? `concluída${s.doneAt ? " em " + s.doneAt : ""}` : active ? "etapa atual" : "bloqueada · conclua a anterior"
                 return (
                   <div key={s.id} className="flex items-center gap-3 border border-[var(--border-default)] rounded-lg px-3 py-2.5">
-                    <span className={`w-6 h-6 rounded-full flex items-center justify-center text-[11px] font-bold ${isDone ? "bg-[var(--surface-secondary)] text-green-700" : active ? "bg-[var(--action-primary)] text-white" : "bg-[var(--surface-tertiary)] text-[var(--text-muted)]"}`}>{isDone ? "✓" : i + 1}</span>
+                    <span className={`w-6 h-6 rounded-full flex items-center justify-center text-[11px] font-bold ${isDone ? "bg-[var(--surface-secondary)] text-green-800" : active ? "bg-[var(--action-primary)] text-white" : "bg-[var(--surface-tertiary)] text-[var(--text-muted)]"}`}>{isDone ? "✓" : i + 1}</span>
                     <div className="flex-1 min-w-0"><div className="text-sm font-medium text-white/95">{i + 1}. {s.title}</div><div className="text-[11px] text-[var(--text-secondary)]">{meta}</div></div>
                     {active && <button onClick={() => onAbrirEtapa(s.id)} className="text-xs font-semibold text-[var(--text-primary)] bg-[var(--surface-secondary)] border border-[var(--border-default)] hover:bg-[var(--surface-tertiary)] rounded-md px-2.5 py-1.5">Central da etapa</button>}
                   </div>
@@ -521,7 +521,7 @@ function DocDrawer({ pk, tab, onTab, onClose, onAbrirEtapa }: {
                 <div className="text-[11px] font-semibold uppercase text-[var(--text-secondary)] mb-1.5">Correção esperada</div>
                 <div className="flex justify-between py-0.5"><span className="text-[var(--text-secondary)]">Campo</span><b className="text-white/95">{pk.correcao.campo}</b></div>
                 <div className="flex justify-between py-0.5"><span className="text-[var(--text-secondary)]">Valor antigo</span><b className="text-red-700">{pk.correcao.old}</b></div>
-                <div className="flex justify-between py-0.5"><span className="text-[var(--text-secondary)]">Valor correto</span><b className="text-green-700">{pk.correcao.novo}</b></div>
+                <div className="flex justify-between py-0.5"><span className="text-[var(--text-secondary)]">Valor correto</span><b className="text-green-800">{pk.correcao.novo}</b></div>
               </div>
               <div className="mt-3"><Meta>{Object.keys(pk.conference).length ? "Conferência registrada." : "Conferência ainda não realizada."}</Meta></div>
             </>
@@ -712,13 +712,13 @@ function EtapaModal({ stepId, doc, posting, erro, onClose, onSubmit }: {
               <div className="text-[11px] font-semibold uppercase text-[var(--text-secondary)] mb-1.5">Correção esperada</div>
               <div className="flex justify-between py-0.5"><span className="text-[var(--text-secondary)]">Campo</span><b className="text-white/95">{cor.campo}</b></div>
               <div className="flex justify-between py-0.5"><span className="text-[var(--text-secondary)]">Valor antigo</span><b className="text-red-700">{cor.old}</b></div>
-              <div className="flex justify-between py-0.5"><span className="text-[var(--text-secondary)]">Valor correto</span><b className="text-green-700">{cor.novo}</b></div>
+              <div className="flex justify-between py-0.5"><span className="text-[var(--text-secondary)]">Valor correto</span><b className="text-green-800">{cor.novo}</b></div>
             </div>
             <Field label="Nome do titular (como aparece no documento)"><input className={EC} placeholder={doc.pessoaNome} /></Field>
             <Sec>Checklist de conferência</Sec>
             <div className="flex flex-wrap gap-1.5">
               {CONF_CHK.map(([key, label]) => (
-                <button key={key} type="button" onClick={() => setCfChk((p) => ({ ...p, [key]: !p[key] }))} className={`inline-flex items-center gap-1.5 text-[11px] font-semibold rounded-md border px-2 py-1 ${cfChk[key] ? "border-[var(--border-default)] bg-[var(--surface-secondary)] text-green-700" : "border-[var(--border-default)] text-white/68"}`}>
+                <button key={key} type="button" onClick={() => setCfChk((p) => ({ ...p, [key]: !p[key] }))} className={`inline-flex items-center gap-1.5 text-[11px] font-semibold rounded-md border px-2 py-1 ${cfChk[key] ? "border-[var(--border-default)] bg-[var(--surface-secondary)] text-green-800" : "border-[var(--border-default)] text-white/68"}`}>
                   <span className={`w-3.5 h-3.5 rounded flex items-center justify-center ${cfChk[key] ? "bg-[var(--surface-secondary)] text-white" : "border border-[var(--border-default)]"}`}>{cfChk[key] && <Check className="w-2.5 h-2.5" />}</span>{label}
                 </button>
               ))}
@@ -727,7 +727,7 @@ function EtapaModal({ stepId, doc, posting, erro, onClose, onSubmit }: {
             <div className="grid grid-cols-3 gap-2">
               {CONF_RES.map(([v, l, hint, tone]) => {
                 const sel = cfRes === v
-                const cls = !sel ? "border-[var(--border-default)] text-white/80" : tone === "ok" ? "border-[var(--border-default)] bg-[var(--surface-secondary)] text-green-700" : tone === "warn" ? "border-[var(--border-default)] bg-[var(--surface-secondary)] text-red-700" : "border-[var(--border-strong)] bg-[var(--surface-secondary)] text-white/80"
+                const cls = !sel ? "border-[var(--border-default)] text-white/80" : tone === "ok" ? "border-[var(--border-default)] bg-[var(--surface-secondary)] text-green-800" : tone === "warn" ? "border-[var(--border-default)] bg-[var(--surface-secondary)] text-red-700" : "border-[var(--border-strong)] bg-[var(--surface-secondary)] text-white/80"
                 return <button key={v} type="button" onClick={() => setCfRes(v)} className={`border rounded-lg px-2 py-2 text-center ${cls}`}><div className="text-xs font-semibold">{l}</div><div className="text-[10px] text-[var(--text-secondary)]">{hint}</div></button>
               })}
             </div>
@@ -740,7 +740,7 @@ function EtapaModal({ stepId, doc, posting, erro, onClose, onSubmit }: {
           <>
             <div className="rounded-lg border border-[var(--border-default)] bg-[var(--surface-secondary)] p-3 text-sm">
               <div className="text-[11px] font-semibold uppercase text-[var(--text-secondary)] mb-1.5">Correção aplicada</div>
-              <div className="flex justify-between py-0.5"><span className="text-[var(--text-secondary)]">{cor.campo}</span><b><s className="text-red-700">{cor.old}</s> → <span className="text-green-700">{cor.novo}</span></b></div>
+              <div className="flex justify-between py-0.5"><span className="text-[var(--text-secondary)]">{cor.campo}</span><b><s className="text-red-700">{cor.old}</s> → <span className="text-green-800">{cor.novo}</span></b></div>
             </div>
             <Sec>Decisão final</Sec>
             <div className="space-y-2">
@@ -824,7 +824,7 @@ function Chips({ opts, value, onChange }: { opts: Array<[string, string]>; value
 }
 function FakeFile({ ok, onClick, label, okLabel }: { ok: boolean; onClick: () => void; label: string; okLabel: string }) {
   return (
-    <button type="button" onClick={onClick} className={`w-full inline-flex items-center gap-2 text-sm font-semibold rounded-md border px-3 py-2.5 ${ok ? "border-[var(--border-default)] bg-[var(--surface-secondary)] text-green-700" : "border-[var(--border-default)] text-white/80"}`}>
+    <button type="button" onClick={onClick} className={`w-full inline-flex items-center gap-2 text-sm font-semibold rounded-md border px-3 py-2.5 ${ok ? "border-[var(--border-default)] bg-[var(--surface-secondary)] text-green-800" : "border-[var(--border-default)] text-white/80"}`}>
       {ok ? <Check className="w-4 h-4" /> : <Upload className="w-4 h-4" />}{ok ? okLabel : label}
     </button>
   )

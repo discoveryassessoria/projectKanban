@@ -957,7 +957,7 @@ function FormSolicitarCertidao({
           {/* AVISO DO CADASTRO — o que os requisitos configurados ainda cobram. Não
               trava o botão: quem recusa é a porta, com os valores do envio. */}
           {avisosDoCadastro.length > 0 && !readOnly && (
-            <span className="mr-auto text-[11px] text-amber-700/70" title={avisosDoCadastro.join(" · ")}>
+            <span className="mr-auto text-[11px] text-amber-800/70" title={avisosDoCadastro.join(" · ")}>
               {avisosDoCadastro.length === 1 ? avisosDoCadastro[0] : `${avisosDoCadastro.length} requisitos cadastrados pendentes`}
             </span>
           )}
@@ -2349,7 +2349,7 @@ function FormReceberCertidao({
                       <div className="flex-1 min-w-0">
                         <div
                           className={`text-[12.5px] font-semibold flex items-center gap-1.5 ${
-                            ativo ? "text-green-700" : "text-white/85"
+                            ativo ? "text-green-800" : "text-white/85"
                           }`}
                         >
                           <span>{opt.icon}</span>
@@ -2903,7 +2903,7 @@ function FormConferirCertidao({
                       <div className="flex-1 min-w-0">
                         <div
                           className={`text-[12.5px] font-semibold ${
-                            isChecked ? "text-green-700" : "text-white/85"
+                            isChecked ? "text-green-800" : "text-white/85"
                           }`}
                         >
                           {item.label}
@@ -3009,8 +3009,8 @@ function ResultadoBtn({
 }) {
   const colorMap = {
     emerald: {
-      ativo: "border-[var(--border-default)] bg-[var(--surface-secondary)] text-green-700",
-      icon: "text-green-700",
+      ativo: "border-[var(--border-default)] bg-[var(--surface-secondary)] text-green-800",
+      icon: "text-green-800",
     },
     amber: {
       ativo: "border-[var(--accent-primary)]/60 bg-[var(--accent-primary)]/15 text-[var(--accent-text)]",
@@ -3452,13 +3452,13 @@ function FormValidarCertidao({
                   red: ativo ? "border-[var(--border-default)] bg-[var(--surface-secondary)] ring-1 border-[var(--border-default)]" : "",
                 }
                 const iconColorMap = {
-                  emerald: ativo ? "text-green-700" : "text-[var(--text-secondary)]",
+                  emerald: ativo ? "text-green-800" : "text-[var(--text-secondary)]",
                   blue: ativo ? "text-[var(--text-secondary)]" : "text-[var(--text-secondary)]",
                   amber: ativo ? "text-[var(--accent-text)]" : "text-[var(--text-secondary)]",
                   red: ativo ? "text-red-700" : "text-[var(--text-secondary)]",
                 }
                 const textColorMap = {
-                  emerald: ativo ? "text-green-700" : "text-white/85",
+                  emerald: ativo ? "text-green-800" : "text-white/85",
                   blue: ativo ? "text-[var(--text-secondary)]" : "text-white/85",
                   amber: ativo ? "text-[var(--accent-text)]" : "text-white/85",
                   red: ativo ? "text-red-700" : "text-white/85",
@@ -3724,7 +3724,7 @@ function FileUploadField({
         // 2. ARQUIVO CARREGADO
         <div className="px-3 py-2.5 bg-[var(--surface-secondary)] border border-[var(--border-default)] rounded-md">
           <div className="flex items-center gap-2.5">
-            <FileCheck className="w-4 h-4 text-green-700 flex-shrink-0" />
+            <FileCheck className="w-4 h-4 text-green-800 flex-shrink-0" />
             <div className="flex-1 min-w-0">
               <div className="text-[12px] text-white truncate font-medium">
                 {displayName || "Arquivo enviado"}

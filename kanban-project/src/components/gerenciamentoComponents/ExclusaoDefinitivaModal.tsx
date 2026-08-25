@@ -84,7 +84,7 @@ export function ExclusaoDefinitivaModal({ titulo, previewUrl, deleteUrl, entidad
     return (
       <div className="fixed inset-0 z-[90] flex items-center justify-center bg-[var(--overlay-modal)] p-4" onClick={() => onDone()}>
         <div className="max-w-md w-full rounded-2xl bg-[var(--surface-overlay)] border border-[var(--border-default)] shadow-[var(--elev-3)] text-white/90 p-5" onClick={(e) => e.stopPropagation()}>
-          <div className={`text-[15px] font-extrabold ${excluido ? "text-red-700" : "text-amber-700"}`}>
+          <div className={`text-[15px] font-extrabold ${excluido ? "text-red-700" : "text-amber-800"}`}>
             {excluido ? `${entidadeLabel} excluído definitivamente` : `${entidadeLabel} inativado`}
           </div>
           <p className="text-[12.5px] text-[var(--text-secondary)] mt-1">
@@ -185,7 +185,7 @@ export function ExclusaoDefinitivaModal({ titulo, previewUrl, deleteUrl, entidad
           <button disabled={executando} onClick={onClose} className="px-3.5 py-2 text-[12.5px] font-semibold rounded-lg bg-[var(--surface-primary)] hover:bg-[var(--surface-hover)] disabled:opacity-50">Cancelar</button>
           <div className="flex items-center gap-2">
             {onInativar && analise?.deactivationRequired && (
-              <button disabled={executando} onClick={() => void inativar()} className="px-3.5 py-2 text-[12.5px] font-bold rounded-lg bg-[var(--surface-secondary)] text-black hover:bg-amber-600 disabled:opacity-50">Inativar e preservar histórico</button>
+              <button disabled={executando} onClick={() => void inativar()} className="px-3.5 py-2 text-[12.5px] font-bold rounded-lg bg-[var(--surface-secondary)] text-black hover:bg-[var(--action-primary)] disabled:opacity-50">Inativar e preservar histórico</button>
             )}
             {onInativar && analise?.deletionAllowed && (
               <button disabled={executando} onClick={() => void inativar()} className="px-3.5 py-2 text-[12.5px] font-semibold rounded-lg bg-[var(--surface-primary)] hover:bg-[var(--surface-hover)] disabled:opacity-50">Só inativar</button>

@@ -95,7 +95,7 @@ export default function CambioHistoricoPage() {
                   <td className="px-3 py-2 text-[var(--text-secondary)]">{dth(c.consultadoEm)}</td>
                   <td className="px-3 py-2 text-[var(--text-secondary)]">{c.origem ?? c.fonte ?? '—'}</td>
                   <td className="px-3 py-2 text-[var(--text-secondary)]">{c.modalidade ?? '—'}</td>
-                  <td className="px-3 py-2">{(c.vigente ?? c.ativo) ? <span className="rounded bg-[var(--surface-secondary)] px-1.5 py-0.5 text-[11px] text-green-700">vigente</span> : <span className="text-[var(--text-secondary)]">—</span>}</td>
+                  <td className="px-3 py-2">{(c.vigente ?? c.ativo) ? <span className="rounded bg-[var(--surface-secondary)] px-1.5 py-0.5 text-[11px] text-green-800">vigente</span> : <span className="text-[var(--text-secondary)]">—</span>}</td>
                 </tr>
               ))}
             </tbody>

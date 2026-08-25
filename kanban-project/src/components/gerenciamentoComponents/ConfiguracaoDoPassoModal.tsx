@@ -227,12 +227,12 @@ export default function ConfiguracaoDoPassoModal({
             <div className="flex flex-none items-center gap-2">
               {/* RASCUNHO × PUBLICADO — o administrador precisa saber, antes de mexer,
                   se o que ele fizer atinge quem já está rodando. Não atinge. */}
-              <span className="rounded-full border border-[var(--border-default)] bg-[var(--surface-secondary)] px-2.5 py-1 text-[11px] text-amber-700">
+              <span className="rounded-full border border-[var(--border-default)] bg-[var(--surface-secondary)] px-2.5 py-1 text-[11px] text-amber-800">
                 Rascunho
               </span>
               {sujo && (
                 <span className="flex items-center gap-1.5 text-[11px] text-[var(--text-secondary)]" title="Há alterações que ainda não foram salvas.">
-                  <span className="h-1.5 w-1.5 rounded-full bg-amber-600" aria-hidden />
+                  <span className="h-1.5 w-1.5 rounded-full bg-[var(--action-primary)]" aria-hidden />
                   Alterações não salvas
                 </span>
               )}
@@ -391,7 +391,7 @@ export default function ConfiguracaoDoPassoModal({
                 execução própria e histórico próprio — e pode depender das irmãs.
               </p>
               {exec && exec.suportaCondicoes === false && (
-                <p className="text-[11px] text-amber-700/70">
+                <p className="text-[11px] text-amber-800/70">
                   O executor “{exec.label}” não interpreta condições; as subtarefas ficam cadastradas, mas ele não as usa.
                 </p>
               )}
@@ -413,7 +413,7 @@ export default function ConfiguracaoDoPassoModal({
                   </div>
                   <div className="mt-1.5 flex flex-wrap items-center gap-1.5 text-[10px]">
                     <code className="text-[var(--text-muted)]">{st.key ?? chaveDe(st.label)}</code>
-                    {st.obrigatoria !== false && <span className="rounded bg-[var(--surface-secondary)] px-1.5 py-0.5 text-amber-700">obrigatória</span>}
+                    {st.obrigatoria !== false && <span className="rounded bg-[var(--surface-secondary)] px-1.5 py-0.5 text-amber-800">obrigatória</span>}
                     {st.repetivel && <span className="rounded bg-[var(--surface-primary)] px-1.5 py-0.5 text-[var(--text-secondary)]">repetível{st.maxOcorrencias ? ` ≤${st.maxOcorrencias}` : ""}</span>}
                     {(st.dependeDe?.length ?? 0) > 0 && <span className="rounded bg-[var(--surface-primary)] px-1.5 py-0.5 text-[var(--text-secondary)]">depende de {st.dependeDe!.length}</span>}
                     {st.fonteDeCanais && st.fonteDeCanais !== "NENHUMA" && <span className="rounded bg-[var(--surface-secondary)] px-1.5 py-0.5 text-[var(--text-secondary)]">canais do fornecedor</span>}
@@ -529,7 +529,7 @@ export default function ConfiguracaoDoPassoModal({
                                     )
                                   })}
                                   {(st.tiposDeCanal ?? []).length === 0 && (
-                                    <p className="text-[11px] text-amber-700/70">Nenhum tipo marcado — não sobraria canal nenhum. A publicação recusa.</p>
+                                    <p className="text-[11px] text-amber-800/70">Nenhum tipo marcado — não sobraria canal nenhum. A publicação recusa.</p>
                                   )}
                                 </div>
                               )}
@@ -624,7 +624,7 @@ export default function ConfiguracaoDoPassoModal({
                   {REGRAS_DE_CONCLUSAO.find((r) => r.key === (f.regraDeConclusao ?? "ACAO_DO_PASSO"))?.ajuda}
                 </p>
                 {f.regraDeConclusao !== "ACAO_DO_PASSO" && subs.length === 0 && (
-                  <p className="mt-2 text-[11px] text-amber-700/70">
+                  <p className="mt-2 text-[11px] text-amber-800/70">
                     Esta regra olha para subtarefas e este passo não tem nenhuma — ele nunca concluiria. A publicação recusa.
                   </p>
                 )}
@@ -720,7 +720,7 @@ export default function ConfiguracaoDoPassoModal({
                       ["suportaCanais", "canais"], ["suportaEvidencia", "evidência"],
                       ["suportaEsperaExterna", "espera externa"], ["suportaCondicoes", "condições"],
                     ] as Array<[keyof Executor, string]>).map(([k, rotulo]) => (
-                      <span key={String(k)} className={`rounded px-1.5 py-0.5 ${exec[k] ? "bg-[var(--surface-secondary)] text-green-700" : "bg-[var(--surface-primary)] text-[var(--text-muted)]"}`}>
+                      <span key={String(k)} className={`rounded px-1.5 py-0.5 ${exec[k] ? "bg-[var(--surface-secondary)] text-green-800" : "bg-[var(--surface-primary)] text-[var(--text-muted)]"}`}>
                         {exec[k] ? "✓" : "✕"} {rotulo}
                       </span>
                     ))}
@@ -731,7 +731,7 @@ export default function ConfiguracaoDoPassoModal({
                   </p>
                   <div className="mt-2 text-[11px] text-[var(--text-muted)]">
                     Efeitos que ele dispara nesta fase: {efeitosOfertados.length === 0
-                      ? <span className="text-amber-700/70">nenhum — a fase não declarou competência compatível.</span>
+                      ? <span className="text-amber-800/70">nenhum — a fase não declarou competência compatível.</span>
                       : efeitosOfertados.map((e) => e.label).join(", ")}
                   </div>
                 </div>

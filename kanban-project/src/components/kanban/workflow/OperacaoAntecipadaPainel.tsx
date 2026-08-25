@@ -56,8 +56,8 @@ const ST_OP_LABEL: Record<string, { t: string; c: string }> = {
   CRIADA: { t: "Criada", c: "bg-[var(--surface-tertiary)] text-white/68" },
   EM_EXECUCAO: { t: "Em execução", c: "bg-[var(--surface-secondary)] text-[var(--text-secondary)]" },
   AGUARDANDO_RESULTADO: { t: "Aguardando avaliação", c: "bg-[var(--accent-primary)]/15 text-[var(--accent-text)]" },
-  CONCLUIDA: { t: "Concluída", c: "bg-[var(--surface-secondary)] text-green-700" },
-  CONCLUIDA_PARCIAL: { t: "Concluída parcial", c: "bg-[var(--surface-secondary)] text-amber-700" },
+  CONCLUIDA: { t: "Concluída", c: "bg-[var(--surface-secondary)] text-green-800" },
+  CONCLUIDA_PARCIAL: { t: "Concluída parcial", c: "bg-[var(--surface-secondary)] text-amber-800" },
   NAO_ATINGIDA: { t: "Não atingida", c: "bg-[var(--surface-secondary)] text-red-700" },
   CANCELADA: { t: "Cancelada", c: "bg-[var(--surface-tertiary)] text-[var(--text-muted)]" },
 }
@@ -139,14 +139,14 @@ function OperacaoAntecipadaItem({ o, readOnly, onAvaliar, onAbrir }: {
             )}
             <input value={resultado} onChange={(e) => setResultado(e.target.value)} placeholder={apoio ? "Observações" : "Resultado obtido"} className="w-full text-[12px] rounded-md border border-[var(--border-default)] px-2 py-1.5 focus:outline-none focus:border-[var(--border-default)] focus:ring-1 focus:border-[var(--border-default)]" autoFocus />
             <div className="flex items-center gap-2 flex-wrap">
-              <button onClick={() => enviar("SIM")} className="inline-flex items-center gap-1 text-[11.5px] font-bold px-2.5 py-1.5 rounded-md bg-[var(--surface-secondary)] text-green-700 border border-[var(--border-default)] hover:bg-[var(--surface-secondary)]"><CheckCircle2 className="w-3.5 h-3.5" /> Objetivo atingido</button>
-              <button onClick={() => enviar("PARCIAL")} className="text-[11.5px] font-semibold px-2.5 py-1.5 rounded-md border border-[var(--border-default)] text-amber-700 hover:bg-[var(--surface-secondary)]">Parcialmente</button>
+              <button onClick={() => enviar("SIM")} className="inline-flex items-center gap-1 text-[11.5px] font-bold px-2.5 py-1.5 rounded-md bg-[var(--surface-secondary)] text-green-800 border border-[var(--border-default)] hover:bg-[var(--surface-secondary)]"><CheckCircle2 className="w-3.5 h-3.5" /> Objetivo atingido</button>
+              <button onClick={() => enviar("PARCIAL")} className="text-[11.5px] font-semibold px-2.5 py-1.5 rounded-md border border-[var(--border-default)] text-amber-800 hover:bg-[var(--surface-secondary)]">Parcialmente</button>
               <button onClick={() => enviar("NAO")} className="text-[11.5px] font-semibold px-2.5 py-1.5 rounded-md border border-[var(--border-default)] text-white/80 hover:bg-[var(--surface-secondary)]">Não atingido</button>
               <button onClick={() => enviar("CANCELAR")} className="text-[11.5px] text-[var(--text-muted)] hover:text-red-700 ml-auto">Cancelar operação</button>
             </div>
           </div>
         ) : (
-          <button onClick={() => { setAvaliando(true); setResultado("") }} className="mt-2 inline-flex items-center gap-1 text-[11.5px] font-bold px-2.5 py-1.5 rounded-md bg-[var(--surface-secondary)] text-green-700 border border-[var(--border-default)] hover:bg-[var(--surface-secondary)]"><CheckCircle2 className="w-3.5 h-3.5" /> Operação concluída — avaliar objetivo</button>
+          <button onClick={() => { setAvaliando(true); setResultado("") }} className="mt-2 inline-flex items-center gap-1 text-[11.5px] font-bold px-2.5 py-1.5 rounded-md bg-[var(--surface-secondary)] text-green-800 border border-[var(--border-default)] hover:bg-[var(--surface-secondary)]"><CheckCircle2 className="w-3.5 h-3.5" /> Operação concluída — avaliar objetivo</button>
         )
       )}
       {o.resultadoObtido && <div className="text-[11px] text-[var(--text-secondary)] mt-1">Resultado: {o.resultadoObtido}</div>}

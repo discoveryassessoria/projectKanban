@@ -427,7 +427,7 @@ function ConteudoDialog({
                         </Select>
                         {availablePessoas.length === 0 && (
                           <div className="flex items-center gap-2 p-3 bg-[var(--surface-secondary)] border border-[var(--border-default)] rounded-md">
-                            <span className="text-sm text-amber-700">
+                            <span className="text-sm text-amber-800">
                               ⚠️ Nenhuma pessoa disponível para este relacionamento.
                             </span>
                           </div>

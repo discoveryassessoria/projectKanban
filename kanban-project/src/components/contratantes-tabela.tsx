@@ -1088,7 +1088,7 @@ const removerDocumentoObrigatorio = async (categoria: string) => {
               <Button
                 onClick={onSave}
                 disabled={isLoading}
-                className="bg-green-700 hover:bg-green-800 text-[var(--action-primary-ink)]"
+                className="bg-[var(--action-primary)] hover:bg-[var(--action-primary)] text-[var(--action-primary-ink)]"
               >
                 {isLoading ? "Salvando..." : editingId ? "Salvar Alterações" : "Criar Cliente"}
               </Button>
@@ -1629,7 +1629,7 @@ style={{
 
                   {!editingId && (
                     <div className="mb-4 p-3 bg-[var(--surface-secondary)] border border-[var(--border-default)] rounded-lg">
-                      <p className="text-sm text-amber-700">
+                      <p className="text-sm text-amber-800">
                         ⚠️ Salve o cliente primeiro para poder adicionar documentos.
                       </p>
                     </div>
@@ -1660,7 +1660,7 @@ style={{
                             {temDocumento ? (
                               <div className="flex items-center gap-1 px-2 py-0.5 bg-[var(--surface-secondary)] rounded-full">
                                 <CheckCircle2 className="h-3.5 w-3.5 text-green-600" />
-                                <span className="text-xs font-medium text-green-700">Enviado</span>
+                                <span className="text-xs font-medium text-green-800">Enviado</span>
                               </div>
                             ) : (
                               <div className="flex items-center gap-1 px-2 py-0.5 bg-[var(--surface-secondary)] rounded-full">
@@ -1773,7 +1773,7 @@ style={{
 
                   {!editingId && (
                     <div className="mb-4 p-3 bg-[var(--surface-secondary)] border border-[var(--border-default)] rounded-lg">
-                      <p className="text-sm text-amber-700">
+                      <p className="text-sm text-amber-800">
                         ⚠️ Salve o cliente primeiro para poder adicionar anexos.
                       </p>
                     </div>
@@ -1823,7 +1823,7 @@ style={{
                                       </div>
                                     ) : isExcel ? (
                                       <div className="text-center">
-                                        <div className="w-12 h-14 mx-auto bg-green-700 rounded-sm flex items-center justify-center text-[var(--action-primary-ink)] text-xs font-bold">
+                                        <div className="w-12 h-14 mx-auto bg-[var(--action-primary)] rounded-sm flex items-center justify-center text-[var(--action-primary-ink)] text-xs font-bold">
                                           XLS
                                         </div>
                                       </div>
@@ -1942,7 +1942,7 @@ style={{
                   podeGerar={!isViewMode && podeEditar}
                 />
               ) : (
-                <div className="rounded-xl border border-[var(--border-default)] bg-[var(--surface-secondary)] p-4 text-sm text-amber-700">
+                <div className="rounded-xl border border-[var(--border-default)] bg-[var(--surface-secondary)] p-4 text-sm text-amber-800">
                   Salve o cliente primeiro para gerar procurações.
                 </div>
               )
@@ -2289,7 +2289,7 @@ export function ContratantesTabela({ contratantes, onRefresh, onOpenProcesso }: 
           {pode('clientes.criar') && (
             <Button
               onClick={handleNew}
-              className="bg-green-700 hover:bg-green-800 text-[var(--action-primary-ink)]"
+              className="bg-[var(--action-primary)] hover:bg-[var(--action-primary)] text-[var(--action-primary-ink)]"
             >
               <Plus className="h-4 w-4 mr-2" />
               Novo Cliente

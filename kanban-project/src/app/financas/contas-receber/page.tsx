@@ -54,8 +54,8 @@ interface Fatura {
 }
 
 const statusConfig = {
-  PENDENTE: { label: 'Pendente', color: 'bg-[var(--surface-secondary)] text-amber-700', icon: Clock },
-  PAGO: { label: 'Pago', color: 'bg-[var(--surface-secondary)] text-green-700', icon: CheckCircle },
+  PENDENTE: { label: 'Pendente', color: 'bg-[var(--surface-secondary)] text-amber-800', icon: Clock },
+  PAGO: { label: 'Pago', color: 'bg-[var(--surface-secondary)] text-green-800', icon: CheckCircle },
   VENCIDO: { label: 'Vencido', color: 'bg-[var(--surface-secondary)] text-red-700', icon: AlertTriangle },
   CANCELADO: { label: 'Cancelado', color: 'bg-gray-500/20 text-[var(--text-muted)]', icon: XCircle },
   PARCIAL: { label: 'Parcial', color: 'bg-[var(--surface-secondary)] text-[var(--text-secondary)]', icon: Clock },
@@ -110,7 +110,7 @@ export default function ContasReceberPage() {
           <p className="text-white/70">Gerencie as cobranças dos processos</p>
         </div>
         <Link href="/financas/contas-receber/nova">
-          <Button className="bg-green-700 hover:bg-green-800 text-[var(--action-primary-ink)]">
+          <Button className="bg-[var(--action-primary)] hover:bg-[var(--action-primary)] text-[var(--action-primary-ink)]">
             <Plus className="h-4 w-4 mr-2" />
             Nova Cobrança
           </Button>
@@ -128,7 +128,7 @@ export default function ContasReceberPage() {
         <Card className="bg-[var(--surface-primary)] border-[var(--border-strong)]">
           <CardContent className="pt-4">
             <p className="text-sm text-white/70">Pendente</p>
-            <p className="text-xl font-bold text-amber-700">{formatCurrency(totais.pendente)}</p>
+            <p className="text-xl font-bold text-amber-800">{formatCurrency(totais.pendente)}</p>
           </CardContent>
         </Card>
         <Card className="bg-[var(--surface-primary)] border-[var(--border-strong)]">
@@ -140,7 +140,7 @@ export default function ContasReceberPage() {
         <Card className="bg-[var(--surface-primary)] border-[var(--border-strong)]">
           <CardContent className="pt-4">
             <p className="text-sm text-white/70">Recebido</p>
-            <p className="text-xl font-bold text-green-700">{formatCurrency(totais.pago)}</p>
+            <p className="text-xl font-bold text-green-800">{formatCurrency(totais.pago)}</p>
           </CardContent>
         </Card>
       </div>
@@ -220,7 +220,7 @@ export default function ContasReceberPage() {
                       <td className="p-4">
                         <p className="text-white font-semibold">{formatCurrency(fatura.valor)}</p>
                         {fatura.valorPago && fatura.valorPago > 0 && (
-                          <p className="text-xs text-green-700">Pago: {formatCurrency(fatura.valorPago)}</p>
+                          <p className="text-xs text-green-800">Pago: {formatCurrency(fatura.valorPago)}</p>
                         )}
                       </td>
                       <td className="p-4 text-white/70">
@@ -249,7 +249,7 @@ export default function ContasReceberPage() {
                               Editar
                             </DropdownMenuItem>
                             {fatura.status === 'PENDENTE' && (
-                              <DropdownMenuItem className="text-green-700">
+                              <DropdownMenuItem className="text-green-800">
                                 <CheckCircle className="h-4 w-4 mr-2" />
                                 Registrar pagamento
                               </DropdownMenuItem>

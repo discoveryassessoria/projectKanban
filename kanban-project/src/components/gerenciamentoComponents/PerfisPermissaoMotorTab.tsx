@@ -177,7 +177,7 @@ export default function PerfisPermissaoMotorTab() {
                 <td className="px-3 py-2.5">
                   {p.arquivado
                     ? <span className="rounded bg-[var(--surface-primary)] px-1.5 py-0.5 text-[10px] text-[var(--text-secondary)]">arquivado</span>
-                    : <span className="rounded bg-[var(--surface-secondary)] px-1.5 py-0.5 text-[10px] text-green-700">ativo</span>}
+                    : <span className="rounded bg-[var(--surface-secondary)] px-1.5 py-0.5 text-[10px] text-green-800">ativo</span>}
                 </td>
                 <td className="px-3 py-2.5 text-center text-[var(--text-secondary)]">{p.usedByCount || 0}</td>
                 <td className="px-3 py-2.5">

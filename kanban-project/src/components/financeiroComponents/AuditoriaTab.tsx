@@ -34,7 +34,7 @@ const CHIPS = [
 
 function sevBadge(s: string) {
   if (s === "critico") return <span className="text-[11px] px-2 py-0.5 rounded-full bg-[var(--surface-secondary)] text-red-700 border border-[var(--border-default)]">Crítico</span>
-  if (s === "aviso") return <span className="text-[11px] px-2 py-0.5 rounded-full bg-[var(--surface-secondary)] text-amber-700 border border-[var(--border-default)]">Aviso</span>
+  if (s === "aviso") return <span className="text-[11px] px-2 py-0.5 rounded-full bg-[var(--surface-secondary)] text-amber-800 border border-[var(--border-default)]">Aviso</span>
   return <span className="text-[11px] px-2 py-0.5 rounded-full bg-[var(--surface-secondary)] text-[var(--text-secondary)] border border-[var(--border-default)]">Info</span>
 }
 
@@ -80,7 +80,7 @@ export default function AuditoriaTab() {
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         <Kpi label="Eventos hoje" value={`${k.eventosHoje}`} sub={`${k.automaticosHoje} automáticos · ${k.manuaisHoje} manuais`} />
         <Kpi icon={<AlertTriangle className="h-3.5 w-3.5" />} label="Críticos" value={`${k.criticos}`} valueColor={k.criticos > 0 ? "text-red-700" : "text-white"} sub="Estornos, exclusões, cancelamentos" />
-        <Kpi label="Avisos" value={`${k.avisos}`} valueColor="text-amber-700" sub="Alterações, aprovações" />
+        <Kpi label="Avisos" value={`${k.avisos}`} valueColor="text-amber-800" sub="Alterações, aprovações" />
         <Kpi label="Origem automática" value={fmtPct(k.pctAutomatico)} sub={`${k.automaticos} de ${k.total} gerados pelo sistema`} />
       </div>
 

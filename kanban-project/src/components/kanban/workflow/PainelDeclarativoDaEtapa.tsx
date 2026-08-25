@@ -260,16 +260,16 @@ export default function PainelDeclarativoDaEtapa({
                         : st.status === "AGUARDANDO_EXTERNO" ? "bg-[var(--surface-secondary)]"
                         : "bg-amber-600"}`} />
                       <span className={`text-sm ${st.concluida ? "text-[var(--text-secondary)] line-through" : "text-white"}`}>{st.label}</span>
-                      {st.obrigatoria && !st.concluida && <span className="rounded bg-[var(--surface-secondary)] px-1.5 py-0.5 text-[10px] text-amber-700">obrigatória</span>}
+                      {st.obrigatoria && !st.concluida && <span className="rounded bg-[var(--surface-secondary)] px-1.5 py-0.5 text-[10px] text-amber-800">obrigatória</span>}
                       {st.ocorrencias > 1 && <span className="rounded bg-[var(--surface-primary)] px-1.5 py-0.5 text-[10px] text-[var(--text-secondary)]">{st.ocorrencias}ª vez</span>}
                     </div>
                     {st.descricao && <p className="mt-0.5 text-[11px] text-[var(--text-muted)]">{st.descricao}</p>}
                     {/* O MOTIVO VEM DO SERVIDOR. A tela não deduz por que está bloqueada. */}
                     {!st.disponivel && !st.concluida && st.bloqueioTexto && (
-                      <p className="mt-1 text-[11px] text-amber-700/70">{st.bloqueioTexto}</p>
+                      <p className="mt-1 text-[11px] text-amber-800/70">{st.bloqueioTexto}</p>
                     )}
                     {st.concluida && st.execucao?.resultado && (
-                      <p className="mt-1 text-[11px] text-green-700/60">
+                      <p className="mt-1 text-[11px] text-green-800/60">
                         {st.execucao.resultado}
                         {st.execucao.completedAt && ` · ${new Date(st.execucao.completedAt).toLocaleDateString("pt-BR")}`}
                       </p>
@@ -313,7 +313,7 @@ export default function PainelDeclarativoDaEtapa({
 
                     {st.definicao.campos.filter((c) => visivel(c, vals)).map((c) => (
                       <div key={c.key}>
-                        <label className={lbl}>{c.label}{c.obrigatorio && <span className="text-amber-700"> *</span>}</label>
+                        <label className={lbl}>{c.label}{c.obrigatorio && <span className="text-amber-800"> *</span>}</label>
                         {c.tipo === "textarea" ? (
                           <textarea className={inp} rows={3} value={String(vals[c.key] ?? "")}
                             onChange={(e) => setValoresDaSub({ ...valoresDaSub, [st.key]: { ...vals, [c.key]: e.target.value } })} />
@@ -339,7 +339,7 @@ export default function PainelDeclarativoDaEtapa({
                           <label key={it.key} className="flex items-start gap-2 text-xs text-white/70">
                             <input type="checkbox" className="mt-0.5" checked={!!marc[it.key]}
                               onChange={(e) => setMarcadosDaSub({ ...marcadosDaSub, [st.key]: { ...marc, [it.key]: e.target.checked } })} />
-                            <span>{it.label}{it.obrigatorio && <span className="text-amber-700"> *</span>}
+                            <span>{it.label}{it.obrigatorio && <span className="text-amber-800"> *</span>}
                               {it.descricao && <span className="block text-[11px] text-[var(--text-muted)]">{it.descricao}</span>}</span>
                           </label>
                         ))}
@@ -348,7 +348,7 @@ export default function PainelDeclarativoDaEtapa({
 
                     <div className="flex flex-wrap gap-2">
                       {st.definicao.acoes.length === 0 && (
-                        <p className="text-[11px] text-amber-700/70">Esta subtarefa não tem resultado cadastrado.</p>
+                        <p className="text-[11px] text-amber-800/70">Esta subtarefa não tem resultado cadastrado.</p>
                       )}
                       {st.definicao.acoes.map((a) => (
                         <button key={a.key} onClick={() => executar(a, st.key)}
@@ -367,7 +367,7 @@ export default function PainelDeclarativoDaEtapa({
 
           {/* O QUE FALTA PARA O PASSO CONCLUIR, segundo a regra cadastrada. */}
           {d.conclusao && !d.conclusao.pode && (
-            <p className="text-[11px] text-amber-700/70">
+            <p className="text-[11px] text-amber-800/70">
               A etapa só conclui quando: {d.conclusao.faltando.map((x) => x.label).join(", ")}.
             </p>
           )}
@@ -400,7 +400,7 @@ export default function PainelDeclarativoDaEtapa({
         <div className="space-y-3">
           {cfg.campos.filter((c) => visivel(c, valores)).map((c) => (
             <div key={c.key}>
-              <label className={lbl}>{c.label}{c.obrigatorio && <span className="text-amber-700"> *</span>}</label>
+              <label className={lbl}>{c.label}{c.obrigatorio && <span className="text-amber-800"> *</span>}</label>
               {c.tipo === "textarea" ? (
                 <textarea className={inp} rows={3} value={String(valores[c.key] ?? "")} onChange={(e) => setValores({ ...valores, [c.key]: e.target.value })} />
               ) : c.tipo === "select" || c.tipo === "multiselect" || c.tipo === "referencia" ? (
@@ -455,7 +455,7 @@ export default function PainelDeclarativoDaEtapa({
             ))}
           </div>
           {checklistFaltando.length > 0 && (
-            <p className="mt-1 text-[11px] text-amber-700/70">{checklistFaltando.length} item(ns) de conferência ainda não marcados.</p>
+            <p className="mt-1 text-[11px] text-amber-800/70">{checklistFaltando.length} item(ns) de conferência ainda não marcados.</p>
           )}
         </div>
       )}
@@ -510,7 +510,7 @@ export default function PainelDeclarativoDaEtapa({
               <div className="flex justify-end gap-2">
                 <button onClick={() => setPreview(null)} className="rounded-lg border border-[var(--border-default)] bg-[var(--surface-primary)] px-3 py-1.5 text-xs text-white/70">Cancelar</button>
                 <button onClick={() => void confirmarReexecucao()} disabled={enviando != null || justificativa.trim().length < 5}
-                  className="rounded-lg bg-amber-700 px-3 py-1.5 text-xs font-medium text-[var(--action-primary-ink)] disabled:opacity-40">
+                  className="rounded-lg bg-[var(--action-primary)] px-3 py-1.5 text-xs font-medium text-[var(--action-primary-ink)] disabled:opacity-40">
                   {enviando === "__reexecutar" ? "Reexecutando…" : "Confirmar reexecução"}
                 </button>
               </div>

@@ -65,7 +65,7 @@ export default function CategoriasDocumentaisTab() {
 
   return (
     <div className="space-y-5">
-      {flash && <div className="rounded-xl border border-[var(--border-default)] bg-[var(--surface-secondary)] px-4 py-3 text-sm text-green-700">{flash}</div>}
+      {flash && <div className="rounded-xl border border-[var(--border-default)] bg-[var(--surface-secondary)] px-4 py-3 text-sm text-green-800">{flash}</div>}
 
       <div className="rounded-2xl border border-[var(--border-default)] bg-[var(--surface-primary)] p-5 backdrop-blur-sm">
         <div className="flex items-start justify-between gap-3">
@@ -105,7 +105,7 @@ export default function CategoriasDocumentaisTab() {
               <tr key={c.id} className="border-b border-[var(--border-subtle)] last:border-0">
                 <td className="px-4 py-2.5 text-white">{c.name}{c.sistema && <span className="ml-1.5 rounded bg-[var(--surface-primary)] px-1.5 py-0.5 text-[9px] uppercase text-[var(--text-secondary)]">sistema</span>}</td>
                 <td className="px-4 py-2.5 text-white/70">{c.ordem}</td>
-                <td className="px-4 py-2.5"><span className={`rounded-full px-2 py-0.5 text-[10px] ${c.ativo ? "bg-[var(--surface-secondary)] text-green-700" : "bg-[var(--surface-primary)] text-[var(--text-secondary)]"}`}>{c.ativo ? "Ativa" : "Inativa"}</span></td>
+                <td className="px-4 py-2.5"><span className={`rounded-full px-2 py-0.5 text-[10px] ${c.ativo ? "bg-[var(--surface-secondary)] text-green-800" : "bg-[var(--surface-primary)] text-[var(--text-secondary)]"}`}>{c.ativo ? "Ativa" : "Inativa"}</span></td>
                 <td className="px-4 py-2.5 text-white/70">{c.tiposCount}</td>
                 <td className="px-4 py-2.5">
                   <div className="flex items-center justify-end gap-1 text-xs text-[var(--text-secondary)]">

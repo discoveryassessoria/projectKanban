@@ -179,7 +179,7 @@ export function RemocaoPessoaModal({
                       <li key={f.tipo} className="text-sm text-amber-900">{f.descricao}</li>
                     ))}
                   </ul>
-                  <p className="mt-2 text-xs text-amber-700">
+                  <p className="mt-2 text-xs text-amber-800">
                     Histórico não se apaga. Por isso a exclusão definitiva está indisponível:
                     esta pessoa sai da operação ativa e o registro permanece.
                   </p>
@@ -219,7 +219,7 @@ export function RemocaoPessoaModal({
               <button
                 onClick={() => executar("DESATIVAR")}
                 disabled={!!executando || !plano.podeDesativar}
-                className="flex items-center justify-center gap-2 rounded-lg bg-amber-700 px-4 py-2.5 text-sm font-medium text-[var(--action-primary-ink)] transition-colors hover:bg-amber-800 disabled:opacity-60"
+                className="flex items-center justify-center gap-2 rounded-lg bg-[var(--action-primary)] px-4 py-2.5 text-sm font-medium text-[var(--action-primary-ink)] transition-colors hover:bg-[var(--action-primary)] disabled:opacity-60"
               >
                 {executando === "DESATIVAR" ? <Loader2 className="h-4 w-4 animate-spin" /> : <Shield className="h-4 w-4" />}
                 Remover da árvore e preservar histórico

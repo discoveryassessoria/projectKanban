@@ -208,10 +208,10 @@ export default function CarteirasTab() {
                   <td className="px-4 py-2.5 text-right tabular-nums text-white/70">{c.diasLiquidacao != null ? `${c.diasLiquidacao}d` : '—'}</td>
                   <td className="px-4 py-2.5">
                     <div className="flex flex-wrap items-center gap-1.5">
-                      <span className={`rounded px-2 py-0.5 text-[11px] font-medium ${c.ativo ? 'bg-[var(--surface-secondary)] text-green-700' : 'bg-[var(--surface-primary)] text-[var(--text-secondary)]'}`}>
+                      <span className={`rounded px-2 py-0.5 text-[11px] font-medium ${c.ativo ? 'bg-[var(--surface-secondary)] text-green-800' : 'bg-[var(--surface-primary)] text-[var(--text-secondary)]'}`}>
                         {c.ativo ? 'Ativo' : 'Inativo'}
                       </span>
-                      {c.isDefault && <span className="rounded px-2 py-0.5 text-[11px] font-medium bg-[var(--surface-secondary)] text-green-700">Padrão</span>}
+                      {c.isDefault && <span className="rounded px-2 py-0.5 text-[11px] font-medium bg-[var(--surface-secondary)] text-green-800">Padrão</span>}
                     </div>
                   </td>
                   <td className="px-4 py-2.5">
@@ -261,7 +261,7 @@ export default function CarteirasTab() {
                   <option value="" className="bg-zinc-900">— Nenhuma —</option>
                   {contas.map((c) => <option key={c.id} value={c.id} className="bg-zinc-900">{c.nome}</option>)}
                 </select>
-                {contas.length === 0 && <p className="mt-1 text-[11px] text-amber-700/70">Cadastre Contas primeiro para vincular.</p>}
+                {contas.length === 0 && <p className="mt-1 text-[11px] text-amber-800/70">Cadastre Contas primeiro para vincular.</p>}
               </div>
               <div>
                 <label className="mb-1 block text-xs text-[var(--text-secondary)]">Dias para liquidação</label>

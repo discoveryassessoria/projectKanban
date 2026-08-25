@@ -110,7 +110,7 @@ export default function CondicoesPagamentoTab() {
             <p className="text-sm text-[var(--text-secondary)]">Regra reutilizável do motor. Só sugere/parametriza — a Cobrança decide.</p>
           </div>
         </div>
-        <button onClick={() => { setEditando(null); setAberto(true) }} className="inline-flex items-center gap-1.5 rounded-lg px-4 py-2 text-sm font-semibold text-[#1b1508] transition" style={{ background: OURO }}>
+        <button onClick={() => { setEditando(null); setAberto(true) }} className="inline-flex items-center gap-1.5 rounded-lg px-4 py-2 text-sm font-semibold text-[var(--accent-ink)] transition" style={{ background: OURO }}>
           <Plus className="h-4 w-4" /> Nova condição
         </button>
       </div>
@@ -146,7 +146,7 @@ export default function CondicoesPagamentoTab() {
                     <span>{APLICA_A_LABEL[x.aplicaA] || x.aplicaA}</span>
                     <span>{TIPOS_PAGAMENTO_LABEL[x.tipoPagamento] || x.tipoPagamento}{x.tipoPagamento === 'PARCELADO' ? ` até ${x.parcelasMax ?? '—'}×` : ''}</span>
                     <span>{POLITICAS_TAXAS_LABEL[x.politicaTaxas] || 'taxas: —'}</span>
-                    {usoReal > 0 && <span className="text-amber-700/70">em uso ({usoReal})</span>}
+                    {usoReal > 0 && <span className="text-amber-800/70">em uso ({usoReal})</span>}
                   </div>
                 </div>
                 <div className="flex shrink-0 items-center gap-2">
@@ -223,18 +223,18 @@ function CondicaoWizard({ editando, carteiras, formas, taxas, servicos, moedas, 
         <div className="flex items-center justify-between">
           <button onClick={() => (step > 1 ? irPara(step - 1) : (fecharTodosMultiSelects(), onClose()))} className="inline-flex items-center gap-1 text-sm text-[var(--text-secondary)] transition hover:text-white"><ArrowLeft className="h-4 w-4" /> {step > 1 ? 'Voltar' : 'Cancelar'}</button>
           {step < PASSOS.length ? (
-            <button onClick={() => { fecharTodosMultiSelects(); if (step === 1 && !f.name.trim()) { setErro('Informe o nome.'); return } setErro(null); setStep(step + 1) }} className="inline-flex items-center gap-1 rounded-lg px-4 py-2 text-sm font-semibold text-[#1b1508] transition" style={{ background: OURO }}>Próximo <ArrowRight className="h-4 w-4" /></button>
+            <button onClick={() => { fecharTodosMultiSelects(); if (step === 1 && !f.name.trim()) { setErro('Informe o nome.'); return } setErro(null); setStep(step + 1) }} className="inline-flex items-center gap-1 rounded-lg px-4 py-2 text-sm font-semibold text-[var(--accent-ink)] transition" style={{ background: OURO }}>Próximo <ArrowRight className="h-4 w-4" /></button>
           ) : (
-            <button onClick={() => salvar(false)} disabled={salvando} className="inline-flex items-center gap-1.5 rounded-lg px-4 py-2 text-sm font-semibold text-[#1b1508] transition disabled:opacity-50" style={{ background: OURO }}>{salvando ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />}{salvando ? 'Salvando…' : (editando ? 'Salvar' : 'Criar condição')}</button>
+            <button onClick={() => salvar(false)} disabled={salvando} className="inline-flex items-center gap-1.5 rounded-lg px-4 py-2 text-sm font-semibold text-[var(--accent-ink)] transition disabled:opacity-50" style={{ background: OURO }}>{salvando ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />}{salvando ? 'Salvando…' : (editando ? 'Salvar' : 'Criar condição')}</button>
           )}
         </div>
       }
     >
       <>
           {erro && (
-            <div className="rounded-lg border border-[var(--border-default)] bg-[var(--surface-secondary)] p-3 text-sm text-amber-700">
+            <div className="rounded-lg border border-[var(--border-default)] bg-[var(--surface-secondary)] p-3 text-sm text-amber-800">
               {erro}
-              {novaVersao && <button onClick={() => salvar(true)} className="ml-2 inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs font-semibold text-[#1b1508]" style={{ background: OURO }}><GitBranch className="h-3 w-3" /> Criar nova versão</button>}
+              {novaVersao && <button onClick={() => salvar(true)} className="ml-2 inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs font-semibold text-[var(--accent-ink)]" style={{ background: OURO }}><GitBranch className="h-3 w-3" /> Criar nova versão</button>}
             </div>
           )}
 

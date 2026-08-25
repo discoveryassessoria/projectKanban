@@ -236,7 +236,7 @@ export function PessoaDetailsPage({
                 <div className="flex items-center gap-2 text-gray-500">
                   {dateRange && <span>{dateRange}</span>}
                   {pessoa.vivo === false && <span className="text-xs bg-gray-200 px-2 py-0.5 rounded">Falecido</span>}
-                  {pessoa.vivo === true && <span className="text-xs bg-[var(--surface-secondary)] text-green-700 px-2 py-0.5 rounded">Vivo</span>}
+                  {pessoa.vivo === true && <span className="text-xs bg-[var(--surface-secondary)] text-green-800 px-2 py-0.5 rounded">Vivo</span>}
                 </div>
               </div>
             </div>
@@ -256,7 +256,7 @@ export function PessoaDetailsPage({
               >
                 {tab.label}
                 {activeTab === tab.id && (
-                  <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-amber-600" />
+                  <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-[var(--action-primary)]" />
                 )}
               </button>
             ))}
@@ -417,7 +417,7 @@ export function PessoaDetailsPage({
                             
                             <button 
                               onClick={() => onAddFilho?.(pessoa.id)}
-                              className="w-full p-3 flex items-center gap-1 text-amber-600 hover:text-amber-700 hover:bg-gray-50"
+                              className="w-full p-3 flex items-center gap-1 text-amber-600 hover:text-amber-800 hover:bg-gray-50"
                             >
                               <Plus className="h-4 w-4" />
                               <span className="text-sm font-medium">ACRESCENTAR FILHO(A)</span>
@@ -432,7 +432,7 @@ export function PessoaDetailsPage({
                   {!conjuge && (
                     <button 
                       onClick={() => onAddConjuge?.(pessoa.id)}
-                      className="w-full mt-3 p-3 flex items-center gap-1 text-amber-600 hover:text-amber-700 border border-gray-200 rounded-lg hover:bg-gray-50"
+                      className="w-full mt-3 p-3 flex items-center gap-1 text-amber-600 hover:text-amber-800 border border-gray-200 rounded-lg hover:bg-gray-50"
                     >
                       <Plus className="h-4 w-4" />
                       <span className="text-sm font-medium">ACRESCENTAR CÔNJUGE</span>
@@ -442,7 +442,7 @@ export function PessoaDetailsPage({
                   {filhos.length === 0 && (
                     <button 
                       onClick={() => onAddFilho?.(pessoa.id)}
-                      className="w-full mt-2 p-3 flex items-center gap-1 text-amber-600 hover:text-amber-700 border border-gray-200 rounded-lg hover:bg-gray-50"
+                      className="w-full mt-2 p-3 flex items-center gap-1 text-amber-600 hover:text-amber-800 border border-gray-200 rounded-lg hover:bg-gray-50"
                     >
                       <Plus className="h-4 w-4" />
                       <span className="text-sm font-medium">ACRESCENTAR FILHO(A)</span>
@@ -499,7 +499,7 @@ export function PessoaDetailsPage({
                       {!pessoa.pai && (
                         <button 
                           onClick={() => onAddPai?.(pessoa.id)}
-                          className="w-full p-3 flex items-center gap-1 text-amber-600 hover:text-amber-700 border-t border-gray-100 hover:bg-gray-50"
+                          className="w-full p-3 flex items-center gap-1 text-amber-600 hover:text-amber-800 border-t border-gray-100 hover:bg-gray-50"
                         >
                           <Plus className="h-4 w-4" />
                           <span className="text-sm font-medium">ACRESCENTAR PAI</span>
@@ -508,7 +508,7 @@ export function PessoaDetailsPage({
                       {!pessoa.mae && (
                         <button 
                           onClick={() => onAddMae?.(pessoa.id)}
-                          className="w-full p-3 flex items-center gap-1 text-amber-600 hover:text-amber-700 border-t border-gray-100 hover:bg-gray-50"
+                          className="w-full p-3 flex items-center gap-1 text-amber-600 hover:text-amber-800 border-t border-gray-100 hover:bg-gray-50"
                         >
                           <Plus className="h-4 w-4" />
                           <span className="text-sm font-medium">ACRESCENTAR MÃE</span>
@@ -519,14 +519,14 @@ export function PessoaDetailsPage({
                     <div className="space-y-2">
                       <button 
                         onClick={() => onAddPai?.(pessoa.id)}
-                        className="w-full p-3 flex items-center gap-1 text-amber-600 hover:text-amber-700 border border-gray-200 rounded-lg hover:bg-gray-50"
+                        className="w-full p-3 flex items-center gap-1 text-amber-600 hover:text-amber-800 border border-gray-200 rounded-lg hover:bg-gray-50"
                       >
                         <Plus className="h-4 w-4" />
                         <span className="text-sm font-medium">ACRESCENTAR PAI</span>
                       </button>
                       <button 
                         onClick={() => onAddMae?.(pessoa.id)}
-                        className="w-full p-3 flex items-center gap-1 text-amber-600 hover:text-amber-700 border border-gray-200 rounded-lg hover:bg-gray-50"
+                        className="w-full p-3 flex items-center gap-1 text-amber-600 hover:text-amber-800 border border-gray-200 rounded-lg hover:bg-gray-50"
                       >
                         <Plus className="h-4 w-4" />
                         <span className="text-sm font-medium">ACRESCENTAR MÃE</span>
@@ -568,7 +568,7 @@ export function PessoaDetailsPage({
                           href={doc.arquivo_url} 
                           target="_blank" 
                           rel="noopener noreferrer"
-                          className="text-amber-600 hover:text-amber-700 text-sm"
+                          className="text-amber-600 hover:text-amber-800 text-sm"
                         >
                           Ver documento
                         </a>

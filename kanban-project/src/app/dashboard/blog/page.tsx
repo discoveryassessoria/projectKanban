@@ -267,14 +267,14 @@ export default function BlogAdminPage() {
           <div className="flex items-center justify-between">
             <div>
               <h2 className="text-2xl md:text-3xl font-semibold flex items-center gap-3">
-                <FileText className="w-8 h-8 text-amber-700" />
+                <FileText className="w-8 h-8 text-amber-800" />
                 Blog
               </h2>
               <p className="text-sm text-white/70 mt-1">Gerencie os posts do blog da landing page</p>
             </div>
             <Button 
               onClick={() => setShowForm(true)}
-              className="bg-amber-600 hover:bg-amber-800 text-black font-semibold"
+              className="bg-[var(--action-primary)] hover:bg-[var(--action-primary)] text-black font-semibold"
             >
               <Plus className="w-4 h-4 mr-2" />
               Novo Post
@@ -391,15 +391,15 @@ export default function BlogAdminPage() {
                             {/* Status Badge */}
                             <span className={`px-2 py-1 rounded-full text-xs font-medium ${
                               post.status === 'PUBLICADO' 
-                                ? 'bg-[var(--surface-secondary)] text-green-700 border border-[var(--border-default)]'
+                                ? 'bg-[var(--surface-secondary)] text-green-800 border border-[var(--border-default)]'
                                 : post.status === 'ARQUIVADO'
                                 ? 'bg-gray-500/20 text-[var(--text-muted)] border border-gray-500/30'
-                                : 'bg-[var(--surface-secondary)] text-amber-700 border border-[var(--border-default)]'
+                                : 'bg-[var(--surface-secondary)] text-amber-800 border border-[var(--border-default)]'
                             }`}>
                               {post.status}
                             </span>
                             {post.destaque && (
-                              <Star className="w-4 h-4 text-amber-700 fill-amber-400" />
+                              <Star className="w-4 h-4 text-amber-800 fill-amber-400" />
                             )}
                           </div>
                         </div>
@@ -440,7 +440,7 @@ export default function BlogAdminPage() {
                             variant="ghost"
                             size="sm"
                             onClick={() => toggleDestaque(post)}
-                            className="text-[var(--text-secondary)] hover:text-amber-700 hover:bg-[var(--surface-hover)]"
+                            className="text-[var(--text-secondary)] hover:text-amber-800 hover:bg-[var(--surface-hover)]"
                           >
                             {post.destaque ? (
                               <><StarOff className="w-4 h-4 mr-1" /> Remover Destaque</>
@@ -619,7 +619,7 @@ export default function BlogAdminPage() {
                   <Button
                     type="submit"
                     disabled={saving}
-                    className="flex-1 bg-amber-600 hover:bg-amber-800 text-black font-semibold"
+                    className="flex-1 bg-[var(--action-primary)] hover:bg-[var(--action-primary)] text-black font-semibold"
                   >
                     {saving ? 'Salvando...' : (
                       <><Check className="w-4 h-4 mr-2" /> {editingPost ? 'Atualizar' : 'Criar Post'}</>

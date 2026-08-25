@@ -124,7 +124,7 @@ export default function CanaisPorOrganizacaoPanel() {
       <input className={inp} placeholder="Buscar organização por nome ou cidade…"
         value={busca} onChange={(e) => setBusca(e.target.value)} />
 
-      {flash && <div className="rounded-lg border border-[var(--border-default)] bg-[var(--surface-secondary)] p-2 text-xs text-green-700">{flash}</div>}
+      {flash && <div className="rounded-lg border border-[var(--border-default)] bg-[var(--surface-secondary)] p-2 text-xs text-green-800">{flash}</div>}
 
       {organizacoes === null && <p className="text-sm text-[var(--text-muted)]">Carregando organizações…</p>}
       {organizacoes?.length === 0 && <p className="text-sm text-[var(--text-muted)]">Nenhuma organização encontrada.</p>}
@@ -138,7 +138,7 @@ export default function CanaisPorOrganizacaoPanel() {
                 {o.type && <span className="rounded bg-[var(--surface-primary)] px-1.5 py-0.5 text-[var(--text-secondary)]">{o.type}</span>}
                 {o.city && <span className="rounded bg-[var(--surface-primary)] px-1.5 py-0.5 text-[var(--text-secondary)]">{o.city}</span>}
                 {o.canais.length === 0
-                  ? <span className="rounded bg-[var(--surface-secondary)] px-1.5 py-0.5 text-amber-700" title="Toda subtarefa que dependa de canal fica bloqueada nesta organização.">sem canal cadastrado</span>
+                  ? <span className="rounded bg-[var(--surface-secondary)] px-1.5 py-0.5 text-amber-800" title="Toda subtarefa que dependa de canal fica bloqueada nesta organização.">sem canal cadastrado</span>
                   : o.canais.map((c) => (
                       <span key={c.canal.key} className="rounded bg-[var(--surface-secondary)] px-1.5 py-0.5 text-[var(--text-secondary)]">{c.canal.label}</span>
                     ))}
