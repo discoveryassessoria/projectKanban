@@ -2153,9 +2153,10 @@ model RetificacaoPacoteDivergencia {
 model Profissional {
   id             Int      @id @default(autoincrement())
   nome           String   @db.VarChar(200)
-  /// CATEGORIA em vocabulario aberto (advogado | tradutor | despachante | ...).
-  /// Aberto porque a proxima categoria nao pode exigir migration.
-  categoria      String   @db.VarChar(40)
+  /// A PROFISSAO, pelo cadastro. Acrescentar uma nao pede deploy: pede um registro
+  /// em Profissionais > Categorias.
+  categoriaId    Int
+  categoria      CategoriaProfissional @relation(fields: [categoriaId], references: [id])
   email          String?  @db.VarChar(200)
   telefone       String?  @db.VarChar(60)
   /// ESCRITORIO/EMPRESA onde atua, quando houver. Opcional: profissional autonomo
@@ -2170,7 +2171,7 @@ model Profissional {
   registros      RegistroProfissional[]
   retificacoes   RetificacaoPacote[]    @relation("ProfissionalDaRetificacao")
 
-  @@index([categoria])
+  @@index([categoriaId])
   @@index([organizacaoId])
   @@index([ativo])
 }
@@ -5971,6 +5972,28 @@ model CategoriaOrganizacao {
   criadoEm     DateTime               @default(now())
   atualizadoEm DateTime               @updatedAt
   organizacoes OrganizacaoCategoria[]
+}
+
+/// A PROFISSAO EXERCIDA — advogado, tradutor juramentado, despachante.
+///
+/// Nasceu como texto aberto em `Profissional.categoria`, com o argumento de que "a
+/// proxima profissao nao pode exigir migration". O argumento e verdadeiro e vale para
+/// qualquer campo que o guard de referencias pega — e por isso nao decide nada: o
+/// sistema ja resolve exatamente isso com cadastro, e criar um custa uma linha no
+/// registro generico, nao um deploy.
+///
+/// Sem cadastro, "advogado" e "Advogado" viravam duas profissoes, e ninguem conseguia
+/// perguntar quais existem.
+model CategoriaProfissional {
+  id            Int      @id @default(autoincrement())
+  code          String   @unique @db.VarChar(60)
+  nome          String   @db.VarChar(200)
+  descricao     String?  @db.Text
+  ordem         Int      @default(0)
+  ativo         Boolean  @default(true)
+  criadoEm      DateTime @default(now())
+  atualizadoEm  DateTime @updatedAt
+  profissionais Profissional[]
 }
 
 model OrganizacaoCategoria {

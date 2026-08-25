@@ -15,8 +15,9 @@ import { registrarAuditoria } from "@/lib/gerenciamento/auditoria"
 
 /** O que a tela precisa saber de cada profissional. */
 const SELECT = {
-  id: true, nome: true, categoria: true, email: true, telefone: true,
-  observacoes: true, ativo: true, organizacaoId: true, criadoEm: true,
+  id: true, nome: true, email: true, telefone: true,
+  observacoes: true, ativo: true, organizacaoId: true, categoriaId: true, criadoEm: true,
+  categoria: { select: { id: true, code: true, nome: true } },
   organizacao: { select: { id: true, name: true, nomeFantasia: true } },
   registros: {
     orderBy: { id: "asc" as const },
@@ -43,7 +44,7 @@ export async function GET(request: Request) {
             OR: [
               { nome: { contains: busca, mode: "insensitive" as const } },
               { email: { contains: busca, mode: "insensitive" as const } },
-              { categoria: { contains: busca, mode: "insensitive" as const } },
+              { categoria: { nome: { contains: busca, mode: "insensitive" as const } } },
               { registros: { some: { numero: { contains: busca, mode: "insensitive" as const } } } },
               { organizacao: { name: { contains: busca, mode: "insensitive" as const } } },
             ],
@@ -62,9 +63,9 @@ export async function POST(request: Request) {
   if (erro) return erro
   const body = (await request.json().catch(() => ({}))) as Record<string, unknown>
   const nome = String(body.nome ?? "").trim()
-  const categoria = String(body.categoria ?? "").trim()
+  const categoriaId = idOuNulo(body.categoriaId)
   if (!nome) return NextResponse.json({ error: "VALIDACAO", mensagem: "O nome é obrigatório." }, { status: 422 })
-  if (!categoria) return NextResponse.json({ error: "VALIDACAO", mensagem: "A categoria profissional é obrigatória." }, { status: 422 })
+  if (!categoriaId) return NextResponse.json({ error: "VALIDACAO", mensagem: "Escolha a categoria profissional." }, { status: 422 })
 
   const registros = normalizarRegistros(body.registros)
   const problema = conferirRegistros(registros)
@@ -73,7 +74,7 @@ export async function POST(request: Request) {
   try {
     const criado = await prisma.profissional.create({
       data: {
-        nome, categoria,
+        nome, categoriaId,
         email: texto(body.email), telefone: texto(body.telefone), observacoes: texto(body.observacoes),
         organizacaoId: idOuNulo(body.organizacaoId),
         ativo: body.ativo === undefined ? true : !!body.ativo,
@@ -83,7 +84,7 @@ export async function POST(request: Request) {
     })
     await registrarAuditoria(request, {
       acao: "CRIAR", entidade: "Profissional", entidadeId: criado.id,
-      descricao: `Profissional "${criado.nome}" (${criado.categoria}) cadastrado.`,
+      descricao: `Profissional "${criado.nome}" (${criado.categoria.nome}) cadastrado.`,
     })
     return NextResponse.json({ ok: true, profissional: criado })
   } catch (e) {

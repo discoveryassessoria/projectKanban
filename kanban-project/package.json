@@ -353,7 +353,8 @@
     "test:um-motor": "tsx scripts/guard-um-motor-por-fase.test.ts",
     "test:tarefa-fantasma": "tsx scripts/tarefa-fantasma.test.ts",
     "reparar:passo-fantasma:dry": "tsx scripts/reparar-passo-fantasma.ts",
-    "reparar:passo-fantasma": "tsx scripts/reparar-passo-fantasma.ts --execute"
+    "reparar:passo-fantasma": "tsx scripts/reparar-passo-fantasma.ts --execute",
+    "test:fase-vazia": "tsx scripts/fase-vazia-explica.test.ts"
   },
   "prisma": {
     "seed": "npm run guard:escrita && tsx prisma/seed.ts"

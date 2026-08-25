@@ -26,10 +26,13 @@ interface Registro {
   ativo: boolean
 }
 
+interface Categoria { id: number; nome: string; code: string }
+
 interface Profissional {
   id: number
   nome: string
-  categoria: string
+  categoriaId: number
+  categoria: Categoria
   email: string | null
   telefone: string | null
   observacoes: string | null
@@ -49,20 +52,14 @@ function authHeaders(): HeadersInit {
 const inputCls = "w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-white placeholder-white/30 outline-none focus:border-white/20"
 const labelCls = "mb-1 block text-xs text-white/60"
 
-/**
- * As categorias que o sistema já usa. É SUGESTÃO, não trava: `categoria` é texto
- * aberto no modelo, e a próxima profissão não pode exigir deploy. O campo aceita o
- * que for digitado.
- */
-const CATEGORIAS_CONHECIDAS = ["advogado", "tradutor juramentado", "despachante", "contador", "correspondente"]
-/** Idem para o conselho: OAB é um VALOR, e a lista só poupa digitação. */
+/** O conselho é um VALOR; a lista só poupa digitação. */
 const TIPOS_DE_REGISTRO_CONHECIDOS = ["OAB", "CRC", "CREA", "CRM", "JUCESP", "MTE"]
 
 /** O formulário: o profissional sem as projeções de leitura, e com `id` só ao editar. */
-type Formulario = Omit<Profissional, "id" | "organizacao" | "_count"> & { id?: number }
+type Formulario = Omit<Profissional, "id" | "organizacao" | "categoria" | "_count"> & { id?: number }
 
 const vazio = (): Formulario => ({
-  nome: "", categoria: "advogado", email: null, telefone: null, observacoes: null,
+  nome: "", categoriaId: 0, email: null, telefone: null, observacoes: null,
   ativo: true, organizacaoId: null, registros: [],
 })
 
@@ -74,6 +71,7 @@ export function descreverRegistro(r: Registro): string {
 export function ProfissionaisTab() {
   const [lista, setLista] = useState<Profissional[]>([])
   const [orgs, setOrgs] = useState<Organizacao[]>([])
+  const [categorias, setCategorias] = useState<Categoria[]>([])
   const [busca, setBusca] = useState("")
   const [mostrarInativos, setMostrarInativos] = useState(false)
   const [carregando, setCarregando] = useState(true)
@@ -111,6 +109,14 @@ export function ProfissionaisTab() {
       if (!r?.ok) return
       const j = await r.json().catch(() => null)
       setOrgs((j?.orgaos ?? j?.organizacoes ?? j?.itens ?? []) as Organizacao[])
+    })()
+    // A CATEGORIA VEM DO CADASTRO. Digitar livremente fazia "advogado" e "Advogado"
+    // virarem duas profissões, e ninguém conseguia perguntar quais existem.
+    void (async () => {
+      const r = await fetch("/api/gerenciamento/cadastros/categorias-profissional", { headers: authHeaders() }).catch(() => null)
+      if (!r?.ok) return
+      const j = await r.json().catch(() => null)
+      setCategorias((j?.itens ?? j?.registros ?? []) as Categoria[])
     })()
   }, [])
 
@@ -203,7 +209,7 @@ export function ProfissionaisTab() {
               {lista.map((p) => (
                 <tr key={p.id} className={`border-t border-white/5 ${p.ativo ? "" : "opacity-50"}`}>
                   <td className="px-4 py-2.5 text-white/90">{p.nome}</td>
-                  <td className="px-4 py-2.5 text-white/60">{p.categoria}</td>
+                  <td className="px-4 py-2.5 text-white/60">{p.categoria?.nome ?? "—"}</td>
                   <td className="px-4 py-2.5 text-white/60">
                     {p.registros.filter((r) => r.ativo !== false).map(descreverRegistro).join(" · ") || "—"}
                   </td>
@@ -255,12 +261,14 @@ export function ProfissionaisTab() {
               </div>
               <div>
                 <label className={labelCls}>Categoria profissional *</label>
-                <input className={inputCls} list="categorias-profissionais" value={form.categoria}
-                  onChange={(e) => setCampo({ categoria: e.target.value })} />
-                <datalist id="categorias-profissionais">
-                  {CATEGORIAS_CONHECIDAS.map((c) => <option key={c} value={c} />)}
-                </datalist>
-                <p className="mt-1 text-[11px] text-white/35">Sugestões conhecidas; aceita qualquer categoria.</p>
+                <select className={inputCls} value={form.categoriaId || ""}
+                  onChange={(e) => setCampo({ categoriaId: Number(e.target.value) || 0 })}>
+                  <option value="">— escolher —</option>
+                  {categorias.map((c) => <option key={c.id} value={c.id}>{c.nome}</option>)}
+                </select>
+                <p className="mt-1 text-[11px] text-white/35">
+                  Vem do cadastro de Categorias. Falta uma? Cadastre em Profissionais › Categorias.
+                </p>
               </div>
               <div>
                 <label className={labelCls}>Escritório / organização</label>
@@ -322,7 +330,7 @@ export function ProfissionaisTab() {
 
             <div className="mt-5 flex justify-end gap-2">
               <button onClick={() => setForm(null)} className="rounded-lg border border-white/10 px-3 py-2 text-sm text-white/70 hover:bg-white/10">Cancelar</button>
-              <button onClick={() => void salvar()} disabled={salvando || !form.nome.trim() || !form.categoria.trim()}
+              <button onClick={() => void salvar()} disabled={salvando || !form.nome.trim() || !form.categoriaId}
                 className="rounded-lg border border-white/10 bg-white/10 px-4 py-2 text-sm text-white hover:bg-white/20 disabled:opacity-40">
                 {salvando ? "Salvando…" : "Salvar"}
               </button>

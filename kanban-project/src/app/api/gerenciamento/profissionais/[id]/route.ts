@@ -14,8 +14,9 @@ import { registrarAuditoria } from "@/lib/gerenciamento/auditoria"
 import { texto, idOuNulo, normalizarRegistros, conferirRegistros, traduzir } from "../route"
 
 const SELECT = {
-  id: true, nome: true, categoria: true, email: true, telefone: true,
-  observacoes: true, ativo: true, organizacaoId: true,
+  id: true, nome: true, email: true, telefone: true,
+  observacoes: true, ativo: true, organizacaoId: true, categoriaId: true,
+  categoria: { select: { id: true, code: true, nome: true } },
   organizacao: { select: { id: true, name: true, nomeFantasia: true } },
   registros: {
     orderBy: { id: "asc" as const },
@@ -77,7 +78,8 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
         where: { id },
         data: {
           ...(body.nome !== undefined ? { nome: String(body.nome).trim() } : {}),
-          ...(body.categoria !== undefined ? { categoria: String(body.categoria).trim() } : {}),
+          ...(body.categoriaId !== undefined && idOuNulo(body.categoriaId)
+            ? { categoriaId: idOuNulo(body.categoriaId)! } : {}),
           ...(body.email !== undefined ? { email: texto(body.email) } : {}),
           ...(body.telefone !== undefined ? { telefone: texto(body.telefone) } : {}),
           ...(body.observacoes !== undefined ? { observacoes: texto(body.observacoes) } : {}),

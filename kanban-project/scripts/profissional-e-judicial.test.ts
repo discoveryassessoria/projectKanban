@@ -60,6 +60,7 @@ async function limpar() {
   await prisma.arvore.deleteMany({ where: { nome: { startsWith: `${M} ` } } })
   await prisma.registroProfissional.deleteMany({ where: { profissional: { nome: { startsWith: `${M} ` } } } })
   await prisma.profissional.deleteMany({ where: { nome: { startsWith: `${M} ` } } })
+  await prisma.categoriaProfissional.deleteMany({ where: { code: { startsWith: `${M.toLowerCase()}_` } } })
   await prisma.orgaoProtocolo.deleteMany({ where: { name: { startsWith: `${M} ` } } })
   const wf = await prisma.phaseInternalWorkflow.findUnique({ where: { wfUid: `${M}::ret` }, select: { id: true } })
   if (wf) {
@@ -75,23 +76,30 @@ async function main() {
   // ══════════════════════════════════════════════════════════════════════════
   console.log("\n1 — O PROFISSIONAL É CADASTRO, NÃO TEXTO")
   // ══════════════════════════════════════════════════════════════════════════
+  // A CATEGORIA É CADASTRO. O palco cadastra a dele, como quem administra faria.
+  const cat = await prisma.categoriaProfissional.upsert({
+    where: { code: `${M.toLowerCase()}_advogado` },
+    create: { code: `${M.toLowerCase()}_advogado`, nome: "Advogado", ordem: 1 },
+    update: {},
+    select: { id: true },
+  })
   const escritorio = await prisma.orgaoProtocolo.create({
     data: { name: `${M} Silva & Associados`, type: "outro", ativo: true }, select: { id: true },
   })
   const adv = await prisma.profissional.create({
     data: {
-      nome: `${M} Ana Ribeiro`, categoria: "advogado", organizacaoId: escritorio.id, ativo: true,
+      nome: `${M} Ana Ribeiro`, categoriaId: cat.id, organizacaoId: escritorio.id, ativo: true,
       registros: { create: [{ tipo: "OAB", numero: "123456", jurisdicao: "SP" }] },
     },
     select: { id: true },
   })
   const advSemOrg = await prisma.profissional.create({
-    data: { nome: `${M} Bruno Autônomo`, categoria: "advogado", ativo: true,
+    data: { nome: `${M} Bruno Autônomo`, categoriaId: cat.id, ativo: true,
       registros: { create: [{ tipo: "OAB", numero: "999999", jurisdicao: "RJ" }] } },
     select: { id: true },
   })
   const inativo = await prisma.profissional.create({
-    data: { nome: `${M} Carla Inativa`, categoria: "advogado", ativo: false }, select: { id: true },
+    data: { nome: `${M} Carla Inativa`, categoriaId: cat.id, ativo: false }, select: { id: true },
   })
 
   check("o profissional não é Pessoa, Usuário nem Organização",
@@ -343,7 +351,7 @@ async function main() {
   check("nenhuma segunda verdade em SubtaskExecution", subs === 0)
 
   // ISOLAMENTO com advogados e processos distintos.
-  const adv2 = await prisma.profissional.create({ data: { nome: `${M} Dora Segunda`, categoria: "advogado", ativo: true }, select: { id: true } })
+  const adv2 = await prisma.profissional.create({ data: { nome: `${M} Dora Segunda`, categoriaId: cat.id, ativo: true }, select: { id: true } })
   await prisma.retificacaoPacote.update({ where: { id: pacB.pacoteId }, data: { tipo: "judicial", profissionalId: adv2.id, processoNum: "0807777-11.2026.8.26.0100" } })
   const [fA, fB] = await Promise.all([
     prisma.retificacaoPacote.findUnique({ where: { id: pacA.pacoteId }, select: { profissionalId: true, processoNum: true } }),
@@ -509,6 +517,15 @@ async function main() {
   const api = read("src/app/api/gerenciamento/profissionais/[id]/route.ts")
   check("e o servidor recusa apagar quem tem histórico, oferecendo a inativação",
     api.includes('error: "EM_USO"') && api.includes("Tire de circulação"))
+  // A PROFISSÃO TAMBÉM VIROU CADASTRO. Texto livre fazia "advogado" e "Advogado"
+  // serem duas, e ninguém conseguia perguntar quais existem.
+  check("a categoria do profissional vem de cadastro, não de texto digitado",
+    tela.includes("categorias.map((c)") && !tela.includes("CATEGORIAS_CONHECIDAS"))
+  check("e ela tem tela própria, no mesmo módulo",
+    read("src/lib/gerenciamento/cadastros-registry.ts").includes('"categorias-profissional"') &&
+    read("src/app/administrator/page.tsx").includes('profcats: cad("categorias-profissional")'))
+  check("categoria em uso não pode ser apagada",
+    /protegerExclusao:[\s\S]{0,160}model: "profissional", campo: "categoriaId"/.test(read("src/lib/gerenciamento/cadastros-registry.ts")))
   check("a UI reflete o schema REAL: registros são lista, porque o modelo aceita vários",
     tela.includes("+ Registro") && /registros: \[\.\.\.f\.registros/.test(tela))
 

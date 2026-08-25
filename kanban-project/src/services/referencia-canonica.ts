@@ -77,7 +77,8 @@ const RESOLVEDORES: Record<ChaveDeAlvo, {
 }
 
 const SELECT_PROF = {
-  id: true, nome: true, categoria: true, ativo: true,
+  id: true, nome: true, ativo: true,
+  categoria: { select: { nome: true } },
   organizacao: { select: { nomeFantasia: true, name: true } },
   registros: {
     where: { ativo: true }, orderBy: { id: "asc" as const },
@@ -86,7 +87,7 @@ const SELECT_PROF = {
 } as const
 
 function projetarProfissional(p: {
-  id: number; nome: string; categoria: string; ativo: boolean
+  id: number; nome: string; ativo: boolean; categoria: { nome: string }
   organizacao: { nomeFantasia: string | null; name: string } | null
   registros: Array<{ tipo: string; numero: string; jurisdicao: string | null }>
 }): EntidadeReferenciada {
@@ -99,7 +100,7 @@ function projetarProfissional(p: {
   return {
     id: p.id,
     label: registro ? `${p.nome} — ${registro}` : p.nome,
-    descricao: [p.categoria, onde].filter(Boolean).join(" · ") || null,
+    descricao: [p.categoria.nome, onde].filter(Boolean).join(" · ") || null,
     ativo: p.ativo,
   }
 }

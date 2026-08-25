@@ -26,6 +26,19 @@ const RAIZ = join(dirname(fileURLToPath(import.meta.url)), '..')
 // desligada em bloco: um alvo por linha, um motivo por alvo.
 // ════════════════════════════════════════════════════════════════════════════
 const EXCECOES_SCHEMA: Excecao[] = [
+  // ── 24/08/2026 — achados da auditoria de referências ─────────────────────
+  { alvo: 'OrgaoProtocolo.responsavel',
+    motivo: 'NÃO É DÍVIDA — é o nome do CONTATO na organização externa, e ele não é usuário do sistema. ' +
+      'O próprio schema já dizia isso ("texto — não é usuário do sistema"). Apontar para Usuario seria afirmar ' +
+      'que o atendente do cartório tem conta aqui. Zero linhas preenchidas hoje.' },
+  { alvo: 'OrgaoProtocolo.moeda',
+    motivo: 'DÍVIDA: moeda da organização em texto, 241 de 241 registros preenchidos. Destino: moedaId → ' +
+      'MoedaCadastro. Exige migration aditiva, backfill por código e troca dos consumidores em Órgãos e no ' +
+      'financeiro — trabalho de um domínio próprio, não um ajuste de coluna.' },
+  { alvo: 'PlanilhaCelulaOverride.moeda',
+    motivo: 'DÍVIDA: idem OrgaoProtocolo.moeda. Zero linhas hoje — o backfill é vazio e a migração é a mais barata ' +
+      'das três; entra junto quando a moeda virar FK.' },
+
   // ── Conteúdo próprio do registro (texto legítimo, não referência) ─────────
   { alvo: 'CatalogoPais.nationalityKey', motivo: 'Chave própria do país no seu PRÓPRIO cadastro — é identidade dele, não referência a outro.' },
   { alvo: 'CatalogoPais.nationalityLabel', motivo: 'Rótulo pátrio exibido — conteúdo do próprio registro.' },
@@ -88,6 +101,18 @@ const EXCECOES_CODIGO: Excecao[] = [
   { alvo: 'prisma/carga-servicos-oficiais.ts', motivo: 'Carga curada: idempotência por nome normalizado é intencional e roda uma vez, fora do caminho de requisição.' },
   { alvo: 'scripts/catalogo-certidoes-vinculo.ts', motivo: 'Diagnóstico read-only que PROPÕE consolidação por nome para decisão humana; não grava sozinho.' },
   { alvo: 'scripts/seed-honorarios-italia.ts', motivo: 'Seed curado: find-or-create por nome é a idempotência do próprio registro que ele cria, fora do caminho de requisição.' },
+
+  // ── 24/08/2026 ────────────────────────────────────────────────────────────
+  { alvo: 'src/services/organizacao-identidade.ts',
+    motivo: 'NÃO É REFERÊNCIA — é DEDUPLICAÇÃO na entrada. Um registro que chega de fora ainda não tem id; ' +
+      'casá-lo por identificação fiscal, e depois por nome + país, é o que impede a mesma organização entrar duas ' +
+      'vezes. Buscar "por id" aqui seria impossível: o id é justamente o que se está tentando descobrir. É este ' +
+      'código que PROTEGE a integridade que o guard defende.' },
+  { alvo: 'src/services/parametrizacao/estado-parametrizacao.ts',
+    motivo: 'DÍVIDA: "preço ainda por ajustar" é lido do NOME (`MARCA_PLACEHOLDER = "[AJUSTAR]"`). O marcador é ' +
+      'constante exportada e usada consistentemente em quatro pontos, mas continua sendo fato inferido de texto: ' +
+      'renomear a linha muda o comportamento em silêncio. Destino: coluna `placeholder` em TabelaValor, com backfill ' +
+      'determinístico (`name contains "[AJUSTAR]"`) e troca dos quatro consumidores.' },
 ]
 
 // ── Coleta ─────────────────────────────────────────────────────────────────

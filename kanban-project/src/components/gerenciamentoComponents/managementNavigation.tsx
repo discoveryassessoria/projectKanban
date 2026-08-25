@@ -317,6 +317,7 @@ export const MANAGEMENT_NAVIGATION: ManagementNavigationItem[] = [
       // própria. Ficam no mesmo módulo porque o módulo é o das partes EXTERNAS que
       // participam dos processos — não porque sejam a mesma coisa.
       a(27, "profissionais", "Profissionais", ["profissional", "advogado", "oab", "tradutor", "juramentado", "despachante", "contador", "registro", "conselho", "crc", "jucesp", "escritorio", "escritório"], "Organizações"),
+      a(28, "profcats", "Categorias Profissionais", ["categoria", "profissao", "profissão", "advogado", "tradutor", "despachante"], "Organizações"),
       a(30, "orgcats", "Categorias", ["categoria", "tipo", "orgao", "organizacao"]),
     ],
   },

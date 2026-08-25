@@ -141,12 +141,38 @@ const ORIGEM_POR_FONTE: Record<FonteMaterializacao, "MOTOR" | "MANUAL" | "MIGRAC
 }
 
 /**
+ * NOTAS DE BASTIDOR — verdadeiras, úteis no log, sem serventia para quem opera.
+ *
+ * "Tipo inferido de createsTask=true => HUMANO" descreve uma decisão interna do
+ * motor. Ela ia para a mesma frase que o operador lê, colada no meio, sem pontuação:
+ *
+ *   "…nenhuma entidade do processo se aplica aos passos dele. Tipo inferido de
+ *    createsTask=true => HUMANO O processo ainda não tem árvore genealógica…"
+ *
+ * Quem abriu o processo Gerbi em 12/08 leu isso e não fez nada — e a parte que dizia
+ * o que fazer ("crie a árvore e cadastre as pessoas") estava ali, enterrada.
+ *
+ * Elas continuam no relatório: `motivos` não perde nada. O que muda é que param de
+ * entrar na frase que a tela mostra.
+ */
+const NOTAS_DE_BASTIDOR = new Set(["PASSO_TIPO_INFERIDO"])
+
+/** Os motivos que o operador consegue AGIR. */
+export function motivosAcionaveis(motivos: WorkflowValidationIssue[]): WorkflowValidationIssue[] {
+  return motivos.filter((m) => !NOTAS_DE_BASTIDOR.has(m.code) && !!m.message)
+}
+
+/**
  * Traduz os motivos técnicos numa frase que o operador consegue AGIR. Sem isso, o
  * relatório vira log e a tela continua mentindo.
  */
 function mensagemDe(estado: EstadoMaterializacao, faseLabel: string, motivos: WorkflowValidationIssue[]): string | null {
   if (estado === "MATERIALIZADO") return null
-  const detalhe = motivos.map((m) => m.message).filter(Boolean).join(" ")
+  // PONTUADO, e sem as notas de bastidor: duas frases coladas por um espaço viram uma
+  // frase que não termina, e ninguém lê até o fim.
+  const detalhe = motivosAcionaveis(motivos)
+    .map((m) => (/[.!?]$/.test(m.message.trim()) ? m.message.trim() : `${m.message.trim()}.`))
+    .join(" ")
   switch (estado) {
     case "SEM_WORKFLOW_PUBLICADO":
       return `A fase ${faseLabel} não tem Workflow Interno publicado aplicável a este processo. ${detalhe} Publique o workflow em Gerenciamento › Workflows das Fases.`

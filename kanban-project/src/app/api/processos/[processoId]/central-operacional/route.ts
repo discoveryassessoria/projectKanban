@@ -20,7 +20,7 @@ import {
 // domínio, por IDs relacionais — a tela não recombina nada por nome.
 import { DOCUMENTO_STATUS_LABELS, getPhaseOperationalSummary, TIPO_DOCUMENTO_LABELS } from "@/src/lib/process-stage/estrutura-operacional"
 import { resolverInstanciaVigente } from "@/src/lib/process-stage/instancia-vigente-da-fase"
-import { materializarExecucaoDaFase } from "@/src/services/materializar-fase"
+import { materializarExecucaoDaFase, motivosAcionaveis } from "@/src/services/materializar-fase"
 import type { IndiceOperacional } from "@/src/lib/process-stage/estrutura-operacional-core"
 import type { FaseCode } from "@prisma/client"
 
@@ -325,7 +325,9 @@ export async function GET(
         materializacao = {
           estado: rel.estado,
           mensagemAdministrativa: rel.mensagemAdministrativa,
-          motivos: rel.motivos.map((m) => ({ code: m.code, message: m.message })),
+          // SÓ O QUE O OPERADOR CONSEGUE AGIR. As notas de bastidor continuam no
+          // relatório e no log; na tela elas só empurravam o que importa para baixo.
+          motivos: motivosAcionaveis(rel.motivos).map((m) => ({ code: m.code, message: m.message })),
           workflowInstanceId: rel.workflowInstanceId,
           ciclo: rel.ciclo,
           passos: rel.passosTotais,

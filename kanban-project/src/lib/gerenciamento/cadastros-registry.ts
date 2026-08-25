@@ -171,6 +171,42 @@ export const CADASTROS: Record<string, CadastroSpec> = {
     ],
   },
 
+  // ── Órgãos e Organizações › Profissionais › Categorias ────────────────────
+  "categorias-profissional": {
+    entidade: "categorias-profissional",
+    model: "categoriaProfissional",
+    titulo: "Categorias Profissionais",
+    singular: "categoria",
+    descricao:
+      "As profissões que atuam nos processos: advogado, tradutor juramentado, despachante. " +
+      "Um profissional aponta para uma delas — a profissão não é digitada, senão \"advogado\" e " +
+      "\"Advogado\" viram duas.",
+    novoLabel: "+ Nova categoria",
+    codeDe: "nome",
+    identidade: "nome",
+    ordenavel: true,
+    auditoria: "CategoriaProfissional",
+    // QUEM ESTÁ EM USO NÃO SE APAGA: um profissional cadastrado com esta profissão
+    // continua tendo de dizer qual ela é.
+    protegerExclusao: [
+      { model: "profissional", campo: "categoriaId", rotulo: "profissionais" },
+    ],
+    ordenarPor: [{ campo: "ordem", direcao: "asc" }, { campo: "nome", direcao: "asc" }],
+    colunas: [
+      { key: "nome", label: "Profissão" },
+      { key: "code", label: "Código" },
+      { key: "descricao", label: "Descrição" },
+    ],
+    campos: [
+      { key: "nome", label: "Nome da profissão", tipo: "text", obrigatorio: true, largura: "cheia" },
+      {
+        key: "descricao", label: "Descrição", tipo: "textarea", largura: "cheia",
+        ajuda: "O que esta profissão faz nos processos.",
+      },
+      ...CAMPOS_BASE,
+    ],
+  },
+
   // ── Usuários e Acessos › Grupos › Equipes ──────────────────────────────────
   grupos: {
     entidade: "grupos",

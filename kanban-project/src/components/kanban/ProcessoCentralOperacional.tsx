@@ -394,6 +394,14 @@ function mapearPainel(data: CentralOpData, faseNome: string) {
       ? data.materializacao.mensagemAdministrativa
       : null
 
+  // O QUE FAZER, EM LISTA. A frase administrativa resume; os motivos dizem o passo
+  // seguinte, um por linha. Enquanto os dois vinham colados num parágrafo só, a parte
+  // acionável ficava no meio — e o processo Gerbi passou duas semanas parado com a
+  // instrução na tela e ninguém a lendo.
+  const oQueFazer = data.materializacao?.estado !== "MATERIALIZADO"
+    ? (data.materializacao?.motivos ?? [])
+    : []
+
   const progressoTexto =
     total === 0
       ? (explicacaoMaterializacao
@@ -402,7 +410,7 @@ function mapearPainel(data: CentralOpData, faseNome: string) {
         ? `${faseNome} concluída — todos os documentos validados.`
         : `Solicite, receba, confira e valide cada certidão. Falta${total - validados === 1 ? "" : "m"} ${total - validados} documento${total - validados === 1 ? "" : "s"} para concluir a ${faseNome}.`
 
-  return { kpis, pct, validados, total, progressoTexto }
+  return { kpis, pct, validados, total, progressoTexto, oQueFazer }
 }
 
 // Back sem `indice` (janela de deploy): a tela renderiza o índice VAZIO, que diz que
@@ -1078,6 +1086,7 @@ export function ProcessoCentralOperacional({
             progressoConcluidos={painel.validados}
             progressoTotal={painel.total}
             progressoTexto={painel.progressoTexto}
+            oQueFazer={painel.oQueFazer}
             indice={bodyData.indice ?? INDICE_VAZIO}
             // A identidade da fase EXIBIDA (não a ativa): trocar de fase reseta a
             // expansão, para o card nunca mostrar a posição de outro trabalho.

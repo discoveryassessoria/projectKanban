@@ -210,6 +210,7 @@ const TELAS: Record<string, React.ComponentType> = {
   opcapacity: CapacidadeOperacionalTab,
   servcats: cad("categorias-servico"),
   orgcats: cad("categorias-organizacao"),
+  profcats: cad("categorias-profissional"),
   // Automações por fase — MESMA tela para os itens oficiais "Financeiras" e
   // "Eventos" (só muda a aba inicial). A key antiga `opauto` não tem mais registro
   // próprio: vira alias para `autofin` (deep-link preservado).

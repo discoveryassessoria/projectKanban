@@ -80,6 +80,13 @@ export interface PainelDaFaseProps {
   progressoConcluidos: number
   progressoTotal: number
   progressoTexto: string
+  /**
+   * O QUE FAZER para a fase sair do lugar, um item por linha.
+   *
+   * `progressoTexto` resume; isto diz o passo seguinte. Enquanto os dois vinham
+   * colados num parágrafo, o operador lia o resumo e parava antes da instrução.
+   */
+  oQueFazer?: Array<{ code: string; message: string }>
   /** ÍNDICE OFICIAL da fase — pessoas e documentos. Sem nada de execução. */
   indice: IndiceOperacional
   /**
@@ -137,6 +144,7 @@ export function PainelDaFase({
   progressoConcluidos,
   progressoTotal,
   progressoTexto,
+  oQueFazer,
   indice,
   chaveExpansao,
   onAbrirDetalhes,
@@ -268,6 +276,19 @@ export function PainelDaFase({
               <div className="h-full bg-[#7dd3fc] transition-all duration-500" style={{ width: `${progressoPct}%` }} />
             </div>
             <div className="text-center text-[12.5px] text-white/40 mt-3">{progressoTexto}</div>
+            {/* A FASE PAROU E O SISTEMA SABE POR QUÊ. Dizer isso em lista, com o verbo
+                na frente, é a diferença entre o operador agir e o processo esperar duas
+                semanas por uma árvore que ninguém sabia que faltava. */}
+            {(oQueFazer?.length ?? 0) > 0 && (
+              <ul className="mt-3 space-y-1.5 rounded-lg border border-amber-400/20 bg-amber-400/[0.06] px-4 py-3">
+                {oQueFazer!.map((m) => (
+                  <li key={m.code} className="flex gap-2 text-[12.5px] leading-snug text-amber-100/80">
+                    <span aria-hidden className="text-amber-300/60">·</span>
+                    <span>{m.message}</span>
+                  </li>
+                ))}
+              </ul>
+            )}
           </div>
         </>
         )}

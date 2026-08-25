@@ -5,7 +5,7 @@
 --   corpo        → gerado do prisma/schema.prisma
 --   bloco manual → prisma/baseline/bloco-manual.sql (edite LÁ)
 --
--- Gerado em : 2026-08-24
+-- Gerado em : 2026-08-25
 -- Prisma    : 6.19.3
 --
 -- PARA QUE SERVE: reconstruir o banco DO ZERO. O histórico de migrations NÃO
@@ -1658,7 +1658,7 @@ CREATE TABLE "RetificacaoPacoteDivergencia" (
 CREATE TABLE "Profissional" (
     "id" SERIAL NOT NULL,
     "nome" VARCHAR(200) NOT NULL,
-    "categoria" VARCHAR(40) NOT NULL,
+    "categoriaId" INTEGER NOT NULL,
     "email" VARCHAR(200),
     "telefone" VARCHAR(60),
     "organizacaoId" INTEGER,
@@ -3741,6 +3741,20 @@ CREATE TABLE "CategoriaOrganizacao" (
 );
 
 -- CreateTable
+CREATE TABLE "CategoriaProfissional" (
+    "id" SERIAL NOT NULL,
+    "code" VARCHAR(60) NOT NULL,
+    "nome" VARCHAR(200) NOT NULL,
+    "descricao" TEXT,
+    "ordem" INTEGER NOT NULL DEFAULT 0,
+    "ativo" BOOLEAN NOT NULL DEFAULT true,
+    "criadoEm" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "atualizadoEm" TIMESTAMP(3) NOT NULL,
+
+    CONSTRAINT "CategoriaProfissional_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
 CREATE TABLE "OrganizacaoCategoria" (
     "id" SERIAL NOT NULL,
     "orgaoId" INTEGER NOT NULL,
@@ -5191,7 +5205,7 @@ CREATE INDEX "RetificacaoPacoteDivergencia_divergenciaId_idx" ON "RetificacaoPac
 CREATE UNIQUE INDEX "RetificacaoPacoteDivergencia_pacoteId_divergenciaId_key" ON "RetificacaoPacoteDivergencia"("pacoteId", "divergenciaId");
 
 -- CreateIndex
-CREATE INDEX "Profissional_categoria_idx" ON "Profissional"("categoria");
+CREATE INDEX "Profissional_categoriaId_idx" ON "Profissional"("categoriaId");
 
 -- CreateIndex
 CREATE INDEX "Profissional_organizacaoId_idx" ON "Profissional"("organizacaoId");
@@ -5966,6 +5980,9 @@ CREATE UNIQUE INDEX "CategoriaServico_code_key" ON "CategoriaServico"("code");
 
 -- CreateIndex
 CREATE UNIQUE INDEX "CategoriaOrganizacao_code_key" ON "CategoriaOrganizacao"("code");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "CategoriaProfissional_code_key" ON "CategoriaProfissional"("code");
 
 -- CreateIndex
 CREATE INDEX "OrganizacaoCategoria_categoriaId_idx" ON "OrganizacaoCategoria"("categoriaId");
@@ -6746,6 +6763,9 @@ ALTER TABLE "RetificacaoPacoteDivergencia" ADD CONSTRAINT "RetificacaoPacoteDive
 
 -- AddForeignKey
 ALTER TABLE "RetificacaoPacoteDivergencia" ADD CONSTRAINT "RetificacaoPacoteDivergencia_divergenciaId_fkey" FOREIGN KEY ("divergenciaId") REFERENCES "Divergencia"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "Profissional" ADD CONSTRAINT "Profissional_categoriaId_fkey" FOREIGN KEY ("categoriaId") REFERENCES "CategoriaProfissional"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "Profissional" ADD CONSTRAINT "Profissional_organizacaoId_fkey" FOREIGN KEY ("organizacaoId") REFERENCES "OrgaoProtocolo"("id") ON DELETE SET NULL ON UPDATE CASCADE;

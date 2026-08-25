@@ -144,7 +144,7 @@ ok(JSON.stringify(itensDaSecao("grp_financeiro", "Tabela de Valores")) === JSON.
 // participam dos processos — não porque advogado seja organização. O escritório é
 // pessoa jurídica e vive em "Cartórios e Órgãos"; o profissional é pessoa física com
 // inscrição de classe própria, e a Retificação apenas o REFERENCIA.
-ok(JSON.stringify(itensDaSecao("grp_orgaos", "Organizações")) === JSON.stringify(["organs", "suppliers", "canais", "profissionais"]), "Órgãos › Organizações = Cartórios e Órgãos + Fornecedores + Canais + Profissionais")
+ok(JSON.stringify(itensDaSecao("grp_orgaos", "Organizações")) === JSON.stringify(["organs", "suppliers", "canais", "profissionais", "profcats"]), "Órgãos › Organizações = Cartórios e Órgãos + Fornecedores + Canais + Profissionais + Categorias Profissionais")
 // A seção deixou de se chamar "Grupos": Capacidade Operacional não é um grupo
 // de pessoas. Departamentos e Cargos saíram — eram cadastros sem consumidor
 // (nenhuma FK, nenhuma regra, e ninguém podia ser associado a eles).
