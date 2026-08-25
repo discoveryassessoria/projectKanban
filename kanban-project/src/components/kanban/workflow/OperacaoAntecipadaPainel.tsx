@@ -53,13 +53,13 @@ export type ResultadoAvaliacaoUI = "SIM" | "PARCIAL" | "NAO" | "CANCELAR"
 export type AvaliarFn = (id: number, resultado: ResultadoAvaliacaoUI, resultadoObtido: string, resultadoDados?: Record<string, unknown>) => void
 
 const ST_OP_LABEL: Record<string, { t: string; c: string }> = {
-  CRIADA: { t: "Criada", c: "bg-[#252c35] text-white/68" },
+  CRIADA: { t: "Criada", c: "bg-[var(--surface-tertiary)] text-white/68" },
   EM_EXECUCAO: { t: "Em execução", c: "bg-[#7dd3fc]/15 text-[#7dd3fc]" },
   AGUARDANDO_RESULTADO: { t: "Aguardando avaliação", c: "bg-[#d2a948]/15 text-[#d2a948]" },
   CONCLUIDA: { t: "Concluída", c: "bg-[#4ade80]/15 text-[#4ade80]" },
-  CONCLUIDA_PARCIAL: { t: "Concluída parcial", c: "bg-teal-500/15 text-teal-300" },
+  CONCLUIDA_PARCIAL: { t: "Concluída parcial", c: "bg-amber-50 text-amber-700" },
   NAO_ATINGIDA: { t: "Não atingida", c: "bg-[#f87171]/15 text-[#f87171]" },
-  CANCELADA: { t: "Cancelada", c: "bg-[#252c35] text-white/40" },
+  CANCELADA: { t: "Cancelada", c: "bg-[var(--surface-tertiary)] text-[var(--text-muted)]" },
 }
 
 export function OperacoesAntecipadasInline({ ops, readOnly, onAvaliar, onAbrir }: {
@@ -95,7 +95,7 @@ function OperacaoAntecipadaItem({ o, readOnly, onAvaliar, onAbrir }: {
   const [avaliando, setAvaliando] = useState(false)
   const [resultado, setResultado] = useState("")
   const [dados, setDados] = useState<Record<string, string>>({})
-  const st = ST_OP_LABEL[o.status] ?? { t: o.status, c: "bg-[#252c35] text-white/68" }
+  const st = ST_OP_LABEL[o.status] ?? { t: o.status, c: "bg-[var(--surface-tertiary)] text-white/68" }
   const objetivo = o.objetivo || "Operação antecipada"
   const apoio = !o.vinculavel // documento-alvo diferente do exigido → captura resultado estruturado
   const setD = (k: string, v: string) => setDados((d) => ({ ...d, [k]: v }))
@@ -110,7 +110,7 @@ function OperacaoAntecipadaItem({ o, readOnly, onAvaliar, onAbrir }: {
         <div className="min-w-0 flex items-baseline gap-1.5 flex-wrap">
           {/* Operação Antecipada é orquestração interna: identificada pelo objetivo/documento/serviço vinculado, sem código público próprio (OPA-n removido). */}
           <span className="text-[12.5px] font-semibold text-white/95">{objetivo}</span>
-          <span className="text-[11px] text-white/40">
+          <span className="text-[11px] text-[var(--text-muted)]">
             {o.operacao.statusLabel}
             {o.originPhaseCode ? ` · origem ${faseLabel(o.originPhaseCode)}` : ""}
             {apoio && o.targetTipoDocumentoId ? " · documento de apoio" : ""}
@@ -120,7 +120,7 @@ function OperacaoAntecipadaItem({ o, readOnly, onAvaliar, onAbrir }: {
         <div className="flex items-center gap-2 flex-none">
           <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full uppercase ${st.c}`}>{st.t}</span>
           {onAbrir && (
-            <button onClick={() => onAbrir(o)} className="text-[11.5px] font-bold px-2.5 py-1 rounded-md bg-[#252c35] text-white/95 border border-[var(--border-default)] hover:bg-[#2d353f]">Abrir operação</button>
+            <button onClick={() => onAbrir(o)} className="text-[11.5px] font-bold px-2.5 py-1 rounded-md bg-[var(--surface-tertiary)] text-white/95 border border-[var(--border-default)] hover:bg-[var(--surface-tertiary)]">Abrir operação</button>
           )}
         </div>
       </div>
@@ -140,16 +140,16 @@ function OperacaoAntecipadaItem({ o, readOnly, onAvaliar, onAbrir }: {
             <input value={resultado} onChange={(e) => setResultado(e.target.value)} placeholder={apoio ? "Observações" : "Resultado obtido"} className="w-full text-[12px] rounded-md border border-[var(--border-default)] px-2 py-1.5 focus:outline-none focus:border-[#7dd3fc]/50 focus:ring-1 focus:ring-[#7dd3fc]/25" autoFocus />
             <div className="flex items-center gap-2 flex-wrap">
               <button onClick={() => enviar("SIM")} className="inline-flex items-center gap-1 text-[11.5px] font-bold px-2.5 py-1.5 rounded-md bg-[#4ade80]/15 text-[#4ade80] border border-[#4ade80]/40 hover:bg-[#4ade80]/25"><CheckCircle2 className="w-3.5 h-3.5" /> Objetivo atingido</button>
-              <button onClick={() => enviar("PARCIAL")} className="text-[11.5px] font-semibold px-2.5 py-1.5 rounded-md border border-teal-500/25 text-teal-300 hover:bg-teal-500/10">Parcialmente</button>
-              <button onClick={() => enviar("NAO")} className="text-[11.5px] font-semibold px-2.5 py-1.5 rounded-md border border-[var(--border-default)] text-white/80 hover:bg-[#20262e]">Não atingido</button>
-              <button onClick={() => enviar("CANCELAR")} className="text-[11.5px] text-white/40 hover:text-[#f87171] ml-auto">Cancelar operação</button>
+              <button onClick={() => enviar("PARCIAL")} className="text-[11.5px] font-semibold px-2.5 py-1.5 rounded-md border border-amber-200 text-amber-700 hover:bg-amber-50">Parcialmente</button>
+              <button onClick={() => enviar("NAO")} className="text-[11.5px] font-semibold px-2.5 py-1.5 rounded-md border border-[var(--border-default)] text-white/80 hover:bg-[var(--surface-secondary)]">Não atingido</button>
+              <button onClick={() => enviar("CANCELAR")} className="text-[11.5px] text-[var(--text-muted)] hover:text-[#f87171] ml-auto">Cancelar operação</button>
             </div>
           </div>
         ) : (
           <button onClick={() => { setAvaliando(true); setResultado("") }} className="mt-2 inline-flex items-center gap-1 text-[11.5px] font-bold px-2.5 py-1.5 rounded-md bg-[#4ade80]/15 text-[#4ade80] border border-[#4ade80]/40 hover:bg-[#4ade80]/25"><CheckCircle2 className="w-3.5 h-3.5" /> Operação concluída — avaliar objetivo</button>
         )
       )}
-      {o.resultadoObtido && <div className="text-[11px] text-white/55 mt-1">Resultado: {o.resultadoObtido}</div>}
+      {o.resultadoObtido && <div className="text-[11px] text-[var(--text-secondary)] mt-1">Resultado: {o.resultadoObtido}</div>}
     </div>
   )
 }

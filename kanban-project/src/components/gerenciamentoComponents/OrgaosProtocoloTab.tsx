@@ -226,11 +226,11 @@ export default function OrgaosProtocoloTab() {
   const alternarCategoria = (id: number) =>
     setForm(f => f && ({ ...f, categoriaIds: f.categoriaIds.includes(id) ? f.categoriaIds.filter(x => x !== id) : [...f.categoriaIds, id] }))
 
-  if (loading) return <div className="py-24 text-center text-white/50">Carregando…</div>
+  if (loading) return <div className="py-24 text-center text-[var(--text-secondary)]">Carregando…</div>
 
   return (
     <div className="space-y-5">
-      {flash && <div className="rounded-xl border border-green-400/30 bg-green-500/15 px-4 py-3 text-sm text-green-200">{flash}</div>}
+      {flash && <div className="rounded-xl border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-700">{flash}</div>}
 
       <div className="rounded-2xl border border-[var(--border-default)] bg-[var(--surface-primary)] p-5 backdrop-blur-sm">
         <div className="flex items-start justify-between gap-3">
@@ -238,7 +238,7 @@ export default function OrgaosProtocoloTab() {
             <h2 className="text-lg font-semibold text-white">Órgãos e Organizações</h2>
             <p className="mt-1 text-sm text-white/60">Cadastro <strong className="text-white/80">mestre</strong> das entidades com que a operação fala: consulados, embaixadas, registros civis, comuni, tribunais, arquivos, cartórios, transportadoras e parceiros. Uma organização pode ter várias categorias.</p>
           </div>
-          <button onClick={() => abrirForm(blank())} className="flex-none rounded-lg bg-blue-600 px-3 py-2 text-xs font-medium text-[#fff] hover:bg-blue-500">+ Nova organização</button>
+          <button onClick={() => abrirForm(blank())} className="flex-none rounded-lg bg-[var(--action-primary)] px-3 py-2 text-xs font-medium text-[var(--action-primary-ink)] hover:bg-[var(--action-primary)]">+ Nova organização</button>
         </div>
         <div className="mt-4 flex flex-wrap items-center gap-2">
           <input value={busca} onChange={e => setBusca(e.target.value)} placeholder="Buscar por nome, código, cidade, categoria ou tag…" className={inputCls + " max-w-md"} />
@@ -250,13 +250,13 @@ export default function OrgaosProtocoloTab() {
             <option value="" className={opt}>Todas as funções</option>
             {FUNCOES.map(([v, l]) => <option key={v} value={v} className={opt}>{l}</option>)}
           </select>
-          <span className="text-xs text-white/40">{visiveis.length} exibida(s)</span>
+          <span className="text-xs text-[var(--text-muted)]">{visiveis.length} exibida(s)</span>
         </div>
       </div>
 
       <div className="overflow-hidden rounded-2xl border border-[var(--border-default)] bg-[var(--surface-primary)] backdrop-blur-sm">
         <table className="w-full text-sm">
-          <thead className="border-b border-[var(--border-default)] text-left text-xs text-white/50">
+          <thead className="border-b border-[var(--border-default)] text-left text-xs text-[var(--text-secondary)]">
             <tr>
               <th className="px-4 py-3 font-medium">Código</th>
               <th className="px-4 py-3 font-medium">Nome oficial</th>
@@ -271,25 +271,25 @@ export default function OrgaosProtocoloTab() {
           </thead>
           <tbody>
             {visiveis.length === 0 ? (
-              <tr><td colSpan={9} className="px-4 py-8 text-center text-xs text-white/40">Nenhuma organização encontrada.</td></tr>
+              <tr><td colSpan={9} className="px-4 py-8 text-center text-xs text-[var(--text-muted)]">Nenhuma organização encontrada.</td></tr>
             ) : visiveis.map(d => (
               <tr key={d.id} className="border-b border-[var(--border-subtle)] last:border-0">
                 <td className="px-4 py-2.5 font-mono text-[12px] font-bold text-white/80">{d.publicCode ?? "—"}</td>
                 <td className="px-4 py-2.5 text-white">
                   {d.name}
-                  {d.nomeFantasia && <span className="ml-2 text-[11px] text-white/40">{d.nomeFantasia}</span>}
+                  {d.nomeFantasia && <span className="ml-2 text-[11px] text-[var(--text-muted)]">{d.nomeFantasia}</span>}
                 </td>
                 <td className="px-4 py-2.5">
                   <div className="flex flex-wrap gap-1">
                     {(d.funcoes ?? []).map(f => (
-                      <span key={f} className={`rounded px-1.5 py-0.5 text-[10px] ${f === 'FORNECEDOR' ? 'bg-amber-500/15 text-amber-200' : f === 'ORGAO' ? 'bg-sky-500/15 text-sky-200' : 'bg-violet-500/15 text-violet-200'}`}>{funcaoLabel(f)}</span>
+                      <span key={f} className={`rounded px-1.5 py-0.5 text-[10px] ${f === 'FORNECEDOR' ? 'bg-amber-50 text-amber-700' : f === 'ORGAO' ? 'bg-sky-50 text-sky-700' : 'bg-slate-50 text-slate-700'}`}>{funcaoLabel(f)}</span>
                     ))}
                   </div>
                 </td>
                 <td className="px-4 py-2.5">
                   <div className="flex flex-wrap gap-1">
                     {(d.categorias ?? []).length === 0
-                      ? <span className="rounded bg-[var(--surface-primary)] px-1.5 py-0.5 text-[10px] text-white/50">{typeLabel(d.type)}</span>
+                      ? <span className="rounded bg-[var(--surface-primary)] px-1.5 py-0.5 text-[10px] text-[var(--text-secondary)]">{typeLabel(d.type)}</span>
                       : (d.categorias ?? []).map(c => (
                         <span key={c.categoriaId} className="rounded bg-[var(--surface-primary)] px-1.5 py-0.5 text-[10px] text-white/70">{c.categoria?.nome}</span>
                       ))}
@@ -298,11 +298,11 @@ export default function OrgaosProtocoloTab() {
                 <td className="px-4 py-2.5 text-white/70">{d.country || "—"}</td>
                 <td className="px-4 py-2.5 text-white/70">{d.city || "—"}</td>
                 <td className="px-4 py-2.5 text-white/60">{d.provincia || "—"}</td>
-                <td className="px-4 py-2.5"><span className={`rounded-full px-2 py-0.5 text-[10px] ${d.ativo ? "bg-green-500/15 text-green-300" : "bg-[var(--surface-primary)] text-white/50"}`}>{d.ativo ? "Ativo" : "Inativo"}</span></td>
+                <td className="px-4 py-2.5"><span className={`rounded-full px-2 py-0.5 text-[10px] ${d.ativo ? "bg-green-50 text-green-700" : "bg-[var(--surface-primary)] text-[var(--text-secondary)]"}`}>{d.ativo ? "Ativo" : "Inativo"}</span></td>
                 <td className="px-4 py-2.5">
-                  <div className="flex items-center justify-end gap-0.5 text-white/50">
+                  <div className="flex items-center justify-end gap-0.5 text-[var(--text-secondary)]">
                     <button title="Editar" aria-label="Editar" onClick={() => abrirForm(daLinha(d))} className="rounded p-1 hover:bg-[var(--surface-hover)] hover:text-white"><IEdit /></button>
-                    <button title="Excluir" aria-label="Excluir" onClick={() => del(d)} className="rounded p-1 text-red-300/70 hover:bg-red-500/10 hover:text-red-300"><ITrash /></button>
+                    <button title="Excluir" aria-label="Excluir" onClick={() => del(d)} className="rounded p-1 text-red-700/70 hover:bg-red-50 hover:text-red-700"><ITrash /></button>
                   </div>
                 </td>
               </tr>
@@ -321,13 +321,13 @@ export default function OrgaosProtocoloTab() {
               {/* ORGANIZAÇÃO ÚNICA — se a entidade já existe, acrescenta-se função ao
                   cadastro que existe. Nunca se cria um segundo registro. */}
               {existente && (
-                <div className="col-span-2 rounded-xl border border-amber-400/30 bg-amber-500/10 px-4 py-3 text-sm text-amber-100">
+                <div className="col-span-2 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-100">
                   Esta organização <b>já existe</b>: <span className="font-mono">{existente.publicCode ?? `#${existente.id}`}</span> — {existente.name}.
-                  <div className="mt-1 text-xs text-amber-200/80">Salvar vai <b>acrescentar as funções e categorias</b> ao cadastro existente, sem duplicar.</div>
+                  <div className="mt-1 text-xs text-amber-700/80">Salvar vai <b>acrescentar as funções e categorias</b> ao cadastro existente, sem duplicar.</div>
                 </div>
               )}
               {!existente && suspeitas.length > 0 && (
-                <div className="col-span-2 rounded-xl border border-amber-400/20 bg-amber-500/5 px-4 py-3 text-xs text-amber-100/90">
+                <div className="col-span-2 rounded-xl border border-amber-200 bg-amber-500/5 px-4 py-3 text-xs text-amber-100/90">
                   Organizações parecidas já cadastradas — confirme que esta é uma entidade diferente:
                   <ul className="mt-1 space-y-0.5">
                     {suspeitas.map(su => (
@@ -372,7 +372,7 @@ export default function OrgaosProtocoloTab() {
               <div className="col-span-2">
                 <label className={labelCls}>Categorias</label>
                 {categorias.length === 0 ? (
-                  <p className="rounded-md border border-dashed border-[var(--border-default)] p-3 text-xs text-white/40">Nenhuma categoria cadastrada.</p>
+                  <p className="rounded-md border border-dashed border-[var(--border-default)] p-3 text-xs text-[var(--text-muted)]">Nenhuma categoria cadastrada.</p>
                 ) : (
                   <div className="max-h-40 overflow-y-auto rounded-md border border-[var(--border-default)]">
                     {categorias.map(c => (
@@ -415,7 +415,7 @@ export default function OrgaosProtocoloTab() {
                   <option value="" className={opt}>—</option>
                   {MOEDAS.map(([v, l]) => <option key={v} value={v} className={opt}>{l}</option>)}
                 </select>
-                <p className="mt-1 text-[11px] text-white/35">
+                <p className="mt-1 text-[11px] text-[var(--text-muted)]">
                   Informação cadastral. Não interfere em preços, custos ou cálculos financeiros.
                 </p>
               </div>
@@ -437,7 +437,7 @@ export default function OrgaosProtocoloTab() {
               {/* FINANCEIRO — só aparece para quem é FORNECEDOR: sem função, sem campo morto. */}
               {form.funcoes.includes("FORNECEDOR") && (
                 <>
-                  <div className="col-span-2 mt-1 border-t border-[var(--border-default)] pt-3 text-[11px] font-semibold uppercase tracking-wide text-white/40">Dados financeiros do fornecedor</div>
+                  <div className="col-span-2 mt-1 border-t border-[var(--border-default)] pt-3 text-[11px] font-semibold uppercase tracking-wide text-[var(--text-muted)]">Dados financeiros do fornecedor</div>
                   <div><label className={labelCls}>Forma de pagamento</label><input value={form.formaPagamento} onChange={e => setForm(f => f && { ...f, formaPagamento: e.target.value })} className={inputCls} placeholder="PIX, transferência, boleto…" /></div>
                   <div><label className={labelCls}>Prazo de pagamento (dias)</label><input type="number" min={0} value={form.prazoPagamentoDias} onChange={e => setForm(f => f && { ...f, prazoPagamentoDias: e.target.value })} className={inputCls} /></div>
                   <div><label className={labelCls}>Chave PIX</label><input value={form.chavePix} onChange={e => setForm(f => f && { ...f, chavePix: e.target.value })} className={inputCls} /></div>
@@ -474,7 +474,7 @@ export default function OrgaosProtocoloTab() {
             </div>
             <div className="flex justify-end gap-2 border-t border-[var(--border-default)] px-6 py-4">
               <button onClick={() => abrirForm(null)} className="rounded-lg border border-[var(--border-default)] bg-[var(--surface-primary)] px-4 py-2 text-sm text-white/80 hover:bg-[var(--surface-hover)]">Cancelar</button>
-              <button disabled={busy} onClick={save} className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-[#fff] hover:bg-blue-500 disabled:opacity-50">Salvar</button>
+              <button disabled={busy} onClick={save} className="rounded-lg bg-[var(--action-primary)] px-4 py-2 text-sm font-medium text-[var(--action-primary-ink)] hover:bg-[var(--action-primary)] disabled:opacity-50">Salvar</button>
             </div>
           </div>
         </div>

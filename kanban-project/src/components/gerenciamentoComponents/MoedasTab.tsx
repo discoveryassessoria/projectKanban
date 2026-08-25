@@ -112,9 +112,9 @@ export default function MoedasTab() {
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h2 className="text-xl font-semibold text-white">Moedas</h2>
-          <p className="text-sm text-white/50">Moedas usadas no sistema (código, nome e símbolo).</p>
+          <p className="text-sm text-[var(--text-secondary)]">Moedas usadas no sistema (código, nome e símbolo).</p>
         </div>
-        <button onClick={abrirNovo} className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-[#fff] transition hover:bg-blue-500">
+        <button onClick={abrirNovo} className="rounded-lg bg-[var(--action-primary)] px-4 py-2 text-sm font-medium text-[var(--action-primary-ink)] transition hover:bg-[var(--action-primary)]">
           + Nova moeda
         </button>
       </div>
@@ -126,17 +126,17 @@ export default function MoedasTab() {
         className="w-full rounded-lg border border-[var(--border-default)] bg-[var(--surface-primary)] px-4 py-2 text-sm text-white placeholder-white/30 outline-none backdrop-blur focus:border-white/20"
       />
 
-      {loading && <div className="py-12 text-center text-sm text-white/40">Carregando...</div>}
+      {loading && <div className="py-12 text-center text-sm text-[var(--text-muted)]">Carregando...</div>}
 
       {!loading && erroLista && (
-        <div className="rounded-lg border border-red-500/30 bg-red-500/10 p-4 text-sm text-red-200">
+        <div className="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-700">
           {erroLista}
           <button onClick={() => void carregar()} className="ml-3 underline hover:text-white">Tentar de novo</button>
         </div>
       )}
 
       {!loading && !erroLista && filtrados.length === 0 && (
-        <div className="rounded-xl border border-[var(--border-default)] bg-[var(--surface-primary)] py-12 text-center text-sm text-white/40 backdrop-blur">
+        <div className="rounded-xl border border-[var(--border-default)] bg-[var(--surface-primary)] py-12 text-center text-sm text-[var(--text-muted)] backdrop-blur">
           {busca ? 'Nenhuma moeda encontrada.' : 'Nenhuma moeda ainda. Crie a primeira.'}
         </div>
       )}
@@ -146,22 +146,22 @@ export default function MoedasTab() {
           <table className="w-full text-[13px]">
             <thead>
               <tr className="bg-[var(--surface-primary)]">
-                <th className="border-b border-[var(--border-default)] px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wide text-white/50">Código</th>
-                <th className="border-b border-[var(--border-default)] px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wide text-white/50">Nome</th>
-                <th className="border-b border-[var(--border-default)] px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wide text-white/50">Símbolo</th>
-                <th className="border-b border-[var(--border-default)] px-4 py-2.5 text-right text-[11px] font-semibold uppercase tracking-wide text-white/50">Ações</th>
+                <th className="border-b border-[var(--border-default)] px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wide text-[var(--text-secondary)]">Código</th>
+                <th className="border-b border-[var(--border-default)] px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wide text-[var(--text-secondary)]">Nome</th>
+                <th className="border-b border-[var(--border-default)] px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wide text-[var(--text-secondary)]">Símbolo</th>
+                <th className="border-b border-[var(--border-default)] px-4 py-2.5 text-right text-[11px] font-semibold uppercase tracking-wide text-[var(--text-secondary)]">Ações</th>
               </tr>
             </thead>
             <tbody>
               {filtrados.map((m) => (
-                <tr key={m.id} className="border-b border-[var(--border-subtle)] last:border-0 hover:bg-white/[0.03]">
+                <tr key={m.id} className="border-b border-[var(--border-subtle)] last:border-0 hover:bg-[var(--surface-primary)]">
                   <td className="px-4 py-2.5 font-mono text-[12px] font-semibold text-white/90">{m.code}</td>
                   <td className="px-4 py-2.5 text-white/70">{m.name || '—'}</td>
                   <td className="px-4 py-2.5 text-white/70">{m.symbol || '—'}</td>
                   <td className="px-4 py-2.5">
                     <div className="flex items-center justify-end gap-2">
                       <button onClick={() => abrirEditar(m)} className="rounded-md border border-[var(--border-default)] px-2.5 py-1 text-xs text-white/70 transition hover:bg-[var(--surface-hover)] hover:text-white">Editar</button>
-                      <button onClick={() => excluir(m)} className="rounded-md border border-red-500/20 px-2.5 py-1 text-xs text-red-300/80 transition hover:bg-red-500/10 hover:text-red-200">Excluir</button>
+                      <button onClick={() => excluir(m)} className="rounded-md border border-red-200 px-2.5 py-1 text-xs text-red-700/80 transition hover:bg-red-50 hover:text-red-700">Excluir</button>
                     </div>
                   </td>
                 </tr>
@@ -176,7 +176,7 @@ export default function MoedasTab() {
           <div className="w-full max-w-md rounded-2xl border border-[var(--border-default)] bg-zinc-900/95 shadow-2xl">
             <div className="flex items-center justify-between border-b border-[var(--border-default)] px-6 py-4">
               <h3 className="text-lg font-semibold text-white">{editando ? 'Editar moeda' : 'Nova moeda'}</h3>
-              <button onClick={() => setModalAberto(false)} className="text-white/40 transition hover:text-white">✕</button>
+              <button onClick={() => setModalAberto(false)} className="text-[var(--text-muted)] transition hover:text-white">✕</button>
             </div>
 
             <div className="space-y-4 px-6 py-4">
@@ -194,13 +194,13 @@ export default function MoedasTab() {
               </div>
 
               {erroModal && (
-                <div className="rounded-lg border border-red-500/30 bg-red-500/10 p-3 text-sm text-red-200">{erroModal}</div>
+                <div className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700">{erroModal}</div>
               )}
             </div>
 
             <div className="flex items-center justify-end gap-2 border-t border-[var(--border-default)] px-6 py-4">
               <button onClick={() => setModalAberto(false)} className="rounded-lg px-4 py-2 text-sm text-white/60 transition hover:text-white">Cancelar</button>
-              <button onClick={salvar} disabled={salvando} className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-[#fff] transition hover:bg-blue-500 disabled:opacity-50">
+              <button onClick={salvar} disabled={salvando} className="rounded-lg bg-[var(--action-primary)] px-4 py-2 text-sm font-medium text-[var(--action-primary-ink)] transition hover:bg-[var(--action-primary)] disabled:opacity-50">
                 {salvando ? 'Salvando...' : 'Salvar'}
               </button>
             </div>

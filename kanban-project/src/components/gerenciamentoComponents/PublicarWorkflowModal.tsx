@@ -45,9 +45,9 @@ const AREA_DO_ESCOPO: Record<string, string> = {
 const ORDEM_DAS_AREAS = ["Geral", "Execução", "Conclusão", "Resultados", "Avançado"]
 
 const COR_DO_TIPO: Record<string, string> = {
-  ACRESCENTADO: "bg-emerald-500/15 text-emerald-300",
-  REMOVIDO: "bg-red-500/15 text-red-300",
-  ALTERADO: "bg-amber-500/15 text-amber-300",
+  ACRESCENTADO: "bg-emerald-50 text-emerald-700",
+  REMOVIDO: "bg-red-50 text-red-700",
+  ALTERADO: "bg-amber-50 text-amber-700",
 }
 
 export default function PublicarWorkflowModal({
@@ -112,27 +112,27 @@ export default function PublicarWorkflowModal({
         <div className="border-b border-[var(--border-default)] px-6 py-4">
           <h3 className="font-semibold text-white">Publicar {preview ? `“${preview.nome}”` : "workflow"}</h3>
           {preview && (
-            <p className="mt-0.5 text-xs text-white/50">
+            <p className="mt-0.5 text-xs text-[var(--text-secondary)]">
               Versão {preview.versaoAtual} → {preview.versaoNova} · {preview.mudancas.length} alteração(ões)
             </p>
           )}
         </div>
 
         <div className="flex-1 space-y-3 overflow-auto px-6 py-4">
-          {!preview && !erro && <p className="text-sm text-white/40">Comparando o rascunho com a versão publicada…</p>}
-          {erro && <div className="rounded-lg border border-red-400/30 bg-red-500/10 p-3 text-xs text-red-200">{erro}</div>}
+          {!preview && !erro && <p className="text-sm text-[var(--text-muted)]">Comparando o rascunho com a versão publicada…</p>}
+          {erro && <div className="rounded-lg border border-red-200 bg-red-50 p-3 text-xs text-red-700">{erro}</div>}
 
           {preview && preview.problemas.length > 0 && (
-            <div className="rounded-lg border border-red-400/30 bg-red-500/10 p-3">
-              <div className="text-xs font-medium text-red-200">A configuração não pode ser publicada:</div>
-              <ul className="mt-1 space-y-0.5 text-xs text-red-200/80">
+            <div className="rounded-lg border border-red-200 bg-red-50 p-3">
+              <div className="text-xs font-medium text-red-700">A configuração não pode ser publicada:</div>
+              <ul className="mt-1 space-y-0.5 text-xs text-red-700/80">
                 {preview.problemas.map((p, i) => <li key={i}>· {p.stepKey ? `[${p.stepKey}] ` : ""}{p.mensagem}</li>)}
               </ul>
             </div>
           )}
 
           {preview && !preview.temRascunho && preview.problemas.length === 0 && (
-            <p className="text-sm text-white/50">
+            <p className="text-sm text-[var(--text-secondary)]">
               Não há alterações para publicar: o rascunho é idêntico à versão {preview.versaoAtual}.
             </p>
           )}
@@ -140,7 +140,7 @@ export default function PublicarWorkflowModal({
           {preview && areasComMudanca.map((area) => (
             <div key={area} className="rounded-lg border border-[var(--border-default)] bg-[var(--surface-primary)] p-3">
               <div className="text-xs font-medium text-white/80">
-                {area} <span className="text-white/35">· {porArea.get(area)!.length} alteração(ões)</span>
+                {area} <span className="text-[var(--text-muted)]">· {porArea.get(area)!.length} alteração(ões)</span>
               </div>
               <ul className="mt-1.5 space-y-1">
                 {porArea.get(area)!.map((m, i) => (
@@ -149,8 +149,8 @@ export default function PublicarWorkflowModal({
                       {m.tipo.toLowerCase()}
                     </span>
                     <span className="text-white/80">{m.alvo}</span>
-                    {m.passo && <span className="text-white/35">em {m.passo}</span>}
-                    <span className="text-white/50">{m.detalhe}</span>
+                    {m.passo && <span className="text-[var(--text-muted)]">em {m.passo}</span>}
+                    <span className="text-[var(--text-secondary)]">{m.detalhe}</span>
                   </li>
                 ))}
               </ul>
@@ -158,7 +158,7 @@ export default function PublicarWorkflowModal({
           ))}
 
           {preview && (
-            <p className="rounded-lg border border-[var(--border-default)] bg-black/20 p-3 text-[11px] leading-relaxed text-white/45">{preview.aviso}</p>
+            <p className="rounded-lg border border-[var(--border-default)] bg-black/20 p-3 text-[11px] leading-relaxed text-[var(--text-secondary)]">{preview.aviso}</p>
           )}
         </div>
 

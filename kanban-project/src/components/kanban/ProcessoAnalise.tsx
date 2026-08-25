@@ -143,13 +143,13 @@ export function ProcessoAnalise({ processoId, onConcluido, readOnly = false }: P
     { label: "Análise concluída", st: analise?.status === "concluida" ? "concluida" : "pendente" },
   ]
 
-  if (loading) return <div className="flex items-center justify-center py-16"><Loader2 className="w-5 h-5 animate-spin text-white/40" /></div>
+  if (loading) return <div className="flex items-center justify-center py-16"><Loader2 className="w-5 h-5 animate-spin text-[var(--text-muted)]" /></div>
 
   return (
     <div className="space-y-4">
       <div>
         <h2 className="text-lg font-bold text-white/95">Central Operacional · Análise Documental</h2>
-        <p className="text-sm text-white/55">Confira os documentos, detecte divergências e decida o próximo passo.</p>
+        <p className="text-sm text-[var(--text-secondary)]">Confira os documentos, detecte divergências e decida o próximo passo.</p>
       </div>
 
       {analise && (
@@ -162,7 +162,7 @@ export function ProcessoAnalise({ processoId, onConcluido, readOnly = false }: P
             <Stat label="Ressalvas" value={ress} />
             <Stat label="Aprovados" value={aprov} />
           </div>
-          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-sky-500/15 text-sky-300">
+          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-sky-50 text-sky-700">
             <span className="w-1.5 h-1.5 rounded-full bg-sky-400" />
             {analise.status === "concluida" ? "Análise concluída" : "Em análise"}
           </span>
@@ -177,20 +177,20 @@ export function ProcessoAnalise({ processoId, onConcluido, readOnly = false }: P
                 <div className="flex flex-col items-center text-center w-[88px] shrink-0">
                   <div className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold ${
                     e.st === "concluida" ? "bg-[#4ade80] text-white"
-                    : e.st === "em_andamento" ? "bg-[#2563eb] text-white"
-                    : "bg-[#252c35] text-white/55"}`}>
+                    : e.st === "em_andamento" ? "bg-[var(--action-primary)] text-white"
+                    : "bg-[var(--surface-tertiary)] text-[var(--text-secondary)]"}`}>
                     {e.st === "concluida" ? <Check className="w-4 h-4" /> : i + 1}
                   </div>
                   <div className="mt-1.5 text-[11px] font-medium text-white/80 leading-tight">{e.label}</div>
                   <div className={`text-[10px] ${
                     e.st === "concluida" ? "text-[#4ade80]"
                     : e.st === "em_andamento" ? "text-[#7dd3fc]"
-                    : "text-white/40"}`}>
+                    : "text-[var(--text-muted)]"}`}>
                     {e.st === "concluida" ? "Concluído" : e.st === "em_andamento" ? "Em andamento" : "Pendente"}
                   </div>
                 </div>
                 {i < etapas.length - 1 && (
-                  <div className={`flex-1 h-0.5 mt-3.5 ${e.st === "concluida" ? "bg-[#4ade80]" : "bg-[#252c35]"}`} />
+                  <div className={`flex-1 h-0.5 mt-3.5 ${e.st === "concluida" ? "bg-[#4ade80]" : "bg-[var(--surface-tertiary)]"}`} />
                 )}
               </div>
             ))}
@@ -198,13 +198,13 @@ export function ProcessoAnalise({ processoId, onConcluido, readOnly = false }: P
         </div>
       )}
 
-      <div className="rounded-xl border border-[var(--border-default)] bg-[#20262e] p-4 flex items-start gap-3">
-        <div className="w-9 h-9 rounded-lg bg-[#20262e] text-white/80 flex items-center justify-center flex-shrink-0"><Sparkles className="w-5 h-5" /></div>
+      <div className="rounded-xl border border-[var(--border-default)] bg-[var(--surface-secondary)] p-4 flex items-start gap-3">
+        <div className="w-9 h-9 rounded-lg bg-[var(--surface-secondary)] text-white/80 flex items-center justify-center flex-shrink-0"><Sparkles className="w-5 h-5" /></div>
         <div className="flex-1 min-w-0">
           <div className="text-sm font-semibold text-white/95">Assistente de Divergências</div>
           <p className="text-xs text-white/68 mt-0.5">Compara os dados da árvore com os dados das certidões e aponta possíveis divergências. A decisão final é sua.</p>
         </div>
-        <button onClick={rodar} disabled={running} className="px-3 py-2 text-sm font-semibold text-[#fff] bg-[#2563eb] hover:bg-[#1d4ed8] rounded-md inline-flex items-center gap-2 disabled:opacity-50 flex-shrink-0">
+        <button onClick={rodar} disabled={running} className="px-3 py-2 text-sm font-semibold text-[var(--action-primary-ink)] bg-[var(--action-primary)] hover:bg-[var(--action-primary-hover)] rounded-md inline-flex items-center gap-2 disabled:opacity-50 flex-shrink-0">
           {running ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />} Rodar análise IA
         </button>
       </div>
@@ -213,19 +213,19 @@ export function ProcessoAnalise({ processoId, onConcluido, readOnly = false }: P
       {resultado && <div className="bg-[#4ade80]/12 border border-[#4ade80]/30 rounded-lg px-4 py-3 text-sm text-[#4ade80] flex items-center gap-2"><CheckCircle2 className="w-4 h-4" />{resultado}</div>}
 
       {!analise ? (
-        <div className="rounded-xl border border-dashed border-[var(--border-default)] p-8 text-center text-sm text-white/55">A análise ainda não foi rodada. Clique em <b>Rodar análise IA</b>.</div>
+        <div className="rounded-xl border border-dashed border-[var(--border-default)] p-8 text-center text-sm text-[var(--text-secondary)]">A análise ainda não foi rodada. Clique em <b>Rodar análise IA</b>.</div>
       ) : divs.length === 0 ? (
-        <div className="rounded-xl border border-dashed border-[var(--border-default)] p-8 text-center text-sm text-white/55">Nenhuma divergência encontrada — o processo pode seguir sem retificação.</div>
+        <div className="rounded-xl border border-dashed border-[var(--border-default)] p-8 text-center text-sm text-[var(--text-secondary)]">Nenhuma divergência encontrada — o processo pode seguir sem retificação.</div>
       ) : (
         <div className="rounded-xl border border-[var(--border-default)] overflow-hidden">
           <div className="px-4 py-2.5 border-b border-[var(--border-default)] flex items-center gap-2">
             <span className="text-sm font-semibold text-white/95">Divergências encontradas</span>
-            <span className="text-xs font-semibold text-white/55 bg-[#252c35] rounded-full px-2 py-0.5">{divs.length}</span>
+            <span className="text-xs font-semibold text-[var(--text-secondary)] bg-[var(--surface-tertiary)] rounded-full px-2 py-0.5">{divs.length}</span>
           </div>
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
-                <tr className="text-[10px] uppercase tracking-wider text-white/55 bg-[#20262e]">
+                <tr className="text-[10px] uppercase tracking-wider text-[var(--text-secondary)] bg-[var(--surface-secondary)]">
                   {["Pessoa","Documento","Campo","Valor na árvore","Valor no documento","Gravidade","Sugestão IA","Decisão"].map((h) => (
                     <th key={h} className="text-left font-semibold px-3 py-2 whitespace-nowrap">{h}</th>
                   ))}
@@ -234,18 +234,18 @@ export function ProcessoAnalise({ processoId, onConcluido, readOnly = false }: P
               </thead>
               <tbody className="divide-y divide-white/10">
                 {divs.map((d) => (
-                  <tr key={d.id} className="hover:bg-[#20262e] align-top">
+                  <tr key={d.id} className="hover:bg-[var(--surface-secondary)] align-top">
                     <td className="px-3 py-2.5">
                       <div className="flex items-center gap-2">
-                        <span className="w-7 h-7 rounded-full bg-[#252c35] text-white/68 text-[11px] font-bold flex items-center justify-center flex-shrink-0">{ini(d.pessoaNome)}</span>
-                        <div className="min-w-0"><div className="font-semibold text-white/95">{d.pessoaNome}</div><div className="text-[11px] text-white/55">{d.geracao != null ? `G${d.geracao}` : "—"} · {d.linhaReta ? "Linha reta" : "Apoio"}</div></div>
+                        <span className="w-7 h-7 rounded-full bg-[var(--surface-tertiary)] text-white/68 text-[11px] font-bold flex items-center justify-center flex-shrink-0">{ini(d.pessoaNome)}</span>
+                        <div className="min-w-0"><div className="font-semibold text-white/95">{d.pessoaNome}</div><div className="text-[11px] text-[var(--text-secondary)]">{d.geracao != null ? `G${d.geracao}` : "—"} · {d.linhaReta ? "Linha reta" : "Apoio"}</div></div>
                       </div>
                     </td>
-                    <td className="px-3 py-2.5"><div className="font-medium text-white/95">{d.documentoTitulo}</div><div className="text-[11px] text-white/55">{d.dataDocumento ? `Recebido em ${d.dataDocumento}` : "—"}</div></td>
+                    <td className="px-3 py-2.5"><div className="font-medium text-white/95">{d.documentoTitulo}</div><div className="text-[11px] text-[var(--text-secondary)]">{d.dataDocumento ? `Recebido em ${d.dataDocumento}` : "—"}</div></td>
                     <td className="px-3 py-2.5 text-white/80 whitespace-nowrap">{d.campoLabel}</td>
                     <td className="px-3 py-2.5 text-white/95">{d.valorArvore || "—"}</td>
                     <td className="px-3 py-2.5 text-white/95">{d.valorDocumento || "—"}</td>
-                    <td className="px-3 py-2.5"><span className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs font-semibold ${SEV_STYLE[d.severidade] || "bg-[#252c35] text-white/80"}`}><span className={`w-1.5 h-1.5 rounded-full ${SEV_DOT[d.severidade] || "bg-[var(--surface-secondary)]"}`} />{SEV_LABEL[d.severidade] || d.severidade}</span></td>
+                    <td className="px-3 py-2.5"><span className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs font-semibold ${SEV_STYLE[d.severidade] || "bg-[var(--surface-tertiary)] text-white/80"}`}><span className={`w-1.5 h-1.5 rounded-full ${SEV_DOT[d.severidade] || "bg-[var(--surface-secondary)]"}`} />{SEV_LABEL[d.severidade] || d.severidade}</span></td>
                     <td className="px-3 py-2.5 text-xs text-white/68 max-w-[200px]">{d.sugestaoIA || "—"}</td>
                     <td className="px-3 py-2.5">
                       <select value={d.status} onChange={(e) => decidir(d.id, e.target.value)} className={`text-xs border rounded-md px-2 py-1.5 bg-[var(--surface-popover)] focus:outline-none ${d.status === "retificacao" ? "border-[#f87171]/30 text-[#f87171]" : d.status === "aceita" ? "border-[#4ade80]/30 text-[#4ade80]" : d.status === "pendente" ? "border-[var(--border-default)] text-white/68" : "border-[#d2a948]/30 text-[#d2a948]"}`}>
@@ -253,7 +253,7 @@ export function ProcessoAnalise({ processoId, onConcluido, readOnly = false }: P
                       </select>
                     </td>
                     <td className="px-3 py-2.5 text-right">
-                      <button onClick={() => setDrawerDiv(d)} className="text-white/40 hover:text-white/80 p-1" title="Ver detalhes"><ArrowRight className="w-4 h-4" /></button>
+                      <button onClick={() => setDrawerDiv(d)} className="text-[var(--text-muted)] hover:text-white/80 p-1" title="Ver detalhes"><ArrowRight className="w-4 h-4" /></button>
                     </td>
                   </tr>
                 ))}
@@ -270,7 +270,7 @@ export function ProcessoAnalise({ processoId, onConcluido, readOnly = false }: P
               ? <span className="inline-flex items-center gap-1.5 text-[#d2a948]"><AlertTriangle className="w-4 h-4" />Faltam {pend} decisão(ões) antes de concluir.</span>
               : <>O destino depende das decisões: alguma marcada <b>“Enviar para retificação”</b> → Retificação; nenhuma → Tradução.</>}
           </div>
-          <button onClick={concluir} disabled={!podeConcluir || concluding} className="px-4 py-2 text-sm font-semibold text-[#fff] bg-[var(--app-background)] hover:bg-[#20262e] rounded-md inline-flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed flex-shrink-0">
+          <button onClick={concluir} disabled={!podeConcluir || concluding} className="px-4 py-2 text-sm font-semibold text-[#fff] bg-[var(--app-background)] hover:bg-[var(--surface-secondary)] rounded-md inline-flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed flex-shrink-0">
             {concluding ? <Loader2 className="w-4 h-4 animate-spin" /> : <ArrowRight className="w-4 h-4" />} Concluir análise
           </button>
         </div>
@@ -296,7 +296,7 @@ function Stat({ label, value, danger }: { label: string; value: number; danger?:
   return (
     <div className="rounded-lg border border-[var(--border-default)] bg-[var(--surface-popover)] px-3 py-2">
       <div className={`text-xl font-bold ${danger ? "text-[#f87171]" : "text-white/95"}`}>{value}</div>
-      <div className="text-[11px] text-white/55">{label}</div>
+      <div className="text-[11px] text-[var(--text-secondary)]">{label}</div>
     </div>
   )
 }
@@ -323,34 +323,34 @@ function DivergenciaDrawer({ div, readOnly, onClose, onSalvar }: {
         <div className="flex items-center justify-between px-5 py-4 border-b border-[var(--border-default)]">
           <div>
             <div className="text-sm font-bold text-white/95">Detalhe da divergência</div>
-            <div className="text-xs text-white/55">{div.documentoTitulo}</div>
+            <div className="text-xs text-[var(--text-secondary)]">{div.documentoTitulo}</div>
           </div>
-          <button onClick={onClose} className="text-white/40 hover:text-white/80 p-1"><X className="w-5 h-5" /></button>
+          <button onClick={onClose} className="text-[var(--text-muted)] hover:text-white/80 p-1"><X className="w-5 h-5" /></button>
         </div>
 
         <div className="p-5 space-y-4 flex-1">
           <div className="flex items-center gap-2">
-            <span className="w-8 h-8 rounded-full bg-[#252c35] text-white/68 text-xs font-bold flex items-center justify-center">{ini(div.pessoaNome)}</span>
+            <span className="w-8 h-8 rounded-full bg-[var(--surface-tertiary)] text-white/68 text-xs font-bold flex items-center justify-center">{ini(div.pessoaNome)}</span>
             <div>
               <div className="font-semibold text-white/95 text-sm">{div.pessoaNome}</div>
-              <div className="text-[11px] text-white/55">{div.geracao != null ? `G${div.geracao}` : "—"} · {div.linhaReta ? "Linha reta" : "Apoio"}</div>
+              <div className="text-[11px] text-[var(--text-secondary)]">{div.geracao != null ? `G${div.geracao}` : "—"} · {div.linhaReta ? "Linha reta" : "Apoio"}</div>
             </div>
           </div>
 
           <div className="rounded-lg border border-[var(--border-default)] divide-y divide-white/10 text-sm">
-            <div className="flex justify-between px-3 py-2"><span className="text-white/55">Campo</span><span className="font-medium text-white/95">{div.campoLabel}</span></div>
-            <div className="flex justify-between px-3 py-2"><span className="text-white/55">Valor na árvore</span><span className="font-medium text-white/95">{div.valorArvore || "—"}</span></div>
-            <div className="flex justify-between px-3 py-2"><span className="text-white/55">Valor no documento</span><span className="font-medium text-white/95">{div.valorDocumento || "—"}</span></div>
-            <div className="flex justify-between px-3 py-2 items-center"><span className="text-white/55">Gravidade</span>
-              <span className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs font-semibold ${SEV_STYLE[div.severidade] || "bg-[#252c35] text-white/80"}`}>
+            <div className="flex justify-between px-3 py-2"><span className="text-[var(--text-secondary)]">Campo</span><span className="font-medium text-white/95">{div.campoLabel}</span></div>
+            <div className="flex justify-between px-3 py-2"><span className="text-[var(--text-secondary)]">Valor na árvore</span><span className="font-medium text-white/95">{div.valorArvore || "—"}</span></div>
+            <div className="flex justify-between px-3 py-2"><span className="text-[var(--text-secondary)]">Valor no documento</span><span className="font-medium text-white/95">{div.valorDocumento || "—"}</span></div>
+            <div className="flex justify-between px-3 py-2 items-center"><span className="text-[var(--text-secondary)]">Gravidade</span>
+              <span className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs font-semibold ${SEV_STYLE[div.severidade] || "bg-[var(--surface-tertiary)] text-white/80"}`}>
                 <span className={`w-1.5 h-1.5 rounded-full ${SEV_DOT[div.severidade] || "bg-[var(--surface-secondary)]"}`} />{SEV_LABEL[div.severidade] || div.severidade}
               </span>
             </div>
           </div>
 
           {(div.sugestaoIA || div.motivoIA || div.impacto) && (
-            <div className="rounded-lg bg-sky-500/12 border border-sky-500/25 p-3 text-sm">
-              <div className="text-xs font-semibold text-sky-300 mb-1">Sugestão da IA</div>
+            <div className="rounded-lg bg-sky-50 border border-sky-200 p-3 text-sm">
+              <div className="text-xs font-semibold text-sky-700 mb-1">Sugestão da IA</div>
               {div.sugestaoIA && <div className="text-white/80">{div.sugestaoIA}</div>}
               {div.motivoIA && <div className="text-white/68 text-xs mt-1">{div.motivoIA}</div>}
               {div.impacto && <div className="text-white/68 text-xs mt-1">Impacto: {div.impacto}</div>}
@@ -360,7 +360,7 @@ function DivergenciaDrawer({ div, readOnly, onClose, onSalvar }: {
           <div>
             <label className="text-xs font-semibold text-white/80">Decisão</label>
             <select value={decisao} onChange={(e) => setDecisao(e.target.value)} disabled={readOnly}
-              className="mt-1 w-full text-sm border border-[var(--border-default)] rounded-md px-2 py-2 bg-[var(--surface-popover)] disabled:bg-[#20262e] disabled:text-white/55">
+              className="mt-1 w-full text-sm border border-[var(--border-default)] rounded-md px-2 py-2 bg-[var(--surface-popover)] disabled:bg-[var(--surface-secondary)] disabled:text-[var(--text-secondary)]">
               {DECISOES.map(([v, l]) => <option key={v} value={v}>{l}</option>)}
             </select>
           </div>
@@ -369,14 +369,14 @@ function DivergenciaDrawer({ div, readOnly, onClose, onSalvar }: {
             <label className="text-xs font-semibold text-white/80">Notas</label>
             <textarea value={notas} onChange={(e) => setNotas(e.target.value)} disabled={readOnly} rows={4}
               placeholder="Registre o motivo da decisão."
-              className="mt-1 w-full text-sm border border-[var(--border-default)] rounded-md px-3 py-2 disabled:bg-[#20262e]" />
+              className="mt-1 w-full text-sm border border-[var(--border-default)] rounded-md px-3 py-2 disabled:bg-[var(--surface-secondary)]" />
           </div>
         </div>
 
         {!readOnly && (
           <div className="bg-[var(--surface-popover)] border-t border-[var(--border-default)] px-5 py-3 flex justify-end gap-2">
-            <button onClick={onClose} className="px-3 py-2 text-sm text-white/68 hover:bg-[#20262e] rounded-md">Cancelar</button>
-            <button onClick={salvar} disabled={salvando} className="px-4 py-2 text-sm font-semibold text-[#fff] bg-[#2563eb] hover:bg-[#1d4ed8] rounded-md inline-flex items-center gap-2 disabled:opacity-50">
+            <button onClick={onClose} className="px-3 py-2 text-sm text-white/68 hover:bg-[var(--surface-secondary)] rounded-md">Cancelar</button>
+            <button onClick={salvar} disabled={salvando} className="px-4 py-2 text-sm font-semibold text-[var(--action-primary-ink)] bg-[var(--action-primary)] hover:bg-[var(--action-primary-hover)] rounded-md inline-flex items-center gap-2 disabled:opacity-50">
               {salvando ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />} Salvar decisão
             </button>
           </div>

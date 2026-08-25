@@ -26,43 +26,43 @@ import type { ProcessoWithStatus } from "@/src/types/kanban"
 
 const TesourariaTab = dynamic(() => import("@/src/components/financeiroComponents/TesourariaTab"), {
   ssr: false,
-  loading: () => <div className="flex items-center justify-center py-24"><Loader2 className="h-8 w-8 animate-spin text-white/50" /></div>,
+  loading: () => <div className="flex items-center justify-center py-24"><Loader2 className="h-8 w-8 animate-spin text-[var(--text-secondary)]" /></div>,
 })
 const ReceberTab = dynamic(() => import("@/src/components/financeiroComponents/ReceberTab"), {
   ssr: false,
-  loading: () => <div className="flex items-center justify-center py-24"><Loader2 className="h-8 w-8 animate-spin text-white/50" /></div>,
+  loading: () => <div className="flex items-center justify-center py-24"><Loader2 className="h-8 w-8 animate-spin text-[var(--text-secondary)]" /></div>,
 })
 const CobrancasTab = dynamic(() => import("@/src/components/financeiroComponents/CobrancasTab"), {
   ssr: false,
-  loading: () => <div className="flex items-center justify-center py-24"><Loader2 className="h-8 w-8 animate-spin text-white/50" /></div>,
+  loading: () => <div className="flex items-center justify-center py-24"><Loader2 className="h-8 w-8 animate-spin text-[var(--text-secondary)]" /></div>,
 })
 const PagarTab = dynamic(() => import("@/src/components/financeiroComponents/PagarTab"), {
   ssr: false,
-  loading: () => <div className="flex items-center justify-center py-24"><Loader2 className="h-8 w-8 animate-spin text-white/50" /></div>,
+  loading: () => <div className="flex items-center justify-center py-24"><Loader2 className="h-8 w-8 animate-spin text-[var(--text-secondary)]" /></div>,
 })
 const FluxoTab = dynamic(() => import("@/src/components/financeiroComponents/FluxoTab"), {
   ssr: false,
-  loading: () => <div className="flex items-center justify-center py-24"><Loader2 className="h-8 w-8 animate-spin text-white/50" /></div>,
+  loading: () => <div className="flex items-center justify-center py-24"><Loader2 className="h-8 w-8 animate-spin text-[var(--text-secondary)]" /></div>,
 })
 const DreTab = dynamic(() => import("@/src/components/financeiroComponents/DreTab"), {
   ssr: false,
-  loading: () => <div className="flex items-center justify-center py-24"><Loader2 className="h-8 w-8 animate-spin text-white/50" /></div>,
+  loading: () => <div className="flex items-center justify-center py-24"><Loader2 className="h-8 w-8 animate-spin text-[var(--text-secondary)]" /></div>,
 })
 const CcTab = dynamic(() => import("@/src/components/financeiroComponents/CcTab"), {
   ssr: false,
-  loading: () => <div className="flex items-center justify-center py-24"><Loader2 className="h-8 w-8 animate-spin text-white/50" /></div>,
+  loading: () => <div className="flex items-center justify-center py-24"><Loader2 className="h-8 w-8 animate-spin text-[var(--text-secondary)]" /></div>,
 })
 const ComissoesTab = dynamic(() => import("@/src/components/financeiroComponents/ComissoesTab"), {
   ssr: false,
-  loading: () => <div className="flex items-center justify-center py-24"><Loader2 className="h-8 w-8 animate-spin text-white/50" /></div>,
+  loading: () => <div className="flex items-center justify-center py-24"><Loader2 className="h-8 w-8 animate-spin text-[var(--text-secondary)]" /></div>,
 })
 const ImpostosTab = dynamic(() => import("@/src/components/financeiroComponents/ImpostosTab"), {
   ssr: false,
-  loading: () => <div className="flex items-center justify-center py-24"><Loader2 className="h-8 w-8 animate-spin text-white/50" /></div>,
+  loading: () => <div className="flex items-center justify-center py-24"><Loader2 className="h-8 w-8 animate-spin text-[var(--text-secondary)]" /></div>,
 })
 const AuditoriaTab = dynamic(() => import("@/src/components/financeiroComponents/AuditoriaTab"), {
   ssr: false,
-  loading: () => <div className="flex items-center justify-center py-24"><Loader2 className="h-8 w-8 animate-spin text-white/50" /></div>,
+  loading: () => <div className="flex items-center justify-center py-24"><Loader2 className="h-8 w-8 animate-spin text-[var(--text-secondary)]" /></div>,
 })
 
 // ============================================================
@@ -183,7 +183,7 @@ export default function FinanceiroPage() {
                   key={t.key}
                   onClick={() => setTab(t.key)}
                   className={`relative px-3.5 py-2 text-sm font-medium whitespace-nowrap transition-colors -mb-px border-b-2 border-transparent ${
-                    tab === t.key ? "" : "text-white/55 hover:text-white"
+                    tab === t.key ? "" : "text-[var(--text-secondary)] hover:text-white"
                   }`}
                   style={tab === t.key ? { color: OURO, borderBottomColor: OURO } : undefined}
                 >
@@ -198,7 +198,7 @@ export default function FinanceiroPage() {
             <CentralFinanceira onIrPara={(t) => setTab(t as TabKey)} />
           ) : tab === "dashboard" ? (
             loading || !dash
-              ? <div className="flex items-center justify-center py-24"><Loader2 className="h-8 w-8 animate-spin text-white/50" /></div>
+              ? <div className="flex items-center justify-center py-24"><Loader2 className="h-8 w-8 animate-spin text-[var(--text-secondary)]" /></div>
               : <DashboardCorporativo
                   dash={dash}
                   onGoTab={(t) => setTab(t as TabKey)}
@@ -241,10 +241,10 @@ export default function FinanceiroPage() {
 function EmConstrucao({ tab }: { tab: TabKey }) {
   const label = TABS.find(t => t.key === tab)?.label ?? tab
   return (
-    <div className="rounded-xl border border-[var(--border-default)] bg-white/[0.05] backdrop-blur-md p-16 text-center">
-      <FileText className="h-10 w-10 text-white/30 mx-auto mb-3" />
+    <div className="rounded-xl border border-[var(--border-default)] bg-[var(--surface-primary)] backdrop-blur-md p-16 text-center">
+      <FileText className="h-10 w-10 text-[var(--text-muted)] mx-auto mb-3" />
       <h3 className="text-white font-semibold">{label}</h3>
-      <p className="text-white/50 text-sm mt-1">Esta aba entra na próxima fatia da entrega.</p>
+      <p className="text-[var(--text-secondary)] text-sm mt-1">Esta aba entra na próxima fatia da entrega.</p>
     </div>
   )
 }

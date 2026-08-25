@@ -21,7 +21,7 @@ import {
 import { useApi } from "@/src/lib/dados"
 
 const OURO = '#D2A948'
-const GLASS = 'rounded-xl border border-[var(--border-default)] bg-white/[0.05] backdrop-blur-md'
+const GLASS = 'rounded-xl border border-[var(--border-default)] bg-[var(--surface-primary)] backdrop-blur-md'
 
 type MoedaRef = { id: number; code: string; name: string | null }
 type DestinoRef = { id: number; nome: string; moeda: string }
@@ -126,7 +126,7 @@ export default function FormasPagamentoTab() {
           <div className="flex h-10 w-10 items-center justify-center rounded-xl" style={{ background: `${OURO}22`, color: OURO }}><CreditCard className="h-5 w-5" /></div>
           <div>
             <h2 className="text-lg font-semibold text-white">Formas de Pagamento</h2>
-            <p className="text-sm text-white/50">Capacidades técnicas do meio. Regra comercial pertence à Condição.</p>
+            <p className="text-sm text-[var(--text-secondary)]">Capacidades técnicas do meio. Regra comercial pertence à Condição.</p>
           </div>
         </div>
         <button onClick={abrirNovo} className="inline-flex items-center gap-1.5 rounded-lg px-4 py-2 text-sm font-semibold text-[#1b1508] transition" style={{ background: OURO }}>
@@ -135,17 +135,17 @@ export default function FormasPagamentoTab() {
       </div>
 
       <div className="relative">
-        <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-white/30" />
-        <input value={busca} onChange={(e) => setBusca(e.target.value)} placeholder="Buscar forma de pagamento…" className="w-full rounded-lg border border-[var(--border-default)] bg-black/30 py-2 pl-9 pr-3 text-sm text-white placeholder:text-white/30 outline-none focus:border-white/25" />
+        <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--text-muted)]" />
+        <input value={busca} onChange={(e) => setBusca(e.target.value)} placeholder="Buscar forma de pagamento…" className="w-full rounded-lg border border-[var(--border-default)] bg-black/30 py-2 pl-9 pr-3 text-sm text-white placeholder:text-[var(--text-muted)] outline-none focus:border-white/25" />
       </div>
 
       {loading ? (
-        <div className="flex items-center justify-center py-16"><Loader2 className="h-8 w-8 animate-spin text-white/50" /></div>
+        <div className="flex items-center justify-center py-16"><Loader2 className="h-8 w-8 animate-spin text-[var(--text-secondary)]" /></div>
       ) : erroLista ? (
-        <div className="rounded-lg border border-red-500/30 bg-red-500/10 p-4 text-sm text-red-200">{erroLista}<button onClick={() => void carregar()} className="ml-3 underline hover:text-white">Tentar de novo</button></div>
+        <div className="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-700">{erroLista}<button onClick={() => void carregar()} className="ml-3 underline hover:text-white">Tentar de novo</button></div>
       ) : filtrados.length === 0 ? (
         <div className={`${GLASS} flex flex-col items-center gap-2 py-16 text-center`}>
-          <CreditCard className="h-10 w-10 text-white/20" />
+          <CreditCard className="h-10 w-10 text-[var(--text-muted)]" />
           <p className="text-white/60">{busca ? 'Nenhuma forma encontrada.' : 'Nenhuma forma de pagamento ainda.'}</p>
         </div>
       ) : (
@@ -157,9 +157,9 @@ export default function FormasPagamentoTab() {
                 <div className="flex items-center gap-2">
                   <span className="truncate font-medium text-white">{x.name}</span>
                   {x.type && <span className="shrink-0 rounded-md border border-[var(--border-default)] px-2 py-0.5 text-[11px] text-white/60">{TIPOS_FORMA_LABEL[x.type] || x.type}</span>}
-                  {!x.ativo && <span className="shrink-0 rounded-md border border-[var(--border-default)] px-2 py-0.5 text-[11px] text-white/40">inativa</span>}
+                  {!x.ativo && <span className="shrink-0 rounded-md border border-[var(--border-default)] px-2 py-0.5 text-[11px] text-[var(--text-muted)]">inativa</span>}
                 </div>
-                <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-white/45">
+                <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-[var(--text-secondary)]">
                   {x.code && <span className="font-mono">{x.code}</span>}
                   <span>{(x.moedasAceitas?.length ? x.moedasAceitas : (x.moeda ? [x.moeda] : [])).join(' · ') || '—'}</span>
                   <span>{x.permiteParcelas ? `até ${x.maxParcelas ?? '—'}×` : 'sem parcelamento'}</span>
@@ -169,7 +169,7 @@ export default function FormasPagamentoTab() {
               </div>
               <div className="flex shrink-0 items-center gap-2">
                 <button onClick={() => abrirEditar(x)} className="inline-flex items-center gap-1 rounded-md border border-[var(--border-default)] px-2.5 py-1 text-xs text-white/70 transition hover:bg-[var(--surface-hover)] hover:text-white"><Pencil className="h-3 w-3" /> Editar</button>
-                <button onClick={() => excluir(x)} className="inline-flex items-center gap-1 rounded-md border border-red-500/20 px-2.5 py-1 text-xs text-red-300/80 transition hover:bg-red-500/10"><Trash2 className="h-3 w-3" /></button>
+                <button onClick={() => excluir(x)} className="inline-flex items-center gap-1 rounded-md border border-red-200 px-2.5 py-1 text-xs text-red-700/80 transition hover:bg-red-50"><Trash2 className="h-3 w-3" /></button>
               </div>
             </div>
           ))}
@@ -192,14 +192,14 @@ function FormaPanel({ f, set, editId, moedas, carteiras, contas, salvando, erro,
   editId: number | null; moedas: MoedaRef[]; carteiras: DestinoRef[]; contas: DestinoRef[]
   salvando: boolean; erro: string | null; onClose: () => void; onSalvar: () => void
 }) {
-  const input = 'w-full rounded-lg border border-[var(--border-default)] bg-[var(--surface-primary)] px-3 py-2 text-sm text-white placeholder:text-white/30 outline-none focus:border-white/30'
+  const input = 'w-full rounded-lg border border-[var(--border-default)] bg-[var(--surface-primary)] px-3 py-2 text-sm text-white placeholder:text-[var(--text-muted)] outline-none focus:border-white/30'
   const semIntegracao = !f.tipoIntegracao || f.tipoIntegracao === 'NENHUMA'
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-[var(--overlay-modal)] p-4 backdrop-blur-sm" onClick={onClose}>
       <div className="max-h-[92vh] w-full max-w-3xl overflow-auto rounded-2xl border border-[var(--border-default)] bg-zinc-900/95 text-white shadow-2xl" onClick={(e) => e.stopPropagation()}>
         <div className="sticky top-0 z-10 flex items-center justify-between border-b border-[var(--border-default)] bg-zinc-900/95 px-6 py-4">
           <div className="flex items-center gap-2"><Sparkles className="h-4 w-4" style={{ color: OURO }} /><h3 className="text-base font-semibold">{editId ? 'Editar forma de pagamento' : 'Nova forma de pagamento'}</h3></div>
-          <button onClick={onClose} className="text-white/40 transition hover:text-white"><X className="h-4 w-4" /></button>
+          <button onClick={onClose} className="text-[var(--text-muted)] transition hover:text-white"><X className="h-4 w-4" /></button>
         </div>
 
         <div className="space-y-5 px-6 py-5">
@@ -219,14 +219,14 @@ function FormaPanel({ f, set, editId, moedas, carteiras, contas, salvando, erro,
 
           {/* Moedas */}
           <Secao icon={Coins} titulo="Moedas aceitas" dica="A forma pode aceitar uma ou várias moedas. Consome o cadastro de Moedas.">
-            {moedas.length === 0 ? <p className="text-[11px] text-amber-300/70">Cadastre moedas em “Moedas” para escolher aqui.</p> : (
+            {moedas.length === 0 ? <p className="text-[11px] text-amber-700/70">Cadastre moedas em “Moedas” para escolher aqui.</p> : (
               <ChipsMulti items={moedas.map((m) => ({ id: m.code, label: m.code + (m.name ? ` · ${m.name}` : '') }))} selecionados={f.moedasAceitas} onToggle={(code) => set('moedasAceitas', toggle(f.moedasAceitas, String(code)))} />
             )}
           </Secao>
 
           {/* Capacidades + parcelamento */}
           <Secao icon={Settings2} titulo="Capacidades do meio" dica="Só o que o MEIO suporta. Quantidade comercial de parcelas, entrada e cronograma pertencem à Condição de Pagamento — aqui vai apenas o limite técnico.">
-            <div className="mb-3 flex flex-wrap items-center gap-3 rounded-lg border border-[var(--border-default)] bg-white/[0.03] p-3">
+            <div className="mb-3 flex flex-wrap items-center gap-3 rounded-lg border border-[var(--border-default)] bg-[var(--surface-primary)] p-3">
               <Toggle label="Suporta parcelamento" on={f.permiteParcelas} onChange={(v) => { set('permiteParcelas', v); if (!v) { set('maxParcelas', null); set('minParcelas', 1) } }} />
               {f.permiteParcelas && (<>
                 <label className="flex items-center gap-2 text-sm text-white/70">Mín. técnico<input type="number" min={1} className="w-20 rounded-lg border border-[var(--border-default)] bg-[var(--surface-primary)] px-2 py-1 text-sm text-white outline-none focus:border-white/30" value={f.minParcelas ?? ''} onChange={(e) => set('minParcelas', e.target.value === '' ? null : Number(e.target.value))} placeholder="1" /></label>
@@ -235,7 +235,7 @@ function FormaPanel({ f, set, editId, moedas, carteiras, contas, salvando, erro,
             </div>
 
             {/* Direção de uso — a forma serve a entradas, saídas, ou ambas. */}
-            <div className="mb-3 grid grid-cols-1 gap-x-6 gap-y-2 rounded-lg border border-[var(--border-default)] bg-white/[0.03] p-3 sm:grid-cols-2">
+            <div className="mb-3 grid grid-cols-1 gap-x-6 gap-y-2 rounded-lg border border-[var(--border-default)] bg-[var(--surface-primary)] p-3 sm:grid-cols-2">
               <Toggle label="Usar em recebimentos" on={f.usoRecebimento} onChange={(v) => set('usoRecebimento', v)} />
               <Toggle label="Usar em pagamentos" on={f.usoPagamento} onChange={(v) => set('usoPagamento', v)} />
               <Toggle label="Exige adquirente" on={f.exigeAdquirente} onChange={(v) => set('exigeAdquirente', v)} />
@@ -271,12 +271,12 @@ function FormaPanel({ f, set, editId, moedas, carteiras, contas, salvando, erro,
 
           {/* Destinos compatíveis */}
           <Secao icon={Landmark} titulo="Destinos compatíveis" dica="Só restringe quais destinos são compatíveis. A escolha efetiva ocorre na Cobrança.">
-            <p className="mb-1.5 text-[11px] uppercase tracking-wide text-white/40">Carteiras</p>
-            {carteiras.length === 0 ? <p className="mb-3 text-[11px] text-white/35">Nenhuma carteira cadastrada.</p> : (
+            <p className="mb-1.5 text-[11px] uppercase tracking-wide text-[var(--text-muted)]">Carteiras</p>
+            {carteiras.length === 0 ? <p className="mb-3 text-[11px] text-[var(--text-muted)]">Nenhuma carteira cadastrada.</p> : (
               <ChipsMulti items={carteiras.map((c) => ({ id: c.id, label: `${c.nome} · ${c.moeda}` }))} selecionados={f.carteirasCompativeis} onToggle={(id) => set('carteirasCompativeis', toggle(f.carteirasCompativeis, Number(id)))} />
             )}
-            <p className="mb-1.5 mt-3 text-[11px] uppercase tracking-wide text-white/40">Contas bancárias</p>
-            {contas.length === 0 ? <p className="text-[11px] text-white/35">Nenhuma conta cadastrada.</p> : (
+            <p className="mb-1.5 mt-3 text-[11px] uppercase tracking-wide text-[var(--text-muted)]">Contas bancárias</p>
+            {contas.length === 0 ? <p className="text-[11px] text-[var(--text-muted)]">Nenhuma conta cadastrada.</p> : (
               <ChipsMulti items={contas.map((c) => ({ id: c.id, label: `${c.nome} · ${c.moeda}` }))} selecionados={f.contasCompativeis} onToggle={(id) => set('contasCompativeis', toggle(f.contasCompativeis, Number(id)))} />
             )}
           </Secao>
@@ -308,7 +308,7 @@ function FormaPanel({ f, set, editId, moedas, carteiras, contas, salvando, erro,
             <textarea rows={2} className={input} value={f.observacoes ?? ''} onChange={(e) => set('observacoes', e.target.value)} />
           </Secao>
 
-          {erro && <div className="rounded-lg border border-red-500/30 bg-red-500/10 p-3 text-sm text-red-200">{erro}</div>}
+          {erro && <div className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700">{erro}</div>}
         </div>
 
         <div className="sticky bottom-0 flex items-center justify-end gap-2 border-t border-[var(--border-default)] bg-zinc-900/95 px-6 py-4">
@@ -327,7 +327,7 @@ function Secao({ icon: Ic, titulo, dica, children }: { icon: any; titulo: string
   return (
     <div className={`${GLASS} p-4`}>
       <div className="mb-1 flex items-center gap-2"><Ic className="h-4 w-4" style={{ color: OURO }} /><h4 className="text-sm font-semibold text-white">{titulo}</h4></div>
-      {dica && <p className="mb-3 text-[11px] text-white/40">{dica}</p>}
+      {dica && <p className="mb-3 text-[11px] text-[var(--text-muted)]">{dica}</p>}
       <div className={dica ? '' : 'mt-2'}>{children}</div>
     </div>
   )

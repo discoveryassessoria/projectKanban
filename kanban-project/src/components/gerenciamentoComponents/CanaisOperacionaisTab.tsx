@@ -26,8 +26,8 @@ interface Canal {
   observacaoObrigatoria: boolean
 }
 
-const inp = "w-full rounded-lg border border-[var(--border-default)] bg-[var(--surface-primary)] px-3 py-2 text-sm text-white placeholder-white/30 outline-none focus:border-blue-400/50"
-const lbl = "mb-1 block text-[11px] uppercase tracking-wide text-white/40"
+const inp = "w-full rounded-lg border border-[var(--border-default)] bg-[var(--surface-primary)] px-3 py-2 text-sm text-white placeholder-white/30 outline-none focus:border-blue-200"
+const lbl = "mb-1 block text-[11px] uppercase tracking-wide text-[var(--text-muted)]"
 
 function headers(): HeadersInit {
   const t = typeof window !== "undefined" ? localStorage.getItem("token") : null
@@ -83,13 +83,13 @@ export default function CanaisOperacionaisTab() {
     } finally { setSalvando(false) }
   }
 
-  if (canais === null) return <div className="p-6 text-sm text-white/50">Carregando canais…</div>
+  if (canais === null) return <div className="p-6 text-sm text-[var(--text-secondary)]">Carregando canais…</div>
 
   return (
     <div className="space-y-4 p-1">
       <div>
         <h2 className="text-lg font-semibold text-white">Canais de atendimento</h2>
-        <p className="mt-0.5 text-xs text-white/50">
+        <p className="mt-0.5 text-xs text-[var(--text-secondary)]">
           Duas perguntas diferentes, dois donos. <b>Tipos</b> é o vocabulário do domínio — quais canais existem
           e o que cada um exige. <b>Por organização</b> é a disponibilidade real: por onde cada cartório atende.
           O workflow não copia nenhuma das duas; ele referencia os canais do fornecedor relacionado.
@@ -99,7 +99,7 @@ export default function CanaisOperacionaisTab() {
       <div className="flex gap-1 border-b border-[var(--border-default)]">
         {(["tipos", "organizacoes"] as const).map((v) => (
           <button key={v} onClick={() => setVisao(v)}
-            className={`rounded-t-lg px-3 py-2 text-xs ${visao === v ? "bg-[var(--surface-primary)] text-white" : "text-white/50 hover:text-white/80"}`}>
+            className={`rounded-t-lg px-3 py-2 text-xs ${visao === v ? "bg-[var(--surface-primary)] text-white" : "text-[var(--text-secondary)] hover:text-white/80"}`}>
             {v === "tipos" ? "Tipos de canal" : "Por organização"}
           </button>
         ))}
@@ -109,11 +109,11 @@ export default function CanaisOperacionaisTab() {
       {visao === "tipos" && (
       <div className="space-y-4">
 
-      {erro && <div className="rounded-lg border border-red-400/30 bg-red-500/10 px-3 py-2 text-xs text-red-200">{erro}</div>}
+      {erro && <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700">{erro}</div>}
 
       <div className="space-y-1.5">
         {canais.length === 0 && (
-          <div className="rounded-lg border border-[var(--border-default)] bg-[var(--surface-primary)] px-4 py-6 text-center text-sm text-white/40">
+          <div className="rounded-lg border border-[var(--border-default)] bg-[var(--surface-primary)] px-4 py-6 text-center text-sm text-[var(--text-muted)]">
             Nenhum canal cadastrado ainda.
           </div>
         )}
@@ -139,7 +139,7 @@ export default function CanaisOperacionaisTab() {
                 </div>
                 <div className="flex justify-end gap-2">
                   <button onClick={() => setEditando(null)} className="rounded-lg border border-[var(--border-default)] bg-[var(--surface-primary)] px-3 py-1.5 text-xs text-white/70">Cancelar</button>
-                  <button onClick={() => salvar(editando)} disabled={salvando} className="rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-medium text-[#fff] disabled:opacity-50">Salvar</button>
+                  <button onClick={() => salvar(editando)} disabled={salvando} className="rounded-lg bg-[var(--action-primary)] px-3 py-1.5 text-xs font-medium text-[var(--action-primary-ink)] disabled:opacity-50">Salvar</button>
                 </div>
               </div>
             ) : (
@@ -147,13 +147,13 @@ export default function CanaisOperacionaisTab() {
                 <div className="min-w-0">
                   <div className="flex items-center gap-2">
                     <span className="text-sm text-white">{c.label}</span>
-                    <code className="text-[10px] text-white/35">{c.key}</code>
-                    {!c.ativo && <span className="rounded bg-[var(--surface-primary)] px-1.5 py-0.5 text-[10px] text-white/50">inativo</span>}
+                    <code className="text-[10px] text-[var(--text-muted)]">{c.key}</code>
+                    {!c.ativo && <span className="rounded bg-[var(--surface-primary)] px-1.5 py-0.5 text-[10px] text-[var(--text-secondary)]">inativo</span>}
                   </div>
                   <div className="mt-0.5 flex flex-wrap gap-1.5 text-[10px]">
-                    {c.protocoloObrigatorio && <span className="rounded bg-sky-500/15 px-1.5 py-0.5 text-sky-300">protocolo no ato</span>}
+                    {c.protocoloObrigatorio && <span className="rounded bg-sky-50 px-1.5 py-0.5 text-sky-700">protocolo no ato</span>}
                     {c.anexoObrigatorioLabel && <span className="rounded bg-[var(--surface-primary)] px-1.5 py-0.5 text-white/60">{c.anexoObrigatorioLabel}</span>}
-                    {c.rastreioObrigatorio && <span className="rounded bg-amber-500/15 px-1.5 py-0.5 text-amber-300">rastreio</span>}
+                    {c.rastreioObrigatorio && <span className="rounded bg-amber-50 px-1.5 py-0.5 text-amber-700">rastreio</span>}
                     {c.observacaoObrigatoria && <span className="rounded bg-[var(--surface-primary)] px-1.5 py-0.5 text-white/60">observação</span>}
                   </div>
                 </div>
@@ -165,7 +165,7 @@ export default function CanaisOperacionaisTab() {
       </div>
 
       {form ? (
-        <div className="space-y-2 rounded-lg border border-blue-400/30 bg-blue-500/5 p-3">
+        <div className="space-y-2 rounded-lg border border-blue-200 bg-blue-500/5 p-3">
           <div className="grid grid-cols-2 gap-2">
             <div><label className={lbl}>Nome do canal</label>
               <input className={inp} autoFocus value={form.label} onChange={(e) => setForm({ ...form, label: e.target.value })} placeholder="ex.: Portal Estadual" /></div>
@@ -183,11 +183,11 @@ export default function CanaisOperacionaisTab() {
           </div>
           <div className="flex justify-end gap-2">
             <button onClick={() => setForm(null)} className="rounded-lg border border-[var(--border-default)] bg-[var(--surface-primary)] px-3 py-1.5 text-xs text-white/70">Cancelar</button>
-            <button onClick={criar} disabled={salvando || !form.label.trim()} className="rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-medium text-[#fff] disabled:opacity-50">Cadastrar canal</button>
+            <button onClick={criar} disabled={salvando || !form.label.trim()} className="rounded-lg bg-[var(--action-primary)] px-3 py-1.5 text-xs font-medium text-[var(--action-primary-ink)] disabled:opacity-50">Cadastrar canal</button>
           </div>
         </div>
       ) : (
-        <button onClick={() => setForm({ ...VAZIO })} className="rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-medium text-[#fff] hover:bg-blue-500">+ Canal</button>
+        <button onClick={() => setForm({ ...VAZIO })} className="rounded-lg bg-[var(--action-primary)] px-3 py-1.5 text-xs font-medium text-[var(--action-primary-ink)] hover:bg-[var(--action-primary)]">+ Canal</button>
       )}
       </div>
       )}

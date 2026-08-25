@@ -130,13 +130,13 @@ export function OperacaoAntecipadaModal({ processoId, necessidadeId, necessidade
     <div className="fixed inset-0 z-[80] flex items-center justify-center bg-[var(--overlay-modal)] p-4" onClick={() => !enviando && onClose()}>
       <div className="max-w-lg w-full rounded-2xl bg-[var(--surface-popover)] shadow-xl" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center justify-between px-5 pt-4 pb-3 border-b border-[var(--border-default)]">
-          <h3 className="text-[15px] font-extrabold text-white/95 flex items-center gap-2"><ArrowLeftRight className="w-4 h-4 text-white/55" /> Nova operação antecipada</h3>
-          <button onClick={onClose} className="text-white/40 hover:text-white/80"><X className="w-4.5 h-4.5" /></button>
+          <h3 className="text-[15px] font-extrabold text-white/95 flex items-center gap-2"><ArrowLeftRight className="w-4 h-4 text-[var(--text-secondary)]" /> Nova operação antecipada</h3>
+          <button onClick={onClose} className="text-[var(--text-muted)] hover:text-white/80"><X className="w-4.5 h-4.5" /></button>
         </div>
         <div className="px-5 py-4 space-y-3">
-          <p className="text-[12px] text-white/55 leading-relaxed">Executa a operação oficial de outra fase para atender esta necessidade — <b>sem avançar o processo</b>.</p>
+          <p className="text-[12px] text-[var(--text-secondary)] leading-relaxed">Executa a operação oficial de outra fase para atender esta necessidade — <b>sem avançar o processo</b>.</p>
           {necessidadeId && necessidadeLabel ? (
-            <div className="text-[12.5px]"><span className="text-white/40">Necessidade:</span> <span className="font-semibold text-white/95">{necessidadeLabel}</span></div>
+            <div className="text-[12.5px]"><span className="text-[var(--text-muted)]">Necessidade:</span> <span className="font-semibold text-white/95">{necessidadeLabel}</span></div>
           ) : !necessidadeId ? (
             <label className="block">
               <span className="block text-[11.5px] font-semibold text-white/68 mb-1">Necessidade a atender</span>
@@ -170,7 +170,7 @@ export function OperacaoAntecipadaModal({ processoId, necessidadeId, necessidade
                 <option value="">Selecionar…</option>
                 {tipos.map((t) => <option key={t.id} value={t.id}>{t.publicCode ? t.publicCode + " — " : ""}{t.name}{t.countryCode ? ` (${t.countryCode})` : ""}</option>)}
               </select>
-              <span className="block text-[10.5px] text-white/40 mt-1">
+              <span className="block text-[10.5px] text-[var(--text-muted)] mt-1">
                 {tipoSel?.countryCode ? `Jurisdição: ${tipoSel.countryCode}. ` : ""}Se diferir do documento exigido pela necessidade, será tratado como <b>documento de apoio</b> (não substitui a necessidade).
               </span>
             </label>
@@ -195,8 +195,8 @@ export function OperacaoAntecipadaModal({ processoId, necessidadeId, necessidade
           {erro && <div className="bg-[#f87171]/12 border border-[#f87171]/30 rounded-lg px-3 py-2 text-[12.5px] text-[#f87171]">{erro}</div>}
         </div>
         <div className="flex justify-end gap-2 px-5 py-3 border-t border-[var(--border-default)]">
-          <button disabled={enviando} onClick={onClose} className="px-3.5 py-2 text-[12.5px] font-semibold rounded-lg bg-[#252c35] hover:bg-[#252c35] text-white/95 disabled:opacity-50">Cancelar</button>
-          <button disabled={enviando || !necIdFinal || !operationType || faltaDoc} onClick={() => void criar()} className="inline-flex items-center gap-1.5 px-3.5 py-2 text-[12.5px] font-bold rounded-lg bg-[var(--app-background)] text-[#fff] hover:bg-[#20262e] disabled:opacity-50">
+          <button disabled={enviando} onClick={onClose} className="px-3.5 py-2 text-[12.5px] font-semibold rounded-lg bg-[var(--surface-tertiary)] hover:bg-[var(--surface-tertiary)] text-white/95 disabled:opacity-50">Cancelar</button>
+          <button disabled={enviando || !necIdFinal || !operationType || faltaDoc} onClick={() => void criar()} className="inline-flex items-center gap-1.5 px-3.5 py-2 text-[12.5px] font-bold rounded-lg bg-[var(--app-background)] text-[#fff] hover:bg-[var(--surface-secondary)] disabled:opacity-50">
             {enviando ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <ArrowLeftRight className="w-3.5 h-3.5" />} Criar operação antecipada
           </button>
         </div>

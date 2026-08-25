@@ -14,7 +14,7 @@ function Inner() {
     <div className="min-h-screen bg-neutral-950 text-neutral-100">
       <HeaderBar title="Financeiro do Processo · V3" subtitle="Motor Financeiro · Ledger" />
       <div className="mx-auto max-w-5xl px-6 py-8">
-        {processoId ? <ProcessoFinanceiroShell processoId={processoId} /> : <div className="text-sm text-neutral-400">Informe ?processoId=&lt;id&gt; na URL.</div>}
+        {processoId ? <ProcessoFinanceiroShell processoId={processoId} /> : <div className="text-sm text-[var(--text-muted)]">Informe ?processoId=&lt;id&gt; na URL.</div>}
       </div>
     </div>
   )

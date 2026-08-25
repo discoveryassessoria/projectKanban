@@ -43,9 +43,9 @@ const CHIPS = [
 ] as const
 
 function statusBadge(status: string) {
-  if (status === "paga") return <span className="text-[11px] px-2 py-0.5 rounded-full bg-green-500/20 text-green-300 border border-green-500/30">Paga</span>
+  if (status === "paga") return <span className="text-[11px] px-2 py-0.5 rounded-full bg-green-50 text-green-700 border border-green-200">Paga</span>
   if (status === "prevista") return <span className="text-[11px] px-2 py-0.5 rounded-full bg-[var(--surface-primary)] text-white/60 border border-[var(--border-strong)]">Prevista</span>
-  return <span className="text-[11px] px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/30">A pagar</span>
+  return <span className="text-[11px] px-2 py-0.5 rounded-full bg-amber-50 text-amber-700 border border-amber-200">A pagar</span>
 }
 
 export default function ComissoesTab() {
@@ -59,7 +59,7 @@ export default function ComissoesTab() {
       .then(r => r.ok ? r.json() : null).then(d => setData(d)).catch(e => console.error(e)).finally(() => setLoading(false))
   }, [])
 
-  if (loading || !data) return <div className="flex items-center justify-center py-24"><Loader2 className="h-8 w-8 animate-spin text-white/50" /></div>
+  if (loading || !data) return <div className="flex items-center justify-center py-24"><Loader2 className="h-8 w-8 animate-spin text-[var(--text-secondary)]" /></div>
 
   const d = data
   const k = d.kpis
@@ -77,20 +77,20 @@ export default function ComissoesTab() {
       {/* Header */}
       <div className="flex items-start justify-between flex-wrap gap-3">
         <div>
-          <h2 className="text-lg font-bold text-white flex items-center gap-2"><Briefcase className="h-5 w-5" /> Comissões <span className="text-[10px] text-white/40 bg-[var(--surface-primary)] px-1.5 py-0.5 rounded font-normal">prévia</span></h2>
+          <h2 className="text-lg font-bold text-white flex items-center gap-2"><Briefcase className="h-5 w-5" /> Comissões <span className="text-[10px] text-[var(--text-muted)] bg-[var(--surface-primary)] px-1.5 py-0.5 rounded font-normal">prévia</span></h2>
           <div className="text-xs text-white/60 mt-1">{d.contagem.todos} comissões · {d.regras.length} regras ativas</div>
         </div>
         <div className="flex items-center gap-2">
           <GlassBtn icon={<FileText className="h-3.5 w-3.5" />}>Gerenciar regras</GlassBtn>
-          <button className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm rounded-lg bg-blue-600 hover:bg-blue-700 text-[#fff]"><Plus className="h-3.5 w-3.5" /> Nova comissão</button>
+          <button className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm rounded-lg bg-[var(--action-primary)] hover:bg-[var(--action-primary-hover)] text-[var(--action-primary-ink)]"><Plus className="h-3.5 w-3.5" /> Nova comissão</button>
         </div>
       </div>
 
       {/* KPIs */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-        <Kpi label="A Pagar (este mês)" value={fmtBRL(k.aPagar)} valueColor="text-amber-400" sub={`${k.qtdAPagar} comissões liberadas`} />
+        <Kpi label="A Pagar (este mês)" value={fmtBRL(k.aPagar)} valueColor="text-amber-700" sub={`${k.qtdAPagar} comissões liberadas`} />
         <Kpi label="Previstas (futuro)" value={fmtBRL(k.previstas)} sub={`${k.qtdPrevistas} aguardando triggers`} />
-        <Kpi label="Pagas (YTD)" value={fmtBRL(k.pagas)} valueColor="text-green-400" sub={`${k.qtdPagas} liquidadas`} />
+        <Kpi label="Pagas (YTD)" value={fmtBRL(k.pagas)} valueColor="text-green-700" sub={`${k.qtdPagas} liquidadas`} />
         <Kpi label="Vendedor Destaque" value={k.destaque} valueSize="text-base" sub={`${fmtBRL(k.totalDestaque)} · ${k.qtdDestaque} comissões`} />
       </div>
 
@@ -102,7 +102,7 @@ export default function ComissoesTab() {
         </div>
         <table className="w-full text-sm min-w-[640px]">
           <thead>
-            <tr className="text-white/40 text-xs border-b border-[var(--border-default)]">
+            <tr className="text-[var(--text-muted)] text-xs border-b border-[var(--border-default)]">
               <th className="text-left font-medium py-1.5">Beneficiário</th>
               <th className="text-left font-medium py-1.5">Tipo</th>
               <th className="text-left font-medium py-1.5">Base de cálculo</th>
@@ -116,12 +116,12 @@ export default function ComissoesTab() {
               <tr key={r.id} className="border-b border-[var(--border-subtle)] last:border-0">
                 <td className="py-2 text-white/90 font-medium">{r.nome}</td>
                 <td className="py-2">
-                  <span className={`text-[11px] px-2 py-0.5 rounded-full border ${r.tipo === "Vendedor" ? "bg-blue-500/20 text-blue-300 border-blue-500/30" : r.tipo === "Parceiro" ? "bg-sky-500/20 text-sky-300 border-sky-500/30" : "bg-[var(--surface-primary)] text-white/60 border-[var(--border-strong)]"}`}>{r.tipo}</span>
+                  <span className={`text-[11px] px-2 py-0.5 rounded-full border ${r.tipo === "Vendedor" ? "bg-blue-50 text-blue-700 border-blue-200" : r.tipo === "Parceiro" ? "bg-sky-50 text-sky-700 border-sky-200" : "bg-[var(--surface-primary)] text-white/60 border-[var(--border-strong)]"}`}>{r.tipo}</span>
                 </td>
                 <td className="py-2 text-white/70">{r.base}</td>
                 <td className="py-2 text-right text-white font-medium">{r.valor}</td>
-                <td className="py-2 text-white/50">{r.aplicacao}</td>
-                <td className="py-2 text-center">{r.ativa ? <span className="text-[11px] px-2 py-0.5 rounded-full bg-green-500/20 text-green-300 border border-green-500/30">Ativa</span> : <span className="text-[11px] px-2 py-0.5 rounded-full bg-[var(--surface-primary)] text-white/50">Inativa</span>}</td>
+                <td className="py-2 text-[var(--text-secondary)]">{r.aplicacao}</td>
+                <td className="py-2 text-center">{r.ativa ? <span className="text-[11px] px-2 py-0.5 rounded-full bg-green-50 text-green-700 border border-green-200">Ativa</span> : <span className="text-[11px] px-2 py-0.5 rounded-full bg-[var(--surface-primary)] text-[var(--text-secondary)]">Inativa</span>}</td>
               </tr>
             ))}
           </tbody>
@@ -146,7 +146,7 @@ export default function ComissoesTab() {
       <div className="bg-[var(--surface-primary)] backdrop-blur-sm border border-[var(--border-default)] rounded-xl p-4 overflow-x-auto">
         <table className="w-full text-sm min-w-[720px]">
           <thead>
-            <tr className="text-white/40 text-xs border-b border-[var(--border-default)]">
+            <tr className="text-[var(--text-muted)] text-xs border-b border-[var(--border-default)]">
               <th className="text-left font-medium py-1.5">Beneficiário</th>
               <th className="text-left font-medium py-1.5">Processo</th>
               <th className="text-right font-medium py-1.5">Base</th>
@@ -161,26 +161,26 @@ export default function ComissoesTab() {
               <tr key={c.id} className="border-b border-[var(--border-subtle)] last:border-0 hover:bg-[var(--surface-hover)]">
                 <td className="py-2">
                   <div className="text-white/90 font-medium">{c.beneficiario}</div>
-                  <div className="text-[11px] text-white/40">{c.papel}</div>
+                  <div className="text-[11px] text-[var(--text-muted)]">{c.papel}</div>
                 </td>
                 <td className="py-2">
                   <div className="text-white/80">{c.processo}</div>
-                  <div className="text-[11px] text-white/40">{c.processoId}</div>
+                  <div className="text-[11px] text-[var(--text-muted)]">{c.processoId}</div>
                 </td>
                 <td className="py-2 text-right text-white/70 tabular-nums">{fmtBRL(c.base)}</td>
                 <td className="py-2 text-right text-white font-medium tabular-nums">{c.pct}% = {fmtBRL(c.valor)}</td>
                 <td className="py-2 text-right tabular-nums">
                   <div className="text-white/80">{fmtDate(c.vencimento)}</div>
-                  <div className="text-[10px] text-white/40">{c.status === "paga" ? "paga em " + fmtDate(c.pagoEm ?? null) : dueText(c.vencimento)}</div>
+                  <div className="text-[10px] text-[var(--text-muted)]">{c.status === "paga" ? "paga em " + fmtDate(c.pagoEm ?? null) : dueText(c.vencimento)}</div>
                 </td>
                 <td className="py-2 text-center">{statusBadge(c.status)}</td>
                 <td className="py-2 text-center">
                   {c.status === "a_pagar" ? (
                     <button className="inline-flex items-center gap-1 px-2 py-1 text-[11px] rounded bg-green-600/80 hover:bg-green-600 text-[#fff]"><Check className="h-3 w-3" /> Pagar</button>
                   ) : c.status === "paga" ? (
-                    <span className="text-[11px] text-green-300">✓ Paga</span>
+                    <span className="text-[11px] text-green-700">✓ Paga</span>
                   ) : (
-                    <span className="text-[11px] text-white/40">prevista</span>
+                    <span className="text-[11px] text-[var(--text-muted)]">prevista</span>
                   )}
                 </td>
               </tr>
@@ -190,7 +190,7 @@ export default function ComissoesTab() {
       </div>
 
       {/* nota de prévia */}
-      <div className="flex items-start gap-2 text-xs text-white/50 bg-[var(--surface-primary)] border border-[var(--border-default)] rounded-lg p-3">
+      <div className="flex items-start gap-2 text-xs text-[var(--text-secondary)] bg-[var(--surface-primary)] border border-[var(--border-default)] rounded-lg p-3">
         <BarChart3 className="h-4 w-4 mt-0.5 shrink-0" />
         <span>Esta aba é uma <strong className="text-white/70">prévia</strong> com dados de exemplo. O módulo de comissões (regras + cálculo automático sobre parcelas pagas) será ligado a uma estrutura própria numa próxima etapa.</span>
       </div>
@@ -209,10 +209,10 @@ function Kpi({ label, value, sub, valueColor = "text-white", valueSize = "text-x
 }) {
   return (
     <div className="rounded-xl border border-[var(--border-default)] bg-[var(--surface-primary)] backdrop-blur-sm p-4 relative">
-      <span className="absolute top-2 right-2 text-[9px] text-white/30 bg-[var(--surface-primary)] px-1.5 py-0.5 rounded">prévia</span>
-      <div className="text-white/50 text-xs font-medium">{label}</div>
+      <span className="absolute top-2 right-2 text-[9px] text-[var(--text-muted)] bg-[var(--surface-primary)] px-1.5 py-0.5 rounded">prévia</span>
+      <div className="text-[var(--text-secondary)] text-xs font-medium">{label}</div>
       <div className={`font-bold mt-1.5 ${valueSize} ${valueColor} truncate`}>{value}</div>
-      {sub && <div className="text-[11px] text-white/40 mt-1 truncate">{sub}</div>}
+      {sub && <div className="text-[11px] text-[var(--text-muted)] mt-1 truncate">{sub}</div>}
     </div>
   )
 }

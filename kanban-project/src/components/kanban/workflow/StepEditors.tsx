@@ -332,7 +332,7 @@ function EditorShell({
               </div>
               <button
                 onClick={onClose}
-                className="w-8 h-8 rounded-md bg-[var(--surface-overlay)] hover:bg-[#252c35] flex items-center justify-center text-[#fff] flex-shrink-0"
+                className="w-8 h-8 rounded-md bg-[var(--surface-overlay)] hover:bg-[var(--surface-tertiary)] flex items-center justify-center text-[#fff] flex-shrink-0"
                 aria-label="Fechar"
               >
                 <X className="w-4 h-4" />
@@ -368,7 +368,7 @@ function Label({
   required?: boolean
 }) {
   return (
-    <label className="block text-[10px] uppercase font-semibold tracking-wider text-white/55 mb-1.5">
+    <label className="block text-[10px] uppercase font-semibold tracking-wider text-[var(--text-secondary)] mb-1.5">
       {children}
       {required && <span className="text-[#d2a948] ml-1">*</span>}
     </label>
@@ -957,7 +957,7 @@ function FormSolicitarCertidao({
           {/* AVISO DO CADASTRO — o que os requisitos configurados ainda cobram. Não
               trava o botão: quem recusa é a porta, com os valores do envio. */}
           {avisosDoCadastro.length > 0 && !readOnly && (
-            <span className="mr-auto text-[11px] text-amber-300/70" title={avisosDoCadastro.join(" · ")}>
+            <span className="mr-auto text-[11px] text-amber-700/70" title={avisosDoCadastro.join(" · ")}>
               {avisosDoCadastro.length === 1 ? avisosDoCadastro[0] : `${avisosDoCadastro.length} requisitos cadastrados pendentes`}
             </span>
           )}
@@ -971,7 +971,7 @@ function FormSolicitarCertidao({
           <button
             onClick={handleSalvar}
             disabled={saving || readOnly || !podeConcluir}
-            className="px-5 py-2 text-[12.5px] font-semibold bg-[#2563eb] hover:bg-[#1d4ed8] disabled:bg-[#2563eb]/40 disabled:opacity-50 disabled:cursor-not-allowed text-[#fff] rounded-md inline-flex items-center gap-2"
+            className="px-5 py-2 text-[12.5px] font-semibold bg-[var(--action-primary)] hover:bg-[var(--action-primary-hover)] disabled:bg-[var(--action-primary)]/40 disabled:opacity-50 disabled:cursor-not-allowed text-[var(--action-primary-ink)] rounded-md inline-flex items-center gap-2"
             title={!podeConcluir ? "Falta: " + errosValidacao.join(", ") : ""}
           >
             {saving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : null}
@@ -985,7 +985,7 @@ function FormSolicitarCertidao({
 
       {loading ? (
         <div className="py-12 flex justify-center">
-          <Loader2 className="w-5 h-5 animate-spin text-white/50" />
+          <Loader2 className="w-5 h-5 animate-spin text-[var(--text-secondary)]" />
         </div>
       ) : doc ? (
         <>
@@ -1044,7 +1044,7 @@ function FormSolicitarCertidao({
                       {refTxt}
                     </div>
                     {doc.nome_registrado && (
-                      <div className="text-[10.5px] text-white/55 mt-1 truncate">
+                      <div className="text-[10.5px] text-[var(--text-secondary)] mt-1 truncate">
                         Nome registrado: {doc.nome_registrado}
                       </div>
                     )}
@@ -1059,7 +1059,7 @@ function FormSolicitarCertidao({
 
             {/* Histórico Discovery × cartório (placeholder por enquanto) */}
             <div className="px-4 pb-3">
-              <div className="text-[10.5px] text-white/45 leading-relaxed">
+              <div className="text-[10.5px] text-[var(--text-secondary)] leading-relaxed">
                 📊 Histórico Discovery × {doc.cartorio || "este cartório"}:{" "}
                 <span className="italic">cálculo de insights na próxima rodada</span>
               </div>
@@ -1097,10 +1097,10 @@ function FormSolicitarCertidao({
           {/* ========================================================== */}
           {/* CANAL DE SOLICITAÇÃO                                        */}
           {/* ========================================================== */}
-          <div className="text-[10px] uppercase font-bold tracking-wider text-white/45 mb-1.5">
+          <div className="text-[10px] uppercase font-bold tracking-wider text-[var(--text-secondary)] mb-1.5">
             1. Canal de solicitação
           </div>
-          <div className="text-[11px] italic text-white/45 mb-3">
+          <div className="text-[11px] italic text-[var(--text-secondary)] mb-3">
             Cada canal exige evidências diferentes — os campos abaixo se ajustam à sua escolha.
           </div>
 
@@ -1116,7 +1116,7 @@ function FormSolicitarCertidao({
                   className={`px-3 py-2.5 rounded-md border text-left transition-all disabled:cursor-not-allowed ${
                     isSelected
                       ? "border-[#7dd3fc]/60 bg-[#7dd3fc]/15 ring-1 ring-[#7dd3fc]/40"
-                      : "border-[var(--border-default)] bg-[var(--surface-overlay)] hover:bg-[#20262e]"
+                      : "border-[var(--border-default)] bg-[var(--surface-overlay)] hover:bg-[var(--surface-secondary)]"
                   }`}
                 >
                   <div className="flex items-center gap-2 mb-0.5">
@@ -1126,7 +1126,7 @@ function FormSolicitarCertidao({
                     </span>
                     {isSelected && <Check className="w-3 h-3 text-[#7dd3fc] ml-auto" />}
                   </div>
-                  <div className="text-[10px] text-white/55 leading-snug">{canal.desc}</div>
+                  <div className="text-[10px] text-[var(--text-secondary)] leading-snug">{canal.desc}</div>
                 </button>
               )
             })}
@@ -1137,7 +1137,7 @@ function FormSolicitarCertidao({
           {/* ========================================================== */}
           {canalConfig && (
             <>
-              <div className="text-[10px] uppercase font-bold tracking-wider text-white/45 mb-3">
+              <div className="text-[10px] uppercase font-bold tracking-wider text-[var(--text-secondary)] mb-3">
                 2. Evidências obrigatórias para canal &quot;{canalConfig.label}&quot;
               </div>
 
@@ -1172,7 +1172,7 @@ function FormSolicitarCertidao({
                         operador vê o que existe em vez de reenviar às cegas. */}
                     {anexoJaRegistrado && (
                       <div className="rounded-md border border-[var(--border-default)] bg-[var(--app-background)] px-2.5 py-2 flex items-center gap-2">
-                        <Paperclip className="w-3.5 h-3.5 text-white/50 flex-shrink-0" />
+                        <Paperclip className="w-3.5 h-3.5 text-[var(--text-secondary)] flex-shrink-0" />
                         <div className="min-w-0 flex-1">
                           <a
                             href={anexoJaRegistrado.url}
@@ -1182,7 +1182,7 @@ function FormSolicitarCertidao({
                           >
                             {anexoJaRegistrado.nome}
                           </a>
-                          <div className="text-[10px] text-white/45">
+                          <div className="text-[10px] text-[var(--text-secondary)]">
                             já registrado nesta etapa
                             {anexoJaRegistrado.documentoMestre
                               ? ` · ${anexoJaRegistrado.documentoMestre.name}${anexoJaRegistrado.documentoMestre.publicCode ? ` (${anexoJaRegistrado.documentoMestre.publicCode})` : ""}`
@@ -1199,7 +1199,7 @@ function FormSolicitarCertidao({
                 {canalConfig.requires.protocol && (
                   <div>
                     <div className="flex items-center gap-1.5 mb-1.5">
-                      <label className="text-[10px] uppercase font-semibold tracking-wider text-white/55">
+                      <label className="text-[10px] uppercase font-semibold tracking-wider text-[var(--text-secondary)]">
                         🏷 Número do protocolo
                       </label>
                       <span className="text-[8.5px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded bg-[#d2a948]/20 text-[#d2a948] border border-[#d2a948]/40">
@@ -1221,7 +1221,7 @@ function FormSolicitarCertidao({
                 {canalConfig.requires.trackingCode && (
                   <div>
                     <div className="flex items-center gap-1.5 mb-1.5">
-                      <label className="text-[10px] uppercase font-semibold tracking-wider text-white/55">
+                      <label className="text-[10px] uppercase font-semibold tracking-wider text-[var(--text-secondary)]">
                         📦 Código de rastreio
                       </label>
                       <span className="text-[8.5px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded bg-[#d2a948]/20 text-[#d2a948] border border-[#d2a948]/40">
@@ -1242,7 +1242,7 @@ function FormSolicitarCertidao({
                 {/* Observação */}
                 <div>
                   <div className="flex items-center gap-1.5 mb-1.5">
-                    <label className="text-[10px] uppercase font-semibold tracking-wider text-white/55">
+                    <label className="text-[10px] uppercase font-semibold tracking-wider text-[var(--text-secondary)]">
                       📝 Observação
                     </label>
                     {canalConfig.requires.observation ? (
@@ -1250,7 +1250,7 @@ function FormSolicitarCertidao({
                         obrigatória
                       </span>
                     ) : (
-                      <span className="text-[8.5px] uppercase tracking-wider text-white/40">
+                      <span className="text-[8.5px] uppercase tracking-wider text-[var(--text-muted)]">
                         opcional
                       </span>
                     )}
@@ -1275,7 +1275,7 @@ function FormSolicitarCertidao({
               {/* ========================================================== */}
               {/* DETALHES DO ENVIO                                           */}
               {/* ========================================================== */}
-              <div className="text-[10px] uppercase font-bold tracking-wider text-white/45 mb-3">
+              <div className="text-[10px] uppercase font-bold tracking-wider text-[var(--text-secondary)] mb-3">
                 3. Detalhes do envio
               </div>
 
@@ -1341,11 +1341,11 @@ function FormSolicitarCertidao({
                     disabled={readOnly}
                     className={inputCls}
                   >
-                    <option value="" className="bg-[#20262e]">
+                    <option value="" className="bg-[var(--surface-secondary)]">
                       — Selecione —
                     </option>
                     {FORMAS_PAGAMENTO.map((fp) => (
-                      <option key={fp.id} value={fp.id} className="bg-[#20262e]">
+                      <option key={fp.id} value={fp.id} className="bg-[var(--surface-secondary)]">
                         {fp.label}
                       </option>
                     ))}
@@ -1361,7 +1361,7 @@ function FormSolicitarCertidao({
                   REFERÊNCIA ao mesmo registro — nenhuma cópia, nenhum upload
                   paralelo. Só leitura: quem anexa nesta etapa é o campo acima. */}
               <div className="mt-5 pt-4 border-t border-[var(--border-default)]">
-                <div className="text-[10px] uppercase font-bold tracking-wider text-white/45 mb-2">
+                <div className="text-[10px] uppercase font-bold tracking-wider text-[var(--text-secondary)] mb-2">
                   4. Anexos desta etapa
                 </div>
                 <AbaAnexosDocumentais documentoId={documentoId} stepInstanceId={stepId} />
@@ -1370,7 +1370,7 @@ function FormSolicitarCertidao({
           )}
         </>
       ) : (
-        <div className="py-12 text-center text-white/55">
+        <div className="py-12 text-center text-[var(--text-secondary)]">
           Documento não encontrado.
         </div>
       )}
@@ -1388,7 +1388,7 @@ function ResumoCard({
 }) {
   return (
     <div className="rounded-lg border border-[var(--border-default)] bg-[var(--surface-overlay)] p-3">
-      <div className="text-[9.5px] uppercase font-bold tracking-wider text-white/45 mb-1.5">
+      <div className="text-[9.5px] uppercase font-bold tracking-wider text-[var(--text-secondary)] mb-1.5">
         {label}
       </div>
       {children}
@@ -1622,7 +1622,7 @@ function FormAguardarRetorno({
             <button
               onClick={salvarAndamento}
               disabled={salvando || concluindo}
-              className="px-4 py-2 text-[12.5px] font-semibold bg-[#20262e] hover:bg-[#252c35] disabled:opacity-50 text-[#fff] rounded-md inline-flex items-center gap-2"
+              className="px-4 py-2 text-[12.5px] font-semibold bg-[var(--surface-secondary)] hover:bg-[var(--surface-tertiary)] disabled:opacity-50 text-[#fff] rounded-md inline-flex items-center gap-2"
             >
               {salvando && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
               Salvar andamento
@@ -1632,7 +1632,7 @@ function FormAguardarRetorno({
             <button
               onClick={concluir}
               disabled={salvando || concluindo}
-              className="px-5 py-2 text-[12.5px] font-semibold bg-[#2563eb] hover:bg-[#1d4ed8] disabled:bg-[#2563eb]/40 disabled:opacity-50 disabled:cursor-not-allowed text-[#fff] rounded-md inline-flex items-center gap-2"
+              className="px-5 py-2 text-[12.5px] font-semibold bg-[var(--action-primary)] hover:bg-[var(--action-primary-hover)] disabled:bg-[var(--action-primary)]/40 disabled:opacity-50 disabled:cursor-not-allowed text-[var(--action-primary-ink)] rounded-md inline-flex items-center gap-2"
             >
               {concluindo ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Check className="w-3.5 h-3.5" />}
               Confirmar retorno · concluir etapa
@@ -1645,7 +1645,7 @@ function FormAguardarRetorno({
 
       {loading ? (
         <div className="py-12 flex justify-center">
-          <Loader2 className="w-5 h-5 animate-spin text-white/50" />
+          <Loader2 className="w-5 h-5 animate-spin text-[var(--text-secondary)]" />
         </div>
       ) : (
         <div className="space-y-5">
@@ -1707,7 +1707,7 @@ function FormAguardarRetorno({
               <span className="text-[11px] font-bold uppercase tracking-wider text-white/60">
                 Protocolo da solicitação
               </span>
-              <span className="ml-auto text-[10px] uppercase tracking-wider text-white/35">somente leitura</span>
+              <span className="ml-auto text-[10px] uppercase tracking-wider text-[var(--text-muted)]">somente leitura</span>
             </div>
             <div className="p-3.5 grid grid-cols-2 gap-x-4 gap-y-2.5 text-[12px]">
               <SummaryField label="Cartório / destinatário" value={solicit.cartorio} />
@@ -1735,7 +1735,7 @@ function FormAguardarRetorno({
                   foi o que fez o arquivo enviado sumir de vista. */}
               {solicit.requerimentoUrl && (
                 <div className="col-span-2">
-                  <div className="text-[10px] uppercase font-semibold tracking-wider text-white/45 mb-0.5">
+                  <div className="text-[10px] uppercase font-semibold tracking-wider text-[var(--text-secondary)] mb-0.5">
                     Requerimento enviado ao cartório
                   </div>
                   <a
@@ -1752,7 +1752,7 @@ function FormAguardarRetorno({
               )}
               {solicit.link && (
                 <div className="col-span-2">
-                  <div className="text-[10px] uppercase font-semibold tracking-wider text-white/45 mb-0.5">
+                  <div className="text-[10px] uppercase font-semibold tracking-wider text-[var(--text-secondary)] mb-0.5">
                     Link de acompanhamento
                   </div>
                   <a
@@ -1768,7 +1768,7 @@ function FormAguardarRetorno({
               )}
               {solicit.observacao && (
                 <div className="col-span-2">
-                  <div className="text-[10px] uppercase font-semibold tracking-wider text-white/45 mb-0.5">
+                  <div className="text-[10px] uppercase font-semibold tracking-wider text-[var(--text-secondary)] mb-0.5">
                     Observação da solicitação
                   </div>
                   <div className="text-[12px] text-white/80 italic">&ldquo;{solicit.observacao}&rdquo;</div>
@@ -1846,9 +1846,9 @@ function FormAguardarRetorno({
                     onChange={(e) => setCanalPref(e.target.value as CanalContato | "")}
                     className={inputCls}
                   >
-                    <option value="" className="bg-[#20262e]">—</option>
+                    <option value="" className="bg-[var(--surface-secondary)]">—</option>
                     {CANAIS_CONTATO.map((c) => (
-                      <option key={c} value={c} className="bg-[#20262e]">
+                      <option key={c} value={c} className="bg-[var(--surface-secondary)]">
                         {LABEL_CANAL[c]}
                       </option>
                     ))}
@@ -1888,7 +1888,7 @@ function FormAguardarRetorno({
           {/* OBSERVAÇÕES e ANEXOS — os MESMOS registros das abas do documento,
               escopados a esta etapa. Não existe cópia local do dado. */}
           <div>
-            <div className="text-[11px] font-bold uppercase tracking-wider text-white/55 mb-2">Observações</div>
+            <div className="text-[11px] font-bold uppercase tracking-wider text-[var(--text-secondary)] mb-2">Observações</div>
             <AbaObservacoesDocumentais
               documentoId={documentoId}
               stepInstanceId={stepId}
@@ -1897,7 +1897,7 @@ function FormAguardarRetorno({
           </div>
 
           <div>
-            <div className="text-[11px] font-bold uppercase tracking-wider text-white/55 mb-2">Anexos e comprovantes</div>
+            <div className="text-[11px] font-bold uppercase tracking-wider text-[var(--text-secondary)] mb-2">Anexos e comprovantes</div>
             <AbaAnexosDocumentais
               documentoId={documentoId}
               stepInstanceId={stepId}
@@ -1965,7 +1965,7 @@ function InformarProtocoloInline({
       {!aberto ? (
         <button
           onClick={() => setAberto(true)}
-          className="px-2.5 py-1 text-[11px] font-semibold bg-[#20262e] hover:bg-[#252c35] text-white/85 rounded"
+          className="px-2.5 py-1 text-[11px] font-semibold bg-[var(--surface-secondary)] hover:bg-[var(--surface-tertiary)] text-white/85 rounded"
         >
           {jaTemProtocolo ? "+ Informar novo protocolo" : "+ Informar protocolo"}
         </button>
@@ -1982,7 +1982,7 @@ function InformarProtocoloInline({
           <button
             onClick={registrar}
             disabled={salvando || !numero.trim()}
-            className="px-3 py-1.5 text-[11px] font-semibold bg-[#2563eb] hover:bg-[#1d4ed8] disabled:opacity-50 text-[#fff] rounded inline-flex items-center gap-1.5"
+            className="px-3 py-1.5 text-[11px] font-semibold bg-[var(--action-primary)] hover:bg-[var(--action-primary-hover)] disabled:opacity-50 text-[var(--action-primary-ink)] rounded inline-flex items-center gap-1.5"
           >
             {salvando && <Loader2 className="w-3 h-3 animate-spin" />}
             Registrar
@@ -2002,10 +2002,10 @@ function InformarProtocoloInline({
 
 function TituloAcompanhamento() {
   return (
-    <div className="text-[11px] font-bold uppercase tracking-wider text-white/55 flex items-center gap-1.5 mb-2">
+    <div className="text-[11px] font-bold uppercase tracking-wider text-[var(--text-secondary)] flex items-center gap-1.5 mb-2">
       <Clock className="w-3.5 h-3.5" />
       Acompanhamento
-      <span className="ml-1 text-[9.5px] font-medium normal-case tracking-normal text-white/35">
+      <span className="ml-1 text-[9.5px] font-medium normal-case tracking-normal text-[var(--text-muted)]">
         nenhum campo é obrigatório para salvar
       </span>
     </div>
@@ -2043,12 +2043,12 @@ function SummaryField({
 }) {
   return (
     <div>
-      <div className="text-[10px] uppercase font-semibold tracking-wider text-white/45 mb-0.5">
+      <div className="text-[10px] uppercase font-semibold tracking-wider text-[var(--text-secondary)] mb-0.5">
         {label}
       </div>
       <div
         className={`text-[12px] ${mono ? "font-mono" : ""} ${
-          value ? "text-white/90" : "text-white/30 italic"
+          value ? "text-white/90" : "text-[var(--text-muted)] italic"
         }`}
       >
         {value || "—"}
@@ -2258,7 +2258,7 @@ function FormReceberCertidao({
           <button
             onClick={handleSalvar}
             disabled={saving || readOnly || !podeConcluir}
-            className="px-5 py-2 text-[12.5px] font-semibold bg-[#2563eb] hover:bg-[#1d4ed8] disabled:bg-[#2563eb]/40 disabled:opacity-50 disabled:cursor-not-allowed text-[#fff] rounded-md inline-flex items-center gap-2"
+            className="px-5 py-2 text-[12.5px] font-semibold bg-[var(--action-primary)] hover:bg-[var(--action-primary-hover)] disabled:bg-[var(--action-primary)]/40 disabled:opacity-50 disabled:cursor-not-allowed text-[var(--action-primary-ink)] rounded-md inline-flex items-center gap-2"
           >
             {saving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Upload className="w-3.5 h-3.5" />}
             Confirmar recebimento · concluir etapa
@@ -2271,7 +2271,7 @@ function FormReceberCertidao({
 
       {loading ? (
         <div className="py-12 flex justify-center">
-          <Loader2 className="w-5 h-5 animate-spin text-white/50" />
+          <Loader2 className="w-5 h-5 animate-spin text-[var(--text-secondary)]" />
         </div>
       ) : (
         <div className="space-y-5">
@@ -2279,7 +2279,7 @@ function FormReceberCertidao({
               1. ANEXO DA CERTIDÃO
              ═══════════════════════════════════════════════════════ */}
           <div>
-            <div className="text-[10px] uppercase font-bold tracking-wider text-white/45 mb-2">
+            <div className="text-[10px] uppercase font-bold tracking-wider text-[var(--text-secondary)] mb-2">
               1. Anexo da certidão
             </div>
             <FileUploadField
@@ -2309,14 +2309,14 @@ function FormReceberCertidao({
              ═══════════════════════════════════════════════════════ */}
           <div>
             <div className="flex items-center gap-1.5 mb-2">
-              <div className="text-[10px] uppercase font-bold tracking-wider text-white/45">
+              <div className="text-[10px] uppercase font-bold tracking-wider text-[var(--text-secondary)]">
                 2. Tipo de mídia
               </div>
               <span className="text-[8.5px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded bg-[#d2a948]/20 text-[#d2a948] border border-[#d2a948]/40">
                 obrigatório
               </span>
             </div>
-            <div className="text-[11px] text-white/55 mb-2 leading-snug">
+            <div className="text-[11px] text-[var(--text-secondary)] mb-2 leading-snug">
               Marque se a certidão recebida é física (papel original) ou digital (arquivo eletrônico com assinatura).
             </div>
             <div className="grid gap-2">
@@ -2331,7 +2331,7 @@ function FormReceberCertidao({
                     className={`text-left px-3.5 py-2.5 rounded-md border transition-all disabled:cursor-not-allowed ${
                       ativo
                         ? "border-[#4ade80]/60 bg-[#4ade80]/10 ring-1 ring-[#4ade80]/30"
-                        : "border-[var(--border-default)] bg-[var(--surface-overlay)] hover:bg-[#20262e]"
+                        : "border-[var(--border-default)] bg-[var(--surface-overlay)] hover:bg-[var(--surface-secondary)]"
                     }`}
                   >
                     <div className="flex items-start gap-3">
@@ -2355,7 +2355,7 @@ function FormReceberCertidao({
                           <span>{opt.icon}</span>
                           <span>{opt.label}</span>
                         </div>
-                        <div className="text-[10.5px] text-white/55 mt-0.5 leading-snug">
+                        <div className="text-[10.5px] text-[var(--text-secondary)] mt-0.5 leading-snug">
                           {opt.desc}
                         </div>
                       </div>
@@ -2380,7 +2380,7 @@ function FormReceberCertidao({
                 disabled={readOnly}
                 className={inputCls}
               />
-              <div className="text-[10.5px] text-white/55 mt-1.5 italic leading-snug">
+              <div className="text-[10.5px] text-[var(--text-secondary)] mt-1.5 italic leading-snug">
                 Onde o documento físico está guardado fisicamente no escritório? Essencial pra recuperação futura.
               </div>
             </div>
@@ -2722,12 +2722,12 @@ function FormConferirCertidao({
             disabled={saving || readOnly || !podeConcluir}
             className={`px-5 py-2 text-[12.5px] font-semibold disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-md inline-flex items-center gap-2 ${
               resultado === "aprovado"
-                ? "bg-[#2563eb] hover:bg-[#1d4ed8] disabled:bg-[#2563eb]/40"
+                ? "bg-[var(--action-primary)] hover:bg-[var(--action-primary-hover)] disabled:bg-[var(--action-primary)]/40"
                 : resultado === "divergente"
                 ? "bg-[#d2a948] hover:bg-[#d2a948]/15 disabled:bg-[#d2a948]/15"
                 : resultado === "nova_via"
                 ? "bg-rose-500 hover:bg-rose-600 disabled:bg-rose-900"
-                : "bg-[#20262e]0 disabled:bg-[#20262e]"
+                : "bg-[var(--surface-secondary)]0 disabled:bg-[var(--surface-secondary)]"
             }`}
           >
             {saving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <FileCheck className="w-3.5 h-3.5" />}
@@ -2741,7 +2741,7 @@ function FormConferirCertidao({
 
       {loading ? (
         <div className="py-12 flex justify-center">
-          <Loader2 className="w-5 h-5 animate-spin text-white/50" />
+          <Loader2 className="w-5 h-5 animate-spin text-[var(--text-secondary)]" />
         </div>
       ) : (
         <div className="space-y-5">
@@ -2768,10 +2768,10 @@ function FormConferirCertidao({
               1. DADOS LITERAIS DO DOCUMENTO
              ═══════════════════════════════════════════════════════ */}
           <div>
-            <div className="text-[10px] uppercase font-bold tracking-wider text-white/45 mb-1.5">
+            <div className="text-[10px] uppercase font-bold tracking-wider text-[var(--text-secondary)] mb-1.5">
               1. Dados literais do documento
             </div>
-            <div className="text-[11px] text-white/55 leading-snug mb-2">
+            <div className="text-[11px] text-[var(--text-secondary)] leading-snug mb-2">
               Digite <strong>EXATAMENTE</strong> como aparece na certidão. Divergências
               de nomes com a árvore vão ser detectadas e tratadas no fluxo de validação jurídica.
             </div>
@@ -2865,10 +2865,10 @@ function FormConferirCertidao({
               2. CHECKLIST OPERACIONAL
              ═══════════════════════════════════════════════════════ */}
           <div>
-            <div className="text-[10px] uppercase font-bold tracking-wider text-white/45 mb-1.5">
+            <div className="text-[10px] uppercase font-bold tracking-wider text-[var(--text-secondary)] mb-1.5">
               2. Checklist de inspeção
             </div>
-            <div className="text-[11px] text-white/55 leading-snug mb-2">
+            <div className="text-[11px] text-[var(--text-secondary)] leading-snug mb-2">
               Marque cada item conforme a inspeção do documento.
             </div>
             <div className="space-y-2">
@@ -2885,7 +2885,7 @@ function FormConferirCertidao({
                     className={`w-full text-left px-3 py-2.5 rounded-md border transition-all disabled:cursor-not-allowed ${
                       isChecked
                         ? "border-[#4ade80]/40 bg-[#4ade80]/10"
-                        : "border-[var(--border-default)] bg-[var(--surface-overlay)] hover:bg-[#20262e]"
+                        : "border-[var(--border-default)] bg-[var(--surface-overlay)] hover:bg-[var(--surface-secondary)]"
                     }`}
                   >
                     <div className="flex items-start gap-3">
@@ -2908,7 +2908,7 @@ function FormConferirCertidao({
                         >
                           {item.label}
                         </div>
-                        <div className="text-[10.5px] text-white/55 mt-0.5 leading-snug">
+                        <div className="text-[10.5px] text-[var(--text-secondary)] mt-0.5 leading-snug">
                           {item.desc}
                         </div>
                       </div>
@@ -2923,10 +2923,10 @@ function FormConferirCertidao({
               3. RESULTADO DA CONFERÊNCIA
              ═══════════════════════════════════════════════════════ */}
           <div>
-            <div className="text-[10px] uppercase font-bold tracking-wider text-white/45 mb-1.5">
+            <div className="text-[10px] uppercase font-bold tracking-wider text-[var(--text-secondary)] mb-1.5">
               3. Resultado da conferência
             </div>
-            <div className="text-[11px] text-white/55 leading-snug mb-2">
+            <div className="text-[11px] text-[var(--text-secondary)] leading-snug mb-2">
               {usandoCadastroConferencia
                 ? "Os resultados abaixo são os cadastrados para esta etapa nesta versão do workflow."
                 : "Se aprovado, o documento segue para validação jurídica final."}
@@ -3027,12 +3027,12 @@ function ResultadoBtn({
     <button
       onClick={onClick}
       className={`px-3 py-3 rounded-md border text-center transition-all ${
-        ativo ? cls.ativo + " ring-1 ring-current/40" : "border-[var(--border-default)] bg-[var(--surface-overlay)] hover:bg-[#20262e] text-white/80"
+        ativo ? cls.ativo + " ring-1 ring-current/40" : "border-[var(--border-default)] bg-[var(--surface-overlay)] hover:bg-[var(--surface-secondary)] text-white/80"
       }`}
     >
       <div className={`flex justify-center mb-1.5 ${ativo ? cls.icon : "text-white/60"}`}>{icon}</div>
       <div className="text-[12.5px] font-semibold mb-0.5">{label}</div>
-      <div className={`text-[10px] ${ativo ? "opacity-90" : "text-white/50"}`}>{desc}</div>
+      <div className={`text-[10px] ${ativo ? "opacity-90" : "text-[var(--text-secondary)]"}`}>{desc}</div>
     </button>
   )
 }
@@ -3346,14 +3346,14 @@ function FormValidarCertidao({
             disabled={saving || readOnly || !podeConcluir}
             className={`px-5 py-2 text-[12.5px] font-semibold disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-md inline-flex items-center gap-2 ${
               decisao === "aprovado"
-                ? "bg-[#2563eb] hover:bg-[#1d4ed8] disabled:bg-[#2563eb]/40"
+                ? "bg-[var(--action-primary)] hover:bg-[var(--action-primary-hover)] disabled:bg-[var(--action-primary)]/40"
                 : decisao === "aprovado_ressalvas"
                 ? "bg-[#7dd3fc] hover:bg-[#7dd3fc] disabled:bg-[#7dd3fc]/15"
                 : decisao === "nova_via"
                 ? "bg-[#d2a948] hover:bg-[#d2a948]/15 disabled:bg-[#d2a948]/15"
                 : decisao === "rejeitado"
-                ? "bg-[#2563eb] hover:bg-[#1d4ed8] disabled:bg-[#2563eb]/40"
-                : "bg-[#20262e]0 disabled:bg-[#20262e]"
+                ? "bg-[var(--action-primary)] hover:bg-[var(--action-primary-hover)] disabled:bg-[var(--action-primary)]/40"
+                : "bg-[var(--surface-secondary)]0 disabled:bg-[var(--surface-secondary)]"
             }`}
           >
             {saving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Scale className="w-3.5 h-3.5" />}
@@ -3367,7 +3367,7 @@ function FormValidarCertidao({
 
       {loading ? (
         <div className="py-12 flex justify-center">
-          <Loader2 className="w-5 h-5 animate-spin text-white/50" />
+          <Loader2 className="w-5 h-5 animate-spin text-[var(--text-secondary)]" />
         </div>
       ) : (
         <div className="space-y-5">
@@ -3383,18 +3383,18 @@ function FormValidarCertidao({
             </div>
             <div className="p-3.5 grid grid-cols-2 gap-x-4 gap-y-2.5 text-[12px]">
               <div>
-                <div className="text-[10px] uppercase font-semibold tracking-wider text-white/45 mb-0.5">
+                <div className="text-[10px] uppercase font-semibold tracking-wider text-[var(--text-secondary)] mb-0.5">
                   Documento
                 </div>
                 <div className="text-[12px] text-white/90 font-medium">
                   {docTipo || "—"}
                 </div>
                 {pessoaNome && (
-                  <div className="text-[10.5px] text-white/55 mt-0.5">{pessoaNome}</div>
+                  <div className="text-[10.5px] text-[var(--text-secondary)] mt-0.5">{pessoaNome}</div>
                 )}
               </div>
               <div>
-                <div className="text-[10px] uppercase font-semibold tracking-wider text-white/45 mb-0.5">
+                <div className="text-[10px] uppercase font-semibold tracking-wider text-[var(--text-secondary)] mb-0.5">
                   Anexo
                 </div>
                 {arquivoUrl ? (
@@ -3408,18 +3408,18 @@ function FormValidarCertidao({
                     <ExternalLink className="w-2.5 h-2.5 flex-shrink-0" />
                   </a>
                 ) : (
-                  <div className="text-[12px] text-white/30 italic">Sem anexo</div>
+                  <div className="text-[12px] text-[var(--text-muted)] italic">Sem anexo</div>
                 )}
               </div>
               <div className="col-span-2">
-                <div className="text-[10px] uppercase font-semibold tracking-wider text-white/45 mb-0.5">
+                <div className="text-[10px] uppercase font-semibold tracking-wider text-[var(--text-secondary)] mb-0.5">
                   Resultado da conferência operacional
                 </div>
                 <div className="text-[12.5px] text-white/90 font-medium">
                   {conferenciaLabel(conferencia?.resultado ?? null)}
                 </div>
                 {conferencia?.completedBy && (
-                  <div className="text-[10.5px] text-white/55 mt-0.5">
+                  <div className="text-[10.5px] text-[var(--text-secondary)] mt-0.5">
                     Por <strong className="text-white/75">{conferencia.completedBy}</strong>
                     {conferencia.completedAt && (
                       <span> em {fmtDateTime(conferencia.completedAt)}</span>
@@ -3439,7 +3439,7 @@ function FormValidarCertidao({
               2. DECISÃO JURÍDICA
              ═══════════════════════════════════════════════════════ */}
           <div>
-            <div className="text-[10px] uppercase font-bold tracking-wider text-white/45 mb-2">
+            <div className="text-[10px] uppercase font-bold tracking-wider text-[var(--text-secondary)] mb-2">
               1. Decisão
             </div>
             <div className="space-y-2">
@@ -3472,7 +3472,7 @@ function FormValidarCertidao({
                     className={`w-full text-left px-3.5 py-2.5 rounded-md border transition-all disabled:cursor-not-allowed ${
                       ativo
                         ? colorMap[opt.cor]
-                        : "border-[var(--border-default)] bg-[var(--surface-overlay)] hover:bg-[#20262e]"
+                        : "border-[var(--border-default)] bg-[var(--surface-overlay)] hover:bg-[var(--surface-secondary)]"
                     }`}
                   >
                     <div className="flex items-start gap-3">
@@ -3490,7 +3490,7 @@ function FormValidarCertidao({
                           <span className={iconColorMap[opt.cor]}>{opt.icon}</span>
                           <span>{opt.label}</span>
                         </div>
-                        <div className="text-[10.5px] text-white/55 mt-0.5 leading-snug">
+                        <div className="text-[10.5px] text-[var(--text-secondary)] mt-0.5 leading-snug">
                           {opt.desc}
                         </div>
                       </div>
@@ -3515,7 +3515,7 @@ function FormValidarCertidao({
                 </span>
               )}
               {!precisaParecer && decisao && (
-                <span className="text-[10px] text-white/45 italic">opcional</span>
+                <span className="text-[10px] text-[var(--text-secondary)] italic">opcional</span>
               )}
             </div>
             <textarea
@@ -3680,7 +3680,7 @@ function FileUploadField({
     <div>
       {/* Label */}
       <div className="flex items-center gap-1.5 mb-1.5">
-        <label className="text-[10px] uppercase font-semibold tracking-wider text-white/55">
+        <label className="text-[10px] uppercase font-semibold tracking-wider text-[var(--text-secondary)]">
           {label}
         </label>
         {required && (
@@ -3708,14 +3708,14 @@ function FileUploadField({
             <Loader2 className="w-3.5 h-3.5 animate-spin text-[#7dd3fc] flex-shrink-0" />
             <div className="flex-1 min-w-0">
               <div className="text-[12px] text-white truncate">{fileName}</div>
-              <div className="text-[10px] text-white/55">
+              <div className="text-[10px] text-[var(--text-secondary)]">
                 Enviando... {progress}% · {formatBytes(fileSize)}
               </div>
             </div>
           </div>
-          <div className="h-1 bg-[#20262e] rounded-full overflow-hidden">
+          <div className="h-1 bg-[var(--surface-secondary)] rounded-full overflow-hidden">
             <div
-              className="h-full bg-[#2563eb] transition-all"
+              className="h-full bg-[var(--action-primary)] transition-all"
               style={{ width: `${progress}%` }}
             />
           </div>
@@ -3729,7 +3729,7 @@ function FileUploadField({
               <div className="text-[12px] text-white truncate font-medium">
                 {displayName || "Arquivo enviado"}
               </div>
-              <div className="text-[10px] text-white/55 flex items-center gap-2">
+              <div className="text-[10px] text-[var(--text-secondary)] flex items-center gap-2">
                 {fileSize != null && <span>{formatBytes(fileSize)}</span>}
                 <a
                   href={value}
@@ -3746,7 +3746,7 @@ function FileUploadField({
                 <button
                   type="button"
                   onClick={openPicker}
-                  className="text-[10.5px] font-semibold px-2 py-1 bg-[#20262e] hover:bg-[#252c35] rounded text-[#fff]"
+                  className="text-[10.5px] font-semibold px-2 py-1 bg-[var(--surface-secondary)] hover:bg-[var(--surface-tertiary)] rounded text-[#fff]"
                 >
                   Trocar
                 </button>
@@ -3768,7 +3768,7 @@ function FileUploadField({
           type="button"
           onClick={openPicker}
           disabled={disabled}
-          className={`w-full px-3 py-3.5 bg-[var(--surface-overlay)] border border-dashed rounded-md text-left hover:bg-[#20262e] transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${
+          className={`w-full px-3 py-3.5 bg-[var(--surface-overlay)] border border-dashed rounded-md text-left hover:bg-[var(--surface-secondary)] transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${
             invalid ? "border-[#d2a948]/40" : "border-[var(--border-default)]"
           }`}
         >
@@ -3778,7 +3778,7 @@ function FileUploadField({
               <div className="text-[12px] text-white/85 font-medium">
                 Selecionar arquivo
               </div>
-              <div className="text-[10px] text-white/45 mt-0.5">
+              <div className="text-[10px] text-[var(--text-secondary)] mt-0.5">
                 PNG, JPG, PDF, DOC, XLS · máx 64MB
               </div>
             </div>
@@ -3892,7 +3892,7 @@ function FormPadrao({
             <button
               onClick={concluir}
               disabled={concluindo}
-              className="px-5 py-2 text-[12.5px] font-semibold bg-[#2563eb] hover:bg-[#1d4ed8] disabled:opacity-50 disabled:cursor-not-allowed text-[#fff] rounded-md inline-flex items-center gap-2"
+              className="px-5 py-2 text-[12.5px] font-semibold bg-[var(--action-primary)] hover:bg-[var(--action-primary-hover)] disabled:opacity-50 disabled:cursor-not-allowed text-[var(--action-primary-ink)] rounded-md inline-flex items-center gap-2"
             >
               {concluindo ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Check className="w-3.5 h-3.5" />}
               Concluir etapa
@@ -3905,7 +3905,7 @@ function FormPadrao({
 
       {loading ? (
         <div className="py-12 flex justify-center">
-          <Loader2 className="w-5 h-5 animate-spin text-white/50" />
+          <Loader2 className="w-5 h-5 animate-spin text-[var(--text-secondary)]" />
         </div>
       ) : (
         <div className="space-y-5">
@@ -3927,7 +3927,7 @@ function FormPadrao({
           {/* OBSERVAÇÕES e ANEXOS — os MESMOS registros das abas do documento,
               escopados a esta etapa. Não existe cópia local do dado. */}
           <div>
-            <div className="text-[11px] font-bold uppercase tracking-wider text-white/55 mb-2">Observações</div>
+            <div className="text-[11px] font-bold uppercase tracking-wider text-[var(--text-secondary)] mb-2">Observações</div>
             <AbaObservacoesDocumentais
               documentoId={documentoId}
               stepInstanceId={stepId}
@@ -3936,7 +3936,7 @@ function FormPadrao({
           </div>
 
           <div>
-            <div className="text-[11px] font-bold uppercase tracking-wider text-white/55 mb-2">Anexos e comprovantes</div>
+            <div className="text-[11px] font-bold uppercase tracking-wider text-[var(--text-secondary)] mb-2">Anexos e comprovantes</div>
             <AbaAnexosDocumentais
               documentoId={documentoId}
               stepInstanceId={stepId}

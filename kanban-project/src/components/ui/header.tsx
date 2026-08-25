@@ -99,10 +99,10 @@ export function Header({
             {showSearchResults && (
               <div className="absolute top-full mt-2 left-0 right-0 w-80 bg-[var(--surface-primary)] border border-gray-200 rounded-xl shadow-2xl overflow-hidden z-50">
                 {searchResults.length === 0 ? (
-                  <div className="px-4 py-6 text-center text-gray-400">
+                  <div className="px-4 py-6 text-center text-[var(--text-muted)]">
                     <Search className="h-8 w-8 mx-auto mb-2 opacity-50" />
                     <p className="text-sm text-gray-600">Nenhum resultado encontrado</p>
-                    <p className="text-xs mt-1 text-gray-400">Tente buscar por outro termo</p>
+                    <p className="text-xs mt-1 text-[var(--text-muted)]">Tente buscar por outro termo</p>
                   </div>
                 ) : (
                   <div className="max-h-80 overflow-y-auto">
@@ -123,7 +123,7 @@ export function Header({
                         </div>
                         <div className="flex-1 min-w-0">
                           <p className="text-sm text-gray-800 truncate">{result.title}</p>
-                          <p className="text-[10px] text-gray-400 truncate">{result.subtitle || "Sem descrição"}</p>
+                          <p className="text-[10px] text-[var(--text-muted)] truncate">{result.subtitle || "Sem descrição"}</p>
                         </div>
                       </button>
                     ))}
@@ -152,9 +152,9 @@ export function Header({
                 </div>
 
                 <div className="px-4 py-8 text-center">
-                  <Bell className="h-10 w-10 mx-auto mb-2 text-gray-300" />
+                  <Bell className="h-10 w-10 mx-auto mb-2 text-[var(--text-muted)]" />
                   <p className="text-sm text-gray-500">Nenhuma notificação</p>
-                  <p className="text-xs text-gray-400 mt-1">Você está em dia!</p>
+                  <p className="text-xs text-[var(--text-muted)] mt-1">Você está em dia!</p>
                 </div>
               </div>
             )}
@@ -184,7 +184,7 @@ export function Header({
             variant="outline"
             size="sm"
             onClick={handleLogout}
-            className="border-[var(--border-strong)] text-xs bg-transparent hover:bg-red-500/20 hover:border-red-400/50 text-[#fff] hover:text-red-400 flex items-center justify-center gap-1.5"
+            className="border-[var(--border-strong)] text-xs bg-transparent hover:bg-red-50 hover:border-red-200 text-[#fff] hover:text-red-700 flex items-center justify-center gap-1.5"
           >
             <LogOut className="h-3 w-3" />
             Sair

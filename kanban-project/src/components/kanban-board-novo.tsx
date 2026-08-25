@@ -335,7 +335,7 @@ export function KanbanBoard({
           <h3 className="text-lg font-medium text-white flex items-center gap-2">
             {pais.flag && <span className="text-xl">{pais.flag}</span>}
             Processos - {pais.countryLabel}
-            <span className="text-sm font-normal text-white/50">· {tipo.name}</span>
+            <span className="text-sm font-normal text-[var(--text-secondary)]">· {tipo.name}</span>
           </h3>
           <p className="text-sm text-white/70">
             Arraste e solte os processos entre as fases
@@ -352,7 +352,7 @@ export function KanbanBoard({
       </div>
 
       {fases.length === 0 ? (
-        <div className="rounded-lg border border-amber-500/30 bg-amber-500/10 p-6 text-center text-sm text-amber-200">
+        <div className="rounded-lg border border-amber-200 bg-amber-50 p-6 text-center text-sm text-amber-700">
           Este tipo de processo ainda não tem fases configuradas.
           Monte o workflow em Gerenciamento → Workflows e Fases → Workflow Macro.
         </div>
@@ -415,7 +415,7 @@ export function KanbanBoard({
           <div className="w-full max-w-md overflow-auto rounded-2xl border border-[var(--border-default)] bg-zinc-900/95 shadow-2xl">
             <div className="flex items-center justify-between border-b border-[var(--border-default)] px-6 py-4">
               <h3 className="text-lg font-semibold text-white">Novo processo</h3>
-              <button onClick={() => setCriarModal(false)} className="text-white/40 transition hover:text-white">✕</button>
+              <button onClick={() => setCriarModal(false)} className="text-[var(--text-muted)] transition hover:text-white">✕</button>
             </div>
 
             <div className="space-y-4 px-6 py-4">
@@ -431,13 +431,13 @@ export function KanbanBoard({
                 />
               </div>
 
-              <p className="text-xs text-white/40">
+              <p className="text-xs text-[var(--text-muted)]">
                 Tipo: <span className="text-white/70">{tipo.name}</span> — o processo nasce na primeira fase
                 {fases[0] ? ` (${fases[0].label})` : ""} e já entra no motor.
               </p>
 
               {erroCriar && (
-                <div className="rounded-lg border border-red-500/30 bg-red-500/10 p-3 text-sm text-red-200">{erroCriar}</div>
+                <div className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700">{erroCriar}</div>
               )}
             </div>
 
@@ -496,7 +496,7 @@ export function KanbanBoard({
             <div className="flex justify-end mt-4">
               <button
                 onClick={() => setAviso(null)}
-                className="text-[12.5px] font-bold px-3.5 py-1.5 rounded-lg bg-[#252c35] text-white/95 hover:bg-[#2d353f]"
+                className="text-[12.5px] font-bold px-3.5 py-1.5 rounded-lg bg-[var(--surface-tertiary)] text-white/95 hover:bg-[var(--surface-tertiary)]"
               >
                 Fechar
               </button>

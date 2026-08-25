@@ -136,7 +136,7 @@ const rotuloDocumento = (d: { publicCode?: string | null; tipo?: string | null; 
 }
 
 const SEM_PROTOCOLOS: Protocolo[] = []
-const INPUT = "w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-orange-500"
+const INPUT = "w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-amber-500"
 
 const FORM_VAZIO = {
   tipoPessoa: "contratante" as "contratante" | "requerente",
@@ -440,10 +440,10 @@ export function ProcessoProtocolos({
       {/* Header */}
       <div className="flex items-center justify-between px-6 py-4 border-b border-[var(--border-default)] flex-shrink-0">
         <div className="flex items-center gap-2">
-          <FileText className="h-5 w-5 text-orange-600" />
+          <FileText className="h-5 w-5 text-amber-600" />
           <h3 className="font-semibold text-white/95">Protocolos</h3>
           {protocolos.length > 0 && (
-            <span className="px-2 py-0.5 bg-orange-100 text-orange-600 text-xs font-medium rounded-full">
+            <span className="px-2 py-0.5 bg-amber-100 text-amber-600 text-xs font-medium rounded-full">
               {protocolos.length}
             </span>
           )}
@@ -454,7 +454,7 @@ export function ProcessoProtocolos({
             setShowForm(true)
           }}
           size="sm"
-          className={`bg-orange-600 hover:bg-orange-700 ${!podeEditar || protocolos.length === 0 ? 'hidden' : ''}`}
+          className={`bg-amber-600 hover:bg-amber-700 ${!podeEditar || protocolos.length === 0 ? 'hidden' : ''}`}
         >
           <Plus className="h-4 w-4 mr-1" />
           Registrar protocolo
@@ -465,7 +465,7 @@ export function ProcessoProtocolos({
       <div className="flex-1 overflow-y-auto p-6">
         {loading ? (
           <div className="flex items-center justify-center py-12">
-            <Loader2 className="h-6 w-6 animate-spin text-gray-400" />
+            <Loader2 className="h-6 w-6 animate-spin text-[var(--text-muted)]" />
           </div>
         ) : showForm ? (
           /* ===== FORMULÁRIO ===== */
@@ -476,7 +476,7 @@ export function ProcessoProtocolos({
               </h4>
               <button
                 onClick={resetForm}
-                className="text-gray-400 hover:text-white/70"
+                className="text-[var(--text-muted)] hover:text-white/70"
               >
                 <X className="h-5 w-5" />
               </button>
@@ -638,13 +638,13 @@ export function ProcessoProtocolos({
                   Documentos enviados
                 </label>
                 {(opcoes?.documentos ?? []).length === 0 ? (
-                  <p className="text-xs text-gray-400 border border-dashed border-[var(--border-default)] rounded-md p-3">
+                  <p className="text-xs text-[var(--text-muted)] border border-dashed border-[var(--border-default)] rounded-md p-3">
                     Nenhum documento disponível neste processo.
                   </p>
                 ) : (
                   <div className="max-h-44 overflow-y-auto border border-[var(--border-default)] rounded-md divide-y divide-gray-100">
                     {(opcoes?.documentos ?? []).map((d) => (
-                      <label key={d.id} className="flex items-start gap-2 px-3 py-2 text-sm text-white/95 hover:bg-[#252c35] cursor-pointer">
+                      <label key={d.id} className="flex items-start gap-2 px-3 py-2 text-sm text-white/95 hover:bg-[var(--surface-tertiary)] cursor-pointer">
                         <input
                           type="checkbox"
                           checked={form.documentoIds.includes(d.id)}
@@ -685,7 +685,7 @@ export function ProcessoProtocolos({
                 <Button
                   onClick={handleSalvar}
                   disabled={salvando}
-                  className="flex-1 bg-orange-600 hover:bg-orange-700"
+                  className="flex-1 bg-amber-600 hover:bg-amber-700"
                 >
                   {salvando && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
                   {editando ? "Salvar alterações" : "Registrar protocolo"}
@@ -703,7 +703,7 @@ export function ProcessoProtocolos({
         ) : protocolos.length === 0 ? (
           /* ===== EMPTY STATE ===== */
           <div className="text-center py-12">
-            <FileText className="h-12 w-12 mx-auto mb-4 text-gray-300" />
+            <FileText className="h-12 w-12 mx-auto mb-4 text-[var(--text-muted)]" />
             <h3 className="text-lg font-medium text-white/95">Nenhuma protocolização registrada</h3>
             <p className="text-sm text-white/70 mt-1 mb-4">
               {podeEditar
@@ -714,7 +714,7 @@ export function ProcessoProtocolos({
             {podeEditar && (
               <Button
                 onClick={() => setShowForm(true)}
-                className="bg-orange-600 hover:bg-orange-700"
+                className="bg-amber-600 hover:bg-amber-700"
               >
                 <Plus className="h-4 w-4 mr-2" />
                 Registrar primeiro protocolo
@@ -747,12 +747,12 @@ export function ProcessoProtocolos({
                             {rotuloOrgao(protocolo)}
                           </span>
                           {protocolo.setor && (
-                            <span className="text-xs px-2 py-0.5 bg-[#252c35] text-white/70 rounded">
+                            <span className="text-xs px-2 py-0.5 bg-[var(--surface-tertiary)] text-white/70 rounded">
                               {protocolo.setor}
                             </span>
                           )}
                           {rotuloTipo(protocolo.tipoProtocolo) && (
-                            <span className="text-xs px-2 py-0.5 bg-orange-50 text-orange-700 rounded">
+                            <span className="text-xs px-2 py-0.5 bg-amber-50 text-amber-700 rounded">
                               {rotuloTipo(protocolo.tipoProtocolo)}
                             </span>
                           )}
@@ -761,27 +761,27 @@ export function ProcessoProtocolos({
                         {/* Info do protocolo */}
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm ml-5">
                           <div className="flex items-center gap-2 text-white/70">
-                            <Calendar className="h-4 w-4 text-gray-400" />
+                            <Calendar className="h-4 w-4 text-[var(--text-muted)]" />
                             <span>{formatarDataHora(protocolo.dataProtocolo)}</span>
                           </div>
 
                           {protocolo.numeroProtocolo && (
                             <div className="flex items-center gap-2 text-white/70">
-                              <Hash className="h-4 w-4 text-gray-400" />
+                              <Hash className="h-4 w-4 text-[var(--text-muted)]" />
                               <span className="font-mono">{protocolo.numeroProtocolo}</span>
                             </div>
                           )}
 
                           {rotuloForma(protocolo.formaEnvio) && (
                             <div className="flex items-center gap-2 text-white/70">
-                              <Send className="h-4 w-4 text-gray-400" />
+                              <Send className="h-4 w-4 text-[var(--text-muted)]" />
                               <span>{rotuloForma(protocolo.formaEnvio)}</span>
                             </div>
                           )}
 
                           {protocolo.responsavel && (
                             <div className="flex items-center gap-2 text-white/70">
-                              <User className="h-4 w-4 text-gray-400" />
+                              <User className="h-4 w-4 text-[var(--text-muted)]" />
                               <span>{protocolo.responsavel.nome}</span>
                             </div>
                           )}
@@ -827,14 +827,14 @@ export function ProcessoProtocolos({
                         <div className="flex items-center gap-1 ml-4">
                           <button
                             onClick={() => abrirEdicao(protocolo)}
-                            className="p-2 text-gray-400 hover:text-blue-500 rounded-lg hover:bg-blue-50"
+                            className="p-2 text-[var(--text-muted)] hover:text-blue-500 rounded-lg hover:bg-blue-50"
                             title="Editar"
                           >
                             <Edit2 className="h-4 w-4" />
                           </button>
                           <button
                             onClick={() => handleExcluir(protocolo.id)}
-                            className="p-2 text-gray-400 hover:text-red-500 rounded-lg hover:bg-red-50"
+                            className="p-2 text-[var(--text-muted)] hover:text-red-500 rounded-lg hover:bg-red-50"
                             title="Excluir"
                           >
                             <Trash2 className="h-4 w-4" />
@@ -881,13 +881,13 @@ export function ProcessoProtocolos({
                                       className="w-full h-full object-cover"
                                     />
                                   ) : (
-                                    <div className="w-full h-full flex items-center justify-center bg-[#252c35]">
+                                    <div className="w-full h-full flex items-center justify-center bg-[var(--surface-tertiary)]">
                                       {isPDF ? (
                                         <div className="w-12 h-14 bg-red-600 rounded-sm flex items-center justify-center text-[#fff] text-xs font-bold">
                                           PDF
                                         </div>
                                       ) : (
-                                        <FileText className="h-12 w-12 text-gray-400" />
+                                        <FileText className="h-12 w-12 text-[var(--text-muted)]" />
                                       )}
                                     </div>
                                   )}
@@ -904,7 +904,7 @@ export function ProcessoProtocolos({
                                     {anexo.nome}
                                   </p>
                                   {anexo.tamanho && (
-                                    <p className="text-xs text-gray-400">{formatFileSize(anexo.tamanho)}</p>
+                                    <p className="text-xs text-[var(--text-muted)]">{formatFileSize(anexo.tamanho)}</p>
                                   )}
                                 </div>
 
@@ -978,15 +978,15 @@ export function ProcessoProtocolos({
                             className="hidden"
                             accept="image/*,.pdf,.doc,.docx,.xls,.xlsx"
                           />
-                          <FileText className="h-8 w-8 mx-auto mb-2 text-gray-400" />
+                          <FileText className="h-8 w-8 mx-auto mb-2 text-[var(--text-muted)]" />
                           <p className="text-sm text-white/70 font-medium">Clique para selecionar arquivos</p>
-                          <p className="text-xs text-gray-400 mt-1">Imagens, PDF, Word, Excel (máx. 64MB cada)</p>
+                          <p className="text-xs text-[var(--text-muted)] mt-1">Imagens, PDF, Word, Excel (máx. 64MB cada)</p>
                         </label>
                       )}
 
                       {/* Mensagem quando não pode editar e não tem anexos */}
                       {!podeEditar && anexos.length === 0 && (
-                        <p className="text-sm text-gray-400 text-center py-4">Nenhum anexo</p>
+                        <p className="text-sm text-[var(--text-muted)] text-center py-4">Nenhum anexo</p>
                       )}
                     </div>
                   </div>

@@ -61,7 +61,7 @@ const formVazio = (): Form => ({
 function LinhaContrato({ rotulo, valor }: { rotulo: string; valor: string }) {
   return (
     <div className="flex items-baseline justify-between gap-3">
-      <span className="text-white/45">{rotulo}</span>
+      <span className="text-[var(--text-secondary)]">{rotulo}</span>
       <span className="text-right text-white/85">{valor}</span>
     </div>
   )
@@ -128,7 +128,7 @@ export default function TiposDocumentoTab() {
   const perfilSelecionado = perfis.find(p => p.id === form?.perfilOperacionalId) ?? null
   const exigePerfil = naturezaSelecionada?.exigeWorkflow === true
 
-  if (loading) return <div className="py-24 text-center text-white/50">Carregando…</div>
+  if (loading) return <div className="py-24 text-center text-[var(--text-secondary)]">Carregando…</div>
 
   // Filtro "Certidões" por CLASSIFICAÇÃO ESTRUTURADA. Certidão é um SUBTIPO técnico
   // (naturezaDocumental / `nature`), eixo distinto de CategoriaDocumental — logo o
@@ -146,7 +146,7 @@ export default function TiposDocumentoTab() {
 
   return (
     <div className="space-y-5">
-      {flash && <div className="rounded-xl border border-green-400/30 bg-green-500/15 px-4 py-3 text-sm text-green-200">{flash}</div>}
+      {flash && <div className="rounded-xl border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-700">{flash}</div>}
 
       <div className="rounded-2xl border border-[var(--border-default)] bg-[var(--surface-primary)] p-5 backdrop-blur-sm">
         <div className="flex items-start justify-between gap-3">
@@ -154,7 +154,7 @@ export default function TiposDocumentoTab() {
             <h2 className="text-lg font-semibold text-white">Tipos de Documento</h2>
             <p className="mt-1 text-sm text-white/60">Cadastro <strong className="text-white/80">mestre</strong> de tipos documentais — inclui certidões, identidades, judiciais, etc. Certidões são criadas aqui (não há cadastro separado).</p>
           </div>
-          <button onClick={() => setForm(formVazio())} className="flex-none rounded-lg bg-blue-600 px-3 py-2 text-xs font-medium text-[#fff] hover:bg-blue-500">+ Novo tipo de documento</button>
+          <button onClick={() => setForm(formVazio())} className="flex-none rounded-lg bg-[var(--action-primary)] px-3 py-2 text-xs font-medium text-[var(--action-primary-ink)] hover:bg-[var(--action-primary)]">+ Novo tipo de documento</button>
         </div>
         {/* Filtro rápido — consolidação de "Tipos de Certidão" */}
         <div className="mt-4 inline-flex overflow-hidden rounded-lg border border-[var(--border-default)] text-xs">
@@ -162,28 +162,28 @@ export default function TiposDocumentoTab() {
           <button onClick={() => setFiltro("certidoes")} aria-pressed={filtro === "certidoes"} className={`px-3 py-1.5 ${filtro === "certidoes" ? "bg-[var(--surface-secondary)] font-medium text-white" : "text-white/60 hover:bg-[var(--surface-hover)]"}`}>Certidões ({totalCertidoes})</button>
         </div>
         {filtro === "certidoes" && (
-          <p className="mt-2 text-[11px] text-white/40">Cobertura: {certPorNature} por natureza estruturada · {certPorTexto} por fallback textual{certPorTexto > 0 ? " (migrar `nature` para eliminar)" : ""}.</p>
+          <p className="mt-2 text-[11px] text-[var(--text-muted)]">Cobertura: {certPorNature} por natureza estruturada · {certPorTexto} por fallback textual{certPorTexto > 0 ? " (migrar `nature` para eliminar)" : ""}.</p>
         )}
       </div>
 
       <div className="overflow-hidden rounded-2xl border border-[var(--border-default)] bg-[var(--surface-primary)] backdrop-blur-sm">
         <table className="w-full text-sm">
-          <thead className="border-b border-[var(--border-default)] text-left text-xs text-white/50">
+          <thead className="border-b border-[var(--border-default)] text-left text-xs text-[var(--text-secondary)]">
             <tr><th className="px-4 py-3 font-medium">Código</th><th className="px-4 py-3 font-medium">Nome</th><th className="px-4 py-3 font-medium">Categoria</th><th className="px-4 py-3 font-medium">Status</th><th className="px-4 py-3 text-right font-medium">Ações</th></tr>
           </thead>
           <tbody>
             {visiveis.length === 0 ? (
-              <tr><td colSpan={5} className="px-4 py-8 text-center text-xs text-white/40">{filtro === "certidoes" ? "Nenhuma certidão encontrada." : "Nenhum tipo de documento cadastrado."}</td></tr>
+              <tr><td colSpan={5} className="px-4 py-8 text-center text-xs text-[var(--text-muted)]">{filtro === "certidoes" ? "Nenhuma certidão encontrada." : "Nenhum tipo de documento cadastrado."}</td></tr>
             ) : visiveis.map(d => (
               <tr key={d.id} className="border-b border-[var(--border-subtle)] last:border-0">
                 <td className="px-4 py-2.5 font-mono text-[12px] font-bold text-white/80">{d.publicCode ?? "—"}</td>
                 <td className="px-4 py-2.5 text-white">{d.name}</td>
                 <td className="px-4 py-2.5 text-white/70">{d.categoriaDocumental?.name ?? (d.category || "—")}</td>
-                <td className="px-4 py-2.5"><span className={`rounded-full px-2 py-0.5 text-[10px] ${d.ativo ? "bg-green-500/15 text-green-300" : "bg-[var(--surface-primary)] text-white/50"}`}>{d.ativo ? "Ativo" : "Inativo"}</span></td>
+                <td className="px-4 py-2.5"><span className={`rounded-full px-2 py-0.5 text-[10px] ${d.ativo ? "bg-green-50 text-green-700" : "bg-[var(--surface-primary)] text-[var(--text-secondary)]"}`}>{d.ativo ? "Ativo" : "Inativo"}</span></td>
                 <td className="px-4 py-2.5">
-                  <div className="flex items-center justify-end gap-0.5 text-white/50">
+                  <div className="flex items-center justify-end gap-0.5 text-[var(--text-secondary)]">
                     <button title="Editar" aria-label="Editar" onClick={() => setForm({ id: d.id, publicCode: d.publicCode ?? null, code: d.code || "", name: d.name, category: d.category || "", categoriaDocumentalId: d.categoriaDocumentalId ?? null, currentCat: d.categoriaDocumental ?? null, ativo: d.ativo, familiaDocumentalId: d.familiaDocumentalId ?? null, naturezaOperacionalId: d.naturezaOperacionalId ?? null, perfilOperacionalId: d.perfilOperacionalId ?? null })} className="rounded p-1 hover:bg-[var(--surface-hover)] hover:text-white"><IEdit /></button>
-                    <button title="Excluir" aria-label="Excluir" onClick={() => del(d)} className="rounded p-1 text-red-300/70 hover:bg-red-500/10 hover:text-red-300"><ITrash /></button>
+                    <button title="Excluir" aria-label="Excluir" onClick={() => del(d)} className="rounded p-1 text-red-700/70 hover:bg-red-50 hover:text-red-700"><ITrash /></button>
                   </div>
                 </td>
               </tr>
@@ -213,8 +213,8 @@ export default function TiposDocumentoTab() {
               {/* ── CONTRATO OPERACIONAL ────────────────────────────────
                   Categoria diz ONDE o documento se arquiva. Estes três dizem
                   COMO ele opera. Todos gravam ID; nenhum aceita texto. */}
-              <div className="rounded-lg border border-[var(--border-default)] bg-white/[0.03] p-3 space-y-3">
-                <div className="text-[11px] font-semibold uppercase tracking-wider text-white/45">Contrato operacional</div>
+              <div className="rounded-lg border border-[var(--border-default)] bg-[var(--surface-primary)] p-3 space-y-3">
+                <div className="text-[11px] font-semibold uppercase tracking-wider text-[var(--text-secondary)]">Contrato operacional</div>
 
                 <div>
                   <label className={labelCls}>Família documental</label>
@@ -239,19 +239,19 @@ export default function TiposDocumentoTab() {
                     {naturezas.map(x => <option key={x.id} value={x.id}>{x.name}</option>)}
                   </select>
                   {naturezaSelecionada?.descricao && (
-                    <div className="mt-1 text-[11px] text-white/45">{naturezaSelecionada.descricao}</div>
+                    <div className="mt-1 text-[11px] text-[var(--text-secondary)]">{naturezaSelecionada.descricao}</div>
                   )}
                 </div>
 
                 <div>
                   <label className={labelCls}>
                     Perfil operacional
-                    {exigePerfil && <span className="ml-1 text-amber-300">· obrigatório para esta natureza</span>}
+                    {exigePerfil && <span className="ml-1 text-amber-700">· obrigatório para esta natureza</span>}
                   </label>
                   <select
                     value={form.perfilOperacionalId ?? ""}
                     onChange={e => setForm(f => f && { ...f, perfilOperacionalId: e.target.value ? Number(e.target.value) : null })}
-                    className={exigePerfil && form.perfilOperacionalId == null ? `${inputCls} border-amber-400/50` : inputCls}
+                    className={exigePerfil && form.perfilOperacionalId == null ? `${inputCls} border-amber-200` : inputCls}
                   >
                     <option value="">— Sem perfil (não é processado por workflow) —</option>
                     {perfis.map(x => <option key={x.id} value={x.id}>{x.name}</option>)}
@@ -261,14 +261,14 @@ export default function TiposDocumentoTab() {
                 {/* O QUE O PERFIL IMPLICA — só leitura. Os passos se editam no
                     Workflow Interno; aqui a tela apenas referencia o contrato. */}
                 {perfilSelecionado && (
-                  <div className="rounded-md border border-sky-400/20 bg-sky-400/[0.06] p-2.5 space-y-1 text-[11.5px]">
+                  <div className="rounded-md border border-sky-200 bg-sky-400/[0.06] p-2.5 space-y-1 text-[11.5px]">
                     <LinhaContrato rotulo="Workflow" valor={perfilSelecionado.workflow?.name ?? "— nenhum —"} />
                     <LinhaContrato rotulo="Versão publicada" valor={perfilSelecionado.workflow ? `v${perfilSelecionado.workflow.versao}${perfilSelecionado.workflow.active ? "" : " (inativo)"}` : "—"} />
                     <LinhaContrato rotulo="Escopo de execução" valor={LABEL_ESCOPO[perfilSelecionado.escopoInstanciacao] ?? perfilSelecionado.escopoInstanciacao} />
                     <LinhaContrato rotulo="Exige documento" valor={perfilSelecionado.exigeDocumento ? "Sim" : "Não"} />
                     <LinhaContrato rotulo="Exige pessoa" valor={perfilSelecionado.exigePessoa ? "Sim" : "Não"} />
                     <LinhaContrato rotulo="Passos" valor={perfilSelecionado.workflow ? String(perfilSelecionado.workflow._count.passos) : "—"} />
-                    <div className="pt-1 text-[10.5px] text-white/40">Os passos são editados no Workflow Interno.</div>
+                    <div className="pt-1 text-[10.5px] text-[var(--text-muted)]">Os passos são editados no Workflow Interno.</div>
                   </div>
                 )}
               </div>
@@ -277,7 +277,7 @@ export default function TiposDocumentoTab() {
             </div>
             <div className="flex justify-end gap-2 border-t border-[var(--border-default)] px-6 py-4">
               <button onClick={() => setForm(null)} className="rounded-lg border border-[var(--border-default)] bg-[var(--surface-primary)] px-4 py-2 text-sm text-white/80 hover:bg-[var(--surface-hover)]">Cancelar</button>
-              <button disabled={busy} onClick={save} className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-[#fff] hover:bg-blue-500 disabled:opacity-50">Salvar</button>
+              <button disabled={busy} onClick={save} className="rounded-lg bg-[var(--action-primary)] px-4 py-2 text-sm font-medium text-[var(--action-primary-ink)] hover:bg-[var(--action-primary)] disabled:opacity-50">Salvar</button>
             </div>
           </div>
         </div>

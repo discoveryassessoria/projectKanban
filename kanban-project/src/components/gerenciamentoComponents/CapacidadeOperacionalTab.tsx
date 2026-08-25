@@ -126,7 +126,7 @@ export default function CapacidadeOperacionalTab() {
   }, [dados, busca])
 
   if (erro && !dados) {
-    return <div className="rounded border border-red-400/25 bg-red-500/10 px-4 py-3 text-[12px] text-red-200/90">{erro}</div>
+    return <div className="rounded border border-red-200 bg-red-50 px-4 py-3 text-[12px] text-red-700/90">{erro}</div>
   }
   if (!dados) {
     return (
@@ -140,25 +140,25 @@ export default function CapacidadeOperacionalTab() {
     <div className="space-y-4">
       <div>
         <h2 className="text-[15px] font-medium text-white/95">Equipes e capacidade operacional</h2>
-        <p className="mt-1 max-w-3xl text-[11px] leading-4 text-white/45">
+        <p className="mt-1 max-w-3xl text-[11px] leading-4 text-[var(--text-secondary)]">
           Para que trabalho cada pessoa está apta, quando ela não deve receber nada, quanto aguenta e quanto já carrega.
           Nada aqui concede permissão — autorização continua em <span className="text-white/65">Perfis e Permissões</span>.
           Estes números são de carga, não de desempenho.
         </p>
       </div>
 
-      {erro && <div className="rounded border border-red-400/25 bg-red-500/10 px-3 py-2 text-[11px] text-red-200/90">{erro}</div>}
+      {erro && <div className="rounded border border-red-200 bg-red-50 px-3 py-2 text-[11px] text-red-700/90">{erro}</div>}
 
       {/* A COMPOSIÇÃO DAS EQUIPES SE FAZ NO CADASTRO DE EQUIPES.
           Duplicar aqui um editor de membros criaria dois lugares para a mesma
           verdade. O caminho fica explícito para quem está configurando. */}
-      <div className="flex items-center gap-3 rounded border border-white/[0.07] bg-white/[0.02] px-3 py-2">
-        <span className="text-[11px] text-white/45">
+      <div className="flex items-center gap-3 rounded border border-white/[0.07] bg-[var(--surface-primary)] px-3 py-2">
+        <span className="text-[11px] text-[var(--text-secondary)]">
           Quem pertence a cada equipe se define no cadastro de Equipes.
         </span>
         <a
           href="/administrator?screen=teams"
-          className="rounded border border-[var(--border-default)] px-2 py-1 text-[10px] text-white/70 transition-colors hover:bg-white/[0.06] hover:text-white/95"
+          className="rounded border border-[var(--border-default)] px-2 py-1 text-[10px] text-white/70 transition-colors hover:bg-[var(--surface-primary)] hover:text-white/95"
         >
           Abrir Equipes
         </a>
@@ -168,62 +168,62 @@ export default function CapacidadeOperacionalTab() {
         value={busca}
         onChange={(e) => setBusca(e.target.value)}
         placeholder="Buscar pessoa ou equipe…"
-        className="w-72 rounded border border-[var(--border-default)] bg-white/[0.03] px-2.5 py-1.5 text-[12px] text-white/85 placeholder:text-white/25 focus:border-white/25 focus:outline-none"
+        className="w-72 rounded border border-[var(--border-default)] bg-[var(--surface-primary)] px-2.5 py-1.5 text-[12px] text-white/85 placeholder:text-[var(--text-muted)] focus:border-white/25 focus:outline-none"
       />
 
       <div className="overflow-hidden rounded border border-white/[0.08]">
         <table className="w-full border-collapse text-left">
-          <thead className="bg-white/[0.03]">
+          <thead className="bg-[var(--surface-primary)]">
             <tr className="border-b border-white/[0.08]">
               {["Funcionário", "Equipe(s)", "Aptidões", "Disponibilidade", "Capacidade", "Carga ativa", "Executável", "Atrasadas", "Aguardando terceiro", ""].map((h) => (
-                <th key={h} className="px-3 py-2 text-[10px] font-medium uppercase tracking-wide text-white/35">{h}</th>
+                <th key={h} className="px-3 py-2 text-[10px] font-medium uppercase tracking-wide text-[var(--text-muted)]">{h}</th>
               ))}
             </tr>
           </thead>
           <tbody>
             {linhas.map((l) => (
-              <tr key={l.usuarioId} className="border-b border-white/[0.05] align-top hover:bg-white/[0.02]">
+              <tr key={l.usuarioId} className="border-b border-white/[0.05] align-top hover:bg-[var(--surface-primary)]">
                 <td className="px-3 py-2">
                   <div className="text-[12px] text-white/90">{l.nome}</div>
-                  <div className="text-[10px] text-white/35">{l.perfil}</div>
+                  <div className="text-[10px] text-[var(--text-muted)]">{l.perfil}</div>
                   {/* A permissão vem primeiro porque sem ela o resto é decorativo. */}
                   {!l.podeExecutar && (
-                    <div className="mt-1 inline-flex rounded border border-amber-300/25 bg-amber-400/10 px-1.5 py-[1px] text-[9px] text-amber-200/90">
+                    <div className="mt-1 inline-flex rounded border border-amber-200 bg-amber-50 px-1.5 py-[1px] text-[9px] text-amber-700/90">
                       não executa tarefas
                     </div>
                   )}
                 </td>
                 <td className="px-3 py-2 text-[11px] text-white/60">
-                  {l.equipes.length ? l.equipes.map((e) => e.nome).join(", ") : <span className="text-white/25">—</span>}
+                  {l.equipes.length ? l.equipes.map((e) => e.nome).join(", ") : <span className="text-[var(--text-muted)]">—</span>}
                 </td>
                 <td className="max-w-[220px] px-3 py-2 text-[11px] text-white/60">
                   {l.aptidoesDetalhadas.length
                     ? l.aptidoesDetalhadas.map((a) => a.nome).join(", ")
-                    : <span className="text-white/25">nenhuma declarada</span>}
+                    : <span className="text-[var(--text-muted)]">nenhuma declarada</span>}
                 </td>
                 <td className="px-3 py-2 text-[11px]">
                   {l.indisponivelPor ? (
-                    <span className="text-amber-200/85">
+                    <span className="text-amber-700/85">
                       {ROTULO_TIPO[l.indisponivelPor.tipo] ?? l.indisponivelPor.tipo}
-                      <span className="text-white/35">
+                      <span className="text-[var(--text-muted)]">
                         {l.indisponivelPor.fim ? ` até ${dataCurta(l.indisponivelPor.fim)}` : " (sem retorno)"}
                       </span>
                     </span>
                   ) : (
-                    <span className="text-emerald-200/70">disponível</span>
+                    <span className="text-emerald-700/70">disponível</span>
                   )}
                 </td>
                 <td className="px-3 py-2 text-[11px] tabular-nums text-white/60">
-                  {l.limiteExecutaveis == null ? <span className="text-white/25">sem teto</span> : `${l.limiteExecutaveis} executáveis`}
+                  {l.limiteExecutaveis == null ? <span className="text-[var(--text-muted)]">sem teto</span> : `${l.limiteExecutaveis} executáveis`}
                 </td>
                 <td className="px-3 py-2 text-[11px] tabular-nums text-white/70">{l.carga.ativas}</td>
                 <td className="px-3 py-2 text-[11px] tabular-nums text-white/70">{l.carga.executaveis}</td>
-                <td className={`px-3 py-2 text-[11px] tabular-nums ${l.carga.atrasadas > 0 ? "text-red-300/85" : "text-white/50"}`}>{l.carga.atrasadas}</td>
-                <td className="px-3 py-2 text-[11px] tabular-nums text-white/50">{l.carga.aguardandoTerceiro}</td>
+                <td className={`px-3 py-2 text-[11px] tabular-nums ${l.carga.atrasadas > 0 ? "text-red-700/85" : "text-[var(--text-secondary)]"}`}>{l.carga.atrasadas}</td>
+                <td className="px-3 py-2 text-[11px] tabular-nums text-[var(--text-secondary)]">{l.carga.aguardandoTerceiro}</td>
                 <td className="px-3 py-2 text-right">
                   <button
                     onClick={() => setAberta(l.usuarioId)}
-                    className="rounded border border-[var(--border-default)] px-2 py-1 text-[10px] text-white/60 transition-colors hover:bg-white/[0.06] hover:text-white/90"
+                    className="rounded border border-[var(--border-default)] px-2 py-1 text-[10px] text-white/60 transition-colors hover:bg-[var(--surface-primary)] hover:text-white/90"
                   >
                     Configurar
                   </button>
@@ -273,12 +273,12 @@ function PainelConfiguracao({
       >
         <div className="border-b border-white/[0.08] px-4 py-3">
           <h2 className="text-[14px] font-medium text-white/95">{linha.nome}</h2>
-          <p className="mt-0.5 text-[11px] text-white/40">
+          <p className="mt-0.5 text-[11px] text-[var(--text-muted)]">
             {linha.perfil}
             {linha.equipes.length > 0 && ` · ${linha.equipes.map((e) => e.nome).join(", ")}`}
           </p>
           {!linha.podeExecutar && (
-            <p className="mt-1.5 rounded border border-amber-300/25 bg-amber-400/10 px-2 py-1 text-[10px] leading-4 text-amber-200/85">
+            <p className="mt-1.5 rounded border border-amber-200 bg-amber-50 px-2 py-1 text-[10px] leading-4 text-amber-700/85">
               Esta pessoa não tem permissão de executar tarefa. Nada configurado aqui a torna elegível —
               a permissão se concede em Perfis e Permissões.
             </p>
@@ -288,14 +288,14 @@ function PainelConfiguracao({
         <div className="min-h-0 flex-1 space-y-4 overflow-y-auto px-4 py-3">
           {/* ── APTIDÕES OPERACIONAIS ── */}
           <section>
-            <h3 className="text-[10px] uppercase tracking-wide text-white/35">Aptidões operacionais</h3>
-            <p className="mt-1 text-[10px] leading-4 text-white/40">
+            <h3 className="text-[10px] uppercase tracking-wide text-[var(--text-muted)]">Aptidões operacionais</h3>
+            <p className="mt-1 text-[10px] leading-4 text-[var(--text-muted)]">
               Quais <span className="text-white/65">tipos de trabalho</span> esta pessoa está apta a executar. Não é a
               fase do processo: a fase diz onde o processo está, a aptidão diz o que a pessoa sabe fazer. Enquanto
               ninguém for declarado apto para uma unidade, ela não restringe ninguém — a primeira declaração liga a regra.
             </p>
             {unidades.length === 0 ? (
-              <p className="mt-2 rounded border border-amber-300/20 bg-amber-400/[0.06] px-2 py-1.5 text-[10px] leading-4 text-amber-200/80">
+              <p className="mt-2 rounded border border-amber-200 bg-amber-400/[0.06] px-2 py-1.5 text-[10px] leading-4 text-amber-700/80">
                 Nenhuma unidade de trabalho cadastrada. Elas vêm dos Perfis Operacionais do Cadastro Mestre —
                 cadastre-os em Gerenciamento › Documentos e Protocolos para que apareçam aqui.
               </p>
@@ -304,7 +304,7 @@ function PainelConfiguracao({
                 {unidades.map((u) => (
                   <label
                     key={u.perfilOperacionalId}
-                    className="flex cursor-pointer items-start gap-2 rounded px-1.5 py-1 hover:bg-white/[0.04]"
+                    className="flex cursor-pointer items-start gap-2 rounded px-1.5 py-1 hover:bg-[var(--surface-primary)]"
                   >
                     <input
                       type="checkbox"
@@ -319,7 +319,7 @@ function PainelConfiguracao({
                     <span>
                       <span className="block text-[11px] text-white/80">{u.nome}</span>
                       {/* Contexto secundário — família, não chave técnica. */}
-                      {u.familia && <span className="block text-[10px] text-white/35">{u.familia}</span>}
+                      {u.familia && <span className="block text-[10px] text-[var(--text-muted)]">{u.familia}</span>}
                     </span>
                   </label>
                 ))}
@@ -328,7 +328,7 @@ function PainelConfiguracao({
             <button
               disabled={ocupado || unidades.length === 0}
               onClick={() => aoSalvar({ acao: "aptidoes", usuarioId: linha.usuarioId, perfilOperacionalIds: [...marcadas] })}
-              className="mt-2 rounded border border-[var(--border-default)] bg-white/[0.06] px-3 py-1.5 text-[11px] text-white/85 disabled:opacity-40"
+              className="mt-2 rounded border border-[var(--border-default)] bg-[var(--surface-primary)] px-3 py-1.5 text-[11px] text-white/85 disabled:opacity-40"
             >
               Salvar aptidões
             </button>
@@ -336,8 +336,8 @@ function PainelConfiguracao({
 
           {/* ── CAPACIDADE ── */}
           <section className="border-t border-white/[0.06] pt-3">
-            <h3 className="text-[10px] uppercase tracking-wide text-white/35">Capacidade</h3>
-            <p className="mt-1 text-[10px] leading-4 text-white/40">
+            <h3 className="text-[10px] uppercase tracking-wide text-[var(--text-muted)]">Capacidade</h3>
+            <p className="mt-1 text-[10px] leading-4 text-[var(--text-muted)]">
               Teto de trabalho EXECUTÁVEL simultâneo. Vazio = sem teto: a comparação segue relativa à carga real.
               Tarefa aguardando terceiro não ocupa lugar.
             </p>
@@ -348,13 +348,13 @@ function PainelConfiguracao({
                 value={limite}
                 onChange={(e) => setLimite(e.target.value)}
                 placeholder="sem teto"
-                className="w-28 rounded border border-[var(--border-default)] bg-white/[0.03] px-2 py-1.5 text-[12px] text-white/85 placeholder:text-white/25 focus:outline-none"
+                className="w-28 rounded border border-[var(--border-default)] bg-[var(--surface-primary)] px-2 py-1.5 text-[12px] text-white/85 placeholder:text-[var(--text-muted)] focus:outline-none"
               />
-              <span className="text-[11px] text-white/40">executáveis · hoje carrega {linha.carga.executaveis}</span>
+              <span className="text-[11px] text-[var(--text-muted)]">executáveis · hoje carrega {linha.carga.executaveis}</span>
               <button
                 disabled={ocupado}
                 onClick={() => aoSalvar({ acao: "capacidade", usuarioId: linha.usuarioId, limiteExecutaveis: limite === "" ? null : Number(limite) })}
-                className="ml-auto rounded border border-[var(--border-default)] bg-white/[0.06] px-3 py-1.5 text-[11px] text-white/85 disabled:opacity-40"
+                className="ml-auto rounded border border-[var(--border-default)] bg-[var(--surface-primary)] px-3 py-1.5 text-[11px] text-white/85 disabled:opacity-40"
               >
                 Salvar
               </button>
@@ -363,8 +363,8 @@ function PainelConfiguracao({
 
           {/* ── DISPONIBILIDADE ── */}
           <section className="border-t border-white/[0.06] pt-3">
-            <h3 className="text-[10px] uppercase tracking-wide text-white/35">Disponibilidade</h3>
-            <p className="mt-1 text-[10px] leading-4 text-white/40">
+            <h3 className="text-[10px] uppercase tracking-wide text-[var(--text-muted)]">Disponibilidade</h3>
+            <p className="mt-1 text-[10px] leading-4 text-[var(--text-muted)]">
               Período em que a pessoa não deve receber trabalho novo. Sem data de fim = em aberto.
               Encerrar preenche a data; o registro fica, para que o histórico continue explicável.
             </p>
@@ -375,15 +375,15 @@ function PainelConfiguracao({
                   const vigente = linha.indisponivelPor?.id === i.id
                   return (
                     <div key={i.id} className={`flex items-center gap-2 rounded border px-2 py-1.5 text-[11px] ${
-                      vigente ? "border-amber-300/25 bg-amber-400/[0.07]" : "border-white/[0.07]"
+                      vigente ? "border-amber-200 bg-amber-400/[0.07]" : "border-white/[0.07]"
                     }`}>
-                      <span className={vigente ? "text-amber-200/90" : "text-white/50"}>
+                      <span className={vigente ? "text-amber-700/90" : "text-[var(--text-secondary)]"}>
                         {ROTULO_TIPO[i.tipo] ?? i.tipo}
                       </span>
-                      <span className="text-white/35">
+                      <span className="text-[var(--text-muted)]">
                         {dataCurta(i.inicio)} → {i.fim ? dataCurta(i.fim) : "em aberto"}
                       </span>
-                      {i.motivo && <span className="truncate text-white/30">{i.motivo}</span>}
+                      {i.motivo && <span className="truncate text-[var(--text-muted)]">{i.motivo}</span>}
                       {vigente && (
                         <button
                           disabled={ocupado}
@@ -401,15 +401,15 @@ function PainelConfiguracao({
 
             <div className="mt-2 flex flex-wrap items-center gap-2">
               <select value={tipo} onChange={(e) => setTipo(e.target.value)}
-                className="rounded border border-[var(--border-default)] bg-white/[0.03] px-2 py-1.5 text-[11px] text-white/80 focus:outline-none">
+                className="rounded border border-[var(--border-default)] bg-[var(--surface-primary)] px-2 py-1.5 text-[11px] text-white/80 focus:outline-none">
                 {tipos.map((t) => <option key={t} value={t}>{ROTULO_TIPO[t] ?? t}</option>)}
               </select>
               <input type="date" value={inicio} onChange={(e) => setInicio(e.target.value)}
-                className="rounded border border-[var(--border-default)] bg-white/[0.03] px-2 py-1.5 text-[11px] text-white/80 focus:outline-none" />
+                className="rounded border border-[var(--border-default)] bg-[var(--surface-primary)] px-2 py-1.5 text-[11px] text-white/80 focus:outline-none" />
               <input type="date" value={fim} onChange={(e) => setFim(e.target.value)} placeholder="fim"
-                className="rounded border border-[var(--border-default)] bg-white/[0.03] px-2 py-1.5 text-[11px] text-white/80 focus:outline-none" />
+                className="rounded border border-[var(--border-default)] bg-[var(--surface-primary)] px-2 py-1.5 text-[11px] text-white/80 focus:outline-none" />
               <input value={motivo} onChange={(e) => setMotivo(e.target.value)} placeholder="motivo (opcional)"
-                className="min-w-[140px] flex-1 rounded border border-[var(--border-default)] bg-white/[0.03] px-2 py-1.5 text-[11px] text-white/80 placeholder:text-white/25 focus:outline-none" />
+                className="min-w-[140px] flex-1 rounded border border-[var(--border-default)] bg-[var(--surface-primary)] px-2 py-1.5 text-[11px] text-white/80 placeholder:text-[var(--text-muted)] focus:outline-none" />
               <button
                 disabled={ocupado}
                 onClick={() => aoSalvar({
@@ -418,7 +418,7 @@ function PainelConfiguracao({
                   fim: fim ? new Date(`${fim}T12:00:00`).toISOString() : null,
                   motivo: motivo || null,
                 })}
-                className="rounded border border-[var(--border-default)] bg-white/[0.06] px-3 py-1.5 text-[11px] text-white/85 disabled:opacity-40"
+                className="rounded border border-[var(--border-default)] bg-[var(--surface-primary)] px-3 py-1.5 text-[11px] text-white/85 disabled:opacity-40"
               >
                 Registrar
               </button>
@@ -427,18 +427,18 @@ function PainelConfiguracao({
 
           {/* ── HISTÓRICO ── quem mudou o quê, e quando */}
           <section className="border-t border-white/[0.06] pt-3">
-            <h3 className="text-[10px] uppercase tracking-wide text-white/35">Histórico desta configuração</h3>
+            <h3 className="text-[10px] uppercase tracking-wide text-[var(--text-muted)]">Histórico desta configuração</h3>
             {linha.historico.length === 0 ? (
-              <p className="mt-1 text-[10px] text-white/30">Nada foi alterado ainda.</p>
+              <p className="mt-1 text-[10px] text-[var(--text-muted)]">Nada foi alterado ainda.</p>
             ) : (
               <div className="mt-2 space-y-1">
                 {linha.historico.map((h) => (
-                  <div key={h.id} className="text-[10px] leading-4 text-white/45">
-                    <span className="tabular-nums text-white/30">
+                  <div key={h.id} className="text-[10px] leading-4 text-[var(--text-secondary)]">
+                    <span className="tabular-nums text-[var(--text-muted)]">
                       {new Date(h.em).toLocaleString("pt-BR", { day: "2-digit", month: "2-digit", year: "2-digit", hour: "2-digit", minute: "2-digit" })}
                     </span>{" "}
                     {h.descricao}
-                    {h.por && <span className="text-white/25"> · por {h.por}</span>}
+                    {h.por && <span className="text-[var(--text-muted)]"> · por {h.por}</span>}
                   </div>
                 ))}
               </div>
@@ -447,7 +447,7 @@ function PainelConfiguracao({
         </div>
 
         <div className="flex justify-end border-t border-white/[0.08] px-4 py-2.5">
-          <button onClick={aoFechar} className="rounded px-3 py-1.5 text-[11px] text-white/50 hover:text-white/80">Fechar</button>
+          <button onClick={aoFechar} className="rounded px-3 py-1.5 text-[11px] text-[var(--text-secondary)] hover:text-white/80">Fechar</button>
         </div>
       </div>
     </div>

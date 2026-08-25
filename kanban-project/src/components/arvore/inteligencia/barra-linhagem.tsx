@@ -336,7 +336,7 @@ export function BarraLinhagem(props: Props) {
                         <span
                           aria-hidden
                           className={`h-3.5 w-3.5 shrink-0 rounded border ${
-                            ligado ? "border-gray-800 bg-gray-800" : "border-gray-300 bg-[var(--surface-primary)]"
+                            ligado ? "border-gray-800 bg-[var(--surface-popover)]" : "border-gray-300 bg-[var(--surface-primary)]"
                           }`}
                         />
                         {ROTULO_FILTRO[chave]}
@@ -395,7 +395,7 @@ export function BarraLinhagem(props: Props) {
                   ? `${resumo.documental.atendidas + resumo.documental.dispensadas}/${resumo.documental.necessarias}`
                   : "—"}
               </span>
-              <span className="hidden lg:inline text-gray-400">·</span>
+              <span className="hidden lg:inline text-[var(--text-muted)]">·</span>
               <span className="hidden lg:inline">{resumo.pessoas} na linha</span>
             </button>
 
@@ -418,7 +418,7 @@ export function BarraLinhagem(props: Props) {
                       {resumo.danteCausaNome}
                     </button>
                   ) : (
-                    <span className="text-gray-400">não identificado</span>
+                    <span className="text-[var(--text-muted)]">não identificado</span>
                   )}
                 </p>
 
@@ -445,7 +445,7 @@ export function BarraLinhagem(props: Props) {
                       {resumo.prazo.rotuloDias} ({resumo.prazo.rotuloStatus})
                     </span>
                   ) : (
-                    <span className="text-gray-400">sem SLA configurado</span>
+                    <span className="text-[var(--text-muted)]">sem SLA configurado</span>
                   )}
                 </div>
 
@@ -457,7 +457,7 @@ export function BarraLinhagem(props: Props) {
                     {proximaAcao.pessoaNome ? `${proximaAcao.pessoaNome}: ` : ""}
                     {proximaAcao.acao}
                   </p>
-                  <p className="mt-1 text-[10px] uppercase tracking-wide text-gray-400">
+                  <p className="mt-1 text-[10px] uppercase tracking-wide text-[var(--text-muted)]">
                     Fonte: {proximaAcao.fonte}
                   </p>
                   {proximaAcao.pessoaId != null && (
@@ -474,7 +474,7 @@ export function BarraLinhagem(props: Props) {
                 </div>
 
                 {carregando && (
-                  <p className="mt-2 text-[11px] text-gray-400">Atualizando dados operacionais…</p>
+                  <p className="mt-2 text-[11px] text-[var(--text-muted)]">Atualizando dados operacionais…</p>
                 )}
               </div>
             )}
@@ -601,7 +601,7 @@ export function BarraLinhagem(props: Props) {
               <span className="font-medium tabular-nums text-gray-900">{contagemSaude[n]}</span>
             </span>
           ))}
-          <span className="text-[11px] text-gray-400">
+          <span className="text-[11px] text-[var(--text-muted)]">
             Crítico = bloqueio impeditivo · Atenção = pendência, divergência ou tarefa
           </span>
         </div>
@@ -617,7 +617,7 @@ export function BarraLinhagem(props: Props) {
         >
           {trilha.map((degrau, i) => (
             <span key={degrau.pessoaId} className="flex items-center gap-1">
-              {i > 0 && <ChevronRight aria-hidden className="h-3 w-3 shrink-0 text-gray-300" />}
+              {i > 0 && <ChevronRight aria-hidden className="h-3 w-3 shrink-0 text-[var(--text-muted)]" />}
               <button
                 onClick={() => onIrParaPessoa(degrau.pessoaId)}
                 title={`${degrau.rotulo}${degrau.compartilhadoPor > 1 ? ` · ${degrau.compartilhadoPor} requerentes dependem` : ""}`}
@@ -625,7 +625,7 @@ export function BarraLinhagem(props: Props) {
                   degrau.ehDanteCausa ? "font-semibold text-gray-900" : "text-gray-600"
                 }`}
               >
-                <span className="text-gray-400">{degrau.rotulo}: </span>
+                <span className="text-[var(--text-muted)]">{degrau.rotulo}: </span>
                 {degrau.nome}
               </button>
             </span>
@@ -654,7 +654,7 @@ function Campo({
 }) {
   const corpo = (
     <>
-      <span className="block text-[9px] uppercase leading-none tracking-wide text-gray-400">
+      <span className="block text-[9px] uppercase leading-none tracking-wide text-[var(--text-muted)]">
         {rotulo}
       </span>
       <span

@@ -269,7 +269,7 @@ export function TreeOnboardingWizard({ arvore, onComplete, onArvoreUpdate }: Tre
       case "welcome":
         return (
           <div className="text-center space-y-6">
-            <div className="mx-auto w-20 h-20 bg-[#123C73] rounded-full flex items-center justify-center">
+            <div className="mx-auto w-20 h-20 bg-[var(--action-primary)] rounded-full flex items-center justify-center">
               <TreePine className="h-10 w-10 text-white" />
             </div>
             <div>
@@ -297,7 +297,7 @@ export function TreeOnboardingWizard({ arvore, onComplete, onArvoreUpdate }: Tre
             </div>
             <Button
               onClick={() => setCurrentStep("add-self")}
-              className="bg-[#123C73] hover:bg-[#0f2d5a] text-[#fff]"
+              className="bg-[var(--action-primary)] hover:bg-[var(--surface-secondary)] text-[var(--action-primary-ink)]"
               size="lg"
             >
               Começar
@@ -309,14 +309,14 @@ export function TreeOnboardingWizard({ arvore, onComplete, onArvoreUpdate }: Tre
       case "add-self":
         return (
           <div className="text-center space-y-6">
-            <div className="mx-auto w-16 h-16 bg-[#123C73] rounded-full flex items-center justify-center">
+            <div className="mx-auto w-16 h-16 bg-[var(--action-primary)] rounded-full flex items-center justify-center">
               <User className="h-8 w-8 text-white" />
             </div>
             <div>
               <h2 className="text-xl font-bold text-[#123C73] mb-2">Adicione Suas Informações</h2>
               <p className="text-[#9AA0A6]">Comece sua árvore genealógica adicionando suas informações pessoais.</p>
             </div>
-            <Button onClick={handleAddSelf} className="bg-[#123C73] hover:bg-[#0f2d5a] text-[#fff]" size="lg">
+            <Button onClick={handleAddSelf} className="bg-[var(--action-primary)] hover:bg-[var(--surface-secondary)] text-[var(--action-primary-ink)]" size="lg">
               Adicionar Minhas Informações
             </Button>
           </div>
@@ -325,7 +325,7 @@ export function TreeOnboardingWizard({ arvore, onComplete, onArvoreUpdate }: Tre
       case "add-parents":
         return (
           <div className="text-center space-y-6">
-            <div className="mx-auto w-16 h-16 bg-[#123C73] rounded-full flex items-center justify-center">
+            <div className="mx-auto w-16 h-16 bg-[var(--action-primary)] rounded-full flex items-center justify-center">
               <Users className="h-8 w-8 text-white" />
             </div>
             <div>
@@ -338,14 +338,14 @@ export function TreeOnboardingWizard({ arvore, onComplete, onArvoreUpdate }: Tre
               <Button
                 onClick={() => handleAddParent("pai")}
                 variant="outline"
-                className="border-[#123C73] text-[#123C73] hover:bg-[#123C73] hover:text-[#fff]"
+                className="border-[var(--border-strong)] text-[#123C73] hover:bg-[var(--action-primary)] hover:text-[var(--action-primary-ink)]"
               >
                 Adicionar Pai
               </Button>
               <Button
                 onClick={() => handleAddParent("mae")}
                 variant="outline"
-                className="border-[#123C73] text-[#123C73] hover:bg-[#123C73] hover:text-[#fff]"
+                className="border-[var(--border-strong)] text-[#123C73] hover:bg-[var(--action-primary)] hover:text-[var(--action-primary-ink)]"
               >
                 Adicionar Mãe
               </Button>
@@ -363,7 +363,7 @@ export function TreeOnboardingWizard({ arvore, onComplete, onArvoreUpdate }: Tre
       case "add-spouse":
         return (
           <div className="text-center space-y-6">
-            <div className="mx-auto w-16 h-16 bg-[#123C73] rounded-full flex items-center justify-center">
+            <div className="mx-auto w-16 h-16 bg-[var(--action-primary)] rounded-full flex items-center justify-center">
               <Heart className="h-8 w-8 text-white" />
             </div>
             <div>
@@ -371,7 +371,7 @@ export function TreeOnboardingWizard({ arvore, onComplete, onArvoreUpdate }: Tre
               <p className="text-[#9AA0A6]">Se você é casado(a), adicione informações sobre seu cônjuge.</p>
             </div>
             <div className="flex flex-col sm:flex-row gap-4 justify-center">
-              <Button onClick={handleAddSpouse} className="bg-[#123C73] hover:bg-[#0f2d5a] text-[#fff]">
+              <Button onClick={handleAddSpouse} className="bg-[var(--action-primary)] hover:bg-[var(--surface-secondary)] text-[var(--action-primary-ink)]">
                 Adicionar Cônjuge
               </Button>
               <Button

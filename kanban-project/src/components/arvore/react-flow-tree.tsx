@@ -90,7 +90,7 @@ function DocumentoIndicador({ tipo, label, status, mode }: DocumentoIndicadorPro
         {tipo}
       </div>
       {/* Tooltip */}
-      <div className={`${tooltipClass} px-1.5 py-0.5 bg-gray-900 text-white text-[9px] rounded whitespace-nowrap opacity-0 invisible group-hover/doctip:opacity-100 group-hover/doctip:visible transition-all z-[100] pointer-events-none`}>
+      <div className={`${tooltipClass} px-1.5 py-0.5 bg-[var(--surface-popover)] text-white text-[9px] rounded whitespace-nowrap opacity-0 invisible group-hover/doctip:opacity-100 group-hover/doctip:visible transition-all z-[100] pointer-events-none`}>
         {label}: {statusText}
       </div>
     </div>

@@ -743,9 +743,9 @@ export function TabelaCustos({ processoId, nomeFamilia, onTotaisChange }: Tabela
   if (linhas.length === 0) {
     return (
       <div className="text-center py-12">
-        <FileText className="w-12 h-12 mx-auto text-gray-300 mb-4" />
+        <FileText className="w-12 h-12 mx-auto text-[var(--text-muted)] mb-4" />
         <h3 className="text-lg font-medium text-gray-600 mb-2">Nenhuma pessoa na árvore</h3>
-        <p className="text-sm text-gray-400 max-w-md mx-auto">
+        <p className="text-sm text-[var(--text-muted)] max-w-md mx-auto">
           Adicione pessoas na aba "Árvore Genealógica" para que elas apareçam aqui na planilha de custos.
         </p>
       </div>
@@ -799,35 +799,35 @@ export function TabelaCustos({ processoId, nomeFamilia, onTotaisChange }: Tabela
       <div ref={tabelaRef} className="overflow-x-auto border border-gray-200 rounded-lg shadow-sm">
         <table className="w-full text-xs">
           <thead>
-            <tr className="bg-[#1e3a5f] text-[#fff]">
-              <th className="px-2 py-2 text-center font-semibold border-r border-[#2d4a6f] w-10">
+            <tr className="bg-[var(--surface-secondary)] text-[#fff]">
+              <th className="px-2 py-2 text-center font-semibold border-r border-[var(--border-default)] w-10">
                 <button
                   onClick={todasSelecionadas ? limparSelecao : selecionarTodas}
-                  className="hover:bg-[#2d4a6f] p-1 rounded transition"
+                  className="hover:bg-[var(--surface-secondary)] p-1 rounded transition"
                   title={todasSelecionadas ? "Desmarcar todas" : "Selecionar todas"}
                 >
                   {todasSelecionadas ? (
-                    <CheckSquare className="w-4 h-4 text-blue-300" />
+                    <CheckSquare className="w-4 h-4 text-blue-700" />
                   ) : (
-                    <Square className="w-4 h-4 text-gray-300" />
+                    <Square className="w-4 h-4 text-[var(--text-muted)]" />
                   )}
                 </button>
               </th>
-              <th className="px-2 py-2 text-center font-semibold border-r border-[#2d4a6f] w-12">Nº</th>
-              <th className="px-3 py-2 text-left font-semibold border-r border-[#2d4a6f] min-w-[150px]">Nome</th>
+              <th className="px-2 py-2 text-center font-semibold border-r border-[var(--border-default)] w-12">Nº</th>
+              <th className="px-3 py-2 text-left font-semibold border-r border-[var(--border-default)] min-w-[150px]">Nome</th>
               {mostrarDetalhes && (
                 <>
-                  <th className="px-2 py-2 text-center font-semibold border-r border-[#2d4a6f] min-w-[90px]">Registro</th>
-                  <th className="px-2 py-2 text-center font-semibold border-r border-[#2d4a6f] min-w-[90px]">Data</th>
-                  <th className="px-2 py-2 text-left font-semibold border-r border-[#2d4a6f] min-w-[120px]">Local</th>
-                  <th className="px-2 py-2 text-left font-semibold border-r border-[#2d4a6f] min-w-[180px]">Dados do Registro</th>
-                  <th className="px-2 py-2 text-left font-semibold border-r border-[#2d4a6f] min-w-[120px]">Cônjuge</th>
-                  <th className="px-2 py-2 text-left font-semibold border-r border-[#2d4a6f] min-w-[180px]">Genitores</th>
-                  <th className="px-2 py-2 text-left font-semibold border-r border-[#2d4a6f] min-w-[100px]">Observação</th>
+                  <th className="px-2 py-2 text-center font-semibold border-r border-[var(--border-default)] min-w-[90px]">Registro</th>
+                  <th className="px-2 py-2 text-center font-semibold border-r border-[var(--border-default)] min-w-[90px]">Data</th>
+                  <th className="px-2 py-2 text-left font-semibold border-r border-[var(--border-default)] min-w-[120px]">Local</th>
+                  <th className="px-2 py-2 text-left font-semibold border-r border-[var(--border-default)] min-w-[180px]">Dados do Registro</th>
+                  <th className="px-2 py-2 text-left font-semibold border-r border-[var(--border-default)] min-w-[120px]">Cônjuge</th>
+                  <th className="px-2 py-2 text-left font-semibold border-r border-[var(--border-default)] min-w-[180px]">Genitores</th>
+                  <th className="px-2 py-2 text-left font-semibold border-r border-[var(--border-default)] min-w-[100px]">Observação</th>
                 </>
               )}
               {servicos.map(servico => (
-                <th key={servico.id} className="px-2 py-2 text-center font-semibold border-r border-[#2d4a6f] min-w-[100px]">
+                <th key={servico.id} className="px-2 py-2 text-center font-semibold border-r border-[var(--border-default)] min-w-[100px]">
                   <span className="truncate" title={servico.nome}>{servico.nome}</span>
                 </th>
               ))}
@@ -868,7 +868,7 @@ export function TabelaCustos({ processoId, nomeFamilia, onTotaisChange }: Tabela
                       {isSelected ? (
                         <CheckSquare className="w-4 h-4 text-blue-600" />
                       ) : (
-                        <Square className="w-4 h-4 text-gray-400" />
+                        <Square className="w-4 h-4 text-[var(--text-muted)]" />
                       )}
                     </button>
                   </td>
@@ -887,7 +887,7 @@ export function TabelaCustos({ processoId, nomeFamilia, onTotaisChange }: Tabela
                           <button
                             onClick={() => moverPessoaParaCima(linha.pessoaId, linha.numeroLinhagem)}
                             disabled={!canMoveUp}
-                            className={`p-0.5 rounded ${canMoveUp ? 'hover:bg-gray-200 text-gray-500' : 'text-gray-200 cursor-not-allowed'}`}
+                            className={`p-0.5 rounded ${canMoveUp ? 'hover:bg-gray-200 text-gray-500' : 'text-[var(--text-muted)] cursor-not-allowed'}`}
                             title="Mover para cima"
                           >
                             <ArrowUp className="w-3 h-3" />
@@ -895,7 +895,7 @@ export function TabelaCustos({ processoId, nomeFamilia, onTotaisChange }: Tabela
                           <button
                             onClick={() => moverPessoaParaBaixo(linha.pessoaId, linha.numeroLinhagem)}
                             disabled={!canMoveDown}
-                            className={`p-0.5 rounded ${canMoveDown ? 'hover:bg-gray-200 text-gray-500' : 'text-gray-200 cursor-not-allowed'}`}
+                            className={`p-0.5 rounded ${canMoveDown ? 'hover:bg-gray-200 text-gray-500' : 'text-[var(--text-muted)] cursor-not-allowed'}`}
                             title="Mover para baixo"
                           >
                             <ArrowDown className="w-3 h-3" />
@@ -914,7 +914,7 @@ export function TabelaCustos({ processoId, nomeFamilia, onTotaisChange }: Tabela
                           ${linha.tipoRegistro === 'Nascimento' ? 'bg-green-100 text-green-700' : ''}
                           ${linha.tipoRegistro === 'Casamento' ? 'bg-blue-100 text-blue-700' : ''}
                           ${linha.tipoRegistro === 'Óbito' ? 'bg-gray-200 text-gray-700' : ''}
-                          ${linha.tipoRegistro === '-' ? 'text-gray-400' : ''}
+                          ${linha.tipoRegistro === '-' ? 'text-[var(--text-muted)]' : ''}
                         `}>
                           {linha.tipoRegistro}
                         </span>
@@ -980,7 +980,7 @@ export function TabelaCustos({ processoId, nomeFamilia, onTotaisChange }: Tabela
                     const num = Number(String(bruto ?? '').replace(',', '.'))
                     return (
                       <td key={servico.id} className="px-2 py-1.5 text-right text-xs text-gray-700 border-r border-gray-200">
-                        {bruto && num > 0 ? formatarMoeda(num) : <span className="text-gray-300">—</span>}
+                        {bruto && num > 0 ? formatarMoeda(num) : <span className="text-[var(--text-muted)]">—</span>}
                       </td>
                     )
                   })}
@@ -1015,7 +1015,7 @@ export function TabelaCustos({ processoId, nomeFamilia, onTotaisChange }: Tabela
       {/* Resumo Total */}
       {/* 🆕 Marco 29/04/2026: "Total Geral do Processo" → "Total Geral da Pasta Documental" */}
       <div className="flex justify-end">
-        <div className="bg-gradient-to-r from-amber-500 to-orange-500 text-white px-6 py-4 rounded-xl shadow-lg">
+        <div className="bg-gradient-to-r from-amber-500 to-amber-500 text-white px-6 py-4 rounded-xl shadow-lg">
           <p className="text-sm opacity-90">Total Geral da Pasta Documental</p>
           <p className="text-2xl font-bold">{formatarMoeda(calcularTotalGeral())}</p>
         </div>

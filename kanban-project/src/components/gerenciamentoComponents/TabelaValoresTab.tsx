@@ -410,16 +410,16 @@ export default function TabelaValoresTab() {
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h2 className="text-xl font-semibold text-white">Tabelas de Preços</h2>
-          <p className="text-sm text-white/50">Repositório de valores: quanto vale cada Configuração Financeira. Custo/venda por fornecedor — a decisão de onde aplicar cada preço é da Regra Financeira. Preço ativo vale por tempo indeterminado.</p>
+          <p className="text-sm text-[var(--text-secondary)]">Repositório de valores: quanto vale cada Configuração Financeira. Custo/venda por fornecedor — a decisão de onde aplicar cada preço é da Regra Financeira. Preço ativo vale por tempo indeterminado.</p>
         </div>
-        <button onClick={abrirNovo} className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-[#fff] transition hover:bg-blue-500">+ Novo valor</button>
+        <button onClick={abrirNovo} className="rounded-lg bg-[var(--action-primary)] px-4 py-2 text-sm font-medium text-[var(--action-primary-ink)] transition hover:bg-[var(--action-primary)]">+ Novo valor</button>
       </div>
 
       <input value={busca} onChange={(e) => setBusca(e.target.value)} placeholder="Buscar por cadastro mestre, papel ou contexto..." className="w-full rounded-lg border border-[var(--border-default)] bg-[var(--surface-primary)] px-4 py-2 text-sm text-white placeholder-white/30 outline-none backdrop-blur focus:border-white/20" />
 
-      {loading && <div className="py-12 text-center text-sm text-white/40">Carregando...</div>}
-      {!loading && erroLista && <div className="rounded-lg border border-red-500/30 bg-red-500/10 p-4 text-sm text-red-200">{erroLista}<button onClick={() => void carregar()} className="ml-3 underline hover:text-white">Tentar de novo</button></div>}
-      {!loading && !erroLista && filtrados.length === 0 && <div className="rounded-xl border border-[var(--border-default)] bg-[var(--surface-primary)] py-12 text-center text-sm text-white/40 backdrop-blur">{busca ? 'Nenhum preço encontrado.' : 'Nenhum preço ainda. Crie o primeiro em “Novo valor”.'}</div>}
+      {loading && <div className="py-12 text-center text-sm text-[var(--text-muted)]">Carregando...</div>}
+      {!loading && erroLista && <div className="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-700">{erroLista}<button onClick={() => void carregar()} className="ml-3 underline hover:text-white">Tentar de novo</button></div>}
+      {!loading && !erroLista && filtrados.length === 0 && <div className="rounded-xl border border-[var(--border-default)] bg-[var(--surface-primary)] py-12 text-center text-sm text-[var(--text-muted)] backdrop-blur">{busca ? 'Nenhum preço encontrado.' : 'Nenhum preço ainda. Crie o primeiro em “Novo valor”.'}</div>}
 
       {!loading && !erroLista && filtrados.length > 0 && (
         <div className="overflow-hidden rounded-xl border border-[var(--border-default)] bg-[var(--surface-primary)] backdrop-blur">
@@ -429,7 +429,7 @@ export default function TabelaValoresTab() {
                   renderizava REGISTRO de preço; agora Custo e Venda são colunas
                   próprias do mesmo item, e "Preço" genérico deixou de existir. */}
               {['Código', 'Cadastro mestre', 'Origem', 'Custo', 'Venda', 'Status', ''].map((h, idx) => (
-                <th key={idx} className={`border-b border-[var(--border-default)] px-3 py-2.5 text-[11px] font-semibold uppercase tracking-wide text-white/50 ${idx === 3 || idx === 4 || idx === 6 ? 'text-right' : 'text-left'}`}>{h}</th>
+                <th key={idx} className={`border-b border-[var(--border-default)] px-3 py-2.5 text-[11px] font-semibold uppercase tracking-wide text-[var(--text-secondary)] ${idx === 3 || idx === 4 || idx === 6 ? 'text-right' : 'text-left'}`}>{h}</th>
               ))}
             </tr></thead>
             <tbody>
@@ -437,21 +437,21 @@ export default function TabelaValoresTab() {
                 const om = origemMestre(linha.referencia.configuracaoFinanceiraItem)
                 const ativo = !linha.referencia.arquivado
                 return (
-                  <tr key={linha.configId} className="border-b border-[var(--border-subtle)] last:border-0 hover:bg-white/[0.03]">
+                  <tr key={linha.configId} className="border-b border-[var(--border-subtle)] last:border-0 hover:bg-[var(--surface-primary)]">
                     <td className="px-3 py-2.5 font-mono text-[12px] text-white/70">{om.codigo ?? '—'}</td>
                     <td className="px-3 py-2.5 font-medium text-white">{om.mestre}</td>
                     <td className="px-3 py-2.5 text-white/60">{om.origem}</td>
                     <CelulaDimensao dim={linha.custo} onEditar={abrirEditar} onExcluir={excluir} />
                     <CelulaDimensao dim={linha.venda} onEditar={abrirEditar} onExcluir={excluir} />
-                    <td className="px-3 py-2.5"><span className={`rounded px-2 py-0.5 text-[11px] font-medium ${ativo ? 'bg-green-500/15 text-green-300' : 'bg-[var(--surface-primary)] text-white/50'}`}>{ativo ? 'Ativo' : 'Inativo'}</span></td>
-                    <td className="px-3 py-2.5 text-right text-[11px] text-white/40">
+                    <td className="px-3 py-2.5"><span className={`rounded px-2 py-0.5 text-[11px] font-medium ${ativo ? 'bg-green-50 text-green-700' : 'bg-[var(--surface-primary)] text-[var(--text-secondary)]'}`}>{ativo ? 'Ativo' : 'Inativo'}</span></td>
+                    <td className="px-3 py-2.5 text-right text-[11px] text-[var(--text-muted)]">
                       {/* VARIAÇÃO ≠ SEM PAPEL. O preço de um fornecedor específico
                           convivendo com o genérico é cadastro correto — é a régua
                           de prioridade do resolvedor. Chamá-lo de "sem papel"
                           fazia parecer defeito e escondia um preço vivo. */}
                       {linha.variacoes.length > 0 && (
                         <span
-                          className="mr-2 text-white/55"
+                          className="mr-2 text-[var(--text-secondary)]"
                           title={linha.variacoes
                             .map((v) => `${v.papel}: ${v.fornecedor ?? 'genérico'} — ${v.registro.moeda} ${String(v.registro.valor)}`)
                             .join('\n')}
@@ -474,7 +474,7 @@ export default function TabelaValoresTab() {
           <div className="max-h-[90vh] w-full max-w-2xl overflow-auto rounded-2xl border border-[var(--border-default)] bg-zinc-900/95 shadow-2xl">
             <div className="flex items-center justify-between border-b border-[var(--border-default)] px-6 py-4">
               <h3 className="text-lg font-semibold text-white">{editando ? 'Editar preço' : 'Novo valor'}</h3>
-              <button onClick={() => setModalAberto(false)} className="text-white/40 transition hover:text-white">✕</button>
+              <button onClick={() => setModalAberto(false)} className="text-[var(--text-muted)] transition hover:text-white">✕</button>
             </div>
             <div className="space-y-4 px-6 py-4">
               {/* Item via dois selects DEPENDENTES (sem digitação livre). Tipo = natureza
@@ -537,10 +537,10 @@ export default function TabelaValoresTab() {
                   </select>
                   {/* Confirmação do VÍNCULO — o que a tela mostra é o item resolvido pelo id. */}
                   {itemVinculado && rotuloItemVinculado && (
-                    <p className="mt-1 text-[11px] text-emerald-300/80">Item vinculado: {rotuloItemVinculado}</p>
+                    <p className="mt-1 text-[11px] text-emerald-700/80">Item vinculado: {rotuloItemVinculado}</p>
                   )}
                   {form.categoria && !editando && itensDaCategoria.length === 0 && (
-                    <p className="mt-1 text-[11px] text-white/40">Nenhum item nesta categoria. Cadastre a Configuração Financeira do mestre.</p>
+                    <p className="mt-1 text-[11px] text-[var(--text-muted)]">Nenhum item nesta categoria. Cadastre a Configuração Financeira do mestre.</p>
                   )}
                 </div>
               </div>
@@ -552,22 +552,22 @@ export default function TabelaValoresTab() {
               <div>
                 <label className="mb-1 block text-xs text-white/60">Natureza do preço *</label>
                 <div className="flex flex-wrap gap-x-6 gap-y-2">
-                  <label className={`flex items-center gap-2 text-sm ${(!itemVinculado || editando || !podeCusto) ? 'cursor-not-allowed text-white/30' : 'text-white/80'}`}>
+                  <label className={`flex items-center gap-2 text-sm ${(!itemVinculado || editando || !podeCusto) ? 'cursor-not-allowed text-[var(--text-muted)]' : 'text-white/80'}`}>
                     <input type="checkbox" checked={form.precoCusto}
                       disabled={!itemVinculado || !!editando || !podeCusto}
                       onChange={(e) => set('precoCusto', e.target.checked)} className="h-4 w-4 accent-amber-500" />
                     Preço de Custo
                   </label>
-                  <label className={`flex items-center gap-2 text-sm ${(!itemVinculado || editando || !podeVenda) ? 'cursor-not-allowed text-white/30' : 'text-white/80'}`}>
+                  <label className={`flex items-center gap-2 text-sm ${(!itemVinculado || editando || !podeVenda) ? 'cursor-not-allowed text-[var(--text-muted)]' : 'text-white/80'}`}>
                     <input type="checkbox" checked={form.precoVenda}
                       disabled={!itemVinculado || !!editando || !podeVenda}
                       onChange={(e) => set('precoVenda', e.target.checked)} className="h-4 w-4 accent-emerald-500" />
                     Preço de Venda
                   </label>
                 </div>
-                {!itemVinculado && <p className="mt-1 text-[11px] text-white/40">Selecione um item para escolher as naturezas.</p>}
+                {!itemVinculado && <p className="mt-1 text-[11px] text-[var(--text-muted)]">Selecione um item para escolher as naturezas.</p>}
                 {itemVinculado && itemSelecionado && !podeCusto && !podeVenda && (
-                  <p className="mt-1 text-[11px] text-amber-300/80">Esta configuração não habilita custo nem venda. Ajuste a Natureza Financeira em Configurações Financeiras.</p>
+                  <p className="mt-1 text-[11px] text-amber-700/80">Esta configuração não habilita custo nem venda. Ajuste a Natureza Financeira em Configurações Financeiras.</p>
                 )}
               </div>
 
@@ -591,20 +591,20 @@ export default function TabelaValoresTab() {
                 </div>
                 <div>
                   <label className="mb-1 block text-xs text-white/60">
-                    Unidade de cobrança {estrategiaDoModo(form.modoCalculo) === 'fixo' ? <span className="text-white/40">(referência)</span> : '*'}
+                    Unidade de cobrança {estrategiaDoModo(form.modoCalculo) === 'fixo' ? <span className="text-[var(--text-muted)]">(referência)</span> : '*'}
                   </label>
                   <select value={form.unidade} onChange={(e) => set('unidade', e.target.value)} className={inputCls}>
                     <option value="" className="bg-zinc-900">{estrategiaDoModo(form.modoCalculo) === 'fixo' ? '— (opcional) —' : 'Selecione a unidade'}</option>
                     {UNIDADES_COBRANCA_OPCOES.map(([k, label]) => <option key={k} value={k} className="bg-zinc-900">{label}</option>)}
                   </select>
-                  <p className="mt-1 text-[11px] text-white/40">O que está sendo contado (requerente, documento, página, hora…).</p>
+                  <p className="mt-1 text-[11px] text-[var(--text-muted)]">O que está sendo contado (requerente, documento, página, hora…).</p>
                 </div>
               </div>
 
               {/* Bloco PREÇO DE CUSTO — Fornecedor + Moeda + Valor */}
               {form.precoCusto && (
-                <div className="rounded-lg border border-amber-400/20 bg-amber-500/[0.04] p-3">
-                  <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-amber-300/80">Preço de Custo</div>
+                <div className="rounded-lg border border-amber-200 bg-amber-500/[0.04] p-3">
+                  <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-amber-700/80">Preço de Custo</div>
                   <div className="grid grid-cols-3 gap-3">
                     <div>
                       <label className="mb-1 block text-xs text-white/60">Fornecedor</label>
@@ -643,8 +643,8 @@ export default function TabelaValoresTab() {
 
               {/* Bloco PREÇO DE VENDA — Moeda + Valor (sem fornecedor) */}
               {form.precoVenda && (
-                <div className="rounded-lg border border-emerald-400/20 bg-emerald-500/[0.04] p-3">
-                  <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-emerald-300/80">Preço de Venda</div>
+                <div className="rounded-lg border border-emerald-200 bg-emerald-500/[0.04] p-3">
+                  <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-emerald-700/80">Preço de Venda</div>
                   <div className="grid grid-cols-2 gap-3">
                     <div>
                       <label className="mb-1 block text-xs text-white/60">Moeda da venda *</label>
@@ -699,7 +699,7 @@ export default function TabelaValoresTab() {
                 <label className="flex items-center gap-2 text-sm text-white/80"><input type="checkbox" checked={!form.arquivado} onChange={(e) => set('arquivado', !e.target.checked)} className="h-4 w-4 accent-blue-500" />Ativo</label>
               </div>
 
-              {erroModal && <div className="rounded-lg border border-red-500/30 bg-red-500/10 p-3 text-sm text-red-200">{erroModal}</div>}
+              {erroModal && <div className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700">{erroModal}</div>}
             </div>
             <div className="flex items-center justify-end gap-2 border-t border-[var(--border-default)] px-6 py-4">
               <button onClick={() => setModalAberto(false)} className="rounded-lg px-4 py-2 text-sm text-white/60 transition hover:text-white">Cancelar</button>
@@ -734,13 +734,13 @@ function CelulaDimensao({
   onEditar: (i: Item) => void
   onExcluir: (i: Item) => void
 }) {
-  if (!dim) return <td className="px-3 py-2.5 text-right text-white/25">—</td>
+  if (!dim) return <td className="px-3 py-2.5 text-right text-[var(--text-muted)]">—</td>
   const i = dim.registro
   const valor = estrategiaUsaPrimeiroAdicional(i.modoCalculo) && i.valorBase != null && i.valorAdicional != null
     ? (
       <span className="inline-flex flex-col items-end leading-tight gap-0.5">
-        <span><span className="text-[11px] text-white/50">{rotuloPrimeiro(i.unidade || '')}: </span>{fmtMoeda(i.valorBase, i.moeda)}</span>
-        <span className="text-[12px]"><span className="text-[11px] text-white/50">{rotuloAdicional(i.unidade || '')}: </span>{fmtMoeda(i.valorAdicional, i.moeda)}</span>
+        <span><span className="text-[11px] text-[var(--text-secondary)]">{rotuloPrimeiro(i.unidade || '')}: </span>{fmtMoeda(i.valorBase, i.moeda)}</span>
+        <span className="text-[12px]"><span className="text-[11px] text-[var(--text-secondary)]">{rotuloAdicional(i.unidade || '')}: </span>{fmtMoeda(i.valorAdicional, i.moeda)}</span>
       </span>
     )
     : <span>{fmtMoeda(i.valor, i.moeda)}</span>
@@ -749,11 +749,11 @@ function CelulaDimensao({
     <td className="group px-3 py-2.5 text-right tabular-nums text-white/90">
       <div className="inline-flex flex-col items-end leading-tight gap-0.5">
         {valor}
-        <span className="text-[11px] text-white/40">{rotuloEstrategia(i.modoCalculo)}</span>
-        {dim.fornecedor && <span className="text-[11px] text-white/40">{dim.fornecedor}</span>}
+        <span className="text-[11px] text-[var(--text-muted)]">{rotuloEstrategia(i.modoCalculo)}</span>
+        {dim.fornecedor && <span className="text-[11px] text-[var(--text-muted)]">{dim.fornecedor}</span>}
         <span className="mt-0.5 hidden gap-2 group-hover:flex">
           <button onClick={() => onEditar(i)} className="text-[11px] text-white/60 underline-offset-2 hover:text-white hover:underline">Editar</button>
-          <button onClick={() => onExcluir(i)} className="text-[11px] text-red-300/70 underline-offset-2 hover:text-red-200 hover:underline">Excluir</button>
+          <button onClick={() => onExcluir(i)} className="text-[11px] text-red-700/70 underline-offset-2 hover:text-red-700 hover:underline">Excluir</button>
         </span>
       </div>
     </td>

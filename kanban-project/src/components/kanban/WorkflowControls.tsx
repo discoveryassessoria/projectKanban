@@ -130,29 +130,29 @@ export function WorkflowControls({
 
         {/* Barra de progresso */}
         <div className="flex items-center justify-between mb-2">
-          <span className="text-[10px] font-bold uppercase tracking-wider text-white/40">
+          <span className="text-[10px] font-bold uppercase tracking-wider text-[var(--text-muted)]">
             Progresso operacional
           </span>
-          <span className="text-[11px] font-mono text-white/50">
+          <span className="text-[11px] font-mono text-[var(--text-secondary)]">
             {progress}% · {isCancelado && cancelledAt ? `Cancelado em ${cancelledAt}` : `Iniciado em ${startedAt}`}
           </span>
         </div>
-        <div className="h-1.5 bg-[#252c35] rounded-full overflow-hidden">
+        <div className="h-1.5 bg-[var(--surface-tertiary)] rounded-full overflow-hidden">
           <div
-            className="h-full bg-[#2563eb] rounded-full transition-all duration-500"
+            className="h-full bg-[var(--action-primary)] rounded-full transition-all duration-500"
             style={{ width: `${progress}%` }}
           />
         </div>
 
         {/* Banner de status */}
         {isPausado && (
-          <div className="mt-3 px-3 py-2 bg-amber-500/15 border border-amber-500/30 rounded-md text-[11px] text-amber-200 flex items-center gap-2">
+          <div className="mt-3 px-3 py-2 bg-amber-50 border border-amber-200 rounded-md text-[11px] text-amber-700 flex items-center gap-2">
             <Pause className="w-3 h-3 flex-shrink-0" />
             <span><strong>Operação PAUSADA</strong> · use Retomar quando estiver pronto pra continuar</span>
           </div>
         )}
         {isCancelado && (
-          <div className="mt-3 px-3 py-2 bg-red-500/15 border border-red-500/30 rounded-md text-[11px] text-red-200 flex items-center gap-2">
+          <div className="mt-3 px-3 py-2 bg-red-50 border border-red-200 rounded-md text-[11px] text-red-700 flex items-center gap-2">
             <Ban className="w-3 h-3 flex-shrink-0" />
             <span><strong>Operação CANCELADA</strong> · documento voltou pra fila de pendentes</span>
           </div>
@@ -165,7 +165,7 @@ export function WorkflowControls({
               <button
                 onClick={handlePausar}
                 disabled={!!actionLoading}
-                className="inline-flex items-center gap-1.5 px-3 py-1.5 text-[11px] font-medium rounded-md transition-colors disabled:opacity-50 border border-[#2563eb]/50 text-[#7dd3fc] bg-transparent hover:bg-[#2563eb]/10"
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 text-[11px] font-medium rounded-md transition-colors disabled:opacity-50 border border-[var(--border-strong)]/50 text-[#7dd3fc] bg-transparent hover:bg-[var(--action-primary)]/10"
               >
                 {actionLoading === "pausar" ? <Loader2 className="w-3 h-3 animate-spin" /> : <Pause className="w-3 h-3" />}
                 Pausar operação
@@ -184,7 +184,7 @@ export function WorkflowControls({
             <button
               onClick={() => setConfirmAction("cancelar")}
               disabled={!!actionLoading}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 text-[11px] font-medium rounded-md transition-colors disabled:opacity-50 border border-[var(--border-default)] text-white/80 bg-[#20262e] hover:bg-[#252c35]"
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 text-[11px] font-medium rounded-md transition-colors disabled:opacity-50 border border-[var(--border-default)] text-white/80 bg-[var(--surface-secondary)] hover:bg-[var(--surface-tertiary)]"
             >
               <X className="w-3 h-3" />
               Cancelar operação

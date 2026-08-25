@@ -72,12 +72,12 @@ export default function DashboardsTab() {
     },
   ]
 
-  if (loading) return <div className="py-24 text-center text-white/50">Carregando…</div>
+  if (loading) return <div className="py-24 text-center text-[var(--text-secondary)]">Carregando…</div>
 
   return (
     <div className="space-y-5">
       {erro && (
-        <div className="rounded-xl border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-200">
+        <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
           {erro} <button onClick={() => void load()} className="ml-2 underline hover:text-white">Tentar de novo</button>
         </div>
       )}
@@ -95,18 +95,18 @@ export default function DashboardsTab() {
           <a
             key={p.chave}
             href={p.href}
-            className="group flex flex-col rounded-2xl border border-[var(--border-default)] bg-[var(--surface-primary)] p-5 backdrop-blur-sm transition-all duration-150 hover:-translate-y-0.5 hover:border-[var(--border-strong)] hover:bg-white/[0.08] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/40"
+            className="group flex flex-col rounded-2xl border border-[var(--border-default)] bg-[var(--surface-primary)] p-5 backdrop-blur-sm transition-all duration-150 hover:-translate-y-0.5 hover:border-[var(--border-strong)] hover:bg-[var(--surface-primary)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/40"
           >
-            <div className="mb-3 flex h-11 w-11 flex-none items-center justify-center rounded-xl border border-[var(--border-default)] bg-white/[0.07] text-white/85">
+            <div className="mb-3 flex h-11 w-11 flex-none items-center justify-center rounded-xl border border-[var(--border-default)] bg-[var(--surface-primary)] text-white/85">
               <p.Icon className="h-5 w-5" />
             </div>
             <h3 className="text-base font-semibold text-white">{p.nome}</h3>
-            <p className="mt-1 flex-1 text-[13px] leading-snug text-white/55">{p.descricao}</p>
+            <p className="mt-1 flex-1 text-[13px] leading-snug text-[var(--text-secondary)]">{p.descricao}</p>
             <div className="mt-4 flex flex-wrap gap-x-5 gap-y-1 border-t border-[var(--border-default)] pt-3">
               {p.metricas.filter((m) => !("oculto" in m && m.oculto)).map((m) => (
                 <div key={m.label}>
                   <div className="text-lg font-bold text-white">{m.valor}</div>
-                  <div className="text-[10px] font-semibold uppercase tracking-wide text-white/45">{m.label}</div>
+                  <div className="text-[10px] font-semibold uppercase tracking-wide text-[var(--text-secondary)]">{m.label}</div>
                 </div>
               ))}
             </div>

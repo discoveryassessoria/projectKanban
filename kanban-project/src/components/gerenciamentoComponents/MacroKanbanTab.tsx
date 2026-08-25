@@ -180,28 +180,28 @@ export default function MacroKanbanTab() {
     <div className="space-y-5">
       <div>
         <h2 className="text-xl font-semibold text-white">Workflow Macro / Kanban</h2>
-        <p className="text-sm text-white/50">As fases de cada processo — adicione, remova e reordene. As colunas do kanban saem daqui.</p>
+        <p className="text-sm text-[var(--text-secondary)]">As fases de cada processo — adicione, remova e reordene. As colunas do kanban saem daqui.</p>
       </div>
 
-      <div className="rounded-lg border border-blue-500/30 bg-blue-500/10 px-4 py-2.5 text-sm text-blue-200">
+      <div className="rounded-lg border border-blue-200 bg-blue-50 px-4 py-2.5 text-sm text-blue-700">
         O Workflow Macro define a <span className="font-medium">SEQUÊNCIA</span> das fases. Os requisitos para <span className="font-medium">CONCLUIR</span> cada fase são definidos no Workflow Interno; o avanço é executado pelo PhaseAdvanceService.
       </div>
 
       {salvoMsg && (
-        <div className="rounded-lg border border-green-500/30 bg-green-500/10 px-4 py-2.5 text-sm text-green-200">
+        <div className="rounded-lg border border-green-200 bg-green-50 px-4 py-2.5 text-sm text-green-700">
           ✓ {salvoMsg}
         </div>
       )}
 
-      {loading && <div className="py-12 text-center text-sm text-white/40">Carregando...</div>}
+      {loading && <div className="py-12 text-center text-sm text-[var(--text-muted)]">Carregando...</div>}
       {!loading && erro && (
-        <div className="rounded-lg border border-red-500/30 bg-red-500/10 p-4 text-sm text-red-200">{erro}
+        <div className="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-700">{erro}
           <button onClick={() => { void bootstrap() }} className="ml-3 underline hover:text-white">Tentar de novo</button>
         </div>
       )}
 
       {!loading && !erro && tipos.length === 0 && (
-        <div className="rounded-lg border border-amber-500/30 bg-amber-500/10 p-3 text-sm text-amber-200">
+        <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-700">
           Nenhum tipo de processo ainda. Crie em <span className="font-medium">Processos de Nacionalidade</span> primeiro.
         </div>
       )}
@@ -221,7 +221,7 @@ export default function MacroKanbanTab() {
             </select>
           </div>
 
-          {tipoId && carregandoWf && <div className="py-8 text-center text-sm text-white/40">Carregando workflow...</div>}
+          {tipoId && carregandoWf && <div className="py-8 text-center text-sm text-[var(--text-muted)]">Carregando workflow...</div>}
 
           {/* Sem workflow ainda → CTA */}
           {tipoId && !carregandoWf && !wf && (
@@ -229,9 +229,9 @@ export default function MacroKanbanTab() {
               <p className="text-sm text-white/70">
                 <span className="font-medium text-white">{tipoSel?.name}</span> ainda não tem um Workflow Macro.
               </p>
-              <p className="mt-1 text-xs text-white/40">Comece pelas 10 fases padrão (recomendado) ou monte do zero.</p>
+              <p className="mt-1 text-xs text-[var(--text-muted)]">Comece pelas 10 fases padrão (recomendado) ou monte do zero.</p>
               <div className="mt-4 flex flex-wrap items-center justify-center gap-3">
-                <button onClick={() => criarWorkflow(true)} disabled={criando} className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-[#fff] transition hover:bg-blue-500 disabled:opacity-50">
+                <button onClick={() => criarWorkflow(true)} disabled={criando} className="rounded-lg bg-[var(--action-primary)] px-4 py-2 text-sm font-medium text-[var(--action-primary-ink)] transition hover:bg-[var(--action-primary)] disabled:opacity-50">
                   {criando ? 'Criando...' : 'Criar com as 10 fases padrão'}
                 </button>
                 <button onClick={() => criarWorkflow(false)} disabled={criando} className="rounded-lg border border-[var(--border-default)] px-4 py-2 text-sm text-white/80 transition hover:bg-[var(--surface-hover)] disabled:opacity-50">
@@ -246,13 +246,13 @@ export default function MacroKanbanTab() {
             <div className="space-y-4">
               {/* Prévia do kanban */}
               <div className="rounded-xl border border-[var(--border-default)] bg-[var(--surface-primary)] p-4 backdrop-blur">
-                <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-white/40">Prévia do kanban ({colunas.length} colunas)</div>
+                <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-[var(--text-muted)]">Prévia do kanban ({colunas.length} colunas)</div>
                 {colunas.length === 0 ? (
-                  <div className="text-sm text-white/40">Nenhuma coluna — adicione fases ou marque "no kanban".</div>
+                  <div className="text-sm text-[var(--text-muted)]">Nenhuma coluna — adicione fases ou marque "no kanban".</div>
                 ) : (
                   <div className="flex gap-2 overflow-x-auto pb-1">
                     {colunas.map((c, i) => (
-                      <div key={i} className="flex h-16 min-w-[130px] shrink-0 items-center justify-center rounded-lg border border-[var(--border-default)] bg-white/[0.04] px-3 text-center text-xs font-medium text-white/80">
+                      <div key={i} className="flex h-16 min-w-[130px] shrink-0 items-center justify-center rounded-lg border border-[var(--border-default)] bg-[var(--surface-primary)] px-3 text-center text-xs font-medium text-white/80">
                         {c}
                       </div>
                     ))}
@@ -262,18 +262,18 @@ export default function MacroKanbanTab() {
 
               {/* Lista de fases */}
               <div className="space-y-2">
-                {fases.length === 0 && <div className="rounded-lg border border-dashed border-[var(--border-default)] p-6 text-center text-sm text-white/40">Workflow vazio. Adicione a primeira fase abaixo.</div>}
+                {fases.length === 0 && <div className="rounded-lg border border-dashed border-[var(--border-default)] p-6 text-center text-sm text-[var(--text-muted)]">Workflow vazio. Adicione a primeira fase abaixo.</div>}
                 {fases.map((f, idx) => (
                   <div key={f.phaseKey} className="rounded-xl border border-[var(--border-default)] bg-[var(--surface-primary)] p-3 backdrop-blur">
                     <div className="flex items-center gap-3">
                       <div className="flex flex-col">
-                        <button onClick={() => mover(idx, -1)} disabled={idx === 0} className="text-white/40 transition hover:text-white disabled:opacity-20" title="Subir">▲</button>
-                        <button onClick={() => mover(idx, 1)} disabled={idx === fases.length - 1} className="text-white/40 transition hover:text-white disabled:opacity-20" title="Descer">▼</button>
+                        <button onClick={() => mover(idx, -1)} disabled={idx === 0} className="text-[var(--text-muted)] transition hover:text-white disabled:opacity-20" title="Subir">▲</button>
+                        <button onClick={() => mover(idx, 1)} disabled={idx === fases.length - 1} className="text-[var(--text-muted)] transition hover:text-white disabled:opacity-20" title="Descer">▼</button>
                       </div>
                       <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-[var(--surface-primary)] text-xs font-semibold text-white/70">{f.ordem}</div>
                       <input value={f.label} onChange={(e) => patch(idx, { label: e.target.value })} className="flex-1 rounded-lg border border-[var(--border-default)] bg-[var(--surface-primary)] px-3 py-1.5 text-sm text-white outline-none focus:border-white/20" />
-                      {f.conditional && <span className="rounded-md bg-amber-500/15 px-2 py-0.5 text-[11px] font-medium text-amber-300">condicional</span>}
-                      <button onClick={() => remover(idx)} className="rounded-md border border-red-500/20 px-2 py-1 text-xs text-red-300/80 transition hover:bg-red-500/10 hover:text-red-200">Remover</button>
+                      {f.conditional && <span className="rounded-md bg-amber-50 px-2 py-0.5 text-[11px] font-medium text-amber-700">condicional</span>}
+                      <button onClick={() => remover(idx)} className="rounded-md border border-red-200 px-2 py-1 text-xs text-red-700/80 transition hover:bg-red-50 hover:text-red-700">Remover</button>
                     </div>
                     <div className="mt-2 flex flex-wrap items-center gap-x-5 gap-y-2 pl-[68px] text-xs text-white/60">
                       <label className="flex items-center gap-1.5">
@@ -314,7 +314,7 @@ export default function MacroKanbanTab() {
                     continua sendo só o compositor, e não ganha um CRUD paralelo. */}
                 <a
                   href="?screen=fases"
-                  className="rounded-lg px-2 py-2 text-xs text-white/45 underline-offset-4 transition hover:text-white/70 hover:underline"
+                  className="rounded-lg px-2 py-2 text-xs text-[var(--text-secondary)] underline-offset-4 transition hover:text-white/70 hover:underline"
                   title="Abre o cadastro de fases, onde novas fases são criadas"
                 >
                   A fase que preciso não está na lista
@@ -323,10 +323,10 @@ export default function MacroKanbanTab() {
 
               {/* Barra de ações */}
               <div className="flex items-center justify-between gap-3 border-t border-[var(--border-default)] pt-4">
-                <button onClick={excluirWorkflow} className="text-xs text-red-300/70 transition hover:text-red-200">Excluir workflow</button>
+                <button onClick={excluirWorkflow} className="text-xs text-red-700/70 transition hover:text-red-700">Excluir workflow</button>
                 <div className="flex items-center gap-3">
-                  {dirty && <span className="text-xs text-amber-300/80">alterações não salvas</span>}
-                  <button onClick={salvar} disabled={salvando || !dirty} className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-[#fff] transition hover:bg-blue-500 disabled:opacity-50">
+                  {dirty && <span className="text-xs text-amber-700/80">alterações não salvas</span>}
+                  <button onClick={salvar} disabled={salvando || !dirty} className="rounded-lg bg-[var(--action-primary)] px-4 py-2 text-sm font-medium text-[var(--action-primary-ink)] transition hover:bg-[var(--action-primary)] disabled:opacity-50">
                     {salvando ? 'Salvando...' : 'Salvar workflow'}
                   </button>
                 </div>

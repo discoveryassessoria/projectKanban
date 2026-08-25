@@ -30,7 +30,7 @@ export default function CatalogTab({ catalogKey }: { catalogKey: string }) {
     return (
       <div className="rounded-xl border border-[var(--border-default)] bg-[var(--surface-primary)] p-10 text-center backdrop-blur">
         <div className="text-sm font-semibold text-white/80">Cadastro ainda não configurado</div>
-        <div className="mt-1 text-xs text-white/40">
+        <div className="mt-1 text-xs text-[var(--text-muted)]">
           O item <code className="rounded bg-[var(--surface-primary)] px-1">{catalogKey}</code> existe no menu mas não tem
           configuração de catálogo. Será definido numa próxima etapa.
         </div>
@@ -58,7 +58,7 @@ export default function CatalogTab({ catalogKey }: { catalogKey: string }) {
   return (
     <div className="text-white">
       <AvisoRascunho />
-      <div className="mb-3 text-xs text-white/50">{cfg.desc}</div>
+      <div className="mb-3 text-xs text-[var(--text-secondary)]">{cfg.desc}</div>
 
       {/* título da seção + ações (desabilitadas enquanto não há persistência) */}
       <div className="mb-3 flex items-center justify-between gap-2">
@@ -81,7 +81,7 @@ export default function CatalogTab({ catalogKey }: { catalogKey: string }) {
               {headers.map((h, i) => (
                 <th
                   key={i}
-                  className={`border-b border-[var(--border-default)] px-3 py-2.5 text-[11px] font-semibold uppercase tracking-wide text-white/50 ${
+                  className={`border-b border-[var(--border-default)] px-3 py-2.5 text-[11px] font-semibold uppercase tracking-wide text-[var(--text-secondary)] ${
                     i === headers.length - 1 ? 'text-right' : 'text-left'
                   }`}
                 >
@@ -93,7 +93,7 @@ export default function CatalogTab({ catalogKey }: { catalogKey: string }) {
           <tbody>
             {rows.length === 0 ? (
               <tr>
-                <td colSpan={headers.length} className="px-3 py-6 text-center text-xs text-white/40">
+                <td colSpan={headers.length} className="px-3 py-6 text-center text-xs text-[var(--text-muted)]">
                   Nenhum cadastro. Clique em “+ Novo” para começar.
                 </td>
               </tr>
@@ -106,7 +106,7 @@ export default function CatalogTab({ catalogKey }: { catalogKey: string }) {
                     </td>
                   ))}
                   <td className="border-b border-[var(--border-default)] px-3 py-2.5">
-                    <span className="rounded bg-green-500/15 px-1.5 py-0.5 text-[10px] font-semibold text-green-300">
+                    <span className="rounded bg-green-50 px-1.5 py-0.5 text-[10px] font-semibold text-green-700">
                       ativo
                     </span>
                   </td>
@@ -131,7 +131,7 @@ export default function CatalogTab({ catalogKey }: { catalogKey: string }) {
               <h3 className="text-base font-semibold text-white">
                 {editId ? 'Editar' : 'Novo'} · {cfg.title}
               </h3>
-              <button onClick={() => setModalOpen(false)} className="text-white/40 transition hover:text-white">
+              <button onClick={() => setModalOpen(false)} className="text-[var(--text-muted)] transition hover:text-white">
                 ✕
               </button>
             </div>
@@ -169,7 +169,7 @@ function RowBtn({ children, danger }: { children: React.ReactNode; danger?: bool
       disabled
       title={TITULO_RASCUNHO}
       className={`ml-1 cursor-not-allowed rounded border border-[var(--border-default)] px-1.5 py-0.5 text-[10px] ${
-        danger ? 'text-red-300/40' : 'text-white/35'
+        danger ? 'text-red-700/40' : 'text-[var(--text-muted)]'
       }`}
     >
       {children}

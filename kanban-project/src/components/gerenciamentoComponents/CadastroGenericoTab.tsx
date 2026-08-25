@@ -229,7 +229,7 @@ export default function CadastroGenericoTab({ entidade }: { entidade: string }) 
     return s.length > 70 ? `${s.slice(0, 70)}…` : s
   }
 
-  if (loading) return <div className="py-24 text-center text-white/50">Carregando…</div>
+  if (loading) return <div className="py-24 text-center text-[var(--text-secondary)]">Carregando…</div>
   if (!spec) {
     return (
       <div className={`${CARD} p-8 text-center text-sm text-white/60`}>
@@ -241,9 +241,9 @@ export default function CadastroGenericoTab({ entidade }: { entidade: string }) 
 
   return (
     <div className="space-y-5">
-      {flash && <div className="rounded-xl border border-green-400/30 bg-green-500/15 px-4 py-3 text-sm text-green-200">{flash}</div>}
+      {flash && <div className="rounded-xl border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-700">{flash}</div>}
       {erro && !form && (
-        <div className="rounded-xl border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-200">
+        <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
           {erro} <button onClick={() => { setErro(null); load() }} className="ml-2 underline hover:text-white">Recarregar</button>
         </div>
       )}
@@ -254,7 +254,7 @@ export default function CadastroGenericoTab({ entidade }: { entidade: string }) 
             <h2 className="text-lg font-semibold text-white">{spec.titulo}</h2>
             <p className="mt-1 max-w-3xl text-sm text-white/60">{spec.descricao}</p>
           </div>
-          <button onClick={novo} className="flex-none rounded-lg bg-blue-600 px-3 py-2 text-xs font-medium text-[#fff] hover:bg-blue-500">
+          <button onClick={novo} className="flex-none rounded-lg bg-[var(--action-primary)] px-3 py-2 text-xs font-medium text-[var(--action-primary-ink)] hover:bg-[var(--action-primary)]">
             {spec.novoLabel}
           </button>
         </div>
@@ -267,7 +267,7 @@ export default function CadastroGenericoTab({ entidade }: { entidade: string }) 
 
       <div className={`overflow-x-auto ${CARD}`}>
         <table className="w-full text-sm">
-          <thead className="border-b border-[var(--border-default)] text-left text-xs text-white/50">
+          <thead className="border-b border-[var(--border-default)] text-left text-xs text-[var(--text-secondary)]">
             <tr>
               {spec.ordenavel && <th className="w-10 px-2 py-3 font-medium" aria-label="Ordem" />}
               {spec.colunas.map((c) => <th key={c.key} className="px-4 py-3 font-medium">{c.label}</th>)}
@@ -278,7 +278,7 @@ export default function CadastroGenericoTab({ entidade }: { entidade: string }) 
           <tbody>
             {filtradas.length === 0 ? (
               <tr>
-                <td colSpan={spec.colunas.length + (spec.ordenavel ? 3 : 2)} className="px-4 py-10 text-center text-xs text-white/40">
+                <td colSpan={spec.colunas.length + (spec.ordenavel ? 3 : 2)} className="px-4 py-10 text-center text-xs text-[var(--text-muted)]">
                   {rows.length === 0 ? `Nenhum registro. Comece em “${spec.novoLabel}”.` : "Nada encontrado para esta busca."}
                 </td>
               </tr>
@@ -303,7 +303,7 @@ export default function CadastroGenericoTab({ entidade }: { entidade: string }) 
                   <td className="px-2 py-2.5 align-middle">
                     <div className="flex items-center gap-0.5">
                       <span
-                        className={`text-white/25 ${busca ? "cursor-not-allowed" : "cursor-grab"}`}
+                        className={`text-[var(--text-muted)] ${busca ? "cursor-not-allowed" : "cursor-grab"}`}
                         title={busca ? "Limpe a busca para reordenar" : "Arraste para reordenar"}
                       >
                         <IGrip />
@@ -314,13 +314,13 @@ export default function CadastroGenericoTab({ entidade }: { entidade: string }) 
                           type="button" aria-label={`Mover ${String(r.nome ?? r.id)} para cima`}
                           disabled={!!busca || idx === 0}
                           onClick={() => void salvarOrdem(moverUmaPosicao(idsOrdenados, Number(r.id), "cima"))}
-                          className="leading-none text-white/40 hover:text-white disabled:opacity-20"
+                          className="leading-none text-[var(--text-muted)] hover:text-white disabled:opacity-20"
                         >▲</button>
                         <button
                           type="button" aria-label={`Mover ${String(r.nome ?? r.id)} para baixo`}
                           disabled={!!busca || idx === filtradas.length - 1}
                           onClick={() => void salvarOrdem(moverUmaPosicao(idsOrdenados, Number(r.id), "baixo"))}
-                          className="leading-none text-white/40 hover:text-white disabled:opacity-20"
+                          className="leading-none text-[var(--text-muted)] hover:text-white disabled:opacity-20"
                         >▼</button>
                       </div>
                     </div>
@@ -335,15 +335,15 @@ export default function CadastroGenericoTab({ entidade }: { entidade: string }) 
                   <button
                     onClick={() => alternarAtivo(r)}
                     title={r.ativo ? "Inativar (some dos seletores, sem apagar)" : "Ativar"}
-                    className={`rounded-full px-2 py-0.5 text-[10px] ${r.ativo ? "bg-green-500/15 text-green-300" : "bg-[var(--surface-primary)] text-white/50"}`}
+                    className={`rounded-full px-2 py-0.5 text-[10px] ${r.ativo ? "bg-green-50 text-green-700" : "bg-[var(--surface-primary)] text-[var(--text-secondary)]"}`}
                   >
                     {r.ativo ? "Ativo" : "Inativo"}
                   </button>
                 </td>
                 <td className="px-4 py-2.5">
-                  <div className="flex items-center justify-end gap-0.5 text-white/50">
+                  <div className="flex items-center justify-end gap-0.5 text-[var(--text-secondary)]">
                     <button title="Editar" aria-label="Editar" onClick={() => editar(r)} className="rounded p-1 hover:bg-[var(--surface-hover)] hover:text-white"><IEdit /></button>
-                    <button title="Excluir" aria-label="Excluir" onClick={() => excluir(r)} className="rounded p-1 text-red-300/70 hover:bg-red-500/10 hover:text-red-300"><ITrash /></button>
+                    <button title="Excluir" aria-label="Excluir" onClick={() => excluir(r)} className="rounded p-1 text-red-700/70 hover:bg-red-50 hover:text-red-700"><ITrash /></button>
                   </div>
                 </td>
               </tr>
@@ -363,7 +363,7 @@ export default function CadastroGenericoTab({ entidade }: { entidade: string }) 
               </h3>
             </div>
             <div className="flex-1 overflow-y-auto px-6 py-4">
-              {erro && <div className="mb-3 rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-2 text-sm text-red-200">{erro}</div>}
+              {erro && <div className="mb-3 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">{erro}</div>}
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                 {spec.campos.map((c, indiceCampo) => {
                   // Somente leitura: administrado pelo sistema, nunca editável.
@@ -396,7 +396,7 @@ export default function CadastroGenericoTab({ entidade }: { entidade: string }) 
                         </select>
                       ) : c.tipo === "multiselect" ? (
                         <div className="max-h-44 space-y-1 overflow-y-auto rounded-lg border border-[var(--border-default)] bg-[var(--surface-primary)] p-2">
-                          {opcoesDe(c).length === 0 && <div className="px-1 py-2 text-xs text-white/40">Nenhuma opção disponível.</div>}
+                          {opcoesDe(c).length === 0 && <div className="px-1 py-2 text-xs text-[var(--text-muted)]">Nenhuma opção disponível.</div>}
                           {opcoesDe(c).map((o) => {
                             const sel = Array.isArray(v) && (v as unknown[]).map(String).includes(o.valor)
                             return (
@@ -424,8 +424,8 @@ export default function CadastroGenericoTab({ entidade }: { entidade: string }) 
                           className={`${inputCls} disabled:opacity-50 ${erroDesteCampo ? "border-red-500/60" : ""}`} />
                       )}
                       {/* Mensagem de validação embaixo do campo a que se refere. */}
-                      {erroDesteCampo && <p className="mt-1 text-[11px] text-red-300">{erroDesteCampo}</p>}
-                      {c.ajuda && !erroDesteCampo && <p className="mt-1 text-[11px] text-white/40">{c.ajuda}</p>}
+                      {erroDesteCampo && <p className="mt-1 text-[11px] text-red-700">{erroDesteCampo}</p>}
+                      {c.ajuda && !erroDesteCampo && <p className="mt-1 text-[11px] text-[var(--text-muted)]">{c.ajuda}</p>}
                     </div>
                   )
                 })}
@@ -433,7 +433,7 @@ export default function CadastroGenericoTab({ entidade }: { entidade: string }) 
             </div>
             <div className="flex justify-end gap-2 border-t border-[var(--border-default)] px-6 py-4">
               <button onClick={() => fecharModal()} className="rounded-lg border border-[var(--border-default)] bg-[var(--surface-primary)] px-4 py-2 text-sm text-white/80 hover:bg-[var(--surface-hover)]">Cancelar</button>
-              <button disabled={busy} onClick={salvar} className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-[#fff] hover:bg-blue-500 disabled:opacity-50">
+              <button disabled={busy} onClick={salvar} className="rounded-lg bg-[var(--action-primary)] px-4 py-2 text-sm font-medium text-[var(--action-primary-ink)] hover:bg-[var(--action-primary)] disabled:opacity-50">
                 {busy ? "Salvando…" : "Salvar"}
               </button>
             </div>

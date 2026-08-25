@@ -32,7 +32,7 @@ function Section({
 }) {
   return (
     <div className="mb-3">
-      {desc && <div className="mb-3 text-xs text-white/50">{desc}</div>}
+      {desc && <div className="mb-3 text-xs text-[var(--text-secondary)]">{desc}</div>}
       <div className="flex items-center justify-between gap-2">
         <h2 className="text-base font-semibold text-white">{title}</h2>
         {action}
@@ -50,7 +50,7 @@ function Table({ headers, empty }: { headers: string[]; empty?: string }) {
             {headers.map((h, i) => (
               <th
                 key={i}
-                className={`border-b border-[var(--border-default)] px-3 py-2.5 text-[11px] font-semibold uppercase tracking-wide text-white/50 ${
+                className={`border-b border-[var(--border-default)] px-3 py-2.5 text-[11px] font-semibold uppercase tracking-wide text-[var(--text-secondary)] ${
                   i === headers.length - 1 ? 'text-right' : 'text-left'
                 }`}
               >
@@ -63,11 +63,11 @@ function Table({ headers, empty }: { headers: string[]; empty?: string }) {
           <tr>
             <td colSpan={headers.length} className="px-4 py-10">
               <div className="mx-auto flex max-w-sm flex-col items-center text-center">
-                <div className="mb-3 flex h-11 w-11 items-center justify-center rounded-full border border-[var(--border-default)] bg-white/[0.05]">
-                  <Inbox className="h-5 w-5 text-white/45" />
+                <div className="mb-3 flex h-11 w-11 items-center justify-center rounded-full border border-[var(--border-default)] bg-[var(--surface-primary)]">
+                  <Inbox className="h-5 w-5 text-[var(--text-secondary)]" />
                 </div>
                 <div className="text-sm font-semibold text-white/85">Nenhum item cadastrado</div>
-                <div className="mt-1 text-[13px] text-white/50">
+                <div className="mt-1 text-[13px] text-[var(--text-secondary)]">
                   {empty || 'Cadastre o primeiro item para começar — use “+ Novo” acima.'}
                 </div>
               </div>
@@ -192,7 +192,7 @@ export function ImportExportTab() {
       <AvisoRascunho />
       <Section title="Importação / Exportação" />
       <div className={`mb-3 ${CARD} p-4`}>
-        <div className="mb-2 text-[11px] font-bold uppercase tracking-wide text-white/50">Exportar (JSON)</div>
+        <div className="mb-2 text-[11px] font-bold uppercase tracking-wide text-[var(--text-secondary)]">Exportar (JSON)</div>
         <div className="flex flex-wrap gap-2">
           {EXPORT_SCOPES.map((s) => (
             <button key={s} disabled title={TITULO_RASCUNHO} className={BTN_RASCUNHO}>{s}</button>
@@ -200,7 +200,7 @@ export function ImportExportTab() {
         </div>
       </div>
       <div className={`${CARD} p-4`}>
-        <div className="mb-2 text-[11px] font-bold uppercase tracking-wide text-white/50">Importar (JSON)</div>
+        <div className="mb-2 text-[11px] font-bold uppercase tracking-wide text-[var(--text-secondary)]">Importar (JSON)</div>
         <textarea
           rows={6}
           value={json}
@@ -223,12 +223,12 @@ export function BackupTab() {
     <div>
       <AvisoRascunho />
       <Section title="Backup / Restauração" action={<button disabled title={TITULO_RASCUNHO} className={BTN_RASCUNHO}>Baixar Backup Completo</button>} />
-      <div className={`mb-3 ${CARD} p-4 text-xs text-white/50`}>
+      <div className={`mb-3 ${CARD} p-4 text-xs text-[var(--text-secondary)]`}>
         O backup inclui processos, pessoas, financeiro, protocolos, gerenciamento e configurações. Antes de
         restaurar, um backup automático é criado.
       </div>
       <div className={`mb-3 ${CARD} p-4`}>
-        <div className="mb-2 text-[11px] font-bold uppercase tracking-wide text-white/50">Restaurar</div>
+        <div className="mb-2 text-[11px] font-bold uppercase tracking-wide text-[var(--text-secondary)]">Restaurar</div>
         <textarea
           rows={5}
           value={json}

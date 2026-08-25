@@ -203,7 +203,7 @@ export default function RolesTab() {
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h2 className="text-xl font-semibold text-white">Perfis de permissão</h2>
-          <p className="text-sm text-white/50">
+          <p className="text-sm text-[var(--text-secondary)]">
             Defina o que cada perfil pode ver e fazer no sistema.
           </p>
         </div>
@@ -225,11 +225,11 @@ export default function RolesTab() {
 
       {/* Estados */}
       {loading && (
-        <div className="py-12 text-center text-sm text-white/40">Carregando perfis...</div>
+        <div className="py-12 text-center text-sm text-[var(--text-muted)]">Carregando perfis...</div>
       )}
 
       {!loading && erroLista && (
-        <div className="rounded-lg border border-red-500/30 bg-red-500/10 p-4 text-sm text-red-200">
+        <div className="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-700">
           {erroLista}
           <button onClick={() => void carregar()} className="ml-3 underline hover:text-white">
             Tentar de novo
@@ -238,7 +238,7 @@ export default function RolesTab() {
       )}
 
       {!loading && !erroLista && perfisFiltrados.length === 0 && (
-        <div className="rounded-xl border border-[var(--border-default)] bg-[var(--surface-primary)] py-12 text-center text-sm text-white/40 backdrop-blur">
+        <div className="rounded-xl border border-[var(--border-default)] bg-[var(--surface-primary)] py-12 text-center text-sm text-[var(--text-muted)] backdrop-blur">
           {busca ? 'Nenhum perfil encontrado.' : 'Nenhum perfil cadastrado ainda. Crie o primeiro.'}
         </div>
       )}
@@ -264,7 +264,7 @@ export default function RolesTab() {
                     <div className="flex items-center gap-2">
                       <h3 className="truncate font-medium text-white">{p.nome}</h3>
                       {bloqueado ? (
-                        <span className="shrink-0 rounded bg-amber-500/15 px-1.5 py-0.5 text-[10px] font-medium text-amber-300">
+                        <span className="shrink-0 rounded bg-amber-50 px-1.5 py-0.5 text-[10px] font-medium text-amber-700">
                           Protegido
                         </span>
                       ) : p.sistema ? (
@@ -273,13 +273,13 @@ export default function RolesTab() {
                         </span>
                       ) : null}
                     </div>
-                    <p className="truncate text-xs text-white/50">
+                    <p className="truncate text-xs text-[var(--text-secondary)]">
                       {p.descricao || 'Sem descrição'}
                     </p>
                   </div>
                 </div>
 
-                <div className="mb-4 flex items-center gap-4 text-xs text-white/50">
+                <div className="mb-4 flex items-center gap-4 text-xs text-[var(--text-secondary)]">
                   <span>
                     <strong className="text-white/80">{ativas}</strong>/{TOTAL_PERMISSOES} permissões
                   </span>
@@ -304,7 +304,7 @@ export default function RolesTab() {
                   {!bloqueado && (
                     <button
                       onClick={() => excluir(p)}
-                      className="ml-auto rounded-md border border-red-500/20 px-2.5 py-1.5 text-red-300/80 transition hover:bg-red-500/10 hover:text-red-200"
+                      className="ml-auto rounded-md border border-red-200 px-2.5 py-1.5 text-red-700/80 transition hover:bg-red-50 hover:text-red-700"
                     >
                       Excluir
                     </button>
@@ -327,7 +327,7 @@ export default function RolesTab() {
               </h3>
               <button
                 onClick={() => setModalAberto(false)}
-                className="text-white/40 transition hover:text-white"
+                className="text-[var(--text-muted)] transition hover:text-white"
               >
                 ✕
               </button>
@@ -336,7 +336,7 @@ export default function RolesTab() {
             {/* corpo rolável */}
             <div className="flex-1 overflow-y-auto px-6 py-4">
               {somenteLeitura && (
-                <div className="mb-4 rounded-lg border border-amber-500/20 bg-amber-500/10 p-3 text-xs text-amber-200">
+                <div className="mb-4 rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs text-amber-700">
                   O perfil <strong>Administrador</strong> não pode ser editado. Use <strong>Duplicar</strong> para criar uma versão editável.
                 </div>
               )}
@@ -391,17 +391,17 @@ export default function RolesTab() {
                 <div className="mb-3 flex items-center justify-between">
                   <span className="text-sm font-medium text-white">
                     Permissões{' '}
-                    <span className="text-white/40">
+                    <span className="text-[var(--text-muted)]">
                       ({ativasNoForm}/{TOTAL_PERMISSOES})
                     </span>
                   </span>
                   {!somenteLeitura && (
                     <div className="flex gap-2 text-xs">
-                      <button onClick={() => setTodas(true)} className="text-white/50 hover:text-white">
+                      <button onClick={() => setTodas(true)} className="text-[var(--text-secondary)] hover:text-white">
                         Marcar tudo
                       </button>
-                      <span className="text-white/20">·</span>
-                      <button onClick={() => setTodas(false)} className="text-white/50 hover:text-white">
+                      <span className="text-[var(--text-muted)]">·</span>
+                      <button onClick={() => setTodas(false)} className="text-[var(--text-secondary)] hover:text-white">
                         Limpar
                       </button>
                     </div>
@@ -415,7 +415,7 @@ export default function RolesTab() {
                     return (
                       <div
                         key={mod.modulo}
-                        className="rounded-lg border border-[var(--border-default)] bg-white/[0.03] p-3"
+                        className="rounded-lg border border-[var(--border-default)] bg-[var(--surface-primary)] p-3"
                       >
                         <div className="mb-2 flex items-center justify-between">
                           <span className="text-sm font-medium text-white/90">
@@ -425,7 +425,7 @@ export default function RolesTab() {
                           {!somenteLeitura && (
                             <button
                               onClick={() => setModulo(chaves, !todasOn)}
-                              className="text-[11px] text-white/40 hover:text-white"
+                              className="text-[11px] text-[var(--text-muted)] hover:text-white"
                             >
                               {todasOn ? 'Desmarcar módulo' : 'Marcar módulo'}
                             </button>
@@ -460,7 +460,7 @@ export default function RolesTab() {
               </div>
 
               {erroModal && (
-                <div className="mt-4 rounded-lg border border-red-500/30 bg-red-500/10 p-3 text-sm text-red-200">
+                <div className="mt-4 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700">
                   {erroModal}
                 </div>
               )}

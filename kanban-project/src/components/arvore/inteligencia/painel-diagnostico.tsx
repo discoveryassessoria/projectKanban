@@ -106,7 +106,7 @@ function CadeiaCausal({ e, onIrParaPessoa }: { e: Explicacao; onIrParaPessoa?: (
       <ol className="mt-2 space-y-1.5">
         {e.cadeia.map((elo, i) => (
           <li key={i} className="flex gap-2">
-            <span aria-hidden className="mt-1 text-[10px] leading-none text-gray-300">
+            <span aria-hidden className="mt-1 text-[10px] leading-none text-[var(--text-muted)]">
               {i === 0 ? "●" : "↓"}
             </span>
             <span className="min-w-0">
@@ -120,7 +120,7 @@ function CadeiaCausal({ e, onIrParaPessoa }: { e: Explicacao; onIrParaPessoa?: (
               ) : (
                 <span className="block text-[11px] leading-snug text-gray-800">{elo.fato}</span>
               )}
-              <span className="block text-[10px] uppercase tracking-wide text-gray-400">
+              <span className="block text-[10px] uppercase tracking-wide text-[var(--text-muted)]">
                 {elo.fonte}
               </span>
             </span>
@@ -173,7 +173,7 @@ export function PainelDiagnostico({
         <button
           onClick={onFechar}
           aria-label="Fechar diagnóstico"
-          className="rounded-md p-1.5 text-gray-400 transition hover:bg-gray-100 hover:text-gray-700"
+          className="rounded-md p-1.5 text-[var(--text-muted)] transition hover:bg-gray-100 hover:text-gray-700"
         >
           <X className="h-4 w-4" />
         </button>
@@ -213,7 +213,7 @@ export function PainelDiagnostico({
             </p>
             <p className="mt-1 text-[11px] leading-snug text-gray-500">{proximaAcao.motivo}</p>
             <div className="mt-1 flex items-center justify-between gap-2">
-              <p className="text-[10px] uppercase tracking-wide text-gray-400">
+              <p className="text-[10px] uppercase tracking-wide text-[var(--text-muted)]">
                 Prioridade {proximaAcao.prioridade}/7 · Fonte: {proximaAcao.fonte}
               </p>
               {auditor && (
@@ -245,7 +245,7 @@ export function PainelDiagnostico({
             Pendências ({diagnostico.problemas.length})
           </h3>
           {diagnostico.problemas.length === 0 ? (
-            <p className="py-6 text-center text-[13px] text-gray-400">
+            <p className="py-6 text-center text-[13px] text-[var(--text-muted)]">
               Nenhuma pendência conhecida neste escopo.
             </p>
           ) : (
@@ -273,7 +273,7 @@ export function PainelDiagnostico({
                       → {p.acao}
                     </p>
                     <div className="mt-2 flex items-center justify-between gap-2">
-                      <span className="truncate text-[10px] uppercase tracking-wide text-gray-400">
+                      <span className="truncate text-[10px] uppercase tracking-wide text-[var(--text-muted)]">
                         Fonte: {p.fonte}
                       </span>
                       <span className="flex shrink-0 items-center gap-1.5">

@@ -267,7 +267,7 @@ export default function BlogAdminPage() {
           <div className="flex items-center justify-between">
             <div>
               <h2 className="text-2xl md:text-3xl font-semibold flex items-center gap-3">
-                <FileText className="w-8 h-8 text-amber-400" />
+                <FileText className="w-8 h-8 text-amber-700" />
                 Blog
               </h2>
               <p className="text-sm text-white/70 mt-1">Gerencie os posts do blog da landing page</p>
@@ -287,7 +287,7 @@ export default function BlogAdminPage() {
               { label: 'Total de Posts', value: totalPosts, cor: 'bg-blue-500' },
               { label: 'Publicados', value: publicados, cor: 'bg-green-500' },
               { label: 'Rascunhos', value: rascunhos, cor: 'bg-yellow-500' },
-              { label: 'Em Destaque', value: destaques, cor: 'bg-purple-500' },
+              { label: 'Em Destaque', value: destaques, cor: 'bg-slate-500' },
             ].map((metric, idx) => (
               <Card key={idx} className="bg-[var(--surface-primary)] backdrop-blur-sm border border-[var(--border-strong)] text-white">
                 <CardContent className="p-5">
@@ -311,12 +311,12 @@ export default function BlogAdminPage() {
               <div className="flex flex-wrap gap-4 items-center">
                 <div className="flex-1 min-w-[200px]">
                   <div className="relative">
-                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-white/50" />
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[var(--text-secondary)]" />
                     <Input
                       placeholder="Buscar posts..."
                       value={busca}
                       onChange={(e) => setBusca(e.target.value)}
-                      className="pl-10 bg-[var(--surface-primary)] border-[var(--border-strong)] text-white placeholder:text-white/50"
+                      className="pl-10 bg-[var(--surface-primary)] border-[var(--border-strong)] text-white placeholder:text-[var(--text-secondary)]"
                     />
                   </div>
                 </div>
@@ -354,9 +354,9 @@ export default function BlogAdminPage() {
           {filteredPosts.length === 0 ? (
             <Card className="bg-[var(--surface-primary)] backdrop-blur-sm border border-[var(--border-strong)]">
               <CardContent className="p-12 text-center">
-                <FileText className="w-16 h-16 text-white/30 mx-auto mb-4" />
+                <FileText className="w-16 h-16 text-[var(--text-muted)] mx-auto mb-4" />
                 <p className="text-white/70 text-lg">Nenhum post encontrado</p>
-                <p className="text-white/50 text-sm mt-1">Clique em "Novo Post" para criar seu primeiro post</p>
+                <p className="text-[var(--text-secondary)] text-sm mt-1">Clique em "Novo Post" para criar seu primeiro post</p>
               </CardContent>
             </Card>
           ) : (
@@ -375,7 +375,7 @@ export default function BlogAdminPage() {
                           />
                         ) : (
                           <div className="w-full h-full flex items-center justify-center">
-                            <ImageIcon className="w-8 h-8 text-white/30" />
+                            <ImageIcon className="w-8 h-8 text-[var(--text-muted)]" />
                           </div>
                         )}
                       </div>
@@ -391,21 +391,21 @@ export default function BlogAdminPage() {
                             {/* Status Badge */}
                             <span className={`px-2 py-1 rounded-full text-xs font-medium ${
                               post.status === 'PUBLICADO' 
-                                ? 'bg-green-500/20 text-green-400 border border-green-500/30'
+                                ? 'bg-green-50 text-green-700 border border-green-200'
                                 : post.status === 'ARQUIVADO'
-                                ? 'bg-gray-500/20 text-gray-400 border border-gray-500/30'
-                                : 'bg-yellow-500/20 text-yellow-400 border border-yellow-500/30'
+                                ? 'bg-gray-500/20 text-[var(--text-muted)] border border-gray-500/30'
+                                : 'bg-yellow-50 text-yellow-700 border border-yellow-200'
                             }`}>
                               {post.status}
                             </span>
                             {post.destaque && (
-                              <Star className="w-4 h-4 text-amber-400 fill-amber-400" />
+                              <Star className="w-4 h-4 text-amber-700 fill-amber-400" />
                             )}
                           </div>
                         </div>
 
                         {/* Meta info */}
-                        <div className="flex items-center gap-4 mt-3 text-xs text-white/50">
+                        <div className="flex items-center gap-4 mt-3 text-xs text-[var(--text-secondary)]">
                           <span className="flex items-center gap-1">
                             <Tag className="w-3 h-3" />
                             {post.categoria}
@@ -440,7 +440,7 @@ export default function BlogAdminPage() {
                             variant="ghost"
                             size="sm"
                             onClick={() => toggleDestaque(post)}
-                            className="text-white/60 hover:text-amber-400 hover:bg-[var(--surface-hover)]"
+                            className="text-white/60 hover:text-amber-700 hover:bg-[var(--surface-hover)]"
                           >
                             {post.destaque ? (
                               <><StarOff className="w-4 h-4 mr-1" /> Remover Destaque</>
@@ -452,7 +452,7 @@ export default function BlogAdminPage() {
                             variant="ghost"
                             size="sm"
                             onClick={() => editPost(post)}
-                            className="text-white/60 hover:text-blue-400 hover:bg-[var(--surface-hover)]"
+                            className="text-white/60 hover:text-blue-700 hover:bg-[var(--surface-hover)]"
                           >
                             <Pencil className="w-4 h-4 mr-1" /> Editar
                           </Button>
@@ -460,7 +460,7 @@ export default function BlogAdminPage() {
                             variant="ghost"
                             size="sm"
                             onClick={() => handleDelete(post.id)}
-                            className="text-white/60 hover:text-red-400 hover:bg-[var(--surface-hover)]"
+                            className="text-white/60 hover:text-red-700 hover:bg-[var(--surface-hover)]"
                           >
                             <Trash2 className="w-4 h-4 mr-1" /> Excluir
                           </Button>
@@ -479,7 +479,7 @@ export default function BlogAdminPage() {
       {showForm && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
           <div className="absolute inset-0 bg-[var(--overlay-modal)] backdrop-blur-sm" onClick={resetForm} />
-          <Card className="relative w-full max-w-2xl max-h-[90vh] overflow-y-auto bg-gray-900 border-[var(--border-strong)]">
+          <Card className="relative w-full max-w-2xl max-h-[90vh] overflow-y-auto bg-[var(--surface-popover)] border-[var(--border-strong)]">
             <CardContent className="p-6">
               <div className="flex items-center justify-between mb-6">
                 <h2 className="text-xl font-bold text-white">
@@ -497,7 +497,7 @@ export default function BlogAdminPage() {
                     value={formData.titulo}
                     onChange={(e) => setFormData({...formData, titulo: e.target.value})}
                     placeholder="Digite o título do post"
-                    className="bg-[var(--surface-primary)] border-[var(--border-strong)] text-white placeholder:text-white/50"
+                    className="bg-[var(--surface-primary)] border-[var(--border-strong)] text-white placeholder:text-[var(--text-secondary)]"
                     required
                   />
                 </div>
@@ -508,7 +508,7 @@ export default function BlogAdminPage() {
                     value={formData.resumo}
                     onChange={(e) => setFormData({...formData, resumo: e.target.value})}
                     placeholder="Digite um resumo do post (aparece no card)"
-                    className="w-full px-3 py-2 bg-[var(--surface-primary)] border border-[var(--border-strong)] rounded-md text-white placeholder:text-white/50 resize-none h-20"
+                    className="w-full px-3 py-2 bg-[var(--surface-primary)] border border-[var(--border-strong)] rounded-md text-white placeholder:text-[var(--text-secondary)] resize-none h-20"
                     required
                   />
                 </div>
@@ -519,7 +519,7 @@ export default function BlogAdminPage() {
                     value={formData.conteudo}
                     onChange={(e) => setFormData({...formData, conteudo: e.target.value})}
                     placeholder="Conteúdo completo do post (opcional)"
-                    className="w-full px-3 py-2 bg-[var(--surface-primary)] border border-[var(--border-strong)] rounded-md text-white placeholder:text-white/50 resize-none h-32"
+                    className="w-full px-3 py-2 bg-[var(--surface-primary)] border border-[var(--border-strong)] rounded-md text-white placeholder:text-[var(--text-secondary)] resize-none h-32"
                   />
                 </div>
 
@@ -530,7 +530,7 @@ export default function BlogAdminPage() {
                       value={formData.imagemUrl}
                       onChange={(e) => setFormData({...formData, imagemUrl: e.target.value})}
                       placeholder="https://..."
-                      className="bg-[var(--surface-primary)] border-[var(--border-strong)] text-white placeholder:text-white/50"
+                      className="bg-[var(--surface-primary)] border-[var(--border-strong)] text-white placeholder:text-[var(--text-secondary)]"
                     />
                   </div>
                   <div>
@@ -539,7 +539,7 @@ export default function BlogAdminPage() {
                       value={formData.imagemAlt}
                       onChange={(e) => setFormData({...formData, imagemAlt: e.target.value})}
                       placeholder="Descrição da imagem"
-                      className="bg-[var(--surface-primary)] border-[var(--border-strong)] text-white placeholder:text-white/50"
+                      className="bg-[var(--surface-primary)] border-[var(--border-strong)] text-white placeholder:text-[var(--text-secondary)]"
                     />
                   </div>
                 </div>
@@ -554,7 +554,7 @@ export default function BlogAdminPage() {
                       required
                     >
                       {categorias.map(cat => (
-                        <option key={cat} value={cat} className="bg-gray-900">{cat}</option>
+                        <option key={cat} value={cat} className="bg-[var(--surface-popover)]">{cat}</option>
                       ))}
                     </select>
                   </div>
@@ -578,9 +578,9 @@ export default function BlogAdminPage() {
                       onChange={(e) => setFormData({...formData, status: e.target.value})}
                       className="w-full px-3 py-2 bg-[var(--surface-primary)] border border-[var(--border-strong)] rounded-md text-white"
                     >
-                      <option value="RASCUNHO" className="bg-gray-900">Rascunho</option>
-                      <option value="PUBLICADO" className="bg-gray-900">Publicado</option>
-                      <option value="ARQUIVADO" className="bg-gray-900">Arquivado</option>
+                      <option value="RASCUNHO" className="bg-[var(--surface-popover)]">Rascunho</option>
+                      <option value="PUBLICADO" className="bg-[var(--surface-popover)]">Publicado</option>
+                      <option value="ARQUIVADO" className="bg-[var(--surface-popover)]">Arquivado</option>
                     </select>
                   </div>
                   <div>

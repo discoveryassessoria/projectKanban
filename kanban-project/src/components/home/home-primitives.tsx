@@ -18,7 +18,7 @@ import type { NivelPrioridade } from "@/src/types/home"
 /** Acento dourado — mesmo token do Financeiro. */
 export const OURO = "#D2A948"
 /** Card glass — mesma composição do Financeiro. */
-export const CARD = "rounded-xl border border-[var(--border-default)] bg-white/[0.05] backdrop-blur-md"
+export const CARD = "rounded-xl border border-[var(--border-default)] bg-[var(--surface-primary)] backdrop-blur-md"
 /**
  * Card FOCAL — a tela tem um assunto principal, e ele não pode ter o mesmo peso
  * dos apoios. Superfície OPACA do DS (`--surface-overlay`, o mesmo token dos
@@ -26,7 +26,7 @@ export const CARD = "rounded-xl border border-[var(--border-default)] bg-white/[
  * uma camada translúcida sobre a foto.
  */
 export const CARD_FOCAL =
-  "relative overflow-hidden rounded-2xl border border-[var(--border-default)] bg-white/[0.05] backdrop-blur-md shadow-[0_24px_60px_-20px_rgba(0,0,0,0.75)]"
+  "relative overflow-hidden rounded-2xl border border-[var(--border-default)] bg-[var(--surface-primary)] backdrop-blur-md shadow-[0_24px_60px_-20px_rgba(0,0,0,0.75)]"
 
 // ---- Estilos por nível -----------------------------------------------------
 export interface NivelStyle {
@@ -39,23 +39,23 @@ export function nivelStyle(nivel: NivelPrioridade | "critico" | "alto"): NivelSt
   switch (nivel) {
     case "critico":
       return {
-        chip: "bg-red-500/15 text-red-300 border-red-400/30",
+        chip: "bg-red-50 text-red-700 border-red-200",
         ponto: "bg-red-400",
-        texto: "text-red-300",
+        texto: "text-red-700",
         aro: "ring-red-400/25",
       }
     case "alto":
       return {
-        chip: "bg-amber-500/15 text-amber-300 border-amber-400/30",
+        chip: "bg-amber-50 text-amber-700 border-amber-200",
         ponto: "bg-amber-400",
-        texto: "text-amber-300",
+        texto: "text-amber-700",
         aro: "ring-amber-400/25",
       }
     case "medio":
       return {
-        chip: "bg-sky-500/15 text-sky-300 border-sky-400/30",
+        chip: "bg-sky-50 text-sky-700 border-sky-200",
         ponto: "bg-sky-400",
-        texto: "text-sky-300",
+        texto: "text-sky-700",
         aro: "ring-sky-400/25",
       }
     default:
@@ -90,7 +90,7 @@ export function BlocoHeader({
     <div className="mb-4 flex items-end justify-between gap-3">
       <div className="min-w-0">
         <h2 className="text-[13px] font-semibold uppercase tracking-[0.14em] text-white/90">{titulo}</h2>
-        {descricao && <p className="mt-0.5 text-xs text-white/50">{descricao}</p>}
+        {descricao && <p className="mt-0.5 text-xs text-[var(--text-secondary)]">{descricao}</p>}
       </div>
       {acao}
     </div>
@@ -107,8 +107,8 @@ export function EmptyState({
 }) {
   return (
     <div className="flex flex-col items-center justify-center gap-2 py-8 text-center">
-      <Icon className="h-6 w-6 text-white/25" />
-      <p className="text-sm text-white/50">{children}</p>
+      <Icon className="h-6 w-6 text-[var(--text-muted)]" />
+      <p className="text-sm text-[var(--text-secondary)]">{children}</p>
     </div>
   )
 }
@@ -116,7 +116,7 @@ export function EmptyState({
 export function ErrorState({ onRetry, mensagem }: { onRetry?: () => void; mensagem?: string }) {
   return (
     <div className="flex flex-col items-center justify-center gap-3 py-10 text-center">
-      <AlertTriangle className="h-6 w-6 text-red-400" />
+      <AlertTriangle className="h-6 w-6 text-red-700" />
       <p className="text-sm text-white/70">{mensagem ?? "Não foi possível carregar estes dados."}</p>
       {onRetry && (
         <button

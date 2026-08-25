@@ -17,11 +17,11 @@ export const TITULO_RASCUNHO =
   'Ação indisponível: esta tela ainda não está conectada ao banco.'
 
 export const BTN_RASCUNHO =
-  'cursor-not-allowed rounded-lg border border-[var(--border-default)] px-3 py-1.5 text-xs font-medium text-white/35'
+  'cursor-not-allowed rounded-lg border border-[var(--border-default)] px-3 py-1.5 text-xs font-medium text-[var(--text-muted)]'
 
 export function AvisoRascunho({ children }: { children?: React.ReactNode }) {
   return (
-    <div className="mb-3 flex items-start gap-2 rounded-xl border border-amber-400/25 bg-amber-500/10 px-4 py-2.5 text-[12.5px] text-amber-100/90">
+    <div className="mb-3 flex items-start gap-2 rounded-xl border border-amber-200 bg-amber-50 px-4 py-2.5 text-[12.5px] text-amber-100/90">
       <span aria-hidden="true" className="mt-[1px]">⚠️</span>
       <span>
         {children ?? (

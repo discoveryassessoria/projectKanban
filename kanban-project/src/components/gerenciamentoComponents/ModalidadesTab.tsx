@@ -123,13 +123,13 @@ export default function ModalidadesTab() {
     } catch (e) { setErro(e instanceof Error ? e.message : "Não foi possível excluir a modalidade.") }
   }
 
-  if (loading) return <div className="py-24 text-center text-white/50">Carregando…</div>
+  if (loading) return <div className="py-24 text-center text-[var(--text-secondary)]">Carregando…</div>
 
   return (
     <div className="space-y-5">
-      {flash && <div className="rounded-xl border border-green-400/30 bg-green-500/15 px-4 py-3 text-sm text-green-200">{flash}</div>}
+      {flash && <div className="rounded-xl border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-700">{flash}</div>}
       {erro && (
-        <div className="rounded-xl border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-200">
+        <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
           {erro} <button onClick={() => { setErro(null); void carregarMods() }} className="ml-2 underline hover:text-white">Recarregar</button>
         </div>
       )}
@@ -167,13 +167,13 @@ export default function ModalidadesTab() {
       </div>
 
       {paises.length === 0 ? (
-        <div className="rounded-2xl border border-[var(--border-default)] bg-[var(--surface-primary)] p-8 text-center text-sm text-white/50 backdrop-blur-sm">
+        <div className="rounded-2xl border border-[var(--border-default)] bg-[var(--surface-primary)] p-8 text-center text-sm text-[var(--text-secondary)] backdrop-blur-sm">
           Nenhum país cadastrado ainda. Cadastre em <span className="text-white/80">Processos › Cadastros › Países e Regiões</span> para criar modalidades.
         </div>
       ) : (
         <div className="overflow-x-auto rounded-2xl border border-[var(--border-default)] bg-[var(--surface-primary)] backdrop-blur-sm">
           <table className="w-full text-sm">
-            <thead className="border-b border-[var(--border-default)] text-left text-xs text-white/50">
+            <thead className="border-b border-[var(--border-default)] text-left text-xs text-[var(--text-secondary)]">
               <tr>
                 <th className="px-4 py-3 font-medium">Ordem</th>
                 <th className="px-4 py-3 font-medium">Modalidade</th>
@@ -186,9 +186,9 @@ export default function ModalidadesTab() {
             </thead>
             <tbody>
               {carregandoMods ? (
-                <tr><td colSpan={7} className="px-4 py-10 text-center text-xs text-white/40">Carregando…</td></tr>
+                <tr><td colSpan={7} className="px-4 py-10 text-center text-xs text-[var(--text-muted)]">Carregando…</td></tr>
               ) : rows.length === 0 ? (
-                <tr><td colSpan={7} className="px-4 py-10 text-center text-xs text-white/40">Nenhuma modalidade neste país. Crie em “+ Nova modalidade”.</td></tr>
+                <tr><td colSpan={7} className="px-4 py-10 text-center text-xs text-[var(--text-muted)]">Nenhuma modalidade neste país. Crie em “+ Nova modalidade”.</td></tr>
               ) : rows.map(m => (
                 <tr key={m.modalityKey} className="border-b border-[var(--border-subtle)] last:border-0">
                   <td className="px-4 py-2.5 text-white/60">{m.ordem}</td>
@@ -200,13 +200,13 @@ export default function ModalidadesTab() {
                     <button
                       onClick={() => toggleAtivo(m)}
                       title={(m.ativo ?? true) ? "Inativar (some do seletor de Tipos de Processo, sem apagar)" : "Ativar"}
-                      className={`rounded-full px-2 py-0.5 text-[10px] ${(m.ativo ?? true) ? "bg-green-500/15 text-green-300" : "bg-[var(--surface-primary)] text-white/50"}`}
+                      className={`rounded-full px-2 py-0.5 text-[10px] ${(m.ativo ?? true) ? "bg-green-50 text-green-700" : "bg-[var(--surface-primary)] text-[var(--text-secondary)]"}`}
                     >
                       {(m.ativo ?? true) ? "Ativa" : "Inativa"}
                     </button>
                   </td>
                   <td className="px-4 py-2.5">
-                    <div className="flex items-center justify-end gap-0.5 text-white/50">
+                    <div className="flex items-center justify-end gap-0.5 text-[var(--text-secondary)]">
                       <button
                         title="Editar" aria-label="Editar"
                         onClick={() => setForm({ editando: m, modalityLabel: m.modalityLabel, codeSuffix: m.codeSuffix || "" })}
@@ -217,7 +217,7 @@ export default function ModalidadesTab() {
                         aria-label="Excluir"
                         disabled={(m.tiposCount ?? 0) > 0}
                         onClick={() => excluir(m)}
-                        className="rounded p-1 text-red-300/70 hover:bg-red-500/10 hover:text-red-300 disabled:cursor-not-allowed disabled:opacity-30"
+                        className="rounded p-1 text-red-700/70 hover:bg-red-50 hover:text-red-700 disabled:cursor-not-allowed disabled:opacity-30"
                       ><ITrash /></button>
                     </div>
                   </td>
@@ -233,7 +233,7 @@ export default function ModalidadesTab() {
           <div className="w-full max-w-md rounded-2xl border border-[var(--border-default)] bg-zinc-900/95 shadow-2xl" onClick={e => e.stopPropagation()}>
             <div className="border-b border-[var(--border-default)] px-6 py-4">
               <h3 className="font-semibold text-white">{form.editando ? "Editar modalidade" : "Nova modalidade"}</h3>
-              <p className="mt-0.5 text-xs text-white/50">{paises.find(p => p.countryKey === countryKey)?.countryLabel}</p>
+              <p className="mt-0.5 text-xs text-[var(--text-secondary)]">{paises.find(p => p.countryKey === countryKey)?.countryLabel}</p>
             </div>
             <div className="space-y-3 px-6 py-4">
               <div>
@@ -247,7 +247,7 @@ export default function ModalidadesTab() {
             </div>
             <div className="flex justify-end gap-2 border-t border-[var(--border-default)] px-6 py-4">
               <button onClick={() => setForm(null)} className="rounded-lg border border-[var(--border-default)] bg-[var(--surface-primary)] px-4 py-2 text-sm text-white/80 hover:bg-[var(--surface-hover)]">Cancelar</button>
-              <button disabled={busy} onClick={salvar} className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-[#fff] hover:bg-blue-500 disabled:opacity-50">Salvar</button>
+              <button disabled={busy} onClick={salvar} className="rounded-lg bg-[var(--action-primary)] px-4 py-2 text-sm font-medium text-[var(--action-primary-ink)] hover:bg-[var(--action-primary)] disabled:opacity-50">Salvar</button>
             </div>
           </div>
         </div>

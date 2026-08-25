@@ -202,7 +202,7 @@ function ConteudoModal({
   // deste arquivo que sai o `text-white/80` das abas, e uma classe de campo com
   // `bg-[var(--surface-primary)]` e sem cor de texto é a semente do bug — quem copiar daqui herda
   // o campo branco no branco.
-  const inputClass = "w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-[var(--surface-primary)] text-gray-900 placeholder:text-gray-400 text-sm h-[42px]"
+  const inputClass = "w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-[var(--surface-primary)] text-gray-900 placeholder:text-[var(--text-muted)] text-sm h-[42px]"
 
   // ✅ Verificar se o processo é da Itália (aba Informações)
   const isItalia = ehItalia(processo)
@@ -520,7 +520,7 @@ function ConteudoModal({
           <div className="flex items-center gap-4">
             <button 
               onClick={handleClose}
-              className="w-10 h-10 bg-[#2563eb] hover:bg-[#1d4ed8] rounded-lg flex items-center justify-center transition-colors"
+              className="w-10 h-10 bg-[var(--action-primary)] hover:bg-[var(--action-primary-hover)] rounded-lg flex items-center justify-center transition-colors"
             >
               <X className="h-5 w-5 text-white" />
             </button>
@@ -570,7 +570,7 @@ function ConteudoModal({
               <Button 
                 variant="ghost" 
                 size="icon" 
-                className="text-red-400 hover:text-red-500 hover:bg-red-500/10"
+                className="text-red-700 hover:text-red-500 hover:bg-red-50"
                 onClick={handleDelete}
               >
                 <Trash2 className="h-5 w-5" />
@@ -588,7 +588,7 @@ function ConteudoModal({
               className={`
                 px-4 py-3 text-sm font-medium border-b-2 transition-colors
                 ${activeTab === tab.id
-                  ? (finDark ? 'border-[#d2a948] text-[#d2a948]' : 'border-[#2563eb] text-white')
+                  ? (finDark ? 'border-[#d2a948] text-[#d2a948]' : 'border-[var(--border-strong)] text-white')
                   : (finDark ? 'border-transparent text-white/60 hover:text-white' : 'border-transparent text-gray-500 hover:text-gray-700')}
               `}
             >
@@ -604,7 +604,7 @@ function ConteudoModal({
               {/* ========== COLUNA ESQUERDA - SOBRE O NEGÓCIO ========== */}
               <div className="border-r border-[var(--border-default)] overflow-y-auto p-6 min-h-0">
                 <div className="flex items-center justify-between mb-6">
-                  <h2 className="text-sm font-semibold text-white/40 uppercase tracking-wide">
+                  <h2 className="text-sm font-semibold text-[var(--text-muted)] uppercase tracking-wide">
                     Sobre o Negócio
                   </h2>
                   {!isEditing ? (
@@ -636,7 +636,7 @@ function ConteudoModal({
                   <>
                     {/* Etapa */}
                     <div className="mb-6">
-                      <label className="text-xs text-white/40 uppercase">Etapa</label>
+                      <label className="text-xs text-[var(--text-muted)] uppercase">Etapa</label>
                       <p className="text-white/95 font-medium">
                         {processo.faseAtualKey ?? "—"}
                       </p>
@@ -644,20 +644,20 @@ function ConteudoModal({
 
                     {/* País */}
                     <div className="mb-6">
-                      <label className="text-xs text-white/40 uppercase">País</label>
+                      <label className="text-xs text-[var(--text-muted)] uppercase">País</label>
                       <p className="text-white/95 font-medium">{paisConfig.label}</p>
                     </div>
 
                     {/* Contratantes - ✅ ORDENADOS ALFABETICAMENTE */}
                     <div className="mb-6">
-                      <label className="text-xs text-white/40 uppercase mb-2 block">Contratantes</label>
+                      <label className="text-xs text-[var(--text-muted)] uppercase mb-2 block">Contratantes</label>
                       {contratantesSelecionados.length > 0 ? (
                         <div className="space-y-3">
                           {[...contratantesSelecionados].sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR')).map((cont) => (
                             <div
                               key={cont.id}
                               onClick={() => pode('clientes.ver') && abrirDetalhesCliente(cont, "contratante")}
-                              className={`p-4 bg-[var(--surface-popover)] border border-[var(--border-default)] rounded-xl transition-colors ${pode('clientes.ver') ? 'hover:bg-[#252c35] cursor-pointer' : 'cursor-default'}`}
+                              className={`p-4 bg-[var(--surface-popover)] border border-[var(--border-default)] rounded-xl transition-colors ${pode('clientes.ver') ? 'hover:bg-[var(--surface-tertiary)] cursor-pointer' : 'cursor-default'}`}
                             >
                               <p className="text-white/95 font-semibold">{nomePessoa(cont)}</p>
 
@@ -702,13 +702,13 @@ function ConteudoModal({
                               )}
 
                               <div className="flex gap-2 mt-3" onClick={(e) => e.stopPropagation()}>
-                                <Button variant="outline" size="sm" className="border-[var(--border-default)] bg-transparent text-white/70 hover:bg-[#252c35] hover:text-[#fff]">
+                                <Button variant="outline" size="sm" className="border-[var(--border-default)] bg-transparent text-white/70 hover:bg-[var(--surface-tertiary)] hover:text-[#fff]">
                                   <Phone className="h-4 w-4" />
                                 </Button>
-                                <Button variant="outline" size="sm" className="border-[var(--border-default)] bg-transparent text-white/70 hover:bg-[#252c35] hover:text-[#fff]">
+                                <Button variant="outline" size="sm" className="border-[var(--border-default)] bg-transparent text-white/70 hover:bg-[var(--surface-tertiary)] hover:text-[#fff]">
                                   <Mail className="h-4 w-4" />
                                 </Button>
-                                <Button variant="outline" size="sm" className="border-[var(--border-default)] bg-transparent text-white/70 hover:bg-[#252c35] hover:text-[#fff]">
+                                <Button variant="outline" size="sm" className="border-[var(--border-default)] bg-transparent text-white/70 hover:bg-[var(--surface-tertiary)] hover:text-[#fff]">
                                   <MessageSquare className="h-4 w-4" />
                                 </Button>
                               </div>
@@ -716,20 +716,20 @@ function ConteudoModal({
                           ))}
                         </div>
                       ) : (
-                        <p className="text-white/40 italic">Nenhum contratante vinculado</p>
+                        <p className="text-[var(--text-muted)] italic">Nenhum contratante vinculado</p>
                       )}
                     </div>
 
                     {/* Requerentes - ✅ ORDENADOS ALFABETICAMENTE */}
                     <div className="mb-6">
-                      <label className="text-xs text-white/40 uppercase mb-2 block">Requerentes</label>
+                      <label className="text-xs text-[var(--text-muted)] uppercase mb-2 block">Requerentes</label>
                       {requerentesSelecionados.length > 0 ? (
                         <div className="space-y-3">
                           {[...requerentesSelecionados].sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR')).map((req) => (
                             <div
                               key={req.id}
                               onClick={() => pode('clientes.ver') && abrirDetalhesCliente(req, "requerente")}
-                              className={`p-3 bg-[var(--surface-popover)] border border-[var(--border-default)] rounded-xl transition-colors ${pode('clientes.ver') ? 'hover:bg-[#252c35] cursor-pointer' : 'cursor-default'}`}
+                              className={`p-3 bg-[var(--surface-popover)] border border-[var(--border-default)] rounded-xl transition-colors ${pode('clientes.ver') ? 'hover:bg-[var(--surface-tertiary)] cursor-pointer' : 'cursor-default'}`}
                             >
                               <p className="text-white/95 font-medium">{nomePessoa(req)}</p>
                               {req.telefone && (
@@ -773,7 +773,7 @@ function ConteudoModal({
                           ))}
                         </div>
                       ) : (
-                        <p className="text-white/40 italic">Nenhum requerente vinculado</p>
+                        <p className="text-[var(--text-muted)] italic">Nenhum requerente vinculado</p>
                       )}
                     </div>
                   </>
@@ -782,17 +782,17 @@ function ConteudoModal({
                   <>
                     {/* Nome */}
                     <div className="mb-6">
-                      <label className="text-xs text-white/40 uppercase mb-1 block">Nome</label>
+                      <label className="text-xs text-[var(--text-muted)] uppercase mb-1 block">Nome</label>
                       <Input
                         value={nomeEditado}
                         onChange={(e) => setNomeEditado(e.target.value)}
-                        className="w-full bg-[var(--surface-popover)] border-[var(--border-default)] text-white/95 placeholder:text-white/40"
+                        className="w-full bg-[var(--surface-popover)] border-[var(--border-default)] text-white/95 placeholder:text-[var(--text-muted)]"
                       />
                     </div>
 
                     {/* Contratantes (busca múltipla) - ✅ ORDENADOS ALFABETICAMENTE */}
                     <div className="mb-6" ref={contratanteRef}>
-                      <label className="text-xs text-white/40 uppercase mb-1 block">Contratantes</label>
+                      <label className="text-xs text-[var(--text-muted)] uppercase mb-1 block">Contratantes</label>
 
                       {contratantesSelecionados.length > 0 && (
                         <div className="space-y-2 mb-3">
@@ -804,7 +804,7 @@ function ConteudoModal({
                               </div>
                               <button
                                 onClick={() => removeContratante(cont.id)}
-                                className="text-white/40 hover:text-[#f87171]"
+                                className="text-[var(--text-muted)] hover:text-[#f87171]"
                               >
                                 <Trash2 className="h-4 w-4" />
                               </button>
@@ -816,7 +816,7 @@ function ConteudoModal({
                       <div className="relative">
                         <button
                           onClick={() => setShowContratanteDropdown(!showContratanteDropdown)}
-                          className="w-full flex items-center gap-2 px-3 py-2 text-sm text-[#7dd3fc] hover:bg-[#252c35] rounded-md transition-colors"
+                          className="w-full flex items-center gap-2 px-3 py-2 text-sm text-[#7dd3fc] hover:bg-[var(--surface-tertiary)] rounded-md transition-colors"
                         >
                           <Plus className="h-4 w-4" />
                           Adicionar contratante
@@ -829,7 +829,7 @@ function ConteudoModal({
                                 placeholder="Buscar contratante..."
                                 value={buscaContratante}
                                 onChange={(e) => setBuscaContratante(e.target.value)}
-                                className="h-8 text-sm bg-[var(--surface-popover)] border-[var(--border-default)] text-white/95 placeholder:text-white/40"
+                                className="h-8 text-sm bg-[var(--surface-popover)] border-[var(--border-default)] text-white/95 placeholder:text-[var(--text-muted)]"
                                 autoFocus
                               />
                             </div>
@@ -839,19 +839,19 @@ function ConteudoModal({
                                   <button
                                     key={c.id}
                                     onClick={() => addContratante(c)}
-                                    className="w-full px-4 py-2 text-left hover:bg-[#252c35] flex items-center gap-3"
+                                    className="w-full px-4 py-2 text-left hover:bg-[var(--surface-tertiary)] flex items-center gap-3"
                                   >
                                     <div className="w-8 h-8 bg-[#7dd3fc]/15 rounded-full flex items-center justify-center">
                                       <User className="h-4 w-4 text-[#7dd3fc]" />
                                     </div>
                                     <div>
                                       <p className="font-medium text-white/95 text-sm">{nomePessoa(c)}</p>
-                                      <p className="text-xs text-white/40">{c.email || c.telefone}</p>
+                                      <p className="text-xs text-[var(--text-muted)]">{c.email || c.telefone}</p>
                                     </div>
                                   </button>
                                 ))
                               ) : (
-                                <p className="px-4 py-3 text-sm text-white/40 text-center">
+                                <p className="px-4 py-3 text-sm text-[var(--text-muted)] text-center">
                                   Nenhum contratante encontrado
                                 </p>
                               )}
@@ -863,7 +863,7 @@ function ConteudoModal({
 
                     {/* Requerentes (busca múltipla) - ✅ ORDENADOS ALFABETICAMENTE */}
                     <div className="mb-6" ref={requerenteRef}>
-                      <label className="text-xs text-white/40 uppercase mb-1 block">Requerentes</label>
+                      <label className="text-xs text-[var(--text-muted)] uppercase mb-1 block">Requerentes</label>
 
                       {requerentesSelecionados.length > 0 && (
                         <div className="space-y-2 mb-3">
@@ -875,7 +875,7 @@ function ConteudoModal({
                               </div>
                               <button
                                 onClick={() => removeRequerente(req.id)}
-                                className="text-white/40 hover:text-[#f87171]"
+                                className="text-[var(--text-muted)] hover:text-[#f87171]"
                               >
                                 <Trash2 className="h-4 w-4" />
                               </button>
@@ -887,7 +887,7 @@ function ConteudoModal({
                       <div className="relative">
                         <button
                           onClick={() => setShowRequerenteDropdown(!showRequerenteDropdown)}
-                          className="w-full flex items-center gap-2 px-3 py-2 text-sm text-[#7dd3fc] hover:bg-[#252c35] rounded-md transition-colors"
+                          className="w-full flex items-center gap-2 px-3 py-2 text-sm text-[#7dd3fc] hover:bg-[var(--surface-tertiary)] rounded-md transition-colors"
                         >
                           <Plus className="h-4 w-4" />
                           Adicionar requerente
@@ -900,7 +900,7 @@ function ConteudoModal({
                                 placeholder="Buscar requerente..."
                                 value={buscaRequerente}
                                 onChange={(e) => setBuscaRequerente(e.target.value)}
-                                className="h-8 text-sm bg-[var(--surface-popover)] border-[var(--border-default)] text-white/95 placeholder:text-white/40"
+                                className="h-8 text-sm bg-[var(--surface-popover)] border-[var(--border-default)] text-white/95 placeholder:text-[var(--text-muted)]"
                                 autoFocus
                               />
                             </div>
@@ -910,19 +910,19 @@ function ConteudoModal({
                                   <button
                                     key={r.id}
                                     onClick={() => addRequerente(r)}
-                                    className="w-full px-4 py-2 text-left hover:bg-[#252c35] flex items-center gap-3"
+                                    className="w-full px-4 py-2 text-left hover:bg-[var(--surface-tertiary)] flex items-center gap-3"
                                   >
                                     <div className="w-8 h-8 bg-[#4ade80]/15 rounded-full flex items-center justify-center">
                                       <User className="h-4 w-4 text-[#4ade80]" />
                                     </div>
                                     <div>
                                       <p className="font-medium text-white/95 text-sm">{nomePessoa(r)}</p>
-                                      <p className="text-xs text-white/40">{r.email || r.telefone}</p>
+                                      <p className="text-xs text-[var(--text-muted)]">{r.email || r.telefone}</p>
                                     </div>
                                   </button>
                                 ))
                               ) : (
-                                <p className="px-4 py-3 text-sm text-white/40 text-center">
+                                <p className="px-4 py-3 text-sm text-[var(--text-muted)] text-center">
                                   Nenhum requerente encontrado
                                 </p>
                               )}
@@ -937,7 +937,7 @@ function ConteudoModal({
                       <Button onClick={handleSaveEdit} className="bg-[#d2a948] hover:bg-[#e0b957] text-[#1b1508]">
                         Salvar
                       </Button>
-                      <Button variant="outline" onClick={handleCancelEdit} className="border-[var(--border-default)] bg-transparent text-white/80 hover:bg-[#252c35] hover:text-[#fff]">
+                      <Button variant="outline" onClick={handleCancelEdit} className="border-[var(--border-default)] bg-transparent text-white/80 hover:bg-[var(--surface-tertiary)] hover:text-[#fff]">
                         Cancelar
                       </Button>
                     </div>

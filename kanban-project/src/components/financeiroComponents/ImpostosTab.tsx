@@ -31,9 +31,9 @@ interface ImpostosData {
 }
 
 function statusBadge(status: string) {
-  if (status === "pago") return <span className="text-[11px] px-2 py-0.5 rounded-full bg-green-500/20 text-green-300 border border-green-500/30">Pago</span>
+  if (status === "pago") return <span className="text-[11px] px-2 py-0.5 rounded-full bg-green-50 text-green-700 border border-green-200">Pago</span>
   if (status === "previsto") return <span className="text-[11px] px-2 py-0.5 rounded-full bg-[var(--surface-primary)] text-white/60 border border-[var(--border-strong)]">Previsto</span>
-  return <span className="text-[11px] px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/30">A pagar</span>
+  return <span className="text-[11px] px-2 py-0.5 rounded-full bg-amber-50 text-amber-700 border border-amber-200">A pagar</span>
 }
 
 export default function ImpostosTab() {
@@ -46,7 +46,7 @@ export default function ImpostosTab() {
       .then(r => r.ok ? r.json() : null).then(d => setData(d)).catch(e => console.error(e)).finally(() => setLoading(false))
   }, [])
 
-  if (loading || !data) return <div className="flex items-center justify-center py-24"><Loader2 className="h-8 w-8 animate-spin text-white/50" /></div>
+  if (loading || !data) return <div className="flex items-center justify-center py-24"><Loader2 className="h-8 w-8 animate-spin text-[var(--text-secondary)]" /></div>
 
   const d = data
   const k = d.kpis
@@ -56,21 +56,21 @@ export default function ImpostosTab() {
       {/* Header */}
       <div className="flex items-start justify-between flex-wrap gap-3">
         <div>
-          <h2 className="text-lg font-bold text-white flex items-center gap-2"><Receipt className="h-5 w-5" /> Impostos e Tributos <span className="text-[10px] text-white/40 bg-[var(--surface-primary)] px-1.5 py-0.5 rounded font-normal">prévia</span></h2>
+          <h2 className="text-lg font-bold text-white flex items-center gap-2"><Receipt className="h-5 w-5" /> Impostos e Tributos <span className="text-[10px] text-[var(--text-muted)] bg-[var(--surface-primary)] px-1.5 py-0.5 rounded font-normal">prévia</span></h2>
           <div className="text-xs text-white/60 mt-1">Provisão automática · {k.qtdPendentes} guias em aberto · regime Simples Nacional</div>
         </div>
         <div className="flex items-center gap-2">
           <GlassBtn icon={<BarChart3 className="h-3.5 w-3.5" />}>Relatório fiscal</GlassBtn>
-          <button className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm rounded-lg bg-blue-600 hover:bg-blue-700 text-[#fff]"><Plus className="h-3.5 w-3.5" /> Provisionar</button>
+          <button className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm rounded-lg bg-[var(--action-primary)] hover:bg-[var(--action-primary-hover)] text-[var(--action-primary-ink)]"><Plus className="h-3.5 w-3.5" /> Provisionar</button>
         </div>
       </div>
 
       {/* KPIs */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-        <Kpi label="Provisão do mês" value={fmtBRL(k.provisaoMes)} valueColor="text-amber-400" sub={`${k.qtdGuias} guias a vencer`} />
+        <Kpi label="Provisão do mês" value={fmtBRL(k.provisaoMes)} valueColor="text-amber-700" sub={`${k.qtdGuias} guias a vencer`} />
         <Kpi label="Total A Pagar" value={fmtBRL(k.aPagar)} sub={`${k.qtdPendentes} tributos pendentes`} />
-        <Kpi label="Pago no mês" value={fmtBRL(k.pagosMes)} valueColor="text-green-400" sub="IRRF · Folha" />
-        <Kpi label="Em Atraso" value={`${k.atrasados}`} valueColor={k.atrasados > 0 ? "text-red-400" : "text-white"} sub={k.atrasados > 0 ? fmtBRL(k.totalAtrasado) : "Nenhum atraso"} />
+        <Kpi label="Pago no mês" value={fmtBRL(k.pagosMes)} valueColor="text-green-700" sub="IRRF · Folha" />
+        <Kpi label="Em Atraso" value={`${k.atrasados}`} valueColor={k.atrasados > 0 ? "text-red-700" : "text-white"} sub={k.atrasados > 0 ? fmtBRL(k.totalAtrasado) : "Nenhum atraso"} />
       </div>
 
       {/* CALENDÁRIO + CARGA */}
@@ -79,17 +79,17 @@ export default function ImpostosTab() {
         <div className="bg-[var(--surface-primary)] backdrop-blur-sm border border-[var(--border-default)] rounded-xl p-4">
           <div className="flex items-center justify-between mb-3">
             <div className="text-sm font-semibold text-white flex items-center gap-2"><Calendar className="h-4 w-4" /> Calendário de Vencimentos</div>
-            <span className="text-[11px] text-white/40">{d.calendario.length} vencimentos</span>
+            <span className="text-[11px] text-[var(--text-muted)]">{d.calendario.length} vencimentos</span>
           </div>
           <div className="space-y-2">
             {d.calendario.map((c, i) => {
               const cor = c.status === "pago" ? "border-l-green-400" : c.status === "previsto" ? "border-l-sky-400" : "border-l-amber-400"
               return (
                 <div key={i} className={`border-l-2 ${cor} pl-3 py-1`}>
-                  <div className="text-[10px] text-white/40">{fmtDate(c.date)} · {c.dueText}</div>
+                  <div className="text-[10px] text-[var(--text-muted)]">{fmtDate(c.date)} · {c.dueText}</div>
                   <div className="flex justify-between items-center mt-0.5">
                     <span className="text-sm text-white/80 font-medium">{c.tipo}</span>
-                    <span className={`text-sm font-bold tabular-nums ${c.status === "pago" ? "text-green-400" : "text-white"}`}>{fmtBRL(c.valor)}</span>
+                    <span className={`text-sm font-bold tabular-nums ${c.status === "pago" ? "text-green-700" : "text-white"}`}>{fmtBRL(c.valor)}</span>
                   </div>
                   <div className="mt-1">{statusBadge(c.status)}</div>
                 </div>
@@ -114,7 +114,7 @@ export default function ImpostosTab() {
               </div>
             ))}
           </div>
-          <div className="flex items-start gap-2 mt-4 p-3 bg-sky-500/10 border border-sky-500/20 rounded-lg text-xs text-sky-200/80">
+          <div className="flex items-start gap-2 mt-4 p-3 bg-sky-50 border border-sky-200 rounded-lg text-xs text-sky-700/80">
             <Info className="h-4 w-4 mt-0.5 shrink-0" />
             <span>Carga tributária estável em torno de 15% da receita. Avaliar Lucro Presumido se o faturamento ultrapassar R$ 4,8M anuais.</span>
           </div>
@@ -125,7 +125,7 @@ export default function ImpostosTab() {
       <div className="bg-[var(--surface-primary)] backdrop-blur-sm border border-[var(--border-default)] rounded-xl p-4 overflow-x-auto">
         <table className="w-full text-sm min-w-[680px]">
           <thead>
-            <tr className="text-white/40 text-xs border-b border-[var(--border-default)]">
+            <tr className="text-[var(--text-muted)] text-xs border-b border-[var(--border-default)]">
               <th className="text-left font-medium py-1.5">Tributo</th>
               <th className="text-left font-medium py-1.5">Competência</th>
               <th className="text-right font-medium py-1.5">Base</th>
@@ -145,7 +145,7 @@ export default function ImpostosTab() {
                 <td className="py-2 text-right text-white font-medium tabular-nums">{fmtBRL(t.provisao)}</td>
                 <td className="py-2 text-right tabular-nums">
                   <div className="text-white/80">{fmtDate(t.vencimento)}</div>
-                  <div className="text-[10px] text-white/40">{t.status === "pago" ? "pago em " + fmtDate(t.pagoEm ?? null) : ""}</div>
+                  <div className="text-[10px] text-[var(--text-muted)]">{t.status === "pago" ? "pago em " + fmtDate(t.pagoEm ?? null) : ""}</div>
                 </td>
                 <td className="py-2 text-center">{statusBadge(t.status)}</td>
               </tr>
@@ -155,7 +155,7 @@ export default function ImpostosTab() {
       </div>
 
       {/* nota */}
-      <div className="flex items-start gap-2 text-xs text-white/50 bg-[var(--surface-primary)] border border-[var(--border-default)] rounded-lg p-3">
+      <div className="flex items-start gap-2 text-xs text-[var(--text-secondary)] bg-[var(--surface-primary)] border border-[var(--border-default)] rounded-lg p-3">
         <Info className="h-4 w-4 mt-0.5 shrink-0" />
         <span>Esta aba é uma <strong className="text-white/70">prévia</strong> com dados de exemplo. A provisão automática de tributos (calculada sobre a receita real) será ligada a uma estrutura própria numa próxima etapa.</span>
       </div>
@@ -170,10 +170,10 @@ function GlassBtn({ icon, children }: { icon: React.ReactNode; children: React.R
 function Kpi({ label, value, sub, valueColor = "text-white" }: { label: string; value: string; sub?: string; valueColor?: string }) {
   return (
     <div className="rounded-xl border border-[var(--border-default)] bg-[var(--surface-primary)] backdrop-blur-sm p-4 relative">
-      <span className="absolute top-2 right-2 text-[9px] text-white/30 bg-[var(--surface-primary)] px-1.5 py-0.5 rounded">prévia</span>
-      <div className="text-white/50 text-xs font-medium">{label}</div>
+      <span className="absolute top-2 right-2 text-[9px] text-[var(--text-muted)] bg-[var(--surface-primary)] px-1.5 py-0.5 rounded">prévia</span>
+      <div className="text-[var(--text-secondary)] text-xs font-medium">{label}</div>
       <div className={`font-bold mt-1.5 text-xl ${valueColor}`}>{value}</div>
-      {sub && <div className="text-[11px] text-white/40 mt-1">{sub}</div>}
+      {sub && <div className="text-[11px] text-[var(--text-muted)] mt-1">{sub}</div>}
     </div>
   )
 }

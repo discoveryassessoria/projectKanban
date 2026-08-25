@@ -96,14 +96,14 @@ export function LancamentoExtraForm({ processoIdInicial, onClose, onDone }: { pr
   }
 
   const inp = "mt-1 w-full rounded border border-neutral-700 bg-neutral-900 p-2 text-sm text-neutral-100 outline-none focus:border-neutral-500"
-  const lbl = "block text-xs text-neutral-400"
+  const lbl = "block text-xs text-[var(--text-muted)]"
 
   return (
     <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-[var(--overlay-modal)] p-4">
       <div className="my-8 w-full max-w-2xl rounded-xl border border-neutral-700 bg-neutral-950 p-6">
         <div className="mb-5 flex items-center justify-between">
           <h2 className="text-lg font-semibold" style={{ color: OURO }}>Novo lançamento extra</h2>
-          <button onClick={onClose} className="text-neutral-500 hover:text-neutral-300"><X className="h-5 w-5" /></button>
+          <button onClick={onClose} className="text-neutral-500 hover:text-[var(--text-muted)]"><X className="h-5 w-5" /></button>
         </div>
 
         <div className="grid gap-4 sm:grid-cols-2">
@@ -130,14 +130,14 @@ export function LancamentoExtraForm({ processoIdInicial, onClose, onDone }: { pr
         </div>
 
         {/* Requerentes + distribuição */}
-        <div className="mt-5 rounded-lg border border-neutral-800 bg-neutral-900/50 p-4">
+        <div className="mt-5 rounded-lg border border-neutral-800 bg-[var(--surface-secondary)] p-4">
           <div className="mb-3 flex items-center justify-between">
-            <span className="text-sm font-medium text-neutral-300">Requerentes e distribuição</span>
+            <span className="text-sm font-medium text-[var(--text-muted)]">Requerentes e distribuição</span>
             <div className="flex gap-2">
               <select value={modo} onChange={(e) => setModo(e.target.value)} className="rounded border border-neutral-700 bg-neutral-900 p-1.5 text-xs text-neutral-100">
                 <option value="IGUAL">Igual</option><option value="PERCENTUAL">Percentual</option><option value="VALOR">Valor</option>
               </select>
-              <button onClick={atribuirUnico} className="rounded border border-neutral-700 px-2 py-1 text-xs text-neutral-300 hover:border-neutral-500">Único requerente</button>
+              <button onClick={atribuirUnico} className="rounded border border-neutral-700 px-2 py-1 text-xs text-[var(--text-muted)] hover:border-neutral-500">Único requerente</button>
             </div>
           </div>
           {reqs.map((r, i) => (
@@ -145,19 +145,19 @@ export function LancamentoExtraForm({ processoIdInicial, onClose, onDone }: { pr
               <input value={r.pessoaId} onChange={(e) => setReq(i, { pessoaId: e.target.value })} inputMode="numeric" placeholder="pessoaId" className="w-28 rounded border border-neutral-700 bg-neutral-900 p-2 text-sm text-neutral-100" />
               {modo === "PERCENTUAL" && <input value={r.percentual} onChange={(e) => setReq(i, { percentual: e.target.value })} inputMode="decimal" placeholder="%" className="w-20 rounded border border-neutral-700 bg-neutral-900 p-2 text-sm text-neutral-100" />}
               {modo === "VALOR" && <input value={r.valor} onChange={(e) => setReq(i, { valor: e.target.value })} inputMode="decimal" placeholder="valor" className="w-28 rounded border border-neutral-700 bg-neutral-900 p-2 text-sm text-neutral-100" />}
-              <button onClick={() => delReq(i)} className="text-neutral-600 hover:text-red-400"><Trash2 className="h-4 w-4" /></button>
+              <button onClick={() => delReq(i)} className="text-neutral-600 hover:text-red-700"><Trash2 className="h-4 w-4" /></button>
             </div>
           ))}
-          <button onClick={addReq} className="mt-1 inline-flex items-center gap-1 text-xs text-neutral-400 hover:text-neutral-200"><Plus className="h-3.5 w-3.5" /> adicionar requerente</button>
+          <button onClick={addReq} className="mt-1 inline-flex items-center gap-1 text-xs text-[var(--text-muted)] hover:text-[var(--text-muted)]"><Plus className="h-3.5 w-3.5" /> adicionar requerente</button>
 
           {/* CONFIRMAÇÃO VISUAL DA DISTRIBUIÇÃO */}
           {cotas.length > 0 && (
             <div className="mt-4 rounded border border-neutral-800 bg-neutral-950 p-3">
               <div className="mb-2 text-xs uppercase tracking-wider text-neutral-500">Prévia da distribuição</div>
               {cotas.map((c) => (
-                <div key={c.pessoaId} className="flex justify-between py-0.5 text-sm"><span className="text-neutral-400">pessoa #{c.pessoaId}</span><span>{fmt(c.valor, moeda)}</span></div>
+                <div key={c.pessoaId} className="flex justify-between py-0.5 text-sm"><span className="text-[var(--text-muted)]">pessoa #{c.pessoaId}</span><span>{fmt(c.valor, moeda)}</span></div>
               ))}
-              <div className={`mt-2 flex justify-between border-t border-neutral-800 pt-2 text-sm ${distConfere ? "text-emerald-400" : "text-red-400"}`}>
+              <div className={`mt-2 flex justify-between border-t border-neutral-800 pt-2 text-sm ${distConfere ? "text-emerald-700" : "text-red-700"}`}>
                 <span>Soma das cotas</span><span>{fmt(somaCotas, moeda)} {distConfere ? "✓" : `≠ ${fmt(total, moeda)}`}</span>
               </div>
             </div>
@@ -165,10 +165,10 @@ export function LancamentoExtraForm({ processoIdInicial, onClose, onDone }: { pr
         </div>
 
         {/* Pagamento imediato x cobrança futura */}
-        <div className="mt-5 rounded-lg border border-neutral-800 bg-neutral-900/50 p-4">
+        <div className="mt-5 rounded-lg border border-neutral-800 bg-[var(--surface-secondary)] p-4">
           <div className="mb-3 flex gap-2">
-            <button onClick={() => setImediato(false)} className={`rounded px-3 py-1.5 text-xs ${!imediato ? "text-neutral-950" : "border border-neutral-700 text-neutral-300"}`} style={!imediato ? { backgroundColor: OURO } : {}}>Cobrança futura</button>
-            <button onClick={() => setImediato(true)} className={`rounded px-3 py-1.5 text-xs ${imediato ? "text-neutral-950" : "border border-neutral-700 text-neutral-300"}`} style={imediato ? { backgroundColor: OURO } : {}}>Pagamento imediato</button>
+            <button onClick={() => setImediato(false)} className={`rounded px-3 py-1.5 text-xs ${!imediato ? "text-neutral-950" : "border border-neutral-700 text-[var(--text-muted)]"}`} style={!imediato ? { backgroundColor: OURO } : {}}>Cobrança futura</button>
+            <button onClick={() => setImediato(true)} className={`rounded px-3 py-1.5 text-xs ${imediato ? "text-neutral-950" : "border border-neutral-700 text-[var(--text-muted)]"}`} style={imediato ? { backgroundColor: OURO } : {}}>Pagamento imediato</button>
           </div>
           {!imediato ? (
             <label className={lbl}>Vencimento
@@ -192,9 +192,9 @@ export function LancamentoExtraForm({ processoIdInicial, onClose, onDone }: { pr
           )}
         </div>
 
-        {erro && <div className="mt-4 text-sm text-red-400">{erro}</div>}
+        {erro && <div className="mt-4 text-sm text-red-700">{erro}</div>}
         <div className="mt-6 flex justify-end gap-2">
-          <button onClick={onClose} className="rounded-lg border border-neutral-700 px-4 py-2 text-sm text-neutral-300 hover:border-neutral-500">Cancelar</button>
+          <button onClick={onClose} className="rounded-lg border border-neutral-700 px-4 py-2 text-sm text-[var(--text-muted)] hover:border-neutral-500">Cancelar</button>
           <button onClick={enviar} disabled={salvando || !(total > 0) || !distConfere} className="rounded-lg px-4 py-2 text-sm font-medium text-neutral-950 disabled:opacity-40" style={{ backgroundColor: OURO }}>
             {salvando ? "Salvando…" : imediato ? "Criar e pagar" : "Criar cobrança"}
           </button>

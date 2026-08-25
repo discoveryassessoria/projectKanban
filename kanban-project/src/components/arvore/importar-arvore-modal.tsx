@@ -168,12 +168,12 @@ export function ImportarArvoreModal({ arvoreId, aberto, onFechar, onImportado }:
 
         <div className="flex-1 overflow-y-auto px-6 py-5">
           {erro && (
-            <div className="mb-4 flex items-start gap-2 rounded-lg border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm">
-              <AlertTriangle className="mt-0.5 h-4 w-4 flex-shrink-0 text-red-400" />
+            <div className="mb-4 flex items-start gap-2 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm">
+              <AlertTriangle className="mt-0.5 h-4 w-4 flex-shrink-0 text-red-700" />
               <div>
-                <p className="text-red-200">{erro}</p>
+                <p className="text-red-700">{erro}</p>
                 {naoImplementado && (
-                  <p className="mt-1 text-red-200/70">
+                  <p className="mt-1 text-red-700/70">
                     A leitura por IA ainda não foi ligada neste ambiente. O restante do fluxo já funciona —
                     a prévia e a gravação podem ser exercitadas com <code className="rounded bg-black/30 px-1">IMPORTAR_ARVORE_MOCK=1</code>.
                   </p>
@@ -185,7 +185,7 @@ export function ImportarArvoreModal({ arvoreId, aberto, onFechar, onImportado }:
           {(etapa === "upload" || etapa === "analisando") && (
             <div className="space-y-5">
               <div>
-                <label className="mb-2 block text-sm font-medium">Print da árvore <span className="text-red-400">*</span></label>
+                <label className="mb-2 block text-sm font-medium">Print da árvore <span className="text-red-700">*</span></label>
                 <label className="flex cursor-pointer flex-col items-center justify-center gap-2 rounded-xl border border-dashed border-[var(--border-strong)] bg-[var(--surface-popover)] px-6 py-10 text-center transition hover:border-[var(--border-strong)]">
                   {previewUrl ? (
                     // <img> e não next/image: a origem é um blob: URL local do
@@ -193,25 +193,25 @@ export function ImportarArvoreModal({ arvoreId, aberto, onFechar, onImportado }:
                     <img src={previewUrl} alt="Prévia do print enviado" className="max-h-56 rounded-lg object-contain" />
                   ) : (
                     <>
-                      <Upload className="h-8 w-8 text-white/40" />
+                      <Upload className="h-8 w-8 text-[var(--text-muted)]" />
                       <span className="text-sm text-white/70">Clique para escolher uma imagem</span>
-                      <span className="text-xs text-white/50">PNG, JPEG ou WebP · até {LIMITE_MB} MB</span>
+                      <span className="text-xs text-[var(--text-secondary)]">PNG, JPEG ou WebP · até {LIMITE_MB} MB</span>
                     </>
                   )}
                   <input type="file" accept="image/png,image/jpeg,image/webp" className="hidden"
                     onChange={(e) => escolherArquivo(e.target.files?.[0] ?? null)} disabled={ocupado} />
                 </label>
-                {arquivo && <p className="mt-2 text-xs text-white/50">{arquivo.name} · {(arquivo.size / 1024 / 1024).toFixed(1)} MB</p>}
+                {arquivo && <p className="mt-2 text-xs text-[var(--text-secondary)]">{arquivo.name} · {(arquivo.size / 1024 / 1024).toFixed(1)} MB</p>}
               </div>
 
               <div>
                 <label className="mb-2 block text-sm font-medium">
-                  Texto complementar <span className="font-normal text-white/50">(opcional)</span>
+                  Texto complementar <span className="font-normal text-[var(--text-secondary)]">(opcional)</span>
                 </label>
                 <textarea value={textoComplementar} onChange={(e) => setTextoComplementar(e.target.value)}
                   disabled={ocupado} rows={4}
                   placeholder="Lista ou resumo escrito para desambiguar o que ficar cortado ou pouco legível na imagem."
-                  className="w-full rounded-lg border border-[var(--border-default)] bg-[var(--surface-popover)] px-3 py-2 text-sm placeholder:text-white/35 focus:border-white/30 focus:outline-none" />
+                  className="w-full rounded-lg border border-[var(--border-default)] bg-[var(--surface-popover)] px-3 py-2 text-sm placeholder:text-[var(--text-muted)] focus:border-white/30 focus:outline-none" />
               </div>
             </div>
           )}
@@ -224,9 +224,9 @@ export function ImportarArvoreModal({ arvoreId, aberto, onFechar, onImportado }:
               </div>
 
               {extracao.avisos.length > 0 && (
-                <div className="rounded-lg border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm text-amber-200">
+                <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-700">
                   <p className="mb-1 font-medium">Pontos de atenção da leitura</p>
-                  <ul className="list-inside list-disc space-y-0.5 text-amber-200/80">
+                  <ul className="list-inside list-disc space-y-0.5 text-amber-700/80">
                     {extracao.avisos.map((a, i) => <li key={i}>{a}</li>)}
                   </ul>
                 </div>
@@ -249,7 +249,7 @@ export function ImportarArvoreModal({ arvoreId, aberto, onFechar, onImportado }:
                             p.data_obito && `fal. ${p.data_obito}`, p.nacionalidade].filter(Boolean).join(" · ") || "sem dados adicionais"}
                         </p>
                         {(pai || mae) && (
-                          <p className="mt-0.5 text-xs text-white/50">
+                          <p className="mt-0.5 text-xs text-[var(--text-secondary)]">
                             filho(a) de {[pai && `${pai.nome} ${pai.sobrenome ?? ""}`.trim(), mae && `${mae.nome} ${mae.sobrenome ?? ""}`.trim()].filter(Boolean).join(" e ")}
                           </p>
                         )}
@@ -268,7 +268,7 @@ export function ImportarArvoreModal({ arvoreId, aberto, onFechar, onImportado }:
         </div>
 
         <footer className="flex flex-shrink-0 items-center justify-between gap-3 border-t border-[var(--border-default)] px-6 py-4">
-          <p className="text-xs text-white/50">
+          <p className="text-xs text-[var(--text-secondary)]">
             {naPrevia ? "Nada foi gravado ainda — confira antes de confirmar." : "A imagem é lida no servidor; nada é gravado nesta etapa."}
           </p>
           <div className="flex items-center gap-2">

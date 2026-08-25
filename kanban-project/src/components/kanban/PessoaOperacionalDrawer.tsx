@@ -59,21 +59,21 @@ const STATUS_LABELS: Record<string, string> = {
 }
 
 const STATUS_PILL_CLS: Record<string, string> = {
-  PENDENTE: "bg-[var(--surface-secondary)]/20 text-white/40",
-  SOLICITAR: "bg-[#a78bfa]/20 text-violet-300",
-  SOLICITADO: "bg-[#a78bfa]/20 text-violet-300",
-  EM_BUSCA: "bg-[#d2a948]/20 text-amber-300",
-  RECEBIDO: "bg-emerald-500/20 text-emerald-300",
-  EM_ANALISE: "bg-[#7dd3fc]/20 text-blue-300",
-  RETIFICANDO: "bg-orange-500/20 text-orange-300",
-  EM_TRADUCAO: "bg-cyan-500/20 text-cyan-300",
-  TRADUZIDO: "bg-emerald-500/20 text-emerald-300",
-  EM_APOSTILAMENTO: "bg-cyan-500/20 text-cyan-300",
-  APOSTILADO: "bg-emerald-500/20 text-emerald-300",
-  ENTREGUE: "bg-emerald-500/20 text-emerald-300",
-  INVALIDO: "bg-[#f87171]/20 text-red-300",
-  NAO_ENCONTRADO: "bg-[#20262e]0/20 text-white/40",
-  CANCELADO: "bg-[#20262e]0/20 text-white/40",
+  PENDENTE: "bg-[var(--surface-secondary)]/20 text-[var(--text-muted)]",
+  SOLICITAR: "bg-[#a78bfa]/20 text-slate-700",
+  SOLICITADO: "bg-[#a78bfa]/20 text-slate-700",
+  EM_BUSCA: "bg-[#d2a948]/20 text-amber-700",
+  RECEBIDO: "bg-emerald-50 text-emerald-700",
+  EM_ANALISE: "bg-[#7dd3fc]/20 text-blue-700",
+  RETIFICANDO: "bg-amber-50 text-amber-700",
+  EM_TRADUCAO: "bg-amber-50 text-amber-700",
+  TRADUZIDO: "bg-emerald-50 text-emerald-700",
+  EM_APOSTILAMENTO: "bg-amber-50 text-amber-700",
+  APOSTILADO: "bg-emerald-50 text-emerald-700",
+  ENTREGUE: "bg-emerald-50 text-emerald-700",
+  INVALIDO: "bg-[#f87171]/20 text-red-700",
+  NAO_ENCONTRADO: "bg-[var(--surface-secondary)]0/20 text-[var(--text-muted)]",
+  CANCELADO: "bg-[var(--surface-secondary)]0/20 text-[var(--text-muted)]",
 }
 
 const STATUS_RECEBIDO = new Set([
@@ -279,13 +279,13 @@ function ConteudoDrawer({
       >
         {loading && !pessoa && (
           <div className="flex-1 flex items-center justify-center">
-            <Loader2 className="w-6 h-6 animate-spin text-white/50" />
+            <Loader2 className="w-6 h-6 animate-spin text-[var(--text-secondary)]" />
           </div>
         )}
 
         {erro && !pessoa && (
           <div className="flex-1 flex flex-col items-center justify-center text-white/60 gap-3 p-6">
-            <AlertTriangle className="w-8 h-8 text-amber-400" />
+            <AlertTriangle className="w-8 h-8 text-amber-700" />
             <p className="text-sm">{erro}</p>
             <button
               onClick={onClose}
@@ -304,7 +304,7 @@ function ConteudoDrawer({
               style={{ background: "linear-gradient(180deg,#181d24 0%,#11151b 100%)" }}
             >
               <div className="flex items-center justify-between mb-3">
-                <div className="text-[10px] uppercase font-semibold tracking-wider text-white/50">
+                <div className="text-[10px] uppercase font-semibold tracking-wider text-[var(--text-secondary)]">
                   Central Operacional · Pessoa
                 </div>
                 <button
@@ -319,7 +319,7 @@ function ConteudoDrawer({
               <div className="text-[20px] font-bold tracking-tight leading-tight text-white mb-0.5">
                 {nomeCompleto(pessoa)}
               </div>
-              <div className="text-[12px] text-white/55 mb-4">
+              <div className="text-[12px] text-[var(--text-secondary)] mb-4">
                 {linhagemLabel(pessoa)}
               </div>
 
@@ -333,11 +333,11 @@ function ConteudoDrawer({
 
               {/* ============== PROGRESSO DOCUMENTAL ============== */}
               <div className="mb-4">
-                <div className="flex items-center justify-between text-[10px] uppercase font-semibold tracking-wider text-white/45 mb-1.5">
+                <div className="flex items-center justify-between text-[10px] uppercase font-semibold tracking-wider text-[var(--text-secondary)] mb-1.5">
                   <span>Progresso documental</span>
                   <span>
                     {progresso}% · SLA crítico:{" "}
-                    <span className={slaCritico ? "text-red-300" : "text-emerald-300"}>
+                    <span className={slaCritico ? "text-red-700" : "text-emerald-700"}>
                       {slaCritico ? "SIM" : "NÃO"}
                     </span>
                   </span>
@@ -381,7 +381,7 @@ function ConteudoDrawer({
                     className={`ml-auto inline-flex items-center gap-1.5 px-2.5 py-1.5 text-[11px] font-semibold rounded-md transition-colors ${
                       confirmDelete
                         ? "bg-[#f87171] text-white hover:bg-red-600"
-                        : "bg-[#f87171]/10 text-red-300 hover:bg-[#f87171]/20"
+                        : "bg-[#f87171]/10 text-red-700 hover:bg-[#f87171]/20"
                     }`}
                   >
                     <Trash2 className="w-3 h-3" />
@@ -403,14 +403,14 @@ function ConteudoDrawer({
                   className={`flex-shrink-0 inline-flex items-center gap-1.5 px-4 py-2.5 text-[11.5px] font-semibold border-b-2 transition-colors -mb-px ${
                     activeTab === t.id
                       ? "text-white border-blue-500"
-                      : "text-white/55 hover:text-white border-transparent"
+                      : "text-[var(--text-secondary)] hover:text-white border-transparent"
                   }`}
                 >
                   {t.label}
                   {t.count !== undefined && (
                     <span
                       className={`text-[9.5px] px-1.5 rounded-full font-bold ${
-                        activeTab === t.id ? "bg-[#7dd3fc]/30 text-blue-200" : "bg-[var(--surface-popover)]/10 text-white/70"
+                        activeTab === t.id ? "bg-[#7dd3fc]/30 text-blue-700" : "bg-[var(--surface-popover)]/10 text-white/70"
                       }`}
                     >
                       {t.count}
@@ -479,11 +479,11 @@ function StatCard({
 }) {
   const valueCls =
     tone === "alert"
-      ? "text-red-300"
+      ? "text-red-700"
       : tone === "warn"
-      ? "text-amber-300"
+      ? "text-amber-700"
       : tone === "ok"
-      ? "text-emerald-300"
+      ? "text-emerald-700"
       : "text-white"
 
   return (
@@ -491,7 +491,7 @@ function StatCard({
       <div className={`text-[22px] font-bold leading-none mb-1 tabular-nums ${valueCls}`}>
         {value}
       </div>
-      <div className="text-[9.5px] uppercase font-semibold tracking-wider text-white/50">
+      <div className="text-[9.5px] uppercase font-semibold tracking-wider text-[var(--text-secondary)]">
         {label}
       </div>
     </div>
@@ -531,8 +531,8 @@ function TabDocs({
 }) {
   if (docs.length === 0) {
     return (
-      <div className="flex flex-col items-center justify-center py-16 text-center text-white/40">
-        <FileText className="w-10 h-10 text-white/20 mb-3" />
+      <div className="flex flex-col items-center justify-center py-16 text-center text-[var(--text-muted)]">
+        <FileText className="w-10 h-10 text-[var(--text-muted)] mb-3" />
         <p className="text-sm">Nenhum documento cadastrado para esta pessoa.</p>
       </div>
     )
@@ -550,7 +550,7 @@ function TabDocs({
 function DocCard({ doc, onClick }: { doc: Documento; onClick: () => void }) {
   const tipoLabel = TIPO_LABELS[doc.tipo] || doc.tipo
   const statusLabel = STATUS_LABELS[doc.status] || doc.status
-  const statusCls = STATUS_PILL_CLS[doc.status] || "bg-[#20262e]0/20 text-white/40"
+  const statusCls = STATUS_PILL_CLS[doc.status] || "bg-[var(--surface-secondary)]0/20 text-[var(--text-muted)]"
 
   const isPendente = doc.status === "PENDENTE"
   const isRecebido = STATUS_RECEBIDO.has(doc.status)
@@ -577,7 +577,7 @@ function DocCard({ doc, onClick }: { doc: Documento; onClick: () => void }) {
             {tipoLabel}
           </div>
           {registralInfo && (
-            <div className="text-[11px] text-white/55 font-mono mt-1 truncate">
+            <div className="text-[11px] text-[var(--text-secondary)] font-mono mt-1 truncate">
               {registralInfo}
             </div>
           )}
@@ -593,9 +593,9 @@ function DocCard({ doc, onClick }: { doc: Documento; onClick: () => void }) {
       {/* Progress bar fino (só se houver workflow ou estiver concluído) */}
       {!isPendente && (
         <div className="mt-2.5">
-          <div className="flex items-center justify-between text-[10px] text-white/45 mb-1">
+          <div className="flex items-center justify-between text-[10px] text-[var(--text-secondary)] mb-1">
             <span>{progress}% concluído</span>
-            <ChevronRight className="w-3 h-3 text-white/30 group-hover:text-white/60 transition-colors" />
+            <ChevronRight className="w-3 h-3 text-[var(--text-muted)] group-hover:text-white/60 transition-colors" />
           </div>
           <div className="h-1 bg-[var(--surface-popover)]/10 rounded-full overflow-hidden">
             <div
@@ -612,7 +612,7 @@ function DocCard({ doc, onClick }: { doc: Documento; onClick: () => void }) {
 
       {/* CTA pra Pendente */}
       {isPendente && (
-        <div className="mt-2 inline-flex items-center gap-1.5 text-[11.5px] font-semibold text-blue-300">
+        <div className="mt-2 inline-flex items-center gap-1.5 text-[11.5px] font-semibold text-blue-700">
           <PlayCircle className="w-3.5 h-3.5" />
           Iniciar operação
         </div>
@@ -630,8 +630,8 @@ function Placeholder({ titulo, descricao }: { titulo: string; descricao: string 
   return (
     <div className="flex flex-col items-center justify-center py-16 text-center max-w-md mx-auto">
       <div className="text-base font-semibold text-white/80 mb-2">{titulo}</div>
-      <div className="text-sm text-white/55 leading-relaxed">{descricao}</div>
-      <div className="mt-3 text-[11px] uppercase tracking-wider text-white/35">
+      <div className="text-sm text-[var(--text-secondary)] leading-relaxed">{descricao}</div>
+      <div className="mt-3 text-[11px] uppercase tracking-wider text-[var(--text-muted)]">
         Ainda não há registros aqui
       </div>
     </div>

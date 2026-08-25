@@ -37,7 +37,7 @@ export default function RuntimeWorkflowDiagnostics() {
             inputMode="numeric"
             className="w-40 rounded-lg border border-[var(--border-default)] bg-[var(--surface-primary)] px-3 py-2 text-sm text-white placeholder-white/30 outline-none focus:border-white/20"
           />
-          <button onClick={carregar} className="rounded-lg bg-blue-600 px-3 py-2 text-xs font-medium text-[#fff] hover:bg-blue-500">
+          <button onClick={carregar} className="rounded-lg bg-[var(--action-primary)] px-3 py-2 text-xs font-medium text-[var(--action-primary-ink)] hover:bg-[var(--action-primary)]">
             Carregar diagnóstico
           </button>
         </div>
@@ -50,7 +50,7 @@ export default function RuntimeWorkflowDiagnostics() {
           <WorkflowV2Panel processoId={processoId} />
         </div>
       ) : (
-        <div className="rounded-2xl border border-[var(--border-default)] bg-[var(--surface-primary)] p-8 text-center text-sm text-white/40">
+        <div className="rounded-2xl border border-[var(--border-default)] bg-[var(--surface-primary)] p-8 text-center text-sm text-[var(--text-muted)]">
           Informe o ID de um processo para ver o diagnóstico técnico do Runtime.
         </div>
       )}

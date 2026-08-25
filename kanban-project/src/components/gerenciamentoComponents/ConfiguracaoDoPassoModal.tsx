@@ -80,8 +80,8 @@ interface Catalogo {
 // organizada como processo de trabalho: o que é, o que se faz, o que precisa estar
 // cumprido, o que pode acontecer, e as regras especiais.
 
-const inp = "w-full rounded-lg border border-[var(--border-default)] bg-[var(--surface-primary)] px-3 py-2 text-sm text-white placeholder-white/30 outline-none focus:border-blue-400/50"
-const lbl = "mb-1 block text-[11px] uppercase tracking-wide text-white/40"
+const inp = "w-full rounded-lg border border-[var(--border-default)] bg-[var(--surface-primary)] px-3 py-2 text-sm text-white placeholder-white/30 outline-none focus:border-blue-200"
+const lbl = "mb-1 block text-[11px] uppercase tracking-wide text-[var(--text-muted)]"
 const card = "rounded-lg border border-[var(--border-default)] bg-[var(--surface-primary)] p-3"
 
 export default function ConfiguracaoDoPassoModal({
@@ -220,25 +220,25 @@ export default function ConfiguracaoDoPassoModal({
           <div className="flex items-start justify-between gap-3">
             <div className="min-w-0">
               <h3 className="font-semibold text-white">Configurar “{f.label}”</h3>
-              <p className="mt-0.5 text-xs text-white/50">
+              <p className="mt-0.5 text-xs text-[var(--text-secondary)]">
                 {faseLabel} · <code className="text-white/70">{f.key}</code>
               </p>
             </div>
             <div className="flex flex-none items-center gap-2">
               {/* RASCUNHO × PUBLICADO — o administrador precisa saber, antes de mexer,
                   se o que ele fizer atinge quem já está rodando. Não atinge. */}
-              <span className="rounded-full border border-amber-400/30 bg-amber-500/10 px-2.5 py-1 text-[11px] text-amber-200">
+              <span className="rounded-full border border-amber-200 bg-amber-50 px-2.5 py-1 text-[11px] text-amber-700">
                 Rascunho
               </span>
               {sujo && (
-                <span className="flex items-center gap-1.5 text-[11px] text-white/50" title="Há alterações que ainda não foram salvas.">
+                <span className="flex items-center gap-1.5 text-[11px] text-[var(--text-secondary)]" title="Há alterações que ainda não foram salvas.">
                   <span className="h-1.5 w-1.5 rounded-full bg-amber-400" aria-hidden />
                   Alterações não salvas
                 </span>
               )}
             </div>
           </div>
-          <p className="mt-1.5 text-[11px] text-white/35">
+          <p className="mt-1.5 text-[11px] text-[var(--text-muted)]">
             As alterações ficam em rascunho e <b>não afetam processos em andamento</b>. Elas passam a valer quando
             você publicar, na tela do workflow.
           </p>
@@ -251,20 +251,20 @@ export default function ConfiguracaoDoPassoModal({
               <button key={a.key} role="tab" aria-selected={area === a.key} type="button"
                 onClick={() => setArea(a.key)}
                 title={a.ajuda}
-                className={`rounded-t-lg px-3 py-2 text-xs ${area === a.key ? "bg-[var(--surface-primary)] text-white" : "text-white/50 hover:text-white/80"}`}>
+                className={`rounded-t-lg px-3 py-2 text-xs ${area === a.key ? "bg-[var(--surface-primary)] text-white" : "text-[var(--text-secondary)] hover:text-white/80"}`}>
                 {a.label}
               </button>
             ))}
           </div>
-          <p className="px-1 py-2 text-[11px] text-white/40">
-            {AREAS.find((a) => a.key === area)?.ajuda} <span className="text-white/25">· {RESUMO[area]}</span>
+          <p className="px-1 py-2 text-[11px] text-[var(--text-muted)]">
+            {AREAS.find((a) => a.key === area)?.ajuda} <span className="text-[var(--text-muted)]">· {RESUMO[area]}</span>
           </p>
         </div>
 
         {meus.length > 0 && (
-          <div className="mx-6 mt-4 rounded-lg border border-red-400/30 bg-red-500/10 p-3">
-            <div className="text-xs font-medium text-red-200">A publicação foi recusada:</div>
-            <ul className="mt-1 space-y-0.5 text-xs text-red-200/80">
+          <div className="mx-6 mt-4 rounded-lg border border-red-200 bg-red-50 p-3">
+            <div className="text-xs font-medium text-red-700">A publicação foi recusada:</div>
+            <ul className="mt-1 space-y-0.5 text-xs text-red-700/80">
               {meus.map((p, i) => <li key={i}>· {p.mensagem}</li>)}
             </ul>
           </div>
@@ -296,7 +296,7 @@ export default function ConfiguracaoDoPassoModal({
                 </select>
                 {/* A ENUM NÃO MUDA — o que faltava era dizer o que cada valor PRODUZ.
                     "PESSOA" não informa nada a quem configura. */}
-                <p className="mt-1 text-[11px] text-white/40">
+                <p className="mt-1 text-[11px] text-[var(--text-muted)]">
                   {CARDINALIDADES.find((c) => c.key === (f.cardinalidade ?? ""))?.ajuda}
                 </p>
               </div>
@@ -321,7 +321,7 @@ export default function ConfiguracaoDoPassoModal({
                     value={temPrazoProprio(f.slaDays) ? String(f.slaDays) : ""}
                     onChange={(e) => set("slaDays", e.target.value === "" ? PRAZO_HERDADO : Number(e.target.value) || PRAZO_HERDADO)}
                   />
-                  <p className="mt-1 text-[11px] text-white/40">
+                  <p className="mt-1 text-[11px] text-[var(--text-muted)]">
                     {temPrazoProprio(f.slaDays)
                       ? "Prazo específico deste passo. Some ao da fase; não substitui a régua da fase."
                       : "Prazo: padrão da fase. Deixe vazio para continuar herdando — o passo acompanha a fase quando ela mudar."}
@@ -333,7 +333,7 @@ export default function ConfiguracaoDoPassoModal({
                 <label className={lbl}>Responsável padrão</label>
                 <input className={inp} value={f.owner ?? ""} placeholder="equipe, papel ou pessoa"
                   onChange={(e) => set("owner", e.target.value || null)} />
-                <p className="mt-1 text-[11px] text-white/40">
+                <p className="mt-1 text-[11px] text-[var(--text-muted)]">
                   Quem recebe a etapa quando ninguém a assume. Não confundir com o <b>executor</b>, que é o
                   mecanismo técnico que desenha a tela — esse fica em Avançado.
                 </p>
@@ -351,7 +351,7 @@ export default function ConfiguracaoDoPassoModal({
               {/* A CONDIÇÃO DE CONCLUSÃO MORA EM "Conclusão", e só lá. Ela estava
                   aqui também — dois seletores para o mesmo atributo, que é a
                   duplicidade que esta reorganização existe para desfazer. */}
-              <p className="rounded-lg border border-[var(--border-default)] bg-[var(--surface-primary)] p-3 text-[11px] text-white/45">
+              <p className="rounded-lg border border-[var(--border-default)] bg-[var(--surface-primary)] p-3 text-[11px] text-[var(--text-secondary)]">
                 Este passo termina: <b>{REGRAS_DE_CONCLUSAO.find((r) => r.key === (f.regraDeConclusao ?? "ACAO_DO_PASSO"))?.label}</b>.
                 {" "}Para mudar, vá em <b>Conclusão</b>.
               </p>
@@ -366,7 +366,7 @@ export default function ConfiguracaoDoPassoModal({
                    ["campos", `Campos (${f.campos?.length ?? 0})`],
                    ["checklist", `Checklist (${f.checkItens?.length ?? 0})`]] as const).map(([k, rotulo]) => (
                   <button key={k} type="button" role="tab" aria-selected={secaoExec === k} onClick={() => setSecaoExec(k)}
-                    className={`rounded-t-lg px-2.5 py-1.5 text-[11px] ${secaoExec === k ? "bg-[var(--surface-primary)] text-white" : "text-white/50 hover:text-white/80"}`}>
+                    className={`rounded-t-lg px-2.5 py-1.5 text-[11px] ${secaoExec === k ? "bg-[var(--surface-primary)] text-white" : "text-[var(--text-secondary)] hover:text-white/80"}`}>
                     {rotulo}
                   </button>
                 ))}
@@ -386,12 +386,12 @@ export default function ConfiguracaoDoPassoModal({
               )}
               {secaoExec === "subtarefas" && (
               <>
-              <p className="text-xs text-white/50">
+              <p className="text-xs text-[var(--text-secondary)]">
                 O que acontece DENTRO deste passo. Cada subtarefa tem identidade própria, estado próprio,
                 execução própria e histórico próprio — e pode depender das irmãs.
               </p>
               {exec && exec.suportaCondicoes === false && (
-                <p className="text-[11px] text-amber-300/70">
+                <p className="text-[11px] text-amber-700/70">
                   O executor “{exec.label}” não interpreta condições; as subtarefas ficam cadastradas, mas ele não as usa.
                 </p>
               )}
@@ -405,20 +405,20 @@ export default function ConfiguracaoDoPassoModal({
                         onChange={(e) => setSub(i, { label: e.target.value, key: st.key ?? chaveDe(e.target.value) })} />
                     </div>
                     <button onClick={() => setSubAberta(subAberta === i ? null : i)}
-                      className="rounded-lg border border-[var(--border-default)] px-3 py-2 text-xs text-blue-300 hover:bg-blue-500/10">
+                      className="rounded-lg border border-[var(--border-default)] px-3 py-2 text-xs text-blue-700 hover:bg-blue-50">
                       {subAberta === i ? "Fechar" : "Configurar"}
                     </button>
                     <button onClick={() => setF((x) => ({ ...x, subtarefas: (x.subtarefas ?? []).filter((_, j) => j !== i) }))}
-                      className="rounded-lg border border-[var(--border-default)] px-2 py-2 text-xs text-red-300 hover:bg-red-500/10">Remover</button>
+                      className="rounded-lg border border-[var(--border-default)] px-2 py-2 text-xs text-red-700 hover:bg-red-50">Remover</button>
                   </div>
                   <div className="mt-1.5 flex flex-wrap items-center gap-1.5 text-[10px]">
-                    <code className="text-white/35">{st.key ?? chaveDe(st.label)}</code>
-                    {st.obrigatoria !== false && <span className="rounded bg-amber-500/15 px-1.5 py-0.5 text-amber-300">obrigatória</span>}
+                    <code className="text-[var(--text-muted)]">{st.key ?? chaveDe(st.label)}</code>
+                    {st.obrigatoria !== false && <span className="rounded bg-amber-50 px-1.5 py-0.5 text-amber-700">obrigatória</span>}
                     {st.repetivel && <span className="rounded bg-[var(--surface-primary)] px-1.5 py-0.5 text-white/60">repetível{st.maxOcorrencias ? ` ≤${st.maxOcorrencias}` : ""}</span>}
                     {(st.dependeDe?.length ?? 0) > 0 && <span className="rounded bg-[var(--surface-primary)] px-1.5 py-0.5 text-white/60">depende de {st.dependeDe!.length}</span>}
-                    {st.fonteDeCanais && st.fonteDeCanais !== "NENHUMA" && <span className="rounded bg-sky-500/15 px-1.5 py-0.5 text-sky-300">canais do fornecedor</span>}
-                    {(st.acoes?.length ?? 0) > 0 && <span className="rounded bg-violet-500/15 px-1.5 py-0.5 text-violet-300">{st.acoes!.length} ações</span>}
-                    {(st.campos?.length ?? 0) > 0 && <span className="rounded bg-violet-500/15 px-1.5 py-0.5 text-violet-300">{st.campos!.length} campos</span>}
+                    {st.fonteDeCanais && st.fonteDeCanais !== "NENHUMA" && <span className="rounded bg-sky-50 px-1.5 py-0.5 text-sky-700">canais do fornecedor</span>}
+                    {(st.acoes?.length ?? 0) > 0 && <span className="rounded bg-slate-50 px-1.5 py-0.5 text-slate-700">{st.acoes!.length} ações</span>}
+                    {(st.campos?.length ?? 0) > 0 && <span className="rounded bg-slate-50 px-1.5 py-0.5 text-slate-700">{st.campos!.length} campos</span>}
                   </div>
 
                   {subAberta === i && (
@@ -426,7 +426,7 @@ export default function ConfiguracaoDoPassoModal({
                       <div className="flex flex-wrap gap-1 border-b border-[var(--border-default)] pb-2">
                         {(["geral", "campos", "acoes", "checklist", "requisitos", "evidencias"] as const).map((v) => (
                           <button key={v} onClick={() => setAbaDaSub(v)}
-                            className={`rounded-t-lg px-2.5 py-1 text-[11px] ${abaDaSub === v ? "bg-[var(--surface-primary)] text-white" : "text-white/50 hover:text-white/80"}`}>
+                            className={`rounded-t-lg px-2.5 py-1 text-[11px] ${abaDaSub === v ? "bg-[var(--surface-primary)] text-white" : "text-[var(--text-secondary)] hover:text-white/80"}`}>
                             {v === "geral" ? "Geral" : v === "acoes" ? "Ações" : v === "evidencias" ? "Evidências" : v[0].toUpperCase() + v.slice(1)}
                           </button>
                         ))}
@@ -480,7 +480,7 @@ export default function ConfiguracaoDoPassoModal({
                             <div>
                               <label className={lbl}>Depende de (subtarefas deste passo)</label>
                               {subs.filter((_, j) => j !== i).length === 0 && (
-                                <p className="text-[11px] text-white/35">Não há outra subtarefa para depender.</p>
+                                <p className="text-[11px] text-[var(--text-muted)]">Não há outra subtarefa para depender.</p>
                               )}
                               <div className="flex flex-wrap gap-2">
                                 {subs.filter((_, j) => j !== i).map((outra) => {
@@ -499,7 +499,7 @@ export default function ConfiguracaoDoPassoModal({
                                   )
                                 })}
                               </div>
-                              <p className="mt-1 text-[11px] text-white/35">
+                              <p className="mt-1 text-[11px] text-[var(--text-muted)]">
                                 Ordem não é dependência: duas subtarefas podem depender da mesma sem depender uma da outra.
                               </p>
                             </div>
@@ -509,7 +509,7 @@ export default function ConfiguracaoDoPassoModal({
                               <select className={inp} value={st.fonteDeCanais ?? "NENHUMA"} onChange={(e) => setSub(i, { fonteDeCanais: e.target.value })}>
                                 {FONTES_DE_CANAIS.map((x) => <option key={x.key} value={x.key}>{x.label}</option>)}
                               </select>
-                              <p className="mt-1 text-[11px] text-white/40">
+                              <p className="mt-1 text-[11px] text-[var(--text-muted)]">
                                 {FONTES_DE_CANAIS.find((x) => x.key === (st.fonteDeCanais ?? "NENHUMA"))?.ajuda}
                               </p>
                               {st.fonteDeCanais === "TIPOS_PERMITIDOS" && (
@@ -529,12 +529,12 @@ export default function ConfiguracaoDoPassoModal({
                                     )
                                   })}
                                   {(st.tiposDeCanal ?? []).length === 0 && (
-                                    <p className="text-[11px] text-amber-300/70">Nenhum tipo marcado — não sobraria canal nenhum. A publicação recusa.</p>
+                                    <p className="text-[11px] text-amber-700/70">Nenhum tipo marcado — não sobraria canal nenhum. A publicação recusa.</p>
                                   )}
                                 </div>
                               )}
                               {st.fonteDeCanais !== "NENHUMA" && (
-                                <p className="mt-2 text-[11px] text-white/35">
+                                <p className="mt-2 text-[11px] text-[var(--text-muted)]">
                                   Quais canais aparecem depende do órgão do documento — cadastre-os em
                                   Órgãos e Organizações → Canais de atendimento. O workflow não copia essa lista.
                                 </p>
@@ -602,7 +602,7 @@ export default function ConfiguracaoDoPassoModal({
                 className="rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-medium text-[#fff] hover:bg-blue-500">+ Subtarefa</button>
 
               {subs.length > 0 && f.regraDeConclusao === "ACAO_DO_PASSO" && (
-                <p className="text-[11px] text-white/40">
+                <p className="text-[11px] text-[var(--text-muted)]">
                   Este passo tem subtarefas e conclui pela ação do passo — elas não travam a conclusão. Para que travem,
                   mude a condição de conclusão em <b>Conclusão</b>.
                 </p>
@@ -620,11 +620,11 @@ export default function ConfiguracaoDoPassoModal({
                 <select className={inp} value={f.regraDeConclusao ?? "ACAO_DO_PASSO"} onChange={(e) => set("regraDeConclusao", e.target.value)}>
                   {REGRAS_DE_CONCLUSAO.map((r) => <option key={r.key} value={r.key}>{r.label}</option>)}
                 </select>
-                <p className="mt-1 text-[11px] text-white/40">
+                <p className="mt-1 text-[11px] text-[var(--text-muted)]">
                   {REGRAS_DE_CONCLUSAO.find((r) => r.key === (f.regraDeConclusao ?? "ACAO_DO_PASSO"))?.ajuda}
                 </p>
                 {f.regraDeConclusao !== "ACAO_DO_PASSO" && subs.length === 0 && (
-                  <p className="mt-2 text-[11px] text-amber-300/70">
+                  <p className="mt-2 text-[11px] text-amber-700/70">
                     Esta regra olha para subtarefas e este passo não tem nenhuma — ele nunca concluiria. A publicação recusa.
                   </p>
                 )}
@@ -639,7 +639,7 @@ export default function ConfiguracaoDoPassoModal({
                 {([["requisitos", `Requisitos (${requisitosSimples.length})`],
                    ["evidencias", `Evidências obrigatórias (${evidencias.length})`]] as const).map(([k, rotulo]) => (
                   <button key={k} type="button" role="tab" aria-selected={secaoConcl === k} onClick={() => setSecaoConcl(k)}
-                    className={`rounded-t-lg px-2.5 py-1.5 text-[11px] ${secaoConcl === k ? "bg-[var(--surface-primary)] text-white" : "text-white/50 hover:text-white/80"}`}>
+                    className={`rounded-t-lg px-2.5 py-1.5 text-[11px] ${secaoConcl === k ? "bg-[var(--surface-primary)] text-white" : "text-[var(--text-secondary)] hover:text-white/80"}`}>
                     {rotulo}
                   </button>
                 ))}
@@ -672,15 +672,15 @@ export default function ConfiguracaoDoPassoModal({
             <div className="space-y-3">
               <details open className={card}>
                 <summary className="cursor-pointer text-sm font-medium text-white/80">
-                  Dependências <span className="text-white/35">({f.dependeDe?.length ?? 0})</span>
+                  Dependências <span className="text-[var(--text-muted)]">({f.dependeDe?.length ?? 0})</span>
                 </summary>
                 <div className="mt-3 space-y-2">
-              <p className="text-xs text-white/50">
+              <p className="text-xs text-[var(--text-secondary)]">
                 De quais PASSOS este depende. Ordem não é dependência: dois passos podem depender do mesmo
                 sem depender um do outro — e reabrir alcança quem depende, não quem vem depois.
               </p>
               {irmaos.filter((s) => s.key !== f.key).length === 0 && (
-                <p className="text-[11px] text-white/35">Não há outro passo neste workflow.</p>
+                <p className="text-[11px] text-[var(--text-muted)]">Não há outro passo neste workflow.</p>
               )}
               <div className="flex flex-wrap gap-2">
                 {irmaos.filter((s) => s.key !== f.key).map((s) => {
@@ -701,7 +701,7 @@ export default function ConfiguracaoDoPassoModal({
 
               <details className={card}>
                 <summary className="cursor-pointer text-sm font-medium text-white/80">
-                  Executor técnico <span className="text-white/35">({exec?.label ?? "padrão"})</span>
+                  Executor técnico <span className="text-[var(--text-muted)]">({exec?.label ?? "padrão"})</span>
                 </summary>
                 <div className="mt-3 space-y-2">
               <div>
@@ -720,18 +720,18 @@ export default function ConfiguracaoDoPassoModal({
                       ["suportaCanais", "canais"], ["suportaEvidencia", "evidência"],
                       ["suportaEsperaExterna", "espera externa"], ["suportaCondicoes", "condições"],
                     ] as Array<[keyof Executor, string]>).map(([k, rotulo]) => (
-                      <span key={String(k)} className={`rounded px-1.5 py-0.5 ${exec[k] ? "bg-emerald-500/15 text-emerald-300" : "bg-[var(--surface-primary)] text-white/40"}`}>
+                      <span key={String(k)} className={`rounded px-1.5 py-0.5 ${exec[k] ? "bg-emerald-50 text-emerald-700" : "bg-[var(--surface-primary)] text-[var(--text-muted)]"}`}>
                         {exec[k] ? "✓" : "✕"} {rotulo}
                       </span>
                     ))}
                   </div>
-                  <p className="mt-2 text-[11px] text-white/40">
+                  <p className="mt-2 text-[11px] text-[var(--text-muted)]">
                     Executor é capacidade técnica. Ele não decide subtarefa, ação, resultado, canal nem checklist —
                     recebe a configuração. Publicar uma configuração que ele não sabe desenhar é recusado.
                   </p>
-                  <div className="mt-2 text-[11px] text-white/40">
+                  <div className="mt-2 text-[11px] text-[var(--text-muted)]">
                     Efeitos que ele dispara nesta fase: {efeitosOfertados.length === 0
-                      ? <span className="text-amber-300/70">nenhum — a fase não declarou competência compatível.</span>
+                      ? <span className="text-amber-700/70">nenhum — a fase não declarou competência compatível.</span>
                       : efeitosOfertados.map((e) => e.label).join(", ")}
                   </div>
                 </div>
@@ -744,7 +744,7 @@ export default function ConfiguracaoDoPassoModal({
                   Reabertura
                 </summary>
                 <div className="mt-3 space-y-2">
-                  <p className="text-[11px] text-white/40">
+                  <p className="text-[11px] text-[var(--text-muted)]">
                     Controla o que pode ser reexecutado <b>depois</b> que o passo foi concluído. Não se confunde com
                     retroceder a fase: retroceder move o processo e <b>não reabre este passo automaticamente</b>.
                   </p>
@@ -759,7 +759,7 @@ export default function ConfiguracaoDoPassoModal({
                   <option value="SOMENTE_ESTA">Somente esta</option>
                   <option value="ESTA_E_DEPENDENTES">Esta e as que dependem dela</option>
                 </select>
-                <p className="mt-1 text-[11px] text-white/40">
+                <p className="mt-1 text-[11px] text-[var(--text-muted)]">
                   &quot;As que dependem dela&quot; vem do grafo cadastrado na aba Dependências — nunca da ordem da lista.
                 </p>
               </div>
@@ -782,10 +782,10 @@ export default function ConfiguracaoDoPassoModal({
         <div className="flex flex-none items-center justify-between gap-3 border-t border-[var(--border-default)] px-6 py-4">
           <div className="min-w-0 text-[11px]">
             {erroAoSalvar
-              ? <span className="text-red-300">{erroAoSalvar}</span>
+              ? <span className="text-red-700">{erroAoSalvar}</span>
               : sujo
-                ? <span className="text-white/45">Salvar guarda o rascunho. Publicar é um passo à parte, na tela do workflow.</span>
-                : <span className="text-white/30">Sem alterações pendentes.</span>}
+                ? <span className="text-[var(--text-secondary)]">Salvar guarda o rascunho. Publicar é um passo à parte, na tela do workflow.</span>
+                : <span className="text-[var(--text-muted)]">Sem alterações pendentes.</span>}
           </div>
           <div className="flex flex-none gap-2">
             <button type="button" onClick={tentarFechar}
@@ -804,7 +804,7 @@ export default function ConfiguracaoDoPassoModal({
         <div className="fixed inset-0 z-[60] flex items-center justify-center bg-[var(--overlay-modal)] p-4" onClick={(e) => e.stopPropagation()}>
           <div className="w-full max-w-sm rounded-2xl border border-[var(--border-default)] bg-zinc-900 p-6 shadow-2xl">
             <h4 className="text-sm font-semibold text-white">Você tem alterações não salvas</h4>
-            <p className="mt-1 text-xs text-white/50">Se sair agora, o que você configurou nesta sessão será descartado.</p>
+            <p className="mt-1 text-xs text-[var(--text-secondary)]">Se sair agora, o que você configurou nesta sessão será descartado.</p>
             <div className="mt-4 flex justify-end gap-2">
               <button type="button" onClick={() => setConfirmandoSaida(false)}
                 className="rounded-lg border border-[var(--border-default)] bg-[var(--surface-primary)] px-3 py-1.5 text-xs text-white/70 hover:bg-[var(--surface-hover)]">Continuar editando</button>

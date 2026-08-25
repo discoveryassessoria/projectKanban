@@ -52,7 +52,7 @@ export function CommandPalette() {
         onClick={() => setAberto(true)}
         aria-haspopup="dialog"
         aria-expanded={aberto}
-        className="flex h-9 items-center gap-2 rounded-full border border-[var(--border-default)] bg-black/30 px-3 text-sm text-white/45 backdrop-blur-md transition hover:border-[var(--border-strong)] hover:text-white/70 focus:outline-none focus:ring-2 focus:ring-white/20"
+        className="flex h-9 items-center gap-2 rounded-full border border-[var(--border-default)] bg-black/30 px-3 text-sm text-[var(--text-secondary)] backdrop-blur-md transition hover:border-[var(--border-strong)] hover:text-white/70 focus:outline-none focus:ring-2 focus:ring-white/20"
       >
         <Search className="h-3.5 w-3.5" />
         <span>Buscar</span>
@@ -76,8 +76,8 @@ export function CommandPalette() {
           >
             <div className="w-full max-w-xl rounded-2xl border border-[var(--border-strong)] bg-[var(--surface-popover)] p-3 shadow-2xl">
               <GlobalSearch autoFocusRef={inputRef} />
-              <p className="px-1 pt-2 text-[11px] text-white/35">
-                Família, requerente, processo ou cliente · <kbd className="text-white/50">Esc</kbd> para fechar
+              <p className="px-1 pt-2 text-[11px] text-[var(--text-muted)]">
+                Família, requerente, processo ou cliente · <kbd className="text-[var(--text-secondary)]">Esc</kbd> para fechar
               </p>
             </div>
           </div>,

@@ -73,7 +73,7 @@ export default function LogAuditoriaTab({ escopo }: { escopo?: string }) {
     )
   }, [logsEscopo, fEntidade, fAcao, busca])
 
-  if (loading) return <div className="py-24 text-center text-white/50">Carregando…</div>
+  if (loading) return <div className="py-24 text-center text-[var(--text-secondary)]">Carregando…</div>
 
   return (
     <div className="space-y-5">
@@ -102,19 +102,19 @@ export default function LogAuditoriaTab({ escopo }: { escopo?: string }) {
 
       <div className="overflow-hidden rounded-2xl border border-[var(--border-default)] bg-[var(--surface-primary)] backdrop-blur-sm">
         <table className="w-full text-sm">
-          <thead className="border-b border-[var(--border-default)] text-left text-xs text-white/50">
+          <thead className="border-b border-[var(--border-default)] text-left text-xs text-[var(--text-secondary)]">
             <tr><th className="px-4 py-3 font-medium">Data/hora</th><th className="px-4 py-3 font-medium">Ação</th><th className="px-4 py-3 font-medium">Entidade</th><th className="px-4 py-3 font-medium">Descrição</th><th className="px-4 py-3 font-medium">Usuário</th></tr>
           </thead>
           <tbody>
             {filtered.length === 0 ? (
-              <tr><td colSpan={5} className="px-4 py-8 text-center text-xs text-white/40">Nenhum log encontrado.</td></tr>
+              <tr><td colSpan={5} className="px-4 py-8 text-center text-xs text-[var(--text-muted)]">Nenhum log encontrado.</td></tr>
             ) : filtered.map(l => (
               <Fragment key={l.id}>
                 <tr className={`border-b border-[var(--border-subtle)] last:border-0 ${l.detalhes ? "cursor-pointer hover:bg-[var(--surface-hover)]" : ""}`} onClick={() => l.detalhes && setAberto(aberto === l.id ? null : l.id)}>
                   <td className="whitespace-nowrap px-4 py-2.5 text-white/60">{fmt(l.criadoEm)}</td>
-                  <td className="px-4 py-2.5"><span className="rounded bg-sky-500/15 px-1.5 py-0.5 text-[10px] text-sky-300">{l.acao}</span></td>
-                  <td className="px-4 py-2.5 text-white/70">{l.entidade}{l.entidadeId != null && <span className="text-white/40"> #{l.entidadeId}</span>}</td>
-                  <td className="px-4 py-2.5 text-white">{l.descricao}{l.detalhes ? <span className="ml-1 text-[10px] text-white/40">(detalhes)</span> : null}</td>
+                  <td className="px-4 py-2.5"><span className="rounded bg-sky-50 px-1.5 py-0.5 text-[10px] text-sky-700">{l.acao}</span></td>
+                  <td className="px-4 py-2.5 text-white/70">{l.entidade}{l.entidadeId != null && <span className="text-[var(--text-muted)]"> #{l.entidadeId}</span>}</td>
+                  <td className="px-4 py-2.5 text-white">{l.descricao}{l.detalhes ? <span className="ml-1 text-[10px] text-[var(--text-muted)]">(detalhes)</span> : null}</td>
                   <td className="px-4 py-2.5 text-white/70">{l.usuarioNome || (l.usuarioId != null ? `#${l.usuarioId}` : "sistema")}</td>
                 </tr>
                 {aberto === l.id && l.detalhes != null && (

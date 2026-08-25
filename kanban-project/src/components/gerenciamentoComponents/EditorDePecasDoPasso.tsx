@@ -20,8 +20,8 @@ export interface Efeito {
   permitidoNestaFase: boolean; camposObrigatorios: string[]
 }
 
-const inp = "w-full rounded-lg border border-[var(--border-default)] bg-[var(--surface-primary)] px-3 py-2 text-sm text-white placeholder-white/30 outline-none focus:border-blue-400/50"
-const lbl = "mb-1 block text-[11px] uppercase tracking-wide text-white/40"
+const inp = "w-full rounded-lg border border-[var(--border-default)] bg-[var(--surface-primary)] px-3 py-2 text-sm text-white placeholder-white/30 outline-none focus:border-blue-200"
+const lbl = "mb-1 block text-[11px] uppercase tracking-wide text-[var(--text-muted)]"
 const card = "rounded-lg border border-[var(--border-default)] bg-[var(--surface-primary)] p-3"
 
 export interface PecasDoPasso {
@@ -57,9 +57,9 @@ export default function EditorDePecasDoPasso({
   // ══════════════════════════════════════════════════════════════════════
   if (aba === "campos") return (
     <>
-      <p className="text-xs text-white/50">O que o operador preenche aqui.</p>
+      <p className="text-xs text-[var(--text-secondary)]">O que o operador preenche aqui.</p>
       {pecas.campos.length === 0 && (
-        <p className="rounded-lg border border-dashed border-[var(--border-default)] p-4 text-center text-xs text-white/40">
+        <p className="rounded-lg border border-dashed border-[var(--border-default)] p-4 text-center text-xs text-[var(--text-muted)]">
           Nenhum campo configurado.
         </p>
       )}
@@ -78,13 +78,13 @@ export default function EditorDePecasDoPasso({
                 {tiposDeCampo.map((t) => <option key={t} value={t}>{nomeDoTipoDeCampo(t)}</option>)}
               </select>
             </div>
-            <button onClick={() => delLista("campos", i)} className="rounded-lg border border-[var(--border-default)] px-2 py-2 text-xs text-red-300 hover:bg-red-500/10">Remover</button>
+            <button onClick={() => delLista("campos", i)} className="rounded-lg border border-[var(--border-default)] px-2 py-2 text-xs text-red-700 hover:bg-red-50">Remover</button>
           </div>
           <div className="mt-2 flex flex-wrap items-center gap-4">
             <label className="flex items-center gap-2 text-xs text-white/60">
               <input type="checkbox" checked={!!c.obrigatorio} onChange={(e) => setLista("campos", i, { obrigatorio: e.target.checked })} /> Obrigatório
             </label>
-            <code className="text-[11px] text-white/35" title="Chave gravada nas execuções — não muda.">{c.key ?? chaveDe(c.label)}</code>
+            <code className="text-[11px] text-[var(--text-muted)]" title="Chave gravada nas execuções — não muda.">{c.key ?? chaveDe(c.label)}</code>
           </div>
           {c.tipo === TIPO_REFERENCIA && (
             <div className="mt-3 rounded-lg border border-[var(--border-default)] bg-black/20 p-3">
@@ -107,12 +107,12 @@ export default function EditorDePecasDoPasso({
               {(() => {
                 const a = alvoDeReferencia(alvoDoCampo(c.opcoes))
                 return a ? (
-                  <p className="mt-1 text-[11px] text-white/35">
+                  <p className="mt-1 text-[11px] text-[var(--text-muted)]">
                     {a.descricao} Fica gravado o identificador do registro, não o nome — renomear lá
                     aparece aqui sem regravar nada.
                   </p>
                 ) : (
-                  <p className="mt-1 text-[11px] text-amber-300/70">
+                  <p className="mt-1 text-[11px] text-amber-700/70">
                     Referência sem cadastro escolhido não deixa escolher nada — a publicação recusa.
                   </p>
                 )
@@ -127,12 +127,12 @@ export default function EditorDePecasDoPasso({
                   onClick={() => setLista("campos", i, { opcoesCadastradas: [...(c.opcoesCadastradas ?? []), { label: "Nova opção", ativo: true }] })}
                   className="rounded-lg border border-[var(--border-default)] px-2 py-1 text-[11px] text-white/70 hover:bg-[var(--surface-hover)]">+ Opção</button>
               </div>
-              <p className="mt-1 text-[11px] text-white/35">
+              <p className="mt-1 text-[11px] text-[var(--text-muted)]">
                 Cada opção tem chave própria. Renomear o rótulo não desliga a escolha já registrada; para tirar
                 de circulação, desmarque &quot;disponível&quot;.
               </p>
               {(c.opcoesCadastradas ?? []).length === 0 && (
-                <p className="mt-2 text-[11px] text-amber-300/70">
+                <p className="mt-2 text-[11px] text-amber-700/70">
                   Campo de escolha sem opção não deixa escolher nada — a publicação recusa.
                 </p>
               )}
@@ -140,7 +140,7 @@ export default function EditorDePecasDoPasso({
                 <div key={k} className="mt-2 grid grid-cols-[1fr_140px_auto] items-center gap-2">
                   <input className={inp} value={o.label}
                     onChange={(e) => opcaoSet(i, k, { label: e.target.value, key: o.key ?? chaveDe(e.target.value) })} />
-                  <code className="truncate text-[11px] text-white/35">{o.key ?? chaveDe(o.label)}</code>
+                  <code className="truncate text-[11px] text-[var(--text-muted)]">{o.key ?? chaveDe(o.label)}</code>
                   <label className="flex items-center gap-1.5 whitespace-nowrap text-[11px] text-white/60">
                     <input type="checkbox" checked={o.ativo !== false} onChange={(e) => opcaoSet(i, k, { ativo: e.target.checked })} />
                     disponível
@@ -159,12 +159,12 @@ export default function EditorDePecasDoPasso({
   // ══════════════════════════════════════════════════════════════════════
   if (aba === "acoes") return (
     <>
-      <p className="text-xs text-white/50">
+      <p className="text-xs text-[var(--text-secondary)]">
         Os resultados que o operador pode escolher. Cada um aponta para um efeito do catálogo — a lista mostra
         <b> só</b> os que esta fase tem competência para executar e que o executor sabe disparar.
       </p>
       {pecas.acoes.length === 0 && (
-        <p className="rounded-lg border border-dashed border-[var(--border-default)] p-4 text-center text-xs text-white/40">
+        <p className="rounded-lg border border-dashed border-[var(--border-default)] p-4 text-center text-xs text-[var(--text-muted)]">
           Nenhum resultado disponível. Sem um resultado cadastrado o operador vê a etapa e não tem como fechá-la.
         </p>
       )}
@@ -180,7 +180,7 @@ export default function EditorDePecasDoPasso({
                 <label className={lbl}>Rótulo</label>
                 <input className={inp} value={a.label} onChange={(e) => setLista("acoes", i, { label: e.target.value })} />
               </div>
-              <button onClick={() => delLista("acoes", i)} className="rounded-lg border border-[var(--border-default)] px-2 py-2 text-xs text-red-300 hover:bg-red-500/10">Remover</button>
+              <button onClick={() => delLista("acoes", i)} className="rounded-lg border border-[var(--border-default)] px-2 py-2 text-xs text-red-700 hover:bg-red-50">Remover</button>
             </div>
             <div className="mt-2">
               <label className={lbl}>O que acontece</label>
@@ -197,7 +197,7 @@ export default function EditorDePecasDoPasso({
                   problema é a competência da fase ou o executor escolhido — e são
                   correções diferentes. */}
               {!efeitosOfertados.some((e) => e.key === a.effectKey) && (
-                <p className="mt-1 text-[11px] text-amber-300/80">
+                <p className="mt-1 text-[11px] text-amber-700/80">
                   {indisponivel
                     ? indisponivel.permitidoNestaFase
                       ? `O executor configurado para este passo não sabe disparar "${indisponivel.label}". Troque o executor em Avançado ou escolha outro resultado.`
@@ -205,7 +205,7 @@ export default function EditorDePecasDoPasso({
                     : `O resultado aponta para um efeito que não está no catálogo (${a.effectKey}).`}
                 </p>
               )}
-              {ef && <p className="mt-1 text-[11px] text-white/40">{ef.descricao}</p>}
+              {ef && <p className="mt-1 text-[11px] text-[var(--text-muted)]">{ef.descricao}</p>}
             </div>
             <div className="mt-2">
               <label className={lbl}>Explicação para o operador</label>
@@ -222,7 +222,7 @@ export default function EditorDePecasDoPasso({
         onClick={() => aoMudar({ acoes: [...pecas.acoes, { label: "Novo resultado", effectKey: efeitosOfertados[0]?.key ?? "REGISTER_ONLY" }] })}
         className="rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-medium text-[#fff] hover:bg-blue-500 disabled:opacity-40">+ Resultado</button>
       {efeitosOfertados.length === 0 && (
-        <p className="text-[11px] text-amber-300/70">
+        <p className="text-[11px] text-amber-700/70">
           Nenhum efeito disponível: a fase não declarou competência compatível com o executor escolhido.
         </p>
       )}
@@ -232,10 +232,10 @@ export default function EditorDePecasDoPasso({
   // ══════════════════════════════════════════════════════════════════════
   if (aba === "checklist") return (
     <>
-      <p className="text-xs text-white/50">Itens de conferência.</p>
-      {avisoDoExecutor && <p className="text-[11px] text-amber-300/70">{avisoDoExecutor}</p>}
+      <p className="text-xs text-[var(--text-secondary)]">Itens de conferência.</p>
+      {avisoDoExecutor && <p className="text-[11px] text-amber-700/70">{avisoDoExecutor}</p>}
       {pecas.checkItens.length === 0 && (
-        <p className="rounded-lg border border-dashed border-[var(--border-default)] p-4 text-center text-xs text-white/40">
+        <p className="rounded-lg border border-dashed border-[var(--border-default)] p-4 text-center text-xs text-[var(--text-muted)]">
           Nenhum item de conferência.
         </p>
       )}
@@ -246,7 +246,7 @@ export default function EditorDePecasDoPasso({
               <label className={lbl}>Item</label>
               <input className={inp} value={k.label} onChange={(e) => setLista("checkItens", i, { label: e.target.value })} />
             </div>
-            <button onClick={() => delLista("checkItens", i)} className="rounded-lg border border-[var(--border-default)] px-2 py-2 text-xs text-red-300 hover:bg-red-500/10">Remover</button>
+            <button onClick={() => delLista("checkItens", i)} className="rounded-lg border border-[var(--border-default)] px-2 py-2 text-xs text-red-700 hover:bg-red-50">Remover</button>
           </div>
           <input className={`${inp} mt-2`} placeholder="Explicação (opcional)" value={k.descricao ?? ""} onChange={(e) => setLista("checkItens", i, { descricao: e.target.value })} />
           <label className="mt-2 flex items-center gap-2 text-xs text-white/60">
@@ -271,13 +271,13 @@ export default function EditorDePecasDoPasso({
 
   return (
     <>
-      <p className="text-xs text-white/50">
+      <p className="text-xs text-[var(--text-secondary)]">
         {soEvidencia
           ? "Que arquivo precisa estar anexado para concluir. Evidência é um requisito do tipo “arquivo anexado”: um registro só, mostrado aqui porque tem campos próprios."
           : "O que precisa estar cumprido para concluir. O motor recusa a conclusão citando o requisito pelo nome que está aqui. As evidências ficam logo abaixo — mesma lista, agrupada à parte."}
       </p>
       {visiveis.length === 0 && (
-        <p className="rounded-lg border border-dashed border-[var(--border-default)] p-4 text-center text-xs text-white/40">
+        <p className="rounded-lg border border-dashed border-[var(--border-default)] p-4 text-center text-xs text-[var(--text-muted)]">
           {soEvidencia ? "Nenhuma evidência obrigatória." : "Nenhum requisito configurado."}
         </p>
       )}
@@ -295,7 +295,7 @@ export default function EditorDePecasDoPasso({
                 <label className={lbl}>O que o operador lê quando falta</label>
                 <input className={inp} value={r.label} onChange={(e) => setLista("requisitos", i, { label: e.target.value })} />
               </div>
-              <button onClick={() => delLista("requisitos", i)} className="rounded-lg border border-[var(--border-default)] px-2 py-2 text-xs text-red-300 hover:bg-red-500/10">Remover</button>
+              <button onClick={() => delLista("requisitos", i)} className="rounded-lg border border-[var(--border-default)] px-2 py-2 text-xs text-red-700 hover:bg-red-50">Remover</button>
             </div>
             {!soEvidencia && (
               <div className="mt-2 grid grid-cols-2 gap-2">

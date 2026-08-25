@@ -69,7 +69,7 @@ export default function ModalNovoProjeto({ isOpen, onClose, onSubmit }: ModalNov
         <CardHeader className="pb-4 border-b border-zinc-800">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <div className="p-2 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-lg">
+              <div className="p-2 bg-gradient-to-br from-indigo-500 to-slate-600 rounded-lg">
                 <FolderPlus className="h-5 w-5 text-white" />
               </div>
               <CardTitle className="text-xl text-zinc-100">Novo Projeto</CardTitle>
@@ -79,18 +79,18 @@ export default function ModalNovoProjeto({ isOpen, onClose, onSubmit }: ModalNov
               size="sm"
               onClick={handleClose}
               disabled={loading}
-              className="h-8 w-8 p-0 hover:bg-zinc-800 text-zinc-400"
+              className="h-8 w-8 p-0 hover:bg-zinc-800 text-[var(--text-muted)]"
             >
               <X className="h-4 w-4" />
             </Button>
           </div>
-          <p className="text-sm text-zinc-400 mt-2">Crie um novo projeto para organizar suas atividades</p>
+          <p className="text-sm text-[var(--text-muted)] mt-2">Crie um novo projeto para organizar suas atividades</p>
         </CardHeader>
 
         <CardContent className="pt-6">
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="space-y-2">
-              <Label htmlFor="nome" className="text-sm font-medium text-zinc-300">
+              <Label htmlFor="nome" className="text-sm font-medium text-[var(--text-muted)]">
                 Nome do Projeto *
               </Label>
               <Input
@@ -107,7 +107,7 @@ export default function ModalNovoProjeto({ isOpen, onClose, onSubmit }: ModalNov
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="descricao" className="text-sm font-medium text-zinc-300">
+              <Label htmlFor="descricao" className="text-sm font-medium text-[var(--text-muted)]">
                 Descrição (opcional)
               </Label>
               <textarea
@@ -125,7 +125,7 @@ export default function ModalNovoProjeto({ isOpen, onClose, onSubmit }: ModalNov
 
             {erro && (
               <div className="p-3 bg-red-950 border border-red-900 rounded-md">
-                <p className="text-sm text-red-400">{erro}</p>
+                <p className="text-sm text-red-700">{erro}</p>
               </div>
             )}
 
@@ -135,7 +135,7 @@ export default function ModalNovoProjeto({ isOpen, onClose, onSubmit }: ModalNov
                 variant="outline"
                 onClick={handleClose}
                 disabled={loading}
-                className="flex-1 border-zinc-800 hover:bg-zinc-800 text-zinc-300 bg-transparent"
+                className="flex-1 border-zinc-800 hover:bg-zinc-800 text-[var(--text-muted)] bg-transparent"
               >
                 Cancelar
               </Button>

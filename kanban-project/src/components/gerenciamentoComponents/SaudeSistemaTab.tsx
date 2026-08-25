@@ -90,28 +90,28 @@ interface Resposta {
 }
 
 const CORES_PRONTIDAO: Record<EstadoProntidao, string> = {
-  PRONTO: "bg-green-500/15 text-green-300 border-green-400/30",
-  PARCIALMENTE_PRONTO: "bg-amber-500/15 text-amber-300 border-amber-400/30",
-  NAO_CONFIGURADO: "bg-orange-500/15 text-orange-300 border-orange-400/30",
-  CONFIGURACAO_INVALIDA: "bg-orange-500/15 text-orange-300 border-orange-400/30",
-  BLOQUEADO: "bg-red-500/15 text-red-300 border-red-400/30",
-  DIAGNOSTICO_INCOMPLETO: "bg-violet-500/15 text-violet-300 border-violet-400/30",
+  PRONTO: "bg-green-50 text-green-700 border-green-200",
+  PARCIALMENTE_PRONTO: "bg-amber-50 text-amber-700 border-amber-200",
+  NAO_CONFIGURADO: "bg-amber-50 text-amber-700 border-amber-200",
+  CONFIGURACAO_INVALIDA: "bg-amber-50 text-amber-700 border-amber-200",
+  BLOQUEADO: "bg-red-50 text-red-700 border-red-200",
+  DIAGNOSTICO_INCOMPLETO: "bg-slate-50 text-slate-700 border-slate-200",
 }
 
 const CARD = "rounded-2xl border border-[var(--border-default)] bg-[var(--surface-primary)] backdrop-blur-sm"
 const CORES_ESTADO: Record<Estado, { fundo: string; texto: string; ponto: string }> = {
-  SAUDAVEL: { fundo: "bg-green-500/10 border-green-400/30", texto: "text-green-300", ponto: "bg-green-400" },
-  ATENCAO: { fundo: "bg-amber-500/10 border-amber-400/30", texto: "text-amber-300", ponto: "bg-amber-400" },
-  DEGRADADO: { fundo: "bg-orange-500/10 border-orange-400/30", texto: "text-orange-300", ponto: "bg-orange-400" },
-  CRITICO: { fundo: "bg-red-500/10 border-red-400/30", texto: "text-red-300", ponto: "bg-red-400" },
-  DIAGNOSTICO_INCOMPLETO: { fundo: "bg-violet-500/10 border-violet-400/30", texto: "text-violet-300", ponto: "bg-violet-400" },
+  SAUDAVEL: { fundo: "bg-green-50 border-green-200", texto: "text-green-700", ponto: "bg-green-400" },
+  ATENCAO: { fundo: "bg-amber-50 border-amber-200", texto: "text-amber-700", ponto: "bg-amber-400" },
+  DEGRADADO: { fundo: "bg-amber-50 border-amber-200", texto: "text-amber-700", ponto: "bg-amber-400" },
+  CRITICO: { fundo: "bg-red-50 border-red-200", texto: "text-red-700", ponto: "bg-red-400" },
+  DIAGNOSTICO_INCOMPLETO: { fundo: "bg-slate-50 border-slate-200", texto: "text-slate-700", ponto: "bg-slate-400" },
   INDISPONIVEL: { fundo: "bg-[var(--surface-primary)] border-[var(--border-strong)]", texto: "text-white/70", ponto: "bg-[var(--surface-elevated)]" },
 }
 const CORES_SEV: Record<Severidade, string> = {
-  CRITICO: "bg-red-500/15 text-red-300 border-red-400/30",
-  ERRO: "bg-orange-500/15 text-orange-300 border-orange-400/30",
-  ALERTA: "bg-amber-500/15 text-amber-300 border-amber-400/30",
-  INFORMATIVO: "bg-sky-500/15 text-sky-300 border-sky-400/30",
+  CRITICO: "bg-red-50 text-red-700 border-red-200",
+  ERRO: "bg-amber-50 text-amber-700 border-amber-200",
+  ALERTA: "bg-amber-50 text-amber-700 border-amber-200",
+  INFORMATIVO: "bg-sky-50 text-sky-700 border-sky-200",
 }
 const fmtData = (iso?: string | null) =>
   iso ? new Date(iso).toLocaleString("pt-BR", { day: "2-digit", month: "2-digit", year: "2-digit", hour: "2-digit", minute: "2-digit" }) : "—"
@@ -126,7 +126,7 @@ function Kpi({ valor, label, cor, destaque }: { valor: React.ReactNode; label: s
   return (
     <div className={`${CARD} p-4 ${destaque ? "ring-1 ring-white/20" : ""}`}>
       <div className="text-2xl font-semibold" style={{ color: cor ?? "#fff" }}>{valor}</div>
-      <div className="mt-0.5 text-[11px] uppercase tracking-wide text-white/45">{label}</div>
+      <div className="mt-0.5 text-[11px] uppercase tracking-wide text-[var(--text-secondary)]">{label}</div>
     </div>
   )
 }
@@ -192,10 +192,10 @@ export function SaudeSistemaTab() {
     return lista.filter((a) => (!filtroSev || a.severidade === filtroSev) && (!filtroDominio || a.dominio === filtroDominio))
   }, [dados, filtroSev, filtroDominio])
 
-  if (carregando) return <div className="py-24 text-center text-white/50">Carregando a saúde do sistema…</div>
+  if (carregando) return <div className="py-24 text-center text-[var(--text-secondary)]">Carregando a saúde do sistema…</div>
   if (erroApi || !dados) {
     return (
-      <div className="rounded-xl border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-200" role="alert">
+      <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700" role="alert">
         Não foi possível carregar a saúde do sistema. Isso é, por si só, um sinal: nenhum estado saudável pode ser assumido.
       </div>
     )
@@ -220,7 +220,7 @@ export function SaudeSistemaTab() {
               <span className="rounded bg-[var(--surface-primary)] px-1.5 py-0.5 text-[10px] text-white/60">catálogo v{dados.versaoCatalogo}</span>
             </div>
             <p className="mt-1 max-w-3xl text-sm text-white/70">{dados.motivoEstado}</p>
-            <p className="mt-1 text-xs text-white/45">
+            <p className="mt-1 text-xs text-[var(--text-secondary)]">
               {e
                 ? `Última execução: ${fmtData(e.concluidoEm)} · modo ${e.modo.toLowerCase()} · ${fmtDur(e.duracaoMs)} · cobertura ${e.coberturaPercentual}% (${e.executadas}/${e.totalElegiveis})`
                 : "O diagnóstico nunca foi executado neste ambiente."}
@@ -273,7 +273,7 @@ export function SaudeSistemaTab() {
           ["historico", "Histórico"],
         ] as [Aba, string][]).map(([k, l]) => (
           <button key={k} onClick={() => setAba(k)}
-            className={`px-3 py-2 ${aba === k ? "border-b-2 border-blue-400 font-medium text-white" : "text-white/55 hover:text-white/80"}`}>
+            className={`px-3 py-2 ${aba === k ? "border-b-2 border-blue-400 font-medium text-white" : "text-[var(--text-secondary)] hover:text-white/80"}`}>
             {l}
           </button>
         ))}
@@ -282,10 +282,10 @@ export function SaudeSistemaTab() {
       {aba === "visao" && (
         <div className="space-y-3">
           {dados.dominiosSemCobertura.length > 0 && (
-            <div className="rounded-xl border border-violet-400/30 bg-violet-500/10 px-4 py-3 text-sm text-violet-100">
+            <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-100">
               <b>{dados.dominiosSemCobertura.length} domínio(s) obrigatório(s) ainda sem verificação.</b> Enquanto houver lacuna de cobertura,
               o sistema não pode ser declarado saudável — o motor devolve “diagnóstico incompleto” de propósito.
-              <div className="mt-1 text-xs text-violet-200/80">
+              <div className="mt-1 text-xs text-slate-700/80">
                 {dados.dominiosSemCobertura.map((d) => rot.dominios[d] ?? d).join(" · ")}
               </div>
             </div>
@@ -298,16 +298,16 @@ export function SaudeSistemaTab() {
               ["Causas raiz", String(dados.causasRaiz.length)],
             ] as [string, string][]).map(([rotulo, valor]) => (
               <div key={rotulo} className={`${CARD} px-4 py-3`}>
-                <div className="text-xs text-white/45">{rotulo}</div>
+                <div className="text-xs text-[var(--text-secondary)]">{rotulo}</div>
                 <div className="mt-0.5 text-xl font-semibold text-white">{valor}</div>
               </div>
             ))}
           </div>
           {dados.capacidades.some((c) => c.estado === "BLOQUEADO") && (
-            <div className="rounded-xl border border-red-400/30 bg-red-500/10 px-4 py-3 text-sm text-red-100">
+            <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-100">
               <b>Há capacidade operacional bloqueada.</b> Enquanto uma operação essencial não puder ser executada de ponta a ponta,
               o sistema não é declarado saudável, mesmo sem erro técnico aparente.
-              <div className="mt-1 text-xs text-red-200/80">
+              <div className="mt-1 text-xs text-red-700/80">
                 {dados.capacidades.filter((c) => c.estado === "BLOQUEADO").map((c) => c.nome).join(" · ")}
               </div>
             </div>
@@ -323,7 +323,7 @@ export function SaudeSistemaTab() {
 
       {aba === "prontidao" && (
         <div className="space-y-3">
-          <p className="text-xs text-white/45">
+          <p className="text-xs text-[var(--text-secondary)]">
             Prontidão operacional responde a uma pergunta diferente de “há erro?”: pergunta se cada operação essencial
             <b className="text-white/70"> pode ser executada hoje, de ponta a ponta</b>, com os cadastros, configurações e vínculos que existem.
           </p>
@@ -332,19 +332,19 @@ export function SaudeSistemaTab() {
               <div className="flex flex-wrap items-center gap-2">
                 <span className={`rounded border px-1.5 py-0.5 text-[10px] ${CORES_PRONTIDAO[c.estado]}`}>{rot.prontidao[c.estado] ?? c.estado}</span>
                 <span className="font-medium text-white">{c.nome}</span>
-                <span className="text-xs text-white/35">{c.codigo} · {c.modulo}</span>
+                <span className="text-xs text-[var(--text-muted)]">{c.codigo} · {c.modulo}</span>
               </div>
               <div className="mt-1 text-sm text-white/70">{c.motivo}</div>
               <div className="mt-2 grid gap-1">
                 {c.dependencias.map((d) => (
                   <div key={d.codigo} className="flex items-start gap-2 text-xs">
-                    <span className={d.indeterminada ? "text-violet-300" : d.ok ? "text-green-400" : d.obrigatoria ? "text-red-400" : "text-amber-300"}>
+                    <span className={d.indeterminada ? "text-slate-700" : d.ok ? "text-green-700" : d.obrigatoria ? "text-red-700" : "text-amber-700"}>
                       {d.indeterminada ? "?" : d.ok ? "✓" : "✕"}
                     </span>
-                    <span className="text-white/45">{rot.dependencias[d.tipo] ?? d.tipo}</span>
+                    <span className="text-[var(--text-secondary)]">{rot.dependencias[d.tipo] ?? d.tipo}</span>
                     <span className="text-white/70">{d.nome}</span>
-                    <span className="text-white/40">— {d.detalhe}</span>
-                    {!d.obrigatoria && <span className="text-white/30">(recomendada)</span>}
+                    <span className="text-[var(--text-muted)]">— {d.detalhe}</span>
+                    {!d.obrigatoria && <span className="text-[var(--text-muted)]">(recomendada)</span>}
                   </div>
                 ))}
               </div>
@@ -355,21 +355,21 @@ export function SaudeSistemaTab() {
 
       {aba === "falta" && (
         <div className="space-y-3">
-          <p className="text-xs text-white/45">
+          <p className="text-xs text-[var(--text-secondary)]">
             O que está faltando para o sistema operar — cadastros, configurações, vínculos e automações ausentes. Nada aqui é excluído
             ou corrigido sozinho: o motor aponta, quem decide é você.
           </p>
           {dados.causasRaiz.length > 0 && (
             <div className={`${CARD} px-4 py-3`}>
-              <div className="text-xs uppercase tracking-wide text-white/40">Causas raiz</div>
+              <div className="text-xs uppercase tracking-wide text-[var(--text-muted)]">Causas raiz</div>
               <div className="mt-2 space-y-1.5">
                 {dados.causasRaiz.map((c) => (
                   <div key={c.causa} className="flex flex-wrap items-center gap-2 text-sm">
                     <span className={`rounded border px-1.5 py-0.5 text-[10px] ${CORES_SEV[c.severidade]}`}>{rot.severidades[c.severidade]}</span>
                     <span className="text-white">{c.causa}</span>
-                    <span className="text-xs text-white/45">{c.ocorrencias} ocorrência(s) · {c.registrosAfetados} registro(s)</span>
+                    <span className="text-xs text-[var(--text-secondary)]">{c.ocorrencias} ocorrência(s) · {c.registrosAfetados} registro(s)</span>
                     {c.capacidadesAfetadas.length > 0 && (
-                      <span className="text-xs text-white/35">afeta: {c.capacidadesAfetadas.join(", ")}</span>
+                      <span className="text-xs text-[var(--text-muted)]">afeta: {c.capacidadesAfetadas.join(", ")}</span>
                     )}
                   </div>
                 ))}
@@ -380,18 +380,18 @@ export function SaudeSistemaTab() {
             <div key={c.cadastro} className={`${CARD} px-4 py-3`}>
               <div className="flex flex-wrap items-center gap-2">
                 <span className="font-medium text-white">{c.rotulo}</span>
-                <span className="text-xs text-white/40">{c.totalAtivos} ativo(s)</span>
+                <span className="text-xs text-[var(--text-muted)]">{c.totalAtivos} ativo(s)</span>
                 {c.incompletos.length === 0
-                  ? <span className="rounded bg-green-500/15 px-1.5 py-0.5 text-[10px] text-green-300">contrato mínimo cumprido</span>
-                  : <span className="rounded bg-amber-500/15 px-1.5 py-0.5 text-[10px] text-amber-300">{c.incompletos.length} incompleto(s)</span>}
+                  ? <span className="rounded bg-green-50 px-1.5 py-0.5 text-[10px] text-green-700">contrato mínimo cumprido</span>
+                  : <span className="rounded bg-amber-50 px-1.5 py-0.5 text-[10px] text-amber-700">{c.incompletos.length} incompleto(s)</span>}
               </div>
-              <div className="mt-1 text-xs text-white/40">Exige: {c.requisitos.join(" · ")}</div>
+              <div className="mt-1 text-xs text-[var(--text-muted)]">Exige: {c.requisitos.join(" · ")}</div>
               {c.incompletos.slice(0, 8).map((i) => (
                 <div key={i.id} className="mt-1 text-xs text-white/60">
                   <span className="text-white/80">{i.rotulo}</span> — falta {i.faltando.join(", ")}
                 </div>
               ))}
-              {c.incompletos.length > 8 && <div className="mt-1 text-xs text-white/35">e mais {c.incompletos.length - 8}…</div>}
+              {c.incompletos.length > 8 && <div className="mt-1 text-xs text-[var(--text-muted)]">e mais {c.incompletos.length - 8}…</div>}
             </div>
           ))}
           {dados.plano.length === 0 && dados.contratos.every((c) => !c.incompletos.length) && (
@@ -404,7 +404,7 @@ export function SaudeSistemaTab() {
 
       {aba === "plano" && (
         <div className="space-y-3">
-          <p className="text-xs text-white/45">
+          <p className="text-xs text-[var(--text-secondary)]">
             Plano ordenado: cada ação aparece depois daquilo de que ela depende. Resolver na ordem evita trabalho perdido.
           </p>
           {dados.plano.map((r) => (
@@ -413,14 +413,14 @@ export function SaudeSistemaTab() {
                 <span className="rounded bg-[var(--surface-primary)] px-1.5 py-0.5 text-[10px] text-white/70">{r.ordem}º</span>
                 <span className={`rounded border px-1.5 py-0.5 text-[10px] ${CORES_SEV[r.severidade]}`}>{rot.severidades[r.severidade]}</span>
                 <span className="font-medium text-white">{r.titulo}</span>
-                <span className="text-xs text-white/35">{rot.dependencias[r.tipo] ?? r.tipo} · esforço {r.esforco.toLowerCase()}</span>
+                <span className="text-xs text-[var(--text-muted)]">{rot.dependencias[r.tipo] ?? r.tipo} · esforço {r.esforco.toLowerCase()}</span>
               </div>
               <div className="mt-1 grid gap-0.5 text-xs">
-                <div className="text-white/70"><span className="text-white/40">Problema: </span>{r.problema}</div>
-                <div className="text-white/70"><span className="text-white/40">Causa: </span>{r.causa}</div>
-                <div className="text-white/70"><span className="text-white/40">Impacto: </span>{r.impacto}</div>
-                <div className="text-white/85"><span className="text-white/40">Ação: </span>{r.acao}</div>
-                {r.destrava.length > 0 && <div className="text-white/50">Destrava: {r.destrava.join(", ")}</div>}
+                <div className="text-white/70"><span className="text-[var(--text-muted)]">Problema: </span>{r.problema}</div>
+                <div className="text-white/70"><span className="text-[var(--text-muted)]">Causa: </span>{r.causa}</div>
+                <div className="text-white/70"><span className="text-[var(--text-muted)]">Impacto: </span>{r.impacto}</div>
+                <div className="text-white/85"><span className="text-[var(--text-muted)]">Ação: </span>{r.acao}</div>
+                {r.destrava.length > 0 && <div className="text-[var(--text-secondary)]">Destrava: {r.destrava.join(", ")}</div>}
               </div>
               {r.rota && (
                 <a href={r.rota} className="mt-2 inline-block rounded-lg border border-[var(--border-default)] px-2.5 py-1 text-xs text-white/80 hover:bg-[var(--surface-hover)]">
@@ -438,7 +438,7 @@ export function SaudeSistemaTab() {
       {aba === "capacidades" && (
         <div className={`${CARD} overflow-hidden`}>
           <table className="w-full text-sm">
-            <thead className="border-b border-[var(--border-default)] text-left text-xs text-white/50">
+            <thead className="border-b border-[var(--border-default)] text-left text-xs text-[var(--text-secondary)]">
               <tr>
                 <th className="px-4 py-3">Capacidade</th><th className="px-4 py-3">Módulo</th>
                 <th className="px-4 py-3">Dependências</th><th className="px-4 py-3">Faltando</th><th className="px-4 py-3">Estado</th>
@@ -447,7 +447,7 @@ export function SaudeSistemaTab() {
             <tbody>
               {dados.capacidades.map((c) => (
                 <tr key={c.codigo} className="border-b border-[var(--border-subtle)] last:border-0">
-                  <td className="px-4 py-2.5 text-white">{c.nome}<div className="text-[10px] text-white/35">{c.codigo}</div></td>
+                  <td className="px-4 py-2.5 text-white">{c.nome}<div className="text-[10px] text-[var(--text-muted)]">{c.codigo}</div></td>
                   <td className="px-4 py-2.5 text-white/70">{c.modulo}</td>
                   <td className="px-4 py-2.5 text-white/70">{c.dependencias.length}</td>
                   <td className="px-4 py-2.5 text-white/70">{c.faltantes.length}</td>
@@ -478,7 +478,7 @@ export function SaudeSistemaTab() {
                 <option key={d} value={d} className="bg-zinc-900">{rot.dominios[d] ?? d}</option>
               ))}
             </select>
-            <span className="self-center text-xs text-white/40">{achadosFiltrados.length} problema(s)</span>
+            <span className="self-center text-xs text-[var(--text-muted)]">{achadosFiltrados.length} problema(s)</span>
           </div>
           {achadosFiltrados.map((a) => <LinhaAchado key={a.id} a={a} rot={rot} detalhado onCorrigir={corrigir} corrigindo={corrigindo === a.chave} />)}
           {achadosFiltrados.length === 0 && (
@@ -490,7 +490,7 @@ export function SaudeSistemaTab() {
       {aba === "dominios" && (
         <div className={`${CARD} overflow-hidden`}>
           <table className="w-full text-sm">
-            <thead className="border-b border-[var(--border-default)] text-left text-xs text-white/50">
+            <thead className="border-b border-[var(--border-default)] text-left text-xs text-[var(--text-secondary)]">
               <tr><th className="px-4 py-3">Domínio</th><th className="px-4 py-3">Problemas</th><th className="px-4 py-3">Pior severidade</th></tr>
             </thead>
             <tbody>
@@ -505,7 +505,7 @@ export function SaudeSistemaTab() {
                   </tr>
                 )
               })}
-              {dados.achados.length === 0 && <tr><td colSpan={3} className="px-4 py-8 text-center text-xs text-white/40">Nenhum domínio com problema aberto.</td></tr>}
+              {dados.achados.length === 0 && <tr><td colSpan={3} className="px-4 py-8 text-center text-xs text-[var(--text-muted)]">Nenhum domínio com problema aberto.</td></tr>}
             </tbody>
           </table>
         </div>
@@ -514,9 +514,9 @@ export function SaudeSistemaTab() {
       {aba === "cobertura" && (
         <div className="space-y-3">
         <div className={`${CARD} overflow-hidden`}>
-          <div className="border-b border-[var(--border-default)] px-4 py-2.5 text-xs uppercase tracking-wide text-white/40">Matriz por módulo</div>
+          <div className="border-b border-[var(--border-default)] px-4 py-2.5 text-xs uppercase tracking-wide text-[var(--text-muted)]">Matriz por módulo</div>
           <table className="w-full text-sm">
-            <thead className="border-b border-[var(--border-default)] text-left text-xs text-white/50">
+            <thead className="border-b border-[var(--border-default)] text-left text-xs text-[var(--text-secondary)]">
               <tr><th className="px-4 py-3">Módulo</th><th className="px-4 py-3">Capacidades prontas</th><th className="px-4 py-3">Verificações</th><th className="px-4 py-3">Situação</th></tr>
             </thead>
             <tbody>
@@ -527,10 +527,10 @@ export function SaudeSistemaTab() {
                   <td className="px-4 py-2.5 text-white/70">{m.verificacoes}</td>
                   <td className="px-4 py-2.5">
                     {m.capacidades === 0
-                      ? <span className="rounded bg-violet-500/15 px-1.5 py-0.5 text-[10px] text-violet-300">sem capacidade declarada</span>
+                      ? <span className="rounded bg-slate-50 px-1.5 py-0.5 text-[10px] text-slate-700">sem capacidade declarada</span>
                       : m.capacidadesProntas === m.capacidades
-                        ? <span className="rounded bg-green-500/15 px-1.5 py-0.5 text-[10px] text-green-300">operacional</span>
-                        : <span className="rounded bg-amber-500/15 px-1.5 py-0.5 text-[10px] text-amber-300">parcial</span>}
+                        ? <span className="rounded bg-green-50 px-1.5 py-0.5 text-[10px] text-green-700">operacional</span>
+                        : <span className="rounded bg-amber-50 px-1.5 py-0.5 text-[10px] text-amber-700">parcial</span>}
                   </td>
                 </tr>
               ))}
@@ -539,7 +539,7 @@ export function SaudeSistemaTab() {
         </div>
         <div className={`${CARD} overflow-hidden`}>
           <table className="w-full text-sm">
-            <thead className="border-b border-[var(--border-default)] text-left text-xs text-white/50">
+            <thead className="border-b border-[var(--border-default)] text-left text-xs text-[var(--text-secondary)]">
               <tr><th className="px-4 py-3">Domínio obrigatório</th><th className="px-4 py-3">Verificações</th><th className="px-4 py-3">Obrigatórias</th><th className="px-4 py-3">Situação</th></tr>
             </thead>
             <tbody>
@@ -550,8 +550,8 @@ export function SaudeSistemaTab() {
                   <td className="px-4 py-2.5 text-white/70">{c.obrigatorias}</td>
                   <td className="px-4 py-2.5">
                     {c.ativas > 0
-                      ? <span className="rounded bg-green-500/15 px-1.5 py-0.5 text-[10px] text-green-300">coberto</span>
-                      : <span className="rounded bg-violet-500/15 px-1.5 py-0.5 text-[10px] text-violet-300">sem cobertura</span>}
+                      ? <span className="rounded bg-green-50 px-1.5 py-0.5 text-[10px] text-green-700">coberto</span>
+                      : <span className="rounded bg-slate-50 px-1.5 py-0.5 text-[10px] text-slate-700">sem cobertura</span>}
                   </td>
                 </tr>
               ))}
@@ -565,7 +565,7 @@ export function SaudeSistemaTab() {
         <div className="space-y-4">
           {(() => {
             const h = historicoReq.dados
-            if (historicoReq.carregando) return <div className="py-10 text-center text-white/50">Carregando histórico…</div>
+            if (historicoReq.carregando) return <div className="py-10 text-center text-[var(--text-secondary)]">Carregando histórico…</div>
             if (!h) return <div className={`${CARD} px-4 py-6 text-center text-sm text-white/60`}>Sem histórico disponível.</div>
             return (
               <>
@@ -579,9 +579,9 @@ export function SaudeSistemaTab() {
                 </div>
 
                 <div className={`${CARD} overflow-hidden`}>
-                  <div className="border-b border-[var(--border-default)] px-4 py-3 text-xs uppercase tracking-wide text-white/45">Execuções (mais recente por último)</div>
+                  <div className="border-b border-[var(--border-default)] px-4 py-3 text-xs uppercase tracking-wide text-[var(--text-secondary)]">Execuções (mais recente por último)</div>
                   <table className="w-full text-sm">
-                    <thead className="border-b border-[var(--border-default)] text-left text-xs text-white/50">
+                    <thead className="border-b border-[var(--border-default)] text-left text-xs text-[var(--text-secondary)]">
                       <tr><th className="px-4 py-3">Quando</th><th className="px-4 py-3">Modo</th><th className="px-4 py-3">Estado</th><th className="px-4 py-3">Cobertura</th><th className="px-4 py-3">Achados</th><th className="px-4 py-3">Duração</th></tr>
                     </thead>
                     <tbody>
@@ -594,7 +594,7 @@ export function SaudeSistemaTab() {
                             <td className="px-4 py-2.5"><span className={`rounded px-1.5 py-0.5 text-[10px] ${c.texto}`}>{rot.estados[x.estado] ?? x.estado}</span></td>
                             <td className="px-4 py-2.5 text-white/60">{x.coberturaPercentual}%</td>
                             <td className="px-4 py-2.5 text-white/70">{x.criticos}C · {x.erros}E · {x.alertas}A{x.falhasTecnicas ? ` · ${x.falhasTecnicas} falha(s)` : ""}</td>
-                            <td className="px-4 py-2.5 text-white/50">{fmtDur(x.duracaoMs)}</td>
+                            <td className="px-4 py-2.5 text-[var(--text-secondary)]">{fmtDur(x.duracaoMs)}</td>
                           </tr>
                         )
                       })}
@@ -603,9 +603,9 @@ export function SaudeSistemaTab() {
                 </div>
 
                 <div className={`${CARD} overflow-hidden`}>
-                  <div className="border-b border-[var(--border-default)] px-4 py-3 text-xs uppercase tracking-wide text-white/45">Domínios que mais falham</div>
+                  <div className="border-b border-[var(--border-default)] px-4 py-3 text-xs uppercase tracking-wide text-[var(--text-secondary)]">Domínios que mais falham</div>
                   <table className="w-full text-sm">
-                    <thead className="border-b border-[var(--border-default)] text-left text-xs text-white/50">
+                    <thead className="border-b border-[var(--border-default)] text-left text-xs text-[var(--text-secondary)]">
                       <tr><th className="px-4 py-3">Domínio</th><th className="px-4 py-3">Abertos</th><th className="px-4 py-3">Total histórico</th><th className="px-4 py-3">Críticos</th></tr>
                     </thead>
                     <tbody>
@@ -613,7 +613,7 @@ export function SaudeSistemaTab() {
                         <tr key={d.dominio} className="border-b border-[var(--border-subtle)] last:border-0">
                           <td className="px-4 py-2.5 text-white">{rot.dominios[d.dominio] ?? d.dominio}</td>
                           <td className="px-4 py-2.5 text-white/70">{d.abertos}</td>
-                          <td className="px-4 py-2.5 text-white/50">{d.total}</td>
+                          <td className="px-4 py-2.5 text-[var(--text-secondary)]">{d.total}</td>
                           <td className="px-4 py-2.5 text-white/70">{d.criticos}</td>
                         </tr>
                       ))}
@@ -629,31 +629,31 @@ export function SaudeSistemaTab() {
       {aba === "execucao" && (
         <div className={`${CARD} overflow-hidden`}>
           <table className="w-full text-sm">
-            <thead className="border-b border-[var(--border-default)] text-left text-xs text-white/50">
+            <thead className="border-b border-[var(--border-default)] text-left text-xs text-[var(--text-secondary)]">
               <tr><th className="px-4 py-3">Verificação</th><th className="px-4 py-3">Status</th><th className="px-4 py-3">Duração</th><th className="px-4 py-3">Resultado</th></tr>
             </thead>
             <tbody>
               {(e?.execucoes ?? []).map((x) => {
                 const meta = dados.catalogo.find((v) => v.codigo === x.codigo)
-                const cores = x.status === "APROVADA" ? "bg-green-500/15 text-green-300"
-                  : x.status === "COM_ACHADOS" ? "bg-amber-500/15 text-amber-300"
-                  : x.status === "NAO_EXECUTADA" ? "bg-violet-500/15 text-violet-300"
-                  : "bg-red-500/15 text-red-300"
+                const cores = x.status === "APROVADA" ? "bg-green-50 text-green-700"
+                  : x.status === "COM_ACHADOS" ? "bg-amber-50 text-amber-700"
+                  : x.status === "NAO_EXECUTADA" ? "bg-slate-50 text-slate-700"
+                  : "bg-red-50 text-red-700"
                 return (
                   <tr key={x.codigo} className="border-b border-[var(--border-subtle)] last:border-0 align-top">
                     <td className="px-4 py-2.5">
-                      <div className="font-mono text-[11px] text-white/50">{x.codigo}</div>
+                      <div className="font-mono text-[11px] text-[var(--text-secondary)]">{x.codigo}</div>
                       <div className="text-white">{meta?.nome ?? "—"}</div>
                     </td>
                     <td className="px-4 py-2.5"><span className={`rounded px-1.5 py-0.5 text-[10px] ${cores}`}>{x.status.replace("_", " ").toLowerCase()}</span></td>
                     <td className="px-4 py-2.5 text-white/60">{fmtDur(x.duracaoMs)}</td>
                     <td className="px-4 py-2.5 text-white/70">
-                      {x.erro ? <span className="text-red-300">{x.erro}</span> : x.achados > 0 ? `${x.achados} achado(s)` : (x.resumo ?? "sem achados")}
+                      {x.erro ? <span className="text-red-700">{x.erro}</span> : x.achados > 0 ? `${x.achados} achado(s)` : (x.resumo ?? "sem achados")}
                     </td>
                   </tr>
                 )
               })}
-              {!e && <tr><td colSpan={4} className="px-4 py-8 text-center text-xs text-white/40">Nenhuma execução registrada.</td></tr>}
+              {!e && <tr><td colSpan={4} className="px-4 py-8 text-center text-xs text-[var(--text-muted)]">Nenhuma execução registrada.</td></tr>}
             </tbody>
           </table>
         </div>
@@ -674,12 +674,12 @@ function LinhaAchado({ a, rot, detalhado, onCorrigir, corrigindo }: {
         <span className="min-w-0 flex-1">
           <span className="block text-sm font-medium text-white">{a.titulo}</span>
           <span className="mt-0.5 block text-xs text-white/60">{a.descricao}</span>
-          <span className="mt-1 flex flex-wrap items-center gap-2 text-[11px] text-white/40">
+          <span className="mt-1 flex flex-wrap items-center gap-2 text-[11px] text-[var(--text-muted)]">
             <span className="font-mono">{a.codigo}</span>
             <span>{rot.dominios[a.dominio] ?? a.dominio}</span>
             <span>{a.modulo}</span>
-            {a.recorrencias > 1 && <span className="rounded bg-amber-500/15 px-1.5 text-amber-300">recorrente ({a.recorrencias}×)</span>}
-            {a.recorrencias <= 1 && <span className="rounded bg-sky-500/15 px-1.5 text-sky-300">novo</span>}
+            {a.recorrencias > 1 && <span className="rounded bg-amber-50 px-1.5 text-amber-700">recorrente ({a.recorrencias}×)</span>}
+            {a.recorrencias <= 1 && <span className="rounded bg-sky-50 px-1.5 text-sky-700">novo</span>}
             <span>detectado em {fmtData(a.primeiraDeteccao)}</span>
           </span>
         </span>
@@ -695,7 +695,7 @@ function LinhaAchado({ a, rot, detalhado, onCorrigir, corrigindo }: {
             <span>Última detecção: <span className="text-white/85">{fmtData(a.ultimaDeteccao)}</span></span>
             {a.correcaoAutomatica && onCorrigir && (
               <button disabled={corrigindo} onClick={() => onCorrigir(a)}
-                className="rounded-lg border border-green-400/30 bg-green-500/15 px-2 py-1 font-medium text-green-200 hover:bg-green-500/25 disabled:opacity-50">
+                className="rounded-lg border border-green-200 bg-green-50 px-2 py-1 font-medium text-green-700 hover:bg-green-50 disabled:opacity-50">
                 {corrigindo ? "Corrigindo…" : "Corrigir automaticamente"}
               </button>
             )}

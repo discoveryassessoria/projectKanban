@@ -69,7 +69,7 @@ export function PhaseProgressHeader({
     return (
       <div
         className={`flex items-center gap-2 ${
-          variant === "dark" ? "text-white/50" : "text-gray-400"
+          variant === "dark" ? "text-[var(--text-secondary)]" : "text-[var(--text-muted)]"
         }`}
       >
         <Loader2 className="w-3 h-3 animate-spin" />
@@ -80,7 +80,7 @@ export function PhaseProgressHeader({
 
   if (error || !data) {
     return (
-      <div className={`text-[11px] ${variant === "dark" ? "text-white/40" : "text-gray-400"}`}>
+      <div className={`text-[11px] ${variant === "dark" ? "text-[var(--text-muted)]" : "text-[var(--text-muted)]"}`}>
         Fase indisponível
       </div>
     )
@@ -93,7 +93,7 @@ export function PhaseProgressHeader({
   const pctCls = isDark
     ? "text-white tabular-nums"
     : "text-gray-900 tabular-nums"
-  const countsCls = isDark ? "text-white/50" : "text-gray-500"
+  const countsCls = isDark ? "text-[var(--text-secondary)]" : "text-gray-500"
   const trackCls = isDark ? "bg-[var(--surface-primary)]" : "bg-gray-200"
 
   // FONTE ÚNICA: projeção oficial (percentual, label e métricas). Sem recálculo local.

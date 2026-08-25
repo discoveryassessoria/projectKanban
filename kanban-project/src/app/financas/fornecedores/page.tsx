@@ -150,7 +150,7 @@ export default function FornecedoresPage() {
       {erro && (
         <div
           role="alert"
-          className="rounded-lg border border-red-500/40 bg-red-500/10 px-4 py-3 text-sm text-red-200"
+          className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700"
         >
           {erro} Tente novamente em instantes — nenhum dado foi exibido no lugar.
         </div>
@@ -165,12 +165,12 @@ export default function FornecedoresPage() {
         
         <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
           <DialogTrigger asChild>
-            <Button className="bg-blue-600 hover:bg-blue-700">
+            <Button className="bg-[var(--action-primary)] hover:bg-[var(--action-primary-hover)]">
               <Plus className="h-4 w-4 mr-2" />
               Novo Fornecedor
             </Button>
           </DialogTrigger>
-          <DialogContent className="bg-[#0a1628] border-[var(--border-strong)] text-[#fff] max-w-2xl max-h-[90vh] overflow-y-auto">
+          <DialogContent className="bg-[var(--surface-overlay)] border-[var(--border-strong)] text-[#fff] max-w-2xl max-h-[90vh] overflow-y-auto">
             <DialogHeader>
               <DialogTitle>Novo Fornecedor</DialogTitle>
               <DialogDescription className="text-white/60">
@@ -420,7 +420,7 @@ export default function FornecedoresPage() {
                 <Button type="button" variant="ghost" onClick={() => setIsDialogOpen(false)}>
                   Cancelar
                 </Button>
-                <Button type="submit" className="bg-blue-600 hover:bg-blue-700">
+                <Button type="submit" className="bg-[var(--action-primary)] hover:bg-[var(--action-primary-hover)]">
                   Salvar
                 </Button>
               </DialogFooter>
@@ -432,12 +432,12 @@ export default function FornecedoresPage() {
       {/* Filtros */}
       <div className="flex gap-4">
         <div className="relative flex-1">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-white/50" />
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-[var(--text-secondary)]" />
           <Input
             placeholder="Buscar por nome, fantasia ou documento..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            className="pl-10 bg-[var(--surface-primary)] border-[var(--border-strong)] text-white placeholder:text-white/50"
+            className="pl-10 bg-[var(--surface-primary)] border-[var(--border-strong)] text-white placeholder:text-[var(--text-secondary)]"
           />
         </div>
       </div>
@@ -449,7 +449,7 @@ export default function FornecedoresPage() {
         </div>
       ) : filteredFornecedores.length === 0 ? (
         <Card className="bg-[var(--surface-primary)] border-[var(--border-strong)]">
-          <CardContent className="flex flex-col items-center justify-center h-48 text-white/50">
+          <CardContent className="flex flex-col items-center justify-center h-48 text-[var(--text-secondary)]">
             <Users className="h-12 w-12 mb-4" />
             <p>Nenhum fornecedor encontrado</p>
           </CardContent>
@@ -461,17 +461,17 @@ export default function FornecedoresPage() {
               <CardContent className="p-4">
                 <div className="flex items-start justify-between">
                   <div className="flex items-center gap-3">
-                    <div className={`p-2 rounded-full ${fornecedor.tipo === 'PJ' ? 'bg-blue-500/20' : 'bg-purple-500/20'}`}>
+                    <div className={`p-2 rounded-full ${fornecedor.tipo === 'PJ' ? 'bg-blue-50' : 'bg-slate-50'}`}>
                       {fornecedor.tipo === 'PJ' ? (
-                        <Building className="h-5 w-5 text-blue-400" />
+                        <Building className="h-5 w-5 text-blue-700" />
                       ) : (
-                        <User className="h-5 w-5 text-purple-400" />
+                        <User className="h-5 w-5 text-slate-700" />
                       )}
                     </div>
                     <div>
                       <p className="font-medium text-white">{fornecedor.nomeFantasia || fornecedor.nome}</p>
                       {fornecedor.nomeFantasia && (
-                        <p className="text-xs text-white/50">{fornecedor.nome}</p>
+                        <p className="text-xs text-[var(--text-secondary)]">{fornecedor.nome}</p>
                       )}
                     </div>
                   </div>
@@ -491,7 +491,7 @@ export default function FornecedoresPage() {
                         <Edit className="h-4 w-4 mr-2" />
                         Editar
                       </DropdownMenuItem>
-                      <DropdownMenuItem className="text-red-400">
+                      <DropdownMenuItem className="text-red-700">
                         <Trash2 className="h-4 w-4 mr-2" />
                         Excluir
                       </DropdownMenuItem>
@@ -506,7 +506,7 @@ export default function FornecedoresPage() {
                     </p>
                   )}
                   
-                  <div className="flex items-center gap-4 text-sm text-white/50">
+                  <div className="flex items-center gap-4 text-sm text-[var(--text-secondary)]">
                     {(fornecedor.telefone || fornecedor.celular) && (
                       <span className="flex items-center gap-1">
                         <Phone className="h-3 w-3" />
@@ -522,12 +522,12 @@ export default function FornecedoresPage() {
                   </div>
                   
                   {fornecedor.cidade && fornecedor.estado && (
-                    <p className="text-sm text-white/50">{fornecedor.cidade}/{fornecedor.estado}</p>
+                    <p className="text-sm text-[var(--text-secondary)]">{fornecedor.cidade}/{fornecedor.estado}</p>
                   )}
                 </div>
                 
                 <div className="mt-4 pt-4 border-t border-[var(--border-default)] flex justify-between text-sm">
-                  <span className="text-white/50">{fornecedor.totalContas} contas</span>
+                  <span className="text-[var(--text-secondary)]">{fornecedor.totalContas} contas</span>
                   <span className="text-white font-medium">{formatCurrency(fornecedor.totalPago)} pago</span>
                 </div>
               </CardContent>

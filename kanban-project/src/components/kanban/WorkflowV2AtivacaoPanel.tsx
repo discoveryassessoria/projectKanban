@@ -91,7 +91,7 @@ export function WorkflowV2AtivacaoPanel({ processoId }: Props) {
           <li key={c.chave} className="flex items-center gap-2 text-xs">
             <span>{c.ok ? "✅" : "❌"}</span>
             <span className="text-gray-500">{c.chave}</span>
-            <span className="text-gray-400">— {c.detalhe}</span>
+            <span className="text-[var(--text-muted)]">— {c.detalhe}</span>
           </li>
         ))}
       </ul>
@@ -105,11 +105,11 @@ export function WorkflowV2AtivacaoPanel({ processoId }: Props) {
         >
           Ativar runtime v2
         </button>
-        {ativando && <Loader2 className="h-4 w-4 animate-spin text-gray-400" />}
+        {ativando && <Loader2 className="h-4 w-4 animate-spin text-[var(--text-muted)]" />}
         {msg && <span className="text-xs text-gray-500">{msg}</span>}
       </div>
       {!prep.avaliacao.podeAtivarEfetivo && (
-        <div className="mt-2 text-xs text-gray-400">
+        <div className="mt-2 text-xs text-[var(--text-muted)]">
           Ativação efetiva requer todos os critérios + kill switch ON. Bloqueios: {prep.avaliacao.bloqueios.join(", ") || "—"}.
         </div>
       )}

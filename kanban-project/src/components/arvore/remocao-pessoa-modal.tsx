@@ -110,7 +110,7 @@ export function RemocaoPessoaModal({
 
   return createPortal(
     <div className="fixed inset-0 flex items-center justify-center p-4" style={{ zIndex: LAYER.aboveProcessCritical }}>
-      <div className="absolute inset-0 bg-slate-900/40" onClick={executando ? undefined : onFechar} />
+      <div className="absolute inset-0 bg-[var(--overlay-modal)]" onClick={executando ? undefined : onFechar} />
 
       <div className="relative w-full max-w-lg max-h-[85vh] overflow-y-auto rounded-xl bg-[var(--surface-primary)] shadow-xl border border-slate-200">
         <div className="sticky top-0 flex items-start justify-between gap-3 border-b border-slate-200 bg-[var(--surface-primary)] px-5 py-4">
@@ -123,7 +123,7 @@ export function RemocaoPessoaModal({
           <button
             onClick={onFechar}
             disabled={!!executando}
-            className="rounded-md p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-600 disabled:opacity-40"
+            className="rounded-md p-1 text-slate-700 hover:bg-slate-100 hover:text-slate-600 disabled:opacity-40"
             aria-label="Fechar"
           >
             <X className="h-4 w-4" />

@@ -143,7 +143,7 @@ export default function PerfisPermissaoMotorTab() {
           <option value="active" className="bg-zinc-900">Ativos</option>
           <option value="archived" className="bg-zinc-900">Arquivados</option>
         </select>
-        <button onClick={abrirNovo} className="ml-auto rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-[#fff] hover:bg-blue-500">
+        <button onClick={abrirNovo} className="ml-auto rounded-lg bg-[var(--action-primary)] px-4 py-2 text-sm font-medium text-[var(--action-primary-ink)] hover:bg-[var(--action-primary)]">
           + Novo perfil
         </button>
       </div>
@@ -151,7 +151,7 @@ export default function PerfisPermissaoMotorTab() {
       <div className="overflow-hidden rounded-xl border border-[var(--border-default)] bg-[var(--surface-primary)]">
         <table className="w-full text-sm">
           <thead>
-            <tr className="border-b border-[var(--border-default)] text-left text-xs text-white/50">
+            <tr className="border-b border-[var(--border-default)] text-left text-xs text-[var(--text-secondary)]">
               <th className="px-3 py-2 font-medium">Perfil</th>
               <th className="px-3 py-2 font-medium">Permissões</th>
               <th className="px-3 py-2 font-medium">Status</th>
@@ -161,9 +161,9 @@ export default function PerfisPermissaoMotorTab() {
           </thead>
           <tbody>
             {loading ? (
-              <tr><td colSpan={5} className="px-3 py-8 text-center text-white/40">Carregando…</td></tr>
+              <tr><td colSpan={5} className="px-3 py-8 text-center text-[var(--text-muted)]">Carregando…</td></tr>
             ) : lista.length === 0 ? (
-              <tr><td colSpan={5} className="px-3 py-8 text-center text-white/40">Nenhum perfil. Clique em “+ Novo perfil”.</td></tr>
+              <tr><td colSpan={5} className="px-3 py-8 text-center text-[var(--text-muted)]">Nenhum perfil. Clique em “+ Novo perfil”.</td></tr>
             ) : lista.map(p => (
               <tr key={p.id} className="border-b border-[var(--border-subtle)] last:border-0">
                 <td className="px-3 py-2.5">
@@ -171,13 +171,13 @@ export default function PerfisPermissaoMotorTab() {
                     <span className="font-medium text-white">{p.nome}</span>
                     {p.isSystemTemplate && <span className="rounded bg-[var(--surface-primary)] px-1.5 py-0.5 text-[10px] text-white/60">padrão</span>}
                   </div>
-                  {p.chave && <div className="text-xs text-white/40">{p.chave}</div>}
+                  {p.chave && <div className="text-xs text-[var(--text-muted)]">{p.chave}</div>}
                 </td>
                 <td className="px-3 py-2.5 text-white/70">{contaOn(p)} de {PERMISSOES.length} permissões</td>
                 <td className="px-3 py-2.5">
                   {p.arquivado
                     ? <span className="rounded bg-[var(--surface-primary)] px-1.5 py-0.5 text-[10px] text-white/60">arquivado</span>
-                    : <span className="rounded bg-green-500/15 px-1.5 py-0.5 text-[10px] text-green-300">ativo</span>}
+                    : <span className="rounded bg-green-50 px-1.5 py-0.5 text-[10px] text-green-700">ativo</span>}
                 </td>
                 <td className="px-3 py-2.5 text-center text-white/60">{p.usedByCount || 0}</td>
                 <td className="px-3 py-2.5">
@@ -220,7 +220,7 @@ export default function PerfisPermissaoMotorTab() {
                   <label className="text-xs text-white/60">Permissões</label>
                   <div className="flex gap-2 text-[11px]">
                     <button type="button" onClick={() => marcarTodas(true)} className="text-white/60 hover:text-white">marcar todas</button>
-                    <span className="text-white/20">·</span>
+                    <span className="text-[var(--text-muted)]">·</span>
                     <button type="button" onClick={() => marcarTodas(false)} className="text-white/60 hover:text-white">limpar</button>
                   </div>
                 </div>
@@ -237,7 +237,7 @@ export default function PerfisPermissaoMotorTab() {
 
             <div className="flex justify-end gap-2 border-t border-[var(--border-default)] px-5 py-4">
               <button onClick={() => setModalOpen(false)} className="rounded-lg border border-[var(--border-default)] px-4 py-2 text-sm text-white/70 hover:bg-[var(--surface-hover)]">Cancelar</button>
-              <button onClick={salvar} disabled={salvando} className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-[#fff] hover:bg-blue-500 disabled:opacity-60">
+              <button onClick={salvar} disabled={salvando} className="rounded-lg bg-[var(--action-primary)] px-4 py-2 text-sm font-medium text-[var(--action-primary-ink)] hover:bg-[var(--action-primary)] disabled:opacity-60">
                 {salvando ? "Salvando…" : "Salvar"}
               </button>
             </div>
@@ -251,7 +251,7 @@ export default function PerfisPermissaoMotorTab() {
 function IconBtn({ children, title, onClick, danger }: { children: ReactNode; title: string; onClick: () => void; danger?: boolean }) {
   return (
     <button title={title} aria-label={title} onClick={onClick}
-      className={`rounded-md p-1.5 hover:bg-[var(--surface-hover)] ${danger ? "text-red-300/80 hover:text-red-300" : "text-white/60 hover:text-white"}`}>
+      className={`rounded-md p-1.5 hover:bg-[var(--surface-hover)] ${danger ? "text-red-700/80 hover:text-red-700" : "text-white/60 hover:text-white"}`}>
       {children}
     </button>
   )

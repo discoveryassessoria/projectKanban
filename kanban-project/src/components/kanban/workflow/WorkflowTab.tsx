@@ -131,12 +131,12 @@ const fmtDate = (iso: string | null): string => {
 }
 
 const fmtSla = (dueAt: string | null) => {
-  if (!dueAt) return { label: "no prazo", cls: "text-emerald-300 bg-emerald-900/40" }
+  if (!dueAt) return { label: "no prazo", cls: "text-emerald-700 bg-emerald-900/40" }
   const diff = (new Date(dueAt).getTime() - Date.now()) / 86400000
-  if (diff < -5) return { label: `${Math.abs(Math.floor(diff))}d crítico`, cls: "text-red-300 bg-red-900/50" }
-  if (diff < 0) return { label: `${Math.abs(Math.floor(diff))}d atrasado`, cls: "text-orange-300 bg-orange-900/50" }
-  if (diff < 1) return { label: "vence hoje", cls: "text-amber-300 bg-amber-900/50" }
-  return { label: `${Math.ceil(diff)} dia(s)`, cls: "text-emerald-300 bg-emerald-900/40" }
+  if (diff < -5) return { label: `${Math.abs(Math.floor(diff))}d crítico`, cls: "text-red-700 bg-red-900/50" }
+  if (diff < 0) return { label: `${Math.abs(Math.floor(diff))}d atrasado`, cls: "text-amber-700 bg-amber-900/50" }
+  if (diff < 1) return { label: "vence hoje", cls: "text-amber-700 bg-amber-900/50" }
+  return { label: `${Math.ceil(diff)} dia(s)`, cls: "text-emerald-700 bg-emerald-900/40" }
 }
 
 const STATUS_LABEL: Record<StatusStep, string> = {
@@ -223,7 +223,7 @@ export function WorkflowTab({ documentoId, onChange, contextoAntecipada }: Workf
   if (erro) {
     return (
       <div className="px-1 py-6">
-        <div className="bg-red-900/20 border border-red-800 rounded-lg px-4 py-3 text-sm text-red-200">
+        <div className="bg-red-900/20 border border-red-800 rounded-lg px-4 py-3 text-sm text-red-700">
           ⚠ {erro}
         </div>
       </div>
@@ -241,7 +241,7 @@ export function WorkflowTab({ documentoId, onChange, contextoAntecipada }: Workf
             <Circle className="w-5 h-5 text-slate-500" />
           </div>
           <h4 className="text-white font-semibold text-sm mb-1.5">Sem Workflow Interno</h4>
-          <p className="text-xs text-slate-400 max-w-xs">
+          <p className="text-xs text-slate-700 max-w-xs">
             Não existe Workflow Interno configurado para esta fase.
           </p>
         </div>
@@ -255,7 +255,7 @@ export function WorkflowTab({ documentoId, onChange, contextoAntecipada }: Workf
           <Circle className="w-5 h-5 text-slate-500" />
         </div>
         <h4 className="text-white font-semibold text-sm mb-1.5">Não foi possível carregar as etapas</h4>
-        <p className="text-xs text-slate-400 max-w-xs mb-5">
+        <p className="text-xs text-slate-700 max-w-xs mb-5">
           Recarregue para tentar montar a operação desta fase.
         </p>
         <button
@@ -282,7 +282,7 @@ export function WorkflowTab({ documentoId, onChange, contextoAntecipada }: Workf
       <div className="bg-gradient-to-br from-slate-900/80 to-slate-900/40 border border-slate-700/50 rounded-lg px-4 py-3.5 flex items-center justify-between gap-4 flex-wrap">
         <div>
           <div className="text-[13px] font-bold text-white">{workflow.templateName}</div>
-          <div className="text-[11px] text-slate-400 mt-0.5">
+          <div className="text-[11px] text-slate-700 mt-0.5">
             {workflow.steps.length} etapas · {doneCount} concluídas · iniciado em {fmtDate(workflow.startedAt)}
           </div>
         </div>
@@ -327,14 +327,14 @@ export function WorkflowTab({ documentoId, onChange, contextoAntecipada }: Workf
               <button
                 type="button"
                 onClick={() => setCriandoAntecipada(true)}
-                className="text-[11px] font-semibold text-white/55 hover:text-[#a78bfa] underline decoration-dotted underline-offset-2"
+                className="text-[11px] font-semibold text-[var(--text-secondary)] hover:text-[#a78bfa] underline decoration-dotted underline-offset-2"
               >
                 + nova operação antecipada
               </button>
             )}
           </div>
           {opsDoAlvo.length === 0 ? (
-            <div className="text-[11.5px] text-white/40">
+            <div className="text-[11.5px] text-[var(--text-muted)]">
               Nenhuma operação antecipada para este documento.
             </div>
           ) : (
@@ -418,10 +418,10 @@ function StepCard({
           <Check className="w-3.5 h-3.5 text-white" />
         </div>
         <div className="flex-1 min-w-0">
-          <div className="text-[12.5px] font-semibold text-emerald-200">
+          <div className="text-[12.5px] font-semibold text-emerald-700">
             {step.ordem}. {step.title}
           </div>
-          <div className="text-[10.5px] text-emerald-400/80 mt-0.5">
+          <div className="text-[10.5px] text-emerald-700/80 mt-0.5">
             concluída por <strong>{completedByName}</strong> em {fmtDateTime(step.completedAt)} · peso {step.weight}%
           </div>
         </div>
@@ -435,12 +435,12 @@ function StepCard({
   // ============================================================
   if (isFuture) {
     return (
-      <div className="bg-slate-900/40 border border-slate-800/60 rounded-md px-3 py-2.5 flex items-center gap-3 opacity-60">
+      <div className="bg-[var(--surface-primary)] border border-[var(--border-default)] rounded-md px-3 py-2.5 flex items-center gap-3 opacity-60">
         <div className="w-6 h-6 rounded-full bg-slate-800 border border-slate-700 flex items-center justify-center flex-shrink-0">
           <Lock className="w-3 h-3 text-slate-500" />
         </div>
         <div className="flex-1 min-w-0">
-          <div className="text-[12.5px] font-semibold text-slate-400">
+          <div className="text-[12.5px] font-semibold text-slate-700">
             {step.ordem}. {step.title}
           </div>
           <div className="text-[10.5px] text-slate-500 mt-0.5">
@@ -477,14 +477,14 @@ function StepCard({
 
   // Badge de status (texto e cor)
   const statusBadgeCls = isLockStepWait
-    ? "bg-amber-900/60 text-amber-200 border-amber-800"
+    ? "bg-amber-900/60 text-amber-700 border-amber-800"
     : isBloqueioManual
-    ? "bg-red-900/60 text-red-200 border-red-800"
+    ? "bg-red-900/60 text-red-700 border-red-800"
     : step.status === "aguardando_terceiro"
-    ? "bg-amber-900/60 text-amber-200 border-amber-800"
+    ? "bg-amber-900/60 text-amber-700 border-amber-800"
     : step.status === "atrasada"
-    ? "bg-orange-900/60 text-orange-200 border-orange-800"
-    : "bg-blue-900/60 text-blue-200 border-blue-800"
+    ? "bg-amber-900/60 text-amber-700 border-amber-800"
+    : "bg-blue-900/60 text-blue-700 border-blue-800"
 
   const statusLabel = isLockStepWait
     ? "Aguardando docs"
@@ -494,7 +494,7 @@ function StepCard({
   const dotColor = ownerColor(step.ownerKey)
 
   return (
-    <div className={`bg-slate-900/60 border ${cardBorderCls} rounded-md overflow-hidden`}>
+    <div className={`bg-[var(--surface-primary)] border ${cardBorderCls} rounded-md overflow-hidden`}>
 
       {/* Cabeçalho do step ativo */}
       <div ref={refDoAtual} className="px-3 py-3 flex items-start gap-3">
@@ -515,12 +515,12 @@ function StepCard({
             </span>
           </div>
           {step.description && (
-            <div className="text-[11px] text-slate-400 mt-1">{step.description}</div>
+            <div className="text-[11px] text-slate-700 mt-1">{step.description}</div>
           )}
 
           {/* Meta compacta — esconde se for lock-step wait (responsável/SLA não fazem sentido) */}
           {!isLockStepWait && (
-            <div className="flex items-center gap-2 flex-wrap text-[11px] text-slate-300 mt-2">
+            <div className="flex items-center gap-2 flex-wrap text-[11px] text-slate-700 mt-2">
               {/* QUEM EXECUTA ESTA ETAPA — não "o responsável".
                   O responsável pelo trabalho é o da TAREFA, e ele aparece uma
                   vez só, no topo do painel. Um nome solto aqui era lido como
@@ -541,7 +541,7 @@ function StepCard({
               {step.dueAt && (
                 <>
                   <span className="text-slate-600">·</span>
-                  <span className="font-mono text-[10.5px] text-slate-400">{fmtDateTime(step.dueAt)}</span>
+                  <span className="font-mono text-[10.5px] text-slate-700">{fmtDateTime(step.dueAt)}</span>
                 </>
               )}
             </div>
@@ -549,11 +549,11 @@ function StepCard({
 
           {/* Banner LOCK-STEP — amigável, âmbar */}
           {isLockStepWait && (
-            <div className="mt-2 px-2.5 py-2 bg-amber-950/40 border border-amber-900/50 rounded text-[11.5px] text-amber-200 flex items-start gap-2">
-              <Lock className="w-3.5 h-3.5 flex-shrink-0 mt-0.5 text-amber-400" />
+            <div className="mt-2 px-2.5 py-2 bg-amber-950/40 border border-amber-900/50 rounded text-[11.5px] text-amber-700 flex items-start gap-2">
+              <Lock className="w-3.5 h-3.5 flex-shrink-0 mt-0.5 text-amber-700" />
               <div>
                 <strong className="font-semibold">Aguardando outros documentos chegarem nesta etapa.</strong>
-                <div className="text-[10.5px] text-amber-400/80 mt-0.5">
+                <div className="text-[10.5px] text-amber-700/80 mt-0.5">
                   Libera automaticamente quando todos os documentos do processo concluírem a etapa anterior.
                 </div>
               </div>
@@ -562,14 +562,14 @@ function StepCard({
 
           {/* Banner BLOQUEIO MANUAL — vermelho, como antes */}
           {isBloqueioManual && step.motivoBloqueio && (
-            <div className="mt-2 px-2 py-1.5 bg-red-950/50 border border-red-900 rounded text-[11px] text-red-200">
+            <div className="mt-2 px-2 py-1.5 bg-red-950/50 border border-red-900 rounded text-[11px] text-red-700">
               Bloqueado: <strong>{step.motivoBloqueio}</strong>
             </div>
           )}
 
           {/* Notas */}
           {step.notes && (
-            <div className="mt-2 px-2 py-1.5 bg-slate-800/50 rounded text-[11px] text-slate-300 italic">
+            <div className="mt-2 px-2 py-1.5 bg-slate-800/50 rounded text-[11px] text-slate-700 italic">
               {step.notes}
             </div>
           )}

@@ -130,16 +130,16 @@ export default function MatrizDocumentalTab() {
     setForm({ id: r.id, tipoProcessoId: r.tipoProcessoId, phaseKey: r.phaseKey || "", documentTypeCode: r.documentTypeCode, target: r.target, generationRule: r.generationRule, required: r.required, conditional: r.conditional, condition: r.condition || "", createsTask: r.createsTask, createsCost: r.createsCost, createsRevenue: r.createsRevenue, blocksPhaseCompletion: r.blocksPhaseCompletion })
   }
 
-  if (loading) return <div className="py-24 text-center text-white/50">Carregando…</div>
+  if (loading) return <div className="py-24 text-center text-[var(--text-secondary)]">Carregando…</div>
 
   return (
     <div className="space-y-5">
-      {flash && <div className="rounded-xl border border-green-400/30 bg-green-500/15 px-4 py-3 text-sm text-green-200">{flash}</div>}
+      {flash && <div className="rounded-xl border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-700">{flash}</div>}
 
       {/* cabeçalho + seletor */}
       <div className="rounded-2xl border border-[var(--border-default)] bg-[var(--surface-primary)] p-5 backdrop-blur-sm">
         <h2 className="text-lg font-semibold text-white">Matriz Documental</h2>
-        <p className="mt-1 text-sm text-white/60">Quais documentos são exigidos por processo, fase, alvo e regra de geração. Define se cria tarefa/custo/receita e se bloqueia a conclusão da fase. <span className="text-white/40">A execução real vem na Fase 4.</span></p>
+        <p className="mt-1 text-sm text-white/60">Quais documentos são exigidos por processo, fase, alvo e regra de geração. Define se cria tarefa/custo/receita e se bloqueia a conclusão da fase. <span className="text-[var(--text-muted)]">A execução real vem na Fase 4.</span></p>
         <div className="mt-4 max-w-md">
           <label className={labelCls}>Processo de Nacionalidade</label>
           <select value={ptId ?? ""} onChange={e => { setPtId(Number(e.target.value)); setShowArchived(false) }} className={inputCls}>
@@ -152,9 +152,9 @@ export default function MatrizDocumentalTab() {
       {proc && (
         <div className="rounded-2xl border border-[var(--border-default)] bg-[var(--surface-primary)] p-4 backdrop-blur-sm">
           <div className="mb-3 flex flex-wrap items-center gap-2">
-            <button onClick={() => setForm(blankForm(proc.id))} className="rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-medium text-[#fff] hover:bg-blue-500">+ Nova regra documental</button>
+            <button onClick={() => setForm(blankForm(proc.id))} className="rounded-lg bg-[var(--action-primary)] px-3 py-1.5 text-xs font-medium text-[var(--action-primary-ink)] hover:bg-[var(--action-primary)]">+ Nova regra documental</button>
             {arquivadasCount > 0 && (
-              <button onClick={() => setShowArchived(v => !v)} className={`ml-auto rounded-lg border px-3 py-1.5 text-xs ${showArchived ? "border-blue-400/40 bg-blue-500/10 text-blue-200" : "border-[var(--border-default)] bg-[var(--surface-primary)] text-white/60 hover:bg-[var(--surface-hover)]"}`}>
+              <button onClick={() => setShowArchived(v => !v)} className={`ml-auto rounded-lg border px-3 py-1.5 text-xs ${showArchived ? "border-blue-200 bg-blue-50 text-blue-700" : "border-[var(--border-default)] bg-[var(--surface-primary)] text-white/60 hover:bg-[var(--surface-hover)]"}`}>
                 {showArchived ? "Ocultar arquivadas" : `Mostrar arquivadas (${arquivadasCount})`}
               </button>
             )}
@@ -162,36 +162,36 @@ export default function MatrizDocumentalTab() {
 
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
-              <thead className="border-b border-[var(--border-default)] text-left text-xs text-white/50">
+              <thead className="border-b border-[var(--border-default)] text-left text-xs text-[var(--text-secondary)]">
                 <tr><th className="px-3 py-2 font-medium">Fase</th><th className="px-3 py-2 font-medium">Documento</th><th className="px-3 py-2 font-medium">Alvo</th><th className="px-3 py-2 font-medium">Regra de geração</th><th className="px-3 py-2 font-medium">Exigência</th><th className="px-3 py-2 font-medium">Gera</th><th className="px-3 py-2 text-right font-medium">Ações</th></tr>
               </thead>
               <tbody>
                 {regrasDoProc.length === 0 ? (
-                  <tr><td colSpan={7} className="px-3 py-8 text-center text-xs text-white/40">Nenhuma regra documental para este processo.</td></tr>
+                  <tr><td colSpan={7} className="px-3 py-8 text-center text-xs text-[var(--text-muted)]">Nenhuma regra documental para este processo.</td></tr>
                 ) : regrasDoProc.map(m => (
                   <tr key={m.id} className={`border-b border-[var(--border-subtle)] last:border-0 ${m.arquivado ? "opacity-60" : ""}`}>
                     <td className="px-3 py-2 text-xs text-white/70">{phaseName(m.phaseKey)}</td>
-                    <td className="px-3 py-2 font-medium text-white">{docName(m.documentTypeCode)}{m.arquivado && <span className="ml-1.5 rounded-full bg-[var(--surface-primary)] px-1.5 py-0.5 text-[9px] text-white/50">arquivada</span>}</td>
+                    <td className="px-3 py-2 font-medium text-white">{docName(m.documentTypeCode)}{m.arquivado && <span className="ml-1.5 rounded-full bg-[var(--surface-primary)] px-1.5 py-0.5 text-[9px] text-[var(--text-secondary)]">arquivada</span>}</td>
                     <td className="px-3 py-2 text-xs text-white/70">{TARGETS[m.target] || m.target}</td>
-                    <td className="px-3 py-2 text-[11px] text-white/50">{GENRULES[m.generationRule] || m.generationRule}</td>
+                    <td className="px-3 py-2 text-[11px] text-[var(--text-secondary)]">{GENRULES[m.generationRule] || m.generationRule}</td>
                     <td className="px-3 py-2">
-                      <span className={`rounded px-1.5 py-0.5 text-[10px] ${m.required ? "bg-amber-500/15 text-amber-300" : "bg-[var(--surface-primary)] text-white/50"}`}>{m.required ? "obrigatório" : "opcional"}</span>
-                      {m.blocksPhaseCompletion && <span className="ml-1 rounded bg-red-500/15 px-1.5 py-0.5 text-[10px] text-red-300">bloqueia fase</span>}
+                      <span className={`rounded px-1.5 py-0.5 text-[10px] ${m.required ? "bg-amber-50 text-amber-700" : "bg-[var(--surface-primary)] text-[var(--text-secondary)]"}`}>{m.required ? "obrigatório" : "opcional"}</span>
+                      {m.blocksPhaseCompletion && <span className="ml-1 rounded bg-red-50 px-1.5 py-0.5 text-[10px] text-red-700">bloqueia fase</span>}
                     </td>
-                    <td className="px-3 py-2 text-[10px] text-white/50">{[m.createsTask && "tarefa", m.createsCost && "custo", m.createsRevenue && "receita"].filter(Boolean).join(" · ") || "—"}</td>
+                    <td className="px-3 py-2 text-[10px] text-[var(--text-secondary)]">{[m.createsTask && "tarefa", m.createsCost && "custo", m.createsRevenue && "receita"].filter(Boolean).join(" · ") || "—"}</td>
                     <td className="px-3 py-2">
-                      <div className="flex items-center justify-end gap-0.5 text-white/50">
+                      <div className="flex items-center justify-end gap-0.5 text-[var(--text-secondary)]">
                         {m.arquivado ? (
                           <>
-                            <button title="Reativar" aria-label="Reativar" onClick={() => setArquivado(m, false)} className="rounded p-1 text-green-300/80 hover:bg-[var(--surface-hover)] hover:text-green-300"><IUnarch /></button>
-                            {(m.usedByCount || 0) === 0 && <button title="Excluir" aria-label="Excluir" onClick={() => del(m)} className="rounded p-1 text-red-300/70 hover:bg-red-500/10 hover:text-red-300"><ITrash /></button>}
+                            <button title="Reativar" aria-label="Reativar" onClick={() => setArquivado(m, false)} className="rounded p-1 text-green-700/80 hover:bg-[var(--surface-hover)] hover:text-green-700"><IUnarch /></button>
+                            {(m.usedByCount || 0) === 0 && <button title="Excluir" aria-label="Excluir" onClick={() => del(m)} className="rounded p-1 text-red-700/70 hover:bg-red-50 hover:text-red-700"><ITrash /></button>}
                           </>
                         ) : (
                           <>
                             <button title="Editar" aria-label="Editar" onClick={() => openEdit(m)} className="rounded p-1 hover:bg-[var(--surface-hover)] hover:text-white"><IEdit /></button>
                             <button title="Duplicar" aria-label="Duplicar" onClick={() => dup(m)} className="rounded p-1 hover:bg-[var(--surface-hover)] hover:text-white"><ICopy /></button>
                             <button title="Arquivar" aria-label="Arquivar" onClick={() => setArquivado(m, true)} className="rounded p-1 hover:bg-[var(--surface-hover)] hover:text-white"><IArch /></button>
-                            {(m.usedByCount || 0) === 0 && <button title="Excluir" aria-label="Excluir" onClick={() => del(m)} className="rounded p-1 text-red-300/70 hover:bg-red-500/10 hover:text-red-300"><ITrash /></button>}
+                            {(m.usedByCount || 0) === 0 && <button title="Excluir" aria-label="Excluir" onClick={() => del(m)} className="rounded p-1 text-red-700/70 hover:bg-red-50 hover:text-red-700"><ITrash /></button>}
                           </>
                         )}
                       </div>
@@ -254,7 +254,7 @@ export default function MatrizDocumentalTab() {
             </div>
             <div className="flex justify-end gap-2 border-t border-[var(--border-default)] px-6 py-4">
               <button onClick={() => setForm(null)} className="rounded-lg border border-[var(--border-default)] bg-[var(--surface-primary)] px-4 py-2 text-sm text-white/80 hover:bg-[var(--surface-hover)]">Cancelar</button>
-              <button disabled={busy} onClick={saveForm} className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-[#fff] hover:bg-blue-500 disabled:opacity-50">Salvar</button>
+              <button disabled={busy} onClick={saveForm} className="rounded-lg bg-[var(--action-primary)] px-4 py-2 text-sm font-medium text-[var(--action-primary-ink)] hover:bg-[var(--action-primary)] disabled:opacity-50">Salvar</button>
             </div>
           </div>
         </div>

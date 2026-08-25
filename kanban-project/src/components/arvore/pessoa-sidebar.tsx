@@ -195,13 +195,13 @@ function InfoItem({
         ) : onAdd ? (
           <button 
             onClick={onAdd}
-            className="flex items-center gap-1 text-teal-600 hover:text-teal-700 text-sm mt-0.5"
+            className="flex items-center gap-1 text-amber-600 hover:text-amber-700 text-sm mt-0.5"
           >
             <Plus className="w-3 h-3" />
             Adicionar
           </button>
         ) : (
-          <p className="text-sm text-slate-400 italic mt-0.5">Não informado</p>
+          <p className="text-sm text-slate-700 italic mt-0.5">Não informado</p>
         )}
       </div>
     </div>
@@ -232,7 +232,7 @@ function CollapsibleSection({
           <span className="font-semibold text-slate-900 text-sm">{title}</span>
         </div>
         <div className={`transform transition-transform ${isOpen ? '' : '-rotate-90'}`}>
-          <ChevronDown className="h-4 w-4 text-slate-400" />
+          <ChevronDown className="h-4 w-4 text-slate-700" />
         </div>
       </button>
       {isOpen && (
@@ -360,7 +360,7 @@ function BlocoValores({
     return (
       <div className="py-2">
         <p className="text-xs font-medium text-slate-500">{titulo}</p>
-        <p className="mt-0.5 text-sm text-slate-400 italic">Sem permissão para ver valores</p>
+        <p className="mt-0.5 text-sm text-slate-700 italic">Sem permissão para ver valores</p>
       </div>
     )
   }
@@ -368,7 +368,7 @@ function BlocoValores({
     return (
       <div className="py-2">
         <p className="text-xs font-medium text-slate-500">{titulo}</p>
-        <p className="mt-0.5 text-sm text-slate-400 italic">Nenhum lançamento para esta pessoa</p>
+        <p className="mt-0.5 text-sm text-slate-700 italic">Nenhum lançamento para esta pessoa</p>
       </div>
     )
   }
@@ -435,7 +435,7 @@ function DocumentoCard({
             </p>
           )}
           {(documento.livro || documento.folha || documento.termo) && (
-            <p className="text-xs text-slate-400 mt-0.5">
+            <p className="text-xs text-slate-700 mt-0.5">
               {[
                 documento.livro && `Livro: ${documento.livro}`,
                 documento.folha && `Folha: ${documento.folha}`,
@@ -460,7 +460,7 @@ function DocumentoCard({
               className={`p-1.5 rounded-md transition-colors ${
                 confirmDelete 
                   ? 'bg-red-500 text-white hover:bg-red-600' 
-                  : 'hover:bg-red-50 text-slate-400 hover:text-red-500'
+                  : 'hover:bg-red-50 text-slate-700 hover:text-red-500'
               }`}
               title={confirmDelete ? 'Clique para confirmar' : 'Excluir documento'}
             >
@@ -473,12 +473,12 @@ function DocumentoCard({
       {/* Badges e links de arquivos */}
       <div className="flex items-center gap-2 mt-2 flex-wrap">
         {documento.traduzido && (
-          <span className="px-1.5 py-0.5 text-[10px] font-medium rounded bg-cyan-50 text-cyan-700">
+          <span className="px-1.5 py-0.5 text-[10px] font-medium rounded bg-amber-50 text-amber-700">
             Traduzido
           </span>
         )}
         {documento.apostilado && (
-          <span className="px-1.5 py-0.5 text-[10px] font-medium rounded bg-purple-50 text-purple-700">
+          <span className="px-1.5 py-0.5 text-[10px] font-medium rounded bg-slate-50 text-slate-700">
             Apostilado
           </span>
         )}
@@ -493,7 +493,7 @@ function DocumentoCard({
               target="_blank" 
               rel="noopener noreferrer"
               onClick={(e) => e.stopPropagation()}
-              className="flex items-center gap-1 text-[10px] text-teal-600 hover:text-teal-700 font-medium"
+              className="flex items-center gap-1 text-[10px] text-amber-600 hover:text-amber-700 font-medium"
             >
               <FileText className="w-3 h-3" />
               Original
@@ -505,7 +505,7 @@ function DocumentoCard({
               target="_blank" 
               rel="noopener noreferrer"
               onClick={(e) => e.stopPropagation()}
-              className="flex items-center gap-1 text-[10px] text-cyan-600 hover:text-cyan-700 font-medium"
+              className="flex items-center gap-1 text-[10px] text-amber-600 hover:text-amber-700 font-medium"
             >
               <FileText className="w-3 h-3" />
               Tradução
@@ -517,7 +517,7 @@ function DocumentoCard({
               target="_blank" 
               rel="noopener noreferrer"
               onClick={(e) => e.stopPropagation()}
-              className="flex items-center gap-1 text-[10px] text-purple-600 hover:text-purple-700 font-medium"
+              className="flex items-center gap-1 text-[10px] text-slate-600 hover:text-slate-700 font-medium"
             >
               <FileText className="w-3 h-3" />
               Apostila
@@ -545,18 +545,18 @@ function FamiliarCard({
 }) {
   return (
     <div 
-      className="flex items-center gap-3 p-3 bg-slate-50 rounded-lg hover:bg-teal-50 hover:ring-1 hover:ring-teal-200 transition-all cursor-pointer group"
+      className="flex items-center gap-3 p-3 bg-slate-50 rounded-lg hover:bg-amber-50 hover:ring-1 hover:ring-amber-200 transition-all cursor-pointer group"
       onClick={onClick}
     >
       <PersonAvatar pessoa={familiar} size={40} />
       <div className="flex-1 min-w-0">
-        <p className="font-medium text-slate-900 text-sm group-hover:text-teal-700 transition-colors">
+        <p className="font-medium text-slate-900 text-sm group-hover:text-amber-700 transition-colors">
           {familiar.nome} {familiar.sobrenome}
         </p>
         <p className="text-xs text-slate-500">{relacao}</p>
         {extra}
       </div>
-      <ExternalLink className="w-4 h-4 text-slate-300 group-hover:text-teal-500 transition-colors" />
+      <ExternalLink className="w-4 h-4 text-slate-700 group-hover:text-amber-500 transition-colors" />
     </div>
   )
 }
@@ -646,7 +646,7 @@ function ConteudoSidebar({
           <PersonAvatar pessoa={pessoa} size={64} />
           <div className="flex-1 min-w-0">
             <h2 
-              className="text-xl font-bold text-slate-900 hover:text-teal-600 cursor-pointer transition-colors truncate"
+              className="text-xl font-bold text-slate-900 hover:text-amber-600 cursor-pointer transition-colors truncate"
               onClick={() => onOpenFullDetails(pessoa)}
             >
               {nomeCompleto}
@@ -677,7 +677,7 @@ function ConteudoSidebar({
             {onEdit && (
               <button 
                 onClick={() => onEdit(pessoa)}
-                className="flex-1 flex items-center justify-center gap-2 px-3 py-2 bg-teal-50 text-teal-700 rounded-lg hover:bg-teal-100 transition-colors"
+                className="flex-1 flex items-center justify-center gap-2 px-3 py-2 bg-amber-50 text-amber-700 rounded-lg hover:bg-amber-100 transition-colors"
               >
                 <Pencil className="h-4 w-4" />
                 <span className="text-sm font-medium">Editar</span>
@@ -709,47 +709,47 @@ function ConteudoSidebar({
           onClick={() => setActiveTab("info")}
           className={`flex-1 flex items-center justify-center gap-2 ${dossie ? 'px-2' : 'px-4'} py-3 text-sm font-medium transition-colors relative ${
             activeTab === "info"
-              ? 'text-teal-600 bg-[var(--surface-primary)]'
+              ? 'text-amber-600 bg-[var(--surface-primary)]'
               : 'text-slate-600 hover:text-slate-900'
           }`}
         >
           <User className="h-4 w-4" />
           {dossie ? "Info" : "Informações"}
           {activeTab === "info" && (
-            <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-teal-500" />
+            <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-amber-500" />
           )}
         </button>
         <button
           onClick={() => setActiveTab("familia")}
           className={`flex-1 flex items-center justify-center gap-2 ${dossie ? 'px-2' : 'px-4'} py-3 text-sm font-medium transition-colors relative ${
             activeTab === "familia"
-              ? 'text-teal-600 bg-[var(--surface-primary)]'
+              ? 'text-amber-600 bg-[var(--surface-primary)]'
               : 'text-slate-600 hover:text-slate-900'
           }`}
         >
           <GitBranch className="h-4 w-4" />
           Família
           {activeTab === "familia" && (
-            <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-teal-500" />
+            <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-amber-500" />
           )}
         </button>
         <button
           onClick={() => setActiveTab("docs")}
           className={`flex-1 flex items-center justify-center gap-2 ${dossie ? 'px-2' : 'px-4'} py-3 text-sm font-medium transition-colors relative ${
             activeTab === "docs"
-              ? 'text-teal-600 bg-[var(--surface-primary)]'
+              ? 'text-amber-600 bg-[var(--surface-primary)]'
               : 'text-slate-600 hover:text-slate-900'
           }`}
         >
           <FileText className="h-4 w-4" />
           {dossie ? "Docs" : "Documentos"}
           {documentos.length > 0 && (
-            <span className="px-1.5 py-0.5 text-[10px] font-medium rounded-full bg-teal-100 text-teal-700">
+            <span className="px-1.5 py-0.5 text-[10px] font-medium rounded-full bg-amber-100 text-amber-700">
               {documentos.length}
             </span>
           )}
           {activeTab === "docs" && (
-            <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-teal-500" />
+            <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-amber-500" />
           )}
         </button>
         {dossie && (
@@ -757,19 +757,19 @@ function ConteudoSidebar({
             onClick={() => setActiveTab("operacao")}
             className={`flex-1 flex items-center justify-center gap-2 px-2 py-3 text-sm font-medium transition-colors relative ${
               activeTab === "operacao"
-                ? 'text-teal-600 bg-[var(--surface-primary)]'
+                ? 'text-amber-600 bg-[var(--surface-primary)]'
                 : 'text-slate-600 hover:text-slate-900'
             }`}
           >
             <ListChecks className="h-4 w-4" />
             Operação
             {dossie.tarefasAbertas.length > 0 && (
-              <span className="px-1.5 py-0.5 text-[10px] font-medium rounded-full bg-teal-100 text-teal-700">
+              <span className="px-1.5 py-0.5 text-[10px] font-medium rounded-full bg-amber-100 text-amber-700">
                 {dossie.tarefasAbertas.length}
               </span>
             )}
             {activeTab === "operacao" && (
-              <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-teal-500" />
+              <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-amber-500" />
             )}
           </button>
         )}
@@ -836,7 +836,7 @@ function ConteudoSidebar({
                     )
                   })
                 ) : (
-                  <p className="text-sm text-slate-400">Nenhum casamento registrado</p>
+                  <p className="text-sm text-slate-700">Nenhum casamento registrado</p>
                 )}
               </div>
             </CollapsibleSection>
@@ -894,7 +894,7 @@ function ConteudoSidebar({
                   {pode('arvore.criar') && !pessoa.pai && onAddPai && (
                     <button 
                       onClick={() => onAddPai(pessoa.id)}
-                      className="w-full flex items-center justify-center gap-2 p-3 border-2 border-dashed border-slate-200 rounded-lg text-teal-600 hover:border-teal-300 hover:bg-teal-50 transition-colors"
+                      className="w-full flex items-center justify-center gap-2 p-3 border-2 border-dashed border-slate-200 rounded-lg text-amber-600 hover:border-amber-300 hover:bg-amber-50 transition-colors"
                     >
                       <Plus className="w-4 h-4" />
                       <span className="text-sm font-medium">Adicionar Pai</span>
@@ -904,7 +904,7 @@ function ConteudoSidebar({
                   {pode('arvore.criar') && !pessoa.mae && onAddMae && (
                     <button 
                       onClick={() => onAddMae(pessoa.id)}
-                      className="w-full flex items-center justify-center gap-2 p-3 border-2 border-dashed border-slate-200 rounded-lg text-teal-600 hover:border-teal-300 hover:bg-teal-50 transition-colors"
+                      className="w-full flex items-center justify-center gap-2 p-3 border-2 border-dashed border-slate-200 rounded-lg text-amber-600 hover:border-amber-300 hover:bg-amber-50 transition-colors"
                     >
                       <Plus className="w-4 h-4" />
                       <span className="text-sm font-medium">Adicionar Mãe</span>
@@ -915,14 +915,14 @@ function ConteudoSidebar({
                 <div className="space-y-2">
                   <button 
                     onClick={() => onAddPai?.(pessoa.id)}
-                    className="w-full flex items-center justify-center gap-2 p-3 border-2 border-dashed border-slate-200 rounded-lg text-teal-600 hover:border-teal-300 hover:bg-teal-50 transition-colors"
+                    className="w-full flex items-center justify-center gap-2 p-3 border-2 border-dashed border-slate-200 rounded-lg text-amber-600 hover:border-amber-300 hover:bg-amber-50 transition-colors"
                   >
                     <Plus className="w-4 h-4" />
                     <span className="text-sm font-medium">Adicionar Pai</span>
                   </button>
                   <button 
                     onClick={() => onAddMae?.(pessoa.id)}
-                    className="w-full flex items-center justify-center gap-2 p-3 border-2 border-dashed border-slate-200 rounded-lg text-teal-600 hover:border-teal-300 hover:bg-teal-50 transition-colors"
+                    className="w-full flex items-center justify-center gap-2 p-3 border-2 border-dashed border-slate-200 rounded-lg text-amber-600 hover:border-amber-300 hover:bg-amber-50 transition-colors"
                   >
                     <Plus className="w-4 h-4" />
                     <span className="text-sm font-medium">Adicionar Mãe</span>
@@ -945,13 +945,13 @@ function ConteudoSidebar({
                   return (
                     <div 
                       key={conjuge.id} 
-                      className="p-3 bg-slate-50 rounded-lg hover:bg-teal-50 hover:ring-1 hover:ring-teal-200 transition-all cursor-pointer group"
+                      className="p-3 bg-slate-50 rounded-lg hover:bg-amber-50 hover:ring-1 hover:ring-amber-200 transition-all cursor-pointer group"
                       onClick={() => handleSelectFamiliar(conjuge)}
                     >
                       <div className="flex items-center gap-3">
                         <PersonAvatar pessoa={conjuge} size={40} />
                         <div className="flex-1 min-w-0">
-                          <p className="font-medium text-slate-900 text-sm group-hover:text-teal-700 transition-colors">
+                          <p className="font-medium text-slate-900 text-sm group-hover:text-amber-700 transition-colors">
                             {conjuge.nome} {conjuge.sobrenome}
                           </p>
                           {casamento?.data_inicio && (
@@ -960,7 +960,7 @@ function ConteudoSidebar({
                             </p>
                           )}
                         </div>
-                        <ExternalLink className="w-4 h-4 text-slate-300 group-hover:text-teal-500 transition-colors" />
+                        <ExternalLink className="w-4 h-4 text-slate-700 group-hover:text-amber-500 transition-colors" />
                       </div>
                       {casamento && (casamento.local || casamento.cartorio) && (
                         <div className="mt-2 pt-2 border-t border-slate-200 text-xs text-slate-500">
@@ -975,7 +975,7 @@ function ConteudoSidebar({
                 {/* Botão para adicionar cônjuge - sempre visível */}
                 {pode('arvore.criar') && <button 
                   onClick={() => onAddConjuge?.(pessoa.id)}
-                  className="w-full flex items-center justify-center gap-2 p-3 border-2 border-dashed border-slate-200 rounded-lg text-teal-600 hover:border-teal-300 hover:bg-teal-50 transition-colors"
+                  className="w-full flex items-center justify-center gap-2 p-3 border-2 border-dashed border-slate-200 rounded-lg text-amber-600 hover:border-amber-300 hover:bg-amber-50 transition-colors"
                 >
                   <Heart className="w-4 h-4" />
                   <span className="text-sm font-medium">Adicionar cônjuge</span>
@@ -1006,7 +1006,7 @@ function ConteudoSidebar({
                     ))}
                     {pode('arvore.criar') && <button 
                       onClick={() => onAddFilho?.(pessoa.id)}
-                      className="w-full flex items-center justify-center gap-2 p-3 border-2 border-dashed border-slate-200 rounded-lg text-teal-600 hover:border-teal-300 hover:bg-teal-50 transition-colors"
+                      className="w-full flex items-center justify-center gap-2 p-3 border-2 border-dashed border-slate-200 rounded-lg text-amber-600 hover:border-amber-300 hover:bg-amber-50 transition-colors"
                     >
                       <Plus className="w-4 h-4" />
                       <span className="text-sm font-medium">Adicionar filho(a)</span>
@@ -1034,7 +1034,7 @@ function ConteudoSidebar({
             ) : (
               <div className="text-center py-8">
                 <div className="w-16 h-16 bg-slate-100 rounded-full flex items-center justify-center mx-auto mb-3">
-                  <FileText className="w-8 h-8 text-slate-400" />
+                  <FileText className="w-8 h-8 text-slate-700" />
                 </div>
                 <p className="text-slate-500 text-sm mb-4">Nenhum documento cadastrado</p>
               </div>
@@ -1042,7 +1042,7 @@ function ConteudoSidebar({
             
             {pode('arvore.criar_documento') && onAddDocumento && <button 
               onClick={() => onAddDocumento(pessoa.id)}
-              className="w-full mt-4 flex items-center justify-center gap-2 p-3 bg-teal-50 text-teal-700 rounded-lg hover:bg-teal-100 transition-colors"
+              className="w-full mt-4 flex items-center justify-center gap-2 p-3 bg-amber-50 text-amber-700 rounded-lg hover:bg-amber-100 transition-colors"
             >
               <Plus className="w-4 h-4" />
               <span className="text-sm font-medium">Adicionar documento</span>
@@ -1057,7 +1057,7 @@ function ConteudoSidebar({
           <div>
             <CollapsibleSection title="Tarefas abertas" icon={ListChecks} defaultOpen>
               {dossie.tarefasAbertas.length === 0 ? (
-                <p className="py-2 text-sm italic text-slate-400">
+                <p className="py-2 text-sm italic text-slate-700">
                   {dossie.tarefasConcluidas > 0
                     ? `Nenhuma tarefa aberta. ${dossie.tarefasConcluidas} já concluída(s).`
                     : "Nenhuma tarefa vinculada a esta pessoa."}
@@ -1083,7 +1083,7 @@ function ConteudoSidebar({
 
             <CollapsibleSection title="Divergências" icon={TriangleAlert} defaultOpen={false}>
               {dossie.divergencias.length === 0 ? (
-                <p className="py-2 text-sm italic text-slate-400">
+                <p className="py-2 text-sm italic text-slate-700">
                   Nenhuma contradição de dado encontrada.
                 </p>
               ) : (
@@ -1103,7 +1103,7 @@ function ConteudoSidebar({
 
             <CollapsibleSection title="Histórico" icon={History} defaultOpen={false}>
               {!eventos || eventos.length === 0 ? (
-                <p className="py-2 text-sm italic text-slate-400">
+                <p className="py-2 text-sm italic text-slate-700">
                   Nenhum evento de vida registrado no cadastro desta pessoa.
                 </p>
               ) : (
@@ -1163,7 +1163,7 @@ function ConteudoSidebar({
       <div className="p-4 border-t border-slate-200 bg-slate-50">
         <button 
           onClick={() => onOpenFullDetails(pessoa)}
-          className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-slate-900 text-white rounded-lg hover:bg-slate-800 transition-colors"
+          className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-[var(--action-primary)] text-[var(--action-primary-ink)] rounded-lg hover:bg-[var(--action-primary-hover)] transition-colors"
         >
           <ExternalLink className="w-4 h-4" />
           <span className="font-medium">Ver detalhes completos</span>

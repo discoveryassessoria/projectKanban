@@ -262,7 +262,7 @@ export function AcessoAppTab({ clienteId, clienteTipo, clienteEmail, clienteNome
           <div className="mb-4 flex items-center gap-2 p-3 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm">
             <AlertTriangle className="h-4 w-4 flex-shrink-0" />
             <span>{erro}</span>
-            <button onClick={() => setErro(null)} className="ml-auto text-red-400 hover:text-red-600">✕</button>
+            <button onClick={() => setErro(null)} className="ml-auto text-red-700 hover:text-red-600">✕</button>
           </div>
         )}
 
@@ -395,7 +395,7 @@ export function AcessoAppTab({ clienteId, clienteTipo, clienteEmail, clienteNome
           <div className="space-y-4">
             <div className="flex items-center gap-3 p-4 bg-gray-50 border border-gray-200 rounded-xl">
               <div className="w-10 h-10 rounded-full bg-gray-200 flex items-center justify-center">
-                <XCircle className="h-5 w-5 text-gray-400" />
+                <XCircle className="h-5 w-5 text-[var(--text-muted)]" />
               </div>
               <div>
                 <p className="font-semibold text-gray-700">Sem acesso ao app</p>
@@ -415,7 +415,7 @@ export function AcessoAppTab({ clienteId, clienteTipo, clienteEmail, clienteNome
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
                     placeholder="email@exemplo.com"
-                    className="bg-[var(--surface-primary)] border-gray-300 text-gray-900 placeholder:text-gray-400"
+                    className="bg-[var(--surface-primary)] border-gray-300 text-gray-900 placeholder:text-[var(--text-muted)]"
                   />
                   {clienteEmail && email !== clienteEmail && (
                     <p className="text-xs text-amber-600 mt-1">

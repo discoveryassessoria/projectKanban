@@ -162,7 +162,7 @@ const STATUS_CONFIG = {
   },
   PARCIAL: { 
     label: 'Parcial', 
-    color: 'bg-orange-100 text-orange-700 border-orange-200',
+    color: 'bg-amber-100 text-amber-700 border-amber-200',
     icon: TrendingDown 
   },
 }
@@ -621,9 +621,9 @@ export function ProcessoFaturas({ processoId, nomeFamilia, onUpdate }: ProcessoF
             </div>
           </div>
           {showCustos ? (
-            <ChevronUp className="h-5 w-5 text-gray-400" />
+            <ChevronUp className="h-5 w-5 text-[var(--text-muted)]" />
           ) : (
-            <ChevronDown className="h-5 w-5 text-gray-400" />
+            <ChevronDown className="h-5 w-5 text-[var(--text-muted)]" />
           )}
         </div>
         
@@ -682,9 +682,9 @@ export function ProcessoFaturas({ processoId, nomeFamilia, onUpdate }: ProcessoF
                 </Button>
               )}
               {showFaturas ? (
-                <ChevronUp className="h-5 w-5 text-gray-400" />
+                <ChevronUp className="h-5 w-5 text-[var(--text-muted)]" />
               ) : (
-                <ChevronDown className="h-5 w-5 text-gray-400" />
+                <ChevronDown className="h-5 w-5 text-[var(--text-muted)]" />
               )}
             </div>
           </div>
@@ -808,7 +808,7 @@ export function ProcessoFaturas({ processoId, nomeFamilia, onUpdate }: ProcessoF
             ) : faturas.length === 0 ? (
               <div className="flex flex-col items-center justify-center h-64 text-center">
                 <div className="p-4 bg-gray-100 rounded-full mb-4">
-                  <Receipt className="h-10 w-10 text-gray-300" />
+                  <Receipt className="h-10 w-10 text-[var(--text-muted)]" />
                 </div>
                 <h4 className="text-gray-700 font-medium mb-1">Nenhuma fatura</h4>
                 <p className="text-gray-500 text-sm max-w-xs mb-4">
@@ -857,7 +857,7 @@ export function ProcessoFaturas({ processoId, nomeFamilia, onUpdate }: ProcessoF
                                     <Coins className="h-3 w-3" />
                                     {fatura.moeda}
                                     {fatura.cambio && (
-                                      <span className="text-xs text-gray-400">
+                                      <span className="text-xs text-[var(--text-muted)]">
                                         (câmbio: {fatura.cambio})
                                       </span>
                                     )}
@@ -901,7 +901,7 @@ export function ProcessoFaturas({ processoId, nomeFamilia, onUpdate }: ProcessoF
                               </span>
                             </div>
 
-                            <button className="text-gray-400 hover:text-gray-600 ml-2">
+                            <button className="text-[var(--text-muted)] hover:text-gray-600 ml-2">
                               {isExpanded ? (
                                 <ChevronUp className="h-5 w-5" />
                               ) : (
@@ -970,7 +970,7 @@ export function ProcessoFaturas({ processoId, nomeFamilia, onUpdate }: ProcessoF
                                           ) : vencida ? (
                                             <AlertCircle className="h-5 w-5 text-red-500" />
                                           ) : (
-                                            <CircleDot className="h-5 w-5 text-gray-400" />
+                                            <CircleDot className="h-5 w-5 text-[var(--text-muted)]" />
                                           )}
                                           <span className={`
                                             font-medium
@@ -1084,7 +1084,7 @@ export function ProcessoFaturas({ processoId, nomeFamilia, onUpdate }: ProcessoF
                               </div>
                               <div>
                                 <p className="text-xs text-gray-500 uppercase">Restante</p>
-                                <p className="text-sm font-bold text-orange-600">
+                                <p className="text-sm font-bold text-amber-600">
                                   {formatarMoeda(fatura.valorRestante, fatura.moeda)}
                                 </p>
                               </div>
@@ -1107,7 +1107,7 @@ export function ProcessoFaturas({ processoId, nomeFamilia, onUpdate }: ProcessoF
                                   >
                                     <div className="flex items-center justify-between">
                                       <div className="flex items-center gap-3">
-                                        <span className="text-gray-400 text-sm">#{idx + 1}</span>
+                                        <span className="text-[var(--text-muted)] text-sm">#{idx + 1}</span>
                                         <span className="font-bold text-green-600">
                                           {formatarMoeda(pag.valor, fatura.moeda)}
                                         </span>
@@ -1123,7 +1123,7 @@ export function ProcessoFaturas({ processoId, nomeFamilia, onUpdate }: ProcessoF
                                           </span>
                                         )}
                                       </div>
-                                      <ChevronDown className="h-4 w-4 text-gray-400" />
+                                      <ChevronDown className="h-4 w-4 text-[var(--text-muted)]" />
                                     </div>
                                     
                                     <div className="mt-2 flex flex-wrap gap-2 text-xs">
@@ -1220,7 +1220,7 @@ export function ProcessoFaturas({ processoId, nomeFamilia, onUpdate }: ProcessoF
               <h3 className="font-semibold text-gray-900">Confirmar Pagamento</h3>
               <button 
                 onClick={() => setConfirmarParcela(null)}
-                className="text-gray-400 hover:text-gray-600"
+                className="text-[var(--text-muted)] hover:text-gray-600"
               >
                 <X className="h-5 w-5" />
               </button>
@@ -1309,7 +1309,7 @@ export function ProcessoFaturas({ processoId, nomeFamilia, onUpdate }: ProcessoF
                   </div>
                   <div>
                     <p className="text-xs text-gray-500">Restante</p>
-                    <p className="font-bold text-orange-600">{formatarMoeda(showPagar.valorRestante, showPagar.moeda)}</p>
+                    <p className="font-bold text-amber-600">{formatarMoeda(showPagar.valorRestante, showPagar.moeda)}</p>
                   </div>
                 </div>
               </div>
@@ -1351,7 +1351,7 @@ export function ProcessoFaturas({ processoId, nomeFamilia, onUpdate }: ProcessoF
 
                   <div>
                     <label className="flex items-center gap-2 text-sm font-medium text-gray-700 mb-2">
-                      <CreditCard className="h-4 w-4 text-gray-400" />
+                      <CreditCard className="h-4 w-4 text-[var(--text-muted)]" />
                       Método de Pagamento
                     </label>
                     <select
@@ -1369,7 +1369,7 @@ export function ProcessoFaturas({ processoId, nomeFamilia, onUpdate }: ProcessoF
                   {showPagar.moeda !== 'BRL' && (
                     <div>
                       <label className="flex items-center gap-2 text-sm font-medium text-gray-700 mb-2">
-                        <Coins className="h-4 w-4 text-gray-400" />
+                        <Coins className="h-4 w-4 text-[var(--text-muted)]" />
                         Câmbio (1 {showPagar.moeda} = R$)
                       </label>
                       <div className="relative">
@@ -1421,7 +1421,7 @@ export function ProcessoFaturas({ processoId, nomeFamilia, onUpdate }: ProcessoF
                     <div>
                       <div className="flex items-center justify-between mb-3">
                         <label className="flex items-center gap-2 text-sm font-medium text-gray-700">
-                          <Users className="h-4 w-4 text-gray-400" />
+                          <Users className="h-4 w-4 text-[var(--text-muted)]" />
                           Destinatário(s)
                         </label>
                         <button
@@ -1550,7 +1550,7 @@ export function ProcessoFaturas({ processoId, nomeFamilia, onUpdate }: ProcessoF
                       </div>
                       <div>
                         <p className="text-xs text-gray-500">Restante</p>
-                        <p className="font-bold text-orange-600">{formatarMoeda(pagamentoSelecionado.fatura.valorRestante, pagamentoSelecionado.fatura.moeda)}</p>
+                        <p className="font-bold text-amber-600">{formatarMoeda(pagamentoSelecionado.fatura.valorRestante, pagamentoSelecionado.fatura.moeda)}</p>
                       </div>
                     </div>
                   </div>
@@ -1586,7 +1586,7 @@ export function ProcessoFaturas({ processoId, nomeFamilia, onUpdate }: ProcessoF
 
                       <div>
                         <label className="flex items-center gap-2 text-sm font-medium text-gray-700 mb-2">
-                          <CreditCard className="h-4 w-4 text-gray-400" />
+                          <CreditCard className="h-4 w-4 text-[var(--text-muted)]" />
                           Método de Pagamento
                         </label>
                         <select
@@ -1603,7 +1603,7 @@ export function ProcessoFaturas({ processoId, nomeFamilia, onUpdate }: ProcessoF
                       {pagamentoSelecionado.fatura.moeda !== 'BRL' && (
                         <div>
                           <label className="flex items-center gap-2 text-sm font-medium text-gray-700 mb-2">
-                            <Coins className="h-4 w-4 text-gray-400" />
+                            <Coins className="h-4 w-4 text-[var(--text-muted)]" />
                             Câmbio (1 {pagamentoSelecionado.fatura.moeda} = R$)
                           </label>
                           <div className="relative">
@@ -1634,7 +1634,7 @@ export function ProcessoFaturas({ processoId, nomeFamilia, onUpdate }: ProcessoF
                       {requerentes.length > 0 && (
                         <div>
                           <label className="flex items-center gap-2 text-sm font-medium text-gray-700 mb-3">
-                            <Users className="h-4 w-4 text-gray-400" />
+                            <Users className="h-4 w-4 text-[var(--text-muted)]" />
                             Destinatário(s)
                           </label>
                           <div className="space-y-2 max-h-[320px] overflow-y-auto">
@@ -1722,7 +1722,7 @@ export function ProcessoFaturas({ processoId, nomeFamilia, onUpdate }: ProcessoF
                         <div className="bg-gray-50 rounded-xl p-4 border">
                           <p className="text-xs text-gray-500 uppercase font-medium">Método de Pagamento</p>
                           <p className="text-sm font-medium text-gray-900 flex items-center gap-2 mt-1">
-                            <CreditCard className="h-4 w-4 text-gray-400" />
+                            <CreditCard className="h-4 w-4 text-[var(--text-muted)]" />
                             {FORMAS_PAGAMENTO[pagamentoSelecionado.pagamento.formaPagamento] || pagamentoSelecionado.pagamento.formaPagamento}
                           </p>
                         </div>
@@ -1751,7 +1751,7 @@ export function ProcessoFaturas({ processoId, nomeFamilia, onUpdate }: ProcessoF
                             ))}
                           </div>
                         ) : (
-                          <p className="text-sm text-gray-400 italic">Nenhum destinatário vinculado</p>
+                          <p className="text-sm text-[var(--text-muted)] italic">Nenhum destinatário vinculado</p>
                         )}
                       </div>
                     </div>

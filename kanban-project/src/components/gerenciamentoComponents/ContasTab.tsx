@@ -68,7 +68,7 @@ async function jsonFetch(url: string, options: RequestInit = {}) {
 function Secao({ titulo, children, primeira }: { titulo: string; children: React.ReactNode; primeira?: boolean }) {
   return (
     <div className={primeira ? '' : 'border-t border-[var(--border-default)] pt-4'}>
-      <div className="mb-3 text-[11px] font-semibold uppercase tracking-wide text-white/40">{titulo}</div>
+      <div className="mb-3 text-[11px] font-semibold uppercase tracking-wide text-[var(--text-muted)]">{titulo}</div>
       <div className="space-y-3">{children}</div>
     </div>
   )
@@ -186,9 +186,9 @@ export default function ContasTab() {
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h2 className="text-xl font-semibold text-white">Contas Bancárias</h2>
-          <p className="text-sm text-white/50">Contas da empresa para recebimento e pagamento.</p>
+          <p className="text-sm text-[var(--text-secondary)]">Contas da empresa para recebimento e pagamento.</p>
         </div>
-        <button onClick={abrirNovo} className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-[#fff] transition hover:bg-blue-500">
+        <button onClick={abrirNovo} className="rounded-lg bg-[var(--action-primary)] px-4 py-2 text-sm font-medium text-[var(--action-primary-ink)] transition hover:bg-[var(--action-primary)]">
           + Nova conta
         </button>
       </div>
@@ -202,17 +202,17 @@ export default function ContasTab() {
       />
 
       {/* Estados */}
-      {loading && <div className="py-12 text-center text-sm text-white/40">Carregando...</div>}
+      {loading && <div className="py-12 text-center text-sm text-[var(--text-muted)]">Carregando...</div>}
 
       {!loading && erroLista && (
-        <div className="rounded-lg border border-red-500/30 bg-red-500/10 p-4 text-sm text-red-200">
+        <div className="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-700">
           {erroLista}
           <button onClick={() => void carregar()} className="ml-3 underline hover:text-white">Tentar de novo</button>
         </div>
       )}
 
       {!loading && !erroLista && filtradas.length === 0 && (
-        <div className="rounded-xl border border-[var(--border-default)] bg-[var(--surface-primary)] py-12 text-center text-sm text-white/40 backdrop-blur">
+        <div className="rounded-xl border border-[var(--border-default)] bg-[var(--surface-primary)] py-12 text-center text-sm text-[var(--text-muted)] backdrop-blur">
           {busca ? 'Nenhuma conta encontrada.' : 'Nenhuma conta ainda. Crie a primeira.'}
         </div>
       )}
@@ -223,22 +223,22 @@ export default function ContasTab() {
           <table className="w-full text-[13px]">
             <thead>
               <tr className="bg-[var(--surface-primary)]">
-                <th className="border-b border-[var(--border-default)] px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wide text-white/50">Conta</th>
-                <th className="border-b border-[var(--border-default)] px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wide text-white/50">Tipo / Moeda</th>
-                <th className="border-b border-[var(--border-default)] px-4 py-2.5 text-right text-[11px] font-semibold uppercase tracking-wide text-white/50">Saldo atual</th>
-                <th className="border-b border-[var(--border-default)] px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wide text-white/50">Status</th>
-                <th className="border-b border-[var(--border-default)] px-4 py-2.5 text-right text-[11px] font-semibold uppercase tracking-wide text-white/50">Ações</th>
+                <th className="border-b border-[var(--border-default)] px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wide text-[var(--text-secondary)]">Conta</th>
+                <th className="border-b border-[var(--border-default)] px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wide text-[var(--text-secondary)]">Tipo / Moeda</th>
+                <th className="border-b border-[var(--border-default)] px-4 py-2.5 text-right text-[11px] font-semibold uppercase tracking-wide text-[var(--text-secondary)]">Saldo atual</th>
+                <th className="border-b border-[var(--border-default)] px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wide text-[var(--text-secondary)]">Status</th>
+                <th className="border-b border-[var(--border-default)] px-4 py-2.5 text-right text-[11px] font-semibold uppercase tracking-wide text-[var(--text-secondary)]">Ações</th>
               </tr>
             </thead>
             <tbody>
               {filtradas.map((c) => (
-                <tr key={c.id} className="border-b border-[var(--border-subtle)] last:border-0 hover:bg-white/[0.03]">
+                <tr key={c.id} className="border-b border-[var(--border-subtle)] last:border-0 hover:bg-[var(--surface-primary)]">
                   <td className="px-4 py-2.5">
                     <div className="flex items-center gap-2.5">
                       <span className="h-3 w-3 shrink-0 rounded-full" style={{ backgroundColor: c.cor || '#64748b' }} />
                       <div>
                         <div className="font-medium text-white">{c.nome}</div>
-                        <div className="text-[11px] text-white/40">
+                        <div className="text-[11px] text-[var(--text-muted)]">
                           {c.bank?.nome || 'Sem banco'}
                           {c.agencia ? ` · Ag. ${c.agencia}` : ''}{c.conta ? ` · ${c.conta}` : ''}
                         </div>
@@ -246,22 +246,22 @@ export default function ContasTab() {
                     </div>
                   </td>
                   <td className="px-4 py-2.5 text-white/70">
-                    {tipoLabel(c.tipoConta)}<span className="text-white/40"> · {c.moeda}</span>
+                    {tipoLabel(c.tipoConta)}<span className="text-[var(--text-muted)]"> · {c.moeda}</span>
                   </td>
                   <td className="px-4 py-2.5 text-right font-medium tabular-nums text-white">{fmtMoney(c.saldoAtual, c.moeda)}</td>
                   <td className="px-4 py-2.5">
                     <div className="flex flex-wrap items-center gap-1.5">
-                      <span className={`rounded px-2 py-0.5 text-[11px] font-medium ${c.ativo ? 'bg-green-500/15 text-green-300' : 'bg-[var(--surface-primary)] text-white/50'}`}>
+                      <span className={`rounded px-2 py-0.5 text-[11px] font-medium ${c.ativo ? 'bg-green-50 text-green-700' : 'bg-[var(--surface-primary)] text-[var(--text-secondary)]'}`}>
                         {c.ativo ? 'Ativo' : 'Inativo'}
                       </span>
-                      {c.isDefaultReceiving && <span className="rounded px-2 py-0.5 text-[11px] font-medium bg-emerald-500/15 text-emerald-300">Receb. padrão</span>}
-                      {c.isDefaultPayment && <span className="rounded px-2 py-0.5 text-[11px] font-medium bg-blue-500/15 text-blue-300">Pgto. padrão</span>}
+                      {c.isDefaultReceiving && <span className="rounded px-2 py-0.5 text-[11px] font-medium bg-emerald-50 text-emerald-700">Receb. padrão</span>}
+                      {c.isDefaultPayment && <span className="rounded px-2 py-0.5 text-[11px] font-medium bg-blue-50 text-blue-700">Pgto. padrão</span>}
                     </div>
                   </td>
                   <td className="px-4 py-2.5">
                     <div className="flex items-center justify-end gap-2">
                       <button onClick={() => abrirEditar(c)} className="rounded-md border border-[var(--border-default)] px-2.5 py-1 text-xs text-white/70 transition hover:bg-[var(--surface-hover)] hover:text-white">Editar</button>
-                      <button onClick={() => excluir(c)} className="rounded-md border border-red-500/20 px-2.5 py-1 text-xs text-red-300/80 transition hover:bg-red-500/10 hover:text-red-200">Excluir</button>
+                      <button onClick={() => excluir(c)} className="rounded-md border border-red-200 px-2.5 py-1 text-xs text-red-700/80 transition hover:bg-red-50 hover:text-red-700">Excluir</button>
                     </div>
                   </td>
                 </tr>
@@ -277,7 +277,7 @@ export default function ContasTab() {
           <div className="w-full max-w-2xl rounded-2xl border border-[var(--border-default)] bg-zinc-900/95 shadow-2xl">
             <div className="flex items-center justify-between border-b border-[var(--border-default)] px-6 py-4">
               <h3 className="text-lg font-semibold text-white">{editando ? 'Editar conta' : 'Nova conta'}</h3>
-              <button onClick={() => setModalAberto(false)} className="text-white/40 transition hover:text-white">✕</button>
+              <button onClick={() => setModalAberto(false)} className="text-[var(--text-muted)] transition hover:text-white">✕</button>
             </div>
 
             <div className="max-h-[72vh] space-y-5 overflow-y-auto px-6 py-5">
@@ -294,7 +294,7 @@ export default function ContasTab() {
                       <option value="" className="bg-zinc-900">— Nenhum —</option>
                       {bancos.map((b) => <option key={b.id} value={b.id} className="bg-zinc-900">{b.nome}{b.sigla ? ` (${b.sigla})` : ''}</option>)}
                     </select>
-                    {bancos.length === 0 && <p className="mt-1 text-[11px] text-amber-300/70">Cadastre Bancos primeiro para vincular.</p>}
+                    {bancos.length === 0 && <p className="mt-1 text-[11px] text-amber-700/70">Cadastre Bancos primeiro para vincular.</p>}
                   </div>
                   <div>
                     <label className="mb-1 block text-xs text-white/60">Tipo</label>
@@ -360,7 +360,7 @@ export default function ContasTab() {
                   <label className="mb-1 block text-xs text-white/60">Saldo inicial</label>
                   <input type="number" step="0.01" value={saldoInicial} onChange={(e) => setSaldoInicial(e.target.value)} placeholder="0,00" className={`${inputCls} max-w-[200px]`} />
                   {editando && (
-                    <p className="mt-1 text-[11px] text-white/40">Saldo atual ({fmtMoney(editando.saldoAtual, editando.moeda)}) é atualizado pelos lançamentos.</p>
+                    <p className="mt-1 text-[11px] text-[var(--text-muted)]">Saldo atual ({fmtMoney(editando.saldoAtual, editando.moeda)}) é atualizado pelos lançamentos.</p>
                   )}
                 </div>
                 <div className="flex flex-wrap items-center gap-x-6 gap-y-2">
@@ -380,13 +380,13 @@ export default function ContasTab() {
               </Secao>
 
               {erroModal && (
-                <div className="rounded-lg border border-red-500/30 bg-red-500/10 p-3 text-sm text-red-200">{erroModal}</div>
+                <div className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700">{erroModal}</div>
               )}
             </div>
 
             <div className="flex items-center justify-end gap-2 border-t border-[var(--border-default)] px-6 py-4">
               <button onClick={() => setModalAberto(false)} className="rounded-lg px-4 py-2 text-sm text-white/60 transition hover:text-white">Cancelar</button>
-              <button onClick={salvar} disabled={salvando} className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-[#fff] transition hover:bg-blue-500 disabled:opacity-50">
+              <button onClick={salvar} disabled={salvando} className="rounded-lg bg-[var(--action-primary)] px-4 py-2 text-sm font-medium text-[var(--action-primary-ink)] transition hover:bg-[var(--action-primary)] disabled:opacity-50">
                 {salvando ? 'Salvando...' : 'Salvar'}
               </button>
             </div>

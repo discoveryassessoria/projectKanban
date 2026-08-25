@@ -37,11 +37,11 @@ export default function DreTab() {
       .then(r => r.ok ? r.json() : null).then(d => setData(d)).catch(e => console.error(e)).finally(() => setLoading(false))
   }, [])
 
-  if (loading || !data) return <div className="flex items-center justify-center py-24"><Loader2 className="h-8 w-8 animate-spin text-white/50" /></div>
+  if (loading || !data) return <div className="flex items-center justify-center py-24"><Loader2 className="h-8 w-8 animate-spin text-[var(--text-secondary)]" /></div>
 
   const d = data
   const k = d.kpis
-  const ahColor = (v: number) => v > 0 ? "text-green-400" : v < 0 ? "text-red-400" : "text-white/40"
+  const ahColor = (v: number) => v > 0 ? "text-green-700" : v < 0 ? "text-red-700" : "text-[var(--text-muted)]"
   const ah = (cur: number, prev: number) => prev !== 0 ? ((cur - prev) / Math.abs(prev)) * 100 : 0
 
   return (
@@ -60,16 +60,16 @@ export default function DreTab() {
       {/* KPIs */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         <Kpi label="Receita Bruta" value={fmtBRL(k.receitaBruta)} sub={<>vs {fmtBRL(k.receitaBrutaPrev)} · <span className={ahColor(k.ahReceita)}>{fmtPct(k.ahReceita)}</span></>} />
-        <Kpi label="Lucro Bruto" value={fmtBRL(k.lucroBruto)} valueColor={k.lucroBruto >= 0 ? "text-green-400" : "text-red-400"} sub={<>Margem: <strong className="text-white">{fmtPct(k.margemBruta)}</strong></>} />
-        <Kpi label="Lucro Operacional" value={fmtBRL(k.lucroOperacional)} valueColor={k.lucroOperacional >= 0 ? "text-green-400" : "text-red-400"} sub={<>Margem: <strong className="text-white">{fmtPct(k.margemOper)}</strong></>} />
-        <Kpi label="Lucro Líquido" value={fmtBRL(k.lucroLiquido)} valueColor={k.lucroLiquido >= 0 ? "text-green-400" : "text-red-400"} sub={<>Margem: <strong className="text-white">{fmtPct(k.margemLiq)}</strong></>} />
+        <Kpi label="Lucro Bruto" value={fmtBRL(k.lucroBruto)} valueColor={k.lucroBruto >= 0 ? "text-green-700" : "text-red-700"} sub={<>Margem: <strong className="text-white">{fmtPct(k.margemBruta)}</strong></>} />
+        <Kpi label="Lucro Operacional" value={fmtBRL(k.lucroOperacional)} valueColor={k.lucroOperacional >= 0 ? "text-green-700" : "text-red-700"} sub={<>Margem: <strong className="text-white">{fmtPct(k.margemOper)}</strong></>} />
+        <Kpi label="Lucro Líquido" value={fmtBRL(k.lucroLiquido)} valueColor={k.lucroLiquido >= 0 ? "text-green-700" : "text-red-700"} sub={<>Margem: <strong className="text-white">{fmtPct(k.margemLiq)}</strong></>} />
       </div>
 
       {/* TABELA DRE */}
       <div className="bg-[var(--surface-primary)] backdrop-blur-sm border border-[var(--border-default)] rounded-xl overflow-x-auto">
         <div className="min-w-[640px]">
           {/* cabeçalho */}
-          <div className="grid grid-cols-[2fr_1.2fr_1.2fr_0.8fr_0.8fr] gap-2 px-4 py-2.5 border-b border-[var(--border-default)] text-[11px] font-bold uppercase tracking-wide text-white/40">
+          <div className="grid grid-cols-[2fr_1.2fr_1.2fr_0.8fr_0.8fr] gap-2 px-4 py-2.5 border-b border-[var(--border-default)] text-[11px] font-bold uppercase tracking-wide text-[var(--text-muted)]">
             <div>Conta</div>
             <div className="text-right capitalize">{d.periodoAtual.split(" ")[0]}</div>
             <div className="text-right capitalize">{d.periodoAnterior.split(" ")[0]}</div>
@@ -92,7 +92,7 @@ export default function DreTab() {
       </div>
 
       {/* nota de prévia */}
-      <div className="flex items-start gap-2 text-xs text-white/50 bg-[var(--surface-primary)] border border-[var(--border-default)] rounded-lg p-3">
+      <div className="flex items-start gap-2 text-xs text-[var(--text-secondary)] bg-[var(--surface-primary)] border border-[var(--border-default)] rounded-lg p-3">
         <Info className="h-4 w-4 mt-0.5 shrink-0" />
         <span>Receita bruta e custos são dados reais do mês. A quebra detalhada de impostos e despesas operacionais é uma <strong className="text-white/70">prévia</strong> estimada — será ligada a um plano de contas estruturado numa próxima etapa.</span>
       </div>
@@ -103,18 +103,18 @@ export default function DreTab() {
     label: string; l: Linha; grupo?: boolean; deduct?: boolean; margem?: boolean; total?: boolean; indent?: boolean
   }) {
     const ahVal = ah(l.valor, l.prev)
-    const bg = total ? "bg-[var(--surface-primary)]" : margem ? "bg-white/[0.07]" : grupo ? "bg-white/[0.03]" : ""
+    const bg = total ? "bg-[var(--surface-primary)]" : margem ? "bg-[var(--surface-primary)]" : grupo ? "bg-[var(--surface-primary)]" : ""
     const weight = total || margem || grupo ? "font-bold" : "font-normal"
-    const valColor = total ? (l.valor >= 0 ? "text-green-400" : "text-red-400") : deduct ? "text-red-300/80" : "text-white"
+    const valColor = total ? (l.valor >= 0 ? "text-green-700" : "text-red-700") : deduct ? "text-red-700/80" : "text-white"
     return (
       <div className={`grid grid-cols-[2fr_1.2fr_1.2fr_0.8fr_0.8fr] gap-2 px-4 py-2 border-b border-[var(--border-subtle)] text-sm ${bg}`}>
         <div className={`${weight} text-white/90 ${indent ? "pl-4" : ""} flex items-center gap-1.5`}>
-          {label}{!l.real && <span className="text-[9px] text-white/30 font-normal">prévia</span>}
+          {label}{!l.real && <span className="text-[9px] text-[var(--text-muted)] font-normal">prévia</span>}
         </div>
         <div className={`text-right tabular-nums ${weight} ${valColor}`}>{fmtBRL(l.valor)}</div>
-        <div className="text-right tabular-nums text-white/40">{l.prev !== 0 ? fmtBRL(l.prev) : "—"}</div>
+        <div className="text-right tabular-nums text-[var(--text-muted)]">{l.prev !== 0 ? fmtBRL(l.prev) : "—"}</div>
         <div className={`text-right tabular-nums text-xs ${ahColor(ahVal)}`}>{l.prev !== 0 ? `${ahVal >= 0 ? "+" : ""}${fmtPct(ahVal)}` : "—"}</div>
-        <div className="text-right tabular-nums text-xs text-white/40">{fmtPct(l.av)}</div>
+        <div className="text-right tabular-nums text-xs text-[var(--text-muted)]">{fmtPct(l.av)}</div>
       </div>
     )
   }
@@ -122,11 +122,11 @@ export default function DreTab() {
   function DreSub({ label, valor, av }: { label: string; valor: number; av: number }) {
     return (
       <div className="grid grid-cols-[2fr_1.2fr_1.2fr_0.8fr_0.8fr] gap-2 px-4 py-1.5 border-b border-[var(--border-subtle)] text-xs">
-        <div className="pl-8 text-white/50 flex items-center gap-1.5">{label}<span className="text-[9px] text-white/25">prévia</span></div>
+        <div className="pl-8 text-[var(--text-secondary)] flex items-center gap-1.5">{label}<span className="text-[9px] text-[var(--text-muted)]">prévia</span></div>
         <div className="text-right tabular-nums text-white/60">{fmtBRL(valor)}</div>
-        <div className="text-right text-white/30">—</div>
-        <div className="text-right text-white/30">—</div>
-        <div className="text-right tabular-nums text-white/30">{fmtPct(av)}</div>
+        <div className="text-right text-[var(--text-muted)]">—</div>
+        <div className="text-right text-[var(--text-muted)]">—</div>
+        <div className="text-right tabular-nums text-[var(--text-muted)]">{fmtPct(av)}</div>
       </div>
     )
   }
@@ -143,9 +143,9 @@ function Kpi({ label, value, sub, valueColor = "text-white" }: {
 }) {
   return (
     <div className="rounded-xl border border-[var(--border-default)] bg-[var(--surface-primary)] backdrop-blur-sm p-4">
-      <div className="text-white/50 text-xs font-medium">{label}</div>
+      <div className="text-[var(--text-secondary)] text-xs font-medium">{label}</div>
       <div className={`font-bold mt-1.5 text-xl ${valueColor}`}>{value}</div>
-      {sub && <div className="text-[11px] text-white/40 mt-1">{sub}</div>}
+      {sub && <div className="text-[11px] text-[var(--text-muted)] mt-1">{sub}</div>}
     </div>
   )
 }

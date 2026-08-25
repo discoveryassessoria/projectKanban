@@ -46,8 +46,8 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
             className={`
               flex items-center p-4 rounded-lg shadow-lg max-w-sm
               ${toast.type === 'success' 
-                ? 'bg-green-50 text-green-800 border border-green-200 dark:bg-green-900/20 dark:text-green-400 dark:border-green-800' 
-                : 'bg-red-50 text-red-800 border border-red-200 dark:bg-red-900/20 dark:text-red-400 dark:border-red-800'
+                ? 'bg-green-50 text-green-800 border border-green-200 dark:bg-green-900/20 dark:text-green-700 dark:border-green-800' 
+                : 'bg-red-50 text-red-800 border border-red-200 dark:bg-red-900/20 dark:text-red-700 dark:border-red-800'
               }
               animate-in slide-in-from-right-4
             `}

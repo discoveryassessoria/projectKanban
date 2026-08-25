@@ -255,7 +255,7 @@ export function ProcessoEventos({ processoId, onUpdate }: ProcessoEventosProps) 
               </h3>
               <button
                 onClick={resetForm}
-                className="text-gray-400 hover:text-white/70"
+                className="text-[var(--text-muted)] hover:text-white/70"
               >
                 <X className="h-5 w-5" />
               </button>
@@ -397,7 +397,7 @@ export function ProcessoEventos({ processoId, onUpdate }: ProcessoEventosProps) 
 
               {/* Botões */}
               <div className="flex gap-2 pt-2">
-                <Button onClick={handleSubmit} disabled={isSaving} className="bg-blue-600 hover:bg-blue-700">
+                <Button onClick={handleSubmit} disabled={isSaving} className="bg-[var(--action-primary)] hover:bg-[var(--action-primary-hover)]">
                   <Check className="h-4 w-4 mr-1.5" />
                   {isSaving ? "Salvando..." : (editingId ? "Salvar" : "Criar Evento")}
                 </Button>
@@ -412,9 +412,9 @@ export function ProcessoEventos({ processoId, onUpdate }: ProcessoEventosProps) 
         {/* Lista de eventos */}
         {eventos.length === 0 ? (
           <div className="text-center py-12">
-            <Calendar className="h-12 w-12 mx-auto mb-4 text-gray-300" />
+            <Calendar className="h-12 w-12 mx-auto mb-4 text-[var(--text-muted)]" />
             <p className="text-white/70">Nenhum evento cadastrado</p>
-            <p className="text-sm text-gray-400 mt-1">
+            <p className="text-sm text-[var(--text-muted)] mt-1">
               Clique em "Novo Evento" para adicionar
             </p>
           </div>
@@ -472,7 +472,7 @@ export function ProcessoEventos({ processoId, onUpdate }: ProcessoEventosProps) 
                       {pode('eventos.editar') && (
                         <button
                           onClick={() => handleEdit(evento)}
-                          className="p-2 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                          className="p-2 text-[var(--text-muted)] hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
                         >
                           <Edit2 className="h-4 w-4" />
                         </button>
@@ -480,7 +480,7 @@ export function ProcessoEventos({ processoId, onUpdate }: ProcessoEventosProps) 
                       {pode('eventos.excluir') && (
                         <button
                           onClick={() => handleDelete(evento.id)}
-                          className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                          className="p-2 text-[var(--text-muted)] hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
                         >
                           <Trash2 className="h-4 w-4" />
                         </button>

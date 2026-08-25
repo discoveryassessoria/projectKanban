@@ -132,7 +132,7 @@ export function WorkflowMacroTrilha({
     // "Decisão da Análise Documental"
     if (needsRectification === true) return { txt: "Precisa retificação", cls: "bg-[#4ade80]/15 text-[#4ade80]" }
     if (needsRectification === false) return { txt: "Sem retificação", cls: "bg-[#4ade80]/15 text-[#4ade80]" }
-    return { txt: "Não definida", cls: "bg-[#252c35] text-white/55" }
+    return { txt: "Não definida", cls: "bg-[var(--surface-tertiary)] text-[var(--text-secondary)]" }
   })()
 
   return (
@@ -142,11 +142,11 @@ export function WorkflowMacroTrilha({
         <div>
           <h3 className="text-base font-extrabold text-white/95 flex items-center gap-1.5">
             Workflow Macro do Processo
-            <span className="inline-flex items-center justify-center w-4 h-4 rounded-full bg-[#252c35] text-white/40 text-[10px] font-bold">i</span>
+            <span className="inline-flex items-center justify-center w-4 h-4 rounded-full bg-[var(--surface-tertiary)] text-[var(--text-muted)] text-[10px] font-bold">i</span>
           </h3>
-          <div className="text-xs text-white/55 mt-0.5">Visão geral do caminho do processo entre fases.</div>
+          <div className="text-xs text-[var(--text-secondary)] mt-0.5">Visão geral do caminho do processo entre fases.</div>
         </div>
-        <div className="text-xs text-white/55 bg-[#20262e] border border-[var(--border-default)] rounded-lg px-3 py-2 whitespace-nowrap">
+        <div className="text-xs text-[var(--text-secondary)] bg-[var(--surface-secondary)] border border-[var(--border-default)] rounded-lg px-3 py-2 whitespace-nowrap">
           Decisão da Análise Documental:
           <span className={`text-[11px] font-bold px-2.5 py-0.5 rounded-md ml-1.5 ${decLabel.cls}`}>{decLabel.txt}</span>
         </div>
@@ -161,19 +161,19 @@ export function WorkflowMacroTrilha({
 
           const dotCls =
             st === "concluida" ? "bg-[#4ade80]/15 text-[#4ade80] border border-[#4ade80]/40"
-            : st === "atual" ? "bg-[#252c35] text-white/95 border border-[var(--border-default)]"
-            : st === "pulada" ? "bg-[#252c35] text-white/40"
+            : st === "atual" ? "bg-[var(--surface-tertiary)] text-white/95 border border-[var(--border-default)]"
+            : st === "pulada" ? "bg-[var(--surface-tertiary)] text-[var(--text-muted)]"
             : st === "condicional" ? "bg-[#a78bfa]/15 text-[#a78bfa]"
             : st === "bloqueada" ? "bg-[#d2a948]/15 text-[#d2a948]"
-            : "border-2 border-[var(--border-default)] bg-[var(--surface-popover)] text-white/40"
+            : "border-2 border-[var(--border-default)] bg-[var(--surface-popover)] text-[var(--text-muted)]"
 
           const badgeCls =
             st === "concluida" ? "bg-[#4ade80]/15 text-[#4ade80]"
             : st === "atual" ? "bg-[#7dd3fc]/15 text-[#7dd3fc] border border-[#7dd3fc]/40"
-            : st === "pulada" ? "bg-[#252c35] text-white/55"
+            : st === "pulada" ? "bg-[var(--surface-tertiary)] text-[var(--text-secondary)]"
             : st === "condicional" ? "bg-[#a78bfa]/15 text-[#a78bfa]"
             : st === "bloqueada" ? "bg-[#d2a948]/15 text-[#d2a948]"
-            : "bg-[#20262e] text-white/40"
+            : "bg-[var(--surface-secondary)] text-[var(--text-muted)]"
           const badgeTxt =
             st === "concluida" ? "Concluída"
             : st === "atual" ? "Atual"
@@ -191,7 +191,7 @@ export function WorkflowMacroTrilha({
           const pctColor =
             st === "concluida" ? "text-[#4ade80]"
             : st === "atual" ? "text-[#7dd3fc]"
-            : "text-white/40"
+            : "text-[var(--text-muted)]"
 
           // conector pra próxima fase
           const nextDone = i < PROCESS_PHASES.length - 1
@@ -211,7 +211,7 @@ export function WorkflowMacroTrilha({
                 disabled={!clicavel}
                 title={clicavel ? "Ver esta fase" : undefined}
                 className={`flex flex-col items-center gap-1 w-full bg-transparent border-none py-1.5 px-1 rounded-[10px] transition-colors ${
-                  clicavel ? "cursor-pointer hover:bg-[#20262e]" : "cursor-default"
+                  clicavel ? "cursor-pointer hover:bg-[var(--surface-secondary)]" : "cursor-default"
                 } ${consultando ? "ring-2 ring-[#7dd3fc]/40 bg-[#7dd3fc]/12" : ""}`}
               >
                 {/* dot + conector */}
@@ -246,7 +246,7 @@ export function WorkflowMacroTrilha({
                 <span className={`text-[12.5px] font-extrabold ${pctColor}`}>{prog}%</span>
 
                 {/* mini barra */}
-                <div className="w-4/5 h-1 bg-[#252c35] rounded-full overflow-hidden">
+                <div className="w-4/5 h-1 bg-[var(--surface-tertiary)] rounded-full overflow-hidden">
                   <div className="h-full rounded-full" style={{ width: `${prog}%`, background: barColor }} />
                 </div>
               </button>
@@ -256,12 +256,12 @@ export function WorkflowMacroTrilha({
       </div>
 
       {/* Legenda */}
-      <div className="flex flex-wrap gap-3.5 pt-3 mt-2.5 border-t border-[var(--border-default)] text-[11px] text-white/55">
+      <div className="flex flex-wrap gap-3.5 pt-3 mt-2.5 border-t border-[var(--border-default)] text-[11px] text-[var(--text-secondary)]">
         <span className="flex items-center gap-1.5"><span className="w-3.5 h-3.5 rounded-full bg-[#4ade80]/15 text-[#4ade80] border border-[#4ade80]/40 grid place-items-center"><Check className="w-2 h-2" strokeWidth={3} /></span>Concluída</span>
         <span className="flex items-center gap-1.5"><span className="w-3.5 h-3.5 rounded-full bg-[#7dd3fc]" />Atual (fase real)</span>
         <span className="flex items-center gap-1.5"><span className="w-3.5 h-3.5 rounded-full border-2 border-[var(--border-default)] bg-[var(--surface-popover)]" />Futura</span>
         <span className="flex items-center gap-1.5"><span className="w-3.5 h-3.5 rounded-full bg-[#a78bfa]/15 text-[#a78bfa] grid place-items-center text-[8px]">?</span>Condicional</span>
-        <span className="flex items-center gap-1.5"><span className="w-3.5 h-3.5 rounded-full bg-[#252c35] text-white/40 grid place-items-center text-[8px]">⤳</span>Pulada</span>
+        <span className="flex items-center gap-1.5"><span className="w-3.5 h-3.5 rounded-full bg-[var(--surface-tertiary)] text-[var(--text-muted)] grid place-items-center text-[8px]">⤳</span>Pulada</span>
       </div>
     </div>
   )
@@ -311,7 +311,7 @@ export function ResumoDoProcesso({
       <StatRow label="Fases futuras" value={String(futuras)} />
       <StatRow label="Fases puladas" value={String(puladas)} />
       <div className="flex justify-between items-center text-[12.5px] pt-2.5 mt-auto border-t-2 border-[var(--border-default)]">
-        <span className="text-white/55">Progresso geral</span>
+        <span className="text-[var(--text-secondary)]">Progresso geral</span>
         <b className="text-[#7dd3fc] text-[15px]">{overall}%</b>
       </div>
     </div>
@@ -364,7 +364,7 @@ export function MacroSidebar({
         <StatRow label="Fases futuras" value={String(futuras)} />
         <StatRow label="Fases puladas" value={String(puladas)} />
         <div className="flex justify-between items-center text-[12.5px] pt-2.5 mt-1 border-t-2 border-[var(--border-default)]">
-          <span className="text-white/55">Progresso geral</span>
+          <span className="text-[var(--text-secondary)]">Progresso geral</span>
           <b className="text-[#7dd3fc] text-[15px]">{overall}%</b>
         </div>
       </div>
@@ -379,18 +379,18 @@ export function MacroSidebar({
             const icCls =
               st === "concluida" ? "bg-[#4ade80]/15 text-[#4ade80] border border-[#4ade80]/40"
               : st === "atual" ? "bg-[#7dd3fc]"
-              : st === "pulada" ? "bg-[#252c35] text-white/40"
+              : st === "pulada" ? "bg-[var(--surface-tertiary)] text-[var(--text-muted)]"
               : "border-[1.5px] border-[var(--border-default)] bg-[var(--surface-popover)]"
             const pctCls =
               st === "concluida" ? "text-[#4ade80]"
               : st === "atual" ? "text-[#7dd3fc]"
-              : "text-white/40"
+              : "text-[var(--text-muted)]"
             return (
               <button
                 key={title}
                 onClick={() => onSelectPhase?.(title)}
                 className={`flex gap-2 items-start w-full text-left p-2 rounded-lg cursor-pointer transition-colors ${
-                  title === sel ? "bg-[#7dd3fc]/12" : "hover:bg-[#20262e]"
+                  title === sel ? "bg-[#7dd3fc]/12" : "hover:bg-[var(--surface-secondary)]"
                 }`}
               >
                 <span className={`w-4 h-4 rounded-full grid place-items-center text-[9px] font-bold flex-none mt-0.5 ${icCls}`}>
@@ -401,7 +401,7 @@ export function MacroSidebar({
                     <b className="text-[12px] text-white/95">{i + 1}. {title}</b>
                     <span className={`text-[12px] font-extrabold flex-none ${pctCls}`}>{prog}%</span>
                   </div>
-                  <span className="text-[10.5px] text-white/40 block mt-0.5 leading-snug">
+                  <span className="text-[10.5px] text-[var(--text-muted)] block mt-0.5 leading-snug">
                     {phaseSummary(title, st, prog)}
                   </span>
                 </div>
@@ -417,7 +417,7 @@ export function MacroSidebar({
 function StatRow({ label, value }: { label: string; value: string }) {
   return (
     <div className="flex justify-between items-center text-[12.5px] py-1.5 border-b border-[var(--border-default)]">
-      <span className="text-white/55">{label}</span>
+      <span className="text-[var(--text-secondary)]">{label}</span>
       <b className="text-white/95">{value}</b>
     </div>
   )

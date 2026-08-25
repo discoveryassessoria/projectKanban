@@ -111,7 +111,7 @@ function Linha({
 }) {
   const contexto = [l.processoNome, l.pessoaNome, l.servico].filter(Boolean).join(" · ")
   return (
-    <div className="group grid grid-cols-[1fr_auto] items-start gap-4 border-b border-white/[0.06] px-4 py-3 last:border-b-0 hover:bg-white/[0.02]">
+    <div className="group grid grid-cols-[1fr_auto] items-start gap-4 border-b border-white/[0.06] px-4 py-3 last:border-b-0 hover:bg-[var(--surface-primary)]">
       {/* Clicar na linha abre a TAREFA — é o gesto natural, e é por ele que o
           funcionário chega ao workflow interno sem passar pelo processo. */}
       <button type="button" onClick={aoAbrir} className="min-w-0 cursor-pointer text-left">
@@ -122,28 +122,28 @@ function Linha({
           {l.aguardandoDependencia && <Etiqueta tom="neutro">Depende de outra</Etiqueta>}
           {l.requerDecisao && <Etiqueta tom="alerta">Requer decisão</Etiqueta>}
         </div>
-        {contexto && <div className="mt-0.5 truncate text-[11px] text-white/45">{contexto}</div>}
-        <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-white/40">
+        {contexto && <div className="mt-0.5 truncate text-[11px] text-[var(--text-secondary)]">{contexto}</div>}
+        <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-[var(--text-muted)]">
           {l.etapaAtual && (
             <span>
-              <span className="text-white/30">Etapa atual:</span> <span className="text-white/60">{l.etapaAtual}</span>
+              <span className="text-[var(--text-muted)]">Etapa atual:</span> <span className="text-white/60">{l.etapaAtual}</span>
             </span>
           )}
-          {rotularFase(l.faseMacroKey) && <span className="text-white/35">{rotularFase(l.faseMacroKey)}</span>}
-          {l.responsavelNome && <span className="text-white/35">{l.responsavelNome}</span>}
+          {rotularFase(l.faseMacroKey) && <span className="text-[var(--text-muted)]">{rotularFase(l.faseMacroKey)}</span>}
+          {l.responsavelNome && <span className="text-[var(--text-muted)]">{l.responsavelNome}</span>}
           {/* HÁ QUANTO TEMPO ESTE TRABALHO ESPERA. Quem distribui precisa ver
               o que está parado há mais tempo, não só o que vence antes — um
               pedido de duas semanas sem dono não aparece na régua de prazo. */}
-          {l.criadaEm && <span className="text-white/30">Entrou em {dataCurta(l.criadaEm)}</span>}
+          {l.criadaEm && <span className="text-[var(--text-muted)]">Entrou em {dataCurta(l.criadaEm)}</span>}
         </div>
       </button>
 
       <div className="flex shrink-0 items-center gap-4">
         <div className="text-right">
-          <div className={`text-[12px] tabular-nums ${l.atrasada ? "text-red-300/90" : "text-white/70"}`}>
+          <div className={`text-[12px] tabular-nums ${l.atrasada ? "text-red-700/90" : "text-white/70"}`}>
             {dataCurta(l.dataPrazo)}
           </div>
-          <div className="mt-0.5 text-[10px] text-white/35">
+          <div className="mt-0.5 text-[10px] text-[var(--text-muted)]">
             {ROTULO_STATUS[l.statusTarefa] ?? l.statusTarefa} · {ROTULO_PRIORIDADE[l.prioridade] ?? l.prioridade}
           </div>
         </div>
@@ -220,7 +220,7 @@ function CartaoDaFila({
     : "border-l-transparent"
 
   return (
-    <div className={`border-b border-l-2 border-white/[0.06] px-4 py-3 transition-colors last:border-b-0 hover:bg-white/[0.02] ${corDaBorda}`}>
+    <div className={`border-b border-l-2 border-white/[0.06] px-4 py-3 transition-colors last:border-b-0 hover:bg-[var(--surface-primary)] ${corDaBorda}`}>
       <div className="flex items-start justify-between gap-4">
         {/* O CARTÃO LEVA AO TRABALHO — E SÓ LEVA.
             Clicar no cartão nunca comanda: leva à Central Operacional do
@@ -235,31 +235,31 @@ function CartaoDaFila({
             {l.requerDecisao && <Etiqueta tom="alerta">Requer decisão</Etiqueta>}
             {l.aguardandoDependencia && <Etiqueta tom="neutro">Depende de outra</Etiqueta>}
           </div>
-          {contexto && <div className="mt-0.5 truncate text-[11px] text-white/45">{contexto}</div>}
+          {contexto && <div className="mt-0.5 truncate text-[11px] text-[var(--text-secondary)]">{contexto}</div>}
 
           {/* ESTADO + ETAPA: as duas coisas que dizem onde o trabalho está. */}
           <div className="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px]">
             <span className="text-white/70">{ROTULO_STATUS[l.statusTarefa] ?? l.statusTarefa}</span>
             {l.etapaAtual && (
               <>
-                <span className="text-white/20">›</span>
+                <span className="text-[var(--text-muted)]">›</span>
                 <span className="text-white/60">{l.etapaAtual}</span>
               </>
             )}
             {rotularFase(l.faseMacroKey) && (
-              <span className="text-white/25">· {rotularFase(l.faseMacroKey)}</span>
+              <span className="text-[var(--text-muted)]">· {rotularFase(l.faseMacroKey)}</span>
             )}
           </div>
 
           {/* POR QUE ESTÁ PARADO — no cartão, não a três cliques de distância. */}
           {l.coluna === "AGUARDANDO_TERCEIRO" && l.esperandoHaDias != null && (
-            <div className="mt-1 text-[11px] text-white/45">
+            <div className="mt-1 text-[11px] text-[var(--text-secondary)]">
               Aguardando {l.esperandoDe === "cliente" ? "o cliente" : "terceiro"} há {l.esperandoHaDias} dia
               {l.esperandoHaDias === 1 ? "" : "s"}
             </div>
           )}
           {l.motivoBloqueio && (
-            <div className="mt-1 text-[11px] text-red-200/75">Bloqueio: {l.motivoBloqueio}</div>
+            <div className="mt-1 text-[11px] text-red-700/75">Bloqueio: {l.motivoBloqueio}</div>
           )}
         </button>
 
@@ -267,11 +267,11 @@ function CartaoDaFila({
           {/* PRAZO OPERACIONAL: o que ele significa vem primeiro; a data, depois. */}
           <div className="text-right">
             <div className={`text-[11px] font-medium ${
-              u.tom === "critico" ? "text-red-300/90" : u.tom === "alerta" ? "text-amber-200/90" : "text-white/55"
+              u.tom === "critico" ? "text-red-700/90" : u.tom === "alerta" ? "text-amber-700/90" : "text-[var(--text-secondary)]"
             }`}>
               {u.texto}
             </div>
-            {l.dataPrazo && <div className="text-[10px] tabular-nums text-white/30">{dataCurta(l.dataPrazo)}</div>}
+            {l.dataPrazo && <div className="text-[10px] tabular-nums text-[var(--text-muted)]">{dataCurta(l.dataPrazo)}</div>}
           </div>
           <div className="flex items-center gap-1.5">
             {acaoSecundaria}
@@ -282,7 +282,7 @@ function CartaoDaFila({
             <button
               disabled={ocupado}
               onClick={aoExecutar}
-              className="rounded border border-[var(--border-default)] bg-white/[0.06] px-2.5 py-1 text-[11px] text-white/85 transition-colors hover:bg-white/[0.1] disabled:opacity-40"
+              className="rounded border border-[var(--border-default)] bg-[var(--surface-primary)] px-2.5 py-1 text-[11px] text-white/85 transition-colors hover:bg-[var(--surface-primary)] disabled:opacity-40"
             >
               {ocupado && acao.comando === "iniciar" ? "Iniciando…" : acao.rotulo}
             </button>
@@ -465,7 +465,7 @@ export function CentralTarefas({ podeDistribuir }: { podeDistribuir: boolean }) 
               className={`rounded-t border-b-2 px-3 py-1.5 text-[12px] transition-colors ${
                 visao === a.id
                   ? "border-sky-400/70 text-white/90"
-                  : "border-transparent text-white/40 hover:text-white/70"
+                  : "border-transparent text-[var(--text-muted)] hover:text-white/70"
               }`}
             >
               {a.rotulo}
@@ -474,7 +474,7 @@ export function CentralTarefas({ podeDistribuir }: { podeDistribuir: boolean }) 
         </div>
         <div className="flex items-center gap-3 pb-1.5">
           {!carregando && linhas != null && (
-            <span className="text-[11px] tabular-nums text-white/35">
+            <span className="text-[11px] tabular-nums text-[var(--text-muted)]">
               {contagem} tarefa{contagem === 1 ? "" : "s"}
             </span>
           )}
@@ -484,7 +484,7 @@ export function CentralTarefas({ podeDistribuir }: { podeDistribuir: boolean }) 
                 key={m}
                 onClick={() => setModo(m)}
                 className={`rounded px-2 py-0.5 text-[10px] transition-colors ${
-                  modo === m ? "bg-white/[0.08] text-white/80" : "text-white/35 hover:text-white/60"
+                  modo === m ? "bg-[var(--surface-primary)] text-white/80" : "text-[var(--text-muted)] hover:text-white/60"
                 }`}
               >
                 {m === "lista" ? "Lista" : "Calendário"}
@@ -508,11 +508,11 @@ export function CentralTarefas({ podeDistribuir }: { podeDistribuir: boolean }) 
                 onClick={() => setFiltro(f.id)}
                 className={`rounded border px-2 py-1 text-[11px] transition-colors ${
                   filtro === f.id
-                    ? "border-[var(--border-strong)] bg-white/[0.08] text-white/85"
-                    : "border-[var(--border-default)] text-white/45 hover:text-white/75"
+                    ? "border-[var(--border-strong)] bg-[var(--surface-primary)] text-white/85"
+                    : "border-[var(--border-default)] text-[var(--text-secondary)] hover:text-white/75"
                 }`}
               >
-                {f.rotulo} <span className="tabular-nums text-white/35">{n}</span>
+                {f.rotulo} <span className="tabular-nums text-[var(--text-muted)]">{n}</span>
               </button>
             )
           })}
@@ -528,12 +528,12 @@ export function CentralTarefas({ podeDistribuir }: { podeDistribuir: boolean }) 
       {erroComando && (
         <div
           role="alert"
-          className="mb-2 flex items-start justify-between gap-3 rounded border border-red-300/25 bg-red-400/[0.08] px-3 py-2 text-[11px] text-red-100/90"
+          className="mb-2 flex items-start justify-between gap-3 rounded border border-red-200 bg-red-400/[0.08] px-3 py-2 text-[11px] text-red-100/90"
         >
           <span>{erroComando}</span>
           <button
             onClick={() => setErroComando(null)}
-            className="shrink-0 text-red-200/60 transition-colors hover:text-red-100"
+            className="shrink-0 text-red-700/60 transition-colors hover:text-red-100"
             aria-label="Fechar aviso de erro"
           >
             ✕
@@ -541,12 +541,12 @@ export function CentralTarefas({ podeDistribuir }: { podeDistribuir: boolean }) 
         </div>
       )}
       {aviso && (
-        <div className="mb-2 rounded border border-sky-300/20 bg-sky-400/[0.07] px-3 py-2 text-[11px] text-sky-100/85">
+        <div className="mb-2 rounded border border-sky-200 bg-sky-400/[0.07] px-3 py-2 text-[11px] text-sky-100/85">
           {aviso}
         </div>
       )}
 
-      <div className="overflow-hidden rounded-lg border border-white/[0.08] bg-white/[0.02]">
+      <div className="overflow-hidden rounded-lg border border-white/[0.08] bg-[var(--surface-primary)]">
         {falhou && <Estado tipo="erro" mensagem="Não foi possível carregar as tarefas." aoTentar={carregar} />}
         {carregando && <Estado tipo="carregando" mensagem="Carregando tarefas…" />}
         {!falhou && linhas?.length === 0 && (
@@ -562,7 +562,7 @@ export function CentralTarefas({ podeDistribuir }: { podeDistribuir: boolean }) 
         {modo === "calendario" && linhas != null && linhas.length > 0 &&
           agruparPorDia(linhas).map((grupo) => (
             <div key={grupo.dia}>
-              <div className="sticky top-0 border-b border-white/[0.06] bg-[var(--surface-overlay)] px-4 py-1.5 text-[10px] uppercase tracking-wide text-white/40">
+              <div className="sticky top-0 border-b border-white/[0.06] bg-[var(--surface-overlay)] px-4 py-1.5 text-[10px] uppercase tracking-wide text-[var(--text-muted)]">
                 {grupo.rotulo} · {grupo.linhas.length}
               </div>
               {grupo.linhas.map((l) => (
@@ -594,7 +594,7 @@ export function CentralTarefas({ podeDistribuir }: { podeDistribuir: boolean }) 
                 <div className="flex items-center gap-1.5">
                   <button
                     onClick={() => { setErroComando(null); setAlvo(l) }}
-                    className="rounded border border-[var(--border-default)] px-2.5 py-1 text-[11px] text-white/75 transition-colors hover:border-[var(--border-strong)] hover:bg-white/[0.06]"
+                    className="rounded border border-[var(--border-default)] px-2.5 py-1 text-[11px] text-white/75 transition-colors hover:border-[var(--border-strong)] hover:bg-[var(--surface-primary)]"
                   >
                     {l.responsavelId == null ? "Atribuir" : "Transferir"}
                   </button>
@@ -607,7 +607,7 @@ export function CentralTarefas({ podeDistribuir }: { podeDistribuir: boolean }) 
                     <button
                       disabled={ocupado}
                       onClick={() => void comandar(l.taskId, { acao: "devolver_a_fila" }, "Tarefa devolvida para Sem responsável.")}
-                      className="rounded px-2 py-1 text-[11px] text-white/40 transition-colors hover:bg-white/[0.06] hover:text-white/75 disabled:opacity-40"
+                      className="rounded px-2 py-1 text-[11px] text-[var(--text-muted)] transition-colors hover:bg-[var(--surface-primary)] hover:text-white/75 disabled:opacity-40"
                       title="Remover o responsável e devolver para distribuição"
                     >
                       Retirar

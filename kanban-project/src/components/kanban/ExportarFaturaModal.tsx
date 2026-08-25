@@ -333,7 +333,7 @@ export function ExportarFaturaModal({ faturas, requerentes, onClose }: ExportarF
           <div className="mb-6">
             <div className="flex items-center justify-between mb-3">
               <label className="flex items-center gap-2 text-sm font-medium text-gray-700">
-                <User className="h-4 w-4 text-gray-400" />
+                <User className="h-4 w-4 text-[var(--text-muted)]" />
                 Selecione o Destinatário
               </label>
               {totalDestinatarios > 2 && (
@@ -408,7 +408,7 @@ export function ExportarFaturaModal({ faturas, requerentes, onClose }: ExportarF
                 {/* Indicador de scroll */}
                 {showScrollIndicator && (
                   <div className="absolute bottom-0 left-0 right-0 h-12 bg-gradient-to-t from-white to-transparent pointer-events-none flex items-end justify-center pb-1">
-                    <div className="flex items-center gap-1 text-xs text-gray-400 bg-[var(--surface-elevated)] px-2 py-1 rounded-full">
+                    <div className="flex items-center gap-1 text-xs text-[var(--text-muted)] bg-[var(--surface-elevated)] px-2 py-1 rounded-full">
                       <ChevronDown className="h-3 w-3" />
                       Role para ver mais
                     </div>
@@ -440,11 +440,11 @@ export function ExportarFaturaModal({ faturas, requerentes, onClose }: ExportarF
 
               {faturasFiltradas.length === 0 ? (
                 <div className="p-4 bg-gray-50 border border-gray-200 rounded-xl text-center">
-                  <AlertCircle className="h-8 w-8 text-gray-300 mx-auto mb-2" />
+                  <AlertCircle className="h-8 w-8 text-[var(--text-muted)] mx-auto mb-2" />
                   <p className="text-gray-500 text-sm">
                     Nenhuma fatura vinculada a este destinatário.
                   </p>
-                  <p className="text-gray-400 text-xs mt-1">
+                  <p className="text-[var(--text-muted)] text-xs mt-1">
                     Vincule o destinatário às faturas para poder exportar.
                   </p>
                 </div>
@@ -478,7 +478,7 @@ export function ExportarFaturaModal({ faturas, requerentes, onClose }: ExportarF
                             {isSelected && <Check className="h-3 w-3 text-white" />}
                           </div>
                           
-                          <FileText className={`h-4 w-4 flex-shrink-0 ${isSelected ? 'text-blue-500' : 'text-gray-400'}`} />
+                          <FileText className={`h-4 w-4 flex-shrink-0 ${isSelected ? 'text-blue-500' : 'text-[var(--text-muted)]'}`} />
                           
                           <span className={`text-sm flex-1 truncate ${isSelected ? 'text-gray-900' : 'text-gray-600'}`}>
                             {fatura.descricao}
@@ -505,7 +505,7 @@ export function ExportarFaturaModal({ faturas, requerentes, onClose }: ExportarF
                           </div>
                         ))}
                       </div>
-                      <p className="text-xs text-gray-400 mt-2">
+                      <p className="text-xs text-[var(--text-muted)] mt-2">
                         {faturasParaExportar.length} de {faturasFiltradas.length} fatura{faturasFiltradas.length > 1 ? 's' : ''} selecionada{faturasParaExportar.length > 1 ? 's' : ''}
                       </p>
                     </div>

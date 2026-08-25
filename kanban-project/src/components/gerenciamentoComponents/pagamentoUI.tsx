@@ -9,8 +9,8 @@ import { createPortal } from 'react-dom'
 import { Check, ChevronDown, X } from 'lucide-react'
 
 export const OURO = '#D2A948'
-export const GLASS = 'rounded-xl border border-[var(--border-default)] bg-white/[0.05] backdrop-blur-md'
-export const INPUT = 'w-full rounded-lg border border-[var(--border-default)] bg-[var(--surface-primary)] px-3 py-2 text-sm text-white placeholder:text-white/30 outline-none focus:border-white/30'
+export const GLASS = 'rounded-xl border border-[var(--border-default)] bg-[var(--surface-primary)] backdrop-blur-md'
+export const INPUT = 'w-full rounded-lg border border-[var(--border-default)] bg-[var(--surface-primary)] px-3 py-2 text-sm text-white placeholder:text-[var(--text-muted)] outline-none focus:border-white/30'
 
 export async function jf(url: string, options: RequestInit = {}) {
   const token = typeof window !== 'undefined' ? localStorage.getItem('authToken') : null
@@ -26,7 +26,7 @@ export function Secao({ icon: Ic, titulo, dica, children }: { icon?: any; titulo
   return (
     <div className={`${GLASS} p-4`}>
       <div className="mb-1 flex items-center gap-2">{Ic && <Ic className="h-4 w-4" style={{ color: OURO }} />}<h4 className="text-sm font-semibold text-white">{titulo}</h4></div>
-      {dica && <p className="mb-3 text-[11px] text-white/40">{dica}</p>}
+      {dica && <p className="mb-3 text-[11px] text-[var(--text-muted)]">{dica}</p>}
       <div className={dica ? '' : 'mt-2'}>{children}</div>
     </div>
   )
@@ -254,14 +254,14 @@ export function MultiSelect({
           <input
             ref={buscaRef} value={filtro} onChange={(e) => { setFiltro(e.target.value); setFoco(0) }}
             placeholder={buscaPlaceholder} autoFocus
-            className="w-full rounded-md border border-[var(--border-default)] bg-[var(--surface-primary)] px-2 py-1 text-xs text-white placeholder:text-white/30 outline-none focus:border-white/25"
+            className="w-full rounded-md border border-[var(--border-default)] bg-[var(--surface-primary)] px-2 py-1 text-xs text-white placeholder:text-[var(--text-muted)] outline-none focus:border-white/25"
           />
         </div>
       )}
       {acoes && (
         <div className="flex shrink-0 items-center gap-2 border-b border-[var(--border-default)] px-2 py-1.5 text-[11px]">
           <button type="button" onClick={() => onChange(Array.from(new Set([...selecionados, ...visiveis.map((o) => o.id)])))} className="text-white/60 transition hover:text-white">Selecionar todas</button>
-          <span className="text-white/20">·</span>
+          <span className="text-[var(--text-muted)]">·</span>
           <button type="button" onClick={() => onChange([])} className="text-white/60 transition hover:text-white">Limpar seleção</button>
         </div>
       )}
@@ -277,15 +277,15 @@ export function MultiSelect({
               {especial.ativa && <Check className="h-3 w-3 text-[#1b1508]" />}
             </span>
             <span className="truncate font-medium">{especial.label}</span>
-            {especial.hint && <span className="ml-auto shrink-0 text-[10px] text-white/35">{especial.hint}</span>}
+            {especial.hint && <span className="ml-auto shrink-0 text-[10px] text-[var(--text-muted)]">{especial.hint}</span>}
           </button>
         </div>
       )}
       <ul ref={listaRef} id={idLista} role="listbox" aria-multiselectable tabIndex={-1} className="min-h-0 flex-1 overflow-y-auto p-1">
         {opcoes.length === 0 ? (
-          <li className="px-2 py-2 text-[11px] text-white/35">{vazioMsg}</li>
+          <li className="px-2 py-2 text-[11px] text-[var(--text-muted)]">{vazioMsg}</li>
         ) : visiveis.length === 0 ? (
-          <li className="px-2 py-2 text-[11px] text-white/35">Nada encontrado.</li>
+          <li className="px-2 py-2 text-[11px] text-[var(--text-muted)]">Nada encontrado.</li>
         ) : visiveis.map((o, i) => {
           const on = selecionados.includes(o.id)
           return (
@@ -300,7 +300,7 @@ export function MultiSelect({
                 {on && <Check className="h-3 w-3 text-[#1b1508]" />}
               </span>
               <span className="truncate">{o.label}</span>
-              {o.hint && <span className="ml-auto shrink-0 text-[10px] text-white/35">{o.hint}</span>}
+              {o.hint && <span className="ml-auto shrink-0 text-[10px] text-[var(--text-muted)]">{o.hint}</span>}
             </li>
           )
         })}
@@ -316,12 +316,12 @@ export function MultiSelect({
         onClick={() => (aberto ? fechar() : abrir())} onKeyDown={teclado}
         className={`${INPUT} flex items-center justify-between gap-2 text-left`}
       >
-        <span className={especial?.ativa || escolhidos.length ? 'text-white/85' : 'text-white/30'}>
+        <span className={especial?.ativa || escolhidos.length ? 'text-white/85' : 'text-[var(--text-muted)]'}>
           {especial?.ativa
             ? especial.label
             : escolhidos.length ? `${escolhidos.length} selecionado${escolhidos.length > 1 ? 's' : ''}` : placeholder}
         </span>
-        <ChevronDown className={`h-4 w-4 shrink-0 text-white/40 transition ${aberto ? 'rotate-180' : ''}`} />
+        <ChevronDown className={`h-4 w-4 shrink-0 text-[var(--text-muted)] transition ${aberto ? 'rotate-180' : ''}`} />
       </button>
 
       {menu}
@@ -348,7 +348,7 @@ export function MultiSelect({
           ))}
         </div>
       ) : dicaVazio ? (
-        <p className="mt-1 text-[11px] text-white/35">{dicaVazio}</p>
+        <p className="mt-1 text-[11px] text-[var(--text-muted)]">{dicaVazio}</p>
       ) : null}
     </div>
   )
@@ -390,8 +390,8 @@ export function Stepper({ passos, atual }: { passos: string[]; atual: number }) 
       {passos.map((label, i) => {
         const n = i + 1
         return (
-          <div key={label} className={`flex items-center gap-1.5 text-xs ${atual === n ? 'text-white' : atual > n ? 'text-emerald-400' : 'text-white/35'}`}>
-            <span className={`grid h-5 w-5 place-items-center rounded-full border text-[10px] ${atual === n ? 'border-[var(--border-strong)]' : atual > n ? 'border-emerald-400/40 bg-emerald-400/10' : 'border-[var(--border-default)]'}`}>{atual > n ? <Check className="h-3 w-3" /> : n}</span>
+          <div key={label} className={`flex items-center gap-1.5 text-xs ${atual === n ? 'text-white' : atual > n ? 'text-emerald-700' : 'text-[var(--text-muted)]'}`}>
+            <span className={`grid h-5 w-5 place-items-center rounded-full border text-[10px] ${atual === n ? 'border-[var(--border-strong)]' : atual > n ? 'border-emerald-200 bg-emerald-50' : 'border-[var(--border-default)]'}`}>{atual > n ? <Check className="h-3 w-3" /> : n}</span>
             {label}
           </div>
         )

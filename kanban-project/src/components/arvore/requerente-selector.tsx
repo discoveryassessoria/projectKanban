@@ -144,7 +144,7 @@ export function RequerenteSelector({
   if (loading) {
     return (
       <div className="flex items-center justify-center py-16">
-        <Loader2 className="w-6 h-6 animate-spin text-teal-600" />
+        <Loader2 className="w-6 h-6 animate-spin text-amber-600" />
       </div>
     )
   }
@@ -211,21 +211,21 @@ export function RequerenteSelector({
                     onClick={() => setSelectedId(r.requerenteId)}
                     className={`w-full text-left p-4 rounded-xl border-2 transition-all ${
                       isSel
-                        ? "border-teal-500 bg-teal-50"
+                        ? "border-amber-500 bg-amber-50"
                         : "border-gray-200 bg-[var(--surface-primary)] hover:border-gray-300 hover:bg-gray-50"
                     }`}
                   >
                     <div className="flex items-start gap-3">
                       <div
                         className={`mt-0.5 w-5 h-5 rounded-full border-2 flex items-center justify-center flex-shrink-0 ${
-                          isSel ? "border-teal-500 bg-teal-500" : "border-gray-300"
+                          isSel ? "border-amber-500 bg-amber-500" : "border-gray-300"
                         }`}
                       >
                         {isSel && <Check className="w-3 h-3 text-white" strokeWidth={3} />}
                       </div>
                       <div className="flex-1 min-w-0">
                         <p className="font-semibold text-gray-900 flex items-center gap-2">
-                          <User className="w-4 h-4 text-gray-400" />
+                          <User className="w-4 h-4 text-[var(--text-muted)]" />
                           {r.nome}
                           {faixa && (
                             <span className={`text-[11px] font-medium px-1.5 py-0.5 rounded-full ${faixa === "Menor" ? "bg-amber-100 text-amber-700" : "bg-gray-100 text-gray-600"}`}>
@@ -266,7 +266,7 @@ export function RequerenteSelector({
                 disabled={selectedId == null || saving}
                 className={`flex-1 py-3 rounded-lg font-semibold text-sm tracking-wide transition-all flex items-center justify-center gap-2 ${
                   selectedId != null
-                    ? "bg-teal-600 text-white hover:bg-teal-700"
+                    ? "bg-amber-600 text-white hover:bg-amber-700"
                     : "bg-gray-200 text-gray-500 cursor-not-allowed"
                 }`}
               >

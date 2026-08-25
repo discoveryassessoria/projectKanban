@@ -102,7 +102,7 @@ function SecaoPerguntas({
                   )}
                   {/* Resposta sem fonte não é resposta: o operador precisa saber
                       onde conferir antes de agir sobre um processo. */}
-                  <p className="mt-2 text-[10px] uppercase tracking-wide text-gray-400">
+                  <p className="mt-2 text-[10px] uppercase tracking-wide text-[var(--text-muted)]">
                     Fonte: {resposta.fonte}
                   </p>
                 </div>
@@ -215,14 +215,14 @@ export function PainelInteligencia({
           <h2 className="text-sm font-semibold text-gray-900">Inteligência da árvore</h2>
           <p className="text-[11px] text-gray-500">Análise determinística · sem enviar dados</p>
         </div>
-        <button onClick={onFechar} aria-label="Fechar painel" className="rounded-md p-1.5 text-gray-400 transition hover:bg-gray-100 hover:text-gray-700">
+        <button onClick={onFechar} aria-label="Fechar painel" className="rounded-md p-1.5 text-[var(--text-muted)] transition hover:bg-gray-100 hover:text-gray-700">
           <X className="h-4 w-4" />
         </button>
       </div>
 
       <div className="flex-1 space-y-5 overflow-y-auto px-4 py-4">
         {!analise ? (
-          <p className="py-10 text-center text-sm text-gray-400">
+          <p className="py-10 text-center text-sm text-[var(--text-muted)]">
             Adicione pessoas à árvore para ver a análise.
           </p>
         ) : (
@@ -248,7 +248,7 @@ export function PainelInteligencia({
                 <ol className="space-y-1.5">
                   {analise.proximosPassos.slice(0, 5).map((passo, i) => (
                     <li key={passo.id} className="flex gap-2 rounded-lg border border-gray-100 bg-gray-50 p-2.5 text-[12px] text-gray-700">
-                      <span className="font-semibold text-gray-400">{i + 1}</span>
+                      <span className="font-semibold text-[var(--text-muted)]">{i + 1}</span>
                       <span className="min-w-0">
                         {passo.titulo}
                         {/* O motor também diz POR QUE o passo importa — é o que
@@ -303,7 +303,7 @@ export function PainelInteligencia({
                   )),
                 )}
                 {analise.insights.length === 0 && (
-                  <p className="py-6 text-center text-[13px] text-gray-400">
+                  <p className="py-6 text-center text-[13px] text-[var(--text-muted)]">
                     Nenhum problema encontrado nesta árvore.
                   </p>
                 )}

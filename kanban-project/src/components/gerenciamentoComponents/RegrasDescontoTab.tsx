@@ -121,9 +121,9 @@ export default function RegrasDescontoTab() {
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h2 className="text-xl font-semibold text-white">Regras de Desconto</h2>
-          <p className="text-sm text-white/50">Limites de desconto e quando exigir aprovação.</p>
+          <p className="text-sm text-[var(--text-secondary)]">Limites de desconto e quando exigir aprovação.</p>
         </div>
-        <button onClick={abrirNovo} className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-[#fff] transition hover:bg-blue-500">
+        <button onClick={abrirNovo} className="rounded-lg bg-[var(--action-primary)] px-4 py-2 text-sm font-medium text-[var(--action-primary-ink)] transition hover:bg-[var(--action-primary)]">
           + Nova regra
         </button>
       </div>
@@ -135,17 +135,17 @@ export default function RegrasDescontoTab() {
         className="w-full rounded-lg border border-[var(--border-default)] bg-[var(--surface-primary)] px-4 py-2 text-sm text-white placeholder-white/30 outline-none backdrop-blur focus:border-white/20"
       />
 
-      {loading && <div className="py-12 text-center text-sm text-white/40">Carregando...</div>}
+      {loading && <div className="py-12 text-center text-sm text-[var(--text-muted)]">Carregando...</div>}
 
       {!loading && erroLista && (
-        <div className="rounded-lg border border-red-500/30 bg-red-500/10 p-4 text-sm text-red-200">
+        <div className="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-700">
           {erroLista}
           <button onClick={() => void carregar()} className="ml-3 underline hover:text-white">Tentar de novo</button>
         </div>
       )}
 
       {!loading && !erroLista && filtradas.length === 0 && (
-        <div className="rounded-xl border border-[var(--border-default)] bg-[var(--surface-primary)] py-12 text-center text-sm text-white/40 backdrop-blur">
+        <div className="rounded-xl border border-[var(--border-default)] bg-[var(--surface-primary)] py-12 text-center text-sm text-[var(--text-muted)] backdrop-blur">
           {busca ? 'Nenhuma regra encontrada.' : 'Nenhuma regra ainda. Crie a primeira.'}
         </div>
       )}
@@ -155,31 +155,31 @@ export default function RegrasDescontoTab() {
           <table className="w-full text-[13px]">
             <thead>
               <tr className="bg-[var(--surface-primary)]">
-                <th className="border-b border-[var(--border-default)] px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wide text-white/50">Regra</th>
-                <th className="border-b border-[var(--border-default)] px-4 py-2.5 text-right text-[11px] font-semibold uppercase tracking-wide text-white/50">% máx s/ aprovação</th>
-                <th className="border-b border-[var(--border-default)] px-4 py-2.5 text-right text-[11px] font-semibold uppercase tracking-wide text-white/50">Valor máx s/ aprovação</th>
-                <th className="border-b border-[var(--border-default)] px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wide text-white/50">Status</th>
-                <th className="border-b border-[var(--border-default)] px-4 py-2.5 text-right text-[11px] font-semibold uppercase tracking-wide text-white/50">Ações</th>
+                <th className="border-b border-[var(--border-default)] px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wide text-[var(--text-secondary)]">Regra</th>
+                <th className="border-b border-[var(--border-default)] px-4 py-2.5 text-right text-[11px] font-semibold uppercase tracking-wide text-[var(--text-secondary)]">% máx s/ aprovação</th>
+                <th className="border-b border-[var(--border-default)] px-4 py-2.5 text-right text-[11px] font-semibold uppercase tracking-wide text-[var(--text-secondary)]">Valor máx s/ aprovação</th>
+                <th className="border-b border-[var(--border-default)] px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wide text-[var(--text-secondary)]">Status</th>
+                <th className="border-b border-[var(--border-default)] px-4 py-2.5 text-right text-[11px] font-semibold uppercase tracking-wide text-[var(--text-secondary)]">Ações</th>
               </tr>
             </thead>
             <tbody>
               {filtradas.map((r) => (
-                <tr key={r.id} className="border-b border-[var(--border-subtle)] last:border-0 hover:bg-white/[0.03]">
+                <tr key={r.id} className="border-b border-[var(--border-subtle)] last:border-0 hover:bg-[var(--surface-primary)]">
                   <td className="px-4 py-2.5">
                     <div className="font-medium text-white">{r.name}</div>
-                    <div className="text-[11px] text-white/40">{r.exigeAprovacaoAcima ? 'Exige aprovação acima do limite' : 'Sem aprovação obrigatória'}</div>
+                    <div className="text-[11px] text-[var(--text-muted)]">{r.exigeAprovacaoAcima ? 'Exige aprovação acima do limite' : 'Sem aprovação obrigatória'}</div>
                   </td>
                   <td className="px-4 py-2.5 text-right tabular-nums text-white/70">{fmtPct(r.maxPercentSemAprovacao)}</td>
                   <td className="px-4 py-2.5 text-right tabular-nums text-white/70">{fmtNum(r.maxValorSemAprovacao)}</td>
                   <td className="px-4 py-2.5">
-                    <span className={`rounded px-2 py-0.5 text-[11px] font-medium ${r.ativo ? 'bg-green-500/15 text-green-300' : 'bg-[var(--surface-primary)] text-white/50'}`}>
+                    <span className={`rounded px-2 py-0.5 text-[11px] font-medium ${r.ativo ? 'bg-green-50 text-green-700' : 'bg-[var(--surface-primary)] text-[var(--text-secondary)]'}`}>
                       {r.ativo ? 'Ativo' : 'Inativo'}
                     </span>
                   </td>
                   <td className="px-4 py-2.5">
                     <div className="flex items-center justify-end gap-2">
                       <button onClick={() => abrirEditar(r)} className="rounded-md border border-[var(--border-default)] px-2.5 py-1 text-xs text-white/70 transition hover:bg-[var(--surface-hover)] hover:text-white">Editar</button>
-                      <button onClick={() => excluir(r)} className="rounded-md border border-red-500/20 px-2.5 py-1 text-xs text-red-300/80 transition hover:bg-red-500/10 hover:text-red-200">Excluir</button>
+                      <button onClick={() => excluir(r)} className="rounded-md border border-red-200 px-2.5 py-1 text-xs text-red-700/80 transition hover:bg-red-50 hover:text-red-700">Excluir</button>
                     </div>
                   </td>
                 </tr>
@@ -194,7 +194,7 @@ export default function RegrasDescontoTab() {
           <div className="w-full max-w-md rounded-2xl border border-[var(--border-default)] bg-zinc-900/95 shadow-2xl">
             <div className="flex items-center justify-between border-b border-[var(--border-default)] px-6 py-4">
               <h3 className="text-lg font-semibold text-white">{editando ? 'Editar regra' : 'Nova regra'}</h3>
-              <button onClick={() => setModalAberto(false)} className="text-white/40 transition hover:text-white">✕</button>
+              <button onClick={() => setModalAberto(false)} className="text-[var(--text-muted)] transition hover:text-white">✕</button>
             </div>
 
             <div className="space-y-4 px-6 py-4">
@@ -224,13 +224,13 @@ export default function RegrasDescontoTab() {
               </div>
 
               {erroModal && (
-                <div className="rounded-lg border border-red-500/30 bg-red-500/10 p-3 text-sm text-red-200">{erroModal}</div>
+                <div className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700">{erroModal}</div>
               )}
             </div>
 
             <div className="flex items-center justify-end gap-2 border-t border-[var(--border-default)] px-6 py-4">
               <button onClick={() => setModalAberto(false)} className="rounded-lg px-4 py-2 text-sm text-white/60 transition hover:text-white">Cancelar</button>
-              <button onClick={salvar} disabled={salvando} className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-[#fff] transition hover:bg-blue-500 disabled:opacity-50">
+              <button onClick={salvar} disabled={salvando} className="rounded-lg bg-[var(--action-primary)] px-4 py-2 text-sm font-medium text-[var(--action-primary-ink)] transition hover:bg-[var(--action-primary)] disabled:opacity-50">
                 {salvando ? 'Salvando...' : 'Salvar'}
               </button>
             </div>

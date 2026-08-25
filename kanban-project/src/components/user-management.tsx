@@ -232,8 +232,8 @@ export function UserManagement() {
       )}
 
       {success && (
-        <Alert className="border-green-500/50 bg-green-50 dark:bg-green-950/20">
-          <AlertDescription className="text-green-700 dark:text-green-400">{success}</AlertDescription>
+        <Alert className="border-green-200 bg-green-50 dark:bg-green-950/20">
+          <AlertDescription className="text-green-700 dark:text-green-700">{success}</AlertDescription>
         </Alert>
       )}
 

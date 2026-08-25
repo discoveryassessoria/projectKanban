@@ -129,12 +129,12 @@ export function ProcessoDocumentosBiblioteca({
         <div className="min-w-0">
           {/* Título */}
           <div className="flex items-center gap-3 mb-[18px]">
-            <div className="w-10 h-10 text-white/55">
+            <div className="w-10 h-10 text-[var(--text-secondary)]">
               <FileText className="w-[30px] h-[30px]" strokeWidth={1.7} />
             </div>
             <div>
               <h2 className="text-[21px] font-extrabold text-white/95">Documentos</h2>
-              <span className="text-[13px] text-white/55">Biblioteca documental consolidada do processo.</span>
+              <span className="text-[13px] text-[var(--text-secondary)]">Biblioteca documental consolidada do processo.</span>
             </div>
           </div>
 
@@ -142,7 +142,7 @@ export function ProcessoDocumentosBiblioteca({
           <div className="grid gap-2.5 mb-[18px]" style={{ gridTemplateColumns: "repeat(8, 1fr)" }}>
             {kpiCards.map(([label, val, ic, tone], i) => (
               <div key={i} className="bg-[var(--surface-popover)] border border-[var(--border-default)] rounded-xl p-[13px]">
-                <span className="text-[10.5px] text-white/55 block leading-tight min-h-[28px]">{label}</span>
+                <span className="text-[10.5px] text-[var(--text-secondary)] block leading-tight min-h-[28px]">{label}</span>
                 <div className="flex items-center justify-between mt-1.5">
                   <b className="text-[23px] font-extrabold text-white/95">{val}</b>
                   <span className="text-[15px] opacity-85">{ic}</span>
@@ -154,7 +154,7 @@ export function ProcessoDocumentosBiblioteca({
           {/* Toolbar: filtros + busca */}
           <div className="flex items-center justify-between gap-3.5 mb-5 flex-wrap">
             <div className="flex items-center gap-[7px] flex-wrap">
-              <button className="inline-flex items-center gap-1.5 border border-[var(--border-default)] bg-[var(--surface-popover)] rounded-lg px-3 py-2 text-[12.5px] font-semibold text-white/55">
+              <button className="inline-flex items-center gap-1.5 border border-[var(--border-default)] bg-[var(--surface-popover)] rounded-lg px-3 py-2 text-[12.5px] font-semibold text-[var(--text-secondary)]">
                 <Filter className="w-3.5 h-3.5" /> Filtros
               </button>
               {FILTERS.map((f) => (
@@ -164,7 +164,7 @@ export function ProcessoDocumentosBiblioteca({
                   className={`border rounded-lg px-[13px] py-2 text-[12.5px] font-semibold cursor-pointer transition-colors ${
                     f === filtro
                       ? "bg-[#7dd3fc]/12 border-[#7dd3fc] text-[#7dd3fc]"
-                      : "border-[var(--border-default)] bg-[var(--surface-popover)] text-white/55 hover:border-[var(--border-strong)]"
+                      : "border-[var(--border-default)] bg-[var(--surface-popover)] text-[var(--text-secondary)] hover:border-[var(--border-strong)]"
                   }`}
                 >
                   {f}
@@ -172,7 +172,7 @@ export function ProcessoDocumentosBiblioteca({
               ))}
             </div>
             <div className="flex items-center gap-2 border border-[var(--border-default)] bg-[var(--surface-popover)] rounded-lg px-[13px] py-2 min-w-[280px] flex-1 max-w-[340px]">
-              <Search className="w-[15px] h-[15px] text-white/40" />
+              <Search className="w-[15px] h-[15px] text-[var(--text-muted)]" />
               <input
                 value={busca}
                 onChange={(e) => setBusca(e.target.value)}
@@ -186,10 +186,10 @@ export function ProcessoDocumentosBiblioteca({
           <div className="mb-6">
             <div className="border-l-[3px] border-[#7dd3fc] pl-3 mb-3.5">
               <b className="text-[13px] font-extrabold text-white/95 tracking-wide">LINHA PRINCIPAL · TRANSMISSÃO DE CIDADANIA</b>
-              <span className="block text-[12px] text-white/55 mt-0.5">Pessoas da linha reta ordenadas por geração</span>
+              <span className="block text-[12px] text-[var(--text-secondary)] mt-0.5">Pessoas da linha reta ordenadas por geração</span>
             </div>
             {linhaPrincipal.length === 0 ? (
-              <div className="p-[18px] text-center text-white/40 text-[13px]">Nenhuma pessoa nesta seção.</div>
+              <div className="p-[18px] text-center text-[var(--text-muted)] text-[13px]">Nenhuma pessoa nesta seção.</div>
             ) : (
               linhaPrincipal.map((g) => (
                 <PersonGroup key={g.personId} g={g} matchFilter={matchFilter} onAbrirDetalhes={onAbrirDetalhes} />
@@ -201,10 +201,10 @@ export function ProcessoDocumentosBiblioteca({
           <div className="mb-6">
             <div className="border-l-[3px] border-[var(--border-strong)] pl-3 mb-3.5">
               <b className="text-[13px] font-extrabold text-white/95 tracking-wide">FORA DA LINHAGEM · CÔNJUGES / APOIO</b>
-              <span className="block text-[12px] text-white/55 mt-0.5">Pessoas fora da linha reta ou documentos de apoio</span>
+              <span className="block text-[12px] text-[var(--text-secondary)] mt-0.5">Pessoas fora da linha reta ou documentos de apoio</span>
             </div>
             {foraDaLinha.length === 0 ? (
-              <div className="p-[18px] text-center text-white/40 text-[13px]">Nenhuma pessoa nesta seção.</div>
+              <div className="p-[18px] text-center text-[var(--text-muted)] text-[13px]">Nenhuma pessoa nesta seção.</div>
             ) : (
               foraDaLinha.map((g) => (
                 <PersonGroup key={g.personId} g={g} matchFilter={matchFilter} onAbrirDetalhes={onAbrirDetalhes} />
@@ -230,10 +230,10 @@ export function ProcessoDocumentosBiblioteca({
           {/* Informações */}
           <div className="bg-[var(--surface-popover)] border border-[var(--border-default)] rounded-xl p-[15px]">
             <h3 className="text-[13.5px] font-extrabold text-white/95 mb-3">⚠ Informações</h3>
-            <p className="text-[11.5px] text-white/55 leading-relaxed mb-2">
+            <p className="text-[11.5px] text-[var(--text-secondary)] leading-relaxed mb-2">
               A biblioteca mostra apenas certidões, certidões retificadas, traduções juramentadas e apostilas de Haia.
             </p>
-            <p className="text-[11.5px] text-white/55 leading-relaxed">
+            <p className="text-[11.5px] text-[var(--text-secondary)] leading-relaxed">
               Documentos jurídicos e operacionais ficam dentro das fases que os geraram.
             </p>
           </div>
@@ -270,18 +270,18 @@ function PersonGroup({
         className="flex items-center gap-3.5 px-[18px] py-4 cursor-pointer"
         onClick={() => setAberto(!aberto)}
       >
-        <span className="w-[38px] h-[38px] rounded-full bg-[#252c35] text-white/55 grid place-items-center text-[13px] font-bold flex-none">
+        <span className="w-[38px] h-[38px] rounded-full bg-[var(--surface-tertiary)] text-[var(--text-secondary)] grid place-items-center text-[13px] font-bold flex-none">
           {ini}
         </span>
         <div className="flex-1 min-w-0">
           <b className="text-[14.5px] text-white/95">
             {g.personName}
-            {g.lineage !== "Linha reta" && <span className="font-medium text-white/55"> ({g.role})</span>}
+            {g.lineage !== "Linha reta" && <span className="font-medium text-[var(--text-secondary)]"> ({g.role})</span>}
           </b>
-          <span className="block text-[12px] text-white/55 mt-px">{genTxt} · {g.lineage} · {g.role}</span>
+          <span className="block text-[12px] text-[var(--text-secondary)] mt-px">{genTxt} · {g.lineage} · {g.role}</span>
         </div>
         <div className="flex gap-2.5">
-          <span className="inline-flex items-center gap-1.5 text-[12px] font-semibold text-white/55 bg-[#20262e] border border-[var(--border-default)] rounded-lg px-[11px] py-1.5">
+          <span className="inline-flex items-center gap-1.5 text-[12px] font-semibold text-[var(--text-secondary)] bg-[var(--surface-secondary)] border border-[var(--border-default)] rounded-lg px-[11px] py-1.5">
             <FileText className="w-3.5 h-3.5" /> {g.stats.totalDocuments} documentos
           </span>
           <span className="inline-flex items-center gap-1.5 text-[12px] font-semibold text-[#4ade80] bg-[#4ade80]/12 border border-[#4ade80]/30 rounded-lg px-[11px] py-1.5">
@@ -291,7 +291,7 @@ function PersonGroup({
             <Clock className="w-3.5 h-3.5" /> {g.stats.pending} pendentes
           </span>
         </div>
-        <ChevronDown className={`w-[18px] h-[18px] text-white/40 transition-transform ${aberto ? "" : "-rotate-90"}`} />
+        <ChevronDown className={`w-[18px] h-[18px] text-[var(--text-muted)] transition-transform ${aberto ? "" : "-rotate-90"}`} />
       </div>
 
       {/* Corpo (tabela) */}
@@ -299,7 +299,7 @@ function PersonGroup({
         <div className="border-t border-[var(--border-default)]">
           {/* Cabeçalho de colunas */}
           <div
-            className="grid gap-2.5 items-center px-[18px] py-[13px] bg-[#20262e] text-white/40 text-[10px] font-bold tracking-wider"
+            className="grid gap-2.5 items-center px-[18px] py-[13px] bg-[var(--surface-secondary)] text-[var(--text-muted)] text-[10px] font-bold tracking-wider"
             style={{ gridTemplateColumns: "1.6fr .9fr 1fr 1.1fr 1fr 1fr 1.1fr .9fr" }}
           >
             <span>DOCUMENTO</span>
@@ -332,17 +332,17 @@ function DocRow({ it, onAbrirDetalhes }: { it: BibDocItem; onAbrirDetalhes: (doc
     >
       {/* Documento */}
       <span className="flex items-center gap-2.5">
-        <span className="w-5 h-5 text-white/40 flex-none">
+        <span className="w-5 h-5 text-[var(--text-muted)] flex-none">
           <FileText className="w-5 h-5" />
         </span>
         <span>
           <b className="text-[13px] text-white/95 block">{it.documentType}</b>
-          <small className="text-[11px] text-white/40">{it.personName}</small>
+          <small className="text-[11px] text-[var(--text-muted)]">{it.personName}</small>
         </span>
       </span>
 
       {/* Tipo */}
-      <span className="text-[12px] text-white/55">{it.documentFormat}</span>
+      <span className="text-[12px] text-[var(--text-secondary)]">{it.documentFormat}</span>
 
       {/* Certidão / Cert. retificada / Tradução / Apostila */}
       <StatusCell st={it.certificate.status} date={it.certificate.date} />
@@ -367,7 +367,7 @@ function DocRow({ it, onAbrirDetalhes }: { it: BibDocItem; onAbrirDetalhes: (doc
 }
 
 function StatusCell({ st, date }: { st: CellStatus; date?: string | null }) {
-  if (st === "nao_aplica") return <span className="text-[11.5px] text-white/40">Não se aplica</span>
+  if (st === "nao_aplica") return <span className="text-[11.5px] text-[var(--text-muted)]">Não se aplica</span>
 
   const cls =
     st === "validada" ? "text-[#4ade80]"
@@ -379,7 +379,7 @@ function StatusCell({ st, date }: { st: CellStatus; date?: string | null }) {
     : "Pendente"
 
   if (st === "pendente" && !date) {
-    return <span className="text-white/40">—</span>
+    return <span className="text-[var(--text-muted)]">—</span>
   }
 
   return (
@@ -388,7 +388,7 @@ function StatusCell({ st, date }: { st: CellStatus; date?: string | null }) {
         <span className="w-[7px] h-[7px] rounded-full bg-current" />
         {txt}
       </span>
-      {date && <small className="block text-[10.5px] text-white/40 mt-px ml-3">{date}</small>}
+      {date && <small className="block text-[10.5px] text-[var(--text-muted)] mt-px ml-3">{date}</small>}
     </span>
   )
 }
@@ -431,14 +431,14 @@ function Donut({ kpis }: { kpis: BibKpis }) {
         </svg>
         <div className="absolute inset-0 grid place-content-center text-center">
           <b className="text-[20px] font-extrabold text-white/95 block">{kpis.obrig}</b>
-          <span className="text-[10px] text-white/40">Total</span>
+          <span className="text-[10px] text-[var(--text-muted)]">Total</span>
         </div>
       </div>
       <div className="flex flex-col gap-[7px]">
         {segs.map((s, i) => {
           const pct = Math.round((s[1] / total) * 100)
           return (
-            <div key={i} className="flex items-center gap-[7px] text-[11.5px] text-white/55">
+            <div key={i} className="flex items-center gap-[7px] text-[11.5px] text-[var(--text-secondary)]">
               <span className="w-[9px] h-[9px] rounded-[3px] flex-none" style={{ background: s[2] }} />
               {s[0]}
               <b className="ml-auto text-white/95 text-[11.5px]">{s[1]} ({pct}%)</b>
@@ -467,7 +467,7 @@ function Legenda() {
           <span className={`w-[13px] h-[13px] rounded-full flex-none mt-0.5 ${dot}`} />
           <div>
             <b className="text-[12px] text-white/95 block">{title}</b>
-            <span className="text-[11px] text-white/40">{desc}</span>
+            <span className="text-[11px] text-[var(--text-muted)]">{desc}</span>
           </div>
         </div>
       ))}

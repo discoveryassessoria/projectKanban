@@ -34,7 +34,7 @@ function Table({ headers, empty }: { headers: string[]; empty?: string }) {
             {headers.map((h, i) => (
               <th
                 key={i}
-                className={`whitespace-nowrap border-b border-[var(--border-default)] px-3 py-2.5 text-[11px] font-semibold uppercase tracking-wide text-white/50 ${
+                className={`whitespace-nowrap border-b border-[var(--border-default)] px-3 py-2.5 text-[11px] font-semibold uppercase tracking-wide text-[var(--text-secondary)] ${
                   i === headers.length - 1 ? 'text-right' : 'text-left'
                 }`}
               >
@@ -45,7 +45,7 @@ function Table({ headers, empty }: { headers: string[]; empty?: string }) {
         </thead>
         <tbody>
           <tr>
-            <td colSpan={headers.length} className="px-3 py-6 text-center text-xs text-white/40">
+            <td colSpan={headers.length} className="px-3 py-6 text-center text-xs text-[var(--text-muted)]">
               {empty || 'Nenhum cadastro. Clique em “+ Novo” para começar.'}
             </td>
           </tr>
@@ -60,7 +60,7 @@ export function ProcTypesTab() {
   return (
     <div>
       <AvisoRascunho />
-      <div className="mb-3 text-xs text-white/50">
+      <div className="mb-3 text-xs text-[var(--text-secondary)]">
         A unidade-mestre do sistema. Cada Processo de Nacionalidade tem Workflow Macro próprio, Kanban
         derivado, fases, automações, documentos, financeiro e protocolos. Não se cadastra país + tipo soltos.
       </div>
@@ -84,7 +84,7 @@ export function MacroKanbanTab() {
   return (
     <div>
       <AvisoRascunho />
-      <div className="mb-3 text-xs text-white/50">
+      <div className="mb-3 text-xs text-[var(--text-secondary)]">
         O Workflow Macro define a sequência real de fases do Processo de Nacionalidade. O Kanban é derivado
         automaticamente dessa sequência. Não existe cadastro de fases separado.
       </div>
@@ -94,7 +94,7 @@ export function MacroKanbanTab() {
           <option value="" className="bg-zinc-900">— escolha um Processo de Nacionalidade —</option>
         </select>
       </div>
-      <div className={`${CARD} p-5 text-sm text-white/40`}>
+      <div className={`${CARD} p-5 text-sm text-[var(--text-muted)]`}>
         Escolha um Processo de Nacionalidade para configurar seu Workflow Macro. O Kanban é derivado
         automaticamente.
       </div>
@@ -109,7 +109,7 @@ function Kpi({ value, label, color }: { value: string; label: string; color?: st
       <div className="text-2xl font-bold" style={{ color: color || '#e8ebf2' }}>
         {value}
       </div>
-      <div className="text-[10px] font-semibold uppercase tracking-wide text-white/50">{label}</div>
+      <div className="text-[10px] font-semibold uppercase tracking-wide text-[var(--text-secondary)]">{label}</div>
     </div>
   )
 }
@@ -117,7 +117,7 @@ export function HealthTab() {
   return (
     <div>
       <AvisoRascunho />
-      <div className="mb-3 text-xs text-white/50">
+      <div className="mb-3 text-xs text-[var(--text-secondary)]">
         Auditoria executiva do Gerenciamento: Processo de Nacionalidade, Workflow Macro, Kanban derivado,
         Workflow Interno, automações e taxonomia.
       </div>
@@ -131,7 +131,7 @@ export function HealthTab() {
         <Kpi value="0" label="Alertas" color="#fbbf24" />
         <Kpi value="—" label="Pronto" />
       </div>
-      <div className={`${CARD} p-5 text-sm font-medium text-green-300`}>
+      <div className={`${CARD} p-5 text-sm font-medium text-green-700`}>
         ✅ Nenhum problema estrutural no Gerenciamento.
       </div>
     </div>

@@ -49,7 +49,7 @@ export function KanbanColumn({
       className={`
         flex flex-col h-full w-full
         ${!isLast ? 'border-r-2 border-dashed border-[var(--border-strong)]' : ''}
-        ${isOver ? 'bg-blue-500/10' : 'bg-transparent'}
+        ${isOver ? 'bg-blue-50' : 'bg-transparent'}
         transition-colors duration-200
       `}
     >

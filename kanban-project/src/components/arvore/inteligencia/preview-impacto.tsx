@@ -149,7 +149,7 @@ export function PreviewImpactoModal({ proposta, onCancelar, onConfirmar }: Props
           <button
             onClick={onCancelar}
             aria-label="Cancelar"
-            className="rounded-md p-1.5 text-gray-400 transition hover:bg-gray-100 hover:text-gray-700"
+            className="rounded-md p-1.5 text-[var(--text-muted)] transition hover:bg-gray-100 hover:text-gray-700"
           >
             <X className="h-4 w-4" />
           </button>
@@ -164,7 +164,7 @@ export function PreviewImpactoModal({ proposta, onCancelar, onConfirmar }: Props
               {proposta.alteracoes.map((a) => (
                 <li key={a.campo} className="text-[13px] text-gray-800">
                   <span className="text-gray-500">{a.campo}: </span>
-                  {a.de} <span className="text-gray-400">→</span>{" "}
+                  {a.de} <span className="text-[var(--text-muted)]">→</span>{" "}
                   <span className="font-medium">{a.para}</span>
                 </li>
               ))}
@@ -226,7 +226,7 @@ export function PreviewImpactoModal({ proposta, onCancelar, onConfirmar }: Props
                             <span className="text-gray-500"> — {d.pessoaNome}</span>
                           ) : null}
                           {d.obrigatoriedade === "OPCIONAL" && (
-                            <span className="text-gray-400"> (opcional)</span>
+                            <span className="text-[var(--text-muted)]"> (opcional)</span>
                           )}
                         </li>
                       ))}
@@ -328,7 +328,7 @@ export function PreviewImpactoModal({ proposta, onCancelar, onConfirmar }: Props
           <button
             onClick={onConfirmar}
             disabled={carregando}
-            className="rounded-lg bg-slate-900 px-3 py-2 text-[13px] font-medium text-white transition hover:bg-slate-800 disabled:opacity-50"
+            className="rounded-lg bg-[var(--action-primary)] px-3 py-2 text-[13px] font-medium text-[var(--action-primary-ink)] transition hover:bg-[var(--action-primary-hover)] disabled:opacity-50"
           >
             Confirmar alteração
           </button>
@@ -362,16 +362,16 @@ function AntesDepois({ linhas }: { linhas: LinhaComparacao[] }) {
       <div className="overflow-hidden rounded-lg border border-gray-200">
         <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-x-2 border-b border-gray-100 bg-gray-50 px-2.5 py-1.5">
           <span className="text-[10px] font-semibold uppercase tracking-wide text-gray-500">Antes</span>
-          <ArrowDown aria-hidden className="h-3 w-3 -rotate-90 text-gray-300" />
+          <ArrowDown aria-hidden className="h-3 w-3 -rotate-90 text-[var(--text-muted)]" />
           <span className="text-[10px] font-semibold uppercase tracking-wide text-gray-500">Depois</span>
         </div>
         <ul className="divide-y divide-gray-100">
           {linhas.map((l) => (
             <li key={l.rotulo} className="px-2.5 py-1.5" title={l.dica}>
-              <p className="text-[10px] uppercase tracking-wide text-gray-400">{l.rotulo}</p>
+              <p className="text-[10px] uppercase tracking-wide text-[var(--text-muted)]">{l.rotulo}</p>
               <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-x-2">
                 <span className="truncate text-[12px] text-gray-600">{l.antes}</span>
-                <span aria-hidden className="text-[11px] text-gray-300">→</span>
+                <span aria-hidden className="text-[11px] text-[var(--text-muted)]">→</span>
                 <span className={`truncate text-[12px] font-medium ${COR_DIRECAO[l.direcao]}`}>
                   {l.depois}
                 </span>

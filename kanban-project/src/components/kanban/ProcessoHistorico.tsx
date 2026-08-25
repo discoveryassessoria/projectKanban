@@ -143,19 +143,19 @@ export function ProcessoHistorico({ processoId }: ProcessoHistoricoProps) {
         <div className="min-w-0">
           <div className="flex items-start justify-between gap-3">
             <div>
-              <h2 className="flex items-center gap-2 text-lg font-semibold text-white">Diário Operacional do Processo <Info className="h-4 w-4 text-white/40" /></h2>
-              <p className="text-sm text-white/45">Linha do tempo completa de tudo que aconteceu neste processo</p>
+              <h2 className="flex items-center gap-2 text-lg font-semibold text-white">Diário Operacional do Processo <Info className="h-4 w-4 text-[var(--text-muted)]" /></h2>
+              <p className="text-sm text-[var(--text-secondary)]">Linha do tempo completa de tudo que aconteceu neste processo</p>
             </div>
             <div className="flex items-center gap-2">
-              <button className="inline-flex items-center gap-1.5 rounded-lg border border-[var(--border-default)] bg-[var(--surface-popover)] px-3 py-2 text-sm text-white/80 hover:bg-[#252c35]"><Download className="h-4 w-4" /> Exportar <ChevronDown className="h-3.5 w-3.5" /></button>
-              <button className="inline-flex items-center gap-1.5 rounded-lg border border-[var(--border-default)] bg-[var(--surface-popover)] px-3 py-2 text-sm text-white/80 hover:bg-[#252c35]"><Filter className="h-4 w-4" /> Filtros <ChevronDown className="h-3.5 w-3.5" /></button>
+              <button className="inline-flex items-center gap-1.5 rounded-lg border border-[var(--border-default)] bg-[var(--surface-popover)] px-3 py-2 text-sm text-white/80 hover:bg-[var(--surface-tertiary)]"><Download className="h-4 w-4" /> Exportar <ChevronDown className="h-3.5 w-3.5" /></button>
+              <button className="inline-flex items-center gap-1.5 rounded-lg border border-[var(--border-default)] bg-[var(--surface-popover)] px-3 py-2 text-sm text-white/80 hover:bg-[var(--surface-tertiary)]"><Filter className="h-4 w-4" /> Filtros <ChevronDown className="h-3.5 w-3.5" /></button>
             </div>
           </div>
 
           {/* filtros */}
           <div className="mt-4 flex flex-wrap items-center gap-3">
-            <div className="relative min-w-[240px] flex-1"><Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-white/40" /><input value={busca} onChange={(e) => setBusca(e.target.value)} placeholder="Buscar no histórico..." className="w-full rounded-lg border border-[var(--border-default)] bg-[var(--app-background)] py-2 pl-9 pr-3 text-sm outline-none placeholder:text-white/30" /></div>
-            <div className="flex items-center justify-between gap-6 rounded-lg border border-[var(--border-default)] bg-[var(--app-background)] px-3 py-2 text-sm"><span className="inline-flex items-center gap-1.5 text-white/70"><CalendarDays className="h-3.5 w-3.5 text-white/40" /> Período: Todo o período</span><ChevronDown className="h-3.5 w-3.5 text-white/40" /></div>
+            <div className="relative min-w-[240px] flex-1"><Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--text-muted)]" /><input value={busca} onChange={(e) => setBusca(e.target.value)} placeholder="Buscar no histórico..." className="w-full rounded-lg border border-[var(--border-default)] bg-[var(--app-background)] py-2 pl-9 pr-3 text-sm outline-none placeholder:text-[var(--text-muted)]" /></div>
+            <div className="flex items-center justify-between gap-6 rounded-lg border border-[var(--border-default)] bg-[var(--app-background)] px-3 py-2 text-sm"><span className="inline-flex items-center gap-1.5 text-white/70"><CalendarDays className="h-3.5 w-3.5 text-[var(--text-muted)]" /> Período: Todo o período</span><ChevronDown className="h-3.5 w-3.5 text-[var(--text-muted)]" /></div>
             <button onClick={() => { setBusca(""); setTipo("todos") }} className="inline-flex items-center gap-2 rounded-lg border border-[var(--border-default)] bg-[var(--app-background)] px-3 py-2 text-sm text-white/70"><RotateCcw className="h-3.5 w-3.5" /> Limpar filtros</button>
           </div>
 
@@ -167,11 +167,11 @@ export function ProcessoHistorico({ processoId }: ProcessoHistoricoProps) {
 
           {/* timeline */}
           <div className="mt-5">
-            {loading ? <div className="py-16 text-center text-sm text-white/40">Carregando histórico…</div>
-              : visiveis.length === 0 ? <div className="py-16 text-center text-sm text-white/40">Nenhum evento no histórico.</div>
+            {loading ? <div className="py-16 text-center text-sm text-[var(--text-muted)]">Carregando histórico…</div>
+              : visiveis.length === 0 ? <div className="py-16 text-center text-sm text-[var(--text-muted)]">Nenhum evento no histórico.</div>
               : grupos.map((g) => (
                 <div key={g.dia} className="mb-5">
-                  <div className="mb-3 text-[13px] font-semibold text-white/55">{g.dia}</div>
+                  <div className="mb-3 text-[13px] font-semibold text-[var(--text-secondary)]">{g.dia}</div>
                   <div className="relative">
                     {g.itens.map((l, i) => {
                       const t = TIPO_POR_KEY[tipoDoLog(l)]
@@ -179,18 +179,18 @@ export function ProcessoHistorico({ processoId }: ProcessoHistoricoProps) {
                       return (
                         <div key={l.id} className="flex gap-3">
                           <div className="flex w-14 shrink-0 flex-col items-end pt-2 text-right"><span className="text-[12px] tabular-nums text-white/60">{horaBR(l.criadoEm)}</span></div>
-                          <div className="flex flex-col items-center pt-2.5"><span className="h-2.5 w-2.5 rounded-full ring-4 ring-[#1b2027]" style={{ background: t.cor }} />{i < g.itens.length - 1 && <span className="mt-1 w-px flex-1 bg-[var(--surface-primary)]" />}</div>
+                          <div className="flex flex-col items-center pt-2.5"><span className="h-2.5 w-2.5 rounded-full ring-4 ring-[var(--border-default)]" style={{ background: t.cor }} />{i < g.itens.length - 1 && <span className="mt-1 w-px flex-1 bg-[var(--surface-primary)]" />}</div>
                           <div className="min-w-0 flex-1 pb-4">
                             <div className={`${CARD} flex items-start gap-3 p-3.5`}>
                               <span className="grid h-9 w-9 shrink-0 place-items-center rounded-lg" style={{ background: `${t.cor}22`, color: t.cor }}><t.icon className="h-4.5 w-4.5" /></span>
                               <div className="min-w-0 flex-1">
                                 <span className="inline-block rounded px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide" style={{ background: `${t.cor}22`, color: t.cor }}>{t.label}</span>
                                 <div className="mt-1 text-sm font-medium text-white/90">{l.descricao}</div>
-                                {sub && <div className="mt-0.5 truncate text-[12px] text-white/45">{sub}</div>}
+                                {sub && <div className="mt-0.5 truncate text-[12px] text-[var(--text-secondary)]">{sub}</div>}
                               </div>
                               <div className="flex shrink-0 items-center gap-2.5">
-                                {l.usuario && <div className="flex items-center gap-2"><span className="grid h-7 w-7 place-items-center rounded-full bg-[#252c35] text-[10px] font-semibold text-white/70">{iniciais(l.usuario.nome)}</span><div className="text-right leading-tight"><div className="text-[12px] text-white/80">{l.usuario.nome}</div><div className="text-[10px] text-white/40">Usuário</div></div></div>}
-                                <span className="text-[11px] text-white/40">{relativa(l.criadoEm)}</span>
+                                {l.usuario && <div className="flex items-center gap-2"><span className="grid h-7 w-7 place-items-center rounded-full bg-[var(--surface-tertiary)] text-[10px] font-semibold text-white/70">{iniciais(l.usuario.nome)}</span><div className="text-right leading-tight"><div className="text-[12px] text-white/80">{l.usuario.nome}</div><div className="text-[10px] text-[var(--text-muted)]">Usuário</div></div></div>}
+                                <span className="text-[11px] text-[var(--text-muted)]">{relativa(l.criadoEm)}</span>
                               </div>
                             </div>
                           </div>
@@ -201,7 +201,7 @@ export function ProcessoHistorico({ processoId }: ProcessoHistoricoProps) {
                 </div>
               ))}
             {!loading && filtrados.length > visiveis.length && (
-              <div className="pt-2 text-center"><button onClick={() => setLimite((n) => n + 20)} className="inline-flex items-center gap-2 rounded-lg border border-[var(--border-default)] bg-[var(--surface-popover)] px-4 py-2 text-sm text-white/80 hover:bg-[#252c35]"><ChevronDown className="h-4 w-4" /> Carregar mais eventos</button></div>
+              <div className="pt-2 text-center"><button onClick={() => setLimite((n) => n + 20)} className="inline-flex items-center gap-2 rounded-lg border border-[var(--border-default)] bg-[var(--surface-popover)] px-4 py-2 text-sm text-white/80 hover:bg-[var(--surface-tertiary)]"><ChevronDown className="h-4 w-4" /> Carregar mais eventos</button></div>
             )}
           </div>
         </div>
@@ -216,7 +216,7 @@ export function ProcessoHistorico({ processoId }: ProcessoHistoricoProps) {
               <ResumoLinha k="Esta semana" v={stats.semana} />
               <ResumoLinha k="Este mês" v={stats.mes} />
               <ResumoLinha k="Usuários envolvidos" v={stats.usuarios} />
-              <div className="flex justify-between"><span className="text-white/55">Último evento</span><span className="text-white/70">{stats.ultimo}</span></div>
+              <div className="flex justify-between"><span className="text-[var(--text-secondary)]">Último evento</span><span className="text-white/70">{stats.ultimo}</span></div>
             </div>
           </div>
 
@@ -233,12 +233,12 @@ export function ProcessoHistorico({ processoId }: ProcessoHistoricoProps) {
 
           <div className={`${CARD} p-4`}>
             <div className="mb-3 text-sm font-semibold text-white">Usuários envolvidos</div>
-            {usuarios.length === 0 ? <div className="text-xs text-white/40">Sem registros.</div> : (
+            {usuarios.length === 0 ? <div className="text-xs text-[var(--text-muted)]">Sem registros.</div> : (
               <div className="space-y-2">
                 {usuarios.map((u) => (
                   <div key={u.nome} className="flex items-center justify-between gap-2">
-                    <div className="flex min-w-0 items-center gap-2"><span className="grid h-7 w-7 shrink-0 place-items-center rounded-full bg-[#252c35] text-[10px] font-semibold text-white/70">{iniciais(u.nome)}</span><span className="truncate text-sm text-white/80">{u.nome}</span></div>
-                    <span className="shrink-0 rounded-full bg-[#252c35] px-2 py-0.5 text-[11px] text-white/60">{u.n}</span>
+                    <div className="flex min-w-0 items-center gap-2"><span className="grid h-7 w-7 shrink-0 place-items-center rounded-full bg-[var(--surface-tertiary)] text-[10px] font-semibold text-white/70">{iniciais(u.nome)}</span><span className="truncate text-sm text-white/80">{u.nome}</span></div>
+                    <span className="shrink-0 rounded-full bg-[var(--surface-tertiary)] px-2 py-0.5 text-[11px] text-white/60">{u.n}</span>
                   </div>
                 ))}
               </div>
@@ -246,8 +246,8 @@ export function ProcessoHistorico({ processoId }: ProcessoHistoricoProps) {
           </div>
 
           <div className={`${CARD} p-4`}>
-            <div className="mb-2 flex items-center gap-1.5 text-sm font-semibold text-white"><Info className="h-4 w-4 text-white/40" /> Sobre o histórico</div>
-            <p className="text-[12px] leading-relaxed text-white/50">Este diário registra todas as ações operacionais realizadas no processo. Informações financeiras estão disponíveis no módulo Financeiro.</p>
+            <div className="mb-2 flex items-center gap-1.5 text-sm font-semibold text-white"><Info className="h-4 w-4 text-[var(--text-muted)]" /> Sobre o histórico</div>
+            <p className="text-[12px] leading-relaxed text-[var(--text-secondary)]">Este diário registra todas as ações operacionais realizadas no processo. Informações financeiras estão disponíveis no módulo Financeiro.</p>
           </div>
         </div>
       </div>
@@ -257,7 +257,7 @@ export function ProcessoHistorico({ processoId }: ProcessoHistoricoProps) {
 
 function ChipTipo({ ativo, onClick, icon: Ic, cor, label, n }: { ativo: boolean; onClick: () => void; icon: any; cor: string; label: string; n: number }) {
   return (
-    <button onClick={onClick} className={`inline-flex items-center gap-2 rounded-lg border px-3 py-2 text-sm transition-colors ${ativo ? "border-[#d2a948]/50 bg-[#d2a948]/12" : "border-[var(--border-default)] bg-[var(--surface-popover)] hover:bg-[#252c35]"}`}>
+    <button onClick={onClick} className={`inline-flex items-center gap-2 rounded-lg border px-3 py-2 text-sm transition-colors ${ativo ? "border-[#d2a948]/50 bg-[#d2a948]/12" : "border-[var(--border-default)] bg-[var(--surface-popover)] hover:bg-[var(--surface-tertiary)]"}`}>
       <Ic className="h-4 w-4" style={{ color: cor }} />
       <span className={ativo ? "text-white/90" : "text-white/70"}>{label}</span>
       <span className="text-[11px] font-semibold" style={{ color: ativo ? "#d2a948" : "rgba(255,255,255,0.5)" }}>{n}</span>
@@ -265,13 +265,13 @@ function ChipTipo({ ativo, onClick, icon: Ic, cor, label, n }: { ativo: boolean;
   )
 }
 function ResumoLinha({ k, v }: { k: string; v: number }) {
-  return <div className="flex justify-between"><span className="text-white/55">{k}</span><span className="font-semibold tabular-nums text-white/90">{v}</span></div>
+  return <div className="flex justify-between"><span className="text-[var(--text-secondary)]">{k}</span><span className="font-semibold tabular-nums text-white/90">{v}</span></div>
 }
 function FiltroRapido({ icon: Ic, cor, label, n, onClick }: { icon: any; cor: string; label: string; n: number; onClick: () => void }) {
   return (
-    <button onClick={onClick} className="flex w-full items-center justify-between gap-2 rounded-lg px-2 py-1.5 text-sm hover:bg-[#252c35]">
+    <button onClick={onClick} className="flex w-full items-center justify-between gap-2 rounded-lg px-2 py-1.5 text-sm hover:bg-[var(--surface-tertiary)]">
       <span className="inline-flex items-center gap-2 text-white/70"><Ic className="h-4 w-4" style={{ color: cor }} /> {label}</span>
-      <span className="rounded-full bg-[#252c35] px-2 py-0.5 text-[11px] text-white/60">{n}</span>
+      <span className="rounded-full bg-[var(--surface-tertiary)] px-2 py-0.5 text-[11px] text-white/60">{n}</span>
     </button>
   )
 }

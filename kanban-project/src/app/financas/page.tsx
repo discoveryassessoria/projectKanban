@@ -107,11 +107,11 @@ export default function FinancasDashboard() {
         <Card className="bg-[var(--surface-primary)] border-[var(--border-strong)] backdrop-blur-sm">
           <CardHeader className="flex flex-row items-center justify-between pb-2">
             <CardTitle className="text-sm font-medium text-white/70">Saldo em Contas</CardTitle>
-            <PiggyBank className="h-4 w-4 text-white/50" />
+            <PiggyBank className="h-4 w-4 text-[var(--text-secondary)]" />
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-white">{formatCurrency(resumo.saldoContas)}</div>
-            <p className="text-xs text-white/50 mt-1">Total disponível</p>
+            <p className="text-xs text-[var(--text-secondary)] mt-1">Total disponível</p>
           </CardContent>
         </Card>
 
@@ -119,12 +119,12 @@ export default function FinancasDashboard() {
         <Card className="bg-[var(--surface-primary)] border-[var(--border-strong)] backdrop-blur-sm">
           <CardHeader className="flex flex-row items-center justify-between pb-2">
             <CardTitle className="text-sm font-medium text-white/70">A Receber</CardTitle>
-            <Receipt className="h-4 w-4 text-green-400" />
+            <Receipt className="h-4 w-4 text-green-700" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-green-400">{formatCurrency(resumo.totalReceber)}</div>
+            <div className="text-2xl font-bold text-green-700">{formatCurrency(resumo.totalReceber)}</div>
             {resumo.totalReceberVencido > 0 && (
-              <p className="text-xs text-red-400 mt-1 flex items-center gap-1">
+              <p className="text-xs text-red-700 mt-1 flex items-center gap-1">
                 <AlertTriangle className="h-3 w-3" />
                 {formatCurrency(resumo.totalReceberVencido)} vencido
               </p>
@@ -136,12 +136,12 @@ export default function FinancasDashboard() {
         <Card className="bg-[var(--surface-primary)] border-[var(--border-strong)] backdrop-blur-sm">
           <CardHeader className="flex flex-row items-center justify-between pb-2">
             <CardTitle className="text-sm font-medium text-white/70">A Pagar</CardTitle>
-            <CreditCard className="h-4 w-4 text-red-400" />
+            <CreditCard className="h-4 w-4 text-red-700" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-red-400">{formatCurrency(resumo.totalPagar)}</div>
+            <div className="text-2xl font-bold text-red-700">{formatCurrency(resumo.totalPagar)}</div>
             {resumo.totalPagarVencido > 0 && (
-              <p className="text-xs text-red-400 mt-1 flex items-center gap-1">
+              <p className="text-xs text-red-700 mt-1 flex items-center gap-1">
                 <AlertTriangle className="h-3 w-3" />
                 {formatCurrency(resumo.totalPagarVencido)} vencido
               </p>
@@ -154,21 +154,21 @@ export default function FinancasDashboard() {
           <CardHeader className="flex flex-row items-center justify-between pb-2">
             <CardTitle className="text-sm font-medium text-white/70">Saldo do Mês</CardTitle>
             {resumo.saldoMes >= 0 ? (
-              <TrendingUp className="h-4 w-4 text-green-400" />
+              <TrendingUp className="h-4 w-4 text-green-700" />
             ) : (
-              <TrendingDown className="h-4 w-4 text-red-400" />
+              <TrendingDown className="h-4 w-4 text-red-700" />
             )}
           </CardHeader>
           <CardContent>
-            <div className={`text-2xl font-bold ${resumo.saldoMes >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+            <div className={`text-2xl font-bold ${resumo.saldoMes >= 0 ? 'text-green-700' : 'text-red-700'}`}>
               {formatCurrency(resumo.saldoMes)}
             </div>
             <div className="flex gap-4 mt-1">
-              <span className="text-xs text-green-400 flex items-center gap-0.5">
+              <span className="text-xs text-green-700 flex items-center gap-0.5">
                 <ArrowUpRight className="h-3 w-3" />
                 {formatCurrency(resumo.entradasMes)}
               </span>
-              <span className="text-xs text-red-400 flex items-center gap-0.5">
+              <span className="text-xs text-red-700 flex items-center gap-0.5">
                 <ArrowDownRight className="h-3 w-3" />
                 {formatCurrency(resumo.saidasMes)}
               </span>
@@ -183,10 +183,10 @@ export default function FinancasDashboard() {
         <Card className="bg-[var(--surface-primary)] border-[var(--border-strong)] backdrop-blur-sm">
           <CardHeader>
             <CardTitle className="text-white flex items-center gap-2">
-              <AlertTriangle className="h-5 w-5 text-yellow-400" />
+              <AlertTriangle className="h-5 w-5 text-yellow-700" />
               Próximos Vencimentos
             </CardTitle>
-            <CardDescription className="text-white/50">
+            <CardDescription className="text-[var(--text-secondary)]">
               Contas a vencer nos próximos 7 dias
             </CardDescription>
           </CardHeader>
@@ -199,21 +199,21 @@ export default function FinancasDashboard() {
                 >
                   <div className="flex items-center gap-3">
                     {conta.tipo === 'receber' ? (
-                      <div className="p-2 rounded-full bg-green-500/20">
-                        <ArrowUpRight className="h-4 w-4 text-green-400" />
+                      <div className="p-2 rounded-full bg-green-50">
+                        <ArrowUpRight className="h-4 w-4 text-green-700" />
                       </div>
                     ) : (
-                      <div className="p-2 rounded-full bg-red-500/20">
-                        <ArrowDownRight className="h-4 w-4 text-red-400" />
+                      <div className="p-2 rounded-full bg-red-50">
+                        <ArrowDownRight className="h-4 w-4 text-red-700" />
                       </div>
                     )}
                     <div>
                       <p className="text-sm font-medium text-white">{conta.descricao}</p>
-                      <p className="text-xs text-white/50">Vence em {formatDate(conta.dataVencimento)}</p>
+                      <p className="text-xs text-[var(--text-secondary)]">Vence em {formatDate(conta.dataVencimento)}</p>
                     </div>
                   </div>
                   <div className="text-right">
-                    <p className={`font-semibold ${conta.tipo === 'receber' ? 'text-green-400' : 'text-red-400'}`}>
+                    <p className={`font-semibold ${conta.tipo === 'receber' ? 'text-green-700' : 'text-red-700'}`}>
                       {conta.tipo === 'receber' ? '+' : '-'} {formatCurrency(conta.valor)}
                     </p>
                   </div>
@@ -221,7 +221,7 @@ export default function FinancasDashboard() {
               ))}
               
               {contasVencendo.length === 0 && (
-                <p className="text-center text-white/50 py-4">Nenhuma conta vencendo</p>
+                <p className="text-center text-[var(--text-secondary)] py-4">Nenhuma conta vencendo</p>
               )}
             </div>
           </CardContent>
@@ -231,7 +231,7 @@ export default function FinancasDashboard() {
         <Card className="bg-[var(--surface-primary)] border-[var(--border-strong)] backdrop-blur-sm">
           <CardHeader>
             <CardTitle className="text-white">Ações Rápidas</CardTitle>
-            <CardDescription className="text-white/50">
+            <CardDescription className="text-[var(--text-secondary)]">
               Acesse as principais funções
             </CardDescription>
           </CardHeader>
@@ -240,7 +240,7 @@ export default function FinancasDashboard() {
               <Link href="/financas/contas-receber/nova">
                 <Button 
                   variant="outline" 
-                  className="w-full h-20 flex-col gap-2 border-green-500/30 text-green-400 hover:bg-green-500/10 hover:border-green-500/50"
+                  className="w-full h-20 flex-col gap-2 border-green-200 text-green-700 hover:bg-green-50 hover:border-green-200"
                 >
                   <Receipt className="h-5 w-5" />
                   <span className="text-xs">Nova Cobrança</span>
@@ -250,7 +250,7 @@ export default function FinancasDashboard() {
               <Link href="/financas/contas-pagar/nova">
                 <Button 
                   variant="outline" 
-                  className="w-full h-20 flex-col gap-2 border-red-500/30 text-red-400 hover:bg-red-500/10 hover:border-red-500/50"
+                  className="w-full h-20 flex-col gap-2 border-red-200 text-red-700 hover:bg-red-50 hover:border-red-200"
                 >
                   <CreditCard className="h-5 w-5" />
                   <span className="text-xs">Nova Despesa</span>
@@ -260,7 +260,7 @@ export default function FinancasDashboard() {
               <Link href="/financas/fluxo-caixa">
                 <Button 
                   variant="outline" 
-                  className="w-full h-20 flex-col gap-2 border-blue-500/30 text-blue-400 hover:bg-blue-500/10 hover:border-blue-500/50"
+                  className="w-full h-20 flex-col gap-2 border-blue-200 text-blue-700 hover:bg-blue-50 hover:border-blue-200"
                 >
                   <DollarSign className="h-5 w-5" />
                   <span className="text-xs">Fluxo de Caixa</span>
@@ -270,7 +270,7 @@ export default function FinancasDashboard() {
               <Link href="/financas/relatorios">
                 <Button 
                   variant="outline" 
-                  className="w-full h-20 flex-col gap-2 border-purple-500/30 text-purple-400 hover:bg-purple-500/10 hover:border-purple-500/50"
+                  className="w-full h-20 flex-col gap-2 border-slate-200 text-slate-700 hover:bg-slate-50 hover:border-slate-200"
                 >
                   <TrendingUp className="h-5 w-5" />
                   <span className="text-xs">Relatórios</span>

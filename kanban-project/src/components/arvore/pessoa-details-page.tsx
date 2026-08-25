@@ -131,7 +131,7 @@ function formatDateRange(nascimento: Date | string | null | undefined, obito: Da
 function ToggleSwitch({ label, checked, onChange }: { label: string; checked: boolean; onChange: () => void }) {
   return (
     <label className="flex items-center gap-2 cursor-pointer">
-      <div className={`relative w-10 h-5 rounded-full transition-colors ${checked ? 'bg-teal-500' : 'bg-gray-300'}`}>
+      <div className={`relative w-10 h-5 rounded-full transition-colors ${checked ? 'bg-amber-500' : 'bg-gray-300'}`}>
         <div className={`absolute top-0.5 w-4 h-4 bg-[var(--surface-primary)] rounded-full shadow transition-transform ${checked ? 'translate-x-5' : 'translate-x-0.5'}`} />
       </div>
       <span className="text-sm text-gray-600">{label}</span>
@@ -175,7 +175,7 @@ function InfoItem({
 }) {
   return (
     <div className="flex items-start gap-2 py-2">
-      {Icon && <Icon className="h-4 w-4 text-gray-400 mt-0.5" />}
+      {Icon && <Icon className="h-4 w-4 text-[var(--text-muted)] mt-0.5" />}
       <div>
         <p className="text-sm text-gray-500">{label}</p>
         <p className="font-medium text-gray-900">{value || 'Não informado'}</p>
@@ -250,13 +250,13 @@ export function PessoaDetailsPage({
                 onClick={() => setActiveTab(tab.id as typeof activeTab)}
                 className={`px-6 py-3 text-sm font-medium transition-colors relative ${
                   activeTab === tab.id 
-                    ? 'text-teal-600' 
+                    ? 'text-amber-600' 
                     : 'text-gray-600 hover:text-gray-900'
                 }`}
               >
                 {tab.label}
                 {activeTab === tab.id && (
-                  <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-teal-500" />
+                  <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-amber-500" />
                 )}
               </button>
             ))}
@@ -380,7 +380,7 @@ export function PessoaDetailsPage({
                         <p className="text-sm font-medium text-gray-700">Casamento</p>
                         <p className="text-sm text-gray-600">{formatDateFull(casamento.data_inicio)}</p>
                         {casamento.local && <p className="text-sm text-gray-500">{casamento.local}{casamento.pais && `, ${casamento.pais}`}</p>}
-                        {casamento.tipo && <p className="text-xs text-gray-400">{casamento.tipo}</p>}
+                        {casamento.tipo && <p className="text-xs text-[var(--text-muted)]">{casamento.tipo}</p>}
                       </div>
                     )}
                     
@@ -417,7 +417,7 @@ export function PessoaDetailsPage({
                             
                             <button 
                               onClick={() => onAddFilho?.(pessoa.id)}
-                              className="w-full p-3 flex items-center gap-1 text-teal-600 hover:text-teal-700 hover:bg-gray-50"
+                              className="w-full p-3 flex items-center gap-1 text-amber-600 hover:text-amber-700 hover:bg-gray-50"
                             >
                               <Plus className="h-4 w-4" />
                               <span className="text-sm font-medium">ACRESCENTAR FILHO(A)</span>
@@ -432,7 +432,7 @@ export function PessoaDetailsPage({
                   {!conjuge && (
                     <button 
                       onClick={() => onAddConjuge?.(pessoa.id)}
-                      className="w-full mt-3 p-3 flex items-center gap-1 text-teal-600 hover:text-teal-700 border border-gray-200 rounded-lg hover:bg-gray-50"
+                      className="w-full mt-3 p-3 flex items-center gap-1 text-amber-600 hover:text-amber-700 border border-gray-200 rounded-lg hover:bg-gray-50"
                     >
                       <Plus className="h-4 w-4" />
                       <span className="text-sm font-medium">ACRESCENTAR CÔNJUGE</span>
@@ -442,7 +442,7 @@ export function PessoaDetailsPage({
                   {filhos.length === 0 && (
                     <button 
                       onClick={() => onAddFilho?.(pessoa.id)}
-                      className="w-full mt-2 p-3 flex items-center gap-1 text-teal-600 hover:text-teal-700 border border-gray-200 rounded-lg hover:bg-gray-50"
+                      className="w-full mt-2 p-3 flex items-center gap-1 text-amber-600 hover:text-amber-700 border border-gray-200 rounded-lg hover:bg-gray-50"
                     >
                       <Plus className="h-4 w-4" />
                       <span className="text-sm font-medium">ACRESCENTAR FILHO(A)</span>
@@ -499,7 +499,7 @@ export function PessoaDetailsPage({
                       {!pessoa.pai && (
                         <button 
                           onClick={() => onAddPai?.(pessoa.id)}
-                          className="w-full p-3 flex items-center gap-1 text-teal-600 hover:text-teal-700 border-t border-gray-100 hover:bg-gray-50"
+                          className="w-full p-3 flex items-center gap-1 text-amber-600 hover:text-amber-700 border-t border-gray-100 hover:bg-gray-50"
                         >
                           <Plus className="h-4 w-4" />
                           <span className="text-sm font-medium">ACRESCENTAR PAI</span>
@@ -508,7 +508,7 @@ export function PessoaDetailsPage({
                       {!pessoa.mae && (
                         <button 
                           onClick={() => onAddMae?.(pessoa.id)}
-                          className="w-full p-3 flex items-center gap-1 text-teal-600 hover:text-teal-700 border-t border-gray-100 hover:bg-gray-50"
+                          className="w-full p-3 flex items-center gap-1 text-amber-600 hover:text-amber-700 border-t border-gray-100 hover:bg-gray-50"
                         >
                           <Plus className="h-4 w-4" />
                           <span className="text-sm font-medium">ACRESCENTAR MÃE</span>
@@ -519,14 +519,14 @@ export function PessoaDetailsPage({
                     <div className="space-y-2">
                       <button 
                         onClick={() => onAddPai?.(pessoa.id)}
-                        className="w-full p-3 flex items-center gap-1 text-teal-600 hover:text-teal-700 border border-gray-200 rounded-lg hover:bg-gray-50"
+                        className="w-full p-3 flex items-center gap-1 text-amber-600 hover:text-amber-700 border border-gray-200 rounded-lg hover:bg-gray-50"
                       >
                         <Plus className="h-4 w-4" />
                         <span className="text-sm font-medium">ACRESCENTAR PAI</span>
                       </button>
                       <button 
                         onClick={() => onAddMae?.(pessoa.id)}
-                        className="w-full p-3 flex items-center gap-1 text-teal-600 hover:text-teal-700 border border-gray-200 rounded-lg hover:bg-gray-50"
+                        className="w-full p-3 flex items-center gap-1 text-amber-600 hover:text-amber-700 border border-gray-200 rounded-lg hover:bg-gray-50"
                       >
                         <Plus className="h-4 w-4" />
                         <span className="text-sm font-medium">ACRESCENTAR MÃE</span>
@@ -561,14 +561,14 @@ export function PessoaDetailsPage({
                       <div>
                         <p className="font-medium text-gray-900">{doc.tipo.replace(/_/g, ' ')}</p>
                         {doc.descricao && <p className="text-sm text-gray-600">{doc.descricao}</p>}
-                        <p className="text-xs text-gray-400 mt-1">Status: {doc.status}</p>
+                        <p className="text-xs text-[var(--text-muted)] mt-1">Status: {doc.status}</p>
                       </div>
                       {doc.arquivo_url && (
                         <a 
                           href={doc.arquivo_url} 
                           target="_blank" 
                           rel="noopener noreferrer"
-                          className="text-teal-600 hover:text-teal-700 text-sm"
+                          className="text-amber-600 hover:text-amber-700 text-sm"
                         >
                           Ver documento
                         </a>

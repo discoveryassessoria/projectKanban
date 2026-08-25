@@ -302,7 +302,7 @@ export default function PhaseAutomationsFasesTab({ kindInicial }: { kindInicial?
   }
 
   // ---------- render ----------
-  if (loading) return <div className="py-24 text-center text-white/50">Carregando…</div>
+  if (loading) return <div className="py-24 text-center text-[var(--text-secondary)]">Carregando…</div>
 
   const modelosDoKind = (data?.modelosAutomacao || [])
     .filter(m => amtTypeToKind(m.type) === tab)
@@ -316,15 +316,15 @@ export default function PhaseAutomationsFasesTab({ kindInicial }: { kindInicial?
 
   return (
     <div className="space-y-5">
-      {flash && <div className="rounded-xl border border-green-400/30 bg-green-500/15 px-4 py-3 text-sm text-green-200">{flash}</div>}
+      {flash && <div className="rounded-xl border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-700">{flash}</div>}
 
       {/* cabeçalho */}
       <div className="rounded-2xl border border-[var(--border-default)] bg-[var(--surface-primary)] p-5 backdrop-blur-sm">
         <h2 className="text-lg font-semibold text-white">Automações e efeitos da fase</h2>
         <p className="mt-1 text-sm text-white/60">
-          Aqui você configura os <b className="text-white/80">efeitos adicionais</b> disparados por eventos da fase: lançamento financeiro, evento/agenda, protocolo e notificação. Tarefas obrigatórias e avanço de fase NÃO são automação — pertencem ao <span className="text-blue-300">Workflow Interno</span>. Modelos reutilizáveis ficam na biblioteca <span className="text-blue-300">“Modelos de Automação”</span>.
+          Aqui você configura os <b className="text-white/80">efeitos adicionais</b> disparados por eventos da fase: lançamento financeiro, evento/agenda, protocolo e notificação. Tarefas obrigatórias e avanço de fase NÃO são automação — pertencem ao <span className="text-blue-700">Workflow Interno</span>. Modelos reutilizáveis ficam na biblioteca <span className="text-blue-700">“Modelos de Automação”</span>.
         </p>
-        <div className="mt-3 rounded-xl border border-sky-400/20 bg-sky-500/10 px-4 py-2.5 text-xs text-sky-200">
+        <div className="mt-3 rounded-xl border border-sky-200 bg-sky-50 px-4 py-2.5 text-xs text-sky-700">
           As automações desta área <b>reagem</b> aos eventos da fase. A <b>conclusão</b> é determinada pelo <b>Workflow Interno</b> (+ BlockingEngine) e a <b>próxima fase</b> pela ordem do <b>Workflow Macro</b>. Nenhuma automação avança ou escolhe a fase.
         </div>
         <div className="mt-4 flex flex-wrap gap-3">
@@ -347,12 +347,12 @@ export default function PhaseAutomationsFasesTab({ kindInicial }: { kindInicial?
         </div>
       </div>
 
-      {!proc && <div className="rounded-2xl border border-[var(--border-default)] bg-[var(--surface-primary)] p-8 text-center text-sm text-white/50">Escolha um Processo de Nacionalidade para ver as automações das fases.</div>}
+      {!proc && <div className="rounded-2xl border border-[var(--border-default)] bg-[var(--surface-primary)] p-8 text-center text-sm text-[var(--text-secondary)]">Escolha um Processo de Nacionalidade para ver as automações das fases.</div>}
 
       {/* RESUMO — todas as fases */}
       {proc && phase === "all" && (
         <div className="space-y-3">
-          {fases.length === 0 && <div className="rounded-2xl border border-[var(--border-default)] bg-[var(--surface-primary)] p-8 text-center text-sm text-white/50">Este processo ainda não possui fases no Workflow Macro.</div>}
+          {fases.length === 0 && <div className="rounded-2xl border border-[var(--border-default)] bg-[var(--surface-primary)] p-8 text-center text-sm text-[var(--text-secondary)]">Este processo ainda não possui fases no Workflow Macro.</div>}
           {fases.map(f => {
             const all = rulesOf(f.phaseKey)
             const byKind = KIND_TABS.map(([k, lbl]) => [lbl, all.filter(r => r.kind === k).length] as [string, number]).filter(([, n]) => n > 0)
@@ -362,11 +362,11 @@ export default function PhaseAutomationsFasesTab({ kindInicial }: { kindInicial?
                   <div>
                     <div className="flex items-center gap-2">
                       <span className="font-semibold text-white">[{f.order}] {f.label}</span>
-                      <span className={`rounded-full px-2 py-0.5 text-[10px] ${all.length ? "bg-green-500/15 text-green-300" : "bg-[var(--surface-primary)] text-white/50"}`}>{all.length ? "configurada" : "vazia"}</span>
+                      <span className={`rounded-full px-2 py-0.5 text-[10px] ${all.length ? "bg-green-50 text-green-700" : "bg-[var(--surface-primary)] text-[var(--text-secondary)]"}`}>{all.length ? "configurada" : "vazia"}</span>
                     </div>
-                    <div className="mt-0.5 text-xs text-white/50">{byKind.length ? byKind.map(([l, n]) => `${n} ${l.toLowerCase()}`).join(" · ") : "nenhuma automação aplicada"}</div>
+                    <div className="mt-0.5 text-xs text-[var(--text-secondary)]">{byKind.length ? byKind.map(([l, n]) => `${n} ${l.toLowerCase()}`).join(" · ") : "nenhuma automação aplicada"}</div>
                   </div>
-                  <button onClick={() => { setPhase(f.phaseKey); setTab("financial") }} className="rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-medium text-[#fff] hover:bg-blue-500">Gerenciar</button>
+                  <button onClick={() => { setPhase(f.phaseKey); setTab("financial") }} className="rounded-lg bg-[var(--action-primary)] px-3 py-1.5 text-xs font-medium text-[var(--action-primary-ink)] hover:bg-[var(--action-primary)]">Gerenciar</button>
                 </div>
               </div>
             )
@@ -392,11 +392,11 @@ export default function PhaseAutomationsFasesTab({ kindInicial }: { kindInicial?
           {/* toolbar */}
           <div className="mb-3 flex flex-wrap items-center gap-2">
             {/* Biblioteca de Modelos REMOVIDA — automações são criadas ad-hoc ("Nova regra"). */}
-            <button onClick={openNew} className={`rounded-lg px-3 py-1.5 text-xs font-medium ${tab === "financial" ? "bg-blue-600 text-white hover:bg-blue-500" : "border border-[var(--border-default)] bg-[var(--surface-primary)] text-white/80 hover:bg-[var(--surface-hover)]"}`}>+ Nova regra ({kindLabel(tab).toLowerCase()})</button>
+            <button onClick={openNew} className={`rounded-lg px-3 py-1.5 text-xs font-medium ${tab === "financial" ? "bg-[var(--action-primary)] text-[var(--action-primary-ink)] hover:bg-[var(--action-primary)]" : "border border-[var(--border-default)] bg-[var(--surface-primary)] text-white/80 hover:bg-[var(--surface-hover)]"}`}>+ Nova regra ({kindLabel(tab).toLowerCase()})</button>
             {(() => {
               const arq = rulesOf(faseAtual.phaseKey, tab, true).filter(r => r.arquivado).length
               return arq > 0 ? (
-                <button onClick={() => setShowArchived(v => !v)} className={`ml-auto rounded-lg border px-3 py-1.5 text-xs ${showArchived ? "border-blue-400/40 bg-blue-500/10 text-blue-200" : "border-[var(--border-default)] bg-[var(--surface-primary)] text-white/60 hover:bg-[var(--surface-hover)]"}`}>
+                <button onClick={() => setShowArchived(v => !v)} className={`ml-auto rounded-lg border px-3 py-1.5 text-xs ${showArchived ? "border-blue-200 bg-blue-50 text-blue-700" : "border-[var(--border-default)] bg-[var(--surface-primary)] text-white/60 hover:bg-[var(--surface-hover)]"}`}>
                   {showArchived ? "Ocultar arquivadas" : `Mostrar arquivadas (${arq})`}
                 </button>
               ) : null
@@ -406,7 +406,7 @@ export default function PhaseAutomationsFasesTab({ kindInicial }: { kindInicial?
           {/* lista de regras */}
           {(() => {
             const rules = rulesOf(faseAtual.phaseKey, tab, showArchived)
-            if (!rules.length) return <div className="rounded-lg border border-[var(--border-default)] bg-[var(--surface-primary)] px-4 py-6 text-center text-xs text-white/40">Nenhuma automação de {kindLabel(tab).toLowerCase()} {showArchived ? "arquivada " : ""}nesta fase. Aplique um modelo ou crie uma regra.</div>
+            if (!rules.length) return <div className="rounded-lg border border-[var(--border-default)] bg-[var(--surface-primary)] px-4 py-6 text-center text-xs text-[var(--text-muted)]">Nenhuma automação de {kindLabel(tab).toLowerCase()} {showArchived ? "arquivada " : ""}nesta fase. Aplique um modelo ou crie uma regra.</div>
             return (
               <div className="space-y-2">
                 {rules.map(r => {
@@ -419,31 +419,31 @@ export default function PhaseAutomationsFasesTab({ kindInicial }: { kindInicial?
                           <div className="flex items-center gap-2">
                             <span className="text-sm font-medium text-white">{rotuloRegra(r)}</span>
                             {r.arquivado
-                              ? <span className="rounded-full bg-[var(--surface-primary)] px-2 py-0.5 text-[10px] text-white/50">arquivada</span>
-                              : <span className={`rounded-full px-2 py-0.5 text-[10px] ${r.active ? "bg-green-500/15 text-green-300" : "bg-[var(--surface-primary)] text-white/50"}`}>{r.active ? "Ativa" : "Inativa"}</span>}
-                            {r.templateId != null && <span className="rounded-full bg-violet-500/15 px-2 py-0.5 text-[10px] text-violet-300">de modelo</span>}
+                              ? <span className="rounded-full bg-[var(--surface-primary)] px-2 py-0.5 text-[10px] text-[var(--text-secondary)]">arquivada</span>
+                              : <span className={`rounded-full px-2 py-0.5 text-[10px] ${r.active ? "bg-green-50 text-green-700" : "bg-[var(--surface-primary)] text-[var(--text-secondary)]"}`}>{r.active ? "Ativa" : "Inativa"}</span>}
+                            {r.templateId != null && <span className="rounded-full bg-slate-50 px-2 py-0.5 text-[10px] text-slate-700">de modelo</span>}
                           </div>
-                          {descricaoRegra(r) && <div className="mt-0.5 text-xs text-white/50">{descricaoRegra(r)}</div>}
-                          <div className="mt-1 flex flex-wrap items-center gap-1.5 text-[10px] text-white/50">
+                          {descricaoRegra(r) && <div className="mt-0.5 text-xs text-[var(--text-secondary)]">{descricaoRegra(r)}</div>}
+                          <div className="mt-1 flex flex-wrap items-center gap-1.5 text-[10px] text-[var(--text-secondary)]">
                             <span className="rounded bg-[var(--surface-primary)] px-1.5 py-0.5">{kindLabel(r.kind)}</span>
                             <span className="rounded bg-[var(--surface-primary)] px-1.5 py-0.5">{trigLabel(r.trigger)}</span>
                             {r.kind === "financial" && (r.configItemId
                               ? <>
-                                  <span className="rounded bg-sky-500/15 px-1.5 py-0.5 text-sky-300">{catLabel(data?.configsFinanceiras.find(c => c.id === r.configItemId)?.origem)}</span>
+                                  <span className="rounded bg-sky-50 px-1.5 py-0.5 text-sky-700">{catLabel(data?.configsFinanceiras.find(c => c.id === r.configItemId)?.origem)}</span>
                                   <span className="rounded bg-[var(--surface-primary)] px-1.5 py-0.5">{data?.configsFinanceiras.find(c => c.id === r.configItemId)?.mestre || `config #${r.configItemId}`}</span>
-                                  <span className="rounded bg-emerald-500/15 px-1.5 py-0.5 text-emerald-300">{APLIC_LABEL[r.aplicacaoFinanceira || ""] || "Receita"}</span>
+                                  <span className="rounded bg-emerald-50 px-1.5 py-0.5 text-emerald-700">{APLIC_LABEL[r.aplicacaoFinanceira || ""] || "Receita"}</span>
                                 </>
-                              : <span className="rounded bg-amber-500/15 px-1.5 py-0.5 text-amber-300">Legada (valor manual)</span>)}
+                              : <span className="rounded bg-amber-50 px-1.5 py-0.5 text-amber-700">Legada (valor manual)</span>)}
                             {r.kind === "task" && !!p.priority && <span className="rounded bg-[var(--surface-primary)] px-1.5 py-0.5">prio: {String(p.priority)}</span>}
-                            {cond && <span className="rounded bg-sky-500/15 px-1.5 py-0.5 text-sky-300">se {cond.field} {cond.op === "eq" ? "=" : cond.op} {cond.value}</span>}
+                            {cond && <span className="rounded bg-sky-50 px-1.5 py-0.5 text-sky-700">se {cond.field} {cond.op === "eq" ? "=" : cond.op} {cond.value}</span>}
                             <span className="rounded bg-[var(--surface-primary)] px-1.5 py-0.5">{r.idempotent ? "evita duplicar" : "permite repetir"}</span>
                           </div>
                         </div>
-                        <div className="flex flex-none items-center gap-0.5 text-white/50">
+                        <div className="flex flex-none items-center gap-0.5 text-[var(--text-secondary)]">
                           {r.arquivado ? (
                             <>
-                              <button title="Reativar" aria-label="Reativar" onClick={() => unarchiveRule(r)} className="rounded p-1 text-green-300/80 hover:bg-[var(--surface-hover)] hover:text-green-300"><IUnarch /></button>
-                              <button title="Excluir" aria-label="Excluir" onClick={() => deleteRule(r)} className="rounded p-1 text-red-300/70 hover:bg-red-500/10 hover:text-red-300"><ITrash /></button>
+                              <button title="Reativar" aria-label="Reativar" onClick={() => unarchiveRule(r)} className="rounded p-1 text-green-700/80 hover:bg-[var(--surface-hover)] hover:text-green-700"><IUnarch /></button>
+                              <button title="Excluir" aria-label="Excluir" onClick={() => deleteRule(r)} className="rounded p-1 text-red-700/70 hover:bg-red-50 hover:text-red-700"><ITrash /></button>
                             </>
                           ) : (
                             <>
@@ -451,7 +451,7 @@ export default function PhaseAutomationsFasesTab({ kindInicial }: { kindInicial?
                               <button title="Duplicar" aria-label="Duplicar" onClick={() => dupRule(r)} className="rounded p-1 hover:bg-[var(--surface-hover)] hover:text-white"><ICopy /></button>
                               <button title={r.active ? "Desativar" : "Ativar"} aria-label="Ativar/Desativar" onClick={() => toggleRule(r)} className="rounded p-1 hover:bg-[var(--surface-hover)] hover:text-white"><IPower /></button>
                               <button title="Arquivar" aria-label="Arquivar" onClick={() => archiveRule(r)} className="rounded p-1 hover:bg-[var(--surface-hover)] hover:text-white"><IArch /></button>
-                              <button title="Excluir" aria-label="Excluir" onClick={() => deleteRule(r)} className="rounded p-1 text-red-300/70 hover:bg-red-500/10 hover:text-red-300"><ITrash /></button>
+                              <button title="Excluir" aria-label="Excluir" onClick={() => deleteRule(r)} className="rounded p-1 text-red-700/70 hover:bg-red-50 hover:text-red-700"><ITrash /></button>
                             </>
                           )}
                         </div>
@@ -471,21 +471,21 @@ export default function PhaseAutomationsFasesTab({ kindInicial }: { kindInicial?
           <div className="max-h-[90vh] w-full max-w-2xl overflow-auto rounded-2xl border border-[var(--border-default)] bg-zinc-900/95 shadow-2xl" onClick={e => e.stopPropagation()}>
             <div className="border-b border-[var(--border-default)] px-6 py-4">
               <h3 className="font-semibold text-white">Aplicar modelo de automação</h3>
-              <p className="mt-0.5 text-xs text-white/50">Fase: {faseAtual.label} · tipo: {kindLabel(tab)} · a configuração do modelo será copiada para a fase.</p>
+              <p className="mt-0.5 text-xs text-[var(--text-secondary)]">Fase: {faseAtual.label} · tipo: {kindLabel(tab)} · a configuração do modelo será copiada para a fase.</p>
             </div>
             <div className="space-y-1.5 px-6 py-4">
-              {modelosDoKind.length === 0 && <div className="text-sm text-white/50">Nenhum modelo de {kindLabel(tab).toLowerCase()} na biblioteca.</div>}
+              {modelosDoKind.length === 0 && <div className="text-sm text-[var(--text-secondary)]">Nenhum modelo de {kindLabel(tab).toLowerCase()} na biblioteca.</div>}
               {modelosDoKind.map(m => {
                 const rec = (m.recommendedPhases || []).includes(faseAtual.phaseKey)
                 return (
-                  <label key={m.id} className={`flex cursor-pointer items-start gap-3 rounded-lg border px-3 py-2 ${applySel === m.id ? "border-blue-400/50 bg-blue-500/10" : "border-[var(--border-default)] bg-[var(--surface-primary)] hover:bg-[var(--surface-hover)]"}`}>
+                  <label key={m.id} className={`flex cursor-pointer items-start gap-3 rounded-lg border px-3 py-2 ${applySel === m.id ? "border-blue-200 bg-blue-50" : "border-[var(--border-default)] bg-[var(--surface-primary)] hover:bg-[var(--surface-hover)]"}`}>
                     <input type="radio" name="modelo" checked={applySel === m.id} onChange={() => setApplySel(m.id)} className="mt-1" />
                     <div className="min-w-0">
                       <div className="flex items-center gap-2">
                         <span className="text-sm font-medium text-white">{m.name}</span>
-                        {rec && <span className="rounded-full bg-green-500/15 px-2 py-0.5 text-[10px] text-green-300">recomendado</span>}
+                        {rec && <span className="rounded-full bg-green-50 px-2 py-0.5 text-[10px] text-green-700">recomendado</span>}
                       </div>
-                      {m.description && <div className="mt-0.5 text-xs text-white/50">{m.description}</div>}
+                      {m.description && <div className="mt-0.5 text-xs text-[var(--text-secondary)]">{m.description}</div>}
                     </div>
                   </label>
                 )
@@ -493,7 +493,7 @@ export default function PhaseAutomationsFasesTab({ kindInicial }: { kindInicial?
             </div>
             <div className="flex justify-end gap-2 border-t border-[var(--border-default)] px-6 py-4">
               <button onClick={() => setApplyOpen(false)} className="rounded-lg border border-[var(--border-default)] bg-[var(--surface-primary)] px-4 py-2 text-sm text-white/80 hover:bg-[var(--surface-hover)]">Cancelar</button>
-              <button disabled={!applySel || busy} onClick={aplicar} className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-[#fff] hover:bg-blue-500 disabled:opacity-50">Aplicar</button>
+              <button disabled={!applySel || busy} onClick={aplicar} className="rounded-lg bg-[var(--action-primary)] px-4 py-2 text-sm font-medium text-[var(--action-primary-ink)] hover:bg-[var(--action-primary)] disabled:opacity-50">Aplicar</button>
             </div>
           </div>
         </div>
@@ -505,7 +505,7 @@ export default function PhaseAutomationsFasesTab({ kindInicial }: { kindInicial?
           <div className="max-h-[90vh] w-full max-w-2xl overflow-auto rounded-2xl border border-[var(--border-default)] bg-zinc-900/95 shadow-2xl" onClick={e => e.stopPropagation()}>
             <div className="border-b border-[var(--border-default)] px-6 py-4">
               <h3 className="font-semibold text-white">{form.id ? "Editar automação" : "Nova automação"} · {kindLabel(form.kind)}</h3>
-              <p className="mt-0.5 text-xs text-white/50">Fase: {faseAtual.label}</p>
+              <p className="mt-0.5 text-xs text-[var(--text-secondary)]">Fase: {faseAtual.label}</p>
             </div>
             <div className="grid grid-cols-2 gap-3 px-6 py-4">
               {/* FINANCEIRO: sem Nome/Descrição — a identidade é 100% estruturada
@@ -513,7 +513,7 @@ export default function PhaseAutomationsFasesTab({ kindInicial }: { kindInicial?
               {form.kind === "financial" ? (
                 <div className="col-span-2 rounded-lg border border-[var(--border-default)] bg-[var(--surface-primary)] px-3 py-2 text-xs text-white/60">
                   <div className="font-medium text-white">{tituloFinanceiroDoForm(form) || "Título gerado automaticamente"}</div>
-                  <div className="mt-0.5 text-white/50">{descricaoFinanceiraDoForm(form) || "A descrição é gerada a partir da regra — sem texto livre."}</div>
+                  <div className="mt-0.5 text-[var(--text-secondary)]">{descricaoFinanceiraDoForm(form) || "A descrição é gerada a partir da regra — sem texto livre."}</div>
                 </div>
               ) : (<>
                 <div className="col-span-2">
@@ -547,7 +547,7 @@ export default function PhaseAutomationsFasesTab({ kindInicial }: { kindInicial?
               </>)}
               {form.kind === "financial" && (<>
                 {form.id && !form.configItemId && (
-                  <div className="col-span-2 rounded-lg border border-amber-400/30 bg-amber-500/10 px-3 py-2 text-xs text-amber-200">Regra <b>legada</b> (valor/código manual). Selecione uma Configuração Financeira para migrá-la: o preço passa a vir da Tabela de Preços.</div>
+                  <div className="col-span-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-700">Regra <b>legada</b> (valor/código manual). Selecione uma Configuração Financeira para migrá-la: o preço passa a vir da Tabela de Preços.</div>
                 )}
                 <div>
                   <label className={labelCls}>Categoria *</label>
@@ -570,7 +570,7 @@ export default function PhaseAutomationsFasesTab({ kindInicial }: { kindInicial?
                     <option value="CUSTO" className={opt} disabled={!cfgTemCusto}>Custo{cfgTemCusto ? "" : " (sem preço de custo)"}</option>
                     <option value="AMBOS" className={opt} disabled={!cfgAmbosPermitido}>Custo e receita{cfgAmbosPermitido ? "" : " (falta preço)"}</option>
                   </select>
-                  <p className="mt-1 text-[11px] text-white/40">Só aparecem Configurações com preço na Tabela de Preços. A automação não guarda valor — o preço vigente vem da Tabela.</p>
+                  <p className="mt-1 text-[11px] text-[var(--text-muted)]">Só aparecem Configurações com preço na Tabela de Preços. A automação não guarda valor — o preço vigente vem da Tabela.</p>
                 </div>
               </>)}
               {form.kind === "alert" && (
@@ -604,7 +604,7 @@ export default function PhaseAutomationsFasesTab({ kindInicial }: { kindInicial?
             </div>
             <div className="flex justify-end gap-2 border-t border-[var(--border-default)] px-6 py-4">
               <button onClick={() => setForm(null)} className="rounded-lg border border-[var(--border-default)] bg-[var(--surface-primary)] px-4 py-2 text-sm text-white/80 hover:bg-[var(--surface-hover)]">Cancelar</button>
-              <button disabled={busy} onClick={saveForm} className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-[#fff] hover:bg-blue-500 disabled:opacity-50">Salvar</button>
+              <button disabled={busy} onClick={saveForm} className="rounded-lg bg-[var(--action-primary)] px-4 py-2 text-sm font-medium text-[var(--action-primary-ink)] hover:bg-[var(--action-primary)] disabled:opacity-50">Salvar</button>
             </div>
           </div>
         </div>

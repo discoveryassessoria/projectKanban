@@ -228,13 +228,13 @@ export default function ProdutosServicosTab() {
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h2 className="text-xl font-semibold text-white">Catálogo de Serviços</h2>
-          <p className="text-sm text-white/50">
+          <p className="text-sm text-[var(--text-secondary)]">
             Cadastro único do que a empresa vende e executa (assessoria, tradução, apostilamento, retificação,
             busca genealógica, logística…) e dos itens cobráveis relacionados — documentos, taxas, etapas e pacotes.
             O preço e a configuração financeira vivem no Financeiro, que apenas referencia este cadastro.
           </p>
         </div>
-        <button onClick={abrirNovo} className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-[#fff] transition hover:bg-blue-500">
+        <button onClick={abrirNovo} className="rounded-lg bg-[var(--action-primary)] px-4 py-2 text-sm font-medium text-[var(--action-primary-ink)] transition hover:bg-[var(--action-primary)]">
           + Novo item
         </button>
       </div>
@@ -246,10 +246,10 @@ export default function ProdutosServicosTab() {
               key={e.valor}
               onClick={() => setEscopo(e.valor)}
               title={e.ajuda}
-              className={`rounded-md px-3 py-1.5 text-xs font-medium transition ${escopo === e.valor ? 'bg-[var(--surface-primary)] text-white' : 'text-white/50 hover:text-white/80'}`}
+              className={`rounded-md px-3 py-1.5 text-xs font-medium transition ${escopo === e.valor ? 'bg-[var(--surface-primary)] text-white' : 'text-[var(--text-secondary)] hover:text-white/80'}`}
             >
               {e.label}
-              <span className="ml-1.5 text-[10px] text-white/40">{contagem[e.valor]}</span>
+              <span className="ml-1.5 text-[10px] text-[var(--text-muted)]">{contagem[e.valor]}</span>
             </button>
           ))}
         </div>
@@ -286,17 +286,17 @@ export default function ProdutosServicosTab() {
         </select>
       </div>
 
-      {loading && <div className="py-12 text-center text-sm text-white/40">Carregando...</div>}
+      {loading && <div className="py-12 text-center text-sm text-[var(--text-muted)]">Carregando...</div>}
 
       {!loading && erroLista && (
-        <div className="rounded-lg border border-red-500/30 bg-red-500/10 p-4 text-sm text-red-200">
+        <div className="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-700">
           {erroLista}
           <button onClick={carregar} className="ml-3 underline hover:text-white">Tentar de novo</button>
         </div>
       )}
 
       {!loading && !erroLista && filtrados.length === 0 && (
-        <div className="rounded-xl border border-[var(--border-default)] bg-[var(--surface-primary)] py-12 text-center text-sm text-white/40 backdrop-blur">
+        <div className="rounded-xl border border-[var(--border-default)] bg-[var(--surface-primary)] py-12 text-center text-sm text-[var(--text-muted)] backdrop-blur">
           {busca || filtroPais !== null
             ? 'Nenhum item encontrado.'
             : escopo === 'relacionados'
@@ -312,15 +312,15 @@ export default function ProdutosServicosTab() {
           <table className="w-full text-[13px]">
             <thead>
               <tr className="bg-[var(--surface-primary)]">
-                <th className="border-b border-[var(--border-default)] px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wide text-white/50">Código</th>
-                <th className="border-b border-[var(--border-default)] px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wide text-white/50">Nome</th>
-                <th className="border-b border-[var(--border-default)] px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wide text-white/50">Tipo</th>
-                <th className="border-b border-[var(--border-default)] px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wide text-white/50">Aplicação</th>
-                <th className="border-b border-[var(--border-default)] px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wide text-white/50">Categoria</th>
-                <th className="border-b border-[var(--border-default)] px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wide text-white/50">Unidade</th>
-                <th className="border-b border-[var(--border-default)] px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wide text-white/50">Vínculos</th>
-                <th className="border-b border-[var(--border-default)] px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wide text-white/50">Status</th>
-                <th className="border-b border-[var(--border-default)] px-4 py-2.5 text-right text-[11px] font-semibold uppercase tracking-wide text-white/50">Ações</th>
+                <th className="border-b border-[var(--border-default)] px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wide text-[var(--text-secondary)]">Código</th>
+                <th className="border-b border-[var(--border-default)] px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wide text-[var(--text-secondary)]">Nome</th>
+                <th className="border-b border-[var(--border-default)] px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wide text-[var(--text-secondary)]">Tipo</th>
+                <th className="border-b border-[var(--border-default)] px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wide text-[var(--text-secondary)]">Aplicação</th>
+                <th className="border-b border-[var(--border-default)] px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wide text-[var(--text-secondary)]">Categoria</th>
+                <th className="border-b border-[var(--border-default)] px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wide text-[var(--text-secondary)]">Unidade</th>
+                <th className="border-b border-[var(--border-default)] px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wide text-[var(--text-secondary)]">Vínculos</th>
+                <th className="border-b border-[var(--border-default)] px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wide text-[var(--text-secondary)]">Status</th>
+                <th className="border-b border-[var(--border-default)] px-4 py-2.5 text-right text-[11px] font-semibold uppercase tracking-wide text-[var(--text-secondary)]">Ações</th>
               </tr>
             </thead>
             <tbody>
@@ -330,29 +330,29 @@ export default function ProdutosServicosTab() {
                       documento como serviço quando as duas famílias convivem. */}
                   {s.grupo && (
                     <tr>
-                      <td colSpan={9} className="border-b border-[var(--border-default)] bg-white/[0.07] px-4 py-2">
+                      <td colSpan={9} className="border-b border-[var(--border-default)] bg-[var(--surface-primary)] px-4 py-2">
                         <div className="text-[11px] font-semibold uppercase tracking-wide text-white/70">{s.titulo}</div>
-                        <div className="text-[11px] text-white/40">{s.ajuda}</div>
+                        <div className="text-[11px] text-[var(--text-muted)]">{s.ajuda}</div>
                       </td>
                     </tr>
                   )}
                   {s.linhas.map((l) => (
-                <tr key={l.chave} className="border-b border-[var(--border-subtle)] last:border-0 hover:bg-white/[0.03]">
+                <tr key={l.chave} className="border-b border-[var(--border-subtle)] last:border-0 hover:bg-[var(--surface-primary)]">
                   <td className="px-4 py-2.5 font-mono text-[12px] font-bold text-white/90">{l.codigo ?? '—'}</td>
                   <td className="px-4 py-2.5">
                     <div className="font-medium text-white">{l.nome}</div>
-                    {l.descricao && <div className="text-[11px] text-white/40">{l.descricao}</div>}
+                    {l.descricao && <div className="text-[11px] text-[var(--text-muted)]">{l.descricao}</div>}
                     {/* Documento no catálogo é REFERÊNCIA ao Documento Mestre. A
                         linha diz de onde ele vem — ou denuncia que não veio de lá. */}
                     {l.documentoMestreVinculado === true && (
-                      <div className="text-[11px] text-white/40">Referência ao Documento Mestre · Documentos e Protocolos</div>
+                      <div className="text-[11px] text-[var(--text-muted)]">Referência ao Documento Mestre · Documentos e Protocolos</div>
                     )}
                     {l.documentoMestreVinculado === false && (
-                      <div className="text-[11px] text-amber-300/70">Sem vínculo com Documentos e Protocolos — cadastre o documento oficial lá e vincule</div>
+                      <div className="text-[11px] text-amber-700/70">Sem vínculo com Documentos e Protocolos — cadastre o documento oficial lá e vincule</div>
                     )}
                   </td>
                   <td className="px-4 py-2.5">
-                    <span className={`rounded px-2 py-0.5 text-[11px] font-medium ${l.grupo === 'servico_pacote' ? 'bg-blue-500/15 text-blue-200' : 'bg-[var(--surface-primary)] text-white/70'}`}>
+                    <span className={`rounded px-2 py-0.5 text-[11px] font-medium ${l.grupo === 'servico_pacote' ? 'bg-blue-50 text-blue-700' : 'bg-[var(--surface-primary)] text-white/70'}`}>
                       {l.tipo}
                     </span>
                   </td>
@@ -361,18 +361,18 @@ export default function ProdutosServicosTab() {
                   <td className="px-4 py-2.5 text-white/70">{l.unidade || '—'}</td>
                   <td className="px-4 py-2.5">
                     {l.vinculos > 0
-                      ? <span className="rounded-full bg-blue-500/15 px-2 py-0.5 text-[11px] text-blue-300" title="Configurações financeiras, preços e tipos de documento que apontam para este item">{l.vinculos}</span>
-                      : <span className="text-white/30">—</span>}
+                      ? <span className="rounded-full bg-blue-50 px-2 py-0.5 text-[11px] text-blue-700" title="Configurações financeiras, preços e tipos de documento que apontam para este item">{l.vinculos}</span>
+                      : <span className="text-[var(--text-muted)]">—</span>}
                   </td>
                   <td className="px-4 py-2.5">
-                    <span className={`rounded px-2 py-0.5 text-[11px] font-medium ${l.ativo ? 'bg-green-500/15 text-green-300' : 'bg-[var(--surface-primary)] text-white/50'}`}>
+                    <span className={`rounded px-2 py-0.5 text-[11px] font-medium ${l.ativo ? 'bg-green-50 text-green-700' : 'bg-[var(--surface-primary)] text-[var(--text-secondary)]'}`}>
                       {l.ativo ? 'Ativo' : 'Inativo'}
                     </span>
                   </td>
                   <td className="px-4 py-2.5">
                     <div className="flex items-center justify-end gap-2">
                       <button onClick={() => abrirEditar(l)} className="rounded-md border border-[var(--border-default)] px-2.5 py-1 text-xs text-white/70 transition hover:bg-[var(--surface-hover)] hover:text-white">Editar</button>
-                      <button onClick={() => excluir(l)} className="rounded-md border border-red-500/20 px-2.5 py-1 text-xs text-red-300/80 transition hover:bg-red-500/10 hover:text-red-200">Excluir</button>
+                      <button onClick={() => excluir(l)} className="rounded-md border border-red-200 px-2.5 py-1 text-xs text-red-700/80 transition hover:bg-red-50 hover:text-red-700">Excluir</button>
                     </div>
                   </td>
                 </tr>
@@ -389,7 +389,7 @@ export default function ProdutosServicosTab() {
           <div className="max-h-[90vh] w-full max-w-2xl overflow-auto rounded-2xl border border-[var(--border-default)] bg-zinc-900/95 shadow-2xl">
             <div className="flex items-center justify-between border-b border-[var(--border-default)] px-6 py-4">
               <h3 className="text-lg font-semibold text-white">{editando ? `Editar ${rotuloTipo(editando.natureza).toLowerCase()}` : 'Novo item do catálogo'}</h3>
-              <button onClick={() => setModalAberto(false)} className="text-white/40 transition hover:text-white">✕</button>
+              <button onClick={() => setModalAberto(false)} className="text-[var(--text-muted)] transition hover:text-white">✕</button>
             </div>
 
             <div className="space-y-4 px-6 py-4">
@@ -460,7 +460,7 @@ export default function ProdutosServicosTab() {
                       onToggle: () => setTerritorio((t) => alternarTodas(t)),
                     }}
                   />
-                  <p className="mt-1 text-[11px] text-white/35">
+                  <p className="mt-1 text-[11px] text-[var(--text-muted)]">
                     {estadoTerritorial(territorio) === 'global'
                       ? `${ROTULO_GLOBAL} — inclusive os que forem cadastrados depois. Nenhum vínculo individual é criado.`
                       : estadoTerritorial(territorio) === 'sem_aplicacao'
@@ -488,13 +488,13 @@ export default function ProdutosServicosTab() {
               )}
 
               {erroModal && (
-                <div className="rounded-lg border border-red-500/30 bg-red-500/10 p-3 text-sm text-red-200">{erroModal}</div>
+                <div className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700">{erroModal}</div>
               )}
             </div>
 
             <div className="flex items-center justify-end gap-2 border-t border-[var(--border-default)] px-6 py-4">
               <button onClick={() => setModalAberto(false)} className="rounded-lg px-4 py-2 text-sm text-white/60 transition hover:text-white">Cancelar</button>
-              <button onClick={salvar} disabled={salvando} className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-[#fff] transition hover:bg-blue-500 disabled:opacity-50">
+              <button onClick={salvar} disabled={salvando} className="rounded-lg bg-[var(--action-primary)] px-4 py-2 text-sm font-medium text-[var(--action-primary-ink)] transition hover:bg-[var(--action-primary)] disabled:opacity-50">
                 {salvando ? 'Salvando...' : 'Salvar'}
               </button>
             </div>

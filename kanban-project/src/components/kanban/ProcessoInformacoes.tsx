@@ -325,7 +325,7 @@ export function ProcessoInformacoes({
       <div className="flex-1 overflow-y-auto p-6">
         {loading ? (
           <div className="flex items-center justify-center py-12">
-            <Loader2 className="h-6 w-6 animate-spin text-gray-400" />
+            <Loader2 className="h-6 w-6 animate-spin text-[var(--text-muted)]" />
           </div>
         ) : showForm ? (
           /* ===== FORMULÁRIO ===== */
@@ -336,7 +336,7 @@ export function ProcessoInformacoes({
               </h4>
               <button
                 onClick={resetForm}
-                className="text-gray-400 hover:text-gray-600"
+                className="text-[var(--text-muted)] hover:text-gray-600"
               >
                 <X className="h-5 w-5" />
               </button>
@@ -435,7 +435,7 @@ export function ProcessoInformacoes({
         ) : !informacao ? (
           /* ===== EMPTY STATE ===== */
           <div className="text-center py-12">
-            <Gavel className="h-12 w-12 mx-auto mb-4 text-gray-300" />
+            <Gavel className="h-12 w-12 mx-auto mb-4 text-[var(--text-muted)]" />
             <h3 className="text-lg font-medium text-gray-700">Nenhuma informação cadastrada</h3>
             <p className="text-sm text-gray-500 mt-1 mb-4">
               {podeEditar 
@@ -476,14 +476,14 @@ export function ProcessoInformacoes({
                     <div className="flex items-center gap-1">
                       <button
                         onClick={abrirEdicao}
-                        className="p-2 text-gray-400 hover:text-blue-500 rounded-lg hover:bg-blue-50"
+                        className="p-2 text-[var(--text-muted)] hover:text-blue-500 rounded-lg hover:bg-blue-50"
                         title="Editar"
                       >
                         <Edit2 className="h-4 w-4" />
                       </button>
                       <button
                         onClick={handleExcluir}
-                        className="p-2 text-gray-400 hover:text-red-500 rounded-lg hover:bg-red-50"
+                        className="p-2 text-[var(--text-muted)] hover:text-red-500 rounded-lg hover:bg-red-50"
                         title="Excluir"
                       >
                         <Trash2 className="h-4 w-4" />
@@ -502,7 +502,7 @@ export function ProcessoInformacoes({
                     <p className="text-gray-900 font-medium mt-1">
                       {informacao.dataProtocolo 
                         ? new Date(informacao.dataProtocolo).toLocaleDateString("pt-BR")
-                        : <span className="text-gray-400 italic">Não informada</span>
+                        : <span className="text-[var(--text-muted)] italic">Não informada</span>
                       }
                     </p>
                   </div>
@@ -513,7 +513,7 @@ export function ProcessoInformacoes({
                     <p className="text-gray-900 font-medium mt-1">
                       {informacao.dataDistribuicao 
                         ? new Date(informacao.dataDistribuicao).toLocaleDateString("pt-BR")
-                        : <span className="text-gray-400 italic">Não informada</span>
+                        : <span className="text-[var(--text-muted)] italic">Não informada</span>
                       }
                     </p>
                   </div>
@@ -522,7 +522,7 @@ export function ProcessoInformacoes({
                   <div className="col-span-2">
                     <label className="text-xs text-gray-500 uppercase font-medium">Nº Ruolo Generale</label>
                     <p className="text-gray-900 font-medium font-mono mt-1 text-lg">
-                      {informacao.numeroRuoloGenerale || <span className="text-gray-400 italic text-base font-normal">Não informado</span>}
+                      {informacao.numeroRuoloGenerale || <span className="text-[var(--text-muted)] italic text-base font-normal">Não informado</span>}
                     </p>
                   </div>
 
@@ -581,7 +581,7 @@ export function ProcessoInformacoes({
                                       PDF
                                     </div>
                                   ) : (
-                                    <FileText className="h-12 w-12 text-gray-400" />
+                                    <FileText className="h-12 w-12 text-[var(--text-muted)]" />
                                   )}
                                 </div>
                               )}
@@ -598,7 +598,7 @@ export function ProcessoInformacoes({
                                 {anexo.nome}
                               </p>
                               {anexo.tamanho && (
-                                <p className="text-xs text-gray-400">{formatFileSize(anexo.tamanho)}</p>
+                                <p className="text-xs text-[var(--text-muted)]">{formatFileSize(anexo.tamanho)}</p>
                               )}
                             </div>
                             
@@ -672,15 +672,15 @@ export function ProcessoInformacoes({
                         className="hidden"
                         accept="image/*,.pdf,.doc,.docx,.xls,.xlsx"
                       />
-                      <FileText className="h-8 w-8 mx-auto mb-2 text-gray-400" />
+                      <FileText className="h-8 w-8 mx-auto mb-2 text-[var(--text-muted)]" />
                       <p className="text-sm text-gray-600 font-medium">Clique para selecionar arquivos</p>
-                      <p className="text-xs text-gray-400 mt-1">Imagens, PDF, Word, Excel (máx. 64MB cada)</p>
+                      <p className="text-xs text-[var(--text-muted)] mt-1">Imagens, PDF, Word, Excel (máx. 64MB cada)</p>
                     </label>
                   )}
                   
                   {/* Mensagem quando não pode editar e não tem anexos */}
                   {!podeEditar && anexos.length === 0 && (
-                    <p className="text-sm text-gray-400 text-center py-4">Nenhum anexo</p>
+                    <p className="text-sm text-[var(--text-muted)] text-center py-4">Nenhum anexo</p>
                   )}
                 </div>
               </div>

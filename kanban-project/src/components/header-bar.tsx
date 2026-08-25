@@ -242,10 +242,10 @@ export function HeaderBar({
             {showSearchResults && (
               <div className="absolute top-full mt-2 left-0 right-0 w-80 bg-[var(--surface-primary)] border border-gray-200 rounded-xl shadow-2xl overflow-hidden z-50">
                 {totalResults === 0 ? (
-                  <div className="px-4 py-6 text-center text-gray-400">
+                  <div className="px-4 py-6 text-center text-[var(--text-muted)]">
                     <Search className="h-8 w-8 mx-auto mb-2 opacity-50" />
                     <p className="text-sm text-gray-600">Nenhum processo encontrado</p>
-                    <p className="text-xs mt-1 text-gray-400">Tente buscar por outro termo</p>
+                    <p className="text-xs mt-1 text-[var(--text-muted)]">Tente buscar por outro termo</p>
                   </div>
                 ) : (
                   <div className="max-h-80 overflow-y-auto">
@@ -263,7 +263,7 @@ export function HeaderBar({
                         </span>
                         <div className="flex-1 min-w-0">
                           <p className="text-sm text-gray-800 truncate font-medium">{processo.nome}</p>
-                          <p className="text-[10px] text-gray-400 truncate">
+                          <p className="text-[10px] text-[var(--text-muted)] truncate">
                             {processo.contratantes?.[0] ? (processo.contratantes[0].publicCode ? processo.contratantes[0].publicCode + ' — ' : '') + processo.contratantes[0].nome : "Sem contratante"}
                           </p>
                         </div>
@@ -302,9 +302,9 @@ export function HeaderBar({
 
                 {totalNotificacoes === 0 ? (
                   <div className="px-4 py-8 text-center">
-                    <Bell className="h-10 w-10 mx-auto mb-2 text-gray-300" />
+                    <Bell className="h-10 w-10 mx-auto mb-2 text-[var(--text-muted)]" />
                     <p className="text-sm text-gray-500">Nenhuma notificação</p>
-                    <p className="text-xs text-gray-400 mt-1">Você está em dia!</p>
+                    <p className="text-xs text-[var(--text-muted)] mt-1">Você está em dia!</p>
                   </div>
                 ) : (
                   <div className="max-h-[400px] overflow-y-auto">
@@ -352,19 +352,19 @@ export function HeaderBar({
 
                     {notificacoes.proximos3Dias.length > 0 && (
                       <div>
-                        <div className="px-3 py-2 bg-orange-50 text-[10px] uppercase tracking-wide text-orange-600 font-medium flex items-center gap-1 sticky top-0">
-                          <span className="h-2 w-2 rounded-full bg-orange-500"></span>
+                        <div className="px-3 py-2 bg-amber-50 text-[10px] uppercase tracking-wide text-amber-600 font-medium flex items-center gap-1 sticky top-0">
+                          <span className="h-2 w-2 rounded-full bg-amber-500"></span>
                           Próximos 3 dias ({notificacoes.proximos3Dias.length})
                         </div>
                         {notificacoes.proximos3Dias.map(tarefa => (
                           <button
                             key={`proximos-${tarefa.id}`}
-                            className="w-full text-left px-3 py-2 border-l-4 border-orange-500 hover:bg-orange-50 transition-colors cursor-pointer"
+                            className="w-full text-left px-3 py-2 border-l-4 border-amber-500 hover:bg-amber-50 transition-colors cursor-pointer"
                             onClick={() => handleTarefaClick(tarefa)}
                           >
                             <p className="text-sm text-gray-800 truncate font-medium">{tarefa.titulo}</p>
                             <p className="text-[10px] text-gray-500">{tarefa.processoNome}</p>
-                            <p className="text-[10px] text-orange-600 font-medium">
+                            <p className="text-[10px] text-amber-600 font-medium">
                               Vence em {formatDateBR(tarefa.dataPrazo)}
                             </p>
                           </button>
@@ -419,7 +419,7 @@ export function HeaderBar({
             variant="outline"
             size="sm"
             onClick={onLogout}
-            className="border-[var(--border-strong)] text-xs bg-transparent hover:bg-red-500/20 hover:border-red-400/50 text-[#fff] hover:text-red-400 flex items-center justify-center gap-1.5"
+            className="border-[var(--border-strong)] text-xs bg-transparent hover:bg-red-50 hover:border-red-200 text-[#fff] hover:text-red-700 flex items-center justify-center gap-1.5"
           >
             <LogOut className="h-3 w-3" />
             Sair

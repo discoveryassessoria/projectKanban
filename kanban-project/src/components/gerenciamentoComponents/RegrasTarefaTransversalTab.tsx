@@ -218,7 +218,7 @@ export default function RegrasTarefaTransversalTab() {
           <option value="active" className="bg-zinc-900">Ativos</option>
           <option value="archived" className="bg-zinc-900">Arquivados</option>
         </select>
-        <button onClick={abrirNovo} className="ml-auto rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-[#fff] hover:bg-blue-500">
+        <button onClick={abrirNovo} className="ml-auto rounded-lg bg-[var(--action-primary)] px-4 py-2 text-sm font-medium text-[var(--action-primary-ink)] hover:bg-[var(--action-primary)]">
           + Nova regra
         </button>
       </div>
@@ -226,7 +226,7 @@ export default function RegrasTarefaTransversalTab() {
       <div className="overflow-hidden rounded-xl border border-[var(--border-default)] bg-[var(--surface-primary)]">
         <table className="w-full text-sm">
           <thead>
-            <tr className="border-b border-[var(--border-default)] text-left text-xs text-white/50">
+            <tr className="border-b border-[var(--border-default)] text-left text-xs text-[var(--text-secondary)]">
               <th className="px-3 py-2 font-medium">Regra</th>
               <th className="px-3 py-2 font-medium">Fase de origem</th>
               <th className="px-3 py-2 font-medium">Operação</th>
@@ -238,14 +238,14 @@ export default function RegrasTarefaTransversalTab() {
           </thead>
           <tbody>
             {loading ? (
-              <tr><td colSpan={7} className="px-3 py-8 text-center text-white/40">Carregando…</td></tr>
+              <tr><td colSpan={7} className="px-3 py-8 text-center text-[var(--text-muted)]">Carregando…</td></tr>
             ) : lista.length === 0 ? (
-              <tr><td colSpan={7} className="px-3 py-8 text-center text-white/40">Nenhuma regra. Clique em “+ Nova regra”.</td></tr>
+              <tr><td colSpan={7} className="px-3 py-8 text-center text-[var(--text-muted)]">Nenhuma regra. Clique em “+ Nova regra”.</td></tr>
             ) : lista.map(r => (
               <tr key={r.id} className="border-b border-[var(--border-subtle)] last:border-0">
                 <td className="px-3 py-2.5">
                   <div className="font-medium text-white">{r.name}</div>
-                  <div className="text-xs text-white/40">{TRIGGERS[r.trigger?.type] || r.trigger?.type || "—"}</div>
+                  <div className="text-xs text-[var(--text-muted)]">{TRIGGERS[r.trigger?.type] || r.trigger?.type || "—"}</div>
                 </td>
                 <td className="px-3 py-2.5 text-white/70">{faseLabel(r.originPhase)}</td>
                 <td className="px-3 py-2.5 text-white/70">{faseLabel(r.operationalPhase)}</td>
@@ -253,7 +253,7 @@ export default function RegrasTarefaTransversalTab() {
                 <td className="px-3 py-2.5">
                   <div className="flex flex-wrap gap-1">
                     {r.autoCreate
-                      ? <span className="rounded bg-amber-500/15 px-1.5 py-0.5 text-[10px] text-amber-300">cria automático</span>
+                      ? <span className="rounded bg-amber-50 px-1.5 py-0.5 text-[10px] text-amber-700">cria automático</span>
                       : <span className="rounded bg-[var(--surface-primary)] px-1.5 py-0.5 text-[10px] text-white/60">sugere</span>}
                     {r.mandatory && <span className="rounded bg-[var(--surface-primary)] px-1.5 py-0.5 text-[10px] text-white/60">obrigatória</span>}
                   </div>
@@ -261,7 +261,7 @@ export default function RegrasTarefaTransversalTab() {
                 <td className="px-3 py-2.5">
                   {r.arquivado
                     ? <span className="rounded bg-[var(--surface-primary)] px-1.5 py-0.5 text-[10px] text-white/60">arquivado</span>
-                    : <span className="rounded bg-green-500/15 px-1.5 py-0.5 text-[10px] text-green-300">ativo</span>}
+                    : <span className="rounded bg-green-50 px-1.5 py-0.5 text-[10px] text-green-700">ativo</span>}
                 </td>
                 <td className="px-3 py-2.5">
                   <div className="flex items-center justify-end gap-1">
@@ -398,7 +398,7 @@ export default function RegrasTarefaTransversalTab() {
 
             <div className="flex justify-end gap-2 border-t border-[var(--border-default)] px-5 py-4">
               <button onClick={() => setModalOpen(false)} className="rounded-lg border border-[var(--border-default)] px-4 py-2 text-sm text-white/70 hover:bg-[var(--surface-hover)]">Cancelar</button>
-              <button onClick={salvar} disabled={salvando} className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-[#fff] hover:bg-blue-500 disabled:opacity-60">
+              <button onClick={salvar} disabled={salvando} className="rounded-lg bg-[var(--action-primary)] px-4 py-2 text-sm font-medium text-[var(--action-primary-ink)] hover:bg-[var(--action-primary)] disabled:opacity-60">
                 {salvando ? "Salvando…" : "Salvar"}
               </button>
             </div>
@@ -410,7 +410,7 @@ export default function RegrasTarefaTransversalTab() {
 }
 
 function Secao({ titulo }: { titulo: string }) {
-  return <div className="col-span-2 mt-1 border-t border-[var(--border-default)] pt-3 text-xs font-bold uppercase tracking-wide text-white/50">{titulo}</div>
+  return <div className="col-span-2 mt-1 border-t border-[var(--border-default)] pt-3 text-xs font-bold uppercase tracking-wide text-[var(--text-secondary)]">{titulo}</div>
 }
 function Chk({ label, checked, onChange }: { label: string; checked: boolean; onChange: (v: boolean) => void }) {
   return (
@@ -423,7 +423,7 @@ function Chk({ label, checked, onChange }: { label: string; checked: boolean; on
 function IconBtn({ children, title, onClick, danger }: { children: ReactNode; title: string; onClick: () => void; danger?: boolean }) {
   return (
     <button title={title} aria-label={title} onClick={onClick}
-      className={`rounded-md p-1.5 hover:bg-[var(--surface-hover)] ${danger ? "text-red-300/80 hover:text-red-300" : "text-white/60 hover:text-white"}`}>
+      className={`rounded-md p-1.5 hover:bg-[var(--surface-hover)] ${danger ? "text-red-700/80 hover:text-red-700" : "text-white/60 hover:text-white"}`}>
       {children}
     </button>
   )

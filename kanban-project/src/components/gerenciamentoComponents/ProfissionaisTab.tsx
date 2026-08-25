@@ -163,7 +163,7 @@ export function ProfissionaisTab() {
     <div className="space-y-4">
       <div>
         <h2 className="text-lg font-medium text-white">Profissionais</h2>
-        <p className="mt-1 text-sm text-white/50">
+        <p className="mt-1 text-sm text-[var(--text-secondary)]">
           Pessoas que exercem profissão regulamentada e atuam nos processos. Os pedidos de retificação
           referenciam daqui — nome e inscrição são lidos deste cadastro, nunca copiados.
         </p>
@@ -184,18 +184,18 @@ export function ProfissionaisTab() {
         >+ Novo profissional</button>
       </div>
 
-      {erro && <div className="rounded-lg border border-amber-400/30 bg-amber-400/10 px-4 py-3 text-sm text-amber-200">{erro}</div>}
+      {erro && <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-700">{erro}</div>}
 
       {carregando ? (
-        <p className="py-10 text-center text-sm text-white/40">Carregando…</p>
+        <p className="py-10 text-center text-sm text-[var(--text-muted)]">Carregando…</p>
       ) : lista.length === 0 ? (
-        <p className="rounded-lg border border-dashed border-[var(--border-default)] p-8 text-center text-sm text-white/40">
+        <p className="rounded-lg border border-dashed border-[var(--border-default)] p-8 text-center text-sm text-[var(--text-muted)]">
           {busca ? "Nenhum profissional encontrado para essa busca." : "Nenhum profissional cadastrado ainda."}
         </p>
       ) : (
         <div className="overflow-x-auto rounded-lg border border-[var(--border-default)]">
           <table className="w-full text-sm">
-            <thead className="bg-[var(--surface-primary)] text-left text-xs uppercase tracking-wide text-white/40">
+            <thead className="bg-[var(--surface-primary)] text-left text-xs uppercase tracking-wide text-[var(--text-muted)]">
               <tr>
                 <th className="px-4 py-2.5">Nome</th>
                 <th className="px-4 py-2.5">Categoria</th>
@@ -217,11 +217,11 @@ export function ProfissionaisTab() {
                     {p.organizacao ? (p.organizacao.nomeFantasia || p.organizacao.name) : "autônomo"}
                   </td>
                   <td className="px-4 py-2.5">
-                    <span className={p.ativo ? "text-emerald-300/80" : "text-white/40"}>
+                    <span className={p.ativo ? "text-emerald-700/80" : "text-[var(--text-muted)]"}>
                       {p.ativo ? "em circulação" : "fora de circulação"}
                     </span>
                     {p._count.retificacoes > 0 && (
-                      <span className="ml-2 text-[11px] text-white/35">{p._count.retificacoes} pedido(s)</span>
+                      <span className="ml-2 text-[11px] text-[var(--text-muted)]">{p._count.retificacoes} pedido(s)</span>
                     )}
                   </td>
                   <td className="px-4 py-2.5 text-right">
@@ -235,7 +235,7 @@ export function ProfissionaisTab() {
                         um pedido é histórico, e o botão diria uma coisa que não pode fazer. */}
                     {p._count.retificacoes === 0 && (
                       <button onClick={() => void excluir(p)}
-                        className="ml-2 rounded border border-[var(--border-default)] px-2 py-1 text-xs text-red-300/80 hover:bg-red-500/10">Excluir</button>
+                        className="ml-2 rounded border border-[var(--border-default)] px-2 py-1 text-xs text-red-700/80 hover:bg-red-50">Excluir</button>
                     )}
                   </td>
                 </tr>
@@ -247,12 +247,12 @@ export function ProfissionaisTab() {
 
       {form && (
         <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-[var(--overlay-modal)] p-4" onClick={() => setForm(null)}>
-          <div className="max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-xl border border-[var(--border-default)] bg-[#0f1115] p-5" onClick={(e) => e.stopPropagation()}>
+          <div className="max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-xl border border-[var(--border-default)] bg-[var(--surface-overlay)] p-5" onClick={(e) => e.stopPropagation()}>
             <h3 className="text-base font-medium text-white">
               {form.id ? "Editar profissional" : "Novo profissional"}
             </h3>
 
-            {erroForm && <div className="mt-3 rounded-lg border border-red-400/30 bg-red-400/10 px-3 py-2 text-sm text-red-200">{erroForm}</div>}
+            {erroForm && <div className="mt-3 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">{erroForm}</div>}
 
             <div className="mt-4 grid grid-cols-2 gap-3">
               <div className="col-span-2">
@@ -266,7 +266,7 @@ export function ProfissionaisTab() {
                   <option value="">— escolher —</option>
                   {categorias.map((c) => <option key={c.id} value={c.id}>{c.nome}</option>)}
                 </select>
-                <p className="mt-1 text-[11px] text-white/35">
+                <p className="mt-1 text-[11px] text-[var(--text-muted)]">
                   Vem do cadastro de Categorias. Falta uma? Cadastre em Profissionais › Categorias.
                 </p>
               </div>
@@ -277,7 +277,7 @@ export function ProfissionaisTab() {
                   <option value="">— autônomo —</option>
                   {orgs.map((o) => <option key={o.id} value={o.id}>{o.nomeFantasia || o.name}</option>)}
                 </select>
-                <p className="mt-1 text-[11px] text-white/35">Escolhido em Órgãos e Organizações — não se cadastra escritório aqui.</p>
+                <p className="mt-1 text-[11px] text-[var(--text-muted)]">Escolhido em Órgãos e Organizações — não se cadastra escritório aqui.</p>
               </div>
               <div>
                 <label className={labelCls}>E-mail</label>
@@ -304,12 +304,12 @@ export function ProfissionaisTab() {
                   onClick={() => setForm((f) => f ? { ...f, registros: [...f.registros, { tipo: "OAB", numero: "", jurisdicao: null, orgaoDeClasseId: null, ativo: true }] } : f)}
                   className="rounded-lg border border-[var(--border-default)] px-2 py-1 text-[11px] text-white/70 hover:bg-[var(--surface-hover)]">+ Registro</button>
               </div>
-              <p className="mt-1 text-[11px] text-white/35">
+              <p className="mt-1 text-[11px] text-[var(--text-muted)]">
                 O tipo é um valor, não uma estrutura: OAB, CRC, JUCESP. A mesma inscrição não se repete no sistema —
                 &quot;OAB 123456/SP&quot; identifica uma pessoa só.
               </p>
               {form.registros.length === 0 && (
-                <p className="mt-2 text-[11px] text-white/35">Nenhum registro. Um advogado sem OAB não pode assinar petição.</p>
+                <p className="mt-2 text-[11px] text-[var(--text-muted)]">Nenhum registro. Um advogado sem OAB não pode assinar petição.</p>
               )}
               {form.registros.map((r, i) => (
                 <div key={i} className="mt-2 grid grid-cols-[110px_1fr_90px_auto] items-center gap-2">
@@ -320,7 +320,7 @@ export function ProfissionaisTab() {
                   <input className={inputCls} placeholder="UF" value={r.jurisdicao ?? ""}
                     onChange={(e) => setRegistro(i, { jurisdicao: e.target.value.toUpperCase() || null })} />
                   <button onClick={() => setForm((f) => f ? { ...f, registros: f.registros.filter((_, k) => k !== i) } : f)}
-                    className="rounded border border-[var(--border-default)] px-2 py-2 text-xs text-red-300/80 hover:bg-red-500/10">Remover</button>
+                    className="rounded border border-[var(--border-default)] px-2 py-2 text-xs text-red-700/80 hover:bg-red-50">Remover</button>
                 </div>
               ))}
               <datalist id="tipos-registro">

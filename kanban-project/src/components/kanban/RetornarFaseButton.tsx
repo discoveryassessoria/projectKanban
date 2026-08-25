@@ -57,7 +57,7 @@ export function RetornarFaseButton({ processoId, faseKey, faseLabel, onRetornou 
     <>
       <button
         onClick={() => setAberto(true)}
-        className="inline-flex items-center gap-1.5 bg-[var(--app-background)] text-[#fff] text-[12.5px] font-bold px-3.5 py-2 rounded-lg hover:bg-[#20262e] transition-colors"
+        className="inline-flex items-center gap-1.5 bg-[var(--app-background)] text-[#fff] text-[12.5px] font-bold px-3.5 py-2 rounded-lg hover:bg-[var(--surface-secondary)] transition-colors"
       >
         <RotateCcw className="w-3.5 h-3.5" /> Retornar processo para esta fase
       </button>
@@ -93,8 +93,8 @@ export function RetornarFaseButton({ processoId, faseKey, faseLabel, onRetornou 
             {erro && <div className="bg-[#f87171]/12 border border-[#f87171]/30 rounded-lg px-3 py-2 text-[12.5px] text-[#f87171] mb-3">{erro}</div>}
 
             <div className="flex justify-end gap-2">
-              <button disabled={enviando} onClick={() => setAberto(false)} className="px-3.5 py-2 text-[12.5px] font-semibold rounded-lg bg-[#252c35] hover:bg-[#252c35] text-white/95 disabled:opacity-50">Cancelar</button>
-              <button disabled={enviando} onClick={() => void enviar()} className="inline-flex items-center gap-1.5 px-3.5 py-2 text-[12.5px] font-bold rounded-lg bg-[var(--app-background)] text-[#fff] hover:bg-[#20262e] disabled:opacity-50">
+              <button disabled={enviando} onClick={() => setAberto(false)} className="px-3.5 py-2 text-[12.5px] font-semibold rounded-lg bg-[var(--surface-tertiary)] hover:bg-[var(--surface-tertiary)] text-white/95 disabled:opacity-50">Cancelar</button>
+              <button disabled={enviando} onClick={() => void enviar()} className="inline-flex items-center gap-1.5 px-3.5 py-2 text-[12.5px] font-bold rounded-lg bg-[var(--app-background)] text-[#fff] hover:bg-[var(--surface-secondary)] disabled:opacity-50">
                 {enviando ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <RotateCcw className="w-3.5 h-3.5" />} Confirmar retorno
               </button>
             </div>

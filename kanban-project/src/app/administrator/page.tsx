@@ -289,10 +289,10 @@ function CarregandoTela() {
 // fallback de segurança (não deve aparecer — todas as telas estão registradas)
 function EmBreve({ titulo }: { titulo: string }) {
   return (
-    <div className="rounded-2xl border border-[var(--border-default)] bg-white/[0.05] backdrop-blur-md p-10 text-center">
-      <Settings2 className="mx-auto mb-3 h-10 w-10 text-white/40" />
+    <div className="rounded-2xl border border-[var(--border-default)] bg-[var(--surface-primary)] backdrop-blur-md p-10 text-center">
+      <Settings2 className="mx-auto mb-3 h-10 w-10 text-[var(--text-muted)]" />
       <div className="font-semibold text-white/90">{titulo}</div>
-      <div className="mt-1 text-sm text-white/50">Esta área será portada em breve.</div>
+      <div className="mt-1 text-sm text-[var(--text-secondary)]">Esta área será portada em breve.</div>
     </div>
   )
 }
@@ -560,7 +560,7 @@ export default function GerenciamentoPage() {
   const secaoTela = itemAtivo?.section
 
   // classes de superfície — contraste real (fundo semissólido, blur discreto)
-  const PANEL = "rounded-2xl border border-[var(--border-default)] bg-white/[0.05] backdrop-blur-md"
+  const PANEL = "rounded-2xl border border-[var(--border-default)] bg-[var(--surface-primary)] backdrop-blur-md"
 
   return (
     <div className="relative min-h-screen overflow-x-hidden text-white">
@@ -591,19 +591,19 @@ export default function GerenciamentoPage() {
               </p>
               {/* Busca global */}
               <div className="relative mt-5 max-w-2xl">
-                <Search className="pointer-events-none absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-white/45" />
+                <Search className="pointer-events-none absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-[var(--text-secondary)]" />
                 <input
                   value={busca}
                   onChange={(e) => setBusca(e.target.value)}
                   placeholder="Buscar configuração, módulo ou tela…"
                   aria-label="Buscar configuração, módulo ou tela"
-                  className="w-full rounded-xl border border-[var(--border-default)] bg-white/[0.05] backdrop-blur-md py-3.5 pl-12 pr-11 text-[15px] text-white placeholder:text-white/45 focus:border-white/35 focus:outline-none focus-visible:ring-2 focus-visible:ring-white/40"
+                  className="w-full rounded-xl border border-[var(--border-default)] bg-[var(--surface-primary)] backdrop-blur-md py-3.5 pl-12 pr-11 text-[15px] text-white placeholder:text-[var(--text-secondary)] focus:border-white/35 focus:outline-none focus-visible:ring-2 focus-visible:ring-white/40"
                 />
                 {busca ? (
                   <button
                     onClick={() => setBusca("")}
                     aria-label="Limpar busca"
-                    className="absolute right-3 top-1/2 -translate-y-1/2 rounded-md p-1 text-white/50 hover:bg-[var(--surface-hover)] hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/40"
+                    className="absolute right-3 top-1/2 -translate-y-1/2 rounded-md p-1 text-[var(--text-secondary)] hover:bg-[var(--surface-hover)] hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/40"
                   >
                     <X className="h-4 w-4" />
                   </button>
@@ -615,22 +615,22 @@ export default function GerenciamentoPage() {
               // ── resultados da busca ──────────────────────────────────────────
               <div className={`${PANEL} p-2.5`}>
                 {resultados.length === 0 ? (
-                  <div className="px-3 py-8 text-center text-sm text-white/50">Nada encontrado para “{busca}”.</div>
+                  <div className="px-3 py-8 text-center text-sm text-[var(--text-secondary)]">Nada encontrado para “{busca}”.</div>
                 ) : (
                   <ul className="divide-y divide-white/5">
                     {resultados.map((r) => (
                       <li key={`${r.modulo}-${r.key}`}>
                         <button
                           onClick={() => irParaTela(r.key)}
-                          className="flex w-full items-center gap-3 rounded-lg px-3 py-3 text-left transition-colors hover:bg-white/[0.06] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/40"
+                          className="flex w-full items-center gap-3 rounded-lg px-3 py-3 text-left transition-colors hover:bg-[var(--surface-primary)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/40"
                         >
                           <span className="min-w-0 flex-1">
                             <span className="block truncate text-[15px] font-medium text-white">{r.label}</span>
-                            <span className="mt-0.5 block truncate text-[12.5px] text-white/50">
+                            <span className="mt-0.5 block truncate text-[12.5px] text-[var(--text-secondary)]">
                               {r.modulo}{r.secao ? ` › ${r.secao}` : ""}
                             </span>
                           </span>
-                          <ChevronRight className="h-4 w-4 flex-none text-white/40" />
+                          <ChevronRight className="h-4 w-4 flex-none text-[var(--text-muted)]" />
                         </button>
                       </li>
                     ))}
@@ -646,13 +646,13 @@ export default function GerenciamentoPage() {
                     <button
                       key={g.key}
                       onClick={() => irParaModulo(g.key)}
-                      className="group flex min-h-[188px] flex-col rounded-2xl border border-[var(--border-default)] bg-white/[0.05] p-5 text-left backdrop-blur-sm transition-all duration-150 hover:-translate-y-0.5 hover:border-[var(--border-strong)] hover:bg-white/[0.08] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/50"
+                      className="group flex min-h-[188px] flex-col rounded-2xl border border-[var(--border-default)] bg-[var(--surface-primary)] p-5 text-left backdrop-blur-sm transition-all duration-150 hover:-translate-y-0.5 hover:border-[var(--border-strong)] hover:bg-[var(--surface-primary)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/50"
                     >
-                      <div className="mb-3.5 flex h-12 w-12 flex-none items-center justify-center rounded-xl border border-[var(--border-default)] bg-white/[0.07] text-white/85 transition-colors group-hover:bg-white/[0.12]">
+                      <div className="mb-3.5 flex h-12 w-12 flex-none items-center justify-center rounded-xl border border-[var(--border-default)] bg-[var(--surface-primary)] text-white/85 transition-colors group-hover:bg-[var(--surface-primary)]">
                         {Icon ? <Icon className="h-6 w-6" /> : <Settings2 className="h-6 w-6" />}
                       </div>
                       <h2 className="text-[19px] font-semibold leading-tight text-white">{g.fullLabel || g.label}</h2>
-                      <p className="mt-1.5 flex-1 text-[14px] leading-snug text-white/55">{g.description || ""}</p>
+                      <p className="mt-1.5 flex-1 text-[14px] leading-snug text-[var(--text-secondary)]">{g.description || ""}</p>
                       <span className="mt-4 inline-flex items-center gap-1 text-[14px] font-medium text-white/80 group-hover:text-white">
                         Acessar <ChevronRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" />
                       </span>
@@ -675,7 +675,7 @@ export default function GerenciamentoPage() {
             <button
               onClick={() => setMobileNav(true)}
               aria-label="Abrir navegação do Gerenciamento"
-              className="mb-3 inline-flex items-center gap-2 rounded-lg border border-[var(--border-default)] bg-white/[0.08] px-3 py-2 text-[13px] md:hidden"
+              className="mb-3 inline-flex items-center gap-2 rounded-lg border border-[var(--border-default)] bg-[var(--surface-primary)] px-3 py-2 text-[13px] md:hidden"
             >
               <Menu className="h-4 w-4" /> {moduloAtivo.fullLabel || moduloAtivo.label}
             </button>
@@ -688,7 +688,7 @@ export default function GerenciamentoPage() {
               {/* ÁRVORE LATERAL — TODOS os módulos; accordion (1 módulo aberto por vez) */}
               <aside
                 aria-label="Navegação do Gerenciamento"
-                className={`mgmt-scroll fixed left-0 top-0 z-40 h-full flex-none overflow-y-auto overflow-x-hidden border-r border-[var(--border-default)] bg-white/[0.05] backdrop-blur-md p-3 transition-transform duration-200 motion-reduce:transition-none md:sticky md:top-4 md:z-auto md:h-auto md:max-h-[calc(100vh-96px)] md:rounded-2xl md:border md:bg-white/[0.05] md:backdrop-blur-sm ${mobileNav ? "translate-x-0" : "-translate-x-full"} md:translate-x-0 ${navCollapsed ? "md:w-[60px]" : "w-[280px] md:w-[272px]"}`}
+                className={`mgmt-scroll fixed left-0 top-0 z-40 h-full flex-none overflow-y-auto overflow-x-hidden border-r border-[var(--border-default)] bg-[var(--surface-primary)] backdrop-blur-md p-3 transition-transform duration-200 motion-reduce:transition-none md:sticky md:top-4 md:z-auto md:h-auto md:max-h-[calc(100vh-96px)] md:rounded-2xl md:border md:bg-[var(--surface-primary)] md:backdrop-blur-sm ${mobileNav ? "translate-x-0" : "-translate-x-full"} md:translate-x-0 ${navCollapsed ? "md:w-[60px]" : "w-[280px] md:w-[272px]"}`}
               >
                 {navCollapsed ? (
                   // modo recolhido (rail com ícones de TODOS os módulos)
@@ -712,7 +712,7 @@ export default function GerenciamentoPage() {
                           aria-label={g.fullLabel || g.label}
                           aria-current={ativo ? "true" : undefined}
                           className={`flex h-10 w-10 items-center justify-center rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/40 ${
-                            ativo ? "bg-white/[0.14] text-white" : "text-white/70 hover:bg-[var(--surface-hover)] hover:text-white"
+                            ativo ? "bg-[var(--surface-primary)] text-white" : "text-white/70 hover:bg-[var(--surface-hover)] hover:text-white"
                           }`}
                         >
                           {Icon ? <Icon className="h-5 w-5" /> : <Settings2 className="h-5 w-5" />}
@@ -735,14 +735,14 @@ export default function GerenciamentoPage() {
                         onClick={() => setNavCollapsed(true)}
                         aria-label="Recolher navegação"
                         title="Recolher navegação"
-                        className="hidden flex-none rounded-md p-1 text-white/45 hover:bg-[var(--surface-hover)] hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/40 md:block"
+                        className="hidden flex-none rounded-md p-1 text-[var(--text-secondary)] hover:bg-[var(--surface-hover)] hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/40 md:block"
                       >
                         <PanelLeftClose className="h-4 w-4" />
                       </button>
                       <button
                         onClick={() => setMobileNav(false)}
                         aria-label="Fechar navegação"
-                        className="flex-none rounded-md p-1 text-white/45 hover:bg-[var(--surface-hover)] hover:text-white md:hidden"
+                        className="flex-none rounded-md p-1 text-[var(--text-secondary)] hover:bg-[var(--surface-hover)] hover:text-white md:hidden"
                       >
                         <X className="h-4 w-4" />
                       </button>
@@ -775,10 +775,10 @@ export default function GerenciamentoPage() {
                               aria-disabled={indisponivel || undefined}
                               className={`flex min-h-[38px] w-full items-center gap-2 rounded-lg border-l-2 py-2 pl-3 pr-2.5 text-left text-[13.5px] transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/40 ${
                                 ativo
-                                  ? "border-sky-400/80 bg-white/[0.12] font-semibold text-white"
+                                  ? "border-sky-400/80 bg-[var(--surface-primary)] font-semibold text-white"
                                   : indisponivel
-                                    ? "cursor-not-allowed border-transparent text-white/30"
-                                    : "border-transparent text-white/65 hover:bg-white/[0.06] hover:text-white"
+                                    ? "cursor-not-allowed border-transparent text-[var(--text-muted)]"
+                                    : "border-transparent text-white/65 hover:bg-[var(--surface-primary)] hover:text-white"
                               }`}
                             >
                               <span className="min-w-0 flex-1 truncate">{it.label}</span>
@@ -790,7 +790,7 @@ export default function GerenciamentoPage() {
                             {/* linha do módulo */}
                             <div
                               className={`flex items-stretch rounded-lg transition-colors ${
-                                moduloEhAtivo ? "bg-white/[0.06]" : "hover:bg-white/[0.05]"
+                                moduloEhAtivo ? "bg-[var(--surface-primary)]" : "hover:bg-[var(--surface-primary)]"
                               }`}
                             >
                               <button
@@ -802,7 +802,7 @@ export default function GerenciamentoPage() {
                                 className={`flex min-w-0 flex-1 items-center gap-2 rounded-l-lg py-2.5 pl-2.5 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/40 ${direto ? "rounded-r-lg pr-2.5" : "pr-1"}`}
                               >
                                 {Icon ? (
-                                  <Icon className={`h-4 w-4 flex-none ${moduloEhAtivo ? "text-white/85" : "text-white/55"}`} />
+                                  <Icon className={`h-4 w-4 flex-none ${moduloEhAtivo ? "text-white/85" : "text-[var(--text-secondary)]"}`} />
                                 ) : null}
                                 <span className={`min-w-0 flex-1 truncate text-[13.5px] font-semibold ${moduloEhAtivo ? "text-white" : "text-white/80"}`}>
                                   {g.fullLabel || g.label}
@@ -815,7 +815,7 @@ export default function GerenciamentoPage() {
                                   aria-expanded={moduloAberto}
                                   aria-controls={painelId}
                                   aria-label={moduloAberto ? `Recolher ${g.fullLabel || g.label}` : `Expandir ${g.fullLabel || g.label}`}
-                                  className="flex flex-none items-center rounded-r-lg px-2 text-white/40 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/40"
+                                  className="flex flex-none items-center rounded-r-lg px-2 text-[var(--text-muted)] hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/40"
                                 >
                                   <ChevronRight className={`h-4 w-4 transition-transform duration-200 motion-reduce:transition-none ${moduloAberto ? "rotate-90" : ""}`} />
                                 </button>
@@ -836,7 +836,7 @@ export default function GerenciamentoPage() {
                                         <div key={`i-${b.item.key}-${i}`}>{renderItem(b.item)}</div>
                                       ) : (
                                         <div key={`s-${b.nome}-${i}`}>
-                                          <div className="px-2 pb-1 pt-2 text-[10.5px] font-bold uppercase tracking-[0.12em] text-white/40">
+                                          <div className="px-2 pb-1 pt-2 text-[10.5px] font-bold uppercase tracking-[0.12em] text-[var(--text-muted)]">
                                             {b.nome}
                                           </div>
                                           {b.itens.map(renderItem)}
@@ -894,8 +894,8 @@ export default function GerenciamentoPage() {
 // ── Breadcrumb com links (Gerenciamento › Módulo › Tela) ─────────────────────
 function Breadcrumb({ trilha }: { trilha: { label: string; onClick?: () => void }[] }) {
   return (
-    <nav aria-label="Trilha de navegação" className="flex flex-wrap items-center gap-1 text-[13px] text-white/50">
-      <Home className="mr-0.5 h-3.5 w-3.5 text-white/40" />
+    <nav aria-label="Trilha de navegação" className="flex flex-wrap items-center gap-1 text-[13px] text-[var(--text-secondary)]">
+      <Home className="mr-0.5 h-3.5 w-3.5 text-[var(--text-muted)]" />
       {trilha.map((c, i) => {
         const ultimo = i === trilha.length - 1
         return (
@@ -910,7 +910,7 @@ function Breadcrumb({ trilha }: { trilha: { label: string; onClick?: () => void 
             ) : (
               <span className={ultimo ? "font-medium text-white/85" : "text-white/60"}>{c.label}</span>
             )}
-            {!ultimo ? <ChevronRight className="h-3.5 w-3.5 text-white/30" /> : null}
+            {!ultimo ? <ChevronRight className="h-3.5 w-3.5 text-[var(--text-muted)]" /> : null}
           </span>
         )
       })}

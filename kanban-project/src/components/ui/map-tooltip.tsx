@@ -78,7 +78,7 @@ export function MapTooltip(props: MapTooltipProps) {
                 {enderecoLabel}
               </span>
             </div>
-            <button onClick={handleClose} className="text-gray-400 hover:text-gray-600 flex-shrink-0">
+            <button onClick={handleClose} className="text-[var(--text-muted)] hover:text-gray-600 flex-shrink-0">
               <X className="h-4 w-4" />
             </button>
           </div>

@@ -47,7 +47,7 @@ export default function DocumentCategorySelector({
   }, [])
 
   if (loading) return <div className={className}>Carregando categorias…</div>
-  if (erro) return <div className={`${className ?? ""} text-red-300`}>{erro}</div>
+  if (erro) return <div className={`${className ?? ""} text-red-700`}>{erro}</div>
 
   const valorNaLista = value != null && cats.some((c) => c.id === value)
   const extra = currentInactive && value != null && !valorNaLista ? [currentInactive] : []

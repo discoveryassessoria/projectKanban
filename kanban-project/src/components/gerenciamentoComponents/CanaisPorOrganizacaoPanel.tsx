@@ -36,7 +36,7 @@ interface Organizacao {
   canais: Array<{ canal: { key: string; label: string } }>
 }
 
-const inp = "w-full rounded-lg border border-[var(--border-default)] bg-[var(--surface-primary)] px-3 py-2 text-sm text-white placeholder-white/30 outline-none focus:border-blue-400/50"
+const inp = "w-full rounded-lg border border-[var(--border-default)] bg-[var(--surface-primary)] px-3 py-2 text-sm text-white placeholder-white/30 outline-none focus:border-blue-200"
 
 function headers(): HeadersInit {
   const t = typeof window !== "undefined" ? localStorage.getItem("token") : null
@@ -116,7 +116,7 @@ export default function CanaisPorOrganizacaoPanel() {
 
   return (
     <div className="space-y-4">
-      <p className="text-xs text-white/50">
+      <p className="text-xs text-[var(--text-secondary)]">
         Quais canais cada organização atende. É esta lista que o operador vê quando uma subtarefa
         declara &ldquo;usar os canais do fornecedor relacionado&rdquo; — nunca o catálogo inteiro.
       </p>
@@ -124,10 +124,10 @@ export default function CanaisPorOrganizacaoPanel() {
       <input className={inp} placeholder="Buscar organização por nome ou cidade…"
         value={busca} onChange={(e) => setBusca(e.target.value)} />
 
-      {flash && <div className="rounded-lg border border-emerald-400/30 bg-emerald-500/10 p-2 text-xs text-emerald-200">{flash}</div>}
+      {flash && <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-2 text-xs text-emerald-700">{flash}</div>}
 
-      {organizacoes === null && <p className="text-sm text-white/40">Carregando organizações…</p>}
-      {organizacoes?.length === 0 && <p className="text-sm text-white/40">Nenhuma organização encontrada.</p>}
+      {organizacoes === null && <p className="text-sm text-[var(--text-muted)]">Carregando organizações…</p>}
+      {organizacoes?.length === 0 && <p className="text-sm text-[var(--text-muted)]">Nenhuma organização encontrada.</p>}
 
       <div className="space-y-1.5">
         {(organizacoes ?? []).map((o) => (
@@ -138,9 +138,9 @@ export default function CanaisPorOrganizacaoPanel() {
                 {o.type && <span className="rounded bg-[var(--surface-primary)] px-1.5 py-0.5 text-white/60">{o.type}</span>}
                 {o.city && <span className="rounded bg-[var(--surface-primary)] px-1.5 py-0.5 text-white/60">{o.city}</span>}
                 {o.canais.length === 0
-                  ? <span className="rounded bg-amber-500/15 px-1.5 py-0.5 text-amber-300" title="Toda subtarefa que dependa de canal fica bloqueada nesta organização.">sem canal cadastrado</span>
+                  ? <span className="rounded bg-amber-50 px-1.5 py-0.5 text-amber-700" title="Toda subtarefa que dependa de canal fica bloqueada nesta organização.">sem canal cadastrado</span>
                   : o.canais.map((c) => (
-                      <span key={c.canal.key} className="rounded bg-sky-500/15 px-1.5 py-0.5 text-sky-300">{c.canal.label}</span>
+                      <span key={c.canal.key} className="rounded bg-sky-50 px-1.5 py-0.5 text-sky-700">{c.canal.label}</span>
                     ))}
               </div>
             </div>
@@ -157,7 +157,7 @@ export default function CanaisPorOrganizacaoPanel() {
           <div className="flex max-h-[90vh] w-full max-w-2xl flex-col overflow-hidden rounded-2xl border border-[var(--border-default)] bg-zinc-900/95 shadow-2xl" onClick={(e) => e.stopPropagation()}>
             <div className="border-b border-[var(--border-default)] px-6 py-4">
               <h3 className="font-semibold text-white">Canais de {aberta.nomeFantasia || aberta.name}</h3>
-              <p className="mt-0.5 text-xs text-white/50">
+              <p className="mt-0.5 text-xs text-[var(--text-secondary)]">
                 Marque por onde esta organização atende. As exigências abaixo SOMAM às do tipo de canal —
                 uma organização pode pedir mais, nunca menos.
               </p>
@@ -175,9 +175,9 @@ export default function CanaisPorOrganizacaoPanel() {
                   <div key={t.key} className="rounded-lg border border-[var(--border-default)] bg-[var(--surface-primary)] p-3">
                     <label className="flex items-center gap-2 text-sm text-white/80">
                       <input type="checkbox" checked={temCanal(t.key)} onChange={(e) => alternar(t, e.target.checked)} />
-                      {t.label} <code className="text-[11px] text-white/35">{t.key}</code>
+                      {t.label} <code className="text-[11px] text-[var(--text-muted)]">{t.key}</code>
                     </label>
-                    <p className="mt-1 text-[11px] text-white/35">
+                    <p className="mt-1 text-[11px] text-[var(--text-muted)]">
                       {doTipo.length ? `O tipo já exige: ${doTipo.join(", ")}.` : "O tipo não exige nada."}
                     </p>
                     {v && (

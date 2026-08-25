@@ -240,7 +240,7 @@ export default function AuthComponent({
                 aria-hidden="true"
                 className="
                   flex h-7 w-7 shrink-0 items-center justify-center
-                  rounded-full bg-[#123C73] text-[12px] font-semibold text-[#fff]
+                  rounded-full bg-[var(--action-primary)] text-[12px] font-semibold text-[var(--action-primary-ink)]
                 "
               >
                 {ultimoEmail.slice(0, 1).toUpperCase()}
@@ -271,11 +271,11 @@ export default function AuthComponent({
                 bg-[var(--surface-primary)]
                 border border-slate-200
                 text-slate-900
-                placeholder:text-slate-400
+                placeholder:text-slate-700
                 rounded-lg
                 focus-visible:ring-2
-                focus-visible:ring-[#123C73]/30
-                focus-visible:border-[#123C73]
+                focus-visible:ring-[var(--border-strong)]/30
+                focus-visible:border-[var(--border-strong)]
                 transition-all duration-150
               "
             />
@@ -305,11 +305,11 @@ export default function AuthComponent({
               bg-[var(--surface-primary)]
               border border-slate-200
               text-slate-900
-              placeholder:text-slate-400
+              placeholder:text-slate-700
               rounded-lg
               focus-visible:ring-2
-              focus-visible:ring-[#123C73]/30
-              focus-visible:border-[#123C73]
+              focus-visible:ring-[var(--border-strong)]/30
+              focus-visible:border-[var(--border-strong)]
               transition-all duration-150
             "
           />
@@ -329,8 +329,8 @@ export default function AuthComponent({
           type="submit"
           className="
             w-full h-12
-            bg-[#123C73] hover:bg-[#0f315f]
-            text-[#fff] font-medium text-[15px]
+            bg-[var(--action-primary)] hover:bg-[var(--action-primary-hover)]
+            text-[var(--action-primary-ink)] font-medium text-[15px]
             rounded-lg
             transition-all duration-150
             mt-2

@@ -30,9 +30,9 @@ export function ModalBase({
   }, [onClose])
 
   const colorClasses = {
-    violet: "bg-gradient-to-br from-violet-500 to-violet-700",
+    violet: "bg-gradient-to-br from-slate-500 to-slate-700",
     green: "bg-gradient-to-br from-green-500 to-green-700",
-    orange: "bg-gradient-to-br from-orange-500 to-orange-700",
+    orange: "bg-gradient-to-br from-amber-500 to-amber-700",
     blue: "bg-gradient-to-br from-blue-500 to-blue-700",
     red: "bg-gradient-to-br from-red-500 to-red-700",
   }

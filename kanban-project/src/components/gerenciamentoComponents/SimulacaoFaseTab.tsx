@@ -41,7 +41,7 @@ function money(v: number, ccy: string) {
 
 // selo "condicional"
 function CondBadge({ nota }: { nota?: string | null }) {
-  return <span className="ml-1.5 rounded bg-sky-500/15 px-1.5 py-0.5 text-[10px] text-sky-300" title={nota || "Condição avaliada na execução"}>condicional</span>
+  return <span className="ml-1.5 rounded bg-sky-50 px-1.5 py-0.5 text-[10px] text-sky-700" title={nota || "Condição avaliada na execução"}>condicional</span>
 }
 
 // ============================================================
@@ -89,14 +89,14 @@ export default function SimulacaoFaseTab() {
     } finally { setRunning(false) }
   }
 
-  if (loading) return <div className="py-24 text-center text-white/50">Carregando…</div>
+  if (loading) return <div className="py-24 text-center text-[var(--text-secondary)]">Carregando…</div>
 
   return (
     <div className="space-y-5">
       {/* cabeçalho + seletores */}
       <div className="rounded-2xl border border-[var(--border-default)] bg-[var(--surface-primary)] p-5 backdrop-blur-sm">
         <h2 className="text-lg font-semibold text-white">Simulação de Fase</h2>
-        <p className="mt-1 text-sm text-white/60">Mostra <b>o que o motor faria</b> quando um processo deste tipo dispara o evento da fase — tarefas, lançamentos, alertas. <span className="text-green-300/80">É só uma prévia: nada é criado.</span></p>
+        <p className="mt-1 text-sm text-white/60">Mostra <b>o que o motor faria</b> quando um processo deste tipo dispara o evento da fase — tarefas, lançamentos, alertas. <span className="text-green-700/80">É só uma prévia: nada é criado.</span></p>
 
         <div className="mt-4 grid gap-3 sm:grid-cols-3">
           <div>
@@ -122,15 +122,15 @@ export default function SimulacaoFaseTab() {
         </div>
 
         <div className="mt-4 flex items-center gap-3">
-          <button disabled={running || !ptId || !phaseKey} onClick={run} className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-[#fff] hover:bg-blue-500 disabled:opacity-50">{running ? "Simulando…" : "Executar simulação"}</button>
-          {erro && <span className="text-sm text-red-300">{erro}</span>}
+          <button disabled={running || !ptId || !phaseKey} onClick={run} className="rounded-lg bg-[var(--action-primary)] px-4 py-2 text-sm font-medium text-[var(--action-primary-ink)] hover:bg-[var(--action-primary)] disabled:opacity-50">{running ? "Simulando…" : "Executar simulação"}</button>
+          {erro && <span className="text-sm text-red-700">{erro}</span>}
         </div>
       </div>
 
       {/* resultado */}
       {report && (
         <div className="space-y-3">
-          <div className="rounded-xl border border-blue-400/20 bg-blue-500/10 px-4 py-3 text-sm text-blue-100">
+          <div className="rounded-xl border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-100">
             <b>{report.totalCriaria}</b> ação(ões) seriam criadas nesta fase{report.ignoradas.length > 0 && <> · {report.ignoradas.length} ignorada(s)</>}.
           </div>
 
@@ -139,8 +139,8 @@ export default function SimulacaoFaseTab() {
               {report.receitas.map((a, i) => (
                 <Linha key={i}>
                   <span className="text-white">{a.name}</span>
-                  <span className="text-green-300">{money(a.amount, a.currency)}</span>
-                  <span className="text-white/40">({a.source})</span>{a.condicional && <CondBadge nota={a.condicaoNota} />}
+                  <span className="text-green-700">{money(a.amount, a.currency)}</span>
+                  <span className="text-[var(--text-muted)]">({a.source})</span>{a.condicional && <CondBadge nota={a.condicaoNota} />}
                 </Linha>
               ))}
             </Secao>
@@ -149,8 +149,8 @@ export default function SimulacaoFaseTab() {
               {report.custos.map((a, i) => (
                 <Linha key={i}>
                   <span className="text-white">{a.name}</span>
-                  <span className="text-amber-300">{money(a.amount, a.currency)}</span>
-                  <span className="text-white/40">({a.source})</span>{a.condicional && <CondBadge nota={a.condicaoNota} />}
+                  <span className="text-amber-700">{money(a.amount, a.currency)}</span>
+                  <span className="text-[var(--text-muted)]">({a.source})</span>{a.condicional && <CondBadge nota={a.condicaoNota} />}
                 </Linha>
               ))}
             </Secao>
@@ -160,25 +160,25 @@ export default function SimulacaoFaseTab() {
                 <Linha key={i}>
                   <span className="rounded bg-[var(--surface-primary)] px-1.5 py-0.5 text-[10px] text-white/60">{KIND_LABELS[a.kind] || a.kind}</span>
                   <span className="text-white">{a.name}</span>
-                  {a.acao && <span className="text-white/40">· {a.acao}</span>}{a.condicional && <CondBadge nota={a.condicaoNota} />}
+                  {a.acao && <span className="text-[var(--text-muted)]">· {a.acao}</span>}{a.condicional && <CondBadge nota={a.condicaoNota} />}
                 </Linha>
               ))}
             </Secao>
 
             <Secao titulo="Alertas" count={report.alertas.length} tone="red">
               {report.alertas.map((a, i) => (
-                <Linha key={i}><span className="text-red-300">⚠</span><span className="text-white">{a.name}</span>{a.condicional && <CondBadge nota={a.condicaoNota} />}</Linha>
+                <Linha key={i}><span className="text-red-700">⚠</span><span className="text-white">{a.name}</span>{a.condicional && <CondBadge nota={a.condicaoNota} />}</Linha>
               ))}
             </Secao>
 
             <Secao titulo="Ignoradas" count={report.ignoradas.length} tone="neutral">
               {report.ignoradas.map((a, i) => (
-                <Linha key={i}><span className="text-white/70">{a.name}</span><span className="text-amber-300/80">— {a.reason}</span></Linha>
+                <Linha key={i}><span className="text-white/70">{a.name}</span><span className="text-amber-700/80">— {a.reason}</span></Linha>
               ))}
             </Secao>
 
             <Secao titulo="Duplicidades evitadas" count={report.duplicidades.length} tone="neutral">
-              <div className="text-[11px] text-white/40">A idempotência é verificada na execução real (Fase 4.2), contra o que o processo já tem.</div>
+              <div className="text-[11px] text-[var(--text-muted)]">A idempotência é verificada na execução real (Fase 4.2), contra o que o processo já tem.</div>
             </Secao>
           </div>
         </div>
@@ -196,10 +196,10 @@ function Secao({ titulo, count, tone, children }: { titulo: string; count: numbe
     <div className="rounded-2xl border border-[var(--border-default)] bg-[var(--surface-primary)] p-4 backdrop-blur-sm">
       <div className="mb-2 flex items-center gap-2">
         <span className={`h-2 w-2 rounded-full ${dot[tone] || dot.neutral}`} />
-        <span className="text-xs font-bold uppercase tracking-wider text-white/50">{titulo}</span>
+        <span className="text-xs font-bold uppercase tracking-wider text-[var(--text-secondary)]">{titulo}</span>
         <span className="rounded-full bg-[var(--surface-primary)] px-2 py-0.5 text-[10px] text-white/60">{count}</span>
       </div>
-      <div className="space-y-1">{count === 0 ? <div className="text-xs text-white/30">—</div> : children}</div>
+      <div className="space-y-1">{count === 0 ? <div className="text-xs text-[var(--text-muted)]">—</div> : children}</div>
     </div>
   )
 }

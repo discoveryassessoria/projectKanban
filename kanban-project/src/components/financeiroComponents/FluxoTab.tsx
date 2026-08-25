@@ -39,7 +39,7 @@ export default function FluxoTab() {
       .then(r => r.ok ? r.json() : null).then(d => setData(d)).catch(e => console.error(e)).finally(() => setLoading(false))
   }, [])
 
-  if (loading || !data) return <div className="flex items-center justify-center py-24"><Loader2 className="h-8 w-8 animate-spin text-white/50" /></div>
+  if (loading || !data) return <div className="flex items-center justify-center py-24"><Loader2 className="h-8 w-8 animate-spin text-[var(--text-secondary)]" /></div>
 
   const d = data
   const k = d.kpis
@@ -60,9 +60,9 @@ export default function FluxoTab() {
       {/* KPIs */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         <Kpi icon={<Wallet className="h-3.5 w-3.5" />} label="Saldo Atual" value={fmtBRL(k.saldoAtual)} sub="Caixa consolidado" />
-        <Kpi icon={<Download className="h-3.5 w-3.5" />} label="Entradas · 30 dias" value={fmtBRL(k.entradas30)} valueColor="text-green-400" sub={`${k.qtdEntradas30} eventos previstos`} />
-        <Kpi icon={<Upload className="h-3.5 w-3.5" />} label="Saídas · 30 dias" value={fmtBRL(k.saidas30)} valueColor="text-red-400" sub={`${k.qtdSaidas30} pagamentos`} />
-        <Kpi icon={<Activity className="h-3.5 w-3.5" />} label="Saldo Projetado · 30d" value={fmtBRL(k.saldoProjetado30)} valueColor={k.net30 >= 0 ? "text-green-400" : "text-red-400"} sub={`Variação: ${k.net30 >= 0 ? "+" : ""}${fmtBRLshort(k.net30)}`} />
+        <Kpi icon={<Download className="h-3.5 w-3.5" />} label="Entradas · 30 dias" value={fmtBRL(k.entradas30)} valueColor="text-green-700" sub={`${k.qtdEntradas30} eventos previstos`} />
+        <Kpi icon={<Upload className="h-3.5 w-3.5" />} label="Saídas · 30 dias" value={fmtBRL(k.saidas30)} valueColor="text-red-700" sub={`${k.qtdSaidas30} pagamentos`} />
+        <Kpi icon={<Activity className="h-3.5 w-3.5" />} label="Saldo Projetado · 30d" value={fmtBRL(k.saldoProjetado30)} valueColor={k.net30 >= 0 ? "text-green-700" : "text-red-700"} sub={`Variação: ${k.net30 >= 0 ? "+" : ""}${fmtBRLshort(k.net30)}`} />
       </div>
 
       {/* GRÁFICO */}
@@ -76,7 +76,7 @@ export default function FluxoTab() {
           </div>
         </div>
         {d.serie.length === 0 ? (
-          <p className="text-sm text-white/40 py-16 text-center">Sem movimentações na janela de tempo.</p>
+          <p className="text-sm text-[var(--text-muted)] py-16 text-center">Sem movimentações na janela de tempo.</p>
         ) : (
           <FluxoChart serie={d.serie} />
         )}
@@ -88,7 +88,7 @@ export default function FluxoTab() {
         <div className="bg-[var(--surface-primary)] backdrop-blur-sm border border-[var(--border-default)] rounded-xl p-4">
           <div className="text-sm font-semibold text-white flex items-center gap-2 mb-3 capitalize"><Calendar className="h-4 w-4" /> Calendário · {d.mesLabel}</div>
           <div className="grid grid-cols-7 gap-1 text-center">
-            {["D", "S", "T", "Q", "Q", "S", "S"].map((dd, i) => <div key={i} className="text-[10px] text-white/40 font-bold py-1">{dd}</div>)}
+            {["D", "S", "T", "Q", "Q", "S", "S"].map((dd, i) => <div key={i} className="text-[10px] text-[var(--text-muted)] font-bold py-1">{dd}</div>)}
             {d.calendario.map((c, i) => {
               if (c.day === null) return <div key={i} />
               // Discreto: célula neutra + pontinhos de movimentação; hoje = contorno dourado.
@@ -123,18 +123,18 @@ export default function FluxoTab() {
         <div className="bg-[var(--surface-primary)] backdrop-blur-sm border border-[var(--border-default)] rounded-xl p-4">
           <div className="text-sm font-semibold text-white flex items-center gap-2 mb-3"><FileText className="h-4 w-4" /> Agenda Financeira</div>
           {d.timeline.length === 0 ? (
-            <p className="text-sm text-white/40 py-8 text-center">Sem eventos na janela.</p>
+            <p className="text-sm text-[var(--text-muted)] py-8 text-center">Sem eventos na janela.</p>
           ) : (
             <div className="max-h-[420px] overflow-y-auto pr-1 space-y-2">
               {d.timeline.map((t, i) => {
                 const cor = t.entrada > 0 && t.saida > 0 ? "border-l-amber-400" : t.entrada > 0 ? "border-l-green-400" : "border-l-red-400"
                 return (
                   <div key={i} className={`border-l-2 ${cor} pl-3 py-1`}>
-                    <div className="text-[10px] text-white/40">{fmtDate(t.date)} · {t.past || t.realizado ? "realizado" : "previsto"}</div>
+                    <div className="text-[10px] text-[var(--text-muted)]">{fmtDate(t.date)} · {t.past || t.realizado ? "realizado" : "previsto"}</div>
                     <div className="text-sm text-white/80">{t.desc}</div>
                     <div className="flex gap-3 text-xs mt-0.5 tabular-nums">
-                      {t.entrada > 0 && <span className="text-green-400 font-semibold">+{fmtBRL(t.entrada)}</span>}
-                      {t.saida > 0 && <span className="text-red-400 font-semibold">−{fmtBRL(t.saida)}</span>}
+                      {t.entrada > 0 && <span className="text-green-700 font-semibold">+{fmtBRL(t.entrada)}</span>}
+                      {t.saida > 0 && <span className="text-red-700 font-semibold">−{fmtBRL(t.saida)}</span>}
                     </div>
                   </div>
                 )

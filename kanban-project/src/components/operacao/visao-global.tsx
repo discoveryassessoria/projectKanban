@@ -136,7 +136,7 @@ function iniciais(nome: string): string {
 }
 
 function Responsavel({ nome }: { nome: string | null }) {
-  if (!nome) return <span className="text-[11px] text-white/30">Sem responsável</span>
+  if (!nome) return <span className="text-[11px] text-[var(--text-muted)]">Sem responsável</span>
   return (
     <span className="inline-flex items-center gap-1.5">
       <span className="grid h-5 w-5 shrink-0 place-items-center rounded-full bg-[var(--surface-primary)] text-[9px] font-medium text-white/70">
@@ -162,12 +162,12 @@ function Sinais({ l }: { l: LinhaGerencial }) {
 }
 
 const INDICADORES: Array<{ chave: keyof Indicadores; rotulo: string; filtro: Partial<Filtros>; tom: string }> = [
-  { chave: "semResponsavel", rotulo: "Sem responsável", filtro: { semResponsavel: true }, tom: "text-sky-200/90" },
+  { chave: "semResponsavel", rotulo: "Sem responsável", filtro: { semResponsavel: true }, tom: "text-sky-700/90" },
   { chave: "emAndamento", rotulo: "Em andamento", filtro: {}, tom: "text-white/80" },
   { chave: "aguardandoTerceiro", rotulo: "Aguardando terceiro", filtro: {}, tom: "text-white/80" },
   { chave: "bloqueadas", rotulo: "Bloqueadas", filtro: {}, tom: "text-white/80" },
-  { chave: "atrasadas", rotulo: "Atrasadas", filtro: { atrasadas: true }, tom: "text-red-300/90" },
-  { chave: "venceHoje", rotulo: "Vence hoje", filtro: { venceHoje: true }, tom: "text-amber-200/90" },
+  { chave: "atrasadas", rotulo: "Atrasadas", filtro: { atrasadas: true }, tom: "text-red-700/90" },
+  { chave: "venceHoje", rotulo: "Vence hoje", filtro: { venceHoje: true }, tom: "text-amber-700/90" },
 ]
 
 export function VisaoGlobal() {
@@ -321,13 +321,13 @@ export function VisaoGlobal() {
                 ativo ? { semResponsavel: false, atrasadas: false, venceHoje: false } : { ...SEM_FILTRO, ...ind.filtro, busca: filtros.busca },
               )}
               className={`rounded border px-2.5 py-1.5 text-left transition-colors ${
-                ativo ? "border-[var(--border-strong)] bg-white/[0.08]" : "border-[var(--border-default)] hover:bg-white/[0.04]"
+                ativo ? "border-[var(--border-strong)] bg-[var(--surface-primary)]" : "border-[var(--border-default)] hover:bg-[var(--surface-primary)]"
               } ${clicavel ? "cursor-pointer" : "cursor-default"}`}
             >
               <div className={`text-[15px] font-medium tabular-nums leading-5 ${ind.tom}`}>
                 {dados ? dados.indicadores[ind.chave] : "—"}
               </div>
-              <div className="text-[10px] leading-4 text-white/40">{ind.rotulo}</div>
+              <div className="text-[10px] leading-4 text-[var(--text-muted)]">{ind.rotulo}</div>
             </button>
           )
         })}
@@ -337,7 +337,7 @@ export function VisaoGlobal() {
               key={m}
               onClick={() => setModo(m)}
               className={`rounded px-2.5 py-1 text-[11px] transition-colors ${
-                modo === m ? "bg-[var(--surface-primary)] text-white/90" : "text-white/45 hover:text-white/75"
+                modo === m ? "bg-[var(--surface-primary)] text-white/90" : "text-[var(--text-secondary)] hover:text-white/75"
               }`}
             >
               {m === "lista" ? "Lista" : "Kanban"}
@@ -352,7 +352,7 @@ export function VisaoGlobal() {
           value={buscaDigitada}
           onChange={(e) => setBuscaDigitada(e.target.value)}
           placeholder="Buscar tarefa, pessoa ou processo…"
-          className="w-64 rounded border border-[var(--border-default)] bg-white/[0.03] px-2.5 py-1.5 text-[12px] text-white/85 placeholder:text-white/25 focus:border-white/25 focus:outline-none"
+          className="w-64 rounded border border-[var(--border-default)] bg-[var(--surface-primary)] px-2.5 py-1.5 text-[12px] text-white/85 placeholder:text-[var(--text-muted)] focus:border-white/25 focus:outline-none"
         />
         <select
           value={filtros.semResponsavel ? "sem" : filtros.responsavel ?? ""}
@@ -360,7 +360,7 @@ export function VisaoGlobal() {
             const v = e.target.value
             aplicar({ semResponsavel: v === "sem", responsavel: v && v !== "sem" ? Number(v) : null })
           }}
-          className="rounded border border-[var(--border-default)] bg-white/[0.03] px-2 py-1.5 text-[12px] text-white/80 focus:outline-none"
+          className="rounded border border-[var(--border-default)] bg-[var(--surface-primary)] px-2 py-1.5 text-[12px] text-white/80 focus:outline-none"
         >
           <option value="">Todos os responsáveis</option>
           <option value="sem">Sem responsável</option>
@@ -373,7 +373,7 @@ export function VisaoGlobal() {
         <select
           value={filtros.fase ?? ""}
           onChange={(e) => aplicar({ fase: e.target.value || null })}
-          className="rounded border border-[var(--border-default)] bg-white/[0.03] px-2 py-1.5 text-[12px] text-white/80 focus:outline-none"
+          className="rounded border border-[var(--border-default)] bg-[var(--surface-primary)] px-2 py-1.5 text-[12px] text-white/80 focus:outline-none"
         >
           <option value="">Todas as fases</option>
           {dados?.facetas.fases.map((f) => (
@@ -385,7 +385,7 @@ export function VisaoGlobal() {
         <select
           value={filtros.prioridade ?? ""}
           onChange={(e) => aplicar({ prioridade: e.target.value || null })}
-          className="rounded border border-[var(--border-default)] bg-white/[0.03] px-2 py-1.5 text-[12px] text-white/80 focus:outline-none"
+          className="rounded border border-[var(--border-default)] bg-[var(--surface-primary)] px-2 py-1.5 text-[12px] text-white/80 focus:outline-none"
         >
           <option value="">Toda prioridade</option>
           {["URGENTE", "ALTA", "MEDIA", "BAIXA"].map((p) => (
@@ -397,18 +397,18 @@ export function VisaoGlobal() {
             key={k}
             onClick={() => aplicar({ [k]: !filtros[k] } as Partial<Filtros>)}
             className={`rounded border px-2.5 py-1.5 text-[11px] transition-colors ${
-              filtros[k] ? "border-[var(--border-strong)] bg-white/[0.08] text-white/85" : "border-[var(--border-default)] text-white/50 hover:text-white/80"
+              filtros[k] ? "border-[var(--border-strong)] bg-[var(--surface-primary)] text-white/85" : "border-[var(--border-default)] text-[var(--text-secondary)] hover:text-white/80"
             }`}
           >
             {r}
           </button>
         ))}
         {temFiltro(filtros) && (
-          <button onClick={limpar} className="text-[11px] text-white/45 underline-offset-2 hover:text-white/80 hover:underline">
+          <button onClick={limpar} className="text-[11px] text-[var(--text-secondary)] underline-offset-2 hover:text-white/80 hover:underline">
             Limpar filtros
           </button>
         )}
-        <span className="ml-auto text-[11px] tabular-nums text-white/35">
+        <span className="ml-auto text-[11px] tabular-nums text-[var(--text-muted)]">
           {dados ? `${linhas.length} de ${dados.total}` : ""}
         </span>
       </div>
@@ -424,7 +424,7 @@ export function VisaoGlobal() {
       {(erroComando || aviso) && (
         <div
           className={`border-b px-4 py-2 text-[11px] ${
-            erroComando ? "border-red-400/20 bg-red-500/10 text-red-200/90" : "border-emerald-400/20 bg-emerald-500/10 text-emerald-200/90"
+            erroComando ? "border-red-200 bg-red-50 text-red-700/90" : "border-emerald-200 bg-emerald-50 text-emerald-700/90"
           }`}
         >
           {erroComando ?? aviso}
@@ -506,10 +506,10 @@ function CargaDoResponsavel({ nome, linhas }: { nome: string; linhas: LinhaGeren
     ["bloqueadas", ativas.filter((l) => l.coluna === "BLOQUEADA").length],
   ] as const
   return (
-    <div className="flex items-center gap-4 border-b border-white/[0.06] bg-white/[0.02] px-4 py-2">
-      <span className="text-[11px] text-white/55">{nome}</span>
+    <div className="flex items-center gap-4 border-b border-white/[0.06] bg-[var(--surface-primary)] px-4 py-2">
+      <span className="text-[11px] text-[var(--text-secondary)]">{nome}</span>
       {n.map(([r, v]) => (
-        <span key={r} className="text-[11px] text-white/35">
+        <span key={r} className="text-[11px] text-[var(--text-muted)]">
           <span className="tabular-nums text-white/70">{v}</span> {r}
         </span>
       ))}
@@ -557,10 +557,10 @@ function Lista({
             <th key={String(c.campo)} className={`${c.classe} px-3 py-2`}>
               <button
                 onClick={() => aoOrdenar(c.campo)}
-                className="text-[10px] font-medium uppercase tracking-wide text-white/35 transition-colors hover:text-white/70"
+                className="text-[10px] font-medium uppercase tracking-wide text-[var(--text-muted)] transition-colors hover:text-white/70"
               >
                 {c.rotulo}
-                {ordem.campo === c.campo && <span className="ml-1 text-white/55">{ordem.asc ? "↑" : "↓"}</span>}
+                {ordem.campo === c.campo && <span className="ml-1 text-[var(--text-secondary)]">{ordem.asc ? "↑" : "↓"}</span>}
               </button>
             </th>
           ))}
@@ -569,7 +569,7 @@ function Lista({
       </thead>
       <tbody>
         {linhas.map((l) => (
-          <tr key={l.taskId} className="group border-b border-white/[0.05] hover:bg-white/[0.02]">
+          <tr key={l.taskId} className="group border-b border-white/[0.05] hover:bg-[var(--surface-primary)]">
             <td className="max-w-0 px-3 py-2 align-top">
               <button onClick={() => aoAbrir(l.taskId)} className="w-full cursor-pointer text-left">
                 <span className="block truncate text-[12px] text-white/90">{l.titulo}</span>
@@ -578,18 +578,18 @@ function Lista({
             </td>
             <td className="truncate px-3 py-2 text-[11px] text-white/60">{l.pessoaNome ?? "—"}</td>
             <td className="truncate px-3 py-2 text-[11px] text-white/60">{l.processoNome ?? "—"}</td>
-            <td className="truncate px-3 py-2 text-[11px] text-white/50">{rotularFase(l.faseMacroKey) ?? "—"}</td>
+            <td className="truncate px-3 py-2 text-[11px] text-[var(--text-secondary)]">{rotularFase(l.faseMacroKey) ?? "—"}</td>
             <td className="truncate px-3 py-2 text-[11px] text-white/60">{l.etapaAtual ?? "—"}</td>
             <td className="px-3 py-2"><Responsavel nome={l.responsavelNome} /></td>
             <td className="px-3 py-2 text-[11px] text-white/60">{ROTULO_STATUS[l.statusTarefa] ?? l.statusTarefa}</td>
             <td className="px-3 py-2 text-[11px] text-white/60">{ROTULO_PRIORIDADE[l.prioridade] ?? l.prioridade}</td>
-            <td className={`px-3 py-2 text-[11px] tabular-nums ${l.atrasada ? "text-red-300/90" : "text-white/60"}`}>
+            <td className={`px-3 py-2 text-[11px] tabular-nums ${l.atrasada ? "text-red-700/90" : "text-white/60"}`}>
               {dataCurta(l.dataPrazo)}
             </td>
-            <td className={`px-3 py-2 text-[11px] ${l.atrasada ? "text-red-300/80" : "text-white/40"}`}>
+            <td className={`px-3 py-2 text-[11px] ${l.atrasada ? "text-red-700/80" : "text-[var(--text-muted)]"}`}>
               {tempo(l.diasParaPrazo, l.atrasada)}
             </td>
-            <td className="px-3 py-2 text-[11px] tabular-nums text-white/35">{dataCurta(l.criadaEm)}</td>
+            <td className="px-3 py-2 text-[11px] tabular-nums text-[var(--text-muted)]">{dataCurta(l.criadaEm)}</td>
             <td className="px-3 py-2 text-right">
               <div className="flex items-center justify-end gap-1 opacity-0 transition-opacity group-hover:opacity-100">
                 {/* Só onde não há dono: sugerir para quem já tem responsável
@@ -597,14 +597,14 @@ function Lista({
                 {l.responsavelId == null && (
                   <button
                     onClick={() => aoSugerir(l)}
-                    className="rounded border border-sky-300/25 px-2 py-1 text-[10px] text-sky-200/80 transition-colors hover:bg-sky-400/10 hover:text-sky-100"
+                    className="rounded border border-sky-200 px-2 py-1 text-[10px] text-sky-700/80 transition-colors hover:bg-sky-50 hover:text-sky-100"
                   >
                     Sugerir
                   </button>
                 )}
                 <button
                   onClick={() => aoDistribuir(l)}
-                  className="rounded border border-[var(--border-default)] px-2 py-1 text-[10px] text-white/60 transition-colors hover:bg-white/[0.06] hover:text-white/90"
+                  className="rounded border border-[var(--border-default)] px-2 py-1 text-[10px] text-white/60 transition-colors hover:bg-[var(--surface-primary)] hover:text-white/90"
                 >
                   {l.responsavelId == null ? "Atribuir" : "Transferir"}
                 </button>
@@ -685,20 +685,20 @@ function Quadro({
             onDragLeave={() => setSobre((s) => (s === c.chave ? null : s))}
             onDrop={() => soltar(c.chave)}
             className={`flex h-full w-72 shrink-0 flex-col rounded-lg border transition-colors ${
-              sobre === c.chave && alvoValido ? "border-sky-400/40 bg-sky-400/[0.06]"
-              : alvoInvalido ? "border-white/[0.04] bg-white/[0.01] opacity-40"
-              : "border-white/[0.08] bg-white/[0.02]"
+              sobre === c.chave && alvoValido ? "border-sky-200 bg-sky-400/[0.06]"
+              : alvoInvalido ? "border-white/[0.04] bg-[var(--surface-primary)] opacity-40"
+              : "border-white/[0.08] bg-[var(--surface-primary)]"
             }`}
           >
             <div className="flex items-baseline justify-between border-b border-white/[0.06] px-3 py-2">
               <span className="text-[11px] font-medium uppercase tracking-wide text-white/60">{c.rotulo}</span>
-              <span className="text-[11px] tabular-nums text-white/35">{linhas.length}</span>
+              <span className="text-[11px] tabular-nums text-[var(--text-muted)]">{linhas.length}</span>
             </div>
             {alvoValido && (
-              <div className="border-b border-sky-400/20 px-3 py-1.5 text-[10px] text-sky-200/80">{permitido.rotulo}</div>
+              <div className="border-b border-sky-200 px-3 py-1.5 text-[10px] text-sky-700/80">{permitido.rotulo}</div>
             )}
             <div className="flex min-h-[60px] flex-1 flex-col gap-2 overflow-y-auto p-2">
-              {linhas.length === 0 && <p className="px-1 py-3 text-[11px] text-white/25">{c.nota ?? "Nada aqui."}</p>}
+              {linhas.length === 0 && <p className="px-1 py-3 text-[11px] text-[var(--text-muted)]">{c.nota ?? "Nada aqui."}</p>}
               {linhas.map((l) => (
                 <Card
                   key={l.taskId}
@@ -718,16 +718,16 @@ function Quadro({
         <div className="fixed inset-0 z-[60] flex items-center justify-center bg-[var(--overlay-modal)] p-4" onClick={() => setPedindo(null)}>
           <div className="w-full max-w-sm rounded-lg border border-[var(--border-default)] bg-[var(--surface-overlay)] p-4" onClick={(e) => e.stopPropagation()}>
             <h2 className="text-[13px] font-medium text-white/90">{pedindo.rotulo}</h2>
-            <p className="mt-1 text-[11px] text-white/45">{pedindo.l.titulo}</p>
+            <p className="mt-1 text-[11px] text-[var(--text-secondary)]">{pedindo.l.titulo}</p>
             <textarea
               value={motivo}
               onChange={(e) => setMotivo(e.target.value)}
               rows={3}
               placeholder="Por quê? Quem ler depois precisa entender sem perguntar."
-              className="mt-3 w-full rounded border border-[var(--border-default)] bg-white/[0.03] px-2.5 py-2 text-[12px] text-white/85 placeholder:text-white/25 focus:border-white/25 focus:outline-none"
+              className="mt-3 w-full rounded border border-[var(--border-default)] bg-[var(--surface-primary)] px-2.5 py-2 text-[12px] text-white/85 placeholder:text-[var(--text-muted)] focus:border-white/25 focus:outline-none"
             />
             <div className="mt-3 flex justify-end gap-2">
-              <button onClick={() => setPedindo(null)} className="rounded px-3 py-1.5 text-[11px] text-white/50 hover:text-white/80">
+              <button onClick={() => setPedindo(null)} className="rounded px-3 py-1.5 text-[11px] text-[var(--text-secondary)] hover:text-white/80">
                 Cancelar
               </button>
               <button
@@ -736,7 +736,7 @@ function Quadro({
                   const ok = await aoComandar(pedindo.l.taskId, { acao: pedindo.acao, motivo: motivo.trim() }, `${pedindo.rotulo}: feito.`)
                   if (ok) setPedindo(null)
                 }}
-                className="rounded border border-[var(--border-default)] bg-white/[0.06] px-3 py-1.5 text-[11px] text-white/85 disabled:opacity-40"
+                className="rounded border border-[var(--border-default)] bg-[var(--surface-primary)] px-3 py-1.5 text-[11px] text-white/85 disabled:opacity-40"
               >
                 Confirmar
               </button>
@@ -763,27 +763,27 @@ function Card({
       draggable
       onDragStart={() => aoArrastar(true)}
       onDragEnd={() => aoArrastar(false)}
-      className={`cursor-grab rounded border border-white/[0.08] bg-white/[0.03] p-2.5 transition-colors hover:border-[var(--border-strong)] active:cursor-grabbing ${
+      className={`cursor-grab rounded border border-white/[0.08] bg-[var(--surface-primary)] p-2.5 transition-colors hover:border-[var(--border-strong)] active:cursor-grabbing ${
         l.atrasada ? "border-l-2 border-l-red-400/60" : l.venceHoje ? "border-l-2 border-l-amber-300/60" : ""
       }`}
     >
       <button onClick={aoAbrir} className="w-full cursor-pointer text-left">
         <p className="text-[12px] font-medium leading-4 text-white/90">{l.titulo}</p>
-        {contexto && <p className="mt-1 truncate text-[10px] text-white/40">{contexto}</p>}
+        {contexto && <p className="mt-1 truncate text-[10px] text-[var(--text-muted)]">{contexto}</p>}
         <div className="mt-1.5 flex flex-wrap gap-1"><Sinais l={l} /></div>
-        <div className="mt-1.5 space-y-0.5 text-[10px] text-white/40">
+        <div className="mt-1.5 space-y-0.5 text-[10px] text-[var(--text-muted)]">
           {rotularFase(l.faseMacroKey) && <p>{rotularFase(l.faseMacroKey)}</p>}
-          {l.etapaAtual && <p className="truncate"><span className="text-white/25">Etapa:</span> {l.etapaAtual}</p>}
+          {l.etapaAtual && <p className="truncate"><span className="text-[var(--text-muted)]">Etapa:</span> {l.etapaAtual}</p>}
           {/* HÁ QUANTO TEMPO ESPERA — sem isso, "aguardando terceiro" é um
               estado onde o trabalho envelhece sem ninguém notar. */}
           {l.esperandoHaDias != null && (
-            <p className={l.esperandoHaDias >= 15 ? "text-amber-200/70" : ""}>
+            <p className={l.esperandoHaDias >= 15 ? "text-amber-700/70" : ""}>
               Aguardando {l.esperandoDe === "cliente" ? "o cliente" : "terceiro"} há {l.esperandoHaDias} dia
               {l.esperandoHaDias === 1 ? "" : "s"}
             </p>
           )}
           {/* POR QUE PAROU — na cara, não a cinco telas de distância. */}
-          {l.motivoBloqueio && <p className="text-red-200/70">Bloqueio: {l.motivoBloqueio}</p>}
+          {l.motivoBloqueio && <p className="text-red-700/70">Bloqueio: {l.motivoBloqueio}</p>}
           {l.concluidaEm && <p>Concluída em {dataCurta(l.concluidaEm)}</p>}
         </div>
       </button>
@@ -791,21 +791,21 @@ function Card({
         <Responsavel nome={l.responsavelNome} />
         <div className="flex shrink-0 items-center gap-2">
           {l.dataPrazo && (
-            <span className={`text-[10px] tabular-nums ${l.atrasada ? "text-red-300/90" : "text-white/45"}`}>
+            <span className={`text-[10px] tabular-nums ${l.atrasada ? "text-red-700/90" : "text-[var(--text-secondary)]"}`}>
               {dataCurta(l.dataPrazo)}
             </span>
           )}
           {l.responsavelId == null && (
             <button
               onClick={aoSugerir}
-              className="rounded border border-sky-300/25 px-1.5 py-0.5 text-[10px] text-sky-200/80 transition-colors hover:bg-sky-400/10 hover:text-sky-100"
+              className="rounded border border-sky-200 px-1.5 py-0.5 text-[10px] text-sky-700/80 transition-colors hover:bg-sky-50 hover:text-sky-100"
             >
               Sugerir
             </button>
           )}
           <button
             onClick={aoDistribuir}
-            className="rounded border border-[var(--border-default)] px-1.5 py-0.5 text-[10px] text-white/55 transition-colors hover:bg-white/[0.06] hover:text-white/90"
+            className="rounded border border-[var(--border-default)] px-1.5 py-0.5 text-[10px] text-[var(--text-secondary)] transition-colors hover:bg-[var(--surface-primary)] hover:text-white/90"
           >
             {l.responsavelId == null ? "Atribuir" : "Transferir"}
           </button>
@@ -845,15 +845,15 @@ function PainelSugestao({
         onClick={(e) => e.stopPropagation()}
       >
         <div className="border-b border-white/[0.08] px-4 py-3">
-          <p className="text-[10px] uppercase tracking-wide text-white/35">Sugerir responsável</p>
+          <p className="text-[10px] uppercase tracking-wide text-[var(--text-muted)]">Sugerir responsável</p>
           <h2 className="mt-0.5 truncate text-[14px] font-medium text-white/95">{l.titulo}</h2>
-          <p className="mt-0.5 text-[11px] text-white/40">
+          <p className="mt-0.5 text-[11px] text-[var(--text-muted)]">
             {[l.pessoaNome, l.processoNome].filter(Boolean).join(" · ") || "—"}
           </p>
         </div>
 
         <div className="min-h-0 flex-1 overflow-y-auto">
-          {erro && <div className="border-b border-red-400/20 bg-red-500/10 px-4 py-2.5 text-[11px] text-red-200/90">{erro}</div>}
+          {erro && <div className="border-b border-red-200 bg-red-50 px-4 py-2.5 text-[11px] text-red-700/90">{erro}</div>}
           {!s && !erro && <Estado tipo="carregando" mensagem="Calculando elegibilidade e carga…" />}
 
           {s && (
@@ -863,16 +863,16 @@ function PainelSugestao({
                 {s.recomendado ? (
                   <>
                     <div className="flex items-baseline gap-2">
-                      <span className="grid h-7 w-7 shrink-0 place-items-center rounded-full bg-emerald-400/15 text-[10px] font-medium text-emerald-200/90">
+                      <span className="grid h-7 w-7 shrink-0 place-items-center rounded-full bg-emerald-50 text-[10px] font-medium text-emerald-700/90">
                         {iniciais(s.recomendado.nome)}
                       </span>
                       <span className="text-[15px] font-medium text-white/95">{s.recomendado.nome}</span>
-                      <span className="text-[11px] tabular-nums text-white/40">custo operacional {s.recomendado.score}</span>
+                      <span className="text-[11px] tabular-nums text-[var(--text-muted)]">custo operacional {s.recomendado.score}</span>
                     </div>
                     <ul className="mt-2.5 space-y-1">
                       {s.explicacao.map((linha, i) => (
                         <li key={i} className={`text-[11px] leading-4 ${
-                          linha.startsWith("⚠") ? "text-amber-200/80" : linha.startsWith("ℹ") ? "text-white/45" : "text-white/65"
+                          linha.startsWith("⚠") ? "text-amber-700/80" : linha.startsWith("ℹ") ? "text-[var(--text-secondary)]" : "text-white/65"
                         }`}>
                           {linha}
                         </li>
@@ -882,9 +882,9 @@ function PainelSugestao({
                 ) : (
                   <>
                     {/* A ABSTENÇÃO É UMA RESPOSTA — com motivo, nunca um nome inventado. */}
-                    <p className="text-[13px] font-medium text-amber-200/90">Sem recomendação automática</p>
+                    <p className="text-[13px] font-medium text-amber-700/90">Sem recomendação automática</p>
                     <p className="mt-1 text-[11px] leading-4 text-white/60">{s.abstencao?.texto}</p>
-                    <p className="mt-1.5 text-[10px] text-white/35">
+                    <p className="mt-1.5 text-[10px] text-[var(--text-muted)]">
                       Código: {s.abstencao?.codigo}. A decisão continua sendo sua — atribuir manualmente segue disponível.
                     </p>
                   </>
@@ -894,22 +894,22 @@ function PainelSugestao({
               {/* ── QUEM PODE, E QUANTO CADA UM CARREGA ── */}
               {elegiveis.length > 0 && (
                 <div className="border-b border-white/[0.06] px-4 py-3">
-                  <p className="text-[10px] uppercase tracking-wide text-white/35">
+                  <p className="text-[10px] uppercase tracking-wide text-[var(--text-muted)]">
                     Elegíveis · {elegiveis.length}
                   </p>
                   <div className="mt-2 space-y-1.5">
                     {elegiveis.map((a) => (
                       <div key={a.usuarioId} className="rounded border border-white/[0.07] px-2.5 py-2">
                         <div className="flex items-baseline justify-between gap-2">
-                          <span className={`text-[12px] ${a.usuarioId === s.recomendado?.usuarioId ? "text-emerald-200/90" : "text-white/80"}`}>
+                          <span className={`text-[12px] ${a.usuarioId === s.recomendado?.usuarioId ? "text-emerald-700/90" : "text-white/80"}`}>
                             {a.nome}
                           </span>
-                          <span className="text-[11px] tabular-nums text-white/50">custo {a.score}</span>
+                          <span className="text-[11px] tabular-nums text-[var(--text-secondary)]">custo {a.score}</span>
                         </div>
-                        <div className="mt-1 flex flex-wrap gap-x-3 gap-y-0.5 text-[10px] text-white/40">
+                        <div className="mt-1 flex flex-wrap gap-x-3 gap-y-0.5 text-[10px] text-[var(--text-muted)]">
                           <span><span className="tabular-nums text-white/65">{a.carga.executaveis}</span> executáveis</span>
                           <span><span className="tabular-nums text-white/65">{a.carga.ativas}</span> ativas</span>
-                          <span className={a.carga.atrasadas > 0 ? "text-red-300/70" : ""}>
+                          <span className={a.carga.atrasadas > 0 ? "text-red-700/70" : ""}>
                             <span className="tabular-nums">{a.carga.atrasadas}</span> atrasadas
                           </span>
                           <span><span className="tabular-nums text-white/65">{a.carga.urgentes}</span> urgentes</span>
@@ -919,7 +919,7 @@ function PainelSugestao({
                         {auditor && (
                           <div className="mt-1.5 space-y-0.5 border-t border-white/[0.06] pt-1.5">
                             {a.parcelas.map((p) => (
-                              <div key={p.componente} className="flex justify-between text-[10px] text-white/35">
+                              <div key={p.componente} className="flex justify-between text-[10px] text-[var(--text-muted)]">
                                 <span>{p.explicacao}</span>
                                 <span className="tabular-nums">{p.quantidade} × {p.peso} = {p.subtotal}</span>
                               </div>
@@ -939,14 +939,14 @@ function PainelSugestao({
               {/* ── QUEM NÃO PODE, E POR QUÊ ── */}
               {inelegiveis.length > 0 && (
                 <div className="border-b border-white/[0.06] px-4 py-3">
-                  <p className="text-[10px] uppercase tracking-wide text-white/35">
+                  <p className="text-[10px] uppercase tracking-wide text-[var(--text-muted)]">
                     Inelegíveis · {inelegiveis.length}
                   </p>
                   <div className="mt-2 space-y-1">
                     {inelegiveis.map((a) => (
                       <div key={a.usuarioId} className="flex gap-2 text-[11px]">
-                        <span className="shrink-0 text-white/55">{a.nome}</span>
-                        <span className="text-white/35">{a.motivos.map((m) => m.texto).join(" ")}</span>
+                        <span className="shrink-0 text-[var(--text-secondary)]">{a.nome}</span>
+                        <span className="text-[var(--text-muted)]">{a.motivos.map((m) => m.texto).join(" ")}</span>
                       </div>
                     ))}
                   </div>
@@ -957,20 +957,20 @@ function PainelSugestao({
               <div className="px-4 py-3">
                 <button
                   onClick={() => setAuditor((v) => !v)}
-                  className="text-[10px] uppercase tracking-wide text-white/35 transition-colors hover:text-white/70"
+                  className="text-[10px] uppercase tracking-wide text-[var(--text-muted)] transition-colors hover:text-white/70"
                 >
                   {auditor ? "▾" : "▸"} Como esta conta foi feita
                 </button>
                 {auditor && (
                   <div className="mt-2 space-y-1.5">
-                    <p className="text-[10px] leading-4 text-white/45">
+                    <p className="text-[10px] leading-4 text-[var(--text-secondary)]">
                       Elegibilidade tem um critério só neste sistema: permissão de executar tarefa. Os critérios abaixo
                       são frequentemente esperados e <span className="text-white/70">não existem no cadastro</span> —
                       nenhum foi inventado:
                     </p>
                     {s.criteriosAusentes.map((c) => (
-                      <div key={c.criterio} className="text-[10px] leading-4 text-white/35">
-                        <span className="text-white/55">{c.criterio}</span> — {c.porque}
+                      <div key={c.criterio} className="text-[10px] leading-4 text-[var(--text-muted)]">
+                        <span className="text-[var(--text-secondary)]">{c.criterio}</span> — {c.porque}
                       </div>
                     ))}
                   </div>
@@ -981,15 +981,15 @@ function PainelSugestao({
         </div>
 
         <div className="flex items-center justify-between gap-2 border-t border-white/[0.08] px-4 py-2.5">
-          <span className="text-[10px] text-white/30">Nada foi alterado. A atribuição continua sendo sua.</span>
+          <span className="text-[10px] text-[var(--text-muted)]">Nada foi alterado. A atribuição continua sendo sua.</span>
           <div className="flex gap-2">
-            <button onClick={aoFechar} className="rounded px-3 py-1.5 text-[11px] text-white/50 transition-colors hover:text-white/80">
+            <button onClick={aoFechar} className="rounded px-3 py-1.5 text-[11px] text-[var(--text-secondary)] transition-colors hover:text-white/80">
               Fechar
             </button>
             {/* Confirmar abre o MESMO seletor de sempre — a porta que escreve é uma só. */}
             <button
               onClick={() => aoAtribuir(l)}
-              className="rounded border border-[var(--border-default)] bg-white/[0.06] px-3 py-1.5 text-[11px] text-white/85 transition-colors hover:bg-white/[0.1]"
+              className="rounded border border-[var(--border-default)] bg-[var(--surface-primary)] px-3 py-1.5 text-[11px] text-white/85 transition-colors hover:bg-[var(--surface-primary)]"
             >
               Atribuir…
             </button>

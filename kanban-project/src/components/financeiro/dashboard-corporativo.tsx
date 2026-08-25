@@ -20,7 +20,7 @@ import {
 // TOKENS DA REFERÊNCIA
 // ============================================================
 export const OURO = "#D2A948"
-const CARD = "rounded-xl border border-[var(--border-default)] bg-white/[0.05] backdrop-blur-md"
+const CARD = "rounded-xl border border-[var(--border-default)] bg-[var(--surface-primary)] backdrop-blur-md"
 
 // ============================================================
 // FORMATO
@@ -98,11 +98,11 @@ export function DashboardCorporativo({ dash, onGoTab, onClickProcesso }: {
           </h2>
           <div className="text-xs text-white/60 mt-1 flex items-center gap-2 flex-wrap">
             <span>{hoje.toLocaleDateString("pt-BR", { day: "2-digit", month: "long", year: "numeric" })}</span>
-            <span className="text-white/30">·</span>
+            <span className="text-[var(--text-muted)]">·</span>
             <span className="inline-flex items-center gap-1.5"><span className="w-1.5 h-1.5 rounded-full bg-sky-400" /><strong className="text-white">{k.processosAtivos}</strong> processos ativos</span>
-            <span className="text-white/30">·</span>
+            <span className="text-[var(--text-muted)]">·</span>
             <span className="inline-flex items-center gap-1.5"><span className="w-1.5 h-1.5 rounded-full" style={{ background: OURO }} /><strong className="text-white">{m.colaboradores}</strong> colaboradores</span>
-            <span className="text-white/30">·</span>
+            <span className="text-[var(--text-muted)]">·</span>
             <span className="inline-flex items-center gap-1.5"><span className="w-1.5 h-1.5 rounded-full bg-green-400" /> Contas em dia</span>
           </div>
         </div>
@@ -174,8 +174,8 @@ export function DashboardCorporativo({ dash, onGoTab, onClickProcesso }: {
           <div className="flex items-center justify-between mb-3">
             <div className="text-sm font-semibold text-white flex items-center gap-2"><Activity className="h-4 w-4" style={{ color: OURO }} /> Entradas vs Saídas · Últimos 6 meses</div>
             <div className="flex items-center gap-2">
-              <span className="inline-flex items-center gap-1 text-[11px] text-white/60 bg-[var(--surface-primary)] border border-[var(--border-default)] px-2 py-1 rounded-md">6 meses <span className="text-white/40">▾</span></span>
-              <button type="button" aria-label="Opções do gráfico" className="text-white/40 hover:text-white/80 transition-colors">
+              <span className="inline-flex items-center gap-1 text-[11px] text-white/60 bg-[var(--surface-primary)] border border-[var(--border-default)] px-2 py-1 rounded-md">6 meses <span className="text-[var(--text-muted)]">▾</span></span>
+              <button type="button" aria-label="Opções do gráfico" className="text-[var(--text-muted)] hover:text-white/80 transition-colors">
                 <MoreVertical className="h-4 w-4" />
               </button>
             </div>
@@ -193,19 +193,19 @@ export function DashboardCorporativo({ dash, onGoTab, onClickProcesso }: {
               <AlertTriangle className="h-4 w-4" style={{ color: OURO }} /> Alertas e Aprovações
               <span className={`text-[11px] font-bold px-2 py-0.5 rounded-full border ${
                 m.alertas.length === 0
-                  ? "bg-[var(--surface-primary)] text-white/50 border-[var(--border-default)]"
-                  : "bg-red-500/20 text-red-300 border-red-500/30"
+                  ? "bg-[var(--surface-primary)] text-[var(--text-secondary)] border-[var(--border-default)]"
+                  : "bg-red-50 text-red-700 border-red-200"
               }`}>{m.alertas.length}</span>
             </div>
             <button onClick={() => onGoTab("auditoria")} className="text-xs text-white/60 hover:text-white">Ver todos</button>
           </div>
           {m.alertas.length === 0 ? (
             <div className="flex flex-col items-center justify-center text-center py-10">
-              <div className="h-12 w-12 rounded-full grid place-items-center bg-green-500/10 border border-green-500/20 mb-3">
-                <ShieldCheck className="h-6 w-6 text-green-400" />
+              <div className="h-12 w-12 rounded-full grid place-items-center bg-green-50 border border-green-200 mb-3">
+                <ShieldCheck className="h-6 w-6 text-green-700" />
               </div>
               <p className="text-sm text-white/60">Nenhum alerta ou aprovação pendente</p>
-              <p className="text-xs text-white/35 mt-1">Tudo em dia!</p>
+              <p className="text-xs text-[var(--text-muted)] mt-1">Tudo em dia!</p>
             </div>
           ) : (
             <div className="space-y-2 max-h-[280px] overflow-y-auto pr-1">
@@ -233,20 +233,20 @@ export function DashboardCorporativo({ dash, onGoTab, onClickProcesso }: {
             due: fmtDate(p.vencimento), dueHint: dueText(p.vencimento), critical: p.atrasado,
           }))} />
         <div className={`${CARD} p-4`}>
-          <div className="text-sm font-semibold text-white flex items-center gap-2 mb-3"><Globe className="h-4 w-4" style={{ color: OURO }} /> Exposição Cambial <span className="text-[10px] text-white/40 bg-[var(--surface-primary)] px-1.5 py-0.5 rounded">prévia</span></div>
+          <div className="text-sm font-semibold text-white flex items-center gap-2 mb-3"><Globe className="h-4 w-4" style={{ color: OURO }} /> Exposição Cambial <span className="text-[10px] text-[var(--text-muted)] bg-[var(--surface-primary)] px-1.5 py-0.5 rounded">prévia</span></div>
           <div className="rounded-lg border border-[var(--border-default)] bg-[var(--surface-primary)] p-3 mb-2">
-            <div className="flex items-center justify-between text-[11px] text-white/50 font-semibold uppercase tracking-wide">
+            <div className="flex items-center justify-between text-[11px] text-[var(--text-secondary)] font-semibold uppercase tracking-wide">
               <span>🇪🇺 EUR</span><span>@ R$ {dash.fx.EUR.toFixed(2)}</span>
             </div>
             <div className="text-xl font-bold text-white mt-1">{fmtEUR(m.exposicaoEUR)}</div>
-            <div className="text-xs text-white/50">≈ {fmtBRL(m.exposicaoEUR * dash.fx.EUR)}</div>
+            <div className="text-xs text-[var(--text-secondary)]">≈ {fmtBRL(m.exposicaoEUR * dash.fx.EUR)}</div>
           </div>
           <div className="rounded-lg border border-[var(--border-default)] bg-[var(--surface-primary)] p-3">
-            <div className="flex items-center justify-between text-[11px] text-white/50 font-semibold uppercase tracking-wide">
+            <div className="flex items-center justify-between text-[11px] text-[var(--text-secondary)] font-semibold uppercase tracking-wide">
               <span>🇺🇸 USD</span><span>@ R$ {dash.fx.USD.toFixed(2)}</span>
             </div>
             <div className="text-xl font-bold text-white mt-1">{fmtUSD(m.exposicaoUSD)}</div>
-            <div className="text-xs text-white/50">≈ {fmtBRL(m.exposicaoUSD * dash.fx.USD)}</div>
+            <div className="text-xs text-[var(--text-secondary)]">≈ {fmtBRL(m.exposicaoUSD * dash.fx.USD)}</div>
           </div>
         </div>
         <div className={`${CARD} p-4`}>
@@ -256,12 +256,12 @@ export function DashboardCorporativo({ dash, onGoTab, onClickProcesso }: {
           </div>
           <div className="space-y-2 max-h-[260px] overflow-y-auto pr-1">
             {dash.atividade.length === 0 ? (
-              <p className="text-sm text-white/40 py-6 text-center">Sem registros de auditoria.</p>
+              <p className="text-sm text-[var(--text-muted)] py-6 text-center">Sem registros de auditoria.</p>
             ) : dash.atividade.map(a => (
               <div key={a.id} className="text-xs border-l-2 border-[var(--border-strong)] pl-3 py-1">
-                <div className="text-white/40">{fmtDate(a.data)}</div>
+                <div className="text-[var(--text-muted)]">{fmtDate(a.data)}</div>
                 <div className="text-white/80"><span className="font-medium">{a.usuario}</span> · {a.acao}</div>
-                <div className="text-white/40">{a.entidade}</div>
+                <div className="text-[var(--text-muted)]">{a.entidade}</div>
               </div>
             ))}
           </div>
@@ -271,20 +271,20 @@ export function DashboardCorporativo({ dash, onGoTab, onClickProcesso }: {
       {/* LINHA 2: Receita por País · Contas Bancárias */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
         <div className={`${CARD} p-4`}>
-          <div className="text-sm font-semibold text-white flex items-center gap-2 mb-3"><Globe className="h-4 w-4" style={{ color: OURO }} /> Receita por País · YTD <span className="text-[10px] text-white/40 bg-[var(--surface-primary)] px-1.5 py-0.5 rounded">prévia</span></div>
+          <div className="text-sm font-semibold text-white flex items-center gap-2 mb-3"><Globe className="h-4 w-4" style={{ color: OURO }} /> Receita por País · YTD <span className="text-[10px] text-[var(--text-muted)] bg-[var(--surface-primary)] px-1.5 py-0.5 rounded">prévia</span></div>
           <ReceitaPaisBars data={m.receitaPorPais} />
         </div>
 
         <div className={`${CARD} p-4`}>
           <div className="text-sm font-semibold text-white flex items-center gap-2 mb-3"><Wallet className="h-4 w-4" style={{ color: OURO }} /> Contas Bancárias</div>
           {dash.contas.length === 0 ? (
-            <p className="text-sm text-white/40 py-4 text-center">Nenhuma conta bancária cadastrada.</p>
+            <p className="text-sm text-[var(--text-muted)] py-4 text-center">Nenhuma conta bancária cadastrada.</p>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
               {dash.contas.map(c => (
                 <div key={c.id} className="rounded-lg border border-[var(--border-default)] bg-[var(--surface-primary)] p-3">
                   <div className="flex items-center justify-between">
-                    <span className="text-xs text-white/50">{c.banco || "Conta"}</span>
+                    <span className="text-xs text-[var(--text-secondary)]">{c.banco || "Conta"}</span>
                     <span className="w-2.5 h-2.5 rounded-full" style={{ background: c.cor || "#64748b" }} />
                   </div>
                   <div className="text-white font-semibold mt-1">{c.nome}</div>
@@ -368,10 +368,10 @@ function StripCard({ topColor, icon, label, value, valueColor = "text-white", su
   void topColor
   return (
     <div className={`${CARD} p-4 relative`}>
-      {mock && <span className="absolute top-2 right-2 text-[9px] text-white/30 bg-[var(--surface-primary)] px-1.5 py-0.5 rounded">prévia</span>}
-      <div className="flex items-center gap-1.5 text-white/50 text-xs font-medium">{icon}{label}</div>
+      {mock && <span className="absolute top-2 right-2 text-[9px] text-[var(--text-muted)] bg-[var(--surface-primary)] px-1.5 py-0.5 rounded">prévia</span>}
+      <div className="flex items-center gap-1.5 text-[var(--text-secondary)] text-xs font-medium">{icon}{label}</div>
       <div className={`text-[22px] font-bold mt-1 ${valueColor}`}>{value}</div>
-      <div className="text-[11px] text-white/40 mt-1">{sub}</div>
+      <div className="text-[11px] text-[var(--text-muted)] mt-1">{sub}</div>
       <button onClick={action.onClick} className="mt-2 text-[11px] px-2.5 py-1 rounded-md border border-[var(--border-strong)] text-white/80 hover:bg-[var(--surface-hover)] transition-colors">{action.label}</button>
     </div>
   )
@@ -385,7 +385,7 @@ function Kpi({ icon, label, value, sub, mock, accent }: {
 }) {
   return (
     <div className={`${CARD} relative overflow-hidden`}>
-      {mock && <span className="absolute top-2 right-2 text-[9px] text-white/30 bg-[var(--surface-primary)] px-1.5 py-0.5 rounded">prévia</span>}
+      {mock && <span className="absolute top-2 right-2 text-[9px] text-[var(--text-muted)] bg-[var(--surface-primary)] px-1.5 py-0.5 rounded">prévia</span>}
       <div className="p-3.5">
         <div className="flex items-center gap-2">
           <span
@@ -397,7 +397,7 @@ function Kpi({ icon, label, value, sub, mock, accent }: {
           <span className={`text-[11px] font-semibold text-white/60 leading-tight ${mock ? "pr-8" : ""}`}>{label}</span>
         </div>
         <div className="font-bold mt-2 text-xl text-white">{value}</div>
-        {sub && <div className="text-[11px] text-white/40 mt-1">{sub}</div>}
+        {sub && <div className="text-[11px] text-[var(--text-muted)] mt-1">{sub}</div>}
       </div>
     </div>
   )
@@ -406,20 +406,20 @@ function Kpi({ icon, label, value, sub, mock, accent }: {
 function Mini({ label, value, hint, mock, last }: { label: string; value: string; hint: string; mock?: boolean; last?: boolean }) {
   return (
     <div className={`px-3 ${last ? "" : "xl:border-r border-[var(--border-default)]"}`}>
-      <div className="text-[10px] text-white/40 font-semibold uppercase tracking-wide flex items-center gap-1 xl:whitespace-nowrap">
-        {label}{mock && <span className="text-white/20">·prévia</span>}
+      <div className="text-[10px] text-[var(--text-muted)] font-semibold uppercase tracking-wide flex items-center gap-1 xl:whitespace-nowrap">
+        {label}{mock && <span className="text-[var(--text-muted)]">·prévia</span>}
       </div>
-      <div className="text-base font-bold text-white mt-1">{value} <span className="text-[11px] text-white/40 font-medium">{hint}</span></div>
+      <div className="text-base font-bold text-white mt-1">{value} <span className="text-[11px] text-[var(--text-muted)] font-medium">{hint}</span></div>
     </div>
   )
 }
 
 function AlertCard({ tipo, titulo, texto, meta }: { tipo: string; titulo: string; texto: string; meta: string }) {
   const styles: Record<string, { border: string; icon: React.ReactNode }> = {
-    critical: { border: "border-l-red-400", icon: <AlertTriangle className="h-4 w-4 text-red-400" /> },
-    warning: { border: "border-l-amber-400", icon: <Bell className="h-4 w-4 text-amber-400" /> },
-    info: { border: "border-l-sky-400", icon: <Calendar className="h-4 w-4 text-sky-400" /> },
-    success: { border: "border-l-green-400", icon: <CheckCircle className="h-4 w-4 text-green-400" /> },
+    critical: { border: "border-l-red-400", icon: <AlertTriangle className="h-4 w-4 text-red-700" /> },
+    warning: { border: "border-l-amber-400", icon: <Bell className="h-4 w-4 text-amber-700" /> },
+    info: { border: "border-l-sky-400", icon: <Calendar className="h-4 w-4 text-sky-700" /> },
+    success: { border: "border-l-green-400", icon: <CheckCircle className="h-4 w-4 text-green-700" /> },
   }
   const s = styles[tipo] || styles.info
   return (
@@ -428,7 +428,7 @@ function AlertCard({ tipo, titulo, texto, meta }: { tipo: string; titulo: string
       <div className="min-w-0">
         <div className="text-sm font-semibold text-white">{titulo}</div>
         <div className="text-xs text-white/70">{texto}</div>
-        <div className="text-[10px] text-white/40 mt-0.5">{meta}</div>
+        <div className="text-[10px] text-[var(--text-muted)] mt-0.5">{meta}</div>
       </div>
     </div>
   )
@@ -467,12 +467,12 @@ function ListCard({ icon, title, rows, colLeft, colMid, empty, onVerTodos }: {
       {rows.length === 0 ? (
         <div className="flex flex-col items-center justify-center text-center py-8">
           <div className="h-11 w-11 rounded-full grid place-items-center bg-[var(--surface-primary)] border border-[var(--border-default)] mb-2 opacity-40">{icon}</div>
-          <p className="text-sm text-white/40">{empty}</p>
+          <p className="text-sm text-[var(--text-muted)]">{empty}</p>
         </div>
       ) : (
         <table className="w-full text-sm">
           <thead>
-            <tr className="text-white/40 text-xs border-b border-[var(--border-default)]">
+            <tr className="text-[var(--text-muted)] text-xs border-b border-[var(--border-default)]">
               <th className="text-left font-medium py-1.5">{colLeft}</th>
               <th className="text-left font-medium py-1.5">{colMid}</th>
               <th className="text-right font-medium py-1.5">Valor</th>
@@ -484,11 +484,11 @@ function ListCard({ icon, title, rows, colLeft, colMid, empty, onVerTodos }: {
               <tr key={r.id} onClick={r.onClick}
                 className={`border-b border-[var(--border-subtle)] last:border-0 ${r.onClick ? "cursor-pointer hover:bg-[var(--surface-hover)]" : ""}`}>
                 <td className="py-2 text-white/90"><span className={`inline-block w-1.5 h-1.5 rounded-full mr-2 ${r.critical ? "bg-red-400" : "bg-[var(--surface-secondary)]"}`} />{r.left}</td>
-                <td className="py-2 text-white/50">{r.mid}</td>
+                <td className="py-2 text-[var(--text-secondary)]">{r.mid}</td>
                 <td className="py-2 text-right text-white font-medium tabular-nums">{r.val}</td>
                 <td className="py-2 text-right tabular-nums">
                   <div className="text-white/80">{r.due}</div>
-                  <div className={`text-[10px] ${r.critical ? "text-red-400" : "text-white/40"}`}>{r.dueHint}</div>
+                  <div className={`text-[10px] ${r.critical ? "text-red-700" : "text-[var(--text-muted)]"}`}>{r.dueHint}</div>
                 </td>
               </tr>
             ))}

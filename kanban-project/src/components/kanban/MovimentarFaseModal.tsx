@@ -221,14 +221,14 @@ export function MovimentarFaseModal({
             <h2 className="text-[16px] font-extrabold text-white/95">
               {plano?.ehRetrocesso ? "Retroceder processo" : "Confirmar movimentação manual"}
             </h2>
-            <p className="text-[12px] text-white/55 mt-0.5">
+            <p className="text-[12px] text-[var(--text-secondary)] mt-0.5">
               {ctx?.processo ? `${ctx.processo.codigo ? ctx.processo.codigo + " · " : ""}${ctx.processo.nome}` : "Carregando processo…"}
             </p>
           </div>
           <button
             onClick={onCancelar}
             disabled={enviando}
-            className="w-8 h-8 rounded-lg grid place-items-center text-white/55 hover:text-white hover:bg-[var(--surface-hover)] disabled:opacity-40"
+            className="w-8 h-8 rounded-lg grid place-items-center text-[var(--text-secondary)] hover:text-white hover:bg-[var(--surface-hover)] disabled:opacity-40"
             aria-label="Cancelar"
           >
             <X className="w-4 h-4" />
@@ -237,7 +237,7 @@ export function MovimentarFaseModal({
 
         <div className="px-5 py-4 space-y-4">
           {carregandoCtx ? (
-            <div className="flex items-center justify-center py-10 text-white/40">
+            <div className="flex items-center justify-center py-10 text-[var(--text-muted)]">
               <Loader2 className="w-5 h-5 animate-spin" />
             </div>
           ) : (
@@ -245,19 +245,19 @@ export function MovimentarFaseModal({
               {/* ORIGEM → DESTINO */}
               <div className="flex items-center gap-3 rounded-xl border border-[var(--border-default)] bg-[var(--surface-popover)] px-4 py-3">
                 <div className="min-w-0 flex-1">
-                  <div className="text-[10px] font-bold uppercase tracking-wider text-white/40">De</div>
+                  <div className="text-[10px] font-bold uppercase tracking-wider text-[var(--text-muted)]">De</div>
                   <div className="text-[13px] font-bold text-white/95 truncate">{ctx?.faseAtualLabel ?? "—"}</div>
                 </div>
-                <ArrowRight className="w-4 h-4 text-white/40 flex-none" />
+                <ArrowRight className="w-4 h-4 text-[var(--text-muted)] flex-none" />
                 <div className="min-w-0 flex-1">
-                  <div className="text-[10px] font-bold uppercase tracking-wider text-white/40">Para</div>
+                  <div className="text-[10px] font-bold uppercase tracking-wider text-[var(--text-muted)]">Para</div>
                   <div className="text-[13px] font-bold text-[#7dd3fc] truncate">{destino?.label ?? "Selecione a fase"}</div>
                 </div>
               </div>
 
               {/* DESTINO — do macro DESTE processo (o drop já preenche) */}
               <label className="block">
-                <span className="text-[11px] font-bold uppercase tracking-wider text-white/40">Fase de destino</span>
+                <span className="text-[11px] font-bold uppercase tracking-wider text-[var(--text-muted)]">Fase de destino</span>
                 <select
                   value={faseAlvo}
                   onChange={(e) => setFaseAlvo(e.target.value)}
@@ -297,7 +297,7 @@ export function MovimentarFaseModal({
 
               {/* MOTIVO — catálogo do servidor, nunca texto livre estrutural */}
               <label className="block">
-                <span className="text-[11px] font-bold uppercase tracking-wider text-white/40">Motivo *</span>
+                <span className="text-[11px] font-bold uppercase tracking-wider text-[var(--text-muted)]">Motivo *</span>
                 <select
                   value={motivoCodigo}
                   onChange={(e) => setMotivoCodigo(e.target.value)}
@@ -310,7 +310,7 @@ export function MovimentarFaseModal({
                   ))}
                 </select>
                 {motivoCodigo && (
-                  <span className="text-[11px] text-white/40 block mt-1">
+                  <span className="text-[11px] text-[var(--text-muted)] block mt-1">
                     {ctx?.motivos.find((m) => m.codigo === motivoCodigo)?.descricao}
                   </span>
                 )}
@@ -318,8 +318,8 @@ export function MovimentarFaseModal({
 
               {/* JUSTIFICATIVA */}
               <label className="block">
-                <span className="text-[11px] font-bold uppercase tracking-wider text-white/40">
-                  Justificativa * <span className="normal-case font-semibold text-white/25">({justificativaLimpa.length}/{max}, mínimo {min})</span>
+                <span className="text-[11px] font-bold uppercase tracking-wider text-[var(--text-muted)]">
+                  Justificativa * <span className="normal-case font-semibold text-[var(--text-muted)]">({justificativaLimpa.length}/{max}, mínimo {min})</span>
                 </span>
                 <textarea
                   value={justificativa}
@@ -336,7 +336,7 @@ export function MovimentarFaseModal({
                   "e o trabalho que já foi feito?" existe. Retroceder sem marcar nada é
                   o caminho normal — reposiciona a fase e mais nada. */}
               {carregandoPlano && (
-                <div className="rounded-lg border border-[var(--border-default)] bg-[var(--surface-popover)] px-3 py-2.5 text-[12px] text-white/50">
+                <div className="rounded-lg border border-[var(--border-default)] bg-[var(--surface-popover)] px-3 py-2.5 text-[12px] text-[var(--text-secondary)]">
                   Carregando o que existe na fase de destino…
                 </div>
               )}
@@ -350,9 +350,9 @@ export function MovimentarFaseModal({
                     {plano.retrato.concluidas > 0 && ` · ${plano.retrato.concluidas} concluída(s)`}
                     {plano.retrato.emAberto > 0 && ` · ${plano.retrato.emAberto} em aberto`}
                   </p>
-                  <p className="mt-1.5 text-[11.5px] leading-snug text-white/55">{plano.aviso}</p>
+                  <p className="mt-1.5 text-[11.5px] leading-snug text-[var(--text-secondary)]">{plano.aviso}</p>
                   {plano.fasesPosterioresVisitadas.length > 0 && (
-                    <p className="mt-2 text-[11px] text-white/40">
+                    <p className="mt-2 text-[11px] text-[var(--text-muted)]">
                       O trabalho das fases posteriores continua registrado
                       {" "}({plano.fasesPosterioresVisitadas.map((f) => `${f.faseMacroKey}: ${f.obrigacoes} obrigação(ões)`).join(" · ")}).
                       Nada é apagado.
@@ -381,7 +381,7 @@ export function MovimentarFaseModal({
           <button
             onClick={confirmar}
             disabled={!podeConfirmar}
-            className="inline-flex items-center gap-2 text-[12.5px] font-bold px-4 py-2 rounded-lg bg-[#2563eb] text-[#fff] hover:bg-[#1d4ed8] disabled:opacity-40 disabled:cursor-not-allowed"
+            className="inline-flex items-center gap-2 text-[12.5px] font-bold px-4 py-2 rounded-lg bg-[var(--action-primary)] text-[var(--action-primary-ink)] hover:bg-[var(--action-primary-hover)] disabled:opacity-40 disabled:cursor-not-allowed"
           >
             {enviando && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
             {enviando

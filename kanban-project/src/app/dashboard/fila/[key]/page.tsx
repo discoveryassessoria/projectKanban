@@ -52,7 +52,7 @@ export default function FilaPage({ params }: { params: Promise<{ key: string }> 
           {isLoading && !data ? (
             <div className="space-y-2">
               {Array.from({ length: 6 }).map((_, i) => (
-                <div key={i} className="h-14 animate-pulse rounded-lg bg-white/[0.06]" />
+                <div key={i} className="h-14 animate-pulse rounded-lg bg-[var(--surface-primary)]" />
               ))}
             </div>
           ) : status === 404 ? (
@@ -78,34 +78,34 @@ export default function FilaPage({ params }: { params: Promise<{ key: string }> 
                   <li key={item.id}>
                     <Link
                       href={item.href}
-                      className="group flex items-center gap-3 rounded-lg border border-[var(--border-default)] bg-white/[0.03] px-3 py-2.5 transition hover:border-[var(--border-strong)] hover:bg-white/[0.07] focus:outline-none focus:ring-2 focus:ring-white/20"
+                      className="group flex items-center gap-3 rounded-lg border border-[var(--border-default)] bg-[var(--surface-primary)] px-3 py-2.5 transition hover:border-[var(--border-strong)] hover:bg-[var(--surface-primary)] focus:outline-none focus:ring-2 focus:ring-white/20"
                     >
                       <span className="w-6 shrink-0 text-center text-base">
                         {item.pais ? (BANDEIRA[item.pais] ?? "🏳️") : "•"}
                       </span>
                       <div className="min-w-0 flex-1">
                         <p className="truncate text-sm font-medium text-white">{item.titulo}</p>
-                        <p className="truncate text-xs text-white/45">
+                        <p className="truncate text-xs text-[var(--text-secondary)]">
                           {[item.processoCodigo ?? item.processoNome, item.subtitulo].filter(Boolean).join(" · ")}
                         </p>
                       </div>
                       {item.prazo && (
                         <span
                           className={`hidden shrink-0 text-xs font-medium sm:inline ${
-                            item.atrasado ? "text-red-300" : "text-white/50"
+                            item.atrasado ? "text-red-700" : "text-[var(--text-secondary)]"
                           }`}
                         >
                           {formatarPrazo(item.prazo)}
                         </span>
                       )}
-                      <ChevronRight className="h-4 w-4 shrink-0 text-white/30 transition-transform group-hover:translate-x-0.5" />
+                      <ChevronRight className="h-4 w-4 shrink-0 text-[var(--text-muted)] transition-transform group-hover:translate-x-0.5" />
                     </Link>
                   </li>
                 ))}
               </ul>
 
               {data.truncado && (
-                <p className="mt-3 flex items-center gap-1.5 text-xs text-white/45">
+                <p className="mt-3 flex items-center gap-1.5 text-xs text-[var(--text-secondary)]">
                   <Flag className="h-3.5 w-3.5" style={{ color: OURO }} />
                   Mostrando os {data.itens.length} itens mais urgentes de {data.quantidade}.
                 </p>

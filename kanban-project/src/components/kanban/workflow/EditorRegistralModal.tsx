@@ -409,7 +409,7 @@ function ConteudoModal({
         >
           {loading && !doc && (
             <div className="flex-1 flex items-center justify-center py-16">
-              <Loader2 className="w-6 h-6 animate-spin text-white/50" />
+              <Loader2 className="w-6 h-6 animate-spin text-[var(--text-secondary)]" />
             </div>
           )}
 
@@ -435,7 +435,7 @@ function ConteudoModal({
               >
                 <div className="flex items-start justify-between gap-4">
                   <div className="flex-1 min-w-0">
-                    <div className="text-[10px] uppercase font-bold tracking-wider text-white/55 mb-1">
+                    <div className="text-[10px] uppercase font-bold tracking-wider text-[var(--text-secondary)] mb-1">
                       Dados registrais — {tipoLabel}
                     </div>
                     <div className="text-[13px] text-white/70 leading-snug">
@@ -459,7 +459,7 @@ function ConteudoModal({
               <div className="flex-1 overflow-y-auto px-6 py-5 text-white/70">
                 {/* Nome base (não muda) */}
                 <div className="mb-5 p-3 rounded-lg bg-[var(--surface-popover)]/5 border border-[var(--border-default)]">
-                  <div className="text-[10px] uppercase font-bold tracking-wider text-white/45 mb-1">
+                  <div className="text-[10px] uppercase font-bold tracking-wider text-[var(--text-secondary)] mb-1">
                     Nome base na árvore (não muda aqui)
                   </div>
                   <div className="text-[15px] font-semibold text-white">{pessoaNome}</div>
@@ -788,22 +788,22 @@ function Section({
         className="w-full flex items-center justify-between gap-2 mb-2 group"
       >
         <div className="flex items-center gap-2 text-left">
-          <BookOpen className="w-3.5 h-3.5 text-white/40 group-hover:text-white/60" />
-          <h3 className="text-[11px] uppercase font-bold tracking-wider text-white/55 group-hover:text-white/80">
+          <BookOpen className="w-3.5 h-3.5 text-[var(--text-muted)] group-hover:text-white/60" />
+          <h3 className="text-[11px] uppercase font-bold tracking-wider text-[var(--text-secondary)] group-hover:text-white/80">
             {title}
           </h3>
         </div>
         {open ? (
-          <ChevronUp className="w-3.5 h-3.5 text-white/40 group-hover:text-white/60" />
+          <ChevronUp className="w-3.5 h-3.5 text-[var(--text-muted)] group-hover:text-white/60" />
         ) : (
-          <ChevronDown className="w-3.5 h-3.5 text-white/40 group-hover:text-white/60" />
+          <ChevronDown className="w-3.5 h-3.5 text-[var(--text-muted)] group-hover:text-white/60" />
         )}
       </button>
 
       {open && (
         <div className="pl-5">
           {intro && (
-            <div className="text-[11px] text-white/45 italic mb-3 leading-relaxed">{intro}</div>
+            <div className="text-[11px] text-[var(--text-secondary)] italic mb-3 leading-relaxed">{intro}</div>
           )}
           {children}
         </div>
@@ -838,7 +838,7 @@ function Field({
   return (
     <div className={colSpan === 2 ? "col-span-2" : ""}>
       <div className="flex items-center gap-1.5 mb-1">
-        <label className="text-[10px] uppercase font-semibold tracking-wider text-white/50">
+        <label className="text-[10px] uppercase font-semibold tracking-wider text-[var(--text-secondary)]">
           {label}
         </label>
         {requiredToComplete && (

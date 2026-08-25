@@ -17,7 +17,7 @@ const BTN_PRIMARY =
 const BTN_GHOST =
   'rounded-lg border border-[var(--border-default)] px-3 py-1.5 text-xs text-white/70 transition hover:bg-[var(--surface-hover)]'
 const INPUT =
-  'rounded-lg border border-[var(--border-default)] bg-[var(--surface-primary)] px-2.5 py-1.5 text-xs text-white placeholder:text-white/40 outline-none focus:border-white/20'
+  'rounded-lg border border-[var(--border-default)] bg-[var(--surface-primary)] px-2.5 py-1.5 text-xs text-white placeholder:text-[var(--text-muted)] outline-none focus:border-white/20'
 const SELECT =
   'rounded-lg border border-[var(--border-default)] bg-[var(--surface-primary)] px-2.5 py-1.5 text-xs text-white outline-none focus:border-white/20'
 
@@ -36,12 +36,12 @@ function Table({ headers, empty }: { headers: string[]; empty: string }) {
         <thead>
           <tr className="bg-[var(--surface-primary)]">
             {headers.map((h, i) => (
-              <th key={i} className={`whitespace-nowrap border-b border-[var(--border-default)] px-3 py-2.5 text-[11px] font-semibold uppercase tracking-wide text-white/50 ${i === headers.length - 1 ? 'text-right' : 'text-left'}`}>{h}</th>
+              <th key={i} className={`whitespace-nowrap border-b border-[var(--border-default)] px-3 py-2.5 text-[11px] font-semibold uppercase tracking-wide text-[var(--text-secondary)] ${i === headers.length - 1 ? 'text-right' : 'text-left'}`}>{h}</th>
             ))}
           </tr>
         </thead>
         <tbody>
-          <tr><td colSpan={headers.length} className="px-3 py-6 text-center text-xs text-white/40">{empty}</td></tr>
+          <tr><td colSpan={headers.length} className="px-3 py-6 text-center text-xs text-[var(--text-muted)]">{empty}</td></tr>
         </tbody>
       </table>
     </div>
@@ -52,14 +52,14 @@ function PickProcess({ title, desc, empty }: { title: string; desc: string; empt
   return (
     <div>
       <AvisoRascunho />
-      <div className="mb-3 text-xs text-white/50">{desc}</div>
+      <div className="mb-3 text-xs text-[var(--text-secondary)]">{desc}</div>
       <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
         <h2 className="text-base font-semibold text-white">{title}</h2>
         <select value={pt} onChange={(e) => setPt(e.target.value)} className={SELECT}>
           <option value="" className="bg-zinc-900">— Processo de Nacionalidade —</option>
         </select>
       </div>
-      <div className={`${CARD} p-5 text-sm text-white/40`}>{empty}</div>
+      <div className={`${CARD} p-5 text-sm text-[var(--text-muted)]`}>{empty}</div>
     </div>
   )
 }
@@ -67,7 +67,7 @@ function Kpi({ value, label, color }: { value: string; label: string; color?: st
   return (
     <div className={`${CARD} p-3 text-center`}>
       <div className="text-2xl font-bold" style={{ color: color || '#e8ebf2' }}>{value}</div>
-      <div className="text-[10px] font-semibold uppercase tracking-wide text-white/50">{label}</div>
+      <div className="text-[10px] font-semibold uppercase tracking-wide text-[var(--text-secondary)]">{label}</div>
     </div>
   )
 }
@@ -77,7 +77,7 @@ export function ExecMatrixTab() {
   return (
     <div>
       <AvisoRascunho />
-      <div className="mb-3 text-xs text-white/50">
+      <div className="mb-3 text-xs text-[var(--text-secondary)]">
         Cada tipo real de processo e o status de sua configuração (workflow, kanban, documentos, protocolos,
         financeiro, tarefas, automações, SLA). Retificação não aparece aqui — é fase.
       </div>
@@ -95,7 +95,7 @@ export function SystemHealthTab() {
   return (
     <div>
       <AvisoRascunho />
-      <div className="mb-3 text-xs text-white/50">
+      <div className="mb-3 text-xs text-[var(--text-secondary)]">
         Auditoria executiva de classificação, contexto, workflows, kanbans, documentos, protocolos,
         financeiro e retificação.
       </div>
@@ -110,7 +110,7 @@ export function SystemHealthTab() {
         <Kpi value="0" label="Recomendações" />
         <Kpi value="—" label="Pronto p/ protótipo" />
       </div>
-      <div className={`${CARD} p-5 text-sm font-medium text-green-300`}>✅ Nenhum problema estrutural detectado.</div>
+      <div className={`${CARD} p-5 text-sm font-medium text-green-700`}>✅ Nenhum problema estrutural detectado.</div>
     </div>
   )
 }
@@ -120,7 +120,7 @@ export function PricingTableTab() {
   return (
     <div>
       <AvisoRascunho />
-      <div className="mb-1.5 text-xs text-white/50">
+      <div className="mb-1.5 text-xs text-[var(--text-secondary)]">
         Parametrize valores por Processo de Nacionalidade, fase, produto/serviço, país, modalidade e
         fornecedor. As automações financeiras puxam o valor daqui em vez de usar número fixo.
       </div>
@@ -143,7 +143,7 @@ export function PermProfilesTab() {
   return (
     <div>
       <AvisoRascunho />
-      <div className="mb-1.5 text-xs text-white/50">
+      <div className="mb-1.5 text-xs text-[var(--text-secondary)]">
         Perfis de permissão para ações críticas do Gerenciamento. Marque por checkbox o que cada perfil pode fazer.
       </div>
       <Section title="Usuários e Permissões" action={<button disabled title={TITULO_RASCUNHO} className={BTN_RASCUNHO}>+ Novo perfil</button>} />

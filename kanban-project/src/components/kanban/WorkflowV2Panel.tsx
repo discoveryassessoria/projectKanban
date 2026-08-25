@@ -106,17 +106,17 @@ export function WorkflowV2Panel({ processoId }: Props) {
       ))}
 
       <div className="mb-3 grid grid-cols-2 gap-2 text-xs text-gray-600 sm:grid-cols-4">
-        <div><span className="text-gray-400">Fase:</span> {view.faseAtual || "—"}</div>
-        <div><span className="text-gray-400">Ciclo:</span> {view.ciclo ?? "—"}</div>
-        <div><span className="text-gray-400">Versão macro:</span> {view.versoes.macro ?? "—"}</div>
-        <div><span className="text-gray-400">Versão interno:</span> {view.versoes.interno ?? "—"}</div>
+        <div><span className="text-[var(--text-muted)]">Fase:</span> {view.faseAtual || "—"}</div>
+        <div><span className="text-[var(--text-muted)]">Ciclo:</span> {view.ciclo ?? "—"}</div>
+        <div><span className="text-[var(--text-muted)]">Versão macro:</span> {view.versoes.macro ?? "—"}</div>
+        <div><span className="text-[var(--text-muted)]">Versão interno:</span> {view.versoes.interno ?? "—"}</div>
       </div>
 
       {/* Passos */}
       {view.passos.length > 0 && (
         <div className="mb-3 overflow-x-auto">
           <table className="w-full text-left text-xs">
-            <thead className="text-gray-400">
+            <thead className="text-[var(--text-muted)]">
               <tr><th className="py-1">#</th><th>Passo</th><th>Tipo</th><th>Status</th><th>Obrig.</th></tr>
             </thead>
             <tbody>
@@ -137,7 +137,7 @@ export function WorkflowV2Panel({ processoId }: Props) {
       {/* Tarefas vinculadas */}
       {view.tarefas.length > 0 && (
         <div className="mb-3 text-xs text-gray-600">
-          <span className="text-gray-400">Tarefas:</span> {view.tarefas.length} — {view.tarefas.filter((t) => t.stepInstanceId != null).length} vinculadas a passo
+          <span className="text-[var(--text-muted)]">Tarefas:</span> {view.tarefas.length} — {view.tarefas.filter((t) => t.stepInstanceId != null).length} vinculadas a passo
         </div>
       )}
 
@@ -162,7 +162,7 @@ export function WorkflowV2Panel({ processoId }: Props) {
             <button onClick={simular} disabled={acao != null} className="rounded border border-gray-300 px-2 py-1 text-xs hover:bg-gray-50 disabled:opacity-50">
               Simular avanço
             </button>
-            <button onClick={avancar} disabled={acao != null || !v2} className="rounded bg-blue-600 px-2 py-1 text-xs text-[#fff] hover:bg-blue-700 disabled:opacity-50">
+            <button onClick={avancar} disabled={acao != null || !v2} className="rounded bg-[var(--action-primary)] px-2 py-1 text-xs text-[var(--action-primary-ink)] hover:bg-[var(--action-primary-hover)] disabled:opacity-50">
               Avançar
             </button>
           </>
@@ -172,11 +172,11 @@ export function WorkflowV2Panel({ processoId }: Props) {
             Forçar avanço
           </button>
         )}
-        {acao && <Loader2 className="h-4 w-4 animate-spin text-gray-400" />}
+        {acao && <Loader2 className="h-4 w-4 animate-spin text-[var(--text-muted)]" />}
         {msg && <span className="text-xs text-gray-500">{msg}</span>}
       </div>
       {!v2 && (
-        <div className="mt-2 text-xs text-gray-400">Avançar/forçar exigem runtime v2 efetivo (processo v2 + kill switch ON).</div>
+        <div className="mt-2 text-xs text-[var(--text-muted)]">Avançar/forçar exigem runtime v2 efetivo (processo v2 + kill switch ON).</div>
       )}
     </div>
   )

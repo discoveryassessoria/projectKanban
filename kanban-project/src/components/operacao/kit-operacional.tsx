@@ -111,10 +111,10 @@ export function rotularFase(k: string | null): string | null {
 
 export function Etiqueta({ tom, children }: { tom: "neutro" | "alerta" | "critico" | "acento"; children: React.ReactNode }) {
   const cores = {
-    neutro: "bg-white/[0.06] text-white/60 border-[var(--border-default)]",
-    alerta: "bg-amber-400/10 text-amber-200/90 border-amber-300/25",
-    critico: "bg-red-500/10 text-red-200/90 border-red-400/25",
-    acento: "bg-sky-400/10 text-sky-200/90 border-sky-300/25",
+    neutro: "bg-[var(--surface-primary)] text-white/60 border-[var(--border-default)]",
+    alerta: "bg-amber-50 text-amber-700/90 border-amber-200",
+    critico: "bg-red-50 text-red-700/90 border-red-200",
+    acento: "bg-sky-50 text-sky-700/90 border-sky-200",
   }[tom]
   return (
     <span className={`inline-flex items-center rounded border px-1.5 py-[1px] text-[10px] font-medium leading-4 ${cores}`}>
@@ -127,11 +127,11 @@ export function Estado({ tipo, mensagem, aoTentar }: { tipo: "carregando" | "vaz
   return (
     <div className="flex flex-col items-center justify-center gap-3 px-4 py-16 text-center">
       {tipo === "carregando" && <div className="h-6 w-6 animate-spin rounded-full border-2 border-[var(--border-strong)] border-t-transparent" />}
-      <p className="text-[12px] text-white/45">{mensagem}</p>
+      <p className="text-[12px] text-[var(--text-secondary)]">{mensagem}</p>
       {tipo === "erro" && aoTentar && (
         <button
           onClick={aoTentar}
-          className="rounded border border-[var(--border-default)] px-3 py-1.5 text-[11px] text-white/70 transition-colors hover:bg-white/[0.06]"
+          className="rounded border border-[var(--border-default)] px-3 py-1.5 text-[11px] text-white/70 transition-colors hover:bg-[var(--surface-primary)]"
         >
           Tentar novamente
         </button>
@@ -196,7 +196,7 @@ export function SeletorResponsavel({
           <h2 className="text-[13px] font-medium text-white/90">{titulo}</h2>
         </div>
 
-        {erro && <div className="border-b border-red-400/20 bg-red-500/10 px-4 py-2 text-[11px] text-red-200/90">{erro}</div>}
+        {erro && <div className="border-b border-red-200 bg-red-50 px-4 py-2 text-[11px] text-red-700/90">{erro}</div>}
 
         <div className="max-h-72 overflow-y-auto">
           {falhou && <Estado tipo="erro" mensagem="Não foi possível carregar os funcionários." aoTentar={carregar} />}
@@ -209,25 +209,25 @@ export function SeletorResponsavel({
               key={f.id}
               disabled={ocupado || f.id === atual}
               onClick={() => aoEscolher(f.id)}
-              className="flex w-full items-center justify-between border-b border-white/[0.05] px-4 py-2.5 text-left transition-colors last:border-b-0 hover:bg-white/[0.04] disabled:opacity-40"
+              className="flex w-full items-center justify-between border-b border-white/[0.05] px-4 py-2.5 text-left transition-colors last:border-b-0 hover:bg-[var(--surface-primary)] disabled:opacity-40"
             >
               <span className="min-w-0">
                 <span className="block truncate text-[12px] text-white/85">{f.nome}</span>
                 {/* Discreto, mas presente: dois funcionários de mesmo nome eram
                     duas linhas idênticas no seletor. */}
-                {f.email && <span className="block truncate text-[10px] text-white/30">{f.email}</span>}
+                {f.email && <span className="block truncate text-[10px] text-[var(--text-muted)]">{f.email}</span>}
               </span>
-              <span className="text-[10px] tabular-nums text-white/35">
+              <span className="text-[10px] tabular-nums text-[var(--text-muted)]">
                 {f.tarefasAtivas} ativa{f.tarefasAtivas === 1 ? "" : "s"}
-                {f.atrasadas > 0 && <span className="text-red-300/70"> · {f.atrasadas} atrasada{f.atrasadas === 1 ? "" : "s"}</span>}
-                {f.id === atual && <span className="text-white/50"> · atual</span>}
+                {f.atrasadas > 0 && <span className="text-red-700/70"> · {f.atrasadas} atrasada{f.atrasadas === 1 ? "" : "s"}</span>}
+                {f.id === atual && <span className="text-[var(--text-secondary)]"> · atual</span>}
               </span>
             </button>
           ))}
         </div>
 
         <div className="flex justify-end border-t border-white/[0.08] px-4 py-2.5">
-          <button onClick={aoFechar} className="rounded px-3 py-1.5 text-[11px] text-white/50 transition-colors hover:text-white/80">
+          <button onClick={aoFechar} className="rounded px-3 py-1.5 text-[11px] text-[var(--text-secondary)] transition-colors hover:text-white/80">
             Cancelar
           </button>
         </div>

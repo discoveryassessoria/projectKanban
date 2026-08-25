@@ -261,7 +261,7 @@ function DecisaoSobreCausa({
         <span className="text-white/90">{titulo}</span>
         {motivo ? ` — ${motivo}` : ""}
       </p>
-      <p className="mt-1 text-xs text-white/55">
+      <p className="mt-1 text-xs text-[var(--text-secondary)]">
         O trabalho já iniciado foi preservado: nada foi cancelado automaticamente.
         Encerrar retira a tarefa da fila; manter devolve o trabalho a quem o executa.
       </p>
@@ -273,7 +273,7 @@ function DecisaoSobreCausa({
             rows={2}
             maxLength={300}
             placeholder="Por quê? (obrigatório — fica no histórico)"
-            className="mt-3 w-full resize-none rounded-md border border-[var(--border-default)] bg-black/30 px-3 py-2 text-xs text-white/85 placeholder:text-white/30 focus:border-white/30 focus:outline-none"
+            className="mt-3 w-full resize-none rounded-md border border-[var(--border-default)] bg-black/30 px-3 py-2 text-xs text-white/85 placeholder:text-[var(--text-muted)] focus:border-white/30 focus:outline-none"
           />
           <div className="mt-2 flex flex-wrap items-center gap-2">
             <button
@@ -288,18 +288,18 @@ function DecisaoSobreCausa({
               type="button"
               onClick={() => decidir("ENCERRAR")}
               disabled={enviando !== null}
-              className="rounded-md border border-red-400/30 bg-red-500/15 px-3 py-1.5 text-xs font-medium text-red-200 hover:bg-red-500/25 disabled:opacity-50"
+              className="rounded-md border border-red-200 bg-red-50 px-3 py-1.5 text-xs font-medium text-red-700 hover:bg-red-50 disabled:opacity-50"
             >
               {enviando === "ENCERRAR" ? "Encerrando…" : "Encerrar a tarefa"}
             </button>
           </div>
         </>
       ) : (
-        <p className="mt-3 text-xs text-white/45">
+        <p className="mt-3 text-xs text-[var(--text-secondary)]">
           Você não tem permissão para decidir sobre esta tarefa. Procure quem responde pela fila.
         </p>
       )}
-      {erro && <p className="mt-2 text-xs text-red-300">{erro}</p>}
+      {erro && <p className="mt-2 text-xs text-red-700">{erro}</p>}
     </div>
   )
 }
@@ -795,7 +795,7 @@ export function ProcessoCentralOperacional({
   if (loading && !data) {
     return (
       <div className="h-full flex items-center justify-center">
-        <Loader2 className="w-6 h-6 animate-spin text-white/40" />
+        <Loader2 className="w-6 h-6 animate-spin text-[var(--text-muted)]" />
       </div>
     )
   }
@@ -826,7 +826,7 @@ export function ProcessoCentralOperacional({
       <div className="h-full overflow-y-auto p-6">
         <div className="rounded-lg border border-[var(--border-default)] bg-[var(--surface-primary)] px-4 py-6 text-center text-sm text-white/60">
           <div className="text-white/80">Nenhuma operação materializada para este processo.</div>
-          <div className="mt-1 text-xs text-white/45">
+          <div className="mt-1 text-xs text-[var(--text-secondary)]">
             A Central aparece quando o processo tem fase e workflow ativos.
           </div>
           <button
@@ -1017,7 +1017,7 @@ export function ProcessoCentralOperacional({
           // spinner/erro — NUNCA o corpo, que cairia nos dados da fase ativa.
           viewErro
             ? <div className="bg-[#d2a948]/12 border border-[#d2a948]/30 rounded-lg px-4 py-3 text-sm text-[#d2a948]">⚠ {viewErro}</div>
-            : <div className="flex items-center justify-center py-16 text-white/40"><Loader2 className="w-6 h-6 animate-spin" /></div>
+            : <div className="flex items-center justify-center py-16 text-[var(--text-muted)]"><Loader2 className="w-6 h-6 animate-spin" /></div>
         ) : !isView && ehAnalise ? (
           <ProcessoAnalise processoId={processo.id} onConcluido={() => carregar(true)} />
         ) : !isView && ehTraducao ? (
@@ -1047,7 +1047,7 @@ export function ProcessoCentralOperacional({
         {/* ===== Header da Central ===== */}
         <div className="mb-4">
           <h3 className="text-lg font-bold text-white/95 tracking-tight">Central Operacional</h3>
-          <p className="text-xs text-white/55 mt-0.5">
+          <p className="text-xs text-[var(--text-secondary)] mt-0.5">
             Fila de produção documental · todas as tarefas ativas do processo
           </p>
         </div>
@@ -1117,7 +1117,7 @@ export function ProcessoCentralOperacional({
                 <div className="text-sm font-semibold text-white/95 mb-1">Não foi possível abrir a operação</div>
                 <div className="text-sm text-white/68 mb-4">{erroOperacao}</div>
                 <div className="flex justify-end">
-                  <button onClick={() => setErroOperacao(null)} className="px-3 py-1.5 text-sm font-medium rounded-md bg-[#252c35] hover:bg-[#252c35] text-white/95">Fechar</button>
+                  <button onClick={() => setErroOperacao(null)} className="px-3 py-1.5 text-sm font-medium rounded-md bg-[var(--surface-tertiary)] hover:bg-[var(--surface-tertiary)] text-white/95">Fechar</button>
                 </div>
               </div>
             </div>

@@ -335,15 +335,15 @@ export default function GenealogyPage() {
                 <div className="grid grid-cols-3 gap-3">
                   <div className="bg-[var(--surface-primary)] backdrop-blur-sm rounded-xl px-4 py-3 border border-[var(--border-strong)]">
                     <p className="text-2xl font-bold">{estatisticas.totalPessoas}</p>
-                    <p className="text-white/50 text-xs">{estatisticas.totalPessoas === 1 ? 'Pessoa' : 'Pessoas'}</p>
+                    <p className="text-[var(--text-secondary)] text-xs">{estatisticas.totalPessoas === 1 ? 'Pessoa' : 'Pessoas'}</p>
                   </div>
                   <div className="bg-[var(--surface-primary)] backdrop-blur-sm rounded-xl px-4 py-3 border border-[var(--border-strong)]">
                     <p className="text-2xl font-bold">{estatisticas.totalDocumentos}</p>
-                    <p className="text-white/50 text-xs">{estatisticas.totalDocumentos === 1 ? 'Documento' : 'Documentos'}</p>
+                    <p className="text-[var(--text-secondary)] text-xs">{estatisticas.totalDocumentos === 1 ? 'Documento' : 'Documentos'}</p>
                   </div>
                   <div className="bg-[var(--surface-primary)] backdrop-blur-sm rounded-xl px-4 py-3 border border-[var(--border-strong)]">
                     <p className="text-2xl font-bold">{estatisticas.totalArvores}</p>
-                    <p className="text-white/50 text-xs">{estatisticas.totalArvores === 1 ? 'Árvore' : 'Árvores'}</p>
+                    <p className="text-[var(--text-secondary)] text-xs">{estatisticas.totalArvores === 1 ? 'Árvore' : 'Árvores'}</p>
                   </div>
                 </div>
               </div>
@@ -357,7 +357,7 @@ export default function GenealogyPage() {
                     className={`flex-1 py-3 px-4 text-sm font-medium transition ${
                       activeTab === 'pessoa' 
                         ? 'text-white border-b-2 border-[var(--border-default)]' 
-                        : 'text-white/50 hover:text-white/70'
+                        : 'text-[var(--text-secondary)] hover:text-white/70'
                     }`}
                   >
                     <User className="h-4 w-4 inline mr-2" />
@@ -368,7 +368,7 @@ export default function GenealogyPage() {
                     className={`flex-1 py-3 px-4 text-sm font-medium transition ${
                       activeTab === 'documento' 
                         ? 'text-white border-b-2 border-[var(--border-default)]' 
-                        : 'text-white/50 hover:text-white/70'
+                        : 'text-[var(--text-secondary)] hover:text-white/70'
                     }`}
                   >
                     <FileText className="h-4 w-4 inline mr-2" />
@@ -381,7 +381,7 @@ export default function GenealogyPage() {
                   <div className="p-5">
                     <div className="grid grid-cols-2 gap-3 mb-3">
                       <div>
-                        <label className="block text-xs text-white/50 mb-1">Nome</label>
+                        <label className="block text-xs text-[var(--text-secondary)] mb-1">Nome</label>
                         <input
                           type="text"
                           value={nome}
@@ -391,7 +391,7 @@ export default function GenealogyPage() {
                         />
                       </div>
                       <div>
-                        <label className="block text-xs text-white/50 mb-1">Sobrenome</label>
+                        <label className="block text-xs text-[var(--text-secondary)] mb-1">Sobrenome</label>
                         <input
                           type="text"
                           value={sobrenome}
@@ -404,7 +404,7 @@ export default function GenealogyPage() {
                     
                     <div className="grid grid-cols-2 gap-3 mb-3">
                       <div>
-                        <label className="block text-xs text-white/50 mb-1">Local de nascimento</label>
+                        <label className="block text-xs text-[var(--text-secondary)] mb-1">Local de nascimento</label>
                         <input
                           type="text"
                           value={localNascimento}
@@ -414,7 +414,7 @@ export default function GenealogyPage() {
                         />
                       </div>
                       <div>
-                        <label className="block text-xs text-white/50 mb-1">Ano de nascimento</label>
+                        <label className="block text-xs text-[var(--text-secondary)] mb-1">Ano de nascimento</label>
                         <input
                           type="text"
                           value={anoNascimento}
@@ -437,7 +437,7 @@ export default function GenealogyPage() {
                     {showAdvanced && (
                       <div className="grid grid-cols-3 gap-3 mb-3 p-3 bg-[var(--surface-primary)] rounded-lg border border-[var(--border-default)]">
                         <div>
-                          <label className="block text-xs text-white/50 mb-1">Ano falecimento</label>
+                          <label className="block text-xs text-[var(--text-secondary)] mb-1">Ano falecimento</label>
                           <input
                             type="text"
                             value={anoFalecimento}
@@ -447,7 +447,7 @@ export default function GenealogyPage() {
                           />
                         </div>
                         <div>
-                          <label className="block text-xs text-white/50 mb-1">Nacionalidade</label>
+                          <label className="block text-xs text-[var(--text-secondary)] mb-1">Nacionalidade</label>
                           <input
                             type="text"
                             value={nacionalidade}
@@ -457,15 +457,15 @@ export default function GenealogyPage() {
                           />
                         </div>
                         <div>
-                          <label className="block text-xs text-white/50 mb-1">Sexo</label>
+                          <label className="block text-xs text-[var(--text-secondary)] mb-1">Sexo</label>
                           <select
                             value={sexo}
                             onChange={(e) => setSexo(e.target.value)}
                             className="w-full px-3 py-2 bg-[var(--surface-primary)] border border-[var(--border-strong)] rounded-lg focus:ring-2 focus:ring-white/50 focus:border-transparent outline-none text-white text-sm"
                           >
-                            <option value="" className="bg-gray-800">Todos</option>
-                            <option value="Masculino" className="bg-gray-800">Masculino</option>
-                            <option value="Feminino" className="bg-gray-800">Feminino</option>
+                            <option value="" className="bg-[var(--surface-popover)]">Todos</option>
+                            <option value="Masculino" className="bg-[var(--surface-popover)]">Masculino</option>
+                            <option value="Feminino" className="bg-[var(--surface-popover)]">Feminino</option>
                           </select>
                         </div>
                       </div>
@@ -497,40 +497,40 @@ export default function GenealogyPage() {
                   <div className="p-5">
                     <div className="grid grid-cols-2 gap-3 mb-3">
                       <div>
-                        <label className="block text-xs text-white/50 mb-1">Tipo de documento</label>
+                        <label className="block text-xs text-[var(--text-secondary)] mb-1">Tipo de documento</label>
                         <select
                           value={tipoDocumento}
                           onChange={(e) => setTipoDocumento(e.target.value)}
                           className="w-full px-3 py-2 bg-[var(--surface-primary)] border border-[var(--border-strong)] rounded-lg focus:ring-2 focus:ring-white/50 focus:border-transparent outline-none text-white text-sm"
                         >
-                          <option value="" className="bg-gray-800">Todos os tipos</option>
-                          <option value="CERTIDAO_NASCIMENTO_INTEIRO_TEOR" className="bg-gray-800">Certidão de Nascimento</option>
-                          <option value="CERTIDAO_CASAMENTO_INTEIRO_TEOR" className="bg-gray-800">Certidão de Casamento</option>
-                          <option value="CERTIDAO_OBITO_INTEIRO_TEOR" className="bg-gray-800">Certidão de Óbito</option>
-                          <option value="CERTIDAO_BATISMO" className="bg-gray-800">Certidão de Batismo</option>
-                          <option value="CNN" className="bg-gray-800">CNN</option>
-                          <option value="RG" className="bg-gray-800">RG</option>
-                          <option value="CPF" className="bg-gray-800">CPF</option>
-                          <option value="PASSAPORTE" className="bg-gray-800">Passaporte</option>
+                          <option value="" className="bg-[var(--surface-popover)]">Todos os tipos</option>
+                          <option value="CERTIDAO_NASCIMENTO_INTEIRO_TEOR" className="bg-[var(--surface-popover)]">Certidão de Nascimento</option>
+                          <option value="CERTIDAO_CASAMENTO_INTEIRO_TEOR" className="bg-[var(--surface-popover)]">Certidão de Casamento</option>
+                          <option value="CERTIDAO_OBITO_INTEIRO_TEOR" className="bg-[var(--surface-popover)]">Certidão de Óbito</option>
+                          <option value="CERTIDAO_BATISMO" className="bg-[var(--surface-popover)]">Certidão de Batismo</option>
+                          <option value="CNN" className="bg-[var(--surface-popover)]">CNN</option>
+                          <option value="RG" className="bg-[var(--surface-popover)]">RG</option>
+                          <option value="CPF" className="bg-[var(--surface-popover)]">CPF</option>
+                          <option value="PASSAPORTE" className="bg-[var(--surface-popover)]">Passaporte</option>
                         </select>
                       </div>
                       <div>
-                        <label className="block text-xs text-white/50 mb-1">Status</label>
+                        <label className="block text-xs text-[var(--text-secondary)] mb-1">Status</label>
                         <select
                           value={statusDocumento}
                           onChange={(e) => setStatusDocumento(e.target.value)}
                           className="w-full px-3 py-2 bg-[var(--surface-primary)] border border-[var(--border-strong)] rounded-lg focus:ring-2 focus:ring-white/50 focus:border-transparent outline-none text-white text-sm"
                         >
-                          <option value="" className="bg-gray-800">Todos os status</option>
-                          <option value="PENDENTE" className="bg-gray-800">Pendente</option>
-                          <option value="SOLICITADO" className="bg-gray-800">Solicitado</option>
-                          <option value="RECEBIDO" className="bg-gray-800">Recebido</option>
+                          <option value="" className="bg-[var(--surface-popover)]">Todos os status</option>
+                          <option value="PENDENTE" className="bg-[var(--surface-popover)]">Pendente</option>
+                          <option value="SOLICITADO" className="bg-[var(--surface-popover)]">Solicitado</option>
+                          <option value="RECEBIDO" className="bg-[var(--surface-popover)]">Recebido</option>
                         </select>
                       </div>
                     </div>
                     
                     <div className="mb-3">
-                      <label className="block text-xs text-white/50 mb-1">Nome da pessoa</label>
+                      <label className="block text-xs text-[var(--text-secondary)] mb-1">Nome da pessoa</label>
                       <input
                         type="text"
                         value={pessoaDocumento}
@@ -581,9 +581,9 @@ export default function GenealogyPage() {
                       
                       {resultadosPessoas.length === 0 ? (
                         <div className="text-center py-12">
-                          <User className="h-12 w-12 text-white/30 mx-auto mb-3" />
+                          <User className="h-12 w-12 text-[var(--text-muted)] mx-auto mb-3" />
                           <p className="text-white/70">Nenhuma pessoa encontrada com esses critérios.</p>
-                          <p className="text-white/40 text-sm mt-1">Tente ajustar os filtros de pesquisa.</p>
+                          <p className="text-[var(--text-muted)] text-sm mt-1">Tente ajustar os filtros de pesquisa.</p>
                         </div>
                       ) : (
                         <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-3">
@@ -606,7 +606,7 @@ export default function GenealogyPage() {
                                     {pessoa.nome} {pessoa.sobrenome}
                                   </h3>
                                   
-                                  <p className="text-xs text-white/50">
+                                  <p className="text-xs text-[var(--text-secondary)]">
                                     {formatarData(pessoa.data_nasc)}
                                     {pessoa.data_nasc && (pessoa.data_obito || pessoa.vivo === false) && ' – '}
                                     {pessoa.data_obito ? formatarData(pessoa.data_obito) : (pessoa.vivo === false ? '?' : '')}
@@ -614,7 +614,7 @@ export default function GenealogyPage() {
                                   </p>
                                   
                                   {formatarLocal(pessoa) && (
-                                    <p className="text-xs text-white/40 flex items-center gap-1 mt-1 truncate">
+                                    <p className="text-xs text-[var(--text-muted)] flex items-center gap-1 mt-1 truncate">
                                       <MapPin className="h-3 w-3 flex-shrink-0" />
                                       {formatarLocal(pessoa)}
                                     </p>
@@ -643,9 +643,9 @@ export default function GenealogyPage() {
                       
                       {resultadosDocumentos.length === 0 ? (
                         <div className="text-center py-12">
-                          <FileText className="h-12 w-12 text-white/30 mx-auto mb-3" />
+                          <FileText className="h-12 w-12 text-[var(--text-muted)] mx-auto mb-3" />
                           <p className="text-white/70">Nenhum documento encontrado com esses critérios.</p>
-                          <p className="text-white/40 text-sm mt-1">Tente ajustar os filtros de pesquisa.</p>
+                          <p className="text-[var(--text-muted)] text-sm mt-1">Tente ajustar os filtros de pesquisa.</p>
                         </div>
                       ) : (
                         <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-3">
@@ -666,15 +666,15 @@ export default function GenealogyPage() {
                                   </h3>
                                   
                                   <span className={`inline-block text-xs px-2 py-0.5 rounded mt-1 ${
-                                    doc.status === 'RECEBIDO' ? 'bg-green-500/20 text-green-400' :
-                                    doc.status === 'SOLICITADO' ? 'bg-yellow-500/20 text-yellow-400' :
-                                    'bg-[var(--surface-primary)] text-white/50'
+                                    doc.status === 'RECEBIDO' ? 'bg-green-50 text-green-700' :
+                                    doc.status === 'SOLICITADO' ? 'bg-yellow-50 text-yellow-700' :
+                                    'bg-[var(--surface-primary)] text-[var(--text-secondary)]'
                                   }`}>
                                     {doc.status}
                                   </span>
                                   
                                   {doc.pessoaNome && (
-                                    <p className="text-xs text-white/50 mt-1 flex items-center gap-1">
+                                    <p className="text-xs text-[var(--text-secondary)] mt-1 flex items-center gap-1">
                                       <User className="h-3 w-3" />
                                       {doc.pessoaNome} {doc.pessoaSobrenome}
                                     </p>
@@ -703,7 +703,7 @@ export default function GenealogyPage() {
           {!searched && pesquisasRecentes.length > 0 && (
             <section className="bg-[var(--surface-primary)] backdrop-blur-sm rounded-xl border border-[var(--border-default)] p-5">
               <h3 className="text-white font-medium mb-3 flex items-center gap-2 text-sm">
-                <Clock className="h-4 w-4 text-white/50" />
+                <Clock className="h-4 w-4 text-[var(--text-secondary)]" />
                 Pesquisas recentes
               </h3>
               <div className="flex flex-wrap gap-2">
@@ -733,7 +733,7 @@ export default function GenealogyPage() {
                   <User className="h-6 w-6 text-white/70" />
                 </div>
                 <h3 className="font-medium text-white mb-1 text-sm">Encontre pessoas</h3>
-                <p className="text-white/50 text-xs">
+                <p className="text-[var(--text-secondary)] text-xs">
                   Pesquise por nome, local de nascimento ou ano.
                 </p>
               </div>
@@ -743,7 +743,7 @@ export default function GenealogyPage() {
                   <FileText className="h-6 w-6 text-white/70" />
                 </div>
                 <h3 className="font-medium text-white mb-1 text-sm">Gerencie documentos</h3>
-                <p className="text-white/50 text-xs">
+                <p className="text-[var(--text-secondary)] text-xs">
                   Localize certidões e acompanhe o status.
                 </p>
               </div>
@@ -753,7 +753,7 @@ export default function GenealogyPage() {
                   <Users className="h-6 w-6 text-white/70" />
                 </div>
                 <h3 className="font-medium text-white mb-1 text-sm">Descubra conexões</h3>
-                <p className="text-white/50 text-xs">
+                <p className="text-[var(--text-secondary)] text-xs">
                   Veja como as pessoas se conectam.
                 </p>
               </div>

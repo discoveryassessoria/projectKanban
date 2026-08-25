@@ -107,7 +107,7 @@ export default function CondicoesPagamentoTab() {
           <div className="flex h-10 w-10 items-center justify-center rounded-xl" style={{ background: `${OURO}22`, color: OURO }}><CalendarClock className="h-5 w-5" /></div>
           <div>
             <h2 className="text-lg font-semibold text-white">Condições de Pagamento</h2>
-            <p className="text-sm text-white/50">Regra reutilizável do motor. Só sugere/parametriza — a Cobrança decide.</p>
+            <p className="text-sm text-[var(--text-secondary)]">Regra reutilizável do motor. Só sugere/parametriza — a Cobrança decide.</p>
           </div>
         </div>
         <button onClick={() => { setEditando(null); setAberto(true) }} className="inline-flex items-center gap-1.5 rounded-lg px-4 py-2 text-sm font-semibold text-[#1b1508] transition" style={{ background: OURO }}>
@@ -116,17 +116,17 @@ export default function CondicoesPagamentoTab() {
       </div>
 
       <div className="relative">
-        <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-white/30" />
-        <input value={busca} onChange={(e) => setBusca(e.target.value)} placeholder="Buscar condição…" className="w-full rounded-lg border border-[var(--border-default)] bg-black/30 py-2 pl-9 pr-3 text-sm text-white placeholder:text-white/30 outline-none focus:border-white/25" />
+        <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--text-muted)]" />
+        <input value={busca} onChange={(e) => setBusca(e.target.value)} placeholder="Buscar condição…" className="w-full rounded-lg border border-[var(--border-default)] bg-black/30 py-2 pl-9 pr-3 text-sm text-white placeholder:text-[var(--text-muted)] outline-none focus:border-white/25" />
       </div>
 
       {loading ? (
-        <div className="flex items-center justify-center py-16"><Loader2 className="h-8 w-8 animate-spin text-white/50" /></div>
+        <div className="flex items-center justify-center py-16"><Loader2 className="h-8 w-8 animate-spin text-[var(--text-secondary)]" /></div>
       ) : erroLista ? (
-        <div className="rounded-lg border border-red-500/30 bg-red-500/10 p-4 text-sm text-red-200">{erroLista}<button onClick={() => void carregar()} className="ml-3 underline hover:text-white">Tentar de novo</button></div>
+        <div className="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-700">{erroLista}<button onClick={() => void carregar()} className="ml-3 underline hover:text-white">Tentar de novo</button></div>
       ) : filtrados.length === 0 ? (
         <div className={`${GLASS} flex flex-col items-center gap-2 py-16 text-center`}>
-          <CalendarClock className="h-10 w-10 text-white/20" />
+          <CalendarClock className="h-10 w-10 text-[var(--text-muted)]" />
           <p className="text-white/60">{busca ? 'Nenhuma condição encontrada.' : 'Nenhuma condição cadastrada.'}</p>
         </div>
       ) : (
@@ -140,18 +140,18 @@ export default function CondicoesPagamentoTab() {
                   <div className="flex items-center gap-2">
                     <span className="truncate font-medium text-white">{x.name}</span>
                     {x.codigo && <span className="shrink-0 rounded-md border border-[var(--border-default)] px-2 py-0.5 text-[11px] text-white/60">v{x.versao} · {x.codigo}</span>}
-                    {!x.ativo && <span className="shrink-0 rounded-md border border-[var(--border-default)] px-2 py-0.5 text-[11px] text-white/40">inativa</span>}
+                    {!x.ativo && <span className="shrink-0 rounded-md border border-[var(--border-default)] px-2 py-0.5 text-[11px] text-[var(--text-muted)]">inativa</span>}
                   </div>
-                  <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-white/45">
+                  <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-[var(--text-secondary)]">
                     <span>{APLICA_A_LABEL[x.aplicaA] || x.aplicaA}</span>
                     <span>{TIPOS_PAGAMENTO_LABEL[x.tipoPagamento] || x.tipoPagamento}{x.tipoPagamento === 'PARCELADO' ? ` até ${x.parcelasMax ?? '—'}×` : ''}</span>
                     <span>{POLITICAS_TAXAS_LABEL[x.politicaTaxas] || 'taxas: —'}</span>
-                    {usoReal > 0 && <span className="text-amber-300/70">em uso ({usoReal})</span>}
+                    {usoReal > 0 && <span className="text-amber-700/70">em uso ({usoReal})</span>}
                   </div>
                 </div>
                 <div className="flex shrink-0 items-center gap-2">
                   <button onClick={() => { setEditando(x); setAberto(true) }} className="inline-flex items-center gap-1 rounded-md border border-[var(--border-default)] px-2.5 py-1 text-xs text-white/70 transition hover:bg-[var(--surface-hover)] hover:text-white"><Pencil className="h-3 w-3" /> {usoReal > 0 ? 'Nova versão' : 'Editar'}</button>
-                  <button onClick={() => excluir(x)} className="inline-flex items-center gap-1 rounded-md border border-red-500/20 px-2.5 py-1 text-xs text-red-300/80 transition hover:bg-red-500/10"><Trash2 className="h-3 w-3" /></button>
+                  <button onClick={() => excluir(x)} className="inline-flex items-center gap-1 rounded-md border border-red-200 px-2.5 py-1 text-xs text-red-700/80 transition hover:bg-red-50"><Trash2 className="h-3 w-3" /></button>
                 </div>
               </div>
             )
@@ -215,7 +215,7 @@ function CondicaoWizard({ editando, carteiras, formas, taxas, servicos, moedas, 
       header={<>
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2"><Sparkles className="h-4 w-4" style={{ color: OURO }} /><h3 className="text-base font-semibold">{editando ? 'Editar condição' : 'Nova condição de pagamento'}</h3></div>
-          <button onClick={() => { fecharTodosMultiSelects(); onClose() }} className="text-white/40 transition hover:text-white"><X className="h-4 w-4" /></button>
+          <button onClick={() => { fecharTodosMultiSelects(); onClose() }} className="text-[var(--text-muted)] transition hover:text-white"><X className="h-4 w-4" /></button>
         </div>
         <div className="mt-3"><Stepper passos={PASSOS} atual={step} /></div>
       </>}
@@ -232,7 +232,7 @@ function CondicaoWizard({ editando, carteiras, formas, taxas, servicos, moedas, 
     >
       <>
           {erro && (
-            <div className="rounded-lg border border-amber-500/30 bg-amber-500/10 p-3 text-sm text-amber-200">
+            <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-700">
               {erro}
               {novaVersao && <button onClick={() => salvar(true)} className="ml-2 inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs font-semibold text-[#1b1508]" style={{ background: OURO }}><GitBranch className="h-3 w-3" /> Criar nova versão</button>}
             </div>
@@ -254,7 +254,7 @@ function CondicaoWizard({ editando, carteiras, formas, taxas, servicos, moedas, 
               </div>
               {/* O antigo campo único de forma saiu daqui: virou FORMA PADRÃO na
                   etapa Formas, ao lado das Formas permitidas (conceitos separados). */}
-              <p className="mt-2 text-[11px] text-white/40">A carteira aqui é apenas uma <b>sugestão</b>. As formas de pagamento ficam na etapa <b>Formas</b>.</p>
+              <p className="mt-2 text-[11px] text-[var(--text-muted)]">A carteira aqui é apenas uma <b>sugestão</b>. As formas de pagamento ficam na etapa <b>Formas</b>.</p>
               <div className="mt-3"><Toggle label="Condição ativa" on={f.ativo} onChange={(v) => set('ativo', v)} /></div>
             </Secao>
           )}
@@ -340,7 +340,7 @@ function CondicaoWizard({ editando, carteiras, formas, taxas, servicos, moedas, 
                 <Toggle label="Permite quantidade personalizada" on={f.permiteParcelasPersonalizadas} onChange={(v) => set('permiteParcelasPersonalizadas', v)} />
                 <Toggle label="Permite edição manual das parcelas" on={f.permiteEdicaoManual} onChange={(v) => set('permiteEdicaoManual', v)} />
               </div>}
-              <div className="mt-4 rounded-lg border border-[var(--border-default)] bg-white/[0.03] p-3">
+              <div className="mt-4 rounded-lg border border-[var(--border-default)] bg-[var(--surface-primary)] p-3">
                 <Toggle label="Possui entrada" on={f.temEntrada} onChange={(v) => set('temEntrada', v)} />
                 {f.temEntrada && (
                   <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
@@ -402,7 +402,7 @@ function CondicaoWizard({ editando, carteiras, formas, taxas, servicos, moedas, 
                     dicaVazio="Sem restrição: a cobrança poderá usar qualquer forma ativa compatível."
                     vazioMsg="Nenhuma forma ativa cadastrada."
                   />
-                  <p className="mt-1 text-[11px] text-white/35">Selecione todas as formas que poderão ser usadas com esta condição.</p>
+                  <p className="mt-1 text-[11px] text-[var(--text-muted)]">Selecione todas as formas que poderão ser usadas com esta condição.</p>
                 </Campo>
                 <Campo label="Forma padrão (opcional)">
                   <Select
@@ -415,10 +415,10 @@ function CondicaoWizard({ editando, carteiras, formas, taxas, servicos, moedas, 
                         .map((x) => [String(x.id), `${x.icone || ''} ${x.name}`.trim()] as [string, string]),
                     ]}
                   />
-                  <p className="mt-1 text-[11px] text-white/35">Será pré-selecionada na cobrança, mas poderá ser alterada por outra forma permitida.</p>
+                  <p className="mt-1 text-[11px] text-[var(--text-muted)]">Será pré-selecionada na cobrança, mas poderá ser alterada por outra forma permitida.</p>
                 </Campo>
               </div>
-              <p className="mt-3 text-[11px] text-white/40">
+              <p className="mt-3 text-[11px] text-[var(--text-muted)]">
                 A forma padrão será sugerida inicialmente. Na cobrança, o operador poderá escolher qualquer outra forma
                 permitida <b>e compatível</b> — a condição nunca torna válida uma forma incompatível (moeda, direção,
                 parcelamento, adquirente continuam valendo).
@@ -431,8 +431,8 @@ function CondicaoWizard({ editando, carteiras, formas, taxas, servicos, moedas, 
               <Campo label="Política"><Select value={f.politicaTaxas} onChange={(v) => set('politicaTaxas', v)} options={POLITICAS_TAXAS.map((p) => [p, POLITICAS_TAXAS_LABEL[p]] as [string, string])} /></Campo>
               {f.politicaTaxas !== 'IGNORAR' && (
                 <div className="mt-3">
-                  <p className="mb-1.5 text-[11px] uppercase tracking-wide text-white/40">Taxas consideradas (opcional)</p>
-                  {taxas.length === 0 ? <p className="text-[11px] text-white/35">Nenhuma taxa ativa cadastrada.</p> : (
+                  <p className="mb-1.5 text-[11px] uppercase tracking-wide text-[var(--text-muted)]">Taxas consideradas (opcional)</p>
+                  {taxas.length === 0 ? <p className="text-[11px] text-[var(--text-muted)]">Nenhuma taxa ativa cadastrada.</p> : (
                     <ChipsMulti items={taxas.map((x) => ({ id: x.id, label: x.name }))} selecionados={f.taxasVinculadas} onToggle={(id) => set('taxasVinculadas', toggleArr(f.taxasVinculadas, Number(id)))} />
                   )}
                 </div>
@@ -482,10 +482,10 @@ function CondicaoWizard({ editando, carteiras, formas, taxas, servicos, moedas, 
                   ['Forma padrão', formas.find((x) => x.id === f.formaPadraoId)?.name ?? 'nenhuma'],
                   ['Política de taxas', POLITICAS_TAXAS_LABEL[f.politicaTaxas]], ['Câmbio', POLITICAS_CAMBIO_LABEL[f.politicaCambio]],
                 ].map(([l, v], i) => (
-                  <div key={i} className="flex justify-between gap-3"><span className="text-white/45">{l}</span><span className="truncate text-right text-white/85">{String(v ?? '—')}</span></div>
+                  <div key={i} className="flex justify-between gap-3"><span className="text-[var(--text-secondary)]">{l}</span><span className="truncate text-right text-white/85">{String(v ?? '—')}</span></div>
                 ))}
               </div>
-              <p className="mt-3 text-[11px] text-white/40">Ao salvar, o motor usará esta regra para gerar Cobranças. Ela nunca congela dados da Cobrança.</p>
+              <p className="mt-3 text-[11px] text-[var(--text-muted)]">Ao salvar, o motor usará esta regra para gerar Cobranças. Ela nunca congela dados da Cobrança.</p>
             </Secao>
           )}
       </>

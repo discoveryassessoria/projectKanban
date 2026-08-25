@@ -88,9 +88,9 @@ const PersonNode = ({ data }: { data: TreeNode["data"] }) => {
       case "filho":
         return "border-green-500 bg-green-50 shadow-green-100"
       case "conjuge":
-        return "border-purple-500 bg-purple-50 shadow-purple-100"
+        return "border-slate-500 bg-slate-50 shadow-purple-100"
       case "irmao":
-        return "border-orange-500 bg-orange-50 shadow-orange-100"
+        return "border-amber-500 bg-amber-50 shadow-orange-100"
       default:
         return "border-gray-300 bg-[var(--surface-primary)] shadow-gray-100"
     }
@@ -101,8 +101,8 @@ const PersonNode = ({ data }: { data: TreeNode["data"] }) => {
       pai: { label: "Pai", icon: User, color: "bg-blue-100 text-blue-800 border-blue-200" },
       mae: { label: "Mãe", icon: User, color: "bg-pink-100 text-pink-800 border-pink-200" },
       filho: { label: "Filho(a)", icon: UserPlus, color: "bg-green-100 text-green-800 border-green-200" },
-      conjuge: { label: "Cônjuge", icon: Heart, color: "bg-purple-100 text-purple-800 border-purple-200" },
-      irmao: { label: "Irmão(ã)", icon: Users, color: "bg-orange-100 text-orange-800 border-orange-200" },
+      conjuge: { label: "Cônjuge", icon: Heart, color: "bg-slate-100 text-slate-800 border-slate-200" },
+      irmao: { label: "Irmão(ã)", icon: Users, color: "bg-amber-100 text-amber-800 border-amber-200" },
     }
 
     if (relationshipType && relationshipType in badges) {
@@ -141,13 +141,13 @@ const PersonNode = ({ data }: { data: TreeNode["data"] }) => {
         type="source"
         position={Position.Right}
         id="right"
-        className="w-3 h-3 bg-purple-500 border-2 border-[var(--border-default)] shadow-md"
+        className="w-3 h-3 bg-slate-500 border-2 border-[var(--border-default)] shadow-md"
       />
       <Handle
         type="target"
         position={Position.Left}
         id="left"
-        className="w-3 h-3 bg-purple-500 border-2 border-[var(--border-default)] shadow-md"
+        className="w-3 h-3 bg-slate-500 border-2 border-[var(--border-default)] shadow-md"
       />
 
       <div className="absolute -top-3 -right-3 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity z-10">
@@ -183,7 +183,7 @@ const PersonNode = ({ data }: { data: TreeNode["data"] }) => {
         <Button
           size="sm"
           variant="outline"
-          className="h-7 w-7 p-0 bg-[var(--surface-primary)] shadow-md hover:bg-purple-500 hover:text-[#fff] border-purple-200"
+          className="h-7 w-7 p-0 bg-[var(--surface-primary)] shadow-md hover:bg-slate-500 hover:text-[#fff] border-slate-200"
           onClick={() => onAddSpouse(pessoa.id)}
           title="Adicionar Cônjuge"
         >

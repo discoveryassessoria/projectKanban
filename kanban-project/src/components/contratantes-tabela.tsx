@@ -249,7 +249,7 @@ function ProcessosTooltip({
 
   if (count === 0) {
     return (
-      <span className="px-2 py-1 bg-[var(--surface-primary)] rounded text-xs text-white/40">
+      <span className="px-2 py-1 bg-[var(--surface-primary)] rounded text-xs text-[var(--text-muted)]">
         0
       </span>
     )
@@ -296,7 +296,7 @@ function ProcessosTooltip({
                   </div>
                 </div>
               </div>
-              <Eye className="h-3 w-3 text-gray-400 group-hover:text-gray-600 transition-colors" />
+              <Eye className="h-3 w-3 text-[var(--text-muted)] group-hover:text-gray-600 transition-colors" />
             </div>
           ))}
         </div>
@@ -304,7 +304,7 @@ function ProcessosTooltip({
       
       {!loading && processos.length > 0 && (
         <div className="mt-2 pt-2 border-t border-gray-200 text-center">
-          <span className="text-[10px] text-gray-400">
+          <span className="text-[10px] text-[var(--text-muted)]">
             Clique para abrir no Kanban
           </span>
         </div>
@@ -321,7 +321,7 @@ function ProcessosTooltip({
       onMouseLeave={handleMouseLeave}
       onClick={(e) => e.stopPropagation()}
     >
-      <span className="px-2 py-1 bg-indigo-500/20 hover:bg-indigo-500/30 rounded text-xs text-indigo-300 cursor-pointer transition-colors">
+      <span className="px-2 py-1 bg-indigo-50 hover:bg-indigo-500/30 rounded text-xs text-indigo-700 cursor-pointer transition-colors">
         {count}
       </span>
       {tooltipContent}
@@ -1059,7 +1059,7 @@ const removerDocumentoObrigatorio = async (categoria: string) => {
         <div className="flex items-center justify-between px-8 py-5 border-b border-gray-200 bg-gray-50 shrink-0">
           <div className="flex items-center gap-4">
             <div className={`w-12 h-12 rounded-full flex items-center justify-center text-white text-xl font-semibold ${
-              formData.tipo === 'requerente' ? 'bg-purple-600' : 'bg-indigo-600'
+              formData.tipo === 'requerente' ? 'bg-slate-600' : 'bg-indigo-600'
             }`}>
               {formData.nome ? formData.nome.charAt(0).toUpperCase() : <User className="h-6 w-6" />}
             </div>
@@ -1156,10 +1156,10 @@ const removerDocumentoObrigatorio = async (categoria: string) => {
                   ) : clienteExistente ? (
                     <div className="text-sm font-medium text-amber-600">
                       Código não atribuído
-                      <span className="ml-2 font-normal text-gray-400">— exige correção administrativa</span>
+                      <span className="ml-2 font-normal text-[var(--text-muted)]">— exige correção administrativa</span>
                     </div>
                   ) : (
-                    <div className="text-sm italic text-gray-400">Será gerado automaticamente ao salvar.</div>
+                    <div className="text-sm italic text-[var(--text-muted)]">Será gerado automaticamente ao salvar.</div>
                   )}
                 </div>
                 {/* Seção: Identificação */}
@@ -1181,7 +1181,7 @@ const removerDocumentoObrigatorio = async (categoria: string) => {
                           disabled={isViewMode || !!editingId}
                           className={`w-full h-[42px] px-3 rounded-lg border text-gray-900 disabled:opacity-50 disabled:bg-[var(--surface-primary)] focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-0 focus:border-indigo-500 appearance-none cursor-pointer ${
                             formData.tipo === 'requerente' 
-                              ? 'bg-purple-50 border-purple-300' 
+                              ? 'bg-slate-50 border-slate-300' 
                               : 'bg-[var(--surface-primary)] border-gray-300'
                           }`}
                           style={{
@@ -1210,7 +1210,7 @@ const removerDocumentoObrigatorio = async (categoria: string) => {
                           onChange={(e) => handleNomeChange(e.target.value)}
                           placeholder="Nome completo"
                           disabled={isViewMode}
-                          className={`bg-[var(--surface-primary)] border-gray-300 text-gray-900 placeholder:text-gray-400 disabled:opacity-50 disabled:bg-[var(--surface-primary)] ${
+                          className={`bg-[var(--surface-primary)] border-gray-300 text-gray-900 placeholder:text-[var(--text-muted)] disabled:opacity-50 disabled:bg-[var(--surface-primary)] ${
                             errors.nome ? 'border-red-500 focus-visible:ring-red-500' : ''
                           }`}
                         />
@@ -1235,7 +1235,7 @@ const removerDocumentoObrigatorio = async (categoria: string) => {
                           placeholder="000.000.000-00"
                           maxLength={14}
                           disabled={isViewMode}
-                          className={`bg-[var(--surface-primary)] border-gray-300 text-gray-900 placeholder:text-gray-400 disabled:opacity-50 disabled:bg-[var(--surface-primary)] ${
+                          className={`bg-[var(--surface-primary)] border-gray-300 text-gray-900 placeholder:text-[var(--text-muted)] disabled:opacity-50 disabled:bg-[var(--surface-primary)] ${
                             errors.cpf ? 'border-red-500 focus-visible:ring-red-500' : ''
                           }`}
                         />
@@ -1254,7 +1254,7 @@ const removerDocumentoObrigatorio = async (categoria: string) => {
                           onChange={(e) => setFormData({ ...formData, rg: e.target.value })}
                           placeholder="Número do RG"
                           disabled={isViewMode}
-                          className="bg-[var(--surface-primary)] border-gray-300 text-gray-900 placeholder:text-gray-400 disabled:opacity-50 disabled:bg-[var(--surface-primary)]"
+                          className="bg-[var(--surface-primary)] border-gray-300 text-gray-900 placeholder:text-[var(--text-muted)] disabled:opacity-50 disabled:bg-[var(--surface-primary)]"
                         />
                       </div>
                     </div>
@@ -1268,7 +1268,7 @@ const removerDocumentoObrigatorio = async (categoria: string) => {
                           placeholder="Número do passaporte"
                           maxLength={15}
                           disabled={isViewMode}
-                          className="bg-[var(--surface-primary)] border-gray-300 text-gray-900 placeholder:text-gray-400 disabled:opacity-50 disabled:bg-[var(--surface-primary)]"
+                          className="bg-[var(--surface-primary)] border-gray-300 text-gray-900 placeholder:text-[var(--text-muted)] disabled:opacity-50 disabled:bg-[var(--surface-primary)]"
                         />
                       </div>
                       <div>
@@ -1279,7 +1279,7 @@ const removerDocumentoObrigatorio = async (categoria: string) => {
                           placeholder="Número do CRNM"
                           maxLength={15}
                           disabled={isViewMode}
-                          className="bg-[var(--surface-primary)] border-gray-300 text-gray-900 placeholder:text-gray-400 disabled:opacity-50 disabled:bg-[var(--surface-primary)]"
+                          className="bg-[var(--surface-primary)] border-gray-300 text-gray-900 placeholder:text-[var(--text-muted)] disabled:opacity-50 disabled:bg-[var(--surface-primary)]"
                         />
                       </div>
                     </div>
@@ -1330,7 +1330,7 @@ style={{
                     <div className="grid grid-cols-2 gap-4">
                       <div>
                         <label className="block text-sm font-medium text-gray-700 mb-1">
-                          <Heart className="h-4 w-4 inline mr-1 text-gray-400" />
+                          <Heart className="h-4 w-4 inline mr-1 text-[var(--text-muted)]" />
                           Estado Civil
                         </label>
                         <select
@@ -1352,7 +1352,7 @@ style={{
                       </div>
                       <div>
                         <label className="block text-sm font-medium text-gray-700 mb-1">
-                          <Globe className="h-4 w-4 inline mr-1 text-gray-400" />
+                          <Globe className="h-4 w-4 inline mr-1 text-[var(--text-muted)]" />
                           Nacionalidade
                         </label>
                         <select
@@ -1392,7 +1392,7 @@ style={{
                         placeholder="+55 (11) 99999-9999"
                         maxLength={25}
                         disabled={isViewMode}
-                        className="bg-[var(--surface-primary)] border-gray-300 text-gray-900 placeholder:text-gray-400 disabled:opacity-50 disabled:bg-[var(--surface-primary)]"
+                        className="bg-[var(--surface-primary)] border-gray-300 text-gray-900 placeholder:text-[var(--text-muted)] disabled:opacity-50 disabled:bg-[var(--surface-primary)]"
                       />
                     </div>
                     <div>
@@ -1403,7 +1403,7 @@ style={{
                         onChange={(e) => setFormData({ ...formData, email: e.target.value })}
                         placeholder="email@exemplo.com"
                         disabled={isViewMode}
-                        className="bg-[var(--surface-primary)] border-gray-300 text-gray-900 placeholder:text-gray-400 disabled:opacity-50 disabled:bg-[var(--surface-primary)]"
+                        className="bg-[var(--surface-primary)] border-gray-300 text-gray-900 placeholder:text-[var(--text-muted)] disabled:opacity-50 disabled:bg-[var(--surface-primary)]"
                       />
                     </div>
                   </div>
@@ -1425,7 +1425,7 @@ style={{
                       <div className="grid grid-cols-2 gap-4">
                         <div>
                           <label className="block text-sm font-medium text-gray-700 mb-1">
-                            <Globe className="h-4 w-4 inline mr-1 text-gray-400" />
+                            <Globe className="h-4 w-4 inline mr-1 text-[var(--text-muted)]" />
                             País
                           </label>
                           <select
@@ -1455,7 +1455,7 @@ style={{
                             onChange={(e) => setFormData({ ...formData, paisOutro: e.target.value })}
                             placeholder="Digite o nome do país"
                             disabled={isViewMode}
-                            className="bg-[var(--surface-primary)] border-gray-300 text-gray-900 placeholder:text-gray-400 disabled:opacity-50 disabled:bg-[var(--surface-primary)]"
+                            className="bg-[var(--surface-primary)] border-gray-300 text-gray-900 placeholder:text-[var(--text-muted)] disabled:opacity-50 disabled:bg-[var(--surface-primary)]"
                           />
                         </div>
                         <div>
@@ -1468,7 +1468,7 @@ style={{
                             placeholder="Código postal"
                             maxLength={15}
                             disabled={isViewMode}
-                            className="bg-[var(--surface-primary)] border-gray-300 text-gray-900 placeholder:text-gray-400 disabled:opacity-50 disabled:bg-[var(--surface-primary)]"
+                            className="bg-[var(--surface-primary)] border-gray-300 text-gray-900 placeholder:text-[var(--text-muted)] disabled:opacity-50 disabled:bg-[var(--surface-primary)]"
                           />
                           <p className="text-xs text-gray-500 mt-1">Preencha manualmente</p>
                         </div>
@@ -1478,7 +1478,7 @@ style={{
                     <div className="grid grid-cols-2 gap-4">
                       <div>
                         <label className="block text-sm font-medium text-gray-700 mb-1">
-                          <Globe className="h-4 w-4 inline mr-1 text-gray-400" />
+                          <Globe className="h-4 w-4 inline mr-1 text-[var(--text-muted)]" />
                           País
                         </label>
                         <select
@@ -1510,7 +1510,7 @@ style={{
                             placeholder={getCEPPlaceholder(formData.pais)}
                             maxLength={isBrasil ? 9 : 15}
                             disabled={isViewMode}
-                            className="bg-[var(--surface-primary)] border-gray-300 text-gray-900 placeholder:text-gray-400 disabled:opacity-50 disabled:bg-[var(--surface-primary)] pr-10"
+                            className="bg-[var(--surface-primary)] border-gray-300 text-gray-900 placeholder:text-[var(--text-muted)] disabled:opacity-50 disabled:bg-[var(--surface-primary)] pr-10"
                           />
                           {buscandoCep && (
                             <div className="absolute right-3 top-1/2 -translate-y-1/2">
@@ -1533,7 +1533,7 @@ style={{
                         onChange={(e) => setFormData({ ...formData, endereco: e.target.value })}
                         placeholder="Rua, Avenida..."
                         disabled={isViewMode}
-                        className="bg-[var(--surface-primary)] border-gray-300 text-gray-900 placeholder:text-gray-400 disabled:opacity-50 disabled:bg-[var(--surface-primary)]"
+                        className="bg-[var(--surface-primary)] border-gray-300 text-gray-900 placeholder:text-[var(--text-muted)] disabled:opacity-50 disabled:bg-[var(--surface-primary)]"
                       />
                     </div>
                     <div>
@@ -1543,7 +1543,7 @@ style={{
                         onChange={(e) => setFormData({ ...formData, numero: e.target.value })}
                         placeholder="Nº"
                         disabled={isViewMode}
-                        className="bg-[var(--surface-primary)] border-gray-300 text-gray-900 placeholder:text-gray-400 disabled:opacity-50 disabled:bg-[var(--surface-primary)]"
+                        className="bg-[var(--surface-primary)] border-gray-300 text-gray-900 placeholder:text-[var(--text-muted)] disabled:opacity-50 disabled:bg-[var(--surface-primary)]"
                       />
                     </div>
                   </div>
@@ -1556,7 +1556,7 @@ style={{
                         onChange={(e) => setFormData({ ...formData, complemento: e.target.value })}
                         placeholder="Apto, Bloco..."
                         disabled={isViewMode}
-                        className="bg-[var(--surface-primary)] border-gray-300 text-gray-900 placeholder:text-gray-400 disabled:opacity-50 disabled:bg-[var(--surface-primary)]"
+                        className="bg-[var(--surface-primary)] border-gray-300 text-gray-900 placeholder:text-[var(--text-muted)] disabled:opacity-50 disabled:bg-[var(--surface-primary)]"
                       />
                     </div>
                     <div>
@@ -1568,7 +1568,7 @@ style={{
                         onChange={(e) => setFormData({ ...formData, bairro: e.target.value })}
                         placeholder="Nome do bairro"
                         disabled={isViewMode}
-                        className="bg-[var(--surface-primary)] border-gray-300 text-gray-900 placeholder:text-gray-400 disabled:opacity-50 disabled:bg-[var(--surface-primary)]"
+                        className="bg-[var(--surface-primary)] border-gray-300 text-gray-900 placeholder:text-[var(--text-muted)] disabled:opacity-50 disabled:bg-[var(--surface-primary)]"
                       />
                     </div>
                   </div>
@@ -1581,7 +1581,7 @@ style={{
                         onChange={(e) => setFormData({ ...formData, cidade: e.target.value })}
                         placeholder="Nome da cidade"
                         disabled={isViewMode}
-                        className="bg-[var(--surface-primary)] border-gray-300 text-gray-900 placeholder:text-gray-400 disabled:opacity-50 disabled:bg-[var(--surface-primary)]"
+                        className="bg-[var(--surface-primary)] border-gray-300 text-gray-900 placeholder:text-[var(--text-muted)] disabled:opacity-50 disabled:bg-[var(--surface-primary)]"
                       />
                     </div>
                     <div>
@@ -1593,7 +1593,7 @@ style={{
                         onChange={(e) => setFormData({ ...formData, estado: e.target.value })}
                         placeholder="UF"
                         disabled={isViewMode}
-                        className="bg-[var(--surface-primary)] border-gray-300 text-gray-900 placeholder:text-gray-400 disabled:opacity-50 disabled:bg-[var(--surface-primary)]"
+                        className="bg-[var(--surface-primary)] border-gray-300 text-gray-900 placeholder:text-[var(--text-muted)] disabled:opacity-50 disabled:bg-[var(--surface-primary)]"
                       />
                     </div>
                   </div>
@@ -1615,7 +1615,7 @@ style={{
                     placeholder="Anotações, informações importantes..."
                     rows={4}
                     disabled={isViewMode}
-                    className="w-full px-3 py-2 rounded-xl bg-[var(--surface-primary)] border border-gray-300 text-gray-900 placeholder:text-gray-400 disabled:opacity-50 disabled:bg-[var(--surface-primary)] resize-none focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-0 focus:border-indigo-500"
+                    className="w-full px-3 py-2 rounded-xl bg-[var(--surface-primary)] border border-gray-300 text-gray-900 placeholder:text-[var(--text-muted)] disabled:opacity-50 disabled:bg-[var(--surface-primary)] resize-none focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-0 focus:border-indigo-500"
                   />
                 </div>
 
@@ -1694,7 +1694,7 @@ style={{
                                     />
                                   ) : (
                                     <div className="w-full h-full flex items-center justify-center bg-gray-50">
-                                      <FileText className="h-10 w-10 text-gray-400" />
+                                      <FileText className="h-10 w-10 text-[var(--text-muted)]" />
                                     </div>
                                   )}
                                   <div className="absolute inset-0 bg-[var(--overlay-modal)] group-hover:bg-[var(--overlay-modal)] transition-colors flex items-center justify-center">
@@ -1743,17 +1743,17 @@ style={{
                                     </>
                                   ) : (
                                     <>
-                                      <Upload className="h-6 w-6 text-gray-400 mb-2" />
+                                      <Upload className="h-6 w-6 text-[var(--text-muted)] mb-2" />
                                       <p className="text-xs text-gray-600 font-medium">Enviar {label}</p>
-                                      <p className="text-[10px] text-gray-400 mt-0.5">PDF, imagem ou documento</p>
+                                      <p className="text-[10px] text-[var(--text-muted)] mt-0.5">PDF, imagem ou documento</p>
                                     </>
                                   )}
                                 </div>
                               </label>
                             ) : (
                               <div className="flex flex-col items-center justify-center py-6 border-2 border-dashed border-gray-200 rounded-lg">
-                                <FileText className="h-6 w-6 text-gray-300 mb-2" />
-                                <p className="text-xs text-gray-400">Nenhum arquivo</p>
+                                <FileText className="h-6 w-6 text-[var(--text-muted)] mb-2" />
+                                <p className="text-xs text-[var(--text-muted)]">Nenhum arquivo</p>
                               </div>
                             )
                           )}
@@ -1828,7 +1828,7 @@ style={{
                                         </div>
                                       </div>
                                     ) : (
-                                      <FileText className="h-12 w-12 text-gray-400" />
+                                      <FileText className="h-12 w-12 text-[var(--text-muted)]" />
                                     )}
                                   </div>
                                 )}
@@ -1843,7 +1843,7 @@ style={{
                                   {fileName}
                                 </p>
                                 {anexo.tamanho && (
-                                  <p className="text-xs text-gray-400">{formatFileSize(anexo.tamanho)}</p>
+                                  <p className="text-xs text-[var(--text-muted)]">{formatFileSize(anexo.tamanho)}</p>
                                 )}
                               </div>
                               
@@ -1915,16 +1915,16 @@ style={{
                         className="hidden"
                         accept="image/*,.pdf,.doc,.docx,.xls,.xlsx"
                       />
-                      <FileText className="h-10 w-10 mx-auto mb-3 text-gray-400" />
+                      <FileText className="h-10 w-10 mx-auto mb-3 text-[var(--text-muted)]" />
                       <p className="text-sm text-gray-600 font-medium">Clique para selecionar arquivos</p>
-                      <p className="text-xs text-gray-400 mt-1">Imagens, PDF, Word, Excel (máx. 64MB cada)</p>
+                      <p className="text-xs text-[var(--text-muted)] mt-1">Imagens, PDF, Word, Excel (máx. 64MB cada)</p>
                     </label>
                   )}
 
                   {isViewMode && anexosExistentes.length === 0 && !carregandoAnexos && (
                     <div className="border-2 border-dashed border-gray-200 rounded-lg p-8 text-center">
-                      <FileText className="h-10 w-10 mx-auto mb-3 text-gray-300" />
-                      <p className="text-sm text-gray-400">Nenhum documento adicional</p>
+                      <FileText className="h-10 w-10 mx-auto mb-3 text-[var(--text-muted)]" />
+                      <p className="text-sm text-[var(--text-muted)]">Nenhum documento adicional</p>
                     </div>
                   )}
                 </div>
@@ -2272,7 +2272,7 @@ export function ContratantesTabela({ contratantes, onRefresh, onOpenProcesso }: 
     <>
       <div className="flex items-center justify-between mb-4">
         <div className="relative w-64">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-white/40" />
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-[var(--text-muted)]" />
           <Input
             placeholder="Buscar cliente..."
             value={searchTerm}
@@ -2280,7 +2280,7 @@ export function ContratantesTabela({ contratantes, onRefresh, onOpenProcesso }: 
               setSearchTerm(e.target.value)
               setCurrentPage(1)
             }}
-            className="pl-9 bg-[var(--surface-primary)] border-[var(--border-strong)] text-white placeholder:text-white/40"
+            className="pl-9 bg-[var(--surface-primary)] border-[var(--border-strong)] text-white placeholder:text-[var(--text-muted)]"
           />
         </div>
         
@@ -2316,7 +2316,7 @@ export function ContratantesTabela({ contratantes, onRefresh, onOpenProcesso }: 
           <tbody className="divide-y divide-white/10">
             {paginatedContratantes.length === 0 ? (
               <tr>
-                <td colSpan={8} className="px-4 py-8 text-center text-white/50">
+                <td colSpan={8} className="px-4 py-8 text-center text-[var(--text-secondary)]">
                   {searchTerm ? "Nenhum cliente encontrado" : "Nenhum cliente cadastrado"}
                 </td>
               </tr>
@@ -2331,8 +2331,8 @@ export function ContratantesTabela({ contratantes, onRefresh, onOpenProcesso }: 
                     <span className={`
                       px-2 py-1 rounded text-xs font-medium
                       ${contratante.tipo === 'requerente' 
-                        ? 'bg-purple-500/20 text-purple-300' 
-                        : 'bg-blue-500/20 text-blue-300'
+                        ? 'bg-slate-50 text-slate-700' 
+                        : 'bg-blue-50 text-blue-700'
                       }
                     `}>
                       {contratante.tipo === 'requerente' ? 'Requerente' : 'Contratante'}
@@ -2342,7 +2342,7 @@ export function ContratantesTabela({ contratantes, onRefresh, onOpenProcesso }: 
                   <td className="px-4 py-3">
                     <div className="flex items-center gap-3">
                       <div className={`w-8 h-8 rounded-full flex items-center justify-center text-white text-sm font-medium ${
-                        contratante.tipo === 'requerente' ? 'bg-purple-600' : 'bg-indigo-600'
+                        contratante.tipo === 'requerente' ? 'bg-slate-600' : 'bg-indigo-600'
                       }`}>
                         {contratante.nome.charAt(0).toUpperCase()}
                       </div>
@@ -2359,7 +2359,7 @@ export function ContratantesTabela({ contratantes, onRefresh, onOpenProcesso }: 
                         {contratante.telefone}
                       </div>
                     ) : (
-                      <span className="text-white/40 text-sm">-</span>
+                      <span className="text-[var(--text-muted)] text-sm">-</span>
                     )}
                   </td>
                   <td className="px-4 py-3">
@@ -2369,7 +2369,7 @@ export function ContratantesTabela({ contratantes, onRefresh, onOpenProcesso }: 
                         {contratante.email}
                       </div>
                     ) : (
-                      <span className="text-white/40 text-sm">-</span>
+                      <span className="text-[var(--text-muted)] text-sm">-</span>
                     )}
                   </td>
                   <td className="px-4 py-3">
@@ -2380,7 +2380,7 @@ export function ContratantesTabela({ contratantes, onRefresh, onOpenProcesso }: 
                       onOpenProcesso={onOpenProcesso}
                     />
                   </td>
-                  <td className="px-4 py-3 text-white/50 text-sm">
+                  <td className="px-4 py-3 text-[var(--text-secondary)] text-sm">
                     {formatDate(contratante.createdAt)}
                   </td>
                   <td className="px-4 py-3 text-right" onClick={(e) => e.stopPropagation()}>
@@ -2410,7 +2410,7 @@ export function ContratantesTabela({ contratantes, onRefresh, onOpenProcesso }: 
                         {pode('clientes.excluir') && (
                           <DropdownMenuItem 
                             onClick={() => handleDelete(contratante.id, contratante.tipo)}
-                            className="text-red-500 focus:text-red-500 data-[highlighted]:text-red-500 data-[highlighted]:bg-red-500/10 cursor-pointer"
+                            className="text-red-500 focus:text-red-500 data-[highlighted]:text-red-500 data-[highlighted]:bg-red-50 cursor-pointer"
                           >
                             <Trash2 className="h-4 w-4 mr-2 text-red-500" />
                             Excluir
@@ -2428,7 +2428,7 @@ export function ContratantesTabela({ contratantes, onRefresh, onOpenProcesso }: 
 
       {totalPages > 1 && (
         <div className="flex items-center justify-between mt-4">
-          <p className="text-sm text-white/50">
+          <p className="text-sm text-[var(--text-secondary)]">
             Mostrando {startIndex + 1} a {Math.min(startIndex + itemsPerPage, filteredContratantes.length)} de {filteredContratantes.length}
           </p>
           <div className="flex items-center gap-2">

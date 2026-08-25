@@ -63,23 +63,23 @@ export default function TaxasPagamentoTab() {
           <div className="flex h-10 w-10 items-center justify-center rounded-xl" style={{ background: `${OURO}22`, color: OURO }}><Percent className="h-5 w-5" /></div>
           <div>
             <h2 className="text-lg font-semibold text-white">Taxas de Pagamento</h2>
-            <p className="text-sm text-white/50">Uma linha por forma. Bandeira, adquirente e parcelas ficam dentro da configuração.</p>
+            <p className="text-sm text-[var(--text-secondary)]">Uma linha por forma. Bandeira, adquirente e parcelas ficam dentro da configuração.</p>
           </div>
         </div>
       </div>
 
       <div className="relative">
-        <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-white/30" />
-        <input value={busca} onChange={(e) => setBusca(e.target.value)} placeholder="Buscar forma…" className="w-full rounded-lg border border-[var(--border-default)] bg-black/30 py-2 pl-9 pr-3 text-sm text-white placeholder:text-white/30 outline-none focus:border-white/25" />
+        <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--text-muted)]" />
+        <input value={busca} onChange={(e) => setBusca(e.target.value)} placeholder="Buscar forma…" className="w-full rounded-lg border border-[var(--border-default)] bg-black/30 py-2 pl-9 pr-3 text-sm text-white placeholder:text-[var(--text-muted)] outline-none focus:border-white/25" />
       </div>
 
       {loading ? (
-        <div className="flex items-center justify-center py-16"><Loader2 className="h-8 w-8 animate-spin text-white/50" /></div>
+        <div className="flex items-center justify-center py-16"><Loader2 className="h-8 w-8 animate-spin text-[var(--text-secondary)]" /></div>
       ) : erro ? (
-        <div className="rounded-lg border border-red-500/30 bg-red-500/10 p-4 text-sm text-red-200">{erro}<button onClick={() => { void carregar() }} className="ml-3 underline hover:text-white">Tentar de novo</button></div>
+        <div className="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-700">{erro}<button onClick={() => { void carregar() }} className="ml-3 underline hover:text-white">Tentar de novo</button></div>
       ) : filtrados.length === 0 ? (
         <div className={`${GLASS} flex flex-col items-center gap-2 py-16 text-center`}>
-          <Percent className="h-10 w-10 text-white/20" />
+          <Percent className="h-10 w-10 text-[var(--text-muted)]" />
           <p className="text-white/60">Nenhuma forma com taxa configurada.</p>
         </div>
       ) : (
@@ -92,9 +92,9 @@ export default function TaxasPagamentoTab() {
                 <div className="min-w-0 flex-1">
                   <div className="flex flex-wrap items-center gap-2">
                     <span className="truncate font-medium text-white">{x.nome}</span>
-                    {!x.status && <span className="shrink-0 rounded-md border border-[var(--border-default)] px-2 py-0.5 text-[11px] text-white/40">inativa</span>}
+                    {!x.status && <span className="shrink-0 rounded-md border border-[var(--border-default)] px-2 py-0.5 text-[11px] text-[var(--text-muted)]">inativa</span>}
                   </div>
-                  <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-white/45">
+                  <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-[var(--text-secondary)]">
                     {x.adquirentesNomes.length > 0 && <span>Adquirente: {x.adquirentesNomes.join(', ')}</span>}
                     {x.bandeirasNomes.length > 0 && <span>Bandeiras: {x.bandeirasNomes.join(', ')}</span>}
                     <span className="text-white/70">{resumoLinha(x)}</span>
@@ -230,26 +230,26 @@ function FormaConfig({ formaId, onClose, onSalvo }: { formaId: number; onClose: 
     finally { setSalvando(false) }
   }
 
-  const nInput = 'w-16 rounded-md border border-[var(--border-default)] bg-[var(--surface-primary)] px-1.5 py-1 text-center text-[13px] text-white outline-none focus:border-white/30 placeholder:text-white/20'
+  const nInput = 'w-16 rounded-md border border-[var(--border-default)] bg-[var(--surface-primary)] px-1.5 py-1 text-center text-[13px] text-white outline-none focus:border-white/30 placeholder:text-[var(--text-muted)]'
 
   return (
     <div className="fixed inset-0 z-[60] flex items-center justify-center bg-[var(--overlay-modal)] p-4 backdrop-blur-sm" onClick={onClose}>
       <div className="max-h-[92vh] w-full max-w-5xl overflow-auto rounded-2xl border border-[var(--border-default)] bg-zinc-900/95 text-white shadow-2xl" onClick={(e) => e.stopPropagation()}>
         <div className="sticky top-0 z-10 flex items-center justify-between border-b border-[var(--border-default)] bg-zinc-900/95 px-6 py-4">
           <div className="flex items-center gap-2">
-            <button onClick={onClose} className="text-white/50 hover:text-white"><ArrowLeft className="h-4 w-4" /></button>
+            <button onClick={onClose} className="text-[var(--text-secondary)] hover:text-white"><ArrowLeft className="h-4 w-4" /></button>
             <h3 className="text-base font-semibold">Configurar taxas · {det?.forma.name ?? '…'}</h3>
           </div>
-          <button onClick={onClose} className="text-white/40 hover:text-white"><X className="h-4 w-4" /></button>
+          <button onClick={onClose} className="text-[var(--text-muted)] hover:text-white"><X className="h-4 w-4" /></button>
         </div>
 
         <div className="space-y-4 px-6 py-5">
-          {erro && <div className="rounded-lg border border-red-500/30 bg-red-500/10 p-3 text-sm text-red-200">{erro}</div>}
+          {erro && <div className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700">{erro}</div>}
           {!det ? (
-            <div className="flex items-center justify-center py-16"><Loader2 className="h-8 w-8 animate-spin text-white/50" /></div>
+            <div className="flex items-center justify-center py-16"><Loader2 className="h-8 w-8 animate-spin text-[var(--text-secondary)]" /></div>
           ) : det.perfil.calculo === 'BOLETO' ? (
             <div className={`${GLASS} p-4`}>
-              <p className="mb-3 text-[11px] font-semibold uppercase tracking-wide text-white/50">Encargos do boleto</p>
+              <p className="mb-3 text-[11px] font-semibold uppercase tracking-wide text-[var(--text-secondary)]">Encargos do boleto</p>
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                 <Campo label="Taxa de emissão (R$)"><input type="number" step="0.01" min={0} className={INPUT} value={boleto.emissao} onChange={(e) => setBoleto({ ...boleto, emissao: e.target.value })} placeholder="5.00" /></Campo>
                 <Campo label="Taxa de liquidação (R$)"><input type="number" step="0.01" min={0} className={INPUT} value={boleto.liquidacao} onChange={(e) => setBoleto({ ...boleto, liquidacao: e.target.value })} placeholder="5.00" /></Campo>
@@ -257,16 +257,16 @@ function FormaConfig({ formaId, onClose, onSalvo }: { formaId: number; onClose: 
                 <Campo label="Juros ao mês (%)"><input type="number" step="0.01" min={0} className={INPUT} value={boleto.juros} onChange={(e) => setBoleto({ ...boleto, juros: e.target.value })} placeholder="1" /></Campo>
                 <Campo label="Carência da multa (dias)"><input type="number" min={0} className={INPUT} value={boleto.carencia} onChange={(e) => setBoleto({ ...boleto, carencia: e.target.value })} placeholder="3" /></Campo>
               </div>
-              <p className="mt-3 text-[11px] text-white/40">Emissão só na emissão, liquidação só no pagamento; multa após a carência, juros simples pro-rata. Nunca antecipados no cronograma.</p>
+              <p className="mt-3 text-[11px] text-[var(--text-muted)]">Emissão só na emissão, liquidação só no pagamento; multa após a carência, juros simples pro-rata. Nunca antecipados no cronograma.</p>
             </div>
           ) : !det.perfil.mostraBandeira ? (
             <div className={`${GLASS} p-4`}>
-              <p className="mb-3 text-[11px] font-semibold uppercase tracking-wide text-white/50">Taxa de {det.forma.name}</p>
+              <p className="mb-3 text-[11px] font-semibold uppercase tracking-wide text-[var(--text-secondary)]">Taxa de {det.forma.name}</p>
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                 <Campo label="Percentual (%)"><input type="number" step="0.0001" min={0} className={INPUT} value={simples.feePercent} onChange={(e) => setSimples({ ...simples, feePercent: e.target.value })} placeholder="0" /></Campo>
                 <Campo label="Valor fixo (opcional)"><input type="number" step="0.01" min={0} className={INPUT} value={simples.fixedFee} onChange={(e) => setSimples({ ...simples, fixedFee: e.target.value })} placeholder="0.00" /></Campo>
               </div>
-              <p className="mt-3 text-[11px] text-white/40">0% é uma taxa explícita. Deixe vazio somente se a combinação não deve ser usada.</p>
+              <p className="mt-3 text-[11px] text-[var(--text-muted)]">0% é uma taxa explícita. Deixe vazio somente se a combinação não deve ser usada.</p>
             </div>
           ) : (
             <>
@@ -276,14 +276,14 @@ function FormaConfig({ formaId, onClose, onSalvo }: { formaId: number; onClose: 
                 <select value={adqSel ?? ''} onChange={(e) => setAdqSel(Number(e.target.value) || null)} className="rounded-lg border border-[var(--border-default)] bg-black/30 px-3 py-1.5 text-sm text-white outline-none focus:border-white/25">
                   {det.adquirentes.map((a) => <option key={a.id} value={a.id} className="bg-zinc-900">{a.nome}</option>)}
                 </select>
-                <span className="text-[11px] text-white/40">A estrutura aceita múltiplas adquirentes; a grade abaixo é da selecionada.</span>
+                <span className="text-[11px] text-[var(--text-muted)]">A estrutura aceita múltiplas adquirentes; a grade abaixo é da selecionada.</span>
               </div>
 
               {/* grade bandeiras × parcelas (crédito) OU × taxa única (débito) */}
               <div className="overflow-x-auto rounded-lg border border-[var(--border-default)]">
                 <table className="w-full text-[13px]">
                   <thead>
-                    <tr className="border-b border-[var(--border-default)] bg-white/[0.03] text-[11px] uppercase tracking-wide text-white/40">
+                    <tr className="border-b border-[var(--border-default)] bg-[var(--surface-primary)] text-[11px] uppercase tracking-wide text-[var(--text-muted)]">
                       <th className="px-3 py-2 text-left font-medium">Bandeira</th>
                       {det.perfil.mostraGrade
                         ? PARCELAS.map((p) => <th key={p} className="px-1 py-2 text-center font-medium">{p}x</th>)
@@ -310,7 +310,7 @@ function FormaConfig({ formaId, onClose, onSalvo }: { formaId: number; onClose: 
                   </tbody>
                 </table>
               </div>
-              <p className="text-[11px] text-white/40">
+              <p className="text-[11px] text-[var(--text-muted)]">
                 Célula <b>vazia</b> = combinação indisponível (não cadastrada). <b>0</b> é uma taxa explícita.
                 Ex.: Diners só tem 1x; deixe as demais vazias. Salvamento é transacional.
               </p>

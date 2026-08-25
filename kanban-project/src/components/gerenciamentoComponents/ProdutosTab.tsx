@@ -132,14 +132,14 @@ async function jsonFetch(url: string, options: RequestInit = {}) {
 function Secao({ titulo, children, primeira }: { titulo: string; children: React.ReactNode; primeira?: boolean }) {
   return (
     <div className={primeira ? '' : 'border-t border-[var(--border-default)] pt-4'}>
-      <div className="mb-3 text-[11px] font-semibold uppercase tracking-wide text-white/40">{titulo}</div>
+      <div className="mb-3 text-[11px] font-semibold uppercase tracking-wide text-[var(--text-muted)]">{titulo}</div>
       <div className="space-y-3">{children}</div>
     </div>
   )
 }
 
 const Check = ({ ok }: { ok: boolean }) =>
-  ok ? <span className="text-green-300">✓</span> : <span className="text-white/25">—</span>
+  ok ? <span className="text-green-700">✓</span> : <span className="text-[var(--text-muted)]">—</span>
 
 export default function ProdutosTab() {
   // Duas leituras pela camada oficial. A lista de regras de comissão é de APOIO ao
@@ -308,9 +308,9 @@ export default function ProdutosTab() {
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h2 className="text-xl font-semibold text-white">Configurações Financeiras</h2>
-          <p className="text-sm text-white/50">Uma configuração por cadastro mestre. Custo e receita são valores dela.</p>
+          <p className="text-sm text-[var(--text-secondary)]">Uma configuração por cadastro mestre. Custo e receita são valores dela.</p>
         </div>
-        <button onClick={abrirNovo} className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-[#fff] transition hover:bg-blue-500">
+        <button onClick={abrirNovo} className="rounded-lg bg-[var(--action-primary)] px-4 py-2 text-sm font-medium text-[var(--action-primary-ink)] transition hover:bg-[var(--action-primary)]">
           + Nova configuração
         </button>
       </div>
@@ -333,17 +333,17 @@ export default function ProdutosTab() {
         </label>
       </div>
 
-      {loading && <div className="py-12 text-center text-sm text-white/40">Carregando...</div>}
+      {loading && <div className="py-12 text-center text-sm text-[var(--text-muted)]">Carregando...</div>}
 
       {!loading && erroLista && (
-        <div className="rounded-lg border border-red-500/30 bg-red-500/10 p-4 text-sm text-red-200">
+        <div className="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-700">
           {erroLista}
           <button onClick={() => { void carregar() }} className="ml-3 underline hover:text-white">Tentar de novo</button>
         </div>
       )}
 
       {!loading && !erroLista && filtrados.length === 0 && (
-        <div className="rounded-xl border border-[var(--border-default)] bg-[var(--surface-primary)] py-12 text-center text-sm text-white/40 backdrop-blur">
+        <div className="rounded-xl border border-[var(--border-default)] bg-[var(--surface-primary)] py-12 text-center text-sm text-[var(--text-muted)] backdrop-blur">
           {busca ? 'Nenhuma configuração encontrada.' : 'Nenhuma configuração ainda. Crie a primeira.'}
         </div>
       )}
@@ -353,39 +353,39 @@ export default function ProdutosTab() {
           <table className="w-full text-[13px]">
             <thead>
               <tr className="bg-[var(--surface-primary)]">
-                <th className="border-b border-[var(--border-default)] px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wide text-white/50">Cadastro mestre</th>
-                <th className="border-b border-[var(--border-default)] px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wide text-white/50">Origem</th>
-                <th className="border-b border-[var(--border-default)] px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wide text-white/50">Natureza financeira</th>
-                <th className="border-b border-[var(--border-default)] px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wide text-white/50">Status</th>
-                <th className="border-b border-[var(--border-default)] px-4 py-2.5 text-right text-[11px] font-semibold uppercase tracking-wide text-white/50">Ações</th>
+                <th className="border-b border-[var(--border-default)] px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wide text-[var(--text-secondary)]">Cadastro mestre</th>
+                <th className="border-b border-[var(--border-default)] px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wide text-[var(--text-secondary)]">Origem</th>
+                <th className="border-b border-[var(--border-default)] px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wide text-[var(--text-secondary)]">Natureza financeira</th>
+                <th className="border-b border-[var(--border-default)] px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wide text-[var(--text-secondary)]">Status</th>
+                <th className="border-b border-[var(--border-default)] px-4 py-2.5 text-right text-[11px] font-semibold uppercase tracking-wide text-[var(--text-secondary)]">Ações</th>
               </tr>
             </thead>
             <tbody>
               {filtrados.map((p) => (
-                <tr key={p.id} className="border-b border-[var(--border-subtle)] last:border-0 hover:bg-white/[0.03]">
+                <tr key={p.id} className="border-b border-[var(--border-subtle)] last:border-0 hover:bg-[var(--surface-primary)]">
                   <td className="px-4 py-2.5">
                     {/* Só o nome legível. Código (SRV-n) e chave estrutural são do
                         cadastro de ORIGEM — vivem no Catálogo de Serviços. */}
                     <div className="font-medium text-white">{nomeExibidoDoMestre(mestreDaConfiguracao(p))}</div>
                   </td>
                   <td className="px-4 py-2.5">
-                    <span className={`rounded px-2 py-0.5 text-[11px] font-medium ${p.mestre?.origem === 'servico' ? 'bg-sky-500/15 text-sky-300' : p.mestre?.origem === 'documento' ? 'bg-indigo-500/15 text-indigo-300' : 'bg-[var(--surface-primary)] text-white/60'}`}>{origemLabel(p.mestre?.origem)}</span>
+                    <span className={`rounded px-2 py-0.5 text-[11px] font-medium ${p.mestre?.origem === 'servico' ? 'bg-sky-50 text-sky-700' : p.mestre?.origem === 'documento' ? 'bg-indigo-50 text-indigo-700' : 'bg-[var(--surface-primary)] text-white/60'}`}>{origemLabel(p.mestre?.origem)}</span>
                   </td>
                   <td className="px-4 py-2.5 text-white/80">{lbl(NATUREZA_FIN, natFinDe(p.possuiCusto, p.possuiReceita))}</td>
                   <td className="px-4 py-2.5">
                     <div className="flex flex-wrap items-center gap-1.5">
-                      <span className={`rounded px-2 py-0.5 text-[11px] font-medium ${p.ativo ? 'bg-green-500/15 text-green-300' : 'bg-[var(--surface-primary)] text-white/50'}`}>
+                      <span className={`rounded px-2 py-0.5 text-[11px] font-medium ${p.ativo ? 'bg-green-50 text-green-700' : 'bg-[var(--surface-primary)] text-[var(--text-secondary)]'}`}>
                         {p.ativo ? 'Ativo' : 'Inativo'}
                       </span>
-                      {p.cobravelDoCliente && <span className="rounded px-2 py-0.5 text-[11px] font-medium bg-blue-500/15 text-blue-300">Cobrável</span>}
-                      {p.repasse && <span className="rounded px-2 py-0.5 text-[11px] font-medium bg-purple-500/15 text-purple-300">Repasse</span>}
-                      {p.reembolsavel && <span className="rounded px-2 py-0.5 text-[11px] font-medium bg-teal-500/15 text-teal-300">Reembolsável</span>}
+                      {p.cobravelDoCliente && <span className="rounded px-2 py-0.5 text-[11px] font-medium bg-blue-50 text-blue-700">Cobrável</span>}
+                      {p.repasse && <span className="rounded px-2 py-0.5 text-[11px] font-medium bg-slate-50 text-slate-700">Repasse</span>}
+                      {p.reembolsavel && <span className="rounded px-2 py-0.5 text-[11px] font-medium bg-amber-50 text-amber-700">Reembolsável</span>}
                     </div>
                   </td>
                   <td className="px-4 py-2.5">
                     <div className="flex items-center justify-end gap-2">
                       <button onClick={() => abrirEditar(p)} className="rounded-md border border-[var(--border-default)] px-2.5 py-1 text-xs text-white/70 transition hover:bg-[var(--surface-hover)] hover:text-white">Editar</button>
-                      <button onClick={() => excluir(p)} className="rounded-md border border-red-500/20 px-2.5 py-1 text-xs text-red-300/80 transition hover:bg-red-500/10 hover:text-red-200">Excluir</button>
+                      <button onClick={() => excluir(p)} className="rounded-md border border-red-200 px-2.5 py-1 text-xs text-red-700/80 transition hover:bg-red-50 hover:text-red-700">Excluir</button>
                     </div>
                   </td>
                 </tr>
@@ -400,7 +400,7 @@ export default function ProdutosTab() {
           <div className="w-full max-w-2xl rounded-2xl border border-[var(--border-default)] bg-zinc-900/95 shadow-2xl">
             <div className="flex items-center justify-between border-b border-[var(--border-default)] px-6 py-4">
               <h3 className="text-lg font-semibold text-white">{editando ? 'Editar Configuração Financeira' : 'Nova Configuração Financeira'}</h3>
-              <button onClick={() => setModalAberto(false)} className="text-white/40 transition hover:text-white">✕</button>
+              <button onClick={() => setModalAberto(false)} className="text-[var(--text-muted)] transition hover:text-white">✕</button>
             </div>
 
             <div className="max-h-[72vh] space-y-5 overflow-y-auto px-6 py-5">
@@ -417,14 +417,14 @@ export default function ProdutosTab() {
                   {masterSelecionado ? (
                     <div className="flex items-center justify-between rounded-lg border border-[var(--border-default)] bg-[var(--surface-primary)] px-3 py-2 text-sm">
                       <span className="text-white">{nomeExibidoDoMestre(masterSelecionado)}</span>
-                      {!editando && <button onClick={() => setForm((f) => ({ ...f, masterId: '', codigo: '', nome: '' }))} className="text-xs text-white/50 hover:text-white">trocar</button>}
+                      {!editando && <button onClick={() => setForm((f) => ({ ...f, masterId: '', codigo: '', nome: '' }))} className="text-xs text-[var(--text-secondary)] hover:text-white">trocar</button>}
                     </div>
                   ) : (
                     <>
                       <input value={masterBusca} onChange={(e) => setMasterBusca(e.target.value)} autoFocus placeholder={`Buscar ${lbl(ORIGENS, form.origem).toLowerCase()} pelo nome/código...`} className={inputCls} />
                       {masterBusca && (
                         <div className="mt-1 max-h-44 overflow-y-auto rounded-lg border border-[var(--border-default)] bg-zinc-900">
-                          {masterFiltrado.length === 0 && <div className="px-3 py-2 text-xs text-white/40">Nenhum cadastro encontrado.</div>}
+                          {masterFiltrado.length === 0 && <div className="px-3 py-2 text-xs text-[var(--text-muted)]">Nenhum cadastro encontrado.</div>}
                           {masterFiltrado.map((m) => (
                             <button key={m.sourceId} onClick={() => selecionarMaster(m)} className="block w-full px-3 py-1.5 text-left text-sm text-white/80 hover:bg-[var(--surface-hover)]">
                               {nomeExibidoDoMestre(m)}
@@ -434,7 +434,7 @@ export default function ProdutosTab() {
                       )}
                     </>
                   )}
-                  <p className="mt-1 text-[11px] text-white/40">O nome vem do cadastro mestre — não é possível redigitá-lo aqui. O código e a chave ficam no cadastro de origem, no Catálogo de Serviços.</p>
+                  <p className="mt-1 text-[11px] text-[var(--text-muted)]">O nome vem do cadastro mestre — não é possível redigitá-lo aqui. O código e a chave ficam no cadastro de origem, no Catálogo de Serviços.</p>
                 </div>
               </Secao>
 
@@ -452,7 +452,7 @@ export default function ProdutosTab() {
                     {NATUREZA_FIN.map(([k, label]) => <option key={k} value={k} className="bg-zinc-900">{label}</option>)}
                   </select>
                 </div>
-                <p className="text-[11px] text-white/40">A Configuração Financeira define <b>o que</b> é o item. Os <b>preços</b> (custo/venda) vivem na Tabela de Preços — cadastre-os lá conforme a natureza escolhida.</p>
+                <p className="text-[11px] text-[var(--text-muted)]">A Configuração Financeira define <b>o que</b> é o item. Os <b>preços</b> (custo/venda) vivem na Tabela de Preços — cadastre-os lá conforme a natureza escolhida.</p>
               </Secao>
 
               {/* Vínculos — o comportamento financeiro vive AQUI, no cadastro mestre.
@@ -494,20 +494,20 @@ export default function ProdutosTab() {
                     Ativo
                   </label>
                 </div>
-                <div className="mt-2 space-y-0.5 text-[11px] text-white/40">
+                <div className="mt-2 space-y-0.5 text-[11px] text-[var(--text-muted)]">
                   <p><b>Repasse</b>: valor de terceiros repassado ao cliente (pass-through, sem margem/serviço próprio).</p>
                   <p><b>Reembolsável</b>: os custos gerados por este item podem ser reembolsados pelo cliente.</p>
                 </div>
               </Secao>
 
               {erroModal && (
-                <div className="rounded-lg border border-red-500/30 bg-red-500/10 p-3 text-sm text-red-200">{erroModal}</div>
+                <div className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700">{erroModal}</div>
               )}
             </div>
 
             <div className="flex items-center justify-end gap-2 border-t border-[var(--border-default)] px-6 py-4">
               <button onClick={() => setModalAberto(false)} className="rounded-lg px-4 py-2 text-sm text-white/60 transition hover:text-white">Cancelar</button>
-              <button onClick={salvar} disabled={salvando} className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-[#fff] transition hover:bg-blue-500 disabled:opacity-50">
+              <button onClick={salvar} disabled={salvando} className="rounded-lg bg-[var(--action-primary)] px-4 py-2 text-sm font-medium text-[var(--action-primary-ink)] transition hover:bg-[var(--action-primary)] disabled:opacity-50">
                 {salvando ? 'Salvando...' : 'Salvar'}
               </button>
             </div>

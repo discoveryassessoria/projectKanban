@@ -92,12 +92,12 @@ function Consulta({
 
   const tipo = useMemo(() => visiveis.find((t) => t.id === tipoIdEfetivo) ?? null, [visiveis, tipoIdEfetivo])
 
-  if (loading) return <div className="py-24 text-center text-white/50">Carregando…</div>
+  if (loading) return <div className="py-24 text-center text-[var(--text-secondary)]">Carregando…</div>
 
   return (
     <div className="space-y-5">
       {erro && (
-        <div className="rounded-xl border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-200">
+        <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
           {erro} <button onClick={() => { void reload() }} className="ml-2 underline hover:text-white">Tentar de novo</button>
         </div>
       )}
@@ -108,7 +108,7 @@ function Consulta({
             <h2 className="text-lg font-semibold text-white">{titulo}</h2>
             <p className="mt-1 max-w-3xl text-sm text-white/60">{descricao}</p>
           </div>
-          <span className="flex-none rounded-lg border border-[var(--border-default)] bg-white/[0.04] px-3 py-1.5 text-[11px] text-white/50">
+          <span className="flex-none rounded-lg border border-[var(--border-default)] bg-[var(--surface-primary)] px-3 py-1.5 text-[11px] text-[var(--text-secondary)]">
             Somente leitura · edite em {onde}
           </span>
         </div>
@@ -133,7 +133,7 @@ function Consulta({
       </div>
 
       {visiveis.length === 0 ? (
-        <div className={`${CARD} p-8 text-center text-sm text-white/50`}>
+        <div className={`${CARD} p-8 text-center text-sm text-[var(--text-secondary)]`}>
           Nenhum tipo de processo cadastrado. Comece em <span className="text-white/80">Processos › Cadastros › Tipos de Processo</span>.
         </div>
       ) : (
@@ -145,7 +145,7 @@ function Consulta({
 
 function SemFluxo({ nome }: { nome: string }) {
   return (
-    <div className={`${CARD} p-8 text-center text-sm text-white/50`}>
+    <div className={`${CARD} p-8 text-center text-sm text-[var(--text-secondary)]`}>
       <span className="text-white/80">{nome}</span> ainda não tem Workflow Macro.
       Monte a sequência de fases em <span className="text-white/80">Workflow › Fluxos › Workflow Macro</span>.
     </div>
@@ -174,7 +174,7 @@ export function SLAConfiguracaoTab() {
         return (
           <div className={`overflow-x-auto ${CARD}`}>
             <table className="w-full text-sm">
-              <thead className="border-b border-[var(--border-default)] text-left text-xs text-white/50">
+              <thead className="border-b border-[var(--border-default)] text-left text-xs text-[var(--text-secondary)]">
                 <tr>
                   <th className={TH}>#</th>
                   <th className={TH}>Fase</th>
@@ -192,7 +192,7 @@ export function SLAConfiguracaoTab() {
                   const maiorPasso = passos.reduce((m, p) => Math.max(m, p.slaDays), 0)
                   return (
                     <tr key={f.phaseKey} className="border-b border-[var(--border-subtle)] last:border-0">
-                      <td className="px-4 py-2.5 text-white/50">{f.ordem}</td>
+                      <td className="px-4 py-2.5 text-[var(--text-secondary)]">{f.ordem}</td>
                       <td className="px-4 py-2.5 text-white">{f.label}</td>
                       <td className="px-4 py-2.5 text-white/80">{f.slaDays} d</td>
                       <td className="px-4 py-2.5 text-white/60">{f.required ? `${acumulado} d` : "—"}</td>
@@ -202,14 +202,14 @@ export function SLAConfiguracaoTab() {
                         <div className="flex flex-wrap gap-1 text-[10px]">
                           {f.required
                             ? <span className="rounded bg-[var(--surface-primary)] px-1.5 py-0.5 text-white/70">obrigatória</span>
-                            : <span className="rounded bg-[var(--surface-primary)] px-1.5 py-0.5 text-white/40">opcional</span>}
-                          {f.conditional && <span className="rounded bg-amber-500/15 px-1.5 py-0.5 text-amber-300">condicional</span>}
+                            : <span className="rounded bg-[var(--surface-primary)] px-1.5 py-0.5 text-[var(--text-muted)]">opcional</span>}
+                          {f.conditional && <span className="rounded bg-amber-50 px-1.5 py-0.5 text-amber-700">condicional</span>}
                         </div>
                       </td>
                     </tr>
                   )
                 })}
-                <tr className="bg-white/[0.03]">
+                <tr className="bg-[var(--surface-primary)]">
                   <td className="px-4 py-3" />
                   <td className="px-4 py-3 font-medium text-white">Prazo total (fases obrigatórias)</td>
                   <td className="px-4 py-3" />
@@ -243,17 +243,17 @@ export function VersoesConfiguracaoTab() {
             <div className={`${CARD} p-5`}>
               <div className="grid gap-4 sm:grid-cols-3">
                 <div>
-                  <div className="text-[11px] uppercase tracking-wide text-white/45">Workflow Macro</div>
+                  <div className="text-[11px] uppercase tracking-wide text-[var(--text-secondary)]">Workflow Macro</div>
                   <div className="mt-1 text-white">{tipo.macro.name}</div>
                   <div className="mt-0.5 text-sm text-white/60">versão {tipo.macro.versao} · {tipo.macro.ativo ? "ativo" : "inativo"}</div>
                 </div>
                 <div>
-                  <div className="text-[11px] uppercase tracking-wide text-white/45">Fases</div>
+                  <div className="text-[11px] uppercase tracking-wide text-[var(--text-secondary)]">Fases</div>
                   <div className="mt-1 text-white">{tipo.contagens.fases}</div>
                   <div className="mt-0.5 text-sm text-white/60">{tipo.contagens.fasesComInterno} com workflow interno</div>
                 </div>
                 <div>
-                  <div className="text-[11px] uppercase tracking-wide text-white/45">Última alteração do tipo</div>
+                  <div className="text-[11px] uppercase tracking-wide text-[var(--text-secondary)]">Última alteração do tipo</div>
                   <div className="mt-1 text-white">{new Date(tipo.atualizadoEm).toLocaleString("pt-BR")}</div>
                 </div>
               </div>
@@ -261,7 +261,7 @@ export function VersoesConfiguracaoTab() {
 
             <div className={`overflow-x-auto ${CARD}`}>
               <table className="w-full text-sm">
-                <thead className="border-b border-[var(--border-default)] text-left text-xs text-white/50">
+                <thead className="border-b border-[var(--border-default)] text-left text-xs text-[var(--text-secondary)]">
                   <tr>
                     <th className={TH}>#</th>
                     <th className={TH}>Fase</th>
@@ -274,13 +274,13 @@ export function VersoesConfiguracaoTab() {
                 <tbody>
                   {tipo.fases.map((f) => (
                     <tr key={f.phaseKey} className="border-b border-[var(--border-subtle)] last:border-0">
-                      <td className="px-4 py-2.5 text-white/50">{f.ordem}</td>
+                      <td className="px-4 py-2.5 text-[var(--text-secondary)]">{f.ordem}</td>
                       <td className="px-4 py-2.5 text-white">{f.label}</td>
                       <td className="px-4 py-2.5 text-white/70">v{f.versao}</td>
                       <td className="px-4 py-2.5 text-white/70">
                         {f.interno
-                          ? <>{f.interno.name}{f.interno.global && <span className="ml-1.5 rounded bg-[var(--surface-primary)] px-1.5 py-0.5 text-[10px] text-white/50">global</span>}</>
-                          : <span className="text-white/30">—</span>}
+                          ? <>{f.interno.name}{f.interno.global && <span className="ml-1.5 rounded bg-[var(--surface-primary)] px-1.5 py-0.5 text-[10px] text-[var(--text-secondary)]">global</span>}</>
+                          : <span className="text-[var(--text-muted)]">—</span>}
                       </td>
                       <td className="px-4 py-2.5 text-white/70">{f.interno ? `v${f.interno.versao}` : "—"}</td>
                       <td className="px-4 py-2.5 text-white/60">{f.interno?.passos.length ?? "—"}</td>
@@ -308,7 +308,7 @@ export function ConfiguracoesGeraisProcessoTab() {
       {({ tipos }) => (
         <div className={`overflow-x-auto ${CARD}`}>
           <table className="w-full text-sm">
-            <thead className="border-b border-[var(--border-default)] text-left text-xs text-white/50">
+            <thead className="border-b border-[var(--border-default)] text-left text-xs text-[var(--text-secondary)]">
               <tr>
                 <th className={TH}>Código</th>
                 <th className={TH}>Processo</th>
@@ -330,10 +330,10 @@ export function ConfiguracoesGeraisProcessoTab() {
                   <td className="px-4 py-2.5 text-white/60">{t.processFamily}</td>
                   <td className="px-4 py-2.5 text-white/60">{t.serviceNature}</td>
                   <td className="px-4 py-2.5 text-white/60">
-                    {t.macro ? `${t.contagens.fases} fase(s) · v${t.macro.versao}` : <span className="text-amber-300/80">sem workflow</span>}
+                    {t.macro ? `${t.contagens.fases} fase(s) · v${t.macro.versao}` : <span className="text-amber-700/80">sem workflow</span>}
                   </td>
                   <td className="px-4 py-2.5">
-                    <span className={`rounded-full px-2 py-0.5 text-[10px] ${t.ativo ? "bg-green-500/15 text-green-300" : "bg-[var(--surface-primary)] text-white/50"}`}>
+                    <span className={`rounded-full px-2 py-0.5 text-[10px] ${t.ativo ? "bg-green-50 text-green-700" : "bg-[var(--surface-primary)] text-[var(--text-secondary)]"}`}>
                       {t.ativo ? "Ativo" : "Inativo"}
                     </span>
                   </td>
@@ -361,7 +361,7 @@ export function TransicoesTab() {
         return (
           <div className={`overflow-x-auto ${CARD}`}>
             <table className="w-full text-sm">
-              <thead className="border-b border-[var(--border-default)] text-left text-xs text-white/50">
+              <thead className="border-b border-[var(--border-default)] text-left text-xs text-[var(--text-secondary)]">
                 <tr>
                   <th className={TH}>#</th>
                   <th className={TH}>De</th>
@@ -377,16 +377,16 @@ export function TransicoesTab() {
                   const anterior = i === 0 ? null : tipo.fases[i - 1]
                   return (
                     <tr key={f.phaseKey} className="border-b border-[var(--border-subtle)] last:border-0">
-                      <td className="px-4 py-2.5 text-white/50">{f.ordem}</td>
-                      <td className="px-4 py-2.5 text-white/70">{anterior ? anterior.label : <span className="text-white/40">início do processo</span>}</td>
+                      <td className="px-4 py-2.5 text-[var(--text-secondary)]">{f.ordem}</td>
+                      <td className="px-4 py-2.5 text-white/70">{anterior ? anterior.label : <span className="text-[var(--text-muted)]">início do processo</span>}</td>
                       <td className="px-4 py-2.5 text-white">{f.label}</td>
                       <td className="px-4 py-2.5 text-white/70">{entryLabel(f.entryRule)}</td>
                       <td className="px-4 py-2.5">
                         <div className="flex flex-wrap gap-1 text-[10px]">
                           {f.required
                             ? <span className="rounded bg-[var(--surface-primary)] px-1.5 py-0.5 text-white/70">obrigatória</span>
-                            : <span className="rounded bg-[var(--surface-primary)] px-1.5 py-0.5 text-white/40">opcional</span>}
-                          {f.conditional && <span className="rounded bg-amber-500/15 px-1.5 py-0.5 text-amber-300">condicional</span>}
+                            : <span className="rounded bg-[var(--surface-primary)] px-1.5 py-0.5 text-[var(--text-muted)]">opcional</span>}
+                          {f.conditional && <span className="rounded bg-amber-50 px-1.5 py-0.5 text-amber-700">condicional</span>}
                         </div>
                       </td>
                       <td className="px-4 py-2.5 text-white/60">{f.slaDays} d</td>
@@ -396,7 +396,7 @@ export function TransicoesTab() {
                 })}
               </tbody>
             </table>
-            <div className="border-t border-[var(--border-default)] px-4 py-3 text-[12px] text-white/45">
+            <div className="border-t border-[var(--border-default)] px-4 py-3 text-[12px] text-[var(--text-secondary)]">
               A condição para CONCLUIR cada fase é do Workflow Interno + motor de bloqueio; esta tela mostra a
               condição para ENTRAR na fase seguinte.
             </div>
@@ -445,9 +445,9 @@ function diagnosticar(t: Tipo): Checagem[] {
 }
 
 const SEV_CLS: Record<Severidade, string> = {
-  ok: "bg-green-500/15 text-green-300",
-  alerta: "bg-amber-500/15 text-amber-300",
-  erro: "bg-red-500/15 text-red-300",
+  ok: "bg-green-50 text-green-700",
+  alerta: "bg-amber-50 text-amber-700",
+  erro: "bg-red-50 text-red-700",
 }
 const SEV_LABEL: Record<Severidade, string> = { ok: "OK", alerta: "Atenção", erro: "Bloqueante" }
 
@@ -476,14 +476,14 @@ export function DiagnosticoConfiguracaoTab() {
               ].map((k) => (
                 <div key={k.l} className={`${CARD} p-4`}>
                   <div className="text-2xl font-bold text-white">{k.v}</div>
-                  <div className="mt-0.5 text-[10px] font-semibold uppercase tracking-wide text-white/50">{k.l}</div>
+                  <div className="mt-0.5 text-[10px] font-semibold uppercase tracking-wide text-[var(--text-secondary)]">{k.l}</div>
                 </div>
               ))}
             </div>
 
             <div className={`overflow-hidden ${CARD}`}>
               <table className="w-full text-sm">
-                <thead className="border-b border-[var(--border-default)] text-left text-xs text-white/50">
+                <thead className="border-b border-[var(--border-default)] text-left text-xs text-[var(--text-secondary)]">
                   <tr>
                     <th className={TH}>Checagem</th>
                     <th className={TH}>Situação</th>

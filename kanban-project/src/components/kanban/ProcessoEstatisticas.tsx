@@ -125,9 +125,9 @@ export function ProcessoEstatisticas({ processo, onNavigate }: ProcessoEstatisti
 
   // Discovery Design System — dark glass (skin only; layout preservado)
   const cardCls = "bg-[var(--surface-popover)] border border-[var(--border-default)] rounded-xl px-4 py-3.5"
-  const labelCls = "text-[10px] font-bold text-white/40 uppercase tracking-[0.08em] mb-1.5"
+  const labelCls = "text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-[0.08em] mb-1.5"
   const valueCls = "text-[22px] font-bold text-white/95 leading-tight tracking-tight"
-  const subCls = "text-[11px] text-white/40 mt-1.5 leading-relaxed"
+  const subCls = "text-[11px] text-[var(--text-muted)] mt-1.5 leading-relaxed"
 
   return (
     <div className="h-full overflow-y-auto p-6">
@@ -142,7 +142,7 @@ export function ProcessoEstatisticas({ processo, onNavigate }: ProcessoEstatisti
           </div>
           <div className={valueCls}>
             {linhagem.emLinhaDireta}
-            <span className="text-[11px] text-white/40 font-medium block mt-0.5">em linha direta</span>
+            <span className="text-[11px] text-[var(--text-muted)] font-medium block mt-0.5">em linha direta</span>
           </div>
           <div className={subCls}>
             {linhagem.origem ? (
@@ -207,7 +207,7 @@ export function ProcessoEstatisticas({ processo, onNavigate }: ProcessoEstatisti
           Alertas executivos
         </div>
         {alertas.length === 0 ? (
-          <div className="text-xs text-white/40 italic">Nenhum alerta executivo no momento.</div>
+          <div className="text-xs text-[var(--text-muted)] italic">Nenhum alerta executivo no momento.</div>
         ) : (
           <div className="space-y-0">
             {alertas.map((a, i) => {
@@ -238,7 +238,7 @@ export function ProcessoEstatisticas({ processo, onNavigate }: ProcessoEstatisti
         <Button
           variant="outline"
           size="sm"
-          className="border-[var(--border-default)] bg-transparent text-white/80 hover:bg-[#252c35] hover:text-[#fff]"
+          className="border-[var(--border-default)] bg-transparent text-white/80 hover:bg-[var(--surface-tertiary)] hover:text-[#fff]"
           onClick={() => onNavigate?.('arvore')}
         >
           → Árvore Genealógica
@@ -248,14 +248,14 @@ export function ProcessoEstatisticas({ processo, onNavigate }: ProcessoEstatisti
           size="sm"
           disabled
           title="Aba ainda não implementada"
-          className="border-[var(--border-default)] bg-transparent text-white/80 hover:bg-[#252c35] hover:text-[#fff]"
+          className="border-[var(--border-default)] bg-transparent text-white/80 hover:bg-[var(--surface-tertiary)] hover:text-[#fff]"
         >
           → Central Operacional
         </Button>
         <Button
           variant="outline"
           size="sm"
-          className="border-[var(--border-default)] bg-transparent text-white/80 hover:bg-[#252c35] hover:text-[#fff]"
+          className="border-[var(--border-default)] bg-transparent text-white/80 hover:bg-[var(--surface-tertiary)] hover:text-[#fff]"
           onClick={() => onNavigate?.('documentos')}
         >
           → Documentos

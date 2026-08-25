@@ -224,30 +224,30 @@ export default function UsersTab() {
           <div className="text-xs text-white/60 mt-1">{usuarios.length} {usuarios.length === 1 ? "usuário cadastrado" : "usuários cadastrados"}</div>
         </div>
         {pode("usuarios.criar") && (
-          <Button onClick={handleCreate} className="gap-2 bg-blue-600 hover:bg-blue-700 text-[#fff]"><UserPlus className="h-4 w-4" /> Novo Usuário</Button>
+          <Button onClick={handleCreate} className="gap-2 bg-[var(--action-primary)] hover:bg-[var(--action-primary-hover)] text-[var(--action-primary-ink)]"><UserPlus className="h-4 w-4" /> Novo Usuário</Button>
         )}
       </div>
 
-      {error && <Alert className="bg-red-500/20 border-red-500/50 text-[#fff]"><AlertDescription className="text-white">{error}</AlertDescription></Alert>}
-      {success && <Alert className="border-green-500/50 bg-green-500/20 text-[#fff]"><AlertDescription className="text-white">{success}</AlertDescription></Alert>}
+      {error && <Alert className="bg-red-50 border-red-200 text-[#fff]"><AlertDescription className="text-white">{error}</AlertDescription></Alert>}
+      {success && <Alert className="border-green-200 bg-green-50 text-[#fff]"><AlertDescription className="text-white">{success}</AlertDescription></Alert>}
 
       {/* Busca */}
       <div className="relative">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-white/50" />
+        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-[var(--text-secondary)]" />
         <Input placeholder="Buscar por nome ou email..." value={searchTerm} onChange={e => setSearchTerm(e.target.value)}
-          className="pl-10 bg-[var(--surface-primary)] border-[var(--border-default)] text-white placeholder:text-white/50" />
+          className="pl-10 bg-[var(--surface-primary)] border-[var(--border-default)] text-white placeholder:text-[var(--text-secondary)]" />
       </div>
 
       {/* Tabela glass */}
       <div className="bg-[var(--surface-primary)] backdrop-blur-sm border border-[var(--border-default)] rounded-xl p-4 overflow-x-auto">
         {isLoading ? (
-          <div className="flex justify-center py-10"><Loader2 className="h-8 w-8 animate-spin text-white/50" /></div>
+          <div className="flex justify-center py-10"><Loader2 className="h-8 w-8 animate-spin text-[var(--text-secondary)]" /></div>
         ) : usuarios.length === 0 ? (
-          <div className="text-center py-10 text-white/50">Nenhum usuário encontrado</div>
+          <div className="text-center py-10 text-[var(--text-secondary)]">Nenhum usuário encontrado</div>
         ) : (
           <table className="w-full text-sm min-w-[640px]">
             <thead>
-              <tr className="text-white/40 text-xs border-b border-[var(--border-default)]">
+              <tr className="text-[var(--text-muted)] text-xs border-b border-[var(--border-default)]">
                 <th className="text-left font-medium py-2">Código</th>
                 <th className="text-left font-medium py-2">Nome</th>
                 <th className="text-left font-medium py-2">E-mail</th>
@@ -263,10 +263,10 @@ export default function UsersTab() {
                   <td className="py-2.5 text-white/70">{u.email}</td>
                   <td className="py-2.5">
                     <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium ${
-                      u.tipo === "admin" ? "bg-blue-500/20 text-blue-300 border border-blue-500/30" :
-                      u.tipo === "gerente" ? "bg-purple-500/20 text-purple-300 border border-purple-500/30" :
-                      u.tipo === "estagiario" ? "bg-amber-500/20 text-amber-300 border border-amber-500/30" :
-                      "bg-emerald-500/20 text-emerald-300 border border-emerald-500/30"}`}>
+                      u.tipo === "admin" ? "bg-blue-50 text-blue-700 border border-blue-200" :
+                      u.tipo === "gerente" ? "bg-slate-50 text-slate-700 border border-slate-200" :
+                      u.tipo === "estagiario" ? "bg-amber-50 text-amber-700 border border-amber-200" :
+                      "bg-emerald-50 text-emerald-700 border border-emerald-200"}`}>
                       {userTypeLabels[u.tipo as UserType] ?? u.tipo}
                     </span>
                   </td>
@@ -276,7 +276,7 @@ export default function UsersTab() {
                         <Button variant="ghost" size="icon" onClick={() => handleEdit(u)} title="Editar" className="text-white/70 hover:text-white hover:bg-[var(--surface-hover)]"><Pencil className="h-4 w-4" /></Button>
                       )}
                       {pode("usuarios.excluir") && u.tipo !== UserType.ADMIN && (
-                        <Button variant="ghost" size="icon" onClick={() => handleDeleteClick(u)} title="Deletar" className="text-red-400 hover:text-red-300 hover:bg-red-500/10"><Trash2 className="h-4 w-4" /></Button>
+                        <Button variant="ghost" size="icon" onClick={() => handleDeleteClick(u)} title="Deletar" className="text-red-700 hover:text-red-700 hover:bg-red-50"><Trash2 className="h-4 w-4" /></Button>
                       )}
                     </div>
                   </td>
@@ -355,7 +355,7 @@ export default function UsersTab() {
                           </div>
                           <div className="flex items-center gap-2">
                             <Switch checked={todasAtivas} onCheckedChange={() => toggleModulo(modulo)} onClick={(e: React.MouseEvent) => e.stopPropagation()} className="scale-75" />
-                            {expanded ? <ChevronUp className="h-4 w-4 text-gray-400" /> : <ChevronDown className="h-4 w-4 text-gray-400" />}
+                            {expanded ? <ChevronUp className="h-4 w-4 text-[var(--text-muted)]" /> : <ChevronDown className="h-4 w-4 text-[var(--text-muted)]" />}
                           </div>
                         </div>
                         {expanded && (
@@ -367,7 +367,7 @@ export default function UsersTab() {
                                 <div key={perm.chave} className={`flex items-center justify-between py-1.5 px-2 rounded ${override ? "bg-amber-50" : ""}`}>
                                   <div className="flex items-center gap-2">
                                     {override && <span className="w-1.5 h-1.5 rounded-full bg-amber-400 flex-shrink-0" />}
-                                    <span className={`text-xs ${ativa ? "text-gray-700" : "text-gray-400"}`}>{perm.label}</span>
+                                    <span className={`text-xs ${ativa ? "text-gray-700" : "text-[var(--text-muted)]"}`}>{perm.label}</span>
                                   </div>
                                   <Switch checked={ativa} onCheckedChange={() => togglePermissao(perm.chave)} className="scale-75" />
                                 </div>
@@ -393,7 +393,7 @@ export default function UsersTab() {
 
             <DialogFooter>
               <Button type="button" variant="outline" onClick={() => setIsDialogOpen(false)} disabled={isSubmitting}>Cancelar</Button>
-              <Button type="submit" disabled={isSubmitting} className="bg-blue-600 hover:bg-blue-700 text-[#fff]">
+              <Button type="submit" disabled={isSubmitting} className="bg-[var(--action-primary)] hover:bg-[var(--action-primary-hover)] text-[var(--action-primary-ink)]">
                 {isSubmitting ? <><div className="mr-2 h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />Salvando...</> : isEditing ? "Atualizar" : "Criar"}
               </Button>
             </DialogFooter>

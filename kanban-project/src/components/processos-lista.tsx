@@ -105,12 +105,12 @@ export function ProcessosLista({
       {/* Header com busca */}
       <div className="flex items-center justify-between gap-4">
         <div className="relative flex-1 max-w-md">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-white/40" />
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-[var(--text-muted)]" />
           <Input
             placeholder="Buscar processo..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            className="pl-10 bg-[var(--surface-primary)] border-[var(--border-strong)] text-white placeholder:text-white/40"
+            className="pl-10 bg-[var(--surface-primary)] border-[var(--border-strong)] text-white placeholder:text-[var(--text-muted)]"
           />
         </div>
         <select
@@ -161,7 +161,7 @@ export function ProcessosLista({
                     <div>
                       <span className="text-white font-medium">{processo.nome}</span>
                       {processo.descricao && (
-                        <p className="text-white/50 text-sm truncate max-w-[200px]">
+                        <p className="text-[var(--text-secondary)] text-sm truncate max-w-[200px]">
                           {processo.descricao}
                         </p>
                       )}
@@ -184,9 +184,9 @@ export function ProcessosLista({
                     <span
                       className={`text-sm ${
                         processo.sla?.status === "atrasado"
-                          ? "text-red-300"
+                          ? "text-red-700"
                           : processo.sla?.status === "proximo_vencimento"
-                            ? "text-amber-300"
+                            ? "text-amber-700"
                             : "text-white/70"
                       }`}
                     >
@@ -195,31 +195,31 @@ export function ProcessosLista({
                   </td>
                   <td className="py-3 px-4">
                     {primeiroContratante ? (
-                      <span className="text-indigo-400 hover:underline cursor-pointer">
+                      <span className="text-indigo-700 hover:underline cursor-pointer">
                         {primeiroContratante.nome}
                       </span>
                     ) : (
-                      <span className="text-white/40">-</span>
+                      <span className="text-[var(--text-muted)]">-</span>
                     )}
                   </td>
                   <td className="py-3 px-4">
                     {requerentesCount > 0 ? (
-                      <span className="flex items-center gap-1 text-purple-400">
+                      <span className="flex items-center gap-1 text-slate-700">
                         <Users className="h-3 w-3" />
                         {requerentesCount}
                       </span>
                     ) : (
-                      <span className="text-white/40">-</span>
+                      <span className="text-[var(--text-muted)]">-</span>
                     )}
                   </td>
                   <td className="py-3 px-4">
                     {tarefasCount > 0 ? (
-                      <span className="flex items-center gap-1 text-blue-400">
+                      <span className="flex items-center gap-1 text-blue-700">
                         <CheckSquare className="h-3 w-3" />
                         {tarefasConcluidas}/{tarefasCount}
                       </span>
                     ) : (
-                      <span className="text-white/40">-</span>
+                      <span className="text-[var(--text-muted)]">-</span>
                     )}
                   </td>
                   <td className="py-3 px-4 text-white/60 text-sm">
@@ -250,7 +250,7 @@ export function ProcessosLista({
                           </DropdownMenuItem>
                           <DropdownMenuItem 
                             onClick={() => handleDelete(processo.id)}
-                            className="text-red-500 focus:text-red-500 data-[highlighted]:text-red-500 data-[highlighted]:bg-red-500/10 cursor-pointer"
+                            className="text-red-500 focus:text-red-500 data-[highlighted]:text-red-500 data-[highlighted]:bg-red-50 cursor-pointer"
                           >
                             <Trash2 className="h-4 w-4 mr-2 text-red-500" />
                             Excluir
@@ -266,7 +266,7 @@ export function ProcessosLista({
             {/* Mensagem quando não há resultados */}
             {paginatedProcessos.length === 0 && (
               <tr>
-                <td colSpan={9} className="py-12 text-center text-white/40">
+                <td colSpan={9} className="py-12 text-center text-[var(--text-muted)]">
                   {searchTerm || filtroSla !== "todos"
                     ? "Nenhum processo encontrado"
                     : "Nenhum processo cadastrado"}

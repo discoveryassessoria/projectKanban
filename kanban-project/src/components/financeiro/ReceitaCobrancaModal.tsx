@@ -15,7 +15,7 @@ import { fmtMoeda as brl } from "@/src/lib/financeiro/formato"
 import { useChaveIdempotencia } from "@/src/lib/financeiro/useChaveIdempotencia"
 
 const OURO = '#D2A948'
-const GLASS = 'rounded-xl border border-[var(--border-default)] bg-white/[0.05] backdrop-blur-md'
+const GLASS = 'rounded-xl border border-[var(--border-default)] bg-[var(--surface-primary)] backdrop-blur-md'
 const dt = (s: any) => (s ? new Date(s).toLocaleDateString('pt-BR') : '—')
 
 async function jf(url: string, opts: RequestInit = {}) {
@@ -35,7 +35,7 @@ type Cobranca = any
 function Card({ label, children, destaque }: { label: string; children: React.ReactNode; destaque?: boolean }) {
   return (
     <div className="rounded-xl border p-3" style={destaque ? { borderColor: `${OURO}55`, background: `${OURO}12` } : { borderColor: 'rgba(255,255,255,0.10)', background: 'rgba(255,255,255,0.03)' }}>
-      <p className="text-[10px] font-semibold uppercase tracking-wide text-white/45">{label}</p>
+      <p className="text-[10px] font-semibold uppercase tracking-wide text-[var(--text-secondary)]">{label}</p>
       <div className="mt-1 text-sm font-semibold">{children}</div>
     </div>
   )
@@ -102,28 +102,28 @@ export function ReceitaCobrancaModal({ receitaId, onClose, onChanged }: { receit
               <ReceiptText className="h-4 w-4" style={{ color: OURO }} />
               <h3 className="text-base font-semibold">Receita {r.codigo ? `· ${r.codigo}` : ''}</h3>
             </div>
-            <p className="mt-0.5 text-xs text-white/50">{r.descricao || 'Compromisso financeiro gerado pelo motor'}</p>
+            <p className="mt-0.5 text-xs text-[var(--text-secondary)]">{r.descricao || 'Compromisso financeiro gerado pelo motor'}</p>
           </div>
-          <button onClick={onClose} className="text-white/40 transition hover:text-white"><X className="h-4 w-4" /></button>
+          <button onClick={onClose} className="text-[var(--text-muted)] transition hover:text-white"><X className="h-4 w-4" /></button>
         </div>
 
         <div className="space-y-5 px-6 py-5">
-          {erro && <div className="rounded-lg border border-red-500/30 bg-red-500/10 p-3 text-sm text-red-200">{erro}</div>}
+          {erro && <div className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700">{erro}</div>}
 
           {/* CONTRATO — só o que a Receita É */}
           <div className="grid grid-cols-3 gap-3">
             {[['Valor contratado', brl(contratado, moeda)], ['Valor recebido', brl(recebido, moeda)], ['Saldo', brl(saldo, moeda)]].map(([l, v], i) => (
               <div key={i} className={`${GLASS} p-3`}>
-                <p className="text-[11px] font-semibold uppercase tracking-wide text-white/50">{l}</p>
+                <p className="text-[11px] font-semibold uppercase tracking-wide text-[var(--text-secondary)]">{l}</p>
                 <p className="mt-1 text-lg font-bold tabular-nums">{v}</p>
               </div>
             ))}
           </div>
           <div className={`${GLASS} p-4`}>
-            <p className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-white/50">Contrato</p>
+            <p className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-[var(--text-secondary)]">Contrato</p>
             <div className="grid grid-cols-2 gap-x-6 gap-y-1.5 text-sm">
               {[['Regra financeira', r.regraFinanceiraId ?? det?.origem?.regra ?? '—'], ['Serviço', r.tipoServico?.name ?? det?.origem?.servico ?? '—'], ['Processo', r.processoId], ['Requerente', (det?.requerentesConsiderados?.[0]?.nome) ?? r.pessoa?.nome ?? '—'], ['Moeda', moeda], ['Cotação utilizada', r.fxEstimado ? `1 ${moeda} = R$ ${Number(r.fxEstimado).toFixed(4)}` : '—']].map(([l, v], i) => (
-                <div key={i} className="flex justify-between gap-3"><span className="text-white/45">{l}</span><span className="truncate text-right text-white/85">{String(v ?? '—')}</span></div>
+                <div key={i} className="flex justify-between gap-3"><span className="text-[var(--text-secondary)]">{l}</span><span className="truncate text-right text-white/85">{String(v ?? '—')}</span></div>
               ))}
             </div>
           </div>
@@ -135,7 +135,7 @@ export function ReceitaCobrancaModal({ receitaId, onClose, onChanged }: { receit
                 <CreditCard className="h-6 w-6" style={{ color: OURO }} />
               </div>
               <h4 className="text-base font-semibold">Esta receita ainda não possui uma cobrança</h4>
-              <p className="mx-auto mt-1 max-w-sm text-sm text-white/55">Para iniciar o processo financeiro, escolha como o cliente irá pagar esta receita.</p>
+              <p className="mx-auto mt-1 max-w-sm text-sm text-[var(--text-secondary)]">Para iniciar o processo financeiro, escolha como o cliente irá pagar esta receita.</p>
               <button onClick={() => setWizard(true)} className="mt-4 inline-flex items-center gap-1.5 rounded-lg px-4 py-2 text-sm font-semibold text-[#1b1508] transition" style={{ background: OURO }} onMouseEnter={(e) => (e.currentTarget.style.background = '#e0b957')} onMouseLeave={(e) => (e.currentTarget.style.background = OURO)}>
                 <Sparkles className="h-4 w-4" /> Cadastrar Cobrança
               </button>
@@ -158,7 +158,7 @@ export function ReceitaCobrancaModal({ receitaId, onClose, onChanged }: { receit
 function CobrancaCard({ cobranca, moeda, onPago }: { cobranca: any; moeda: string; onPago: () => void }) {
   const [pagando, setPagando] = React.useState<number | null>(null)
   const parcelas = (cobranca.parcelas || []).slice().sort((a: any, b: any) => a.numero - b.numero)
-  const statusCls: Record<string, string> = { ABERTA: 'bg-sky-500/15 text-sky-300 border-sky-500/25', PARCIAL: 'bg-amber-500/15 text-amber-300 border-amber-500/25', QUITADA: 'bg-emerald-500/15 text-emerald-300 border-emerald-500/25', CANCELADA: 'bg-[var(--surface-primary)] text-white/50 border-[var(--border-default)]' }
+  const statusCls: Record<string, string> = { ABERTA: 'bg-sky-50 text-sky-700 border-sky-200', PARCIAL: 'bg-amber-50 text-amber-700 border-amber-200', QUITADA: 'bg-emerald-50 text-emerald-700 border-emerald-200', CANCELADA: 'bg-[var(--surface-primary)] text-[var(--text-secondary)] border-[var(--border-default)]' }
   async function pagar(parcelaId: number, valor: number) {
     setPagando(parcelaId)
     try { await jf(`/api/financeiro/cobrancas/${cobranca.id}/pagamentos`, { method: 'POST', body: JSON.stringify({ parcelaId, valor }) }); onPago() }
@@ -172,7 +172,7 @@ function CobrancaCard({ cobranca, moeda, onPago }: { cobranca: any; moeda: strin
       </div>
       <div className="overflow-hidden rounded-lg border border-[var(--border-default)]">
         <table className="w-full text-[13px]">
-          <thead><tr className="bg-[var(--surface-primary)] text-left text-[11px] uppercase tracking-wide text-white/45">
+          <thead><tr className="bg-[var(--surface-primary)] text-left text-[11px] uppercase tracking-wide text-[var(--text-secondary)]">
             {['#', 'Vencimento', 'Valor', 'Status', ''].map((h, i) => <th key={i} className="px-3 py-2 font-semibold">{h}</th>)}
           </tr></thead>
           <tbody>
@@ -183,7 +183,7 @@ function CobrancaCard({ cobranca, moeda, onPago }: { cobranca: any; moeda: strin
                   <td className="px-3 py-2 tabular-nums text-white/70">{p.numero}</td>
                   <td className="px-3 py-2 text-white/70">{dt(p.vencimento)}</td>
                   <td className="px-3 py-2 tabular-nums">{brl(p.valor, moeda)}</td>
-                  <td className="px-3 py-2">{quit ? <span className="text-emerald-400">recebida</span> : <span className="text-white/50">pendente</span>}</td>
+                  <td className="px-3 py-2">{quit ? <span className="text-emerald-700">recebida</span> : <span className="text-[var(--text-secondary)]">pendente</span>}</td>
                   <td className="px-3 py-2 text-right">
                     {!quit && <button disabled title="Registrar pagamento é feito no Financeiro do processo (fluxo canônico único)." className="rounded-md border border-[var(--border-strong)] px-2.5 py-1 text-xs text-white/80 cursor-not-allowed opacity-40">Registrar pagamento</button>}
                   </td>
@@ -301,7 +301,7 @@ function CobrancaWizard({ receitaId, valor, moeda, receita, onClose, onCriada }:
   }
 
   const sel = 'w-full rounded-lg bg-[var(--surface-primary)] border border-[var(--border-default)] px-3 py-2 text-sm text-white outline-none focus:border-white/30'
-  const linha = (l: string, v: any) => (<div className="flex justify-between gap-3 py-0.5"><span className="text-white/45">{l}</span><span className="truncate text-right tabular-nums text-white/85">{v ?? '—'}</span></div>)
+  const linha = (l: string, v: any) => (<div className="flex justify-between gap-3 py-0.5"><span className="text-[var(--text-secondary)]">{l}</span><span className="truncate text-right tabular-nums text-white/85">{v ?? '—'}</span></div>)
   const POL_LABEL: Record<string, string> = { IGNORAR: 'Ignorar', REPASSAR: 'Repassar ao cliente', ABSORVER: 'Absorver' }
 
   // ── câmbio derivado (usado pela Simulação E pelo resumo lateral) ──
@@ -311,7 +311,7 @@ function CobrancaWizard({ receitaId, valor, moeda, receita, onClose, onCriada }:
   const temConv = !!destino && destino !== origem && cotacao != null && cotacao > 0
   const emDest = (v: number) => (v == null ? 0 : Math.round(Number(v) * (cotacao ?? 1) * 100) / 100)
   const dual = (v: number, bold = false) => (
-    <span className="tabular-nums text-white/85">{bold ? <b>{brl(v, moeda)}</b> : brl(v, moeda)}{temConv && <span className="text-white/45"> · {brl(emDest(v), destino!)}</span>}</span>
+    <span className="tabular-nums text-white/85">{bold ? <b>{brl(v, moeda)}</b> : brl(v, moeda)}{temConv && <span className="text-[var(--text-secondary)]"> · {brl(emDest(v), destino!)}</span>}</span>
   )
   const nomeForma = (id?: number) => cfg?.formasPagamento?.find((x: any) => x.id === id)?.name
   const nomeAdq = (id?: number) => (cfg?.adquirentes ?? []).find((x: any) => x.id === id)?.nome
@@ -334,9 +334,9 @@ function CobrancaWizard({ receitaId, valor, moeda, receita, onClose, onCriada }:
   // mesmo conteúdo apenas re-renderiza.
   const simulacao = (
     <div className="space-y-4">
-      {simulando && <p className="text-sm text-white/50">Simulando no servidor…</p>}
+      {simulando && <p className="text-sm text-[var(--text-secondary)]">Simulando no servidor…</p>}
       {!simulando && sim && !sim.ok && (
-        <div className="rounded-lg border border-red-500/30 bg-red-500/10 p-3 text-sm text-red-200">
+        <div className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700">
           {(sim.erros ?? []).map((e, i) => <div key={i}>• {e.mensagem}</div>)}
           {precisaEscolha && (
             <div className="mt-2 flex flex-wrap gap-2">
@@ -359,19 +359,19 @@ function CobrancaWizard({ receitaId, valor, moeda, receita, onClose, onCriada }:
         {temConv && (
           <div className={`${GLASS} flex flex-wrap items-center justify-between gap-2 p-3 text-[12px]`}>
             <span className="text-white/70">Cotação: <b>1 {origem} = {cotacao} {destino}</b></span>
-            <span className="text-white/45">{sim.cambio?.fonte ?? '—'}{sim.cambio?.data ? ` · ${dt(sim.cambio.data)}` : ''} · {(sim.cambio?.tipo || '').toLowerCase() || (sim.cambio?.estimado ? 'estimada — congelada ao gerar' : 'congelada nesta cobrança')}</span>
+            <span className="text-[var(--text-secondary)]">{sim.cambio?.fonte ?? '—'}{sim.cambio?.data ? ` · ${dt(sim.cambio.data)}` : ''} · {(sim.cambio?.tipo || '').toLowerCase() || (sim.cambio?.estimado ? 'estimada — congelada ao gerar' : 'congelada nesta cobrança')}</span>
           </div>
         )}
         <div>
-          <p className="mb-1.5 text-[11px] font-semibold uppercase tracking-wide text-white/50">Cronograma de parcelas</p>
+          <p className="mb-1.5 text-[11px] font-semibold uppercase tracking-wide text-[var(--text-secondary)]">Cronograma de parcelas</p>
           <div className="overflow-x-auto rounded-lg border border-[var(--border-default)]">
-            <table className="w-full text-[13px]"><thead><tr className="bg-[var(--surface-primary)] text-left text-[11px] uppercase tracking-wide text-white/45"><th className="px-3 py-2">#</th><th className="px-3 py-2">Descrição</th><th className="px-3 py-2">Vencimento</th><th className="px-3 py-2 text-right">Valor ({moeda})</th>{temConv && <th className="px-3 py-2 text-right">Valor ({destino})</th>}</tr></thead><tbody>
+            <table className="w-full text-[13px]"><thead><tr className="bg-[var(--surface-primary)] text-left text-[11px] uppercase tracking-wide text-[var(--text-secondary)]"><th className="px-3 py-2">#</th><th className="px-3 py-2">Descrição</th><th className="px-3 py-2">Vencimento</th><th className="px-3 py-2 text-right">Valor ({moeda})</th>{temConv && <th className="px-3 py-2 text-right">Valor ({destino})</th>}</tr></thead><tbody>
               {(sim.parcelas ?? []).map((p: any) => <tr key={p.numero} className="border-t border-[var(--border-subtle)]"><td className="px-3 py-1.5 text-white/60">{p.numero}</td><td className="px-3 py-1.5 text-white/70">{p.entrada ? 'Entrada' : `Parcela ${p.entrada ? '' : p.numero}`}</td><td className="px-3 py-1.5 text-white/70">{dt(p.vencimento)}</td><td className="px-3 py-1.5 text-right tabular-nums">{brl(p.valor, moeda)}</td>{temConv && <td className="px-3 py-1.5 text-right tabular-nums text-white/70">{brl(emDest(p.valor), destino!)}</td>}</tr>)}
             </tbody></table>
           </div>
         </div>
         {Array.isArray(sim.memoria) && (
-          <details className="text-[11px] text-white/50"><summary className="cursor-pointer text-white/60">Memória de cálculo</summary>
+          <details className="text-[11px] text-[var(--text-secondary)]"><summary className="cursor-pointer text-white/60">Memória de cálculo</summary>
             <div className="mt-1 space-y-0.5 rounded-lg border border-[var(--border-default)] bg-black/20 p-2">{sim.memoria.map((m: string, i: number) => <div key={i}>{m}</div>)}</div>
           </details>
         )}
@@ -387,7 +387,7 @@ function CobrancaWizard({ receitaId, valor, moeda, receita, onClose, onCriada }:
         <div className="w-full max-w-md rounded-2xl border border-[var(--border-default)] bg-zinc-900/95 p-6 text-center text-white shadow-2xl" onClick={(e) => e.stopPropagation()}>
           <div className="mx-auto mb-3 grid h-14 w-14 place-items-center rounded-full" style={{ background: `${OURO}22`, color: OURO }}><Check className="h-7 w-7" /></div>
           <h3 className="text-lg font-semibold">Cobrança criada com sucesso</h3>
-          <p className="mt-1 text-sm text-white/55">A cobrança foi gerada e vinculada à receita.</p>
+          <p className="mt-1 text-sm text-[var(--text-secondary)]">A cobrança foi gerada e vinculada à receita.</p>
           <div className={`${GLASS} mt-4 space-y-1 p-4 text-left text-sm`}>
             {linha('Cobrança', `#${cob?.id}`)}
             {linha('Valor total', brl(cob?.valorTotal, cob?.moeda ?? moeda))}
@@ -411,18 +411,18 @@ function CobrancaWizard({ receitaId, valor, moeda, receita, onClose, onCriada }:
         <div className="flex items-center justify-between border-b border-[var(--border-default)] px-6 py-4">
           <div>
             <h3 className="text-lg font-semibold">Cadastrar Cobrança</h3>
-            <p className="text-xs text-white/50">Crie uma nova cobrança vinculada à receita selecionada.</p>
+            <p className="text-xs text-[var(--text-secondary)]">Crie uma nova cobrança vinculada à receita selecionada.</p>
           </div>
-          <button onClick={onClose} className="text-white/40 hover:text-white"><X className="h-4 w-4" /></button>
+          <button onClick={onClose} className="text-[var(--text-muted)] hover:text-white"><X className="h-4 w-4" /></button>
         </div>
         {/* Barra de etapas */}
         <div className="flex flex-wrap gap-2 border-b border-[var(--border-default)] px-6 py-3">
           {PASSOS.map((p) => (
-            <div key={p.n} className={`flex min-w-0 flex-1 items-center gap-2 rounded-lg border px-3 py-2 ${step === p.n ? 'border-[var(--border-strong)] bg-white/[0.04]' : 'border-transparent'}`}>
+            <div key={p.n} className={`flex min-w-0 flex-1 items-center gap-2 rounded-lg border px-3 py-2 ${step === p.n ? 'border-[var(--border-strong)] bg-[var(--surface-primary)]' : 'border-transparent'}`}>
               <span className="grid h-6 w-6 shrink-0 place-items-center rounded-full border text-[11px]" style={step === p.n ? { background: OURO, borderColor: OURO, color: '#1b1508' } : step > p.n ? { borderColor: '#34d39955', background: '#34d39914', color: '#6ee7b7' } : { borderColor: 'rgba(255,255,255,0.15)', color: 'rgba(255,255,255,0.5)' }}>{step > p.n ? <Check className="h-3.5 w-3.5" /> : p.n}</span>
               <div className="min-w-0">
                 <p className={`truncate text-[13px] font-medium ${step === p.n ? 'text-white' : 'text-white/60'}`}>{p.label}</p>
-                <p className="truncate text-[10px] text-white/40">{p.desc}</p>
+                <p className="truncate text-[10px] text-[var(--text-muted)]">{p.desc}</p>
               </div>
             </div>
           ))}
@@ -431,16 +431,16 @@ function CobrancaWizard({ receitaId, valor, moeda, receita, onClose, onCriada }:
         {/* Corpo: conteúdo (esq) + resumo lateral persistente (dir) */}
         <div className="flex min-h-0 flex-1 flex-col lg:flex-row">
           <div className="min-h-0 flex-1 space-y-4 overflow-y-auto px-6 py-5">
-          {!cfg && <p className="text-sm text-white/50">Carregando configuração…</p>}
-          {erro && <div className="rounded-lg border border-red-500/30 bg-red-500/10 p-2 text-sm text-red-200">{erro}</div>}
+          {!cfg && <p className="text-sm text-[var(--text-secondary)]">Carregando configuração…</p>}
+          {erro && <div className="rounded-lg border border-red-200 bg-red-50 p-2 text-sm text-red-700">{erro}</div>}
 
           {cfg && step === 1 && (<div className="space-y-3"><div><label className="mb-1 block text-xs text-white/60">Forma de pagamento</label>
             <select className={sel} value={formaEfetivaId ?? ''} onChange={(e) => { const id = Number(e.target.value) || undefined; setF({ ...f, formaPagamentoId: id, adquirenteId: undefined, bandeiraId: undefined }) }}>
               <option value="" className="bg-zinc-900">Selecione</option>
               {formasDisponiveis.map((x: any) => <option key={x.id} value={x.id} className="bg-zinc-900">{x.name}{condicao?.formaPadraoId === x.id ? ' · padrão' : ''}</option>)}
             </select>
-            {avisoForma && <p className="mt-1 text-[11px] text-amber-300/80">{avisoForma}</p>}
-            {!!permitidas.length && <p className="mt-1 text-[11px] text-white/40">Somente as formas permitidas pela condição selecionada.</p>}
+            {avisoForma && <p className="mt-1 text-[11px] text-amber-700/80">{avisoForma}</p>}
+            {!!permitidas.length && <p className="mt-1 text-[11px] text-[var(--text-muted)]">Somente as formas permitidas pela condição selecionada.</p>}
             </div>
             {ehCartao && (<>
               <div><label className="mb-1 block text-xs text-white/60">Adquirente {ehCartaoCredito ? '' : '(opcional)'}</label>
@@ -453,7 +453,7 @@ function CobrancaWizard({ receitaId, valor, moeda, receita, onClose, onCriada }:
                   <option value="" className="bg-zinc-900">Selecione</option>
                   {(cfg.bandeiras ?? []).map((b: any) => <option key={b.id} value={b.id} className="bg-zinc-900">{b.nome}</option>)}
                 </select>
-                <p className="mt-1 text-[11px] text-white/40">A taxa do cartão é resolvida pela bandeira × parcelas na Tabela de Taxas.</p></div>
+                <p className="mt-1 text-[11px] text-[var(--text-muted)]">A taxa do cartão é resolvida pela bandeira × parcelas na Tabela de Taxas.</p></div>
             </>)}
             </div>)}
 
@@ -470,7 +470,7 @@ function CobrancaWizard({ receitaId, valor, moeda, receita, onClose, onCriada }:
             {condicao?.temEntrada && (
               <div><label className="mb-1 block text-xs text-white/60">Entrada (opcional · PIX/Transferência, à parte)</label>
                 <input type="number" min={0} step="0.01" className={sel} value={f.entradaValor ?? ''} placeholder="0,00" onChange={(e) => setF({ ...f, entradaValor: e.target.value === '' ? undefined : Number(e.target.value) })} />
-                <p className="mt-1 text-[11px] text-white/40">A entrada é paga à parte e NÃO recebe taxa de cartão/boleto. O saldo é parcelado.</p></div>
+                <p className="mt-1 text-[11px] text-[var(--text-muted)]">A entrada é paga à parte e NÃO recebe taxa de cartão/boleto. O saldo é parcelado.</p></div>
             )}
           </div>)}
 
@@ -502,10 +502,10 @@ function CobrancaWizard({ receitaId, valor, moeda, receita, onClose, onCriada }:
                 {sim?.cambio && sim.cambio.estado !== 'INDISPONIVEL' ? (
                   <div className="flex flex-wrap items-center justify-between gap-2">
                     <span className="text-white/70">Cotação {sim.cambio.moedaOrigem}→{sim.cambio.moedaDestino}: <b>{Number(sim.cambio.cotacao)}</b></span>
-                    <span className="text-[11px] text-white/45">{sim.cambio.fonte ?? '—'}{sim.cambio.data ? ` · ${dt(sim.cambio.data)}` : ''} · {(sim.cambio.tipo || '').toLowerCase() || (sim.cambio.estimado ? 'estimada' : 'congelada')}</span>
+                    <span className="text-[11px] text-[var(--text-secondary)]">{sim.cambio.fonte ?? '—'}{sim.cambio.data ? ` · ${dt(sim.cambio.data)}` : ''} · {(sim.cambio.tipo || '').toLowerCase() || (sim.cambio.estimado ? 'estimada' : 'congelada')}</span>
                   </div>
                 ) : (
-                  <p className="text-[12px] text-amber-300/80">Sem cotação automática vigente para {moeda}→{f.moedaRecebimento}. Informe uma cotação manual (requer permissão).</p>
+                  <p className="text-[12px] text-amber-700/80">Sem cotação automática vigente para {moeda}→{f.moedaRecebimento}. Informe uma cotação manual (requer permissão).</p>
                 )}
                 <label className="flex items-center gap-2 text-[12px] text-white/70">
                   <input type="checkbox" checked={!!f.cotacaoManualAtiva} onChange={(e) => setF({ ...f, cotacaoManualAtiva: e.target.checked })} />
@@ -524,7 +524,7 @@ function CobrancaWizard({ receitaId, valor, moeda, receita, onClose, onCriada }:
           {cfg && step === 4 && (<div className="space-y-4">
             <div>
               <h4 className="text-base font-semibold">Simulação da cobrança</h4>
-              <p className="text-xs text-white/50">Confira os valores, o cronograma e as conversões antes de gerar a cobrança.</p>
+              <p className="text-xs text-[var(--text-secondary)]">Confira os valores, o cronograma e as conversões antes de gerar a cobrança.</p>
             </div>
             {simulacao}
           </div>)}
@@ -534,7 +534,7 @@ function CobrancaWizard({ receitaId, valor, moeda, receita, onClose, onCriada }:
           <aside className="w-full shrink-0 space-y-3 overflow-y-auto border-t border-[var(--border-default)] bg-black/20 px-5 py-5 lg:w-80 lg:border-l lg:border-t-0">
             <div className={`${GLASS} p-4`}>
               <div className="flex items-center gap-2 text-sm font-semibold"><ReceiptText className="h-4 w-4" style={{ color: OURO }} /> Receita selecionada</div>
-              <p className="mt-1 text-xs text-white/50">{receita?.codigo ?? `#${receitaId}`}{receita?.descricao ? ` · ${receita.descricao}` : ''}</p>
+              <p className="mt-1 text-xs text-[var(--text-secondary)]">{receita?.codigo ?? `#${receitaId}`}{receita?.descricao ? ` · ${receita.descricao}` : ''}</p>
               <div className="mt-3 space-y-1 text-sm">
                 {linha('Valor contratado', brl(valor, moeda))}
                 {linha('Moeda', moeda)}
@@ -544,7 +544,7 @@ function CobrancaWizard({ receitaId, valor, moeda, receita, onClose, onCriada }:
             </div>
 
             <div className={`${GLASS} p-4`}>
-              <p className="text-[11px] font-semibold uppercase tracking-wide text-white/50">Resumo da configuração</p>
+              <p className="text-[11px] font-semibold uppercase tracking-wide text-[var(--text-secondary)]">Resumo da configuração</p>
               <div className="mt-2 space-y-1 text-sm">
                 {linha('Forma', nomeForma(f.formaPagamentoId))}
                 {ehCartao && linha('Adquirente', nomeAdq(f.adquirenteId))}
@@ -558,7 +558,7 @@ function CobrancaWizard({ receitaId, valor, moeda, receita, onClose, onCriada }:
 
             {temConv && (
               <div className={`${GLASS} p-4`}>
-                <p className="text-[11px] font-semibold uppercase tracking-wide text-white/50">Valores de referência</p>
+                <p className="text-[11px] font-semibold uppercase tracking-wide text-[var(--text-secondary)]">Valores de referência</p>
                 <div className="mt-2 space-y-1 text-sm">
                   {linha('Cotação', `1 ${origem} = ${cotacao} ${destino}`)}
                   {linha(`Contratado (${destino})`, brl(emDest(valor), destino!))}
@@ -573,7 +573,7 @@ function CobrancaWizard({ receitaId, valor, moeda, receita, onClose, onCriada }:
         <div className="flex items-center justify-between border-t border-[var(--border-default)] px-6 py-3">
           <button onClick={() => (step > 1 ? setStep(step - 1) : onClose())} className="inline-flex items-center gap-1 text-sm text-white/60 hover:text-white"><ArrowLeft className="h-4 w-4" /> {step > 1 ? 'Voltar' : 'Cancelar'}</button>
           <div className="flex items-center gap-3">
-            <span className="text-xs text-white/40">Etapa {step} de 4</span>
+            <span className="text-xs text-[var(--text-muted)]">Etapa {step} de 4</span>
             {step < 4 ? (
               <button disabled={(step === 1 && (!f.formaPagamentoId || (ehCartaoCredito && !f.bandeiraId))) || (step === 2 && !f.condicaoPagamentoId)} onClick={() => setStep(step + 1)} className="inline-flex items-center gap-1 rounded-lg px-4 py-2 text-sm font-semibold text-[#1b1508] transition disabled:opacity-40" style={{ background: OURO }}>Próximo <ArrowRight className="h-4 w-4" /></button>
             ) : (

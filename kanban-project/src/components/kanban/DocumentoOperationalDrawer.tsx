@@ -62,7 +62,7 @@ const STATUS_LABELS: Record<string, string> = {
 
 // Mapeamento de cor da pílula por status (mockup): Solicitado = amber,
 // Recebido/Entregue = verde, Inválido/Não encontrado = vermelho, restante neutro.
-const STATUS_NEUTRAL_PILL = "bg-[var(--surface-primary)] text-white/50"
+const STATUS_NEUTRAL_PILL = "bg-[var(--surface-primary)] text-[var(--text-secondary)]"
 const STATUS_PILL_CLS: Record<string, string> = {
   SOLICITADO: "bg-[#d2a948]/15 text-[#d2a948]",
   SOLICITAR: "bg-[#d2a948]/15 text-[#d2a948]",
@@ -466,7 +466,7 @@ function ConteudoDrawer({
         text: tarefa.rotuloDoPrazo,
         cls: tarefa.atrasado ? "text-[#f87171]" : tarefa.venceHoje ? "text-[#d2a948]" : "text-[#4ade80]",
       }
-    : { text: "Sem tarefa nesta fase", cls: "text-white/45" }
+    : { text: "Sem tarefa nesta fase", cls: "text-[var(--text-secondary)]" }
   const statusCls = doc ? (STATUS_PILL_CLS[doc.status] || STATUS_NEUTRAL_PILL) : ""
   const tipoLabel = doc ? (TIPO_LABELS[doc.tipo] || doc.tipo) : ""
   const statusDocumentalLabel = doc ? (STATUS_LABELS[doc.status] || doc.status) : ""
@@ -504,7 +504,7 @@ function ConteudoDrawer({
             nunca "Sem operação ativa", nunca botão "Iniciar operação", nenhuma ação. */}
         {opState === "LOADING" && (
           <div className="flex-1 flex flex-col gap-4 p-6">
-            <div className="flex items-center gap-2 text-white/50">
+            <div className="flex items-center gap-2 text-[var(--text-secondary)]">
               <Loader2 className="w-4 h-4 animate-spin" />
               <span className="text-[12px]">Carregando operação…</span>
             </div>
@@ -517,11 +517,11 @@ function ConteudoDrawer({
         {/* ERROR — estado terminal fechável (falha ou documentoId inválido). */}
         {opState === "ERROR" && (
           <div className="flex-1 flex flex-col items-center justify-center text-white/60 gap-3 p-6">
-            <AlertTriangle className="w-8 h-8 text-amber-400" />
+            <AlertTriangle className="w-8 h-8 text-amber-700" />
             <p className="text-sm">{erro || "Não foi possível abrir a operação."}</p>
             <button
               onClick={onClose}
-              className="px-3 py-1.5 text-xs bg-[#20262e] hover:bg-[#252c35] rounded-md"
+              className="px-3 py-1.5 text-xs bg-[var(--surface-secondary)] hover:bg-[var(--surface-tertiary)] rounded-md"
             >
               Fechar
             </button>
@@ -540,7 +540,7 @@ function ConteudoDrawer({
                 {onBack ? (
                   <button
                     onClick={onBack}
-                    className="inline-flex items-center gap-1.5 text-[11px] font-semibold text-white/70 hover:text-[#fff] transition-colors -ml-1 px-1 py-0.5 rounded hover:bg-[#20262e]"
+                    className="inline-flex items-center gap-1.5 text-[11px] font-semibold text-white/70 hover:text-[#fff] transition-colors -ml-1 px-1 py-0.5 rounded hover:bg-[var(--surface-secondary)]"
                   >
                     <span className="text-[14px] leading-none">←</span>
                     {backLabel || nomeCompleto(doc.pessoa)}
@@ -548,12 +548,12 @@ function ConteudoDrawer({
                 ) : (
                   <div className="text-[10px] uppercase tracking-wide">
                     <span className="font-bold text-[#7dd3fc]">Central Operacional</span>
-                    <span className="text-white/50"> · {nomeCompleto(doc.pessoa)}</span>
+                    <span className="text-[var(--text-secondary)]"> · {nomeCompleto(doc.pessoa)}</span>
                   </div>
                 )}
                 <button
                   onClick={onClose}
-                  className="w-[30px] h-[30px] rounded-md bg-[#20262e] hover:bg-[#252c35] flex items-center justify-center text-[#fff]"
+                  className="w-[30px] h-[30px] rounded-md bg-[var(--surface-secondary)] hover:bg-[var(--surface-tertiary)] flex items-center justify-center text-[#fff]"
                 >
                   <X className="w-4 h-4" />
                 </button>
@@ -561,21 +561,21 @@ function ConteudoDrawer({
 
               {/* Identidade do documento: tile de ícone + título + pessoa */}
               <div className="flex items-center gap-3.5 mb-4">
-                <div className="w-11 h-11 rounded-lg bg-[#20262e] border border-[var(--border-default)] flex items-center justify-center flex-shrink-0">
+                <div className="w-11 h-11 rounded-lg bg-[var(--surface-secondary)] border border-[var(--border-default)] flex items-center justify-center flex-shrink-0">
                   <FileText className="w-5 h-5 text-white/60" />
                 </div>
                 <div className="min-w-0">
                   <div className="text-[22px] font-bold tracking-tight leading-tight text-white truncate">
                     {tipoLabel}
                   </div>
-                  <div className="text-sm text-white/50 truncate">
+                  <div className="text-sm text-[var(--text-secondary)] truncate">
                     {nomeCompleto(doc.pessoa)}
                   </div>
                 </div>
               </div>
 
               {bannerAntecipada && (
-                <div className="mb-4 rounded-lg border border-violet-400/30 bg-[#a78bfa]/15 px-3 py-2 text-[12px] text-violet-100 flex items-start gap-2">
+                <div className="mb-4 rounded-lg border border-slate-200 bg-[#a78bfa]/15 px-3 py-2 text-[12px] text-slate-100 flex items-start gap-2">
                   <span className="text-[13px] leading-none mt-0.5">⇄</span>
                   <span>{bannerAntecipada}</span>
                 </div>
@@ -585,7 +585,7 @@ function ConteudoDrawer({
               <div className="bg-[var(--surface-overlay)] border border-[var(--border-default)] rounded-xl px-4 py-3.5 grid grid-cols-4 gap-4">
                 {/* STATUS */}
                 <div className="flex flex-col gap-1.5 min-w-0">
-                  <div className="text-[10px] font-bold uppercase tracking-wider text-white/40">
+                  <div className="text-[10px] font-bold uppercase tracking-wider text-[var(--text-muted)]">
                     Status
                   </div>
                   <div>
@@ -600,17 +600,17 @@ function ConteudoDrawer({
                       secundária: acompanha o status do trabalho, não o substitui.
                       Era ele que ocupava o campo "Status" e fazia a mesma certidão
                       ser "Em andamento" na linha e "Solicitado" aqui. */}
-                  <div className={`text-[10.5px] truncate ${statusCls ? "text-white/40" : "text-white/40"}`}>
+                  <div className={`text-[10.5px] truncate ${statusCls ? "text-[var(--text-muted)]" : "text-[var(--text-muted)]"}`}>
                     Documento: {statusDocumentalLabel}
                   </div>
                 </div>
                 {/* RESPONSÁVEL */}
                 <div className="flex flex-col gap-1.5 min-w-0">
-                  <div className="text-[10px] font-bold uppercase tracking-wider text-white/40">
+                  <div className="text-[10px] font-bold uppercase tracking-wider text-[var(--text-muted)]">
                     Responsável
                   </div>
                   <div className="flex items-center gap-1.5 text-[13px] text-white/85 min-w-0">
-                    <UserRound className="w-4 h-4 text-white/50 flex-shrink-0" />
+                    <UserRound className="w-4 h-4 text-[var(--text-secondary)] flex-shrink-0" />
                     <span className="truncate">{tarefa?.responsavelNome || "Não atribuído"}</span>
                   </div>
                   {delegandoResp ? (
@@ -625,9 +625,9 @@ function ConteudoDrawer({
                       onBlur={() => setDelegandoResp(false)}
                       className="self-start rounded-md border border-[var(--border-default)] bg-[var(--app-background)] px-1.5 py-1 text-[12px] text-white/85 focus:outline-none focus:border-[#7dd3fc]/50 focus:ring-1 focus:ring-[#7dd3fc]/25 disabled:opacity-50"
                     >
-                      <option value="" className="bg-[#20262e]">— selecione —</option>
+                      <option value="" className="bg-[var(--surface-secondary)]">— selecione —</option>
                       {usuarios.map((u) => (
-                        <option key={u.id} value={u.id} className="bg-[#20262e]">{u.nome}</option>
+                        <option key={u.id} value={u.id} className="bg-[var(--surface-secondary)]">{u.nome}</option>
                       ))}
                     </select>
                   ) : (
@@ -641,7 +641,7 @@ function ConteudoDrawer({
                       onClick={() => tarefa && setDelegandoResp(true)}
                       disabled={!tarefa || salvando}
                       title={tarefa ? "Transferir a tarefa deste documento" : "Sem tarefa nesta fase para delegar"}
-                      className="self-start text-[#7dd3fc] text-[12px] hover:underline disabled:text-white/25 disabled:no-underline disabled:cursor-not-allowed"
+                      className="self-start text-[#7dd3fc] text-[12px] hover:underline disabled:text-[var(--text-muted)] disabled:no-underline disabled:cursor-not-allowed"
                     >
                       Delegar
                     </button>
@@ -649,27 +649,27 @@ function ConteudoDrawer({
                 </div>
                 {/* SLA */}
                 <div className="flex flex-col gap-1.5">
-                  <div className="text-[10px] font-bold uppercase tracking-wider text-white/40">
+                  <div className="text-[10px] font-bold uppercase tracking-wider text-[var(--text-muted)]">
                     SLA
                   </div>
                   <div className={`flex items-center gap-1.5 text-[13px] font-semibold ${sla.cls || "text-white/85"}`}>
                     <Clock className="w-4 h-4 flex-shrink-0" />
                     <span>{sla.text}</span>
                   </div>
-                  <div className="text-white/40 text-[11px]">
+                  <div className="text-[var(--text-muted)] text-[11px]">
                     Prazo: {fmtDateTime(tarefa?.dataPrazo ?? null)}
                   </div>
                 </div>
                 {/* ÚLTIMA MOVIMENTAÇÃO */}
                 <div className="flex flex-col gap-1.5 min-w-0">
-                  <div className="text-[10px] font-bold uppercase tracking-wider text-white/40">
+                  <div className="text-[10px] font-bold uppercase tracking-wider text-[var(--text-muted)]">
                     Última movimentação
                   </div>
                   <div className="flex items-center gap-1.5 text-[13px] text-white/85 min-w-0">
-                    <CalendarDays className="w-4 h-4 text-white/50 flex-shrink-0" />
+                    <CalendarDays className="w-4 h-4 text-[var(--text-secondary)] flex-shrink-0" />
                     <span className="truncate">{fmtDateTime(doc.ultimaMovimentacao || doc.updatedAt)}</span>
                   </div>
-                  <div className="text-white/40 text-[11px]">
+                  <div className="text-[var(--text-muted)] text-[11px]">
                     {relativeTime(doc.ultimaMovimentacao || doc.updatedAt)}
                   </div>
                 </div>
@@ -691,13 +691,13 @@ function ConteudoDrawer({
                   o que aconteceu — mas dito como o que é: registro anterior. */}
               {doc.motivoBloqueio && (
                 tarefa?.statusTarefa === "BLOQUEADA" ? (
-                  <div className="mt-3 p-2.5 rounded-md border border-amber-400/30 bg-amber-400/10 text-[11.5px] text-amber-200">
+                  <div className="mt-3 p-2.5 rounded-md border border-amber-200 bg-amber-50 text-[11.5px] text-amber-700">
                     <strong className="font-semibold">Bloqueado:</strong> {doc.motivoBloqueio}
                   </div>
                 ) : (
-                  <div className="mt-3 p-2.5 rounded-md border border-[var(--border-default)] bg-white/[0.03] text-[11.5px] text-white/45">
+                  <div className="mt-3 p-2.5 rounded-md border border-[var(--border-default)] bg-[var(--surface-primary)] text-[11.5px] text-[var(--text-secondary)]">
                     <strong className="font-semibold text-white/60">Registro anterior:</strong> {doc.motivoBloqueio}
-                    <span className="block text-[10.5px] text-white/30 mt-0.5">
+                    <span className="block text-[10.5px] text-[var(--text-muted)] mt-0.5">
                       Refere-se a uma operação encerrada — não impede o trabalho atual.
                     </span>
                   </div>
@@ -724,13 +724,13 @@ function ConteudoDrawer({
                   className={`inline-flex items-center gap-1.5 px-3.5 py-2.5 text-[11.5px] font-semibold whitespace-nowrap border-b-2 transition-colors -mb-px ${
                     activeTab === t.id
                       ? "text-[#7dd3fc] border-[#7dd3fc]"
-                      : "text-white/55 hover:text-white/80 border-transparent"
+                      : "text-[var(--text-secondary)] hover:text-white/80 border-transparent"
                   }`}
                 >
                   {t.label}
                   {t.count !== undefined && (
                     <span className={`text-[9.5px] px-1.5 rounded-full font-bold ${
-                      activeTab === t.id ? "bg-[#7dd3fc]/30 text-blue-200" : "bg-[#20262e] text-white/70"
+                      activeTab === t.id ? "bg-[#7dd3fc]/30 text-blue-700" : "bg-[var(--surface-secondary)] text-white/70"
                     }`}>
                       {t.count}
                     </span>
@@ -751,7 +751,7 @@ function ConteudoDrawer({
                   <h4 className="text-sm font-bold text-white mb-1">
                     {projection?.permissions.canStart ? "Operação não iniciada" : "Sem operação nesta fase"}
                   </h4>
-                  <p className="text-[12px] text-white/50 mb-4">
+                  <p className="text-[12px] text-[var(--text-secondary)] mb-4">
                     {projection?.permissions.canStart
                       ? "Este documento ainda não tem operação materializada na fase atual."
                       : "Este documento não é operado por workflow de documento na fase atual."}
@@ -759,7 +759,7 @@ function ConteudoDrawer({
                   {projection?.permissions.canStart && (
                     <button
                       onClick={() => setInitModalOpen(true)}
-                      className="inline-flex items-center gap-2 px-4 py-2 text-sm font-semibold text-[#fff] bg-[#2563eb] hover:bg-[#1d4ed8] rounded-md transition-colors"
+                      className="inline-flex items-center gap-2 px-4 py-2 text-sm font-semibold text-[var(--action-primary-ink)] bg-[var(--action-primary)] hover:bg-[var(--action-primary-hover)] rounded-md transition-colors"
                     >
                       {projection?.nextAction?.label ? `Iniciar: ${projection.nextAction.label}` : "Iniciar operação"}
                     </button>
@@ -900,7 +900,7 @@ function TabHistory({ doc }: { doc: Documento }) {
 
   if (eventos.length === 0) {
     return (
-      <div className="text-center py-12 text-white/40">
+      <div className="text-center py-12 text-[var(--text-muted)]">
         <p className="text-sm">Nenhum evento registrado ainda.</p>
       </div>
     )
@@ -915,13 +915,13 @@ function TabHistory({ doc }: { doc: Documento }) {
               <div className="w-2 h-2 rounded-full bg-blue-400 mt-1.5 flex-shrink-0" />
               <div className="flex-1 min-w-0">
                 <div className="text-sm text-white">{e.label}</div>
-                <div className="text-[11px] text-white/50 font-mono mt-0.5">{fmtDateTime(e.data)}</div>
+                <div className="text-[11px] text-[var(--text-secondary)] font-mono mt-0.5">{fmtDateTime(e.data)}</div>
               </div>
             </div>
           ))}
         </div>
       </Section>
-      <div className="text-[11px] text-white/40 px-2 pt-2">
+      <div className="text-[11px] text-[var(--text-muted)] px-2 pt-2">
         Marcos do documento. O diário completo da operação (contatos, observações e
         anexos, com autor e data) fica nas abas Observações e Anexos.
       </div>
@@ -936,7 +936,7 @@ function TabHistory({ doc }: { doc: Documento }) {
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <div>
-      <div className="text-[10px] uppercase font-bold tracking-wider text-white/40 mb-2.5">
+      <div className="text-[10px] uppercase font-bold tracking-wider text-[var(--text-muted)] mb-2.5">
         {title}
       </div>
       {children}
@@ -947,10 +947,10 @@ function Section({ title, children }: { title: string; children: React.ReactNode
 function Field({ label, value }: { label: string; value: string | null | undefined }) {
   return (
     <div>
-      <div className="text-[10px] uppercase font-semibold tracking-wider text-white/45 mb-0.5">
+      <div className="text-[10px] uppercase font-semibold tracking-wider text-[var(--text-secondary)] mb-0.5">
         {label}
       </div>
-      <div className={`text-sm ${value ? "text-white" : "text-white/30 italic"}`}>
+      <div className={`text-sm ${value ? "text-white" : "text-[var(--text-muted)] italic"}`}>
         {value || "—"}
       </div>
     </div>

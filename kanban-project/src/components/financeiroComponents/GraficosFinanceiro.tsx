@@ -113,7 +113,7 @@ function formatCurrencyShort(valor: number): string {
 function CustomTooltip({ active, payload, label }: any) {
   if (!active || !payload || !payload.length) return null
   return (
-    <div className="bg-gray-900 border border-gray-700 rounded-lg px-3 py-2 shadow-xl">
+    <div className="bg-[var(--surface-popover)] border border-gray-700 rounded-lg px-3 py-2 shadow-xl">
       {label && <p className="text-white/70 text-xs mb-1">{label}</p>}
       {payload.map((p: any, i: number) => (
         <p key={i} className="text-sm font-medium" style={{ color: p.color || p.fill }}>
@@ -128,13 +128,13 @@ function PieTooltip({ active, payload }: any) {
   if (!active || !payload || !payload.length) return null
   const data = payload[0]
   return (
-    <div className="bg-gray-900 border border-gray-700 rounded-lg px-3 py-2 shadow-xl">
+    <div className="bg-[var(--surface-popover)] border border-gray-700 rounded-lg px-3 py-2 shadow-xl">
       <p className="text-sm font-medium" style={{ color: data.payload.fill }}>
         {data.name}
       </p>
       <p className="text-white text-sm font-bold">{formatCurrencyBRL(data.value)}</p>
       {data.payload.percent && (
-        <p className="text-white/40 text-xs">{(data.payload.percent * 100).toFixed(1)}%</p>
+        <p className="text-[var(--text-muted)] text-xs">{(data.payload.percent * 100).toFixed(1)}%</p>
       )}
     </div>
   )
@@ -260,7 +260,7 @@ export default function GraficosFinanceiro({ faturas, totaisGeralBRL, totaisPorM
   }, [faturas])
 
   if (faturas.length === 0) {
-    return <div className="text-center py-16 text-white/50">Nenhuma fatura para exibir gráficos</div>
+    return <div className="text-center py-16 text-[var(--text-secondary)]">Nenhuma fatura para exibir gráficos</div>
   }
 
   return (
@@ -299,7 +299,7 @@ export default function GraficosFinanceiro({ faturas, totaisGeralBRL, totaisPorM
           {/* Centro do donut */}
           <div className="absolute inset-0 flex items-center justify-center pointer-events-none" style={{ marginTop: '-30px' }}>
             <div className="text-center">
-              <p className="text-white/50 text-[10px]">Total</p>
+              <p className="text-[var(--text-secondary)] text-[10px]">Total</p>
               <p className="text-white font-bold text-sm">{formatCurrencyShort(totaisGeralBRL.total)}</p>
             </div>
           </div>
@@ -336,7 +336,7 @@ export default function GraficosFinanceiro({ faturas, totaisGeralBRL, totaisPorM
           </ResponsiveContainer>
           <div className="absolute inset-0 flex items-center justify-center pointer-events-none" style={{ marginTop: '-30px' }}>
             <div className="text-center">
-              <p className="text-white/50 text-[10px]">Total</p>
+              <p className="text-[var(--text-secondary)] text-[10px]">Total</p>
               <p className="text-white font-bold text-sm">{formatCurrencyShort(totaisGeralBRL.total)}</p>
             </div>
           </div>
@@ -483,7 +483,7 @@ export default function GraficosFinanceiro({ faturas, totaisGeralBRL, totaisPorM
                 <Tooltip content={({ active, payload }: any) => {
                   if (!active || !payload?.length) return null
                   return (
-                    <div className="bg-gray-900 border border-gray-700 rounded-lg px-3 py-2 shadow-xl">
+                    <div className="bg-[var(--surface-popover)] border border-gray-700 rounded-lg px-3 py-2 shadow-xl">
                       <p className="text-sm font-medium" style={{ color: payload[0].payload.fill }}>{payload[0].name}: {payload[0].value} fatura(s)</p>
                     </div>
                   )
@@ -498,7 +498,7 @@ export default function GraficosFinanceiro({ faturas, totaisGeralBRL, totaisPorM
             </ResponsiveContainer>
             <div className="absolute inset-0 flex items-center justify-center pointer-events-none" style={{ marginTop: '-30px' }}>
               <div className="text-center">
-                <p className="text-white/50 text-[10px]">Total</p>
+                <p className="text-[var(--text-secondary)] text-[10px]">Total</p>
                 <p className="text-white font-bold text-lg">{faturas.length}</p>
               </div>
             </div>
@@ -518,7 +518,7 @@ function ChartCard({ title, subtitle, children }: { title: string; subtitle?: st
     <div className="relative bg-[var(--surface-primary)] border border-[var(--border-default)] rounded-xl p-5">
       <div className="mb-3">
         <h3 className="text-white font-semibold text-sm">{title}</h3>
-        {subtitle && <p className="text-white/40 text-xs">{subtitle}</p>}
+        {subtitle && <p className="text-[var(--text-muted)] text-xs">{subtitle}</p>}
       </div>
       {children}
     </div>

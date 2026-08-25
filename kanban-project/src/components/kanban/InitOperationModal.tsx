@@ -232,12 +232,12 @@ function ConteudoModal({
               <h2 className="text-lg font-bold text-white/95">Iniciar operação</h2>
               <button
                 onClick={onClose}
-                className="w-7 h-7 rounded-md hover:bg-[#252c35] flex items-center justify-center text-white/55"
+                className="w-7 h-7 rounded-md hover:bg-[var(--surface-tertiary)] flex items-center justify-center text-[var(--text-secondary)]"
               >
                 <X className="w-4 h-4" />
               </button>
             </div>
-            <div className="text-xs text-white/55 mt-1">
+            <div className="text-xs text-[var(--text-secondary)] mt-1">
               {loading ? "Carregando…" : doc ? `${tipoLabel} · ${pessoaName}` : "—"}
             </div>
           </div>
@@ -246,7 +246,7 @@ function ConteudoModal({
           <div className="flex-1 overflow-y-auto px-6 py-5">
             {loading ? (
               <div className="flex items-center justify-center py-16">
-                <Loader2 className="w-5 h-5 animate-spin text-white/40" />
+                <Loader2 className="w-5 h-5 animate-spin text-[var(--text-muted)]" />
               </div>
             ) : erro ? (
               <div className="bg-[#f87171]/12 border border-[#f87171]/30 rounded-lg px-4 py-3 text-sm text-[#f87171]">
@@ -266,7 +266,7 @@ function ConteudoModal({
                         className={`w-full flex items-start gap-3 px-3 py-3 rounded-lg border-2 transition-all text-left ${
                           selected
                             ? "border-blue-500 bg-[#7dd3fc]/12"
-                            : "border-[var(--border-default)] bg-[var(--surface-popover)] hover:border-[var(--border-strong)] hover:bg-[#20262e]"
+                            : "border-[var(--border-default)] bg-[var(--surface-popover)] hover:border-[var(--border-strong)] hover:bg-[var(--surface-secondary)]"
                         }`}
                       >
                         <div
@@ -295,7 +295,7 @@ function ConteudoModal({
                     <SectionTitle num={2}>Atribuição inicial</SectionTitle>
                     <div className="grid grid-cols-2 gap-3 mb-6">
                       <div>
-                        <label className="block text-[10px] uppercase tracking-wider font-semibold text-white/55 mb-1.5">
+                        <label className="block text-[10px] uppercase tracking-wider font-semibold text-[var(--text-secondary)] mb-1.5">
                           Responsável inicial
                         </label>
                         <select
@@ -312,7 +312,7 @@ function ConteudoModal({
                         </select>
                       </div>
                       <div>
-                        <label className="block text-[10px] uppercase tracking-wider font-semibold text-white/55 mb-1.5">
+                        <label className="block text-[10px] uppercase tracking-wider font-semibold text-[var(--text-secondary)] mb-1.5">
                           Prazo inicial
                         </label>
                         <input
@@ -334,7 +334,7 @@ function ConteudoModal({
                       {(
                         [
                           { key: "normal", label: "Normal", bgActive: "bg-[var(--app-background)] text-white", bgIdle: "bg-[var(--surface-popover)] text-white/80 border-[var(--border-default)]" },
-                          { key: "urgente", label: "Urgente", bgActive: "bg-orange-500 text-white", bgIdle: "bg-[var(--surface-popover)] text-white/80 border-[var(--border-default)]" },
+                          { key: "urgente", label: "Urgente", bgActive: "bg-amber-500 text-white", bgIdle: "bg-[var(--surface-popover)] text-white/80 border-[var(--border-default)]" },
                           { key: "critica", label: "⚠ Crítica", bgActive: "bg-[#f87171] text-white", bgIdle: "bg-[var(--surface-popover)] text-white/80 border-[var(--border-default)]" },
                         ] as Array<{ key: Prioridade; label: string; bgActive: string; bgIdle: string }>
                       ).map((p) => {
@@ -344,7 +344,7 @@ function ConteudoModal({
                             key={p.key}
                             onClick={() => setPrioridade(p.key)}
                             className={`px-3 py-2 rounded-md text-sm font-semibold border-2 transition-colors ${
-                              selected ? p.bgActive + " border-transparent" : p.bgIdle + " hover:bg-[#20262e]"
+                              selected ? p.bgActive + " border-transparent" : p.bgIdle + " hover:bg-[var(--surface-secondary)]"
                             }`}
                           >
                             {p.label}
@@ -381,7 +381,7 @@ function ConteudoModal({
             <button
               onClick={onClose}
               disabled={saving}
-              className="px-4 py-2 text-sm font-semibold text-white/80 bg-[var(--surface-popover)] hover:bg-[#20262e] border border-[var(--border-default)] rounded-md disabled:opacity-50"
+              className="px-4 py-2 text-sm font-semibold text-white/80 bg-[var(--surface-popover)] hover:bg-[var(--surface-secondary)] border border-[var(--border-default)] rounded-md disabled:opacity-50"
             >
               Cancelar
             </button>

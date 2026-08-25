@@ -404,11 +404,11 @@ export function KanbanContent() {
             {tabPrincipal === "processos" && subTab === "kanban" && (
               pode('processos.ver') ? (
                 paisesDisponiveis.length === 0 ? (
-                  <div className="rounded-lg border border-amber-500/30 bg-amber-500/10 p-6 text-center text-sm text-amber-200">
+                  <div className="rounded-lg border border-amber-200 bg-amber-50 p-6 text-center text-sm text-amber-700">
                     Nenhum país ativo no catálogo. Cadastre em Gerenciamento → Processos de Nacionalidade → + Novo país.
                   </div>
                 ) : !paisObj ? null : !tipoSelecionado ? (
-                  <div className="rounded-lg border border-amber-500/30 bg-amber-500/10 p-6 text-center text-sm text-amber-200">
+                  <div className="rounded-lg border border-amber-200 bg-amber-50 p-6 text-center text-sm text-amber-700">
                     {paisObj.countryLabel} ainda não tem tipo de processo cadastrado.
                     Crie em Gerenciamento → Processos de Nacionalidade.
                   </div>
@@ -431,7 +431,7 @@ export function KanbanContent() {
                 )
               ) : (
                 <div className="flex flex-col items-center justify-center py-20 text-white/60">
-                  <Shield className="h-12 w-12 mb-4 text-white/30" />
+                  <Shield className="h-12 w-12 mb-4 text-[var(--text-muted)]" />
                   <p className="text-lg font-medium">Sem permissão para visualizar processos</p>
                   <p className="text-sm mt-1">Solicite acesso ao administrador</p>
                 </div>
@@ -448,7 +448,7 @@ export function KanbanContent() {
                 />
               ) : (
                 <div className="flex flex-col items-center justify-center py-20 text-white/60">
-                  <Shield className="h-12 w-12 mb-4 text-white/30" />
+                  <Shield className="h-12 w-12 mb-4 text-[var(--text-muted)]" />
                   <p className="text-lg font-medium">Sem permissão para visualizar processos</p>
                   <p className="text-sm mt-1">Solicite acesso ao administrador</p>
                 </div>

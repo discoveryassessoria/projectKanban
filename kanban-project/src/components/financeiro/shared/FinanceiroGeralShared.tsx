@@ -22,7 +22,7 @@ export function OrigemBadge({ origem }: { origem: string | null | undefined }) {
   const proc = origem === "PROCESSO"
   const desconhecida = origem === "ORIGEM_DESCONHECIDA"
   return (
-    <span className={`inline-flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded-full border ${proc ? "bg-blue-500/15 text-blue-300 border-blue-500/25" : desconhecida ? "bg-amber-500/15 text-amber-300 border-amber-500/25" : "bg-[var(--surface-primary)] text-white/60 border-[var(--border-default)]"}`}>
+    <span className={`inline-flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded-full border ${proc ? "bg-blue-50 text-blue-700 border-blue-200" : desconhecida ? "bg-amber-50 text-amber-700 border-amber-200" : "bg-[var(--surface-primary)] text-white/60 border-[var(--border-default)]"}`}>
       {proc ? <Workflow className="h-2.5 w-2.5" /> : <Building2 className="h-2.5 w-2.5" />}
       {proc ? "Processo" : desconhecida ? "Origem?" : "Corporativo"}
     </span>
@@ -37,7 +37,7 @@ export function StatusBadge({ e }: { e: EntradaStatus }) {
 export function VerOrigemLink({ tipo, id, onOpen }: { tipo: "receita" | "custo"; id: number | null; onOpen: (t: "receita" | "custo", id: number) => void }) {
   if (id == null) return null
   return (
-    <button onClick={() => onOpen(tipo, id)} className="inline-flex items-center gap-1 text-[11px] text-blue-300 hover:text-blue-200 hover:underline">
+    <button onClick={() => onOpen(tipo, id)} className="inline-flex items-center gap-1 text-[11px] text-blue-700 hover:text-blue-700 hover:underline">
       <ExternalLink className="h-3 w-3" /> Ver lançamento de origem
     </button>
   )
@@ -54,14 +54,14 @@ export function LancamentoDetalheModal({ tipo, id, onClose }: { tipo: "receita" 
   const l = data?.lancamento
   return (
     <Overlay onClose={onClose} title={`Lançamento ${tipo === "receita" ? "de Receita" : "de Custo"}`}>
-      {loading ? <div className="py-10 text-center"><Loader2 className="h-6 w-6 animate-spin mx-auto text-white/50" /></div> : !l ? (
-        <p className="text-sm text-white/50 py-6">Não foi possível carregar o lançamento.</p>
+      {loading ? <div className="py-10 text-center"><Loader2 className="h-6 w-6 animate-spin mx-auto text-[var(--text-secondary)]" /></div> : !l ? (
+        <p className="text-sm text-[var(--text-secondary)] py-6">Não foi possível carregar o lançamento.</p>
       ) : (
         <div className="space-y-3 text-sm">
           <div className="flex items-center gap-2">
             <OrigemBadge origem={l.origemLancamento} />
             <StatusBadge e={{ statusBruto: l.status, canceladoEm: l.canceladoEm, estornadoEm: l.estornadoEm, estorno: l.estornoDeId != null }} />
-            <span className="text-white/40 text-xs">{l.codigo}</span>
+            <span className="text-[var(--text-muted)] text-xs">{l.codigo}</span>
           </div>
           <Campo k="Natureza do lançamento" v={l.naturezaLancamento} />
           <Campo k="Processo / Fase" v={`${l.processo?.nome ?? "—"}${l.phaseKey ? " · " + l.phaseKey : ""}`} />
@@ -82,10 +82,10 @@ export function LancamentoDetalheModal({ tipo, id, onClose }: { tipo: "receita" 
           {data.movimentoInverso && <Campo k="Movimento inverso" v={`${data.movimentoInverso.codigo} (#${data.movimentoInverso.id})`} />}
           {l.estornoDeId && <Campo k="Estorno do lançamento" v={`#${l.estornoDeId}`} />}
           {l.contextoAplicado && (
-            <details className="text-xs text-white/50"><summary className="cursor-pointer">Contexto aplicado</summary>
+            <details className="text-xs text-[var(--text-secondary)]"><summary className="cursor-pointer">Contexto aplicado</summary>
               <pre className="mt-1 p-2 rounded bg-black/30 overflow-x-auto">{JSON.stringify(l.contextoAplicado, null, 2)}</pre></details>
           )}
-          <details className="text-xs text-white/40"><summary className="cursor-pointer">Auditoria técnica</summary>
+          <details className="text-xs text-[var(--text-muted)]"><summary className="cursor-pointer">Auditoria técnica</summary>
             <div className="mt-1">Chave de idempotência: <code>{l.chaveIdempotencia ?? "—"}</code></div>
             <div>Criado: {fmtD(l.createdAt)} · Atualizado: {fmtD(l.updatedAt)}</div>
           </details>
@@ -126,7 +126,7 @@ export function CancelarEstornarModal({ acao, tipo, id, resumo, onClose, onDone 
       <div className="space-y-3 text-sm">
         <div className="rounded-lg border border-[var(--border-default)] bg-[var(--surface-primary)] p-3">
           <div className="text-white/80">{resumo.item}</div>
-          <div className="text-white/50 text-xs">{resumo.processo ?? "—"} · <b className="text-white/80">{resumo.valor}</b></div>
+          <div className="text-[var(--text-secondary)] text-xs">{resumo.processo ?? "—"} · <b className="text-white/80">{resumo.valor}</b></div>
         </div>
         <p className="text-xs text-white/60">
           {estorno
@@ -138,11 +138,11 @@ export function CancelarEstornarModal({ acao, tipo, id, resumo, onClose, onDone 
           <textarea value={motivo} onChange={(e) => setMotivo(e.target.value)} rows={2}
             className="w-full rounded-lg bg-[var(--surface-primary)] border border-[var(--border-default)] px-3 py-2 text-sm text-white outline-none focus:border-white/30" placeholder="Descreva o motivo…" />
         </div>
-        {erro && <p className="text-xs text-red-300">{erro}</p>}
+        {erro && <p className="text-xs text-red-700">{erro}</p>}
         <div className="flex justify-end gap-2 pt-1">
           <button onClick={onClose} className="px-3 py-1.5 text-sm rounded-lg border border-[var(--border-default)] text-white/70 hover:bg-[var(--surface-hover)]">Voltar</button>
           <button onClick={confirmar} disabled={saving}
-            className={`inline-flex items-center gap-1.5 px-3 py-1.5 text-sm rounded-lg text-white ${estorno ? "bg-purple-600 hover:bg-purple-700" : "bg-red-600 hover:bg-red-700"} disabled:opacity-50`}>
+            className={`inline-flex items-center gap-1.5 px-3 py-1.5 text-sm rounded-lg text-white ${estorno ? "bg-slate-600 hover:bg-slate-700" : "bg-red-600 hover:bg-red-700"} disabled:opacity-50`}>
             {saving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : estorno ? <RotateCcw className="h-3.5 w-3.5" /> : <Ban className="h-3.5 w-3.5" />}
             {estorno ? "Confirmar estorno" : "Confirmar cancelamento"}
           </button>
@@ -159,7 +159,7 @@ function Overlay({ title, children, onClose }: { title: string; children: React.
       <div className="max-h-[90vh] w-full max-w-lg overflow-auto rounded-2xl border border-[var(--border-default)] bg-zinc-900/95 shadow-2xl" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center justify-between border-b border-[var(--border-default)] px-5 py-3">
           <h3 className="text-base font-semibold text-white">{title}</h3>
-          <button onClick={onClose} className="text-white/40 hover:text-white"><X className="h-4 w-4" /></button>
+          <button onClick={onClose} className="text-[var(--text-muted)] hover:text-white"><X className="h-4 w-4" /></button>
         </div>
         <div className="px-5 py-4">{children}</div>
       </div>
@@ -167,5 +167,5 @@ function Overlay({ title, children, onClose }: { title: string; children: React.
   )
 }
 function Campo({ k, v }: { k: string; v: string }) {
-  return <div><div className="text-[10px] uppercase tracking-wide text-white/40">{k}</div><div className="text-white/85">{v}</div></div>
+  return <div><div className="text-[10px] uppercase tracking-wide text-[var(--text-muted)]">{k}</div><div className="text-white/85">{v}</div></div>
 }

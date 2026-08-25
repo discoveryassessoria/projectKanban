@@ -89,7 +89,7 @@ function ConteudoDrawer({ item, context, onClose }: Props) {
         {/* ---- Cabeçalho ---- */}
         <div className="px-6 pt-5 pb-4 border-b border-[var(--border-default)]">
           <div className="flex items-start gap-3">
-            <div className="w-11 h-11 rounded-xl bg-[#252c35] grid place-items-center text-white/55 flex-none">
+            <div className="w-11 h-11 rounded-xl bg-[var(--surface-tertiary)] grid place-items-center text-[var(--text-secondary)] flex-none">
               <FileText className="w-[22px] h-[22px]" strokeWidth={1.7} />
             </div>
             <div className="flex-1 min-w-0">
@@ -99,12 +99,12 @@ function ConteudoDrawer({ item, context, onClose }: Props) {
                   {badge.txt}
                 </span>
               </div>
-              <div className="text-[12.5px] text-white/55 mt-0.5 truncate">
+              <div className="text-[12.5px] text-[var(--text-secondary)] mt-0.5 truncate">
                 {item.personName} · {item.documentFormat}
                 {context?.lineage ? ` · ${context.lineage}` : ""}
               </div>
             </div>
-            <button onClick={onClose} className="text-white/40 hover:text-white/80 flex-none">
+            <button onClick={onClose} className="text-[var(--text-muted)] hover:text-white/80 flex-none">
               <X className="w-[22px] h-[22px]" />
             </button>
           </div>
@@ -139,7 +139,7 @@ function ConteudoDrawer({ item, context, onClose }: Props) {
                 className={`whitespace-nowrap text-[12.5px] font-semibold pb-2.5 border-b-2 transition-colors ${
                   t === tab
                     ? "border-[#7dd3fc] text-[#7dd3fc]"
-                    : "border-transparent text-white/55 hover:text-white/80"
+                    : "border-transparent text-[var(--text-secondary)] hover:text-white/80"
                 }`}
               >
                 {t}
@@ -226,12 +226,12 @@ function Overview({
     <div className="flex flex-col gap-5">
       {/* Resumo / stepper */}
       <div>
-        <div className="text-[11px] font-bold text-white/40 tracking-wider mb-4">RESUMO DO DOCUMENTO</div>
+        <div className="text-[11px] font-bold text-[var(--text-muted)] tracking-wider mb-4">RESUMO DO DOCUMENTO</div>
         <div className="flex items-start">
           {nodes.map((n, i) => (
             <div key={n.label} className="flex-1 flex flex-col items-center relative">
               {i > 0 && (
-                <div className="absolute top-[13px] left-[-50%] right-1/2 h-0.5 bg-[#252c35]" />
+                <div className="absolute top-[13px] left-[-50%] right-1/2 h-0.5 bg-[var(--surface-tertiary)]" />
               )}
               <span
                 className={`relative z-10 w-[26px] h-[26px] rounded-full border-2 grid place-items-center bg-[var(--surface-popover)] ${
@@ -249,7 +249,7 @@ function Overview({
                 />
               </span>
               <span className="text-[10.5px] text-white/68 text-center leading-tight mt-1.5 px-0.5">{n.label}</span>
-              <span className="text-[9.5px] text-white/40 mt-0.5">{n.statusLabel}</span>
+              <span className="text-[9.5px] text-[var(--text-muted)] mt-0.5">{n.statusLabel}</span>
             </div>
           ))}
         </div>
@@ -262,7 +262,7 @@ function Overview({
           <div className="flex flex-col gap-2">
             {info.map(([k, v]) => (
               <div key={k} className="flex items-start justify-between gap-3 text-[12px]">
-                <span className="text-white/55 flex-none">{k}</span>
+                <span className="text-[var(--text-secondary)] flex-none">{k}</span>
                 <span className="font-semibold text-white/95 text-right">{v}</span>
               </div>
             ))}
@@ -320,7 +320,7 @@ function toneNode(label: string, st: CellStatus) {
 function FileTab({ title, status, emptyMsg }: { title: string; status: CellStatus; emptyMsg?: string }) {
   if (status === "nao_aplica") {
     return (
-      <div className="text-[12.5px] text-white/40 py-8 text-center">
+      <div className="text-[12.5px] text-[var(--text-muted)] py-8 text-center">
         {emptyMsg || `${title} não se aplica a este documento.`}
       </div>
     )
@@ -333,9 +333,9 @@ function FileTab({ title, status, emptyMsg }: { title: string; status: CellStatu
       <div className="flex items-center gap-2 text-[12.5px]">
         <span className={`w-[8px] h-[8px] rounded-full ${CELL_DOT[status]}`} />
         <span className="font-semibold text-white/95">{title}</span>
-        <span className="text-white/55">— {CELL_LABEL[status]}</span>
+        <span className="text-[var(--text-secondary)]">— {CELL_LABEL[status]}</span>
       </div>
-      <div className="border border-dashed border-[var(--border-default)] rounded-xl p-8 text-center text-[12px] text-white/40">
+      <div className="border border-dashed border-[var(--border-default)] rounded-xl p-8 text-center text-[12px] text-[var(--text-muted)]">
         {available
           ? "Arquivo recebido. (visualização / download ainda não conectados ao backend)"
           : "Arquivo ainda não disponível."}
@@ -348,7 +348,7 @@ function FileLine({ label, available }: { label: string; available: boolean }) {
   return (
     <div className="flex items-center justify-between gap-3 text-[12px]">
       <span className="font-semibold text-white/95">{label}</span>
-      <span className={available ? "text-[#4ade80] text-[11px] font-semibold flex-none" : "text-white/40 text-[11px] flex-none"}>
+      <span className={available ? "text-[#4ade80] text-[11px] font-semibold flex-none" : "text-[var(--text-muted)] text-[11px] flex-none"}>
         {available ? "Disponível" : "Ainda não disponível"}
       </span>
     </div>
@@ -363,7 +363,7 @@ function PlaceholderTab({ title, msg }: { title: string; msg: string }) {
   return (
     <div className="flex flex-col gap-2 py-8 text-center">
       <div className="text-[13px] font-bold text-white/95">{title}</div>
-      <p className="text-[12px] text-white/40 max-w-[380px] mx-auto leading-relaxed">{msg}</p>
+      <p className="text-[12px] text-[var(--text-muted)] max-w-[380px] mx-auto leading-relaxed">{msg}</p>
     </div>
   )
 }

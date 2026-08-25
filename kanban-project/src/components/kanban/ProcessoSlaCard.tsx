@@ -29,7 +29,7 @@ const plural = (n: number) => (n === 1 ? "dia" : "dias")
 function Campo({ rotulo, valor, destaque }: { rotulo: string; valor: string; destaque?: string }) {
   return (
     <div className="min-w-0">
-      <p className="text-[11px] uppercase tracking-wide text-white/40">{rotulo}</p>
+      <p className="text-[11px] uppercase tracking-wide text-[var(--text-muted)]">{rotulo}</p>
       <p className={`truncate text-sm font-medium ${destaque ?? "text-white/90"}`}>{valor}</p>
     </div>
   )
@@ -43,7 +43,7 @@ export function ProcessoSlaCard({ processoId }: { processoId: number }) {
   const corpo = (() => {
     if (carregando && !dados) {
       return (
-        <div className="flex items-center gap-2 py-6 text-sm text-white/50">
+        <div className="flex items-center gap-2 py-6 text-sm text-[var(--text-secondary)]">
           <Loader2 className="h-4 w-4 animate-spin" /> Carregando o SLA…
         </div>
       )
@@ -52,7 +52,7 @@ export function ProcessoSlaCard({ processoId }: { processoId: number }) {
       return (
         <div className="flex flex-col items-start gap-2 py-4">
           <p className="flex items-center gap-2 text-sm text-white/70">
-            <AlertTriangle className="h-4 w-4 text-red-400" />
+            <AlertTriangle className="h-4 w-4 text-red-700" />
             Não foi possível carregar o SLA deste processo.
           </p>
           <button
@@ -68,7 +68,7 @@ export function ProcessoSlaCard({ processoId }: { processoId: number }) {
     const s = dados
     if (!s.configurado) {
       return (
-        <p className="py-4 text-sm text-white/55">
+        <p className="py-4 text-sm text-[var(--text-secondary)]">
           Este tipo de processo ainda não tem SLA configurado. Defina os prazos em{" "}
           <span className="text-white/80">Gerenciamento › Workflow › Fluxos › Workflow Macro</span>.
         </p>
@@ -92,7 +92,7 @@ export function ProcessoSlaCard({ processoId }: { processoId: number }) {
           <Campo
             rotulo="Dias em atraso"
             valor={s.diasAtraso > 0 ? `${s.diasAtraso} ${plural(s.diasAtraso)}` : "—"}
-            destaque={s.diasAtraso > 0 ? "text-red-300" : undefined}
+            destaque={s.diasAtraso > 0 ? "text-red-700" : undefined}
           />
         </div>
 
@@ -106,7 +106,7 @@ export function ProcessoSlaCard({ processoId }: { processoId: number }) {
                   : `${s.faseAtual.label} · sem SLA de fase`
                 : "—"
             }
-            destaque={s.faseAtual?.status === "atrasado" ? "text-red-300" : undefined}
+            destaque={s.faseAtual?.status === "atrasado" ? "text-red-700" : undefined}
           />
           <Campo
             rotulo="Fase responsável pelo atraso"
@@ -115,7 +115,7 @@ export function ProcessoSlaCard({ processoId }: { processoId: number }) {
                 ? `${s.faseResponsavelAtraso.label} · +${s.faseResponsavelAtraso.diasExcedidos} ${plural(s.faseResponsavelAtraso.diasExcedidos)}`
                 : "Nenhuma fase estourou o prazo"
             }
-            destaque={s.faseResponsavelAtraso ? "text-red-300" : undefined}
+            destaque={s.faseResponsavelAtraso ? "text-red-700" : undefined}
           />
           <Campo
             rotulo="Próximo vencimento"
@@ -133,7 +133,7 @@ export function ProcessoSlaCard({ processoId }: { processoId: number }) {
   })()
 
   return (
-    <section className="rounded-xl border border-[var(--border-default)] bg-white/[0.04] p-4">
+    <section className="rounded-xl border border-[var(--border-default)] bg-[var(--surface-primary)] p-4">
       <div className="mb-3 flex items-center justify-between gap-3">
         <h3 className="flex items-center gap-2 text-sm font-semibold uppercase tracking-wide text-white/60">
           <CalendarClock className="h-4 w-4" /> SLA

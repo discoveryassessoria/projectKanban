@@ -52,7 +52,7 @@ export default function CambioHistoricoPage() {
             <h1 className="text-xl font-semibold text-slate-900">Histórico de câmbio</h1>
             <p className="text-sm text-slate-500">Fonte oficial: <b>Confidence Câmbio</b> · provider ativo: <b>CONFIDENCE</b> · atualização automática diária.</p>
           </div>
-          <button onClick={atualizarAgora} disabled={rodando} className="rounded-lg bg-sky-600 px-4 py-2 text-sm font-medium text-[#fff] transition hover:bg-sky-500 disabled:opacity-50">{rodando ? 'Atualizando…' : 'Atualizar agora'}</button>
+          <button onClick={atualizarAgora} disabled={rodando} className="rounded-lg bg-[var(--action-primary)] px-4 py-2 text-sm font-medium text-[var(--action-primary-ink)] transition hover:bg-[var(--action-primary)] disabled:opacity-50">{rodando ? 'Atualizando…' : 'Atualizar agora'}</button>
         </div>
         {msg && <div className="mb-3 rounded-lg border border-slate-200 bg-[var(--surface-primary)] p-3 text-sm text-slate-700">{msg}</div>}
         {erro && <div className="mb-3 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700">{erro}</div>}
@@ -86,7 +86,7 @@ export default function CambioHistoricoPage() {
               {['Par', 'Valor', 'Data fonte', 'Consulta', 'Origem', 'Modalidade', 'Vigente'].map((h) => <th key={h} className="border-b border-slate-200 px-3 py-2 font-semibold">{h}</th>)}
             </tr></thead>
             <tbody>
-              {hist.length === 0 && <tr><td colSpan={7} className="px-3 py-8 text-center text-slate-400">Nenhuma cotação registrada.</td></tr>}
+              {hist.length === 0 && <tr><td colSpan={7} className="px-3 py-8 text-center text-slate-700">Nenhuma cotação registrada.</td></tr>}
               {hist.map((c) => (
                 <tr key={c.id} className="border-b border-slate-100 last:border-0">
                   <td className="px-3 py-2 font-medium text-slate-800">{c.moedaDe}/{c.moedaPara}</td>
@@ -95,7 +95,7 @@ export default function CambioHistoricoPage() {
                   <td className="px-3 py-2 text-slate-500">{dth(c.consultadoEm)}</td>
                   <td className="px-3 py-2 text-slate-500">{c.origem ?? c.fonte ?? '—'}</td>
                   <td className="px-3 py-2 text-slate-500">{c.modalidade ?? '—'}</td>
-                  <td className="px-3 py-2">{(c.vigente ?? c.ativo) ? <span className="rounded bg-emerald-50 px-1.5 py-0.5 text-[11px] text-emerald-700">vigente</span> : <span className="text-slate-400">—</span>}</td>
+                  <td className="px-3 py-2">{(c.vigente ?? c.ativo) ? <span className="rounded bg-emerald-50 px-1.5 py-0.5 text-[11px] text-emerald-700">vigente</span> : <span className="text-slate-700">—</span>}</td>
                 </tr>
               ))}
             </tbody>

@@ -252,7 +252,7 @@ export function ProcessoDocumentos({ processo }: ProcessoDocumentosProps) {
   if (loading && !data) {
     return (
       <div className="h-full flex items-center justify-center">
-        <Loader2 className="w-6 h-6 animate-spin text-white/40" />
+        <Loader2 className="w-6 h-6 animate-spin text-[var(--text-muted)]" />
       </div>
     )
   }

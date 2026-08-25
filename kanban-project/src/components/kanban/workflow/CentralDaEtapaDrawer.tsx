@@ -164,13 +164,13 @@ const STATUS_LABEL: Record<StatusStep, string> = {
 }
 
 const STATUS_PILL_CLS: Record<StatusStep, string> = {
-  nao_iniciada: "bg-[#20262e]0/20 text-white/40 border-[var(--border-default)]",
+  nao_iniciada: "bg-[var(--surface-secondary)]0/20 text-[var(--text-muted)] border-[var(--border-default)]",
   bloqueada: "bg-[#f87171]/20 text-[#f87171] border-[#f87171]/50",
   em_andamento: "bg-[#7dd3fc]/20 text-[#7dd3fc] border-[#7dd3fc]/50",
   aguardando_terceiro: "bg-[#d2a948]/20 text-[#d2a948] border-[#d2a948]/50",
   atrasada: "bg-[#fbbf24]/20 text-[#fbbf24] border-[#fbbf24]/50",
   concluida: "bg-[#4ade80]/20 text-[#4ade80] border-[#4ade80]/50",
-  cancelada: "bg-[#20262e]0/20 text-white/40 border-[var(--border-default)]",
+  cancelada: "bg-[var(--surface-secondary)]0/20 text-[var(--text-muted)] border-[var(--border-default)]",
 }
 
 const fmtDateTime = (iso: string | null): string => {
@@ -440,7 +440,7 @@ function ConteudoDrawer({
       >
         {loading && !step && (
           <div className="flex-1 flex items-center justify-center">
-            <Loader2 className="w-6 h-6 animate-spin text-white/50" />
+            <Loader2 className="w-6 h-6 animate-spin text-[var(--text-secondary)]" />
           </div>
         )}
 
@@ -465,7 +465,7 @@ function ConteudoDrawer({
               style={{ background: "linear-gradient(180deg,#1c222b 0%,#161b22 100%)" }}
             >
               <div className="flex items-center justify-between mb-3">
-                <div className="text-[10px] uppercase font-semibold tracking-wider text-white/55">
+                <div className="text-[10px] uppercase font-semibold tracking-wider text-[var(--text-secondary)]">
                   Etapa {step.ordem} de {totalSteps} · Workflow Documental
                 </div>
                 <button
@@ -541,7 +541,7 @@ function ConteudoDrawer({
                   </div>
                 </div>
               ) : step.status === "cancelada" ? (
-                <div className="text-[11px] text-white/40/80">
+                <div className="text-[11px] text-[var(--text-muted)]/80">
                   Etapa cancelada.
                 </div>
               ) : (
@@ -685,11 +685,11 @@ function ConteudoDrawer({
                     }
                     className="w-full px-2.5 py-1.5 bg-[var(--surface-popover)]/5 border border-[var(--border-default)] rounded text-[12px] text-[#fff] focus:outline-none focus:border-[#7dd3fc]/50"
                   >
-                    <option value="" className="bg-[#20262e]">
+                    <option value="" className="bg-[var(--surface-secondary)]">
                       — Selecione quem executa —
                     </option>
                     {usuarios.map((u) => (
-                      <option key={u.id} value={u.id} className="bg-[#20262e]">
+                      <option key={u.id} value={u.id} className="bg-[var(--surface-secondary)]">
                         {u.nome}
                       </option>
                     ))}
@@ -798,7 +798,7 @@ function ConteudoDrawer({
                   className={`flex-shrink-0 inline-flex items-center gap-1.5 px-4 py-2.5 text-[11.5px] font-semibold border-b-2 transition-colors -mb-px ${
                     activeTab === t.id
                       ? "text-white border-[#7dd3fc]"
-                      : "text-white/55 hover:text-white border-transparent"
+                      : "text-[var(--text-secondary)] hover:text-white border-transparent"
                   }`}
                 >
                   {t.label}
@@ -921,7 +921,7 @@ function TabTimeline({ step }: { step: WorkflowStep }) {
 
   if (eventos.length === 0) {
     return (
-      <div className="text-center py-12 text-white/40">
+      <div className="text-center py-12 text-[var(--text-muted)]">
         <p className="text-sm">Nenhum evento registrado ainda.</p>
       </div>
     )
@@ -929,7 +929,7 @@ function TabTimeline({ step }: { step: WorkflowStep }) {
 
   return (
     <div className="space-y-3 max-w-2xl">
-      <div className="text-[10px] uppercase font-bold tracking-wider text-white/45 mb-1">
+      <div className="text-[10px] uppercase font-bold tracking-wider text-[var(--text-secondary)] mb-1">
         Eventos desta etapa
       </div>
       <div className="space-y-2">
@@ -942,9 +942,9 @@ function TabTimeline({ step }: { step: WorkflowStep }) {
             <div className="flex-1 min-w-0">
               <div className="text-sm text-white">{e.label}</div>
               {e.sublabel && (
-                <div className="text-[11px] text-white/55 mt-0.5">{e.sublabel}</div>
+                <div className="text-[11px] text-[var(--text-secondary)] mt-0.5">{e.sublabel}</div>
               )}
-              <div className="text-[11px] text-white/45 font-mono mt-0.5">
+              <div className="text-[11px] text-[var(--text-secondary)] font-mono mt-0.5">
                 {fmtDateTime(e.data)}
               </div>
             </div>

@@ -21,7 +21,7 @@ export function CodigoPublicoField({
           {codigo}
         </div>
       ) : (
-        <div className="rounded-lg border border-dashed border-[var(--border-default)] bg-white/[0.03] px-3 py-2 text-sm italic text-white/40">
+        <div className="rounded-lg border border-dashed border-[var(--border-default)] bg-[var(--surface-primary)] px-3 py-2 text-sm italic text-[var(--text-muted)]">
           Será gerado automaticamente ao salvar.
         </div>
       )}

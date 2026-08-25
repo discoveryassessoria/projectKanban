@@ -134,13 +134,13 @@ export default function PaisesRegioesTab() {
     } catch (e) { setErroSalvar(e instanceof Error ? e.message : "Não foi possível excluir o país.") }
   }
 
-  if (loading) return <div className="py-24 text-center text-white/50">Carregando…</div>
+  if (loading) return <div className="py-24 text-center text-[var(--text-secondary)]">Carregando…</div>
 
   return (
     <div className="space-y-5">
-      {flash && <div className="rounded-xl border border-green-400/30 bg-green-500/15 px-4 py-3 text-sm text-green-200">{flash}</div>}
+      {flash && <div className="rounded-xl border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-700">{flash}</div>}
       {erro && (
-        <div className="rounded-xl border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-200">
+        <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
           {erro} <button onClick={() => { setErroSalvar(null); load() }} className="ml-2 underline hover:text-white">Recarregar</button>
         </div>
       )}
@@ -154,7 +154,7 @@ export default function PaisesRegioesTab() {
               cada país são geridas em <span className="text-white/80">Processos › Cadastros › Modalidades</span>.
             </p>
           </div>
-          <button onClick={() => { setErroSalvar(null); setForm(vazio()) }} className="flex-none rounded-lg bg-blue-600 px-3 py-2 text-xs font-medium text-[#fff] hover:bg-blue-500">
+          <button onClick={() => { setErroSalvar(null); setForm(vazio()) }} className="flex-none rounded-lg bg-[var(--action-primary)] px-3 py-2 text-xs font-medium text-[var(--action-primary-ink)] hover:bg-[var(--action-primary)]">
             + Novo país
           </button>
         </div>
@@ -162,7 +162,7 @@ export default function PaisesRegioesTab() {
 
       <div className="overflow-x-auto rounded-2xl border border-[var(--border-default)] bg-[var(--surface-primary)] backdrop-blur-sm">
         <table className="w-full text-sm">
-          <thead className="border-b border-[var(--border-default)] text-left text-xs text-white/50">
+          <thead className="border-b border-[var(--border-default)] text-left text-xs text-[var(--text-secondary)]">
             <tr>
               <th className="px-4 py-3 font-medium">País</th>
               <th className="px-4 py-3 font-medium">Nacionalidade</th>
@@ -176,7 +176,7 @@ export default function PaisesRegioesTab() {
           </thead>
           <tbody>
             {rows.length === 0 ? (
-              <tr><td colSpan={8} className="px-4 py-10 text-center text-xs text-white/40">Nenhum país cadastrado. Comece em “+ Novo país”.</td></tr>
+              <tr><td colSpan={8} className="px-4 py-10 text-center text-xs text-[var(--text-muted)]">Nenhum país cadastrado. Comece em “+ Novo país”.</td></tr>
             ) : rows.map(p => (
               <tr key={p.countryKey} className="border-b border-[var(--border-subtle)] last:border-0">
                 <td className="px-4 py-2.5 text-white">{p.flag ? `${p.flag} ` : ""}{p.countryLabel}</td>
@@ -189,13 +189,13 @@ export default function PaisesRegioesTab() {
                   <button
                     onClick={() => toggleAtivo(p)}
                     title={(p.ativo ?? true) ? "Inativar (some dos seletores, sem apagar)" : "Ativar"}
-                    className={`rounded-full px-2 py-0.5 text-[10px] ${(p.ativo ?? true) ? "bg-green-500/15 text-green-300" : "bg-[var(--surface-primary)] text-white/50"}`}
+                    className={`rounded-full px-2 py-0.5 text-[10px] ${(p.ativo ?? true) ? "bg-green-50 text-green-700" : "bg-[var(--surface-primary)] text-[var(--text-secondary)]"}`}
                   >
                     {(p.ativo ?? true) ? "Ativo" : "Inativo"}
                   </button>
                 </td>
                 <td className="px-4 py-2.5">
-                  <div className="flex items-center justify-end gap-0.5 text-white/50">
+                  <div className="flex items-center justify-end gap-0.5 text-[var(--text-secondary)]">
                     <button
                       title="Editar" aria-label="Editar"
                       onClick={() => setForm({
@@ -210,7 +210,7 @@ export default function PaisesRegioesTab() {
                       aria-label="Excluir"
                       disabled={(p.tiposCount ?? 0) > 0}
                       onClick={() => excluir(p)}
-                      className="rounded p-1 text-red-300/70 hover:bg-red-500/10 hover:text-red-300 disabled:cursor-not-allowed disabled:opacity-30"
+                      className="rounded p-1 text-red-700/70 hover:bg-red-50 hover:text-red-700 disabled:cursor-not-allowed disabled:opacity-30"
                     ><ITrash /></button>
                   </div>
                 </td>
@@ -264,13 +264,13 @@ export default function PaisesRegioesTab() {
                     <input type="checkbox" checked={form.administrativa} onChange={e => setForm(f => f && { ...f, administrativa: e.target.checked })} className="h-3.5 w-3.5 accent-blue-500" />
                     Administrativa
                   </label>
-                  <p className="mt-1 text-[11px] text-white/40">Outras modalidades podem ser criadas depois em Processos › Cadastros › Modalidades.</p>
+                  <p className="mt-1 text-[11px] text-[var(--text-muted)]">Outras modalidades podem ser criadas depois em Processos › Cadastros › Modalidades.</p>
                 </div>
               )}
             </div>
             <div className="flex justify-end gap-2 border-t border-[var(--border-default)] px-6 py-4">
               <button onClick={() => setForm(null)} className="rounded-lg border border-[var(--border-default)] bg-[var(--surface-primary)] px-4 py-2 text-sm text-white/80 hover:bg-[var(--surface-hover)]">Cancelar</button>
-              <button disabled={busy} onClick={salvar} className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-[#fff] hover:bg-blue-500 disabled:opacity-50">Salvar</button>
+              <button disabled={busy} onClick={salvar} className="rounded-lg bg-[var(--action-primary)] px-4 py-2 text-sm font-medium text-[var(--action-primary-ink)] hover:bg-[var(--action-primary)] disabled:opacity-50">Salvar</button>
             </div>
           </div>
         </div>

@@ -56,9 +56,9 @@ const ICONE_MODULO: Record<ModuloFila, React.ComponentType<{ className?: string 
 // ===========================================================================
 /** Pílula de status: a mensagem operacional vira UM objeto, com a cor do nível. */
 const PILULA_STATUS: Record<string, string> = {
-  critico: "border-red-400/25 bg-red-500/[0.13] text-red-300",
-  atencao: "border-amber-400/25 bg-amber-500/[0.12] text-amber-300",
-  ok: "border-emerald-400/25 bg-emerald-500/[0.12] text-emerald-300",
+  critico: "border-red-200 bg-red-500/[0.13] text-red-700",
+  atencao: "border-amber-200 bg-amber-500/[0.12] text-amber-700",
+  ok: "border-emerald-200 bg-emerald-500/[0.12] text-emerald-700",
 }
 const PONTO_STATUS: Record<string, string> = {
   critico: "bg-red-400",
@@ -84,7 +84,7 @@ function Cabecalho({ data }: { data: HomeData }) {
         <h1 className="truncate text-[26px] font-semibold tracking-tight text-white">
           {saudacao()}, {data.usuario.nome.split(" ")[0]}
         </h1>
-        <div className="mt-1.5 flex flex-wrap items-center gap-2.5 text-sm text-white/55">
+        <div className="mt-1.5 flex flex-wrap items-center gap-2.5 text-sm text-[var(--text-secondary)]">
           <span className="capitalize">{hoje}</span>
           <span className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-0.5 text-xs font-medium ${PILULA_STATUS[nivel]}`}>
             <span className={`h-1.5 w-1.5 rounded-full ${PONTO_STATUS[nivel]}`} />
@@ -106,21 +106,21 @@ function LinhaFila({ fila }: { fila: FilaOperacional }) {
   return (
     <Link
       href={fila.href}
-      className="group flex items-center gap-3 rounded-xl border border-transparent bg-white/[0.04] px-3 py-3 transition hover:border-[var(--border-strong)] hover:bg-white/[0.08] focus:outline-none focus:ring-2 focus:ring-white/20 md:gap-4"
+      className="group flex items-center gap-3 rounded-xl border border-transparent bg-[var(--surface-primary)] px-3 py-3 transition hover:border-[var(--border-strong)] hover:bg-[var(--surface-primary)] focus:outline-none focus:ring-2 focus:ring-white/20 md:gap-4"
     >
       <span className={`flex h-[34px] w-[34px] shrink-0 items-center justify-center rounded-[10px] border ${st.chip}`}>
         <Icone className="h-4 w-4" />
       </span>
       <div className="min-w-0 flex-1">
         <p className="truncate text-sm font-semibold text-white">{fila.titulo}</p>
-        <p className="truncate text-xs text-white/45">{fila.descricao}</p>
+        <p className="truncate text-xs text-[var(--text-secondary)]">{fila.descricao}</p>
       </div>
       {/* A quantidade é o dado que decide a prioridade: número grande e limpo,
           sem chip — a cor do nível já vive no ícone. */}
       <span className={`shrink-0 text-xl font-semibold tabular-nums ${fila.nivel === "critico" ? st.texto : "text-white"}`}>
         {fila.quantidade}
       </span>
-      <ChevronRight className="h-4 w-4 shrink-0 text-white/30 transition-transform group-hover:translate-x-0.5 group-hover:text-white/60" />
+      <ChevronRight className="h-4 w-4 shrink-0 text-[var(--text-muted)] transition-transform group-hover:translate-x-0.5 group-hover:text-white/60" />
     </Link>
   )
 }
@@ -135,7 +135,7 @@ function CentralOperacional({ data }: { data: HomeData }) {
           descricao="O que precisa da sua ação agora"
           acao={
             total > 0 ? (
-              <span className="rounded-md border border-red-400/30 bg-red-500/15 px-2 py-0.5 text-sm font-semibold tabular-nums text-red-300">
+              <span className="rounded-md border border-red-200 bg-red-50 px-2 py-0.5 text-sm font-semibold tabular-nums text-red-700">
                 {total}
               </span>
             ) : null
@@ -146,11 +146,11 @@ function CentralOperacional({ data }: { data: HomeData }) {
         // Vazio aqui é CONQUISTA, não buraco: some o ícone apagado e entra a
         // confirmação de que a fila está limpa.
         <div className="flex flex-1 flex-col items-center justify-center gap-3 px-5 pb-10 pt-2 text-center">
-          <span className="flex h-[52px] w-[52px] items-center justify-center rounded-full border border-emerald-400/25 bg-emerald-500/10 text-emerald-300">
+          <span className="flex h-[52px] w-[52px] items-center justify-center rounded-full border border-emerald-200 bg-emerald-50 text-emerald-700">
             <CheckCircle2 className="h-6 w-6" />
           </span>
           <p className="text-[15px] font-medium text-white">Tudo limpo por aqui</p>
-          <p className="text-sm text-white/45">Nenhuma fila com trabalho pendente para você.</p>
+          <p className="text-sm text-[var(--text-secondary)]">Nenhuma fila com trabalho pendente para você.</p>
         </div>
       ) : (
         <div className="space-y-1.5 px-3 pb-3">
@@ -175,17 +175,17 @@ function CardSla({ fila }: { fila: FilaOperacional }) {
   return (
     <Link
       href={fila.href}
-      className="group flex flex-col gap-1 rounded-lg border border-[var(--border-default)] bg-white/[0.03] px-3 py-3 transition hover:border-[var(--border-strong)] hover:bg-white/[0.07] focus:outline-none focus:ring-2 focus:ring-white/20 md:px-4"
+      className="group flex flex-col gap-1 rounded-lg border border-[var(--border-default)] bg-[var(--surface-primary)] px-3 py-3 transition hover:border-[var(--border-strong)] hover:bg-[var(--surface-primary)] focus:outline-none focus:ring-2 focus:ring-white/20 md:px-4"
     >
       <div className="flex items-center gap-2">
         <span className={`h-2 w-2 shrink-0 rounded-full ${st.ponto}`} />
-        <span className={`text-2xl font-bold tabular-nums ${fila.quantidade > 0 ? st.texto : "text-white/40"}`}>
+        <span className={`text-2xl font-bold tabular-nums ${fila.quantidade > 0 ? st.texto : "text-[var(--text-muted)]"}`}>
           {fila.quantidade}
         </span>
-        <ChevronRight className="ml-auto h-4 w-4 shrink-0 text-white/25 transition-transform group-hover:translate-x-0.5 group-hover:text-white/60" />
+        <ChevronRight className="ml-auto h-4 w-4 shrink-0 text-[var(--text-muted)] transition-transform group-hover:translate-x-0.5 group-hover:text-white/60" />
       </div>
       <p className="truncate text-sm font-semibold text-white">{fila.titulo}</p>
-      <p className="truncate text-xs text-white/45">{fila.descricao}</p>
+      <p className="truncate text-xs text-[var(--text-secondary)]">{fila.descricao}</p>
     </Link>
   )
 }
@@ -200,7 +200,7 @@ function PainelSlaBloco({ data }: { data: HomeData }) {
         descricao="Prazo previsto de conclusão, a partir do SLA configurado em cada fase"
         acao={
           sla.resumo.semPrazo > 0 ? (
-            <span className="text-xs font-medium tabular-nums text-white/45">
+            <span className="text-xs font-medium tabular-nums text-[var(--text-secondary)]">
               {sla.resumo.semPrazo} sem SLA configurado
             </span>
           ) : null
@@ -223,7 +223,7 @@ function LinhaAgenda({ item }: { item: AgendaItem }) {
     <li>
       <Link
         href={item.href}
-        className="flex items-start gap-3 rounded-lg px-2 py-2 transition hover:bg-white/[0.06] focus:outline-none focus:ring-2 focus:ring-white/20"
+        className="flex items-start gap-3 rounded-lg px-2 py-2 transition hover:bg-[var(--surface-primary)] focus:outline-none focus:ring-2 focus:ring-white/20"
       >
         <span className="w-14 shrink-0 pt-0.5 text-right text-xs font-semibold tabular-nums text-white/70">
           {item.diaInteiro ? "dia" : formatarHorario(item.horario)}
@@ -231,7 +231,7 @@ function LinhaAgenda({ item }: { item: AgendaItem }) {
         <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full" style={{ background: OURO }} />
         <div className="min-w-0 flex-1">
           <p className="truncate text-sm text-white">{item.titulo}</p>
-          <p className="truncate text-xs text-white/45">
+          <p className="truncate text-xs text-[var(--text-secondary)]">
             {[item.grupo === "proximos" ? item.dia : null, item.processoNome, item.local]
               .filter(Boolean)
               .join(" · ")}
@@ -246,7 +246,7 @@ function GrupoAgendaBloco({ titulo, itens }: { titulo: string; itens: AgendaItem
   if (itens.length === 0) return null
   return (
     <div>
-      <p className="mb-1 px-2 text-[11px] font-semibold uppercase tracking-wider text-white/40">{titulo}</p>
+      <p className="mb-1 px-2 text-[11px] font-semibold uppercase tracking-wider text-[var(--text-muted)]">{titulo}</p>
       <ul className="space-y-0.5">
         {itens.map((e) => (
           <LinhaAgenda key={e.id} item={e} />
@@ -293,7 +293,7 @@ function AgendaBloco({ data }: { data: HomeData }) {
 /** Linha discreta de "nada aqui" — um bloco vazio não merece um vazio de card. */
 function LinhaQuieta({ children }: { children: React.ReactNode }) {
   return (
-    <p className="flex items-center gap-2.5 px-0.5 py-1.5 text-sm text-white/40">
+    <p className="flex items-center gap-2.5 px-0.5 py-1.5 text-sm text-[var(--text-muted)]">
       <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-[var(--surface-secondary)]" />
       {children}
     </p>
@@ -310,7 +310,7 @@ function Alertas({ data }: { data: HomeData }) {
     )
   }
   return (
-    <BlocoCard className="border-red-400/20 bg-red-500/[0.06]">
+    <BlocoCard className="border-red-200 bg-red-500/[0.06]">
       <BlocoHeader titulo="Alertas" descricao="Eventos críticos que travam a operação" />
       <ul className="space-y-2">
         {data.alertas.map((a) => {
@@ -325,9 +325,9 @@ function Alertas({ data }: { data: HomeData }) {
                 <Icone className={`h-4 w-4 shrink-0 ${st.texto}`} />
                 <div className="min-w-0 flex-1">
                   <p className="truncate text-sm font-medium text-white">{a.titulo}</p>
-                  <p className="truncate text-xs text-white/55">{a.detalhe}</p>
+                  <p className="truncate text-xs text-[var(--text-secondary)]">{a.detalhe}</p>
                 </div>
-                <ChevronRight className="h-4 w-4 shrink-0 text-white/30" />
+                <ChevronRight className="h-4 w-4 shrink-0 text-[var(--text-muted)]" />
               </Link>
             </li>
           )
@@ -354,16 +354,16 @@ function Indicador({
   const conteudo = (
     <div className="flex flex-col gap-0.5 px-2 py-1">
       <span
-        className={`text-2xl font-bold tabular-nums ${destaque && valor > 0 ? "text-red-300" : "text-white"}`}
+        className={`text-2xl font-bold tabular-nums ${destaque && valor > 0 ? "text-red-700" : "text-white"}`}
       >
         {valor}
       </span>
-      <span className="text-xs text-white/50">{rotulo}</span>
+      <span className="text-xs text-[var(--text-secondary)]">{rotulo}</span>
     </div>
   )
   if (!href) return conteudo
   return (
-    <Link href={href} className="rounded-lg transition hover:bg-white/[0.06] focus:outline-none focus:ring-2 focus:ring-white/20">
+    <Link href={href} className="rounded-lg transition hover:bg-[var(--surface-primary)] focus:outline-none focus:ring-2 focus:ring-white/20">
       {conteudo}
     </Link>
   )
@@ -389,11 +389,11 @@ function ResumoDoDia({ data }: { data: HomeData }) {
         <h2 className="text-[13px] font-semibold uppercase tracking-[0.14em] text-white/90">Operação de hoje</h2>
         <span className="hidden h-3.5 w-px bg-[var(--surface-primary)] sm:block" />
         {itens.map((i) => (
-          <span key={i.rotulo} className="text-xs text-white/40">
+          <span key={i.rotulo} className="text-xs text-[var(--text-muted)]">
             <b className="font-semibold tabular-nums text-white/60">0</b> {i.curto}
           </span>
         ))}
-        <span className="ml-auto inline-flex items-center gap-2 text-xs font-medium text-emerald-300">
+        <span className="ml-auto inline-flex items-center gap-2 text-xs font-medium text-emerald-700">
           <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" />
           Sem pendências no dia
         </span>

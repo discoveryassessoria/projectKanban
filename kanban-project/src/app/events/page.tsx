@@ -448,7 +448,7 @@ const handleSubmit = async () => {
                         value={titulo}
                         onChange={(e) => setTitulo(e.target.value)}
                         placeholder="Ex: Reunião no Consulado"
-                        className="bg-[var(--surface-primary)] border-[var(--border-strong)] text-white placeholder:text-white/40"
+                        className="bg-[var(--surface-primary)] border-[var(--border-strong)] text-white placeholder:text-[var(--text-muted)]"
                       />
                     </div>
 
@@ -496,7 +496,7 @@ const handleSubmit = async () => {
   value={dataInicio}
   onChange={(value) => setDataInicio(value)}
   placeholder="dd/mm/aaaa"
-  className="bg-[var(--surface-primary)] border-[var(--border-strong)] text-white placeholder:text-white/40"
+  className="bg-[var(--surface-primary)] border-[var(--border-strong)] text-white placeholder:text-[var(--text-muted)]"
 />
                     </div>
 
@@ -522,7 +522,7 @@ const handleSubmit = async () => {
   value={dataFim}
   onChange={(value) => setDataFim(value)}
   placeholder="dd/mm/aaaa"
-  className="bg-[var(--surface-primary)] border-[var(--border-strong)] text-white placeholder:text-white/40"
+  className="bg-[var(--surface-primary)] border-[var(--border-strong)] text-white placeholder:text-[var(--text-muted)]"
 />
     </div>
     {dataFim && (
@@ -546,7 +546,7 @@ const handleSubmit = async () => {
                         value={local}
                         onChange={(e) => setLocal(e.target.value)}
                         placeholder="Ex: Consulado de São Paulo"
-                        className="bg-[var(--surface-primary)] border-[var(--border-strong)] text-white placeholder:text-white/40"
+                        className="bg-[var(--surface-primary)] border-[var(--border-strong)] text-white placeholder:text-[var(--text-muted)]"
                       />
                     </div>
 
@@ -559,7 +559,7 @@ const handleSubmit = async () => {
   onChange={(e) => setLembreteDias(e.target.value)}
   placeholder="Ex: 3"
   min="0"
-  className="bg-[var(--surface-primary)] border-[var(--border-strong)] text-white placeholder:text-white/40 [color-scheme:dark]"
+  className="bg-[var(--surface-primary)] border-[var(--border-strong)] text-white placeholder:text-[var(--text-muted)] [color-scheme:dark]"
 />
                     </div>
 
@@ -571,7 +571,7 @@ const handleSubmit = async () => {
                         onChange={(e) => setDescricao(e.target.value)}
                         placeholder="Detalhes do evento..."
                         rows={3}
-                        className="w-full px-3 py-2 bg-[var(--surface-primary)] border border-[var(--border-strong)] rounded-md text-white placeholder:text-white/40 focus:outline-none focus:ring-2 focus:ring-white/30"
+                        className="w-full px-3 py-2 bg-[var(--surface-primary)] border border-[var(--border-strong)] rounded-md text-white placeholder:text-[var(--text-muted)] focus:outline-none focus:ring-2 focus:ring-white/30"
                       />
                     </div>
                   </div>
@@ -722,7 +722,7 @@ const handleSubmit = async () => {
                     {DIAS_SEMANA.map((dia) => (
                       <div
                         key={dia}
-                        className="text-center text-xs font-medium text-white/50 py-2"
+                        className="text-center text-xs font-medium text-[var(--text-secondary)] py-2"
                       >
                         {dia}
                       </div>
@@ -744,13 +744,13 @@ const handleSubmit = async () => {
                           key={dia}
                           className={`h-24 p-1 rounded-lg border transition-colors ${
                             ehHoje
-                              ? "bg-emerald-500/10 border-emerald-500/30"
+                              ? "bg-emerald-50 border-emerald-200"
                               : "border-[var(--border-default)] hover:bg-[var(--surface-hover)]"
                           }`}
                         >
                           <div
                             className={`text-sm font-medium mb-1 ${
-                              ehHoje ? "text-emerald-400" : "text-white/70"
+                              ehHoje ? "text-emerald-700" : "text-white/70"
                             }`}
                           >
                             {dia}
@@ -778,7 +778,7 @@ const handleSubmit = async () => {
                               )
                             })}
                             {eventosNoDia.length > 2 && (
-                              <div className="text-xs text-white/50 px-1">
+                              <div className="text-xs text-[var(--text-secondary)] px-1">
                                 +{eventosNoDia.length - 2} mais
                               </div>
                             )}

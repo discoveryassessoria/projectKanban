@@ -33,9 +33,9 @@ const CHIPS = [
 ] as const
 
 function sevBadge(s: string) {
-  if (s === "critico") return <span className="text-[11px] px-2 py-0.5 rounded-full bg-red-500/20 text-red-300 border border-red-500/30">Crítico</span>
-  if (s === "aviso") return <span className="text-[11px] px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/30">Aviso</span>
-  return <span className="text-[11px] px-2 py-0.5 rounded-full bg-sky-500/20 text-sky-300 border border-sky-500/30">Info</span>
+  if (s === "critico") return <span className="text-[11px] px-2 py-0.5 rounded-full bg-red-50 text-red-700 border border-red-200">Crítico</span>
+  if (s === "aviso") return <span className="text-[11px] px-2 py-0.5 rounded-full bg-amber-50 text-amber-700 border border-amber-200">Aviso</span>
+  return <span className="text-[11px] px-2 py-0.5 rounded-full bg-sky-50 text-sky-700 border border-sky-200">Info</span>
 }
 
 export default function AuditoriaTab() {
@@ -49,7 +49,7 @@ export default function AuditoriaTab() {
       .then(r => r.ok ? r.json() : null).then(d => setData(d)).catch(e => console.error(e)).finally(() => setLoading(false))
   }, [])
 
-  if (loading || !data) return <div className="flex items-center justify-center py-24"><Loader2 className="h-8 w-8 animate-spin text-white/50" /></div>
+  if (loading || !data) return <div className="flex items-center justify-center py-24"><Loader2 className="h-8 w-8 animate-spin text-[var(--text-secondary)]" /></div>
 
   const d = data
   const k = d.kpis
@@ -79,8 +79,8 @@ export default function AuditoriaTab() {
       {/* KPIs */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         <Kpi label="Eventos hoje" value={`${k.eventosHoje}`} sub={`${k.automaticosHoje} automáticos · ${k.manuaisHoje} manuais`} />
-        <Kpi icon={<AlertTriangle className="h-3.5 w-3.5" />} label="Críticos" value={`${k.criticos}`} valueColor={k.criticos > 0 ? "text-red-400" : "text-white"} sub="Estornos, exclusões, cancelamentos" />
-        <Kpi label="Avisos" value={`${k.avisos}`} valueColor="text-amber-400" sub="Alterações, aprovações" />
+        <Kpi icon={<AlertTriangle className="h-3.5 w-3.5" />} label="Críticos" value={`${k.criticos}`} valueColor={k.criticos > 0 ? "text-red-700" : "text-white"} sub="Estornos, exclusões, cancelamentos" />
+        <Kpi label="Avisos" value={`${k.avisos}`} valueColor="text-amber-700" sub="Alterações, aprovações" />
         <Kpi label="Origem automática" value={fmtPct(k.pctAutomatico)} sub={`${k.automaticos} de ${k.total} gerados pelo sistema`} />
       </div>
 
@@ -101,11 +101,11 @@ export default function AuditoriaTab() {
       {/* TABELA */}
       <div className="bg-[var(--surface-primary)] backdrop-blur-sm border border-[var(--border-default)] rounded-xl p-4 overflow-x-auto">
         {filtrados.length === 0 ? (
-          <p className="text-sm text-white/40 py-10 text-center">Nenhum evento de auditoria registrado ainda.</p>
+          <p className="text-sm text-[var(--text-muted)] py-10 text-center">Nenhum evento de auditoria registrado ainda.</p>
         ) : (
           <table className="w-full text-sm min-w-[720px]">
             <thead>
-              <tr className="text-white/40 text-xs border-b border-[var(--border-default)]">
+              <tr className="text-[var(--text-muted)] text-xs border-b border-[var(--border-default)]">
                 <th className="text-left font-medium py-1.5">Data / Hora</th>
                 <th className="text-left font-medium py-1.5">Usuário</th>
                 <th className="text-left font-medium py-1.5">Ação</th>
@@ -119,21 +119,21 @@ export default function AuditoriaTab() {
                 <tr key={l.id} className="border-b border-[var(--border-subtle)] last:border-0 hover:bg-[var(--surface-hover)]">
                   <td className="py-2 tabular-nums">
                     <div className="text-white/80 font-medium">{fmtDateTime(l.criadoEm)}</div>
-                    <div className="text-[10px] text-white/40">{fmtTime(l.criadoEm)}</div>
+                    <div className="text-[10px] text-[var(--text-muted)]">{fmtTime(l.criadoEm)}</div>
                   </td>
                   <td className="py-2">
                     {l.usuario === "Sistema" ? (
                       <span className="text-[11px] px-2 py-0.5 rounded-full bg-[var(--surface-primary)] text-white/60 border border-[var(--border-strong)]">Sistema</span>
                     ) : (
                       <span className="inline-flex items-center gap-1.5">
-                        <span className="w-5 h-5 rounded-full bg-blue-500/30 text-blue-200 text-[9px] font-bold flex items-center justify-center">{iniciais(l.usuario)}</span>
+                        <span className="w-5 h-5 rounded-full bg-blue-500/30 text-blue-700 text-[9px] font-bold flex items-center justify-center">{iniciais(l.usuario)}</span>
                         <span className="text-white/80">{l.usuario}</span>
                       </span>
                     )}
                   </td>
                   <td className="py-2 text-white/90 font-medium">{l.acao}</td>
                   <td className="py-2 text-white/60">{l.entidade}</td>
-                  <td className="py-2 text-white/50 max-w-[260px] truncate" title={l.descricao}>{l.descricao || "—"}</td>
+                  <td className="py-2 text-[var(--text-secondary)] max-w-[260px] truncate" title={l.descricao}>{l.descricao || "—"}</td>
                   <td className="py-2 text-center">{sevBadge(l.severidade)}</td>
                 </tr>
               ))}
@@ -152,9 +152,9 @@ function GlassBtn({ icon, children }: { icon: React.ReactNode; children: React.R
 function Kpi({ icon, label, value, sub, valueColor = "text-white" }: { icon?: React.ReactNode; label: string; value: string; sub?: string; valueColor?: string }) {
   return (
     <div className="rounded-xl border border-[var(--border-default)] bg-[var(--surface-primary)] backdrop-blur-sm p-4">
-      <div className="flex items-center gap-1.5 text-white/50 text-xs font-medium">{icon && <span className="text-white/60">{icon}</span>}{label}</div>
+      <div className="flex items-center gap-1.5 text-[var(--text-secondary)] text-xs font-medium">{icon && <span className="text-white/60">{icon}</span>}{label}</div>
       <div className={`font-bold mt-1.5 text-xl ${valueColor}`}>{value}</div>
-      {sub && <div className="text-[11px] text-white/40 mt-1">{sub}</div>}
+      {sub && <div className="text-[11px] text-[var(--text-muted)] mt-1">{sub}</div>}
     </div>
   )
 }

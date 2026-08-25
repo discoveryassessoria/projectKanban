@@ -46,16 +46,16 @@ export function CambioMini() {
       className="hidden items-center gap-3 rounded-full border border-[var(--border-strong)] px-3 py-1.5 text-white transition hover:bg-[var(--surface-hover)] xl:inline-flex"
     >
       <span className="flex items-center gap-1.5 text-[11px]">
-        <span className="text-white/50">EUR</span>
+        <span className="text-[var(--text-secondary)]">EUR</span>
         <span className="font-semibold tabular-nums">{fmt(eur?.valor ?? null)}</span>
       </span>
       <span className="h-3 w-px bg-[var(--surface-secondary)]" />
       <span className="flex items-center gap-1.5 text-[11px]">
-        <span className="text-white/50">USD</span>
+        <span className="text-[var(--text-secondary)]">USD</span>
         <span className="font-semibold tabular-nums">{fmt(usd?.valor ?? null)}</span>
       </span>
-      <span className="flex items-center gap-1 text-[10px] text-white/40">
-        {defasado && <AlertTriangle className="h-3 w-3 text-amber-400" />}
+      <span className="flex items-center gap-1 text-[10px] text-[var(--text-muted)]">
+        {defasado && <AlertTriangle className="h-3 w-3 text-amber-700" />}
         {atualizacao
           ? new Date(atualizacao).toLocaleString("pt-BR", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" })
           : "—"}

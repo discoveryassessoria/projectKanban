@@ -65,7 +65,7 @@ export default function CategoriasDocumentaisTab() {
 
   return (
     <div className="space-y-5">
-      {flash && <div className="rounded-xl border border-green-400/30 bg-green-500/15 px-4 py-3 text-sm text-green-200">{flash}</div>}
+      {flash && <div className="rounded-xl border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-700">{flash}</div>}
 
       <div className="rounded-2xl border border-[var(--border-default)] bg-[var(--surface-primary)] p-5 backdrop-blur-sm">
         <div className="flex items-start justify-between gap-3">
@@ -73,7 +73,7 @@ export default function CategoriasDocumentaisTab() {
             <h2 className="text-lg font-semibold text-white">Categorias Documentais</h2>
             <p className="mt-1 text-sm text-white/60">Cadastro mestre que <strong className="text-white/80">apenas classifica</strong> os Tipos de Documento. Não configura processo, fase, workflow, financeiro nem aplicabilidade.</p>
           </div>
-          <button onClick={() => setForm({ code: "", name: "", description: "", ordem: 0, ativo: true })} className="flex-none rounded-lg bg-blue-600 px-3 py-2 text-xs font-medium text-[#fff] hover:bg-blue-500">+ Nova categoria</button>
+          <button onClick={() => setForm({ code: "", name: "", description: "", ordem: 0, ativo: true })} className="flex-none rounded-lg bg-[var(--action-primary)] px-3 py-2 text-xs font-medium text-[var(--action-primary-ink)] hover:bg-[var(--action-primary)]">+ Nova categoria</button>
         </div>
         <div className="mt-4 flex flex-wrap items-center gap-2">
           <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Buscar código ou nome…" className="w-56 rounded-lg border border-[var(--border-default)] bg-[var(--surface-primary)] px-3 py-1.5 text-xs text-white placeholder-white/40 outline-none focus:border-white/20" />
@@ -85,11 +85,11 @@ export default function CategoriasDocumentaisTab() {
         </div>
       </div>
 
-      {erro && <div className="rounded-xl border border-red-400/30 bg-red-500/10 px-4 py-3 text-sm text-red-200">{erro}</div>}
+      {erro && <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{erro}</div>}
 
       <div className="overflow-hidden rounded-2xl border border-[var(--border-default)] bg-[var(--surface-primary)] backdrop-blur-sm">
         <table className="w-full text-sm">
-          <thead className="border-b border-[var(--border-default)] text-left text-xs text-white/50">
+          <thead className="border-b border-[var(--border-default)] text-left text-xs text-[var(--text-secondary)]">
             <tr>
               <th className="px-4 py-3 font-medium">Nome</th>
               <th className="px-4 py-3 font-medium">Ordem</th><th className="px-4 py-3 font-medium">Status</th>
@@ -98,23 +98,23 @@ export default function CategoriasDocumentaisTab() {
           </thead>
           <tbody>
             {loading ? (
-              <tr><td colSpan={5} className="px-4 py-8 text-center text-xs text-white/40">Carregando…</td></tr>
+              <tr><td colSpan={5} className="px-4 py-8 text-center text-xs text-[var(--text-muted)]">Carregando…</td></tr>
             ) : rows.length === 0 ? (
-              <tr><td colSpan={5} className="px-4 py-8 text-center text-xs text-white/40">Nenhuma categoria.</td></tr>
+              <tr><td colSpan={5} className="px-4 py-8 text-center text-xs text-[var(--text-muted)]">Nenhuma categoria.</td></tr>
             ) : rows.map((c) => (
               <tr key={c.id} className="border-b border-[var(--border-subtle)] last:border-0">
-                <td className="px-4 py-2.5 text-white">{c.name}{c.sistema && <span className="ml-1.5 rounded bg-[var(--surface-primary)] px-1.5 py-0.5 text-[9px] uppercase text-white/50">sistema</span>}</td>
+                <td className="px-4 py-2.5 text-white">{c.name}{c.sistema && <span className="ml-1.5 rounded bg-[var(--surface-primary)] px-1.5 py-0.5 text-[9px] uppercase text-[var(--text-secondary)]">sistema</span>}</td>
                 <td className="px-4 py-2.5 text-white/70">{c.ordem}</td>
-                <td className="px-4 py-2.5"><span className={`rounded-full px-2 py-0.5 text-[10px] ${c.ativo ? "bg-green-500/15 text-green-300" : "bg-[var(--surface-primary)] text-white/50"}`}>{c.ativo ? "Ativa" : "Inativa"}</span></td>
+                <td className="px-4 py-2.5"><span className={`rounded-full px-2 py-0.5 text-[10px] ${c.ativo ? "bg-green-50 text-green-700" : "bg-[var(--surface-primary)] text-[var(--text-secondary)]"}`}>{c.ativo ? "Ativa" : "Inativa"}</span></td>
                 <td className="px-4 py-2.5 text-white/70">{c.tiposCount}</td>
                 <td className="px-4 py-2.5">
-                  <div className="flex items-center justify-end gap-1 text-xs text-white/50">
+                  <div className="flex items-center justify-end gap-1 text-xs text-[var(--text-secondary)]">
                     <button onClick={() => setForm({ id: c.id, code: c.code, name: c.name, description: c.description || "", ordem: c.ordem, ativo: c.ativo })} className="rounded px-1.5 py-0.5 hover:bg-[var(--surface-hover)] hover:text-white">Editar</button>
                     <button onClick={() => toggleAtivo(c)} className="rounded px-1.5 py-0.5 hover:bg-[var(--surface-hover)] hover:text-white">{c.ativo ? "Inativar" : "Reativar"}</button>
                     {c.sistema || c.tiposCount > 0 ? (
-                      <span title={c.sistema ? "Categoria de sistema — não pode ser excluída" : `Em uso por ${c.tiposCount} tipo(s)`} className="cursor-not-allowed rounded px-1.5 py-0.5 text-white/20">Excluir</span>
+                      <span title={c.sistema ? "Categoria de sistema — não pode ser excluída" : `Em uso por ${c.tiposCount} tipo(s)`} className="cursor-not-allowed rounded px-1.5 py-0.5 text-[var(--text-muted)]">Excluir</span>
                     ) : (
-                      <button onClick={() => del(c)} className="rounded px-1.5 py-0.5 text-red-300/70 hover:bg-red-500/10 hover:text-red-300">Excluir</button>
+                      <button onClick={() => del(c)} className="rounded px-1.5 py-0.5 text-red-700/70 hover:bg-red-50 hover:text-red-700">Excluir</button>
                     )}
                   </div>
                 </td>
@@ -136,7 +136,7 @@ export default function CategoriasDocumentaisTab() {
             </div>
             <div className="flex justify-end gap-2 border-t border-[var(--border-default)] px-6 py-4">
               <button onClick={() => setForm(null)} className="rounded-lg border border-[var(--border-default)] bg-[var(--surface-primary)] px-4 py-2 text-sm text-white/80 hover:bg-[var(--surface-hover)]">Cancelar</button>
-              <button disabled={busy} onClick={save} className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-[#fff] hover:bg-blue-500 disabled:opacity-50">Salvar</button>
+              <button disabled={busy} onClick={save} className="rounded-lg bg-[var(--action-primary)] px-4 py-2 text-sm font-medium text-[var(--action-primary-ink)] hover:bg-[var(--action-primary)] disabled:opacity-50">Salvar</button>
             </div>
           </div>
         </div>

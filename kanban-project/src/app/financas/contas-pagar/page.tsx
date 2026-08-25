@@ -64,11 +64,11 @@ interface ContaPagar {
 }
 
 const statusConfig = {
-  PENDENTE: { label: 'Pendente', color: 'bg-yellow-500/20 text-yellow-400', icon: Clock },
-  PAGO: { label: 'Pago', color: 'bg-green-500/20 text-green-400', icon: CheckCircle },
-  VENCIDO: { label: 'Vencido', color: 'bg-red-500/20 text-red-400', icon: AlertTriangle },
-  CANCELADO: { label: 'Cancelado', color: 'bg-gray-500/20 text-gray-400', icon: XCircle },
-  AGENDADO: { label: 'Agendado', color: 'bg-blue-500/20 text-blue-400', icon: Calendar },
+  PENDENTE: { label: 'Pendente', color: 'bg-yellow-50 text-yellow-700', icon: Clock },
+  PAGO: { label: 'Pago', color: 'bg-green-50 text-green-700', icon: CheckCircle },
+  VENCIDO: { label: 'Vencido', color: 'bg-red-50 text-red-700', icon: AlertTriangle },
+  CANCELADO: { label: 'Cancelado', color: 'bg-gray-500/20 text-[var(--text-muted)]', icon: XCircle },
+  AGENDADO: { label: 'Agendado', color: 'bg-blue-50 text-blue-700', icon: Calendar },
 }
 
 // Identidade estável para a ausência de dados (evita recomputar memos).
@@ -143,7 +143,7 @@ export default function ContasPagarPage() {
       {erro && (
         <div
           role="alert"
-          className="rounded-lg border border-red-500/40 bg-red-500/10 px-4 py-3 text-sm text-red-200"
+          className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700"
         >
           {erro} Tente novamente em instantes — nenhum dado foi exibido no lugar.
         </div>
@@ -163,7 +163,7 @@ export default function ContasPagarPage() {
               Nova Despesa
             </Button>
           </DialogTrigger>
-          <DialogContent className="bg-[#0a1628] border-[var(--border-strong)] text-[#fff] max-w-lg">
+          <DialogContent className="bg-[var(--surface-overlay)] border-[var(--border-strong)] text-[#fff] max-w-lg">
             <DialogHeader>
               <DialogTitle>Nova Conta a Pagar</DialogTitle>
               <DialogDescription className="text-white/60">
@@ -244,19 +244,19 @@ export default function ContasPagarPage() {
         <Card className="bg-[var(--surface-primary)] border-[var(--border-strong)]">
           <CardContent className="pt-4">
             <p className="text-sm text-white/70">A Pagar</p>
-            <p className="text-xl font-bold text-yellow-400">{formatCurrency(totais.pendente)}</p>
+            <p className="text-xl font-bold text-yellow-700">{formatCurrency(totais.pendente)}</p>
           </CardContent>
         </Card>
         <Card className="bg-[var(--surface-primary)] border-[var(--border-strong)]">
           <CardContent className="pt-4">
             <p className="text-sm text-white/70">Vencido</p>
-            <p className="text-xl font-bold text-red-400">{formatCurrency(totais.vencido)}</p>
+            <p className="text-xl font-bold text-red-700">{formatCurrency(totais.vencido)}</p>
           </CardContent>
         </Card>
         <Card className="bg-[var(--surface-primary)] border-[var(--border-strong)]">
           <CardContent className="pt-4">
             <p className="text-sm text-white/70">Pago</p>
-            <p className="text-xl font-bold text-green-400">{formatCurrency(totais.pago)}</p>
+            <p className="text-xl font-bold text-green-700">{formatCurrency(totais.pago)}</p>
           </CardContent>
         </Card>
       </div>
@@ -264,12 +264,12 @@ export default function ContasPagarPage() {
       {/* Filtros */}
       <div className="flex gap-4">
         <div className="relative flex-1">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-white/50" />
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-[var(--text-secondary)]" />
           <Input
             placeholder="Buscar por descrição ou fornecedor..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            className="pl-10 bg-[var(--surface-primary)] border-[var(--border-strong)] text-white placeholder:text-white/50"
+            className="pl-10 bg-[var(--surface-primary)] border-[var(--border-strong)] text-white placeholder:text-[var(--text-secondary)]"
           />
         </div>
         <Select value={statusFilter} onValueChange={setStatusFilter}>
@@ -299,7 +299,7 @@ export default function ContasPagarPage() {
               <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[var(--border-default)]"></div>
             </div>
           ) : filteredContas.length === 0 ? (
-            <div className="flex flex-col items-center justify-center h-48 text-white/50">
+            <div className="flex flex-col items-center justify-center h-48 text-[var(--text-secondary)]">
               <CreditCard className="h-12 w-12 mb-4" />
               <p>Nenhuma conta encontrada</p>
             </div>
@@ -334,7 +334,7 @@ export default function ContasPagarPage() {
                       <td className="p-4">
                         <p className="text-white font-semibold">{formatCurrency(conta.valor)}</p>
                         {conta.valorPago && conta.valorPago > 0 && (
-                          <p className="text-xs text-green-400">Pago: {formatCurrency(conta.valorPago)}</p>
+                          <p className="text-xs text-green-700">Pago: {formatCurrency(conta.valorPago)}</p>
                         )}
                       </td>
                       <td className="p-4 text-white/70">
@@ -363,12 +363,12 @@ export default function ContasPagarPage() {
                               Editar
                             </DropdownMenuItem>
                             {(conta.status === 'PENDENTE' || conta.status === 'VENCIDO') && (
-                              <DropdownMenuItem className="text-green-400">
+                              <DropdownMenuItem className="text-green-700">
                                 <CheckCircle className="h-4 w-4 mr-2" />
                                 Registrar pagamento
                               </DropdownMenuItem>
                             )}
-                            <DropdownMenuItem className="text-red-400">
+                            <DropdownMenuItem className="text-red-700">
                               <Trash2 className="h-4 w-4 mr-2" />
                               Excluir
                             </DropdownMenuItem>

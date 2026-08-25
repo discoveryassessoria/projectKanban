@@ -158,7 +158,7 @@ export function GenealogyDatePicker({
             <Button
               size="sm"
               onClick={handleApply}
-              className="bg-[#123C73] hover:bg-[#0f2d5a] text-[#fff]"
+              className="bg-[var(--action-primary)] hover:bg-[var(--surface-secondary)] text-[var(--action-primary-ink)]"
               disabled={!year}
             >
               Aplicar

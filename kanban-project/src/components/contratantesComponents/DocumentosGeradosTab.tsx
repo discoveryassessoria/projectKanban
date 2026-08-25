@@ -89,7 +89,7 @@ const ICONE_ESTADO = {
   valido: <CheckCircle2 className="h-4 w-4 text-emerald-600" />,
   ausente: <XCircle className="h-4 w-4 text-red-500" />,
   invalido: <AlertTriangle className="h-4 w-4 text-amber-500" />,
-  nao_aplicavel: <MinusCircle className="h-4 w-4 text-gray-300" />,
+  nao_aplicavel: <MinusCircle className="h-4 w-4 text-[var(--text-muted)]" />,
 }
 
 /** Identidade estável para ausência de dados — evita recomputar memos a cada render. */
@@ -439,7 +439,7 @@ export function DocumentosGeradosTab({
             <button onClick={() => void carregar()} className="ml-2 underline">Tentar novamente</button>
           </div>
         ) : documentos.length === 0 ? (
-          <p className="py-6 text-center text-sm text-gray-400">
+          <p className="py-6 text-center text-sm text-[var(--text-muted)]">
             Nenhuma procuração gerada para este cliente.
           </p>
         ) : (
@@ -495,7 +495,7 @@ export function DocumentosGeradosTab({
                             {v.status}
                           </span>
                           {v.motivoInvalidacao && (
-                            <span className="ml-1 text-[10px] text-gray-400">{v.motivoInvalidacao}</span>
+                            <span className="ml-1 text-[10px] text-[var(--text-muted)]">{v.motivoInvalidacao}</span>
                           )}
                         </td>
                         <td className="px-4 py-2">
@@ -527,7 +527,7 @@ export function DocumentosGeradosTab({
                   </tbody>
                 </table>
 
-                <div className="border-t border-gray-100 px-4 py-2 text-[10px] text-gray-400">
+                <div className="border-t border-gray-100 px-4 py-2 text-[10px] text-[var(--text-muted)]">
                   <Link2 className="mr-1 inline h-3 w-3" />
                   O mesmo arquivo é referenciado no cliente e no processo — nunca copiado.
                 </div>

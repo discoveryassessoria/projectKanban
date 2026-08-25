@@ -936,7 +936,7 @@ export function ArvoreGenealogicaView({
         <div className="flex items-center gap-2">
           {/* Botão Paisagem */}
           <button
-            className={`flex items-center gap-2 px-3 py-2 rounded transition-colors ${viewMode === 'paisagem' ? 'bg-[#252c35] text-white/95' : 'hover:bg-[#252c35]'}`}
+            className={`flex items-center gap-2 px-3 py-2 rounded transition-colors ${viewMode === 'paisagem' ? 'bg-[var(--surface-tertiary)] text-white/95' : 'hover:bg-[var(--surface-tertiary)]'}`}
             onClick={() => setViewMode('paisagem')}
           >
             <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -951,7 +951,7 @@ export function ArvoreGenealogicaView({
 
           {/* Botão Retrato */}
           <button
-            className={`flex items-center gap-2 px-3 py-2 rounded transition-colors ${viewMode === 'retrato' ? 'bg-[#252c35] text-white/95' : 'hover:bg-[#252c35]'}`}
+            className={`flex items-center gap-2 px-3 py-2 rounded transition-colors ${viewMode === 'retrato' ? 'bg-[var(--surface-tertiary)] text-white/95' : 'hover:bg-[var(--surface-tertiary)]'}`}
             onClick={() => setViewMode('retrato')}
           >
             <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -968,7 +968,7 @@ export function ArvoreGenealogicaView({
         <div className="flex items-center gap-1">
           {/* Botão Exportar PDF */}
           <button
-            className="flex items-center gap-2 px-3 py-2 hover:bg-[#252c35] rounded transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            className="flex items-center gap-2 px-3 py-2 hover:bg-[var(--surface-tertiary)] rounded transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             onClick={handleExportPDF}
             disabled={isExporting || pessoas.length === 0}
             title="Exportar para PDF"
@@ -985,7 +985,7 @@ export function ArvoreGenealogicaView({
 
           {/* Botão Fullscreen */}
           <button
-            className="p-2 hover:bg-[#252c35] rounded transition-colors"
+            className="p-2 hover:bg-[var(--surface-tertiary)] rounded transition-colors"
             onClick={handleToggleFullscreen}
             title={isFullscreen ? "Sair da tela cheia" : "Tela cheia"}
           >
@@ -1124,7 +1124,7 @@ export function ArvoreGenealogicaView({
             >
               <Search className="h-4 w-4" />
               <span className="hidden sm:inline">Buscar</span>
-              <kbd className="hidden rounded border border-gray-200 px-1 text-[10px] text-gray-400 sm:inline">⌘K</kbd>
+              <kbd className="hidden rounded border border-gray-200 px-1 text-[10px] text-[var(--text-muted)] sm:inline">⌘K</kbd>
             </button>
             )}
             {botaoImportar}
@@ -1340,9 +1340,9 @@ function AddPersonModal({
   // O Preflight do Tailwind aplica `color: inherit` em input/select/textarea.
   // Declarar `bg-[var(--surface-primary)]` sem declarar a cor do texto deixa o campo à mercê do que
   // o ancestral definir — foi assim que o valor digitado virou branco no branco.
-  const inputClass = "w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500 bg-[var(--surface-primary)] text-gray-900 placeholder:text-gray-400 text-sm h-[42px]"
+  const inputClass = "w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-500 bg-[var(--surface-primary)] text-gray-900 placeholder:text-[var(--text-muted)] text-sm h-[42px]"
   
-  const selectClass = "w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500 bg-[var(--surface-primary)] text-gray-900 text-sm h-[42px] appearance-none cursor-pointer"
+  const selectClass = "w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-500 bg-[var(--surface-primary)] text-gray-900 text-sm h-[42px] appearance-none cursor-pointer"
   
   const selectStyle = {
     backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%239ca3af' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E")`,
@@ -1536,7 +1536,7 @@ function AddPersonModal({
               title={semRequerenteDisponivel ? 'Todos os requerentes deste processo já estão na árvore' : undefined}
               className={`px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
                 semRequerenteDisponivel
-                  ? 'text-gray-300 cursor-not-allowed'
+                  ? 'text-[var(--text-muted)] cursor-not-allowed'
                   : modo === 'requerente' ? 'bg-[var(--surface-primary)] shadow-sm text-gray-900' : 'text-gray-500 hover:text-gray-700'
               }`}
             >
@@ -1545,7 +1545,7 @@ function AddPersonModal({
           </div>
           {/* A explicação vem ANTES do clique, não depois. Botão morto com
               tooltip honesto é melhor do que botão vivo que leva a um aviso. */}
-          <p className="text-xs text-gray-400 mt-1.5">
+          <p className="text-xs text-[var(--text-muted)] mt-1.5">
             {semRequerenteDisponivel
               ? 'Requerente do processo: indisponível — todos já estão na árvore. Siga em Pessoa da família.'
               : 'Requerentes do processo são reaproveitados — a árvore não cria uma pessoa duplicada.'}
@@ -1568,7 +1568,7 @@ function AddPersonModal({
 
           {/* ===== Identificação ===== */}
           <section>
-            <h3 className="text-xs font-semibold uppercase tracking-wider text-gray-400 mb-3">Identificação</h3>
+            <h3 className="text-xs font-semibold uppercase tracking-wider text-[var(--text-muted)] mb-3">Identificação</h3>
             <div className="grid grid-cols-3 gap-3">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Nome *</label>
@@ -1591,7 +1591,7 @@ function AddPersonModal({
 
           {/* ===== Nascimento ===== */}
           <section className="border-t border-gray-100 pt-5">
-            <h3 className="text-xs font-semibold uppercase tracking-wider text-gray-400 mb-3">Nascimento</h3>
+            <h3 className="text-xs font-semibold uppercase tracking-wider text-[var(--text-muted)] mb-3">Nascimento</h3>
             <div className="grid grid-cols-3 gap-3">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Data de Nascimento</label>
@@ -1614,23 +1614,23 @@ function AddPersonModal({
 
           {/* ===== Situação ===== */}
           <section className="border-t border-gray-100 pt-5">
-            <h3 className="text-xs font-semibold uppercase tracking-wider text-gray-400 mb-3">Situação</h3>
+            <h3 className="text-xs font-semibold uppercase tracking-wider text-[var(--text-muted)] mb-3">Situação</h3>
             <div className="flex flex-wrap items-center gap-6">
               {type !== 'conjuge' && (
                 <label className="flex items-center gap-2 cursor-pointer">
-                  <input type="checkbox" checked={isCasado} onChange={(e) => setIsCasado(e.target.checked)} className="w-5 h-5 text-teal-600 border-gray-300 rounded focus:ring-teal-500" />
+                  <input type="checkbox" checked={isCasado} onChange={(e) => setIsCasado(e.target.checked)} className="w-5 h-5 text-amber-600 border-gray-300 rounded focus:ring-amber-500" />
                   <span className="text-sm font-medium text-gray-700">Pessoa casada</span>
                 </label>
               )}
               <label className="flex items-center gap-2 cursor-pointer">
-                <input type="checkbox" checked={isFalecido} onChange={(e) => setIsFalecido(e.target.checked)} className="w-5 h-5 text-teal-600 border-gray-300 rounded focus:ring-teal-500" />
+                <input type="checkbox" checked={isFalecido} onChange={(e) => setIsFalecido(e.target.checked)} className="w-5 h-5 text-amber-600 border-gray-300 rounded focus:ring-amber-500" />
                 <span className="text-sm font-medium text-gray-700">Pessoa falecida</span>
               </label>
             </div>
 
             {(isCasado || type === 'conjuge') && (
-              <div className="bg-purple-50 rounded-lg p-3 border border-purple-200 mt-3">
-                <h4 className="text-sm font-medium text-purple-800 mb-2">Dados do Casamento</h4>
+              <div className="bg-slate-50 rounded-lg p-3 border border-slate-200 mt-3">
+                <h4 className="text-sm font-medium text-slate-800 mb-2">Dados do Casamento</h4>
                 <div className="grid grid-cols-3 gap-3">
                   {type !== 'conjuge' && (
                     <div>
@@ -1674,42 +1674,42 @@ function AddPersonModal({
 
           {/* ===== Classificação no processo ===== */}
           <section className="border-t border-gray-100 pt-5">
-            <h3 className="text-xs font-semibold uppercase tracking-wider text-gray-400 mb-3">Classificação no processo</h3>
+            <h3 className="text-xs font-semibold uppercase tracking-wider text-[var(--text-muted)] mb-3">Classificação no processo</h3>
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Nº Linhagem</label>
                 <input type="number" min="1" value={numeroLinhagem} onChange={(e) => setNumeroLinhagem(e.target.value)} placeholder="Ex: 1, 2, 3..." className={inputClass} />
-                <span className="block text-xs text-gray-400 mt-1">Ordena a pasta documental — vale pra todas as pessoas.</span>
+                <span className="block text-xs text-[var(--text-muted)] mt-1">Ordena a pasta documental — vale pra todas as pessoas.</span>
               </div>
             </div>
-            <p className="text-xs text-gray-400 mt-2">
+            <p className="text-xs text-[var(--text-muted)] mt-2">
               É um requerente do processo? Use a opção <strong>Requerente do processo</strong> no topo — a pessoa existente é reaproveitada, sem duplicar.
             </p>
             <label className="flex items-start gap-2 cursor-pointer rounded-lg border border-gray-200 p-3 mt-3">
-              <input type="checkbox" checked={isLinhaReta} onChange={(e) => setIsLinhaReta(e.target.checked)} className="w-5 h-5 mt-0.5 text-teal-600 border-gray-300 rounded focus:ring-teal-500" />
+              <input type="checkbox" checked={isLinhaReta} onChange={(e) => setIsLinhaReta(e.target.checked)} className="w-5 h-5 mt-0.5 text-amber-600 border-gray-300 rounded focus:ring-amber-500" />
               <span>
                 <span className="block text-sm font-medium text-gray-700">Pertence à linha reta de transmissão</span>
-                <span className="block text-xs text-gray-400">Define se a pessoa entra na Linha principal ou em Cônjuges/Apoio na Central Operacional.</span>
+                <span className="block text-xs text-[var(--text-muted)]">Define se a pessoa entra na Linha principal ou em Cônjuges/Apoio na Central Operacional.</span>
               </span>
             </label>
             <label className="flex items-start gap-2 cursor-pointer rounded-lg border border-gray-200 p-3 mt-3">
-              <input type="checkbox" checked={precisaDocumentacao} onChange={(e) => setPrecisaDocumentacao(e.target.checked)} className="w-5 h-5 mt-0.5 text-teal-600 border-gray-300 rounded focus:ring-teal-500" />
+              <input type="checkbox" checked={precisaDocumentacao} onChange={(e) => setPrecisaDocumentacao(e.target.checked)} className="w-5 h-5 mt-0.5 text-amber-600 border-gray-300 rounded focus:ring-amber-500" />
               <span>
                 <span className="block text-sm font-medium text-gray-700">Precisa de documentação</span>
-                <span className="block text-xs text-gray-400">Se desligado, o sistema não gera os documentos desta pessoa e ela não entra na Central Operacional / workflow.</span>
+                <span className="block text-xs text-[var(--text-muted)]">Se desligado, o sistema não gera os documentos desta pessoa e ela não entra na Central Operacional / workflow.</span>
               </span>
             </label>
           </section>
 
           {/* ===== Observações ===== */}
           <section className="border-t border-gray-100 pt-5">
-            <h3 className="text-xs font-semibold uppercase tracking-wider text-gray-400 mb-3">Observações</h3>
-            <textarea value={comentario} onChange={(e) => setComentario(e.target.value)} rows={2} className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500 bg-[var(--surface-primary)] text-gray-900 placeholder:text-gray-400 resize-none text-sm" />
+            <h3 className="text-xs font-semibold uppercase tracking-wider text-[var(--text-muted)] mb-3">Observações</h3>
+            <textarea value={comentario} onChange={(e) => setComentario(e.target.value)} rows={2} className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-500 bg-[var(--surface-primary)] text-gray-900 placeholder:text-[var(--text-muted)] resize-none text-sm" />
           </section>
 
           <div className="flex justify-end gap-3 pt-4 border-t border-gray-100">
             <button type="button" onClick={onClose} className="px-4 py-2 text-gray-600 hover:text-gray-800 transition-colors">Cancelar</button>
-            <button type="submit" disabled={saving || !nome.trim()} className="px-6 py-2 bg-teal-600 text-[#fff] rounded-lg hover:bg-teal-700 transition-colors disabled:opacity-50">
+            <button type="submit" disabled={saving || !nome.trim()} className="px-6 py-2 bg-amber-600 text-[#fff] rounded-lg hover:bg-amber-700 transition-colors disabled:opacity-50">
               {saving ? 'Salvando...' : 'Adicionar'}
             </button>
           </div>
@@ -1774,9 +1774,9 @@ function EditPersonModal({
   // O Preflight do Tailwind aplica `color: inherit` em input/select/textarea.
   // Declarar `bg-[var(--surface-primary)]` sem declarar a cor do texto deixa o campo à mercê do que
   // o ancestral definir — foi assim que o valor digitado virou branco no branco.
-  const inputClass = "w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500 bg-[var(--surface-primary)] text-gray-900 placeholder:text-gray-400 text-sm h-[42px]"
+  const inputClass = "w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-500 bg-[var(--surface-primary)] text-gray-900 placeholder:text-[var(--text-muted)] text-sm h-[42px]"
   
-  const selectClass = "w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500 bg-[var(--surface-primary)] text-gray-900 text-sm h-[42px] appearance-none cursor-pointer"
+  const selectClass = "w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-500 bg-[var(--surface-primary)] text-gray-900 text-sm h-[42px] appearance-none cursor-pointer"
   
   const selectStyle = {
     backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%239ca3af' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E")`,
@@ -1990,7 +1990,7 @@ function EditPersonModal({
 
           {/* ===== Identificação ===== */}
           <section>
-            <h3 className="text-xs font-semibold uppercase tracking-wider text-gray-400 mb-3">Identificação</h3>
+            <h3 className="text-xs font-semibold uppercase tracking-wider text-[var(--text-muted)] mb-3">Identificação</h3>
             <div className="grid grid-cols-3 gap-3">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Nome *</label>
@@ -2013,7 +2013,7 @@ function EditPersonModal({
 
           {/* ===== Nascimento ===== */}
           <section className="border-t border-gray-100 pt-5">
-            <h3 className="text-xs font-semibold uppercase tracking-wider text-gray-400 mb-3">Nascimento</h3>
+            <h3 className="text-xs font-semibold uppercase tracking-wider text-[var(--text-muted)] mb-3">Nascimento</h3>
             <div className="grid grid-cols-3 gap-3">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Data de Nascimento</label>
@@ -2036,21 +2036,21 @@ function EditPersonModal({
 
           {/* ===== Situação ===== */}
           <section className="border-t border-gray-100 pt-5">
-            <h3 className="text-xs font-semibold uppercase tracking-wider text-gray-400 mb-3">Situação</h3>
+            <h3 className="text-xs font-semibold uppercase tracking-wider text-[var(--text-muted)] mb-3">Situação</h3>
             <div className="flex flex-wrap items-center gap-6">
               <label className="flex items-center gap-2 cursor-pointer">
-                <input type="checkbox" checked={isCasado} onChange={(e) => setIsCasado(e.target.checked)} className="w-5 h-5 text-teal-600 border-gray-300 rounded focus:ring-teal-500" />
+                <input type="checkbox" checked={isCasado} onChange={(e) => setIsCasado(e.target.checked)} className="w-5 h-5 text-amber-600 border-gray-300 rounded focus:ring-amber-500" />
                 <span className="text-sm font-medium text-gray-700">Pessoa casada</span>
               </label>
               <label className="flex items-center gap-2 cursor-pointer">
-                <input type="checkbox" checked={isFalecido} onChange={(e) => setIsFalecido(e.target.checked)} className="w-5 h-5 text-teal-600 border-gray-300 rounded focus:ring-teal-500" />
+                <input type="checkbox" checked={isFalecido} onChange={(e) => setIsFalecido(e.target.checked)} className="w-5 h-5 text-amber-600 border-gray-300 rounded focus:ring-amber-500" />
                 <span className="text-sm font-medium text-gray-700">Pessoa falecida</span>
               </label>
             </div>
 
             {isCasado && (
-              <div className="bg-purple-50 rounded-lg p-3 border border-purple-200 mt-3">
-                <h4 className="text-sm font-medium text-purple-800 mb-2">Dados do Casamento</h4>
+              <div className="bg-slate-50 rounded-lg p-3 border border-slate-200 mt-3">
+                <h4 className="text-sm font-medium text-slate-800 mb-2">Dados do Casamento</h4>
                 <div className="grid grid-cols-3 gap-3">
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">Cônjuge</label>
@@ -2092,7 +2092,7 @@ function EditPersonModal({
 
           {/* ===== Classificação no processo ===== */}
           <section className="border-t border-gray-100 pt-5">
-            <h3 className="text-xs font-semibold uppercase tracking-wider text-gray-400 mb-3">Classificação no processo</h3>
+            <h3 className="text-xs font-semibold uppercase tracking-wider text-[var(--text-muted)] mb-3">Classificação no processo</h3>
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Requerente</label>
@@ -2113,34 +2113,34 @@ function EditPersonModal({
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Nº Linhagem</label>
                 <input type="number" min="1" value={numeroLinhagem} onChange={(e) => setNumeroLinhagem(e.target.value)} placeholder="Ex: 1, 2, 3..." className={inputClass} />
-                <span className="block text-xs text-gray-400 mt-1">Ordena a pasta documental — vale pra todas as pessoas.</span>
+                <span className="block text-xs text-[var(--text-muted)] mt-1">Ordena a pasta documental — vale pra todas as pessoas.</span>
               </div>
             </div>
             <label className="flex items-start gap-2 cursor-pointer rounded-lg border border-gray-200 p-3 mt-3">
-              <input type="checkbox" checked={isLinhaReta} onChange={(e) => setIsLinhaReta(e.target.checked)} className="w-5 h-5 mt-0.5 text-teal-600 border-gray-300 rounded focus:ring-teal-500" />
+              <input type="checkbox" checked={isLinhaReta} onChange={(e) => setIsLinhaReta(e.target.checked)} className="w-5 h-5 mt-0.5 text-amber-600 border-gray-300 rounded focus:ring-amber-500" />
               <span>
                 <span className="block text-sm font-medium text-gray-700">Pertence à linha reta de transmissão</span>
-                <span className="block text-xs text-gray-400">Define se a pessoa entra na Linha principal ou em Cônjuges/Apoio na Central Operacional.</span>
+                <span className="block text-xs text-[var(--text-muted)]">Define se a pessoa entra na Linha principal ou em Cônjuges/Apoio na Central Operacional.</span>
               </span>
             </label>
             <label className="flex items-start gap-2 cursor-pointer rounded-lg border border-gray-200 p-3 mt-3">
-              <input type="checkbox" checked={precisaDocumentacao} onChange={(e) => setPrecisaDocumentacao(e.target.checked)} className="w-5 h-5 mt-0.5 text-teal-600 border-gray-300 rounded focus:ring-teal-500" />
+              <input type="checkbox" checked={precisaDocumentacao} onChange={(e) => setPrecisaDocumentacao(e.target.checked)} className="w-5 h-5 mt-0.5 text-amber-600 border-gray-300 rounded focus:ring-amber-500" />
               <span>
                 <span className="block text-sm font-medium text-gray-700">Precisa de documentação</span>
-                <span className="block text-xs text-gray-400">Se desligado, o sistema não gera os documentos desta pessoa e ela não entra na Central Operacional / workflow.</span>
+                <span className="block text-xs text-[var(--text-muted)]">Se desligado, o sistema não gera os documentos desta pessoa e ela não entra na Central Operacional / workflow.</span>
               </span>
             </label>
           </section>
 
           {/* ===== Observações ===== */}
           <section className="border-t border-gray-100 pt-5">
-            <h3 className="text-xs font-semibold uppercase tracking-wider text-gray-400 mb-3">Observações</h3>
-            <textarea value={comentario} onChange={(e) => setComentario(e.target.value)} rows={2} className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500 bg-[var(--surface-primary)] text-gray-900 placeholder:text-gray-400 resize-none text-sm" />
+            <h3 className="text-xs font-semibold uppercase tracking-wider text-[var(--text-muted)] mb-3">Observações</h3>
+            <textarea value={comentario} onChange={(e) => setComentario(e.target.value)} rows={2} className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-500 bg-[var(--surface-primary)] text-gray-900 placeholder:text-[var(--text-muted)] resize-none text-sm" />
           </section>
 
           <div className="flex justify-end gap-3 pt-4 border-t border-gray-100">
             <button type="button" onClick={onClose} className="px-4 py-2 text-gray-600 hover:text-gray-800 transition-colors">Cancelar</button>
-            <button type="submit" disabled={saving || !nome.trim()} className="px-6 py-2 bg-teal-600 text-[#fff] rounded-lg hover:bg-teal-700 transition-colors disabled:opacity-50">
+            <button type="submit" disabled={saving || !nome.trim()} className="px-6 py-2 bg-amber-600 text-[#fff] rounded-lg hover:bg-amber-700 transition-colors disabled:opacity-50">
               {saving ? 'Salvando...' : 'Salvar'}
             </button>
           </div>

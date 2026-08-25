@@ -3,7 +3,7 @@
 // Skeleton do Centro Operacional — mesma malha da página real (glass/dark),
 // para não haver salto de layout durante o carregamento.
 export function HomeSkeleton() {
-  const bloco = "animate-pulse rounded-xl border border-[var(--border-default)] bg-white/[0.05] backdrop-blur-md"
+  const bloco = "animate-pulse rounded-xl border border-[var(--border-default)] bg-[var(--surface-primary)] backdrop-blur-md"
   return (
     <div
       className="mx-auto w-full max-w-[1600px] space-y-5 px-4 py-5 md:px-6"

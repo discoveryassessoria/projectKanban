@@ -377,7 +377,7 @@ export default function RelatorioClientesButton() {
                 handleSelectDocFiltro({ label: "Clientes sem CNH", filtro: "CNH" })
               }}
             >
-              <Car className="mr-2 h-4 w-4 text-purple-500" />
+              <Car className="mr-2 h-4 w-4 text-slate-500" />
               <span className="font-medium text-sm">Sem CNH</span>
             </DropdownMenuItem>
 
@@ -388,7 +388,7 @@ export default function RelatorioClientesButton() {
                 handleSelectDocFiltro({ label: "Clientes sem Comprovante", filtro: "COMPROVANTE_ENDERECO" })
               }}
             >
-              <Home className="mr-2 h-4 w-4 text-teal-500" />
+              <Home className="mr-2 h-4 w-4 text-amber-500" />
               <span className="font-medium text-sm">Sem Comprovante de Endereço</span>
             </DropdownMenuItem>
           </>

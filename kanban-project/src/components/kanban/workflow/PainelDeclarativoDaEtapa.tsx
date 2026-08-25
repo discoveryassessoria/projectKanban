@@ -91,8 +91,8 @@ interface Dados {
   execucoesAnteriores: Tentativa[]
 }
 
-const inp = "w-full rounded-lg border border-[var(--border-default)] bg-[var(--surface-primary)] px-3 py-2 text-sm text-white placeholder-white/30 outline-none focus:border-blue-400/50"
-const lbl = "mb-1 block text-[11px] uppercase tracking-wide text-white/40"
+const inp = "w-full rounded-lg border border-[var(--border-default)] bg-[var(--surface-primary)] px-3 py-2 text-sm text-white placeholder-white/30 outline-none focus:border-blue-200"
+const lbl = "mb-1 block text-[11px] uppercase tracking-wide text-[var(--text-muted)]"
 
 function headers(): HeadersInit {
   const t = typeof window !== "undefined" ? localStorage.getItem("token") : null
@@ -205,13 +205,13 @@ export default function PainelDeclarativoDaEtapa({
 
   if (erroCarga) {
     return (
-      <div className="rounded-lg border border-red-400/30 bg-red-500/10 p-4 text-sm text-red-200">
+      <div className="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-700">
         {erroCarga}
-        <button onClick={() => void carregar()} className="ml-3 rounded-lg border border-red-300/30 px-2.5 py-1 text-xs hover:bg-red-500/10">Tentar novamente</button>
+        <button onClick={() => void carregar()} className="ml-3 rounded-lg border border-red-200 px-2.5 py-1 text-xs hover:bg-red-50">Tentar novamente</button>
       </div>
     )
   }
-  if (!d) return <div className="p-4 text-sm text-white/50">Carregando a configuração da etapa…</div>
+  if (!d) return <div className="p-4 text-sm text-[var(--text-secondary)]">Carregando a configuração da etapa…</div>
 
   if (!d.configuracao) {
     return (
@@ -229,8 +229,8 @@ export default function PainelDeclarativoDaEtapa({
     <div className="space-y-5">
       <div>
         <h3 className="text-sm font-semibold text-white">{cfg.label}</h3>
-        {cfg.descricao && <p className="mt-0.5 text-xs text-white/50">{cfg.descricao}</p>}
-        <p className="mt-1 text-[11px] text-white/35">
+        {cfg.descricao && <p className="mt-0.5 text-xs text-[var(--text-secondary)]">{cfg.descricao}</p>}
+        <p className="mt-1 text-[11px] text-[var(--text-muted)]">
           Configuração da versão {d.versao} · execução {d.execucaoAtual?.sequencia ?? 1}
           {d.execucoesAnteriores.length > 0 && ` · ${d.execucoesAnteriores.length} execução(ões) anterior(es)`}
         </p>
@@ -241,7 +241,7 @@ export default function PainelDeclarativoDaEtapa({
         <div className="space-y-2">
           <div className="flex items-center justify-between">
             <div className="text-xs font-medium text-white/70">O que fazer nesta etapa</div>
-            {d.fornecedor && <span className="text-[11px] text-white/40">órgão: {d.fornecedor.nome}</span>}
+            {d.fornecedor && <span className="text-[11px] text-[var(--text-muted)]">órgão: {d.fornecedor.nome}</span>}
           </div>
 
           {(d.subtarefas ?? []).filter((st) => st.visivel).map((st) => {
@@ -259,17 +259,17 @@ export default function PainelDeclarativoDaEtapa({
                         : st.status === "BLOQUEADO" || st.status === "PENDENTE" ? "bg-[var(--surface-secondary)]"
                         : st.status === "AGUARDANDO_EXTERNO" ? "bg-sky-400"
                         : "bg-amber-400"}`} />
-                      <span className={`text-sm ${st.concluida ? "text-white/50 line-through" : "text-white"}`}>{st.label}</span>
-                      {st.obrigatoria && !st.concluida && <span className="rounded bg-amber-500/15 px-1.5 py-0.5 text-[10px] text-amber-300">obrigatória</span>}
-                      {st.ocorrencias > 1 && <span className="rounded bg-[var(--surface-primary)] px-1.5 py-0.5 text-[10px] text-white/50">{st.ocorrencias}ª vez</span>}
+                      <span className={`text-sm ${st.concluida ? "text-[var(--text-secondary)] line-through" : "text-white"}`}>{st.label}</span>
+                      {st.obrigatoria && !st.concluida && <span className="rounded bg-amber-50 px-1.5 py-0.5 text-[10px] text-amber-700">obrigatória</span>}
+                      {st.ocorrencias > 1 && <span className="rounded bg-[var(--surface-primary)] px-1.5 py-0.5 text-[10px] text-[var(--text-secondary)]">{st.ocorrencias}ª vez</span>}
                     </div>
-                    {st.descricao && <p className="mt-0.5 text-[11px] text-white/40">{st.descricao}</p>}
+                    {st.descricao && <p className="mt-0.5 text-[11px] text-[var(--text-muted)]">{st.descricao}</p>}
                     {/* O MOTIVO VEM DO SERVIDOR. A tela não deduz por que está bloqueada. */}
                     {!st.disponivel && !st.concluida && st.bloqueioTexto && (
-                      <p className="mt-1 text-[11px] text-amber-300/70">{st.bloqueioTexto}</p>
+                      <p className="mt-1 text-[11px] text-amber-700/70">{st.bloqueioTexto}</p>
                     )}
                     {st.concluida && st.execucao?.resultado && (
-                      <p className="mt-1 text-[11px] text-emerald-300/60">
+                      <p className="mt-1 text-[11px] text-emerald-700/60">
                         {st.execucao.resultado}
                         {st.execucao.completedAt && ` · ${new Date(st.execucao.completedAt).toLocaleDateString("pt-BR")}`}
                       </p>
@@ -302,7 +302,7 @@ export default function PainelDeclarativoDaEtapa({
                             c.exigeRastreio ? "rastreio" : null, c.exigeObservacao ? "observação" : null,
                           ].filter(Boolean)
                           return (
-                            <p className="mt-1 text-[11px] text-white/40">
+                            <p className="mt-1 text-[11px] text-[var(--text-muted)]">
                               {c.endereco ? `${c.endereco} · ` : ""}
                               {exige.length ? `exige ${exige.join(", ")}.` : "não exige comprovação específica."}
                             </p>
@@ -313,7 +313,7 @@ export default function PainelDeclarativoDaEtapa({
 
                     {st.definicao.campos.filter((c) => visivel(c, vals)).map((c) => (
                       <div key={c.key}>
-                        <label className={lbl}>{c.label}{c.obrigatorio && <span className="text-amber-300"> *</span>}</label>
+                        <label className={lbl}>{c.label}{c.obrigatorio && <span className="text-amber-700"> *</span>}</label>
                         {c.tipo === "textarea" ? (
                           <textarea className={inp} rows={3} value={String(vals[c.key] ?? "")}
                             onChange={(e) => setValoresDaSub({ ...valoresDaSub, [st.key]: { ...vals, [c.key]: e.target.value } })} />
@@ -328,7 +328,7 @@ export default function PainelDeclarativoDaEtapa({
                             value={String(vals[c.key] ?? "")}
                             onChange={(e) => setValoresDaSub({ ...valoresDaSub, [st.key]: { ...vals, [c.key]: e.target.value } })} />
                         )}
-                        {c.ajuda && <p className="mt-1 text-[11px] text-white/35">{c.ajuda}</p>}
+                        {c.ajuda && <p className="mt-1 text-[11px] text-[var(--text-muted)]">{c.ajuda}</p>}
                       </div>
                     ))}
 
@@ -339,8 +339,8 @@ export default function PainelDeclarativoDaEtapa({
                           <label key={it.key} className="flex items-start gap-2 text-xs text-white/70">
                             <input type="checkbox" className="mt-0.5" checked={!!marc[it.key]}
                               onChange={(e) => setMarcadosDaSub({ ...marcadosDaSub, [st.key]: { ...marc, [it.key]: e.target.checked } })} />
-                            <span>{it.label}{it.obrigatorio && <span className="text-amber-300"> *</span>}
-                              {it.descricao && <span className="block text-[11px] text-white/35">{it.descricao}</span>}</span>
+                            <span>{it.label}{it.obrigatorio && <span className="text-amber-700"> *</span>}
+                              {it.descricao && <span className="block text-[11px] text-[var(--text-muted)]">{it.descricao}</span>}</span>
                           </label>
                         ))}
                       </div>
@@ -348,7 +348,7 @@ export default function PainelDeclarativoDaEtapa({
 
                     <div className="flex flex-wrap gap-2">
                       {st.definicao.acoes.length === 0 && (
-                        <p className="text-[11px] text-amber-300/70">Esta subtarefa não tem resultado cadastrado.</p>
+                        <p className="text-[11px] text-amber-700/70">Esta subtarefa não tem resultado cadastrado.</p>
                       )}
                       {st.definicao.acoes.map((a) => (
                         <button key={a.key} onClick={() => executar(a, st.key)}
@@ -367,7 +367,7 @@ export default function PainelDeclarativoDaEtapa({
 
           {/* O QUE FALTA PARA O PASSO CONCLUIR, segundo a regra cadastrada. */}
           {d.conclusao && !d.conclusao.pode && (
-            <p className="text-[11px] text-amber-300/70">
+            <p className="text-[11px] text-amber-700/70">
               A etapa só conclui quando: {d.conclusao.faltando.map((x) => x.label).join(", ")}.
             </p>
           )}
@@ -380,14 +380,14 @@ export default function PainelDeclarativoDaEtapa({
       {(d.contexto?.blocos.length ?? 0) > 0 && (
         <div className="space-y-2">
           {d.contexto!.blocos.map((bloco) => (
-            <div key={bloco.chave} className="rounded-lg border border-[var(--border-default)] bg-white/[0.03] p-3">
-              <p className="text-[11px] uppercase tracking-wide text-white/40">{bloco.titulo}</p>
+            <div key={bloco.chave} className="rounded-lg border border-[var(--border-default)] bg-[var(--surface-primary)] p-3">
+              <p className="text-[11px] uppercase tracking-wide text-[var(--text-muted)]">{bloco.titulo}</p>
               <dl className="mt-2 space-y-1.5">
                 {bloco.itens.map((item, i) => (
                   <div key={i} className="flex flex-wrap items-baseline gap-x-2">
-                    <dt className="text-xs text-white/45">{item.rotulo}</dt>
+                    <dt className="text-xs text-[var(--text-secondary)]">{item.rotulo}</dt>
                     <dd className="text-sm text-white/85">{item.valor}</dd>
-                    {item.detalhe && <span className="text-[11px] text-white/35">{item.detalhe}</span>}
+                    {item.detalhe && <span className="text-[11px] text-[var(--text-muted)]">{item.detalhe}</span>}
                   </div>
                 ))}
               </dl>
@@ -400,7 +400,7 @@ export default function PainelDeclarativoDaEtapa({
         <div className="space-y-3">
           {cfg.campos.filter((c) => visivel(c, valores)).map((c) => (
             <div key={c.key}>
-              <label className={lbl}>{c.label}{c.obrigatorio && <span className="text-amber-300"> *</span>}</label>
+              <label className={lbl}>{c.label}{c.obrigatorio && <span className="text-amber-700"> *</span>}</label>
               {c.tipo === "textarea" ? (
                 <textarea className={inp} rows={3} value={String(valores[c.key] ?? "")} onChange={(e) => setValores({ ...valores, [c.key]: e.target.value })} />
               ) : c.tipo === "select" || c.tipo === "multiselect" || c.tipo === "referencia" ? (
@@ -434,7 +434,7 @@ export default function PainelDeclarativoDaEtapa({
                   onChange={(e) => setValores({ ...valores, [c.key]: e.target.value })}
                 />
               )}
-              {c.ajuda && <p className="mt-1 text-[11px] text-white/35">{c.ajuda}</p>}
+              {c.ajuda && <p className="mt-1 text-[11px] text-[var(--text-muted)]">{c.ajuda}</p>}
             </div>
           ))}
         </div>
@@ -449,24 +449,24 @@ export default function PainelDeclarativoDaEtapa({
                 <input type="checkbox" className="mt-1" checked={!!marcados[i.key]} onChange={(e) => setMarcados({ ...marcados, [i.key]: e.target.checked })} />
                 <span>
                   <span className="text-sm text-white/85">{i.label}</span>
-                  {i.descricao && <span className="block text-[11px] text-white/40">{i.descricao}</span>}
+                  {i.descricao && <span className="block text-[11px] text-[var(--text-muted)]">{i.descricao}</span>}
                 </span>
               </label>
             ))}
           </div>
           {checklistFaltando.length > 0 && (
-            <p className="mt-1 text-[11px] text-amber-300/70">{checklistFaltando.length} item(ns) de conferência ainda não marcados.</p>
+            <p className="mt-1 text-[11px] text-amber-700/70">{checklistFaltando.length} item(ns) de conferência ainda não marcados.</p>
           )}
         </div>
       )}
 
-      {recusa && <div className="rounded-lg border border-amber-400/30 bg-amber-500/10 px-3 py-2 text-xs text-amber-100">{recusa}</div>}
-      {feito && <div className="rounded-lg border border-emerald-400/30 bg-emerald-500/10 px-3 py-2 text-xs text-emerald-100">{feito}</div>}
+      {recusa && <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-100">{recusa}</div>}
+      {feito && <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs text-emerald-100">{feito}</div>}
 
       <div>
         <div className={lbl}>Resultado</div>
         {cfg.acoes.length === 0 && (
-          <p className="text-xs text-white/40">Nenhum resultado cadastrado para esta etapa nesta versão.</p>
+          <p className="text-xs text-[var(--text-muted)]">Nenhum resultado cadastrado para esta etapa nesta versão.</p>
         )}
         <div className="space-y-1.5">
           {cfg.acoes.map((a) => (
@@ -474,7 +474,7 @@ export default function PainelDeclarativoDaEtapa({
               className="w-full rounded-lg border border-[var(--border-default)] bg-[var(--surface-primary)] px-3 py-2.5 text-left hover:bg-[var(--surface-hover)] disabled:opacity-50">
               <div className="text-sm font-medium text-white">{enviando === `-|${a.key}` ? "Executando…" : a.label}</div>
               {(a.descricao || a.efeito) && (
-                <div className="mt-0.5 text-[11px] text-white/45">{a.descricao ?? a.efeito?.descricao}</div>
+                <div className="mt-0.5 text-[11px] text-[var(--text-secondary)]">{a.descricao ?? a.efeito?.descricao}</div>
               )}
             </button>
           ))}
@@ -493,7 +493,7 @@ export default function PainelDeclarativoDaEtapa({
               Reexecutar esta etapa
             </button>
           ) : (
-            <div className="space-y-2 rounded-lg border border-amber-400/30 bg-amber-500/5 p-3">
+            <div className="space-y-2 rounded-lg border border-amber-200 bg-amber-500/5 p-3">
               <div className="text-xs font-medium text-amber-100">O que a reexecução faz</div>
               <ul className="space-y-1 text-[11px] text-white/70">
                 <li>Reexecutada: <b>{preview.seraReexecutado.map((p) => p.stepKey).join(", ") || "—"}</b></li>
@@ -501,7 +501,7 @@ export default function PainelDeclarativoDaEtapa({
                 <li>Herdadas (continuam valendo): <b>{preview.herdados.map((p) => p.stepKey).join(", ") || "nenhuma"}</b></li>
                 <li>Intactas: <b>{preview.intactos.map((p) => p.stepKey).join(", ") || "nenhuma"}</b></li>
               </ul>
-              <p className="text-[11px] text-white/45">{preview.aviso}</p>
+              <p className="text-[11px] text-[var(--text-secondary)]">{preview.aviso}</p>
               <div>
                 <label className={lbl}>Por quê</label>
                 <textarea className={inp} rows={2} value={justificativa} onChange={(e) => setJustificativa(e.target.value)}
@@ -524,11 +524,11 @@ export default function PainelDeclarativoDaEtapa({
           <div className={lbl}>Execuções anteriores</div>
           <div className="space-y-1">
             {d.execucoesAnteriores.map((t) => (
-              <div key={t.id} className="rounded-lg border border-[var(--border-default)] bg-white/[0.03] px-3 py-2 text-xs text-white/55">
+              <div key={t.id} className="rounded-lg border border-[var(--border-default)] bg-[var(--surface-primary)] px-3 py-2 text-xs text-[var(--text-secondary)]">
                 <span className="text-white/75">Execução {t.sequencia}</span> · {t.status.toLowerCase()}
                 {t.resultado && ` · ${t.resultado}`}
                 {t.completedAt && ` · concluída em ${new Date(t.completedAt).toLocaleDateString("pt-BR")}`}
-                <span className="ml-1 text-white/30">({t.motivo.toLowerCase()})</span>
+                <span className="ml-1 text-[var(--text-muted)]">({t.motivo.toLowerCase()})</span>
               </div>
             ))}
           </div>

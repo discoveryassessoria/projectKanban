@@ -207,7 +207,7 @@ function DocumentoIndicador({ doc }: { doc: DocumentoArvore }) {
       >
         {tipoLabel.charAt(0)}
       </div>
-      <div className="absolute left-full ml-2 top-1/2 -translate-y-1/2 px-2 py-1 bg-gray-900 text-white text-xs rounded whitespace-nowrap opacity-0 invisible group-hover/tooltip:opacity-100 group-hover/tooltip:visible transition-all z-[100] pointer-events-none shadow-lg">
+      <div className="absolute left-full ml-2 top-1/2 -translate-y-1/2 px-2 py-1 bg-[var(--surface-popover)] text-white text-xs rounded whitespace-nowrap opacity-0 invisible group-hover/tooltip:opacity-100 group-hover/tooltip:visible transition-all z-[100] pointer-events-none shadow-lg">
         {tipoLabel}: {config.label}
         <div className="absolute right-full top-1/2 -translate-y-1/2 border-4 border-transparent border-r-gray-900" />
       </div>
@@ -322,7 +322,7 @@ export function PessoaCard({
             <div className="flex items-center gap-2 mt-1 flex-wrap">
               <StatusBadge deceased={isDeceased(pessoa)} />
               <CountryBadge pais={pessoa.pais_nasc} />
-              <span className="text-xs text-gray-400 font-mono">{pid}</span>
+              <span className="text-xs text-[var(--text-muted)] font-mono">{pid}</span>
             </div>
           </div>
         </div>
@@ -335,7 +335,7 @@ export function PessoaCard({
               {casamento.data_inicio ? formatFullDate(casamento.data_inicio) : 'Data não informada'}
             </p>
             {casamento.local && (
-              <p className="text-xs text-gray-400 mt-0.5">
+              <p className="text-xs text-[var(--text-muted)] mt-0.5">
                 {casamento.local}{casamento.pais ? `, ${casamento.pais}` : ''}
               </p>
             )}
@@ -369,7 +369,7 @@ export function PessoaCard({
                 <div className="flex items-center gap-2 mt-0.5 flex-wrap">
                   <StatusBadge deceased={isDeceased(conjuge)} />
                   <CountryBadge pais={conjuge.pais_nasc} />
-                  <span className="text-xs text-gray-400 font-mono">{conjugePid}</span>
+                  <span className="text-xs text-[var(--text-muted)] font-mono">{conjugePid}</span>
                 </div>
               </div>
             </div>
@@ -386,8 +386,8 @@ export function PessoaCard({
             onAddConjuge(pessoa)
           }}
         >
-          <div className="flex items-center gap-2 text-gray-400 group-hover:text-teal-600">
-            <div className="w-9 h-9 rounded-full bg-gray-100 flex items-center justify-center group-hover:bg-teal-50">
+          <div className="flex items-center gap-2 text-[var(--text-muted)] group-hover:text-amber-600">
+            <div className="w-9 h-9 rounded-full bg-gray-100 flex items-center justify-center group-hover:bg-amber-50">
               <UserPlus className="h-4 w-4" />
             </div>
             <span className="text-sm font-medium">Adicionar cônjuge</span>
@@ -399,7 +399,7 @@ export function PessoaCard({
       {showChildrenDropdown && (
         <div className="px-4 py-3 border-t border-gray-100 flex items-center justify-between cursor-pointer hover:bg-gray-50 transition-colors">
           <span className="text-sm font-medium text-gray-600">Filhos</span>
-          <ChevronDown className="h-4 w-4 text-gray-400" />
+          <ChevronDown className="h-4 w-4 text-[var(--text-muted)]" />
         </div>
       )}
     </div>
@@ -439,7 +439,7 @@ export function AddPersonButton({ type, onClick, disabled, size = 'md' }: AddPer
 
   return (
     <button
-      className={`flex items-center gap-3 ${sizeClasses[size]} bg-[var(--surface-primary)] rounded-xl border-2 border-dashed border-gray-300 cursor-pointer hover:border-teal-500 hover:bg-teal-50 transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-sm hover:shadow-md`}
+      className={`flex items-center gap-3 ${sizeClasses[size]} bg-[var(--surface-primary)] rounded-xl border-2 border-dashed border-gray-300 cursor-pointer hover:border-amber-500 hover:bg-amber-50 transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-sm hover:shadow-md`}
       onClick={onClick}
       disabled={disabled}
     >

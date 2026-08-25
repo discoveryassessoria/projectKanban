@@ -103,13 +103,13 @@ export function TarefaTransversalModal({ processoId, necessidadeId, necessidadeL
       <div className="max-w-lg w-full rounded-2xl bg-[var(--surface-popover)] shadow-xl" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center justify-between px-5 pt-4 pb-3 border-b border-[var(--border-default)]">
           <h3 className="text-[15px] font-extrabold text-white/95 flex items-center gap-2"><ArrowLeftRight className="w-4 h-4 text-amber-500" /> Nova tarefa transversal</h3>
-          <button onClick={onClose} className="text-white/40 hover:text-white/80"><X className="w-4.5 h-4.5" /></button>
+          <button onClick={onClose} className="text-[var(--text-muted)] hover:text-white/80"><X className="w-4.5 h-4.5" /></button>
         </div>
         <div className="px-5 py-4 space-y-3">
-          <p className="text-[12px] text-white/55 leading-relaxed">Orquestra um objetivo transversal referenciando uma <b>operação oficial</b> de outra fase — sem workflow próprio e sem avançar o processo.</p>
+          <p className="text-[12px] text-[var(--text-secondary)] leading-relaxed">Orquestra um objetivo transversal referenciando uma <b>operação oficial</b> de outra fase — sem workflow próprio e sem avançar o processo.</p>
 
           {necessidadeId && necessidadeLabel ? (
-            <div className="text-[12.5px]"><span className="text-white/40">Necessidade:</span> <span className="font-semibold text-white/95">{necessidadeLabel}</span></div>
+            <div className="text-[12.5px]"><span className="text-[var(--text-muted)]">Necessidade:</span> <span className="font-semibold text-white/95">{necessidadeLabel}</span></div>
           ) : (
             <label className="block">
               <span className="block text-[11.5px] font-semibold text-white/68 mb-1">Necessidade a atender</span>
@@ -158,8 +158,8 @@ export function TarefaTransversalModal({ processoId, necessidadeId, necessidadeL
           {erro && <div className="text-[12px] text-[#f87171] bg-[#f87171]/12 rounded-lg px-3 py-2">{erro}</div>}
         </div>
         <div className="flex items-center justify-end gap-2 px-5 pb-4">
-          <button onClick={onClose} disabled={enviando} className="text-[13px] font-semibold px-3.5 py-2 rounded-lg text-white/68 hover:bg-[#252c35]">Cancelar</button>
-          <button onClick={criar} disabled={enviando} className="inline-flex items-center gap-1.5 text-[13px] font-semibold px-4 py-2 rounded-lg bg-[#2563eb] text-[#fff] hover:bg-[#1d4ed8] disabled:opacity-60">
+          <button onClick={onClose} disabled={enviando} className="text-[13px] font-semibold px-3.5 py-2 rounded-lg text-white/68 hover:bg-[var(--surface-tertiary)]">Cancelar</button>
+          <button onClick={criar} disabled={enviando} className="inline-flex items-center gap-1.5 text-[13px] font-semibold px-4 py-2 rounded-lg bg-[var(--action-primary)] text-[var(--action-primary-ink)] hover:bg-[var(--action-primary-hover)] disabled:opacity-60">
             {enviando ? <Loader2 className="w-4 h-4 animate-spin" /> : <ArrowLeftRight className="w-4 h-4" />} Criar tarefa transversal
           </button>
         </div>

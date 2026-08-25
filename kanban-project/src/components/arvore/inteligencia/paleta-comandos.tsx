@@ -78,26 +78,26 @@ export function PaletaComandos({ indice, aberto, onFechar, onEscolher, contextoD
         className="fixed left-1/2 top-[15%] z-[10004] w-full max-w-lg -translate-x-1/2 overflow-hidden rounded-xl border border-gray-200 bg-[var(--surface-primary)] text-gray-900 shadow-2xl"
       >
         <div className="flex items-center gap-2 border-b border-gray-100 px-4">
-          <Search className="h-4 w-4 shrink-0 text-gray-400" />
+          <Search className="h-4 w-4 shrink-0 text-[var(--text-muted)]" />
           <input
             ref={campoRef}
             value={termo}
             onChange={(e) => { setTermo(e.target.value); setAtivo(0) }}
             onKeyDown={teclado}
             placeholder="Buscar por nome, local, cartório…"
-            className="w-full bg-transparent py-3.5 text-sm text-gray-900 outline-none placeholder:text-gray-400"
+            className="w-full bg-transparent py-3.5 text-sm text-gray-900 outline-none placeholder:text-[var(--text-muted)]"
           />
-          <kbd className="hidden shrink-0 rounded border border-gray-200 px-1.5 py-0.5 text-[10px] text-gray-400 sm:block">esc</kbd>
+          <kbd className="hidden shrink-0 rounded border border-gray-200 px-1.5 py-0.5 text-[10px] text-[var(--text-muted)] sm:block">esc</kbd>
         </div>
 
         <div className="max-h-[50vh] overflow-y-auto">
           {termo.trim() && resultados.length === 0 && (
-            <p className="px-4 py-8 text-center text-[13px] text-gray-400">
+            <p className="px-4 py-8 text-center text-[13px] text-[var(--text-muted)]">
               Ninguém encontrado para “{termo}”.
             </p>
           )}
           {!termo.trim() && (
-            <p className="px-4 py-8 text-center text-[13px] text-gray-400">
+            <p className="px-4 py-8 text-center text-[13px] text-[var(--text-muted)]">
               {indice.length} pessoa(s) nesta árvore. Digite para buscar.
             </p>
           )}
@@ -122,7 +122,7 @@ export function PaletaComandos({ indice, aberto, onFechar, onEscolher, contextoD
                     linha
                   </span>
                 )}
-                {i === ativoEfetivo && <CornerDownLeft className="h-3.5 w-3.5 text-gray-300" />}
+                {i === ativoEfetivo && <CornerDownLeft className="h-3.5 w-3.5 text-[var(--text-muted)]" />}
               </span>
             </button>
           ))}

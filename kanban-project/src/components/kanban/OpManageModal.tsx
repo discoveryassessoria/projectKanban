@@ -259,7 +259,7 @@ function ConteudoModal({
           {mode === "cancel" && (
             <Section num={3} title="Impacto e opções">
               <div className="flex flex-col gap-2">
-                <label className="text-[10px] font-bold uppercase tracking-wider text-white/55">
+                <label className="text-[10px] font-bold uppercase tracking-wider text-[var(--text-secondary)]">
                   Impacto operacional
                 </label>
                 <input

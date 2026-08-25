@@ -149,7 +149,7 @@ function PersonMiniCard({
               {dateRange ? `${dateRange}-Vivo` : 'Vivo'}
             </span>
           )}
-          <span className="text-[8px] text-gray-400">• {pid}</span>
+          <span className="text-[8px] text-[var(--text-muted)]">• {pid}</span>
         </div>
       </div>
     </div>
@@ -522,7 +522,7 @@ export function PersonCardFS({
                 </span>
               )}
             </div>
-            <span className="text-[8px] text-gray-400">{pid}</span>
+            <span className="text-[8px] text-[var(--text-muted)]">{pid}</span>
           </div>
         </div>
 
@@ -598,7 +598,7 @@ export function PersonCardFS({
             </span>
           )}
         </div>
-        <span className="text-[8px] text-gray-400 mt-0.5">{pid}</span>
+        <span className="text-[8px] text-[var(--text-muted)] mt-0.5">{pid}</span>
       </div>
     </div>
   )

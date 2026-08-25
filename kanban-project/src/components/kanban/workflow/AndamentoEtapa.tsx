@@ -49,13 +49,13 @@ export const LABEL_RESULTADO: Record<ResultadoContato, string> = {
 }
 
 const PILL_RESULTADO: Record<ResultadoContato, string> = {
-  SEM_RESPOSTA: "bg-[#20262e] text-white/70 border-[var(--border-default)]",
+  SEM_RESPOSTA: "bg-[var(--surface-secondary)] text-white/70 border-[var(--border-default)]",
   EM_ANALISE: "bg-[#7dd3fc]/20 text-[#7dd3fc] border-[#7dd3fc]/30",
   PRAZO_INFORMADO: "bg-[#d2a948]/20 text-[#d2a948] border-[#d2a948]/30",
   EXIGENCIA: "bg-[#f87171]/20 text-[#f87171] border-[#f87171]/30",
   PRONTO_PARA_RETIRADA: "bg-[#4ade80]/20 text-[#4ade80] border-[#4ade80]/30",
   RETORNO_RECEBIDO: "bg-[#4ade80]/20 text-[#4ade80] border-[#4ade80]/30",
-  OUTRO: "bg-[#20262e] text-white/70 border-[var(--border-default)]",
+  OUTRO: "bg-[var(--surface-secondary)] text-white/70 border-[var(--border-default)]",
 }
 
 // Mesmos tokens visuais dos editores existentes — o painel entra no modal aprovado
@@ -65,7 +65,7 @@ export const campoCls =
 
 export function Rotulo({ children }: { children: React.ReactNode }) {
   return (
-    <label className="block text-[10px] uppercase font-semibold tracking-wider text-white/55 mb-1.5">
+    <label className="block text-[10px] uppercase font-semibold tracking-wider text-[var(--text-secondary)] mb-1.5">
       {children}
     </label>
   )
@@ -81,11 +81,11 @@ export function TituloBloco({
   contagem?: number
 }) {
   return (
-    <div className="text-[11px] font-bold uppercase tracking-wider text-white/55 flex items-center gap-1.5 mb-2">
+    <div className="text-[11px] font-bold uppercase tracking-wider text-[var(--text-secondary)] flex items-center gap-1.5 mb-2">
       <Icone className="w-3.5 h-3.5" />
       {children}
       {contagem !== undefined && contagem > 0 && (
-        <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-[#20262e] text-white/70">
+        <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-[var(--surface-secondary)] text-white/70">
           {contagem}
         </span>
       )}
@@ -301,7 +301,7 @@ export function BlocoContatos({
           <button
             type="button"
             onClick={() => setAberto(true)}
-            className="mb-2 px-2.5 py-1 text-[11px] font-semibold bg-[#20262e] hover:bg-[#252c35] text-white/85 rounded"
+            className="mb-2 px-2.5 py-1 text-[11px] font-semibold bg-[var(--surface-secondary)] hover:bg-[var(--surface-tertiary)] text-white/85 rounded"
           >
             + Registrar contato
           </button>
@@ -310,7 +310,7 @@ export function BlocoContatos({
 
       {emOrdem.length === 0 ? (
         <div className="px-3 py-4 rounded-md bg-[var(--surface-overlay)] border border-dashed border-[var(--border-default)] text-center">
-          <div className="text-[11.5px] text-white/55 italic">Nenhum contato registrado ainda.</div>
+          <div className="text-[11.5px] text-[var(--text-secondary)] italic">Nenhum contato registrado ainda.</div>
         </div>
       ) : (
         <div className="space-y-2">
@@ -326,7 +326,7 @@ export function BlocoContatos({
                   {LABEL_RESULTADO[c.resultado]}
                 </span>
                 <span className="text-[10.5px] text-white/60 font-mono">{fmtDataHora(c.ocorridoEm)}</span>
-                <span className="text-[10px] text-white/40">por {nomeAutor(c.autorId, usuarios)}</span>
+                <span className="text-[10px] text-[var(--text-muted)]">por {nomeAutor(c.autorId, usuarios)}</span>
               </div>
               {c.destinatario && (
                 <div className="text-[11px] text-white/60 mb-0.5">Com: {c.destinatario}</div>
@@ -372,7 +372,7 @@ export function BlocoContatos({
               <Rotulo>Canal</Rotulo>
               <select value={canal} onChange={(e) => setCanal(e.target.value as CanalContato)} className={campoCls}>
                 {CANAIS_CONTATO.map((c) => (
-                  <option key={c} value={c} className="bg-[#20262e]">
+                  <option key={c} value={c} className="bg-[var(--surface-secondary)]">
                     {LABEL_CANAL[c]}
                   </option>
                 ))}
@@ -396,7 +396,7 @@ export function BlocoContatos({
                 className={campoCls}
               >
                 {RESULTADOS_CONTATO.map((r) => (
-                  <option key={r} value={r} className="bg-[#20262e]">
+                  <option key={r} value={r} className="bg-[var(--surface-secondary)]">
                     {LABEL_RESULTADO[r]}
                   </option>
                 ))}
@@ -435,7 +435,7 @@ export function BlocoContatos({
               type="button"
               onClick={enviar}
               disabled={salvando}
-              className="px-3.5 py-1.5 text-[11.5px] font-semibold bg-[#2563eb] hover:bg-[#1d4ed8] disabled:opacity-50 disabled:cursor-not-allowed text-[#fff] rounded-md inline-flex items-center gap-1.5"
+              className="px-3.5 py-1.5 text-[11.5px] font-semibold bg-[var(--action-primary)] hover:bg-[var(--action-primary-hover)] disabled:opacity-50 disabled:cursor-not-allowed text-[var(--action-primary-ink)] rounded-md inline-flex items-center gap-1.5"
             >
               {salvando && <Loader2 className="w-3 h-3 animate-spin" />}
               Registrar contato

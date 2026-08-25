@@ -103,7 +103,7 @@ export default function ReabrirEtapaModal({
   }
 
   const inp = "w-full rounded-lg border border-[var(--border-default)] bg-[var(--surface-popover)] px-3 py-2 text-[13px] text-white/95 outline-none focus:border-[#7dd3fc]/50"
-  const rot = "text-[10px] font-bold uppercase tracking-wider text-white/40"
+  const rot = "text-[10px] font-bold uppercase tracking-wider text-[var(--text-muted)]"
   const atual = plano?.execucoes.find((e) => e.status !== "SUPERSEDIDO") ?? plano?.execucoes[plano.execucoes.length - 1] ?? null
   const podeConfirmar =
     !enviando && !!plano?.podeReabrir && !!motivoCodigo &&
@@ -115,13 +115,13 @@ export default function ReabrirEtapaModal({
         onClick={(e) => e.stopPropagation()} role="dialog" aria-modal="true" aria-label="Reabrir tarefa">
         <div className="border-b border-[var(--border-default)] px-5 py-4">
           <h2 className="text-[16px] font-extrabold text-white/95">Reabrir tarefa</h2>
-          <p className="mt-0.5 text-[12px] text-white/50">
+          <p className="mt-0.5 text-[12px] text-[var(--text-secondary)]">
             Uma execução nova começa. A atual é arquivada com o que foi registrado nela — nada é apagado.
           </p>
         </div>
 
         <div className="space-y-3 px-5 py-4">
-          {carregando && <div className="text-[13px] text-white/50">Carregando…</div>}
+          {carregando && <div className="text-[13px] text-[var(--text-secondary)]">Carregando…</div>}
 
           {plano && (
             <>
@@ -133,7 +133,7 @@ export default function ReabrirEtapaModal({
                   <div className={rot}>Documento</div>
                   <div className="text-[13px] text-white/90">
                     {plano.identidade.documentoTitulo ?? "—"}
-                    {plano.identidade.documentoId && <span className="ml-1.5 text-[11px] text-white/35">#{plano.identidade.documentoId}</span>}
+                    {plano.identidade.documentoId && <span className="ml-1.5 text-[11px] text-[var(--text-muted)]">#{plano.identidade.documentoId}</span>}
                   </div>
                 </div>
                 <div className="col-span-2"><div className={rot}>Passo</div><div className="text-[13px] text-white/90">{plano.identidade.stepTitulo}</div></div>
@@ -149,9 +149,9 @@ export default function ReabrirEtapaModal({
                     {atual.executadoPorNome && ` · por ${atual.executadoPorNome}`}
                     {atual.resultado && ` · resultado: ${atual.resultado}`}
                   </div>
-                ) : <div className="mt-1 text-[12.5px] text-white/50">Sem execução registrada.</div>}
+                ) : <div className="mt-1 text-[12.5px] text-[var(--text-secondary)]">Sem execução registrada.</div>}
                 {plano.execucoes.length > 1 && (
-                  <div className="mt-1 text-[11px] text-white/40">
+                  <div className="mt-1 text-[11px] text-[var(--text-muted)]">
                     {plano.execucoes.length} execuções no histórico desta tarefa; a próxima será a {plano.execucoes.length + 1}ª.
                   </div>
                 )}
@@ -171,7 +171,7 @@ export default function ReabrirEtapaModal({
                       <input type="radio" className="mt-0.5" checked={!comDependentes} onChange={() => setComDependentes(false)} />
                       <span className="text-[12.5px] text-white/85">
                         Reabrir somente esta tarefa
-                        <span className="block text-[11px] text-white/40">Nenhuma outra etapa é tocada.</span>
+                        <span className="block text-[11px] text-[var(--text-muted)]">Nenhuma outra etapa é tocada.</span>
                       </span>
                     </label>
                     <label className={`mt-1.5 flex items-start gap-2 rounded-lg border px-3 py-2 ${plano.dependentesDaMesmaUnidade.length ? "cursor-pointer border-[var(--border-default)] bg-[var(--surface-popover)]" : "cursor-not-allowed border-[var(--border-subtle)] bg-[var(--surface-popover)]/50 opacity-50"}`}>
@@ -179,7 +179,7 @@ export default function ReabrirEtapaModal({
                         checked={comDependentes} onChange={() => setComDependentes(true)} />
                       <span className="text-[12.5px] text-white/85">
                         Reabrir esta tarefa e as que dependem dela
-                        <span className="block text-[11px] text-white/40">
+                        <span className="block text-[11px] text-[var(--text-muted)]">
                           {plano.dependentesDaMesmaUnidade.length
                             ? "Só as deste documento — as etapas de mesmo nome dos outros documentos não são tocadas."
                             : "Nenhuma etapa depende desta."}
@@ -211,7 +211,7 @@ export default function ReabrirEtapaModal({
                         ? `Nenhuma outra unidade será alterada — as outras ${plano.outrasUnidadesNaFase} desta fase ficam exatamente como estão.`
                         : "Nenhuma outra unidade será alterada."}
                     </div>
-                    <p className="mt-1.5 text-[11px] text-white/45">{plano.aviso}</p>
+                    <p className="mt-1.5 text-[11px] text-[var(--text-secondary)]">{plano.aviso}</p>
                   </div>
 
                   <label className="block">
@@ -221,7 +221,7 @@ export default function ReabrirEtapaModal({
                       {motivos.map((m) => <option key={m.codigo} value={m.codigo}>{m.label}</option>)}
                     </select>
                     {motivoCodigo && (
-                      <span className="mt-1 block text-[11px] text-white/40">{motivos.find((m) => m.codigo === motivoCodigo)?.descricao}</span>
+                      <span className="mt-1 block text-[11px] text-[var(--text-muted)]">{motivos.find((m) => m.codigo === motivoCodigo)?.descricao}</span>
                     )}
                   </label>
 

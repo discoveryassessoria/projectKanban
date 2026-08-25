@@ -179,7 +179,7 @@ export function PainelDaFase({
             Abrir painel da fase
           </button>
         </div>
-        <div className="text-[13px] text-white/55 mt-1.5">{faseSub}</div>
+        <div className="text-[13px] text-[var(--text-secondary)] mt-1.5">{faseSub}</div>
 
         <div className="flex gap-1 overflow-x-auto mt-3.5 border-b border-[var(--border-default)]">
           {faseTabs.map((t) => (
@@ -188,8 +188,8 @@ export function PainelDaFase({
               onClick={() => setAbaAtiva(t)}
               className={`text-[12.5px] font-semibold px-3 py-2.5 border-b-2 whitespace-nowrap transition-colors ${
                 abaAtiva === t
-                  ? "border-[#2563eb] text-white"
-                  : "text-white/55 border-transparent hover:text-white/95"
+                  ? "border-[var(--border-strong)] text-white"
+                  : "text-[var(--text-secondary)] border-transparent hover:text-white/95"
               }`}
             >
               {t}
@@ -235,7 +235,7 @@ export function PainelDaFase({
               const conteudo = (
                 <>
                   <b className={`text-[22px] font-extrabold block leading-none ${cor}`}>{k.value}</b>
-                  <span className="text-[11px] text-white/40 font-semibold block mt-1.5">{k.label}</span>
+                  <span className="text-[11px] text-[var(--text-muted)] font-semibold block mt-1.5">{k.label}</span>
                 </>
               )
               return alvo == null ? (
@@ -265,25 +265,25 @@ export function PainelDaFase({
                     pelo peso dos passos. São duas perguntas, e chamar as duas de
                     "progresso da fase" fazia o operador achar que uma delas
                     estava errada. */}
-                <div className="text-[13px] font-semibold text-white/55 mb-1">
+                <div className="text-[13px] font-semibold text-[var(--text-secondary)] mb-1">
                   Documentos concluídos na {faseNome}
                 </div>
                 <div className="text-[28px] font-extrabold text-white/95 leading-none">{progressoPct}%</div>
               </div>
-              <div className="text-[13px] text-white/55">{progressoConcluidos} de {progressoTotal} documentos validados</div>
+              <div className="text-[13px] text-[var(--text-secondary)]">{progressoConcluidos} de {progressoTotal} documentos validados</div>
             </div>
-            <div className="h-1.5 bg-[#252c35] rounded-full overflow-hidden mt-3">
+            <div className="h-1.5 bg-[var(--surface-tertiary)] rounded-full overflow-hidden mt-3">
               <div className="h-full bg-[#7dd3fc] transition-all duration-500" style={{ width: `${progressoPct}%` }} />
             </div>
-            <div className="text-center text-[12.5px] text-white/40 mt-3">{progressoTexto}</div>
+            <div className="text-center text-[12.5px] text-[var(--text-muted)] mt-3">{progressoTexto}</div>
             {/* A FASE PAROU E O SISTEMA SABE POR QUÊ. Dizer isso em lista, com o verbo
                 na frente, é a diferença entre o operador agir e o processo esperar duas
                 semanas por uma árvore que ninguém sabia que faltava. */}
             {(oQueFazer?.length ?? 0) > 0 && (
-              <ul className="mt-3 space-y-1.5 rounded-lg border border-amber-400/20 bg-amber-400/[0.06] px-4 py-3">
+              <ul className="mt-3 space-y-1.5 rounded-lg border border-amber-200 bg-amber-400/[0.06] px-4 py-3">
                 {oQueFazer!.map((m) => (
                   <li key={m.code} className="flex gap-2 text-[12.5px] leading-snug text-amber-100/80">
-                    <span aria-hidden className="text-amber-300/60">·</span>
+                    <span aria-hidden className="text-amber-700/60">·</span>
                     <span>{m.message}</span>
                   </li>
                 ))}
@@ -624,7 +624,7 @@ function IndiceView({
     // começar. Nenhum deles consulta nada: recortam o que já veio do servidor.
     <div className="flex flex-wrap items-center gap-2 mb-3">
       <div className="relative">
-        <Search className="w-3.5 h-3.5 text-white/30 absolute left-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+        <Search className="w-3.5 h-3.5 text-[var(--text-muted)] absolute left-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
         <input
           value={recorte.busca}
           onChange={(e) => setRecorte((r) => ({ ...r, busca: e.target.value }))}
@@ -692,7 +692,7 @@ function IndiceView({
         <button
           type="button"
           onClick={() => setRecorte(RECORTE_VAZIO)}
-          className="text-[11.5px] font-semibold text-white/55 hover:text-white/85 underline underline-offset-2"
+          className="text-[11.5px] font-semibold text-[var(--text-secondary)] hover:text-white/85 underline underline-offset-2"
         >
           Limpar filtros
         </button>
@@ -710,7 +710,7 @@ function IndiceView({
         {barraDeRecorte}
       <div className="border border-[var(--border-default)] rounded-xl px-5 py-8 text-center">
         <div className="text-[13px] text-white/68">Nenhum documento neste recorte.</div>
-        <div className="text-[11.5px] text-white/40 mt-1">
+        <div className="text-[11.5px] text-[var(--text-muted)] mt-1">
           A fase tem {indiceBruto.resumo.documentos} documento(s).
         </div>
         <button
@@ -729,7 +729,7 @@ function IndiceView({
     return (
       <div className="border border-[var(--border-default)] rounded-xl px-5 py-8 text-center">
         <div className="text-[13px] text-white/68">Esta fase não tem trabalho materializado.</div>
-        <div className="text-[11.5px] text-white/40 mt-1 leading-relaxed">
+        <div className="text-[11.5px] text-[var(--text-muted)] mt-1 leading-relaxed">
           Publique os passos da fase em Gerenciamento › Workflows das Fases. Enquanto
           não houver passo publicado, não há o que executar aqui.
         </div>
@@ -747,12 +747,12 @@ function IndiceView({
       <div className="mb-5 last:mb-0">
         <div className="flex items-center gap-2.5 mb-2.5">
           <span className={`w-[22px] h-[22px] rounded-lg grid place-items-center flex-none ${
-            tone === "pendente" ? "bg-[#d2a948]/20 text-[#d2a948]" : tone === "fora" ? "bg-[#252c35] text-white/40" : "bg-[#252c35] text-white/55"
+            tone === "pendente" ? "bg-[#d2a948]/20 text-[#d2a948]" : tone === "fora" ? "bg-[var(--surface-tertiary)] text-[var(--text-muted)]" : "bg-[var(--surface-tertiary)] text-[var(--text-secondary)]"
           }`}>
             {icone}
           </span>
-          <b className="text-[11.5px] font-extrabold tracking-wide uppercase text-white/55">{titulo}</b>
-          <span className="ml-auto text-[11px] font-bold text-white/40 bg-[var(--surface-popover)] border border-[var(--border-default)] rounded-full px-2.5 py-0.5">
+          <b className="text-[11.5px] font-extrabold tracking-wide uppercase text-[var(--text-secondary)]">{titulo}</b>
+          <span className="ml-auto text-[11px] font-bold text-[var(--text-muted)] bg-[var(--surface-popover)] border border-[var(--border-default)] rounded-full px-2.5 py-0.5">
             {pessoas.length} pessoa(s)
           </span>
         </div>
@@ -775,13 +775,13 @@ function IndiceView({
       {barraDeRecorte}
 
       <div className="flex items-center gap-2.5 mb-3">
-        <span className="w-[22px] h-[22px] rounded-lg grid place-items-center flex-none bg-[#252c35] text-white/55">
+        <span className="w-[22px] h-[22px] rounded-lg grid place-items-center flex-none bg-[var(--surface-tertiary)] text-[var(--text-secondary)]">
           <Layers className="w-3 h-3" />
         </span>
-        <b className="text-[11.5px] font-extrabold tracking-wide uppercase text-white/55">Documentos por pessoa</b>
+        <b className="text-[11.5px] font-extrabold tracking-wide uppercase text-[var(--text-secondary)]">Documentos por pessoa</b>
         {/* O TOPO FALA DA FASE; ISTO FALA DO RECORTE. Dois números com o mesmo
             nome e escopos diferentes seria a confusão que esta tela evita. */}
-        <span className="ml-auto text-[11px] font-bold text-white/40 bg-[var(--surface-popover)] border border-[var(--border-default)] rounded-full px-2.5 py-0.5">
+        <span className="ml-auto text-[11px] font-bold text-[var(--text-muted)] bg-[var(--surface-popover)] border border-[var(--border-default)] rounded-full px-2.5 py-0.5">
           {recortando
             ? `${visiveis} de ${indiceBruto.resumo.documentos} documento(s)`
             : `${indiceBruto.resumo.documentos} documento(s)`}
@@ -840,7 +840,7 @@ function PessoaCard({
     p.classificacao === "LINHA_PRINCIPAL"
       ? { cor: "text-[#4ade80]", dot: "bg-[#4ade80]", label: "Na linha de transmissão" }
       : p.classificacao === "FORA_DA_LINHAGEM"
-        ? { cor: "text-white/40", dot: "bg-[var(--surface-secondary)]", label: "Fora da linha" }
+        ? { cor: "text-[var(--text-muted)]", dot: "bg-[var(--surface-secondary)]", label: "Fora da linha" }
         : { cor: "text-[#f87171]", dot: "bg-[#f87171]", label: "Classificação pendente" }
 
   return (
@@ -849,17 +849,17 @@ function PessoaCard({
         type="button"
         onClick={() => podeAbrir && alternar()}
         disabled={!podeAbrir}
-        className={`w-full text-left flex items-center gap-4 px-4 py-3.5 transition-colors ${podeAbrir ? "hover:bg-[#20262e]" : "cursor-default"}`}
+        className={`w-full text-left flex items-center gap-4 px-4 py-3.5 transition-colors ${podeAbrir ? "hover:bg-[var(--surface-secondary)]" : "cursor-default"}`}
       >
-        <span className="w-10 h-10 rounded-full grid place-items-center text-[#fff] font-extrabold text-[13px] flex-none bg-[#252c35]">
+        <span className="w-10 h-10 rounded-full grid place-items-center text-[#fff] font-extrabold text-[13px] flex-none bg-[var(--surface-tertiary)]">
           {p.iniciais}
         </span>
 
         <span className="min-w-0 flex-1">
           <b className="text-[14.5px] font-extrabold block leading-tight truncate text-white/95">{p.nome}</b>
-          <span className="text-[11.5px] text-white/40 font-semibold flex items-center gap-1.5 mt-0.5 flex-wrap">
+          <span className="text-[11.5px] text-[var(--text-muted)] font-semibold flex items-center gap-1.5 mt-0.5 flex-wrap">
             {p.geracao != null && (
-              <span className="text-[10px] font-extrabold bg-[#252c35] border border-[var(--border-default)] rounded px-1.5 py-px">
+              <span className="text-[10px] font-extrabold bg-[var(--surface-tertiary)] border border-[var(--border-default)] rounded px-1.5 py-px">
                 G{p.geracao + 1}
               </span>
             )}
@@ -879,7 +879,7 @@ function PessoaCard({
 
         {/* CONTADORES — do backend, nunca contando o que está na tela */}
         {linha.semDocumentoAplicavel ? (
-          <span className="text-[12px] text-white/40 flex-none">Nenhum documento aplicável nesta fase</span>
+          <span className="text-[12px] text-[var(--text-muted)] flex-none">Nenhum documento aplicável nesta fase</span>
         ) : (
           <span className="flex items-center gap-5 flex-none">
             <Pilula valor={t.documentos} rotulo="documentos" />
@@ -889,7 +889,7 @@ function PessoaCard({
           </span>
         )}
 
-        <span className="text-white/40 flex-none w-4">
+        <span className="text-[var(--text-muted)] flex-none w-4">
           {!podeAbrir ? null : aberto ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
         </span>
       </button>
@@ -915,7 +915,7 @@ function Pilula({ valor, rotulo, tone }: { valor: number; rotulo: string; tone?:
   return (
     <span className="text-center block">
       <b className={`text-[16px] font-extrabold block leading-none ${cor}`}>{valor}</b>
-      <span className="text-[10px] text-white/40 font-semibold block mt-1">{rotulo}</span>
+      <span className="text-[10px] text-[var(--text-muted)] font-semibold block mt-1">{rotulo}</span>
     </span>
   )
 }
@@ -962,13 +962,13 @@ function TabelaDocumentos({
   const ocultos = docs.length - visiveis.length
 
   if (docs.length === 0) {
-    return <div className="px-4 py-4 text-[12px] text-white/40">Nenhum documento aplicável nesta fase.</div>
+    return <div className="px-4 py-4 text-[12px] text-[var(--text-muted)]">Nenhum documento aplicável nesta fase.</div>
   }
   return (
     <div className="overflow-x-auto">
       <div className="min-w-[900px]">
         <div
-          className="grid items-end gap-3 px-4 py-2 bg-[#20262e] border-b border-[var(--border-default)] text-[10px] font-bold uppercase tracking-wider text-white/40"
+          className="grid items-end gap-3 px-4 py-2 bg-[var(--surface-secondary)] border-b border-[var(--border-default)] text-[10px] font-bold uppercase tracking-wider text-[var(--text-muted)]"
           style={{ gridTemplateColumns: COLUNAS }}
         >
           <div>Documento</div>
@@ -993,7 +993,7 @@ function TabelaDocumentos({
           <button
             type="button"
             onClick={() => setMostrarTudo(true)}
-            className="w-full px-4 py-2.5 text-[11.5px] font-semibold text-white/55 hover:text-white/85 hover:bg-[#20262e]/60 transition-colors"
+            className="w-full px-4 py-2.5 text-[11.5px] font-semibold text-[var(--text-secondary)] hover:text-white/85 hover:bg-[var(--surface-secondary)]/60 transition-colors"
           >
             Mostrar mais {ocultos} documento(s)
           </button>
@@ -1009,7 +1009,7 @@ const CLS_ARTEFATO: Record<StatusResumo, string> = {
   PENDENTE: "text-white/68",
   DIVERGENTE: "text-[#f87171]",
   INVALIDADO: "text-[#f87171]",
-  NAO_APLICAVEL: "text-white/25",
+  NAO_APLICAVEL: "text-[var(--text-muted)]",
 }
 
 // ------------------------------------------------------------
@@ -1041,10 +1041,10 @@ function CelulaProgresso({ p }: { p: DocumentoDoIndice["naFase"]["progresso"] })
           {p.pct}%
         </b>
         {p.total > 0 && (
-          <span className="text-[10.5px] text-white/35 tabular-nums">{p.concluidos}/{p.total}</span>
+          <span className="text-[10.5px] text-[var(--text-muted)] tabular-nums">{p.concluidos}/{p.total}</span>
         )}
       </div>
-      <div className="h-1.5 bg-[#252c35] rounded-full overflow-hidden mt-1.5">
+      <div className="h-1.5 bg-[var(--surface-tertiary)] rounded-full overflow-hidden mt-1.5">
         <div
           className={`h-full transition-all duration-500 ${completo ? "bg-[#4ade80]" : "bg-[#7dd3fc]"}`}
           style={{ width: `${p.pct}%` }}
@@ -1055,7 +1055,7 @@ function CelulaProgresso({ p }: { p: DocumentoDoIndice["naFase"]["progresso"] })
 }
 
 const CLS_ESTADO: Record<EstadoOperacionalDaLinha, string> = {
-  A_FAZER: "bg-[#252c35] text-white/68",
+  A_FAZER: "bg-[var(--surface-tertiary)] text-white/68",
   EM_ANDAMENTO: "bg-[#7dd3fc]/15 text-[#7dd3fc]",
   AGUARDANDO_TERCEIRO: "bg-[#d2a948]/15 text-[#d2a948]",
   BLOQUEADA: "bg-[#f87171]/15 text-[#f87171]",
@@ -1074,8 +1074,8 @@ const CLS_ESTADO: Record<EstadoOperacionalDaLinha, string> = {
  * reescrever um SLA de cinco.
  */
 function CelulaPrazo({ f }: { f: DocumentoDoIndice["naFase"] }) {
-  if (f.estado === "CONCLUIDA") return <span className="text-[11px] text-white/25">—</span>
-  if (f.prazo == null) return <span className="text-[11px] text-white/35">{f.rotuloDoPrazo}</span>
+  if (f.estado === "CONCLUIDA") return <span className="text-[11px] text-[var(--text-muted)]">—</span>
+  if (f.prazo == null) return <span className="text-[11px] text-[var(--text-muted)]">{f.rotuloDoPrazo}</span>
   // A FRASE VEM DO SERVIDOR. Cada tela montando a sua produzia "Vence em 1
   // dias", "Vence amanhã" e "1 dia restante" para o mesmo prazo — e, pior, réguas
   // diferentes por trás das frases.
@@ -1084,7 +1084,7 @@ function CelulaPrazo({ f }: { f: DocumentoDoIndice["naFase"] }) {
   return (
     <div>
       <div className={`text-[11.5px] font-semibold ${cor}`}>{texto}</div>
-      <div className="text-[10.5px] text-white/30 tabular-nums">
+      <div className="text-[10.5px] text-[var(--text-muted)] tabular-nums">
         {new Date(f.prazo).toLocaleDateString("pt-BR")}
       </div>
     </div>
@@ -1149,7 +1149,7 @@ function CelulaResponsavel({
   const nome = f.responsavelNome
     ? <span className="text-white/80 truncate">{f.responsavelNome}</span>
     : f.estado === "CONCLUIDA"
-      ? <span className="text-white/25">—</span>
+      ? <span className="text-[var(--text-muted)]">—</span>
       : <span className="text-[#d2a948]">Sem responsável</span>
 
   if (!podeGerir) return <div className="min-w-0 text-[11.5px] truncate">{nome}</div>
@@ -1171,11 +1171,11 @@ function CelulaResponsavel({
           onBlur={() => setEditando(false)}
           className="w-full rounded border border-[var(--border-default)] bg-[var(--app-background)] px-1.5 py-1 text-[11.5px] text-white/85 focus:outline-none focus:border-[#7dd3fc]/50 disabled:opacity-50"
         >
-          <option value="" className="bg-[#20262e]">
+          <option value="" className="bg-[var(--surface-secondary)]">
             {f.responsavelId != null ? "— retirar responsável —" : "— selecione —"}
           </option>
           {gestao!.usuarios!.map((u) => (
-            <option key={u.id} value={u.id} className="bg-[#20262e]">{u.nome}</option>
+            <option key={u.id} value={u.id} className="bg-[var(--surface-secondary)]">{u.nome}</option>
           ))}
         </select>
       </div>
@@ -1224,17 +1224,17 @@ function LinhaDocumento({
     <div
       ref={ref}
       className={`grid items-center gap-3 px-4 py-3 border-b border-white/[0.07] last:border-b-0 transition-colors ${
-        destacado ? "bg-sky-400/[0.07] ring-1 ring-inset ring-sky-300/25" : "hover:bg-[#20262e]/60"
+        destacado ? "bg-sky-400/[0.07] ring-1 ring-inset ring-sky-300/25" : "hover:bg-[var(--surface-secondary)]/60"
       }`}
       style={{ gridTemplateColumns: COLUNAS }}
     >
       <div className="flex items-center gap-2.5 min-w-0">
-        <span className="w-7 h-7 rounded-lg grid place-items-center border border-[var(--border-default)] bg-[#252c35] text-white/55 flex-none">
+        <span className="w-7 h-7 rounded-lg grid place-items-center border border-[var(--border-default)] bg-[var(--surface-tertiary)] text-[var(--text-secondary)] flex-none">
           <FileText className="w-3.5 h-3.5" />
         </span>
         <div className="min-w-0">
           <b className="text-[13px] font-bold block leading-tight truncate text-white/95">{doc.titulo}</b>
-          <span className="text-[11px] text-white/40 block truncate">
+          <span className="text-[11px] text-[var(--text-muted)] block truncate">
             {[doc.tipoLabel, doc.pais].filter(Boolean).join(" · ") || "Certidão do processo"}
           </span>
         </div>
@@ -1288,7 +1288,7 @@ function LinhaDocumento({
         </div>
         {doc.naFase.statusDocumentalLabel && (
           <div
-            className="text-[10.5px] text-white/35 mt-1 truncate"
+            className="text-[10.5px] text-[var(--text-muted)] mt-1 truncate"
             title={`Estado do documento: ${doc.naFase.statusDocumentalLabel}`}
           >
             Doc.: {doc.naFase.statusDocumentalLabel}
@@ -1301,7 +1301,7 @@ function LinhaDocumento({
           <button
             type="button"
             onClick={() => onAbrirDetalhes!(doc)}
-            className="inline-flex items-center gap-1.5 bg-[#252c35] text-white/95 border border-[var(--border-default)] text-[12px] font-bold px-3 py-1.5 rounded-lg hover:bg-[#2d353f] transition-colors whitespace-nowrap"
+            className="inline-flex items-center gap-1.5 bg-[var(--surface-tertiary)] text-white/95 border border-[var(--border-default)] text-[12px] font-bold px-3 py-1.5 rounded-lg hover:bg-[var(--surface-tertiary)] transition-colors whitespace-nowrap"
           >
             {rotuloDaAcao(doc.naFase)} <ChevronRight className="w-3 h-3" />
           </button>

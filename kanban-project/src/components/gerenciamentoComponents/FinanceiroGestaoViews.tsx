@@ -37,7 +37,7 @@ function Kpi({ valor, label }: { valor: string | number; label: string }) {
   return (
     <div className={`${CARD} p-4`}>
       <div className="text-xl font-bold text-white">{valor}</div>
-      <div className="mt-0.5 text-[10px] font-semibold uppercase tracking-wide text-white/50">{label}</div>
+      <div className="mt-0.5 text-[10px] font-semibold uppercase tracking-wide text-[var(--text-secondary)]">{label}</div>
     </div>
   )
 }
@@ -71,11 +71,11 @@ interface DadosCredito {
 
 export function CreditoTab() {
   const { dados, loading, erro, load } = useGestao<DadosCredito>("credito")
-  if (loading) return <div className="py-24 text-center text-white/50">Carregando…</div>
+  if (loading) return <div className="py-24 text-center text-[var(--text-secondary)]">Carregando…</div>
   return (
     <div className="space-y-5">
       {erro && (
-        <div className="rounded-xl border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-200">
+        <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
           {erro} <button onClick={() => { void load() }} className="ml-2 underline hover:text-white">Tentar de novo</button>
         </div>
       )}
@@ -96,7 +96,7 @@ export function CreditoTab() {
           </div>
           <div className={`overflow-x-auto ${CARD}`}>
             <table className="w-full text-sm">
-              <thead className="border-b border-[var(--border-default)] text-left text-xs text-white/50">
+              <thead className="border-b border-[var(--border-default)] text-left text-xs text-[var(--text-secondary)]">
                 <tr>
                   <th className={TH}>Criado</th><th className={TH}>Pessoa</th><th className={TH}>Destino</th>
                   <th className={TH}>Gerado</th><th className={TH}>Disponível</th><th className={TH}>Utilizado</th>
@@ -105,7 +105,7 @@ export function CreditoTab() {
               </thead>
               <tbody>
                 {dados.creditos.length === 0 ? (
-                  <tr><td colSpan={7} className="px-4 py-10 text-center text-xs text-white/40">Nenhum crédito registrado.</td></tr>
+                  <tr><td colSpan={7} className="px-4 py-10 text-center text-xs text-[var(--text-muted)]">Nenhum crédito registrado.</td></tr>
                 ) : dados.creditos.map((c) => (
                   <tr key={c.id} className="border-b border-[var(--border-subtle)] last:border-0">
                     <td className="whitespace-nowrap px-4 py-2.5 text-white/60">{data(c.criadoEm)}</td>
@@ -115,7 +115,7 @@ export function CreditoTab() {
                     <td className="px-4 py-2.5 text-white">{dinheiro(c.disponivel, c.moeda)}</td>
                     <td className="px-4 py-2.5 text-white/70">{dinheiro(c.utilizado, c.moeda)}</td>
                     <td className="px-4 py-2.5">
-                      <span className={`rounded-full px-2 py-0.5 text-[10px] ${c.status === "ABERTO" ? "bg-green-500/15 text-green-300" : "bg-[var(--surface-primary)] text-white/50"}`}>{c.status}</span>
+                      <span className={`rounded-full px-2 py-0.5 text-[10px] ${c.status === "ABERTO" ? "bg-green-50 text-green-700" : "bg-[var(--surface-primary)] text-[var(--text-secondary)]"}`}>{c.status}</span>
                     </td>
                   </tr>
                 ))}
@@ -142,11 +142,11 @@ interface DadosDocs {
 export function DocumentosFinanceirosTab() {
   const { dados, loading, erro, load } = useGestao<DadosDocs>("documentos")
   const [aba, setAba] = useState<"recibos" | "faturas">("recibos")
-  if (loading) return <div className="py-24 text-center text-white/50">Carregando…</div>
+  if (loading) return <div className="py-24 text-center text-[var(--text-secondary)]">Carregando…</div>
   return (
     <div className="space-y-5">
       {erro && (
-        <div className="rounded-xl border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-200">
+        <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
           {erro} <button onClick={() => { void load() }} className="ml-2 underline hover:text-white">Tentar de novo</button>
         </div>
       )}
@@ -166,10 +166,10 @@ export function DocumentosFinanceirosTab() {
 
           {dados.porStatus.length > 0 && (
             <div className={`${CARD} p-5`}>
-              <div className="mb-3 text-[11px] uppercase tracking-wide text-white/45">Faturas por situação</div>
+              <div className="mb-3 text-[11px] uppercase tracking-wide text-[var(--text-secondary)]">Faturas por situação</div>
               <div className="flex flex-wrap gap-2">
                 {dados.porStatus.map((s) => (
-                  <span key={s.status} className="rounded-lg border border-[var(--border-default)] bg-white/[0.04] px-3 py-1.5 text-[12px] text-white/75">
+                  <span key={s.status} className="rounded-lg border border-[var(--border-default)] bg-[var(--surface-primary)] px-3 py-1.5 text-[12px] text-white/75">
                     {s.status}: <span className="text-white">{s.quantidade}</span> · {dinheiro(s.valor)}
                   </span>
                 ))}
@@ -180,7 +180,7 @@ export function DocumentosFinanceirosTab() {
           <div className="flex flex-wrap gap-1 border-b border-[var(--border-default)]">
             {(["recibos", "faturas"] as const).map((a) => (
               <button key={a} onClick={() => setAba(a)}
-                className={`rounded-t-lg px-3 py-2 text-sm transition ${aba === a ? "bg-[var(--surface-primary)] font-medium text-white" : "text-white/50 hover:text-white/80"}`}>
+                className={`rounded-t-lg px-3 py-2 text-sm transition ${aba === a ? "bg-[var(--surface-primary)] font-medium text-white" : "text-[var(--text-secondary)] hover:text-white/80"}`}>
                 {a === "recibos" ? "Recibos" : "Faturas"}
               </button>
             ))}
@@ -189,12 +189,12 @@ export function DocumentosFinanceirosTab() {
           <div className={`overflow-x-auto ${CARD}`}>
             {aba === "recibos" ? (
               <table className="w-full text-sm">
-                <thead className="border-b border-[var(--border-default)] text-left text-xs text-white/50">
+                <thead className="border-b border-[var(--border-default)] text-left text-xs text-[var(--text-secondary)]">
                   <tr><th className={TH}>Número</th><th className={TH}>Data</th><th className={TH}>Pagador</th><th className={TH}>Descrição</th><th className={TH}>Valor</th><th className={TH}>Processo</th><th className={TH}>PDF</th></tr>
                 </thead>
                 <tbody>
                   {dados.recibos.length === 0 ? (
-                    <tr><td colSpan={7} className="px-4 py-10 text-center text-xs text-white/40">Nenhum recibo emitido.</td></tr>
+                    <tr><td colSpan={7} className="px-4 py-10 text-center text-xs text-[var(--text-muted)]">Nenhum recibo emitido.</td></tr>
                   ) : dados.recibos.map((r) => (
                     <tr key={r.id} className="border-b border-[var(--border-subtle)] last:border-0">
                       <td className="px-4 py-2.5 text-white">{r.numero}</td>
@@ -205,8 +205,8 @@ export function DocumentosFinanceirosTab() {
                       <td className="px-4 py-2.5 text-white/60">#{r.processoId}</td>
                       <td className="px-4 py-2.5">
                         {r.pdfUrl
-                          ? <a href={r.pdfUrl} target="_blank" rel="noreferrer" className="text-sky-300 underline hover:text-sky-200">abrir</a>
-                          : <span className="text-white/30">—</span>}
+                          ? <a href={r.pdfUrl} target="_blank" rel="noreferrer" className="text-sky-700 underline hover:text-sky-700">abrir</a>
+                          : <span className="text-[var(--text-muted)]">—</span>}
                       </td>
                     </tr>
                   ))}
@@ -214,12 +214,12 @@ export function DocumentosFinanceirosTab() {
               </table>
             ) : (
               <table className="w-full text-sm">
-                <thead className="border-b border-[var(--border-default)] text-left text-xs text-white/50">
+                <thead className="border-b border-[var(--border-default)] text-left text-xs text-[var(--text-secondary)]">
                   <tr><th className={TH}>Emissão</th><th className={TH}>Descrição</th><th className={TH}>Valor</th><th className={TH}>Parcelas</th><th className={TH}>Vencimento</th><th className={TH}>Situação</th><th className={TH}>Processo</th></tr>
                 </thead>
                 <tbody>
                   {dados.faturas.length === 0 ? (
-                    <tr><td colSpan={7} className="px-4 py-10 text-center text-xs text-white/40">Nenhuma fatura emitida.</td></tr>
+                    <tr><td colSpan={7} className="px-4 py-10 text-center text-xs text-[var(--text-muted)]">Nenhuma fatura emitida.</td></tr>
                   ) : dados.faturas.map((f) => (
                     <tr key={f.id} className="border-b border-[var(--border-subtle)] last:border-0">
                       <td className="whitespace-nowrap px-4 py-2.5 text-white/60">{data(f.dataEmissao)}</td>

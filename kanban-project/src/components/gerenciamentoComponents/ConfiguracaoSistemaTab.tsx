@@ -101,13 +101,13 @@ function FormularioConfig({
     } finally { setBusy(false) }
   }
 
-  if (loading) return <div className="py-24 text-center text-white/50">Carregando…</div>
+  if (loading) return <div className="py-24 text-center text-[var(--text-secondary)]">Carregando…</div>
 
   return (
     <div className="space-y-5">
-      {flash && <div className="rounded-xl border border-green-400/30 bg-green-500/15 px-4 py-3 text-sm text-green-200">{flash}</div>}
+      {flash && <div className="rounded-xl border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-700">{flash}</div>}
       {erro && (
-        <div className="rounded-xl border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-200">
+        <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
           {erro} <button onClick={() => { setErro(null); void load() }} className="ml-2 underline hover:text-white">Recarregar</button>
         </div>
       )}
@@ -118,11 +118,11 @@ function FormularioConfig({
             <h2 className="text-lg font-semibold text-white">{titulo}</h2>
             <p className="mt-1 max-w-3xl text-sm text-white/60">{descricao}</p>
             {atualizadoEm && (
-              <p className="mt-1 text-[11px] text-white/40">Última alteração: {new Date(atualizadoEm).toLocaleString("pt-BR")}</p>
+              <p className="mt-1 text-[11px] text-[var(--text-muted)]">Última alteração: {new Date(atualizadoEm).toLocaleString("pt-BR")}</p>
             )}
           </div>
           <div className="flex flex-none items-center gap-2">
-            {sujo && <span className="text-xs text-amber-300/80">alterações não salvas</span>}
+            {sujo && <span className="text-xs text-amber-700/80">alterações não salvas</span>}
             <button
               onClick={salvar} disabled={busy || !sujo}
               className="rounded-lg bg-blue-600 px-4 py-2 text-xs font-medium text-[#fff] hover:bg-blue-500 disabled:opacity-40"
@@ -159,7 +159,7 @@ function FormularioConfig({
               ) : (
                 <input value={valores[c.chave] ?? ""} onChange={(e) => setValores({ ...valores, [c.chave]: e.target.value })} className={inputCls} placeholder={c.padrao} />
               )}
-              {c.ajuda && <p className="mt-1 text-[11px] text-white/40">{c.ajuda}</p>}
+              {c.ajuda && <p className="mt-1 text-[11px] text-[var(--text-muted)]">{c.ajuda}</p>}
             </div>
           ))}
         </div>
@@ -188,7 +188,7 @@ export function IdentidadeVisualTab() {
       descricao="Marca, logotipo e cores institucionais usados nas comunicações e documentos gerados. O fundo por país das telas operacionais é o motor de ambiente e continua definido em build."
       extra={(valores) => (
         <div className={`${CARD} p-5`}>
-          <div className="mb-3 text-[11px] uppercase tracking-wide text-white/45">Pré-visualização</div>
+          <div className="mb-3 text-[11px] uppercase tracking-wide text-[var(--text-secondary)]">Pré-visualização</div>
           <div className="flex flex-wrap items-center gap-4">
             <div
               className="flex h-16 min-w-[220px] items-center gap-3 rounded-xl px-4"
@@ -203,7 +203,7 @@ export function IdentidadeVisualTab() {
               )}
               <span className="text-base font-semibold">{valores["identidade.marca"] || "Marca"}</span>
             </div>
-            <p className="max-w-md text-[12px] text-white/45">
+            <p className="max-w-md text-[12px] text-[var(--text-secondary)]">
               É assim que a marca aparece nos materiais gerados pelo sistema. O tema das telas operacionais
               (fundo por nacionalidade) é decidido pelo processo, não por esta tela.
             </p>

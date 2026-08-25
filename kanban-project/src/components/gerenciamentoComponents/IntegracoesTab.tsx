@@ -30,17 +30,17 @@ const CARD = "rounded-2xl border border-[var(--border-default)] bg-[var(--surfac
 
 // estados vindos do backend → cor e rótulo em português
 const ESTADO: Record<string, { cls: string; label: string }> = {
-  ATUALIZADO: { cls: "bg-green-500/15 text-green-300", label: "Atualizado" },
-  ATIVO: { cls: "bg-green-500/15 text-green-300", label: "Ativo" },
-  DECLARADO: { cls: "bg-green-500/15 text-green-300", label: "Declarado" },
-  RUNTIME_V2_HABILITADO: { cls: "bg-green-500/15 text-green-300", label: "Runtime v2 habilitado" },
-  RUNTIME_V2_DESABILITADO: { cls: "bg-amber-500/15 text-amber-300", label: "Runtime v2 desabilitado" },
-  SEM_NOVA_PUBLICACAO: { cls: "bg-amber-500/15 text-amber-300", label: "Sem nova publicação" },
-  DESATUALIZADO: { cls: "bg-amber-500/15 text-amber-300", label: "Desatualizado" },
-  SEGREDO_PENDENTE: { cls: "bg-amber-500/15 text-amber-300", label: "Segredo pendente" },
-  CONFIGURACAO_PENDENTE: { cls: "bg-red-500/15 text-red-300", label: "Configuração pendente" },
-  INDISPONIVEL: { cls: "bg-red-500/15 text-red-300", label: "Indisponível" },
-  SEM_DADOS: { cls: "bg-[var(--surface-primary)] text-white/50", label: "Sem dados" },
+  ATUALIZADO: { cls: "bg-green-50 text-green-700", label: "Atualizado" },
+  ATIVO: { cls: "bg-green-50 text-green-700", label: "Ativo" },
+  DECLARADO: { cls: "bg-green-50 text-green-700", label: "Declarado" },
+  RUNTIME_V2_HABILITADO: { cls: "bg-green-50 text-green-700", label: "Runtime v2 habilitado" },
+  RUNTIME_V2_DESABILITADO: { cls: "bg-amber-50 text-amber-700", label: "Runtime v2 desabilitado" },
+  SEM_NOVA_PUBLICACAO: { cls: "bg-amber-50 text-amber-700", label: "Sem nova publicação" },
+  DESATUALIZADO: { cls: "bg-amber-50 text-amber-700", label: "Desatualizado" },
+  SEGREDO_PENDENTE: { cls: "bg-amber-50 text-amber-700", label: "Segredo pendente" },
+  CONFIGURACAO_PENDENTE: { cls: "bg-red-50 text-red-700", label: "Configuração pendente" },
+  INDISPONIVEL: { cls: "bg-red-50 text-red-700", label: "Indisponível" },
+  SEM_DADOS: { cls: "bg-[var(--surface-primary)] text-[var(--text-secondary)]", label: "Sem dados" },
 }
 const estadoDe = (e: string) => ESTADO[e] ?? { cls: "bg-[var(--surface-primary)] text-white/60", label: e }
 
@@ -87,12 +87,12 @@ export default function IntegracoesTab() {
   const ambiente = dados?.ambiente ?? ""
   const erro = erroCarregar ? (erroCarregar.message || 'Não foi possível carregar o status das integrações.') : null
 
-  if (loading) return <div className="py-24 text-center text-white/50">Carregando…</div>
+  if (loading) return <div className="py-24 text-center text-[var(--text-secondary)]">Carregando…</div>
 
   return (
     <div className="space-y-5">
       {erro && (
-        <div className="rounded-xl border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-200">
+        <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
           {erro} <button onClick={() => void load()} className="ml-2 underline hover:text-white">Tentar de novo</button>
         </div>
       )}
@@ -108,7 +108,7 @@ export default function IntegracoesTab() {
           </div>
           <div className="flex flex-none items-center gap-2">
             {ambiente && (
-              <span className="rounded-lg border border-[var(--border-default)] bg-white/[0.04] px-3 py-1.5 text-[11px] text-white/50">
+              <span className="rounded-lg border border-[var(--border-default)] bg-[var(--surface-primary)] px-3 py-1.5 text-[11px] text-[var(--text-secondary)]">
                 ambiente: {ambiente}
               </span>
             )}
@@ -138,7 +138,7 @@ export default function IntegracoesTab() {
                 <dl className="mt-4 grid gap-x-4 gap-y-2 border-t border-[var(--border-default)] pt-3 sm:grid-cols-2">
                   {detalhes.map(([k, v]) => (
                     <div key={k} className="min-w-0">
-                      <dt className="text-[11px] uppercase tracking-wide text-white/45">{rotulo(k)}</dt>
+                      <dt className="text-[11px] uppercase tracking-wide text-[var(--text-secondary)]">{rotulo(k)}</dt>
                       <dd className="truncate text-sm text-white/80">{valorLegivel(v)}</dd>
                     </div>
                   ))}
@@ -147,12 +147,12 @@ export default function IntegracoesTab() {
 
               {jobs.length > 0 && (
                 <div className="mt-4 border-t border-[var(--border-default)] pt-3">
-                  <div className="mb-1.5 text-[11px] uppercase tracking-wide text-white/45">Rotinas</div>
+                  <div className="mb-1.5 text-[11px] uppercase tracking-wide text-[var(--text-secondary)]">Rotinas</div>
                   <ul className="space-y-1 text-sm text-white/75">
                     {jobs.map((j) => (
                       <li key={j.path} className="flex flex-wrap items-baseline gap-x-2">
                         <code className="rounded bg-[var(--surface-primary)] px-1.5 py-0.5 text-[11px] text-white/70">{j.path}</code>
-                        <span className="text-white/50">{j.schedule}</span>
+                        <span className="text-[var(--text-secondary)]">{j.schedule}</span>
                         <span className="text-white/60">· {j.descricao}</span>
                       </li>
                     ))}
@@ -160,7 +160,7 @@ export default function IntegracoesTab() {
                 </div>
               )}
 
-              <div className="mt-4 border-t border-[var(--border-default)] pt-3 text-[12px] text-white/45">
+              <div className="mt-4 border-t border-[var(--border-default)] pt-3 text-[12px] text-[var(--text-secondary)]">
                 Configurado em: <span className="text-white/65">{i.ondeConfigurar}</span>
                 {i.telaRelacionada && <> · Tela relacionada: <span className="text-white/65">{i.telaRelacionada}</span></>}
               </div>
