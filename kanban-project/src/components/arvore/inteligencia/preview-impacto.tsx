@@ -137,7 +137,7 @@ export function PreviewImpactoModal({ proposta, onCancelar, onConfirmar }: Props
   const op = resultado?.operacional
 
   return (
-    <div className="fixed inset-0 z-[10050] flex items-center justify-center bg-black/40 p-4">
+    <div className="fixed inset-0 z-[10050] flex items-center justify-center bg-[var(--overlay-modal)] p-4">
       <div className="flex max-h-[85vh] w-full max-w-lg flex-col overflow-hidden rounded-xl border border-gray-200 bg-white text-gray-900 shadow-2xl">
         <div className="flex items-start justify-between gap-3 border-b border-gray-100 px-5 py-4">
           <div>

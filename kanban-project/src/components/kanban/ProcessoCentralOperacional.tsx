@@ -946,7 +946,7 @@ export function ProcessoCentralOperacional({
   }
 
   return (
-    <div className="h-full overflow-y-auto bg-[#15191f]">
+    <div className="h-full overflow-y-auto bg-[var(--surface-popover)]">
       <div className="px-6 py-5">
 
         {/* ===== TOPO: Trilha de fases + Resumo do processo (lado a lado) ===== */}
@@ -987,7 +987,7 @@ export function ProcessoCentralOperacional({
             <div className="flex items-center gap-2">
               <button
                 onClick={() => setSelectedPhaseKey(null)}
-                className="inline-flex items-center gap-1.5 border-[1.5px] border-white/10 bg-[#1b2027] text-white/80 text-[12.5px] font-semibold px-3.5 py-2 rounded-lg hover:border-white/20 hover:text-white transition-colors"
+                className="inline-flex items-center gap-1.5 border-[1.5px] border-white/10 bg-[var(--surface-popover)] text-white/80 text-[12.5px] font-semibold px-3.5 py-2 rounded-lg hover:border-white/20 hover:text-[#fff] transition-colors"
               >
                 <ArrowLeft className="w-3.5 h-3.5" /> Voltar à fase ativa
               </button>
@@ -1106,14 +1106,14 @@ export function ProcessoCentralOperacional({
           />
 
           {abrindoOperacao && (
-            <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/20">
-              <div className="rounded-md bg-[#1b2027] px-4 py-2 text-sm text-white/80 shadow">Abrindo operação…</div>
+            <div className="fixed inset-0 z-[60] flex items-center justify-center bg-[var(--overlay-modal)]">
+              <div className="rounded-md bg-[var(--surface-popover)] px-4 py-2 text-sm text-white/80 shadow">Abrindo operação…</div>
             </div>
           )}
 
           {erroOperacao && (
-            <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/30" onClick={() => setErroOperacao(null)}>
-              <div className="max-w-sm rounded-lg bg-[#1b2027] p-5 shadow-xl" onClick={(e) => e.stopPropagation()}>
+            <div className="fixed inset-0 z-[70] flex items-center justify-center bg-[var(--overlay-modal)]" onClick={() => setErroOperacao(null)}>
+              <div className="max-w-sm rounded-lg bg-[var(--surface-popover)] p-5 shadow-xl" onClick={(e) => e.stopPropagation()}>
                 <div className="text-sm font-semibold text-white/95 mb-1">Não foi possível abrir a operação</div>
                 <div className="text-sm text-white/68 mb-4">{erroOperacao}</div>
                 <div className="flex justify-end">

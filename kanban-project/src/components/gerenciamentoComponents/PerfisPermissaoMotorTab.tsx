@@ -143,7 +143,7 @@ export default function PerfisPermissaoMotorTab() {
           <option value="active" className="bg-zinc-900">Ativos</option>
           <option value="archived" className="bg-zinc-900">Arquivados</option>
         </select>
-        <button onClick={abrirNovo} className="ml-auto rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-500">
+        <button onClick={abrirNovo} className="ml-auto rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-[#fff] hover:bg-blue-500">
           + Novo perfil
         </button>
       </div>
@@ -195,7 +195,7 @@ export default function PerfisPermissaoMotorTab() {
       </div>
 
       {modalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm" onClick={() => setModalOpen(false)}>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-[var(--overlay-modal)] p-4 backdrop-blur-sm" onClick={() => setModalOpen(false)}>
           <div className="max-h-[90vh] w-full max-w-2xl overflow-auto rounded-2xl border border-white/10 bg-zinc-900/95 shadow-2xl" onClick={e => e.stopPropagation()}>
             <div className="border-b border-white/10 px-5 py-4">
               <h3 className="text-base font-semibold text-white">{form.id ? "Editar" : "Novo"} perfil de permissão</h3>
@@ -237,7 +237,7 @@ export default function PerfisPermissaoMotorTab() {
 
             <div className="flex justify-end gap-2 border-t border-white/10 px-5 py-4">
               <button onClick={() => setModalOpen(false)} className="rounded-lg border border-white/10 px-4 py-2 text-sm text-white/70 hover:bg-white/5">Cancelar</button>
-              <button onClick={salvar} disabled={salvando} className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-500 disabled:opacity-60">
+              <button onClick={salvar} disabled={salvando} className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-[#fff] hover:bg-blue-500 disabled:opacity-60">
                 {salvando ? "Salvando…" : "Salvar"}
               </button>
             </div>

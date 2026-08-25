@@ -54,7 +54,7 @@ export default function CcTab() {
           <h2 className="text-lg font-bold text-white flex items-center gap-2"><Target className="h-5 w-5" /> Centros de Custo</h2>
           <div className="text-xs text-white/60 mt-1">{k.qtdCentros} centros · {fmtBRLshort(k.totalExecutado)} executado de {fmtBRLshort(k.totalOrcado)} orçado <span className="text-white/30">·prévia</span></div>
         </div>
-        <button className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm rounded-lg bg-blue-600 hover:bg-blue-700 text-white"><Plus className="h-3.5 w-3.5" /> Novo CC</button>
+        <button className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm rounded-lg bg-blue-600 hover:bg-blue-700 text-[#fff]"><Plus className="h-3.5 w-3.5" /> Novo CC</button>
       </div>
 
       {/* KPIs */}

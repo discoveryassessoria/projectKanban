@@ -224,12 +224,12 @@ export default function UsersTab() {
           <div className="text-xs text-white/60 mt-1">{usuarios.length} {usuarios.length === 1 ? "usuário cadastrado" : "usuários cadastrados"}</div>
         </div>
         {pode("usuarios.criar") && (
-          <Button onClick={handleCreate} className="gap-2 bg-blue-600 hover:bg-blue-700 text-white"><UserPlus className="h-4 w-4" /> Novo Usuário</Button>
+          <Button onClick={handleCreate} className="gap-2 bg-blue-600 hover:bg-blue-700 text-[#fff]"><UserPlus className="h-4 w-4" /> Novo Usuário</Button>
         )}
       </div>
 
-      {error && <Alert className="bg-red-500/20 border-red-500/50 text-white"><AlertDescription className="text-white">{error}</AlertDescription></Alert>}
-      {success && <Alert className="border-green-500/50 bg-green-500/20 text-white"><AlertDescription className="text-white">{success}</AlertDescription></Alert>}
+      {error && <Alert className="bg-red-500/20 border-red-500/50 text-[#fff]"><AlertDescription className="text-white">{error}</AlertDescription></Alert>}
+      {success && <Alert className="border-green-500/50 bg-green-500/20 text-[#fff]"><AlertDescription className="text-white">{success}</AlertDescription></Alert>}
 
       {/* Busca */}
       <div className="relative">
@@ -393,7 +393,7 @@ export default function UsersTab() {
 
             <DialogFooter>
               <Button type="button" variant="outline" onClick={() => setIsDialogOpen(false)} disabled={isSubmitting}>Cancelar</Button>
-              <Button type="submit" disabled={isSubmitting} className="bg-blue-600 hover:bg-blue-700 text-white">
+              <Button type="submit" disabled={isSubmitting} className="bg-blue-600 hover:bg-blue-700 text-[#fff]">
                 {isSubmitting ? <><div className="mr-2 h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />Salvando...</> : isEditing ? "Atualizar" : "Criar"}
               </Button>
             </DialogFooter>
@@ -410,7 +410,7 @@ export default function UsersTab() {
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel disabled={isSubmitting}>Cancelar</AlertDialogCancel>
-            <AlertDialogAction onClick={confirmDelete} disabled={isSubmitting} className="bg-red-600 hover:bg-red-700 text-white">{isSubmitting ? "Deletando..." : "Deletar"}</AlertDialogAction>
+            <AlertDialogAction onClick={confirmDelete} disabled={isSubmitting} className="bg-red-600 hover:bg-red-700 text-[#fff]">{isSubmitting ? "Deletando..." : "Deletar"}</AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>

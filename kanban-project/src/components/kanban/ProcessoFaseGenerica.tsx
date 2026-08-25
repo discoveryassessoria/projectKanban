@@ -59,7 +59,7 @@ export function ProcessoFaseGenerica({ processoId, faseCode, onConcluido }: Prop
           const ok = done.has(s.stepKey)
           return (
             <button key={s.stepKey} onClick={() => toggle(s.stepKey)} disabled={!!resultado}
-              className="w-full flex items-start gap-3 px-4 py-3 text-left hover:bg-[#20262e] disabled:hover:bg-[#1b2027]">
+              className="w-full flex items-start gap-3 px-4 py-3 text-left hover:bg-[#20262e] disabled:hover:bg-[var(--surface-popover)]">
               <span className={`mt-0.5 w-6 h-6 rounded-full flex items-center justify-center flex-shrink-0 ${ok ? "bg-[#4ade80] text-white" : "border-2 border-white/15 text-transparent"}`}>
                 <Check className="w-4 h-4" />
               </span>
@@ -76,7 +76,7 @@ export function ProcessoFaseGenerica({ processoId, faseCode, onConcluido }: Prop
         <div className="flex items-center justify-between gap-3 rounded-xl border border-white/10 p-4">
           <div className="text-xs text-white/68">{todasFeitas ? "Tudo pronto — pode avançar." : `Marque as ${steps.length} etapas para concluir a fase.`}</div>
           <button onClick={concluir} disabled={!todasFeitas || salvando || !!resultado}
-            className="px-4 py-2 text-sm font-semibold text-white bg-[#12161c] hover:bg-[#20262e] rounded-md inline-flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed">
+            className="px-4 py-2 text-sm font-semibold text-[#fff] bg-[var(--app-background)] hover:bg-[#20262e] rounded-md inline-flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed">
             {salvando ? <Loader2 className="w-4 h-4 animate-spin" /> : <ArrowRight className="w-4 h-4" />} Concluir fase
           </button>
         </div>

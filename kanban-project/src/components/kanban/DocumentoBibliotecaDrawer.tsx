@@ -82,10 +82,10 @@ function ConteudoDrawer({ item, context, onClose }: Props) {
   return (
     <>
       {/* Overlay */}
-      <div className="fixed inset-0 bg-black/30 z-40" onClick={onClose} />
+      <div className="fixed inset-0 bg-[var(--overlay-modal)] z-40" onClick={onClose} />
 
       {/* Painel claro */}
-      <div className="fixed top-0 right-0 h-full w-[560px] max-w-[94vw] bg-[#1b2027] text-white/95 z-50 shadow-2xl flex flex-col">
+      <div className="fixed top-0 right-0 h-full w-[560px] max-w-[94vw] bg-[var(--surface-popover)] text-white/95 z-50 shadow-2xl flex flex-col">
         {/* ---- Cabeçalho ---- */}
         <div className="px-6 pt-5 pb-4 border-b border-white/10">
           <div className="flex items-start gap-3">
@@ -114,18 +114,18 @@ function ConteudoDrawer({ item, context, onClose }: Props) {
             <button
               disabled
               title="Arquivo ainda não disponível"
-              className="inline-flex items-center gap-2 border border-white/10 bg-[#1b2027] rounded-lg px-3.5 py-2 text-[12.5px] font-semibold text-white/80 disabled:opacity-60 disabled:cursor-not-allowed"
+              className="inline-flex items-center gap-2 border border-white/10 bg-[var(--surface-popover)] rounded-lg px-3.5 py-2 text-[12.5px] font-semibold text-white/80 disabled:opacity-60 disabled:cursor-not-allowed"
             >
               <ExternalLink className="w-[15px] h-[15px]" /> Abrir arquivo principal
             </button>
             <button
               disabled
               title="Arquivo ainda não disponível"
-              className="inline-flex items-center gap-2 border border-white/10 bg-[#1b2027] rounded-lg px-3.5 py-2 text-[12.5px] font-semibold text-white/80 disabled:opacity-60 disabled:cursor-not-allowed"
+              className="inline-flex items-center gap-2 border border-white/10 bg-[var(--surface-popover)] rounded-lg px-3.5 py-2 text-[12.5px] font-semibold text-white/80 disabled:opacity-60 disabled:cursor-not-allowed"
             >
               <Download className="w-[15px] h-[15px]" /> Baixar todos os arquivos
             </button>
-            <button className="inline-flex items-center gap-1.5 border border-white/10 bg-[#1b2027] rounded-lg px-3.5 py-2 text-[12.5px] font-semibold text-white/80 hover:border-white/20">
+            <button className="inline-flex items-center gap-1.5 border border-white/10 bg-[var(--surface-popover)] rounded-lg px-3.5 py-2 text-[12.5px] font-semibold text-white/80 hover:border-white/20">
               Mais ações <ChevronDown className="w-[15px] h-[15px]" />
             </button>
           </div>
@@ -234,7 +234,7 @@ function Overview({
                 <div className="absolute top-[13px] left-[-50%] right-1/2 h-0.5 bg-[#252c35]" />
               )}
               <span
-                className={`relative z-10 w-[26px] h-[26px] rounded-full border-2 grid place-items-center bg-[#1b2027] ${
+                className={`relative z-10 w-[26px] h-[26px] rounded-full border-2 grid place-items-center bg-[var(--surface-popover)] ${
                   n.tone === "ok"
                     ? "border-[#4ade80]/30"
                     : n.tone === "na"

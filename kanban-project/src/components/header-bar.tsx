@@ -419,7 +419,7 @@ export function HeaderBar({
             variant="outline"
             size="sm"
             onClick={onLogout}
-            className="border-white/30 text-xs bg-transparent hover:bg-red-500/20 hover:border-red-400/50 text-white hover:text-red-400 flex items-center justify-center gap-1.5"
+            className="border-white/30 text-xs bg-transparent hover:bg-red-500/20 hover:border-red-400/50 text-[#fff] hover:text-red-400 flex items-center justify-center gap-1.5"
           >
             <LogOut className="h-3 w-3" />
             Sair

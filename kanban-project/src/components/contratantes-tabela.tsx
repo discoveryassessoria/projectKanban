@@ -1039,7 +1039,7 @@ const removerDocumentoObrigatorio = async (categoria: string) => {
       style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0 }}
     >
       <div 
-        className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+        className="absolute inset-0 bg-[var(--overlay-modal)] backdrop-blur-sm"
         onClick={onClose}
       />
       
@@ -1078,7 +1078,7 @@ const removerDocumentoObrigatorio = async (categoria: string) => {
               podeEditar && (
                 <Button
                   onClick={() => setIsViewMode(false)}
-                  className="bg-indigo-600 hover:bg-indigo-700 text-white"
+                  className="bg-indigo-600 hover:bg-indigo-700 text-[#fff]"
                 >
                   <Edit className="h-4 w-4 mr-2" />
                   Editar
@@ -1088,7 +1088,7 @@ const removerDocumentoObrigatorio = async (categoria: string) => {
               <Button
                 onClick={onSave}
                 disabled={isLoading}
-                className="bg-emerald-600 hover:bg-emerald-700 text-white"
+                className="bg-emerald-600 hover:bg-emerald-700 text-[#fff]"
               >
                 {isLoading ? "Salvando..." : editingId ? "Salvar Alterações" : "Criar Cliente"}
               </Button>
@@ -1697,7 +1697,7 @@ style={{
                                       <FileText className="h-10 w-10 text-gray-400" />
                                     </div>
                                   )}
-                                  <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors flex items-center justify-center">
+                                  <div className="absolute inset-0 bg-[var(--overlay-modal)] group-hover:bg-[var(--overlay-modal)] transition-colors flex items-center justify-center">
                                     <Eye className="h-5 w-5 text-white opacity-0 group-hover:opacity-100 transition-opacity" />
                                   </div>
                                 </div>
@@ -1817,13 +1817,13 @@ style={{
                                   <div className="w-full h-full flex items-center justify-center bg-gray-100">
                                     {isWord ? (
                                       <div className="text-center">
-                                        <div className="w-12 h-14 mx-auto bg-blue-600 rounded-sm flex items-center justify-center text-white text-xs font-bold">
+                                        <div className="w-12 h-14 mx-auto bg-blue-600 rounded-sm flex items-center justify-center text-[#fff] text-xs font-bold">
                                           DOC
                                         </div>
                                       </div>
                                     ) : isExcel ? (
                                       <div className="text-center">
-                                        <div className="w-12 h-14 mx-auto bg-green-600 rounded-sm flex items-center justify-center text-white text-xs font-bold">
+                                        <div className="w-12 h-14 mx-auto bg-green-600 rounded-sm flex items-center justify-center text-[#fff] text-xs font-bold">
                                           XLS
                                         </div>
                                       </div>
@@ -1833,7 +1833,7 @@ style={{
                                   </div>
                                 )}
                                 
-                                <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors flex items-center justify-center">
+                                <div className="absolute inset-0 bg-[var(--overlay-modal)] group-hover:bg-[var(--overlay-modal)] transition-colors flex items-center justify-center">
                                   <Eye className="h-6 w-6 text-white opacity-0 group-hover:opacity-100 transition-opacity" />
                                 </div>
                               </a>
@@ -1854,7 +1854,7 @@ style={{
                                     e.preventDefault()
                                     removerAnexoExistente(anexo, index)
                                   }}
-                                  className="absolute top-1 right-1 p-1 bg-red-500 hover:bg-red-600 rounded-full text-white opacity-0 group-hover:opacity-100 transition-opacity"
+                                  className="absolute top-1 right-1 p-1 bg-red-500 hover:bg-red-600 rounded-full text-[#fff] opacity-0 group-hover:opacity-100 transition-opacity"
                                 >
                                   <X className="h-3 w-3" />
                                 </button>
@@ -1892,7 +1892,7 @@ style={{
                         type="button"
                         onClick={handleUpload}
                         disabled={isUploading}
-                        className="mt-2 w-full py-2 px-4 bg-indigo-600 hover:bg-indigo-700 disabled:bg-indigo-400 text-white rounded-lg font-medium transition-colors"
+                        className="mt-2 w-full py-2 px-4 bg-indigo-600 hover:bg-indigo-700 disabled:bg-indigo-400 text-[#fff] rounded-lg font-medium transition-colors"
                       >
                         {isUploading ? (
                           <span className="flex items-center justify-center gap-2">
@@ -2289,7 +2289,7 @@ export function ContratantesTabela({ contratantes, onRefresh, onOpenProcesso }: 
           {pode('clientes.criar') && (
             <Button
               onClick={handleNew}
-              className="bg-emerald-600 hover:bg-emerald-700 text-white"
+              className="bg-emerald-600 hover:bg-emerald-700 text-[#fff]"
             >
               <Plus className="h-4 w-4 mr-2" />
               Novo Cliente

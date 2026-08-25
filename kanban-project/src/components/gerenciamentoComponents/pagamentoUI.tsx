@@ -370,7 +370,7 @@ export function ModalWizard({ onClose, largura = 'max-w-2xl', header, footer, ch
   }, [onClose])
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm" onClick={() => { fecharTodosMultiSelects(); onClose() }}>
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-[var(--overlay-modal)] p-4 backdrop-blur-sm" onClick={() => { fecharTodosMultiSelects(); onClose() }}>
       <div
         className={`flex max-h-[90vh] w-full ${largura} flex-col rounded-2xl border border-white/10 bg-zinc-900/95 text-white shadow-2xl`}
         onClick={(e) => e.stopPropagation()}

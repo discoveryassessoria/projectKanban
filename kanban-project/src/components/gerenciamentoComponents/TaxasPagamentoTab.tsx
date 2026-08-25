@@ -233,7 +233,7 @@ function FormaConfig({ formaId, onClose, onSalvo }: { formaId: number; onClose: 
   const nInput = 'w-16 rounded-md border border-white/10 bg-white/5 px-1.5 py-1 text-center text-[13px] text-white outline-none focus:border-white/30 placeholder:text-white/20'
 
   return (
-    <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm" onClick={onClose}>
+    <div className="fixed inset-0 z-[60] flex items-center justify-center bg-[var(--overlay-modal)] p-4 backdrop-blur-sm" onClick={onClose}>
       <div className="max-h-[92vh] w-full max-w-5xl overflow-auto rounded-2xl border border-white/10 bg-zinc-900/95 text-white shadow-2xl" onClick={(e) => e.stopPropagation()}>
         <div className="sticky top-0 z-10 flex items-center justify-between border-b border-white/10 bg-zinc-900/95 px-6 py-4">
           <div className="flex items-center gap-2">

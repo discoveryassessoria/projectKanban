@@ -125,7 +125,7 @@ function FormularioConfig({
             {sujo && <span className="text-xs text-amber-300/80">alterações não salvas</span>}
             <button
               onClick={salvar} disabled={busy || !sujo}
-              className="rounded-lg bg-blue-600 px-4 py-2 text-xs font-medium text-white hover:bg-blue-500 disabled:opacity-40"
+              className="rounded-lg bg-blue-600 px-4 py-2 text-xs font-medium text-[#fff] hover:bg-blue-500 disabled:opacity-40"
               title={sujo ? "" : "Nada alterado"}
             >
               {busy ? "Salvando…" : "Salvar"}

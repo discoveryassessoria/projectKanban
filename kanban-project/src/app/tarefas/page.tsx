@@ -25,8 +25,7 @@ import { useIsClient, useJsonLocalStorage } from "@/src/lib/cliente"
 import { VisaoGlobal } from "@/src/components/operacao/visao-global"
 
 const FUNDO =
-  "linear-gradient(180deg, rgba(8,9,11,.985) 0%, rgba(8,9,11,.975) 46%, rgba(8,9,11,.95) 60%," +
-  " rgba(8,9,11,.86) 72%, rgba(8,9,11,.76) 86%, rgba(8,9,11,.88) 100%)"
+  "var(--landscape-veil)"
 
 export default function TarefasEProjetosPage() {
   const router = useRouter()

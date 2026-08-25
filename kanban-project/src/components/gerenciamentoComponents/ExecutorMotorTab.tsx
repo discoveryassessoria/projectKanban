@@ -179,7 +179,7 @@ export default function ExecutorMotorTab() {
                   {tipos.map(t => <option key={t.id} value={t.id} className={opt}>{t.name}</option>)}
                 </select>
               </div>
-              <button disabled={assignTipoId === ""} onClick={() => conectar(Number(assignTipoId))} className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-500 disabled:opacity-50">Conectar</button>
+              <button disabled={assignTipoId === ""} onClick={() => conectar(Number(assignTipoId))} className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-[#fff] hover:bg-blue-500 disabled:opacity-50">Conectar</button>
             </div>
           </div>
         )}
@@ -209,12 +209,12 @@ export default function ExecutorMotorTab() {
             </div>
 
             {!confirming ? (
-              <button disabled={running || !phaseKey} onClick={() => setConfirming(true)} className="mt-4 rounded-lg bg-amber-600 px-4 py-2 text-sm font-medium text-white hover:bg-amber-500 disabled:opacity-50">Executar automações da fase</button>
+              <button disabled={running || !phaseKey} onClick={() => setConfirming(true)} className="mt-4 rounded-lg bg-amber-600 px-4 py-2 text-sm font-medium text-[#fff] hover:bg-amber-500 disabled:opacity-50">Executar automações da fase</button>
             ) : (
               <div className="mt-4 rounded-xl border border-amber-400/30 bg-amber-500/10 p-4">
                 <div className="text-sm text-amber-100">Isso vai <b>criar tarefas e lançamentos reais</b> no processo <b>{proc.nome}</b>. Pode desfazer depois. Confirma?</div>
                 <div className="mt-3 flex gap-2">
-                  <button disabled={running} onClick={executar} className="rounded-lg bg-amber-600 px-4 py-2 text-sm font-medium text-white hover:bg-amber-500 disabled:opacity-50">{running ? "Executando…" : "Sim, executar"}</button>
+                  <button disabled={running} onClick={executar} className="rounded-lg bg-amber-600 px-4 py-2 text-sm font-medium text-[#fff] hover:bg-amber-500 disabled:opacity-50">{running ? "Executando…" : "Sim, executar"}</button>
                   <button disabled={running} onClick={() => setConfirming(false)} className="rounded-lg border border-white/10 px-4 py-2 text-sm text-white/70 hover:bg-white/5">Cancelar</button>
                 </div>
               </div>

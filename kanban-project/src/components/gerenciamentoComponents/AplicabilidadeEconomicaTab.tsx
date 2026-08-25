@@ -114,7 +114,7 @@ export default function AplicabilidadeEconomicaTab() {
       )}
 
       {form && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4" onClick={() => !salvando && setForm(null)}>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-[var(--overlay-modal)] p-4" onClick={() => !salvando && setForm(null)}>
           <div className="w-full max-w-2xl rounded-2xl bg-neutral-900 p-5 ring-1 ring-white/10" onClick={e => e.stopPropagation()}>
             <h3 className="mb-4 text-base font-semibold">{form.id ? 'Editar regra' : 'Nova regra econômica'}</h3>
             <div className="grid grid-cols-2 gap-3 text-sm">

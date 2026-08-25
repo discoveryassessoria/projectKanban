@@ -425,7 +425,7 @@ function ConteudoDrawer({
     <>
       {/* Backdrop empilhado (z-index acima do DocumentoOperationalDrawer) */}
       <div
-        className="fixed inset-0 bg-black/55 z-[10002] transition-opacity"
+        className="fixed inset-0 bg-[var(--overlay-modal)] z-[10002] transition-opacity"
         onClick={onClose}
       />
 
@@ -450,7 +450,7 @@ function ConteudoDrawer({
             <p className="text-sm">{erro}</p>
             <button
               onClick={onClose}
-              className="px-3 py-1.5 text-xs bg-[#1b2027]/10 hover:bg-[#1b2027]/15 rounded-md"
+              className="px-3 py-1.5 text-xs bg-[var(--surface-popover)]/10 hover:bg-[var(--surface-popover)]/15 rounded-md"
             >
               Fechar
             </button>
@@ -470,7 +470,7 @@ function ConteudoDrawer({
                 </div>
                 <button
                   onClick={onClose}
-                  className="w-[30px] h-[30px] rounded-md bg-[#1b2027]/5 hover:bg-[#1b2027]/15 flex items-center justify-center text-white"
+                  className="w-[30px] h-[30px] rounded-md bg-[var(--surface-popover)]/5 hover:bg-[var(--surface-popover)]/15 flex items-center justify-center text-[#fff]"
                   aria-label="Fechar"
                 >
                   <X className="w-4 h-4" />
@@ -495,13 +495,13 @@ function ConteudoDrawer({
                   {STATUS_LABEL[step.status]}
                 </span>
 
-                <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-[#1b2027]/5 border border-white/10 text-[11px] text-white/80">
+                <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-[var(--surface-popover)]/5 border border-white/10 text-[11px] text-white/80">
                   <UserIcon className="w-3 h-3" />
                   {step.assignee?.nome || ownerName(step.ownerKey)}
                 </span>
 
                 {step.dueAt && (
-                  <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-[#1b2027]/5 border border-white/10 text-[11px] text-white/80 font-mono">
+                  <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-[var(--surface-popover)]/5 border border-white/10 text-[11px] text-white/80 font-mono">
                     <Clock className="w-3 h-3" />
                     {fmtDateTime(step.dueAt)}
                   </span>
@@ -514,7 +514,7 @@ function ConteudoDrawer({
                   <button
                     onClick={() => setEditorAberto(true)}
                     disabled={!!saving}
-                    className="inline-flex items-center gap-1.5 px-3 py-2 text-[12px] font-semibold bg-[#1b2027]/10 hover:bg-[#1b2027]/15 disabled:opacity-50 text-white rounded-md transition-colors border border-white/15"
+                    className="inline-flex items-center gap-1.5 px-3 py-2 text-[12px] font-semibold bg-[var(--surface-popover)]/10 hover:bg-[var(--surface-popover)]/15 disabled:opacity-50 text-[#fff] rounded-md transition-colors border border-white/15"
                   >
                     <FileText className="w-3.5 h-3.5" />
                     Ver campos preenchidos
@@ -523,7 +523,7 @@ function ConteudoDrawer({
                     <button
                       onClick={() => setReabrindoModal(true)}
                       disabled={!!saving}
-                      className="inline-flex items-center gap-1.5 px-3 py-2 text-[12px] font-semibold bg-[#1b2027]/10 hover:bg-[#1b2027]/15 disabled:opacity-50 text-white rounded-md transition-colors border border-white/15"
+                      className="inline-flex items-center gap-1.5 px-3 py-2 text-[12px] font-semibold bg-[var(--surface-popover)]/10 hover:bg-[var(--surface-popover)]/15 disabled:opacity-50 text-[#fff] rounded-md transition-colors border border-white/15"
                     >
                       ↻ Reabrir etapa
                     </button>
@@ -551,7 +551,7 @@ function ConteudoDrawer({
                     <button
                       onClick={handleConcluir}
                       disabled={!!saving}
-                      className="inline-flex items-center gap-1.5 px-3 py-2 text-[12px] font-semibold bg-[#4ade80]/15 hover:bg-[#4ade80]/15 disabled:bg-[#4ade80]/15 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-md transition-colors"
+                      className="inline-flex items-center gap-1.5 px-3 py-2 text-[12px] font-semibold bg-[#4ade80]/15 hover:bg-[#4ade80]/15 disabled:bg-[#4ade80]/15 disabled:opacity-50 disabled:cursor-not-allowed text-[#fff] rounded-md transition-colors"
                     >
                       <Check className="w-3.5 h-3.5" />
                       Concluir etapa
@@ -562,7 +562,7 @@ function ConteudoDrawer({
                   <button
                     onClick={() => setEditorAberto(true)}
                     disabled={!!saving}
-                    className="inline-flex items-center gap-1.5 px-3 py-2 text-[12px] font-semibold bg-[#1b2027]/10 hover:bg-[#1b2027]/15 disabled:opacity-50 text-white rounded-md transition-colors"
+                    className="inline-flex items-center gap-1.5 px-3 py-2 text-[12px] font-semibold bg-[var(--surface-popover)]/10 hover:bg-[var(--surface-popover)]/15 disabled:opacity-50 text-[#fff] rounded-md transition-colors"
                   >
                     <FileText className="w-3.5 h-3.5" />
                     Abrir editor
@@ -573,7 +573,7 @@ function ConteudoDrawer({
                     <button
                       onClick={handleDesbloquear}
                       disabled={!!saving}
-                      className="inline-flex items-center gap-1.5 px-3 py-2 text-[12px] font-semibold bg-[#7dd3fc] hover:bg-[#7dd3fc] disabled:opacity-50 text-white rounded-md transition-colors"
+                      className="inline-flex items-center gap-1.5 px-3 py-2 text-[12px] font-semibold bg-[#7dd3fc] hover:bg-[#7dd3fc] disabled:opacity-50 text-[#fff] rounded-md transition-colors"
                     >
                       {saving === "desbloqueando" ? "Desbloqueando…" : "Desbloquear"}
                     </button>
@@ -585,7 +585,7 @@ function ConteudoDrawer({
                         setShowForceForm(false)
                       }}
                       disabled={!!saving}
-                      className="inline-flex items-center gap-1.5 px-3 py-2 text-[12px] font-semibold bg-[#1b2027]/10 hover:bg-[#1b2027]/15 disabled:opacity-50 text-white rounded-md transition-colors"
+                      className="inline-flex items-center gap-1.5 px-3 py-2 text-[12px] font-semibold bg-[var(--surface-popover)]/10 hover:bg-[var(--surface-popover)]/15 disabled:opacity-50 text-[#fff] rounded-md transition-colors"
                     >
                       <Lock className="w-3.5 h-3.5" />
                       Bloquear
@@ -601,7 +601,7 @@ function ConteudoDrawer({
                         setShowForceForm(false)
                       }}
                       disabled={!!saving}
-                      className="inline-flex items-center gap-1.5 px-3 py-2 text-[12px] font-semibold bg-[#1b2027]/10 hover:bg-[#1b2027]/15 disabled:opacity-50 text-white rounded-md transition-colors"
+                      className="inline-flex items-center gap-1.5 px-3 py-2 text-[12px] font-semibold bg-[var(--surface-popover)]/10 hover:bg-[var(--surface-popover)]/15 disabled:opacity-50 text-[#fff] rounded-md transition-colors"
                     >
                       <ArrowLeftRight className="w-3.5 h-3.5" />
                       Alterar executor
@@ -630,7 +630,7 @@ function ConteudoDrawer({
                   <button
                     onClick={onClose}
                     disabled={!!saving}
-                    className="ml-auto inline-flex items-center gap-1.5 px-3 py-2 text-[12px] font-semibold text-white/70 hover:text-white hover:bg-[#1b2027]/5 rounded-md transition-colors"
+                    className="ml-auto inline-flex items-center gap-1.5 px-3 py-2 text-[12px] font-semibold text-white/70 hover:text-[#fff] hover:bg-[var(--surface-popover)]/5 rounded-md transition-colors"
                   >
                     Fechar
                   </button>
@@ -648,14 +648,14 @@ function ConteudoDrawer({
                     value={blockReason}
                     onChange={(e) => setBlockReason(e.target.value)}
                     placeholder="ex: aguardando cliente confirmar dados"
-                    className="w-full px-2.5 py-1.5 bg-[#1b2027]/5 border border-white/10 rounded text-[12px] text-white placeholder-white/30 focus:outline-none focus:border-[#f87171]/50"
+                    className="w-full px-2.5 py-1.5 bg-[var(--surface-popover)]/5 border border-white/10 rounded text-[12px] text-[#fff] placeholder-white/30 focus:outline-none focus:border-[#f87171]/50"
                     autoFocus
                   />
                   <div className="flex gap-2 mt-2">
                     <button
                       onClick={handleBloquear}
                       disabled={!!saving || !blockReason.trim()}
-                      className="px-3 py-1.5 text-[11px] font-semibold bg-[#f87171] hover:bg-[#f87171]/15 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded"
+                      className="px-3 py-1.5 text-[11px] font-semibold bg-[#f87171] hover:bg-[#f87171]/15 disabled:opacity-50 disabled:cursor-not-allowed text-[#fff] rounded"
                     >
                       {saving === "bloqueando" ? "Bloqueando…" : "Confirmar bloqueio"}
                     </button>
@@ -683,7 +683,7 @@ function ConteudoDrawer({
                     onChange={(e) =>
                       setTransferUserId(e.target.value ? Number(e.target.value) : null)
                     }
-                    className="w-full px-2.5 py-1.5 bg-[#1b2027]/5 border border-white/10 rounded text-[12px] text-white focus:outline-none focus:border-[#7dd3fc]/50"
+                    className="w-full px-2.5 py-1.5 bg-[var(--surface-popover)]/5 border border-white/10 rounded text-[12px] text-[#fff] focus:outline-none focus:border-[#7dd3fc]/50"
                   >
                     <option value="" className="bg-[#20262e]">
                       — Selecione quem executa —
@@ -698,7 +698,7 @@ function ConteudoDrawer({
                     <button
                       onClick={handleAlterarExecutor}
                       disabled={!!saving || !transferUserId}
-                      className="px-3 py-1.5 text-[11px] font-semibold bg-[#7dd3fc] hover:bg-[#7dd3fc] disabled:opacity-50 disabled:cursor-not-allowed text-white rounded"
+                      className="px-3 py-1.5 text-[11px] font-semibold bg-[#7dd3fc] hover:bg-[#7dd3fc] disabled:opacity-50 disabled:cursor-not-allowed text-[#fff] rounded"
                     >
                       {saving === "transferindo" ? "Alterando…" : "Confirmar"}
                     </button>
@@ -730,7 +730,7 @@ function ConteudoDrawer({
                     value={forceMotivo}
                     onChange={(e) => setForceMotivo(e.target.value)}
                     placeholder="ex: etapa executada fora do sistema"
-                    className="w-full px-2.5 py-1.5 bg-[#1b2027]/5 border border-white/10 rounded text-[12px] text-white placeholder-white/30 focus:outline-none focus:border-[#d2a948]/50"
+                    className="w-full px-2.5 py-1.5 bg-[var(--surface-popover)]/5 border border-white/10 rounded text-[12px] text-[#fff] placeholder-white/30 focus:outline-none focus:border-[#d2a948]/50"
                     autoFocus
                   />
                   <label className="block text-[10px] uppercase font-semibold tracking-wider text-[#d2a948]/80 mb-1.5 mt-2">
@@ -741,7 +741,7 @@ function ConteudoDrawer({
                     value={forceJustificativa}
                     onChange={(e) => setForceJustificativa(e.target.value)}
                     placeholder="Explique por que a etapa está sendo concluída assim."
-                    className="w-full px-2.5 py-1.5 bg-[#1b2027]/5 border border-white/10 rounded text-[12px] text-white placeholder-white/30 focus:outline-none focus:border-[#d2a948]/50 resize-none"
+                    className="w-full px-2.5 py-1.5 bg-[var(--surface-popover)]/5 border border-white/10 rounded text-[12px] text-[#fff] placeholder-white/30 focus:outline-none focus:border-[#d2a948]/50 resize-none"
                   />
                   <div className="flex gap-2 mt-2">
                     <button
@@ -807,7 +807,7 @@ function ConteudoDrawer({
                       className={`text-[9.5px] px-1.5 rounded-full font-bold ${
                         activeTab === t.id
                           ? "bg-[#7dd3fc]/30 text-[#7dd3fc]"
-                          : "bg-[#1b2027]/10 text-white/70"
+                          : "bg-[var(--surface-popover)]/10 text-white/70"
                       }`}
                     >
                       {t.count}
@@ -936,7 +936,7 @@ function TabTimeline({ step }: { step: WorkflowStep }) {
         {eventos.map((e, i) => (
           <div
             key={i}
-            className="flex items-start gap-3 p-3 rounded-md bg-[#1b2027]/5 border border-white/10"
+            className="flex items-start gap-3 p-3 rounded-md bg-[var(--surface-popover)]/5 border border-white/10"
           >
             <div className="w-2 h-2 rounded-full bg-[#7dd3fc]/15 mt-1.5 flex-shrink-0" />
             <div className="flex-1 min-w-0">

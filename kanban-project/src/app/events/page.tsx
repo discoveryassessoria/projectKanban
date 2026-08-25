@@ -347,8 +347,7 @@ const handleSubmit = async () => {
           className="pointer-events-none fixed inset-0 -z-10"
           style={{
             background:
-              "linear-gradient(180deg, rgba(8,9,11,.985) 0%, rgba(8,9,11,.975) 46%, rgba(8,9,11,.95) 60%," +
-              " rgba(8,9,11,.86) 72%, rgba(8,9,11,.76) 86%, rgba(8,9,11,.88) 100%)",
+              "var(--landscape-veil)",
           }}
         />
         <div className="min-h-screen flex items-center justify-center">
@@ -370,8 +369,7 @@ const handleSubmit = async () => {
         className="pointer-events-none fixed inset-0 -z-10"
         style={{
           background:
-            "linear-gradient(180deg, rgba(8,9,11,.985) 0%, rgba(8,9,11,.975) 46%, rgba(8,9,11,.95) 60%," +
-            " rgba(8,9,11,.86) 72%, rgba(8,9,11,.76) 86%, rgba(8,9,11,.88) 100%)",
+            "var(--landscape-veil)",
         }}
       />
 
@@ -583,7 +581,7 @@ const handleSubmit = async () => {
                     <Button
                       onClick={handleSubmit}
                       disabled={isSaving}
-                      className="bg-emerald-600 hover:bg-emerald-700 text-white"
+                      className="bg-emerald-600 hover:bg-emerald-700 text-[#fff]"
                     >
                       <Check className="h-4 w-4 mr-1.5" />
                       {isSaving ? "Salvando..." : editingId ? "Salvar" : "Criar Evento"}

@@ -122,7 +122,7 @@ export default function SimulacaoFaseTab() {
         </div>
 
         <div className="mt-4 flex items-center gap-3">
-          <button disabled={running || !ptId || !phaseKey} onClick={run} className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-500 disabled:opacity-50">{running ? "Simulando…" : "Executar simulação"}</button>
+          <button disabled={running || !ptId || !phaseKey} onClick={run} className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-[#fff] hover:bg-blue-500 disabled:opacity-50">{running ? "Simulando…" : "Executar simulação"}</button>
           {erro && <span className="text-sm text-red-300">{erro}</span>}
         </div>
       </div>

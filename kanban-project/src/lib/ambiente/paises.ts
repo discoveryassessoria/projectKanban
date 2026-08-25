@@ -125,7 +125,19 @@ export function paletaCss(tokens: Tokens): React.CSSProperties {
     "--amb-ceu-1": `oklch(${tokens.ceu1})`,
     "--amb-ceu-2": `oklch(${tokens.ceu2})`,
     "--amb-ceu-3": `oklch(${tokens.ceu3})`,
-    // Véu/overlay de contraste — intensidade moderada, na cor do céu do país.
-    "--amb-scrim": `oklch(${tokens.ceu3} / 0.42)`,
+    // VÉU DE CONTRASTE — no tema claro ele é IVORY, não a cor do céu.
+    //
+    // Antes o véu era o próprio céu do país a 42%: escurecia a foto o suficiente
+    // para o texto branco do dark glass ficar legível. Sobre um shell claro isso
+    // faria o oposto — a paisagem competiria com o conteúdo.
+    //
+    // Agora é ivory quente em alta opacidade, e a foto aparece por baixo: presente
+    // nas margens e nas áreas vazias, discreta atrás de tabela e formulário. A COR
+    // DO PAÍS não some: continua em `--amb-primaria`/`--amb-acento`, que é onde ela
+    // sempre identificou o ambiente.
+    //
+    // Não é `opacity` no contêiner — isso apagaria o conteúdo junto. É uma camada
+    // própria, entre a foto e o shell.
+    "--amb-scrim": "rgba(246, 243, 237, 0.90)",
   } as React.CSSProperties
 }

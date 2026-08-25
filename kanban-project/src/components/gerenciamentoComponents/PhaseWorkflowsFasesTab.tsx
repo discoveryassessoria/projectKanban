@@ -440,7 +440,7 @@ export default function PhaseWorkflowsFasesTab() {
               </div>
               {wf && (
                 <div className="flex flex-none flex-wrap justify-end gap-1.5">
-                  <button onClick={() => void criarPasso(wf)} className="rounded-lg bg-blue-600 px-2.5 py-1 text-xs font-medium text-white hover:bg-blue-500">+ Passo</button>
+                  <button onClick={() => void criarPasso(wf)} className="rounded-lg bg-blue-600 px-2.5 py-1 text-xs font-medium text-[#fff] hover:bg-blue-500">+ Passo</button>
                   {/* PUBLICAR É UM ATO SEPARADO DE SALVAR. Enquanto não se clica aqui,
                       o que os processos leem continua sendo a versão anterior. */}
                   <button onClick={() => setPublicarWf(wf)}
@@ -455,7 +455,7 @@ export default function PhaseWorkflowsFasesTab() {
             {/* passos ou vazio */}
             {!wf ? (
               <div className="mt-3 flex flex-wrap gap-2">
-                <button onClick={() => criarVazio(p.phaseKey, p.label)} disabled={busy} className="rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-blue-500 disabled:opacity-50">+ Criar workflow interno</button>
+                <button onClick={() => criarVazio(p.phaseKey, p.label)} disabled={busy} className="rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-medium text-[#fff] hover:bg-blue-500 disabled:opacity-50">+ Criar workflow interno</button>
               </div>
             ) : wf.passos.length === 0 ? (
               <div className="mt-3 text-xs text-white/40">Nenhum passo ainda. Use “+ Passo” ou aplique um modelo.</div>
@@ -552,7 +552,7 @@ export default function PhaseWorkflowsFasesTab() {
 
       {/* MODAL — aplicar modelo */}
       {applyFor && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm" onClick={() => setApplyFor(null)}>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-[var(--overlay-modal)] p-4 backdrop-blur-sm" onClick={() => setApplyFor(null)}>
           <div className="max-h-[90vh] w-full max-w-2xl overflow-auto rounded-2xl border border-white/10 bg-zinc-900/95 shadow-2xl" onClick={e => e.stopPropagation()}>
             <div className="border-b border-white/10 px-6 py-4">
               <h3 className="font-semibold text-white">Aplicar modelo de workflow</h3>
@@ -578,7 +578,7 @@ export default function PhaseWorkflowsFasesTab() {
             </div>
             <div className="flex justify-end gap-2 border-t border-white/10 px-6 py-4">
               <button onClick={() => setApplyFor(null)} className="rounded-lg border border-white/10 bg-white/5 px-4 py-2 text-sm text-white/80 hover:bg-white/10">Cancelar</button>
-              <button disabled={!applySel || busy} onClick={() => applySel && aplicar(applySel, applyFor.phaseKey, applyFor.label)} className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-500 disabled:opacity-50">Aplicar</button>
+              <button disabled={!applySel || busy} onClick={() => applySel && aplicar(applySel, applyFor.phaseKey, applyFor.label)} className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-[#fff] hover:bg-blue-500 disabled:opacity-50">Aplicar</button>
             </div>
           </div>
         </div>
@@ -586,13 +586,13 @@ export default function PhaseWorkflowsFasesTab() {
 
       {/* MODAL — confirmar substituição */}
       {replaceAsk && (
-        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm" onClick={() => setReplaceAsk(null)}>
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-[var(--overlay-modal)] p-4 backdrop-blur-sm" onClick={() => setReplaceAsk(null)}>
           <div className="w-full max-w-md rounded-2xl border border-white/10 bg-zinc-900/95 p-6 shadow-2xl" onClick={e => e.stopPropagation()}>
             <h3 className="font-semibold text-white">Substituir os passos?</h3>
             <p className="mt-2 text-sm text-white/60">A fase <strong>{replaceAsk.label}</strong> já tem um workflow interno neste processo. Aplicar o modelo vai <strong>substituir os passos atuais</strong> pelos do modelo.</p>
             <div className="mt-5 flex justify-end gap-2">
               <button onClick={() => setReplaceAsk(null)} className="rounded-lg border border-white/10 bg-white/5 px-4 py-2 text-sm text-white/80 hover:bg-white/10">Cancelar</button>
-              <button disabled={busy} onClick={() => aplicar(replaceAsk.templateId, replaceAsk.phaseKey, replaceAsk.label, "replace")} className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-500 disabled:opacity-50">Substituir passos</button>
+              <button disabled={busy} onClick={() => aplicar(replaceAsk.templateId, replaceAsk.phaseKey, replaceAsk.label, "replace")} className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-[#fff] hover:bg-blue-500 disabled:opacity-50">Substituir passos</button>
             </div>
           </div>
         </div>

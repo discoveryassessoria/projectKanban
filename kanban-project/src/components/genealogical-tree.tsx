@@ -154,7 +154,7 @@ const PersonNode = ({ data }: { data: TreeNode["data"] }) => {
         <Button
           size="sm"
           variant="outline"
-          className="h-7 w-7 p-0 bg-white shadow-md hover:bg-green-500 hover:text-white border-green-200"
+          className="h-7 w-7 p-0 bg-white shadow-md hover:bg-green-500 hover:text-[#fff] border-green-200"
           onClick={() => onAddChild(pessoa.id)}
           title="Adicionar Filho"
         >
@@ -163,7 +163,7 @@ const PersonNode = ({ data }: { data: TreeNode["data"] }) => {
         <Button
           size="sm"
           variant="outline"
-          className="h-7 w-7 p-0 bg-white shadow-md hover:bg-blue-500 hover:text-white border-blue-200"
+          className="h-7 w-7 p-0 bg-white shadow-md hover:bg-blue-500 hover:text-[#fff] border-blue-200"
           onClick={() => onAddParent(pessoa.id, "pai")}
           disabled={!!pessoa.paiId}
           title="Adicionar Pai"
@@ -173,7 +173,7 @@ const PersonNode = ({ data }: { data: TreeNode["data"] }) => {
         <Button
           size="sm"
           variant="outline"
-          className="h-7 w-7 p-0 bg-white shadow-md hover:bg-pink-500 hover:text-white border-pink-200"
+          className="h-7 w-7 p-0 bg-white shadow-md hover:bg-pink-500 hover:text-[#fff] border-pink-200"
           onClick={() => onAddParent(pessoa.id, "mae")}
           disabled={!!pessoa.maeId}
           title="Adicionar Mãe"
@@ -183,7 +183,7 @@ const PersonNode = ({ data }: { data: TreeNode["data"] }) => {
         <Button
           size="sm"
           variant="outline"
-          className="h-7 w-7 p-0 bg-white shadow-md hover:bg-purple-500 hover:text-white border-purple-200"
+          className="h-7 w-7 p-0 bg-white shadow-md hover:bg-purple-500 hover:text-[#fff] border-purple-200"
           onClick={() => onAddSpouse(pessoa.id)}
           title="Adicionar Cônjuge"
         >
@@ -201,7 +201,7 @@ const PersonNode = ({ data }: { data: TreeNode["data"] }) => {
         <Button
           size="sm"
           variant="outline"
-          className="h-7 w-7 p-0 bg-white shadow-md hover:bg-red-500 hover:text-white border-red-200"
+          className="h-7 w-7 p-0 bg-white shadow-md hover:bg-red-500 hover:text-[#fff] border-red-200"
           onClick={() => onDelete(pessoa.id)}
           title="Excluir"
         >

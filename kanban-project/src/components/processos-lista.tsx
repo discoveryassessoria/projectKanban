@@ -117,7 +117,7 @@ export function ProcessosLista({
           value={filtroSla}
           onChange={(e) => setFiltroSla(e.target.value as StatusSla | "todos")}
           aria-label="Filtrar por status de SLA"
-          className="rounded-md border border-white/20 bg-white/10 px-3 py-2 text-sm text-white outline-none focus:border-white/40 [&>option]:bg-[#15191f]"
+          className="rounded-md border border-white/20 bg-white/10 px-3 py-2 text-sm text-[#fff] outline-none focus:border-white/40 [&>option]:bg-[var(--surface-popover)]"
         >
           {FILTROS_SLA.map((f) => (
             <option key={f.valor} value={f.valor}>{f.rotulo}</option>

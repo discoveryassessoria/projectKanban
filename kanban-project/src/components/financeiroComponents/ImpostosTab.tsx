@@ -61,7 +61,7 @@ export default function ImpostosTab() {
         </div>
         <div className="flex items-center gap-2">
           <GlassBtn icon={<BarChart3 className="h-3.5 w-3.5" />}>Relatório fiscal</GlassBtn>
-          <button className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm rounded-lg bg-blue-600 hover:bg-blue-700 text-white"><Plus className="h-3.5 w-3.5" /> Provisionar</button>
+          <button className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm rounded-lg bg-blue-600 hover:bg-blue-700 text-[#fff]"><Plus className="h-3.5 w-3.5" /> Provisionar</button>
         </div>
       </div>
 

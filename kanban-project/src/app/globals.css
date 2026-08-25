@@ -3,6 +3,63 @@
 
 @custom-variant dark (&:not(*));
 
+/* ============================================================================
+   TEMA CLARO PREMIUM — IVORY · BRANCO QUENTE · GRAPHITE · CHAMPAGNE
+   ----------------------------------------------------------------------------
+   A ALAVANCA DESTE TEMA ESTÁ AQUI, e ela é uma linha.
+
+   O produto foi escrito em "dark glass": tinta BRANCA translúcida sobre fundo
+   escuro — `bg-white/5`, `text-white/60`, `border-white/10`. São 4.370
+   ocorrências em 65% dos arquivos .tsx. Trocá-las uma a uma seria reescrever o
+   produto para mudar de cor.
+
+   Mas `white` ali nunca significou "a cor branca": significava A TINTA DO
+   VIDRO — o pigmento que, translúcido, desenha superfície, borda e texto sobre
+   o fundo. Num tema claro esse pigmento é GRAPHITE, e a estrutura é idêntica:
+
+     bg-white/5      → graphite a 5%   = superfície sutil sobre ivory
+     text-white/60   → graphite a 60%  = texto secundário legível
+     border-white/10 → graphite a 10%  = borda discreta
+
+   Redefinir o pigmento converte o produto inteiro de uma vez, e mantém a
+   hierarquia que cada tela já escolheu — quem era /40 continua mais leve que
+   quem era /70.
+
+   O BRANCO REAL não desaparece: virou `--color-pure`, para o texto sobre
+   superfície colorida (botão verde, badge âmbar), onde branco é intencional.
+   ============================================================================ */
+@theme {
+  /* A TINTA CLARA do vidro — era branco translúcido sobre escuro, vira graphite
+     translúcido sobre ivory. `text-white/60`, `bg-white/5`, `border-white/10`. */
+  --color-white: #17191c;
+
+  /* A TINTA ESCURA — `bg-black/40` (sidebar, header, overlays) era preto sobre
+     escuro para AFUNDAR a superfície. Sobre ivory ela precisa fazer o mesmo
+     trabalho e o pigmento é o oposto: branco quente, que ERGUE a superfície.
+     São 137 ocorrências, quase todas em sidebar, header, modal e overlay. */
+  --color-black: #fdfcfa;
+
+  /* Branco de verdade, para tinta sobre superfície colorida. */
+  --color-pure: #ffffff;
+
+  /* ── AS ESCALAS ESCURAS, POR PAPEL ────────────────────────────────────────
+     Medido no produto: `zinc` e `neutral` aparecem quase só como SUPERFÍCIE
+     (229 usos em `bg-`, 3 em `text-`) — eram o painel escuro. Viram superfícies
+     claras.
+
+     `gray` e `slate` são o oposto: 251 usos como TINTA e poucos como fundo. Não
+     entram aqui — texto escuro sobre claro é o que o tema quer, e clareá-los
+     apagaria a leitura. */
+  --color-zinc-950: #f4f1ea;
+  --color-zinc-900: #f7f5f0;
+  --color-zinc-800: #efece4;
+  --color-zinc-700: #e6e1d8;
+  --color-neutral-950: #f4f1ea;
+  --color-neutral-900: #f7f5f0;
+  --color-neutral-800: #efece4;
+  --color-neutral-700: #e6e1d8;
+}
+
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
@@ -45,9 +102,10 @@
 
 :root {
   --radius: 0.625rem;
-  --background: oklch(1 0 0);
-  --foreground: oklch(0.145 0 0);
-  --card: oklch(1 0 0);
+  /* Ivory, não branco: `--background` alimenta `body` via @apply bg-background. */
+  --background: oklch(0.966 0.006 84);
+  --foreground: oklch(0.185 0.004 260);
+  --card: oklch(0.995 0.003 84);
   --card-foreground: oklch(0.145 0 0);
   --popover: oklch(1 0 0);
   --popover-foreground: oklch(0.145 0 0);
@@ -69,15 +127,16 @@
   --chart-4: oklch(0.828 0.189 84.429);
   --chart-5: oklch(0.769 0.188 70.08);
   
-  /* SIDEBAR - Azul escuro estilo Bitrix24 */
-  --sidebar: oklch(0.15 0.05 250);
-  --sidebar-foreground: oklch(0.95 0 0);
-  --sidebar-primary: oklch(0.55 0.15 250);
-  --sidebar-primary-foreground: oklch(0.98 0 0);
-  --sidebar-accent: oklch(0.25 0.03 250);
-  --sidebar-accent-foreground: oklch(0.95 0 0);
-  --sidebar-border: oklch(1 0 0 / 10%);
-  --sidebar-ring: oklch(0.55 0.15 250);
+  /* SIDEBAR — ivory/champagne muito suave. O item ATIVO é graphite profundo com
+     texto claro: sem ele o menu inteiro vira bege e perde a hierarquia. */
+  --sidebar: oklch(0.972 0.007 84);
+  --sidebar-foreground: oklch(0.24 0.004 260);
+  --sidebar-primary: oklch(0.245 0.008 260);
+  --sidebar-primary-foreground: oklch(0.98 0.004 84);
+  --sidebar-accent: oklch(0.93 0.018 84);
+  --sidebar-accent-foreground: oklch(0.24 0.004 260);
+  --sidebar-border: oklch(0.90 0.008 84);
+  --sidebar-ring: oklch(0.62 0.09 76);
 }
 
 /* ============================================================
@@ -89,17 +148,19 @@
    não altera nenhum token pré-existente acima.
    ============================================================ */
 :root {
-  /* Fundo e camadas do shell */
-  --app-background: #0a0a0b;
-  --app-overlay: rgba(0, 0, 0, 0.85);
-  --sidebar-background: rgba(0, 0, 0, 0.55);
-  --header-background: rgba(0, 0, 0, 0.55);
+  /* Fundo e camadas do shell — IVORY QUENTE, nunca branco chapado. A temperatura
+     é o que separa este produto de um painel administrativo genérico. */
+  --app-background: #f6f3ed;
+  --app-overlay: rgba(246, 243, 237, 0.86);
+  --sidebar-background: rgba(248, 246, 241, 0.92);
+  --header-background: rgba(252, 251, 248, 0.88);
 
-  /* Superfícies (cards, painéis, linhas) */
-  --surface-primary: rgba(255, 255, 255, 0.05);
-  --surface-secondary: rgba(255, 255, 255, 0.04);
-  --surface-hover: rgba(255, 255, 255, 0.08);
-  --surface-active: rgba(255, 255, 255, 0.12);
+  /* Superfícies (cards, painéis, linhas) — branco quente sobre ivory. A elevação
+     vem da diferença sutil entre fundo e superfície, não de sombra pesada. */
+  --surface-primary: rgba(255, 255, 255, 0.86);
+  --surface-secondary: rgba(243, 240, 233, 0.70);
+  --surface-hover: rgba(23, 25, 28, 0.045);
+  --surface-active: rgba(210, 169, 72, 0.12);
 
   /* Superfícies OPACAS (overlays) — as superfícies translúcidas acima não servem
      a modal/dialog/drawer/sheet/popover/menu/tooltip, que precisam OCULTAR o
@@ -107,29 +168,44 @@
      só existem em claro). Token global do DS: nenhuma tela cria o seu próprio.
      As superfícies translúcidas (--surface-primary…) podem ser empilhadas SOBRE
      estas para dar elevação de painéis aninhados dentro do overlay. */
-  --surface-overlay: #161b21;        /* painel de modal/dialog/drawer/sheet */
-  --surface-popover: #1b2027;        /* popover/dropdown/menu/tooltip */
-  --surface-input: rgba(0, 0, 0, 0.30); /* fundo de campo de formulário */
+  --surface-overlay: #fcfbf8;        /* painel de modal/dialog/drawer/sheet */
+  --surface-popover: #ffffff;        /* popover/dropdown/menu/tooltip */
+  --surface-input: #ffffff;          /* fundo de campo de formulário */
 
-  /* Bordas */
-  --border-default: rgba(255, 255, 255, 0.10);
-  --border-strong: rgba(255, 255, 255, 0.20);
+  /* ── A CORTINA DO MODAL ───────────────────────────────────────────────────
+     `bg-black/60` fazia dois trabalhos opostos no produto: escurecer a tela por
+     trás de um modal (102 usos) e AFUNDAR superfícies do shell — sidebar,
+     header (28 usos). Sobre ivory o segundo precisa clarear, e é por isso que
+     `--color-black` virou branco quente. O primeiro continua precisando
+     escurecer, e ganha token próprio.
 
-  /* Texto */
-  --text-primary: rgba(255, 255, 255, 0.95);
-  --text-secondary: rgba(255, 255, 255, 0.55);
-  --text-muted: rgba(255, 255, 255, 0.40);
+     Suave de propósito: a tela de origem precisa continuar sendo percebida. Uma
+     cortina quase opaca faz o sistema parecer que apagou. */
+  --overlay-modal: rgba(20, 24, 28, 0.26);
+  --overlay-drawer: rgba(20, 24, 28, 0.22);
+
+  /* Bordas — quentes, para não esfriar o ivory. */
+  --border-default: #e6e1d8;
+  --border-strong: #ded9d0;
+
+  /* Texto — graphite, com a mesma escala de ênfase de antes. */
+  --text-primary: #17191c;
+  --text-secondary: #62666d;
+  --text-muted: #8a8d94;
 
   /* Acento institucional (dourado) — ação/navegação ativa apenas */
-  --accent-primary: #d2a948;
-  --accent-hover: #e0b957;
-  --accent-ink: #1b1508; /* texto sobre dourado */
+  /* Champagne — escurecido para ter contraste sobre superfície clara. O tom
+     anterior (#d2a948) foi calibrado contra fundo preto e some sobre ivory. */
+  --accent-primary: #b98524;
+  --accent-hover: #a3731c;
+  --accent-ink: #ffffff; /* texto sobre champagne */
 
-  /* Semânticas — usar SÓ quando houver significado real */
-  --success: #4ade80;
-  --warning: #fbbf24;
-  --danger: #f87171;
-  --info: #7dd3fc;
+  /* Semânticas — usar SÓ quando houver significado real. Escurecidas para manter
+     legibilidade sobre claro; o SIGNIFICADO de cada cor não muda. */
+  --success: #15803d;
+  --warning: #b45309;
+  --danger: #b91c1c;
+  --info: #1d4ed8;
 
   /* Raio */
   --radius-sm: 8px;
@@ -137,7 +213,26 @@
   --radius-lg: 16px;
 
   /* Sombra de superfície */
-  --shadow-surface: 0 1px 2px rgba(0, 0, 0, 0.30);
+  --shadow-surface: 0 1px 2px rgba(23, 25, 28, 0.05), 0 1px 3px rgba(23, 25, 28, 0.04);
+
+  /* ── O VÉU DA PAISAGEM ────────────────────────────────────────────────────
+     Doze páginas carregavam este gradiente COPIADO no próprio arquivo, cada uma
+     com a mesma string de seis paradas em rgba(8,9,11) — o preto que fazia a
+     paisagem virar textura sob o tema escuro.
+
+     Agora é um token, e a regra da Fase 6 fica visível nele: a foto continua
+     atrás de tudo, aparece um pouco mais no alto (onde há respiro) e some sob o
+     conteúdo denso (onde competiria com a leitura). Nunca `opacity` no contêiner
+     — isso apagaria o conteúdo junto; é uma camada própria, entre foto e shell. */
+  --landscape-veil: linear-gradient(
+    180deg,
+    rgba(246, 243, 237, 0.90) 0%,
+    rgba(246, 243, 237, 0.93) 46%,
+    rgba(247, 244, 239, 0.95) 60%,
+    rgba(248, 246, 241, 0.96) 72%,
+    rgba(250, 248, 244, 0.97) 86%,
+    rgba(246, 243, 237, 0.96) 100%
+  );
 
   /* Espaçamento (escala 4px) */
   --space-1: 4px;
@@ -157,6 +252,9 @@
   }
   body {
     @apply bg-background text-foreground;
+    /* O ivory do shell é o mesmo token que o resto do DS consome — uma fonte só. */
+    background-color: var(--app-background);
+    color: var(--text-primary);
   }
 }
 

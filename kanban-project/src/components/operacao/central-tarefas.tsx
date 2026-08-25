@@ -562,7 +562,7 @@ export function CentralTarefas({ podeDistribuir }: { podeDistribuir: boolean }) 
         {modo === "calendario" && linhas != null && linhas.length > 0 &&
           agruparPorDia(linhas).map((grupo) => (
             <div key={grupo.dia}>
-              <div className="sticky top-0 border-b border-white/[0.06] bg-[#0d0f13] px-4 py-1.5 text-[10px] uppercase tracking-wide text-white/40">
+              <div className="sticky top-0 border-b border-white/[0.06] bg-[var(--surface-overlay)] px-4 py-1.5 text-[10px] uppercase tracking-wide text-white/40">
                 {grupo.rotulo} · {grupo.linhas.length}
               </div>
               {grupo.linhas.map((l) => (

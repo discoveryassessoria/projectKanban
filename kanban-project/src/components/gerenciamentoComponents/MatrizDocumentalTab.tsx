@@ -152,7 +152,7 @@ export default function MatrizDocumentalTab() {
       {proc && (
         <div className="rounded-2xl border border-white/10 bg-white/5 p-4 backdrop-blur-sm">
           <div className="mb-3 flex flex-wrap items-center gap-2">
-            <button onClick={() => setForm(blankForm(proc.id))} className="rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-blue-500">+ Nova regra documental</button>
+            <button onClick={() => setForm(blankForm(proc.id))} className="rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-medium text-[#fff] hover:bg-blue-500">+ Nova regra documental</button>
             {arquivadasCount > 0 && (
               <button onClick={() => setShowArchived(v => !v)} className={`ml-auto rounded-lg border px-3 py-1.5 text-xs ${showArchived ? "border-blue-400/40 bg-blue-500/10 text-blue-200" : "border-white/10 bg-white/5 text-white/60 hover:bg-white/10"}`}>
                 {showArchived ? "Ocultar arquivadas" : `Mostrar arquivadas (${arquivadasCount})`}
@@ -206,7 +206,7 @@ export default function MatrizDocumentalTab() {
 
       {/* MODAL */}
       {form && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm" onClick={() => setForm(null)}>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-[var(--overlay-modal)] p-4 backdrop-blur-sm" onClick={() => setForm(null)}>
           <div className="max-h-[90vh] w-full max-w-2xl overflow-auto rounded-2xl border border-white/10 bg-zinc-900/95 shadow-2xl" onClick={e => e.stopPropagation()}>
             <div className="border-b border-white/10 px-6 py-4"><h3 className="font-semibold text-white">{form.id ? "Editar" : "Nova"} regra documental</h3></div>
             <div className="grid grid-cols-2 gap-3 px-6 py-4">
@@ -254,7 +254,7 @@ export default function MatrizDocumentalTab() {
             </div>
             <div className="flex justify-end gap-2 border-t border-white/10 px-6 py-4">
               <button onClick={() => setForm(null)} className="rounded-lg border border-white/10 bg-white/5 px-4 py-2 text-sm text-white/80 hover:bg-white/10">Cancelar</button>
-              <button disabled={busy} onClick={saveForm} className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-500 disabled:opacity-50">Salvar</button>
+              <button disabled={busy} onClick={saveForm} className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-[#fff] hover:bg-blue-500 disabled:opacity-50">Salvar</button>
             </div>
           </div>
         </div>

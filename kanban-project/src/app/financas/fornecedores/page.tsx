@@ -170,7 +170,7 @@ export default function FornecedoresPage() {
               Novo Fornecedor
             </Button>
           </DialogTrigger>
-          <DialogContent className="bg-[#0a1628] border-white/20 text-white max-w-2xl max-h-[90vh] overflow-y-auto">
+          <DialogContent className="bg-[#0a1628] border-white/20 text-[#fff] max-w-2xl max-h-[90vh] overflow-y-auto">
             <DialogHeader>
               <DialogTitle>Novo Fornecedor</DialogTitle>
               <DialogDescription className="text-white/60">

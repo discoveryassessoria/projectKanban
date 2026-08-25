@@ -208,9 +208,9 @@ export function MovimentarFaseModal({
     faseAlvo !== ctx?.faseAtual
 
   const corpo = (
-    <div className="fixed inset-0 z-[10050] flex items-center justify-center bg-black/60 px-4" onClick={enviando ? undefined : onCancelar}>
+    <div className="fixed inset-0 z-[10050] flex items-center justify-center bg-[var(--overlay-modal)] px-4" onClick={enviando ? undefined : onCancelar}>
       <div
-        className="w-full max-w-[560px] max-h-[88vh] overflow-y-auto rounded-2xl border border-white/10 bg-[#1b2027] shadow-2xl"
+        className="w-full max-w-[560px] max-h-[88vh] overflow-y-auto rounded-2xl border border-white/10 bg-[var(--surface-popover)] shadow-2xl"
         onClick={(e) => e.stopPropagation()}
         role="dialog"
         aria-modal="true"
@@ -243,7 +243,7 @@ export function MovimentarFaseModal({
           ) : (
             <>
               {/* ORIGEM → DESTINO */}
-              <div className="flex items-center gap-3 rounded-xl border border-white/10 bg-[#15191f] px-4 py-3">
+              <div className="flex items-center gap-3 rounded-xl border border-white/10 bg-[var(--surface-popover)] px-4 py-3">
                 <div className="min-w-0 flex-1">
                   <div className="text-[10px] font-bold uppercase tracking-wider text-white/40">De</div>
                   <div className="text-[13px] font-bold text-white/95 truncate">{ctx?.faseAtualLabel ?? "—"}</div>
@@ -262,7 +262,7 @@ export function MovimentarFaseModal({
                   value={faseAlvo}
                   onChange={(e) => setFaseAlvo(e.target.value)}
                   disabled={enviando}
-                  className="mt-1 w-full text-[13px] rounded-lg border border-white/10 bg-[#15191f] text-white/95 px-3 py-2 focus:outline-none focus:border-[#7dd3fc]/50"
+                  className="mt-1 w-full text-[13px] rounded-lg border border-white/10 bg-[var(--surface-popover)] text-white/95 px-3 py-2 focus:outline-none focus:border-[#7dd3fc]/50"
                 >
                   <option value="">Selecione…</option>
                   {(ctx?.fases ?? []).filter((f) => !f.atual).map((f) => (
@@ -302,7 +302,7 @@ export function MovimentarFaseModal({
                   value={motivoCodigo}
                   onChange={(e) => setMotivoCodigo(e.target.value)}
                   disabled={enviando}
-                  className="mt-1 w-full text-[13px] rounded-lg border border-white/10 bg-[#15191f] text-white/95 px-3 py-2 focus:outline-none focus:border-[#7dd3fc]/50"
+                  className="mt-1 w-full text-[13px] rounded-lg border border-white/10 bg-[var(--surface-popover)] text-white/95 px-3 py-2 focus:outline-none focus:border-[#7dd3fc]/50"
                 >
                   <option value="">Selecione o motivo…</option>
                   {(ctx?.motivos ?? []).map((m) => (
@@ -327,7 +327,7 @@ export function MovimentarFaseModal({
                   disabled={enviando}
                   rows={3}
                   placeholder="Explique por que este processo está sendo reposicionado."
-                  className="mt-1 w-full text-[13px] rounded-lg border border-white/10 bg-[#15191f] text-white/95 px-3 py-2 resize-y focus:outline-none focus:border-[#7dd3fc]/50"
+                  className="mt-1 w-full text-[13px] rounded-lg border border-white/10 bg-[var(--surface-popover)] text-white/95 px-3 py-2 resize-y focus:outline-none focus:border-[#7dd3fc]/50"
                 />
               </label>
 
@@ -336,7 +336,7 @@ export function MovimentarFaseModal({
                   "e o trabalho que já foi feito?" existe. Retroceder sem marcar nada é
                   o caminho normal — reposiciona a fase e mais nada. */}
               {carregandoPlano && (
-                <div className="rounded-lg border border-white/10 bg-[#15191f] px-3 py-2.5 text-[12px] text-white/50">
+                <div className="rounded-lg border border-white/10 bg-[var(--surface-popover)] px-3 py-2.5 text-[12px] text-white/50">
                   Carregando o que existe na fase de destino…
                 </div>
               )}
@@ -381,7 +381,7 @@ export function MovimentarFaseModal({
           <button
             onClick={confirmar}
             disabled={!podeConfirmar}
-            className="inline-flex items-center gap-2 text-[12.5px] font-bold px-4 py-2 rounded-lg bg-[#2563eb] text-white hover:bg-[#1d4ed8] disabled:opacity-40 disabled:cursor-not-allowed"
+            className="inline-flex items-center gap-2 text-[12.5px] font-bold px-4 py-2 rounded-lg bg-[#2563eb] text-[#fff] hover:bg-[#1d4ed8] disabled:opacity-40 disabled:cursor-not-allowed"
           >
             {enviando && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
             {enviando

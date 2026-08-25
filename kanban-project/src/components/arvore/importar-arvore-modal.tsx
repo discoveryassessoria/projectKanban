@@ -154,8 +154,8 @@ export function ImportarArvoreModal({ arvoreId, aberto, onFechar, onImportado }:
   const naPrevia = etapa === "previa" || etapa === "gravando"
 
   return (
-    <div className="fixed inset-0 z-[10001] flex items-center justify-center bg-black/60 p-4">
-      <div className="flex max-h-[88vh] w-full max-w-3xl flex-col overflow-hidden rounded-2xl border border-white/10 bg-[#15191f] text-white/95 shadow-2xl">
+    <div className="fixed inset-0 z-[10001] flex items-center justify-center bg-[var(--overlay-modal)] p-4">
+      <div className="flex max-h-[88vh] w-full max-w-3xl flex-col overflow-hidden rounded-2xl border border-white/10 bg-[var(--surface-popover)] text-white/95 shadow-2xl">
         <header className="flex flex-shrink-0 items-center justify-between border-b border-white/10 px-6 py-4">
           <div>
             <h2 className="text-lg font-semibold">Importar Árvore</h2>
@@ -186,7 +186,7 @@ export function ImportarArvoreModal({ arvoreId, aberto, onFechar, onImportado }:
             <div className="space-y-5">
               <div>
                 <label className="mb-2 block text-sm font-medium">Print da árvore <span className="text-red-400">*</span></label>
-                <label className="flex cursor-pointer flex-col items-center justify-center gap-2 rounded-xl border border-dashed border-white/20 bg-[#1b2027] px-6 py-10 text-center transition hover:border-white/35">
+                <label className="flex cursor-pointer flex-col items-center justify-center gap-2 rounded-xl border border-dashed border-white/20 bg-[var(--surface-popover)] px-6 py-10 text-center transition hover:border-white/35">
                   {previewUrl ? (
                     // <img> e não next/image: a origem é um blob: URL local do
                     // arquivo escolhido, que o otimizador do Next não processa.
@@ -211,7 +211,7 @@ export function ImportarArvoreModal({ arvoreId, aberto, onFechar, onImportado }:
                 <textarea value={textoComplementar} onChange={(e) => setTextoComplementar(e.target.value)}
                   disabled={ocupado} rows={4}
                   placeholder="Lista ou resumo escrito para desambiguar o que ficar cortado ou pouco legível na imagem."
-                  className="w-full rounded-lg border border-white/10 bg-[#1b2027] px-3 py-2 text-sm placeholder:text-white/35 focus:border-white/30 focus:outline-none" />
+                  className="w-full rounded-lg border border-white/10 bg-[var(--surface-popover)] px-3 py-2 text-sm placeholder:text-white/35 focus:border-white/30 focus:outline-none" />
               </div>
             </div>
           )}

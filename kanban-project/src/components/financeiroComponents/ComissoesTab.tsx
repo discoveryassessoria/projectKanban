@@ -82,7 +82,7 @@ export default function ComissoesTab() {
         </div>
         <div className="flex items-center gap-2">
           <GlassBtn icon={<FileText className="h-3.5 w-3.5" />}>Gerenciar regras</GlassBtn>
-          <button className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm rounded-lg bg-blue-600 hover:bg-blue-700 text-white"><Plus className="h-3.5 w-3.5" /> Nova comissão</button>
+          <button className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm rounded-lg bg-blue-600 hover:bg-blue-700 text-[#fff]"><Plus className="h-3.5 w-3.5" /> Nova comissão</button>
         </div>
       </div>
 
@@ -176,7 +176,7 @@ export default function ComissoesTab() {
                 <td className="py-2 text-center">{statusBadge(c.status)}</td>
                 <td className="py-2 text-center">
                   {c.status === "a_pagar" ? (
-                    <button className="inline-flex items-center gap-1 px-2 py-1 text-[11px] rounded bg-green-600/80 hover:bg-green-600 text-white"><Check className="h-3 w-3" /> Pagar</button>
+                    <button className="inline-flex items-center gap-1 px-2 py-1 text-[11px] rounded bg-green-600/80 hover:bg-green-600 text-[#fff]"><Check className="h-3 w-3" /> Pagar</button>
                   ) : c.status === "paga" ? (
                     <span className="text-[11px] text-green-300">✓ Paga</span>
                   ) : (

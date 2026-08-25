@@ -260,7 +260,7 @@ export function WorkflowTab({ documentoId, onChange, contextoAntecipada }: Workf
         </p>
         <button
           onClick={() => { void carregar() }}
-          className="px-4 py-2 bg-blue-500 hover:bg-blue-600 text-white text-xs font-semibold rounded-md inline-flex items-center gap-1.5"
+          className="px-4 py-2 bg-blue-500 hover:bg-blue-600 text-[#fff] text-xs font-semibold rounded-md inline-flex items-center gap-1.5"
         >
           ↻ Recarregar
         </button>
@@ -579,7 +579,7 @@ function StepCard({
         {!isLockStepWait && (
           <button
             onClick={onOpenCentral}
-            className="px-2.5 py-1.5 text-[10.5px] font-semibold bg-blue-500 hover:bg-blue-600 text-white rounded transition-colors whitespace-nowrap"
+            className="px-2.5 py-1.5 text-[10.5px] font-semibold bg-blue-500 hover:bg-blue-600 text-[#fff] rounded transition-colors whitespace-nowrap"
           >
             Central da Etapa →
           </button>

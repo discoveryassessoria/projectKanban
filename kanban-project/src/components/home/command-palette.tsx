@@ -71,7 +71,7 @@ export function CommandPalette() {
             onMouseDown={(e) => {
               if (e.target === e.currentTarget) setAberto(false)
             }}
-            className="fixed inset-0 flex items-start justify-center bg-black/55 px-4 pt-[14vh] backdrop-blur-sm"
+            className="fixed inset-0 flex items-start justify-center bg-[var(--overlay-modal)] px-4 pt-[14vh] backdrop-blur-sm"
             style={{ zIndex: LAYER.aboveProcess }}
           >
             <div className="w-full max-w-xl rounded-2xl border border-white/20 bg-[var(--surface-popover)] p-3 shadow-2xl">

@@ -154,7 +154,7 @@ export function PedidosDeRetificacao({ processoId, aoMudar }: { processoId: numb
       )}
 
       {abrindo && (
-        <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/60 p-4" onClick={() => setAbrindo(false)}>
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-[var(--overlay-modal)] p-4" onClick={() => setAbrindo(false)}>
           <div className="max-h-[85vh] w-full max-w-xl overflow-y-auto rounded-xl border border-white/10 bg-[#0f1115] p-5" onClick={(e) => e.stopPropagation()}>
             <h3 className="text-base font-medium text-white">Abrir pedido de retificação</h3>
             <p className="mt-1 text-xs text-white/45">

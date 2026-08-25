@@ -366,7 +366,7 @@ export default function PhaseAutomationsFasesTab({ kindInicial }: { kindInicial?
                     </div>
                     <div className="mt-0.5 text-xs text-white/50">{byKind.length ? byKind.map(([l, n]) => `${n} ${l.toLowerCase()}`).join(" · ") : "nenhuma automação aplicada"}</div>
                   </div>
-                  <button onClick={() => { setPhase(f.phaseKey); setTab("financial") }} className="rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-blue-500">Gerenciar</button>
+                  <button onClick={() => { setPhase(f.phaseKey); setTab("financial") }} className="rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-medium text-[#fff] hover:bg-blue-500">Gerenciar</button>
                 </div>
               </div>
             )
@@ -467,7 +467,7 @@ export default function PhaseAutomationsFasesTab({ kindInicial }: { kindInicial?
 
       {/* MODAL — aplicar modelo 2C */}
       {applyOpen && faseAtual && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm" onClick={() => setApplyOpen(false)}>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-[var(--overlay-modal)] p-4 backdrop-blur-sm" onClick={() => setApplyOpen(false)}>
           <div className="max-h-[90vh] w-full max-w-2xl overflow-auto rounded-2xl border border-white/10 bg-zinc-900/95 shadow-2xl" onClick={e => e.stopPropagation()}>
             <div className="border-b border-white/10 px-6 py-4">
               <h3 className="font-semibold text-white">Aplicar modelo de automação</h3>
@@ -493,7 +493,7 @@ export default function PhaseAutomationsFasesTab({ kindInicial }: { kindInicial?
             </div>
             <div className="flex justify-end gap-2 border-t border-white/10 px-6 py-4">
               <button onClick={() => setApplyOpen(false)} className="rounded-lg border border-white/10 bg-white/5 px-4 py-2 text-sm text-white/80 hover:bg-white/10">Cancelar</button>
-              <button disabled={!applySel || busy} onClick={aplicar} className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-500 disabled:opacity-50">Aplicar</button>
+              <button disabled={!applySel || busy} onClick={aplicar} className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-[#fff] hover:bg-blue-500 disabled:opacity-50">Aplicar</button>
             </div>
           </div>
         </div>
@@ -501,7 +501,7 @@ export default function PhaseAutomationsFasesTab({ kindInicial }: { kindInicial?
 
       {/* MODAL — editor de regra */}
       {form && faseAtual && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm" onClick={() => setForm(null)}>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-[var(--overlay-modal)] p-4 backdrop-blur-sm" onClick={() => setForm(null)}>
           <div className="max-h-[90vh] w-full max-w-2xl overflow-auto rounded-2xl border border-white/10 bg-zinc-900/95 shadow-2xl" onClick={e => e.stopPropagation()}>
             <div className="border-b border-white/10 px-6 py-4">
               <h3 className="font-semibold text-white">{form.id ? "Editar automação" : "Nova automação"} · {kindLabel(form.kind)}</h3>
@@ -604,7 +604,7 @@ export default function PhaseAutomationsFasesTab({ kindInicial }: { kindInicial?
             </div>
             <div className="flex justify-end gap-2 border-t border-white/10 px-6 py-4">
               <button onClick={() => setForm(null)} className="rounded-lg border border-white/10 bg-white/5 px-4 py-2 text-sm text-white/80 hover:bg-white/10">Cancelar</button>
-              <button disabled={busy} onClick={saveForm} className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-500 disabled:opacity-50">Salvar</button>
+              <button disabled={busy} onClick={saveForm} className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-[#fff] hover:bg-blue-500 disabled:opacity-50">Salvar</button>
             </div>
           </div>
         </div>

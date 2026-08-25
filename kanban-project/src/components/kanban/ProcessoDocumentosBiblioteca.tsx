@@ -120,7 +120,7 @@ export function ProcessoDocumentosBiblioteca({
   }
 
   return (
-    <div className="h-full overflow-y-auto bg-[#15191f]">
+    <div className="h-full overflow-y-auto bg-[var(--surface-popover)]">
       <div
         className="grid gap-[18px] items-start p-6"
         style={{ gridTemplateColumns: "minmax(0,1fr) 300px" }}
@@ -141,7 +141,7 @@ export function ProcessoDocumentosBiblioteca({
           {/* 8 KPIs */}
           <div className="grid gap-2.5 mb-[18px]" style={{ gridTemplateColumns: "repeat(8, 1fr)" }}>
             {kpiCards.map(([label, val, ic, tone], i) => (
-              <div key={i} className="bg-[#1b2027] border border-white/10 rounded-xl p-[13px]">
+              <div key={i} className="bg-[var(--surface-popover)] border border-white/10 rounded-xl p-[13px]">
                 <span className="text-[10.5px] text-white/55 block leading-tight min-h-[28px]">{label}</span>
                 <div className="flex items-center justify-between mt-1.5">
                   <b className="text-[23px] font-extrabold text-white/95">{val}</b>
@@ -154,7 +154,7 @@ export function ProcessoDocumentosBiblioteca({
           {/* Toolbar: filtros + busca */}
           <div className="flex items-center justify-between gap-3.5 mb-5 flex-wrap">
             <div className="flex items-center gap-[7px] flex-wrap">
-              <button className="inline-flex items-center gap-1.5 border border-white/10 bg-[#1b2027] rounded-lg px-3 py-2 text-[12.5px] font-semibold text-white/55">
+              <button className="inline-flex items-center gap-1.5 border border-white/10 bg-[var(--surface-popover)] rounded-lg px-3 py-2 text-[12.5px] font-semibold text-white/55">
                 <Filter className="w-3.5 h-3.5" /> Filtros
               </button>
               {FILTERS.map((f) => (
@@ -164,14 +164,14 @@ export function ProcessoDocumentosBiblioteca({
                   className={`border rounded-lg px-[13px] py-2 text-[12.5px] font-semibold cursor-pointer transition-colors ${
                     f === filtro
                       ? "bg-[#7dd3fc]/12 border-[#7dd3fc] text-[#7dd3fc]"
-                      : "border-white/10 bg-[#1b2027] text-white/55 hover:border-white/20"
+                      : "border-white/10 bg-[var(--surface-popover)] text-white/55 hover:border-white/20"
                   }`}
                 >
                   {f}
                 </button>
               ))}
             </div>
-            <div className="flex items-center gap-2 border border-white/10 bg-[#1b2027] rounded-lg px-[13px] py-2 min-w-[280px] flex-1 max-w-[340px]">
+            <div className="flex items-center gap-2 border border-white/10 bg-[var(--surface-popover)] rounded-lg px-[13px] py-2 min-w-[280px] flex-1 max-w-[340px]">
               <Search className="w-[15px] h-[15px] text-white/40" />
               <input
                 value={busca}
@@ -216,19 +216,19 @@ export function ProcessoDocumentosBiblioteca({
         {/* ============== COLUNA LATERAL ============== */}
         <div className="flex flex-col gap-3.5">
           {/* Resumo da biblioteca (donut) */}
-          <div className="bg-[#1b2027] border border-white/10 rounded-xl p-[15px]">
+          <div className="bg-[var(--surface-popover)] border border-white/10 rounded-xl p-[15px]">
             <h3 className="text-[13.5px] font-extrabold text-white/95 mb-3">Resumo da biblioteca</h3>
             <Donut kpis={kpis} />
           </div>
 
           {/* Legenda */}
-          <div className="bg-[#1b2027] border border-white/10 rounded-xl p-[15px]">
+          <div className="bg-[var(--surface-popover)] border border-white/10 rounded-xl p-[15px]">
             <h3 className="text-[13.5px] font-extrabold text-white/95 mb-3">Legenda de status</h3>
             <Legenda />
           </div>
 
           {/* Informações */}
-          <div className="bg-[#1b2027] border border-white/10 rounded-xl p-[15px]">
+          <div className="bg-[var(--surface-popover)] border border-white/10 rounded-xl p-[15px]">
             <h3 className="text-[13.5px] font-extrabold text-white/95 mb-3">⚠ Informações</h3>
             <p className="text-[11.5px] text-white/55 leading-relaxed mb-2">
               A biblioteca mostra apenas certidões, certidões retificadas, traduções juramentadas e apostilas de Haia.
@@ -264,7 +264,7 @@ function PersonGroup({
   const genTxt = g.lineage === "Linha reta" ? `Geração ${g.generation}` : "Fora da linha"
 
   return (
-    <div className="bg-[#1b2027] border border-white/10 rounded-2xl mb-3 overflow-hidden">
+    <div className="bg-[var(--surface-popover)] border border-white/10 rounded-2xl mb-3 overflow-hidden">
       {/* Cabeçalho da pessoa */}
       <div
         className="flex items-center gap-3.5 px-[18px] py-4 cursor-pointer"
@@ -357,7 +357,7 @@ function DocRow({ it, onAbrirDetalhes }: { it: BibDocItem; onAbrirDetalhes: (doc
       <span>
         <button
           onClick={() => onAbrirDetalhes(it.id)}
-          className="border border-white/10 bg-[#1b2027] rounded-lg px-[13px] py-[7px] text-[12px] font-semibold text-white/95 cursor-pointer hover:border-[#7dd3fc] hover:text-[#7dd3fc] transition-colors"
+          className="border border-white/10 bg-[var(--surface-popover)] rounded-lg px-[13px] py-[7px] text-[12px] font-semibold text-white/95 cursor-pointer hover:border-[#7dd3fc] hover:text-[#7dd3fc] transition-colors"
         >
           Abrir detalhes
         </button>

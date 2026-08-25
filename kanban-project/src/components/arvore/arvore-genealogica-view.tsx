@@ -932,7 +932,7 @@ export function ArvoreGenealogicaView({
       <div className={`absolute inset-0 bg-white z-[9999] pointer-events-none transition-opacity duration-300 ${isTransitioning ? 'opacity-60' : 'opacity-0'}`} />
 
       {/* Toolbar */}
-      <div className="flex items-center justify-between px-4 py-2 bg-[#15191f] border-b border-white/10 text-white/70">
+      <div className="flex items-center justify-between px-4 py-2 bg-[var(--surface-popover)] border-b border-white/10 text-white/70">
         <div className="flex items-center gap-2">
           {/* Botão Paisagem */}
           <button
@@ -1176,7 +1176,7 @@ export function ArvoreGenealogicaView({
 
       {/* Overlay para sidebar */}
       {selectedPerson && (
-        <div className="fixed inset-0 bg-black/20 z-[10000]" onClick={handleCloseSidebar} />
+        <div className="fixed inset-0 bg-[var(--overlay-modal)] z-[10000]" onClick={handleCloseSidebar} />
       )}
 
       {/* Sidebar */}
@@ -1507,7 +1507,7 @@ function AddPersonModal({
 
   return (
     <>
-      <div className="fixed inset-0 bg-black/50 z-[10003]" onClick={onClose} />
+      <div className="fixed inset-0 bg-[var(--overlay-modal)] z-[10003]" onClick={onClose} />
       {/* `text-gray-900` na RAIZ do modal não é redundância com as classes dos
           campos: o modal é filho, na árvore DOM, do container de abas que ganha
           `text-white/80` quando `finDark` está ligado (atividade-details-modal),
@@ -1709,7 +1709,7 @@ function AddPersonModal({
 
           <div className="flex justify-end gap-3 pt-4 border-t border-gray-100">
             <button type="button" onClick={onClose} className="px-4 py-2 text-gray-600 hover:text-gray-800 transition-colors">Cancelar</button>
-            <button type="submit" disabled={saving || !nome.trim()} className="px-6 py-2 bg-teal-600 text-white rounded-lg hover:bg-teal-700 transition-colors disabled:opacity-50">
+            <button type="submit" disabled={saving || !nome.trim()} className="px-6 py-2 bg-teal-600 text-[#fff] rounded-lg hover:bg-teal-700 transition-colors disabled:opacity-50">
               {saving ? 'Salvando...' : 'Adicionar'}
             </button>
           </div>
@@ -1975,7 +1975,7 @@ function EditPersonModal({
           onConfirmar={persistir}
         />
       )}
-      <div className="fixed inset-0 bg-black/50 z-[10003]" onClick={onClose} />
+      <div className="fixed inset-0 bg-[var(--overlay-modal)] z-[10003]" onClick={onClose} />
       {/* `text-gray-900` na RAIZ do modal não é redundância com as classes dos
           campos: o modal é filho, na árvore DOM, do container de abas que ganha
           `text-white/80` quando `finDark` está ligado (atividade-details-modal),
@@ -2140,7 +2140,7 @@ function EditPersonModal({
 
           <div className="flex justify-end gap-3 pt-4 border-t border-gray-100">
             <button type="button" onClick={onClose} className="px-4 py-2 text-gray-600 hover:text-gray-800 transition-colors">Cancelar</button>
-            <button type="submit" disabled={saving || !nome.trim()} className="px-6 py-2 bg-teal-600 text-white rounded-lg hover:bg-teal-700 transition-colors disabled:opacity-50">
+            <button type="submit" disabled={saving || !nome.trim()} className="px-6 py-2 bg-teal-600 text-[#fff] rounded-lg hover:bg-teal-700 transition-colors disabled:opacity-50">
               {saving ? 'Salvando...' : 'Salvar'}
             </button>
           </div>

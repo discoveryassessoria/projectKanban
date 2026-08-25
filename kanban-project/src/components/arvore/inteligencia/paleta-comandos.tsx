@@ -70,7 +70,7 @@ export function PaletaComandos({ indice, aberto, onFechar, onEscolher, contextoD
 
   return (
     <>
-      <div className="fixed inset-0 z-[10003] bg-black/20" onClick={onFechar} />
+      <div className="fixed inset-0 z-[10003] bg-[var(--overlay-modal)]" onClick={onFechar} />
       <div
         role="dialog"
         aria-label="Buscar pessoa na árvore"

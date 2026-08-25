@@ -61,7 +61,7 @@ export default function ModalNovoProjeto({ isOpen, onClose, onSubmit }: ModalNov
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center">
       <div
-        className="absolute inset-0 bg-black/60 backdrop-blur-sm transition-all duration-300"
+        className="absolute inset-0 bg-[var(--overlay-modal)] backdrop-blur-sm transition-all duration-300"
         onClick={handleClose}
       />
 

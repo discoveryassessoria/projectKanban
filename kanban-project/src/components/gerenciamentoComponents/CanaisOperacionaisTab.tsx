@@ -139,7 +139,7 @@ export default function CanaisOperacionaisTab() {
                 </div>
                 <div className="flex justify-end gap-2">
                   <button onClick={() => setEditando(null)} className="rounded-lg border border-white/10 bg-white/5 px-3 py-1.5 text-xs text-white/70">Cancelar</button>
-                  <button onClick={() => salvar(editando)} disabled={salvando} className="rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-medium text-white disabled:opacity-50">Salvar</button>
+                  <button onClick={() => salvar(editando)} disabled={salvando} className="rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-medium text-[#fff] disabled:opacity-50">Salvar</button>
                 </div>
               </div>
             ) : (
@@ -183,11 +183,11 @@ export default function CanaisOperacionaisTab() {
           </div>
           <div className="flex justify-end gap-2">
             <button onClick={() => setForm(null)} className="rounded-lg border border-white/10 bg-white/5 px-3 py-1.5 text-xs text-white/70">Cancelar</button>
-            <button onClick={criar} disabled={salvando || !form.label.trim()} className="rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-medium text-white disabled:opacity-50">Cadastrar canal</button>
+            <button onClick={criar} disabled={salvando || !form.label.trim()} className="rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-medium text-[#fff] disabled:opacity-50">Cadastrar canal</button>
           </div>
         </div>
       ) : (
-        <button onClick={() => setForm({ ...VAZIO })} className="rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-blue-500">+ Canal</button>
+        <button onClick={() => setForm({ ...VAZIO })} className="rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-medium text-[#fff] hover:bg-blue-500">+ Canal</button>
       )}
       </div>
       )}

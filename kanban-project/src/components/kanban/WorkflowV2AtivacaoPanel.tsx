@@ -100,7 +100,7 @@ export function WorkflowV2AtivacaoPanel({ processoId }: Props) {
         <button
           onClick={ativar}
           disabled={!prep.avaliacao.podeAtivarEfetivo || ativando}
-          className="rounded bg-indigo-600 px-3 py-1 text-xs text-white hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-50"
+          className="rounded bg-indigo-600 px-3 py-1 text-xs text-[#fff] hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-50"
           title={prep.avaliacao.podeAtivarEfetivo ? "Ativar runtime v2" : "Critérios não satisfeitos (ou kill switch OFF)"}
         >
           Ativar runtime v2

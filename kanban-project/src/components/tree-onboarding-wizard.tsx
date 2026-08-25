@@ -297,7 +297,7 @@ export function TreeOnboardingWizard({ arvore, onComplete, onArvoreUpdate }: Tre
             </div>
             <Button
               onClick={() => setCurrentStep("add-self")}
-              className="bg-[#123C73] hover:bg-[#0f2d5a] text-white"
+              className="bg-[#123C73] hover:bg-[#0f2d5a] text-[#fff]"
               size="lg"
             >
               Começar
@@ -316,7 +316,7 @@ export function TreeOnboardingWizard({ arvore, onComplete, onArvoreUpdate }: Tre
               <h2 className="text-xl font-bold text-[#123C73] mb-2">Adicione Suas Informações</h2>
               <p className="text-[#9AA0A6]">Comece sua árvore genealógica adicionando suas informações pessoais.</p>
             </div>
-            <Button onClick={handleAddSelf} className="bg-[#123C73] hover:bg-[#0f2d5a] text-white" size="lg">
+            <Button onClick={handleAddSelf} className="bg-[#123C73] hover:bg-[#0f2d5a] text-[#fff]" size="lg">
               Adicionar Minhas Informações
             </Button>
           </div>
@@ -338,14 +338,14 @@ export function TreeOnboardingWizard({ arvore, onComplete, onArvoreUpdate }: Tre
               <Button
                 onClick={() => handleAddParent("pai")}
                 variant="outline"
-                className="border-[#123C73] text-[#123C73] hover:bg-[#123C73] hover:text-white"
+                className="border-[#123C73] text-[#123C73] hover:bg-[#123C73] hover:text-[#fff]"
               >
                 Adicionar Pai
               </Button>
               <Button
                 onClick={() => handleAddParent("mae")}
                 variant="outline"
-                className="border-[#123C73] text-[#123C73] hover:bg-[#123C73] hover:text-white"
+                className="border-[#123C73] text-[#123C73] hover:bg-[#123C73] hover:text-[#fff]"
               >
                 Adicionar Mãe
               </Button>
@@ -371,13 +371,13 @@ export function TreeOnboardingWizard({ arvore, onComplete, onArvoreUpdate }: Tre
               <p className="text-[#9AA0A6]">Se você é casado(a), adicione informações sobre seu cônjuge.</p>
             </div>
             <div className="flex flex-col sm:flex-row gap-4 justify-center">
-              <Button onClick={handleAddSpouse} className="bg-[#123C73] hover:bg-[#0f2d5a] text-white">
+              <Button onClick={handleAddSpouse} className="bg-[#123C73] hover:bg-[#0f2d5a] text-[#fff]">
                 Adicionar Cônjuge
               </Button>
               <Button
                 onClick={() => setCurrentStep("complete")}
                 variant="outline"
-                className="border-[#9AA0A6] text-[#9AA0A6] hover:bg-[#9AA0A6] hover:text-white"
+                className="border-[#9AA0A6] text-[#9AA0A6] hover:bg-[#9AA0A6] hover:text-[#fff]"
               >
                 Pular esta etapa
               </Button>
@@ -398,7 +398,7 @@ export function TreeOnboardingWizard({ arvore, onComplete, onArvoreUpdate }: Tre
                 explorando sua história.
               </p>
             </div>
-            <Button onClick={onComplete} className="bg-[#2ECC71] hover:bg-[#27AE60] text-white" size="lg">
+            <Button onClick={onComplete} className="bg-[#2ECC71] hover:bg-[#27AE60] text-[#fff]" size="lg">
               Ver Minha Árvore
               <TreePine className="ml-2 h-4 w-4" />
             </Button>

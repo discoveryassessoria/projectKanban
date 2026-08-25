@@ -52,7 +52,7 @@ export default function CambioHistoricoPage() {
             <h1 className="text-xl font-semibold text-slate-900">Histórico de câmbio</h1>
             <p className="text-sm text-slate-500">Fonte oficial: <b>Confidence Câmbio</b> · provider ativo: <b>CONFIDENCE</b> · atualização automática diária.</p>
           </div>
-          <button onClick={atualizarAgora} disabled={rodando} className="rounded-lg bg-sky-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-sky-500 disabled:opacity-50">{rodando ? 'Atualizando…' : 'Atualizar agora'}</button>
+          <button onClick={atualizarAgora} disabled={rodando} className="rounded-lg bg-sky-600 px-4 py-2 text-sm font-medium text-[#fff] transition hover:bg-sky-500 disabled:opacity-50">{rodando ? 'Atualizando…' : 'Atualizar agora'}</button>
         </div>
         {msg && <div className="mb-3 rounded-lg border border-slate-200 bg-white p-3 text-sm text-slate-700">{msg}</div>}
         {erro && <div className="mb-3 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700">{erro}</div>}

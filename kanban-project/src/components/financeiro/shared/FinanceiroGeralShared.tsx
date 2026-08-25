@@ -155,7 +155,7 @@ export function CancelarEstornarModal({ acao, tipo, id, resumo, onClose, onDone 
 // ── primitivos ───────────────────────────────────────────────────────────────
 function Overlay({ title, children, onClose }: { title: string; children: React.ReactNode; onClose: () => void }) {
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm" onClick={onClose}>
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-[var(--overlay-modal)] p-4 backdrop-blur-sm" onClick={onClose}>
       <div className="max-h-[90vh] w-full max-w-lg overflow-auto rounded-2xl border border-white/10 bg-zinc-900/95 shadow-2xl" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center justify-between border-b border-white/10 px-5 py-3">
           <h3 className="text-base font-semibold text-white">{title}</h3>

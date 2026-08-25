@@ -125,7 +125,7 @@ export default function CatalogTab({ catalogKey }: { catalogKey: string }) {
 
       {/* modal criar/editar */}
       {modalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-[var(--overlay-modal)] p-4 backdrop-blur-sm">
           <div className="flex max-h-[90vh] w-full max-w-lg flex-col rounded-2xl border border-white/10 bg-zinc-900/95 shadow-2xl">
             <div className="flex items-center justify-between border-b border-white/10 px-5 py-3.5">
               <h3 className="text-base font-semibold text-white">
@@ -151,7 +151,7 @@ export default function CatalogTab({ catalogKey }: { catalogKey: string }) {
               </button>
               <button
                 onClick={salvar}
-                className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-blue-500"
+                className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-[#fff] transition hover:bg-blue-500"
               >
                 Salvar
               </button>

@@ -162,13 +162,13 @@ export function WorkflowV2Panel({ processoId }: Props) {
             <button onClick={simular} disabled={acao != null} className="rounded border border-gray-300 px-2 py-1 text-xs hover:bg-gray-50 disabled:opacity-50">
               Simular avanço
             </button>
-            <button onClick={avancar} disabled={acao != null || !v2} className="rounded bg-blue-600 px-2 py-1 text-xs text-white hover:bg-blue-700 disabled:opacity-50">
+            <button onClick={avancar} disabled={acao != null || !v2} className="rounded bg-blue-600 px-2 py-1 text-xs text-[#fff] hover:bg-blue-700 disabled:opacity-50">
               Avançar
             </button>
           </>
         )}
         {pode("workflow.forcarAvanco") && (
-          <button onClick={forcar} disabled={acao != null || !v2} className="rounded bg-red-600 px-2 py-1 text-xs text-white hover:bg-red-700 disabled:opacity-50">
+          <button onClick={forcar} disabled={acao != null || !v2} className="rounded bg-red-600 px-2 py-1 text-xs text-[#fff] hover:bg-red-700 disabled:opacity-50">
             Forçar avanço
           </button>
         )}

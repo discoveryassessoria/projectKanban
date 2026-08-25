@@ -1214,7 +1214,7 @@ export function ProcessoFaturas({ processoId, nomeFamilia, onUpdate }: ProcessoF
 
       {/* Modal de Confirmação de Parcela */}
       {confirmarParcela && (
-      <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50" onClick={() => setConfirmarParcela(null)}>
+      <div className="fixed inset-0 bg-[var(--overlay-modal)] flex items-center justify-center z-50" onClick={() => setConfirmarParcela(null)}>
         <div className="bg-white rounded-xl shadow-xl w-full max-w-sm mx-4" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center justify-between p-4 border-b">
               <h3 className="font-semibold text-gray-900">Confirmar Pagamento</h3>
@@ -1272,7 +1272,7 @@ export function ProcessoFaturas({ processoId, nomeFamilia, onUpdate }: ProcessoF
 
       {/* ===== MODAL REGISTRAR PAGAMENTO ===== */}
       {showPagar && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" onClick={() => setShowPagar(null)}>
+        <div className="fixed inset-0 bg-[var(--overlay-modal)] flex items-center justify-center z-50 p-4" onClick={() => setShowPagar(null)}>
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-3xl max-h-[90vh] overflow-hidden flex flex-col" onClick={(e) => e.stopPropagation()}>
             
             <div className="flex items-center justify-between px-6 py-4 border-b bg-gradient-to-r from-green-500 to-green-600">
@@ -1507,7 +1507,7 @@ export function ProcessoFaturas({ processoId, nomeFamilia, onUpdate }: ProcessoF
 
       {/* ===== MODAL VISUALIZAR/EDITAR PAGAMENTO ===== */}
       {pagamentoSelecionado && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" onClick={() => setPagamentoSelecionado(null)}>
+        <div className="fixed inset-0 bg-[var(--overlay-modal)] flex items-center justify-center z-50 p-4" onClick={() => setPagamentoSelecionado(null)}>
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-3xl max-h-[90vh] overflow-hidden flex flex-col" onClick={(e) => e.stopPropagation()}>
             
             <div className="flex items-center justify-between px-6 py-4 border-b bg-gradient-to-r from-green-500 to-green-600">

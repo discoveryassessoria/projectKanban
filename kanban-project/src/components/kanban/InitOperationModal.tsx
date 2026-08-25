@@ -216,14 +216,14 @@ function ConteudoModal({
     <>
       {/* OVERLAY */}
       <div
-        className="fixed inset-0 bg-black/50 z-[10010] transition-opacity duration-200"
+        className="fixed inset-0 bg-[var(--overlay-modal)] z-[10010] transition-opacity duration-200"
         onClick={onClose}
       />
 
       {/* MODAL */}
       <div className="fixed inset-0 z-[10011] flex items-center justify-center p-4 pointer-events-none">
         <div
-          className="bg-[#1b2027] rounded-xl shadow-2xl w-full max-w-[640px] max-h-[92vh] flex flex-col pointer-events-auto"
+          className="bg-[var(--surface-popover)] rounded-xl shadow-2xl w-full max-w-[640px] max-h-[92vh] flex flex-col pointer-events-auto"
           onClick={(e) => e.stopPropagation()}
         >
           {/* HEADER */}
@@ -266,7 +266,7 @@ function ConteudoModal({
                         className={`w-full flex items-start gap-3 px-3 py-3 rounded-lg border-2 transition-all text-left ${
                           selected
                             ? "border-blue-500 bg-[#7dd3fc]/12"
-                            : "border-white/10 bg-[#1b2027] hover:border-white/15 hover:bg-[#20262e]"
+                            : "border-white/10 bg-[var(--surface-popover)] hover:border-white/15 hover:bg-[#20262e]"
                         }`}
                       >
                         <div
@@ -301,7 +301,7 @@ function ConteudoModal({
                         <select
                           value={responsavelId}
                           onChange={(e) => setResponsavelId(e.target.value)}
-                          className="w-full px-3 py-2 text-sm border border-white/10 rounded-md focus:outline-none focus:border-blue-400 focus:ring-1 focus:ring-blue-100 bg-[#1b2027]"
+                          className="w-full px-3 py-2 text-sm border border-white/10 rounded-md focus:outline-none focus:border-blue-400 focus:ring-1 focus:ring-blue-100 bg-[var(--surface-popover)]"
                         >
                           <option value="auto">Auto (responsável padrão da etapa)</option>
                           {usuarios.map((u) => (
@@ -319,7 +319,7 @@ function ConteudoModal({
                           type="date"
                           value={dataPrazoInicial}
                           onChange={(e) => setDataPrazoInicial(e.target.value)}
-                          className="w-full px-3 py-2 text-sm border border-white/10 rounded-md focus:outline-none focus:border-blue-400 focus:ring-1 focus:ring-blue-100 bg-[#1b2027]"
+                          className="w-full px-3 py-2 text-sm border border-white/10 rounded-md focus:outline-none focus:border-blue-400 focus:ring-1 focus:ring-blue-100 bg-[var(--surface-popover)]"
                         />
                       </div>
                     </div>
@@ -333,9 +333,9 @@ function ConteudoModal({
                     <div className="grid grid-cols-3 gap-2 mb-6">
                       {(
                         [
-                          { key: "normal", label: "Normal", bgActive: "bg-[#12161c] text-white", bgIdle: "bg-[#1b2027] text-white/80 border-white/10" },
-                          { key: "urgente", label: "Urgente", bgActive: "bg-orange-500 text-white", bgIdle: "bg-[#1b2027] text-white/80 border-white/10" },
-                          { key: "critica", label: "⚠ Crítica", bgActive: "bg-[#f87171] text-white", bgIdle: "bg-[#1b2027] text-white/80 border-white/10" },
+                          { key: "normal", label: "Normal", bgActive: "bg-[var(--app-background)] text-white", bgIdle: "bg-[var(--surface-popover)] text-white/80 border-white/10" },
+                          { key: "urgente", label: "Urgente", bgActive: "bg-orange-500 text-white", bgIdle: "bg-[var(--surface-popover)] text-white/80 border-white/10" },
+                          { key: "critica", label: "⚠ Crítica", bgActive: "bg-[#f87171] text-white", bgIdle: "bg-[var(--surface-popover)] text-white/80 border-white/10" },
                         ] as Array<{ key: Prioridade; label: string; bgActive: string; bgIdle: string }>
                       ).map((p) => {
                         const selected = prioridade === p.key
@@ -381,7 +381,7 @@ function ConteudoModal({
             <button
               onClick={onClose}
               disabled={saving}
-              className="px-4 py-2 text-sm font-semibold text-white/80 bg-[#1b2027] hover:bg-[#20262e] border border-white/10 rounded-md disabled:opacity-50"
+              className="px-4 py-2 text-sm font-semibold text-white/80 bg-[var(--surface-popover)] hover:bg-[#20262e] border border-white/10 rounded-md disabled:opacity-50"
             >
               Cancelar
             </button>
@@ -416,7 +416,7 @@ function ConteudoModal({
 function SectionTitle({ num, children }: { num: number; children: React.ReactNode }) {
   return (
     <div className="flex items-center gap-2 mb-3 mt-1">
-      <span className="w-5 h-5 rounded-full bg-[#12161c] text-white text-[11px] font-bold flex items-center justify-center">
+      <span className="w-5 h-5 rounded-full bg-[var(--app-background)] text-[#fff] text-[11px] font-bold flex items-center justify-center">
         {num}
       </span>
       <h3 className="text-[11px] uppercase font-bold tracking-wider text-white/95">{children}</h3>

@@ -231,7 +231,7 @@ export default function MacroKanbanTab() {
               </p>
               <p className="mt-1 text-xs text-white/40">Comece pelas 10 fases padrão (recomendado) ou monte do zero.</p>
               <div className="mt-4 flex flex-wrap items-center justify-center gap-3">
-                <button onClick={() => criarWorkflow(true)} disabled={criando} className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-blue-500 disabled:opacity-50">
+                <button onClick={() => criarWorkflow(true)} disabled={criando} className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-[#fff] transition hover:bg-blue-500 disabled:opacity-50">
                   {criando ? 'Criando...' : 'Criar com as 10 fases padrão'}
                 </button>
                 <button onClick={() => criarWorkflow(false)} disabled={criando} className="rounded-lg border border-white/15 px-4 py-2 text-sm text-white/80 transition hover:bg-white/10 disabled:opacity-50">
@@ -326,7 +326,7 @@ export default function MacroKanbanTab() {
                 <button onClick={excluirWorkflow} className="text-xs text-red-300/70 transition hover:text-red-200">Excluir workflow</button>
                 <div className="flex items-center gap-3">
                   {dirty && <span className="text-xs text-amber-300/80">alterações não salvas</span>}
-                  <button onClick={salvar} disabled={salvando || !dirty} className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-blue-500 disabled:opacity-50">
+                  <button onClick={salvar} disabled={salvando || !dirty} className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-[#fff] transition hover:bg-blue-500 disabled:opacity-50">
                     {salvando ? 'Salvando...' : 'Salvar workflow'}
                   </button>
                 </div>

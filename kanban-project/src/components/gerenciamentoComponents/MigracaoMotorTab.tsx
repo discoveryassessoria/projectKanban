@@ -151,12 +151,12 @@ export default function MigracaoMotorTab() {
         </div>
 
         {!confirmando ? (
-          <button disabled={busy || tipoId === "" || (preview ?? 0) === 0} onClick={() => setConfirmando(true)} className="mt-3 rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-500 disabled:opacity-50">Conectar {preview ?? 0} processo(s)</button>
+          <button disabled={busy || tipoId === "" || (preview ?? 0) === 0} onClick={() => setConfirmando(true)} className="mt-3 rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-[#fff] hover:bg-blue-500 disabled:opacity-50">Conectar {preview ?? 0} processo(s)</button>
         ) : (
           <div className="mt-3 rounded-xl border border-blue-400/30 bg-blue-500/10 p-4">
             <div className="text-sm text-blue-100">Conectar <b>{preview}</b> processo(s) de <b>{paisNome}</b> ao tipo escolhido?</div>
             <div className="mt-3 flex gap-2">
-              <button disabled={busy} onClick={conectar} className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-500 disabled:opacity-50">{busy ? "Conectando…" : "Sim, conectar"}</button>
+              <button disabled={busy} onClick={conectar} className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-[#fff] hover:bg-blue-500 disabled:opacity-50">{busy ? "Conectando…" : "Sim, conectar"}</button>
               <button disabled={busy} onClick={() => setConfirmando(false)} className="rounded-lg border border-white/10 px-4 py-2 text-sm text-white/70 hover:bg-white/5">Cancelar</button>
             </div>
           </div>
@@ -172,7 +172,7 @@ export default function MigracaoMotorTab() {
             <div className="rounded-xl border border-amber-400/30 bg-amber-500/10 p-4">
               <div className="text-sm text-amber-100">Desconectar <b>todos</b> os processos de <b>{paisNome}</b> do motor? (Não apaga nada, só desliga o vínculo.)</div>
               <div className="mt-3 flex gap-2">
-                <button disabled={busy} onClick={desconectar} className="rounded-lg bg-amber-600 px-4 py-2 text-sm font-medium text-white hover:bg-amber-500 disabled:opacity-50">{busy ? "Desconectando…" : "Sim, desconectar"}</button>
+                <button disabled={busy} onClick={desconectar} className="rounded-lg bg-amber-600 px-4 py-2 text-sm font-medium text-[#fff] hover:bg-amber-500 disabled:opacity-50">{busy ? "Desconectando…" : "Sim, desconectar"}</button>
                 <button disabled={busy} onClick={() => setConfirmandoDesc(false)} className="rounded-lg border border-white/10 px-4 py-2 text-sm text-white/70 hover:bg-white/5">Cancelar</button>
               </div>
             </div>

@@ -505,17 +505,17 @@ function ConteudoModal({
           }}
         />
       )}
-      <div className="fixed inset-0 bg-black/50 z-[9998]" onClick={handleClose} />
+      <div className="fixed inset-0 bg-[var(--overlay-modal)] z-[9998]" onClick={handleClose} />
 
       <div 
         className={`fixed z-[9999] shadow-2xl flex flex-col overflow-hidden rounded-tl-xl rounded-tr-xl ${
-          finDark ? 'bg-[#15191f]' : 'bg-white'
+          finDark ? 'bg-[var(--surface-popover)]' : 'bg-white'
         }`}
         style={{ left: '155px', top: '45px', right: '35px', bottom: '0px' }}
       >
         {/* Header */}
         <div className={`flex items-center justify-between px-6 py-4 border-b flex-shrink-0 ${
-          finDark ? 'bg-[#15191f] border-white/10' : 'bg-white'
+          finDark ? 'bg-[var(--surface-popover)] border-white/10' : 'bg-white'
         }`}>
           <div className="flex items-center gap-4">
             <button 
@@ -580,7 +580,7 @@ function ConteudoModal({
         </div>
 
         {/* Abas principais - dinâmicas */}
-        <div className={`flex border-b px-6 flex-shrink-0 ${finDark ? 'bg-[#15191f] border-white/10' : 'bg-white'}`}>
+        <div className={`flex border-b px-6 flex-shrink-0 ${finDark ? 'bg-[var(--surface-popover)] border-white/10' : 'bg-white'}`}>
           {tabs.map((tab) => (
             <button
               key={tab.id}
@@ -657,7 +657,7 @@ function ConteudoModal({
                             <div
                               key={cont.id}
                               onClick={() => pode('clientes.ver') && abrirDetalhesCliente(cont, "contratante")}
-                              className={`p-4 bg-[#1b2027] border border-white/10 rounded-xl transition-colors ${pode('clientes.ver') ? 'hover:bg-[#252c35] cursor-pointer' : 'cursor-default'}`}
+                              className={`p-4 bg-[var(--surface-popover)] border border-white/10 rounded-xl transition-colors ${pode('clientes.ver') ? 'hover:bg-[#252c35] cursor-pointer' : 'cursor-default'}`}
                             >
                               <p className="text-white/95 font-semibold">{nomePessoa(cont)}</p>
 
@@ -702,13 +702,13 @@ function ConteudoModal({
                               )}
 
                               <div className="flex gap-2 mt-3" onClick={(e) => e.stopPropagation()}>
-                                <Button variant="outline" size="sm" className="border-white/15 bg-transparent text-white/70 hover:bg-[#252c35] hover:text-white">
+                                <Button variant="outline" size="sm" className="border-white/15 bg-transparent text-white/70 hover:bg-[#252c35] hover:text-[#fff]">
                                   <Phone className="h-4 w-4" />
                                 </Button>
-                                <Button variant="outline" size="sm" className="border-white/15 bg-transparent text-white/70 hover:bg-[#252c35] hover:text-white">
+                                <Button variant="outline" size="sm" className="border-white/15 bg-transparent text-white/70 hover:bg-[#252c35] hover:text-[#fff]">
                                   <Mail className="h-4 w-4" />
                                 </Button>
-                                <Button variant="outline" size="sm" className="border-white/15 bg-transparent text-white/70 hover:bg-[#252c35] hover:text-white">
+                                <Button variant="outline" size="sm" className="border-white/15 bg-transparent text-white/70 hover:bg-[#252c35] hover:text-[#fff]">
                                   <MessageSquare className="h-4 w-4" />
                                 </Button>
                               </div>
@@ -729,7 +729,7 @@ function ConteudoModal({
                             <div
                               key={req.id}
                               onClick={() => pode('clientes.ver') && abrirDetalhesCliente(req, "requerente")}
-                              className={`p-3 bg-[#1b2027] border border-white/10 rounded-xl transition-colors ${pode('clientes.ver') ? 'hover:bg-[#252c35] cursor-pointer' : 'cursor-default'}`}
+                              className={`p-3 bg-[var(--surface-popover)] border border-white/10 rounded-xl transition-colors ${pode('clientes.ver') ? 'hover:bg-[#252c35] cursor-pointer' : 'cursor-default'}`}
                             >
                               <p className="text-white/95 font-medium">{nomePessoa(req)}</p>
                               {req.telefone && (
@@ -786,7 +786,7 @@ function ConteudoModal({
                       <Input
                         value={nomeEditado}
                         onChange={(e) => setNomeEditado(e.target.value)}
-                        className="w-full bg-[#1b2027] border-white/15 text-white/95 placeholder:text-white/40"
+                        className="w-full bg-[var(--surface-popover)] border-white/15 text-white/95 placeholder:text-white/40"
                       />
                     </div>
 
@@ -797,7 +797,7 @@ function ConteudoModal({
                       {contratantesSelecionados.length > 0 && (
                         <div className="space-y-2 mb-3">
                           {[...contratantesSelecionados].sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR')).map((cont) => (
-                            <div key={cont.id} className="flex items-center justify-between p-2 bg-[#1b2027] border border-white/10 rounded-xl">
+                            <div key={cont.id} className="flex items-center justify-between p-2 bg-[var(--surface-popover)] border border-white/10 rounded-xl">
                               <div className="flex items-center gap-2">
                                 <User className="h-4 w-4 text-white/68" />
                                 <span className="text-white/95 text-sm">{nomePessoa(cont)}</span>
@@ -823,13 +823,13 @@ function ConteudoModal({
                         </button>
 
                         {showContratanteDropdown && (
-                          <div className="absolute top-full left-0 right-0 mt-1 bg-[#14161a] border border-white/10 rounded-xl shadow-lg z-10">
+                          <div className="absolute top-full left-0 right-0 mt-1 bg-[var(--surface-overlay)] border border-white/10 rounded-xl shadow-lg z-10">
                             <div className="p-2 border-b border-white/10">
                               <Input
                                 placeholder="Buscar contratante..."
                                 value={buscaContratante}
                                 onChange={(e) => setBuscaContratante(e.target.value)}
-                                className="h-8 text-sm bg-[#1b2027] border-white/15 text-white/95 placeholder:text-white/40"
+                                className="h-8 text-sm bg-[var(--surface-popover)] border-white/15 text-white/95 placeholder:text-white/40"
                                 autoFocus
                               />
                             </div>
@@ -868,7 +868,7 @@ function ConteudoModal({
                       {requerentesSelecionados.length > 0 && (
                         <div className="space-y-2 mb-3">
                           {[...requerentesSelecionados].sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR')).map((req) => (
-                            <div key={req.id} className="flex items-center justify-between p-2 bg-[#1b2027] border border-white/10 rounded-xl">
+                            <div key={req.id} className="flex items-center justify-between p-2 bg-[var(--surface-popover)] border border-white/10 rounded-xl">
                               <div className="flex items-center gap-2">
                                 <User className="h-4 w-4 text-[#7dd3fc]" />
                                 <span className="text-white/95 text-sm">{nomePessoa(req)}</span>
@@ -894,13 +894,13 @@ function ConteudoModal({
                         </button>
 
                         {showRequerenteDropdown && (
-                          <div className="absolute top-full left-0 right-0 mt-1 bg-[#14161a] border border-white/10 rounded-xl shadow-lg z-10">
+                          <div className="absolute top-full left-0 right-0 mt-1 bg-[var(--surface-overlay)] border border-white/10 rounded-xl shadow-lg z-10">
                             <div className="p-2 border-b border-white/10">
                               <Input
                                 placeholder="Buscar requerente..."
                                 value={buscaRequerente}
                                 onChange={(e) => setBuscaRequerente(e.target.value)}
-                                className="h-8 text-sm bg-[#1b2027] border-white/15 text-white/95 placeholder:text-white/40"
+                                className="h-8 text-sm bg-[var(--surface-popover)] border-white/15 text-white/95 placeholder:text-white/40"
                                 autoFocus
                               />
                             </div>
@@ -937,7 +937,7 @@ function ConteudoModal({
                       <Button onClick={handleSaveEdit} className="bg-[#d2a948] hover:bg-[#e0b957] text-[#1b1508]">
                         Salvar
                       </Button>
-                      <Button variant="outline" onClick={handleCancelEdit} className="border-white/15 bg-transparent text-white/80 hover:bg-[#252c35] hover:text-white">
+                      <Button variant="outline" onClick={handleCancelEdit} className="border-white/15 bg-transparent text-white/80 hover:bg-[#252c35] hover:text-[#fff]">
                         Cancelar
                       </Button>
                     </div>

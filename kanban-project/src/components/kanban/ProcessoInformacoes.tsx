@@ -577,7 +577,7 @@ export function ProcessoInformacoes({
                               ) : (
                                 <div className="w-full h-full flex items-center justify-center bg-gray-100">
                                   {isPDF ? (
-                                    <div className="w-12 h-14 bg-red-600 rounded-sm flex items-center justify-center text-white text-xs font-bold">
+                                    <div className="w-12 h-14 bg-red-600 rounded-sm flex items-center justify-center text-[#fff] text-xs font-bold">
                                       PDF
                                     </div>
                                   ) : (
@@ -587,7 +587,7 @@ export function ProcessoInformacoes({
                               )}
                               
                               {/* Overlay */}
-                              <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors flex items-center justify-center">
+                              <div className="absolute inset-0 bg-[var(--overlay-modal)] group-hover:bg-[var(--overlay-modal)] transition-colors flex items-center justify-center">
                                 <Eye className="h-6 w-6 text-white opacity-0 group-hover:opacity-100 transition-opacity" />
                               </div>
                             </a>
@@ -609,7 +609,7 @@ export function ProcessoInformacoes({
                                   e.preventDefault()
                                   handleExcluirAnexo(anexo.id)
                                 }}
-                                className="absolute top-1 right-1 p-1 bg-red-500 hover:bg-red-600 rounded-full text-white opacity-0 group-hover:opacity-100 transition-opacity"
+                                className="absolute top-1 right-1 p-1 bg-red-500 hover:bg-red-600 rounded-full text-[#fff] opacity-0 group-hover:opacity-100 transition-opacity"
                               >
                                 <X className="h-3 w-3" />
                               </button>
@@ -648,7 +648,7 @@ export function ProcessoInformacoes({
                         type="button"
                         onClick={handleUpload}
                         disabled={uploading}
-                        className="mt-2 w-full py-2 px-4 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white rounded-lg font-medium transition-colors"
+                        className="mt-2 w-full py-2 px-4 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-[#fff] rounded-lg font-medium transition-colors"
                       >
                         {uploading ? (
                           <span className="flex items-center justify-center gap-2">

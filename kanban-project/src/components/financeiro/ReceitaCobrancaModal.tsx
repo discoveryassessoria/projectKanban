@@ -93,7 +93,7 @@ export function ReceitaCobrancaModal({ receitaId, onClose, onChanged }: { receit
   const saldo = contratado - recebido
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm" onClick={onClose}>
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-[var(--overlay-modal)] p-4 backdrop-blur-sm" onClick={onClose}>
       <div className="max-h-[92vh] w-full max-w-3xl overflow-auto rounded-2xl border border-white/10 bg-zinc-900/95 text-white shadow-2xl" onClick={(e) => e.stopPropagation()}>
         {/* Header */}
         <div className="flex items-center justify-between border-b border-white/10 px-6 py-4">
@@ -383,7 +383,7 @@ function CobrancaWizard({ receitaId, valor, moeda, receita, onClose, onCriada }:
   if (sucesso) {
     const cob = sucesso.cobranca
     return (
-      <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/80 p-6 backdrop-blur-sm" onClick={() => onCriada()}>
+      <div className="fixed inset-0 z-[60] flex items-center justify-center bg-[var(--overlay-modal)] p-6 backdrop-blur-sm" onClick={() => onCriada()}>
         <div className="w-full max-w-md rounded-2xl border border-white/10 bg-zinc-900/95 p-6 text-center text-white shadow-2xl" onClick={(e) => e.stopPropagation()}>
           <div className="mx-auto mb-3 grid h-14 w-14 place-items-center rounded-full" style={{ background: `${OURO}22`, color: OURO }}><Check className="h-7 w-7" /></div>
           <h3 className="text-lg font-semibold">Cobrança criada com sucesso</h3>
@@ -405,7 +405,7 @@ function CobrancaWizard({ receitaId, valor, moeda, receita, onClose, onCriada }:
   }
 
   return (
-    <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/80 p-3 backdrop-blur-sm sm:p-6" onClick={onClose}>
+    <div className="fixed inset-0 z-[60] flex items-center justify-center bg-[var(--overlay-modal)] p-3 backdrop-blur-sm sm:p-6" onClick={onClose}>
       <div className="flex h-[92vh] w-full max-w-[1400px] flex-col overflow-hidden rounded-2xl border border-white/10 bg-zinc-900/95 text-white shadow-2xl" onClick={(e) => e.stopPropagation()}>
         {/* Header */}
         <div className="flex items-center justify-between border-b border-white/10 px-6 py-4">

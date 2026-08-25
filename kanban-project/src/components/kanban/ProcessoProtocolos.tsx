@@ -469,7 +469,7 @@ export function ProcessoProtocolos({
           </div>
         ) : showForm ? (
           /* ===== FORMULÁRIO ===== */
-          <div className="max-w-2xl mx-auto bg-[#1b2027] border border-white/10 rounded-lg p-6">
+          <div className="max-w-2xl mx-auto bg-[var(--surface-popover)] border border-white/10 rounded-lg p-6">
             <div className="flex items-center justify-between mb-1">
               <h4 className="font-semibold text-white/95">
                 {editando ? "Editar protocolização" : "Registrar protocolização"}
@@ -734,7 +734,7 @@ export function ProcessoProtocolos({
               return (
                 <div
                   key={protocolo.id}
-                  className="bg-[#1b2027] border border-white/10 rounded-lg overflow-hidden"
+                  className="bg-[var(--surface-popover)] border border-white/10 rounded-lg overflow-hidden"
                 >
                   {/* Card principal */}
                   <div className="p-4">
@@ -865,7 +865,7 @@ export function ProcessoProtocolos({
                             return (
                               <div
                                 key={anexo.id}
-                                className="group relative bg-[#1b2027] rounded-lg border border-white/10 overflow-hidden hover:shadow-md transition-shadow"
+                                className="group relative bg-[var(--surface-popover)] rounded-lg border border-white/10 overflow-hidden hover:shadow-md transition-shadow"
                               >
                                 {/* Preview */}
                                 <a
@@ -883,7 +883,7 @@ export function ProcessoProtocolos({
                                   ) : (
                                     <div className="w-full h-full flex items-center justify-center bg-[#252c35]">
                                       {isPDF ? (
-                                        <div className="w-12 h-14 bg-red-600 rounded-sm flex items-center justify-center text-white text-xs font-bold">
+                                        <div className="w-12 h-14 bg-red-600 rounded-sm flex items-center justify-center text-[#fff] text-xs font-bold">
                                           PDF
                                         </div>
                                       ) : (
@@ -893,7 +893,7 @@ export function ProcessoProtocolos({
                                   )}
 
                                   {/* Overlay */}
-                                  <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors flex items-center justify-center">
+                                  <div className="absolute inset-0 bg-[var(--overlay-modal)] group-hover:bg-[var(--overlay-modal)] transition-colors flex items-center justify-center">
                                     <Eye className="h-6 w-6 text-white opacity-0 group-hover:opacity-100 transition-opacity" />
                                   </div>
                                 </a>
@@ -915,7 +915,7 @@ export function ProcessoProtocolos({
                                       e.preventDefault()
                                       handleExcluirAnexo(protocolo.id, anexo.id)
                                     }}
-                                    className="absolute top-1 right-1 p-1 bg-red-500 hover:bg-red-600 rounded-full text-white opacity-0 group-hover:opacity-100 transition-opacity"
+                                    className="absolute top-1 right-1 p-1 bg-red-500 hover:bg-red-600 rounded-full text-[#fff] opacity-0 group-hover:opacity-100 transition-opacity"
                                   >
                                     <X className="h-3 w-3" />
                                   </button>
@@ -954,7 +954,7 @@ export function ProcessoProtocolos({
                             type="button"
                             onClick={() => handleUpload(protocolo.id)}
                             disabled={uploadingProtocoloId !== null}
-                            className="mt-2 w-full py-2 px-4 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white rounded-lg font-medium transition-colors"
+                            className="mt-2 w-full py-2 px-4 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-[#fff] rounded-lg font-medium transition-colors"
                           >
                             {isUploadingThis ? (
                               <span className="flex items-center justify-center gap-2">

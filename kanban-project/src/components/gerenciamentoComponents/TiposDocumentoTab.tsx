@@ -154,7 +154,7 @@ export default function TiposDocumentoTab() {
             <h2 className="text-lg font-semibold text-white">Tipos de Documento</h2>
             <p className="mt-1 text-sm text-white/60">Cadastro <strong className="text-white/80">mestre</strong> de tipos documentais — inclui certidões, identidades, judiciais, etc. Certidões são criadas aqui (não há cadastro separado).</p>
           </div>
-          <button onClick={() => setForm(formVazio())} className="flex-none rounded-lg bg-blue-600 px-3 py-2 text-xs font-medium text-white hover:bg-blue-500">+ Novo tipo de documento</button>
+          <button onClick={() => setForm(formVazio())} className="flex-none rounded-lg bg-blue-600 px-3 py-2 text-xs font-medium text-[#fff] hover:bg-blue-500">+ Novo tipo de documento</button>
         </div>
         {/* Filtro rápido — consolidação de "Tipos de Certidão" */}
         <div className="mt-4 inline-flex overflow-hidden rounded-lg border border-white/10 text-xs">
@@ -193,7 +193,7 @@ export default function TiposDocumentoTab() {
       </div>
 
       {form && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm" onClick={() => setForm(null)}>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-[var(--overlay-modal)] p-4 backdrop-blur-sm" onClick={() => setForm(null)}>
           <div className="w-full max-w-md rounded-2xl border border-white/10 bg-zinc-900/95 shadow-2xl" onClick={e => e.stopPropagation()}>
             <div className="border-b border-white/10 px-6 py-4"><h3 className="font-semibold text-white">{form.id ? "Editar" : "Novo"} tipo de documento</h3></div>
             <div className="space-y-3 px-6 py-4">
@@ -277,7 +277,7 @@ export default function TiposDocumentoTab() {
             </div>
             <div className="flex justify-end gap-2 border-t border-white/10 px-6 py-4">
               <button onClick={() => setForm(null)} className="rounded-lg border border-white/10 bg-white/5 px-4 py-2 text-sm text-white/80 hover:bg-white/10">Cancelar</button>
-              <button disabled={busy} onClick={save} className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-500 disabled:opacity-50">Salvar</button>
+              <button disabled={busy} onClick={save} className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-[#fff] hover:bg-blue-500 disabled:opacity-50">Salvar</button>
             </div>
           </div>
         </div>

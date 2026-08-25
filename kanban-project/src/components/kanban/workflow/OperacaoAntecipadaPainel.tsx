@@ -129,7 +129,7 @@ function OperacaoAntecipadaItem({ o, readOnly, onAvaliar, onAbrir }: {
           resultado ESTRUTURADO (é ele que resolve a necessidade de origem, não o doc em si). */}
       {!readOnly && o.aguardandoAvaliacao && onAvaliar && (
         avaliando ? (
-          <div className="mt-2 rounded-md border border-white/10 bg-[#1b2027] p-2 space-y-2">
+          <div className="mt-2 rounded-md border border-white/10 bg-[var(--surface-popover)] p-2 space-y-2">
             {apoio && (
               <div className="grid grid-cols-2 gap-2">
                 {[["cartorio", "Cartório"], ["municipio", "Município"], ["livro", "Livro"], ["folha", "Folha"], ["termo", "Termo"], ["data", "Data"], ["fonte", "Fonte da informação"]].map(([k, label]) => (

@@ -344,7 +344,7 @@ export function KanbanBoard({
         {pode('processos.criar') && (
           <Button
             onClick={abrirCriar}
-            className="bg-blue-600 hover:bg-blue-500 text-white"
+            className="bg-blue-600 hover:bg-blue-500 text-[#fff]"
           >
             <Plus className="mr-1.5 h-4 w-4" /> Novo processo
           </Button>
@@ -411,7 +411,7 @@ export function KanbanBoard({
 
       {/* MODAL: Novo processo — em portal pro body (senão fica preso no painel com blur) */}
       {criarModal && createPortal(
-        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm">
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-[var(--overlay-modal)] p-4 backdrop-blur-sm">
           <div className="w-full max-w-md overflow-auto rounded-2xl border border-white/10 bg-zinc-900/95 shadow-2xl">
             <div className="flex items-center justify-between border-b border-white/10 px-6 py-4">
               <h3 className="text-lg font-semibold text-white">Novo processo</h3>
@@ -446,7 +446,7 @@ export function KanbanBoard({
               <button
                 onClick={confirmarCriarProcesso}
                 disabled={salvandoCriar}
-                className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-blue-500 disabled:opacity-50"
+                className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-[#fff] transition hover:bg-blue-500 disabled:opacity-50"
               >
                 {salvandoCriar ? "Criando..." : "Criar processo"}
               </button>
@@ -490,8 +490,8 @@ export function KanbanBoard({
       )}
 
       {aviso && (
-        <div className="fixed inset-0 z-[10060] flex items-center justify-center bg-black/40 px-4" onClick={() => setAviso(null)}>
-          <div className="max-w-sm rounded-xl border border-white/10 bg-[#1b2027] p-5 shadow-2xl" onClick={(e) => e.stopPropagation()}>
+        <div className="fixed inset-0 z-[10060] flex items-center justify-center bg-[var(--overlay-modal)] px-4" onClick={() => setAviso(null)}>
+          <div className="max-w-sm rounded-xl border border-white/10 bg-[var(--surface-popover)] p-5 shadow-2xl" onClick={(e) => e.stopPropagation()}>
             <div className="text-[13px] text-white/90 leading-relaxed">{aviso}</div>
             <div className="flex justify-end mt-4">
               <button

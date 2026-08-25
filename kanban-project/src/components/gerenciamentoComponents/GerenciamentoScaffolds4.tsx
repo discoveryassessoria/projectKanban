@@ -146,7 +146,7 @@ function PhaseCard({ nome }: { nome: string }) {
       <div className="mb-0.5 mt-2 text-[10px] font-bold uppercase tracking-wide text-white/40">Operacional</div>
       <div className="text-[11px] text-white/40">— nenhuma —</div>
       <div className="mt-2.5 flex flex-wrap gap-1.5">
-        <button className="rounded-lg bg-blue-600 px-2 py-1 text-[10px] font-semibold text-white transition hover:bg-blue-500">+ Disparo financeiro</button>
+        <button className="rounded-lg bg-blue-600 px-2 py-1 text-[10px] font-semibold text-[#fff] transition hover:bg-blue-500">+ Disparo financeiro</button>
         <button className="rounded-lg border border-white/10 px-2 py-1 text-[10px] text-white/70 transition hover:bg-white/10">Simular fase</button>
       </div>
     </div>

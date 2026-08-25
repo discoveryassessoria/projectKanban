@@ -57,14 +57,14 @@ export function RetornarFaseButton({ processoId, faseKey, faseLabel, onRetornou 
     <>
       <button
         onClick={() => setAberto(true)}
-        className="inline-flex items-center gap-1.5 bg-[#12161c] text-white text-[12.5px] font-bold px-3.5 py-2 rounded-lg hover:bg-[#20262e] transition-colors"
+        className="inline-flex items-center gap-1.5 bg-[var(--app-background)] text-[#fff] text-[12.5px] font-bold px-3.5 py-2 rounded-lg hover:bg-[#20262e] transition-colors"
       >
         <RotateCcw className="w-3.5 h-3.5" /> Retornar processo para esta fase
       </button>
 
       {aberto && (
-        <div className="fixed inset-0 z-[80] flex items-center justify-center bg-black/40 p-4" onClick={() => !enviando && setAberto(false)}>
-          <div className="max-w-md w-full rounded-2xl bg-[#1b2027] p-6 shadow-xl" onClick={(e) => e.stopPropagation()}>
+        <div className="fixed inset-0 z-[80] flex items-center justify-center bg-[var(--overlay-modal)] p-4" onClick={() => !enviando && setAberto(false)}>
+          <div className="max-w-md w-full rounded-2xl bg-[var(--surface-popover)] p-6 shadow-xl" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center gap-2 mb-3">
               <RotateCcw className="w-5 h-5 text-white/80" />
               <h3 className="text-[16px] font-extrabold text-white/95">Retornar processo para esta fase</h3>
@@ -94,7 +94,7 @@ export function RetornarFaseButton({ processoId, faseKey, faseLabel, onRetornou 
 
             <div className="flex justify-end gap-2">
               <button disabled={enviando} onClick={() => setAberto(false)} className="px-3.5 py-2 text-[12.5px] font-semibold rounded-lg bg-[#252c35] hover:bg-[#252c35] text-white/95 disabled:opacity-50">Cancelar</button>
-              <button disabled={enviando} onClick={() => void enviar()} className="inline-flex items-center gap-1.5 px-3.5 py-2 text-[12.5px] font-bold rounded-lg bg-[#12161c] text-white hover:bg-[#20262e] disabled:opacity-50">
+              <button disabled={enviando} onClick={() => void enviar()} className="inline-flex items-center gap-1.5 px-3.5 py-2 text-[12.5px] font-bold rounded-lg bg-[var(--app-background)] text-[#fff] hover:bg-[#20262e] disabled:opacity-50">
                 {enviando ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <RotateCcw className="w-3.5 h-3.5" />} Confirmar retorno
               </button>
             </div>

@@ -366,7 +366,7 @@ function ConteudoDialog({
                   </Button>
                   <Button
                     type="submit"
-                    className="bg-[#123C73] hover:bg-[#0f2d5a] text-white"
+                    className="bg-[#123C73] hover:bg-[#0f2d5a] text-[#fff]"
                     disabled={isSubmitting}
                   >
                     {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
@@ -444,7 +444,7 @@ function ConteudoDialog({
                   </Button>
                   <Button
                     type="submit"
-                    className="bg-[#123C73] hover:bg-[#0f2d5a] text-white"
+                    className="bg-[#123C73] hover:bg-[#0f2d5a] text-[#fff]"
                     disabled={isSubmitting}
                   >
                     {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
@@ -582,7 +582,7 @@ function ConteudoDialog({
               </Button>
               <Button
                 type="submit"
-                className="bg-[#123C73] hover:bg-[#0f2d5a] text-white"
+                className="bg-[#123C73] hover:bg-[#0f2d5a] text-[#fff]"
                 disabled={isSubmitting}
               >
                 {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}

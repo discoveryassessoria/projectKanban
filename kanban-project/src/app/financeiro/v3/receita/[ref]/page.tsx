@@ -13,5 +13,5 @@ import { ReceitaDetalheView } from "@/src/components/financeiro/v3/ReceitaDetalh
 export default function ReceitaV3Page({ params }: { params: Promise<{ ref: string }> }) {
   const { ref } = use(params)
   const router = useRouter()
-  return <div className="min-h-screen bg-[#12161c] px-6 py-5"><ReceitaDetalheView refParam={ref} onVoltar={() => router.back()} /></div>
+  return <div className="min-h-screen bg-[var(--app-background)] px-6 py-5"><ReceitaDetalheView refParam={ref} onVoltar={() => router.back()} /></div>
 }

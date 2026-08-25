@@ -203,7 +203,7 @@ function ConteudoModal({
           </div>
           <button
             onClick={onClose}
-            className="w-7 h-7 rounded-md bg-[#1b2027]/10 hover:bg-[#1b2027]/20 flex items-center justify-center text-white/85 flex-shrink-0"
+            className="w-7 h-7 rounded-md bg-[var(--surface-popover)]/10 hover:bg-[var(--surface-popover)]/20 flex items-center justify-center text-white/85 flex-shrink-0"
           >
             <X className="w-4 h-4" />
           </button>

@@ -37,7 +37,7 @@ export default function RuntimeWorkflowDiagnostics() {
             inputMode="numeric"
             className="w-40 rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-white placeholder-white/30 outline-none focus:border-white/20"
           />
-          <button onClick={carregar} className="rounded-lg bg-blue-600 px-3 py-2 text-xs font-medium text-white hover:bg-blue-500">
+          <button onClick={carregar} className="rounded-lg bg-blue-600 px-3 py-2 text-xs font-medium text-[#fff] hover:bg-blue-500">
             Carregar diagnóstico
           </button>
         </div>

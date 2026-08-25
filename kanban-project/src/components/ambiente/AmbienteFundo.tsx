@@ -184,7 +184,11 @@ export function AmbienteFundo() {
       {/* Véu/overlay de contraste — moderado, na cor do país. */}
       <div
         className="absolute inset-0"
-        style={{ background: "linear-gradient(to bottom, var(--amb-scrim), color-mix(in oklab, var(--amb-scrim), black 18%))" }}
+        // O DEGRADÊ DO VÉU. Antes ele escurecia 18% para baixo, porque o texto branco
+        // do tema anterior precisava de fundo escuro. Agora CLAREIA para baixo: a
+        // paisagem fica um pouco mais presente no alto — onde há respiro — e some sob
+        // o conteúdo denso, que é onde ela atrapalharia a leitura.
+        style={{ background: "linear-gradient(to bottom, var(--amb-scrim), color-mix(in oklab, var(--amb-scrim), white 55%))" }}
       />
     </div>
   )

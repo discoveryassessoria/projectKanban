@@ -260,7 +260,7 @@ export default function BlogAdminPage() {
 
       {/* Conteúdo */}
       <div className="min-h-screen relative">
-        <div className="absolute inset-0 bg-black/40 pointer-events-none" />
+        <div className="absolute inset-0 bg-[var(--overlay-modal)] pointer-events-none" />
         
         <main className="relative px-6 py-6 space-y-6">
           {/* Título e Botão */}
@@ -478,7 +478,7 @@ export default function BlogAdminPage() {
       {/* Modal de Formulário */}
       {showForm && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-          <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" onClick={resetForm} />
+          <div className="absolute inset-0 bg-[var(--overlay-modal)] backdrop-blur-sm" onClick={resetForm} />
           <Card className="relative w-full max-w-2xl max-h-[90vh] overflow-y-auto bg-gray-900 border-white/20">
             <CardContent className="p-6">
               <div className="flex items-center justify-between mb-6">

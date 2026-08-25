@@ -238,7 +238,7 @@ export default function OrgaosProtocoloTab() {
             <h2 className="text-lg font-semibold text-white">Órgãos e Organizações</h2>
             <p className="mt-1 text-sm text-white/60">Cadastro <strong className="text-white/80">mestre</strong> das entidades com que a operação fala: consulados, embaixadas, registros civis, comuni, tribunais, arquivos, cartórios, transportadoras e parceiros. Uma organização pode ter várias categorias.</p>
           </div>
-          <button onClick={() => abrirForm(blank())} className="flex-none rounded-lg bg-blue-600 px-3 py-2 text-xs font-medium text-white hover:bg-blue-500">+ Nova organização</button>
+          <button onClick={() => abrirForm(blank())} className="flex-none rounded-lg bg-blue-600 px-3 py-2 text-xs font-medium text-[#fff] hover:bg-blue-500">+ Nova organização</button>
         </div>
         <div className="mt-4 flex flex-wrap items-center gap-2">
           <input value={busca} onChange={e => setBusca(e.target.value)} placeholder="Buscar por nome, código, cidade, categoria ou tag…" className={inputCls + " max-w-md"} />
@@ -312,7 +312,7 @@ export default function OrgaosProtocoloTab() {
       </div>
 
       {form && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm" onClick={() => abrirForm(null)}>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-[var(--overlay-modal)] p-4 backdrop-blur-sm" onClick={() => abrirForm(null)}>
           <div className="max-h-[90vh] w-full max-w-3xl overflow-y-auto rounded-2xl border border-white/10 bg-zinc-900/95 shadow-2xl" onClick={e => e.stopPropagation()}>
             <div className="border-b border-white/10 px-6 py-4"><h3 className="font-semibold text-white">{form.id ? "Editar" : "Nova"} organização</h3></div>
             <div className="grid grid-cols-2 gap-3 px-6 py-4">
@@ -474,7 +474,7 @@ export default function OrgaosProtocoloTab() {
             </div>
             <div className="flex justify-end gap-2 border-t border-white/10 px-6 py-4">
               <button onClick={() => abrirForm(null)} className="rounded-lg border border-white/10 bg-white/5 px-4 py-2 text-sm text-white/80 hover:bg-white/10">Cancelar</button>
-              <button disabled={busy} onClick={save} className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-500 disabled:opacity-50">Salvar</button>
+              <button disabled={busy} onClick={save} className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-[#fff] hover:bg-blue-500 disabled:opacity-50">Salvar</button>
             </div>
           </div>
         </div>

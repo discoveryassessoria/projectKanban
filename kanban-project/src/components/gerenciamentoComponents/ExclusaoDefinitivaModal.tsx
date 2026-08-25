@@ -82,8 +82,8 @@ export function ExclusaoDefinitivaModal({ titulo, previewUrl, deleteUrl, entidad
   if (sucesso) {
     const excluido = sucesso === "excluido"
     return (
-      <div className="fixed inset-0 z-[90] flex items-center justify-center bg-black/60 p-4" onClick={() => onDone()}>
-        <div className="max-w-md w-full rounded-2xl bg-[#12151b] border border-white/10 shadow-xl text-white/90 p-5" onClick={(e) => e.stopPropagation()}>
+      <div className="fixed inset-0 z-[90] flex items-center justify-center bg-[var(--overlay-modal)] p-4" onClick={() => onDone()}>
+        <div className="max-w-md w-full rounded-2xl bg-[var(--surface-overlay)] border border-white/10 shadow-xl text-white/90 p-5" onClick={(e) => e.stopPropagation()}>
           <div className={`text-[15px] font-extrabold ${excluido ? "text-red-300" : "text-amber-300"}`}>
             {excluido ? `${entidadeLabel} excluído definitivamente` : `${entidadeLabel} inativado`}
           </div>
@@ -101,8 +101,8 @@ export function ExclusaoDefinitivaModal({ titulo, previewUrl, deleteUrl, entidad
   }
 
   return (
-    <div className="fixed inset-0 z-[90] flex items-center justify-center bg-black/60 p-4" onClick={() => !executando && onClose()}>
-      <div className="max-w-lg w-full rounded-2xl bg-[#12151b] border border-white/10 shadow-xl text-white/90" onClick={(e) => e.stopPropagation()}>
+    <div className="fixed inset-0 z-[90] flex items-center justify-center bg-[var(--overlay-modal)] p-4" onClick={() => !executando && onClose()}>
+      <div className="max-w-lg w-full rounded-2xl bg-[var(--surface-overlay)] border border-white/10 shadow-xl text-white/90" onClick={(e) => e.stopPropagation()}>
         <div className="px-5 pt-4 pb-3 border-b border-white/10">
           <h3 className="text-[15px] font-extrabold">{titulo}</h3>
           <p className="text-[12px] text-white/50 mt-0.5">
@@ -191,7 +191,7 @@ export function ExclusaoDefinitivaModal({ titulo, previewUrl, deleteUrl, entidad
               <button disabled={executando} onClick={() => void inativar()} className="px-3.5 py-2 text-[12.5px] font-semibold rounded-lg bg-white/10 hover:bg-white/20 disabled:opacity-50">Só inativar</button>
             )}
             {analise?.deletionAllowed && (
-              <button disabled={executando || !fraseOk} onClick={() => void excluirDefinitivo()} className="px-3.5 py-2 text-[12.5px] font-bold rounded-lg bg-red-600 text-white hover:bg-red-500 disabled:opacity-40">Excluir definitivamente</button>
+              <button disabled={executando || !fraseOk} onClick={() => void excluirDefinitivo()} className="px-3.5 py-2 text-[12.5px] font-bold rounded-lg bg-red-600 text-[#fff] hover:bg-red-500 disabled:opacity-40">Excluir definitivamente</button>
             )}
           </div>
         </div>

@@ -187,9 +187,9 @@ export function SeletorResponsavel({
   const carregar = () => setTentativa((n) => n + 1)
 
   return (
-    <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 p-4" onClick={aoFechar}>
+    <div className="fixed inset-0 z-[60] flex items-center justify-center bg-[var(--overlay-modal)] p-4" onClick={aoFechar}>
       <div
-        className="w-full max-w-sm overflow-hidden rounded-lg border border-white/10 bg-[#0d0f13] shadow-2xl"
+        className="w-full max-w-sm overflow-hidden rounded-lg border border-white/10 bg-[var(--surface-overlay)] shadow-2xl"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="border-b border-white/[0.08] px-4 py-3">

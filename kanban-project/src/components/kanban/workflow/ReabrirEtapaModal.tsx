@@ -102,7 +102,7 @@ export default function ReabrirEtapaModal({
     finally { setEnviando(false) }
   }
 
-  const inp = "w-full rounded-lg border border-white/10 bg-[#15191f] px-3 py-2 text-[13px] text-white/95 outline-none focus:border-[#7dd3fc]/50"
+  const inp = "w-full rounded-lg border border-white/10 bg-[var(--surface-popover)] px-3 py-2 text-[13px] text-white/95 outline-none focus:border-[#7dd3fc]/50"
   const rot = "text-[10px] font-bold uppercase tracking-wider text-white/40"
   const atual = plano?.execucoes.find((e) => e.status !== "SUPERSEDIDO") ?? plano?.execucoes[plano.execucoes.length - 1] ?? null
   const podeConfirmar =
@@ -110,8 +110,8 @@ export default function ReabrirEtapaModal({
     (!plano.exigeJustificativa || justificativa.trim().length >= 5)
 
   return (
-    <div className="fixed inset-0 z-[10060] flex items-center justify-center bg-black/60 px-4" onClick={enviando ? undefined : onFechar}>
-      <div className="w-full max-w-[560px] max-h-[90vh] overflow-y-auto rounded-2xl border border-white/10 bg-[#1b2027] shadow-2xl"
+    <div className="fixed inset-0 z-[10060] flex items-center justify-center bg-[var(--overlay-modal)] px-4" onClick={enviando ? undefined : onFechar}>
+      <div className="w-full max-w-[560px] max-h-[90vh] overflow-y-auto rounded-2xl border border-white/10 bg-[var(--surface-popover)] shadow-2xl"
         onClick={(e) => e.stopPropagation()} role="dialog" aria-modal="true" aria-label="Reabrir tarefa">
         <div className="border-b border-white/10 px-5 py-4">
           <h2 className="text-[16px] font-extrabold text-white/95">Reabrir tarefa</h2>
@@ -126,7 +126,7 @@ export default function ReabrirEtapaModal({
           {plano && (
             <>
               {/* DE QUEM É O TRABALHO — a identidade, antes de tudo. */}
-              <div className="grid grid-cols-2 gap-3 rounded-lg border border-white/10 bg-[#15191f] px-3 py-3">
+              <div className="grid grid-cols-2 gap-3 rounded-lg border border-white/10 bg-[var(--surface-popover)] px-3 py-3">
                 <div><div className={rot}>Fase</div><div className="text-[13px] text-white/90">{plano.identidade.faseLabel}</div></div>
                 <div><div className={rot}>Pessoa</div><div className="text-[13px] text-white/90">{plano.identidade.pessoaNome ?? "—"}</div></div>
                 <div className="col-span-2">
@@ -140,7 +140,7 @@ export default function ReabrirEtapaModal({
               </div>
 
               {/* O QUE JÁ HOUVE NESTA UNIDADE */}
-              <div className="rounded-lg border border-white/10 bg-[#15191f] px-3 py-3">
+              <div className="rounded-lg border border-white/10 bg-[var(--surface-popover)] px-3 py-3">
                 <div className={rot}>Execução anterior</div>
                 {atual ? (
                   <div className="mt-1 text-[12.5px] text-white/80">
@@ -167,14 +167,14 @@ export default function ReabrirEtapaModal({
                 <>
                   <div>
                     <div className={rot}>O que reabrir</div>
-                    <label className="mt-1 flex cursor-pointer items-start gap-2 rounded-lg border border-white/10 bg-[#15191f] px-3 py-2">
+                    <label className="mt-1 flex cursor-pointer items-start gap-2 rounded-lg border border-white/10 bg-[var(--surface-popover)] px-3 py-2">
                       <input type="radio" className="mt-0.5" checked={!comDependentes} onChange={() => setComDependentes(false)} />
                       <span className="text-[12.5px] text-white/85">
                         Reabrir somente esta tarefa
                         <span className="block text-[11px] text-white/40">Nenhuma outra etapa é tocada.</span>
                       </span>
                     </label>
-                    <label className={`mt-1.5 flex items-start gap-2 rounded-lg border px-3 py-2 ${plano.dependentesDaMesmaUnidade.length ? "cursor-pointer border-white/10 bg-[#15191f]" : "cursor-not-allowed border-white/5 bg-[#15191f]/50 opacity-50"}`}>
+                    <label className={`mt-1.5 flex items-start gap-2 rounded-lg border px-3 py-2 ${plano.dependentesDaMesmaUnidade.length ? "cursor-pointer border-white/10 bg-[var(--surface-popover)]" : "cursor-not-allowed border-white/5 bg-[var(--surface-popover)]/50 opacity-50"}`}>
                       <input type="radio" className="mt-0.5" disabled={!plano.dependentesDaMesmaUnidade.length}
                         checked={comDependentes} onChange={() => setComDependentes(true)} />
                       <span className="text-[12.5px] text-white/85">

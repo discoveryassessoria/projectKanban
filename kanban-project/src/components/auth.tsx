@@ -240,7 +240,7 @@ export default function AuthComponent({
                 aria-hidden="true"
                 className="
                   flex h-7 w-7 shrink-0 items-center justify-center
-                  rounded-full bg-[#123C73] text-[12px] font-semibold text-white
+                  rounded-full bg-[#123C73] text-[12px] font-semibold text-[#fff]
                 "
               >
                 {ultimoEmail.slice(0, 1).toUpperCase()}
@@ -330,7 +330,7 @@ export default function AuthComponent({
           className="
             w-full h-12
             bg-[#123C73] hover:bg-[#0f315f]
-            text-white font-medium text-[15px]
+            text-[#fff] font-medium text-[15px]
             rounded-lg
             transition-all duration-150
             mt-2

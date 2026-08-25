@@ -250,7 +250,7 @@ export function ProcessoEmissaoRetificada({ processoId, onConcluido }: Props) {
         <div className="space-y-4 min-w-0">
           {/* Barra das 6 etapas do documento em foco */}
           {foco && (
-            <div className="rounded-xl border border-white/10 bg-[#1b2027] p-4">
+            <div className="rounded-xl border border-white/10 bg-[var(--surface-popover)] p-4">
               <div className="text-[11px] text-white/55 mb-2">Workflow de <b className="text-white/80">{foco.documentoTitulo}</b> · {foco.pessoaNome}</div>
               <div className="flex items-start">
                 {foco.workflow.map((s, i) => {
@@ -283,7 +283,7 @@ export function ProcessoEmissaoRetificada({ processoId, onConcluido }: Props) {
           {/* 8 KPIs */}
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
             {kpiList.map(([ic, val, lbl], i) => (
-              <div key={i} className="rounded-lg border border-white/10 bg-[#1b2027] px-3 py-2.5">
+              <div key={i} className="rounded-lg border border-white/10 bg-[var(--surface-popover)] px-3 py-2.5">
                 <div className="text-base leading-none">{ic}</div>
                 <div className="text-xl font-bold text-white/95 mt-1">{val}</div>
                 <div className="text-[11px] text-white/55">{lbl}</div>
@@ -337,7 +337,7 @@ export function ProcessoEmissaoRetificada({ processoId, onConcluido }: Props) {
 
         {/* Coluna direita */}
         <aside className="space-y-4">
-          <div className="rounded-xl border border-white/10 bg-[#1b2027] p-4">
+          <div className="rounded-xl border border-white/10 bg-[var(--surface-popover)] p-4">
             <h3 className="text-sm font-semibold text-white/95 mb-2.5">Ações rápidas</h3>
             <div className="space-y-2">
               <QBtn icon={<FileText className="w-4 h-4 text-white/40" />} onClick={() => setAviso("Modelo de ofício de averbação — em breve.")}>Modelo de ofício de averbação</QBtn>
@@ -345,7 +345,7 @@ export function ProcessoEmissaoRetificada({ processoId, onConcluido }: Props) {
             </div>
           </div>
 
-          <div className="rounded-xl border border-white/10 bg-[#1b2027] p-4">
+          <div className="rounded-xl border border-white/10 bg-[var(--surface-popover)] p-4">
             <h3 className="text-sm font-semibold text-white/95 mb-2.5">Alertas</h3>
             <div className="space-y-2 text-xs">
               {k.bloq > 0 && <div className="flex items-center gap-2 text-[#d2a948] bg-[#d2a948]/12 border border-[#d2a948]/25 rounded-lg px-3 py-2"><AlertTriangle className="w-4 h-4 shrink-0" /> {k.bloq} documento(s) com divergência pós-retificação</div>}
@@ -390,7 +390,7 @@ function calcProgress(docs: ReDoc[]): number {
 // ============================================================
 
 function Stat({ label, value, ok }: { label: string; value: string; ok?: boolean }) {
-  return <div className="rounded-lg border border-white/10 bg-[#1b2027] px-3 py-2 text-center"><div className={`text-lg font-bold ${ok ? "text-[#4ade80]" : "text-white/95"}`}>{value}</div><div className="text-[11px] text-white/55 whitespace-nowrap">{label}</div></div>
+  return <div className="rounded-lg border border-white/10 bg-[var(--surface-popover)] px-3 py-2 text-center"><div className={`text-lg font-bold ${ok ? "text-[#4ade80]" : "text-white/95"}`}>{value}</div><div className="text-[11px] text-white/55 whitespace-nowrap">{label}</div></div>
 }
 function QBtn({ icon, onClick, children }: { icon: ReactNode; onClick: () => void; children: ReactNode }) {
   return <button onClick={onClick} className="w-full text-left text-sm text-white/80 hover:bg-[#20262e] border border-white/10 rounded-lg px-3 py-2 inline-flex items-center gap-2">{icon} {children}</button>
@@ -432,8 +432,8 @@ function DocDrawer({ pk, tab, onTab, onClose, onAbrirEtapa }: {
 
   return (
     <div className="fixed inset-0 z-50 flex justify-end">
-      <div className="absolute inset-0 bg-black/30" onClick={onClose} />
-      <div className="relative w-full max-w-lg bg-[#1b2027] h-full shadow-xl overflow-y-auto flex flex-col">
+      <div className="absolute inset-0 bg-[var(--overlay-modal)]" onClick={onClose} />
+      <div className="relative w-full max-w-lg bg-[var(--surface-popover)] h-full shadow-xl overflow-y-auto flex flex-col">
         {/* Header */}
         <div className="px-5 py-4 border-b border-white/10">
           <button onClick={onClose} className="text-white/40 hover:text-white/80 float-right p-1"><X className="w-5 h-5" /></button>
@@ -461,7 +461,7 @@ function DocDrawer({ pk, tab, onTab, onClose, onAbrirEtapa }: {
           {tab === "Operação" && (
             green ? (
               <div className="rounded-lg border border-[#4ade80]/30 bg-[#4ade80]/12 p-4 text-center">
-                <div className="w-9 h-9 mx-auto rounded-full bg-[#4ade80] text-white flex items-center justify-center mb-2"><Check className="w-5 h-5" /></div>
+                <div className="w-9 h-9 mx-auto rounded-full bg-[#4ade80] text-[#fff] flex items-center justify-center mb-2"><Check className="w-5 h-5" /></div>
                 <h4 className="text-sm font-bold text-white/95">Certidão retificada validada</h4>
                 <p className="text-xs text-white/68">Workflow concluído (100%). Documento corrigido e validado.</p>
               </div>
@@ -470,7 +470,7 @@ function DocDrawer({ pk, tab, onTab, onClose, onAbrirEtapa }: {
                 <div className="w-9 h-9 mx-auto rounded-full bg-[#20262e] text-white/80 flex items-center justify-center mb-2"><FileText className="w-5 h-5" /></div>
                 <h4 className="text-sm font-bold text-white/95">{cur.title}</h4>
                 <p className="text-xs text-white/68 mb-3">Etapa atual do workflow retificado. Abra para registrar e concluir.</p>
-                <button onClick={() => onAbrirEtapa(cur.id)} className="px-4 py-2 text-sm font-semibold text-white bg-[#2563eb] hover:bg-[#1d4ed8] rounded-md inline-flex items-center gap-2">Abrir etapa <ArrowRight className="w-4 h-4" /></button>
+                <button onClick={() => onAbrirEtapa(cur.id)} className="px-4 py-2 text-sm font-semibold text-[#fff] bg-[#2563eb] hover:bg-[#1d4ed8] rounded-md inline-flex items-center gap-2">Abrir etapa <ArrowRight className="w-4 h-4" /></button>
               </div>
             ) : null
           )}
@@ -486,7 +486,7 @@ function DocDrawer({ pk, tab, onTab, onClose, onAbrirEtapa }: {
                   <div key={s.id} className="flex items-center gap-3 border border-white/10 rounded-lg px-3 py-2.5">
                     <span className={`w-6 h-6 rounded-full flex items-center justify-center text-[11px] font-bold ${isDone ? "bg-[#4ade80]/15 text-[#4ade80]" : active ? "bg-[#2563eb] text-white" : "bg-[#252c35] text-white/40"}`}>{isDone ? "✓" : i + 1}</span>
                     <div className="flex-1 min-w-0"><div className="text-sm font-medium text-white/95">{i + 1}. {s.title}</div><div className="text-[11px] text-white/55">{meta}</div></div>
-                    {active && <button onClick={() => onAbrirEtapa(s.id)} className="text-xs font-semibold text-white bg-[#20262e] border border-white/10 hover:bg-[#252c35] rounded-md px-2.5 py-1.5">Central da etapa</button>}
+                    {active && <button onClick={() => onAbrirEtapa(s.id)} className="text-xs font-semibold text-[#fff] bg-[#20262e] border border-white/10 hover:bg-[#252c35] rounded-md px-2.5 py-1.5">Central da etapa</button>}
                   </div>
                 )
               })}
@@ -759,7 +759,7 @@ function EtapaModal({ stepId, doc, posting, erro, onClose, onSubmit }: {
 
       <div className="border-t border-white/10 px-5 py-3 -mx-5 -mb-5 mt-4 flex justify-end gap-2">
         <button onClick={onClose} className="px-3 py-2 text-sm text-white/68 hover:bg-[#20262e] rounded-md">Cancelar</button>
-        <button onClick={submit} disabled={!podeSalvar || posting} className="px-4 py-2 text-sm font-semibold text-white bg-[#2563eb] hover:bg-[#1d4ed8] rounded-md inline-flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed">
+        <button onClick={submit} disabled={!podeSalvar || posting} className="px-4 py-2 text-sm font-semibold text-[#fff] bg-[#2563eb] hover:bg-[#1d4ed8] rounded-md inline-flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed">
           {posting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />}
           {isLast ? "Confirmar · finalizar documento" : "Confirmar · concluir etapa"}
         </button>
@@ -783,8 +783,8 @@ function ModalShell({ children, onClose, title, sub, eyebrow, danger, maxW = "ma
 }) {
   return (
     <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
-      <div className="absolute inset-0 bg-black/30" onClick={onClose} />
-      <div className={`relative w-full ${maxW} bg-[#1b2027] rounded-xl shadow-xl max-h-[85vh] flex flex-col`}>
+      <div className="absolute inset-0 bg-[var(--overlay-modal)]" onClick={onClose} />
+      <div className={`relative w-full ${maxW} bg-[var(--surface-popover)] rounded-xl shadow-xl max-h-[85vh] flex flex-col`}>
         <div className={`flex items-start justify-between px-5 py-4 border-b ${danger ? "border-white/10" : "border-white/10"}`}>
           <div>
             {eyebrow && <div className={`text-[11px] font-semibold uppercase tracking-wider ${danger ? "text-[#f87171]" : "text-[#7dd3fc]"}`}>{eyebrow}</div>}

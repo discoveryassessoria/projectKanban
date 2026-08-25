@@ -210,7 +210,7 @@ export function RemocaoPessoaModal({
               <button
                 onClick={() => executar("HARD")}
                 disabled={!!executando}
-                className="flex items-center justify-center gap-2 rounded-lg bg-red-600 px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-red-700 disabled:opacity-60"
+                className="flex items-center justify-center gap-2 rounded-lg bg-red-600 px-4 py-2.5 text-sm font-medium text-[#fff] transition-colors hover:bg-red-700 disabled:opacity-60"
               >
                 {executando === "HARD" ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
                 Excluir definitivamente
@@ -219,7 +219,7 @@ export function RemocaoPessoaModal({
               <button
                 onClick={() => executar("DESATIVAR")}
                 disabled={!!executando || !plano.podeDesativar}
-                className="flex items-center justify-center gap-2 rounded-lg bg-amber-600 px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-amber-700 disabled:opacity-60"
+                className="flex items-center justify-center gap-2 rounded-lg bg-amber-600 px-4 py-2.5 text-sm font-medium text-[#fff] transition-colors hover:bg-amber-700 disabled:opacity-60"
               >
                 {executando === "DESATIVAR" ? <Loader2 className="h-4 w-4 animate-spin" /> : <Shield className="h-4 w-4" />}
                 Remover da árvore e preservar histórico

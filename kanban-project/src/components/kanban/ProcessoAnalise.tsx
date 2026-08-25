@@ -170,7 +170,7 @@ export function ProcessoAnalise({ processoId, onConcluido, readOnly = false }: P
       )}
 
       {analise && (
-        <div className="rounded-xl border border-white/10 bg-[#1b2027] p-4">
+        <div className="rounded-xl border border-white/10 bg-[var(--surface-popover)] p-4">
           <div className="flex items-start">
             {etapas.map((e, i) => (
               <div key={e.label} className={`flex items-start ${i < etapas.length - 1 ? "flex-1" : ""}`}>
@@ -204,7 +204,7 @@ export function ProcessoAnalise({ processoId, onConcluido, readOnly = false }: P
           <div className="text-sm font-semibold text-white/95">Assistente de Divergências</div>
           <p className="text-xs text-white/68 mt-0.5">Compara os dados da árvore com os dados das certidões e aponta possíveis divergências. A decisão final é sua.</p>
         </div>
-        <button onClick={rodar} disabled={running} className="px-3 py-2 text-sm font-semibold text-white bg-[#2563eb] hover:bg-[#1d4ed8] rounded-md inline-flex items-center gap-2 disabled:opacity-50 flex-shrink-0">
+        <button onClick={rodar} disabled={running} className="px-3 py-2 text-sm font-semibold text-[#fff] bg-[#2563eb] hover:bg-[#1d4ed8] rounded-md inline-flex items-center gap-2 disabled:opacity-50 flex-shrink-0">
           {running ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />} Rodar análise IA
         </button>
       </div>
@@ -248,7 +248,7 @@ export function ProcessoAnalise({ processoId, onConcluido, readOnly = false }: P
                     <td className="px-3 py-2.5"><span className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs font-semibold ${SEV_STYLE[d.severidade] || "bg-[#252c35] text-white/80"}`}><span className={`w-1.5 h-1.5 rounded-full ${SEV_DOT[d.severidade] || "bg-white/25"}`} />{SEV_LABEL[d.severidade] || d.severidade}</span></td>
                     <td className="px-3 py-2.5 text-xs text-white/68 max-w-[200px]">{d.sugestaoIA || "—"}</td>
                     <td className="px-3 py-2.5">
-                      <select value={d.status} onChange={(e) => decidir(d.id, e.target.value)} className={`text-xs border rounded-md px-2 py-1.5 bg-[#1b2027] focus:outline-none ${d.status === "retificacao" ? "border-[#f87171]/30 text-[#f87171]" : d.status === "aceita" ? "border-[#4ade80]/30 text-[#4ade80]" : d.status === "pendente" ? "border-white/10 text-white/68" : "border-[#d2a948]/30 text-[#d2a948]"}`}>
+                      <select value={d.status} onChange={(e) => decidir(d.id, e.target.value)} className={`text-xs border rounded-md px-2 py-1.5 bg-[var(--surface-popover)] focus:outline-none ${d.status === "retificacao" ? "border-[#f87171]/30 text-[#f87171]" : d.status === "aceita" ? "border-[#4ade80]/30 text-[#4ade80]" : d.status === "pendente" ? "border-white/10 text-white/68" : "border-[#d2a948]/30 text-[#d2a948]"}`}>
                         {DECISOES.map(([v, l]) => <option key={v} value={v}>{l}</option>)}
                       </select>
                     </td>
@@ -270,7 +270,7 @@ export function ProcessoAnalise({ processoId, onConcluido, readOnly = false }: P
               ? <span className="inline-flex items-center gap-1.5 text-[#d2a948]"><AlertTriangle className="w-4 h-4" />Faltam {pend} decisão(ões) antes de concluir.</span>
               : <>O destino depende das decisões: alguma marcada <b>“Enviar para retificação”</b> → Retificação; nenhuma → Tradução.</>}
           </div>
-          <button onClick={concluir} disabled={!podeConcluir || concluding} className="px-4 py-2 text-sm font-semibold text-white bg-[#12161c] hover:bg-[#20262e] rounded-md inline-flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed flex-shrink-0">
+          <button onClick={concluir} disabled={!podeConcluir || concluding} className="px-4 py-2 text-sm font-semibold text-[#fff] bg-[var(--app-background)] hover:bg-[#20262e] rounded-md inline-flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed flex-shrink-0">
             {concluding ? <Loader2 className="w-4 h-4 animate-spin" /> : <ArrowRight className="w-4 h-4" />} Concluir análise
           </button>
         </div>
@@ -294,7 +294,7 @@ export function ProcessoAnalise({ processoId, onConcluido, readOnly = false }: P
 
 function Stat({ label, value, danger }: { label: string; value: number; danger?: boolean }) {
   return (
-    <div className="rounded-lg border border-white/10 bg-[#1b2027] px-3 py-2">
+    <div className="rounded-lg border border-white/10 bg-[var(--surface-popover)] px-3 py-2">
       <div className={`text-xl font-bold ${danger ? "text-[#f87171]" : "text-white/95"}`}>{value}</div>
       <div className="text-[11px] text-white/55">{label}</div>
     </div>
@@ -318,8 +318,8 @@ function DivergenciaDrawer({ div, readOnly, onClose, onSalvar }: {
 
   return (
     <div className="fixed inset-0 z-50 flex justify-end">
-      <div className="absolute inset-0 bg-black/30" onClick={onClose} />
-      <div className="relative w-full max-w-md bg-[#1b2027] h-full shadow-xl overflow-y-auto flex flex-col">
+      <div className="absolute inset-0 bg-[var(--overlay-modal)]" onClick={onClose} />
+      <div className="relative w-full max-w-md bg-[var(--surface-popover)] h-full shadow-xl overflow-y-auto flex flex-col">
         <div className="flex items-center justify-between px-5 py-4 border-b border-white/10">
           <div>
             <div className="text-sm font-bold text-white/95">Detalhe da divergência</div>
@@ -360,7 +360,7 @@ function DivergenciaDrawer({ div, readOnly, onClose, onSalvar }: {
           <div>
             <label className="text-xs font-semibold text-white/80">Decisão</label>
             <select value={decisao} onChange={(e) => setDecisao(e.target.value)} disabled={readOnly}
-              className="mt-1 w-full text-sm border border-white/10 rounded-md px-2 py-2 bg-[#1b2027] disabled:bg-[#20262e] disabled:text-white/55">
+              className="mt-1 w-full text-sm border border-white/10 rounded-md px-2 py-2 bg-[var(--surface-popover)] disabled:bg-[#20262e] disabled:text-white/55">
               {DECISOES.map(([v, l]) => <option key={v} value={v}>{l}</option>)}
             </select>
           </div>
@@ -374,9 +374,9 @@ function DivergenciaDrawer({ div, readOnly, onClose, onSalvar }: {
         </div>
 
         {!readOnly && (
-          <div className="bg-[#1b2027] border-t border-white/10 px-5 py-3 flex justify-end gap-2">
+          <div className="bg-[var(--surface-popover)] border-t border-white/10 px-5 py-3 flex justify-end gap-2">
             <button onClick={onClose} className="px-3 py-2 text-sm text-white/68 hover:bg-[#20262e] rounded-md">Cancelar</button>
-            <button onClick={salvar} disabled={salvando} className="px-4 py-2 text-sm font-semibold text-white bg-[#2563eb] hover:bg-[#1d4ed8] rounded-md inline-flex items-center gap-2 disabled:opacity-50">
+            <button onClick={salvar} disabled={salvando} className="px-4 py-2 text-sm font-semibold text-[#fff] bg-[#2563eb] hover:bg-[#1d4ed8] rounded-md inline-flex items-center gap-2 disabled:opacity-50">
               {salvando ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />} Salvar decisão
             </button>
           </div>

@@ -107,7 +107,7 @@ export default function PublicarWorkflowModal({
   const areasComMudanca = ORDEM_DAS_AREAS.filter((a) => porArea.has(a))
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm" onClick={onFechar}>
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-[var(--overlay-modal)] p-4 backdrop-blur-sm" onClick={onFechar}>
       <div className="flex max-h-[90vh] w-full max-w-3xl flex-col overflow-hidden rounded-2xl border border-white/10 bg-zinc-900/95 shadow-2xl" onClick={(e) => e.stopPropagation()}>
         <div className="border-b border-white/10 px-6 py-4">
           <h3 className="font-semibold text-white">Publicar {preview ? `“${preview.nome}”` : "workflow"}</h3>
@@ -165,7 +165,7 @@ export default function PublicarWorkflowModal({
         <div className="flex justify-end gap-2 border-t border-white/10 px-6 py-4">
           <button onClick={onFechar} className="rounded-lg border border-white/10 bg-white/5 px-4 py-2 text-sm text-white/70 hover:bg-white/10">Fechar</button>
           <button onClick={publicar} disabled={!preview || !preview.podePublicar || publicando}
-            className="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-500 disabled:opacity-40">
+            className="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-medium text-[#fff] hover:bg-emerald-500 disabled:opacity-40">
             {publicando ? "Publicando…" : `Publicar versão ${preview?.versaoNova ?? ""}`}
           </button>
         </div>

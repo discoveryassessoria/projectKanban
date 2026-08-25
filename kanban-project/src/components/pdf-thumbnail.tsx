@@ -35,7 +35,7 @@ export function PDFThumbnail({ url, className }: PDFThumbnailProps) {
   if (!isClient) {
     return (
       <div className={`flex items-center justify-center bg-gray-100 ${className}`}>
-        <div className="w-12 h-14 bg-red-500 rounded-sm flex items-center justify-center text-white text-xs font-bold animate-pulse">
+        <div className="w-12 h-14 bg-red-500 rounded-sm flex items-center justify-center text-[#fff] text-xs font-bold animate-pulse">
           PDF
         </div>
       </div>
@@ -45,7 +45,7 @@ export function PDFThumbnail({ url, className }: PDFThumbnailProps) {
   if (error) {
     return (
       <div className={`flex items-center justify-center bg-gray-100 ${className}`}>
-        <div className="w-12 h-14 bg-red-500 rounded-sm flex items-center justify-center text-white text-xs font-bold">
+        <div className="w-12 h-14 bg-red-500 rounded-sm flex items-center justify-center text-[#fff] text-xs font-bold">
           PDF
         </div>
       </div>
@@ -58,7 +58,7 @@ export function PDFThumbnail({ url, className }: PDFThumbnailProps) {
         file={url}
         onLoadError={() => setError(true)}
         loading={
-          <div className="w-12 h-14 bg-red-500 rounded-sm flex items-center justify-center text-white text-xs font-bold animate-pulse">
+          <div className="w-12 h-14 bg-red-500 rounded-sm flex items-center justify-center text-[#fff] text-xs font-bold animate-pulse">
             PDF
           </div>
         }

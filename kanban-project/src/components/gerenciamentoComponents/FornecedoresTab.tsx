@@ -187,7 +187,7 @@ export default function FornecedoresTab() {
           <h2 className="text-xl font-semibold text-white">Fornecedores</h2>
           <p className="text-sm text-white/50">Cartórios, tradutores, apostilamento, correspondentes.</p>
         </div>
-        <button onClick={abrirNovo} className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-blue-500">
+        <button onClick={abrirNovo} className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-[#fff] transition hover:bg-blue-500">
           + Novo fornecedor
         </button>
       </div>
@@ -264,7 +264,7 @@ export default function FornecedoresTab() {
 
       {/* Modal */}
       {modalAberto && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-[var(--overlay-modal)] p-4 backdrop-blur-sm">
           <div className="w-full max-w-2xl rounded-2xl border border-white/10 bg-zinc-900/95 shadow-2xl">
             <div className="flex items-center justify-between border-b border-white/10 px-6 py-4">
               <h3 className="text-lg font-semibold text-white">{editando ? 'Editar fornecedor' : 'Novo fornecedor'}</h3>
@@ -438,7 +438,7 @@ export default function FornecedoresTab() {
 
             <div className="flex items-center justify-end gap-2 border-t border-white/10 px-6 py-4">
               <button onClick={() => setModalAberto(false)} className="rounded-lg px-4 py-2 text-sm text-white/60 transition hover:text-white">Cancelar</button>
-              <button onClick={salvar} disabled={salvando} className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-blue-500 disabled:opacity-50">
+              <button onClick={salvar} disabled={salvando} className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-[#fff] transition hover:bg-blue-500 disabled:opacity-50">
                 {salvando ? 'Salvando...' : 'Salvar'}
               </button>
             </div>

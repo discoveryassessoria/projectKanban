@@ -163,7 +163,7 @@ export default function ContasPagarPage() {
               Nova Despesa
             </Button>
           </DialogTrigger>
-          <DialogContent className="bg-[#0a1628] border-white/20 text-white max-w-lg">
+          <DialogContent className="bg-[#0a1628] border-white/20 text-[#fff] max-w-lg">
             <DialogHeader>
               <DialogTitle>Nova Conta a Pagar</DialogTitle>
               <DialogDescription className="text-white/60">

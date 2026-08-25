@@ -489,7 +489,7 @@ function ConteudoDrawer({
   const drawerContent = (
     <>
       <div
-        className="fixed inset-0 bg-black/45 z-[10000] transition-opacity duration-200"
+        className="fixed inset-0 bg-[var(--overlay-modal)] z-[10000] transition-opacity duration-200"
         onClick={onClose}
         />
 
@@ -508,9 +508,9 @@ function ConteudoDrawer({
               <Loader2 className="w-4 h-4 animate-spin" />
               <span className="text-[12px]">Carregando operação…</span>
             </div>
-            <div className="h-16 rounded-lg bg-[#161b21] animate-pulse" />
-            <div className="h-24 rounded-lg bg-[#161b21] animate-pulse" />
-            <div className="h-40 rounded-lg bg-[#161b21] animate-pulse" />
+            <div className="h-16 rounded-lg bg-[var(--surface-overlay)] animate-pulse" />
+            <div className="h-24 rounded-lg bg-[var(--surface-overlay)] animate-pulse" />
+            <div className="h-40 rounded-lg bg-[var(--surface-overlay)] animate-pulse" />
           </div>
         )}
 
@@ -540,7 +540,7 @@ function ConteudoDrawer({
                 {onBack ? (
                   <button
                     onClick={onBack}
-                    className="inline-flex items-center gap-1.5 text-[11px] font-semibold text-white/70 hover:text-white transition-colors -ml-1 px-1 py-0.5 rounded hover:bg-[#20262e]"
+                    className="inline-flex items-center gap-1.5 text-[11px] font-semibold text-white/70 hover:text-[#fff] transition-colors -ml-1 px-1 py-0.5 rounded hover:bg-[#20262e]"
                   >
                     <span className="text-[14px] leading-none">←</span>
                     {backLabel || nomeCompleto(doc.pessoa)}
@@ -553,7 +553,7 @@ function ConteudoDrawer({
                 )}
                 <button
                   onClick={onClose}
-                  className="w-[30px] h-[30px] rounded-md bg-[#20262e] hover:bg-[#252c35] flex items-center justify-center text-white"
+                  className="w-[30px] h-[30px] rounded-md bg-[#20262e] hover:bg-[#252c35] flex items-center justify-center text-[#fff]"
                 >
                   <X className="w-4 h-4" />
                 </button>
@@ -582,7 +582,7 @@ function ConteudoDrawer({
               )}
 
               {/* STATUS BAR — card sólido único, 4 colunas */}
-              <div className="bg-[#161b21] border border-white/10 rounded-xl px-4 py-3.5 grid grid-cols-4 gap-4">
+              <div className="bg-[var(--surface-overlay)] border border-white/10 rounded-xl px-4 py-3.5 grid grid-cols-4 gap-4">
                 {/* STATUS */}
                 <div className="flex flex-col gap-1.5 min-w-0">
                   <div className="text-[10px] font-bold uppercase tracking-wider text-white/40">
@@ -623,7 +623,7 @@ function ConteudoDrawer({
                         setDelegandoResp(false)
                       }}
                       onBlur={() => setDelegandoResp(false)}
-                      className="self-start rounded-md border border-white/10 bg-[#12161c] px-1.5 py-1 text-[12px] text-white/85 focus:outline-none focus:border-[#7dd3fc]/50 focus:ring-1 focus:ring-[#7dd3fc]/25 disabled:opacity-50"
+                      className="self-start rounded-md border border-white/10 bg-[var(--app-background)] px-1.5 py-1 text-[12px] text-white/85 focus:outline-none focus:border-[#7dd3fc]/50 focus:ring-1 focus:ring-[#7dd3fc]/25 disabled:opacity-50"
                     >
                       <option value="" className="bg-[#20262e]">— selecione —</option>
                       {usuarios.map((u) => (
@@ -747,7 +747,7 @@ function ConteudoDrawer({
                   o corpo do painel, porque é o que há para fazer — e some
                   sozinho assim que a operação passa a existir. */}
               {opState === "NOT_MATERIALIZED" && (
-                <div className="mb-4 bg-[#161b21] border border-white/10 rounded-xl p-6 text-center">
+                <div className="mb-4 bg-[var(--surface-overlay)] border border-white/10 rounded-xl p-6 text-center">
                   <h4 className="text-sm font-bold text-white mb-1">
                     {projection?.permissions.canStart ? "Operação não iniciada" : "Sem operação nesta fase"}
                   </h4>
@@ -759,7 +759,7 @@ function ConteudoDrawer({
                   {projection?.permissions.canStart && (
                     <button
                       onClick={() => setInitModalOpen(true)}
-                      className="inline-flex items-center gap-2 px-4 py-2 text-sm font-semibold text-white bg-[#2563eb] hover:bg-[#1d4ed8] rounded-md transition-colors"
+                      className="inline-flex items-center gap-2 px-4 py-2 text-sm font-semibold text-[#fff] bg-[#2563eb] hover:bg-[#1d4ed8] rounded-md transition-colors"
                     >
                       {projection?.nextAction?.label ? `Iniciar: ${projection.nextAction.label}` : "Iniciar operação"}
                     </button>
@@ -911,7 +911,7 @@ function TabHistory({ doc }: { doc: Documento }) {
       <Section title="Timeline do documento">
         <div className="space-y-2.5">
           {eventos.map((e, i) => (
-            <div key={i} className="flex items-start gap-3 p-2.5 rounded-md bg-[#161b21] border border-white/5">
+            <div key={i} className="flex items-start gap-3 p-2.5 rounded-md bg-[var(--surface-overlay)] border border-white/5">
               <div className="w-2 h-2 rounded-full bg-blue-400 mt-1.5 flex-shrink-0" />
               <div className="flex-1 min-w-0">
                 <div className="text-sm text-white">{e.label}</div>

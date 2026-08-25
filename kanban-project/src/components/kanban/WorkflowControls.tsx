@@ -126,7 +126,7 @@ export function WorkflowControls({
 
   return (
     <div className="px-6 py-3 border-b border-white/10" style={{ background: "#11151b" }}>
-      <div className="bg-[#161b21] border border-white/10 rounded-xl px-4 py-3.5">
+      <div className="bg-[var(--surface-overlay)] border border-white/10 rounded-xl px-4 py-3.5">
 
         {/* Barra de progresso */}
         <div className="flex items-center justify-between mb-2">

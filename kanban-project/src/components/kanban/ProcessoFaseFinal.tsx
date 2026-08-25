@@ -83,11 +83,11 @@ export function ProcessoFaseFinal({ processoId, onConcluido }: Props) {
           <p className="text-sm text-white/55">Objetivo: {cfg.obj}</p>
         </div>
         <div className="flex items-center gap-2 shrink-0">
-          <div className="rounded-lg border border-white/10 bg-[#1b2027] px-3 py-2 text-center">
+          <div className="rounded-lg border border-white/10 bg-[var(--surface-popover)] px-3 py-2 text-center">
             <div className="text-lg font-bold text-white/95">{done} / {cfg.steps.length}</div>
             <div className="text-[11px] text-white/55 whitespace-nowrap">Etapas</div>
           </div>
-          <div className="rounded-lg border border-white/10 bg-[#1b2027] px-3 py-2 text-center">
+          <div className="rounded-lg border border-white/10 bg-[var(--surface-popover)] px-3 py-2 text-center">
             <div className="text-lg font-bold text-white/95">{progress}%</div>
             <div className="text-[11px] text-white/55 whitespace-nowrap">Progresso</div>
           </div>
@@ -102,7 +102,7 @@ export function ProcessoFaseFinal({ processoId, onConcluido }: Props) {
       <div className="grid grid-cols-1 lg:grid-cols-[1fr,300px] gap-4">
         <div className="space-y-4">
           {/* Barra das 3 etapas */}
-          <div className="rounded-xl border border-white/10 bg-[#1b2027] p-4">
+          <div className="rounded-xl border border-white/10 bg-[var(--surface-popover)] p-4">
             <div className="flex items-start">
               {fase.workflow.map((s, i) => {
                 const isDone = s.status === "concluida"
@@ -128,7 +128,7 @@ export function ProcessoFaseFinal({ processoId, onConcluido }: Props) {
             {!concluida && activeStep && (
               <div className="mt-3 pt-3 border-t border-white/10 flex justify-end">
                 <button onClick={() => setModalStep(activeStep.id)}
-                  className="px-3 py-2 text-sm font-semibold text-white bg-[#2563eb] hover:bg-[#1d4ed8] rounded-md inline-flex items-center gap-2">
+                  className="px-3 py-2 text-sm font-semibold text-[#fff] bg-[#2563eb] hover:bg-[#1d4ed8] rounded-md inline-flex items-center gap-2">
                   {activeStep.title} <ArrowRight className="w-4 h-4" />
                 </button>
               </div>
@@ -163,7 +163,7 @@ export function ProcessoFaseFinal({ processoId, onConcluido }: Props) {
                       <div className="text-sm font-medium text-white/95">{s.title}</div>
                       <div className="text-[11px] text-white/55">{meta}</div>
                     </div>
-                    {active && <button onClick={() => setModalStep(s.id)} className="text-xs font-semibold text-white bg-[#20262e] hover:bg-[#252c35] border border-white/10 rounded-md px-2.5 py-1.5">Abrir etapa</button>}
+                    {active && <button onClick={() => setModalStep(s.id)} className="text-xs font-semibold text-[#fff] bg-[#20262e] hover:bg-[#252c35] border border-white/10 rounded-md px-2.5 py-1.5">Abrir etapa</button>}
                     {isDone && <span className="text-green-500"><Check className="w-4 h-4" /></span>}
                     {!isDone && !active && <span className="text-white/40">🔒</span>}
                   </div>
@@ -175,14 +175,14 @@ export function ProcessoFaseFinal({ processoId, onConcluido }: Props) {
 
         {/* Coluna direita */}
         <aside className="space-y-4">
-          <div className="rounded-xl border border-white/10 bg-[#1b2027] p-4">
+          <div className="rounded-xl border border-white/10 bg-[var(--surface-popover)] p-4">
             <h3 className="text-sm font-semibold text-white/95 mb-2.5">Ações rápidas</h3>
             <button onClick={() => activeStep ? setModalStep(activeStep.id) : setAviso("Todas as etapas concluídas.")}
               className="w-full text-left text-sm text-white/80 hover:bg-[#20262e] border border-white/10 rounded-lg px-3 py-2 inline-flex items-center gap-2">
               <ArrowRight className="w-4 h-4 text-white/40" /> Abrir etapa atual
             </button>
           </div>
-          <div className="rounded-xl border border-white/10 bg-[#1b2027] p-4">
+          <div className="rounded-xl border border-white/10 bg-[var(--surface-popover)] p-4">
             <h3 className="text-sm font-semibold text-white/95 mb-2.5">Resumo</h3>
             <div className="space-y-1.5 text-xs">
               <Res k="Progresso" v={`${progress}%`} />
@@ -260,8 +260,8 @@ function EtapaModal({ stepId, faseKey, fase, posting, erro, onClose, onSubmit }:
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-      <div className="absolute inset-0 bg-black/30" onClick={onClose} />
-      <div className="relative w-full max-w-lg bg-[#1b2027] rounded-xl shadow-xl max-h-[85vh] flex flex-col">
+      <div className="absolute inset-0 bg-[var(--overlay-modal)]" onClick={onClose} />
+      <div className="relative w-full max-w-lg bg-[var(--surface-popover)] rounded-xl shadow-xl max-h-[85vh] flex flex-col">
         <div className={`flex items-start justify-between px-5 py-4 border-b ${isLast ? "border-white/10" : "border-white/10"}`}>
           <div>
             <div className={`text-[11px] font-semibold uppercase tracking-wider ${isLast ? "text-[#f87171]" : "text-[#7dd3fc]"}`}>Etapa {n} de {cfg.steps.length} · {cfg.phaseName}</div>
@@ -374,7 +374,7 @@ function EtapaModal({ stepId, faseKey, fase, posting, erro, onClose, onSubmit }:
         <div className="border-t border-white/10 px-5 py-3 flex justify-end gap-2">
           <button onClick={onClose} className="px-3 py-2 text-sm text-white/68 hover:bg-[#20262e] rounded-md">Cancelar</button>
           <button onClick={submit} disabled={!podeSalvar || posting}
-            className="px-4 py-2 text-sm font-semibold text-white bg-[#2563eb] hover:bg-[#1d4ed8] rounded-md inline-flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed">
+            className="px-4 py-2 text-sm font-semibold text-[#fff] bg-[#2563eb] hover:bg-[#1d4ed8] rounded-md inline-flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed">
             {posting ? <Loader2 className="w-4 h-4 animate-spin" /> : isLast && faseKey === "finalizado" ? <Flag className="w-4 h-4" /> : <Check className="w-4 h-4" />}
             {cta}
           </button>

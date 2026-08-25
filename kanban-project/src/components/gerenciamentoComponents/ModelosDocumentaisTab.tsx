@@ -161,7 +161,7 @@ export default function ModelosDocumentaisTab() {
           </div>
           <button
             onClick={() => setForm({ codigo: "", nome: "", descricao: "", categoria: "PROCURACAO", ativo: true })}
-            className="flex-none rounded-lg bg-blue-600 px-3 py-2 text-xs font-medium text-white hover:bg-blue-500"
+            className="flex-none rounded-lg bg-blue-600 px-3 py-2 text-xs font-medium text-[#fff] hover:bg-blue-500"
           >
             + Novo modelo
           </button>
@@ -280,7 +280,7 @@ function FormularioModelo({
   tipos: Array<{ id: number; name: string; publicCode: string | null }>
 }) {
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm" onClick={() => setForm(null)}>
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-[var(--overlay-modal)] p-4 backdrop-blur-sm" onClick={() => setForm(null)}>
       <div className="w-full max-w-lg rounded-2xl border border-white/10 bg-zinc-900/95 shadow-2xl" onClick={(e) => e.stopPropagation()}>
         <div className="border-b border-white/10 px-6 py-4">
           <h3 className="font-semibold text-white">{form.id ? "Editar" : "Novo"} modelo</h3>
@@ -331,7 +331,7 @@ function FormularioModelo({
         </div>
         <div className="flex justify-end gap-2 border-t border-white/10 px-6 py-4">
           <button onClick={() => setForm(null)} className="rounded-lg border border-white/10 bg-white/5 px-4 py-2 text-sm text-white/80 hover:bg-white/10">Cancelar</button>
-          <button disabled={busy} onClick={salvar} className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-500 disabled:opacity-50">Salvar</button>
+          <button disabled={busy} onClick={salvar} className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-[#fff] hover:bg-blue-500 disabled:opacity-50">Salvar</button>
         </div>
       </div>
     </div>
@@ -401,7 +401,7 @@ function PainelVersoes({
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/60 p-4 backdrop-blur-sm" onClick={fechar}>
+    <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-[var(--overlay-modal)] p-4 backdrop-blur-sm" onClick={fechar}>
       <div className="my-8 w-full max-w-5xl rounded-2xl border border-white/10 bg-zinc-900/95 shadow-2xl" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-start justify-between border-b border-white/10 px-6 py-4">
           <div>
@@ -421,7 +421,7 @@ function PainelVersoes({
             accept=".docx"
             disabled={busy}
             onChange={(e) => { const f = e.target.files?.[0]; if (f) void enviarDocx(f); e.target.value = "" }}
-            className="text-xs text-white/70 file:mr-3 file:rounded-lg file:border-0 file:bg-blue-600 file:px-3 file:py-1.5 file:text-xs file:text-white hover:file:bg-blue-500"
+            className="text-xs text-white/70 file:mr-3 file:rounded-lg file:border-0 file:bg-blue-600 file:px-3 file:py-1.5 file:text-xs file:text-[#fff] hover:file:bg-blue-500"
           />
           <p className="mt-1 text-[11px] text-white/40">
             A versão nasce em rascunho. Publicada nunca é editada — alteração de redação exige versão nova.
@@ -451,7 +451,7 @@ function PainelVersoes({
                       <button onClick={() => void baixar(v.id)} className="rounded px-1.5 py-0.5 hover:bg-white/10 hover:text-white">Baixar</button>
                       <button disabled={busy} onClick={() => void agir(v.id, "validar")} className="rounded px-1.5 py-0.5 hover:bg-white/10 hover:text-white disabled:opacity-40">Validar</button>
                       {v.status === "RASCUNHO" && (
-                        <button disabled={busy} onClick={() => void agir(v.id, "publicar")} className="rounded bg-green-600/80 px-2 py-0.5 text-white hover:bg-green-600 disabled:opacity-40">Publicar</button>
+                        <button disabled={busy} onClick={() => void agir(v.id, "publicar")} className="rounded bg-green-600/80 px-2 py-0.5 text-[#fff] hover:bg-green-600 disabled:opacity-40">Publicar</button>
                       )}
                       {v.status !== "REVOGADA" && (
                         <button disabled={busy} onClick={() => void agir(v.id, "revogar")} className="rounded px-1.5 py-0.5 text-red-300/70 hover:bg-red-500/10 hover:text-red-300 disabled:opacity-40">Revogar</button>

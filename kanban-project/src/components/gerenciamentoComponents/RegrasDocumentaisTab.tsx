@@ -298,7 +298,7 @@ function FormWizard(props: {
   const toggle = <T,>(arr: T[], v: T): T[] => (arr.includes(v) ? arr.filter((x) => x !== v) : [...arr, v])
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4" onClick={onCancel}>
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-[var(--overlay-modal)] p-4" onClick={onCancel}>
       <div className="max-h-[92vh] w-full max-w-3xl overflow-auto rounded-2xl border border-white/10 bg-zinc-900/95 shadow-2xl" onClick={(e) => e.stopPropagation()}>
         <div className="border-b border-white/10 px-6 py-4">
           <h3 className="font-semibold text-white">{form.id ? `Editar regra (v${form.versao ?? 1})` : "Nova regra documental"}</h3>
@@ -486,7 +486,7 @@ function ConstrutorCondicoes({ form, setForm, modalidades }: { form: RegraForm; 
 
 function HistoricoModal({ versoes, onClose }: { versoes: RegraDocumental[]; onClose: () => void }) {
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4" onClick={onClose}>
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-[var(--overlay-modal)] p-4" onClick={onClose}>
       <div className="w-full max-w-lg rounded-2xl border border-white/10 bg-zinc-900/95 p-5 shadow-2xl" onClick={(e) => e.stopPropagation()}>
         <h3 className="mb-3 font-semibold text-white">Histórico de versões</h3>
         <div className="space-y-1.5">
@@ -527,7 +527,7 @@ function Simulador({ data, ptId, onClose }: { data: Data; ptId: number | null; o
   const docName = (code: string) => data.docTypes.find((d) => docCodeOf(d) === code)?.name || code
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4" onClick={onClose}>
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-[var(--overlay-modal)] p-4" onClick={onClose}>
       <div className="max-h-[92vh] w-full max-w-3xl overflow-auto rounded-2xl border border-white/10 bg-zinc-900/95 shadow-2xl" onClick={(e) => e.stopPropagation()}>
         <div className="border-b border-white/10 px-6 py-4"><h3 className="font-semibold text-white">Simular regras documentais</h3><p className="mt-0.5 text-xs text-white/50">Só calcula e explica — não cria documento, necessidade nem tarefa.</p></div>
         <div className="grid grid-cols-2 gap-3 px-6 py-4">

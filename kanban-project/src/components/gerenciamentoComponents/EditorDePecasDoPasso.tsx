@@ -152,7 +152,7 @@ export default function EditorDePecasDoPasso({
         </div>
       ))}
       <button onClick={() => aoMudar({ campos: [...pecas.campos, { label: "Novo campo", tipo: tiposDeCampo[0] ?? "texto" }] })}
-        className="rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-blue-500">+ Campo</button>
+        className="rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-medium text-[#fff] hover:bg-blue-500">+ Campo</button>
     </>
   )
 
@@ -220,7 +220,7 @@ export default function EditorDePecasDoPasso({
       })}
       <button disabled={efeitosOfertados.length === 0}
         onClick={() => aoMudar({ acoes: [...pecas.acoes, { label: "Novo resultado", effectKey: efeitosOfertados[0]?.key ?? "REGISTER_ONLY" }] })}
-        className="rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-blue-500 disabled:opacity-40">+ Resultado</button>
+        className="rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-medium text-[#fff] hover:bg-blue-500 disabled:opacity-40">+ Resultado</button>
       {efeitosOfertados.length === 0 && (
         <p className="text-[11px] text-amber-300/70">
           Nenhum efeito disponível: a fase não declarou competência compatível com o executor escolhido.
@@ -256,7 +256,7 @@ export default function EditorDePecasDoPasso({
         </div>
       ))}
       <button onClick={() => aoMudar({ checkItens: [...pecas.checkItens, { label: "Novo item" }] })}
-        className="rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-blue-500">+ Item</button>
+        className="rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-medium text-[#fff] hover:bg-blue-500">+ Item</button>
     </>
   )
 
@@ -370,7 +370,7 @@ export default function EditorDePecasDoPasso({
             ? { label: "Nova evidência", tipo: "EVIDENCIA_ANEXADA", obrigatorio: true, minimo: 1, momento: "AO_CONCLUIR" }
             : { label: "Novo requisito", tipo: "CAMPO_PREENCHIDO", obrigatorio: true }],
         })}
-        className="rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-blue-500">
+        className="rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-medium text-[#fff] hover:bg-blue-500">
         {soEvidencia ? "+ Evidência" : "+ Requisito"}
       </button>
     </>

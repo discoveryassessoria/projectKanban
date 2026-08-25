@@ -399,7 +399,7 @@ function ConteudoModal({
   const modalContent = (
     <>
       {/* Backdrop empilhado por cima da Central da Etapa */}
-      <div className="fixed inset-0 bg-black/65 z-[10004] transition-opacity" onClick={onClose} />
+      <div className="fixed inset-0 bg-[var(--overlay-modal)] z-[10004] transition-opacity" onClick={onClose} />
 
       {/* Container centralizado */}
       <div className="fixed inset-0 z-[10005] flex items-center justify-center p-4 pointer-events-none">
@@ -419,7 +419,7 @@ function ConteudoModal({
               <p className="text-sm">{erro}</p>
               <button
                 onClick={onClose}
-                className="px-3 py-1.5 text-xs bg-[#1b2027]/10 hover:bg-[#1b2027]/15 rounded-md text-white"
+                className="px-3 py-1.5 text-xs bg-[var(--surface-popover)]/10 hover:bg-[var(--surface-popover)]/15 rounded-md text-[#fff]"
               >
                 Fechar
               </button>
@@ -447,7 +447,7 @@ function ConteudoModal({
                   </div>
                   <button
                     onClick={onClose}
-                    className="w-8 h-8 rounded-md bg-[#1b2027]/5 hover:bg-[#1b2027]/15 flex items-center justify-center text-white flex-shrink-0"
+                    className="w-8 h-8 rounded-md bg-[var(--surface-popover)]/5 hover:bg-[var(--surface-popover)]/15 flex items-center justify-center text-[#fff] flex-shrink-0"
                     aria-label="Fechar"
                   >
                     <X className="w-4 h-4" />
@@ -458,7 +458,7 @@ function ConteudoModal({
               {/* ============== BODY (scroll) ============== */}
               <div className="flex-1 overflow-y-auto px-6 py-5 text-white/70">
                 {/* Nome base (não muda) */}
-                <div className="mb-5 p-3 rounded-lg bg-[#1b2027]/5 border border-white/10">
+                <div className="mb-5 p-3 rounded-lg bg-[var(--surface-popover)]/5 border border-white/10">
                   <div className="text-[10px] uppercase font-bold tracking-wider text-white/45 mb-1">
                     Nome base na árvore (não muda aqui)
                   </div>
@@ -715,18 +715,18 @@ function ConteudoModal({
                       value={form.observacoes}
                       onChange={(e) => setForm({ ...form, observacoes: e.target.value })}
                       placeholder="Observações registrais…"
-                      className="w-full px-3 py-2 bg-[#1b2027]/5 border border-white/10 rounded-md text-sm text-white placeholder-white/30 focus:outline-none focus:border-[#7dd3fc]/50 focus:ring-1 focus:ring-[#7dd3fc]/30 resize-none"
+                      className="w-full px-3 py-2 bg-[var(--surface-popover)]/5 border border-white/10 rounded-md text-sm text-[#fff] placeholder-white/30 focus:outline-none focus:border-[#7dd3fc]/50 focus:ring-1 focus:ring-[#7dd3fc]/30 resize-none"
                     />
                   </Section>
                 )}
               </div>
 
               {/* ============== FOOTER (botões) ============== */}
-              <div className="flex-shrink-0 px-6 py-4 border-t border-white/10 flex items-center justify-end gap-3 bg-[#11151b]">
+              <div className="flex-shrink-0 px-6 py-4 border-t border-white/10 flex items-center justify-end gap-3 bg-[var(--surface-overlay)]">
                 <button
                   onClick={onClose}
                   disabled={saving}
-                  className="px-4 py-2 text-[12.5px] font-semibold text-white/70 hover:text-white hover:bg-[#1b2027]/5 rounded-md transition-colors disabled:opacity-50"
+                  className="px-4 py-2 text-[12.5px] font-semibold text-white/70 hover:text-[#fff] hover:bg-[var(--surface-popover)]/5 rounded-md transition-colors disabled:opacity-50"
                 >
                   Cancelar
                 </button>
@@ -735,7 +735,7 @@ function ConteudoModal({
                   <button
                     onClick={handleSalvar}
                     disabled={saving || !podeConcluirEtapa}
-                    className="px-5 py-2 text-[12.5px] font-semibold bg-[#f87171] hover:bg-[#f87171]/15 disabled:bg-[#f87171]/15 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-md inline-flex items-center gap-2 transition-colors"
+                    className="px-5 py-2 text-[12.5px] font-semibold bg-[#f87171] hover:bg-[#f87171]/15 disabled:bg-[#f87171]/15 disabled:opacity-50 disabled:cursor-not-allowed text-[#fff] rounded-md inline-flex items-center gap-2 transition-colors"
                   >
                     {saving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : null}
                     Salvar e iniciar solicitação
@@ -744,7 +744,7 @@ function ConteudoModal({
                   <button
                     onClick={handleSalvar}
                     disabled={saving}
-                    className="px-5 py-2 text-[12.5px] font-semibold bg-[#7dd3fc] hover:bg-[#7dd3fc] disabled:bg-[#7dd3fc]/15 disabled:opacity-50 text-white rounded-md inline-flex items-center gap-2 transition-colors"
+                    className="px-5 py-2 text-[12.5px] font-semibold bg-[#7dd3fc] hover:bg-[#7dd3fc] disabled:bg-[#7dd3fc]/15 disabled:opacity-50 text-[#fff] rounded-md inline-flex items-center gap-2 transition-colors"
                   >
                     {saving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : null}
                     Salvar
@@ -873,7 +873,7 @@ function Field({
         type={type}
         value={value}
         onChange={(e) => onChange(e.target.value)}
-        className={`w-full px-3 py-2 bg-[#1b2027]/5 border rounded-md text-sm text-white placeholder-white/30 focus:outline-none focus:ring-1 ${
+        className={`w-full px-3 py-2 bg-[var(--surface-popover)]/5 border rounded-md text-sm text-[#fff] placeholder-white/30 focus:outline-none focus:ring-1 ${
           requiredEmpty || requiredAltEmpty
             ? "border-[#d2a948]/40 focus:border-[#d2a948]/60 focus:ring-[#d2a948]/30"
             : "border-white/10 focus:border-[#7dd3fc]/50 focus:ring-[#7dd3fc]/30"

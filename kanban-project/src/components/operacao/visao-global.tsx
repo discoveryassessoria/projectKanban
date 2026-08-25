@@ -551,7 +551,7 @@ function Lista({
 }) {
   return (
     <table className="w-full border-collapse text-left">
-      <thead className="sticky top-0 z-10 bg-[#0d0f13]">
+      <thead className="sticky top-0 z-10 bg-[var(--surface-overlay)]">
         <tr className="border-b border-white/[0.08]">
           {COLUNAS_LISTA.map((c) => (
             <th key={String(c.campo)} className={`${c.classe} px-3 py-2`}>
@@ -715,8 +715,8 @@ function Quadro({
       })}
 
       {pedindo && (
-        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 p-4" onClick={() => setPedindo(null)}>
-          <div className="w-full max-w-sm rounded-lg border border-white/10 bg-[#0d0f13] p-4" onClick={(e) => e.stopPropagation()}>
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-[var(--overlay-modal)] p-4" onClick={() => setPedindo(null)}>
+          <div className="w-full max-w-sm rounded-lg border border-white/10 bg-[var(--surface-overlay)] p-4" onClick={(e) => e.stopPropagation()}>
             <h2 className="text-[13px] font-medium text-white/90">{pedindo.rotulo}</h2>
             <p className="mt-1 text-[11px] text-white/45">{pedindo.l.titulo}</p>
             <textarea
@@ -839,9 +839,9 @@ function PainelSugestao({
   const [auditor, setAuditor] = useState(false)
 
   return (
-    <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 p-4" onClick={aoFechar}>
+    <div className="fixed inset-0 z-[60] flex items-center justify-center bg-[var(--overlay-modal)] p-4" onClick={aoFechar}>
       <div
-        className="flex max-h-[85vh] w-full max-w-2xl flex-col overflow-hidden rounded-lg border border-white/10 bg-[#0d0f13] shadow-2xl"
+        className="flex max-h-[85vh] w-full max-w-2xl flex-col overflow-hidden rounded-lg border border-white/10 bg-[var(--surface-overlay)] shadow-2xl"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="border-b border-white/[0.08] px-4 py-3">

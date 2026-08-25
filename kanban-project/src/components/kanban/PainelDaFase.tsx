@@ -166,14 +166,14 @@ export function PainelDaFase({
   return (
     <div>
       {/* ============== CABEÇALHO DA FASE ============== */}
-      <div className="bg-[#1b2027] border border-white/10 border-b-0 rounded-t-2xl px-5 pt-4">
+      <div className="bg-[var(--surface-popover)] border border-white/10 border-b-0 rounded-t-2xl px-5 pt-4">
         <div className="flex items-start justify-between gap-4">
           <div className="flex items-center gap-3 flex-wrap">
             <h2 className="text-[19px] font-extrabold text-white/95">{faseNome}</h2>
           </div>
           <button
             onClick={onAbrirPainelCompleto}
-            className="inline-flex items-center gap-1.5 border-[1.5px] border-white/10 bg-[#1b2027] text-white/80 text-[12.5px] font-semibold px-3.5 py-2 rounded-lg whitespace-nowrap hover:border-white/20 hover:text-white transition-colors"
+            className="inline-flex items-center gap-1.5 border-[1.5px] border-white/10 bg-[var(--surface-popover)] text-white/80 text-[12.5px] font-semibold px-3.5 py-2 rounded-lg whitespace-nowrap hover:border-white/20 hover:text-[#fff] transition-colors"
           >
             <ExternalLink className="w-3.5 h-3.5" />
             Abrir painel da fase
@@ -199,7 +199,7 @@ export function PainelDaFase({
       </div>
 
       {/* ============== CORPO DA FASE ============== */}
-      <div className="bg-[#1b2027] border border-white/10 border-t-0 rounded-b-2xl px-5 py-5">
+      <div className="bg-[var(--surface-popover)] border border-white/10 border-t-0 rounded-b-2xl px-5 py-5">
 
         {modoReestruturacao ? (
           <div className="bg-[#d2a948]/12 border border-[#d2a948]/30 rounded-xl px-5 py-4 mb-5">
@@ -229,7 +229,7 @@ export function PainelDaFase({
               // o gesto óbvio, e ele passou a existir.
               const alvo = recorteDoKpi(k.label)
               const ativo = alvo != null && recorte.rapido === alvo
-              const classe = `bg-[#1b2027] border rounded-[10px] px-4 py-3 text-left transition-colors ${
+              const classe = `bg-[var(--surface-popover)] border rounded-[10px] px-4 py-3 text-left transition-colors ${
                 ativo ? "border-[#7dd3fc]/60 ring-1 ring-inset ring-[#7dd3fc]/25" : "border-white/10"
               } ${alvo != null ? "hover:border-white/25 cursor-pointer" : ""}`
               const conteudo = (
@@ -255,7 +255,7 @@ export function PainelDaFase({
           </div>
 
           {/* --- PROGRESSO DA FASE (projeção operacional canônica) --- */}
-          <div className="bg-[#1b2027] border border-white/10 rounded-xl px-5 py-4 mb-5">
+          <div className="bg-[var(--surface-popover)] border border-white/10 rounded-xl px-5 py-4 mb-5">
             <div className="flex items-center justify-between gap-4 mb-2 flex-wrap">
               <div>
                 {/* O QUE ESTE NÚMERO CONTA — dito no rótulo.
@@ -610,7 +610,7 @@ function IndiceView({
   const totalPessoas =
     indice.linhaPrincipal.length + indice.foraDaLinha.length + indice.pendenteClassificacao.length
 
-  const campo = "bg-[#1b2027] border border-white/10 rounded-lg text-[11.5px] text-white/80 px-2.5 py-1.5 focus:border-white/25 focus:outline-none"
+  const campo = "bg-[var(--surface-popover)] border border-white/10 rounded-lg text-[11.5px] text-white/80 px-2.5 py-1.5 focus:border-white/25 focus:outline-none"
 
   // ── A BARRA DE RECORTE ────────────────────────────────────────────────────
   //
@@ -752,7 +752,7 @@ function IndiceView({
             {icone}
           </span>
           <b className="text-[11.5px] font-extrabold tracking-wide uppercase text-white/55">{titulo}</b>
-          <span className="ml-auto text-[11px] font-bold text-white/40 bg-[#1b2027] border border-white/10 rounded-full px-2.5 py-0.5">
+          <span className="ml-auto text-[11px] font-bold text-white/40 bg-[var(--surface-popover)] border border-white/10 rounded-full px-2.5 py-0.5">
             {pessoas.length} pessoa(s)
           </span>
         </div>
@@ -781,7 +781,7 @@ function IndiceView({
         <b className="text-[11.5px] font-extrabold tracking-wide uppercase text-white/55">Documentos por pessoa</b>
         {/* O TOPO FALA DA FASE; ISTO FALA DO RECORTE. Dois números com o mesmo
             nome e escopos diferentes seria a confusão que esta tela evita. */}
-        <span className="ml-auto text-[11px] font-bold text-white/40 bg-[#1b2027] border border-white/10 rounded-full px-2.5 py-0.5">
+        <span className="ml-auto text-[11px] font-bold text-white/40 bg-[var(--surface-popover)] border border-white/10 rounded-full px-2.5 py-0.5">
           {recortando
             ? `${visiveis} de ${indiceBruto.resumo.documentos} documento(s)`
             : `${indiceBruto.resumo.documentos} documento(s)`}
@@ -844,14 +844,14 @@ function PessoaCard({
         : { cor: "text-[#f87171]", dot: "bg-[#f87171]", label: "Classificação pendente" }
 
   return (
-    <div className="rounded-xl border border-white/10 bg-[#1b2027] overflow-hidden">
+    <div className="rounded-xl border border-white/10 bg-[var(--surface-popover)] overflow-hidden">
       <button
         type="button"
         onClick={() => podeAbrir && alternar()}
         disabled={!podeAbrir}
         className={`w-full text-left flex items-center gap-4 px-4 py-3.5 transition-colors ${podeAbrir ? "hover:bg-[#20262e]" : "cursor-default"}`}
       >
-        <span className="w-10 h-10 rounded-full grid place-items-center text-white font-extrabold text-[13px] flex-none bg-[#252c35]">
+        <span className="w-10 h-10 rounded-full grid place-items-center text-[#fff] font-extrabold text-[13px] flex-none bg-[#252c35]">
           {p.iniciais}
         </span>
 
@@ -1169,7 +1169,7 @@ function CelulaResponsavel({
             else await gestao!.onAtribuirResponsavel!(taskId!, Number(v))
           }}
           onBlur={() => setEditando(false)}
-          className="w-full rounded border border-white/15 bg-[#12161c] px-1.5 py-1 text-[11.5px] text-white/85 focus:outline-none focus:border-[#7dd3fc]/50 disabled:opacity-50"
+          className="w-full rounded border border-white/15 bg-[var(--app-background)] px-1.5 py-1 text-[11.5px] text-white/85 focus:outline-none focus:border-[#7dd3fc]/50 disabled:opacity-50"
         >
           <option value="" className="bg-[#20262e]">
             {f.responsavelId != null ? "— retirar responsável —" : "— selecione —"}

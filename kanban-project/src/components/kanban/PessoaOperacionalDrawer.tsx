@@ -263,7 +263,7 @@ function ConteudoDrawer({
   const drawerContent = (
     <>
       <div
-        className="fixed inset-0 bg-black/45 z-[10000] transition-opacity duration-200"
+        className="fixed inset-0 bg-[var(--overlay-modal)] z-[10000] transition-opacity duration-200"
         onClick={onClose}
       />
 
@@ -289,7 +289,7 @@ function ConteudoDrawer({
             <p className="text-sm">{erro}</p>
             <button
               onClick={onClose}
-              className="px-3 py-1.5 text-xs bg-[#1b2027]/10 hover:bg-[#1b2027]/15 rounded-md"
+              className="px-3 py-1.5 text-xs bg-[var(--surface-popover)]/10 hover:bg-[var(--surface-popover)]/15 rounded-md"
             >
               Fechar
             </button>
@@ -309,7 +309,7 @@ function ConteudoDrawer({
                 </div>
                 <button
                   onClick={onClose}
-                  className="w-[30px] h-[30px] rounded-md bg-[#1b2027]/5 hover:bg-[#1b2027]/15 flex items-center justify-center text-white"
+                  className="w-[30px] h-[30px] rounded-md bg-[var(--surface-popover)]/5 hover:bg-[var(--surface-popover)]/15 flex items-center justify-center text-[#fff]"
                   aria-label="Fechar"
                 >
                   <X className="w-4 h-4" />
@@ -342,7 +342,7 @@ function ConteudoDrawer({
                     </span>
                   </span>
                 </div>
-                <div className="h-1.5 bg-[#1b2027]/10 rounded-full overflow-hidden">
+                <div className="h-1.5 bg-[var(--surface-popover)]/10 rounded-full overflow-hidden">
                   <div
                     className="h-full transition-all duration-500"
                     style={{
@@ -410,7 +410,7 @@ function ConteudoDrawer({
                   {t.count !== undefined && (
                     <span
                       className={`text-[9.5px] px-1.5 rounded-full font-bold ${
-                        activeTab === t.id ? "bg-[#7dd3fc]/30 text-blue-200" : "bg-[#1b2027]/10 text-white/70"
+                        activeTab === t.id ? "bg-[#7dd3fc]/30 text-blue-200" : "bg-[var(--surface-popover)]/10 text-white/70"
                       }`}
                     >
                       {t.count}
@@ -487,7 +487,7 @@ function StatCard({
       : "text-white"
 
   return (
-    <div className="bg-[#1b2027]/5 border border-white/10 rounded-lg px-3 py-2.5">
+    <div className="bg-[var(--surface-popover)]/5 border border-white/10 rounded-lg px-3 py-2.5">
       <div className={`text-[22px] font-bold leading-none mb-1 tabular-nums ${valueCls}`}>
         {value}
       </div>
@@ -510,7 +510,7 @@ function ActionButton({
   return (
     <button
       onClick={onClick}
-      className="inline-flex items-center gap-1.5 px-2.5 py-1.5 text-[11px] font-semibold rounded-md bg-[#1b2027]/5 text-white/85 hover:bg-[#1b2027]/12 hover:text-white transition-colors"
+      className="inline-flex items-center gap-1.5 px-2.5 py-1.5 text-[11px] font-semibold rounded-md bg-[var(--surface-popover)]/5 text-white/85 hover:bg-[var(--surface-popover)]/12 hover:text-[#fff] transition-colors"
     >
       {icon}
       {label}
@@ -569,7 +569,7 @@ function DocCard({ doc, onClick }: { doc: Documento; onClick: () => void }) {
   return (
     <button
       onClick={onClick}
-      className="group w-full text-left p-3.5 rounded-lg bg-[#1b2027]/5 border border-white/10 hover:bg-[#1b2027]/[0.08] hover:border-white/20 transition-colors"
+      className="group w-full text-left p-3.5 rounded-lg bg-[var(--surface-popover)]/5 border border-white/10 hover:bg-[var(--surface-popover)]/[0.08] hover:border-white/20 transition-colors"
     >
       <div className="flex items-start justify-between gap-3 mb-2">
         <div className="flex-1 min-w-0">
@@ -597,7 +597,7 @@ function DocCard({ doc, onClick }: { doc: Documento; onClick: () => void }) {
             <span>{progress}% concluído</span>
             <ChevronRight className="w-3 h-3 text-white/30 group-hover:text-white/60 transition-colors" />
           </div>
-          <div className="h-1 bg-[#1b2027]/10 rounded-full overflow-hidden">
+          <div className="h-1 bg-[var(--surface-popover)]/10 rounded-full overflow-hidden">
             <div
               className="h-full transition-all duration-500"
               style={{

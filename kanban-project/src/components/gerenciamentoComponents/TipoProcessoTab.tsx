@@ -376,7 +376,7 @@ export default function TipoProcessoTab() {
           <button onClick={abrirMods} className="rounded-lg border border-white/10 bg-white/5 px-4 py-2 text-sm font-medium text-white/80 transition hover:bg-white/10 hover:text-white">
             Gerenciar modalidades
           </button>
-          <button onClick={abrirNovo} className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-blue-500">
+          <button onClick={abrirNovo} className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-[#fff] transition hover:bg-blue-500">
             + Novo processo
           </button>
         </div>
@@ -452,7 +452,7 @@ export default function TipoProcessoTab() {
 
       {/* MODAL: Novo/Editar processo */}
       {modalAberto && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-[var(--overlay-modal)] p-4 backdrop-blur-sm">
           <div className="max-h-[90vh] w-full max-w-2xl overflow-auto rounded-2xl border border-white/10 bg-zinc-900/95 shadow-2xl">
             <div className="flex items-center justify-between border-b border-white/10 px-6 py-4">
               <h3 className="text-lg font-semibold text-white">{editando ? 'Editar processo' : 'Novo processo de nacionalidade'}</h3>
@@ -499,7 +499,7 @@ export default function TipoProcessoTab() {
 
             <div className="flex items-center justify-end gap-2 border-t border-white/10 px-6 py-4">
               <button onClick={() => setModalAberto(false)} className="rounded-lg px-4 py-2 text-sm text-white/60 transition hover:text-white">Cancelar</button>
-              <button onClick={salvar} disabled={salvando} className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-blue-500 disabled:opacity-50">
+              <button onClick={salvar} disabled={salvando} className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-[#fff] transition hover:bg-blue-500 disabled:opacity-50">
                 {salvando ? 'Salvando...' : 'Salvar'}
               </button>
             </div>
@@ -509,7 +509,7 @@ export default function TipoProcessoTab() {
 
       {/* MODAL: Gerenciar países (lista + criar/editar) */}
       {paisesModal && (
-        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm">
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-[var(--overlay-modal)] p-4 backdrop-blur-sm">
           <div className="max-h-[90vh] w-full max-w-2xl overflow-auto rounded-2xl border border-white/10 bg-zinc-900/95 shadow-2xl">
             <div className="flex items-center justify-between border-b border-white/10 px-6 py-4">
               <h3 className="text-lg font-semibold text-white">
@@ -521,7 +521,7 @@ export default function TipoProcessoTab() {
             {visao === 'lista' && (
               <div className="space-y-3 px-6 py-4">
                 <div className="flex justify-end">
-                  <button onClick={abrirNovoPais} className="rounded-lg bg-blue-600 px-3 py-1.5 text-sm font-medium text-white transition hover:bg-blue-500">
+                  <button onClick={abrirNovoPais} className="rounded-lg bg-blue-600 px-3 py-1.5 text-sm font-medium text-[#fff] transition hover:bg-blue-500">
                     + Novo país
                   </button>
                 </div>
@@ -635,7 +635,7 @@ export default function TipoProcessoTab() {
 
                 <div className="flex items-center justify-between gap-2 border-t border-white/10 px-6 py-4">
                   <button onClick={() => { setVisao('lista'); setErroPais(null) }} className="rounded-lg px-4 py-2 text-sm text-white/60 transition hover:text-white">← Voltar</button>
-                  <button onClick={salvarPais} disabled={salvandoPais} className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-blue-500 disabled:opacity-50">
+                  <button onClick={salvarPais} disabled={salvandoPais} className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-[#fff] transition hover:bg-blue-500 disabled:opacity-50">
                     {salvandoPais ? 'Salvando...' : editandoPais ? 'Salvar alterações' : 'Criar país'}
                   </button>
                 </div>
@@ -647,7 +647,7 @@ export default function TipoProcessoTab() {
 
       {/* MODAL: Gerenciar modalidades (seletor de país + lista + criar/editar) */}
       {modsModal && (
-        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm">
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-[var(--overlay-modal)] p-4 backdrop-blur-sm">
           <div className="max-h-[90vh] w-full max-w-2xl overflow-auto rounded-2xl border border-white/10 bg-zinc-900/95 shadow-2xl">
             <div className="flex items-center justify-between border-b border-white/10 px-6 py-4">
               <h3 className="text-lg font-semibold text-white">
@@ -669,7 +669,7 @@ export default function TipoProcessoTab() {
                       {paises.map((p) => <option key={p.countryKey} value={p.countryKey} className="bg-zinc-900">{p.flag ? p.flag + ' ' : ''}{p.countryLabel}</option>)}
                     </select>
                   </div>
-                  <button onClick={abrirNovaMod} disabled={!modCountryKey} className="rounded-lg bg-blue-600 px-3 py-1.5 text-sm font-medium text-white transition hover:bg-blue-500 disabled:opacity-50">
+                  <button onClick={abrirNovaMod} disabled={!modCountryKey} className="rounded-lg bg-blue-600 px-3 py-1.5 text-sm font-medium text-[#fff] transition hover:bg-blue-500 disabled:opacity-50">
                     + Nova modalidade
                   </button>
                 </div>
@@ -749,7 +749,7 @@ export default function TipoProcessoTab() {
 
                 <div className="flex items-center justify-between gap-2 border-t border-white/10 px-6 py-4">
                   <button onClick={() => { setVisaoMod('lista'); setErroMod(null) }} className="rounded-lg px-4 py-2 text-sm text-white/60 transition hover:text-white">← Voltar</button>
-                  <button onClick={salvarMod} disabled={salvandoMod} className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-blue-500 disabled:opacity-50">
+                  <button onClick={salvarMod} disabled={salvandoMod} className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-[#fff] transition hover:bg-blue-500 disabled:opacity-50">
                     {salvandoMod ? 'Salvando...' : editandoMod ? 'Salvar alterações' : 'Criar modalidade'}
                   </button>
                 </div>

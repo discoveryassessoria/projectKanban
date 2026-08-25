@@ -153,7 +153,7 @@ export default function CanaisPorOrganizacaoPanel() {
       </div>
 
       {aberta && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm" onClick={() => setAberta(null)}>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-[var(--overlay-modal)] p-4 backdrop-blur-sm" onClick={() => setAberta(null)}>
           <div className="flex max-h-[90vh] w-full max-w-2xl flex-col overflow-hidden rounded-2xl border border-white/10 bg-zinc-900/95 shadow-2xl" onClick={(e) => e.stopPropagation()}>
             <div className="border-b border-white/10 px-6 py-4">
               <h3 className="font-semibold text-white">Canais de {aberta.nomeFantasia || aberta.name}</h3>
@@ -209,7 +209,7 @@ export default function CanaisPorOrganizacaoPanel() {
             <div className="flex justify-end gap-2 border-t border-white/10 px-6 py-4">
               <button onClick={() => setAberta(null)} className="rounded-lg border border-white/10 bg-white/5 px-4 py-2 text-sm text-white/70 hover:bg-white/10">Cancelar</button>
               <button onClick={salvar} disabled={salvando}
-                className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-500 disabled:opacity-50">
+                className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-[#fff] hover:bg-blue-500 disabled:opacity-50">
                 {salvando ? "Salvando…" : "Salvar canais"}
               </button>
             </div>

@@ -218,7 +218,7 @@ export function ProcessoApostilamento({ processoId, onConcluido }: Props) {
       <div className="grid grid-cols-1 lg:grid-cols-[1fr,300px] gap-4">
         <div className="space-y-4">
           {/* Barra das 6 etapas */}
-          <div className="rounded-xl border border-white/10 bg-[#1b2027] p-4">
+          <div className="rounded-xl border border-white/10 bg-[var(--surface-popover)] p-4">
             <div className="flex items-start">
               {pasta.workflow.map((s, i) => {
                 const done = s.status === "concluida"
@@ -255,7 +255,7 @@ export function ProcessoApostilamento({ processoId, onConcluido }: Props) {
               <div className="mt-3 pt-3 border-t border-white/10 flex justify-end">
                 <button
                   onClick={() => setModalStep(activeStep.id)}
-                  className="px-3 py-2 text-sm font-semibold text-white bg-[#2563eb] hover:bg-[#1d4ed8] rounded-md inline-flex items-center gap-2"
+                  className="px-3 py-2 text-sm font-semibold text-[#fff] bg-[#2563eb] hover:bg-[#1d4ed8] rounded-md inline-flex items-center gap-2"
                 >
                   {activeStep.title}
                 </button>
@@ -287,7 +287,7 @@ export function ProcessoApostilamento({ processoId, onConcluido }: Props) {
           {/* 8 KPIs */}
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
             {kpis.map(([ic, val, lbl]) => (
-              <div key={lbl} className="rounded-lg border border-white/10 bg-[#1b2027] px-3 py-2.5">
+              <div key={lbl} className="rounded-lg border border-white/10 bg-[var(--surface-popover)] px-3 py-2.5">
                 <div className="text-base leading-none">{ic}</div>
                 <div className="text-xl font-bold text-white/95 mt-1">{val}</div>
                 <div className="text-[11px] text-white/55">{lbl}</div>
@@ -347,7 +347,7 @@ export function ProcessoApostilamento({ processoId, onConcluido }: Props) {
 
         {/* Coluna direita */}
         <aside className="space-y-4">
-          <div className="rounded-xl border border-white/10 bg-[#1b2027] p-4">
+          <div className="rounded-xl border border-white/10 bg-[var(--surface-popover)] p-4">
             <h3 className="text-sm font-semibold text-white/95 mb-2.5">Ações rápidas</h3>
             <div className="space-y-2">
               <button
@@ -363,7 +363,7 @@ export function ProcessoApostilamento({ processoId, onConcluido }: Props) {
             </div>
           </div>
 
-          <div className="rounded-xl border border-white/10 bg-[#1b2027] p-4">
+          <div className="rounded-xl border border-white/10 bg-[var(--surface-popover)] p-4">
             <h3 className="text-sm font-semibold text-white/95 mb-2.5">Alertas</h3>
             <div className="space-y-2 text-xs">
               <div className="flex items-center gap-2 text-[#d2a948] bg-[#d2a948]/12 rounded-lg px-3 py-2">
@@ -380,7 +380,7 @@ export function ProcessoApostilamento({ processoId, onConcluido }: Props) {
             </div>
           </div>
 
-          <div className="rounded-xl border border-white/10 bg-[#1b2027] p-4">
+          <div className="rounded-xl border border-white/10 bg-[var(--surface-popover)] p-4">
             <h3 className="text-sm font-semibold text-white/95 mb-2.5">Últimas movimentações</h3>
             <div className="text-xs text-white/40">Sem movimentações.</div>
           </div>
@@ -407,7 +407,7 @@ export function ProcessoApostilamento({ processoId, onConcluido }: Props) {
 
 function Stat({ label, value, ok }: { label: string; value: string; ok?: boolean }) {
   return (
-    <div className="rounded-lg border border-white/10 bg-[#1b2027] px-3 py-2 text-center">
+    <div className="rounded-lg border border-white/10 bg-[var(--surface-popover)] px-3 py-2 text-center">
       <div className={`text-lg font-bold ${ok ? "text-[#4ade80]" : "text-white/95"}`}>{value}</div>
       <div className="text-[11px] text-white/55 whitespace-nowrap">{label}</div>
     </div>
@@ -525,8 +525,8 @@ function EtapaModal({ stepId, pasta, posting, erro, onClose, onSubmit }: {
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-      <div className="absolute inset-0 bg-black/30" onClick={onClose} />
-      <div className="relative w-full max-w-lg bg-[#1b2027] rounded-xl shadow-xl max-h-[85vh] flex flex-col">
+      <div className="absolute inset-0 bg-[var(--overlay-modal)]" onClick={onClose} />
+      <div className="relative w-full max-w-lg bg-[var(--surface-popover)] rounded-xl shadow-xl max-h-[85vh] flex flex-col">
         <div className="flex items-start justify-between px-5 py-4 border-b border-white/10">
           <div>
             <div className="text-[11px] font-semibold uppercase tracking-wider text-[#7dd3fc]">Etapa {num} de 6 · Workflow do Apostilamento</div>
@@ -731,7 +731,7 @@ function EtapaModal({ stepId, pasta, posting, erro, onClose, onSubmit }: {
         <div className="border-t border-white/10 px-5 py-3 flex justify-end gap-2">
           <button onClick={onClose} className="px-3 py-2 text-sm text-white/68 hover:bg-[#20262e] rounded-md">Cancelar</button>
           <button onClick={submit} disabled={!podeSalvar || posting}
-            className="px-4 py-2 text-sm font-semibold text-white bg-[#2563eb] hover:bg-[#1d4ed8] rounded-md inline-flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed">
+            className="px-4 py-2 text-sm font-semibold text-[#fff] bg-[#2563eb] hover:bg-[#1d4ed8] rounded-md inline-flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed">
             {posting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />}
             {stepId === "validar_pasta_apostilada" ? "Confirmar decisão" : "Concluir etapa"}
           </button>
