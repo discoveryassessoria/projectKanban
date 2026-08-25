@@ -15,7 +15,7 @@ import { fileURLToPath } from 'node:url'
 import { dirname, join, relative } from 'node:path'
 import {
   analisarSchema, idsTextuais, analisarCodigo, formatar,
-  ENTIDADES_MESTRES, type Achado, type Excecao,
+  ENTIDADES_MESTRES, type Achado, type Excecao, type AtributoCadastral,
 } from '../lib/arquitetura/referencias-estruturais'
 
 const RAIZ = join(dirname(fileURLToPath(import.meta.url)), '..')
@@ -31,13 +31,9 @@ const EXCECOES_SCHEMA: Excecao[] = [
     motivo: 'NÃO É DÍVIDA — é o nome do CONTATO na organização externa, e ele não é usuário do sistema. ' +
       'O próprio schema já dizia isso ("texto — não é usuário do sistema"). Apontar para Usuario seria afirmar ' +
       'que o atendente do cartório tem conta aqui. Zero linhas preenchidas hoje.' },
-  { alvo: 'OrgaoProtocolo.moeda',
-    motivo: 'DÍVIDA: moeda da organização em texto, 241 de 241 registros preenchidos. Destino: moedaId → ' +
-      'MoedaCadastro. Exige migration aditiva, backfill por código e troca dos consumidores em Órgãos e no ' +
-      'financeiro — trabalho de um domínio próprio, não um ajuste de coluna.' },
   { alvo: 'PlanilhaCelulaOverride.moeda',
-    motivo: 'DÍVIDA: idem OrgaoProtocolo.moeda. Zero linhas hoje — o backfill é vazio e a migração é a mais barata ' +
-      'das três; entra junto quando a moeda virar FK.' },
+    motivo: 'DÍVIDA: moeda em texto numa célula de planilha, que É valor financeiro — diferente de ' +
+      'OrgaoProtocolo.moeda, que é ficha. Destino: moedaId → MoedaCadastro. Zero linhas hoje; o backfill é vazio.' },
 
   // ── Conteúdo próprio do registro (texto legítimo, não referência) ─────────
   { alvo: 'CatalogoPais.nationalityKey', motivo: 'Chave própria do país no seu PRÓPRIO cadastro — é identidade dele, não referência a outro.' },
@@ -115,6 +111,25 @@ const EXCECOES_CODIGO: Excecao[] = [
       'determinístico (`name contains "[AJUSTAR]"`) e troca dos quatro consumidores.' },
 ]
 
+// ════════════════════════════════════════════════════════════════════════════
+// ATRIBUTOS CADASTRAIS — o campo descreve o registro, não aponta para outro.
+//
+// Lista SEPARADA do inventário de dívidas de propósito. Aquele só encolhe: cada linha
+// é uma migração devida. Este não é dívida nenhuma — é a regra do guard reconhecendo
+// que casou nome com conceito onde não havia referência.
+//
+// Quem entra aqui paga um preço: o modelo NÃO pode ter a FK do conceito. Ficha e
+// vínculo juntos são duas fontes para o mesmo fato, e isso vira violação.
+// ════════════════════════════════════════════════════════════════════════════
+const ATRIBUTOS_CADASTRAIS: AtributoCadastral[] = [
+  { alvo: 'OrgaoProtocolo.moeda',
+    motivo: 'FICHA DA ENTIDADE EXTERNA, ao lado de idioma, horário e telefone: "este cartório cobra em euro" ' +
+      'como "atende em italiano". Auditado em 25/08/2026 — NENHUM leitor no sistema. O preço vem da Tabela de ' +
+      'Preços, o custo de Fornecedor.moedaPadrao, e o motor financeiro nunca pergunta a moeda ao órgão. Apontar ' +
+      'para MoedaCadastro limitaria a ficha aos códigos do financeiro (EUR/DOL/REA) e perderia ARS e PYG, que ' +
+      'existem em 6 organizações. Não é fonte financeira e não deve virar FK.' },
+]
+
 // ── Coleta ─────────────────────────────────────────────────────────────────
 const PASTAS = ['src', 'lib', 'prisma', 'scripts']
 const IGNORAR = /node_modules|\.next|\.d\.ts$|migrations|generated/
@@ -132,11 +147,12 @@ function arquivos(dir: string, acc: string[] = []): string[] {
 
 console.log('GUARDA DE ARQUITETURA — referência estrutural nunca é texto\n')
 console.log(`Entidades mestres registradas: ${ENTIDADES_MESTRES.length}`)
-console.log(`Exceções justificadas: ${EXCECOES_SCHEMA.length} no schema · ${EXCECOES_CODIGO.length} no código\n`)
+console.log(`Exceções justificadas: ${EXCECOES_SCHEMA.length} no schema · ${EXCECOES_CODIGO.length} no código`)
+console.log(`Atributos cadastrais declarados: ${ATRIBUTOS_CADASTRAIS.length} (ficha do registro, não referência)\n`)
 
 const schema = readFileSync(join(RAIZ, 'prisma/schema.prisma'), 'utf8')
 const achados: Achado[] = [
-  ...analisarSchema(schema, EXCECOES_SCHEMA),
+  ...analisarSchema(schema, EXCECOES_SCHEMA, ATRIBUTOS_CADASTRAIS),
   ...idsTextuais(schema, EXCECOES_SCHEMA),
 ]
 

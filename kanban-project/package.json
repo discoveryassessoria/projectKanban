@@ -354,7 +354,8 @@
     "test:tarefa-fantasma": "tsx scripts/tarefa-fantasma.test.ts",
     "reparar:passo-fantasma:dry": "tsx scripts/reparar-passo-fantasma.ts",
     "reparar:passo-fantasma": "tsx scripts/reparar-passo-fantasma.ts --execute",
-    "test:fase-vazia": "tsx scripts/fase-vazia-explica.test.ts"
+    "test:fase-vazia": "tsx scripts/fase-vazia-explica.test.ts",
+    "test:atributo-cadastral": "tsx scripts/guard-atributo-cadastral.test.ts"
   },
   "prisma": {
     "seed": "npm run guard:escrita && tsx prisma/seed.ts"

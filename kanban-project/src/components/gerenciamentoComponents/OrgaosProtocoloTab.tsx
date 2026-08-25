@@ -405,11 +405,19 @@ export default function OrgaosProtocoloTab() {
                 </select>
               </div>
               <div>
-                <label className={labelCls}>Moeda</label>
+                {/* FICHA DA ENTIDADE, não parâmetro do sistema. "Moeda" sozinho fazia
+                    quem configurava supor que o campo alimenta preço ou custo — e ele
+                    não alimenta nada: o preço vem da Tabela de Preços e o custo de
+                    Fornecedor.moedaPadrao. O rótulo diz de quem é a moeda, e a linha
+                    abaixo diz o que ela NÃO faz. */}
+                <label className={labelCls}>Moeda utilizada pelo órgão</label>
                 <select value={form.moeda} onChange={e => setForm(f => f && { ...f, moeda: e.target.value })} className={inputCls}>
                   <option value="" className={opt}>—</option>
                   {MOEDAS.map(([v, l]) => <option key={v} value={v} className={opt}>{l}</option>)}
                 </select>
+                <p className="mt-1 text-[11px] text-white/35">
+                  Informação cadastral. Não interfere em preços, custos ou cálculos financeiros.
+                </p>
               </div>
 
               <div className="col-span-2"><label className={labelCls}>Responsável / contato</label><input value={form.responsavel} onChange={e => setForm(f => f && { ...f, responsavel: e.target.value })} className={inputCls} /></div>

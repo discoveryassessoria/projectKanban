@@ -3921,6 +3921,13 @@ model OrgaoProtocolo {
   /// Idioma de atendimento (ISO 639-1: pt, es, it, en, fr, de…).
   idioma       String?  @db.VarChar(10)
   /// Moeda praticada pela entidade (ISO 4217: BRL, EUR, USD…).
+  ///
+  /// FICHA CADASTRAL, ao lado de `idioma` e `horario`: "este cartorio cobra em euro"
+  /// como "atende em italiano". NAO e fonte financeira e nao deve virar FK para
+  /// `MoedaCadastro` — auditado em 25/08/2026, sem nenhum leitor no sistema. O preco
+  /// vem da Tabela de Precos e o custo de `Fornecedor.moedaPadrao`; o motor financeiro
+  /// nunca pergunta a moeda ao orgao. Apontar para o cadastro limitaria a ficha aos
+  /// codigos do financeiro e perderia ARS e PYG, que 6 organizacoes usam.
   moeda        String?  @db.VarChar(10)
   horario      String?  @db.VarChar(200)
   /// Responsável/contato na entidade (texto — não é usuário do sistema).

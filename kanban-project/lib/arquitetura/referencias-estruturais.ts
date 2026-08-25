@@ -58,6 +58,40 @@ export const ENTIDADES_MESTRES: EntidadeMestre[] = [
   { conceito: 'conta contábil', model: 'ContaContabil', fk: 'contaContabilId', camposSuspeitos: ['contaContabil'] },
 ]
 
+/**
+ * ATRIBUTO CADASTRAL — o campo DESCREVE o próprio registro, não aponta para outro.
+ *
+ * ─── A DISTINÇÃO QUE FALTAVA ────────────────────────────────────────────────
+ * A regra do guard casa nome de campo com conceito mestre e acusa todo `String`.
+ * Ela acerta na maioria e erra numa classe inteira: campo de FICHA.
+ *
+ * `OrgaoProtocolo.moeda` ("moeda praticada pela entidade") fica ao lado de `idioma`,
+ * `horario` e `telefone`. Diz que o cartório italiano cobra em euro — do mesmo jeito
+ * que `idioma` diz que ele atende em italiano. Nenhuma decisão do sistema depende
+ * dele: o preço vem da Tabela de Preços, o custo vem de `Fornecedor.moedaPadrao`, e o
+ * motor financeiro nunca pergunta a moeda ao órgão.
+ *
+ * Chamar isso de dívida faria o inventário prometer uma migração que não deve
+ * acontecer — e, pior, apontar o campo para `MoedaCadastro` o limitaria aos códigos
+ * que o financeiro usa, perdendo os que a ficha registra.
+ *
+ * ─── NÃO É AFROUXAMENTO ─────────────────────────────────────────────────────
+ * Continua exigindo declaração explícita, alvo por alvo, com motivo escrito. O que
+ * muda é a NATUREZA da declaração: "isto não é o que a regra supôs", em vez de "isto
+ * é dívida e um dia migra".
+ *
+ * E a declaração cria uma obrigação nova que antes não existia: um modelo que declara
+ * atributo cadastral e TAMBÉM tem a FK do conceito está mantendo duas fontes para o
+ * mesmo fato — e isso passa a ser violação. Como exceção comum, essa dupla fonte
+ * entraria calada.
+ */
+export interface AtributoCadastral {
+  /** `Model.campo`. */
+  alvo: string
+  /** Por que este campo descreve o registro em vez de referenciar outro. */
+  motivo: string
+}
+
 /** Exceção JUSTIFICADA. Sem motivo escrito, não entra. */
 export interface Excecao {
   /** `Model.campo` (schema) ou caminho do arquivo (código). */
@@ -101,12 +135,37 @@ const ehTipoJson = (t: string) => /^Json(\[\])?\??$/.test(t)
  * Campos do schema que representam entidade mestre como texto, ou que guardam
  * vínculo em JSON/array textual.
  */
-export function analisarSchema(schema: string, excecoes: Excecao[] = []): Achado[] {
+export function analisarSchema(
+  schema: string,
+  excecoes: Excecao[] = [],
+  cadastrais: AtributoCadastral[] = [],
+): Achado[] {
   const isento = new Set(excecoes.map((e) => e.alvo))
+  const ficha = new Set(cadastrais.map((a) => a.alvo))
+  const campos = camposDoSchema(schema)
   const achados: Achado[] = []
-  for (const c of camposDoSchema(schema)) {
+
+  // A FICHA NÃO PODE CONVIVER COM A FK. Declarar `moeda` como atributo cadastral e
+  // ter `moedaId` no mesmo modelo é manter duas fontes para o mesmo fato — exatamente
+  // o que este guard existe para impedir. A declaração de ficha compra a isenção e
+  // paga com esta verificação.
+  for (const a of cadastrais) {
+    const [model, nome] = a.alvo.split('.')
+    const mestre = ENTIDADES_MESTRES.find((m) => m.camposSuspeitos.includes(nome))
+    if (!mestre) continue
+    const temFk = campos.some((c) => c.model === model && c.nome === mestre.fk)
+    if (temFk) {
+      achados.push({
+        tipo: 'schema', onde: a.alvo, conceito: mestre.conceito,
+        detalhe: `declarado como atributo cadastral, mas ${model} também tem ${mestre.fk}. ` +
+          `Duas fontes para ${mestre.conceito}: ou o campo é ficha (e a FK sobra), ou é referência (e o texto sai).`,
+      })
+    }
+  }
+
+  for (const c of campos) {
     const alvo = `${c.model}.${c.nome}`
-    if (isento.has(alvo)) continue
+    if (isento.has(alvo) || ficha.has(alvo)) continue
 
     const mestre = ENTIDADES_MESTRES.find((m) => m.camposSuspeitos.includes(c.nome))
     if (mestre && ehTipoTexto(c.tipoBruto)) {
