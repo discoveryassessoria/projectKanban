@@ -76,7 +76,7 @@ export function OperacoesAntecipadasInline({ ops, readOnly, onAvaliar, onAbrir }
           <ArrowLeftRight className="w-3 h-3" /> Operações antecipadas
           <span className="font-semibold text-slate-700 normal-case tracking-normal">· {ops.length}{abertas > 0 ? ` (${abertas} aberta${abertas > 1 ? "s" : ""})` : ""}</span>
         </div>
-        <div className="divide-y divide-[#a78bfa]/15">
+        <div className="divide-y divide-[var(--border-default)]">
           {ops.map((o) => (
             <OperacaoAntecipadaItem key={o.id} o={o} readOnly={readOnly} onAvaliar={onAvaliar} onAbrir={onAbrir} />
           ))}

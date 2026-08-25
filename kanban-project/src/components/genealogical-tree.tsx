@@ -88,9 +88,9 @@ const PersonNode = ({ data }: { data: TreeNode["data"] }) => {
       case "filho":
         return "border-green-500 bg-green-50 shadow-green-100"
       case "conjuge":
-        return "border-slate-500 bg-slate-50 shadow-purple-100"
+        return "border-slate-500 bg-slate-50 shadow-slate-100"
       case "irmao":
-        return "border-amber-500 bg-amber-50 shadow-orange-100"
+        return "border-amber-500 bg-amber-50 shadow-amber-100"
       default:
         return "border-gray-300 bg-[var(--surface-primary)] shadow-gray-100"
     }
