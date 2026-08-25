@@ -184,8 +184,8 @@
 
   /* Estados — translúcidos DE PROPÓSITO: pintam SOBRE a superfície sólida. */
   --surface-hover: rgba(23, 25, 28, 0.04);
-  --surface-selected: rgba(185, 133, 36, 0.10);
-  --surface-active: rgba(185, 133, 36, 0.14);
+  --surface-selected: rgba(23, 25, 28, 0.06);
+  --surface-active: rgba(23, 25, 28, 0.09);
   --surface-disabled: #f4f1ea;
 
   /* Superfícies OPACAS (overlays) — as superfícies translúcidas acima não servem
@@ -243,17 +243,16 @@
   /* Acento institucional (dourado) — ação/navegação ativa apenas */
   /* Champagne — escurecido para ter contraste sobre superfície clara. O tom
      anterior (#d2a948) foi calibrado contra fundo preto e some sobre ivory. */
-  --accent-primary: #b98524;   /* fundo, borda, ícone, indicador */
-  --accent-hover: #c8952c;
-  --accent-soft: #f6efdf;      /* realce de seleção */
-  --accent-ink: #17191c;
+  --accent-primary: #1d232a;  /* fundo, borda, ícone, indicador — graphite */
+  --accent-hover: #12171c;
+  --accent-soft: #f3efe7;      /* realce de seleção, neutro */
+  --accent-ink: #ffffff;
   /* Vermelho SÓLIDO: só ação destrutiva confirmada. Tinta branca real. */
   --danger-solid: #b91c1c;
   --danger-solid-ink: #ffffff;
-  /* CHAMPAGNE COMO TEXTO precisa ser mais escuro: #b98524 sobre branco dá 3.23 e
-     não passa AA. Este dá 4.59, e é o que deve ser usado quando o dourado é a
-     TINTA — link, valor em destaque, rótulo institucional. */
-  --accent-text: #7d5611;
+  /* O champagne saiu do produto: destaque se faz por PESO e CONTRASTE, não por
+     cor de marca. A tinta de acento é a mesma tinta primária. */
+  --accent-text: #171a1f;
 
   /* Semânticas — usar SÓ quando houver significado real. Escurecidas para manter
      legibilidade sobre claro; o SIGNIFICADO de cada cor não muda. */

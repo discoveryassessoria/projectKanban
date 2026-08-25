@@ -4,7 +4,7 @@
 // para permitir ajuste visual isolado desta tela sem tocar em componentes globais.
 //
 // Identidade visual da referência: fundo arquitetônico escurecido, cards glass/dark,
-// acento dourado (#D2A948) no que é ativo/primário, e as cores de status
+// acento graphite no que é ativo/primário, e as cores de status
 // verde / vermelho / azul / âmbar.
 
 "use client"
