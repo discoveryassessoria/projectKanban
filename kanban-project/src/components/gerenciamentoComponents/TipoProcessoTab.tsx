@@ -383,7 +383,7 @@ export default function TipoProcessoTab() {
       </div>
 
       {!loading && !erroLista && paises.length === 0 && (
-        <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-700">
+        <div className="rounded-lg border border-[var(--border-default)] bg-[var(--surface-secondary)] p-3 text-sm text-amber-700">
           Nenhum país ativo no catálogo. Crie ou reative um em "Gerenciar países".
         </div>
       )}
@@ -398,7 +398,7 @@ export default function TipoProcessoTab() {
       {loading && <div className="py-12 text-center text-sm text-[var(--text-muted)]">Carregando...</div>}
 
       {!loading && erroLista && (
-        <div className="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-700">
+        <div className="rounded-lg border border-[var(--border-default)] bg-[var(--surface-secondary)] p-4 text-sm text-red-700">
           {erroLista}<button onClick={() => void carregar()} className="ml-3 underline hover:text-white">Tentar de novo</button>
         </div>
       )}
@@ -433,13 +433,13 @@ export default function TipoProcessoTab() {
                     <td className="px-4 py-2.5 text-white/70">{t.modalityLabel}</td>
                     <td className="px-4 py-2.5">
                       {t.ativo
-                        ? <span className="rounded-md bg-green-50 px-2 py-0.5 text-[11px] font-medium text-green-700">ativo</span>
+                        ? <span className="rounded-md bg-[var(--surface-secondary)] px-2 py-0.5 text-[11px] font-medium text-green-700">ativo</span>
                         : <span className="rounded-md bg-[var(--surface-primary)] px-2 py-0.5 text-[11px] font-medium text-[var(--text-secondary)]">inativo</span>}
                     </td>
                     <td className="px-4 py-2.5">
                       <div className="flex items-center justify-end gap-2">
                         <button onClick={() => abrirEditar(t)} className="rounded-md border border-[var(--border-default)] px-2.5 py-1 text-xs text-white/70 transition hover:bg-[var(--surface-hover)] hover:text-white">Editar</button>
-                        <button onClick={() => excluir(t)} className="rounded-md border border-red-200 px-2.5 py-1 text-xs text-red-700/80 transition hover:bg-red-50 hover:text-red-700">Excluir</button>
+                        <button onClick={() => excluir(t)} className="rounded-md border border-[var(--border-default)] px-2.5 py-1 text-xs text-red-700/80 transition hover:bg-[var(--surface-secondary)] hover:text-red-700">Excluir</button>
                       </div>
                     </td>
                   </tr>
@@ -453,7 +453,7 @@ export default function TipoProcessoTab() {
       {/* MODAL: Novo/Editar processo */}
       {modalAberto && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-[var(--overlay-modal)] p-4 backdrop-blur-sm">
-          <div className="max-h-[90vh] w-full max-w-2xl overflow-auto rounded-2xl border border-[var(--border-default)] bg-zinc-900/95 shadow-2xl">
+          <div className="max-h-[90vh] w-full max-w-2xl overflow-auto rounded-2xl border border-[var(--border-default)] bg-zinc-900/95 shadow-[var(--elev-3)]">
             <div className="flex items-center justify-between border-b border-[var(--border-default)] px-6 py-4">
               <h3 className="text-lg font-semibold text-white">{editando ? 'Editar processo' : 'Novo processo de nacionalidade'}</h3>
               <button onClick={() => setModalAberto(false)} className="text-[var(--text-muted)] transition hover:text-white">✕</button>
@@ -494,7 +494,7 @@ export default function TipoProcessoTab() {
                 Ativo
               </label>
 
-              {erroModal && <div className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700">{erroModal}</div>}
+              {erroModal && <div className="rounded-lg border border-[var(--border-default)] bg-[var(--surface-secondary)] p-3 text-sm text-red-700">{erroModal}</div>}
             </div>
 
             <div className="flex items-center justify-end gap-2 border-t border-[var(--border-default)] px-6 py-4">
@@ -510,7 +510,7 @@ export default function TipoProcessoTab() {
       {/* MODAL: Gerenciar países (lista + criar/editar) */}
       {paisesModal && (
         <div className="fixed inset-0 z-[60] flex items-center justify-center bg-[var(--overlay-modal)] p-4 backdrop-blur-sm">
-          <div className="max-h-[90vh] w-full max-w-2xl overflow-auto rounded-2xl border border-[var(--border-default)] bg-zinc-900/95 shadow-2xl">
+          <div className="max-h-[90vh] w-full max-w-2xl overflow-auto rounded-2xl border border-[var(--border-default)] bg-zinc-900/95 shadow-[var(--elev-3)]">
             <div className="flex items-center justify-between border-b border-[var(--border-default)] px-6 py-4">
               <h3 className="text-lg font-semibold text-white">
                 {visao === 'lista' ? 'Países' : editandoPais ? `Editar país — ${editandoPais.countryLabel}` : 'Novo país'}
@@ -552,7 +552,7 @@ export default function TipoProcessoTab() {
                             <td className="px-3 py-2 text-white/70">{p.tiposCount ?? 0}</td>
                             <td className="px-3 py-2">
                               {p.ativo
-                                ? <span className="rounded-md bg-green-50 px-2 py-0.5 text-[11px] font-medium text-green-700">ativo</span>
+                                ? <span className="rounded-md bg-[var(--surface-secondary)] px-2 py-0.5 text-[11px] font-medium text-green-700">ativo</span>
                                 : <span className="rounded-md bg-[var(--surface-primary)] px-2 py-0.5 text-[11px] font-medium text-[var(--text-secondary)]">inativo</span>}
                             </td>
                             <td className="px-3 py-2">
@@ -561,7 +561,7 @@ export default function TipoProcessoTab() {
                                 <button onClick={() => toggleAtivoPais(p)} className="rounded-md border border-[var(--border-default)] px-2 py-1 text-xs text-white/70 transition hover:bg-[var(--surface-hover)] hover:text-white">
                                   {p.ativo ? 'Inativar' : 'Ativar'}
                                 </button>
-                                <button onClick={() => excluirPais(p)} className="rounded-md border border-red-200 px-2 py-1 text-xs text-red-700/80 transition hover:bg-red-50 hover:text-red-700">Excluir</button>
+                                <button onClick={() => excluirPais(p)} className="rounded-md border border-[var(--border-default)] px-2 py-1 text-xs text-red-700/80 transition hover:bg-[var(--surface-secondary)] hover:text-red-700">Excluir</button>
                               </div>
                             </td>
                           </tr>
@@ -575,7 +575,7 @@ export default function TipoProcessoTab() {
                   Excluir só funciona para país sem tipos e sem processos. Se já estiver em uso, use "Inativar" — ele some do kanban e dos cadastros, sem apagar nada.
                 </p>
 
-                {erroPais && <div className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700">{erroPais}</div>}
+                {erroPais && <div className="rounded-lg border border-[var(--border-default)] bg-[var(--surface-secondary)] p-3 text-sm text-red-700">{erroPais}</div>}
               </div>
             )}
 
@@ -630,7 +630,7 @@ export default function TipoProcessoTab() {
                     </div>
                   )}
 
-                  {erroPais && <div className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700">{erroPais}</div>}
+                  {erroPais && <div className="rounded-lg border border-[var(--border-default)] bg-[var(--surface-secondary)] p-3 text-sm text-red-700">{erroPais}</div>}
                 </div>
 
                 <div className="flex items-center justify-between gap-2 border-t border-[var(--border-default)] px-6 py-4">
@@ -648,7 +648,7 @@ export default function TipoProcessoTab() {
       {/* MODAL: Gerenciar modalidades (seletor de país + lista + criar/editar) */}
       {modsModal && (
         <div className="fixed inset-0 z-[60] flex items-center justify-center bg-[var(--overlay-modal)] p-4 backdrop-blur-sm">
-          <div className="max-h-[90vh] w-full max-w-2xl overflow-auto rounded-2xl border border-[var(--border-default)] bg-zinc-900/95 shadow-2xl">
+          <div className="max-h-[90vh] w-full max-w-2xl overflow-auto rounded-2xl border border-[var(--border-default)] bg-zinc-900/95 shadow-[var(--elev-3)]">
             <div className="flex items-center justify-between border-b border-[var(--border-default)] px-6 py-4">
               <h3 className="text-lg font-semibold text-white">
                 {visaoMod === 'lista'
@@ -700,7 +700,7 @@ export default function TipoProcessoTab() {
                             <td className="px-3 py-2 text-white/70">{m.tiposCount ?? 0}</td>
                             <td className="px-3 py-2">
                               {(m.ativo ?? true)
-                                ? <span className="rounded-md bg-green-50 px-2 py-0.5 text-[11px] font-medium text-green-700">ativa</span>
+                                ? <span className="rounded-md bg-[var(--surface-secondary)] px-2 py-0.5 text-[11px] font-medium text-green-700">ativa</span>
                                 : <span className="rounded-md bg-[var(--surface-primary)] px-2 py-0.5 text-[11px] font-medium text-[var(--text-secondary)]">inativa</span>}
                             </td>
                             <td className="px-3 py-2">
@@ -709,7 +709,7 @@ export default function TipoProcessoTab() {
                                 <button onClick={() => toggleAtivoMod(m)} className="rounded-md border border-[var(--border-default)] px-2 py-1 text-xs text-white/70 transition hover:bg-[var(--surface-hover)] hover:text-white">
                                   {(m.ativo ?? true) ? 'Inativar' : 'Ativar'}
                                 </button>
-                                <button onClick={() => excluirMod(m)} className="rounded-md border border-red-200 px-2 py-1 text-xs text-red-700/80 transition hover:bg-red-50 hover:text-red-700">Excluir</button>
+                                <button onClick={() => excluirMod(m)} className="rounded-md border border-[var(--border-default)] px-2 py-1 text-xs text-red-700/80 transition hover:bg-[var(--surface-secondary)] hover:text-red-700">Excluir</button>
                               </div>
                             </td>
                           </tr>
@@ -723,7 +723,7 @@ export default function TipoProcessoTab() {
                   Excluir só funciona para modalidade que nenhum tipo de processo usa. Se já estiver em uso, use "Inativar" — ela some do dropdown de novo processo, sem apagar nada.
                 </p>
 
-                {erroMod && <div className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700">{erroMod}</div>}
+                {erroMod && <div className="rounded-lg border border-[var(--border-default)] bg-[var(--surface-secondary)] p-3 text-sm text-red-700">{erroMod}</div>}
               </div>
             )}
 
@@ -744,7 +744,7 @@ export default function TipoProcessoTab() {
                     O sufixo entra na sugestão do código do processo (ex.: FRA-JUD). Vale só para o país selecionado ({paisDoModMods?.countryLabel || '—'}).
                   </p>
 
-                  {erroMod && <div className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700">{erroMod}</div>}
+                  {erroMod && <div className="rounded-lg border border-[var(--border-default)] bg-[var(--surface-secondary)] p-3 text-sm text-red-700">{erroMod}</div>}
                 </div>
 
                 <div className="flex items-center justify-between gap-2 border-t border-[var(--border-default)] px-6 py-4">

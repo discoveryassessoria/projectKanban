@@ -303,7 +303,7 @@ export function ReceitaDetalheView({ refParam, onVoltar }: { refParam: string; o
               {maisOpen && (
                 <>
                   <div className="fixed inset-0 z-40" onClick={() => setMaisOpen(false)} />
-                  <div className="absolute right-0 z-50 mt-1 w-60 overflow-hidden rounded-[var(--radius-sm)] border border-[var(--border-default)] bg-[var(--surface-popover)] py-1 shadow-[var(--shadow-surface)]">
+                  <div className="absolute right-0 z-50 mt-1 w-60 overflow-hidden rounded-[var(--radius-sm)] border border-[var(--border-default)] bg-[var(--surface-popover)] py-1 shadow-[var(--elev-2)]">
                     <div className="px-3 py-1 text-[10px] font-semibold uppercase tracking-wide text-[var(--text-muted)]">Gestão financeira</div>
                     <button onClick={() => { setMaisOpen(false); setEditarReceitaOpen(true) }} className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-[var(--text-secondary)] hover:bg-[var(--surface-hover)]"><Pencil className="h-4 w-4 text-[var(--text-muted)]" /> Editar {isCusto ? "custo" : "Receita"}</button>
                     <button onClick={() => { setMaisOpen(false); setEditarReceitaOpen(true) }} className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-[var(--text-secondary)] hover:bg-[var(--surface-hover)]"><ArrowLeftRight className="h-4 w-4 text-[var(--text-muted)]" /> Editar regra de câmbio</button>
@@ -857,7 +857,7 @@ function PagamentoRowMenu({ p, onEstornar, onTimeline }: { p: any; onEstornar: (
       {open && (
         <>
           <div className="fixed inset-0 z-40" onClick={() => setOpen(false)} />
-          <div className="absolute right-0 top-8 z-50 w-52 overflow-hidden rounded-[var(--radius-sm)] border border-[var(--border-default)] bg-[var(--surface-popover)] py-1 shadow-[var(--shadow-surface)]">
+          <div className="absolute right-0 top-8 z-50 w-52 overflow-hidden rounded-[var(--radius-sm)] border border-[var(--border-default)] bg-[var(--surface-popover)] py-1 shadow-[var(--elev-2)]">
             <button onClick={() => { setOpen(false); onTimeline() }} className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-[var(--text-secondary)] hover:bg-[var(--surface-hover)]"><Clock className="h-4 w-4 text-[var(--text-muted)]" /> Ver movimentações</button>
             <button onClick={() => { setOpen(false); copiar() }} disabled={!ref} title={ref ? "" : "Sem referência"} className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-[var(--text-secondary)] hover:bg-[var(--surface-hover)] disabled:opacity-40">{copiado ? <CheckCircle2 className="h-4 w-4 text-[var(--success)]" /> : <Copy className="h-4 w-4 text-[var(--text-muted)]" />} Copiar referência</button>
             <div className="my-1 border-t border-[var(--border-default)]" />

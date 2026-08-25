@@ -131,12 +131,12 @@ const fmtDate = (iso: string | null): string => {
 }
 
 const fmtSla = (dueAt: string | null) => {
-  if (!dueAt) return { label: "no prazo", cls: "text-emerald-700 bg-emerald-900/40" }
+  if (!dueAt) return { label: "no prazo", cls: "text-green-700 bg-[var(--surface-secondary)]" }
   const diff = (new Date(dueAt).getTime() - Date.now()) / 86400000
-  if (diff < -5) return { label: `${Math.abs(Math.floor(diff))}d crítico`, cls: "text-red-700 bg-red-900/50" }
-  if (diff < 0) return { label: `${Math.abs(Math.floor(diff))}d atrasado`, cls: "text-amber-700 bg-amber-900/50" }
-  if (diff < 1) return { label: "vence hoje", cls: "text-amber-700 bg-amber-900/50" }
-  return { label: `${Math.ceil(diff)} dia(s)`, cls: "text-emerald-700 bg-emerald-900/40" }
+  if (diff < -5) return { label: `${Math.abs(Math.floor(diff))}d crítico`, cls: "text-red-700 bg-[var(--surface-secondary)]" }
+  if (diff < 0) return { label: `${Math.abs(Math.floor(diff))}d atrasado`, cls: "text-amber-700 bg-[var(--surface-secondary)]" }
+  if (diff < 1) return { label: "vence hoje", cls: "text-amber-700 bg-[var(--surface-secondary)]" }
+  return { label: `${Math.ceil(diff)} dia(s)`, cls: "text-green-700 bg-[var(--surface-secondary)]" }
 }
 
 const STATUS_LABEL: Record<StatusStep, string> = {
@@ -215,7 +215,7 @@ export function WorkflowTab({ documentoId, onChange, contextoAntecipada }: Workf
   if (loading) {
     return (
       <div className="flex items-center justify-center py-20">
-        <Loader2 className="w-5 h-5 animate-spin text-slate-500" />
+        <Loader2 className="w-5 h-5 animate-spin text-[var(--text-secondary)]" />
       </div>
     )
   }
@@ -223,7 +223,7 @@ export function WorkflowTab({ documentoId, onChange, contextoAntecipada }: Workf
   if (erro) {
     return (
       <div className="px-1 py-6">
-        <div className="bg-red-900/20 border border-red-800 rounded-lg px-4 py-3 text-sm text-red-700">
+        <div className="bg-[var(--surface-secondary)] border border-red-800 rounded-lg px-4 py-3 text-sm text-red-700">
           ⚠ {erro}
         </div>
       </div>
@@ -237,11 +237,11 @@ export function WorkflowTab({ documentoId, onChange, contextoAntecipada }: Workf
     if (semWorkflowInterno) {
       return (
         <div className="flex flex-col items-center justify-center py-16 px-6 text-center">
-          <div className="w-12 h-12 rounded-full bg-slate-800 border border-slate-700 flex items-center justify-center mb-4">
-            <Circle className="w-5 h-5 text-slate-500" />
+          <div className="w-12 h-12 rounded-full bg-[var(--text-muted)] border border-[var(--border-default)] flex items-center justify-center mb-4">
+            <Circle className="w-5 h-5 text-[var(--text-secondary)]" />
           </div>
           <h4 className="text-white font-semibold text-sm mb-1.5">Sem Workflow Interno</h4>
-          <p className="text-xs text-slate-700 max-w-xs">
+          <p className="text-xs text-[var(--text-secondary)] max-w-xs">
             Não existe Workflow Interno configurado para esta fase.
           </p>
         </div>
@@ -251,11 +251,11 @@ export function WorkflowTab({ documentoId, onChange, contextoAntecipada }: Workf
     // recarregar, sem reiniciar operação nem usar fallback de outra fase.
     return (
       <div className="flex flex-col items-center justify-center py-16 px-6 text-center">
-        <div className="w-12 h-12 rounded-full bg-slate-800 border border-slate-700 flex items-center justify-center mb-4">
-          <Circle className="w-5 h-5 text-slate-500" />
+        <div className="w-12 h-12 rounded-full bg-[var(--text-muted)] border border-[var(--border-default)] flex items-center justify-center mb-4">
+          <Circle className="w-5 h-5 text-[var(--text-secondary)]" />
         </div>
         <h4 className="text-white font-semibold text-sm mb-1.5">Não foi possível carregar as etapas</h4>
-        <p className="text-xs text-slate-700 max-w-xs mb-5">
+        <p className="text-xs text-[var(--text-secondary)] max-w-xs mb-5">
           Recarregue para tentar montar a operação desta fase.
         </p>
         <button
@@ -279,22 +279,22 @@ export function WorkflowTab({ documentoId, onChange, contextoAntecipada }: Workf
     <div className="space-y-4">
 
       {/* ============== HEADER ============== */}
-      <div className="bg-gradient-to-br from-slate-900/80 to-slate-900/40 border border-slate-700/50 rounded-lg px-4 py-3.5 flex items-center justify-between gap-4 flex-wrap">
+      <div className="bg-gradient-to-br from-slate-900/80 to-slate-900/40 border border-[var(--border-default)] rounded-lg px-4 py-3.5 flex items-center justify-between gap-4 flex-wrap">
         <div>
           <div className="text-[13px] font-bold text-white">{workflow.templateName}</div>
-          <div className="text-[11px] text-slate-700 mt-0.5">
+          <div className="text-[11px] text-[var(--text-secondary)] mt-0.5">
             {workflow.steps.length} etapas · {doneCount} concluídas · iniciado em {fmtDate(workflow.startedAt)}
           </div>
         </div>
         <div className="flex flex-col items-end gap-1 min-w-[160px]">
           <div className="text-[18px] font-bold text-white leading-none">{workflow.progress}%</div>
-          <div className="w-40 h-1.5 bg-slate-800 rounded-full overflow-hidden">
+          <div className="w-40 h-1.5 bg-[var(--text-muted)] rounded-full overflow-hidden">
             <div
               className="h-full bg-gradient-to-r from-blue-500 to-emerald-500 transition-all duration-500"
               style={{ width: `${workflow.progress}%` }}
             />
           </div>
-          <div className="text-[10px] text-slate-500 font-mono">{doneWeight}/{totalWeight} pontos</div>
+          <div className="text-[10px] text-[var(--text-secondary)] font-mono">{doneWeight}/{totalWeight} pontos</div>
         </div>
       </div>
 
@@ -318,16 +318,16 @@ export function WorkflowTab({ documentoId, onChange, contextoAntecipada }: Workf
           Capacidade nativa preservada INTEIRA (criar, listar, avaliar, abrir). Ela
           pertence ao ALVO deste documento e só existe aqui dentro. */}
       {contextoAntecipada && necId != null && (
-        <div className="border border-slate-200 rounded-lg bg-slate-50/[0.05] px-3 py-3">
+        <div className="border border-[var(--border-default)] rounded-lg bg-[var(--surface-secondary)]/[0.05] px-3 py-3">
           <div className="flex items-center justify-between gap-3 mb-2 flex-wrap">
-            <b className="text-[11px] font-extrabold uppercase tracking-wide text-slate-700">
+            <b className="text-[11px] font-extrabold uppercase tracking-wide text-[var(--text-secondary)]">
               Operação antecipada
             </b>
             {!contextoAntecipada.readOnly && (
               <button
                 type="button"
                 onClick={() => setCriandoAntecipada(true)}
-                className="text-[11px] font-semibold text-[var(--text-secondary)] hover:text-slate-700 underline decoration-dotted underline-offset-2"
+                className="text-[11px] font-semibold text-[var(--text-secondary)] hover:text-[var(--text-secondary)] underline decoration-dotted underline-offset-2"
               >
                 + nova operação antecipada
               </button>
@@ -412,20 +412,20 @@ function StepCard({
     return (
       <div
         onClick={onOpenCentral}
-        className="bg-emerald-950/30 border border-emerald-900/60 rounded-md px-3 py-2 flex items-center gap-3 cursor-pointer hover:bg-emerald-950/50 transition-colors"
+        className="bg-[var(--surface-secondary)]/30 border border-green-900/60 rounded-md px-3 py-2 flex items-center gap-3 cursor-pointer hover:bg-[var(--surface-secondary)]/50 transition-colors"
       >
-        <div className="w-6 h-6 rounded-full bg-emerald-500 flex items-center justify-center flex-shrink-0">
+        <div className="w-6 h-6 rounded-full bg-green-600 flex items-center justify-center flex-shrink-0">
           <Check className="w-3.5 h-3.5 text-white" />
         </div>
         <div className="flex-1 min-w-0">
-          <div className="text-[12.5px] font-semibold text-emerald-700">
+          <div className="text-[12.5px] font-semibold text-green-700">
             {step.ordem}. {step.title}
           </div>
-          <div className="text-[10.5px] text-emerald-700/80 mt-0.5">
+          <div className="text-[10.5px] text-green-700/80 mt-0.5">
             concluída por <strong>{completedByName}</strong> em {fmtDateTime(step.completedAt)} · peso {step.weight}%
           </div>
         </div>
-        <ChevronRight className="w-4 h-4 text-emerald-500/70 flex-shrink-0" />
+        <ChevronRight className="w-4 h-4 text-green-500/70 flex-shrink-0" />
       </div>
     )
   }
@@ -436,18 +436,18 @@ function StepCard({
   if (isFuture) {
     return (
       <div className="bg-[var(--surface-primary)] border border-[var(--border-default)] rounded-md px-3 py-2.5 flex items-center gap-3 opacity-60">
-        <div className="w-6 h-6 rounded-full bg-slate-800 border border-slate-700 flex items-center justify-center flex-shrink-0">
-          <Lock className="w-3 h-3 text-slate-500" />
+        <div className="w-6 h-6 rounded-full bg-[var(--text-muted)] border border-[var(--border-default)] flex items-center justify-center flex-shrink-0">
+          <Lock className="w-3 h-3 text-[var(--text-secondary)]" />
         </div>
         <div className="flex-1 min-w-0">
-          <div className="text-[12.5px] font-semibold text-slate-700">
+          <div className="text-[12.5px] font-semibold text-[var(--text-secondary)]">
             {step.ordem}. {step.title}
           </div>
-          <div className="text-[10.5px] text-slate-500 mt-0.5">
+          <div className="text-[10.5px] text-[var(--text-secondary)] mt-0.5">
             {ownerName(step.ownerKey)} · peso {step.weight}% · aguarda liberação
           </div>
         </div>
-        <ChevronRight className="w-4 h-4 text-slate-700 flex-shrink-0" />
+        <ChevronRight className="w-4 h-4 text-[var(--text-secondary)] flex-shrink-0" />
       </div>
     )
   }
@@ -466,25 +466,25 @@ function StepCard({
     ? "border-amber-900/60"
     : isBloqueioManual
     ? "border-red-900/60"
-    : "border-blue-900/60"
+    : "border-[var(--border-default)]"
 
   // Círculo com ícone
   const circleCls = isLockStepWait
-    ? "bg-amber-500/80"
+    ? "bg-[var(--surface-secondary)]"
     : isBloqueioManual
-    ? "bg-red-500/80"
-    : "bg-blue-500"
+    ? "bg-[var(--surface-secondary)]"
+    : "bg-[var(--surface-secondary)]"
 
   // Badge de status (texto e cor)
   const statusBadgeCls = isLockStepWait
-    ? "bg-amber-900/60 text-amber-700 border-amber-800"
+    ? "bg-[var(--surface-secondary)] text-amber-700 border-amber-800"
     : isBloqueioManual
-    ? "bg-red-900/60 text-red-700 border-red-800"
+    ? "bg-[var(--surface-secondary)] text-red-700 border-red-800"
     : step.status === "aguardando_terceiro"
-    ? "bg-amber-900/60 text-amber-700 border-amber-800"
+    ? "bg-[var(--surface-secondary)] text-amber-700 border-amber-800"
     : step.status === "atrasada"
-    ? "bg-amber-900/60 text-amber-700 border-amber-800"
-    : "bg-blue-900/60 text-blue-700 border-blue-800"
+    ? "bg-[var(--surface-secondary)] text-amber-700 border-amber-800"
+    : "bg-[var(--surface-secondary)] text-[var(--text-secondary)] border-[var(--border-default)]"
 
   const statusLabel = isLockStepWait
     ? "Aguardando docs"
@@ -515,12 +515,12 @@ function StepCard({
             </span>
           </div>
           {step.description && (
-            <div className="text-[11px] text-slate-700 mt-1">{step.description}</div>
+            <div className="text-[11px] text-[var(--text-secondary)] mt-1">{step.description}</div>
           )}
 
           {/* Meta compacta — esconde se for lock-step wait (responsável/SLA não fazem sentido) */}
           {!isLockStepWait && (
-            <div className="flex items-center gap-2 flex-wrap text-[11px] text-slate-700 mt-2">
+            <div className="flex items-center gap-2 flex-wrap text-[11px] text-[var(--text-secondary)] mt-2">
               {/* QUEM EXECUTA ESTA ETAPA — não "o responsável".
                   O responsável pelo trabalho é o da TAREFA, e ele aparece uma
                   vez só, no topo do painel. Um nome solto aqui era lido como
@@ -528,20 +528,20 @@ function StepCard({
                   parecia ter dois donos conforme onde se olhasse. */}
               <span className="inline-flex items-center gap-1.5">
                 <span className="w-1.5 h-1.5 rounded-full" style={{ background: dotColor }} />
-                <span className="text-slate-500">executa</span>
+                <span className="text-[var(--text-secondary)]">executa</span>
                 {responsibleName}
               </span>
-              <span className="text-slate-600">·</span>
+              <span className="text-[var(--text-secondary)]">·</span>
               <span className="inline-flex items-center gap-1">
-                <span className="text-slate-500">SLA</span>
+                <span className="text-[var(--text-secondary)]">SLA</span>
                 <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded ${sla.cls}`}>
                   {sla.label}
                 </span>
               </span>
               {step.dueAt && (
                 <>
-                  <span className="text-slate-600">·</span>
-                  <span className="font-mono text-[10.5px] text-slate-700">{fmtDateTime(step.dueAt)}</span>
+                  <span className="text-[var(--text-secondary)]">·</span>
+                  <span className="font-mono text-[10.5px] text-[var(--text-secondary)]">{fmtDateTime(step.dueAt)}</span>
                 </>
               )}
             </div>
@@ -569,7 +569,7 @@ function StepCard({
 
           {/* Notas */}
           {step.notes && (
-            <div className="mt-2 px-2 py-1.5 bg-slate-800/50 rounded text-[11px] text-slate-700 italic">
+            <div className="mt-2 px-2 py-1.5 bg-[var(--surface-secondary)] rounded text-[11px] text-[var(--text-secondary)] italic">
               {step.notes}
             </div>
           )}

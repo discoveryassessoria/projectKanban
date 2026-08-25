@@ -150,7 +150,7 @@ export default function FornecedoresPage() {
       {erro && (
         <div
           role="alert"
-          className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700"
+          className="rounded-lg border border-[var(--border-default)] bg-[var(--surface-secondary)] px-4 py-3 text-sm text-red-700"
         >
           {erro} Tente novamente em instantes — nenhum dado foi exibido no lugar.
         </div>
@@ -461,11 +461,11 @@ export default function FornecedoresPage() {
               <CardContent className="p-4">
                 <div className="flex items-start justify-between">
                   <div className="flex items-center gap-3">
-                    <div className={`p-2 rounded-full ${fornecedor.tipo === 'PJ' ? 'bg-blue-50' : 'bg-slate-50'}`}>
+                    <div className={`p-2 rounded-full ${fornecedor.tipo === 'PJ' ? 'bg-[var(--surface-secondary)]' : 'bg-[var(--surface-secondary)]'}`}>
                       {fornecedor.tipo === 'PJ' ? (
-                        <Building className="h-5 w-5 text-blue-700" />
+                        <Building className="h-5 w-5 text-[var(--text-secondary)]" />
                       ) : (
-                        <User className="h-5 w-5 text-slate-700" />
+                        <User className="h-5 w-5 text-[var(--text-secondary)]" />
                       )}
                     </div>
                     <div>

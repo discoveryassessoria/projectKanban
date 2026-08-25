@@ -126,7 +126,7 @@ export default function CapacidadeOperacionalTab() {
   }, [dados, busca])
 
   if (erro && !dados) {
-    return <div className="rounded border border-red-200 bg-red-50 px-4 py-3 text-[12px] text-red-700/90">{erro}</div>
+    return <div className="rounded border border-[var(--border-default)] bg-[var(--surface-secondary)] px-4 py-3 text-[12px] text-red-700/90">{erro}</div>
   }
   if (!dados) {
     return (
@@ -147,7 +147,7 @@ export default function CapacidadeOperacionalTab() {
         </p>
       </div>
 
-      {erro && <div className="rounded border border-red-200 bg-red-50 px-3 py-2 text-[11px] text-red-700/90">{erro}</div>}
+      {erro && <div className="rounded border border-[var(--border-default)] bg-[var(--surface-secondary)] px-3 py-2 text-[11px] text-red-700/90">{erro}</div>}
 
       {/* A COMPOSIÇÃO DAS EQUIPES SE FAZ NO CADASTRO DE EQUIPES.
           Duplicar aqui um editor de membros criaria dois lugares para a mesma
@@ -188,7 +188,7 @@ export default function CapacidadeOperacionalTab() {
                   <div className="text-[10px] text-[var(--text-muted)]">{l.perfil}</div>
                   {/* A permissão vem primeiro porque sem ela o resto é decorativo. */}
                   {!l.podeExecutar && (
-                    <div className="mt-1 inline-flex rounded border border-amber-200 bg-amber-50 px-1.5 py-[1px] text-[9px] text-amber-700/90">
+                    <div className="mt-1 inline-flex rounded border border-[var(--border-default)] bg-[var(--surface-secondary)] px-1.5 py-[1px] text-[9px] text-amber-700/90">
                       não executa tarefas
                     </div>
                   )}
@@ -210,7 +210,7 @@ export default function CapacidadeOperacionalTab() {
                       </span>
                     </span>
                   ) : (
-                    <span className="text-emerald-700/70">disponível</span>
+                    <span className="text-green-700/70">disponível</span>
                   )}
                 </td>
                 <td className="px-3 py-2 text-[11px] tabular-nums text-[var(--text-secondary)]">
@@ -268,7 +268,7 @@ function PainelConfiguracao({
   return (
     <div className="fixed inset-0 z-[60] flex items-center justify-center bg-[var(--overlay-modal)] p-4" onClick={aoFechar}>
       <div
-        className="flex max-h-[85vh] w-full max-w-lg flex-col overflow-hidden rounded-lg border border-[var(--border-default)] bg-[var(--surface-overlay)] shadow-2xl"
+        className="flex max-h-[85vh] w-full max-w-lg flex-col overflow-hidden rounded-lg border border-[var(--border-default)] bg-[var(--surface-overlay)] shadow-[var(--elev-3)]"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="border-b border-white/[0.08] px-4 py-3">
@@ -278,7 +278,7 @@ function PainelConfiguracao({
             {linha.equipes.length > 0 && ` · ${linha.equipes.map((e) => e.nome).join(", ")}`}
           </p>
           {!linha.podeExecutar && (
-            <p className="mt-1.5 rounded border border-amber-200 bg-amber-50 px-2 py-1 text-[10px] leading-4 text-amber-700/85">
+            <p className="mt-1.5 rounded border border-[var(--border-default)] bg-[var(--surface-secondary)] px-2 py-1 text-[10px] leading-4 text-amber-700/85">
               Esta pessoa não tem permissão de executar tarefa. Nada configurado aqui a torna elegível —
               a permissão se concede em Perfis e Permissões.
             </p>
@@ -295,7 +295,7 @@ function PainelConfiguracao({
               ninguém for declarado apto para uma unidade, ela não restringe ninguém — a primeira declaração liga a regra.
             </p>
             {unidades.length === 0 ? (
-              <p className="mt-2 rounded border border-amber-200 bg-amber-400/[0.06] px-2 py-1.5 text-[10px] leading-4 text-amber-700/80">
+              <p className="mt-2 rounded border border-[var(--border-default)] bg-[var(--surface-secondary)] px-2 py-1.5 text-[10px] leading-4 text-amber-700/80">
                 Nenhuma unidade de trabalho cadastrada. Elas vêm dos Perfis Operacionais do Cadastro Mestre —
                 cadastre-os em Gerenciamento › Documentos e Protocolos para que apareçam aqui.
               </p>
@@ -375,7 +375,7 @@ function PainelConfiguracao({
                   const vigente = linha.indisponivelPor?.id === i.id
                   return (
                     <div key={i.id} className={`flex items-center gap-2 rounded border px-2 py-1.5 text-[11px] ${
-                      vigente ? "border-amber-200 bg-amber-400/[0.07]" : "border-white/[0.07]"
+                      vigente ? "border-[var(--border-default)] bg-[var(--surface-secondary)]" : "border-white/[0.07]"
                     }`}>
                       <span className={vigente ? "text-amber-700/90" : "text-[var(--text-secondary)]"}>
                         {ROTULO_TIPO[i.tipo] ?? i.tipo}

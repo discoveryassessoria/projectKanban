@@ -229,7 +229,7 @@ export default function RolesTab() {
       )}
 
       {!loading && erroLista && (
-        <div className="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-700">
+        <div className="rounded-lg border border-[var(--border-default)] bg-[var(--surface-secondary)] p-4 text-sm text-red-700">
           {erroLista}
           <button onClick={() => void carregar()} className="ml-3 underline hover:text-white">
             Tentar de novo
@@ -264,7 +264,7 @@ export default function RolesTab() {
                     <div className="flex items-center gap-2">
                       <h3 className="truncate font-medium text-white">{p.nome}</h3>
                       {bloqueado ? (
-                        <span className="shrink-0 rounded bg-amber-50 px-1.5 py-0.5 text-[10px] font-medium text-amber-700">
+                        <span className="shrink-0 rounded bg-[var(--surface-secondary)] px-1.5 py-0.5 text-[10px] font-medium text-amber-700">
                           Protegido
                         </span>
                       ) : p.sistema ? (
@@ -304,7 +304,7 @@ export default function RolesTab() {
                   {!bloqueado && (
                     <button
                       onClick={() => excluir(p)}
-                      className="ml-auto rounded-md border border-red-200 px-2.5 py-1.5 text-red-700/80 transition hover:bg-red-50 hover:text-red-700"
+                      className="ml-auto rounded-md border border-[var(--border-default)] px-2.5 py-1.5 text-red-700/80 transition hover:bg-[var(--surface-secondary)] hover:text-red-700"
                     >
                       Excluir
                     </button>
@@ -319,7 +319,7 @@ export default function RolesTab() {
       {/* Modal */}
       {modalAberto && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-[var(--overlay-modal)] p-4 backdrop-blur-sm">
-          <div className="flex max-h-[90vh] w-full max-w-2xl flex-col rounded-2xl border border-[var(--border-default)] bg-zinc-900/95 shadow-2xl">
+          <div className="flex max-h-[90vh] w-full max-w-2xl flex-col rounded-2xl border border-[var(--border-default)] bg-zinc-900/95 shadow-[var(--elev-3)]">
             {/* topo do modal */}
             <div className="flex items-center justify-between border-b border-[var(--border-default)] px-6 py-4">
               <h3 className="text-lg font-semibold text-white">
@@ -336,7 +336,7 @@ export default function RolesTab() {
             {/* corpo rolável */}
             <div className="flex-1 overflow-y-auto px-6 py-4">
               {somenteLeitura && (
-                <div className="mb-4 rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs text-amber-700">
+                <div className="mb-4 rounded-lg border border-[var(--border-default)] bg-[var(--surface-secondary)] p-3 text-xs text-amber-700">
                   O perfil <strong>Administrador</strong> não pode ser editado. Use <strong>Duplicar</strong> para criar uma versão editável.
                 </div>
               )}
@@ -460,7 +460,7 @@ export default function RolesTab() {
               </div>
 
               {erroModal && (
-                <div className="mt-4 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700">
+                <div className="mt-4 rounded-lg border border-[var(--border-default)] bg-[var(--surface-secondary)] p-3 text-sm text-red-700">
                   {erroModal}
                 </div>
               )}

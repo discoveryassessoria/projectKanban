@@ -30,16 +30,16 @@ const CARD = "rounded-2xl border border-[var(--border-default)] bg-[var(--surfac
 
 // estados vindos do backend → cor e rótulo em português
 const ESTADO: Record<string, { cls: string; label: string }> = {
-  ATUALIZADO: { cls: "bg-green-50 text-green-700", label: "Atualizado" },
-  ATIVO: { cls: "bg-green-50 text-green-700", label: "Ativo" },
-  DECLARADO: { cls: "bg-green-50 text-green-700", label: "Declarado" },
-  RUNTIME_V2_HABILITADO: { cls: "bg-green-50 text-green-700", label: "Runtime v2 habilitado" },
-  RUNTIME_V2_DESABILITADO: { cls: "bg-amber-50 text-amber-700", label: "Runtime v2 desabilitado" },
-  SEM_NOVA_PUBLICACAO: { cls: "bg-amber-50 text-amber-700", label: "Sem nova publicação" },
-  DESATUALIZADO: { cls: "bg-amber-50 text-amber-700", label: "Desatualizado" },
-  SEGREDO_PENDENTE: { cls: "bg-amber-50 text-amber-700", label: "Segredo pendente" },
-  CONFIGURACAO_PENDENTE: { cls: "bg-red-50 text-red-700", label: "Configuração pendente" },
-  INDISPONIVEL: { cls: "bg-red-50 text-red-700", label: "Indisponível" },
+  ATUALIZADO: { cls: "bg-[var(--surface-secondary)] text-green-700", label: "Atualizado" },
+  ATIVO: { cls: "bg-[var(--surface-secondary)] text-green-700", label: "Ativo" },
+  DECLARADO: { cls: "bg-[var(--surface-secondary)] text-green-700", label: "Declarado" },
+  RUNTIME_V2_HABILITADO: { cls: "bg-[var(--surface-secondary)] text-green-700", label: "Runtime v2 habilitado" },
+  RUNTIME_V2_DESABILITADO: { cls: "bg-[var(--surface-secondary)] text-amber-700", label: "Runtime v2 desabilitado" },
+  SEM_NOVA_PUBLICACAO: { cls: "bg-[var(--surface-secondary)] text-amber-700", label: "Sem nova publicação" },
+  DESATUALIZADO: { cls: "bg-[var(--surface-secondary)] text-amber-700", label: "Desatualizado" },
+  SEGREDO_PENDENTE: { cls: "bg-[var(--surface-secondary)] text-amber-700", label: "Segredo pendente" },
+  CONFIGURACAO_PENDENTE: { cls: "bg-[var(--surface-secondary)] text-red-700", label: "Configuração pendente" },
+  INDISPONIVEL: { cls: "bg-[var(--surface-secondary)] text-red-700", label: "Indisponível" },
   SEM_DADOS: { cls: "bg-[var(--surface-primary)] text-[var(--text-secondary)]", label: "Sem dados" },
 }
 const estadoDe = (e: string) => ESTADO[e] ?? { cls: "bg-[var(--surface-primary)] text-[var(--text-secondary)]", label: e }
@@ -92,7 +92,7 @@ export default function IntegracoesTab() {
   return (
     <div className="space-y-5">
       {erro && (
-        <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+        <div className="rounded-xl border border-[var(--border-default)] bg-[var(--surface-secondary)] px-4 py-3 text-sm text-red-700">
           {erro} <button onClick={() => void load()} className="ml-2 underline hover:text-white">Tentar de novo</button>
         </div>
       )}

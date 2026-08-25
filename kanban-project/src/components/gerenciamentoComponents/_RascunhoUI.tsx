@@ -21,7 +21,7 @@ export const BTN_RASCUNHO =
 
 export function AvisoRascunho({ children }: { children?: React.ReactNode }) {
   return (
-    <div className="mb-3 flex items-start gap-2 rounded-xl border border-amber-200 bg-amber-50 px-4 py-2.5 text-[12.5px] text-amber-100/90">
+    <div className="mb-3 flex items-start gap-2 rounded-xl border border-[var(--border-default)] bg-[var(--surface-secondary)] px-4 py-2.5 text-[12.5px] text-amber-100/90">
       <span aria-hidden="true" className="mt-[1px]">⚠️</span>
       <span>
         {children ?? (

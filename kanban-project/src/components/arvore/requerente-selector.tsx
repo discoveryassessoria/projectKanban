@@ -167,7 +167,7 @@ export function RequerenteSelector({
       )}
 
       {/* Cor própria na raiz — ver comentário equivalente em tree-onboarding.tsx. */}
-      <div className="bg-[var(--surface-primary)] text-gray-900 rounded-2xl shadow-sm border border-gray-200 p-6">
+      <div className="bg-[var(--surface-primary)] text-gray-900 rounded-2xl shadow-[var(--elev-1)] border border-gray-200 p-6">
         <h2 className="text-xl font-bold text-gray-900 mb-1">Selecionar requerente</h2>
         <p className="text-sm text-gray-500 mb-5">
           O requerente já cadastrado no processo é reaproveitado — a árvore não cria uma
@@ -175,7 +175,7 @@ export function RequerenteSelector({
         </p>
 
         {nenhumRequerente && (
-          <div className="rounded-lg border border-amber-200 bg-amber-50 p-4">
+          <div className="rounded-lg border border-[var(--border-default)] bg-[var(--surface-secondary)] p-4">
             <div className="flex items-start gap-2">
               <AlertCircle className="w-5 h-5 text-amber-600 flex-shrink-0 mt-0.5" />
               <div>
@@ -211,14 +211,14 @@ export function RequerenteSelector({
                     onClick={() => setSelectedId(r.requerenteId)}
                     className={`w-full text-left p-4 rounded-xl border-2 transition-all ${
                       isSel
-                        ? "border-amber-500 bg-amber-50"
+                        ? "border-amber-500 bg-[var(--surface-secondary)]"
                         : "border-gray-200 bg-[var(--surface-primary)] hover:border-gray-300 hover:bg-gray-50"
                     }`}
                   >
                     <div className="flex items-start gap-3">
                       <div
                         className={`mt-0.5 w-5 h-5 rounded-full border-2 flex items-center justify-center flex-shrink-0 ${
-                          isSel ? "border-amber-500 bg-amber-500" : "border-gray-300"
+                          isSel ? "border-amber-500 bg-amber-600" : "border-gray-300"
                         }`}
                       >
                         {isSel && <Check className="w-3 h-3 text-white" strokeWidth={3} />}
@@ -228,7 +228,7 @@ export function RequerenteSelector({
                           <User className="w-4 h-4 text-[var(--text-muted)]" />
                           {r.nome}
                           {faixa && (
-                            <span className={`text-[11px] font-medium px-1.5 py-0.5 rounded-full ${faixa === "Menor" ? "bg-amber-100 text-amber-700" : "bg-gray-100 text-gray-600"}`}>
+                            <span className={`text-[11px] font-medium px-1.5 py-0.5 rounded-full ${faixa === "Menor" ? "bg-[var(--surface-secondary)] text-amber-700" : "bg-gray-100 text-gray-600"}`}>
                               {faixa}
                             </span>
                           )}

@@ -49,7 +49,7 @@ export default function DuplicarReceitaModal({ receitaRef, natureza, onClose, on
   if (typeof document === "undefined") return null
   const modal = (
     <div className="fixed inset-0 flex items-start justify-center overflow-y-auto bg-[var(--app-overlay)] p-4 sm:items-center" style={{ zIndex: LAYER.aboveProcess }} onClick={() => !enviando && onClose()}>
-      <div className="w-full max-w-md rounded-[var(--radius-lg)] border border-[var(--border-default)] bg-[var(--surface-overlay)] shadow-[var(--shadow-surface)]" onClick={(e) => e.stopPropagation()}>
+      <div className="w-full max-w-md rounded-[var(--radius-lg)] border border-[var(--border-default)] bg-[var(--surface-overlay)] shadow-[var(--elev-2)]" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center justify-between border-b border-[var(--border-default)] px-5 py-4">
           <h2 className="flex items-center gap-2 text-base font-semibold text-[var(--text-primary)]"><Copy className="h-4 w-4 text-[var(--info)]" /> Duplicar {v.Entidade}</h2>
           <button onClick={() => !enviando && onClose()} className="text-[var(--text-muted)] hover:text-[var(--text-secondary)]"><X className="h-5 w-5" /></button>

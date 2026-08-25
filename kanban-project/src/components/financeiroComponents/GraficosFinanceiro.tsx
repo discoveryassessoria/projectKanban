@@ -113,7 +113,7 @@ function formatCurrencyShort(valor: number): string {
 function CustomTooltip({ active, payload, label }: any) {
   if (!active || !payload || !payload.length) return null
   return (
-    <div className="bg-[var(--surface-popover)] border border-gray-700 rounded-lg px-3 py-2 shadow-xl">
+    <div className="bg-[var(--surface-popover)] border border-gray-700 rounded-lg px-3 py-2 shadow-[var(--elev-3)]">
       {label && <p className="text-white/70 text-xs mb-1">{label}</p>}
       {payload.map((p: any, i: number) => (
         <p key={i} className="text-sm font-medium" style={{ color: p.color || p.fill }}>
@@ -128,7 +128,7 @@ function PieTooltip({ active, payload }: any) {
   if (!active || !payload || !payload.length) return null
   const data = payload[0]
   return (
-    <div className="bg-[var(--surface-popover)] border border-gray-700 rounded-lg px-3 py-2 shadow-xl">
+    <div className="bg-[var(--surface-popover)] border border-gray-700 rounded-lg px-3 py-2 shadow-[var(--elev-3)]">
       <p className="text-sm font-medium" style={{ color: data.payload.fill }}>
         {data.name}
       </p>
@@ -483,7 +483,7 @@ export default function GraficosFinanceiro({ faturas, totaisGeralBRL, totaisPorM
                 <Tooltip content={({ active, payload }: any) => {
                   if (!active || !payload?.length) return null
                   return (
-                    <div className="bg-[var(--surface-popover)] border border-gray-700 rounded-lg px-3 py-2 shadow-xl">
+                    <div className="bg-[var(--surface-popover)] border border-gray-700 rounded-lg px-3 py-2 shadow-[var(--elev-3)]">
                       <p className="text-sm font-medium" style={{ color: payload[0].payload.fill }}>{payload[0].name}: {payload[0].value} fatura(s)</p>
                     </div>
                   )

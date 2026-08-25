@@ -60,7 +60,7 @@ export function RepassePanel({ obrigacaoId, repasses, onChange }: { obrigacaoId:
 
       {modal && (
         <div className="fixed inset-0 z-[10050] flex items-center justify-center bg-[var(--app-overlay)] p-4" onClick={() => setModal(false)}>
-          <div onClick={(e) => e.stopPropagation()} className="w-full max-w-md rounded-[var(--radius-md)] border border-[var(--border-default)] bg-[var(--surface-overlay)] p-5 shadow-[var(--shadow-surface)]">
+          <div onClick={(e) => e.stopPropagation()} className="w-full max-w-md rounded-[var(--radius-md)] border border-[var(--border-default)] bg-[var(--surface-overlay)] p-5 shadow-[var(--elev-2)]">
             <div className="flex items-center justify-between"><h3 className="text-base font-semibold text-[var(--text-primary)]">Registrar repasse/reembolso</h3><button onClick={() => setModal(false)} className="text-[var(--text-muted)] hover:text-[var(--text-secondary)]"><X className="h-4 w-4" /></button></div>
             <div className="mt-4 space-y-3">
               <label className="block text-[11px] font-medium uppercase tracking-wide text-[var(--text-muted)]">Tipo

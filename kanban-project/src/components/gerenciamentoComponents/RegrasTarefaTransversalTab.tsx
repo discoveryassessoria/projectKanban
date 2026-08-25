@@ -253,7 +253,7 @@ export default function RegrasTarefaTransversalTab() {
                 <td className="px-3 py-2.5">
                   <div className="flex flex-wrap gap-1">
                     {r.autoCreate
-                      ? <span className="rounded bg-amber-50 px-1.5 py-0.5 text-[10px] text-amber-700">cria automático</span>
+                      ? <span className="rounded bg-[var(--surface-secondary)] px-1.5 py-0.5 text-[10px] text-amber-700">cria automático</span>
                       : <span className="rounded bg-[var(--surface-primary)] px-1.5 py-0.5 text-[10px] text-[var(--text-secondary)]">sugere</span>}
                     {r.mandatory && <span className="rounded bg-[var(--surface-primary)] px-1.5 py-0.5 text-[10px] text-[var(--text-secondary)]">obrigatória</span>}
                   </div>
@@ -261,7 +261,7 @@ export default function RegrasTarefaTransversalTab() {
                 <td className="px-3 py-2.5">
                   {r.arquivado
                     ? <span className="rounded bg-[var(--surface-primary)] px-1.5 py-0.5 text-[10px] text-[var(--text-secondary)]">arquivado</span>
-                    : <span className="rounded bg-green-50 px-1.5 py-0.5 text-[10px] text-green-700">ativo</span>}
+                    : <span className="rounded bg-[var(--surface-secondary)] px-1.5 py-0.5 text-[10px] text-green-700">ativo</span>}
                 </td>
                 <td className="px-3 py-2.5">
                   <div className="flex items-center justify-end gap-1">
@@ -279,7 +279,7 @@ export default function RegrasTarefaTransversalTab() {
 
       {modalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-[var(--overlay-modal)] p-4 backdrop-blur-sm" onClick={() => setModalOpen(false)}>
-          <div className="max-h-[90vh] w-full max-w-2xl overflow-auto rounded-2xl border border-[var(--border-default)] bg-zinc-900/95 shadow-2xl" onClick={e => e.stopPropagation()}>
+          <div className="max-h-[90vh] w-full max-w-2xl overflow-auto rounded-2xl border border-[var(--border-default)] bg-zinc-900/95 shadow-[var(--elev-3)]" onClick={e => e.stopPropagation()}>
             <div className="border-b border-[var(--border-default)] px-5 py-4">
               <h3 className="text-base font-semibold text-white">{form.id ? "Editar" : "Nova"} regra de tarefa transversal</h3>
             </div>

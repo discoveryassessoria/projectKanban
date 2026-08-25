@@ -36,7 +36,7 @@ interface Organizacao {
   canais: Array<{ canal: { key: string; label: string } }>
 }
 
-const inp = "w-full rounded-lg border border-[var(--border-default)] bg-[var(--surface-primary)] px-3 py-2 text-sm text-white placeholder-white/30 outline-none focus:border-blue-200"
+const inp = "w-full rounded-lg border border-[var(--border-default)] bg-[var(--surface-primary)] px-3 py-2 text-sm text-white placeholder-white/30 outline-none focus:border-[var(--border-default)]"
 
 function headers(): HeadersInit {
   const t = typeof window !== "undefined" ? localStorage.getItem("token") : null
@@ -124,7 +124,7 @@ export default function CanaisPorOrganizacaoPanel() {
       <input className={inp} placeholder="Buscar organização por nome ou cidade…"
         value={busca} onChange={(e) => setBusca(e.target.value)} />
 
-      {flash && <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-2 text-xs text-emerald-700">{flash}</div>}
+      {flash && <div className="rounded-lg border border-[var(--border-default)] bg-[var(--surface-secondary)] p-2 text-xs text-green-700">{flash}</div>}
 
       {organizacoes === null && <p className="text-sm text-[var(--text-muted)]">Carregando organizações…</p>}
       {organizacoes?.length === 0 && <p className="text-sm text-[var(--text-muted)]">Nenhuma organização encontrada.</p>}
@@ -138,9 +138,9 @@ export default function CanaisPorOrganizacaoPanel() {
                 {o.type && <span className="rounded bg-[var(--surface-primary)] px-1.5 py-0.5 text-[var(--text-secondary)]">{o.type}</span>}
                 {o.city && <span className="rounded bg-[var(--surface-primary)] px-1.5 py-0.5 text-[var(--text-secondary)]">{o.city}</span>}
                 {o.canais.length === 0
-                  ? <span className="rounded bg-amber-50 px-1.5 py-0.5 text-amber-700" title="Toda subtarefa que dependa de canal fica bloqueada nesta organização.">sem canal cadastrado</span>
+                  ? <span className="rounded bg-[var(--surface-secondary)] px-1.5 py-0.5 text-amber-700" title="Toda subtarefa que dependa de canal fica bloqueada nesta organização.">sem canal cadastrado</span>
                   : o.canais.map((c) => (
-                      <span key={c.canal.key} className="rounded bg-sky-50 px-1.5 py-0.5 text-sky-700">{c.canal.label}</span>
+                      <span key={c.canal.key} className="rounded bg-[var(--surface-secondary)] px-1.5 py-0.5 text-[var(--text-secondary)]">{c.canal.label}</span>
                     ))}
               </div>
             </div>
@@ -154,7 +154,7 @@ export default function CanaisPorOrganizacaoPanel() {
 
       {aberta && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-[var(--overlay-modal)] p-4 backdrop-blur-sm" onClick={() => setAberta(null)}>
-          <div className="flex max-h-[90vh] w-full max-w-2xl flex-col overflow-hidden rounded-2xl border border-[var(--border-default)] bg-zinc-900/95 shadow-2xl" onClick={(e) => e.stopPropagation()}>
+          <div className="flex max-h-[90vh] w-full max-w-2xl flex-col overflow-hidden rounded-2xl border border-[var(--border-default)] bg-zinc-900/95 shadow-[var(--elev-3)]" onClick={(e) => e.stopPropagation()}>
             <div className="border-b border-[var(--border-default)] px-6 py-4">
               <h3 className="font-semibold text-white">Canais de {aberta.nomeFantasia || aberta.name}</h3>
               <p className="mt-0.5 text-xs text-[var(--text-secondary)]">

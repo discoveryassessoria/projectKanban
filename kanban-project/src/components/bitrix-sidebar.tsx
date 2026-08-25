@@ -151,7 +151,7 @@ export function BitrixSidebar() {
       className={`
         ${isExpanded ? "w-64" : "w-16"} 
         bg-black/40 backdrop-blur-md text-white 
-        border-r border-[var(--border-default)] shadow-xl
+        border-r border-[var(--border-default)] shadow-[var(--elev-3)]
         transition-[width] duration-300 ease-in-out
         flex flex-col h-screen fixed left-0 top-0 z-50
         overflow-hidden

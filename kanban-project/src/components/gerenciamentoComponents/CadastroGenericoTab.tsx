@@ -241,9 +241,9 @@ export default function CadastroGenericoTab({ entidade }: { entidade: string }) 
 
   return (
     <div className="space-y-5">
-      {flash && <div className="rounded-xl border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-700">{flash}</div>}
+      {flash && <div className="rounded-xl border border-[var(--border-default)] bg-[var(--surface-secondary)] px-4 py-3 text-sm text-green-700">{flash}</div>}
       {erro && !form && (
-        <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+        <div className="rounded-xl border border-[var(--border-default)] bg-[var(--surface-secondary)] px-4 py-3 text-sm text-red-700">
           {erro} <button onClick={() => { setErro(null); load() }} className="ml-2 underline hover:text-white">Recarregar</button>
         </div>
       )}
@@ -335,7 +335,7 @@ export default function CadastroGenericoTab({ entidade }: { entidade: string }) 
                   <button
                     onClick={() => alternarAtivo(r)}
                     title={r.ativo ? "Inativar (some dos seletores, sem apagar)" : "Ativar"}
-                    className={`rounded-full px-2 py-0.5 text-[10px] ${r.ativo ? "bg-green-50 text-green-700" : "bg-[var(--surface-primary)] text-[var(--text-secondary)]"}`}
+                    className={`rounded-full px-2 py-0.5 text-[10px] ${r.ativo ? "bg-[var(--surface-secondary)] text-green-700" : "bg-[var(--surface-primary)] text-[var(--text-secondary)]"}`}
                   >
                     {r.ativo ? "Ativo" : "Inativo"}
                   </button>
@@ -343,7 +343,7 @@ export default function CadastroGenericoTab({ entidade }: { entidade: string }) 
                 <td className="px-4 py-2.5">
                   <div className="flex items-center justify-end gap-0.5 text-[var(--text-secondary)]">
                     <button title="Editar" aria-label="Editar" onClick={() => editar(r)} className="rounded p-1 hover:bg-[var(--surface-hover)] hover:text-white"><IEdit /></button>
-                    <button title="Excluir" aria-label="Excluir" onClick={() => excluir(r)} className="rounded p-1 text-red-700/70 hover:bg-red-50 hover:text-red-700"><ITrash /></button>
+                    <button title="Excluir" aria-label="Excluir" onClick={() => excluir(r)} className="rounded p-1 text-red-700/70 hover:bg-[var(--surface-secondary)] hover:text-red-700"><ITrash /></button>
                   </div>
                 </td>
               </tr>
@@ -354,7 +354,7 @@ export default function CadastroGenericoTab({ entidade }: { entidade: string }) 
 
       {form && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-[var(--overlay-modal)] p-4 backdrop-blur-sm" onClick={() => fecharModal()}>
-          <div className="flex max-h-[90vh] w-full max-w-2xl flex-col rounded-2xl border border-[var(--border-default)] bg-zinc-900/95 shadow-2xl" onClick={(e) => e.stopPropagation()}>
+          <div className="flex max-h-[90vh] w-full max-w-2xl flex-col rounded-2xl border border-[var(--border-default)] bg-zinc-900/95 shadow-[var(--elev-3)]" onClick={(e) => e.stopPropagation()}>
             <div className="border-b border-[var(--border-default)] px-6 py-4">
               <h3 className="font-semibold text-white">
                 {spec.singular
@@ -363,7 +363,7 @@ export default function CadastroGenericoTab({ entidade }: { entidade: string }) 
               </h3>
             </div>
             <div className="flex-1 overflow-y-auto px-6 py-4">
-              {erro && <div className="mb-3 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">{erro}</div>}
+              {erro && <div className="mb-3 rounded-lg border border-[var(--border-default)] bg-[var(--surface-secondary)] px-3 py-2 text-sm text-red-700">{erro}</div>}
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                 {spec.campos.map((c, indiceCampo) => {
                   // Somente leitura: administrado pelo sistema, nunca editável.

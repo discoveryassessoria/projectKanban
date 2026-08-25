@@ -145,7 +145,7 @@ function PersonMiniCard({
             <span className="text-[8px] text-gray-500">{dateRange || 'Falecido'}</span>
           ) : (
             <span className="text-[8px] text-green-600 flex items-center gap-0.5">
-              <span className="w-1.5 h-1.5 rounded-full bg-green-500"></span>
+              <span className="w-1.5 h-1.5 rounded-full bg-green-600"></span>
               {dateRange ? `${dateRange}-Vivo` : 'Vivo'}
             </span>
           )}
@@ -196,7 +196,7 @@ function ExpandArrowButton({
 
   return (
     <button
-      className={`absolute ${getPosition()} w-5 h-5 rounded-full bg-[var(--surface-primary)] border border-gray-300 flex items-center justify-center shadow-sm hover:bg-gray-50 hover:border-gray-400 transition-all z-20`}
+      className={`absolute ${getPosition()} w-5 h-5 rounded-full bg-[var(--surface-primary)] border border-gray-300 flex items-center justify-center shadow-[var(--elev-1)] hover:bg-gray-50 hover:border-gray-400 transition-all z-20`}
       onClick={(e) => {
         e.stopPropagation()
         onClick()
@@ -258,7 +258,7 @@ export function CoupleCard({
 
   if (mode === 'paisagem') {
     return (
-      <div className={`relative bg-[var(--surface-primary)] rounded-xl shadow-lg overflow-hidden ${isMain ? 'ring-2 ring-green-500 ring-offset-2' : ''}`}>
+      <div className={`relative bg-[var(--surface-primary)] rounded-xl shadow-[var(--elev-2)] overflow-hidden ${isMain ? 'ring-2 ring-[var(--border-strong)] ring-offset-2' : ''}`}>
         {/* Container principal */}
         <div className="min-w-[200px]">
           {/* Pessoa 1 (marido ou principal) */}
@@ -325,7 +325,7 @@ export function CoupleCard({
                     className="flex items-center gap-2 p-2 cursor-pointer hover:bg-gray-100 transition-colors"
                     onClick={onAddFilho}
                   >
-                    <div className="w-8 h-8 rounded-full flex items-center justify-center bg-green-50">
+                    <div className="w-8 h-8 rounded-full flex items-center justify-center bg-[var(--surface-secondary)]">
                       <Plus className="w-4 h-4 text-green-600" />
                     </div>
                     <span className="text-[10px] font-semibold text-green-600">
@@ -354,7 +354,7 @@ export function CoupleCard({
 
   // MODO RETRATO
   return (
-    <div className={`relative bg-[var(--surface-primary)] rounded-xl shadow-lg overflow-hidden ${isMain ? 'ring-2 ring-green-500 ring-offset-2' : ''}`}>
+    <div className={`relative bg-[var(--surface-primary)] rounded-xl shadow-[var(--elev-2)] overflow-hidden ${isMain ? 'ring-2 ring-[var(--border-strong)] ring-offset-2' : ''}`}>
       {/* Botões de expandir para pais (cima) */}
       {showExpandButtons && marido && (
         <ExpandArrowButton
@@ -398,7 +398,7 @@ export function CoupleCard({
       {showExpandButtons && esposa && marido && (
         <div className="absolute top-0 right-1/4 -translate-y-1/2">
           <button
-            className="w-5 h-5 rounded-full bg-[var(--surface-primary)] border border-gray-300 flex items-center justify-center shadow-sm hover:bg-gray-50 z-20"
+            className="w-5 h-5 rounded-full bg-[var(--surface-primary)] border border-gray-300 flex items-center justify-center shadow-[var(--elev-1)] hover:bg-gray-50 z-20"
             onClick={(e) => {
               e.stopPropagation()
               onExpandMae?.()
@@ -438,7 +438,7 @@ export function CoupleCard({
                 className="flex items-center gap-2 p-2 cursor-pointer hover:bg-gray-100 transition-colors"
                 onClick={onAddFilho}
               >
-                <div className="w-8 h-8 rounded-full flex items-center justify-center bg-green-50">
+                <div className="w-8 h-8 rounded-full flex items-center justify-center bg-[var(--surface-secondary)]">
                   <Plus className="w-4 h-4 text-green-600" />
                 </div>
                 <span className="text-[10px] font-semibold text-green-600">
@@ -494,7 +494,7 @@ export function PersonCardFS({
   if (mode === 'paisagem') {
     return (
       <div
-        className="relative bg-[var(--surface-primary)] rounded-xl shadow-md cursor-pointer hover:shadow-lg transition-all overflow-hidden"
+        className="relative bg-[var(--surface-primary)] rounded-xl shadow-[var(--elev-2)] cursor-pointer hover:shadow-[var(--elev-2)] transition-all overflow-hidden"
         style={{ borderLeft: `3px solid ${genderColors.border}` }}
         onClick={() => onClick?.(pessoa)}
       >
@@ -517,7 +517,7 @@ export function PersonCardFS({
                 <span className="text-[8px] text-gray-500">{dateRange || 'Falecido'}</span>
               ) : (
                 <span className="text-[8px] text-green-600 flex items-center gap-0.5">
-                  <span className="w-1.5 h-1.5 rounded-full bg-green-500"></span>
+                  <span className="w-1.5 h-1.5 rounded-full bg-green-600"></span>
                   Vivo
                 </span>
               )}
@@ -541,35 +541,35 @@ export function PersonCardFS({
   // RETRATO
   return (
     <div
-      className="relative bg-[var(--surface-primary)] rounded-xl shadow-md cursor-pointer hover:shadow-lg transition-all overflow-hidden"
+      className="relative bg-[var(--surface-primary)] rounded-xl shadow-[var(--elev-2)] cursor-pointer hover:shadow-[var(--elev-2)] transition-all overflow-hidden"
       style={{ borderTop: `3px solid ${genderColors.border}` }}
       onClick={() => onClick?.(pessoa)}
     >
       {/* Botão de adicionar pai */}
       {showExpandButtons && onAddPai && (
         <button
-          className="absolute -top-2 left-1/4 w-5 h-5 rounded-full bg-[var(--surface-primary)] border border-gray-300 flex items-center justify-center shadow-sm hover:bg-blue-50 z-20"
+          className="absolute -top-2 left-1/4 w-5 h-5 rounded-full bg-[var(--surface-primary)] border border-gray-300 flex items-center justify-center shadow-[var(--elev-1)] hover:bg-[var(--surface-secondary)] z-20"
           onClick={(e) => {
             e.stopPropagation()
             onAddPai()
           }}
           title="Adicionar pai"
         >
-          <Plus className="w-3 h-3 text-blue-600" />
+          <Plus className="w-3 h-3 text-[var(--text-secondary)]" />
         </button>
       )}
 
       {/* Botão de adicionar mãe */}
       {showExpandButtons && onAddMae && (
         <button
-          className="absolute -top-2 right-1/4 w-5 h-5 rounded-full bg-[var(--surface-primary)] border border-gray-300 flex items-center justify-center shadow-sm hover:bg-pink-50 z-20"
+          className="absolute -top-2 right-1/4 w-5 h-5 rounded-full bg-[var(--surface-primary)] border border-gray-300 flex items-center justify-center shadow-[var(--elev-1)] hover:bg-[var(--surface-secondary)] z-20"
           onClick={(e) => {
             e.stopPropagation()
             onAddMae()
           }}
           title="Adicionar mãe"
         >
-          <Plus className="w-3 h-3 text-pink-600" />
+          <Plus className="w-3 h-3 text-[var(--text-secondary)]" />
         </button>
       )}
 
@@ -593,7 +593,7 @@ export function PersonCardFS({
             <span className="text-[8px] text-gray-500">{dateRange || 'Falecido'}</span>
           ) : (
             <span className="text-[8px] text-green-600 flex items-center gap-0.5">
-              <span className="w-1.5 h-1.5 rounded-full bg-green-500"></span>
+              <span className="w-1.5 h-1.5 rounded-full bg-green-600"></span>
               {dateRange ? `${dateRange}-Vivo` : 'Vivo'}
             </span>
           )}

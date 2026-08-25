@@ -69,7 +69,7 @@ export function Header({
   }
 
   return (
-    <header className="sticky top-0 z-40 border-b border-[var(--border-default)] bg-black/40 backdrop-blur-md shadow-lg">
+    <header className="sticky top-0 z-40 border-b border-[var(--border-default)] bg-black/40 backdrop-blur-md shadow-[var(--elev-2)]">
       <div className="px-6 py-4 flex items-center justify-between">
         <div>
           <h1 className="text-lg font-semibold leading-tight text-white">
@@ -97,7 +97,7 @@ export function Header({
 
             {/* Dropdown de resultados */}
             {showSearchResults && (
-              <div className="absolute top-full mt-2 left-0 right-0 w-80 bg-[var(--surface-primary)] border border-gray-200 rounded-xl shadow-2xl overflow-hidden z-50">
+              <div className="absolute top-full mt-2 left-0 right-0 w-80 bg-[var(--surface-primary)] border border-gray-200 rounded-xl shadow-[var(--elev-3)] overflow-hidden z-50">
                 {searchResults.length === 0 ? (
                   <div className="px-4 py-6 text-center text-[var(--text-muted)]">
                     <Search className="h-8 w-8 mx-auto mb-2 opacity-50" />
@@ -145,7 +145,7 @@ export function Header({
 
             {/* Dropdown de notificações */}
             {showNotifications && (
-              <div className="absolute top-full mt-2 right-0 w-80 bg-[var(--surface-primary)] border border-gray-200 rounded-xl shadow-2xl overflow-hidden z-50">
+              <div className="absolute top-full mt-2 right-0 w-80 bg-[var(--surface-primary)] border border-gray-200 rounded-xl shadow-[var(--elev-3)] overflow-hidden z-50">
                 <div className="px-4 py-3 border-b border-gray-100 bg-gray-50">
                   <h3 className="font-semibold text-gray-800 text-sm">Notificações</h3>
                   <p className="text-xs text-gray-500">0 pendentes</p>
@@ -184,7 +184,7 @@ export function Header({
             variant="outline"
             size="sm"
             onClick={handleLogout}
-            className="border-[var(--border-strong)] text-xs bg-transparent hover:bg-red-50 hover:border-red-200 text-[var(--text-primary)] hover:text-red-700 flex items-center justify-center gap-1.5"
+            className="border-[var(--border-strong)] text-xs bg-transparent hover:bg-[var(--surface-secondary)] hover:border-[var(--border-default)] text-[var(--text-primary)] hover:text-red-700 flex items-center justify-center gap-1.5"
           >
             <LogOut className="h-3 w-3" />
             Sair

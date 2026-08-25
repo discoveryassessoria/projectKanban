@@ -212,9 +212,9 @@ export function ProcessoEstatisticas({ processo, onNavigate }: ProcessoEstatisti
           <div className="space-y-0">
             {alertas.map((a, i) => {
               const corTag =
-                a.sev === 'crit' ? 'bg-red-50 border-red-200' :
-                a.sev === 'warn' ? 'bg-amber-50 border-amber-200' :
-                                    'bg-sky-50 border-sky-200'
+                a.sev === 'crit' ? 'bg-[var(--surface-secondary)] border-[var(--border-default)]' :
+                a.sev === 'warn' ? 'bg-[var(--surface-secondary)] border-[var(--border-default)]' :
+                                    'bg-[var(--surface-secondary)] border-[var(--border-default)]'
               return (
                 <div key={i} className="flex items-center gap-2.5 text-[12.5px] text-white/95 py-1.5">
                   <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ring-[3px] ${corTag}`}></span>
@@ -228,7 +228,7 @@ export function ProcessoEstatisticas({ processo, onNavigate }: ProcessoEstatisti
 
       {/* ============== AVISO TEMPORÁRIO (endpoint pendente) ============== */}
       {!loading && !endpointDisponivel && (
-        <div className="mb-4 px-3 py-2 bg-amber-50 border border-amber-200 rounded text-[11px] text-amber-700">
+        <div className="mb-4 px-3 py-2 bg-[var(--surface-secondary)] border border-[var(--border-default)] rounded text-[11px] text-amber-700">
           ⚠ Endpoint <code className="font-mono">/api/processos/{processo.id}/estatisticas</code> ainda não existe — cards mostrando valores zerados.
         </div>
       )}

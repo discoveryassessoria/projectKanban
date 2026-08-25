@@ -56,7 +56,7 @@ function AvisoSessao({
       role="alertdialog" aria-modal="true" aria-labelledby="sessao-titulo" aria-describedby="sessao-desc"
       className="fixed inset-0 z-[10050] flex items-center justify-center bg-[var(--app-overlay)] p-4"
     >
-      <div className="w-full max-w-sm rounded-[var(--radius-md)] border border-[var(--border-default)] bg-[var(--surface-overlay)] p-5 shadow-lg">
+      <div className="w-full max-w-sm rounded-[var(--radius-md)] border border-[var(--border-default)] bg-[var(--surface-overlay)] p-5 shadow-[var(--elev-2)]">
         <div className="flex items-start gap-3">
           <span className="mt-0.5 grid h-9 w-9 shrink-0 place-items-center rounded-full"
             style={{ background: "color-mix(in srgb, var(--accent-primary) 12%, transparent)", color: "var(--accent-text)" }}>

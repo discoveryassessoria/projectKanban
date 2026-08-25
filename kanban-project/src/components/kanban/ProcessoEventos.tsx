@@ -213,7 +213,7 @@ export function ProcessoEventos({ processoId, onUpdate }: ProcessoEventosProps) 
   if (isLoading) {
     return (
       <div className="p-6 flex items-center justify-center">
-        <div className="animate-spin h-8 w-8 border-4 border-blue-500 border-t-transparent rounded-full" />
+        <div className="animate-spin h-8 w-8 border-4 border-[var(--border-default)] border-t-transparent rounded-full" />
       </div>
     )
   }
@@ -224,8 +224,8 @@ export function ProcessoEventos({ processoId, onUpdate }: ProcessoEventosProps) 
         {/* Header */}
         <div className="flex items-center justify-between mb-6">
           <div className="flex items-center gap-3">
-            <div className="p-2 rounded-lg bg-blue-100">
-              <Calendar className="h-5 w-5 text-blue-600" />
+            <div className="p-2 rounded-lg bg-[var(--surface-secondary)]">
+              <Calendar className="h-5 w-5 text-[var(--text-secondary)]" />
             </div>
             <div>
               <h2 className="text-lg font-semibold text-white/95">Eventos</h2>
@@ -238,7 +238,7 @@ export function ProcessoEventos({ processoId, onUpdate }: ProcessoEventosProps) 
           {!showForm && pode('eventos.criar') && (
             <Button
               onClick={() => setShowForm(true)}
-              className="bg-emerald-700 hover:bg-emerald-800"
+              className="bg-green-700 hover:bg-green-800"
             >
               <Plus className="h-4 w-4 mr-1.5" />
               Novo Evento
@@ -284,7 +284,7 @@ export function ProcessoEventos({ processoId, onUpdate }: ProcessoEventosProps) 
                         onClick={() => setTipo(t.value)}
                         className={`p-2 rounded-lg border text-sm flex flex-col items-center gap-1 transition-colors ${
                           tipo === t.value
-                            ? "border-blue-500 bg-blue-50 text-blue-700"
+                            ? "border-[var(--border-default)] bg-[var(--surface-secondary)] text-[var(--text-secondary)]"
                             : "border-[var(--border-default)] hover:border-gray-300 text-white/70"
                         }`}
                       >
@@ -391,7 +391,7 @@ export function ProcessoEventos({ processoId, onUpdate }: ProcessoEventosProps) 
                   onChange={(e) => setDescricao(e.target.value)}
                   placeholder="Detalhes do evento..."
                   rows={3}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[var(--border-strong)] text-sm"
                 />
               </div>
 
@@ -460,7 +460,7 @@ export function ProcessoEventos({ processoId, onUpdate }: ProcessoEventosProps) 
                           </p>
                         )}
                         {evento.lembreteDias && (
-                          <span className="inline-flex items-center gap-1 mt-2 text-xs text-amber-600 bg-amber-50 px-2 py-1 rounded-full">
+                          <span className="inline-flex items-center gap-1 mt-2 text-xs text-amber-600 bg-[var(--surface-secondary)] px-2 py-1 rounded-full">
                             <Bell className="h-3 w-3" />
                             Lembrete {evento.lembreteDias} dias antes
                           </span>
@@ -472,7 +472,7 @@ export function ProcessoEventos({ processoId, onUpdate }: ProcessoEventosProps) 
                       {pode('eventos.editar') && (
                         <button
                           onClick={() => handleEdit(evento)}
-                          className="p-2 text-[var(--text-muted)] hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                          className="p-2 text-[var(--text-muted)] hover:text-[var(--text-secondary)] hover:bg-[var(--surface-secondary)] rounded-lg transition-colors"
                         >
                           <Edit2 className="h-4 w-4" />
                         </button>
@@ -480,7 +480,7 @@ export function ProcessoEventos({ processoId, onUpdate }: ProcessoEventosProps) 
                       {pode('eventos.excluir') && (
                         <button
                           onClick={() => handleDelete(evento.id)}
-                          className="p-2 text-[var(--text-muted)] hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                          className="p-2 text-[var(--text-muted)] hover:text-red-600 hover:bg-[var(--surface-secondary)] rounded-lg transition-colors"
                         >
                           <Trash2 className="h-4 w-4" />
                         </button>

@@ -146,7 +146,7 @@ export default function TiposDocumentoTab() {
 
   return (
     <div className="space-y-5">
-      {flash && <div className="rounded-xl border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-700">{flash}</div>}
+      {flash && <div className="rounded-xl border border-[var(--border-default)] bg-[var(--surface-secondary)] px-4 py-3 text-sm text-green-700">{flash}</div>}
 
       <div className="rounded-2xl border border-[var(--border-default)] bg-[var(--surface-primary)] p-5 backdrop-blur-sm">
         <div className="flex items-start justify-between gap-3">
@@ -179,11 +179,11 @@ export default function TiposDocumentoTab() {
                 <td className="px-4 py-2.5 font-mono text-[12px] font-bold text-white/80">{d.publicCode ?? "—"}</td>
                 <td className="px-4 py-2.5 text-white">{d.name}</td>
                 <td className="px-4 py-2.5 text-white/70">{d.categoriaDocumental?.name ?? (d.category || "—")}</td>
-                <td className="px-4 py-2.5"><span className={`rounded-full px-2 py-0.5 text-[10px] ${d.ativo ? "bg-green-50 text-green-700" : "bg-[var(--surface-primary)] text-[var(--text-secondary)]"}`}>{d.ativo ? "Ativo" : "Inativo"}</span></td>
+                <td className="px-4 py-2.5"><span className={`rounded-full px-2 py-0.5 text-[10px] ${d.ativo ? "bg-[var(--surface-secondary)] text-green-700" : "bg-[var(--surface-primary)] text-[var(--text-secondary)]"}`}>{d.ativo ? "Ativo" : "Inativo"}</span></td>
                 <td className="px-4 py-2.5">
                   <div className="flex items-center justify-end gap-0.5 text-[var(--text-secondary)]">
                     <button title="Editar" aria-label="Editar" onClick={() => setForm({ id: d.id, publicCode: d.publicCode ?? null, code: d.code || "", name: d.name, category: d.category || "", categoriaDocumentalId: d.categoriaDocumentalId ?? null, currentCat: d.categoriaDocumental ?? null, ativo: d.ativo, familiaDocumentalId: d.familiaDocumentalId ?? null, naturezaOperacionalId: d.naturezaOperacionalId ?? null, perfilOperacionalId: d.perfilOperacionalId ?? null })} className="rounded p-1 hover:bg-[var(--surface-hover)] hover:text-white"><IEdit /></button>
-                    <button title="Excluir" aria-label="Excluir" onClick={() => del(d)} className="rounded p-1 text-red-700/70 hover:bg-red-50 hover:text-red-700"><ITrash /></button>
+                    <button title="Excluir" aria-label="Excluir" onClick={() => del(d)} className="rounded p-1 text-red-700/70 hover:bg-[var(--surface-secondary)] hover:text-red-700"><ITrash /></button>
                   </div>
                 </td>
               </tr>
@@ -194,7 +194,7 @@ export default function TiposDocumentoTab() {
 
       {form && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-[var(--overlay-modal)] p-4 backdrop-blur-sm" onClick={() => setForm(null)}>
-          <div className="w-full max-w-md rounded-2xl border border-[var(--border-default)] bg-zinc-900/95 shadow-2xl" onClick={e => e.stopPropagation()}>
+          <div className="w-full max-w-md rounded-2xl border border-[var(--border-default)] bg-zinc-900/95 shadow-[var(--elev-3)]" onClick={e => e.stopPropagation()}>
             <div className="border-b border-[var(--border-default)] px-6 py-4"><h3 className="font-semibold text-white">{form.id ? "Editar" : "Novo"} tipo de documento</h3></div>
             <div className="space-y-3 px-6 py-4">
               <CodigoPublicoField codigo={form.publicCode} />
@@ -251,7 +251,7 @@ export default function TiposDocumentoTab() {
                   <select
                     value={form.perfilOperacionalId ?? ""}
                     onChange={e => setForm(f => f && { ...f, perfilOperacionalId: e.target.value ? Number(e.target.value) : null })}
-                    className={exigePerfil && form.perfilOperacionalId == null ? `${inputCls} border-amber-200` : inputCls}
+                    className={exigePerfil && form.perfilOperacionalId == null ? `${inputCls} border-[var(--border-default)]` : inputCls}
                   >
                     <option value="">— Sem perfil (não é processado por workflow) —</option>
                     {perfis.map(x => <option key={x.id} value={x.id}>{x.name}</option>)}
@@ -261,7 +261,7 @@ export default function TiposDocumentoTab() {
                 {/* O QUE O PERFIL IMPLICA — só leitura. Os passos se editam no
                     Workflow Interno; aqui a tela apenas referencia o contrato. */}
                 {perfilSelecionado && (
-                  <div className="rounded-md border border-sky-200 bg-sky-400/[0.06] p-2.5 space-y-1 text-[11.5px]">
+                  <div className="rounded-md border border-[var(--border-default)] bg-[var(--surface-secondary)] p-2.5 space-y-1 text-[11.5px]">
                     <LinhaContrato rotulo="Workflow" valor={perfilSelecionado.workflow?.name ?? "— nenhum —"} />
                     <LinhaContrato rotulo="Versão publicada" valor={perfilSelecionado.workflow ? `v${perfilSelecionado.workflow.versao}${perfilSelecionado.workflow.active ? "" : " (inativo)"}` : "—"} />
                     <LinhaContrato rotulo="Escopo de execução" valor={LABEL_ESCOPO[perfilSelecionado.escopoInstanciacao] ?? perfilSelecionado.escopoInstanciacao} />

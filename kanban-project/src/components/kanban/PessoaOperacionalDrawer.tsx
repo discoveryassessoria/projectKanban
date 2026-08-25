@@ -60,18 +60,18 @@ const STATUS_LABELS: Record<string, string> = {
 
 const STATUS_PILL_CLS: Record<string, string> = {
   PENDENTE: "bg-[var(--surface-secondary)]/20 text-[var(--text-muted)]",
-  SOLICITAR: "bg-slate-50 text-slate-700",
-  SOLICITADO: "bg-slate-50 text-slate-700",
+  SOLICITAR: "bg-[var(--surface-secondary)] text-[var(--text-secondary)]",
+  SOLICITADO: "bg-[var(--surface-secondary)] text-[var(--text-secondary)]",
   EM_BUSCA: "bg-[var(--accent-primary)]/20 text-amber-700",
-  RECEBIDO: "bg-emerald-50 text-emerald-700",
-  EM_ANALISE: "bg-sky-50 text-blue-700",
-  RETIFICANDO: "bg-amber-50 text-amber-700",
-  EM_TRADUCAO: "bg-amber-50 text-amber-700",
-  TRADUZIDO: "bg-emerald-50 text-emerald-700",
-  EM_APOSTILAMENTO: "bg-amber-50 text-amber-700",
-  APOSTILADO: "bg-emerald-50 text-emerald-700",
-  ENTREGUE: "bg-emerald-50 text-emerald-700",
-  INVALIDO: "bg-red-50 text-red-700",
+  RECEBIDO: "bg-[var(--surface-secondary)] text-green-700",
+  EM_ANALISE: "bg-[var(--surface-secondary)] text-[var(--text-secondary)]",
+  RETIFICANDO: "bg-[var(--surface-secondary)] text-amber-700",
+  EM_TRADUCAO: "bg-[var(--surface-secondary)] text-amber-700",
+  TRADUZIDO: "bg-[var(--surface-secondary)] text-green-700",
+  EM_APOSTILAMENTO: "bg-[var(--surface-secondary)] text-amber-700",
+  APOSTILADO: "bg-[var(--surface-secondary)] text-green-700",
+  ENTREGUE: "bg-[var(--surface-secondary)] text-green-700",
+  INVALIDO: "bg-[var(--surface-secondary)] text-red-700",
   NAO_ENCONTRADO: "bg-[var(--surface-secondary)]0/20 text-[var(--text-muted)]",
   CANCELADO: "bg-[var(--surface-secondary)]0/20 text-[var(--text-muted)]",
 }
@@ -268,7 +268,7 @@ function ConteudoDrawer({
       />
 
       <div
-        className="fixed top-0 right-0 h-screen z-[10001] flex flex-col text-white/70 font-sans shadow-[-30px_0_60px_rgba(0,0,0,0.4)] transition-transform duration-300"
+        className="fixed top-0 right-0 h-screen z-[10001] flex flex-col text-white/70 font-sans shadow-[var(--elev-2)] transition-transform duration-300"
         style={{
           width: "45vw",
           minWidth: "680px",
@@ -337,7 +337,7 @@ function ConteudoDrawer({
                   <span>Progresso documental</span>
                   <span>
                     {progresso}% · SLA crítico:{" "}
-                    <span className={slaCritico ? "text-red-700" : "text-emerald-700"}>
+                    <span className={slaCritico ? "text-red-700" : "text-green-700"}>
                       {slaCritico ? "SIM" : "NÃO"}
                     </span>
                   </span>
@@ -380,8 +380,8 @@ function ConteudoDrawer({
                     onClick={handleDeleteClick}
                     className={`ml-auto inline-flex items-center gap-1.5 px-2.5 py-1.5 text-[11px] font-semibold rounded-md transition-colors ${
                       confirmDelete
-                        ? "bg-red-50 text-white hover:bg-red-600"
-                        : "bg-red-50 text-red-700 hover:bg-red-50"
+                        ? "bg-[var(--surface-secondary)] text-white hover:bg-red-600"
+                        : "bg-[var(--surface-secondary)] text-red-700 hover:bg-[var(--surface-secondary)]"
                     }`}
                   >
                     <Trash2 className="w-3 h-3" />
@@ -402,7 +402,7 @@ function ConteudoDrawer({
                   onClick={() => setActiveTab(t.id)}
                   className={`flex-shrink-0 inline-flex items-center gap-1.5 px-4 py-2.5 text-[11.5px] font-semibold border-b-2 transition-colors -mb-px ${
                     activeTab === t.id
-                      ? "text-white border-blue-500"
+                      ? "text-white border-[var(--border-default)]"
                       : "text-[var(--text-secondary)] hover:text-white border-transparent"
                   }`}
                 >
@@ -410,7 +410,7 @@ function ConteudoDrawer({
                   {t.count !== undefined && (
                     <span
                       className={`text-[9.5px] px-1.5 rounded-full font-bold ${
-                        activeTab === t.id ? "bg-sky-50 text-blue-700" : "bg-[var(--surface-popover)]/10 text-white/70"
+                        activeTab === t.id ? "bg-[var(--surface-secondary)] text-[var(--text-secondary)]" : "bg-[var(--surface-popover)]/10 text-white/70"
                       }`}
                     >
                       {t.count}
@@ -483,7 +483,7 @@ function StatCard({
       : tone === "warn"
       ? "text-amber-700"
       : tone === "ok"
-      ? "text-emerald-700"
+      ? "text-green-700"
       : "text-white"
 
   return (
@@ -612,7 +612,7 @@ function DocCard({ doc, onClick }: { doc: Documento; onClick: () => void }) {
 
       {/* CTA pra Pendente */}
       {isPendente && (
-        <div className="mt-2 inline-flex items-center gap-1.5 text-[11.5px] font-semibold text-blue-700">
+        <div className="mt-2 inline-flex items-center gap-1.5 text-[11.5px] font-semibold text-[var(--text-secondary)]">
           <PlayCircle className="w-3.5 h-3.5" />
           Iniciar operação
         </div>

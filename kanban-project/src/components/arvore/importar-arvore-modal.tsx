@@ -155,7 +155,7 @@ export function ImportarArvoreModal({ arvoreId, aberto, onFechar, onImportado }:
 
   return (
     <div className="fixed inset-0 z-[10001] flex items-center justify-center bg-[var(--overlay-modal)] p-4">
-      <div className="flex max-h-[88vh] w-full max-w-3xl flex-col overflow-hidden rounded-2xl border border-[var(--border-default)] bg-[var(--surface-popover)] text-white/95 shadow-2xl">
+      <div className="flex max-h-[88vh] w-full max-w-3xl flex-col overflow-hidden rounded-2xl border border-[var(--border-default)] bg-[var(--surface-popover)] text-white/95 shadow-[var(--elev-3)]">
         <header className="flex flex-shrink-0 items-center justify-between border-b border-[var(--border-default)] px-6 py-4">
           <div>
             <h2 className="text-lg font-semibold">Importar Árvore</h2>
@@ -168,7 +168,7 @@ export function ImportarArvoreModal({ arvoreId, aberto, onFechar, onImportado }:
 
         <div className="flex-1 overflow-y-auto px-6 py-5">
           {erro && (
-            <div className="mb-4 flex items-start gap-2 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm">
+            <div className="mb-4 flex items-start gap-2 rounded-lg border border-[var(--border-default)] bg-[var(--surface-secondary)] px-4 py-3 text-sm">
               <AlertTriangle className="mt-0.5 h-4 w-4 flex-shrink-0 text-red-700" />
               <div>
                 <p className="text-red-700">{erro}</p>
@@ -224,7 +224,7 @@ export function ImportarArvoreModal({ arvoreId, aberto, onFechar, onImportado }:
               </div>
 
               {extracao.avisos.length > 0 && (
-                <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-700">
+                <div className="rounded-lg border border-[var(--border-default)] bg-[var(--surface-secondary)] px-4 py-3 text-sm text-amber-700">
                   <p className="mb-1 font-medium">Pontos de atenção da leitura</p>
                   <ul className="list-inside list-disc space-y-0.5 text-amber-700/80">
                     {extracao.avisos.map((a, i) => <li key={i}>{a}</li>)}

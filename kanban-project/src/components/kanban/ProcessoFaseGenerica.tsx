@@ -51,8 +51,8 @@ export function ProcessoFaseGenerica({ processoId, faseCode, onConcluido }: Prop
         <p className="text-sm text-[var(--text-secondary)]">Conclua as etapas abaixo e avance o processo para a próxima fase.</p>
       </div>
 
-      {resultado && <div className="bg-green-50 border border-green-200 rounded-lg px-4 py-3 text-sm text-green-700 flex items-center gap-2"><CheckCircle2 className="w-4 h-4" />{resultado}</div>}
-      {erro && <div className="bg-red-50 border border-red-200 rounded-lg px-4 py-3 text-sm text-red-700">{erro}</div>}
+      {resultado && <div className="bg-[var(--surface-secondary)] border border-[var(--border-default)] rounded-lg px-4 py-3 text-sm text-green-700 flex items-center gap-2"><CheckCircle2 className="w-4 h-4" />{resultado}</div>}
+      {erro && <div className="bg-[var(--surface-secondary)] border border-[var(--border-default)] rounded-lg px-4 py-3 text-sm text-red-700">{erro}</div>}
 
       <div className="rounded-xl border border-[var(--border-default)] divide-y divide-white/10 overflow-hidden">
         {steps.map((s, i) => {
@@ -60,7 +60,7 @@ export function ProcessoFaseGenerica({ processoId, faseCode, onConcluido }: Prop
           return (
             <button key={s.stepKey} onClick={() => toggle(s.stepKey)} disabled={!!resultado}
               className="w-full flex items-start gap-3 px-4 py-3 text-left hover:bg-[var(--surface-secondary)] disabled:hover:bg-[var(--surface-popover)]">
-              <span className={`mt-0.5 w-6 h-6 rounded-full flex items-center justify-center flex-shrink-0 ${ok ? "bg-green-50 text-white" : "border-2 border-[var(--border-default)] text-transparent"}`}>
+              <span className={`mt-0.5 w-6 h-6 rounded-full flex items-center justify-center flex-shrink-0 ${ok ? "bg-[var(--surface-secondary)] text-white" : "border-2 border-[var(--border-default)] text-transparent"}`}>
                 <Check className="w-4 h-4" />
               </span>
               <span>
@@ -81,7 +81,7 @@ export function ProcessoFaseGenerica({ processoId, faseCode, onConcluido }: Prop
           </button>
         </div>
       ) : (
-        <div className="rounded-xl border border-green-200 bg-green-50 p-4 text-sm text-green-700 flex items-center gap-2"><CheckCircle2 className="w-4 h-4" />Esta é a última fase do processo.</div>
+        <div className="rounded-xl border border-[var(--border-default)] bg-[var(--surface-secondary)] p-4 text-sm text-green-700 flex items-center gap-2"><CheckCircle2 className="w-4 h-4" />Esta é a última fase do processo.</div>
       )}
     </div>
   )

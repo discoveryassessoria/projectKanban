@@ -27,7 +27,7 @@ export const CARD = "rounded-xl border border-[var(--border-default)] bg-[var(--
  * uma camada translúcida sobre a foto.
  */
 export const CARD_FOCAL =
-  "relative overflow-hidden rounded-2xl border border-[var(--border-default)] bg-[var(--surface-primary)] backdrop-blur-md shadow-[0_24px_60px_-20px_rgba(0,0,0,0.75)]"
+  "relative overflow-hidden rounded-2xl border border-[var(--border-default)] bg-[var(--surface-primary)] backdrop-blur-md shadow-[var(--elev-2)]"
 
 // ---- Estilos por nível -----------------------------------------------------
 export interface NivelStyle {
@@ -40,31 +40,31 @@ export function nivelStyle(nivel: NivelPrioridade | "critico" | "alto"): NivelSt
   switch (nivel) {
     case "critico":
       return {
-        chip: "bg-red-50 text-red-700 border-red-200",
-        ponto: "bg-red-400",
+        chip: "bg-[var(--surface-secondary)] text-[var(--text-secondary)] border-[var(--border-default)]",
+        ponto: "bg-red-600",
         texto: "text-red-700",
-        aro: "ring-red-400/25",
+        aro: "ring-[var(--border-strong)]",
       }
     case "alto":
       return {
-        chip: "bg-amber-50 text-amber-700 border-amber-200",
-        ponto: "bg-amber-400",
+        chip: "bg-[var(--surface-secondary)] text-[var(--text-secondary)] border-[var(--border-default)]",
+        ponto: "bg-amber-600",
         texto: "text-amber-700",
-        aro: "ring-amber-400/25",
+        aro: "ring-[var(--border-strong)]",
       }
     case "medio":
       return {
-        chip: "bg-sky-50 text-sky-700 border-sky-200",
-        ponto: "bg-sky-400",
-        texto: "text-sky-700",
-        aro: "ring-sky-400/25",
+        chip: "bg-[var(--surface-secondary)] text-[var(--text-secondary)] border-[var(--border-default)]",
+        ponto: "bg-[var(--text-muted)]",
+        texto: "text-[var(--text-primary)]",
+        aro: "ring-[var(--border-strong)]",
       }
     default:
       return {
-        chip: "bg-[var(--surface-primary)] text-white/70 border-[var(--border-default)]",
-        ponto: "bg-[var(--surface-elevated)]",
-        texto: "text-white/70",
-        aro: "ring-white/10",
+        chip: "bg-[var(--surface-secondary)] text-[var(--text-secondary)] border-[var(--border-default)]",
+        ponto: "bg-[var(--text-muted)]",
+        texto: "text-[var(--text-primary)]",
+        aro: "ring-[var(--border-strong)]",
       }
   }
 }

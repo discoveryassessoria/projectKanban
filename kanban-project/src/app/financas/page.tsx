@@ -183,7 +183,7 @@ export default function FinancasDashboard() {
         <Card className="bg-[var(--surface-primary)] border-[var(--border-strong)] backdrop-blur-sm">
           <CardHeader>
             <CardTitle className="text-white flex items-center gap-2">
-              <AlertTriangle className="h-5 w-5 text-yellow-700" />
+              <AlertTriangle className="h-5 w-5 text-amber-700" />
               Próximos Vencimentos
             </CardTitle>
             <CardDescription className="text-[var(--text-secondary)]">
@@ -199,11 +199,11 @@ export default function FinancasDashboard() {
                 >
                   <div className="flex items-center gap-3">
                     {conta.tipo === 'receber' ? (
-                      <div className="p-2 rounded-full bg-green-50">
+                      <div className="p-2 rounded-full bg-[var(--surface-secondary)]">
                         <ArrowUpRight className="h-4 w-4 text-green-700" />
                       </div>
                     ) : (
-                      <div className="p-2 rounded-full bg-red-50">
+                      <div className="p-2 rounded-full bg-[var(--surface-secondary)]">
                         <ArrowDownRight className="h-4 w-4 text-red-700" />
                       </div>
                     )}
@@ -240,7 +240,7 @@ export default function FinancasDashboard() {
               <Link href="/financas/contas-receber/nova">
                 <Button 
                   variant="outline" 
-                  className="w-full h-20 flex-col gap-2 border-green-200 text-green-700 hover:bg-green-50 hover:border-green-200"
+                  className="w-full h-20 flex-col gap-2 border-[var(--border-default)] text-green-700 hover:bg-[var(--surface-secondary)] hover:border-[var(--border-default)]"
                 >
                   <Receipt className="h-5 w-5" />
                   <span className="text-xs">Nova Cobrança</span>
@@ -250,7 +250,7 @@ export default function FinancasDashboard() {
               <Link href="/financas/contas-pagar/nova">
                 <Button 
                   variant="outline" 
-                  className="w-full h-20 flex-col gap-2 border-red-200 text-red-700 hover:bg-red-50 hover:border-red-200"
+                  className="w-full h-20 flex-col gap-2 border-[var(--border-default)] text-red-700 hover:bg-[var(--surface-secondary)] hover:border-[var(--border-default)]"
                 >
                   <CreditCard className="h-5 w-5" />
                   <span className="text-xs">Nova Despesa</span>
@@ -260,7 +260,7 @@ export default function FinancasDashboard() {
               <Link href="/financas/fluxo-caixa">
                 <Button 
                   variant="outline" 
-                  className="w-full h-20 flex-col gap-2 border-blue-200 text-blue-700 hover:bg-blue-50 hover:border-blue-200"
+                  className="w-full h-20 flex-col gap-2 border-[var(--border-default)] text-[var(--text-secondary)] hover:bg-[var(--surface-secondary)] hover:border-[var(--border-default)]"
                 >
                   <DollarSign className="h-5 w-5" />
                   <span className="text-xs">Fluxo de Caixa</span>
@@ -270,7 +270,7 @@ export default function FinancasDashboard() {
               <Link href="/financas/relatorios">
                 <Button 
                   variant="outline" 
-                  className="w-full h-20 flex-col gap-2 border-slate-200 text-slate-700 hover:bg-slate-50 hover:border-slate-200"
+                  className="w-full h-20 flex-col gap-2 border-[var(--border-default)] text-[var(--text-secondary)] hover:bg-[var(--surface-secondary)] hover:border-[var(--border-default)]"
                 >
                   <TrendingUp className="h-5 w-5" />
                   <span className="text-xs">Relatórios</span>

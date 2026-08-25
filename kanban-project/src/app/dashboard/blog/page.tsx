@@ -274,7 +274,7 @@ export default function BlogAdminPage() {
             </div>
             <Button 
               onClick={() => setShowForm(true)}
-              className="bg-amber-500 hover:bg-amber-800 text-black font-semibold"
+              className="bg-amber-600 hover:bg-amber-800 text-black font-semibold"
             >
               <Plus className="w-4 h-4 mr-2" />
               Novo Post
@@ -284,10 +284,10 @@ export default function BlogAdminPage() {
           {/* Cards de Métricas */}
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             {[
-              { label: 'Total de Posts', value: totalPosts, cor: 'bg-blue-500' },
-              { label: 'Publicados', value: publicados, cor: 'bg-green-500' },
-              { label: 'Rascunhos', value: rascunhos, cor: 'bg-yellow-500' },
-              { label: 'Em Destaque', value: destaques, cor: 'bg-slate-500' },
+              { label: 'Total de Posts', value: totalPosts, cor: 'bg-[var(--surface-secondary)]' },
+              { label: 'Publicados', value: publicados, cor: 'bg-green-600' },
+              { label: 'Rascunhos', value: rascunhos, cor: 'bg-amber-600' },
+              { label: 'Em Destaque', value: destaques, cor: 'bg-[var(--surface-secondary)]' },
             ].map((metric, idx) => (
               <Card key={idx} className="bg-[var(--surface-primary)] backdrop-blur-sm border border-[var(--border-strong)] text-white">
                 <CardContent className="p-5">
@@ -325,7 +325,7 @@ export default function BlogAdminPage() {
                     variant={filtroStatus === 'todos' ? 'default' : 'outline'}
                     size="sm"
                     onClick={() => setFiltroStatus('todos')}
-                    className={filtroStatus === 'todos' ? 'bg-amber-500 text-black' : 'border-[var(--border-strong)] text-white/70 bg-transparent hover:bg-[var(--surface-hover)]'}
+                    className={filtroStatus === 'todos' ? 'bg-amber-600 text-black' : 'border-[var(--border-strong)] text-white/70 bg-transparent hover:bg-[var(--surface-hover)]'}
                   >
                     Todos
                   </Button>
@@ -333,7 +333,7 @@ export default function BlogAdminPage() {
                     variant={filtroStatus === 'PUBLICADO' ? 'default' : 'outline'}
                     size="sm"
                     onClick={() => setFiltroStatus('PUBLICADO')}
-                    className={filtroStatus === 'PUBLICADO' ? 'bg-green-500 text-white' : 'border-[var(--border-strong)] text-white/70 bg-transparent hover:bg-[var(--surface-hover)]'}
+                    className={filtroStatus === 'PUBLICADO' ? 'bg-green-600 text-white' : 'border-[var(--border-strong)] text-white/70 bg-transparent hover:bg-[var(--surface-hover)]'}
                   >
                     Publicados
                   </Button>
@@ -341,7 +341,7 @@ export default function BlogAdminPage() {
                     variant={filtroStatus === 'RASCUNHO' ? 'default' : 'outline'}
                     size="sm"
                     onClick={() => setFiltroStatus('RASCUNHO')}
-                    className={filtroStatus === 'RASCUNHO' ? 'bg-yellow-500 text-black' : 'border-[var(--border-strong)] text-white/70 bg-transparent hover:bg-[var(--surface-hover)]'}
+                    className={filtroStatus === 'RASCUNHO' ? 'bg-amber-600 text-black' : 'border-[var(--border-strong)] text-white/70 bg-transparent hover:bg-[var(--surface-hover)]'}
                   >
                     Rascunhos
                   </Button>
@@ -391,10 +391,10 @@ export default function BlogAdminPage() {
                             {/* Status Badge */}
                             <span className={`px-2 py-1 rounded-full text-xs font-medium ${
                               post.status === 'PUBLICADO' 
-                                ? 'bg-green-50 text-green-700 border border-green-200'
+                                ? 'bg-[var(--surface-secondary)] text-green-700 border border-[var(--border-default)]'
                                 : post.status === 'ARQUIVADO'
                                 ? 'bg-gray-500/20 text-[var(--text-muted)] border border-gray-500/30'
-                                : 'bg-yellow-50 text-yellow-700 border border-yellow-200'
+                                : 'bg-[var(--surface-secondary)] text-amber-700 border border-[var(--border-default)]'
                             }`}>
                               {post.status}
                             </span>
@@ -452,7 +452,7 @@ export default function BlogAdminPage() {
                             variant="ghost"
                             size="sm"
                             onClick={() => editPost(post)}
-                            className="text-[var(--text-secondary)] hover:text-blue-700 hover:bg-[var(--surface-hover)]"
+                            className="text-[var(--text-secondary)] hover:text-[var(--text-secondary)] hover:bg-[var(--surface-hover)]"
                           >
                             <Pencil className="w-4 h-4 mr-1" /> Editar
                           </Button>
@@ -619,7 +619,7 @@ export default function BlogAdminPage() {
                   <Button
                     type="submit"
                     disabled={saving}
-                    className="flex-1 bg-amber-500 hover:bg-amber-800 text-black font-semibold"
+                    className="flex-1 bg-amber-600 hover:bg-amber-800 text-black font-semibold"
                   >
                     {saving ? 'Salvando...' : (
                       <><Check className="w-4 h-4 mr-2" /> {editingPost ? 'Atualizar' : 'Criar Post'}</>

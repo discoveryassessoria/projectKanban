@@ -95,7 +95,7 @@ export function ReceitaCobrancaModal({ receitaId, onClose, onChanged }: { receit
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-[var(--overlay-modal)] p-4 backdrop-blur-sm" onClick={onClose}>
-      <div className="max-h-[92vh] w-full max-w-3xl overflow-auto rounded-2xl border border-[var(--border-default)] bg-zinc-900/95 text-white shadow-2xl" onClick={(e) => e.stopPropagation()}>
+      <div className="max-h-[92vh] w-full max-w-3xl overflow-auto rounded-2xl border border-[var(--border-default)] bg-zinc-900/95 text-white shadow-[var(--elev-3)]" onClick={(e) => e.stopPropagation()}>
         {/* Header */}
         <div className="flex items-center justify-between border-b border-[var(--border-default)] px-6 py-4">
           <div>
@@ -109,7 +109,7 @@ export function ReceitaCobrancaModal({ receitaId, onClose, onChanged }: { receit
         </div>
 
         <div className="space-y-5 px-6 py-5">
-          {erro && <div className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700">{erro}</div>}
+          {erro && <div className="rounded-lg border border-[var(--border-default)] bg-[var(--surface-secondary)] p-3 text-sm text-red-700">{erro}</div>}
 
           {/* CONTRATO — só o que a Receita É */}
           <div className="grid grid-cols-3 gap-3">
@@ -159,7 +159,7 @@ export function ReceitaCobrancaModal({ receitaId, onClose, onChanged }: { receit
 function CobrancaCard({ cobranca, moeda, onPago }: { cobranca: any; moeda: string; onPago: () => void }) {
   const [pagando, setPagando] = React.useState<number | null>(null)
   const parcelas = (cobranca.parcelas || []).slice().sort((a: any, b: any) => a.numero - b.numero)
-  const statusCls: Record<string, string> = { ABERTA: 'bg-sky-50 text-sky-700 border-sky-200', PARCIAL: 'bg-amber-50 text-amber-700 border-amber-200', QUITADA: 'bg-emerald-50 text-emerald-700 border-emerald-200', CANCELADA: 'bg-[var(--surface-primary)] text-[var(--text-secondary)] border-[var(--border-default)]' }
+  const statusCls: Record<string, string> = { ABERTA: 'bg-[var(--surface-secondary)] text-[var(--text-secondary)] border-[var(--border-default)]', PARCIAL: 'bg-[var(--surface-secondary)] text-amber-700 border-[var(--border-default)]', QUITADA: 'bg-[var(--surface-secondary)] text-green-700 border-[var(--border-default)]', CANCELADA: 'bg-[var(--surface-primary)] text-[var(--text-secondary)] border-[var(--border-default)]' }
   async function pagar(parcelaId: number, valor: number) {
     setPagando(parcelaId)
     try { await jf(`/api/financeiro/cobrancas/${cobranca.id}/pagamentos`, { method: 'POST', body: JSON.stringify({ parcelaId, valor }) }); onPago() }
@@ -184,7 +184,7 @@ function CobrancaCard({ cobranca, moeda, onPago }: { cobranca: any; moeda: strin
                   <td className="px-3 py-2 tabular-nums text-white/70">{p.numero}</td>
                   <td className="px-3 py-2 text-white/70">{dt(p.vencimento)}</td>
                   <td className="px-3 py-2 tabular-nums">{brl(p.valor, moeda)}</td>
-                  <td className="px-3 py-2">{quit ? <span className="text-emerald-700">recebida</span> : <span className="text-[var(--text-secondary)]">pendente</span>}</td>
+                  <td className="px-3 py-2">{quit ? <span className="text-green-700">recebida</span> : <span className="text-[var(--text-secondary)]">pendente</span>}</td>
                   <td className="px-3 py-2 text-right">
                     {!quit && <button disabled title="Registrar pagamento é feito no Financeiro do processo (fluxo canônico único)." className="rounded-md border border-[var(--border-strong)] px-2.5 py-1 text-xs text-white/80 cursor-not-allowed opacity-40">Registrar pagamento</button>}
                   </td>
@@ -337,7 +337,7 @@ function CobrancaWizard({ receitaId, valor, moeda, receita, onClose, onCriada }:
     <div className="space-y-4">
       {simulando && <p className="text-sm text-[var(--text-secondary)]">Simulando no servidor…</p>}
       {!simulando && sim && !sim.ok && (
-        <div className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700">
+        <div className="rounded-lg border border-[var(--border-default)] bg-[var(--surface-secondary)] p-3 text-sm text-red-700">
           {(sim.erros ?? []).map((e, i) => <div key={i}>• {e.mensagem}</div>)}
           {precisaEscolha && (
             <div className="mt-2 flex flex-wrap gap-2">
@@ -385,7 +385,7 @@ function CobrancaWizard({ receitaId, valor, moeda, receita, onClose, onCriada }:
     const cob = sucesso.cobranca
     return (
       <div className="fixed inset-0 z-[60] flex items-center justify-center bg-[var(--overlay-modal)] p-6 backdrop-blur-sm" onClick={() => onCriada()}>
-        <div className="w-full max-w-md rounded-2xl border border-[var(--border-default)] bg-zinc-900/95 p-6 text-center text-white shadow-2xl" onClick={(e) => e.stopPropagation()}>
+        <div className="w-full max-w-md rounded-2xl border border-[var(--border-default)] bg-zinc-900/95 p-6 text-center text-white shadow-[var(--elev-3)]" onClick={(e) => e.stopPropagation()}>
           <div className="mx-auto mb-3 grid h-14 w-14 place-items-center rounded-full" style={{ background: `${OURO}22`, color: OURO_TINTA }}><Check className="h-7 w-7" /></div>
           <h3 className="text-lg font-semibold">Cobrança criada com sucesso</h3>
           <p className="mt-1 text-sm text-[var(--text-secondary)]">A cobrança foi gerada e vinculada à receita.</p>
@@ -407,7 +407,7 @@ function CobrancaWizard({ receitaId, valor, moeda, receita, onClose, onCriada }:
 
   return (
     <div className="fixed inset-0 z-[60] flex items-center justify-center bg-[var(--overlay-modal)] p-3 backdrop-blur-sm sm:p-6" onClick={onClose}>
-      <div className="flex h-[92vh] w-full max-w-[1400px] flex-col overflow-hidden rounded-2xl border border-[var(--border-default)] bg-zinc-900/95 text-white shadow-2xl" onClick={(e) => e.stopPropagation()}>
+      <div className="flex h-[92vh] w-full max-w-[1400px] flex-col overflow-hidden rounded-2xl border border-[var(--border-default)] bg-zinc-900/95 text-white shadow-[var(--elev-3)]" onClick={(e) => e.stopPropagation()}>
         {/* Header */}
         <div className="flex items-center justify-between border-b border-[var(--border-default)] px-6 py-4">
           <div>
@@ -433,7 +433,7 @@ function CobrancaWizard({ receitaId, valor, moeda, receita, onClose, onCriada }:
         <div className="flex min-h-0 flex-1 flex-col lg:flex-row">
           <div className="min-h-0 flex-1 space-y-4 overflow-y-auto px-6 py-5">
           {!cfg && <p className="text-sm text-[var(--text-secondary)]">Carregando configuração…</p>}
-          {erro && <div className="rounded-lg border border-red-200 bg-red-50 p-2 text-sm text-red-700">{erro}</div>}
+          {erro && <div className="rounded-lg border border-[var(--border-default)] bg-[var(--surface-secondary)] p-2 text-sm text-red-700">{erro}</div>}
 
           {cfg && step === 1 && (<div className="space-y-3"><div><label className="mb-1 block text-xs text-[var(--text-secondary)]">Forma de pagamento</label>
             <select className={sel} value={formaEfetivaId ?? ''} onChange={(e) => { const id = Number(e.target.value) || undefined; setF({ ...f, formaPagamentoId: id, adquirenteId: undefined, bandeiraId: undefined }) }}>

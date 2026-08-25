@@ -66,10 +66,10 @@ const STATUS_NEUTRAL_PILL = "bg-[var(--surface-primary)] text-[var(--text-second
 const STATUS_PILL_CLS: Record<string, string> = {
   SOLICITADO: "bg-[var(--accent-primary)]/15 text-[var(--accent-text)]",
   SOLICITAR: "bg-[var(--accent-primary)]/15 text-[var(--accent-text)]",
-  RECEBIDO: "bg-green-50 text-green-700",
-  ENTREGUE: "bg-green-50 text-green-700",
-  INVALIDO: "bg-red-50 text-red-700",
-  NAO_ENCONTRADO: "bg-red-50 text-red-700",
+  RECEBIDO: "bg-[var(--surface-secondary)] text-green-700",
+  ENTREGUE: "bg-[var(--surface-secondary)] text-green-700",
+  INVALIDO: "bg-[var(--surface-secondary)] text-red-700",
+  NAO_ENCONTRADO: "bg-[var(--surface-secondary)] text-red-700",
 }
 
 // ============================================================
@@ -494,7 +494,7 @@ function ConteudoDrawer({
         />
 
       <div
-        className="fixed top-0 right-0 h-screen z-[10001] flex flex-col text-white/70 font-sans shadow-[-30px_0_60px_rgba(0,0,0,0.4)] transition-transform duration-300"
+        className="fixed top-0 right-0 h-screen z-[10001] flex flex-col text-white/70 font-sans shadow-[var(--elev-2)] transition-transform duration-300"
         style={{
           width: "45vw", minWidth: "680px", maxWidth: "920px",
           background: "#0f1419", transform: "translateX(0)",
@@ -547,7 +547,7 @@ function ConteudoDrawer({
                   </button>
                 ) : (
                   <div className="text-[10px] uppercase tracking-wide">
-                    <span className="font-bold text-sky-700">Central Operacional</span>
+                    <span className="font-bold text-[var(--text-secondary)]">Central Operacional</span>
                     <span className="text-[var(--text-secondary)]"> · {nomeCompleto(doc.pessoa)}</span>
                   </div>
                 )}
@@ -575,7 +575,7 @@ function ConteudoDrawer({
               </div>
 
               {bannerAntecipada && (
-                <div className="mb-4 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-[12px] text-slate-100 flex items-start gap-2">
+                <div className="mb-4 rounded-lg border border-[var(--border-default)] bg-[var(--surface-secondary)] px-3 py-2 text-[12px] text-[var(--text-secondary)] flex items-start gap-2">
                   <span className="text-[13px] leading-none mt-0.5">⇄</span>
                   <span>{bannerAntecipada}</span>
                 </div>
@@ -590,7 +590,7 @@ function ConteudoDrawer({
                   </div>
                   <div>
                     <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10.5px] font-bold uppercase tracking-wider ${
-                      tarefa ? "bg-sky-50 text-sky-700" : STATUS_NEUTRAL_PILL
+                      tarefa ? "bg-[var(--surface-secondary)] text-[var(--text-secondary)]" : STATUS_NEUTRAL_PILL
                     }`}>
                       <span className="w-1.5 h-1.5 rounded-full bg-current" />
                       {statusLabel}
@@ -623,7 +623,7 @@ function ConteudoDrawer({
                         setDelegandoResp(false)
                       }}
                       onBlur={() => setDelegandoResp(false)}
-                      className="self-start rounded-md border border-[var(--border-default)] bg-[var(--app-background)] px-1.5 py-1 text-[12px] text-white/85 focus:outline-none focus:border-sky-200 focus:ring-1 focus:border-sky-200 disabled:opacity-50"
+                      className="self-start rounded-md border border-[var(--border-default)] bg-[var(--app-background)] px-1.5 py-1 text-[12px] text-white/85 focus:outline-none focus:border-[var(--border-default)] focus:ring-1 focus:border-[var(--border-default)] disabled:opacity-50"
                     >
                       <option value="" className="bg-[var(--surface-secondary)]">— selecione —</option>
                       {usuarios.map((u) => (
@@ -641,7 +641,7 @@ function ConteudoDrawer({
                       onClick={() => tarefa && setDelegandoResp(true)}
                       disabled={!tarefa || salvando}
                       title={tarefa ? "Transferir a tarefa deste documento" : "Sem tarefa nesta fase para delegar"}
-                      className="self-start text-sky-700 text-[12px] hover:underline disabled:text-[var(--text-muted)] disabled:no-underline disabled:cursor-not-allowed"
+                      className="self-start text-[var(--text-secondary)] text-[12px] hover:underline disabled:text-[var(--text-muted)] disabled:no-underline disabled:cursor-not-allowed"
                     >
                       Delegar
                     </button>
@@ -691,7 +691,7 @@ function ConteudoDrawer({
                   o que aconteceu — mas dito como o que é: registro anterior. */}
               {doc.motivoBloqueio && (
                 tarefa?.statusTarefa === "BLOQUEADA" ? (
-                  <div className="mt-3 p-2.5 rounded-md border border-amber-200 bg-amber-50 text-[11.5px] text-amber-700">
+                  <div className="mt-3 p-2.5 rounded-md border border-[var(--border-default)] bg-[var(--surface-secondary)] text-[11.5px] text-amber-700">
                     <strong className="font-semibold">Bloqueado:</strong> {doc.motivoBloqueio}
                   </div>
                 ) : (
@@ -723,14 +723,14 @@ function ConteudoDrawer({
                   onClick={() => setActiveTab(t.id)}
                   className={`inline-flex items-center gap-1.5 px-3.5 py-2.5 text-[11.5px] font-semibold whitespace-nowrap border-b-2 transition-colors -mb-px ${
                     activeTab === t.id
-                      ? "text-sky-700 border-sky-200"
+                      ? "text-[var(--text-secondary)] border-[var(--border-default)]"
                       : "text-[var(--text-secondary)] hover:text-white/80 border-transparent"
                   }`}
                 >
                   {t.label}
                   {t.count !== undefined && (
                     <span className={`text-[9.5px] px-1.5 rounded-full font-bold ${
-                      activeTab === t.id ? "bg-sky-50 text-blue-700" : "bg-[var(--surface-secondary)] text-white/70"
+                      activeTab === t.id ? "bg-[var(--surface-secondary)] text-[var(--text-secondary)]" : "bg-[var(--surface-secondary)] text-white/70"
                     }`}>
                       {t.count}
                     </span>
@@ -912,7 +912,7 @@ function TabHistory({ doc }: { doc: Documento }) {
         <div className="space-y-2.5">
           {eventos.map((e, i) => (
             <div key={i} className="flex items-start gap-3 p-2.5 rounded-md bg-[var(--surface-overlay)] border border-[var(--border-subtle)]">
-              <div className="w-2 h-2 rounded-full bg-blue-400 mt-1.5 flex-shrink-0" />
+              <div className="w-2 h-2 rounded-full bg-[var(--text-muted)] mt-1.5 flex-shrink-0" />
               <div className="flex-1 min-w-0">
                 <div className="text-sm text-white">{e.label}</div>
                 <div className="text-[11px] text-[var(--text-secondary)] font-mono mt-0.5">{fmtDateTime(e.data)}</div>

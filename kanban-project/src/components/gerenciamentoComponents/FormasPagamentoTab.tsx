@@ -143,7 +143,7 @@ export default function FormasPagamentoTab() {
       {loading ? (
         <div className="flex items-center justify-center py-16"><Loader2 className="h-8 w-8 animate-spin text-[var(--text-secondary)]" /></div>
       ) : erroLista ? (
-        <div className="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-700">{erroLista}<button onClick={() => void carregar()} className="ml-3 underline hover:text-white">Tentar de novo</button></div>
+        <div className="rounded-lg border border-[var(--border-default)] bg-[var(--surface-secondary)] p-4 text-sm text-red-700">{erroLista}<button onClick={() => void carregar()} className="ml-3 underline hover:text-white">Tentar de novo</button></div>
       ) : filtrados.length === 0 ? (
         <div className={`${GLASS} flex flex-col items-center gap-2 py-16 text-center`}>
           <CreditCard className="h-10 w-10 text-[var(--text-muted)]" />
@@ -170,7 +170,7 @@ export default function FormasPagamentoTab() {
               </div>
               <div className="flex shrink-0 items-center gap-2">
                 <button onClick={() => abrirEditar(x)} className="inline-flex items-center gap-1 rounded-md border border-[var(--border-default)] px-2.5 py-1 text-xs text-white/70 transition hover:bg-[var(--surface-hover)] hover:text-white"><Pencil className="h-3 w-3" /> Editar</button>
-                <button onClick={() => excluir(x)} className="inline-flex items-center gap-1 rounded-md border border-red-200 px-2.5 py-1 text-xs text-red-700/80 transition hover:bg-red-50"><Trash2 className="h-3 w-3" /></button>
+                <button onClick={() => excluir(x)} className="inline-flex items-center gap-1 rounded-md border border-[var(--border-default)] px-2.5 py-1 text-xs text-red-700/80 transition hover:bg-[var(--surface-secondary)]"><Trash2 className="h-3 w-3" /></button>
               </div>
             </div>
           ))}
@@ -197,7 +197,7 @@ function FormaPanel({ f, set, editId, moedas, carteiras, contas, salvando, erro,
   const semIntegracao = !f.tipoIntegracao || f.tipoIntegracao === 'NENHUMA'
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-[var(--overlay-modal)] p-4 backdrop-blur-sm" onClick={onClose}>
-      <div className="max-h-[92vh] w-full max-w-3xl overflow-auto rounded-2xl border border-[var(--border-default)] bg-zinc-900/95 text-white shadow-2xl" onClick={(e) => e.stopPropagation()}>
+      <div className="max-h-[92vh] w-full max-w-3xl overflow-auto rounded-2xl border border-[var(--border-default)] bg-zinc-900/95 text-white shadow-[var(--elev-3)]" onClick={(e) => e.stopPropagation()}>
         <div className="sticky top-0 z-10 flex items-center justify-between border-b border-[var(--border-default)] bg-zinc-900/95 px-6 py-4">
           <div className="flex items-center gap-2"><Sparkles className="h-4 w-4" style={{ color: OURO_TINTA }} /><h3 className="text-base font-semibold">{editId ? 'Editar forma de pagamento' : 'Nova forma de pagamento'}</h3></div>
           <button onClick={onClose} className="text-[var(--text-muted)] transition hover:text-white"><X className="h-4 w-4" /></button>
@@ -309,7 +309,7 @@ function FormaPanel({ f, set, editId, moedas, carteiras, contas, salvando, erro,
             <textarea rows={2} className={input} value={f.observacoes ?? ''} onChange={(e) => set('observacoes', e.target.value)} />
           </Secao>
 
-          {erro && <div className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700">{erro}</div>}
+          {erro && <div className="rounded-lg border border-[var(--border-default)] bg-[var(--surface-secondary)] p-3 text-sm text-red-700">{erro}</div>}
         </div>
 
         <div className="sticky bottom-0 flex items-center justify-end gap-2 border-t border-[var(--border-default)] bg-zinc-900/95 px-6 py-4">

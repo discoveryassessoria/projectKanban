@@ -86,7 +86,7 @@ function hoje(): string {
 }
 
 const ICONE_ESTADO = {
-  valido: <CheckCircle2 className="h-4 w-4 text-emerald-600" />,
+  valido: <CheckCircle2 className="h-4 w-4 text-green-600" />,
   ausente: <XCircle className="h-4 w-4 text-red-500" />,
   invalido: <AlertTriangle className="h-4 w-4 text-amber-500" />,
   nao_aplicavel: <MinusCircle className="h-4 w-4 text-[var(--text-muted)]" />,
@@ -97,10 +97,10 @@ const SEM_MODELOS: ModeloDisponivel[] = []
 const SEM_DOCUMENTOS: DocumentoGerado[] = []
 
 const CORES_VERSAO: Record<VersaoGerada["status"], string> = {
-  VIGENTE: "bg-emerald-100 text-emerald-700",
-  GERADA: "bg-blue-100 text-blue-700",
+  VIGENTE: "bg-[var(--surface-secondary)] text-green-700",
+  GERADA: "bg-[var(--surface-secondary)] text-[var(--text-secondary)]",
   SUBSTITUIDA: "bg-gray-100 text-gray-600",
-  INVALIDADA: "bg-red-100 text-red-700",
+  INVALIDADA: "bg-[var(--surface-secondary)] text-red-700",
 }
 
 export function DocumentosGeradosTab({
@@ -267,18 +267,18 @@ export function DocumentosGeradosTab({
   return (
     <div className="space-y-6">
       {flash && (
-        <div className="rounded-xl border border-indigo-200 bg-indigo-50 px-4 py-3 text-sm text-indigo-800">{flash}</div>
+        <div className="rounded-xl border border-[var(--border-default)] bg-[var(--surface-secondary)] px-4 py-3 text-sm text-[var(--text-secondary)]">{flash}</div>
       )}
 
       {/* ── BLOCO 1 — GERAR NOVA PROCURAÇÃO ─────────────────────────────────── */}
-      <div className="rounded-xl border border-gray-200 bg-[var(--surface-primary)] p-6 shadow-sm">
+      <div className="rounded-xl border border-gray-200 bg-[var(--surface-primary)] p-6 shadow-[var(--elev-1)]">
         <h3 className="mb-4 flex items-center gap-2 text-sm font-semibold text-gray-900">
-          <FileText className="h-4 w-4 text-indigo-600" />
+          <FileText className="h-4 w-4 text-[var(--text-secondary)]" />
           Gerar nova procuração
         </h3>
 
         {modelos.length === 0 && !carregando ? (
-          <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
+          <div className="rounded-lg border border-[var(--border-default)] bg-[var(--surface-secondary)] p-3 text-sm text-amber-800">
             Nenhum modelo publicado. Publique uma versão em Gerenciamento › Sistema › Modelos.
           </div>
         ) : (
@@ -290,7 +290,7 @@ export function DocumentosGeradosTab({
                   value={modeloId ?? ""}
                   onChange={(e) => setModeloId(e.target.value ? Number(e.target.value) : null)}
                   disabled={!podeGerar}
-                  className="w-full rounded-xl border border-gray-300 bg-[var(--surface-primary)] px-3 py-2 text-sm text-gray-900 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 disabled:bg-gray-50"
+                  className="w-full rounded-xl border border-gray-300 bg-[var(--surface-primary)] px-3 py-2 text-sm text-gray-900 focus:border-[var(--border-default)] focus:outline-none focus:ring-2 focus:ring-[var(--border-strong)] disabled:bg-gray-50"
                 >
                   <option value="">Selecione…</option>
                   {modelos.map((m) => <option key={m.id} value={m.id}>{m.nome}</option>)}
@@ -312,7 +312,7 @@ export function DocumentosGeradosTab({
                   value={processoId ?? ""}
                   onChange={(e) => setProcessoId(e.target.value ? Number(e.target.value) : null)}
                   disabled={!podeGerar}
-                  className="w-full rounded-xl border border-gray-300 bg-[var(--surface-primary)] px-3 py-2 text-sm text-gray-900 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 disabled:bg-gray-50"
+                  className="w-full rounded-xl border border-gray-300 bg-[var(--surface-primary)] px-3 py-2 text-sm text-gray-900 focus:border-[var(--border-default)] focus:outline-none focus:ring-2 focus:ring-[var(--border-strong)] disabled:bg-gray-50"
                 >
                   <option value="">Sem processo</option>
                   {processos.map((p) => (
@@ -343,7 +343,7 @@ export function DocumentosGeradosTab({
                   onChange={(e) => setLocalEmissao(e.target.value)}
                   disabled={!podeGerar}
                   placeholder="Amparo"
-                  className="w-full rounded-xl border border-gray-300 bg-[var(--surface-primary)] px-3 py-2 text-sm text-gray-900 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 disabled:bg-gray-50"
+                  className="w-full rounded-xl border border-gray-300 bg-[var(--surface-primary)] px-3 py-2 text-sm text-gray-900 focus:border-[var(--border-default)] focus:outline-none focus:ring-2 focus:ring-[var(--border-strong)] disabled:bg-gray-50"
                 />
               </div>
 
@@ -354,7 +354,7 @@ export function DocumentosGeradosTab({
                   value={dataEmissao}
                   onChange={(e) => setDataEmissao(e.target.value)}
                   disabled={!podeGerar}
-                  className="w-full rounded-xl border border-gray-300 bg-[var(--surface-primary)] px-3 py-2 text-sm text-gray-900 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 disabled:bg-gray-50"
+                  className="w-full rounded-xl border border-gray-300 bg-[var(--surface-primary)] px-3 py-2 text-sm text-gray-900 focus:border-[var(--border-default)] focus:outline-none focus:ring-2 focus:ring-[var(--border-strong)] disabled:bg-gray-50"
                 />
               </div>
             </div>
@@ -365,7 +365,7 @@ export function DocumentosGeradosTab({
                   <h4 className="text-xs font-semibold uppercase tracking-wide text-gray-500">
                     Dados obrigatórios
                   </h4>
-                  <span className={`text-xs font-medium ${podeGerarAgora ? "text-emerald-700" : "text-red-600"}`}>
+                  <span className={`text-xs font-medium ${podeGerarAgora ? "text-green-700" : "text-red-600"}`}>
                     {podeGerarAgora ? "Tudo pronto para gerar" : "Há pendências no cadastro"}
                   </span>
                 </div>
@@ -415,7 +415,7 @@ export function DocumentosGeradosTab({
               <button
                 onClick={() => void gerar()}
                 disabled={!podeGerar || ocupado != null}
-                className="inline-flex items-center gap-2 rounded-xl bg-indigo-700 px-4 py-2 text-sm font-medium text-[var(--action-primary-ink)] hover:bg-indigo-800 disabled:opacity-50"
+                className="inline-flex items-center gap-2 rounded-xl bg-[var(--text-muted)] px-4 py-2 text-sm font-medium text-[var(--action-primary-ink)] hover:bg-[var(--text-muted)] disabled:opacity-50"
               >
                 {ocupado === "gerando" && <Loader2 className="h-4 w-4 animate-spin" />}
                 Gerar DOCX e PDF
@@ -426,7 +426,7 @@ export function DocumentosGeradosTab({
       </div>
 
       {/* ── BLOCO 2 — DOCUMENTOS GERADOS ────────────────────────────────────── */}
-      <div className="rounded-xl border border-gray-200 bg-[var(--surface-primary)] p-6 shadow-sm">
+      <div className="rounded-xl border border-gray-200 bg-[var(--surface-primary)] p-6 shadow-[var(--elev-1)]">
         <h3 className="mb-4 text-sm font-semibold text-gray-900">Documentos gerados</h3>
 
         {carregando ? (
@@ -434,7 +434,7 @@ export function DocumentosGeradosTab({
             <Loader2 className="h-4 w-4 animate-spin" /> Carregando…
           </div>
         ) : erro ? (
-          <div className="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-700">
+          <div className="rounded-lg border border-[var(--border-default)] bg-[var(--surface-secondary)] p-4 text-sm text-red-700">
             {erro}
             <button onClick={() => void carregar()} className="ml-2 underline">Tentar novamente</button>
           </div>
@@ -515,7 +515,7 @@ export function DocumentosGeradosTab({
                             {v.status !== "INVALIDADA" && (
                               <button
                                 onClick={() => void invalidar(d.id, v.id)}
-                                className="inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-red-500 hover:bg-red-50"
+                                className="inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-red-500 hover:bg-[var(--surface-secondary)]"
                               >
                                 <Ban className="h-3.5 w-3.5" /> Invalidar
                               </button>

@@ -115,7 +115,7 @@ export function Selecao({
         <ChevronDown className="h-4 w-4 shrink-0 text-[var(--text-muted)]" />
       </button>
       {aberto && (
-        <div id={listaId} role="listbox" className="absolute left-0 right-0 z-30 mt-1 max-h-60 overflow-y-auto rounded-[var(--radius-sm)] border border-[var(--border-default)] bg-[var(--surface-popover)] shadow-lg">
+        <div id={listaId} role="listbox" className="absolute left-0 right-0 z-30 mt-1 max-h-60 overflow-y-auto rounded-[var(--radius-sm)] border border-[var(--border-default)] bg-[var(--surface-popover)] shadow-[var(--elev-2)]">
           {opcoes.length === 0 && <div className="px-3 py-3 text-xs text-[var(--text-muted)]">Nenhuma opção disponível.</div>}
           {opcoes.map((o, i) => (
             <div

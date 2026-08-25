@@ -286,7 +286,7 @@ export function KanbanContent() {
 
         <main className="relative px-6 py-6 overflow-hidden">
           {/* TABS PRINCIPAIS */}
-          <div className="bg-[var(--surface-primary)] border border-[var(--border-default)] rounded-2xl p-4 backdrop-blur-xl shadow-lg mb-4">
+          <div className="bg-[var(--surface-primary)] border border-[var(--border-default)] rounded-2xl p-4 backdrop-blur-xl shadow-[var(--elev-2)] mb-4">
             <div className="flex items-center justify-between flex-wrap gap-4">
               {/* Tabs Processos / Clientes */}
               <div className="flex items-center gap-2">
@@ -295,7 +295,7 @@ export function KanbanContent() {
                   className={`
                     px-4 py-2 rounded-lg font-medium transition-all duration-200
                     ${tabPrincipal === "processos"
-                      ? "bg-[var(--action-primary)] text-[var(--action-primary-ink)] shadow-lg"
+                      ? "bg-[var(--action-primary)] text-[var(--action-primary-ink)] shadow-[var(--elev-2)]"
                       : "bg-[var(--surface-primary)] text-white/70 hover:bg-[var(--surface-hover)] hover:text-white"
                     }
                   `}
@@ -308,7 +308,7 @@ export function KanbanContent() {
                   className={`
                     px-4 py-2 rounded-lg font-medium transition-all duration-200
                     ${tabPrincipal === "contratantes"
-                      ? "bg-[var(--action-primary)] text-[var(--action-primary-ink)] shadow-lg"
+                      ? "bg-[var(--action-primary)] text-[var(--action-primary-ink)] shadow-[var(--elev-2)]"
                       : "bg-[var(--surface-primary)] text-white/70 hover:bg-[var(--surface-hover)] hover:text-white"
                     }
                   `}
@@ -399,16 +399,16 @@ export function KanbanContent() {
           </div>
 
           {/* CONTEÚDO - overflow-hidden para conter o kanban */}
-          <div className="bg-[var(--surface-primary)] border border-[var(--border-default)] rounded-2xl p-4 backdrop-blur-xl shadow-lg overflow-hidden" style={{ maxWidth: '100%' }}>
+          <div className="bg-[var(--surface-primary)] border border-[var(--border-default)] rounded-2xl p-4 backdrop-blur-xl shadow-[var(--elev-2)] overflow-hidden" style={{ maxWidth: '100%' }}>
             {/* Processos - Kanban */}
             {tabPrincipal === "processos" && subTab === "kanban" && (
               pode('processos.ver') ? (
                 paisesDisponiveis.length === 0 ? (
-                  <div className="rounded-lg border border-amber-200 bg-amber-50 p-6 text-center text-sm text-amber-700">
+                  <div className="rounded-lg border border-[var(--border-default)] bg-[var(--surface-secondary)] p-6 text-center text-sm text-amber-700">
                     Nenhum país ativo no catálogo. Cadastre em Gerenciamento → Processos de Nacionalidade → + Novo país.
                   </div>
                 ) : !paisObj ? null : !tipoSelecionado ? (
-                  <div className="rounded-lg border border-amber-200 bg-amber-50 p-6 text-center text-sm text-amber-700">
+                  <div className="rounded-lg border border-[var(--border-default)] bg-[var(--surface-secondary)] p-6 text-center text-sm text-amber-700">
                     {paisObj.countryLabel} ainda não tem tipo de processo cadastrado.
                     Crie em Gerenciamento → Processos de Nacionalidade.
                   </div>

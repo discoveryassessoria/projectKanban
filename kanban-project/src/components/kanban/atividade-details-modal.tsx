@@ -202,7 +202,7 @@ function ConteudoModal({
   // deste arquivo que sai o `text-white/80` das abas, e uma classe de campo com
   // `bg-[var(--surface-primary)]` e sem cor de texto é a semente do bug — quem copiar daqui herda
   // o campo branco no branco.
-  const inputClass = "w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-[var(--surface-primary)] text-gray-900 placeholder:text-[var(--text-muted)] text-sm h-[42px]"
+  const inputClass = "w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--border-strong)] bg-[var(--surface-primary)] text-gray-900 placeholder:text-[var(--text-muted)] text-sm h-[42px]"
 
   // ✅ Verificar se o processo é da Itália (aba Informações)
   const isItalia = ehItalia(processo)
@@ -508,7 +508,7 @@ function ConteudoModal({
       <div className="fixed inset-0 bg-[var(--overlay-modal)] z-[9998]" onClick={handleClose} />
 
       <div 
-        className={`fixed z-[9999] shadow-2xl flex flex-col overflow-hidden rounded-tl-xl rounded-tr-xl ${
+        className={`fixed z-[9999] shadow-[var(--elev-3)] flex flex-col overflow-hidden rounded-tl-xl rounded-tr-xl ${
           finDark ? 'bg-[var(--surface-popover)]' : 'bg-[var(--surface-primary)]'
         }`}
         style={{ left: '155px', top: '45px', right: '35px', bottom: '0px' }}
@@ -570,7 +570,7 @@ function ConteudoModal({
               <Button 
                 variant="ghost" 
                 size="icon" 
-                className="text-red-700 hover:text-red-500 hover:bg-red-50"
+                className="text-red-700 hover:text-red-500 hover:bg-[var(--surface-secondary)]"
                 onClick={handleDelete}
               >
                 <Trash2 className="h-5 w-5" />
@@ -611,7 +611,7 @@ function ConteudoModal({
                     pode('processos.editar') && (
                       <button
                         onClick={() => setIsEditing(true)}
-                        className="text-sm text-sky-700 hover:text-sky-700"
+                        className="text-sm text-[var(--text-secondary)] hover:text-[var(--text-secondary)]"
                       >
                         editar
                       </button>
@@ -688,7 +688,7 @@ function ConteudoModal({
                                     estado={cont.estado}
                                     cep={cont.cep}
                                   >
-                                    <div className="flex items-start gap-2 cursor-pointer hover:text-sky-700">
+                                    <div className="flex items-start gap-2 cursor-pointer hover:text-[var(--text-secondary)]">
                                       <MapPin className="h-4 w-4 mt-0.5" />
                                       <div className="underline decoration-dotted underline-offset-2">
                                         <p>{cont.endereco}{cont.numero && `, ${cont.numero}`}</p>
@@ -757,7 +757,7 @@ function ConteudoModal({
                                     estado={req.estado}
                                     cep={req.cep}
                                   >
-                                    <div className="flex items-start gap-2 cursor-pointer hover:text-sky-700">
+                                    <div className="flex items-start gap-2 cursor-pointer hover:text-[var(--text-secondary)]">
                                       <MapPin className="h-3 w-3 mt-0.5" />
                                       <div className="underline decoration-dotted underline-offset-2">
                                         <p>{req.endereco}{req.numero && `, ${req.numero}`}</p>
@@ -816,14 +816,14 @@ function ConteudoModal({
                       <div className="relative">
                         <button
                           onClick={() => setShowContratanteDropdown(!showContratanteDropdown)}
-                          className="w-full flex items-center gap-2 px-3 py-2 text-sm text-sky-700 hover:bg-[var(--surface-tertiary)] rounded-md transition-colors"
+                          className="w-full flex items-center gap-2 px-3 py-2 text-sm text-[var(--text-secondary)] hover:bg-[var(--surface-tertiary)] rounded-md transition-colors"
                         >
                           <Plus className="h-4 w-4" />
                           Adicionar contratante
                         </button>
 
                         {showContratanteDropdown && (
-                          <div className="absolute top-full left-0 right-0 mt-1 bg-[var(--surface-overlay)] border border-[var(--border-default)] rounded-xl shadow-lg z-10">
+                          <div className="absolute top-full left-0 right-0 mt-1 bg-[var(--surface-overlay)] border border-[var(--border-default)] rounded-xl shadow-[var(--elev-2)] z-10">
                             <div className="p-2 border-b border-[var(--border-default)]">
                               <Input
                                 placeholder="Buscar contratante..."
@@ -841,8 +841,8 @@ function ConteudoModal({
                                     onClick={() => addContratante(c)}
                                     className="w-full px-4 py-2 text-left hover:bg-[var(--surface-tertiary)] flex items-center gap-3"
                                   >
-                                    <div className="w-8 h-8 bg-sky-50 rounded-full flex items-center justify-center">
-                                      <User className="h-4 w-4 text-sky-700" />
+                                    <div className="w-8 h-8 bg-[var(--surface-secondary)] rounded-full flex items-center justify-center">
+                                      <User className="h-4 w-4 text-[var(--text-secondary)]" />
                                     </div>
                                     <div>
                                       <p className="font-medium text-white/95 text-sm">{nomePessoa(c)}</p>
@@ -870,7 +870,7 @@ function ConteudoModal({
                           {[...requerentesSelecionados].sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR')).map((req) => (
                             <div key={req.id} className="flex items-center justify-between p-2 bg-[var(--surface-popover)] border border-[var(--border-default)] rounded-xl">
                               <div className="flex items-center gap-2">
-                                <User className="h-4 w-4 text-sky-700" />
+                                <User className="h-4 w-4 text-[var(--text-secondary)]" />
                                 <span className="text-white/95 text-sm">{nomePessoa(req)}</span>
                               </div>
                               <button
@@ -887,14 +887,14 @@ function ConteudoModal({
                       <div className="relative">
                         <button
                           onClick={() => setShowRequerenteDropdown(!showRequerenteDropdown)}
-                          className="w-full flex items-center gap-2 px-3 py-2 text-sm text-sky-700 hover:bg-[var(--surface-tertiary)] rounded-md transition-colors"
+                          className="w-full flex items-center gap-2 px-3 py-2 text-sm text-[var(--text-secondary)] hover:bg-[var(--surface-tertiary)] rounded-md transition-colors"
                         >
                           <Plus className="h-4 w-4" />
                           Adicionar requerente
                         </button>
 
                         {showRequerenteDropdown && (
-                          <div className="absolute top-full left-0 right-0 mt-1 bg-[var(--surface-overlay)] border border-[var(--border-default)] rounded-xl shadow-lg z-10">
+                          <div className="absolute top-full left-0 right-0 mt-1 bg-[var(--surface-overlay)] border border-[var(--border-default)] rounded-xl shadow-[var(--elev-2)] z-10">
                             <div className="p-2 border-b border-[var(--border-default)]">
                               <Input
                                 placeholder="Buscar requerente..."
@@ -912,7 +912,7 @@ function ConteudoModal({
                                     onClick={() => addRequerente(r)}
                                     className="w-full px-4 py-2 text-left hover:bg-[var(--surface-tertiary)] flex items-center gap-3"
                                   >
-                                    <div className="w-8 h-8 bg-green-50 rounded-full flex items-center justify-center">
+                                    <div className="w-8 h-8 bg-[var(--surface-secondary)] rounded-full flex items-center justify-center">
                                       <User className="h-4 w-4 text-green-700" />
                                     </div>
                                     <div>

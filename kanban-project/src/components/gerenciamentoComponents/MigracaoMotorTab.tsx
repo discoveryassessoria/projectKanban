@@ -89,7 +89,7 @@ export default function MigracaoMotorTab() {
 
   return (
     <div className="space-y-5">
-      {flash && <div className="rounded-xl border border-green-200 bg-green-50 px-4 py-2.5 text-sm text-green-700">{flash}</div>}
+      {flash && <div className="rounded-xl border border-[var(--border-default)] bg-[var(--surface-secondary)] px-4 py-2.5 text-sm text-green-700">{flash}</div>}
 
       <div className="rounded-2xl border border-[var(--border-default)] bg-[var(--surface-primary)] p-5 backdrop-blur-sm">
         <h2 className="text-lg font-semibold text-white">Conectar Processos ao Motor</h2>
@@ -101,7 +101,7 @@ export default function MigracaoMotorTab() {
             <div className="text-2xl font-bold text-white">{total}</div>
             <div className="text-xs text-[var(--text-secondary)]">processos</div>
           </div>
-          <div className="rounded-xl border border-green-200 bg-green-50 p-3 text-center">
+          <div className="rounded-xl border border-[var(--border-default)] bg-[var(--surface-secondary)] p-3 text-center">
             <div className="text-2xl font-bold text-green-700">{conectados}</div>
             <div className="text-xs text-[var(--text-secondary)]">conectados</div>
           </div>
@@ -146,15 +146,15 @@ export default function MigracaoMotorTab() {
           Reconectar também os que já estão conectados (troca o tipo)
         </label>
 
-        <div className="mt-3 rounded-lg border border-sky-200 bg-sky-50 px-3 py-2 text-sm text-sky-100">
+        <div className="mt-3 rounded-lg border border-[var(--border-default)] bg-[var(--surface-secondary)] px-3 py-2 text-sm text-[var(--text-secondary)]">
           Vai conectar <b>{preview ?? "…"}</b> processo(s) de <b>{paisNome}</b>.
         </div>
 
         {!confirmando ? (
           <button disabled={busy || tipoId === "" || (preview ?? 0) === 0} onClick={() => setConfirmando(true)} className="mt-3 rounded-lg bg-[var(--action-primary)] px-4 py-2 text-sm font-medium text-[var(--action-primary-ink)] hover:bg-[var(--action-primary)] disabled:opacity-50">Conectar {preview ?? 0} processo(s)</button>
         ) : (
-          <div className="mt-3 rounded-xl border border-blue-200 bg-blue-50 p-4">
-            <div className="text-sm text-blue-100">Conectar <b>{preview}</b> processo(s) de <b>{paisNome}</b> ao tipo escolhido?</div>
+          <div className="mt-3 rounded-xl border border-[var(--border-default)] bg-[var(--surface-secondary)] p-4">
+            <div className="text-sm text-[var(--text-secondary)]">Conectar <b>{preview}</b> processo(s) de <b>{paisNome}</b> ao tipo escolhido?</div>
             <div className="mt-3 flex gap-2">
               <button disabled={busy} onClick={conectar} className="rounded-lg bg-[var(--action-primary)] px-4 py-2 text-sm font-medium text-[var(--action-primary-ink)] hover:bg-[var(--action-primary)] disabled:opacity-50">{busy ? "Conectando…" : "Sim, conectar"}</button>
               <button disabled={busy} onClick={() => setConfirmando(false)} className="rounded-lg border border-[var(--border-default)] px-4 py-2 text-sm text-white/70 hover:bg-[var(--surface-hover)]">Cancelar</button>
@@ -169,10 +169,10 @@ export default function MigracaoMotorTab() {
           {!confirmandoDesc ? (
             <button onClick={() => setConfirmandoDesc(true)} className="text-xs text-[var(--text-muted)] underline hover:text-white/70">Desconectar todos de {paisNome}</button>
           ) : (
-            <div className="rounded-xl border border-amber-200 bg-amber-50 p-4">
+            <div className="rounded-xl border border-[var(--border-default)] bg-[var(--surface-secondary)] p-4">
               <div className="text-sm text-amber-100">Desconectar <b>todos</b> os processos de <b>{paisNome}</b> do motor? (Não apaga nada, só desliga o vínculo.)</div>
               <div className="mt-3 flex gap-2">
-                <button disabled={busy} onClick={desconectar} className="rounded-lg bg-amber-700 px-4 py-2 text-sm font-medium text-[var(--action-primary-ink)] hover:bg-amber-500 disabled:opacity-50">{busy ? "Desconectando…" : "Sim, desconectar"}</button>
+                <button disabled={busy} onClick={desconectar} className="rounded-lg bg-amber-700 px-4 py-2 text-sm font-medium text-[var(--action-primary-ink)] hover:bg-amber-600 disabled:opacity-50">{busy ? "Desconectando…" : "Sim, desconectar"}</button>
                 <button disabled={busy} onClick={() => setConfirmandoDesc(false)} className="rounded-lg border border-[var(--border-default)] px-4 py-2 text-sm text-white/70 hover:bg-[var(--surface-hover)]">Cancelar</button>
               </div>
             </div>

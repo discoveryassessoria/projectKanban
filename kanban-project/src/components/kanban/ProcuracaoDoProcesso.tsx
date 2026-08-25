@@ -52,9 +52,9 @@ export function ProcuracaoDoProcesso({
       {/* Cor própria na raiz: superfície clara dentro da subárvore que recebe
           `text-white/80` quando `finDark` está ligado (atividade-details-modal).
           Sem isto, qualquer texto sem `text-` explícito aqui sai branco no branco. */}
-      <div className="rounded-xl border border-gray-200 bg-[var(--surface-primary)] p-6 text-gray-900 shadow-sm">
+      <div className="rounded-xl border border-gray-200 bg-[var(--surface-primary)] p-6 text-gray-900 shadow-[var(--elev-1)]">
         <h3 className="mb-1 flex items-center gap-2 text-sm font-semibold text-gray-900">
-          <Stamp className="h-4 w-4 text-indigo-600" />
+          <Stamp className="h-4 w-4 text-[var(--text-secondary)]" />
           Gerar procuração
         </h3>
         <p className="mb-4 text-xs text-gray-500">
@@ -62,7 +62,7 @@ export function ProcuracaoDoProcesso({
         </p>
 
         {participantes.length === 0 ? (
-          <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
+          <div className="rounded-lg border border-[var(--border-default)] bg-[var(--surface-secondary)] p-3 text-sm text-amber-800">
             Este processo ainda não tem contratante nem requerente. O outorgante vem do cadastro do
             cliente — vincule um participante ao processo primeiro.
           </div>
@@ -72,7 +72,7 @@ export function ProcuracaoDoProcesso({
             <select
               value={selecionado}
               onChange={(e) => setSelecionado(e.target.value)}
-              className="w-full max-w-md rounded-xl border border-gray-300 bg-[var(--surface-primary)] px-3 py-2 text-sm text-gray-900 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              className="w-full max-w-md rounded-xl border border-gray-300 bg-[var(--surface-primary)] px-3 py-2 text-sm text-gray-900 focus:border-[var(--border-default)] focus:outline-none focus:ring-2 focus:ring-[var(--border-strong)]"
             >
               <option value="">Selecione quem concede a procuração…</option>
               {participantes.map((p) => (

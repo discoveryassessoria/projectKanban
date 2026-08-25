@@ -80,7 +80,7 @@ interface Catalogo {
 // organizada como processo de trabalho: o que é, o que se faz, o que precisa estar
 // cumprido, o que pode acontecer, e as regras especiais.
 
-const inp = "w-full rounded-lg border border-[var(--border-default)] bg-[var(--surface-primary)] px-3 py-2 text-sm text-white placeholder-white/30 outline-none focus:border-blue-200"
+const inp = "w-full rounded-lg border border-[var(--border-default)] bg-[var(--surface-primary)] px-3 py-2 text-sm text-white placeholder-white/30 outline-none focus:border-[var(--border-default)]"
 const lbl = "mb-1 block text-[11px] uppercase tracking-wide text-[var(--text-muted)]"
 const card = "rounded-lg border border-[var(--border-default)] bg-[var(--surface-primary)] p-3"
 
@@ -210,7 +210,7 @@ export default function ConfiguracaoDoPassoModal({
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-[var(--overlay-modal)] p-4 backdrop-blur-sm" onClick={tentarFechar}>
       <div
         role="dialog" aria-modal="true" aria-label={`Configurar ${f.label}`}
-        className="flex max-h-[92vh] w-full max-w-4xl flex-col overflow-hidden rounded-2xl border border-[var(--border-default)] bg-zinc-900/95 shadow-2xl"
+        className="flex max-h-[92vh] w-full max-w-4xl flex-col overflow-hidden rounded-2xl border border-[var(--border-default)] bg-zinc-900/95 shadow-[var(--elev-3)]"
         onClick={(e) => e.stopPropagation()}
         onKeyDown={(e) => { if (e.key === "Escape") { e.stopPropagation(); tentarFechar() } }}
       >
@@ -227,12 +227,12 @@ export default function ConfiguracaoDoPassoModal({
             <div className="flex flex-none items-center gap-2">
               {/* RASCUNHO × PUBLICADO — o administrador precisa saber, antes de mexer,
                   se o que ele fizer atinge quem já está rodando. Não atinge. */}
-              <span className="rounded-full border border-amber-200 bg-amber-50 px-2.5 py-1 text-[11px] text-amber-700">
+              <span className="rounded-full border border-[var(--border-default)] bg-[var(--surface-secondary)] px-2.5 py-1 text-[11px] text-amber-700">
                 Rascunho
               </span>
               {sujo && (
                 <span className="flex items-center gap-1.5 text-[11px] text-[var(--text-secondary)]" title="Há alterações que ainda não foram salvas.">
-                  <span className="h-1.5 w-1.5 rounded-full bg-amber-400" aria-hidden />
+                  <span className="h-1.5 w-1.5 rounded-full bg-amber-600" aria-hidden />
                   Alterações não salvas
                 </span>
               )}
@@ -262,7 +262,7 @@ export default function ConfiguracaoDoPassoModal({
         </div>
 
         {meus.length > 0 && (
-          <div className="mx-6 mt-4 rounded-lg border border-red-200 bg-red-50 p-3">
+          <div className="mx-6 mt-4 rounded-lg border border-[var(--border-default)] bg-[var(--surface-secondary)] p-3">
             <div className="text-xs font-medium text-red-700">A publicação foi recusada:</div>
             <ul className="mt-1 space-y-0.5 text-xs text-red-700/80">
               {meus.map((p, i) => <li key={i}>· {p.mensagem}</li>)}
@@ -405,20 +405,20 @@ export default function ConfiguracaoDoPassoModal({
                         onChange={(e) => setSub(i, { label: e.target.value, key: st.key ?? chaveDe(e.target.value) })} />
                     </div>
                     <button onClick={() => setSubAberta(subAberta === i ? null : i)}
-                      className="rounded-lg border border-[var(--border-default)] px-3 py-2 text-xs text-blue-700 hover:bg-blue-50">
+                      className="rounded-lg border border-[var(--border-default)] px-3 py-2 text-xs text-[var(--text-secondary)] hover:bg-[var(--surface-secondary)]">
                       {subAberta === i ? "Fechar" : "Configurar"}
                     </button>
                     <button onClick={() => setF((x) => ({ ...x, subtarefas: (x.subtarefas ?? []).filter((_, j) => j !== i) }))}
-                      className="rounded-lg border border-[var(--border-default)] px-2 py-2 text-xs text-red-700 hover:bg-red-50">Remover</button>
+                      className="rounded-lg border border-[var(--border-default)] px-2 py-2 text-xs text-red-700 hover:bg-[var(--surface-secondary)]">Remover</button>
                   </div>
                   <div className="mt-1.5 flex flex-wrap items-center gap-1.5 text-[10px]">
                     <code className="text-[var(--text-muted)]">{st.key ?? chaveDe(st.label)}</code>
-                    {st.obrigatoria !== false && <span className="rounded bg-amber-50 px-1.5 py-0.5 text-amber-700">obrigatória</span>}
+                    {st.obrigatoria !== false && <span className="rounded bg-[var(--surface-secondary)] px-1.5 py-0.5 text-amber-700">obrigatória</span>}
                     {st.repetivel && <span className="rounded bg-[var(--surface-primary)] px-1.5 py-0.5 text-[var(--text-secondary)]">repetível{st.maxOcorrencias ? ` ≤${st.maxOcorrencias}` : ""}</span>}
                     {(st.dependeDe?.length ?? 0) > 0 && <span className="rounded bg-[var(--surface-primary)] px-1.5 py-0.5 text-[var(--text-secondary)]">depende de {st.dependeDe!.length}</span>}
-                    {st.fonteDeCanais && st.fonteDeCanais !== "NENHUMA" && <span className="rounded bg-sky-50 px-1.5 py-0.5 text-sky-700">canais do fornecedor</span>}
-                    {(st.acoes?.length ?? 0) > 0 && <span className="rounded bg-slate-50 px-1.5 py-0.5 text-slate-700">{st.acoes!.length} ações</span>}
-                    {(st.campos?.length ?? 0) > 0 && <span className="rounded bg-slate-50 px-1.5 py-0.5 text-slate-700">{st.campos!.length} campos</span>}
+                    {st.fonteDeCanais && st.fonteDeCanais !== "NENHUMA" && <span className="rounded bg-[var(--surface-secondary)] px-1.5 py-0.5 text-[var(--text-secondary)]">canais do fornecedor</span>}
+                    {(st.acoes?.length ?? 0) > 0 && <span className="rounded bg-[var(--surface-secondary)] px-1.5 py-0.5 text-[var(--text-secondary)]">{st.acoes!.length} ações</span>}
+                    {(st.campos?.length ?? 0) > 0 && <span className="rounded bg-[var(--surface-secondary)] px-1.5 py-0.5 text-[var(--text-secondary)]">{st.campos!.length} campos</span>}
                   </div>
 
                   {subAberta === i && (
@@ -720,7 +720,7 @@ export default function ConfiguracaoDoPassoModal({
                       ["suportaCanais", "canais"], ["suportaEvidencia", "evidência"],
                       ["suportaEsperaExterna", "espera externa"], ["suportaCondicoes", "condições"],
                     ] as Array<[keyof Executor, string]>).map(([k, rotulo]) => (
-                      <span key={String(k)} className={`rounded px-1.5 py-0.5 ${exec[k] ? "bg-emerald-50 text-emerald-700" : "bg-[var(--surface-primary)] text-[var(--text-muted)]"}`}>
+                      <span key={String(k)} className={`rounded px-1.5 py-0.5 ${exec[k] ? "bg-[var(--surface-secondary)] text-green-700" : "bg-[var(--surface-primary)] text-[var(--text-muted)]"}`}>
                         {exec[k] ? "✓" : "✕"} {rotulo}
                       </span>
                     ))}
@@ -802,14 +802,14 @@ export default function ConfiguracaoDoPassoModal({
           administrador não tem como saber que perdeu. */}
       {confirmandoSaida && (
         <div className="fixed inset-0 z-[60] flex items-center justify-center bg-[var(--overlay-modal)] p-4" onClick={(e) => e.stopPropagation()}>
-          <div className="w-full max-w-sm rounded-2xl border border-[var(--border-default)] bg-zinc-900 p-6 shadow-2xl">
+          <div className="w-full max-w-sm rounded-2xl border border-[var(--border-default)] bg-zinc-900 p-6 shadow-[var(--elev-3)]">
             <h4 className="text-sm font-semibold text-white">Você tem alterações não salvas</h4>
             <p className="mt-1 text-xs text-[var(--text-secondary)]">Se sair agora, o que você configurou nesta sessão será descartado.</p>
             <div className="mt-4 flex justify-end gap-2">
               <button type="button" onClick={() => setConfirmandoSaida(false)}
                 className="rounded-lg border border-[var(--border-default)] bg-[var(--surface-primary)] px-3 py-1.5 text-xs text-white/70 hover:bg-[var(--surface-hover)]">Continuar editando</button>
               <button type="button" onClick={() => { setConfirmandoSaida(false); onFechar() }}
-                className="rounded-lg bg-red-600/80 px-3 py-1.5 text-xs font-medium text-[var(--action-primary-ink)] hover:bg-red-800">Descartar</button>
+                className="rounded-lg bg-[var(--surface-secondary)] px-3 py-1.5 text-xs font-medium text-[var(--action-primary-ink)] hover:bg-red-800">Descartar</button>
             </div>
           </div>
         </div>

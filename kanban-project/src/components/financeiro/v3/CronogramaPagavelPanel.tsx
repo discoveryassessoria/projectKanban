@@ -73,7 +73,7 @@ export function CronogramaPagavelPanel({ obrigacaoId, parcelas, valorContratado,
 
       {modal && (
         <div className="fixed inset-0 z-[10050] flex items-center justify-center bg-[var(--app-overlay)] p-4" onClick={() => setModal(false)}>
-          <div onClick={(e) => e.stopPropagation()} className="w-full max-w-md rounded-[var(--radius-md)] border border-[var(--border-default)] bg-[var(--surface-overlay)] p-5 shadow-[var(--shadow-surface)]">
+          <div onClick={(e) => e.stopPropagation()} className="w-full max-w-md rounded-[var(--radius-md)] border border-[var(--border-default)] bg-[var(--surface-overlay)] p-5 shadow-[var(--elev-2)]">
             <div className="flex items-center justify-between"><h3 className="text-base font-semibold text-[var(--text-primary)]">Definir cronograma</h3><button onClick={() => setModal(false)} className="text-[var(--text-muted)] hover:text-[var(--text-secondary)]"><X className="h-4 w-4" /></button></div>
             <p className="mt-1 text-xs text-[var(--text-muted)]">Total a distribuir: <b className="text-[var(--text-primary)]">{brl(valorContratado, moeda)}</b> (a última parcela ajusta o arredondamento).</p>
             <div className="mt-4 grid grid-cols-3 gap-3">

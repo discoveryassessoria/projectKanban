@@ -305,7 +305,7 @@ export function ExportarFaturaModal({ faturas, requerentes, onClose }: ExportarF
       onClick={onClose}
     >
       <div 
-        className="bg-[var(--surface-primary)] rounded-2xl shadow-2xl w-full max-w-lg max-h-[90vh] overflow-hidden flex flex-col"
+        className="bg-[var(--surface-primary)] rounded-2xl shadow-[var(--elev-3)] w-full max-w-lg max-h-[90vh] overflow-hidden flex flex-col"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
@@ -316,7 +316,7 @@ export function ExportarFaturaModal({ faturas, requerentes, onClose }: ExportarF
             </div>
             <div>
               <h2 className="text-lg font-semibold text-white">Exportar Faturas</h2>
-              <p className="text-sm text-blue-100">Selecione o destinatário</p>
+              <p className="text-sm text-[var(--text-secondary)]">Selecione o destinatário</p>
             </div>
           </div>
           <button 
@@ -344,8 +344,8 @@ export function ExportarFaturaModal({ faturas, requerentes, onClose }: ExportarF
             </div>
             
             {requerentes.length === 0 ? (
-              <div className="p-4 bg-yellow-50 border border-yellow-200 rounded-xl text-center">
-                <p className="text-yellow-700 text-sm">
+              <div className="p-4 bg-[var(--surface-secondary)] border border-[var(--border-default)] rounded-xl text-center">
+                <p className="text-amber-700 text-sm">
                   Nenhum requerente cadastrado no processo.
                 </p>
               </div>
@@ -366,7 +366,7 @@ export function ExportarFaturaModal({ faturas, requerentes, onClose }: ExportarF
                         className={`
                           p-3 rounded-xl border-2 cursor-pointer transition-all
                           ${isSelected 
-                            ? 'border-blue-500 bg-blue-50' 
+                            ? 'border-[var(--border-default)] bg-[var(--surface-secondary)]' 
                             : 'border-gray-200 hover:border-gray-300 bg-[var(--surface-primary)]'
                           }
                           ${qtdFaturas === 0 ? 'opacity-50' : ''}
@@ -376,7 +376,7 @@ export function ExportarFaturaModal({ faturas, requerentes, onClose }: ExportarF
                           <div className={`
                             w-5 h-5 rounded-full border-2 flex items-center justify-center transition-colors flex-shrink-0
                             ${isSelected 
-                              ? 'bg-blue-500 border-blue-500' 
+                              ? 'bg-[var(--text-muted)] border-[var(--border-default)]' 
                               : 'border-gray-300'
                             }
                           `}>
@@ -386,7 +386,7 @@ export function ExportarFaturaModal({ faturas, requerentes, onClose }: ExportarF
                             <div className="flex items-center gap-2">
                               <p className="font-medium text-gray-900 truncate">{dest.nome}</p>
                               {qtdFaturas > 0 ? (
-                                <span className="px-2 py-0.5 bg-blue-100 text-blue-700 text-xs rounded-full flex-shrink-0">
+                                <span className="px-2 py-0.5 bg-[var(--surface-secondary)] text-[var(--text-secondary)] text-xs rounded-full flex-shrink-0">
                                   {qtdFaturas} fatura{qtdFaturas > 1 ? 's' : ''}
                                 </span>
                               ) : (
@@ -431,7 +431,7 @@ export function ExportarFaturaModal({ faturas, requerentes, onClose }: ExportarF
                 {faturasFiltradas.length > 1 && (
                   <button
                     onClick={selecionarTodasFaturas}
-                    className="text-xs text-blue-600 hover:text-blue-700 font-medium"
+                    className="text-xs text-[var(--text-secondary)] hover:text-[var(--text-secondary)] font-medium"
                   >
                     {faturasSelecionadas.size === faturasFiltradas.length ? 'Desmarcar todas' : 'Selecionar todas'}
                   </button>
@@ -462,7 +462,7 @@ export function ExportarFaturaModal({ faturas, requerentes, onClose }: ExportarF
                           className={`
                             flex items-center gap-3 p-2 rounded-lg border cursor-pointer transition-all
                             ${isSelected 
-                              ? 'bg-blue-50 border-blue-200' 
+                              ? 'bg-[var(--surface-secondary)] border-[var(--border-default)]' 
                               : 'bg-[var(--surface-primary)] border-gray-200 hover:border-gray-300'
                             }
                           `}
@@ -471,14 +471,14 @@ export function ExportarFaturaModal({ faturas, requerentes, onClose }: ExportarF
                           <div className={`
                             w-5 h-5 rounded border-2 flex items-center justify-center flex-shrink-0 transition-colors
                             ${isSelected 
-                              ? 'bg-blue-500 border-blue-500' 
+                              ? 'bg-[var(--text-muted)] border-[var(--border-default)]' 
                               : 'border-gray-300 bg-[var(--surface-primary)]'
                             }
                           `}>
                             {isSelected && <Check className="h-3 w-3 text-white" />}
                           </div>
                           
-                          <FileText className={`h-4 w-4 flex-shrink-0 ${isSelected ? 'text-blue-500' : 'text-[var(--text-muted)]'}`} />
+                          <FileText className={`h-4 w-4 flex-shrink-0 ${isSelected ? 'text-[var(--text-secondary)]' : 'text-[var(--text-muted)]'}`} />
                           
                           <span className={`text-sm flex-1 truncate ${isSelected ? 'text-gray-900' : 'text-gray-600'}`}>
                             {fatura.descricao}
@@ -499,7 +499,7 @@ export function ExportarFaturaModal({ faturas, requerentes, onClose }: ExportarF
                         {Object.entries(totaisPorMoeda).map(([moeda, total]) => (
                           <div key={moeda} className="flex items-center gap-2">
                             <span className="text-sm text-gray-600">Total ({moeda}):</span>
-                            <span className="text-lg font-bold text-blue-600">
+                            <span className="text-lg font-bold text-[var(--text-secondary)]">
                               {MOEDA_SYMBOLS[moeda]} {total.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                             </span>
                           </div>

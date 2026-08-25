@@ -106,7 +106,7 @@ export default function CatalogTab({ catalogKey }: { catalogKey: string }) {
                     </td>
                   ))}
                   <td className="border-b border-[var(--border-default)] px-3 py-2.5">
-                    <span className="rounded bg-green-50 px-1.5 py-0.5 text-[10px] font-semibold text-green-700">
+                    <span className="rounded bg-[var(--surface-secondary)] px-1.5 py-0.5 text-[10px] font-semibold text-green-700">
                       ativo
                     </span>
                   </td>
@@ -126,7 +126,7 @@ export default function CatalogTab({ catalogKey }: { catalogKey: string }) {
       {/* modal criar/editar */}
       {modalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-[var(--overlay-modal)] p-4 backdrop-blur-sm">
-          <div className="flex max-h-[90vh] w-full max-w-lg flex-col rounded-2xl border border-[var(--border-default)] bg-zinc-900/95 shadow-2xl">
+          <div className="flex max-h-[90vh] w-full max-w-lg flex-col rounded-2xl border border-[var(--border-default)] bg-zinc-900/95 shadow-[var(--elev-3)]">
             <div className="flex items-center justify-between border-b border-[var(--border-default)] px-5 py-3.5">
               <h3 className="text-base font-semibold text-white">
                 {editId ? 'Editar' : 'Novo'} · {cfg.title}

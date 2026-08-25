@@ -224,7 +224,7 @@ export default function RelatorioClientesButton() {
                 handleSelectFilter({ label: "Próximos 30 dias", proximosDias: 30 })
               }}
             >
-              <Calendar className="mr-2 h-4 w-4 text-indigo-500" />
+              <Calendar className="mr-2 h-4 w-4 text-[var(--text-secondary)]" />
               <span className="font-medium text-sm">Próximos 30 dias</span>
             </DropdownMenuItem>
 
@@ -235,7 +235,7 @@ export default function RelatorioClientesButton() {
                 handleSelectFilter({ label: `${MESES[mesAtual - 1]} (mês atual)`, mes: mesAtual })
               }}
             >
-              <Cake className="mr-2 h-4 w-4 text-pink-500" />
+              <Cake className="mr-2 h-4 w-4 text-red-500" />
               <span className="font-medium text-sm">{MESES[mesAtual - 1]} (mês atual)</span>
             </DropdownMenuItem>
 
@@ -246,7 +246,7 @@ export default function RelatorioClientesButton() {
                 setMenuView("escolherMes")
               }}
             >
-              <Calendar className="mr-2 h-4 w-4 text-blue-500" />
+              <Calendar className="mr-2 h-4 w-4 text-[var(--text-secondary)]" />
               <span className="font-medium text-sm">Escolher mês...</span>
             </DropdownMenuItem>
 
@@ -297,7 +297,7 @@ export default function RelatorioClientesButton() {
         {menuView === "escolherMes" && (
           <>
             <DropdownMenuItem
-              className="cursor-pointer text-indigo-600"
+              className="cursor-pointer text-[var(--text-secondary)]"
               onSelect={(e) => {
                 e.preventDefault()
                 setMenuView("main")
@@ -319,7 +319,7 @@ export default function RelatorioClientesButton() {
                   handleSelectMes(index)
                 }}
               >
-                <span className={`text-sm ${index + 1 === mesAtual ? 'font-bold text-indigo-600' : ''}`}>
+                <span className={`text-sm ${index + 1 === mesAtual ? 'font-bold text-[var(--text-secondary)]' : ''}`}>
                   {nomeMes}
                   {index + 1 === mesAtual && ' ●'}
                 </span>
@@ -332,7 +332,7 @@ export default function RelatorioClientesButton() {
         {menuView === "documentos" && (
           <>
             <DropdownMenuItem
-              className="cursor-pointer text-indigo-600"
+              className="cursor-pointer text-[var(--text-secondary)]"
               onSelect={(e) => {
                 e.preventDefault()
                 setMenuView("main")
@@ -366,7 +366,7 @@ export default function RelatorioClientesButton() {
                 handleSelectDocFiltro({ label: "Clientes sem RG", filtro: "RG" })
               }}
             >
-              <CreditCard className="mr-2 h-4 w-4 text-blue-500" />
+              <CreditCard className="mr-2 h-4 w-4 text-[var(--text-secondary)]" />
               <span className="font-medium text-sm">Sem RG</span>
             </DropdownMenuItem>
 
@@ -377,7 +377,7 @@ export default function RelatorioClientesButton() {
                 handleSelectDocFiltro({ label: "Clientes sem CNH", filtro: "CNH" })
               }}
             >
-              <Car className="mr-2 h-4 w-4 text-slate-500" />
+              <Car className="mr-2 h-4 w-4 text-[var(--text-secondary)]" />
               <span className="font-medium text-sm">Sem CNH</span>
             </DropdownMenuItem>
 
@@ -398,7 +398,7 @@ export default function RelatorioClientesButton() {
         {menuView === "formatoExport" && exportConfig && (
           <>
             <DropdownMenuItem
-              className="cursor-pointer text-indigo-600"
+              className="cursor-pointer text-[var(--text-secondary)]"
               onSelect={(e) => {
                 e.preventDefault()
                 setMenuView("main")
@@ -444,7 +444,7 @@ export default function RelatorioClientesButton() {
         {menuView === "formatoDocumentos" && docExportConfig && (
           <>
             <DropdownMenuItem
-              className="cursor-pointer text-indigo-600"
+              className="cursor-pointer text-[var(--text-secondary)]"
               onSelect={(e) => {
                 e.preventDefault()
                 setMenuView("documentos")

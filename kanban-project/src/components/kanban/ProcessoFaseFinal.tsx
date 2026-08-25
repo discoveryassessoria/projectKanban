@@ -20,7 +20,7 @@ interface Props {
   onConcluido?: () => void
 }
 
-const EC = "w-full text-sm border border-[var(--border-default)] rounded-md px-3 py-2 focus:outline-none focus:ring-1 focus:border-sky-200 focus:border-sky-200"
+const EC = "w-full text-sm border border-[var(--border-default)] rounded-md px-3 py-2 focus:outline-none focus:ring-1 focus:border-[var(--border-default)] focus:border-[var(--border-default)]"
 const authHeaders = () => ({ Authorization: `Bearer ${localStorage.getItem("authToken")}` })
 const jsonHeaders = () => ({ "Content-Type": "application/json", ...authHeaders() })
 
@@ -92,8 +92,8 @@ export function ProcessoFaseFinal({ processoId, onConcluido }: Props) {
             <div className="text-[11px] text-[var(--text-secondary)] whitespace-nowrap">Progresso</div>
           </div>
           <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold ${
-            concluida ? "bg-green-50 text-green-700" : "bg-sky-50 text-sky-700"}`}>
-            <span className={`w-1.5 h-1.5 rounded-full ${concluida ? "bg-green-50" : "bg-sky-400"}`} />
+            concluida ? "bg-[var(--surface-secondary)] text-green-700" : "bg-[var(--surface-secondary)] text-[var(--text-secondary)]"}`}>
+            <span className={`w-1.5 h-1.5 rounded-full ${concluida ? "bg-[var(--surface-secondary)]" : "bg-[var(--surface-secondary)]"}`} />
             {concluida ? "Concluída" : "Em andamento"}
           </span>
         </div>
@@ -112,15 +112,15 @@ export function ProcessoFaseFinal({ processoId, onConcluido }: Props) {
                     <button type="button" disabled={!active} onClick={() => active && setModalStep(s.id)}
                       className={`flex flex-col items-center text-center w-[120px] shrink-0 ${active ? "cursor-pointer" : "cursor-default"}`}>
                       <div className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold ${
-                        isDone ? "bg-green-50 text-white" : active ? "bg-[var(--action-primary)] text-white" : "bg-[var(--surface-tertiary)] text-[var(--text-secondary)]"}`}>
+                        isDone ? "bg-[var(--surface-secondary)] text-white" : active ? "bg-[var(--action-primary)] text-white" : "bg-[var(--surface-tertiary)] text-[var(--text-secondary)]"}`}>
                         {isDone ? <Check className="w-4 h-4" /> : i + 1}
                       </div>
                       <div className="mt-1.5 text-[11px] font-medium text-white/80 leading-tight">{s.title}</div>
-                      <div className={`text-[10px] ${isDone ? "text-green-700" : active ? "text-sky-700" : "text-[var(--text-muted)]"}`}>
+                      <div className={`text-[10px] ${isDone ? "text-green-700" : active ? "text-[var(--text-secondary)]" : "text-[var(--text-muted)]"}`}>
                         {isDone ? "Concluído" : active ? "Em andamento" : "Pendente"}
                       </div>
                     </button>
-                    {i < fase.workflow.length - 1 && <div className={`flex-1 h-0.5 mt-3.5 ${isDone ? "bg-green-50" : "bg-[var(--surface-tertiary)]"}`} />}
+                    {i < fase.workflow.length - 1 && <div className={`flex-1 h-0.5 mt-3.5 ${isDone ? "bg-[var(--surface-secondary)]" : "bg-[var(--surface-tertiary)]"}`} />}
                   </div>
                 )
               })}
@@ -158,7 +158,7 @@ export function ProcessoFaseFinal({ processoId, onConcluido }: Props) {
                 return (
                   <div key={s.id} className="flex items-center gap-3 px-4 py-3">
                     <span className={`w-6 h-6 rounded-full flex items-center justify-center text-[11px] font-bold ${
-                      isDone ? "bg-green-50 text-green-700" : active ? "bg-[var(--action-primary)] text-white" : "bg-[var(--surface-tertiary)] text-[var(--text-muted)]"}`}>{i + 1}</span>
+                      isDone ? "bg-[var(--surface-secondary)] text-green-700" : active ? "bg-[var(--action-primary)] text-white" : "bg-[var(--surface-tertiary)] text-[var(--text-muted)]"}`}>{i + 1}</span>
                     <div className="flex-1 min-w-0">
                       <div className="text-sm font-medium text-white/95">{s.title}</div>
                       <div className="text-[11px] text-[var(--text-secondary)]">{meta}</div>
@@ -197,8 +197,8 @@ export function ProcessoFaseFinal({ processoId, onConcluido }: Props) {
         </aside>
       </div>
 
-      {erro && <div className="bg-red-50 border border-red-200 rounded-lg px-4 py-3 text-sm text-red-700">{erro}</div>}
-      {aviso && <div className="bg-sky-50 border border-sky-200 rounded-lg px-4 py-3 text-sm text-sky-700">{aviso}</div>}
+      {erro && <div className="bg-[var(--surface-secondary)] border border-[var(--border-default)] rounded-lg px-4 py-3 text-sm text-red-700">{erro}</div>}
+      {aviso && <div className="bg-[var(--surface-secondary)] border border-[var(--border-default)] rounded-lg px-4 py-3 text-sm text-[var(--text-secondary)]">{aviso}</div>}
 
       {modalStep && (
         <EtapaModal key={modalStep} stepId={modalStep} faseKey={faseKey} fase={fase}
@@ -261,10 +261,10 @@ function EtapaModal({ stepId, faseKey, fase, posting, erro, onClose, onSubmit }:
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
       <div className="absolute inset-0 bg-[var(--overlay-modal)]" onClick={onClose} />
-      <div className="relative w-full max-w-lg bg-[var(--surface-popover)] rounded-xl shadow-xl max-h-[85vh] flex flex-col">
+      <div className="relative w-full max-w-lg bg-[var(--surface-popover)] rounded-xl shadow-[var(--elev-3)] max-h-[85vh] flex flex-col">
         <div className={`flex items-start justify-between px-5 py-4 border-b ${isLast ? "border-[var(--border-default)]" : "border-[var(--border-default)]"}`}>
           <div>
-            <div className={`text-[11px] font-semibold uppercase tracking-wider ${isLast ? "text-red-700" : "text-sky-700"}`}>Etapa {n} de {cfg.steps.length} · {cfg.phaseName}</div>
+            <div className={`text-[11px] font-semibold uppercase tracking-wider ${isLast ? "text-red-700" : "text-[var(--text-secondary)]"}`}>Etapa {n} de {cfg.steps.length} · {cfg.phaseName}</div>
             <h3 className="text-base font-bold text-white/95 mt-0.5">{sdef.title}</h3>
             <p className="text-xs text-[var(--text-secondary)] mt-0.5">{sdef.desc}</p>
           </div>
@@ -333,7 +333,7 @@ function EtapaModal({ stepId, faseKey, fase, posting, erro, onClose, onSubmit }:
                   ["exigencia", "! Exigência", "Órgão pediu complementação · fase não conclui"],
                   ["indeferido", "✕ Indeferido", "Pedido negado · fase não conclui"]] as const).map(([v, l, sub]) => (
                   <button key={v} type="button" onClick={() => setDecision(v)}
-                    className={`w-full text-left border rounded-lg px-3 py-2.5 ${decision === v ? (v === "deferido" ? "border-green-200 bg-green-50" : "border-[var(--border-strong)] bg-[var(--surface-secondary)]") : "border-[var(--border-default)]"}`}>
+                    className={`w-full text-left border rounded-lg px-3 py-2.5 ${decision === v ? (v === "deferido" ? "border-[var(--border-default)] bg-[var(--surface-secondary)]" : "border-[var(--border-strong)] bg-[var(--surface-secondary)]") : "border-[var(--border-default)]"}`}>
                     <div className="text-sm font-semibold text-white/95">{l}</div>
                     <div className="text-[11px] text-[var(--text-secondary)]">{sub}</div>
                   </button>
@@ -345,7 +345,7 @@ function EtapaModal({ stepId, faseKey, fase, posting, erro, onClose, onSubmit }:
 
           {stepId === "confirmar_deferimento" && (
             <>
-              <div className="rounded-lg border border-green-200 bg-green-50 px-3 py-2.5 text-sm text-green-700">🏛️ Reconhecimento deferido. Confirme para prosseguir com a entrega ao cliente.</div>
+              <div className="rounded-lg border border-[var(--border-default)] bg-[var(--surface-secondary)] px-3 py-2.5 text-sm text-green-700">🏛️ Reconhecimento deferido. Confirme para prosseguir com a entrega ao cliente.</div>
               <Field label="Nº / referência do reconhecimento"><input className={EC} value={fnNum} onChange={(e) => setFnNum(e.target.value)} /></Field>
             </>
           )}
@@ -368,7 +368,7 @@ function EtapaModal({ stepId, faseKey, fase, posting, erro, onClose, onSubmit }:
             </>
           )}
 
-          {erro && <div className="bg-red-50 border border-red-200 rounded-lg px-3 py-2 text-sm text-red-700">{erro}</div>}
+          {erro && <div className="bg-[var(--surface-secondary)] border border-[var(--border-default)] rounded-lg px-3 py-2 text-sm text-red-700">{erro}</div>}
         </div>
 
         <div className="border-t border-[var(--border-default)] px-5 py-3 flex justify-end gap-2">
@@ -391,7 +391,7 @@ function Field({ label, required, children }: { label: string; required?: boolea
   return (
     <div>
       <label className="text-xs font-semibold text-white/80 flex items-center gap-1.5 mb-1">
-        {label}{required && <span className="text-[10px] font-bold text-red-700 bg-red-50 rounded px-1.5 py-0.5">Obrigatório</span>}
+        {label}{required && <span className="text-[10px] font-bold text-red-700 bg-[var(--surface-secondary)] rounded px-1.5 py-0.5">Obrigatório</span>}
       </label>
       {children}
     </div>
@@ -408,8 +408,8 @@ function Select({ value, onChange, opts }: { value: string; onChange: (v: string
 function Chk({ on, onClick, children }: { on: boolean; onClick: () => void; children: ReactNode }) {
   return (
     <button type="button" onClick={onClick}
-      className={`w-full flex items-center gap-2 border rounded-lg px-3 py-2 text-sm text-left ${on ? "border-green-200 bg-green-50 text-green-700" : "border-[var(--border-default)] text-white/80"}`}>
-      <span className={`w-4 h-4 rounded flex items-center justify-center ${on ? "bg-green-50 text-white" : "border border-[var(--border-default)]"}`}>{on && <Check className="w-3 h-3" />}</span>
+      className={`w-full flex items-center gap-2 border rounded-lg px-3 py-2 text-sm text-left ${on ? "border-[var(--border-default)] bg-[var(--surface-secondary)] text-green-700" : "border-[var(--border-default)] text-white/80"}`}>
+      <span className={`w-4 h-4 rounded flex items-center justify-center ${on ? "bg-[var(--surface-secondary)] text-white" : "border border-[var(--border-default)]"}`}>{on && <Check className="w-3 h-3" />}</span>
       {children}
     </button>
   )
@@ -418,7 +418,7 @@ function FakeUpload({ label }: { label: string }) {
   const [ok, setOk] = useState(false)
   return (
     <button type="button" onClick={() => setOk(true)}
-      className={`w-full inline-flex items-center gap-2 text-sm font-semibold rounded-md border px-3 py-2.5 ${ok ? "border-green-200 bg-green-50 text-green-700" : "border-[var(--border-default)] text-white/80"}`}>
+      className={`w-full inline-flex items-center gap-2 text-sm font-semibold rounded-md border px-3 py-2.5 ${ok ? "border-[var(--border-default)] bg-[var(--surface-secondary)] text-green-700" : "border-[var(--border-default)] text-white/80"}`}>
       {ok ? <Check className="w-4 h-4" /> : <Upload className="w-4 h-4" />}
       {ok ? "comprovante_protocolo.pdf · anexado" : label}
     </button>

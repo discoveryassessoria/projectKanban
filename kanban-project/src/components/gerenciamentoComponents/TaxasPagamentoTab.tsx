@@ -76,7 +76,7 @@ export default function TaxasPagamentoTab() {
       {loading ? (
         <div className="flex items-center justify-center py-16"><Loader2 className="h-8 w-8 animate-spin text-[var(--text-secondary)]" /></div>
       ) : erro ? (
-        <div className="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-700">{erro}<button onClick={() => { void carregar() }} className="ml-3 underline hover:text-white">Tentar de novo</button></div>
+        <div className="rounded-lg border border-[var(--border-default)] bg-[var(--surface-secondary)] p-4 text-sm text-red-700">{erro}<button onClick={() => { void carregar() }} className="ml-3 underline hover:text-white">Tentar de novo</button></div>
       ) : filtrados.length === 0 ? (
         <div className={`${GLASS} flex flex-col items-center gap-2 py-16 text-center`}>
           <Percent className="h-10 w-10 text-[var(--text-muted)]" />
@@ -234,7 +234,7 @@ function FormaConfig({ formaId, onClose, onSalvo }: { formaId: number; onClose: 
 
   return (
     <div className="fixed inset-0 z-[60] flex items-center justify-center bg-[var(--overlay-modal)] p-4 backdrop-blur-sm" onClick={onClose}>
-      <div className="max-h-[92vh] w-full max-w-5xl overflow-auto rounded-2xl border border-[var(--border-default)] bg-zinc-900/95 text-white shadow-2xl" onClick={(e) => e.stopPropagation()}>
+      <div className="max-h-[92vh] w-full max-w-5xl overflow-auto rounded-2xl border border-[var(--border-default)] bg-zinc-900/95 text-white shadow-[var(--elev-3)]" onClick={(e) => e.stopPropagation()}>
         <div className="sticky top-0 z-10 flex items-center justify-between border-b border-[var(--border-default)] bg-zinc-900/95 px-6 py-4">
           <div className="flex items-center gap-2">
             <button onClick={onClose} className="text-[var(--text-secondary)] hover:text-white"><ArrowLeft className="h-4 w-4" /></button>
@@ -244,7 +244,7 @@ function FormaConfig({ formaId, onClose, onSalvo }: { formaId: number; onClose: 
         </div>
 
         <div className="space-y-4 px-6 py-5">
-          {erro && <div className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700">{erro}</div>}
+          {erro && <div className="rounded-lg border border-[var(--border-default)] bg-[var(--surface-secondary)] p-3 text-sm text-red-700">{erro}</div>}
           {!det ? (
             <div className="flex items-center justify-center py-16"><Loader2 className="h-8 w-8 animate-spin text-[var(--text-secondary)]" /></div>
           ) : det.perfil.calculo === 'BOLETO' ? (

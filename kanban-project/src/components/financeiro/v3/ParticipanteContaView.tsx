@@ -95,7 +95,7 @@ export default function ParticipanteContaView({ obrigacaoId, nome, onClose, onRe
   return createPortal(
     <>
       <div className="fixed inset-0 flex justify-end bg-[var(--app-overlay)]" style={{ zIndex: LAYER.aboveProcessDrawer }} onClick={onClose}>
-        <div className="flex h-full w-full max-w-[760px] flex-col overflow-hidden border-l border-[var(--border-default)] bg-[var(--surface-overlay)] shadow-[var(--shadow-surface)]" onClick={(e) => e.stopPropagation()}>
+        <div className="flex h-full w-full max-w-[760px] flex-col overflow-hidden border-l border-[var(--border-default)] bg-[var(--surface-overlay)] shadow-[var(--elev-2)]" onClick={(e) => e.stopPropagation()}>
           {/* Header */}
           <div className="flex items-start justify-between gap-3 border-b border-[var(--border-default)] px-5 py-4">
             <div className="flex min-w-0 items-center gap-3">

@@ -54,11 +54,11 @@ interface Fatura {
 }
 
 const statusConfig = {
-  PENDENTE: { label: 'Pendente', color: 'bg-yellow-50 text-yellow-700', icon: Clock },
-  PAGO: { label: 'Pago', color: 'bg-green-50 text-green-700', icon: CheckCircle },
-  VENCIDO: { label: 'Vencido', color: 'bg-red-50 text-red-700', icon: AlertTriangle },
+  PENDENTE: { label: 'Pendente', color: 'bg-[var(--surface-secondary)] text-amber-700', icon: Clock },
+  PAGO: { label: 'Pago', color: 'bg-[var(--surface-secondary)] text-green-700', icon: CheckCircle },
+  VENCIDO: { label: 'Vencido', color: 'bg-[var(--surface-secondary)] text-red-700', icon: AlertTriangle },
   CANCELADO: { label: 'Cancelado', color: 'bg-gray-500/20 text-[var(--text-muted)]', icon: XCircle },
-  PARCIAL: { label: 'Parcial', color: 'bg-blue-50 text-blue-700', icon: Clock },
+  PARCIAL: { label: 'Parcial', color: 'bg-[var(--surface-secondary)] text-[var(--text-secondary)]', icon: Clock },
 }
 
 // Identidade estável para a ausência de dados (evita recomputar memos).
@@ -128,7 +128,7 @@ export default function ContasReceberPage() {
         <Card className="bg-[var(--surface-primary)] border-[var(--border-strong)]">
           <CardContent className="pt-4">
             <p className="text-sm text-white/70">Pendente</p>
-            <p className="text-xl font-bold text-yellow-700">{formatCurrency(totais.pendente)}</p>
+            <p className="text-xl font-bold text-amber-700">{formatCurrency(totais.pendente)}</p>
           </CardContent>
         </Card>
         <Card className="bg-[var(--surface-primary)] border-[var(--border-strong)]">
@@ -212,7 +212,7 @@ export default function ContasReceberPage() {
                       <td className="p-4">
                         <Link 
                           href={`/kanban?processo=${fatura.processo.id}`}
-                          className="text-blue-700 hover:underline"
+                          className="text-[var(--text-secondary)] hover:underline"
                         >
                           {fatura.processo.nome}
                         </Link>

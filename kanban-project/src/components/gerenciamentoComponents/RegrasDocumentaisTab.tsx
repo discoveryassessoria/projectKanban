@@ -79,15 +79,15 @@ const formParaRegra = (f: RegraForm): RegraDocumental => ({
 const input = "w-full rounded-lg border border-[var(--border-default)] bg-[var(--surface-primary)] px-3 py-2 text-sm text-white placeholder-white/30 outline-none focus:border-white/20"
 const label = "mb-1 block text-xs text-[var(--text-secondary)]"
 const opt = "bg-zinc-900"
-const btnP = "rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-blue-500 disabled:opacity-50"
+const btnP = "rounded-lg bg-[var(--text-muted)] px-3 py-1.5 text-xs font-medium text-white hover:bg-[var(--text-muted)] disabled:opacity-50"
 const btnG = "rounded-lg border border-[var(--border-default)] bg-[var(--surface-primary)] px-3 py-1.5 text-xs text-white/80 hover:bg-[var(--surface-hover)]"
 function authHeaders(): HeadersInit {
   const t = typeof window !== "undefined" ? localStorage.getItem("authToken") : null
   return t ? { "Content-Type": "application/json", Authorization: `Bearer ${t}` } : { "Content-Type": "application/json" }
 }
 const STATUS_STYLE: Record<string, string> = {
-  RASCUNHO: "bg-[var(--surface-primary)] text-[var(--text-secondary)]", PUBLICADA: "bg-green-50 text-green-700",
-  INATIVA: "bg-amber-50 text-amber-700", ARQUIVADA: "bg-[var(--surface-primary)] text-[var(--text-muted)]",
+  RASCUNHO: "bg-[var(--surface-primary)] text-[var(--text-secondary)]", PUBLICADA: "bg-[var(--surface-secondary)] text-green-700",
+  INATIVA: "bg-[var(--surface-secondary)] text-amber-700", ARQUIVADA: "bg-[var(--surface-primary)] text-[var(--text-muted)]",
 }
 const ETAPAS = ["Identificação", "Aplicabilidade", "Requisito e documentos", "Público-alvo", "Condições", "Fases e bloqueio", "Validade", "Revisão final"]
 
@@ -177,7 +177,7 @@ export default function RegrasDocumentaisTab() {
 
   return (
     <div className="space-y-5">
-      {flash && <div className="rounded-xl border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-100">{flash}</div>}
+      {flash && <div className="rounded-xl border border-[var(--border-default)] bg-[var(--surface-secondary)] px-4 py-3 text-sm text-[var(--text-secondary)]">{flash}</div>}
 
       <div className="rounded-2xl border border-[var(--border-default)] bg-[var(--surface-primary)] p-5">
         <div className="flex flex-wrap items-start justify-between gap-3">
@@ -201,7 +201,7 @@ export default function RegrasDocumentaisTab() {
       </div>
 
       {conflitosDoProc.length > 0 && (
-        <div className="rounded-2xl border border-red-200 bg-red-50 p-4">
+        <div className="rounded-2xl border border-[var(--border-default)] bg-[var(--surface-secondary)] p-4">
           <div className="mb-2 text-sm font-semibold text-red-700">⚠ {conflitosDoProc.length} conflito(s) — resolver manualmente</div>
           <ul className="space-y-1 text-xs text-red-100/90">{conflitosDoProc.map((c, i) => <li key={i}>• [{c.severidade}] {c.mensagem}</li>)}</ul>
         </div>
@@ -234,8 +234,8 @@ export default function RegrasDocumentaisTab() {
                     <td className="px-2 py-2 text-[11px] text-[var(--text-secondary)]">{(r.publicosAlvo.length ? r.publicosAlvo : [r.publicoAlvo]).map((p) => PUBLICO_ALVO_LABEL[p]).join(", ")}</td>
                     <td className="px-2 py-2 text-[11px] text-[var(--text-secondary)]">{r.condicoes && r.condicoes.regras.length ? justificativaDoConjunto(r.condicoes) : "—"}</td>
                     <td className="px-2 py-2 text-xs text-[var(--text-secondary)]">{faseName(r.faseExigencia)}</td>
-                    <td className="px-2 py-2 text-xs">{r.bloqueiaConclusaoFase ? <span className="rounded bg-red-50 px-1.5 py-0.5 text-[10px] text-red-700">{faseName(r.faseBloqueio)}</span> : <span className="text-[var(--text-muted)]">—</span>}</td>
-                    <td className="px-2 py-2 text-xs"><span className={`rounded px-1.5 py-0.5 text-[10px] ${r.obrigatoriedade === "OBRIGATORIA" ? "bg-amber-50 text-amber-700" : "bg-[var(--surface-primary)] text-[var(--text-secondary)]"}`}>{r.obrigatoriedade === "OBRIGATORIA" ? "obrig." : "opc."}</span></td>
+                    <td className="px-2 py-2 text-xs">{r.bloqueiaConclusaoFase ? <span className="rounded bg-[var(--surface-secondary)] px-1.5 py-0.5 text-[10px] text-red-700">{faseName(r.faseBloqueio)}</span> : <span className="text-[var(--text-muted)]">—</span>}</td>
+                    <td className="px-2 py-2 text-xs"><span className={`rounded px-1.5 py-0.5 text-[10px] ${r.obrigatoriedade === "OBRIGATORIA" ? "bg-[var(--surface-secondary)] text-amber-700" : "bg-[var(--surface-primary)] text-[var(--text-secondary)]"}`}>{r.obrigatoriedade === "OBRIGATORIA" ? "obrig." : "opc."}</span></td>
                     <td className="px-2 py-2 text-[11px] text-[var(--text-secondary)]">{r.possuiValidade ? `${r.validadeDias ?? "?"}d${r.renovarQuandoExpirado ? " ↻" : ""}` : "—"}</td>
                     <td className="px-2 py-2 text-xs text-[var(--text-secondary)]">v{r.versao}</td>
                     <td className="px-2 py-2"><span className={`rounded px-1.5 py-0.5 text-[10px] ${STATUS_STYLE[r.status]}`}>{r.status.toLowerCase()}</span></td>
@@ -248,7 +248,7 @@ export default function RegrasDocumentaisTab() {
                         <button className={btnG} onClick={() => verHistorico(r)}>histórico</button>
                         {r.status !== "ARQUIVADA" && <button className={btnG} onClick={() => acao(r, "arquivar", `Arquivar "${r.nome ?? r.documentTypeCode}"?`)}>arquivar</button>}
                         {r.status === "ARQUIVADA" && <button className={btnG} onClick={() => acao(r, "reativar")}>reabrir</button>}
-                        <button className="rounded px-2 py-1 text-red-700/70 hover:bg-red-50" onClick={() => excluir(r)}>excluir</button>
+                        <button className="rounded px-2 py-1 text-red-700/70 hover:bg-[var(--surface-secondary)]" onClick={() => excluir(r)}>excluir</button>
                       </div>
                     </td>
                   </tr>
@@ -299,7 +299,7 @@ function FormWizard(props: {
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-[var(--overlay-modal)] p-4" onClick={onCancel}>
-      <div className="max-h-[92vh] w-full max-w-3xl overflow-auto rounded-2xl border border-[var(--border-default)] bg-zinc-900/95 shadow-2xl" onClick={(e) => e.stopPropagation()}>
+      <div className="max-h-[92vh] w-full max-w-3xl overflow-auto rounded-2xl border border-[var(--border-default)] bg-zinc-900/95 shadow-[var(--elev-3)]" onClick={(e) => e.stopPropagation()}>
         <div className="border-b border-[var(--border-default)] px-6 py-4">
           <h3 className="font-semibold text-white">{form.id ? `Editar regra (v${form.versao ?? 1})` : "Nova regra documental"}</h3>
           <div className="mt-3 flex flex-wrap gap-1">
@@ -318,10 +318,10 @@ function FormWizard(props: {
           {etapa === 1 && (
             <div className="space-y-3">
               <div className="flex flex-col gap-2">
-                <label className={`flex cursor-pointer items-center gap-2 rounded-lg border px-3 py-2 text-sm ${form.aplicaTodosProcessos ? "border-blue-200 bg-blue-50 text-white" : "border-[var(--border-default)] bg-[var(--surface-primary)] text-white/70"}`}>
+                <label className={`flex cursor-pointer items-center gap-2 rounded-lg border px-3 py-2 text-sm ${form.aplicaTodosProcessos ? "border-[var(--border-default)] bg-[var(--surface-secondary)] text-white" : "border-[var(--border-default)] bg-[var(--surface-primary)] text-white/70"}`}>
                   <input type="radio" checked={form.aplicaTodosProcessos} onChange={() => up({ aplicaTodosProcessos: true })} /> Todos os tipos de processo
                 </label>
-                <label className={`flex cursor-pointer items-center gap-2 rounded-lg border px-3 py-2 text-sm ${!form.aplicaTodosProcessos ? "border-blue-200 bg-blue-50 text-white" : "border-[var(--border-default)] bg-[var(--surface-primary)] text-white/70"}`}>
+                <label className={`flex cursor-pointer items-center gap-2 rounded-lg border px-3 py-2 text-sm ${!form.aplicaTodosProcessos ? "border-[var(--border-default)] bg-[var(--surface-secondary)] text-white" : "border-[var(--border-default)] bg-[var(--surface-primary)] text-white/70"}`}>
                   <input type="radio" checked={!form.aplicaTodosProcessos} onChange={() => up({ aplicaTodosProcessos: false })} /> Apenas os tipos selecionados
                 </label>
               </div>
@@ -368,7 +368,7 @@ function FormWizard(props: {
               <label className={label}>Aplicável a (pode marcar mais de um)</label>
               <div className="grid gap-2">
                 {PUBLICOS_ALVO_PRINCIPAIS.map((p) => (
-                  <label key={p} className={`flex cursor-pointer items-center gap-2 rounded-lg border px-3 py-2 text-sm ${form.publicosAlvo.includes(p) ? "border-blue-200 bg-blue-50 text-white" : "border-[var(--border-default)] bg-[var(--surface-primary)] text-white/70 hover:bg-[var(--surface-hover)]"}`}>
+                  <label key={p} className={`flex cursor-pointer items-center gap-2 rounded-lg border px-3 py-2 text-sm ${form.publicosAlvo.includes(p) ? "border-[var(--border-default)] bg-[var(--surface-secondary)] text-white" : "border-[var(--border-default)] bg-[var(--surface-primary)] text-white/70 hover:bg-[var(--surface-hover)]"}`}>
                     <input type="checkbox" checked={form.publicosAlvo.includes(p)} onChange={() => up({ publicosAlvo: toggle(form.publicosAlvo, p) })} /> {PUBLICO_ALVO_LABEL[p]}
                   </label>
                 ))}
@@ -412,7 +412,7 @@ function FormWizard(props: {
           {etapa === 7 && (
             <div className="space-y-3">
               <div className="rounded-xl border border-[var(--border-default)] bg-[var(--surface-primary)] p-4"><div className="text-xs text-[var(--text-secondary)]">Resumo</div><p className="mt-1 text-sm text-white/90">{resumoRegra(formParaRegra(form), docName(form.documentosAceitos[0] ?? ""))}</p></div>
-              {(() => { const probs = validarConjunto(form.condicoes.regras.length ? form.condicoes : null); return probs.length ? <div className="rounded-xl border border-red-200 bg-red-50 p-3 text-xs text-red-700">{probs.map((p, i) => <div key={i}>⚠ {p.mensagem}</div>)}</div> : null })()}
+              {(() => { const probs = validarConjunto(form.condicoes.regras.length ? form.condicoes : null); return probs.length ? <div className="rounded-xl border border-[var(--border-default)] bg-[var(--surface-secondary)] p-3 text-xs text-red-700">{probs.map((p, i) => <div key={i}>⚠ {p.mensagem}</div>)}</div> : null })()}
               <p className="text-[11px] text-[var(--text-muted)]">Salvar cria/atualiza um RASCUNHO. Publicar torna a regra vigente (requer permissão). Publicar não reaplica a processos existentes.</p>
             </div>
           )}
@@ -472,14 +472,14 @@ function ConstrutorCondicoes({ form, setForm, modalidades }: { form: RegraForm; 
                     ? <select className="rounded border border-[var(--border-default)] bg-[var(--surface-primary)] px-2 py-1 text-xs text-white" value={String(cond.valor ?? "")} onChange={(e) => setCond(i, { valor: e.target.value })}><option value="" className={opt}>—</option>{modalidades.map((m) => <option key={m.id} value={m.modalityKey} className={opt}>{m.modalityLabel}</option>)}</select>
                     : <input className="w-32 rounded border border-[var(--border-default)] bg-[var(--surface-primary)] px-2 py-1 text-xs text-white" value={String(cond.valor ?? "")} onChange={(e) => setCond(i, { valor: e.target.value })} placeholder="valor" />
               )}
-              <button className="ml-auto rounded px-2 py-1 text-xs text-red-700/70 hover:bg-red-50" onClick={() => rmCond(i)}>remover</button>
+              <button className="ml-auto rounded px-2 py-1 text-xs text-red-700/70 hover:bg-[var(--surface-secondary)]" onClick={() => rmCond(i)}>remover</button>
             </div>
           )
         })}
       </div>
       <button className={btnG} onClick={addCond}>+ Adicionar condição</button>
       <div className="rounded-xl border border-[var(--border-default)] bg-[var(--surface-primary)] p-3"><div className="text-[11px] text-[var(--text-muted)]">Resumo</div><p className="mt-1 text-sm text-white/80">Aplica-se quando {justificativaDoConjunto(c.regras.length ? c : null)}.</p></div>
-      {problemas.length > 0 && <div className="rounded-xl border border-red-200 bg-red-50 p-3 text-xs text-red-700">{problemas.map((p, i) => <div key={i}>⚠ {p.mensagem}</div>)}</div>}
+      {problemas.length > 0 && <div className="rounded-xl border border-[var(--border-default)] bg-[var(--surface-secondary)] p-3 text-xs text-red-700">{problemas.map((p, i) => <div key={i}>⚠ {p.mensagem}</div>)}</div>}
     </div>
   )
 }
@@ -487,7 +487,7 @@ function ConstrutorCondicoes({ form, setForm, modalidades }: { form: RegraForm; 
 function HistoricoModal({ versoes, onClose }: { versoes: RegraDocumental[]; onClose: () => void }) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-[var(--overlay-modal)] p-4" onClick={onClose}>
-      <div className="w-full max-w-lg rounded-2xl border border-[var(--border-default)] bg-zinc-900/95 p-5 shadow-2xl" onClick={(e) => e.stopPropagation()}>
+      <div className="w-full max-w-lg rounded-2xl border border-[var(--border-default)] bg-zinc-900/95 p-5 shadow-[var(--elev-3)]" onClick={(e) => e.stopPropagation()}>
         <h3 className="mb-3 font-semibold text-white">Histórico de versões</h3>
         <div className="space-y-1.5">
           {versoes.map((v) => (
@@ -528,7 +528,7 @@ function Simulador({ data, ptId, onClose }: { data: Data; ptId: number | null; o
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-[var(--overlay-modal)] p-4" onClick={onClose}>
-      <div className="max-h-[92vh] w-full max-w-3xl overflow-auto rounded-2xl border border-[var(--border-default)] bg-zinc-900/95 shadow-2xl" onClick={(e) => e.stopPropagation()}>
+      <div className="max-h-[92vh] w-full max-w-3xl overflow-auto rounded-2xl border border-[var(--border-default)] bg-zinc-900/95 shadow-[var(--elev-3)]" onClick={(e) => e.stopPropagation()}>
         <div className="border-b border-[var(--border-default)] px-6 py-4"><h3 className="font-semibold text-white">Simular regras documentais</h3><p className="mt-0.5 text-xs text-[var(--text-secondary)]">Só calcula e explica — não cria documento, necessidade nem tarefa.</p></div>
         <div className="grid grid-cols-2 gap-3 px-6 py-4">
           <div><label className={label}>Tipo de processo</label><select className={input} value={tipoProcessoId} onChange={(e) => setTipo(Number(e.target.value))}>{data.tiposProcesso.map((t) => <option key={t.id} value={t.id} className={opt}>{t.name}</option>)}</select></div>
@@ -550,8 +550,8 @@ function Simulador({ data, ptId, onClose }: { data: Data; ptId: number | null; o
               <div className="space-y-1.5">
                 {res.aplicaveis.length === 0 && <div className="text-xs text-[var(--text-muted)]">Nenhum.</div>}
                 {res.aplicaveis.map((a) => (
-                  <div key={a.regraId} className="rounded-lg border border-green-200 bg-green-500/5 px-3 py-2 text-xs">
-                    <div className="font-medium text-white">{a.requisitoNome ?? docName(a.documentTypeCode)} <span className={`ml-1 rounded px-1 py-0.5 text-[9px] ${a.obrigatoriedade === "OBRIGATORIA" ? "bg-amber-50 text-amber-700" : "bg-[var(--surface-primary)] text-[var(--text-secondary)]"}`}>{a.obrigatoriedade === "OBRIGATORIA" ? "obrig." : "opc."}</span></div>
+                  <div key={a.regraId} className="rounded-lg border border-[var(--border-default)] bg-[var(--surface-secondary)] px-3 py-2 text-xs">
+                    <div className="font-medium text-white">{a.requisitoNome ?? docName(a.documentTypeCode)} <span className={`ml-1 rounded px-1 py-0.5 text-[9px] ${a.obrigatoriedade === "OBRIGATORIA" ? "bg-[var(--surface-secondary)] text-amber-700" : "bg-[var(--surface-primary)] text-[var(--text-secondary)]"}`}>{a.obrigatoriedade === "OBRIGATORIA" ? "obrig." : "opc."}</span></div>
                     <div className="text-[var(--text-secondary)]">Atende: {a.documentosAceitos.map(docName).join(a.modoSatisfacao === "TODOS_SAO_EXIGIDOS" ? " + " : " ou ")}</div>
                     <div className="text-[var(--text-secondary)]">Motivo: {a.justificativa}</div>
                     {a.bloqueiaConclusaoFase && <div className="text-red-700/80">Bloqueia: {a.faseBloqueio}</div>}

@@ -17,9 +17,9 @@ export function CardPastaDocumental({ ctx }: Props) {
   const st = totalmente ? "PAGO" : pago > 0 ? "PARCIAL" : "PENDENTE"
 
   const stColors: Record<string, { bg: string; txt: string; lbl: string }> = {
-    PAGO: { bg: "bg-green-100", txt: "text-green-800", lbl: "✓ Pago" },
-    PARCIAL: { bg: "bg-blue-100", txt: "text-blue-800", lbl: `Parcial · ${pct.toFixed(0)}%` },
-    PENDENTE: { bg: "bg-amber-100", txt: "text-amber-800", lbl: "A receber" },
+    PAGO: { bg: "bg-[var(--surface-secondary)]", txt: "text-green-800", lbl: "✓ Pago" },
+    PARCIAL: { bg: "bg-[var(--surface-secondary)]", txt: "text-[var(--text-secondary)]", lbl: `Parcial · ${pct.toFixed(0)}%` },
+    PENDENTE: { bg: "bg-[var(--surface-secondary)]", txt: "text-amber-800", lbl: "A receber" },
   }
 
   const agrupado: Record<string, number> = {}
@@ -28,7 +28,7 @@ export function CardPastaDocumental({ ctx }: Props) {
   })
 
   return (
-    <div className="bg-[var(--surface-primary)] border border-gray-200 border-l-4 border-l-blue-500 rounded-xl p-4 shadow-sm">
+    <div className="bg-[var(--surface-primary)] border border-gray-200 border-l-4 border-l-blue-500 rounded-xl p-4 shadow-[var(--elev-1)]">
       <div className="flex justify-between items-start mb-3">
         <div className="flex-1">
           <div className="font-bold text-gray-900">
@@ -51,7 +51,7 @@ export function CardPastaDocumental({ ctx }: Props) {
       <div className="mb-3">
         <div className="h-2 bg-gray-100 rounded-full overflow-hidden mb-1">
           <div
-            className={`h-full ${totalmente ? "bg-green-500" : "bg-blue-500"}`}
+            className={`h-full ${totalmente ? "bg-green-600" : "bg-[var(--surface-secondary)]"}`}
             style={{ width: `${pct}%` }}
           />
         </div>
@@ -61,7 +61,7 @@ export function CardPastaDocumental({ ctx }: Props) {
         </div>
       </div>
 
-      <div className="text-xs text-gray-500 bg-blue-50 border border-blue-200 rounded p-2">
+      <div className="text-xs text-gray-500 bg-[var(--surface-secondary)] border border-[var(--border-default)] rounded p-2">
         ℹ Os valores da planilha são recebidos diretamente na aba <strong>Custos</strong>,
         onde você pode editar cada item individualmente.
       </div>

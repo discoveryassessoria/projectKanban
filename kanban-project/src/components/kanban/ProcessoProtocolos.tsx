@@ -136,7 +136,7 @@ const rotuloDocumento = (d: { publicCode?: string | null; tipo?: string | null; 
 }
 
 const SEM_PROTOCOLOS: Protocolo[] = []
-const INPUT = "w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-amber-500"
+const INPUT = "w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-[var(--border-strong)]"
 
 const FORM_VAZIO = {
   tipoPessoa: "contratante" as "contratante" | "requerente",
@@ -443,7 +443,7 @@ export function ProcessoProtocolos({
           <FileText className="h-5 w-5 text-amber-600" />
           <h3 className="font-semibold text-white/95">Protocolos</h3>
           {protocolos.length > 0 && (
-            <span className="px-2 py-0.5 bg-amber-100 text-amber-600 text-xs font-medium rounded-full">
+            <span className="px-2 py-0.5 bg-[var(--surface-secondary)] text-amber-600 text-xs font-medium rounded-full">
               {protocolos.length}
             </span>
           )}
@@ -677,7 +677,7 @@ export function ProcessoProtocolos({
               </p>
 
               {erroForm && (
-                <p className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-md px-3 py-2">{erroForm}</p>
+                <p className="text-sm text-red-600 bg-[var(--surface-secondary)] border border-[var(--border-default)] rounded-md px-3 py-2">{erroForm}</p>
               )}
 
               {/* Botões */}
@@ -752,7 +752,7 @@ export function ProcessoProtocolos({
                             </span>
                           )}
                           {rotuloTipo(protocolo.tipoProtocolo) && (
-                            <span className="text-xs px-2 py-0.5 bg-amber-50 text-amber-700 rounded">
+                            <span className="text-xs px-2 py-0.5 bg-[var(--surface-secondary)] text-amber-700 rounded">
                               {rotuloTipo(protocolo.tipoProtocolo)}
                             </span>
                           )}
@@ -827,14 +827,14 @@ export function ProcessoProtocolos({
                         <div className="flex items-center gap-1 ml-4">
                           <button
                             onClick={() => abrirEdicao(protocolo)}
-                            className="p-2 text-[var(--text-muted)] hover:text-blue-500 rounded-lg hover:bg-blue-50"
+                            className="p-2 text-[var(--text-muted)] hover:text-[var(--text-secondary)] rounded-lg hover:bg-[var(--surface-secondary)]"
                             title="Editar"
                           >
                             <Edit2 className="h-4 w-4" />
                           </button>
                           <button
                             onClick={() => handleExcluir(protocolo.id)}
-                            className="p-2 text-[var(--text-muted)] hover:text-red-500 rounded-lg hover:bg-red-50"
+                            className="p-2 text-[var(--text-muted)] hover:text-red-500 rounded-lg hover:bg-[var(--surface-secondary)]"
                             title="Excluir"
                           >
                             <Trash2 className="h-4 w-4" />
@@ -849,7 +849,7 @@ export function ProcessoProtocolos({
                         <Paperclip className="h-4 w-4" />
                         Comprovantes e anexos
                         {anexos.length > 0 && (
-                          <span className="text-xs px-1.5 py-0.5 bg-blue-100 text-blue-600 rounded">
+                          <span className="text-xs px-1.5 py-0.5 bg-[var(--surface-secondary)] text-[var(--text-secondary)] rounded">
                             {anexos.length}
                           </span>
                         )}
@@ -865,7 +865,7 @@ export function ProcessoProtocolos({
                             return (
                               <div
                                 key={anexo.id}
-                                className="group relative bg-[var(--surface-popover)] rounded-lg border border-[var(--border-default)] overflow-hidden hover:shadow-md transition-shadow"
+                                className="group relative bg-[var(--surface-popover)] rounded-lg border border-[var(--border-default)] overflow-hidden hover:shadow-[var(--elev-2)] transition-shadow"
                               >
                                 {/* Preview */}
                                 <a
@@ -915,7 +915,7 @@ export function ProcessoProtocolos({
                                       e.preventDefault()
                                       handleExcluirAnexo(protocolo.id, anexo.id)
                                     }}
-                                    className="absolute top-1 right-1 p-1 bg-red-500 hover:bg-red-800 rounded-full text-[var(--action-primary-ink)] opacity-0 group-hover:opacity-100 transition-opacity"
+                                    className="absolute top-1 right-1 p-1 bg-red-600 hover:bg-red-800 rounded-full text-[var(--action-primary-ink)] opacity-0 group-hover:opacity-100 transition-opacity"
                                   >
                                     <X className="h-3 w-3" />
                                   </button>
@@ -931,7 +931,7 @@ export function ProcessoProtocolos({
                         <div className="mb-4 space-y-2">
                           <p className="text-sm text-white/70 font-medium">Arquivos selecionados:</p>
                           {arquivosPendentesProtocolo.map((arquivo, index) => (
-                            <div key={index} className="flex items-center justify-between p-3 bg-amber-50 rounded-lg border border-amber-200">
+                            <div key={index} className="flex items-center justify-between p-3 bg-[var(--surface-secondary)] rounded-lg border border-[var(--border-default)]">
                               <div className="flex items-center gap-3">
                                 <FileText className="h-5 w-5 text-amber-600" />
                                 <div>
@@ -942,7 +942,7 @@ export function ProcessoProtocolos({
                               <button
                                 type="button"
                                 onClick={() => removerArquivoPendente(protocolo.id, index)}
-                                className="p-1 hover:bg-red-100 rounded text-red-500"
+                                className="p-1 hover:bg-[var(--surface-secondary)] rounded text-red-500"
                               >
                                 <X className="h-4 w-4" />
                               </button>
@@ -954,7 +954,7 @@ export function ProcessoProtocolos({
                             type="button"
                             onClick={() => handleUpload(protocolo.id)}
                             disabled={uploadingProtocoloId !== null}
-                            className="mt-2 w-full py-2 px-4 bg-[var(--action-primary)] hover:bg-[var(--action-primary)] disabled:bg-blue-400 text-[var(--action-primary-ink)] rounded-lg font-medium transition-colors"
+                            className="mt-2 w-full py-2 px-4 bg-[var(--action-primary)] hover:bg-[var(--action-primary)] disabled:bg-[var(--text-muted)] text-[var(--action-primary-ink)] rounded-lg font-medium transition-colors"
                           >
                             {isUploadingThis ? (
                               <span className="flex items-center justify-center gap-2">
@@ -970,7 +970,7 @@ export function ProcessoProtocolos({
 
                       {/* Área de drop/seleção - apenas para quem pode editar */}
                       {podeEditar && (
-                        <label className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center cursor-pointer hover:border-blue-400 hover:bg-blue-50/50 transition-colors block">
+                        <label className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center cursor-pointer hover:border-[var(--border-default)] hover:bg-[var(--surface-secondary)]/50 transition-colors block">
                           <input
                             type="file"
                             multiple

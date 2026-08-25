@@ -73,11 +73,11 @@ export function WorkflowV2AtivacaoPanel({ processoId }: Props) {
   if (!prep) return null
 
   return (
-    <div className="mb-4 rounded-lg border border-indigo-200 bg-indigo-50/40 p-4 text-sm">
+    <div className="mb-4 rounded-lg border border-[var(--border-default)] bg-[var(--surface-secondary)]/40 p-4 text-sm">
       <div className="mb-2 flex items-center gap-2">
-        <ShieldCheck className="h-4 w-4 text-indigo-600" />
+        <ShieldCheck className="h-4 w-4 text-[var(--text-secondary)]" />
         <span className="font-semibold text-gray-800">Ativação controlada do runtime v2</span>
-        <span className={`rounded px-2 py-0.5 text-xs ${prep.killSwitchGlobal ? "bg-green-100 text-green-700" : "bg-gray-200 text-gray-600"}`}>
+        <span className={`rounded px-2 py-0.5 text-xs ${prep.killSwitchGlobal ? "bg-[var(--surface-secondary)] text-green-700" : "bg-gray-200 text-gray-600"}`}>
           kill switch {prep.killSwitchGlobal ? "ON" : "OFF"}
         </span>
       </div>
@@ -100,7 +100,7 @@ export function WorkflowV2AtivacaoPanel({ processoId }: Props) {
         <button
           onClick={ativar}
           disabled={!prep.avaliacao.podeAtivarEfetivo || ativando}
-          className="rounded bg-indigo-700 px-3 py-1 text-xs text-[var(--action-primary-ink)] hover:bg-indigo-800 disabled:cursor-not-allowed disabled:opacity-50"
+          className="rounded bg-[var(--text-muted)] px-3 py-1 text-xs text-[var(--action-primary-ink)] hover:bg-[var(--text-muted)] disabled:cursor-not-allowed disabled:opacity-50"
           title={prep.avaliacao.podeAtivarEfetivo ? "Ativar runtime v2" : "Critérios não satisfeitos (ou kill switch OFF)"}
         >
           Ativar runtime v2

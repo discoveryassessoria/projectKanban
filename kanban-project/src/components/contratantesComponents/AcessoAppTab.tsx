@@ -229,7 +229,7 @@ export function AcessoAppTab({ clienteId, clienteTipo, clienteEmail, clienteNome
   if (carregando) {
     return (
       <div className="flex items-center justify-center py-20">
-        <Loader2 className="h-6 w-6 animate-spin text-indigo-600" />
+        <Loader2 className="h-6 w-6 animate-spin text-[var(--text-secondary)]" />
         <span className="ml-2 text-gray-500">Verificando acesso...</span>
       </div>
     )
@@ -237,8 +237,8 @@ export function AcessoAppTab({ clienteId, clienteTipo, clienteEmail, clienteNome
 
   if (!clienteId) {
     return (
-      <div className="bg-[var(--surface-primary)] rounded-xl p-6 shadow-sm border border-gray-200">
-        <div className="flex items-center gap-3 p-4 bg-amber-50 border border-amber-200 rounded-lg">
+      <div className="bg-[var(--surface-primary)] rounded-xl p-6 shadow-[var(--elev-1)] border border-gray-200">
+        <div className="flex items-center gap-3 p-4 bg-[var(--surface-secondary)] border border-[var(--border-default)] rounded-lg">
           <AlertTriangle className="h-5 w-5 text-amber-500 flex-shrink-0" />
           <p className="text-sm text-amber-700">
             Salve o cliente primeiro para poder gerar acesso ao app.
@@ -251,15 +251,15 @@ export function AcessoAppTab({ clienteId, clienteTipo, clienteEmail, clienteNome
   return (
     <div className="space-y-6">
       {/* Status do acesso */}
-      <div className="bg-[var(--surface-primary)] rounded-xl p-6 shadow-sm border border-gray-200">
+      <div className="bg-[var(--surface-primary)] rounded-xl p-6 shadow-[var(--elev-1)] border border-gray-200">
         <h3 className="text-sm font-semibold text-gray-900 mb-4 flex items-center gap-2">
-          <Smartphone className="h-4 w-4 text-indigo-600" />
+          <Smartphone className="h-4 w-4 text-[var(--text-secondary)]" />
           Acesso ao App
         </h3>
 
         {/* Erro */}
         {erro && (
-          <div className="mb-4 flex items-center gap-2 p-3 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm">
+          <div className="mb-4 flex items-center gap-2 p-3 bg-[var(--surface-secondary)] border border-[var(--border-default)] rounded-lg text-red-700 text-sm">
             <AlertTriangle className="h-4 w-4 flex-shrink-0" />
             <span>{erro}</span>
             <button onClick={() => setErro(null)} className="ml-auto text-red-700 hover:text-red-600">✕</button>
@@ -270,23 +270,23 @@ export function AcessoAppTab({ clienteId, clienteTipo, clienteEmail, clienteNome
           /* ✅ Cliente JÁ TEM acesso */
           <div className="space-y-4">
             {/* Badge de status */}
-            <div className="flex items-center justify-between p-4 bg-emerald-50 border border-emerald-200 rounded-xl">
+            <div className="flex items-center justify-between p-4 bg-[var(--surface-secondary)] border border-[var(--border-default)] rounded-xl">
               <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-full bg-emerald-100 flex items-center justify-center">
-                  <CheckCircle2 className="h-5 w-5 text-emerald-600" />
+                <div className="w-10 h-10 rounded-full bg-[var(--surface-secondary)] flex items-center justify-center">
+                  <CheckCircle2 className="h-5 w-5 text-green-600" />
                 </div>
                 <div>
-                  <p className="font-semibold text-emerald-800">Acesso ativo</p>
-                  <p className="text-sm text-emerald-600">O cliente pode acessar o app</p>
+                  <p className="font-semibold text-green-800">Acesso ativo</p>
+                  <p className="text-sm text-green-600">O cliente pode acessar o app</p>
                 </div>
               </div>
               {acesso.primeiroAcesso && (
-                <span className="px-3 py-1 bg-amber-100 text-amber-700 rounded-full text-xs font-medium">
+                <span className="px-3 py-1 bg-[var(--surface-secondary)] text-amber-700 rounded-full text-xs font-medium">
                   Aguardando primeiro login
                 </span>
               )}
               {!acesso.primeiroAcesso && (
-                <span className="px-3 py-1 bg-emerald-100 text-emerald-700 rounded-full text-xs font-medium">
+                <span className="px-3 py-1 bg-[var(--surface-secondary)] text-green-700 rounded-full text-xs font-medium">
                   Já acessou o app
                 </span>
               )}
@@ -312,32 +312,32 @@ export function AcessoAppTab({ clienteId, clienteTipo, clienteEmail, clienteNome
 
             {/* Senha temporária (se acabou de gerar ou resetar) */}
             {senhaTemporaria && (
-              <div className="p-4 bg-indigo-50 border border-indigo-200 rounded-xl space-y-3">
+              <div className="p-4 bg-[var(--surface-secondary)] border border-[var(--border-default)] rounded-xl space-y-3">
                 <div className="flex items-center gap-2">
-                  <KeyRound className="h-4 w-4 text-indigo-600" />
-                  <p className="text-sm font-semibold text-indigo-800">Senha temporária gerada</p>
+                  <KeyRound className="h-4 w-4 text-[var(--text-secondary)]" />
+                  <p className="text-sm font-semibold text-[var(--text-secondary)]">Senha temporária gerada</p>
                 </div>
                 
                 <div className="flex items-center gap-2">
-                  <div className="flex-1 px-4 py-3 bg-[var(--surface-primary)] rounded-lg border border-indigo-200 font-mono text-lg text-center tracking-widest text-indigo-800 font-bold">
+                  <div className="flex-1 px-4 py-3 bg-[var(--surface-primary)] rounded-lg border border-[var(--border-default)] font-mono text-lg text-center tracking-widest text-[var(--text-secondary)] font-bold">
                     {senhaTemporaria}
                   </div>
                   <button
                     onClick={copiarSenha}
-                    className="p-3 bg-[var(--surface-primary)] border border-indigo-200 rounded-lg hover:bg-indigo-100 transition-colors"
+                    className="p-3 bg-[var(--surface-primary)] border border-[var(--border-default)] rounded-lg hover:bg-[var(--surface-secondary)] transition-colors"
                     title="Copiar senha"
                   >
                     {copiado ? (
-                      <Check className="h-5 w-5 text-emerald-600" />
+                      <Check className="h-5 w-5 text-green-600" />
                     ) : (
-                      <Copy className="h-5 w-5 text-indigo-600" />
+                      <Copy className="h-5 w-5 text-[var(--text-secondary)]" />
                     )}
                   </button>
                 </div>
 
                 <button
                   onClick={copiarMensagem}
-                  className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-emerald-700 hover:bg-emerald-800 text-[var(--action-primary-ink)] rounded-lg font-medium transition-colors text-sm"
+                  className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-green-700 hover:bg-green-800 text-[var(--action-primary-ink)] rounded-lg font-medium transition-colors text-sm"
                 >
                   {copiadoMsg ? (
                     <>
@@ -352,7 +352,7 @@ export function AcessoAppTab({ clienteId, clienteTipo, clienteEmail, clienteNome
                   )}
                 </button>
 
-                <p className="text-xs text-indigo-600 text-center">
+                <p className="text-xs text-[var(--text-secondary)] text-center">
                   ⚠️ Anote ou envie esta senha agora. Ela não será mostrada novamente.
                 </p>
               </div>
@@ -365,7 +365,7 @@ export function AcessoAppTab({ clienteId, clienteTipo, clienteEmail, clienteNome
                   onClick={resetarSenha}
                   disabled={resetando}
                   variant="outline"
-                  className="flex-1 border-amber-300 text-amber-700 hover:bg-amber-50"
+                  className="flex-1 border-[var(--border-default)] text-amber-700 hover:bg-[var(--surface-secondary)]"
                 >
                   {resetando ? (
                     <Loader2 className="h-4 w-4 animate-spin mr-2" />
@@ -378,7 +378,7 @@ export function AcessoAppTab({ clienteId, clienteTipo, clienteEmail, clienteNome
                   onClick={revogarAcesso}
                   disabled={revogando}
                   variant="outline"
-                  className="border-red-300 text-red-600 hover:bg-red-50"
+                  className="border-[var(--border-default)] text-red-600 hover:bg-[var(--surface-secondary)]"
                 >
                   {revogando ? (
                     <Loader2 className="h-4 w-4 animate-spin mr-2" />
@@ -433,7 +433,7 @@ export function AcessoAppTab({ clienteId, clienteTipo, clienteEmail, clienteNome
                 <Button
                   onClick={gerarAcesso}
                   disabled={gerando || !email.trim()}
-                  className="w-full bg-indigo-700 hover:bg-indigo-800 text-[var(--action-primary-ink)] py-5"
+                  className="w-full bg-[var(--text-muted)] hover:bg-[var(--text-muted)] text-[var(--action-primary-ink)] py-5"
                 >
                   {gerando ? (
                     <>
@@ -454,26 +454,26 @@ export function AcessoAppTab({ clienteId, clienteTipo, clienteEmail, clienteNome
       </div>
 
       {/* Explicação do fluxo */}
-      <div className="bg-[var(--surface-primary)] rounded-xl p-6 shadow-sm border border-gray-200">
+      <div className="bg-[var(--surface-primary)] rounded-xl p-6 shadow-[var(--elev-1)] border border-gray-200">
         <h3 className="text-sm font-semibold text-gray-900 mb-3 flex items-center gap-2">
-          <Shield className="h-4 w-4 text-indigo-600" />
+          <Shield className="h-4 w-4 text-[var(--text-secondary)]" />
           Como funciona
         </h3>
         <div className="space-y-2 text-sm text-gray-600">
           <div className="flex items-start gap-2">
-            <span className="text-indigo-500 font-bold text-xs mt-0.5">1</span>
+            <span className="text-[var(--text-secondary)] font-bold text-xs mt-0.5">1</span>
             <p>Clique em <strong>&quot;Gerar acesso ao app&quot;</strong> para criar login e senha temporária</p>
           </div>
           <div className="flex items-start gap-2">
-            <span className="text-indigo-500 font-bold text-xs mt-0.5">2</span>
+            <span className="text-[var(--text-secondary)] font-bold text-xs mt-0.5">2</span>
             <p>Copie a <strong>mensagem para WhatsApp</strong> e envie para o cliente</p>
           </div>
           <div className="flex items-start gap-2">
-            <span className="text-indigo-500 font-bold text-xs mt-0.5">3</span>
+            <span className="text-[var(--text-secondary)] font-bold text-xs mt-0.5">3</span>
             <p>O cliente abre o app, faz login e <strong>define sua própria senha</strong></p>
           </div>
           <div className="flex items-start gap-2">
-            <span className="text-indigo-500 font-bold text-xs mt-0.5">4</span>
+            <span className="text-[var(--text-secondary)] font-bold text-xs mt-0.5">4</span>
             <p>Pronto! O cliente acompanha seus processos pelo aplicativo</p>
           </div>
         </div>

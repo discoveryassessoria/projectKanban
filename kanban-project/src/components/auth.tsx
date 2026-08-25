@@ -201,19 +201,19 @@ export default function AuthComponent({
       className="
         w-full max-w-md mx-auto
         bg-[var(--surface-primary)]
-        text-slate-900
+        text-[var(--text-secondary)]
         rounded-[20px] 
-        shadow-2xl 
-        border border-slate-200
+        shadow-[var(--elev-3)] 
+        border border-[var(--border-default)]
         p-8
       "
     >
       {/* Cabeçalho */}
       <div className="text-center mb-6">
-        <h1 className="text-[28px] font-semibold text-slate-900">
+        <h1 className="text-[28px] font-semibold text-[var(--text-secondary)]">
           {modoLembrado ? "Bem-vindo de volta!" : "Bem-vindo!"}
         </h1>
-        <p className="text-[14px] text-slate-500 mt-0.5">
+        <p className="text-[14px] text-[var(--text-secondary)] mt-0.5">
           {modoLembrado ? "Confirme sua senha para continuar." : "Faça login para continuar."}
         </p>
       </div>
@@ -231,8 +231,8 @@ export default function AuthComponent({
               className="
                 flex items-center gap-3
                 h-12 px-3
-                bg-slate-50
-                border border-slate-200
+                bg-[var(--surface-secondary)]
+                border border-[var(--border-default)]
                 rounded-lg
               "
             >
@@ -245,7 +245,7 @@ export default function AuthComponent({
               >
                 {ultimoEmail.slice(0, 1).toUpperCase()}
               </span>
-              <span className="truncate text-[15px] text-slate-900" title={ultimoEmail}>
+              <span className="truncate text-[15px] text-[var(--text-secondary)]" title={ultimoEmail}>
                 {ultimoEmail}
               </span>
             </div>
@@ -254,7 +254,7 @@ export default function AuthComponent({
           <div className="space-y-1.5">
             <Label
               htmlFor="login-email"
-              className="text-sm font-medium text-slate-700"
+              className="text-sm font-medium text-[var(--text-secondary)]"
             >
               Email
             </Label>
@@ -269,9 +269,9 @@ export default function AuthComponent({
               className="
                 h-12 text-[15px]
                 bg-[var(--surface-primary)]
-                border border-slate-200
-                text-slate-900
-                placeholder:text-slate-700
+                border border-[var(--border-default)]
+                text-[var(--text-secondary)]
+                placeholder:text-[var(--text-secondary)]
                 rounded-lg
                 focus-visible:ring-2
                 focus-visible:ring-[var(--border-strong)]/30
@@ -286,7 +286,7 @@ export default function AuthComponent({
         <div className="space-y-1.5">
           <Label
             htmlFor="login-senha"
-            className="text-sm font-medium text-slate-700"
+            className="text-sm font-medium text-[var(--text-secondary)]"
           >
             Senha
           </Label>
@@ -303,9 +303,9 @@ export default function AuthComponent({
             className="
               h-12 text-[15px]
               bg-[var(--surface-primary)]
-              border border-slate-200
-              text-slate-900
-              placeholder:text-slate-700
+              border border-[var(--border-default)]
+              text-[var(--text-secondary)]
+              placeholder:text-[var(--text-secondary)]
               rounded-lg
               focus-visible:ring-2
               focus-visible:ring-[var(--border-strong)]/30
@@ -317,7 +317,7 @@ export default function AuthComponent({
 
         {/* ERRO */}
         {error && (
-          <Alert className="border-red-200 bg-red-50">
+          <Alert className="border-[var(--border-default)] bg-[var(--surface-secondary)]">
             <AlertDescription className="text-sm text-red-700">
               {error}
             </AlertDescription>
@@ -348,7 +348,7 @@ export default function AuthComponent({
               onClick={trocarDeConta}
               disabled={isLoading}
               className="
-                text-[13px] text-slate-500 underline underline-offset-2
+                text-[13px] text-[var(--text-secondary)] underline underline-offset-2
                 transition-colors hover:text-[var(--text-primary)]
                 disabled:opacity-50 disabled:cursor-not-allowed
               "
@@ -359,7 +359,7 @@ export default function AuthComponent({
         )}
 
         {/* TEXTO FINAL */}
-        <div className="pt-3 text-center text-[13px] text-slate-500">
+        <div className="pt-3 text-center text-[13px] text-[var(--text-secondary)]">
           <p className="italic">Não possui uma conta?</p>
           <p>Entre em contato com um administrador.</p>
         </div>

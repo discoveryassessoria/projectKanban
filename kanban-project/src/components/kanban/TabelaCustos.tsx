@@ -796,7 +796,7 @@ export function TabelaCustos({ processoId, nomeFamilia, onTotaisChange }: Tabela
       </div>
 
       {/* Tabela de custos estilo Excel */}
-      <div ref={tabelaRef} className="overflow-x-auto border border-gray-200 rounded-lg shadow-sm">
+      <div ref={tabelaRef} className="overflow-x-auto border border-gray-200 rounded-lg shadow-[var(--elev-1)]">
         <table className="w-full text-xs">
           <thead>
             <tr className="bg-[var(--surface-secondary)] text-[var(--text-primary)]">
@@ -807,7 +807,7 @@ export function TabelaCustos({ processoId, nomeFamilia, onTotaisChange }: Tabela
                   title={todasSelecionadas ? "Desmarcar todas" : "Selecionar todas"}
                 >
                   {todasSelecionadas ? (
-                    <CheckSquare className="w-4 h-4 text-blue-700" />
+                    <CheckSquare className="w-4 h-4 text-[var(--text-secondary)]" />
                   ) : (
                     <Square className="w-4 h-4 text-[var(--text-muted)]" />
                   )}
@@ -847,7 +847,7 @@ export function TabelaCustos({ processoId, nomeFamilia, onTotaisChange }: Tabela
               const bgColor = idx % 2 === 0 ? 'bg-[var(--surface-primary)]' : 'bg-gray-50'
               const personBg = isFirstOfPerson ? '' : 'bg-gray-100/50'
               const isSelected = linhasSelecionadas.has(getLinhaKey(linha))
-              const selectedBg = isSelected ? 'bg-blue-50' : ''
+              const selectedBg = isSelected ? 'bg-[var(--surface-secondary)]' : ''
               const rowSpanCount = linhasPorPessoa[linha.pessoaId] || 1
               
               // Verificar se pode mover para cima/baixo
@@ -857,7 +857,7 @@ export function TabelaCustos({ processoId, nomeFamilia, onTotaisChange }: Tabela
               return (
                 <tr 
                   key={`${linha.pessoaId}-${linha.tipoRegistro}-${idx}`}
-                  className={`border-t border-gray-200 hover:bg-amber-50/50 transition ${bgColor} ${personBg} ${selectedBg}`}
+                  className={`border-t border-gray-200 hover:bg-[var(--surface-secondary)]/50 transition ${bgColor} ${personBg} ${selectedBg}`}
                 >
                   {/* Checkbox de seleção - em todas as linhas */}
                   <td className="px-2 py-1.5 text-center border-r border-gray-200">
@@ -866,7 +866,7 @@ export function TabelaCustos({ processoId, nomeFamilia, onTotaisChange }: Tabela
                       className="hover:bg-gray-100 p-1 rounded transition"
                     >
                       {isSelected ? (
-                        <CheckSquare className="w-4 h-4 text-blue-600" />
+                        <CheckSquare className="w-4 h-4 text-[var(--text-secondary)]" />
                       ) : (
                         <Square className="w-4 h-4 text-[var(--text-muted)]" />
                       )}
@@ -911,8 +911,8 @@ export function TabelaCustos({ processoId, nomeFamilia, onTotaisChange }: Tabela
                       <td className="px-2 py-1.5 text-center border-r border-gray-200">
                         <span className={`
                           inline-block px-2 py-0.5 rounded text-xs font-medium
-                          ${linha.tipoRegistro === 'Nascimento' ? 'bg-green-100 text-green-700' : ''}
-                          ${linha.tipoRegistro === 'Casamento' ? 'bg-blue-100 text-blue-700' : ''}
+                          ${linha.tipoRegistro === 'Nascimento' ? 'bg-[var(--surface-secondary)] text-green-700' : ''}
+                          ${linha.tipoRegistro === 'Casamento' ? 'bg-[var(--surface-secondary)] text-[var(--text-secondary)]' : ''}
                           ${linha.tipoRegistro === 'Óbito' ? 'bg-gray-200 text-gray-700' : ''}
                           ${linha.tipoRegistro === '-' ? 'text-[var(--text-muted)]' : ''}
                         `}>
@@ -986,7 +986,7 @@ export function TabelaCustos({ processoId, nomeFamilia, onTotaisChange }: Tabela
                   })}
                   
                   {/* Total da Linha */}
-                  <td className="px-3 py-1.5 text-right font-semibold text-amber-700 bg-amber-50">
+                  <td className="px-3 py-1.5 text-right font-semibold text-amber-700 bg-[var(--surface-secondary)]">
                     {formatarMoeda(calcularTotalLinha(linha.pessoaId, linha.tipoRegistro))}
                   </td>
                 </tr>
@@ -1015,7 +1015,7 @@ export function TabelaCustos({ processoId, nomeFamilia, onTotaisChange }: Tabela
       {/* Resumo Total */}
       {/* 🆕 Marco 29/04/2026: "Total Geral do Processo" → "Total Geral da Pasta Documental" */}
       <div className="flex justify-end">
-        <div className="bg-gradient-to-r from-amber-500 to-amber-500 text-white px-6 py-4 rounded-xl shadow-lg">
+        <div className="bg-gradient-to-r from-amber-500 to-amber-500 text-white px-6 py-4 rounded-xl shadow-[var(--elev-2)]">
           <p className="text-sm opacity-90">Total Geral da Pasta Documental</p>
           <p className="text-2xl font-bold">{formatarMoeda(calcularTotalGeral())}</p>
         </div>

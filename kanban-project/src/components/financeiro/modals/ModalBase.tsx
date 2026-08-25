@@ -43,7 +43,7 @@ export function ModalBase({
 
   const content = (
     <div className="fixed inset-0 flex items-center justify-center p-4 bg-[var(--overlay-modal)]" style={{ zIndex: LAYER.aboveProcess }}>
-      <div className={`bg-[var(--surface-primary)] rounded-2xl shadow-2xl w-full ${sizeClasses[size]} max-h-[90vh] flex flex-col overflow-hidden`}>
+      <div className={`bg-[var(--surface-primary)] rounded-2xl shadow-[var(--elev-3)] w-full ${sizeClasses[size]} max-h-[90vh] flex flex-col overflow-hidden`}>
         <div className={`${colorClasses[color]} text-white p-4 flex items-center gap-3`}>
           <div className="bg-[var(--surface-secondary)] rounded-lg h-10 w-10 flex items-center justify-center text-xl">{icon}</div>
           <div className="flex-1">

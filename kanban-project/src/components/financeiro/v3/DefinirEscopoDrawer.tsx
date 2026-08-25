@@ -98,7 +98,7 @@ export default function DefinirEscopoDrawer({ receitaRef, onEscolher, onClose }:
 
   const modal = (
     <div className="fixed inset-0 z-[65] flex items-start justify-center overflow-y-auto bg-[var(--app-overlay)] p-4 sm:items-center" onClick={onClose}>
-      <div className="w-full max-w-2xl rounded-[var(--radius-lg)] border border-[var(--border-default)] bg-[var(--surface-overlay)] shadow-[var(--shadow-surface)]" onClick={(e) => e.stopPropagation()}>
+      <div className="w-full max-w-2xl rounded-[var(--radius-lg)] border border-[var(--border-default)] bg-[var(--surface-overlay)] shadow-[var(--elev-2)]" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center justify-between border-b border-[var(--border-default)] px-5 py-4">
           <div><h2 className="text-base font-semibold text-[var(--text-primary)]">Definir escopo do pagamento</h2><p className="text-xs text-[var(--text-muted)]">{esc?.descricao} {esc?.codigo ? `· ${esc.codigo}` : ""} · saldo {brl(esc?.totalSaldoBrl ?? 0)}</p></div>
           <button onClick={onClose} className="text-[var(--text-muted)] hover:text-[var(--text-secondary)]"><X className="h-5 w-5" /></button>

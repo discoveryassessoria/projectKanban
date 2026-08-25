@@ -50,18 +50,18 @@ export const LABEL_RESULTADO: Record<ResultadoContato, string> = {
 
 const PILL_RESULTADO: Record<ResultadoContato, string> = {
   SEM_RESPOSTA: "bg-[var(--surface-secondary)] text-white/70 border-[var(--border-default)]",
-  EM_ANALISE: "bg-sky-50 text-sky-700 border-sky-200",
+  EM_ANALISE: "bg-[var(--surface-secondary)] text-[var(--text-secondary)] border-[var(--border-default)]",
   PRAZO_INFORMADO: "bg-[var(--accent-primary)]/20 text-[var(--accent-text)] border-[var(--accent-primary)]/30",
-  EXIGENCIA: "bg-red-50 text-red-700 border-red-200",
-  PRONTO_PARA_RETIRADA: "bg-green-50 text-green-700 border-green-200",
-  RETORNO_RECEBIDO: "bg-green-50 text-green-700 border-green-200",
+  EXIGENCIA: "bg-[var(--surface-secondary)] text-red-700 border-[var(--border-default)]",
+  PRONTO_PARA_RETIRADA: "bg-[var(--surface-secondary)] text-green-700 border-[var(--border-default)]",
+  RETORNO_RECEBIDO: "bg-[var(--surface-secondary)] text-green-700 border-[var(--border-default)]",
   OUTRO: "bg-[var(--surface-secondary)] text-white/70 border-[var(--border-default)]",
 }
 
 // Mesmos tokens visuais dos editores existentes — o painel entra no modal aprovado
 // sem alterar largura, altura, densidade ou paleta.
 export const campoCls =
-  "w-full px-3 py-2 bg-[var(--surface-overlay)] border border-[var(--border-default)] rounded-md text-sm text-white placeholder-white/30 focus:outline-none focus:border-sky-200 focus:ring-1 focus:border-sky-200"
+  "w-full px-3 py-2 bg-[var(--surface-overlay)] border border-[var(--border-default)] rounded-md text-sm text-white placeholder-white/30 focus:outline-none focus:border-[var(--border-default)] focus:ring-1 focus:border-[var(--border-default)]"
 
 export function Rotulo({ children }: { children: React.ReactNode }) {
   return (
@@ -317,7 +317,7 @@ export function BlocoContatos({
           {emOrdem.map((c) => (
             <div key={c.chave} className="rounded-md border border-[var(--border-default)] bg-[var(--surface-overlay)] p-2.5">
               <div className="flex items-center gap-2 mb-1 flex-wrap">
-                <span className="text-[10.5px] font-semibold px-2 py-0.5 rounded border bg-sky-50 text-sky-700 border-sky-200">
+                <span className="text-[10.5px] font-semibold px-2 py-0.5 rounded border bg-[var(--surface-secondary)] text-[var(--text-secondary)] border-[var(--border-default)]">
                   {LABEL_CANAL[c.canal]}
                 </span>
                 <span
@@ -344,7 +344,7 @@ export function BlocoContatos({
                   href={c.anexoUrl}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="text-[11px] text-sky-700 hover:underline inline-flex items-center gap-1 mt-1"
+                  className="text-[11px] text-[var(--text-secondary)] hover:underline inline-flex items-center gap-1 mt-1"
                 >
                   {c.anexoNome || "anexo"}
                   <ExternalLink className="w-3 h-3" />

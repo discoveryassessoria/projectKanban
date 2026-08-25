@@ -198,7 +198,7 @@ export function HeaderBar({
   const totalResults = searchResults.processos.length
 
   return (
-    <header className="sticky top-0 z-40 border-b border-[var(--border-default)] bg-black/40 backdrop-blur-md shadow-lg">
+    <header className="sticky top-0 z-40 border-b border-[var(--border-default)] bg-black/40 backdrop-blur-md shadow-[var(--elev-2)]">
       <div className="px-6 py-4 flex items-center justify-between">
         {/* Lado esquerdo - Título e Subtítulo */}
         <div>
@@ -240,7 +240,7 @@ export function HeaderBar({
 
             {/* Dropdown de resultados */}
             {showSearchResults && (
-              <div className="absolute top-full mt-2 left-0 right-0 w-80 bg-[var(--surface-primary)] border border-gray-200 rounded-xl shadow-2xl overflow-hidden z-50">
+              <div className="absolute top-full mt-2 left-0 right-0 w-80 bg-[var(--surface-primary)] border border-gray-200 rounded-xl shadow-[var(--elev-3)] overflow-hidden z-50">
                 {totalResults === 0 ? (
                   <div className="px-4 py-6 text-center text-[var(--text-muted)]">
                     <Search className="h-8 w-8 mx-auto mb-2 opacity-50" />
@@ -267,7 +267,7 @@ export function HeaderBar({
                             {processo.contratantes?.[0] ? (processo.contratantes[0].publicCode ? processo.contratantes[0].publicCode + ' — ' : '') + processo.contratantes[0].nome : "Sem contratante"}
                           </p>
                         </div>
-                        <span className="text-[10px] text-blue-500 flex-shrink-0">
+                        <span className="text-[10px] text-[var(--text-secondary)] flex-shrink-0">
                           Clique para abrir →
                         </span>
                       </button>
@@ -286,7 +286,7 @@ export function HeaderBar({
             >
               <Bell className="h-4 w-4 text-white" />
               {totalNotificacoes > 0 && (
-                <span className="absolute -top-1 -right-1 h-5 w-5 rounded-full bg-red-500 border-2 border-[var(--border-default)] text-[10px] font-bold flex items-center justify-center">
+                <span className="absolute -top-1 -right-1 h-5 w-5 rounded-full bg-red-600 border-2 border-[var(--border-default)] text-[10px] font-bold flex items-center justify-center">
                   {totalNotificacoes > 9 ? '9+' : totalNotificacoes}
                 </span>
               )}
@@ -294,7 +294,7 @@ export function HeaderBar({
 
             {/* Dropdown de notificações */}
             {showNotifications && (
-              <div className="absolute top-full mt-2 right-0 w-80 bg-[var(--surface-primary)] border border-gray-200 rounded-xl shadow-2xl overflow-hidden z-50">
+              <div className="absolute top-full mt-2 right-0 w-80 bg-[var(--surface-primary)] border border-gray-200 rounded-xl shadow-[var(--elev-3)] overflow-hidden z-50">
                 <div className="px-4 py-3 border-b border-gray-100 bg-gray-50">
                   <h3 className="font-semibold text-gray-800 text-sm">Notificações</h3>
                   <p className="text-xs text-gray-500">{totalNotificacoes} pendentes</p>
@@ -310,14 +310,14 @@ export function HeaderBar({
                   <div className="max-h-[400px] overflow-y-auto">
                     {notificacoes.vencidas.length > 0 && (
                       <div>
-                        <div className="px-3 py-2 bg-red-50 text-[10px] uppercase tracking-wide text-red-600 font-medium flex items-center gap-1 sticky top-0">
-                          <span className="h-2 w-2 rounded-full bg-red-500"></span>
+                        <div className="px-3 py-2 bg-[var(--surface-secondary)] text-[10px] uppercase tracking-wide text-red-600 font-medium flex items-center gap-1 sticky top-0">
+                          <span className="h-2 w-2 rounded-full bg-red-600"></span>
                           Tarefas Vencidas ({notificacoes.vencidas.length})
                         </div>
                         {notificacoes.vencidas.map(tarefa => (
                           <button
                             key={`vencida-${tarefa.id}`}
-                            className="w-full text-left px-3 py-2 border-l-4 border-red-500 hover:bg-red-50 transition-colors cursor-pointer"
+                            className="w-full text-left px-3 py-2 border-l-4 border-red-500 hover:bg-[var(--surface-secondary)] transition-colors cursor-pointer"
                             onClick={() => handleTarefaClick(tarefa)}
                           >
                             <p className="text-sm text-gray-800 truncate font-medium">{tarefa.titulo}</p>
@@ -332,14 +332,14 @@ export function HeaderBar({
 
                     {notificacoes.hoje.length > 0 && (
                       <div>
-                        <div className="px-3 py-2 bg-amber-50 text-[10px] uppercase tracking-wide text-amber-600 font-medium flex items-center gap-1 sticky top-0">
-                          <span className="h-2 w-2 rounded-full bg-amber-500"></span>
+                        <div className="px-3 py-2 bg-[var(--surface-secondary)] text-[10px] uppercase tracking-wide text-amber-600 font-medium flex items-center gap-1 sticky top-0">
+                          <span className="h-2 w-2 rounded-full bg-amber-600"></span>
                           Vencem hoje ({notificacoes.hoje.length})
                         </div>
                         {notificacoes.hoje.map(tarefa => (
                           <button
                             key={`hoje-${tarefa.id}`}
-                            className="w-full text-left px-3 py-2 border-l-4 border-amber-500 hover:bg-amber-50 transition-colors cursor-pointer"
+                            className="w-full text-left px-3 py-2 border-l-4 border-amber-500 hover:bg-[var(--surface-secondary)] transition-colors cursor-pointer"
                             onClick={() => handleTarefaClick(tarefa)}
                           >
                             <p className="text-sm text-gray-800 truncate font-medium">{tarefa.titulo}</p>
@@ -352,14 +352,14 @@ export function HeaderBar({
 
                     {notificacoes.proximos3Dias.length > 0 && (
                       <div>
-                        <div className="px-3 py-2 bg-amber-50 text-[10px] uppercase tracking-wide text-amber-600 font-medium flex items-center gap-1 sticky top-0">
-                          <span className="h-2 w-2 rounded-full bg-amber-500"></span>
+                        <div className="px-3 py-2 bg-[var(--surface-secondary)] text-[10px] uppercase tracking-wide text-amber-600 font-medium flex items-center gap-1 sticky top-0">
+                          <span className="h-2 w-2 rounded-full bg-amber-600"></span>
                           Próximos 3 dias ({notificacoes.proximos3Dias.length})
                         </div>
                         {notificacoes.proximos3Dias.map(tarefa => (
                           <button
                             key={`proximos-${tarefa.id}`}
-                            className="w-full text-left px-3 py-2 border-l-4 border-amber-500 hover:bg-amber-50 transition-colors cursor-pointer"
+                            className="w-full text-left px-3 py-2 border-l-4 border-amber-500 hover:bg-[var(--surface-secondary)] transition-colors cursor-pointer"
                             onClick={() => handleTarefaClick(tarefa)}
                           >
                             <p className="text-sm text-gray-800 truncate font-medium">{tarefa.titulo}</p>
@@ -374,19 +374,19 @@ export function HeaderBar({
 
                     {notificacoes.novas.length > 0 && (
                       <div>
-                        <div className="px-3 py-2 bg-blue-50 text-[10px] uppercase tracking-wide text-blue-600 font-medium flex items-center gap-1 sticky top-0">
-                          <span className="h-2 w-2 rounded-full bg-blue-500"></span>
+                        <div className="px-3 py-2 bg-[var(--surface-secondary)] text-[10px] uppercase tracking-wide text-[var(--text-secondary)] font-medium flex items-center gap-1 sticky top-0">
+                          <span className="h-2 w-2 rounded-full bg-[var(--surface-secondary)]"></span>
                           Novas tarefas ({notificacoes.novas.length})
                         </div>
                         {notificacoes.novas.map(tarefa => (
                           <button
                             key={`nova-${tarefa.id}`}
-                            className="w-full text-left px-3 py-2 border-l-4 border-blue-500 hover:bg-blue-50 transition-colors cursor-pointer"
+                            className="w-full text-left px-3 py-2 border-l-4 border-[var(--border-default)] hover:bg-[var(--surface-secondary)] transition-colors cursor-pointer"
                             onClick={() => handleTarefaClick(tarefa)}
                           >
                             <p className="text-sm text-gray-800 truncate font-medium">{tarefa.titulo}</p>
                             <p className="text-[10px] text-gray-500">{tarefa.processoNome}</p>
-                            <p className="text-[10px] text-blue-600 font-medium">Nova tarefa</p>
+                            <p className="text-[10px] text-[var(--text-secondary)] font-medium">Nova tarefa</p>
                           </button>
                         ))}
                       </div>
@@ -419,7 +419,7 @@ export function HeaderBar({
             variant="outline"
             size="sm"
             onClick={onLogout}
-            className="border-[var(--border-strong)] text-xs bg-transparent hover:bg-red-50 hover:border-red-200 text-[var(--text-primary)] hover:text-red-700 flex items-center justify-center gap-1.5"
+            className="border-[var(--border-strong)] text-xs bg-transparent hover:bg-[var(--surface-secondary)] hover:border-[var(--border-default)] text-[var(--text-primary)] hover:text-red-700 flex items-center justify-center gap-1.5"
           >
             <LogOut className="h-3 w-3" />
             Sair

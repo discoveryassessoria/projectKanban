@@ -123,7 +123,7 @@ export default function CondicoesPagamentoTab() {
       {loading ? (
         <div className="flex items-center justify-center py-16"><Loader2 className="h-8 w-8 animate-spin text-[var(--text-secondary)]" /></div>
       ) : erroLista ? (
-        <div className="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-700">{erroLista}<button onClick={() => void carregar()} className="ml-3 underline hover:text-white">Tentar de novo</button></div>
+        <div className="rounded-lg border border-[var(--border-default)] bg-[var(--surface-secondary)] p-4 text-sm text-red-700">{erroLista}<button onClick={() => void carregar()} className="ml-3 underline hover:text-white">Tentar de novo</button></div>
       ) : filtrados.length === 0 ? (
         <div className={`${GLASS} flex flex-col items-center gap-2 py-16 text-center`}>
           <CalendarClock className="h-10 w-10 text-[var(--text-muted)]" />
@@ -151,7 +151,7 @@ export default function CondicoesPagamentoTab() {
                 </div>
                 <div className="flex shrink-0 items-center gap-2">
                   <button onClick={() => { setEditando(x); setAberto(true) }} className="inline-flex items-center gap-1 rounded-md border border-[var(--border-default)] px-2.5 py-1 text-xs text-white/70 transition hover:bg-[var(--surface-hover)] hover:text-white"><Pencil className="h-3 w-3" /> {usoReal > 0 ? 'Nova versão' : 'Editar'}</button>
-                  <button onClick={() => excluir(x)} className="inline-flex items-center gap-1 rounded-md border border-red-200 px-2.5 py-1 text-xs text-red-700/80 transition hover:bg-red-50"><Trash2 className="h-3 w-3" /></button>
+                  <button onClick={() => excluir(x)} className="inline-flex items-center gap-1 rounded-md border border-[var(--border-default)] px-2.5 py-1 text-xs text-red-700/80 transition hover:bg-[var(--surface-secondary)]"><Trash2 className="h-3 w-3" /></button>
                 </div>
               </div>
             )
@@ -232,7 +232,7 @@ function CondicaoWizard({ editando, carteiras, formas, taxas, servicos, moedas, 
     >
       <>
           {erro && (
-            <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-700">
+            <div className="rounded-lg border border-[var(--border-default)] bg-[var(--surface-secondary)] p-3 text-sm text-amber-700">
               {erro}
               {novaVersao && <button onClick={() => salvar(true)} className="ml-2 inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs font-semibold text-[#1b1508]" style={{ background: OURO }}><GitBranch className="h-3 w-3" /> Criar nova versão</button>}
             </div>

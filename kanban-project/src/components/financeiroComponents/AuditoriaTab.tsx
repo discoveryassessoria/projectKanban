@@ -33,9 +33,9 @@ const CHIPS = [
 ] as const
 
 function sevBadge(s: string) {
-  if (s === "critico") return <span className="text-[11px] px-2 py-0.5 rounded-full bg-red-50 text-red-700 border border-red-200">Crítico</span>
-  if (s === "aviso") return <span className="text-[11px] px-2 py-0.5 rounded-full bg-amber-50 text-amber-700 border border-amber-200">Aviso</span>
-  return <span className="text-[11px] px-2 py-0.5 rounded-full bg-sky-50 text-sky-700 border border-sky-200">Info</span>
+  if (s === "critico") return <span className="text-[11px] px-2 py-0.5 rounded-full bg-[var(--surface-secondary)] text-red-700 border border-[var(--border-default)]">Crítico</span>
+  if (s === "aviso") return <span className="text-[11px] px-2 py-0.5 rounded-full bg-[var(--surface-secondary)] text-amber-700 border border-[var(--border-default)]">Aviso</span>
+  return <span className="text-[11px] px-2 py-0.5 rounded-full bg-[var(--surface-secondary)] text-[var(--text-secondary)] border border-[var(--border-default)]">Info</span>
 }
 
 export default function AuditoriaTab() {
@@ -126,7 +126,7 @@ export default function AuditoriaTab() {
                       <span className="text-[11px] px-2 py-0.5 rounded-full bg-[var(--surface-primary)] text-[var(--text-secondary)] border border-[var(--border-strong)]">Sistema</span>
                     ) : (
                       <span className="inline-flex items-center gap-1.5">
-                        <span className="w-5 h-5 rounded-full bg-blue-500/30 text-blue-700 text-[9px] font-bold flex items-center justify-center">{iniciais(l.usuario)}</span>
+                        <span className="w-5 h-5 rounded-full bg-[var(--surface-secondary)] text-[var(--text-secondary)] text-[9px] font-bold flex items-center justify-center">{iniciais(l.usuario)}</span>
                         <span className="text-white/80">{l.usuario}</span>
                       </span>
                     )}

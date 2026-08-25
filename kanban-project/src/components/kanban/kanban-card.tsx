@@ -116,9 +116,9 @@ export function KanbanCard({ processo, onClick, isDragging: isDraggingProp, pode
     <div ref={setNodeRef} style={style} {...attributes} {...listeners}>
       <div
         className={`
-          mb-3 bg-[var(--surface-primary)] rounded-lg shadow-sm border border-gray-200
-          hover:shadow-md transition-all cursor-grab active:cursor-grabbing
-          ${isDragging ? "shadow-xl ring-2 ring-blue-400/50" : ""}
+          mb-3 bg-[var(--surface-primary)] rounded-lg shadow-[var(--elev-1)] border border-gray-200
+          hover:shadow-[var(--elev-2)] transition-all cursor-grab active:cursor-grabbing
+          ${isDragging ? "shadow-[var(--elev-3)] ring-2 ring-[var(--border-strong)]" : ""}
         `}
         onClick={handleCardClick}
       >
@@ -141,7 +141,7 @@ export function KanbanCard({ processo, onClick, isDragging: isDraggingProp, pode
           {/* Badge: Requerentes (identidade — não é contador operacional) */}
           {requerentesCount > 0 && (
             <div className="flex items-center gap-2 mb-2">
-              <span className="flex items-center gap-1 px-1.5 py-0.5 bg-slate-100 text-slate-600 text-xs font-medium rounded">
+              <span className="flex items-center gap-1 px-1.5 py-0.5 bg-[var(--surface-secondary)] text-[var(--text-secondary)] text-xs font-medium rounded">
                 <Users className="h-3 w-3" />
                 {requerentesCount}
               </span>
@@ -172,7 +172,7 @@ export function KanbanCard({ processo, onClick, isDragging: isDraggingProp, pode
           <div className="flex items-center justify-end gap-1">
             <button
               onClick={handlePhoneClick}
-              className={`p-1.5 rounded hover:bg-gray-100 transition-colors ${telefone ? 'text-gray-500 hover:text-blue-600' : 'text-[var(--text-muted)] cursor-not-allowed'}`}
+              className={`p-1.5 rounded hover:bg-gray-100 transition-colors ${telefone ? 'text-gray-500 hover:text-[var(--text-secondary)]' : 'text-[var(--text-muted)] cursor-not-allowed'}`}
               disabled={!telefone}
               title={telefone || 'Sem telefone'}
             >
@@ -180,7 +180,7 @@ export function KanbanCard({ processo, onClick, isDragging: isDraggingProp, pode
             </button>
             <button
               onClick={handleEmailClick}
-              className={`p-1.5 rounded hover:bg-gray-100 transition-colors ${email ? 'text-gray-500 hover:text-blue-600' : 'text-[var(--text-muted)] cursor-not-allowed'}`}
+              className={`p-1.5 rounded hover:bg-gray-100 transition-colors ${email ? 'text-gray-500 hover:text-[var(--text-secondary)]' : 'text-[var(--text-muted)] cursor-not-allowed'}`}
               disabled={!email}
               title={email || 'Sem email'}
             >

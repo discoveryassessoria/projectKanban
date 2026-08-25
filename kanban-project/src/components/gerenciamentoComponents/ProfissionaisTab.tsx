@@ -184,7 +184,7 @@ export function ProfissionaisTab() {
         >+ Novo profissional</button>
       </div>
 
-      {erro && <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-700">{erro}</div>}
+      {erro && <div className="rounded-lg border border-[var(--border-default)] bg-[var(--surface-secondary)] px-4 py-3 text-sm text-amber-700">{erro}</div>}
 
       {carregando ? (
         <p className="py-10 text-center text-sm text-[var(--text-muted)]">Carregando…</p>
@@ -217,7 +217,7 @@ export function ProfissionaisTab() {
                     {p.organizacao ? (p.organizacao.nomeFantasia || p.organizacao.name) : "autônomo"}
                   </td>
                   <td className="px-4 py-2.5">
-                    <span className={p.ativo ? "text-emerald-700/80" : "text-[var(--text-muted)]"}>
+                    <span className={p.ativo ? "text-green-700/80" : "text-[var(--text-muted)]"}>
                       {p.ativo ? "em circulação" : "fora de circulação"}
                     </span>
                     {p._count.retificacoes > 0 && (
@@ -235,7 +235,7 @@ export function ProfissionaisTab() {
                         um pedido é histórico, e o botão diria uma coisa que não pode fazer. */}
                     {p._count.retificacoes === 0 && (
                       <button onClick={() => void excluir(p)}
-                        className="ml-2 rounded border border-[var(--border-default)] px-2 py-1 text-xs text-red-700/80 hover:bg-red-50">Excluir</button>
+                        className="ml-2 rounded border border-[var(--border-default)] px-2 py-1 text-xs text-red-700/80 hover:bg-[var(--surface-secondary)]">Excluir</button>
                     )}
                   </td>
                 </tr>
@@ -252,7 +252,7 @@ export function ProfissionaisTab() {
               {form.id ? "Editar profissional" : "Novo profissional"}
             </h3>
 
-            {erroForm && <div className="mt-3 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">{erroForm}</div>}
+            {erroForm && <div className="mt-3 rounded-lg border border-[var(--border-default)] bg-[var(--surface-secondary)] px-3 py-2 text-sm text-red-700">{erroForm}</div>}
 
             <div className="mt-4 grid grid-cols-2 gap-3">
               <div className="col-span-2">
@@ -320,7 +320,7 @@ export function ProfissionaisTab() {
                   <input className={inputCls} placeholder="UF" value={r.jurisdicao ?? ""}
                     onChange={(e) => setRegistro(i, { jurisdicao: e.target.value.toUpperCase() || null })} />
                   <button onClick={() => setForm((f) => f ? { ...f, registros: f.registros.filter((_, k) => k !== i) } : f)}
-                    className="rounded border border-[var(--border-default)] px-2 py-2 text-xs text-red-700/80 hover:bg-red-50">Remover</button>
+                    className="rounded border border-[var(--border-default)] px-2 py-2 text-xs text-red-700/80 hover:bg-[var(--surface-secondary)]">Remover</button>
                 </div>
               ))}
               <datalist id="tipos-registro">

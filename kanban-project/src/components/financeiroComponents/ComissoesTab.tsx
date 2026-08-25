@@ -43,9 +43,9 @@ const CHIPS = [
 ] as const
 
 function statusBadge(status: string) {
-  if (status === "paga") return <span className="text-[11px] px-2 py-0.5 rounded-full bg-green-50 text-green-700 border border-green-200">Paga</span>
+  if (status === "paga") return <span className="text-[11px] px-2 py-0.5 rounded-full bg-[var(--surface-secondary)] text-green-700 border border-[var(--border-default)]">Paga</span>
   if (status === "prevista") return <span className="text-[11px] px-2 py-0.5 rounded-full bg-[var(--surface-primary)] text-[var(--text-secondary)] border border-[var(--border-strong)]">Prevista</span>
-  return <span className="text-[11px] px-2 py-0.5 rounded-full bg-amber-50 text-amber-700 border border-amber-200">A pagar</span>
+  return <span className="text-[11px] px-2 py-0.5 rounded-full bg-[var(--surface-secondary)] text-amber-700 border border-[var(--border-default)]">A pagar</span>
 }
 
 export default function ComissoesTab() {
@@ -116,12 +116,12 @@ export default function ComissoesTab() {
               <tr key={r.id} className="border-b border-[var(--border-subtle)] last:border-0">
                 <td className="py-2 text-white/90 font-medium">{r.nome}</td>
                 <td className="py-2">
-                  <span className={`text-[11px] px-2 py-0.5 rounded-full border ${r.tipo === "Vendedor" ? "bg-blue-50 text-blue-700 border-blue-200" : r.tipo === "Parceiro" ? "bg-sky-50 text-sky-700 border-sky-200" : "bg-[var(--surface-primary)] text-[var(--text-secondary)] border-[var(--border-strong)]"}`}>{r.tipo}</span>
+                  <span className={`text-[11px] px-2 py-0.5 rounded-full border ${r.tipo === "Vendedor" ? "bg-[var(--surface-secondary)] text-[var(--text-secondary)] border-[var(--border-default)]" : r.tipo === "Parceiro" ? "bg-[var(--surface-secondary)] text-[var(--text-secondary)] border-[var(--border-default)]" : "bg-[var(--surface-primary)] text-[var(--text-secondary)] border-[var(--border-strong)]"}`}>{r.tipo}</span>
                 </td>
                 <td className="py-2 text-white/70">{r.base}</td>
                 <td className="py-2 text-right text-white font-medium">{r.valor}</td>
                 <td className="py-2 text-[var(--text-secondary)]">{r.aplicacao}</td>
-                <td className="py-2 text-center">{r.ativa ? <span className="text-[11px] px-2 py-0.5 rounded-full bg-green-50 text-green-700 border border-green-200">Ativa</span> : <span className="text-[11px] px-2 py-0.5 rounded-full bg-[var(--surface-primary)] text-[var(--text-secondary)]">Inativa</span>}</td>
+                <td className="py-2 text-center">{r.ativa ? <span className="text-[11px] px-2 py-0.5 rounded-full bg-[var(--surface-secondary)] text-green-700 border border-[var(--border-default)]">Ativa</span> : <span className="text-[11px] px-2 py-0.5 rounded-full bg-[var(--surface-primary)] text-[var(--text-secondary)]">Inativa</span>}</td>
               </tr>
             ))}
           </tbody>
@@ -176,7 +176,7 @@ export default function ComissoesTab() {
                 <td className="py-2 text-center">{statusBadge(c.status)}</td>
                 <td className="py-2 text-center">
                   {c.status === "a_pagar" ? (
-                    <button className="inline-flex items-center gap-1 px-2 py-1 text-[11px] rounded bg-green-600/80 hover:bg-green-800 text-[var(--action-primary-ink)]"><Check className="h-3 w-3" /> Pagar</button>
+                    <button className="inline-flex items-center gap-1 px-2 py-1 text-[11px] rounded bg-[var(--surface-secondary)] hover:bg-green-800 text-[var(--action-primary-ink)]"><Check className="h-3 w-3" /> Pagar</button>
                   ) : c.status === "paga" ? (
                     <span className="text-[11px] text-green-700">✓ Paga</span>
                   ) : (

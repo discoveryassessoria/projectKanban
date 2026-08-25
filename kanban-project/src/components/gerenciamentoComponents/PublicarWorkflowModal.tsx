@@ -45,9 +45,9 @@ const AREA_DO_ESCOPO: Record<string, string> = {
 const ORDEM_DAS_AREAS = ["Geral", "Execução", "Conclusão", "Resultados", "Avançado"]
 
 const COR_DO_TIPO: Record<string, string> = {
-  ACRESCENTADO: "bg-emerald-50 text-emerald-700",
-  REMOVIDO: "bg-red-50 text-red-700",
-  ALTERADO: "bg-amber-50 text-amber-700",
+  ACRESCENTADO: "bg-[var(--surface-secondary)] text-green-700",
+  REMOVIDO: "bg-[var(--surface-secondary)] text-red-700",
+  ALTERADO: "bg-[var(--surface-secondary)] text-amber-700",
 }
 
 export default function PublicarWorkflowModal({
@@ -108,7 +108,7 @@ export default function PublicarWorkflowModal({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-[var(--overlay-modal)] p-4 backdrop-blur-sm" onClick={onFechar}>
-      <div className="flex max-h-[90vh] w-full max-w-3xl flex-col overflow-hidden rounded-2xl border border-[var(--border-default)] bg-zinc-900/95 shadow-2xl" onClick={(e) => e.stopPropagation()}>
+      <div className="flex max-h-[90vh] w-full max-w-3xl flex-col overflow-hidden rounded-2xl border border-[var(--border-default)] bg-zinc-900/95 shadow-[var(--elev-3)]" onClick={(e) => e.stopPropagation()}>
         <div className="border-b border-[var(--border-default)] px-6 py-4">
           <h3 className="font-semibold text-white">Publicar {preview ? `“${preview.nome}”` : "workflow"}</h3>
           {preview && (
@@ -120,10 +120,10 @@ export default function PublicarWorkflowModal({
 
         <div className="flex-1 space-y-3 overflow-auto px-6 py-4">
           {!preview && !erro && <p className="text-sm text-[var(--text-muted)]">Comparando o rascunho com a versão publicada…</p>}
-          {erro && <div className="rounded-lg border border-red-200 bg-red-50 p-3 text-xs text-red-700">{erro}</div>}
+          {erro && <div className="rounded-lg border border-[var(--border-default)] bg-[var(--surface-secondary)] p-3 text-xs text-red-700">{erro}</div>}
 
           {preview && preview.problemas.length > 0 && (
-            <div className="rounded-lg border border-red-200 bg-red-50 p-3">
+            <div className="rounded-lg border border-[var(--border-default)] bg-[var(--surface-secondary)] p-3">
               <div className="text-xs font-medium text-red-700">A configuração não pode ser publicada:</div>
               <ul className="mt-1 space-y-0.5 text-xs text-red-700/80">
                 {preview.problemas.map((p, i) => <li key={i}>· {p.stepKey ? `[${p.stepKey}] ` : ""}{p.mensagem}</li>)}
@@ -165,7 +165,7 @@ export default function PublicarWorkflowModal({
         <div className="flex justify-end gap-2 border-t border-[var(--border-default)] px-6 py-4">
           <button onClick={onFechar} className="rounded-lg border border-[var(--border-default)] bg-[var(--surface-primary)] px-4 py-2 text-sm text-white/70 hover:bg-[var(--surface-hover)]">Fechar</button>
           <button onClick={publicar} disabled={!preview || !preview.podePublicar || publicando}
-            className="rounded-lg bg-emerald-700 px-4 py-2 text-sm font-medium text-[var(--action-primary-ink)] hover:bg-emerald-500 disabled:opacity-40">
+            className="rounded-lg bg-green-700 px-4 py-2 text-sm font-medium text-[var(--action-primary-ink)] hover:bg-green-600 disabled:opacity-40">
             {publicando ? "Publicando…" : `Publicar versão ${preview?.versaoNova ?? ""}`}
           </button>
         </div>

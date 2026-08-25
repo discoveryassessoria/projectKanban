@@ -84,7 +84,7 @@ function DocumentoIndicador({ tipo, label, status, mode }: DocumentoIndicadorPro
   return (
     <div className="group/doctip relative">
       <div
-        className="w-4 h-4 rounded-full flex items-center justify-center text-white text-[8px] font-bold shadow-sm"
+        className="w-4 h-4 rounded-full flex items-center justify-center text-white text-[8px] font-bold shadow-[var(--elev-1)]"
         style={{ backgroundColor: bgColor }}
       >
         {tipo}
@@ -272,7 +272,7 @@ function PersonNode({ data }: NodeProps<PersonNodeData>) {
   if (mode === 'paisagem') {
     return (
       <div
-        className={`relative bg-[var(--surface-primary)] rounded-lg shadow-md cursor-pointer hover:shadow-lg transition-all ${ringClass}`}
+        className={`relative bg-[var(--surface-primary)] rounded-lg shadow-[var(--elev-2)] cursor-pointer hover:shadow-[var(--elev-2)] transition-all ${ringClass}`}
         style={{
           width: NODE_SIZES.paisagem.width,
           height: NODE_SIZES.paisagem.height,
@@ -352,8 +352,8 @@ function PersonNode({ data }: NodeProps<PersonNodeData>) {
             {isRequerente && (
               <span className={`inline-flex items-center mt-0.5 px-1.5 py-0.5 rounded text-[8px] font-semibold w-fit ${
                 requerente === 'maior' 
-                  ? 'bg-green-100 text-green-800' 
-                  : 'bg-amber-100 text-amber-800'
+                  ? 'bg-[var(--surface-secondary)] text-green-800' 
+                  : 'bg-[var(--surface-secondary)] text-amber-800'
                   }`}>
                 {requerenteLabel}
               </span>
@@ -392,7 +392,7 @@ function PersonNode({ data }: NodeProps<PersonNodeData>) {
   // MODO RETRATO
   return (
     <div
-      className={`relative bg-[var(--surface-primary)] rounded-lg shadow-md cursor-pointer hover:shadow-lg transition-all ${ringClass}`}
+      className={`relative bg-[var(--surface-primary)] rounded-lg shadow-[var(--elev-2)] cursor-pointer hover:shadow-[var(--elev-2)] transition-all ${ringClass}`}
       style={{
         width: NODE_SIZES.retrato.width,
         height: NODE_SIZES.retrato.height,
@@ -472,8 +472,8 @@ function PersonNode({ data }: NodeProps<PersonNodeData>) {
           {isRequerente && (
             <span className={`inline-flex items-center mt-0.5 px-1 py-0.5 rounded text-[7px] font-semibold ${
               requerente === 'maior' 
-                ? 'bg-green-100 text-green-800' 
-                : 'bg-amber-100 text-amber-800'
+                ? 'bg-[var(--surface-secondary)] text-green-800' 
+                : 'bg-[var(--surface-secondary)] text-amber-800'
                 }`}>
               {requerenteLabel}
             </span>
@@ -1815,7 +1815,7 @@ const ReactFlowTreeInner = forwardRef<ReactFlowTreeRef, ReactFlowTreeProps>(({
             declaram cor própria. Sem isto, herdam a cor do ancestral — e quando a
             árvore abre dentro do modal de processo (tema escuro, text-white), o
             ícone fica branco sobre botão branco: invisível. */}
-        <div className="flex flex-col bg-[var(--surface-primary)] border border-gray-200 rounded shadow-sm text-gray-700">
+        <div className="flex flex-col bg-[var(--surface-primary)] border border-gray-200 rounded shadow-[var(--elev-1)] text-gray-700">
           <button
             onClick={() => zoomIn()}
             className="p-2 hover:bg-gray-100 border-b border-gray-200"

@@ -15,7 +15,7 @@ import { AvisoRascunho, TITULO_RASCUNHO, BTN_RASCUNHO } from './_RascunhoUI'
 
 const CARD = 'rounded-xl border border-[var(--border-default)] bg-[var(--surface-primary)] backdrop-blur'
 const BTN_PRIMARY =
-  'rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-blue-500'
+  'rounded-lg bg-[var(--text-muted)] px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-[var(--surface-secondary)]'
 const BTN_GHOST =
   'rounded-lg border border-[var(--border-default)] px-3 py-1.5 text-xs font-medium text-white/70 transition hover:bg-[var(--surface-hover)] hover:text-white'
 const INPUT =

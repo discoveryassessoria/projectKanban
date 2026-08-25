@@ -232,7 +232,7 @@ export function UserManagement() {
       )}
 
       {success && (
-        <Alert className="border-green-200 bg-green-50 dark:bg-green-950/20">
+        <Alert className="border-[var(--border-default)] bg-[var(--surface-secondary)] dark:bg-green-950/20">
           <AlertDescription className="text-green-700 dark:text-green-700">{success}</AlertDescription>
         </Alert>
       )}

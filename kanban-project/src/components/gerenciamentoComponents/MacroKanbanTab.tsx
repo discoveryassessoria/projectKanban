@@ -183,25 +183,25 @@ export default function MacroKanbanTab() {
         <p className="text-sm text-[var(--text-secondary)]">As fases de cada processo — adicione, remova e reordene. As colunas do kanban saem daqui.</p>
       </div>
 
-      <div className="rounded-lg border border-blue-200 bg-blue-50 px-4 py-2.5 text-sm text-blue-700">
+      <div className="rounded-lg border border-[var(--border-default)] bg-[var(--surface-secondary)] px-4 py-2.5 text-sm text-[var(--text-secondary)]">
         O Workflow Macro define a <span className="font-medium">SEQUÊNCIA</span> das fases. Os requisitos para <span className="font-medium">CONCLUIR</span> cada fase são definidos no Workflow Interno; o avanço é executado pelo PhaseAdvanceService.
       </div>
 
       {salvoMsg && (
-        <div className="rounded-lg border border-green-200 bg-green-50 px-4 py-2.5 text-sm text-green-700">
+        <div className="rounded-lg border border-[var(--border-default)] bg-[var(--surface-secondary)] px-4 py-2.5 text-sm text-green-700">
           ✓ {salvoMsg}
         </div>
       )}
 
       {loading && <div className="py-12 text-center text-sm text-[var(--text-muted)]">Carregando...</div>}
       {!loading && erro && (
-        <div className="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-700">{erro}
+        <div className="rounded-lg border border-[var(--border-default)] bg-[var(--surface-secondary)] p-4 text-sm text-red-700">{erro}
           <button onClick={() => { void bootstrap() }} className="ml-3 underline hover:text-white">Tentar de novo</button>
         </div>
       )}
 
       {!loading && !erro && tipos.length === 0 && (
-        <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-700">
+        <div className="rounded-lg border border-[var(--border-default)] bg-[var(--surface-secondary)] p-3 text-sm text-amber-700">
           Nenhum tipo de processo ainda. Crie em <span className="font-medium">Processos de Nacionalidade</span> primeiro.
         </div>
       )}
@@ -272,8 +272,8 @@ export default function MacroKanbanTab() {
                       </div>
                       <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-[var(--surface-primary)] text-xs font-semibold text-white/70">{f.ordem}</div>
                       <input value={f.label} onChange={(e) => patch(idx, { label: e.target.value })} className="flex-1 rounded-lg border border-[var(--border-default)] bg-[var(--surface-primary)] px-3 py-1.5 text-sm text-white outline-none focus:border-white/20" />
-                      {f.conditional && <span className="rounded-md bg-amber-50 px-2 py-0.5 text-[11px] font-medium text-amber-700">condicional</span>}
-                      <button onClick={() => remover(idx)} className="rounded-md border border-red-200 px-2 py-1 text-xs text-red-700/80 transition hover:bg-red-50 hover:text-red-700">Remover</button>
+                      {f.conditional && <span className="rounded-md bg-[var(--surface-secondary)] px-2 py-0.5 text-[11px] font-medium text-amber-700">condicional</span>}
+                      <button onClick={() => remover(idx)} className="rounded-md border border-[var(--border-default)] px-2 py-1 text-xs text-red-700/80 transition hover:bg-[var(--surface-secondary)] hover:text-red-700">Remover</button>
                     </div>
                     <div className="mt-2 flex flex-wrap items-center gap-x-5 gap-y-2 pl-[68px] text-xs text-[var(--text-secondary)]">
                       <label className="flex items-center gap-1.5">

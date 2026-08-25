@@ -169,7 +169,7 @@ export function ProcessosLista({
                   </td>
                   <td className="py-3 px-4">
                     <div className="flex items-center gap-2">
-                      <div className="h-2 w-2 rounded-full bg-indigo-500" />
+                      <div className="h-2 w-2 rounded-full bg-[var(--surface-secondary)]" />
                       <span className="text-white/80 text-sm">{processo.faseAtualKey ?? "—"}</span>
                     </div>
                   </td>
@@ -195,7 +195,7 @@ export function ProcessosLista({
                   </td>
                   <td className="py-3 px-4">
                     {primeiroContratante ? (
-                      <span className="text-indigo-700 hover:underline cursor-pointer">
+                      <span className="text-[var(--text-secondary)] hover:underline cursor-pointer">
                         {primeiroContratante.nome}
                       </span>
                     ) : (
@@ -204,7 +204,7 @@ export function ProcessosLista({
                   </td>
                   <td className="py-3 px-4">
                     {requerentesCount > 0 ? (
-                      <span className="flex items-center gap-1 text-slate-700">
+                      <span className="flex items-center gap-1 text-[var(--text-secondary)]">
                         <Users className="h-3 w-3" />
                         {requerentesCount}
                       </span>
@@ -214,7 +214,7 @@ export function ProcessosLista({
                   </td>
                   <td className="py-3 px-4">
                     {tarefasCount > 0 ? (
-                      <span className="flex items-center gap-1 text-blue-700">
+                      <span className="flex items-center gap-1 text-[var(--text-secondary)]">
                         <CheckSquare className="h-3 w-3" />
                         {tarefasConcluidas}/{tarefasCount}
                       </span>
@@ -250,7 +250,7 @@ export function ProcessosLista({
                           </DropdownMenuItem>
                           <DropdownMenuItem 
                             onClick={() => handleDelete(processo.id)}
-                            className="text-red-500 focus:text-red-500 data-[highlighted]:text-red-500 data-[highlighted]:bg-red-50 cursor-pointer"
+                            className="text-red-500 focus:text-red-500 data-[highlighted]:text-red-500 data-[highlighted]:bg-[var(--surface-secondary)] cursor-pointer"
                           >
                             <Trash2 className="h-4 w-4 mr-2 text-red-500" />
                             Excluir

@@ -90,28 +90,28 @@ interface Resposta {
 }
 
 const CORES_PRONTIDAO: Record<EstadoProntidao, string> = {
-  PRONTO: "bg-green-50 text-green-700 border-green-200",
-  PARCIALMENTE_PRONTO: "bg-amber-50 text-amber-700 border-amber-200",
-  NAO_CONFIGURADO: "bg-amber-50 text-amber-700 border-amber-200",
-  CONFIGURACAO_INVALIDA: "bg-amber-50 text-amber-700 border-amber-200",
-  BLOQUEADO: "bg-red-50 text-red-700 border-red-200",
-  DIAGNOSTICO_INCOMPLETO: "bg-slate-50 text-slate-700 border-slate-200",
+  PRONTO: "bg-[var(--surface-secondary)] text-green-700 border-[var(--border-default)]",
+  PARCIALMENTE_PRONTO: "bg-[var(--surface-secondary)] text-amber-700 border-[var(--border-default)]",
+  NAO_CONFIGURADO: "bg-[var(--surface-secondary)] text-amber-700 border-[var(--border-default)]",
+  CONFIGURACAO_INVALIDA: "bg-[var(--surface-secondary)] text-amber-700 border-[var(--border-default)]",
+  BLOQUEADO: "bg-[var(--surface-secondary)] text-red-700 border-[var(--border-default)]",
+  DIAGNOSTICO_INCOMPLETO: "bg-[var(--surface-secondary)] text-[var(--text-secondary)] border-[var(--border-default)]",
 }
 
 const CARD = "rounded-2xl border border-[var(--border-default)] bg-[var(--surface-primary)] backdrop-blur-sm"
 const CORES_ESTADO: Record<Estado, { fundo: string; texto: string; ponto: string }> = {
-  SAUDAVEL: { fundo: "bg-green-50 border-green-200", texto: "text-green-700", ponto: "bg-green-400" },
-  ATENCAO: { fundo: "bg-amber-50 border-amber-200", texto: "text-amber-700", ponto: "bg-amber-400" },
-  DEGRADADO: { fundo: "bg-amber-50 border-amber-200", texto: "text-amber-700", ponto: "bg-amber-400" },
-  CRITICO: { fundo: "bg-red-50 border-red-200", texto: "text-red-700", ponto: "bg-red-400" },
-  DIAGNOSTICO_INCOMPLETO: { fundo: "bg-slate-50 border-slate-200", texto: "text-slate-700", ponto: "bg-slate-400" },
+  SAUDAVEL: { fundo: "bg-[var(--surface-secondary)] border-[var(--border-default)]", texto: "text-green-700", ponto: "bg-green-600" },
+  ATENCAO: { fundo: "bg-[var(--surface-secondary)] border-[var(--border-default)]", texto: "text-amber-700", ponto: "bg-amber-600" },
+  DEGRADADO: { fundo: "bg-[var(--surface-secondary)] border-[var(--border-default)]", texto: "text-amber-700", ponto: "bg-amber-600" },
+  CRITICO: { fundo: "bg-[var(--surface-secondary)] border-[var(--border-default)]", texto: "text-red-700", ponto: "bg-red-600" },
+  DIAGNOSTICO_INCOMPLETO: { fundo: "bg-[var(--surface-secondary)] border-[var(--border-default)]", texto: "text-[var(--text-secondary)]", ponto: "bg-[var(--surface-secondary)]" },
   INDISPONIVEL: { fundo: "bg-[var(--surface-primary)] border-[var(--border-strong)]", texto: "text-white/70", ponto: "bg-[var(--surface-elevated)]" },
 }
 const CORES_SEV: Record<Severidade, string> = {
-  CRITICO: "bg-red-50 text-red-700 border-red-200",
-  ERRO: "bg-amber-50 text-amber-700 border-amber-200",
-  ALERTA: "bg-amber-50 text-amber-700 border-amber-200",
-  INFORMATIVO: "bg-sky-50 text-sky-700 border-sky-200",
+  CRITICO: "bg-[var(--surface-secondary)] text-red-700 border-[var(--border-default)]",
+  ERRO: "bg-[var(--surface-secondary)] text-amber-700 border-[var(--border-default)]",
+  ALERTA: "bg-[var(--surface-secondary)] text-amber-700 border-[var(--border-default)]",
+  INFORMATIVO: "bg-[var(--surface-secondary)] text-[var(--text-secondary)] border-[var(--border-default)]",
 }
 const fmtData = (iso?: string | null) =>
   iso ? new Date(iso).toLocaleString("pt-BR", { day: "2-digit", month: "2-digit", year: "2-digit", hour: "2-digit", minute: "2-digit" }) : "—"
@@ -195,7 +195,7 @@ export function SaudeSistemaTab() {
   if (carregando) return <div className="py-24 text-center text-[var(--text-secondary)]">Carregando a saúde do sistema…</div>
   if (erroApi || !dados) {
     return (
-      <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700" role="alert">
+      <div className="rounded-xl border border-[var(--border-default)] bg-[var(--surface-secondary)] px-4 py-3 text-sm text-red-700" role="alert">
         Não foi possível carregar a saúde do sistema. Isso é, por si só, um sinal: nenhum estado saudável pode ser assumido.
       </div>
     )
@@ -273,7 +273,7 @@ export function SaudeSistemaTab() {
           ["historico", "Histórico"],
         ] as [Aba, string][]).map(([k, l]) => (
           <button key={k} onClick={() => setAba(k)}
-            className={`px-3 py-2 ${aba === k ? "border-b-2 border-blue-400 font-medium text-white" : "text-[var(--text-secondary)] hover:text-white/80"}`}>
+            className={`px-3 py-2 ${aba === k ? "border-b-2 border-[var(--border-default)] font-medium text-white" : "text-[var(--text-secondary)] hover:text-white/80"}`}>
             {l}
           </button>
         ))}
@@ -282,10 +282,10 @@ export function SaudeSistemaTab() {
       {aba === "visao" && (
         <div className="space-y-3">
           {dados.dominiosSemCobertura.length > 0 && (
-            <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-100">
+            <div className="rounded-xl border border-[var(--border-default)] bg-[var(--surface-secondary)] px-4 py-3 text-sm text-[var(--text-secondary)]">
               <b>{dados.dominiosSemCobertura.length} domínio(s) obrigatório(s) ainda sem verificação.</b> Enquanto houver lacuna de cobertura,
               o sistema não pode ser declarado saudável — o motor devolve “diagnóstico incompleto” de propósito.
-              <div className="mt-1 text-xs text-slate-700/80">
+              <div className="mt-1 text-xs text-[var(--text-secondary)]/80">
                 {dados.dominiosSemCobertura.map((d) => rot.dominios[d] ?? d).join(" · ")}
               </div>
             </div>
@@ -304,7 +304,7 @@ export function SaudeSistemaTab() {
             ))}
           </div>
           {dados.capacidades.some((c) => c.estado === "BLOQUEADO") && (
-            <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-100">
+            <div className="rounded-xl border border-[var(--border-default)] bg-[var(--surface-secondary)] px-4 py-3 text-sm text-red-100">
               <b>Há capacidade operacional bloqueada.</b> Enquanto uma operação essencial não puder ser executada de ponta a ponta,
               o sistema não é declarado saudável, mesmo sem erro técnico aparente.
               <div className="mt-1 text-xs text-red-700/80">
@@ -338,7 +338,7 @@ export function SaudeSistemaTab() {
               <div className="mt-2 grid gap-1">
                 {c.dependencias.map((d) => (
                   <div key={d.codigo} className="flex items-start gap-2 text-xs">
-                    <span className={d.indeterminada ? "text-slate-700" : d.ok ? "text-green-700" : d.obrigatoria ? "text-red-700" : "text-amber-700"}>
+                    <span className={d.indeterminada ? "text-[var(--text-secondary)]" : d.ok ? "text-green-700" : d.obrigatoria ? "text-red-700" : "text-amber-700"}>
                       {d.indeterminada ? "?" : d.ok ? "✓" : "✕"}
                     </span>
                     <span className="text-[var(--text-secondary)]">{rot.dependencias[d.tipo] ?? d.tipo}</span>
@@ -382,8 +382,8 @@ export function SaudeSistemaTab() {
                 <span className="font-medium text-white">{c.rotulo}</span>
                 <span className="text-xs text-[var(--text-muted)]">{c.totalAtivos} ativo(s)</span>
                 {c.incompletos.length === 0
-                  ? <span className="rounded bg-green-50 px-1.5 py-0.5 text-[10px] text-green-700">contrato mínimo cumprido</span>
-                  : <span className="rounded bg-amber-50 px-1.5 py-0.5 text-[10px] text-amber-700">{c.incompletos.length} incompleto(s)</span>}
+                  ? <span className="rounded bg-[var(--surface-secondary)] px-1.5 py-0.5 text-[10px] text-green-700">contrato mínimo cumprido</span>
+                  : <span className="rounded bg-[var(--surface-secondary)] px-1.5 py-0.5 text-[10px] text-amber-700">{c.incompletos.length} incompleto(s)</span>}
               </div>
               <div className="mt-1 text-xs text-[var(--text-muted)]">Exige: {c.requisitos.join(" · ")}</div>
               {c.incompletos.slice(0, 8).map((i) => (
@@ -527,10 +527,10 @@ export function SaudeSistemaTab() {
                   <td className="px-4 py-2.5 text-white/70">{m.verificacoes}</td>
                   <td className="px-4 py-2.5">
                     {m.capacidades === 0
-                      ? <span className="rounded bg-slate-50 px-1.5 py-0.5 text-[10px] text-slate-700">sem capacidade declarada</span>
+                      ? <span className="rounded bg-[var(--surface-secondary)] px-1.5 py-0.5 text-[10px] text-[var(--text-secondary)]">sem capacidade declarada</span>
                       : m.capacidadesProntas === m.capacidades
-                        ? <span className="rounded bg-green-50 px-1.5 py-0.5 text-[10px] text-green-700">operacional</span>
-                        : <span className="rounded bg-amber-50 px-1.5 py-0.5 text-[10px] text-amber-700">parcial</span>}
+                        ? <span className="rounded bg-[var(--surface-secondary)] px-1.5 py-0.5 text-[10px] text-green-700">operacional</span>
+                        : <span className="rounded bg-[var(--surface-secondary)] px-1.5 py-0.5 text-[10px] text-amber-700">parcial</span>}
                   </td>
                 </tr>
               ))}
@@ -550,8 +550,8 @@ export function SaudeSistemaTab() {
                   <td className="px-4 py-2.5 text-white/70">{c.obrigatorias}</td>
                   <td className="px-4 py-2.5">
                     {c.ativas > 0
-                      ? <span className="rounded bg-green-50 px-1.5 py-0.5 text-[10px] text-green-700">coberto</span>
-                      : <span className="rounded bg-slate-50 px-1.5 py-0.5 text-[10px] text-slate-700">sem cobertura</span>}
+                      ? <span className="rounded bg-[var(--surface-secondary)] px-1.5 py-0.5 text-[10px] text-green-700">coberto</span>
+                      : <span className="rounded bg-[var(--surface-secondary)] px-1.5 py-0.5 text-[10px] text-[var(--text-secondary)]">sem cobertura</span>}
                   </td>
                 </tr>
               ))}
@@ -635,10 +635,10 @@ export function SaudeSistemaTab() {
             <tbody>
               {(e?.execucoes ?? []).map((x) => {
                 const meta = dados.catalogo.find((v) => v.codigo === x.codigo)
-                const cores = x.status === "APROVADA" ? "bg-green-50 text-green-700"
-                  : x.status === "COM_ACHADOS" ? "bg-amber-50 text-amber-700"
-                  : x.status === "NAO_EXECUTADA" ? "bg-slate-50 text-slate-700"
-                  : "bg-red-50 text-red-700"
+                const cores = x.status === "APROVADA" ? "bg-[var(--surface-secondary)] text-green-700"
+                  : x.status === "COM_ACHADOS" ? "bg-[var(--surface-secondary)] text-amber-700"
+                  : x.status === "NAO_EXECUTADA" ? "bg-[var(--surface-secondary)] text-[var(--text-secondary)]"
+                  : "bg-[var(--surface-secondary)] text-red-700"
                 return (
                   <tr key={x.codigo} className="border-b border-[var(--border-subtle)] last:border-0 align-top">
                     <td className="px-4 py-2.5">
@@ -678,8 +678,8 @@ function LinhaAchado({ a, rot, detalhado, onCorrigir, corrigindo }: {
             <span className="font-mono">{a.codigo}</span>
             <span>{rot.dominios[a.dominio] ?? a.dominio}</span>
             <span>{a.modulo}</span>
-            {a.recorrencias > 1 && <span className="rounded bg-amber-50 px-1.5 text-amber-700">recorrente ({a.recorrencias}×)</span>}
-            {a.recorrencias <= 1 && <span className="rounded bg-sky-50 px-1.5 text-sky-700">novo</span>}
+            {a.recorrencias > 1 && <span className="rounded bg-[var(--surface-secondary)] px-1.5 text-amber-700">recorrente ({a.recorrencias}×)</span>}
+            {a.recorrencias <= 1 && <span className="rounded bg-[var(--surface-secondary)] px-1.5 text-[var(--text-secondary)]">novo</span>}
             <span>detectado em {fmtData(a.primeiraDeteccao)}</span>
           </span>
         </span>
@@ -695,7 +695,7 @@ function LinhaAchado({ a, rot, detalhado, onCorrigir, corrigindo }: {
             <span>Última detecção: <span className="text-white/85">{fmtData(a.ultimaDeteccao)}</span></span>
             {a.correcaoAutomatica && onCorrigir && (
               <button disabled={corrigindo} onClick={() => onCorrigir(a)}
-                className="rounded-lg border border-green-200 bg-green-50 px-2 py-1 font-medium text-green-700 hover:bg-green-50 disabled:opacity-50">
+                className="rounded-lg border border-[var(--border-default)] bg-[var(--surface-secondary)] px-2 py-1 font-medium text-green-700 hover:bg-[var(--surface-secondary)] disabled:opacity-50">
                 {corrigindo ? "Corrigindo…" : "Corrigir automaticamente"}
               </button>
             )}

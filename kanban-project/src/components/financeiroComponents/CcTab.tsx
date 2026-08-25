@@ -65,7 +65,7 @@ export default function CcTab() {
           <div className="text-xl font-bold text-white mt-1.5">{fmtBRL(k.totalExecutado)}</div>
           <div className="text-[11px] text-[var(--text-muted)] mt-1">{fmtPct(k.pctExecucaoTotal)} do orçamento</div>
           <div className="mt-2 h-1 bg-[var(--surface-primary)] rounded-full overflow-hidden">
-            <div className={`h-full rounded-full ${k.pctExecucaoTotal > 90 ? "bg-red-500" : k.pctExecucaoTotal > 75 ? "bg-amber-500" : "bg-green-500"}`} style={{ width: `${Math.min(k.pctExecucaoTotal, 100)}%` }} />
+            <div className={`h-full rounded-full ${k.pctExecucaoTotal > 90 ? "bg-red-600" : k.pctExecucaoTotal > 75 ? "bg-amber-600" : "bg-green-600"}`} style={{ width: `${Math.min(k.pctExecucaoTotal, 100)}%` }} />
           </div>
         </div>
         <Kpi label="Orçamento Disponível" value={fmtBRL(k.disponivel)} valueColor="text-green-700" sub="Saldo restante" mock />
@@ -136,9 +136,9 @@ export default function CcTab() {
                   <td className={`py-2 text-right tabular-nums ${over ? "text-red-700" : "text-white/70"}`}>{fmtBRL(c.disponivel)}</td>
                   <td className={`py-2 text-right tabular-nums font-medium ${over ? "text-red-700" : c.pctExecucao > 85 ? "text-amber-700" : "text-green-700"}`}>{fmtPct(c.pctExecucao)}</td>
                   <td className="py-2 text-center">
-                    {c.status === "estourou" ? <span className="text-[11px] px-2 py-0.5 rounded-full bg-red-50 text-red-700 border border-red-200">Estourou</span>
-                      : c.status === "atencao" ? <span className="text-[11px] px-2 py-0.5 rounded-full bg-amber-50 text-amber-700 border border-amber-200">Atenção</span>
-                      : <span className="text-[11px] px-2 py-0.5 rounded-full bg-green-50 text-green-700 border border-green-200">OK</span>}
+                    {c.status === "estourou" ? <span className="text-[11px] px-2 py-0.5 rounded-full bg-[var(--surface-secondary)] text-red-700 border border-[var(--border-default)]">Estourou</span>
+                      : c.status === "atencao" ? <span className="text-[11px] px-2 py-0.5 rounded-full bg-[var(--surface-secondary)] text-amber-700 border border-[var(--border-default)]">Atenção</span>
+                      : <span className="text-[11px] px-2 py-0.5 rounded-full bg-[var(--surface-secondary)] text-green-700 border border-[var(--border-default)]">OK</span>}
                   </td>
                 </tr>
               )

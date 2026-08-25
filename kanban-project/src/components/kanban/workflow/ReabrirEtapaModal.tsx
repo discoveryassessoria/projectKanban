@@ -102,7 +102,7 @@ export default function ReabrirEtapaModal({
     finally { setEnviando(false) }
   }
 
-  const inp = "w-full rounded-lg border border-[var(--border-default)] bg-[var(--surface-popover)] px-3 py-2 text-[13px] text-white/95 outline-none focus:border-sky-200"
+  const inp = "w-full rounded-lg border border-[var(--border-default)] bg-[var(--surface-popover)] px-3 py-2 text-[13px] text-white/95 outline-none focus:border-[var(--border-default)]"
   const rot = "text-[10px] font-bold uppercase tracking-wider text-[var(--text-muted)]"
   const atual = plano?.execucoes.find((e) => e.status !== "SUPERSEDIDO") ?? plano?.execucoes[plano.execucoes.length - 1] ?? null
   const podeConfirmar =
@@ -111,7 +111,7 @@ export default function ReabrirEtapaModal({
 
   return (
     <div className="fixed inset-0 z-[10060] flex items-center justify-center bg-[var(--overlay-modal)] px-4" onClick={enviando ? undefined : onFechar}>
-      <div className="w-full max-w-[560px] max-h-[90vh] overflow-y-auto rounded-2xl border border-[var(--border-default)] bg-[var(--surface-popover)] shadow-2xl"
+      <div className="w-full max-w-[560px] max-h-[90vh] overflow-y-auto rounded-2xl border border-[var(--border-default)] bg-[var(--surface-popover)] shadow-[var(--elev-3)]"
         onClick={(e) => e.stopPropagation()} role="dialog" aria-modal="true" aria-label="Reabrir tarefa">
         <div className="border-b border-[var(--border-default)] px-5 py-4">
           <h2 className="text-[16px] font-extrabold text-white/95">Reabrir tarefa</h2>
@@ -236,7 +236,7 @@ export default function ReabrirEtapaModal({
             </>
           )}
 
-          {erro && <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2.5 text-[12.5px] text-red-700">{erro}</div>}
+          {erro && <div className="rounded-lg border border-[var(--border-default)] bg-[var(--surface-secondary)] px-3 py-2.5 text-[12.5px] text-red-700">{erro}</div>}
         </div>
 
         <div className="flex items-center justify-end gap-2 border-t border-[var(--border-default)] px-5 py-4">

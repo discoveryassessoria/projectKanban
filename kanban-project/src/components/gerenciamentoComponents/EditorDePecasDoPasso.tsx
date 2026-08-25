@@ -20,7 +20,7 @@ export interface Efeito {
   permitidoNestaFase: boolean; camposObrigatorios: string[]
 }
 
-const inp = "w-full rounded-lg border border-[var(--border-default)] bg-[var(--surface-primary)] px-3 py-2 text-sm text-white placeholder-white/30 outline-none focus:border-blue-200"
+const inp = "w-full rounded-lg border border-[var(--border-default)] bg-[var(--surface-primary)] px-3 py-2 text-sm text-white placeholder-white/30 outline-none focus:border-[var(--border-default)]"
 const lbl = "mb-1 block text-[11px] uppercase tracking-wide text-[var(--text-muted)]"
 const card = "rounded-lg border border-[var(--border-default)] bg-[var(--surface-primary)] p-3"
 
@@ -78,7 +78,7 @@ export default function EditorDePecasDoPasso({
                 {tiposDeCampo.map((t) => <option key={t} value={t}>{nomeDoTipoDeCampo(t)}</option>)}
               </select>
             </div>
-            <button onClick={() => delLista("campos", i)} className="rounded-lg border border-[var(--border-default)] px-2 py-2 text-xs text-red-700 hover:bg-red-50">Remover</button>
+            <button onClick={() => delLista("campos", i)} className="rounded-lg border border-[var(--border-default)] px-2 py-2 text-xs text-red-700 hover:bg-[var(--surface-secondary)]">Remover</button>
           </div>
           <div className="mt-2 flex flex-wrap items-center gap-4">
             <label className="flex items-center gap-2 text-xs text-[var(--text-secondary)]">
@@ -180,7 +180,7 @@ export default function EditorDePecasDoPasso({
                 <label className={lbl}>Rótulo</label>
                 <input className={inp} value={a.label} onChange={(e) => setLista("acoes", i, { label: e.target.value })} />
               </div>
-              <button onClick={() => delLista("acoes", i)} className="rounded-lg border border-[var(--border-default)] px-2 py-2 text-xs text-red-700 hover:bg-red-50">Remover</button>
+              <button onClick={() => delLista("acoes", i)} className="rounded-lg border border-[var(--border-default)] px-2 py-2 text-xs text-red-700 hover:bg-[var(--surface-secondary)]">Remover</button>
             </div>
             <div className="mt-2">
               <label className={lbl}>O que acontece</label>
@@ -246,7 +246,7 @@ export default function EditorDePecasDoPasso({
               <label className={lbl}>Item</label>
               <input className={inp} value={k.label} onChange={(e) => setLista("checkItens", i, { label: e.target.value })} />
             </div>
-            <button onClick={() => delLista("checkItens", i)} className="rounded-lg border border-[var(--border-default)] px-2 py-2 text-xs text-red-700 hover:bg-red-50">Remover</button>
+            <button onClick={() => delLista("checkItens", i)} className="rounded-lg border border-[var(--border-default)] px-2 py-2 text-xs text-red-700 hover:bg-[var(--surface-secondary)]">Remover</button>
           </div>
           <input className={`${inp} mt-2`} placeholder="Explicação (opcional)" value={k.descricao ?? ""} onChange={(e) => setLista("checkItens", i, { descricao: e.target.value })} />
           <label className="mt-2 flex items-center gap-2 text-xs text-[var(--text-secondary)]">
@@ -295,7 +295,7 @@ export default function EditorDePecasDoPasso({
                 <label className={lbl}>O que o operador lê quando falta</label>
                 <input className={inp} value={r.label} onChange={(e) => setLista("requisitos", i, { label: e.target.value })} />
               </div>
-              <button onClick={() => delLista("requisitos", i)} className="rounded-lg border border-[var(--border-default)] px-2 py-2 text-xs text-red-700 hover:bg-red-50">Remover</button>
+              <button onClick={() => delLista("requisitos", i)} className="rounded-lg border border-[var(--border-default)] px-2 py-2 text-xs text-red-700 hover:bg-[var(--surface-secondary)]">Remover</button>
             </div>
             {!soEvidencia && (
               <div className="mt-2 grid grid-cols-2 gap-2">

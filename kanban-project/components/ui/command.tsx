@@ -147,7 +147,7 @@ function CommandItem({
     <CommandPrimitive.Item
       data-slot="command-item"
       className={cn(
-        "data-[selected=true]:bg-accent data-[selected=true]:text-accent-foreground [&_svg:not([class*='text-'])]:text-muted-foreground relative flex cursor-default items-center gap-2 rounded-sm px-2 py-1.5 text-sm outline-hidden select-none data-[disabled=true]:pointer-events-none data-[disabled=true]:opacity-50 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4 text-[var(--text-primary)] hover:bg-[var(--surface-tertiary)] data-[selected=true]:bg-blue-500 data-[selected=true]:text-[var(--action-primary-ink)] dark:text-gray-100 dark:hover:bg-[var(--action-primary)]",
+        "data-[selected=true]:bg-accent data-[selected=true]:text-accent-foreground [&_svg:not([class*='text-'])]:text-muted-foreground relative flex cursor-default items-center gap-2 rounded-sm px-2 py-1.5 text-sm outline-hidden select-none data-[disabled=true]:pointer-events-none data-[disabled=true]:opacity-50 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4 text-[var(--text-primary)] hover:bg-[var(--surface-tertiary)] data-[selected=true]:bg-[var(--text-muted)] data-[selected=true]:text-[var(--action-primary-ink)] dark:text-gray-100 dark:hover:bg-[var(--action-primary)]",
         className
       )}
       {...props}

@@ -119,7 +119,7 @@ export default function RegistrarPagamentoModal({ obrigacaoId, moeda = "BRL", sa
     <>
       <div className="fixed inset-0 bg-[var(--app-overlay)]" style={{ zIndex: LAYER.aboveProcess }} onClick={() => !salvando && onClose()} />
       <div className="fixed inset-0 flex items-center justify-center p-4 pointer-events-none" style={{ zIndex: LAYER.aboveProcess }}>
-        <div className="pointer-events-auto flex max-h-[92vh] w-full max-w-lg flex-col overflow-hidden rounded-[var(--radius-md)] border border-[var(--border-default)] bg-[var(--surface-overlay)] shadow-[var(--shadow-surface)]">
+        <div className="pointer-events-auto flex max-h-[92vh] w-full max-w-lg flex-col overflow-hidden rounded-[var(--radius-md)] border border-[var(--border-default)] bg-[var(--surface-overlay)] shadow-[var(--elev-2)]">
           {/* header */}
           <div className="flex items-start justify-between gap-4 border-b border-[var(--border-default)] bg-[var(--surface-secondary)] px-5 py-4">
             <div>

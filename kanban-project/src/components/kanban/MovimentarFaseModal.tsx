@@ -210,7 +210,7 @@ export function MovimentarFaseModal({
   const corpo = (
     <div className="fixed inset-0 z-[10050] flex items-center justify-center bg-[var(--overlay-modal)] px-4" onClick={enviando ? undefined : onCancelar}>
       <div
-        className="w-full max-w-[560px] max-h-[88vh] overflow-y-auto rounded-2xl border border-[var(--border-default)] bg-[var(--surface-popover)] shadow-2xl"
+        className="w-full max-w-[560px] max-h-[88vh] overflow-y-auto rounded-2xl border border-[var(--border-default)] bg-[var(--surface-popover)] shadow-[var(--elev-3)]"
         onClick={(e) => e.stopPropagation()}
         role="dialog"
         aria-modal="true"
@@ -251,7 +251,7 @@ export function MovimentarFaseModal({
                 <ArrowRight className="w-4 h-4 text-[var(--text-muted)] flex-none" />
                 <div className="min-w-0 flex-1">
                   <div className="text-[10px] font-bold uppercase tracking-wider text-[var(--text-muted)]">Para</div>
-                  <div className="text-[13px] font-bold text-sky-700 truncate">{destino?.label ?? "Selecione a fase"}</div>
+                  <div className="text-[13px] font-bold text-[var(--text-secondary)] truncate">{destino?.label ?? "Selecione a fase"}</div>
                 </div>
               </div>
 
@@ -262,7 +262,7 @@ export function MovimentarFaseModal({
                   value={faseAlvo}
                   onChange={(e) => setFaseAlvo(e.target.value)}
                   disabled={enviando}
-                  className="mt-1 w-full text-[13px] rounded-lg border border-[var(--border-default)] bg-[var(--surface-popover)] text-white/95 px-3 py-2 focus:outline-none focus:border-sky-200"
+                  className="mt-1 w-full text-[13px] rounded-lg border border-[var(--border-default)] bg-[var(--surface-popover)] text-white/95 px-3 py-2 focus:outline-none focus:border-[var(--border-default)]"
                 >
                   <option value="">Selecione…</option>
                   {(ctx?.fases ?? []).filter((f) => !f.atual).map((f) => (
@@ -302,7 +302,7 @@ export function MovimentarFaseModal({
                   value={motivoCodigo}
                   onChange={(e) => setMotivoCodigo(e.target.value)}
                   disabled={enviando}
-                  className="mt-1 w-full text-[13px] rounded-lg border border-[var(--border-default)] bg-[var(--surface-popover)] text-white/95 px-3 py-2 focus:outline-none focus:border-sky-200"
+                  className="mt-1 w-full text-[13px] rounded-lg border border-[var(--border-default)] bg-[var(--surface-popover)] text-white/95 px-3 py-2 focus:outline-none focus:border-[var(--border-default)]"
                 >
                   <option value="">Selecione o motivo…</option>
                   {(ctx?.motivos ?? []).map((m) => (
@@ -327,7 +327,7 @@ export function MovimentarFaseModal({
                   disabled={enviando}
                   rows={3}
                   placeholder="Explique por que este processo está sendo reposicionado."
-                  className="mt-1 w-full text-[13px] rounded-lg border border-[var(--border-default)] bg-[var(--surface-popover)] text-white/95 px-3 py-2 resize-y focus:outline-none focus:border-sky-200"
+                  className="mt-1 w-full text-[13px] rounded-lg border border-[var(--border-default)] bg-[var(--surface-popover)] text-white/95 px-3 py-2 resize-y focus:outline-none focus:border-[var(--border-default)]"
                 />
               </label>
 
@@ -362,7 +362,7 @@ export function MovimentarFaseModal({
               )}
 
               {erro && (
-                <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2.5 text-[12.5px] text-red-700">
+                <div className="rounded-lg border border-[var(--border-default)] bg-[var(--surface-secondary)] px-3 py-2.5 text-[12.5px] text-red-700">
                   {erro}
                 </div>
               )}

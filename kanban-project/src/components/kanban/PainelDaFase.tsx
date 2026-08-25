@@ -230,7 +230,7 @@ export function PainelDaFase({
               const alvo = recorteDoKpi(k.label)
               const ativo = alvo != null && recorte.rapido === alvo
               const classe = `bg-[var(--surface-popover)] border rounded-[10px] px-4 py-3 text-left transition-colors ${
-                ativo ? "border-sky-200 ring-1 ring-inset border-sky-200" : "border-[var(--border-default)]"
+                ativo ? "border-[var(--border-default)] ring-1 ring-inset border-[var(--border-default)]" : "border-[var(--border-default)]"
               } ${alvo != null ? "hover:border-[var(--border-strong)] cursor-pointer" : ""}`
               const conteudo = (
                 <>
@@ -273,14 +273,14 @@ export function PainelDaFase({
               <div className="text-[13px] text-[var(--text-secondary)]">{progressoConcluidos} de {progressoTotal} documentos validados</div>
             </div>
             <div className="h-1.5 bg-[var(--surface-tertiary)] rounded-full overflow-hidden mt-3">
-              <div className="h-full bg-sky-50 transition-all duration-500" style={{ width: `${progressoPct}%` }} />
+              <div className="h-full bg-[var(--surface-secondary)] transition-all duration-500" style={{ width: `${progressoPct}%` }} />
             </div>
             <div className="text-center text-[12.5px] text-[var(--text-muted)] mt-3">{progressoTexto}</div>
             {/* A FASE PAROU E O SISTEMA SABE POR QUÊ. Dizer isso em lista, com o verbo
                 na frente, é a diferença entre o operador agir e o processo esperar duas
                 semanas por uma árvore que ninguém sabia que faltava. */}
             {(oQueFazer?.length ?? 0) > 0 && (
-              <ul className="mt-3 space-y-1.5 rounded-lg border border-amber-200 bg-amber-400/[0.06] px-4 py-3">
+              <ul className="mt-3 space-y-1.5 rounded-lg border border-[var(--border-default)] bg-[var(--surface-secondary)] px-4 py-3">
                 {oQueFazer!.map((m) => (
                   <li key={m.code} className="flex gap-2 text-[12.5px] leading-snug text-amber-100/80">
                     <span aria-hidden className="text-amber-700/60">·</span>
@@ -716,7 +716,7 @@ function IndiceView({
         <button
           type="button"
           onClick={() => setRecorte?.(RECORTE_VAZIO)}
-          className="mt-3 text-[12px] font-semibold text-sky-700 hover:underline underline-offset-2"
+          className="mt-3 text-[12px] font-semibold text-[var(--text-secondary)] hover:underline underline-offset-2"
         >
           Limpar filtros
         </button>
@@ -838,10 +838,10 @@ function PessoaCard({
 
   const transmissao =
     p.classificacao === "LINHA_PRINCIPAL"
-      ? { cor: "text-green-700", dot: "bg-green-50", label: "Na linha de transmissão" }
+      ? { cor: "text-green-700", dot: "bg-[var(--surface-secondary)]", label: "Na linha de transmissão" }
       : p.classificacao === "FORA_DA_LINHAGEM"
         ? { cor: "text-[var(--text-muted)]", dot: "bg-[var(--surface-secondary)]", label: "Fora da linha" }
-        : { cor: "text-red-700", dot: "bg-red-50", label: "Classificação pendente" }
+        : { cor: "text-red-700", dot: "bg-[var(--surface-secondary)]", label: "Classificação pendente" }
 
   return (
     <div className="rounded-xl border border-[var(--border-default)] bg-[var(--surface-popover)] overflow-hidden">
@@ -1005,7 +1005,7 @@ function TabelaDocumentos({
 
 const CLS_ARTEFATO: Record<StatusResumo, string> = {
   PRONTO: "text-green-700",
-  EM_ANDAMENTO: "text-sky-700",
+  EM_ANDAMENTO: "text-[var(--text-secondary)]",
   PENDENTE: "text-white/68",
   DIVERGENTE: "text-red-700",
   INVALIDADO: "text-red-700",
@@ -1046,7 +1046,7 @@ function CelulaProgresso({ p }: { p: DocumentoDoIndice["naFase"]["progresso"] })
       </div>
       <div className="h-1.5 bg-[var(--surface-tertiary)] rounded-full overflow-hidden mt-1.5">
         <div
-          className={`h-full transition-all duration-500 ${completo ? "bg-green-50" : "bg-sky-50"}`}
+          className={`h-full transition-all duration-500 ${completo ? "bg-[var(--surface-secondary)]" : "bg-[var(--surface-secondary)]"}`}
           style={{ width: `${p.pct}%` }}
         />
       </div>
@@ -1056,10 +1056,10 @@ function CelulaProgresso({ p }: { p: DocumentoDoIndice["naFase"]["progresso"] })
 
 const CLS_ESTADO: Record<EstadoOperacionalDaLinha, string> = {
   A_FAZER: "bg-[var(--surface-tertiary)] text-white/68",
-  EM_ANDAMENTO: "bg-sky-50 text-sky-700",
+  EM_ANDAMENTO: "bg-[var(--surface-secondary)] text-[var(--text-secondary)]",
   AGUARDANDO_TERCEIRO: "bg-[var(--accent-primary)]/15 text-[var(--accent-text)]",
-  BLOQUEADA: "bg-red-50 text-red-700",
-  CONCLUIDA: "bg-green-50 text-green-700",
+  BLOQUEADA: "bg-[var(--surface-secondary)] text-red-700",
+  CONCLUIDA: "bg-[var(--surface-secondary)] text-green-700",
 }
 
 /**
@@ -1169,7 +1169,7 @@ function CelulaResponsavel({
             else await gestao!.onAtribuirResponsavel!(taskId!, Number(v))
           }}
           onBlur={() => setEditando(false)}
-          className="w-full rounded border border-[var(--border-default)] bg-[var(--app-background)] px-1.5 py-1 text-[11.5px] text-white/85 focus:outline-none focus:border-sky-200 disabled:opacity-50"
+          className="w-full rounded border border-[var(--border-default)] bg-[var(--app-background)] px-1.5 py-1 text-[11.5px] text-white/85 focus:outline-none focus:border-[var(--border-default)] disabled:opacity-50"
         >
           <option value="" className="bg-[var(--surface-secondary)]">
             {f.responsavelId != null ? "— retirar responsável —" : "— selecione —"}
@@ -1189,7 +1189,7 @@ function CelulaResponsavel({
         type="button"
         disabled={salvando}
         onClick={() => setEditando(true)}
-        className="text-[10.5px] text-sky-700 hover:text-sky-700 hover:underline disabled:opacity-40"
+        className="text-[10.5px] text-[var(--text-secondary)] hover:text-[var(--text-secondary)] hover:underline disabled:opacity-40"
       >
         {salvando ? "salvando…" : f.responsavelId != null ? "alterar" : "atribuir"}
       </button>
@@ -1224,7 +1224,7 @@ function LinhaDocumento({
     <div
       ref={ref}
       className={`grid items-center gap-3 px-4 py-3 border-b border-white/[0.07] last:border-b-0 transition-colors ${
-        destacado ? "bg-sky-400/[0.07] ring-1 ring-inset ring-sky-300/25" : "hover:bg-[var(--surface-secondary)]/60"
+        destacado ? "bg-[var(--surface-secondary)] ring-1 ring-inset ring-[var(--border-strong)]" : "hover:bg-[var(--surface-secondary)]/60"
       }`}
       style={{ gridTemplateColumns: COLUNAS }}
     >
@@ -1242,7 +1242,7 @@ function LinhaDocumento({
             espaço em TODAS as linhas para informar sobre pouquíssimas. */}
         {(doc.statusFinal === "DIVERGENTE" || doc.statusFinal === "INVALIDADO") && (
           <span
-            className="flex-none text-[10px] font-bold px-1.5 py-0.5 rounded bg-red-50 text-red-700"
+            className="flex-none text-[10px] font-bold px-1.5 py-0.5 rounded bg-[var(--surface-secondary)] text-red-700"
             title={doc.statusFinalLabel}
           >
             {doc.statusFinal === "INVALIDADO" ? "Invalidado" : "Divergente"}
@@ -1281,7 +1281,7 @@ function LinhaDocumento({
           </span>
           {/* ATRASADA NÃO É STATUS — é uma condição que acompanha o status. */}
           {doc.naFase.atrasado && (
-            <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-red-50 text-red-700 whitespace-nowrap">
+            <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-[var(--surface-secondary)] text-red-700 whitespace-nowrap">
               Atrasada
             </span>
           )}

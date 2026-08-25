@@ -70,9 +70,9 @@ export default function FluxoTab() {
         <div className="flex items-center justify-between mb-3">
           <div className="text-sm font-semibold text-white flex items-center gap-2"><Activity className="h-4 w-4" /> Fluxo Previsto vs Realizado</div>
           <div className="flex gap-3 text-xs text-[var(--text-secondary)]">
-            <span className="inline-flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full bg-green-500" /> Entradas</span>
-            <span className="inline-flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full bg-red-500" /> Saídas</span>
-            <span className="inline-flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full bg-sky-300" /> Saldo</span>
+            <span className="inline-flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full bg-green-600" /> Entradas</span>
+            <span className="inline-flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full bg-red-600" /> Saídas</span>
+            <span className="inline-flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full bg-[var(--surface-secondary)]" /> Saldo</span>
           </div>
         </div>
         {d.serie.length === 0 ? (
@@ -113,8 +113,8 @@ export default function FluxoTab() {
             })}
           </div>
           <div className="flex gap-4 mt-3 justify-center text-[11px] text-[var(--text-secondary)]">
-            <span className="inline-flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-green-500" /> Entrada</span>
-            <span className="inline-flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-red-500" /> Saída</span>
+            <span className="inline-flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-green-600" /> Entrada</span>
+            <span className="inline-flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-red-600" /> Saída</span>
             <span className="inline-flex items-center gap-1.5"><span className="w-3.5 h-2 rounded" style={{ background: "linear-gradient(90deg,#22c55e 50%,#ef4444 50%)" }} /> Ambos</span>
           </div>
         </div>

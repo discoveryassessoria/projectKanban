@@ -22,7 +22,7 @@ export function OrigemBadge({ origem }: { origem: string | null | undefined }) {
   const proc = origem === "PROCESSO"
   const desconhecida = origem === "ORIGEM_DESCONHECIDA"
   return (
-    <span className={`inline-flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded-full border ${proc ? "bg-blue-50 text-blue-700 border-blue-200" : desconhecida ? "bg-amber-50 text-amber-700 border-amber-200" : "bg-[var(--surface-primary)] text-[var(--text-secondary)] border-[var(--border-default)]"}`}>
+    <span className={`inline-flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded-full border ${proc ? "bg-[var(--surface-secondary)] text-[var(--text-secondary)] border-[var(--border-default)]" : desconhecida ? "bg-[var(--surface-secondary)] text-amber-700 border-[var(--border-default)]" : "bg-[var(--surface-primary)] text-[var(--text-secondary)] border-[var(--border-default)]"}`}>
       {proc ? <Workflow className="h-2.5 w-2.5" /> : <Building2 className="h-2.5 w-2.5" />}
       {proc ? "Processo" : desconhecida ? "Origem?" : "Corporativo"}
     </span>
@@ -37,7 +37,7 @@ export function StatusBadge({ e }: { e: EntradaStatus }) {
 export function VerOrigemLink({ tipo, id, onOpen }: { tipo: "receita" | "custo"; id: number | null; onOpen: (t: "receita" | "custo", id: number) => void }) {
   if (id == null) return null
   return (
-    <button onClick={() => onOpen(tipo, id)} className="inline-flex items-center gap-1 text-[11px] text-blue-700 hover:text-blue-700 hover:underline">
+    <button onClick={() => onOpen(tipo, id)} className="inline-flex items-center gap-1 text-[11px] text-[var(--text-secondary)] hover:text-[var(--text-secondary)] hover:underline">
       <ExternalLink className="h-3 w-3" /> Ver lançamento de origem
     </button>
   )
@@ -142,7 +142,7 @@ export function CancelarEstornarModal({ acao, tipo, id, resumo, onClose, onDone 
         <div className="flex justify-end gap-2 pt-1">
           <button onClick={onClose} className="px-3 py-1.5 text-sm rounded-lg border border-[var(--border-default)] text-white/70 hover:bg-[var(--surface-hover)]">Voltar</button>
           <button onClick={confirmar} disabled={saving}
-            className={`inline-flex items-center gap-1.5 px-3 py-1.5 text-sm rounded-lg text-white ${estorno ? "bg-slate-600 hover:bg-slate-700" : "bg-red-600 hover:bg-red-700"} disabled:opacity-50`}>
+            className={`inline-flex items-center gap-1.5 px-3 py-1.5 text-sm rounded-lg text-white ${estorno ? "bg-[var(--text-muted)] hover:bg-[var(--surface-secondary)]" : "bg-red-600 hover:bg-red-700"} disabled:opacity-50`}>
             {saving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : estorno ? <RotateCcw className="h-3.5 w-3.5" /> : <Ban className="h-3.5 w-3.5" />}
             {estorno ? "Confirmar estorno" : "Confirmar cancelamento"}
           </button>
@@ -156,7 +156,7 @@ export function CancelarEstornarModal({ acao, tipo, id, resumo, onClose, onDone 
 function Overlay({ title, children, onClose }: { title: string; children: React.ReactNode; onClose: () => void }) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-[var(--overlay-modal)] p-4 backdrop-blur-sm" onClick={onClose}>
-      <div className="max-h-[90vh] w-full max-w-lg overflow-auto rounded-2xl border border-[var(--border-default)] bg-zinc-900/95 shadow-2xl" onClick={(e) => e.stopPropagation()}>
+      <div className="max-h-[90vh] w-full max-w-lg overflow-auto rounded-2xl border border-[var(--border-default)] bg-zinc-900/95 shadow-[var(--elev-3)]" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center justify-between border-b border-[var(--border-default)] px-5 py-3">
           <h3 className="text-base font-semibold text-white">{title}</h3>
           <button onClick={onClose} className="text-[var(--text-muted)] hover:text-white"><X className="h-4 w-4" /></button>

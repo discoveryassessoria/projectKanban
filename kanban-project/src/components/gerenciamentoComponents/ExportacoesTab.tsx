@@ -101,8 +101,8 @@ export default function ExportacoesTab() {
 
   return (
     <div className="space-y-5">
-      {flash && <div className="rounded-xl border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-700">{flash}</div>}
-      {erro && <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{erro}</div>}
+      {flash && <div className="rounded-xl border border-[var(--border-default)] bg-[var(--surface-secondary)] px-4 py-3 text-sm text-green-700">{flash}</div>}
+      {erro && <div className="rounded-xl border border-[var(--border-default)] bg-[var(--surface-secondary)] px-4 py-3 text-sm text-red-700">{erro}</div>}
 
       <div className={`${CARD} p-5`}>
         <div className="flex flex-wrap items-start justify-between gap-3">

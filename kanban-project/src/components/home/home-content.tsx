@@ -56,14 +56,14 @@ const ICONE_MODULO: Record<ModuloFila, React.ComponentType<{ className?: string 
 // ===========================================================================
 /** Pílula de status: a mensagem operacional vira UM objeto, com a cor do nível. */
 const PILULA_STATUS: Record<string, string> = {
-  critico: "border-red-200 bg-red-500/[0.13] text-red-700",
-  atencao: "border-amber-200 bg-amber-500/[0.12] text-amber-700",
-  ok: "border-emerald-200 bg-emerald-500/[0.12] text-emerald-700",
+  critico: "border-[var(--border-default)] bg-[var(--surface-secondary)] text-[var(--text-secondary)]",
+  atencao: "border-[var(--border-default)] bg-[var(--surface-secondary)] text-[var(--text-secondary)]",
+  ok: "border-[var(--border-default)] bg-[var(--surface-secondary)] text-[var(--text-secondary)]",
 }
 const PONTO_STATUS: Record<string, string> = {
-  critico: "bg-red-400",
-  atencao: "bg-amber-400",
-  ok: "bg-emerald-400",
+  critico: "bg-red-600",
+  atencao: "bg-amber-600",
+  ok: "bg-green-600",
 }
 
 function Cabecalho({ data }: { data: HomeData }) {
@@ -81,7 +81,7 @@ function Cabecalho({ data }: { data: HomeData }) {
       <div className="min-w-0">
         {/* O protagonista da tela é a fila de trabalho, não a saudação: ela
             desce de tamanho e o status sobe para a mesma linha da data. */}
-        <h1 className="truncate text-[26px] font-semibold tracking-tight text-white">
+        <h1 className="truncate text-[26px] font-semibold tracking-tight text-[var(--text-primary)]">
           {saudacao()}, {data.usuario.nome.split(" ")[0]}
         </h1>
         <div className="mt-1.5 flex flex-wrap items-center gap-2.5 text-sm text-[var(--text-secondary)]">
@@ -112,12 +112,12 @@ function LinhaFila({ fila }: { fila: FilaOperacional }) {
         <Icone className="h-4 w-4" />
       </span>
       <div className="min-w-0 flex-1">
-        <p className="truncate text-sm font-semibold text-white">{fila.titulo}</p>
+        <p className="truncate text-sm font-semibold text-[var(--text-primary)]">{fila.titulo}</p>
         <p className="truncate text-xs text-[var(--text-secondary)]">{fila.descricao}</p>
       </div>
       {/* A quantidade é o dado que decide a prioridade: número grande e limpo,
           sem chip — a cor do nível já vive no ícone. */}
-      <span className={`shrink-0 text-xl font-semibold tabular-nums ${fila.nivel === "critico" ? st.texto : "text-white"}`}>
+      <span className={`shrink-0 text-xl font-semibold tabular-nums ${fila.nivel === "critico" ? st.texto : "text-[var(--text-primary)]"}`}>
         {fila.quantidade}
       </span>
       <ChevronRight className="h-4 w-4 shrink-0 text-[var(--text-muted)] transition-transform group-hover:translate-x-0.5 group-hover:text-[var(--text-secondary)]" />
@@ -135,7 +135,7 @@ function CentralOperacional({ data }: { data: HomeData }) {
           descricao="O que precisa da sua ação agora"
           acao={
             total > 0 ? (
-              <span className="rounded-md border border-red-200 bg-red-50 px-2 py-0.5 text-sm font-semibold tabular-nums text-red-700">
+              <span className="rounded-md border border-[var(--border-default)] bg-[var(--surface-secondary)] px-2 py-0.5 text-sm font-semibold tabular-nums text-[var(--text-primary)]">
                 {total}
               </span>
             ) : null
@@ -146,10 +146,10 @@ function CentralOperacional({ data }: { data: HomeData }) {
         // Vazio aqui é CONQUISTA, não buraco: some o ícone apagado e entra a
         // confirmação de que a fila está limpa.
         <div className="flex flex-1 flex-col items-center justify-center gap-3 px-5 pb-10 pt-2 text-center">
-          <span className="flex h-[52px] w-[52px] items-center justify-center rounded-full border border-emerald-200 bg-emerald-50 text-emerald-700">
+          <span className="flex h-[52px] w-[52px] items-center justify-center rounded-full border border-[var(--border-default)] bg-[var(--surface-secondary)] text-green-700">
             <CheckCircle2 className="h-6 w-6" />
           </span>
-          <p className="text-[15px] font-medium text-white">Tudo limpo por aqui</p>
+          <p className="text-[15px] font-medium text-[var(--text-primary)]">Tudo limpo por aqui</p>
           <p className="text-sm text-[var(--text-secondary)]">Nenhuma fila com trabalho pendente para você.</p>
         </div>
       ) : (
@@ -184,7 +184,7 @@ function CardSla({ fila }: { fila: FilaOperacional }) {
         </span>
         <ChevronRight className="ml-auto h-4 w-4 shrink-0 text-[var(--text-muted)] transition-transform group-hover:translate-x-0.5 group-hover:text-[var(--text-secondary)]" />
       </div>
-      <p className="truncate text-sm font-semibold text-white">{fila.titulo}</p>
+      <p className="truncate text-sm font-semibold text-[var(--text-primary)]">{fila.titulo}</p>
       <p className="truncate text-xs text-[var(--text-secondary)]">{fila.descricao}</p>
     </Link>
   )
@@ -310,7 +310,7 @@ function Alertas({ data }: { data: HomeData }) {
     )
   }
   return (
-    <BlocoCard className="border-red-200 bg-red-500/[0.06]">
+    <BlocoCard className="border-[var(--border-default)] bg-[var(--surface-secondary)]">
       <BlocoHeader titulo="Alertas" descricao="Eventos críticos que travam a operação" />
       <ul className="space-y-2">
         {data.alertas.map((a) => {
@@ -393,8 +393,8 @@ function ResumoDoDia({ data }: { data: HomeData }) {
             <b className="font-semibold tabular-nums text-[var(--text-secondary)]">0</b> {i.curto}
           </span>
         ))}
-        <span className="ml-auto inline-flex items-center gap-2 text-xs font-medium text-emerald-700">
-          <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" />
+        <span className="ml-auto inline-flex items-center gap-2 text-xs font-medium text-green-700">
+          <span className="h-1.5 w-1.5 rounded-full bg-green-600" />
           Sem pendências no dia
         </span>
       </BlocoCard>

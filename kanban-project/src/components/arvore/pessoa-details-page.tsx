@@ -48,7 +48,7 @@ function PersonAvatar({ pessoa, size = 56 }: { pessoa: PessoaArvore; size?: numb
   
   return (
     <div
-      className="rounded-xl flex items-center justify-center font-bold text-white shadow-md"
+      className="rounded-xl flex items-center justify-center font-bold text-white shadow-[var(--elev-2)]"
       style={{ 
         width: size, 
         height: size, 
@@ -131,7 +131,7 @@ function formatDateRange(nascimento: Date | string | null | undefined, obito: Da
 function ToggleSwitch({ label, checked, onChange }: { label: string; checked: boolean; onChange: () => void }) {
   return (
     <label className="flex items-center gap-2 cursor-pointer">
-      <div className={`relative w-10 h-5 rounded-full transition-colors ${checked ? 'bg-amber-500' : 'bg-gray-300'}`}>
+      <div className={`relative w-10 h-5 rounded-full transition-colors ${checked ? 'bg-amber-600' : 'bg-gray-300'}`}>
         <div className={`absolute top-0.5 w-4 h-4 bg-[var(--surface-primary)] rounded-full shadow transition-transform ${checked ? 'translate-x-5' : 'translate-x-0.5'}`} />
       </div>
       <span className="text-sm text-gray-600">{label}</span>
@@ -236,7 +236,7 @@ export function PessoaDetailsPage({
                 <div className="flex items-center gap-2 text-gray-500">
                   {dateRange && <span>{dateRange}</span>}
                   {pessoa.vivo === false && <span className="text-xs bg-gray-200 px-2 py-0.5 rounded">Falecido</span>}
-                  {pessoa.vivo === true && <span className="text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded">Vivo</span>}
+                  {pessoa.vivo === true && <span className="text-xs bg-[var(--surface-secondary)] text-green-700 px-2 py-0.5 rounded">Vivo</span>}
                 </div>
               </div>
             </div>
@@ -256,7 +256,7 @@ export function PessoaDetailsPage({
               >
                 {tab.label}
                 {activeTab === tab.id && (
-                  <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-amber-500" />
+                  <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-amber-600" />
                 )}
               </button>
             ))}
@@ -348,7 +348,7 @@ export function PessoaDetailsPage({
                   {/* Card do casal */}
                   <div className="border border-gray-200 rounded-lg overflow-hidden">
                     {/* Pessoa principal */}
-                    <div className={`p-3 border-l-4 bg-gray-50 ${pessoa.sexo?.toLowerCase() === 'masculino' ? 'border-blue-500' : 'border-pink-500'}`}>
+                    <div className={`p-3 border-l-4 bg-gray-50 ${pessoa.sexo?.toLowerCase() === 'masculino' ? 'border-[var(--border-default)]' : 'border-red-500'}`}>
                       <div className="flex items-center gap-2">
                         <SmallAvatar pessoa={pessoa} size={32} />
                         <div>
@@ -361,7 +361,7 @@ export function PessoaDetailsPage({
                     {/* Cônjuge */}
                     {conjuge && (
                       <div 
-                        className={`p-3 border-l-4 cursor-pointer hover:bg-gray-50 ${conjuge.sexo?.toLowerCase() === 'masculino' ? 'border-blue-500' : 'border-pink-500'}`}
+                        className={`p-3 border-l-4 cursor-pointer hover:bg-gray-50 ${conjuge.sexo?.toLowerCase() === 'masculino' ? 'border-[var(--border-default)]' : 'border-red-500'}`}
                         onClick={() => onPersonClick?.(conjuge)}
                       >
                         <div className="flex items-center gap-2">
@@ -402,7 +402,7 @@ export function PessoaDetailsPage({
                             {filhos.map((filho) => (
                               <div 
                                 key={filho.id}
-                                className={`p-3 hover:bg-gray-50 cursor-pointer border-l-4 ${filho.sexo?.toLowerCase() === 'masculino' ? 'border-blue-500' : 'border-pink-500'}`}
+                                className={`p-3 hover:bg-gray-50 cursor-pointer border-l-4 ${filho.sexo?.toLowerCase() === 'masculino' ? 'border-[var(--border-default)]' : 'border-red-500'}`}
                                 onClick={() => onPersonClick?.(filho)}
                               >
                                 <div className="flex items-center gap-2">
@@ -461,7 +461,7 @@ export function PessoaDetailsPage({
                     <div className="border border-gray-200 rounded-lg overflow-hidden">
                       {pessoa.pai && (
                         <div 
-                          className="p-3 border-l-4 border-blue-500 cursor-pointer hover:bg-gray-50"
+                          className="p-3 border-l-4 border-[var(--border-default)] cursor-pointer hover:bg-gray-50"
                           onClick={() => onPersonClick?.(pessoa.pai!)}
                         >
                           <div className="flex items-center gap-2">
@@ -475,7 +475,7 @@ export function PessoaDetailsPage({
                       )}
                       {pessoa.mae && (
                         <div 
-                          // Cor POR LADO, não genérica: `border-pink-500` e
+                          // Cor POR LADO, não genérica: `border-red-500` e
                           // `border-gray-100` definem a mesma propriedade
                           // (`border-color`, os quatro lados), então uma anulava a
                           // outra e qual vencia dependia da ordem em que o Tailwind

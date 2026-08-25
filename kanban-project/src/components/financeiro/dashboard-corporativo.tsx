@@ -100,11 +100,11 @@ export function DashboardCorporativo({ dash, onGoTab, onClickProcesso }: {
           <div className="text-xs text-[var(--text-secondary)] mt-1 flex items-center gap-2 flex-wrap">
             <span>{hoje.toLocaleDateString("pt-BR", { day: "2-digit", month: "long", year: "numeric" })}</span>
             <span className="text-[var(--text-muted)]">·</span>
-            <span className="inline-flex items-center gap-1.5"><span className="w-1.5 h-1.5 rounded-full bg-sky-400" /><strong className="text-white">{k.processosAtivos}</strong> processos ativos</span>
+            <span className="inline-flex items-center gap-1.5"><span className="w-1.5 h-1.5 rounded-full bg-[var(--surface-secondary)]" /><strong className="text-white">{k.processosAtivos}</strong> processos ativos</span>
             <span className="text-[var(--text-muted)]">·</span>
             <span className="inline-flex items-center gap-1.5"><span className="w-1.5 h-1.5 rounded-full" style={{ background: OURO }} /><strong className="text-white">{m.colaboradores}</strong> colaboradores</span>
             <span className="text-[var(--text-muted)]">·</span>
-            <span className="inline-flex items-center gap-1.5"><span className="w-1.5 h-1.5 rounded-full bg-green-400" /> Contas em dia</span>
+            <span className="inline-flex items-center gap-1.5"><span className="w-1.5 h-1.5 rounded-full bg-green-600" /> Contas em dia</span>
           </div>
         </div>
         <div className="flex items-center gap-2">
@@ -183,9 +183,9 @@ export function DashboardCorporativo({ dash, onGoTab, onClickProcesso }: {
           </div>
           <FluxoChart serie={m.serie6meses} />
           <div className="flex gap-5 mt-3 text-xs text-white/70 flex-wrap">
-            <span className="inline-flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full bg-green-500" /> Entradas · <strong className="text-white">{fmtBRL(m.serie6meses.totalEntradas)}</strong></span>
-            <span className="inline-flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full bg-red-500" /> Saídas · <strong className="text-white">{fmtBRL(m.serie6meses.totalSaidas)}</strong></span>
-            <span className="inline-flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full bg-sky-300" /> Saldo · <strong className="text-white">{fmtBRL(m.serie6meses.totalSaldo)}</strong></span>
+            <span className="inline-flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full bg-green-600" /> Entradas · <strong className="text-white">{fmtBRL(m.serie6meses.totalEntradas)}</strong></span>
+            <span className="inline-flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full bg-red-600" /> Saídas · <strong className="text-white">{fmtBRL(m.serie6meses.totalSaidas)}</strong></span>
+            <span className="inline-flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full bg-[var(--surface-secondary)]" /> Saldo · <strong className="text-white">{fmtBRL(m.serie6meses.totalSaldo)}</strong></span>
           </div>
         </div>
         <div className={`lg:col-span-2 ${CARD} p-4`}>
@@ -195,14 +195,14 @@ export function DashboardCorporativo({ dash, onGoTab, onClickProcesso }: {
               <span className={`text-[11px] font-bold px-2 py-0.5 rounded-full border ${
                 m.alertas.length === 0
                   ? "bg-[var(--surface-primary)] text-[var(--text-secondary)] border-[var(--border-default)]"
-                  : "bg-red-50 text-red-700 border-red-200"
+                  : "bg-[var(--surface-secondary)] text-red-700 border-[var(--border-default)]"
               }`}>{m.alertas.length}</span>
             </div>
             <button onClick={() => onGoTab("auditoria")} className="text-xs text-[var(--text-secondary)] hover:text-white">Ver todos</button>
           </div>
           {m.alertas.length === 0 ? (
             <div className="flex flex-col items-center justify-center text-center py-10">
-              <div className="h-12 w-12 rounded-full grid place-items-center bg-green-50 border border-green-200 mb-3">
+              <div className="h-12 w-12 rounded-full grid place-items-center bg-[var(--surface-secondary)] border border-[var(--border-default)] mb-3">
                 <ShieldCheck className="h-6 w-6 text-green-700" />
               </div>
               <p className="text-sm text-[var(--text-secondary)]">Nenhum alerta ou aprovação pendente</p>
@@ -419,7 +419,7 @@ function AlertCard({ tipo, titulo, texto, meta }: { tipo: string; titulo: string
   const styles: Record<string, { border: string; icon: React.ReactNode }> = {
     critical: { border: "border-l-red-400", icon: <AlertTriangle className="h-4 w-4 text-red-700" /> },
     warning: { border: "border-l-amber-400", icon: <Bell className="h-4 w-4 text-amber-700" /> },
-    info: { border: "border-l-sky-400", icon: <Calendar className="h-4 w-4 text-sky-700" /> },
+    info: { border: "border-l-sky-400", icon: <Calendar className="h-4 w-4 text-[var(--text-secondary)]" /> },
     success: { border: "border-l-green-400", icon: <CheckCircle className="h-4 w-4 text-green-700" /> },
   }
   const s = styles[tipo] || styles.info
@@ -484,7 +484,7 @@ function ListCard({ icon, title, rows, colLeft, colMid, empty, onVerTodos }: {
             {rows.map(r => (
               <tr key={r.id} onClick={r.onClick}
                 className={`border-b border-[var(--border-subtle)] last:border-0 ${r.onClick ? "cursor-pointer hover:bg-[var(--surface-hover)]" : ""}`}>
-                <td className="py-2 text-white/90"><span className={`inline-block w-1.5 h-1.5 rounded-full mr-2 ${r.critical ? "bg-red-400" : "bg-[var(--surface-secondary)]"}`} />{r.left}</td>
+                <td className="py-2 text-white/90"><span className={`inline-block w-1.5 h-1.5 rounded-full mr-2 ${r.critical ? "bg-red-600" : "bg-[var(--surface-secondary)]"}`} />{r.left}</td>
                 <td className="py-2 text-[var(--text-secondary)]">{r.mid}</td>
                 <td className="py-2 text-right text-white font-medium tabular-nums">{r.val}</td>
                 <td className="py-2 text-right tabular-nums">

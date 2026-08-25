@@ -289,7 +289,7 @@ export function ArvoreGenealogicaView({
       })
 
       // ✅ Remover TODAS as sombras (removendo classes E estilos)
-      const shadowElements = reactFlowContainer.querySelectorAll('.shadow-md, .shadow-lg, .shadow-sm, .shadow, .shadow-xl');
+      const shadowElements = reactFlowContainer.querySelectorAll('.shadow-[var(--elev-2)], .shadow-[var(--elev-2)], .shadow-[var(--elev-1)], .shadow, .shadow-[var(--elev-3)]');
       shadowElements.forEach((el) => {
         const htmlEl = el as HTMLElement;
         htmlEl.classList.add('!shadow-none');
@@ -834,7 +834,7 @@ export function ArvoreGenealogicaView({
     <button
       onClick={() => setImportarAberto(true)}
       title="Importar árvore a partir de um print"
-      className="flex items-center gap-2 rounded-lg border border-gray-200 bg-[var(--surface-primary)] px-3 py-2 text-[13px] text-gray-600 shadow-sm transition hover:border-gray-300 hover:text-gray-900"
+      className="flex items-center gap-2 rounded-lg border border-gray-200 bg-[var(--surface-primary)] px-3 py-2 text-[13px] text-gray-600 shadow-[var(--elev-1)] transition hover:border-gray-300 hover:text-gray-900"
     >
       <ImagePlus className="h-4 w-4" />
       <span className="hidden sm:inline">Importar Árvore</span>
@@ -874,7 +874,7 @@ export function ArvoreGenealogicaView({
           <h3 className="text-2xl font-bold text-gray-800 mb-2">Árvore Genealógica</h3>
           <p className="text-gray-500 mb-6">Crie a árvore genealógica para este processo de cidadania e gerencie todos os membros da família</p>
           <button
-            className="px-8 py-3 text-white rounded-xl font-semibold transition-all hover:shadow-lg hover:-translate-y-0.5 flex items-center gap-2 mx-auto disabled:opacity-50 disabled:cursor-not-allowed"
+            className="px-8 py-3 text-white rounded-xl font-semibold transition-all hover:shadow-[var(--elev-2)] hover:-translate-y-0.5 flex items-center gap-2 mx-auto disabled:opacity-50 disabled:cursor-not-allowed"
             style={{ backgroundColor: fsColors.green }}
             onClick={handleCreateArvore}
             disabled={creating}
@@ -900,7 +900,7 @@ export function ArvoreGenealogicaView({
   if (loading) {
     return (
       <div className="h-full flex items-center justify-center">
-        <div className="animate-spin h-8 w-8 border-4 border-blue-500 border-t-transparent rounded-full"></div>
+        <div className="animate-spin h-8 w-8 border-4 border-[var(--border-default)] border-t-transparent rounded-full"></div>
       </div>
     )
   }
@@ -1020,7 +1020,7 @@ export function ArvoreGenealogicaView({
                 </p>
               </div>
               <button
-                className="px-6 py-3 text-white rounded-xl font-semibold transition-all hover:shadow-lg hover:-translate-y-0.5 flex items-center gap-2"
+                className="px-6 py-3 text-white rounded-xl font-semibold transition-all hover:shadow-[var(--elev-2)] hover:-translate-y-0.5 flex items-center gap-2"
                 style={{ backgroundColor: fsColors.green }}
                 onClick={() => setShowOnboarding(true)}
               >
@@ -1120,7 +1120,7 @@ export function ArvoreGenealogicaView({
             <button
               onClick={() => setPaletaAberta(true)}
               title="Buscar pessoa (⌘K)"
-              className="flex items-center gap-2 rounded-lg border border-gray-200 bg-[var(--surface-primary)] px-3 py-2 text-[13px] text-gray-600 shadow-sm transition hover:border-gray-300 hover:text-gray-900"
+              className="flex items-center gap-2 rounded-lg border border-gray-200 bg-[var(--surface-primary)] px-3 py-2 text-[13px] text-gray-600 shadow-[var(--elev-1)] transition hover:border-gray-300 hover:text-gray-900"
             >
               <Search className="h-4 w-4" />
               <span className="hidden sm:inline">Buscar</span>
@@ -1139,14 +1139,14 @@ export function ArvoreGenealogicaView({
             <button
               onClick={() => setPainelAberto(true)}
               title="Inteligência da árvore"
-              className="flex items-center gap-2 rounded-lg border border-gray-200 bg-[var(--surface-primary)] px-3 py-2 text-[13px] text-gray-600 shadow-sm transition hover:border-gray-300 hover:text-gray-900"
+              className="flex items-center gap-2 rounded-lg border border-gray-200 bg-[var(--surface-primary)] px-3 py-2 text-[13px] text-gray-600 shadow-[var(--elev-1)] transition hover:border-gray-300 hover:text-gray-900"
             >
               <Sparkles className="h-4 w-4" />
               <span className="hidden sm:inline">Análise</span>
               {/* Contagem só dos achados que exigem ação — número no botão que não
                   significa urgência vira ruído e o usuário para de olhar. */}
               {analise && analise.insights.some((i) => i.severidade === "critico" || i.severidade === "alto") && (
-                <span className="rounded-full bg-red-50 px-1.5 text-[11px] font-semibold text-red-600">
+                <span className="rounded-full bg-[var(--surface-secondary)] px-1.5 text-[11px] font-semibold text-red-600">
                   {analise.insights.filter((i) => i.severidade === "critico" || i.severidade === "alto").length}
                 </span>
               )}
@@ -1340,9 +1340,9 @@ function AddPersonModal({
   // O Preflight do Tailwind aplica `color: inherit` em input/select/textarea.
   // Declarar `bg-[var(--surface-primary)]` sem declarar a cor do texto deixa o campo à mercê do que
   // o ancestral definir — foi assim que o valor digitado virou branco no branco.
-  const inputClass = "w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-500 bg-[var(--surface-primary)] text-gray-900 placeholder:text-[var(--text-muted)] text-sm h-[42px]"
+  const inputClass = "w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--border-strong)] bg-[var(--surface-primary)] text-gray-900 placeholder:text-[var(--text-muted)] text-sm h-[42px]"
   
-  const selectClass = "w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-500 bg-[var(--surface-primary)] text-gray-900 text-sm h-[42px] appearance-none cursor-pointer"
+  const selectClass = "w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--border-strong)] bg-[var(--surface-primary)] text-gray-900 text-sm h-[42px] appearance-none cursor-pointer"
   
   const selectStyle = {
     backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%239ca3af' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E")`,
@@ -1514,7 +1514,7 @@ function AddPersonModal({
           e `position: fixed` NÃO interrompe herança de cor. Sem uma cor própria
           aqui, todo elemento sem `text-` explícito herda branco sobre `bg-[var(--surface-primary)]`
           — inclusive qualquer campo que venha a ser adicionado depois. */}
-      <div className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-[var(--surface-primary)] text-gray-900 rounded-xl shadow-2xl z-[10004] w-full max-w-3xl max-h-[90vh] overflow-y-auto">
+      <div className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-[var(--surface-primary)] text-gray-900 rounded-xl shadow-[var(--elev-3)] z-[10004] w-full max-w-3xl max-h-[90vh] overflow-y-auto">
         <div className="px-6 py-4 border-b sticky top-0 bg-[var(--surface-primary)]">
           <h2 className="text-xl font-semibold text-gray-900">{titles[type || 'pessoa']}</h2>
         </div>
@@ -1525,7 +1525,7 @@ function AddPersonModal({
             <button
               type="button"
               onClick={() => setModo('pessoa')}
-              className={`px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${modo === 'pessoa' ? 'bg-[var(--surface-primary)] shadow-sm text-gray-900' : 'text-gray-500 hover:text-gray-700'}`}
+              className={`px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${modo === 'pessoa' ? 'bg-[var(--surface-primary)] shadow-[var(--elev-1)] text-gray-900' : 'text-gray-500 hover:text-gray-700'}`}
             >
               Pessoa da família
             </button>
@@ -1537,7 +1537,7 @@ function AddPersonModal({
               className={`px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
                 semRequerenteDisponivel
                   ? 'text-[var(--text-muted)] cursor-not-allowed'
-                  : modo === 'requerente' ? 'bg-[var(--surface-primary)] shadow-sm text-gray-900' : 'text-gray-500 hover:text-gray-700'
+                  : modo === 'requerente' ? 'bg-[var(--surface-primary)] shadow-[var(--elev-1)] text-gray-900' : 'text-gray-500 hover:text-gray-700'
               }`}
             >
               Requerente do processo
@@ -1618,19 +1618,19 @@ function AddPersonModal({
             <div className="flex flex-wrap items-center gap-6">
               {type !== 'conjuge' && (
                 <label className="flex items-center gap-2 cursor-pointer">
-                  <input type="checkbox" checked={isCasado} onChange={(e) => setIsCasado(e.target.checked)} className="w-5 h-5 text-amber-600 border-gray-300 rounded focus:ring-amber-500" />
+                  <input type="checkbox" checked={isCasado} onChange={(e) => setIsCasado(e.target.checked)} className="w-5 h-5 text-amber-600 border-gray-300 rounded focus:ring-[var(--border-strong)]" />
                   <span className="text-sm font-medium text-gray-700">Pessoa casada</span>
                 </label>
               )}
               <label className="flex items-center gap-2 cursor-pointer">
-                <input type="checkbox" checked={isFalecido} onChange={(e) => setIsFalecido(e.target.checked)} className="w-5 h-5 text-amber-600 border-gray-300 rounded focus:ring-amber-500" />
+                <input type="checkbox" checked={isFalecido} onChange={(e) => setIsFalecido(e.target.checked)} className="w-5 h-5 text-amber-600 border-gray-300 rounded focus:ring-[var(--border-strong)]" />
                 <span className="text-sm font-medium text-gray-700">Pessoa falecida</span>
               </label>
             </div>
 
             {(isCasado || type === 'conjuge') && (
-              <div className="bg-slate-50 rounded-lg p-3 border border-slate-200 mt-3">
-                <h4 className="text-sm font-medium text-slate-800 mb-2">Dados do Casamento</h4>
+              <div className="bg-[var(--surface-secondary)] rounded-lg p-3 border border-[var(--border-default)] mt-3">
+                <h4 className="text-sm font-medium text-[var(--text-secondary)] mb-2">Dados do Casamento</h4>
                 <div className="grid grid-cols-3 gap-3">
                   {type !== 'conjuge' && (
                     <div>
@@ -1686,14 +1686,14 @@ function AddPersonModal({
               É um requerente do processo? Use a opção <strong>Requerente do processo</strong> no topo — a pessoa existente é reaproveitada, sem duplicar.
             </p>
             <label className="flex items-start gap-2 cursor-pointer rounded-lg border border-gray-200 p-3 mt-3">
-              <input type="checkbox" checked={isLinhaReta} onChange={(e) => setIsLinhaReta(e.target.checked)} className="w-5 h-5 mt-0.5 text-amber-600 border-gray-300 rounded focus:ring-amber-500" />
+              <input type="checkbox" checked={isLinhaReta} onChange={(e) => setIsLinhaReta(e.target.checked)} className="w-5 h-5 mt-0.5 text-amber-600 border-gray-300 rounded focus:ring-[var(--border-strong)]" />
               <span>
                 <span className="block text-sm font-medium text-gray-700">Pertence à linha reta de transmissão</span>
                 <span className="block text-xs text-[var(--text-muted)]">Define se a pessoa entra na Linha principal ou em Cônjuges/Apoio na Central Operacional.</span>
               </span>
             </label>
             <label className="flex items-start gap-2 cursor-pointer rounded-lg border border-gray-200 p-3 mt-3">
-              <input type="checkbox" checked={precisaDocumentacao} onChange={(e) => setPrecisaDocumentacao(e.target.checked)} className="w-5 h-5 mt-0.5 text-amber-600 border-gray-300 rounded focus:ring-amber-500" />
+              <input type="checkbox" checked={precisaDocumentacao} onChange={(e) => setPrecisaDocumentacao(e.target.checked)} className="w-5 h-5 mt-0.5 text-amber-600 border-gray-300 rounded focus:ring-[var(--border-strong)]" />
               <span>
                 <span className="block text-sm font-medium text-gray-700">Precisa de documentação</span>
                 <span className="block text-xs text-[var(--text-muted)]">Se desligado, o sistema não gera os documentos desta pessoa e ela não entra na Central Operacional / workflow.</span>
@@ -1704,7 +1704,7 @@ function AddPersonModal({
           {/* ===== Observações ===== */}
           <section className="border-t border-gray-100 pt-5">
             <h3 className="text-xs font-semibold uppercase tracking-wider text-[var(--text-muted)] mb-3">Observações</h3>
-            <textarea value={comentario} onChange={(e) => setComentario(e.target.value)} rows={2} className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-500 bg-[var(--surface-primary)] text-gray-900 placeholder:text-[var(--text-muted)] resize-none text-sm" />
+            <textarea value={comentario} onChange={(e) => setComentario(e.target.value)} rows={2} className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--border-strong)] bg-[var(--surface-primary)] text-gray-900 placeholder:text-[var(--text-muted)] resize-none text-sm" />
           </section>
 
           <div className="flex justify-end gap-3 pt-4 border-t border-gray-100">
@@ -1774,9 +1774,9 @@ function EditPersonModal({
   // O Preflight do Tailwind aplica `color: inherit` em input/select/textarea.
   // Declarar `bg-[var(--surface-primary)]` sem declarar a cor do texto deixa o campo à mercê do que
   // o ancestral definir — foi assim que o valor digitado virou branco no branco.
-  const inputClass = "w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-500 bg-[var(--surface-primary)] text-gray-900 placeholder:text-[var(--text-muted)] text-sm h-[42px]"
+  const inputClass = "w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--border-strong)] bg-[var(--surface-primary)] text-gray-900 placeholder:text-[var(--text-muted)] text-sm h-[42px]"
   
-  const selectClass = "w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-500 bg-[var(--surface-primary)] text-gray-900 text-sm h-[42px] appearance-none cursor-pointer"
+  const selectClass = "w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--border-strong)] bg-[var(--surface-primary)] text-gray-900 text-sm h-[42px] appearance-none cursor-pointer"
   
   const selectStyle = {
     backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%239ca3af' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E")`,
@@ -1982,7 +1982,7 @@ function EditPersonModal({
           e `position: fixed` NÃO interrompe herança de cor. Sem uma cor própria
           aqui, todo elemento sem `text-` explícito herda branco sobre `bg-[var(--surface-primary)]`
           — inclusive qualquer campo que venha a ser adicionado depois. */}
-      <div className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-[var(--surface-primary)] text-gray-900 rounded-xl shadow-2xl z-[10004] w-full max-w-3xl max-h-[90vh] overflow-y-auto">
+      <div className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-[var(--surface-primary)] text-gray-900 rounded-xl shadow-[var(--elev-3)] z-[10004] w-full max-w-3xl max-h-[90vh] overflow-y-auto">
         <div className="px-6 py-4 border-b sticky top-0 bg-[var(--surface-primary)]">
           <h2 className="text-xl font-semibold text-gray-900">Editar Pessoa</h2>
         </div>
@@ -2039,18 +2039,18 @@ function EditPersonModal({
             <h3 className="text-xs font-semibold uppercase tracking-wider text-[var(--text-muted)] mb-3">Situação</h3>
             <div className="flex flex-wrap items-center gap-6">
               <label className="flex items-center gap-2 cursor-pointer">
-                <input type="checkbox" checked={isCasado} onChange={(e) => setIsCasado(e.target.checked)} className="w-5 h-5 text-amber-600 border-gray-300 rounded focus:ring-amber-500" />
+                <input type="checkbox" checked={isCasado} onChange={(e) => setIsCasado(e.target.checked)} className="w-5 h-5 text-amber-600 border-gray-300 rounded focus:ring-[var(--border-strong)]" />
                 <span className="text-sm font-medium text-gray-700">Pessoa casada</span>
               </label>
               <label className="flex items-center gap-2 cursor-pointer">
-                <input type="checkbox" checked={isFalecido} onChange={(e) => setIsFalecido(e.target.checked)} className="w-5 h-5 text-amber-600 border-gray-300 rounded focus:ring-amber-500" />
+                <input type="checkbox" checked={isFalecido} onChange={(e) => setIsFalecido(e.target.checked)} className="w-5 h-5 text-amber-600 border-gray-300 rounded focus:ring-[var(--border-strong)]" />
                 <span className="text-sm font-medium text-gray-700">Pessoa falecida</span>
               </label>
             </div>
 
             {isCasado && (
-              <div className="bg-slate-50 rounded-lg p-3 border border-slate-200 mt-3">
-                <h4 className="text-sm font-medium text-slate-800 mb-2">Dados do Casamento</h4>
+              <div className="bg-[var(--surface-secondary)] rounded-lg p-3 border border-[var(--border-default)] mt-3">
+                <h4 className="text-sm font-medium text-[var(--text-secondary)] mb-2">Dados do Casamento</h4>
                 <div className="grid grid-cols-3 gap-3">
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">Cônjuge</label>
@@ -2117,14 +2117,14 @@ function EditPersonModal({
               </div>
             </div>
             <label className="flex items-start gap-2 cursor-pointer rounded-lg border border-gray-200 p-3 mt-3">
-              <input type="checkbox" checked={isLinhaReta} onChange={(e) => setIsLinhaReta(e.target.checked)} className="w-5 h-5 mt-0.5 text-amber-600 border-gray-300 rounded focus:ring-amber-500" />
+              <input type="checkbox" checked={isLinhaReta} onChange={(e) => setIsLinhaReta(e.target.checked)} className="w-5 h-5 mt-0.5 text-amber-600 border-gray-300 rounded focus:ring-[var(--border-strong)]" />
               <span>
                 <span className="block text-sm font-medium text-gray-700">Pertence à linha reta de transmissão</span>
                 <span className="block text-xs text-[var(--text-muted)]">Define se a pessoa entra na Linha principal ou em Cônjuges/Apoio na Central Operacional.</span>
               </span>
             </label>
             <label className="flex items-start gap-2 cursor-pointer rounded-lg border border-gray-200 p-3 mt-3">
-              <input type="checkbox" checked={precisaDocumentacao} onChange={(e) => setPrecisaDocumentacao(e.target.checked)} className="w-5 h-5 mt-0.5 text-amber-600 border-gray-300 rounded focus:ring-amber-500" />
+              <input type="checkbox" checked={precisaDocumentacao} onChange={(e) => setPrecisaDocumentacao(e.target.checked)} className="w-5 h-5 mt-0.5 text-amber-600 border-gray-300 rounded focus:ring-[var(--border-strong)]" />
               <span>
                 <span className="block text-sm font-medium text-gray-700">Precisa de documentação</span>
                 <span className="block text-xs text-[var(--text-muted)]">Se desligado, o sistema não gera os documentos desta pessoa e ela não entra na Central Operacional / workflow.</span>
@@ -2135,7 +2135,7 @@ function EditPersonModal({
           {/* ===== Observações ===== */}
           <section className="border-t border-gray-100 pt-5">
             <h3 className="text-xs font-semibold uppercase tracking-wider text-[var(--text-muted)] mb-3">Observações</h3>
-            <textarea value={comentario} onChange={(e) => setComentario(e.target.value)} rows={2} className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-500 bg-[var(--surface-primary)] text-gray-900 placeholder:text-[var(--text-muted)] resize-none text-sm" />
+            <textarea value={comentario} onChange={(e) => setComentario(e.target.value)} rows={2} className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--border-strong)] bg-[var(--surface-primary)] text-gray-900 placeholder:text-[var(--text-muted)] resize-none text-sm" />
           </section>
 
           <div className="flex justify-end gap-3 pt-4 border-t border-gray-100">

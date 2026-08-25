@@ -97,7 +97,7 @@ function Consulta({
   return (
     <div className="space-y-5">
       {erro && (
-        <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+        <div className="rounded-xl border border-[var(--border-default)] bg-[var(--surface-secondary)] px-4 py-3 text-sm text-red-700">
           {erro} <button onClick={() => { void reload() }} className="ml-2 underline hover:text-white">Tentar de novo</button>
         </div>
       )}
@@ -203,7 +203,7 @@ export function SLAConfiguracaoTab() {
                           {f.required
                             ? <span className="rounded bg-[var(--surface-primary)] px-1.5 py-0.5 text-white/70">obrigatória</span>
                             : <span className="rounded bg-[var(--surface-primary)] px-1.5 py-0.5 text-[var(--text-muted)]">opcional</span>}
-                          {f.conditional && <span className="rounded bg-amber-50 px-1.5 py-0.5 text-amber-700">condicional</span>}
+                          {f.conditional && <span className="rounded bg-[var(--surface-secondary)] px-1.5 py-0.5 text-amber-700">condicional</span>}
                         </div>
                       </td>
                     </tr>
@@ -333,7 +333,7 @@ export function ConfiguracoesGeraisProcessoTab() {
                     {t.macro ? `${t.contagens.fases} fase(s) · v${t.macro.versao}` : <span className="text-amber-700/80">sem workflow</span>}
                   </td>
                   <td className="px-4 py-2.5">
-                    <span className={`rounded-full px-2 py-0.5 text-[10px] ${t.ativo ? "bg-green-50 text-green-700" : "bg-[var(--surface-primary)] text-[var(--text-secondary)]"}`}>
+                    <span className={`rounded-full px-2 py-0.5 text-[10px] ${t.ativo ? "bg-[var(--surface-secondary)] text-green-700" : "bg-[var(--surface-primary)] text-[var(--text-secondary)]"}`}>
                       {t.ativo ? "Ativo" : "Inativo"}
                     </span>
                   </td>
@@ -386,7 +386,7 @@ export function TransicoesTab() {
                           {f.required
                             ? <span className="rounded bg-[var(--surface-primary)] px-1.5 py-0.5 text-white/70">obrigatória</span>
                             : <span className="rounded bg-[var(--surface-primary)] px-1.5 py-0.5 text-[var(--text-muted)]">opcional</span>}
-                          {f.conditional && <span className="rounded bg-amber-50 px-1.5 py-0.5 text-amber-700">condicional</span>}
+                          {f.conditional && <span className="rounded bg-[var(--surface-secondary)] px-1.5 py-0.5 text-amber-700">condicional</span>}
                         </div>
                       </td>
                       <td className="px-4 py-2.5 text-[var(--text-secondary)]">{f.slaDays} d</td>
@@ -445,9 +445,9 @@ function diagnosticar(t: Tipo): Checagem[] {
 }
 
 const SEV_CLS: Record<Severidade, string> = {
-  ok: "bg-green-50 text-green-700",
-  alerta: "bg-amber-50 text-amber-700",
-  erro: "bg-red-50 text-red-700",
+  ok: "bg-[var(--surface-secondary)] text-green-700",
+  alerta: "bg-[var(--surface-secondary)] text-amber-700",
+  erro: "bg-[var(--surface-secondary)] text-red-700",
 }
 const SEV_LABEL: Record<Severidade, string> = { ok: "OK", alerta: "Atenção", erro: "Bloqueante" }
 

@@ -31,9 +31,9 @@ interface ImpostosData {
 }
 
 function statusBadge(status: string) {
-  if (status === "pago") return <span className="text-[11px] px-2 py-0.5 rounded-full bg-green-50 text-green-700 border border-green-200">Pago</span>
+  if (status === "pago") return <span className="text-[11px] px-2 py-0.5 rounded-full bg-[var(--surface-secondary)] text-green-700 border border-[var(--border-default)]">Pago</span>
   if (status === "previsto") return <span className="text-[11px] px-2 py-0.5 rounded-full bg-[var(--surface-primary)] text-[var(--text-secondary)] border border-[var(--border-strong)]">Previsto</span>
-  return <span className="text-[11px] px-2 py-0.5 rounded-full bg-amber-50 text-amber-700 border border-amber-200">A pagar</span>
+  return <span className="text-[11px] px-2 py-0.5 rounded-full bg-[var(--surface-secondary)] text-amber-700 border border-[var(--border-default)]">A pagar</span>
 }
 
 export default function ImpostosTab() {
@@ -109,12 +109,12 @@ export default function ImpostosTab() {
                   <strong className="text-white">{fmtPct(c.pct)}</strong>
                 </div>
                 <div className="h-1.5 bg-[var(--surface-primary)] rounded-full overflow-hidden">
-                  <div className="h-full bg-red-500/70 rounded-full" style={{ width: `${(c.pct / 20) * 100}%` }} />
+                  <div className="h-full bg-[var(--surface-secondary)] rounded-full" style={{ width: `${(c.pct / 20) * 100}%` }} />
                 </div>
               </div>
             ))}
           </div>
-          <div className="flex items-start gap-2 mt-4 p-3 bg-sky-50 border border-sky-200 rounded-lg text-xs text-sky-700/80">
+          <div className="flex items-start gap-2 mt-4 p-3 bg-[var(--surface-secondary)] border border-[var(--border-default)] rounded-lg text-xs text-[var(--text-secondary)]/80">
             <Info className="h-4 w-4 mt-0.5 shrink-0" />
             <span>Carga tributária estável em torno de 15% da receita. Avaliar Lucro Presumido se o faturamento ultrapassar R$ 4,8M anuais.</span>
           </div>

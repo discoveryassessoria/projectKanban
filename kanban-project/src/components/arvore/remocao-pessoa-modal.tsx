@@ -112,18 +112,18 @@ export function RemocaoPessoaModal({
     <div className="fixed inset-0 flex items-center justify-center p-4" style={{ zIndex: LAYER.aboveProcessCritical }}>
       <div className="absolute inset-0 bg-[var(--overlay-modal)]" onClick={executando ? undefined : onFechar} />
 
-      <div className="relative w-full max-w-lg max-h-[85vh] overflow-y-auto rounded-xl bg-[var(--surface-primary)] shadow-xl border border-slate-200">
-        <div className="sticky top-0 flex items-start justify-between gap-3 border-b border-slate-200 bg-[var(--surface-primary)] px-5 py-4">
+      <div className="relative w-full max-w-lg max-h-[85vh] overflow-y-auto rounded-xl bg-[var(--surface-primary)] shadow-[var(--elev-3)] border border-[var(--border-default)]">
+        <div className="sticky top-0 flex items-start justify-between gap-3 border-b border-[var(--border-default)] bg-[var(--surface-primary)] px-5 py-4">
           <div>
-            <h2 className="text-base font-semibold text-slate-900">Remover da árvore</h2>
-            <p className="mt-0.5 text-sm text-slate-500">
+            <h2 className="text-base font-semibold text-[var(--text-secondary)]">Remover da árvore</h2>
+            <p className="mt-0.5 text-sm text-[var(--text-secondary)]">
               {plano ? plano.pessoaNome : "Verificando o que depende desta pessoa…"}
             </p>
           </div>
           <button
             onClick={onFechar}
             disabled={!!executando}
-            className="rounded-md p-1 text-slate-700 hover:bg-slate-100 hover:text-slate-600 disabled:opacity-40"
+            className="rounded-md p-1 text-[var(--text-secondary)] hover:bg-[var(--surface-secondary)] hover:text-[var(--text-secondary)] disabled:opacity-40"
             aria-label="Fechar"
           >
             <X className="h-4 w-4" />
@@ -132,14 +132,14 @@ export function RemocaoPessoaModal({
 
         <div className="px-5 py-4">
           {carregando && (
-            <div className="flex items-center gap-2 py-8 text-sm text-slate-500">
+            <div className="flex items-center gap-2 py-8 text-sm text-[var(--text-secondary)]">
               <Loader2 className="h-4 w-4 animate-spin" />
               Verificando dependências…
             </div>
           )}
 
           {!carregando && erro && (
-            <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2.5 text-sm text-red-700">
+            <div className="rounded-lg border border-[var(--border-default)] bg-[var(--surface-secondary)] px-3 py-2.5 text-sm text-red-700">
               {erro}
             </div>
           )}
@@ -148,18 +148,18 @@ export function RemocaoPessoaModal({
             <div className="space-y-4">
               {/* ── SERÃO REMOVIDOS ────────────────────────────────────── */}
               <section>
-                <h3 className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                <h3 className="text-xs font-semibold uppercase tracking-wide text-[var(--text-secondary)]">
                   Serão removidos
                 </h3>
                 {sairao.length === 0 ? (
-                  <p className="mt-2 text-sm text-slate-500">
+                  <p className="mt-2 text-sm text-[var(--text-secondary)]">
                     Nada além do vínculo — esta pessoa ainda não gerou dados no processo.
                   </p>
                 ) : (
                   <ul className="mt-2 space-y-1">
                     {sairao.map(([chave, n]) => (
-                      <li key={chave} className="flex items-baseline gap-2 text-sm text-slate-700">
-                        <span className="min-w-[2rem] text-right font-medium tabular-nums text-slate-900">{n}</span>
+                      <li key={chave} className="flex items-baseline gap-2 text-sm text-[var(--text-secondary)]">
+                        <span className="min-w-[2rem] text-right font-medium tabular-nums text-[var(--text-secondary)]">{n}</span>
                         <span>{plural(n, ROTULO[chave] ?? chave)}</span>
                       </li>
                     ))}
@@ -169,7 +169,7 @@ export function RemocaoPessoaModal({
 
               {/* ── SERÃO PRESERVADOS ──────────────────────────────────── */}
               {plano.fatosProtegidos.length > 0 && (
-                <section className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-3">
+                <section className="rounded-lg border border-[var(--border-default)] bg-[var(--surface-secondary)] px-3 py-3">
                   <h3 className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-amber-800">
                     <Shield className="h-3.5 w-3.5" />
                     Serão preservados
@@ -187,14 +187,14 @@ export function RemocaoPessoaModal({
               )}
 
               {plano.requerenteNome && (
-                <p className="text-xs text-slate-500">
-                  O cadastro de cliente <span className="font-medium text-slate-700">{plano.requerenteNome}</span> não
+                <p className="text-xs text-[var(--text-secondary)]">
+                  O cadastro de cliente <span className="font-medium text-[var(--text-secondary)]">{plano.requerenteNome}</span> não
                   é apagado — ele pode existir em outros processos.
                 </p>
               )}
 
               {plano.bloqueios.length > 0 && (
-                <div className="flex items-start gap-2 rounded-lg border border-red-200 bg-red-50 px-3 py-2.5 text-sm text-red-700">
+                <div className="flex items-start gap-2 rounded-lg border border-[var(--border-default)] bg-[var(--surface-secondary)] px-3 py-2.5 text-sm text-red-700">
                   <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
                   <span>{plano.bloqueios.join(" · ")}</span>
                 </div>
@@ -205,7 +205,7 @@ export function RemocaoPessoaModal({
 
         {/* ── AÇÕES ─────────────────────────────────────────────────────── */}
         {!carregando && plano && (
-          <div className="sticky bottom-0 flex flex-col gap-2 border-t border-slate-200 bg-[var(--surface-primary)] px-5 py-4">
+          <div className="sticky bottom-0 flex flex-col gap-2 border-t border-[var(--border-default)] bg-[var(--surface-primary)] px-5 py-4">
             {plano.podeHardDelete ? (
               <button
                 onClick={() => executar("HARD")}
@@ -228,7 +228,7 @@ export function RemocaoPessoaModal({
             <button
               onClick={onFechar}
               disabled={!!executando}
-              className="rounded-lg px-4 py-2 text-sm text-slate-600 transition-colors hover:bg-slate-100 disabled:opacity-40"
+              className="rounded-lg px-4 py-2 text-sm text-[var(--text-secondary)] transition-colors hover:bg-[var(--surface-secondary)] disabled:opacity-40"
             >
               Cancelar
             </button>

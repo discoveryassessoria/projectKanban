@@ -138,7 +138,7 @@ export function PreviewImpactoModal({ proposta, onCancelar, onConfirmar }: Props
 
   return (
     <div className="fixed inset-0 z-[10050] flex items-center justify-center bg-[var(--overlay-modal)] p-4">
-      <div className="flex max-h-[85vh] w-full max-w-lg flex-col overflow-hidden rounded-xl border border-gray-200 bg-[var(--surface-primary)] text-gray-900 shadow-2xl">
+      <div className="flex max-h-[85vh] w-full max-w-lg flex-col overflow-hidden rounded-xl border border-gray-200 bg-[var(--surface-primary)] text-gray-900 shadow-[var(--elev-3)]">
         <div className="flex items-start justify-between gap-3 border-b border-gray-100 px-5 py-4">
           <div>
             <h2 className="text-sm font-semibold text-gray-900">Impacto previsto</h2>
@@ -179,7 +179,7 @@ export function PreviewImpactoModal({ proposta, onCancelar, onConfirmar }: Props
           )}
 
           {erro && (
-            <div className="rounded-lg border border-amber-200 bg-amber-50 p-3">
+            <div className="rounded-lg border border-[var(--border-default)] bg-[var(--surface-secondary)] p-3">
               <p className="flex items-start gap-2 text-[13px] text-amber-900">
                 <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
                 {erro}
@@ -278,7 +278,7 @@ export function PreviewImpactoModal({ proposta, onCancelar, onConfirmar }: Props
                       </li>
                     )}
                     {op!.bloqueiosRemovidos > 0 && (
-                      <li className="text-[13px] text-emerald-700">
+                      <li className="text-[13px] text-green-700">
                         Bloqueios resolvidos: −{op!.bloqueiosRemovidos}
                       </li>
                     )}
@@ -301,7 +301,7 @@ export function PreviewImpactoModal({ proposta, onCancelar, onConfirmar }: Props
               )}
 
               {resultado.pendencias.length > 0 && (
-                <div className="rounded-lg border border-amber-200 bg-amber-50 p-3">
+                <div className="rounded-lg border border-[var(--border-default)] bg-[var(--surface-secondary)] p-3">
                   <p className="text-[11px] font-semibold uppercase tracking-wide text-amber-800">
                     O motor não conseguiu avaliar tudo
                   </p>
@@ -347,7 +347,7 @@ export function PreviewImpactoModal({ proposta, onCancelar, onConfirmar }: Props
  * pintaria os dois igual.
  */
 const COR_DIRECAO: Record<LinhaComparacao["direcao"], string> = {
-  melhora: "text-emerald-700",
+  melhora: "text-green-700",
   piora: "text-red-700",
   igual: "text-gray-500",
 }

@@ -167,7 +167,7 @@ export function SeletorItemCatalogo({
 
       {aberto && (
         <div
-          className="absolute left-0 right-0 z-20 mt-1 overflow-hidden rounded-[var(--radius-sm)] border border-[var(--border-default)] bg-[var(--surface-popover)] shadow-lg"
+          className="absolute left-0 right-0 z-20 mt-1 overflow-hidden rounded-[var(--radius-sm)] border border-[var(--border-default)] bg-[var(--surface-popover)] shadow-[var(--elev-2)]"
         >
           <div className="flex items-center gap-2 border-b border-[var(--border-default)] px-3 py-2">
             <Search className="h-4 w-4 shrink-0 text-[var(--text-muted)]" />

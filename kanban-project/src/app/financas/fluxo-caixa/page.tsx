@@ -296,11 +296,11 @@ export default function FluxoCaixaPage() {
                       >
                         <div className="flex items-center gap-3">
                           {transacao.tipo === 'ENTRADA' ? (
-                            <div className="p-2 rounded-full bg-green-50">
+                            <div className="p-2 rounded-full bg-[var(--surface-secondary)]">
                               <ArrowUpRight className="h-4 w-4 text-green-700" />
                             </div>
                           ) : (
-                            <div className="p-2 rounded-full bg-red-50">
+                            <div className="p-2 rounded-full bg-[var(--surface-secondary)]">
                               <ArrowDownRight className="h-4 w-4 text-red-700" />
                             </div>
                           )}

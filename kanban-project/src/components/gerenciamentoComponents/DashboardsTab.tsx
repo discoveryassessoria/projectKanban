@@ -77,7 +77,7 @@ export default function DashboardsTab() {
   return (
     <div className="space-y-5">
       {erro && (
-        <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+        <div className="rounded-xl border border-[var(--border-default)] bg-[var(--surface-secondary)] px-4 py-3 text-sm text-red-700">
           {erro} <button onClick={() => void load()} className="ml-2 underline hover:text-white">Tentar de novo</button>
         </div>
       )}

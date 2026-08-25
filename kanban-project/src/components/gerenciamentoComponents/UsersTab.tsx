@@ -228,8 +228,8 @@ export default function UsersTab() {
         )}
       </div>
 
-      {error && <Alert className="bg-red-50 border-red-200 text-[var(--text-primary)]"><AlertDescription className="text-white">{error}</AlertDescription></Alert>}
-      {success && <Alert className="border-green-200 bg-green-50 text-[var(--text-primary)]"><AlertDescription className="text-white">{success}</AlertDescription></Alert>}
+      {error && <Alert className="bg-[var(--surface-secondary)] border-[var(--border-default)] text-[var(--text-primary)]"><AlertDescription className="text-white">{error}</AlertDescription></Alert>}
+      {success && <Alert className="border-[var(--border-default)] bg-[var(--surface-secondary)] text-[var(--text-primary)]"><AlertDescription className="text-white">{success}</AlertDescription></Alert>}
 
       {/* Busca */}
       <div className="relative">
@@ -263,10 +263,10 @@ export default function UsersTab() {
                   <td className="py-2.5 text-white/70">{u.email}</td>
                   <td className="py-2.5">
                     <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium ${
-                      u.tipo === "admin" ? "bg-blue-50 text-blue-700 border border-blue-200" :
-                      u.tipo === "gerente" ? "bg-slate-50 text-slate-700 border border-slate-200" :
-                      u.tipo === "estagiario" ? "bg-amber-50 text-amber-700 border border-amber-200" :
-                      "bg-emerald-50 text-emerald-700 border border-emerald-200"}`}>
+                      u.tipo === "admin" ? "bg-[var(--surface-secondary)] text-[var(--text-secondary)] border border-[var(--border-default)]" :
+                      u.tipo === "gerente" ? "bg-[var(--surface-secondary)] text-[var(--text-secondary)] border border-[var(--border-default)]" :
+                      u.tipo === "estagiario" ? "bg-[var(--surface-secondary)] text-amber-700 border border-[var(--border-default)]" :
+                      "bg-[var(--surface-secondary)] text-green-700 border border-[var(--border-default)]"}`}>
                       {userTypeLabels[u.tipo as UserType] ?? u.tipo}
                     </span>
                   </td>
@@ -276,7 +276,7 @@ export default function UsersTab() {
                         <Button variant="ghost" size="icon" onClick={() => handleEdit(u)} title="Editar" className="text-white/70 hover:text-white hover:bg-[var(--surface-hover)]"><Pencil className="h-4 w-4" /></Button>
                       )}
                       {pode("usuarios.excluir") && u.tipo !== UserType.ADMIN && (
-                        <Button variant="ghost" size="icon" onClick={() => handleDeleteClick(u)} title="Deletar" className="text-red-700 hover:text-red-700 hover:bg-red-50"><Trash2 className="h-4 w-4" /></Button>
+                        <Button variant="ghost" size="icon" onClick={() => handleDeleteClick(u)} title="Deletar" className="text-red-700 hover:text-red-700 hover:bg-[var(--surface-secondary)]"><Trash2 className="h-4 w-4" /></Button>
                       )}
                     </div>
                   </td>
@@ -321,24 +321,24 @@ export default function UsersTab() {
                   const ps = perfis.find(p => p.id === val)
                   if (ps) { const map: Record<string, string> = { Administrador: "admin", Gerente: "gerente", Assistente: "assistente", Estagiário: "estagiario" }; setFormData(prev => ({ ...prev, tipo: map[ps.nome] || "assistente" })) }
                   else setFormData(prev => ({ ...prev, tipo: "" }))
-                }} className="flex h-10 w-full rounded-md border border-gray-300 bg-[var(--surface-primary)] px-3 py-2 text-sm text-gray-900 focus:border-blue-500 focus:ring-1 focus:ring-blue-500/20 focus:outline-none">
+                }} className="flex h-10 w-full rounded-md border border-gray-300 bg-[var(--surface-primary)] px-3 py-2 text-sm text-gray-900 focus:border-[var(--border-default)] focus:ring-1 focus:ring-[var(--border-strong)] focus:outline-none">
                   <option value="">Sem perfil (todas permissões desligadas)</option>
                   {perfis.map(p => <option key={p.id} value={p.id}>{p.nome}{p.descricao ? ` — ${p.descricao}` : ""}</option>)}
                 </select>
                 {selectedPerfilId && <p className="text-xs text-gray-500">{perfis.find(p => p.id === selectedPerfilId)?.descricao}</p>}
               </div>
 
-              <button type="button" onClick={() => setShowPermissoes(!showPermissoes)} className="flex items-center gap-2 text-sm text-blue-600 hover:text-blue-700 font-medium">
+              <button type="button" onClick={() => setShowPermissoes(!showPermissoes)} className="flex items-center gap-2 text-sm text-[var(--text-secondary)] hover:text-[var(--text-secondary)] font-medium">
                 <Lock className="h-4 w-4" />
                 {showPermissoes ? "Ocultar permissões detalhadas" : "Personalizar permissões"}
                 {showPermissoes ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
-                {totalOverrides > 0 && <span className="bg-amber-100 text-amber-700 text-[10px] font-medium px-1.5 py-0.5 rounded-full">{totalOverrides} {totalOverrides === 1 ? "ajuste" : "ajustes"}</span>}
+                {totalOverrides > 0 && <span className="bg-[var(--surface-secondary)] text-amber-700 text-[10px] font-medium px-1.5 py-0.5 rounded-full">{totalOverrides} {totalOverrides === 1 ? "ajuste" : "ajustes"}</span>}
               </button>
 
               {showPermissoes && (
                 <div className="space-y-3 bg-gray-50 rounded-lg p-4 border border-gray-200">
                   <div className="flex items-center justify-between">
-                    <p className="text-xs text-gray-500">Toggle individual sobrescreve o perfil. Indicador <span className="inline-block w-2 h-2 rounded-full bg-amber-400 mx-0.5" /> = personalizado</p>
+                    <p className="text-xs text-gray-500">Toggle individual sobrescreve o perfil. Indicador <span className="inline-block w-2 h-2 rounded-full bg-amber-600 mx-0.5" /> = personalizado</p>
                     {totalOverrides > 0 && <button type="button" onClick={resetarCustom} className="flex items-center gap-1 text-xs text-gray-500 hover:text-gray-700"><RotateCcw className="h-3 w-3" /> Resetar ajustes</button>}
                   </div>
                   {MODULOS_PERMISSOES.map(modulo => {
@@ -351,7 +351,7 @@ export default function UsersTab() {
                           <div className="flex items-center gap-2">
                             <span className="text-sm">{modulo.icone}</span>
                             <span className="text-sm font-medium text-gray-800">{modulo.modulo}</span>
-                            {temOverrides && <span className="w-2 h-2 rounded-full bg-amber-400" />}
+                            {temOverrides && <span className="w-2 h-2 rounded-full bg-amber-600" />}
                           </div>
                           <div className="flex items-center gap-2">
                             <Switch checked={todasAtivas} onCheckedChange={() => toggleModulo(modulo)} onClick={(e: React.MouseEvent) => e.stopPropagation()} className="scale-75" />
@@ -364,9 +364,9 @@ export default function UsersTab() {
                               const ativa = !!permissoesEfetivas[perm.chave]
                               const override = temOverride(perm.chave)
                               return (
-                                <div key={perm.chave} className={`flex items-center justify-between py-1.5 px-2 rounded ${override ? "bg-amber-50" : ""}`}>
+                                <div key={perm.chave} className={`flex items-center justify-between py-1.5 px-2 rounded ${override ? "bg-[var(--surface-secondary)]" : ""}`}>
                                   <div className="flex items-center gap-2">
-                                    {override && <span className="w-1.5 h-1.5 rounded-full bg-amber-400 flex-shrink-0" />}
+                                    {override && <span className="w-1.5 h-1.5 rounded-full bg-amber-600 flex-shrink-0" />}
                                     <span className={`text-xs ${ativa ? "text-gray-700" : "text-[var(--text-muted)]"}`}>{perm.label}</span>
                                   </div>
                                   <Switch checked={ativa} onCheckedChange={() => togglePermissao(perm.chave)} className="scale-75" />
@@ -384,9 +384,9 @@ export default function UsersTab() {
 
             {formData.tipo === "admin" && (
               <div className="border-t border-gray-200 pt-4">
-                <div className="flex items-center gap-2 p-3 rounded-lg bg-blue-50 border border-blue-200">
-                  <Shield className="h-4 w-4 text-blue-600 flex-shrink-0" />
-                  <p className="text-xs text-blue-700">Administradores têm acesso total ao sistema. Não é necessário configurar permissões.</p>
+                <div className="flex items-center gap-2 p-3 rounded-lg bg-[var(--surface-secondary)] border border-[var(--border-default)]">
+                  <Shield className="h-4 w-4 text-[var(--text-secondary)] flex-shrink-0" />
+                  <p className="text-xs text-[var(--text-secondary)]">Administradores têm acesso total ao sistema. Não é necessário configurar permissões.</p>
                 </div>
               </div>
             )}

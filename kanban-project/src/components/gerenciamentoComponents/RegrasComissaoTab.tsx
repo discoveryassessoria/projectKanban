@@ -158,7 +158,7 @@ export default function RegrasComissaoTab() {
       {loading && <div className="py-12 text-center text-sm text-[var(--text-muted)]">Carregando...</div>}
 
       {!loading && erroLista && (
-        <div className="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-700">
+        <div className="rounded-lg border border-[var(--border-default)] bg-[var(--surface-secondary)] p-4 text-sm text-red-700">
           {erroLista}
           <button onClick={() => void carregar()} className="ml-3 underline hover:text-white">Tentar de novo</button>
         </div>
@@ -196,14 +196,14 @@ export default function RegrasComissaoTab() {
                     {r.modoCalculo === 'fixed' ? fmtNum(r.valorFixo) : (r.percent != null ? `${Number(r.percent)}%` : '—')}
                   </td>
                   <td className="px-4 py-2.5">
-                    <span className={`rounded px-2 py-0.5 text-[11px] font-medium ${r.ativo ? 'bg-green-50 text-green-700' : 'bg-[var(--surface-primary)] text-[var(--text-secondary)]'}`}>
+                    <span className={`rounded px-2 py-0.5 text-[11px] font-medium ${r.ativo ? 'bg-[var(--surface-secondary)] text-green-700' : 'bg-[var(--surface-primary)] text-[var(--text-secondary)]'}`}>
                       {r.ativo ? 'Ativo' : 'Inativo'}
                     </span>
                   </td>
                   <td className="px-4 py-2.5">
                     <div className="flex items-center justify-end gap-2">
                       <button onClick={() => abrirEditar(r)} className="rounded-md border border-[var(--border-default)] px-2.5 py-1 text-xs text-white/70 transition hover:bg-[var(--surface-hover)] hover:text-white">Editar</button>
-                      <button onClick={() => excluir(r)} className="rounded-md border border-red-200 px-2.5 py-1 text-xs text-red-700/80 transition hover:bg-red-50 hover:text-red-700">Excluir</button>
+                      <button onClick={() => excluir(r)} className="rounded-md border border-[var(--border-default)] px-2.5 py-1 text-xs text-red-700/80 transition hover:bg-[var(--surface-secondary)] hover:text-red-700">Excluir</button>
                     </div>
                   </td>
                 </tr>
@@ -215,7 +215,7 @@ export default function RegrasComissaoTab() {
 
       {modalAberto && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-[var(--overlay-modal)] p-4 backdrop-blur-sm">
-          <div className="w-full max-w-md rounded-2xl border border-[var(--border-default)] bg-zinc-900/95 shadow-2xl">
+          <div className="w-full max-w-md rounded-2xl border border-[var(--border-default)] bg-zinc-900/95 shadow-[var(--elev-3)]">
             <div className="flex items-center justify-between border-b border-[var(--border-default)] px-6 py-4">
               <h3 className="text-lg font-semibold text-white">{editando ? 'Editar regra' : 'Nova regra'}</h3>
               <button onClick={() => setModalAberto(false)} className="text-[var(--text-muted)] transition hover:text-white">✕</button>
@@ -264,7 +264,7 @@ export default function RegrasComissaoTab() {
               </label>
 
               {erroModal && (
-                <div className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700">{erroModal}</div>
+                <div className="rounded-lg border border-[var(--border-default)] bg-[var(--surface-secondary)] p-3 text-sm text-red-700">{erroModal}</div>
               )}
             </div>
 

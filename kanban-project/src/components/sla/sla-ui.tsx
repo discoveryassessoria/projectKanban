@@ -24,28 +24,28 @@ export interface CorSla {
 /** Paleta canônica do prazo — definida UMA vez. */
 export const CORES_SLA = {
   atrasado: {
-    chip: "bg-red-50 text-red-700 border-red-200",
-    ponto: "bg-red-400",
+    chip: "bg-[var(--surface-secondary)] text-red-700 border-[var(--border-default)]",
+    ponto: "bg-red-600",
     texto: "text-red-700",
-    aro: "ring-red-400/25",
+    aro: "ring-[var(--border-strong)]",
   },
   hoje: {
-    chip: "bg-amber-50 text-amber-700 border-amber-200",
-    ponto: "bg-amber-400",
+    chip: "bg-[var(--surface-secondary)] text-amber-700 border-[var(--border-default)]",
+    ponto: "bg-amber-600",
     texto: "text-amber-700",
-    aro: "ring-amber-400/25",
+    aro: "ring-[var(--border-strong)]",
   },
   atencao: {
-    chip: "bg-amber-50 text-amber-700 border-amber-200",
-    ponto: "bg-amber-400",
+    chip: "bg-[var(--surface-secondary)] text-amber-700 border-[var(--border-default)]",
+    ponto: "bg-amber-600",
     texto: "text-amber-700",
-    aro: "ring-amber-400/25",
+    aro: "ring-[var(--border-strong)]",
   },
   ok: {
-    chip: "bg-emerald-50 text-emerald-700 border-emerald-200",
-    ponto: "bg-emerald-400",
-    texto: "text-emerald-700",
-    aro: "ring-emerald-400/25",
+    chip: "bg-[var(--surface-secondary)] text-green-700 border-[var(--border-default)]",
+    ponto: "bg-green-600",
+    texto: "text-green-700",
+    aro: "ring-[var(--border-strong)]",
   },
   neutro: {
     chip: "bg-[var(--surface-primary)] text-white/70 border-[var(--border-default)]",

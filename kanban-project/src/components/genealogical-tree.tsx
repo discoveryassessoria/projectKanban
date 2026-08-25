@@ -82,15 +82,15 @@ const PersonNode = ({ data }: { data: TreeNode["data"] }) => {
   const getRelationshipStyle = () => {
     switch (relationshipType) {
       case "pai":
-        return "border-blue-500 bg-blue-50 shadow-blue-100"
+        return "border-[var(--border-default)] bg-[var(--surface-secondary)] shadow-blue-100"
       case "mae":
-        return "border-pink-500 bg-pink-50 shadow-pink-100"
+        return "border-red-500 bg-[var(--surface-secondary)] shadow-pink-100"
       case "filho":
-        return "border-green-500 bg-green-50 shadow-green-100"
+        return "border-green-500 bg-[var(--surface-secondary)] shadow-green-100"
       case "conjuge":
-        return "border-slate-500 bg-slate-50 shadow-slate-100"
+        return "border-[var(--border-default)] bg-[var(--surface-secondary)] shadow-slate-100"
       case "irmao":
-        return "border-amber-500 bg-amber-50 shadow-amber-100"
+        return "border-amber-500 bg-[var(--surface-secondary)] shadow-amber-100"
       default:
         return "border-gray-300 bg-[var(--surface-primary)] shadow-gray-100"
     }
@@ -98,11 +98,11 @@ const PersonNode = ({ data }: { data: TreeNode["data"] }) => {
 
   const getRelationshipBadge = () => {
     const badges: Record<string, { label: string; icon: React.ElementType; color: string }> = {
-      pai: { label: "Pai", icon: User, color: "bg-blue-100 text-blue-800 border-blue-200" },
-      mae: { label: "Mãe", icon: User, color: "bg-pink-100 text-pink-800 border-pink-200" },
-      filho: { label: "Filho(a)", icon: UserPlus, color: "bg-green-100 text-green-800 border-green-200" },
-      conjuge: { label: "Cônjuge", icon: Heart, color: "bg-slate-100 text-slate-800 border-slate-200" },
-      irmao: { label: "Irmão(ã)", icon: Users, color: "bg-amber-100 text-amber-800 border-amber-200" },
+      pai: { label: "Pai", icon: User, color: "bg-[var(--surface-secondary)] text-[var(--text-secondary)] border-[var(--border-default)]" },
+      mae: { label: "Mãe", icon: User, color: "bg-[var(--surface-secondary)] text-[var(--text-secondary)] border-[var(--border-default)]" },
+      filho: { label: "Filho(a)", icon: UserPlus, color: "bg-[var(--surface-secondary)] text-green-800 border-[var(--border-default)]" },
+      conjuge: { label: "Cônjuge", icon: Heart, color: "bg-[var(--surface-secondary)] text-[var(--text-secondary)] border-[var(--border-default)]" },
+      irmao: { label: "Irmão(ã)", icon: Users, color: "bg-[var(--surface-secondary)] text-amber-800 border-[var(--border-default)]" },
     }
 
     if (relationshipType && relationshipType in badges) {
@@ -121,7 +121,7 @@ const PersonNode = ({ data }: { data: TreeNode["data"] }) => {
   return (
     <Card
       className={cn(
-        "tree-node group relative w-72 p-4 border-2 transition-all duration-300 hover:shadow-lg",
+        "tree-node group relative w-72 p-4 border-2 transition-all duration-300 hover:shadow-[var(--elev-2)]",
         getRelationshipStyle(),
       )}
     >
@@ -129,32 +129,32 @@ const PersonNode = ({ data }: { data: TreeNode["data"] }) => {
         type="target"
         position={Position.Top}
         id="top"
-        className="w-3 h-3 bg-blue-500 border-2 border-[var(--border-default)] shadow-md"
+        className="w-3 h-3 bg-[var(--text-muted)] border-2 border-[var(--border-default)] shadow-[var(--elev-2)]"
       />
       <Handle
         type="source"
         position={Position.Bottom}
         id="bottom"
-        className="w-3 h-3 bg-green-500 border-2 border-[var(--border-default)] shadow-md"
+        className="w-3 h-3 bg-green-600 border-2 border-[var(--border-default)] shadow-[var(--elev-2)]"
       />
       <Handle
         type="source"
         position={Position.Right}
         id="right"
-        className="w-3 h-3 bg-slate-500 border-2 border-[var(--border-default)] shadow-md"
+        className="w-3 h-3 bg-[var(--surface-secondary)] border-2 border-[var(--border-default)] shadow-[var(--elev-2)]"
       />
       <Handle
         type="target"
         position={Position.Left}
         id="left"
-        className="w-3 h-3 bg-slate-500 border-2 border-[var(--border-default)] shadow-md"
+        className="w-3 h-3 bg-[var(--surface-secondary)] border-2 border-[var(--border-default)] shadow-[var(--elev-2)]"
       />
 
       <div className="absolute -top-3 -right-3 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity z-10">
         <Button
           size="sm"
           variant="outline"
-          className="h-7 w-7 p-0 bg-[var(--surface-primary)] shadow-md hover:bg-green-500 hover:text-[var(--text-primary)] border-green-200"
+          className="h-7 w-7 p-0 bg-[var(--surface-primary)] shadow-[var(--elev-2)] hover:bg-green-600 hover:text-[var(--text-primary)] border-[var(--border-default)]"
           onClick={() => onAddChild(pessoa.id)}
           title="Adicionar Filho"
         >
@@ -163,7 +163,7 @@ const PersonNode = ({ data }: { data: TreeNode["data"] }) => {
         <Button
           size="sm"
           variant="outline"
-          className="h-7 w-7 p-0 bg-[var(--surface-primary)] shadow-md hover:bg-[var(--action-primary)] hover:text-[var(--action-primary-ink)] border-blue-200"
+          className="h-7 w-7 p-0 bg-[var(--surface-primary)] shadow-[var(--elev-2)] hover:bg-[var(--action-primary)] hover:text-[var(--action-primary-ink)] border-[var(--border-default)]"
           onClick={() => onAddParent(pessoa.id, "pai")}
           disabled={!!pessoa.paiId}
           title="Adicionar Pai"
@@ -173,7 +173,7 @@ const PersonNode = ({ data }: { data: TreeNode["data"] }) => {
         <Button
           size="sm"
           variant="outline"
-          className="h-7 w-7 p-0 bg-[var(--surface-primary)] shadow-md hover:bg-pink-500 hover:text-[var(--text-primary)] border-pink-200"
+          className="h-7 w-7 p-0 bg-[var(--surface-primary)] shadow-[var(--elev-2)] hover:bg-red-500 hover:text-[var(--text-primary)] border-[var(--border-default)]"
           onClick={() => onAddParent(pessoa.id, "mae")}
           disabled={!!pessoa.maeId}
           title="Adicionar Mãe"
@@ -183,7 +183,7 @@ const PersonNode = ({ data }: { data: TreeNode["data"] }) => {
         <Button
           size="sm"
           variant="outline"
-          className="h-7 w-7 p-0 bg-[var(--surface-primary)] shadow-md hover:bg-slate-500 hover:text-[var(--text-primary)] border-slate-200"
+          className="h-7 w-7 p-0 bg-[var(--surface-primary)] shadow-[var(--elev-2)] hover:bg-[var(--surface-secondary)] hover:text-[var(--text-primary)] border-[var(--border-default)]"
           onClick={() => onAddSpouse(pessoa.id)}
           title="Adicionar Cônjuge"
         >
@@ -192,7 +192,7 @@ const PersonNode = ({ data }: { data: TreeNode["data"] }) => {
         <Button
           size="sm"
           variant="outline"
-          className="h-7 w-7 p-0 bg-[var(--surface-primary)] shadow-md hover:bg-yellow-500 hover:text-white border-yellow-200"
+          className="h-7 w-7 p-0 bg-[var(--surface-primary)] shadow-[var(--elev-2)] hover:bg-amber-600 hover:text-white border-[var(--border-default)]"
           onClick={() => onEdit(pessoa)}
           title="Editar"
         >
@@ -201,7 +201,7 @@ const PersonNode = ({ data }: { data: TreeNode["data"] }) => {
         <Button
           size="sm"
           variant="outline"
-          className="h-7 w-7 p-0 bg-[var(--surface-primary)] shadow-md hover:bg-red-500 hover:text-[var(--text-primary)] border-red-200"
+          className="h-7 w-7 p-0 bg-[var(--surface-primary)] shadow-[var(--elev-2)] hover:bg-red-600 hover:text-[var(--text-primary)] border-[var(--border-default)]"
           onClick={() => onDelete(pessoa.id)}
           title="Excluir"
         >
@@ -210,8 +210,8 @@ const PersonNode = ({ data }: { data: TreeNode["data"] }) => {
       </div>
 
       <div className="absolute -top-3 left-1/2 -translate-x-1/2">
-        {pessoa.sexo === "Masculino" && <User className="h-5 w-5 text-blue-500" />}
-        {pessoa.sexo === "Feminino" && <User className="h-5 w-5 text-pink-500" />}
+        {pessoa.sexo === "Masculino" && <User className="h-5 w-5 text-[var(--text-secondary)]" />}
+        {pessoa.sexo === "Feminino" && <User className="h-5 w-5 text-red-500" />}
       </div>
 
       {getRelationshipBadge()}
@@ -240,21 +240,21 @@ const PersonNode = ({ data }: { data: TreeNode["data"] }) => {
 
         <div className="flex flex-wrap gap-1">
           {pessoa.batizado && (
-            <Badge variant="secondary" className="text-xs bg-emerald-100 text-emerald-800 border-emerald-200">
+            <Badge variant="secondary" className="text-xs bg-[var(--surface-secondary)] text-green-800 border-[var(--border-default)]">
               <Crown className="h-2 w-2 mr-1" />
               Batizado
             </Badge>
           )}
 
           {(pessoa.unioesComoPessoa1?.length || pessoa.unioesComoPessoa2?.length) && (
-            <Badge variant="outline" className="text-xs border-rose-200 text-rose-700 bg-rose-50">
+            <Badge variant="outline" className="text-xs border-[var(--border-default)] text-red-700 bg-[var(--surface-secondary)]">
               <Heart className="h-2 w-2 mr-1" />
               Casado
             </Badge>
           )}
 
           {(pessoa.filhosComoPai?.length || 0) + (pessoa.filhosComoMae?.length || 0) > 0 && (
-            <Badge variant="outline" className="text-xs border-indigo-200 text-indigo-700 bg-indigo-50">
+            <Badge variant="outline" className="text-xs border-[var(--border-default)] text-[var(--text-secondary)] bg-[var(--surface-secondary)]">
               <Users className="h-2 w-2 mr-1" />
               {(pessoa.filhosComoPai?.length || 0) + (pessoa.filhosComoMae?.length || 0)} filhos
             </Badge>
@@ -275,17 +275,17 @@ const CommentNode = ({ data }: { data: { comment: string; onCommentChange: (comm
   }
 
   return (
-    <Card className="group w-60 bg-yellow-100 border-yellow-300 shadow-lg hover:scale-105 transition-transform">
+    <Card className="group w-60 bg-[var(--surface-secondary)] border-[var(--border-default)] shadow-[var(--elev-2)] hover:scale-105 transition-transform">
       <Handle type="target" position={Position.Top} className="!bg-transparent !border-none" />
       <Handle type="source" position={Position.Bottom} className="!bg-transparent !border-none" />
       <div className="p-3">
         <div className="flex justify-between items-center mb-2">
-          <h4 className="font-bold text-sm text-yellow-800 flex items-center gap-2">
+          <h4 className="font-bold text-sm text-amber-800 flex items-center gap-2">
             <StickyNote className="h-4 w-4" />
             Comentário
           </h4>
           <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => setIsEditing(!isEditing)}>
-            <Edit3 className="h-3 w-3 text-yellow-700" />
+            <Edit3 className="h-3 w-3 text-amber-700" />
           </Button>
         </div>
         {isEditing ? (
@@ -293,12 +293,12 @@ const CommentNode = ({ data }: { data: { comment: string; onCommentChange: (comm
             value={text}
             onChange={(e) => setText(e.target.value)}
             onBlur={handleSave}
-            className="w-full p-1 border rounded-md text-sm bg-yellow-50"
+            className="w-full p-1 border rounded-md text-sm bg-[var(--surface-secondary)]"
             rows={4}
             autoFocus
           />
         ) : (
-          <p className="text-sm text-yellow-900 whitespace-pre-wrap break-words">{data.comment || "Clique para editar..."}</p>
+          <p className="text-sm text-amber-900 whitespace-pre-wrap break-words">{data.comment || "Clique para editar..."}</p>
         )}
       </div>
     </Card>
@@ -931,7 +931,7 @@ const GenealogicalTreeComponent = forwardRef<GenealogicalTreeHandle, Genealogica
           className="bg-gradient-to-br from-slate-50 to-slate-100"
         >
           <Controls
-            className="bg-[var(--surface-primary)] border border-gray-200 rounded-lg shadow-lg"
+            className="bg-[var(--surface-primary)] border border-gray-200 rounded-lg shadow-[var(--elev-2)]"
             showZoom={true}
             showFitView={true}
             showInteractive={true}
@@ -941,7 +941,7 @@ const GenealogicalTreeComponent = forwardRef<GenealogicalTreeHandle, Genealogica
             </Button>
           </Controls>
           <MiniMap
-            className="bg-[var(--surface-primary)] border border-gray-200 rounded-lg shadow-lg"
+            className="bg-[var(--surface-primary)] border border-gray-200 rounded-lg shadow-[var(--elev-2)]"
             nodeColor={(node) => {
               const relationshipType = node.data?.relationshipType
               switch (relationshipType) {
@@ -965,7 +965,7 @@ const GenealogicalTreeComponent = forwardRef<GenealogicalTreeHandle, Genealogica
         </ReactFlow>
       </ReactFlowProvider>
 
-      <div className="absolute bottom-4 left-4 bg-[var(--surface-primary)] rounded-lg shadow-lg border border-gray-200 p-4 z-10 max-w-xs flex flex-col gap-4">
+      <div className="absolute bottom-4 left-4 bg-[var(--surface-primary)] rounded-lg shadow-[var(--elev-2)] border border-gray-200 p-4 z-10 max-w-xs flex flex-col gap-4">
         <div className="flex justify-between items-center">
           <h3 className="font-semibold text-sm text-gray-800 flex items-center gap-2">
             <TreePine className="h-4 w-4 text-gray-600" />
@@ -978,11 +978,11 @@ const GenealogicalTreeComponent = forwardRef<GenealogicalTreeHandle, Genealogica
             <h4 className="text-xs font-medium text-gray-700 mb-2">Pessoas</h4>
             <div className="space-y-1">
               <div className="flex items-center gap-2">
-                <User className="h-4 w-4 text-blue-500" />
+                <User className="h-4 w-4 text-[var(--text-secondary)]" />
                 <span className="text-xs text-gray-600">Masculino</span>
               </div>
               <div className="flex items-center gap-2">
-                <User className="h-4 w-4 text-pink-500" />
+                <User className="h-4 w-4 text-red-500" />
                 <span className="text-xs text-gray-600">Feminino</span>
               </div>
             </div>

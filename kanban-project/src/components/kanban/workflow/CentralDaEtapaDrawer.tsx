@@ -165,11 +165,11 @@ const STATUS_LABEL: Record<StatusStep, string> = {
 
 const STATUS_PILL_CLS: Record<StatusStep, string> = {
   nao_iniciada: "bg-[var(--surface-secondary)]0/20 text-[var(--text-muted)] border-[var(--border-default)]",
-  bloqueada: "bg-red-50 text-red-700 border-red-200",
-  em_andamento: "bg-sky-50 text-sky-700 border-sky-200",
+  bloqueada: "bg-[var(--surface-secondary)] text-red-700 border-[var(--border-default)]",
+  em_andamento: "bg-[var(--surface-secondary)] text-[var(--text-secondary)] border-[var(--border-default)]",
   aguardando_terceiro: "bg-[var(--accent-primary)]/20 text-[var(--accent-text)] border-[var(--accent-primary)]/50",
-  atrasada: "bg-amber-50 text-amber-700 border-amber-200",
-  concluida: "bg-green-50 text-green-700 border-green-200",
+  atrasada: "bg-[var(--surface-secondary)] text-amber-700 border-[var(--border-default)]",
+  concluida: "bg-[var(--surface-secondary)] text-green-700 border-[var(--border-default)]",
   cancelada: "bg-[var(--surface-secondary)]0/20 text-[var(--text-muted)] border-[var(--border-default)]",
 }
 
@@ -430,7 +430,7 @@ function ConteudoDrawer({
       />
 
       <div
-        className="fixed top-0 right-0 h-screen z-[10003] flex flex-col text-white/70 font-sans shadow-[-30px_0_60px_rgba(0,0,0,0.5)]"
+        className="fixed top-0 right-0 h-screen z-[10003] flex flex-col text-white/70 font-sans shadow-[var(--elev-2)]"
         style={{
           width: "45vw",
           minWidth: "640px",
@@ -531,7 +531,7 @@ function ConteudoDrawer({
                   <button
                     onClick={onClose}
                     disabled={!!saving}
-                    className="inline-flex items-center gap-1.5 px-3 py-2 text-[12px] font-semibold bg-red-50 hover:bg-red-50 disabled:opacity-50 text-red-700 border border-red-200 rounded-md transition-colors"
+                    className="inline-flex items-center gap-1.5 px-3 py-2 text-[12px] font-semibold bg-[var(--surface-secondary)] hover:bg-[var(--surface-secondary)] disabled:opacity-50 text-red-700 border border-[var(--border-default)] rounded-md transition-colors"
                   >
                     Fechar
                   </button>
@@ -551,7 +551,7 @@ function ConteudoDrawer({
                     <button
                       onClick={handleConcluir}
                       disabled={!!saving}
-                      className="inline-flex items-center gap-1.5 px-3 py-2 text-[12px] font-semibold bg-green-50 hover:bg-green-50 disabled:bg-green-50 disabled:opacity-50 disabled:cursor-not-allowed text-[var(--text-primary)] rounded-md transition-colors"
+                      className="inline-flex items-center gap-1.5 px-3 py-2 text-[12px] font-semibold bg-[var(--surface-secondary)] hover:bg-[var(--surface-secondary)] disabled:bg-[var(--surface-secondary)] disabled:opacity-50 disabled:cursor-not-allowed text-[var(--text-primary)] rounded-md transition-colors"
                     >
                       <Check className="w-3.5 h-3.5" />
                       Concluir etapa
@@ -573,7 +573,7 @@ function ConteudoDrawer({
                     <button
                       onClick={handleDesbloquear}
                       disabled={!!saving}
-                      className="inline-flex items-center gap-1.5 px-3 py-2 text-[12px] font-semibold bg-sky-50 hover:bg-sky-50 disabled:opacity-50 text-[var(--text-primary)] rounded-md transition-colors"
+                      className="inline-flex items-center gap-1.5 px-3 py-2 text-[12px] font-semibold bg-[var(--surface-secondary)] hover:bg-[var(--surface-secondary)] disabled:opacity-50 text-[var(--text-primary)] rounded-md transition-colors"
                     >
                       {saving === "desbloqueando" ? "Desbloqueando…" : "Desbloquear"}
                     </button>
@@ -639,7 +639,7 @@ function ConteudoDrawer({
 
               {/* Form inline: Bloquear */}
               {showBlockForm && (
-                <div className="mt-3 p-3 rounded-md border border-red-200 bg-red-50">
+                <div className="mt-3 p-3 rounded-md border border-[var(--border-default)] bg-[var(--surface-secondary)]">
                   <label className="block text-[10px] uppercase font-semibold tracking-wider text-red-700 mb-1.5">
                     Motivo do bloqueio
                   </label>
@@ -648,14 +648,14 @@ function ConteudoDrawer({
                     value={blockReason}
                     onChange={(e) => setBlockReason(e.target.value)}
                     placeholder="ex: aguardando cliente confirmar dados"
-                    className="w-full px-2.5 py-1.5 bg-[var(--surface-popover)]/5 border border-[var(--border-default)] rounded text-[12px] text-[var(--text-primary)] placeholder-white/30 focus:outline-none focus:border-red-200"
+                    className="w-full px-2.5 py-1.5 bg-[var(--surface-popover)]/5 border border-[var(--border-default)] rounded text-[12px] text-[var(--text-primary)] placeholder-white/30 focus:outline-none focus:border-[var(--border-default)]"
                     autoFocus
                   />
                   <div className="flex gap-2 mt-2">
                     <button
                       onClick={handleBloquear}
                       disabled={!!saving || !blockReason.trim()}
-                      className="px-3 py-1.5 text-[11px] font-semibold bg-red-50 hover:bg-red-50 disabled:opacity-50 disabled:cursor-not-allowed text-[var(--text-primary)] rounded"
+                      className="px-3 py-1.5 text-[11px] font-semibold bg-[var(--surface-secondary)] hover:bg-[var(--surface-secondary)] disabled:opacity-50 disabled:cursor-not-allowed text-[var(--text-primary)] rounded"
                     >
                       {saving === "bloqueando" ? "Bloqueando…" : "Confirmar bloqueio"}
                     </button>
@@ -674,8 +674,8 @@ function ConteudoDrawer({
 
               {/* Form inline: executor DA ETAPA — o dono da tarefa não muda aqui */}
               {showTransferForm && (
-                <div className="mt-3 p-3 rounded-md border border-sky-200 bg-sky-50">
-                  <label className="block text-[10px] uppercase font-semibold tracking-wider text-sky-700 mb-1.5">
+                <div className="mt-3 p-3 rounded-md border border-[var(--border-default)] bg-[var(--surface-secondary)]">
+                  <label className="block text-[10px] uppercase font-semibold tracking-wider text-[var(--text-secondary)] mb-1.5">
                     Quem executa esta etapa
                   </label>
                   <select
@@ -683,7 +683,7 @@ function ConteudoDrawer({
                     onChange={(e) =>
                       setTransferUserId(e.target.value ? Number(e.target.value) : null)
                     }
-                    className="w-full px-2.5 py-1.5 bg-[var(--surface-popover)]/5 border border-[var(--border-default)] rounded text-[12px] text-[var(--text-primary)] focus:outline-none focus:border-sky-200"
+                    className="w-full px-2.5 py-1.5 bg-[var(--surface-popover)]/5 border border-[var(--border-default)] rounded text-[12px] text-[var(--text-primary)] focus:outline-none focus:border-[var(--border-default)]"
                   >
                     <option value="" className="bg-[var(--surface-secondary)]">
                       — Selecione quem executa —
@@ -698,7 +698,7 @@ function ConteudoDrawer({
                     <button
                       onClick={handleAlterarExecutor}
                       disabled={!!saving || !transferUserId}
-                      className="px-3 py-1.5 text-[11px] font-semibold bg-sky-50 hover:bg-sky-50 disabled:opacity-50 disabled:cursor-not-allowed text-[var(--text-primary)] rounded"
+                      className="px-3 py-1.5 text-[11px] font-semibold bg-[var(--surface-secondary)] hover:bg-[var(--surface-secondary)] disabled:opacity-50 disabled:cursor-not-allowed text-[var(--text-primary)] rounded"
                     >
                       {saving === "transferindo" ? "Alterando…" : "Confirmar"}
                     </button>
@@ -767,14 +767,14 @@ function ConteudoDrawer({
 
               {/* Erro estruturado da última ação */}
               {erroAcao && (
-                <div className="mt-3 p-2.5 rounded-md border border-red-200 bg-red-50 text-[12px] text-red-700">
+                <div className="mt-3 p-2.5 rounded-md border border-[var(--border-default)] bg-[var(--surface-secondary)] text-[12px] text-red-700">
                   {erroAcao}
                 </div>
               )}
 
               {/* Banner motivoBloqueio */}
               {step.status === "bloqueada" && step.motivoBloqueio && (
-                <div className="mt-3 p-2.5 rounded-md border border-red-200 bg-red-50 text-[12px] text-red-700">
+                <div className="mt-3 p-2.5 rounded-md border border-[var(--border-default)] bg-[var(--surface-secondary)] text-[12px] text-red-700">
                   <strong className="font-semibold">Bloqueado:</strong> {step.motivoBloqueio}
                 </div>
               )}
@@ -797,7 +797,7 @@ function ConteudoDrawer({
                   onClick={() => setActiveTab(t.id)}
                   className={`flex-shrink-0 inline-flex items-center gap-1.5 px-4 py-2.5 text-[11.5px] font-semibold border-b-2 transition-colors -mb-px ${
                     activeTab === t.id
-                      ? "text-white border-sky-200"
+                      ? "text-white border-[var(--border-default)]"
                       : "text-[var(--text-secondary)] hover:text-white border-transparent"
                   }`}
                 >
@@ -806,7 +806,7 @@ function ConteudoDrawer({
                     <span
                       className={`text-[9.5px] px-1.5 rounded-full font-bold ${
                         activeTab === t.id
-                          ? "bg-sky-50 text-sky-700"
+                          ? "bg-[var(--surface-secondary)] text-[var(--text-secondary)]"
                           : "bg-[var(--surface-popover)]/10 text-white/70"
                       }`}
                     >
@@ -938,7 +938,7 @@ function TabTimeline({ step }: { step: WorkflowStep }) {
             key={i}
             className="flex items-start gap-3 p-3 rounded-md bg-[var(--surface-popover)]/5 border border-[var(--border-default)]"
           >
-            <div className="w-2 h-2 rounded-full bg-sky-50 mt-1.5 flex-shrink-0" />
+            <div className="w-2 h-2 rounded-full bg-[var(--surface-secondary)] mt-1.5 flex-shrink-0" />
             <div className="flex-1 min-w-0">
               <div className="text-sm text-white">{e.label}</div>
               {e.sublabel && (

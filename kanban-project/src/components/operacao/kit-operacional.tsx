@@ -112,9 +112,9 @@ export function rotularFase(k: string | null): string | null {
 export function Etiqueta({ tom, children }: { tom: "neutro" | "alerta" | "critico" | "acento"; children: React.ReactNode }) {
   const cores = {
     neutro: "bg-[var(--surface-primary)] text-[var(--text-secondary)] border-[var(--border-default)]",
-    alerta: "bg-amber-50 text-amber-700/90 border-amber-200",
-    critico: "bg-red-50 text-red-700/90 border-red-200",
-    acento: "bg-sky-50 text-sky-700/90 border-sky-200",
+    alerta: "bg-[var(--surface-secondary)] text-amber-700/90 border-[var(--border-default)]",
+    critico: "bg-[var(--surface-secondary)] text-red-700/90 border-[var(--border-default)]",
+    acento: "bg-[var(--surface-secondary)] text-[var(--text-secondary)]/90 border-[var(--border-default)]",
   }[tom]
   return (
     <span className={`inline-flex items-center rounded border px-1.5 py-[1px] text-[10px] font-medium leading-4 ${cores}`}>
@@ -189,14 +189,14 @@ export function SeletorResponsavel({
   return (
     <div className="fixed inset-0 z-[60] flex items-center justify-center bg-[var(--overlay-modal)] p-4" onClick={aoFechar}>
       <div
-        className="w-full max-w-sm overflow-hidden rounded-lg border border-[var(--border-default)] bg-[var(--surface-overlay)] shadow-2xl"
+        className="w-full max-w-sm overflow-hidden rounded-lg border border-[var(--border-default)] bg-[var(--surface-overlay)] shadow-[var(--elev-3)]"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="border-b border-white/[0.08] px-4 py-3">
           <h2 className="text-[13px] font-medium text-white/90">{titulo}</h2>
         </div>
 
-        {erro && <div className="border-b border-red-200 bg-red-50 px-4 py-2 text-[11px] text-red-700/90">{erro}</div>}
+        {erro && <div className="border-b border-[var(--border-default)] bg-[var(--surface-secondary)] px-4 py-2 text-[11px] text-red-700/90">{erro}</div>}
 
         <div className="max-h-72 overflow-y-auto">
           {falhou && <Estado tipo="erro" mensagem="Não foi possível carregar os funcionários." aoTentar={carregar} />}

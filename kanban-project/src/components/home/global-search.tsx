@@ -140,7 +140,7 @@ export function GlobalSearch({ autoFocusRef }: { autoFocusRef?: React.RefObject<
         <ul
           id="busca-global-lista"
           role="listbox"
-          className="absolute z-50 mt-1 max-h-80 w-full overflow-auto rounded-lg border border-[var(--border-default)] bg-[var(--surface-overlay)] py-1 shadow-2xl backdrop-blur-xl"
+          className="absolute z-50 mt-1 max-h-80 w-full overflow-auto rounded-lg border border-[var(--border-default)] bg-[var(--surface-overlay)] py-1 shadow-[var(--elev-3)] backdrop-blur-xl"
         >
           {resultadosVisiveis.length === 0 && !carregandoVisivel && (
             <li className="px-3 py-3 text-sm text-[var(--text-secondary)]">Nenhum resultado para “{q}”.</li>

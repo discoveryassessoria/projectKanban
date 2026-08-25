@@ -140,14 +140,14 @@ export default function ExecutorMotorTab() {
 
   return (
     <div className="space-y-5">
-      {flash && <div className="rounded-xl border border-green-200 bg-green-50 px-4 py-2.5 text-sm text-green-700">{flash}</div>}
+      {flash && <div className="rounded-xl border border-[var(--border-default)] bg-[var(--surface-secondary)] px-4 py-2.5 text-sm text-green-700">{flash}</div>}
 
       {/* chave liga/desliga do gatilho automático */}
       <div className="flex items-center justify-between gap-4 rounded-2xl border border-[var(--border-default)] bg-[var(--surface-primary)] p-4 backdrop-blur-sm">
         <div>
           <div className="flex items-center gap-2 text-sm font-medium text-white">
             Gatilho automático
-            <span className={`rounded-full px-2 py-0.5 text-[10px] ${autoExecutar ? "bg-green-50 text-green-700" : "bg-[var(--surface-primary)] text-[var(--text-secondary)]"}`}>{autoExecutar ? "LIGADO" : "desligado"}</span>
+            <span className={`rounded-full px-2 py-0.5 text-[10px] ${autoExecutar ? "bg-[var(--surface-secondary)] text-green-700" : "bg-[var(--surface-primary)] text-[var(--text-secondary)]"}`}>{autoExecutar ? "LIGADO" : "desligado"}</span>
           </div>
           <div className="mt-0.5 text-xs text-[var(--text-secondary)]">Ligado: o motor roda sozinho ao <b>avançar a fase</b> de um processo conectado. Desligado: só pelo botão abaixo. {autoExecutar && <span className="text-amber-700/80">Cuidado — cria artefatos automaticamente.</span>}</div>
         </div>
@@ -169,8 +169,8 @@ export default function ExecutorMotorTab() {
         </div>
 
         {proc && !tipoAtual && (
-          <div className="mt-4 rounded-xl border border-sky-200 bg-sky-50 p-4">
-            <div className="text-sm text-sky-100">Este processo <b>ainda não está conectado</b> a um Tipo do motor. Conecte para poder executar:</div>
+          <div className="mt-4 rounded-xl border border-[var(--border-default)] bg-[var(--surface-secondary)] p-4">
+            <div className="text-sm text-[var(--text-secondary)]">Este processo <b>ainda não está conectado</b> a um Tipo do motor. Conecte para poder executar:</div>
             <div className="mt-3 flex flex-wrap items-end gap-2">
               <div className="min-w-[240px] flex-1">
                 <label className={labelCls}>Tipo de Processo do motor</label>
@@ -187,7 +187,7 @@ export default function ExecutorMotorTab() {
         {proc && tipoAtual && (
           <>
             <div className="mt-4 flex items-center gap-2 text-sm text-white/70">
-              <span className="rounded-full bg-green-50 px-2.5 py-0.5 text-xs text-green-700">✓ conectado</span>
+              <span className="rounded-full bg-[var(--surface-secondary)] px-2.5 py-0.5 text-xs text-green-700">✓ conectado</span>
               <span>Tipo: <b className="text-white">{tipoAtual.name}</b></span>
               <button onClick={() => conectar(null)} className="ml-2 text-xs text-[var(--text-muted)] underline hover:text-white/70">desconectar</button>
             </div>
@@ -209,12 +209,12 @@ export default function ExecutorMotorTab() {
             </div>
 
             {!confirming ? (
-              <button disabled={running || !phaseKey} onClick={() => setConfirming(true)} className="mt-4 rounded-lg bg-amber-700 px-4 py-2 text-sm font-medium text-[var(--action-primary-ink)] hover:bg-amber-500 disabled:opacity-50">Executar automações da fase</button>
+              <button disabled={running || !phaseKey} onClick={() => setConfirming(true)} className="mt-4 rounded-lg bg-amber-700 px-4 py-2 text-sm font-medium text-[var(--action-primary-ink)] hover:bg-amber-600 disabled:opacity-50">Executar automações da fase</button>
             ) : (
-              <div className="mt-4 rounded-xl border border-amber-200 bg-amber-50 p-4">
+              <div className="mt-4 rounded-xl border border-[var(--border-default)] bg-[var(--surface-secondary)] p-4">
                 <div className="text-sm text-amber-100">Isso vai <b>criar tarefas e lançamentos reais</b> no processo <b>{proc.nome}</b>. Pode desfazer depois. Confirma?</div>
                 <div className="mt-3 flex gap-2">
-                  <button disabled={running} onClick={executar} className="rounded-lg bg-amber-700 px-4 py-2 text-sm font-medium text-[var(--action-primary-ink)] hover:bg-amber-500 disabled:opacity-50">{running ? "Executando…" : "Sim, executar"}</button>
+                  <button disabled={running} onClick={executar} className="rounded-lg bg-amber-700 px-4 py-2 text-sm font-medium text-[var(--action-primary-ink)] hover:bg-amber-600 disabled:opacity-50">{running ? "Executando…" : "Sim, executar"}</button>
                   <button disabled={running} onClick={() => setConfirming(false)} className="rounded-lg border border-[var(--border-default)] px-4 py-2 text-sm text-white/70 hover:bg-[var(--surface-hover)]">Cancelar</button>
                 </div>
               </div>
@@ -234,7 +234,7 @@ export default function ExecutorMotorTab() {
               <span className="rounded bg-[var(--surface-primary)] px-1.5 py-0.5 text-[10px] text-[var(--text-secondary)]">{TABLE_LABEL[c.targetTable] || c.targetTable}</span>
               <span>+ {c.name}</span>
               {c.amount != null && <span className="text-[var(--text-secondary)]">— {money(c.amount, c.currency || "EUR")}</span>}
-              {c.condicional && <span className="rounded bg-sky-50 px-1.5 py-0.5 text-[10px] text-sky-700" title="Era condicional (ex.: exige contrato). Confira e desfaça se não se aplica.">condicional</span>}
+              {c.condicional && <span className="rounded bg-[var(--surface-secondary)] px-1.5 py-0.5 text-[10px] text-[var(--text-secondary)]" title="Era condicional (ex.: exige contrato). Confira e desfaça se não se aplica.">condicional</span>}
             </div>
           ))}
           {result.skipped.map((s, i) => <div key={i} className="text-sm text-[var(--text-secondary)]">• {s.name} — {s.reason}</div>)}

@@ -404,7 +404,7 @@ function ConteudoModal({
       {/* Container centralizado */}
       <div className="fixed inset-0 z-[10005] flex items-center justify-center p-4 pointer-events-none">
         <div
-          className="w-full max-w-3xl max-h-[92vh] flex flex-col rounded-xl overflow-hidden shadow-2xl pointer-events-auto"
+          className="w-full max-w-3xl max-h-[92vh] flex flex-col rounded-xl overflow-hidden shadow-[var(--elev-3)] pointer-events-auto"
           style={{ background: "#0d1117", border: "1px solid rgba(255,255,255,0.08)" }}
         >
           {loading && !doc && (
@@ -470,7 +470,7 @@ function ConteudoModal({
                   <div
                     className={`mb-5 p-3.5 rounded-lg border ${
                       podeConcluirEtapa
-                        ? "border-green-200 bg-green-50"
+                        ? "border-[var(--border-default)] bg-[var(--surface-secondary)]"
                         : "border-[var(--accent-primary)]/30 bg-[var(--accent-primary)]/10"
                     }`}
                   >
@@ -715,7 +715,7 @@ function ConteudoModal({
                       value={form.observacoes}
                       onChange={(e) => setForm({ ...form, observacoes: e.target.value })}
                       placeholder="Observações registrais…"
-                      className="w-full px-3 py-2 bg-[var(--surface-popover)]/5 border border-[var(--border-default)] rounded-md text-sm text-[var(--text-primary)] placeholder-white/30 focus:outline-none focus:border-sky-200 focus:ring-1 focus:border-sky-200 resize-none"
+                      className="w-full px-3 py-2 bg-[var(--surface-popover)]/5 border border-[var(--border-default)] rounded-md text-sm text-[var(--text-primary)] placeholder-white/30 focus:outline-none focus:border-[var(--border-default)] focus:ring-1 focus:border-[var(--border-default)] resize-none"
                     />
                   </Section>
                 )}
@@ -735,7 +735,7 @@ function ConteudoModal({
                   <button
                     onClick={handleSalvar}
                     disabled={saving || !podeConcluirEtapa}
-                    className="px-5 py-2 text-[12.5px] font-semibold bg-red-50 hover:bg-red-50 disabled:bg-red-50 disabled:opacity-50 disabled:cursor-not-allowed text-[var(--text-primary)] rounded-md inline-flex items-center gap-2 transition-colors"
+                    className="px-5 py-2 text-[12.5px] font-semibold bg-[var(--surface-secondary)] hover:bg-[var(--surface-secondary)] disabled:bg-[var(--surface-secondary)] disabled:opacity-50 disabled:cursor-not-allowed text-[var(--text-primary)] rounded-md inline-flex items-center gap-2 transition-colors"
                   >
                     {saving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : null}
                     Salvar e iniciar solicitação
@@ -744,7 +744,7 @@ function ConteudoModal({
                   <button
                     onClick={handleSalvar}
                     disabled={saving}
-                    className="px-5 py-2 text-[12.5px] font-semibold bg-sky-50 hover:bg-sky-50 disabled:bg-sky-50 disabled:opacity-50 text-[var(--text-primary)] rounded-md inline-flex items-center gap-2 transition-colors"
+                    className="px-5 py-2 text-[12.5px] font-semibold bg-[var(--surface-secondary)] hover:bg-[var(--surface-secondary)] disabled:bg-[var(--surface-secondary)] disabled:opacity-50 text-[var(--text-primary)] rounded-md inline-flex items-center gap-2 transition-colors"
                   >
                     {saving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : null}
                     Salvar
@@ -846,7 +846,7 @@ function Field({
             className={`text-[8.5px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded ${
               isEmpty
                 ? "bg-[var(--accent-primary)]/20 text-[var(--accent-text)] border border-[var(--accent-primary)]/40"
-                : "bg-green-50 text-green-700 border border-green-200"
+                : "bg-[var(--surface-secondary)] text-green-700 border border-[var(--border-default)]"
             }`}
           >
             obrigatório p/ concluir
@@ -857,14 +857,14 @@ function Field({
             className={`text-[8.5px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded ${
               isEmpty
                 ? "bg-[var(--accent-primary)]/20 text-[var(--accent-text)] border border-[var(--accent-primary)]/40"
-                : "bg-green-50 text-green-700 border border-green-200"
+                : "bg-[var(--surface-secondary)] text-green-700 border border-[var(--border-default)]"
             }`}
           >
             obrigatório*
           </span>
         )}
         {critical && !requiredToComplete && !requiredAlt && (
-          <span className="text-[8.5px] font-semibold uppercase tracking-wider text-sky-700">
+          <span className="text-[8.5px] font-semibold uppercase tracking-wider text-[var(--text-secondary)]">
             crítico
           </span>
         )}
@@ -876,7 +876,7 @@ function Field({
         className={`w-full px-3 py-2 bg-[var(--surface-popover)]/5 border rounded-md text-sm text-[var(--text-primary)] placeholder-white/30 focus:outline-none focus:ring-1 ${
           requiredEmpty || requiredAltEmpty
             ? "border-[var(--accent-primary)]/40 focus:border-[var(--accent-primary)]/60 focus:ring-[var(--accent-primary)]/30"
-            : "border-[var(--border-default)] focus:border-sky-200 focus:border-sky-200"
+            : "border-[var(--border-default)] focus:border-[var(--border-default)] focus:border-[var(--border-default)]"
         }`}
       />
     </div>

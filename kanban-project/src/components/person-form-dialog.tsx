@@ -380,13 +380,13 @@ function ConteudoDialog({
           <TabsContent value="existing" className="space-y-4 mt-4">
             <Form {...existingPersonForm}>
               <form onSubmit={existingPersonForm.handleSubmit(handleExistingPersonSubmit)} className="space-y-4">
-                <div className="space-y-4 p-4 bg-blue-50 rounded-lg border border-blue-200">
+                <div className="space-y-4 p-4 bg-[var(--surface-secondary)] rounded-lg border border-[var(--border-default)]">
                   <FormField
                     control={existingPersonForm.control}
                     name="id"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel className="text-blue-700 font-semibold">Selecione a Pessoa</FormLabel>
+                        <FormLabel className="text-[var(--text-secondary)] font-semibold">Selecione a Pessoa</FormLabel>
                         <Select
                           onValueChange={(value) => {
                             field.onChange(Number.parseInt(value, 10))
@@ -395,7 +395,7 @@ function ConteudoDialog({
                           value={selectedPersonId}
                         >
                           <FormControl>
-                            <SelectTrigger className="border-blue-300 focus:border-blue-500 bg-[var(--surface-primary)]">
+                            <SelectTrigger className="border-[var(--border-default)] focus:border-[var(--border-default)] bg-[var(--surface-primary)]">
                               <SelectValue placeholder="Selecione uma pessoa da árvore" />
                             </SelectTrigger>
                           </FormControl>
@@ -409,7 +409,7 @@ function ConteudoDialog({
                                   {p.sexo && (
                                     <span
                                       className={`text-xs px-2 py-1 rounded-full ${
-                                        p.sexo === "Masculino" ? "bg-blue-100 text-blue-700" : "bg-pink-100 text-pink-700"
+                                        p.sexo === "Masculino" ? "bg-[var(--surface-secondary)] text-[var(--text-secondary)]" : "bg-[var(--surface-secondary)] text-[var(--text-secondary)]"
                                       }`}
                                     >
                                       {p.sexo}
@@ -426,8 +426,8 @@ function ConteudoDialog({
                           </SelectContent>
                         </Select>
                         {availablePessoas.length === 0 && (
-                          <div className="flex items-center gap-2 p-3 bg-yellow-50 border border-yellow-200 rounded-md">
-                            <span className="text-sm text-yellow-700">
+                          <div className="flex items-center gap-2 p-3 bg-[var(--surface-secondary)] border border-[var(--border-default)] rounded-md">
+                            <span className="text-sm text-amber-700">
                               ⚠️ Nenhuma pessoa disponível para este relacionamento.
                             </span>
                           </div>

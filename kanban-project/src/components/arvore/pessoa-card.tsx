@@ -118,7 +118,7 @@ function PersonAvatar({ pessoa, size = 40 }: { pessoa: PessoaArvore; size?: numb
   
   return (
     <div
-      className="rounded-full flex items-center justify-center font-bold text-white shadow-sm relative"
+      className="rounded-full flex items-center justify-center font-bold text-white shadow-[var(--elev-1)] relative"
       style={{
         width: size,
         height: size,
@@ -202,12 +202,12 @@ function DocumentoIndicador({ doc }: { doc: DocumentoArvore }) {
   return (
     <div className="group/tooltip relative">
       <div
-        className="w-5 h-5 rounded-full flex items-center justify-center text-white text-[9px] font-bold cursor-help transition-transform hover:scale-110 shadow-sm"
+        className="w-5 h-5 rounded-full flex items-center justify-center text-white text-[9px] font-bold cursor-help transition-transform hover:scale-110 shadow-[var(--elev-1)]"
         style={{ backgroundColor: config.color }}
       >
         {tipoLabel.charAt(0)}
       </div>
-      <div className="absolute left-full ml-2 top-1/2 -translate-y-1/2 px-2 py-1 bg-[var(--surface-popover)] text-white text-xs rounded whitespace-nowrap opacity-0 invisible group-hover/tooltip:opacity-100 group-hover/tooltip:visible transition-all z-[100] pointer-events-none shadow-lg">
+      <div className="absolute left-full ml-2 top-1/2 -translate-y-1/2 px-2 py-1 bg-[var(--surface-popover)] text-white text-xs rounded whitespace-nowrap opacity-0 invisible group-hover/tooltip:opacity-100 group-hover/tooltip:visible transition-all z-[100] pointer-events-none shadow-[var(--elev-2)]">
         {tipoLabel}: {config.label}
         <div className="absolute right-full top-1/2 -translate-y-1/2 border-4 border-transparent border-r-gray-900" />
       </div>
@@ -289,7 +289,7 @@ export function PessoaCard({
 
   return (
     <div
-      className={`relative bg-[var(--surface-primary)] rounded-xl shadow-lg overflow-visible transition-all hover:shadow-xl ${isMain ? 'ring-2 ring-offset-2' : ''}`}
+      className={`relative bg-[var(--surface-primary)] rounded-xl shadow-[var(--elev-2)] overflow-visible transition-all hover:shadow-[var(--elev-3)] ${isMain ? 'ring-2 ring-offset-2' : ''}`}
       style={{
         minWidth: '260px',
         maxWidth: '320px',
@@ -387,7 +387,7 @@ export function PessoaCard({
           }}
         >
           <div className="flex items-center gap-2 text-[var(--text-muted)] group-hover:text-amber-600">
-            <div className="w-9 h-9 rounded-full bg-gray-100 flex items-center justify-center group-hover:bg-amber-50">
+            <div className="w-9 h-9 rounded-full bg-gray-100 flex items-center justify-center group-hover:bg-[var(--surface-secondary)]">
               <UserPlus className="h-4 w-4" />
             </div>
             <span className="text-sm font-medium">Adicionar cônjuge</span>
@@ -439,7 +439,7 @@ export function AddPersonButton({ type, onClick, disabled, size = 'md' }: AddPer
 
   return (
     <button
-      className={`flex items-center gap-3 ${sizeClasses[size]} bg-[var(--surface-primary)] rounded-xl border-2 border-dashed border-gray-300 cursor-pointer hover:border-amber-500 hover:bg-amber-50 transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-sm hover:shadow-md`}
+      className={`flex items-center gap-3 ${sizeClasses[size]} bg-[var(--surface-primary)] rounded-xl border-2 border-dashed border-gray-300 cursor-pointer hover:border-amber-500 hover:bg-[var(--surface-secondary)] transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-[var(--elev-1)] hover:shadow-[var(--elev-2)]`}
       onClick={onClick}
       disabled={disabled}
     >

@@ -134,7 +134,7 @@ export default function MatrizDocumentalTab() {
 
   return (
     <div className="space-y-5">
-      {flash && <div className="rounded-xl border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-700">{flash}</div>}
+      {flash && <div className="rounded-xl border border-[var(--border-default)] bg-[var(--surface-secondary)] px-4 py-3 text-sm text-green-700">{flash}</div>}
 
       {/* cabeçalho + seletor */}
       <div className="rounded-2xl border border-[var(--border-default)] bg-[var(--surface-primary)] p-5 backdrop-blur-sm">
@@ -154,7 +154,7 @@ export default function MatrizDocumentalTab() {
           <div className="mb-3 flex flex-wrap items-center gap-2">
             <button onClick={() => setForm(blankForm(proc.id))} className="rounded-lg bg-[var(--action-primary)] px-3 py-1.5 text-xs font-medium text-[var(--action-primary-ink)] hover:bg-[var(--action-primary)]">+ Nova regra documental</button>
             {arquivadasCount > 0 && (
-              <button onClick={() => setShowArchived(v => !v)} className={`ml-auto rounded-lg border px-3 py-1.5 text-xs ${showArchived ? "border-blue-200 bg-blue-50 text-blue-700" : "border-[var(--border-default)] bg-[var(--surface-primary)] text-[var(--text-secondary)] hover:bg-[var(--surface-hover)]"}`}>
+              <button onClick={() => setShowArchived(v => !v)} className={`ml-auto rounded-lg border px-3 py-1.5 text-xs ${showArchived ? "border-[var(--border-default)] bg-[var(--surface-secondary)] text-[var(--text-secondary)]" : "border-[var(--border-default)] bg-[var(--surface-primary)] text-[var(--text-secondary)] hover:bg-[var(--surface-hover)]"}`}>
                 {showArchived ? "Ocultar arquivadas" : `Mostrar arquivadas (${arquivadasCount})`}
               </button>
             )}
@@ -175,8 +175,8 @@ export default function MatrizDocumentalTab() {
                     <td className="px-3 py-2 text-xs text-white/70">{TARGETS[m.target] || m.target}</td>
                     <td className="px-3 py-2 text-[11px] text-[var(--text-secondary)]">{GENRULES[m.generationRule] || m.generationRule}</td>
                     <td className="px-3 py-2">
-                      <span className={`rounded px-1.5 py-0.5 text-[10px] ${m.required ? "bg-amber-50 text-amber-700" : "bg-[var(--surface-primary)] text-[var(--text-secondary)]"}`}>{m.required ? "obrigatório" : "opcional"}</span>
-                      {m.blocksPhaseCompletion && <span className="ml-1 rounded bg-red-50 px-1.5 py-0.5 text-[10px] text-red-700">bloqueia fase</span>}
+                      <span className={`rounded px-1.5 py-0.5 text-[10px] ${m.required ? "bg-[var(--surface-secondary)] text-amber-700" : "bg-[var(--surface-primary)] text-[var(--text-secondary)]"}`}>{m.required ? "obrigatório" : "opcional"}</span>
+                      {m.blocksPhaseCompletion && <span className="ml-1 rounded bg-[var(--surface-secondary)] px-1.5 py-0.5 text-[10px] text-red-700">bloqueia fase</span>}
                     </td>
                     <td className="px-3 py-2 text-[10px] text-[var(--text-secondary)]">{[m.createsTask && "tarefa", m.createsCost && "custo", m.createsRevenue && "receita"].filter(Boolean).join(" · ") || "—"}</td>
                     <td className="px-3 py-2">
@@ -184,14 +184,14 @@ export default function MatrizDocumentalTab() {
                         {m.arquivado ? (
                           <>
                             <button title="Reativar" aria-label="Reativar" onClick={() => setArquivado(m, false)} className="rounded p-1 text-green-700/80 hover:bg-[var(--surface-hover)] hover:text-green-700"><IUnarch /></button>
-                            {(m.usedByCount || 0) === 0 && <button title="Excluir" aria-label="Excluir" onClick={() => del(m)} className="rounded p-1 text-red-700/70 hover:bg-red-50 hover:text-red-700"><ITrash /></button>}
+                            {(m.usedByCount || 0) === 0 && <button title="Excluir" aria-label="Excluir" onClick={() => del(m)} className="rounded p-1 text-red-700/70 hover:bg-[var(--surface-secondary)] hover:text-red-700"><ITrash /></button>}
                           </>
                         ) : (
                           <>
                             <button title="Editar" aria-label="Editar" onClick={() => openEdit(m)} className="rounded p-1 hover:bg-[var(--surface-hover)] hover:text-white"><IEdit /></button>
                             <button title="Duplicar" aria-label="Duplicar" onClick={() => dup(m)} className="rounded p-1 hover:bg-[var(--surface-hover)] hover:text-white"><ICopy /></button>
                             <button title="Arquivar" aria-label="Arquivar" onClick={() => setArquivado(m, true)} className="rounded p-1 hover:bg-[var(--surface-hover)] hover:text-white"><IArch /></button>
-                            {(m.usedByCount || 0) === 0 && <button title="Excluir" aria-label="Excluir" onClick={() => del(m)} className="rounded p-1 text-red-700/70 hover:bg-red-50 hover:text-red-700"><ITrash /></button>}
+                            {(m.usedByCount || 0) === 0 && <button title="Excluir" aria-label="Excluir" onClick={() => del(m)} className="rounded p-1 text-red-700/70 hover:bg-[var(--surface-secondary)] hover:text-red-700"><ITrash /></button>}
                           </>
                         )}
                       </div>
@@ -207,7 +207,7 @@ export default function MatrizDocumentalTab() {
       {/* MODAL */}
       {form && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-[var(--overlay-modal)] p-4 backdrop-blur-sm" onClick={() => setForm(null)}>
-          <div className="max-h-[90vh] w-full max-w-2xl overflow-auto rounded-2xl border border-[var(--border-default)] bg-zinc-900/95 shadow-2xl" onClick={e => e.stopPropagation()}>
+          <div className="max-h-[90vh] w-full max-w-2xl overflow-auto rounded-2xl border border-[var(--border-default)] bg-zinc-900/95 shadow-[var(--elev-3)]" onClick={e => e.stopPropagation()}>
             <div className="border-b border-[var(--border-default)] px-6 py-4"><h3 className="font-semibold text-white">{form.id ? "Editar" : "Nova"} regra documental</h3></div>
             <div className="grid grid-cols-2 gap-3 px-6 py-4">
               <div>

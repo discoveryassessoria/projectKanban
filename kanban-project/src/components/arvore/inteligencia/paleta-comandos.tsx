@@ -75,7 +75,7 @@ export function PaletaComandos({ indice, aberto, onFechar, onEscolher, contextoD
         role="dialog"
         aria-label="Buscar pessoa na árvore"
         // Cor própria na raiz — ver comentário equivalente em tree-onboarding.tsx.
-        className="fixed left-1/2 top-[15%] z-[10004] w-full max-w-lg -translate-x-1/2 overflow-hidden rounded-xl border border-gray-200 bg-[var(--surface-primary)] text-gray-900 shadow-2xl"
+        className="fixed left-1/2 top-[15%] z-[10004] w-full max-w-lg -translate-x-1/2 overflow-hidden rounded-xl border border-gray-200 bg-[var(--surface-primary)] text-gray-900 shadow-[var(--elev-3)]"
       >
         <div className="flex items-center gap-2 border-b border-gray-100 px-4">
           <Search className="h-4 w-4 shrink-0 text-[var(--text-muted)]" />
@@ -118,7 +118,7 @@ export function PaletaComandos({ indice, aberto, onFechar, onEscolher, contextoD
               </span>
               <span className="flex shrink-0 items-center gap-2">
                 {r.naLinha && (
-                  <span className="rounded-full bg-green-50 px-2 py-0.5 text-[10px] font-medium text-green-700">
+                  <span className="rounded-full bg-[var(--surface-secondary)] px-2 py-0.5 text-[10px] font-medium text-green-700">
                     linha
                   </span>
                 )}

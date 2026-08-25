@@ -170,7 +170,7 @@ function ConteudoModal({
       <DialogContent className="sm:max-w-[425px]">
         <DialogHeader>
           <div className="flex items-center gap-2">
-            <Building2 className="h-5 w-5 text-blue-600" />
+            <Building2 className="h-5 w-5 text-[var(--text-secondary)]" />
             <DialogTitle>
               {isCreateMode ? 'Novo Contratante' : 
                isViewMode ? 'Informações do Contratante' : 'Editar Contratante'}
@@ -185,7 +185,7 @@ function ConteudoModal({
 
         {/* Erro geral */}
         {errors.geral && (
-          <div className="flex items-center gap-2 p-3 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm">
+          <div className="flex items-center gap-2 p-3 bg-[var(--surface-secondary)] border border-[var(--border-default)] rounded-lg text-red-700 text-sm">
             <AlertTriangle className="h-4 w-4 flex-shrink-0" />
             <span>{errors.geral}</span>
           </div>
@@ -204,7 +204,7 @@ function ConteudoModal({
               placeholder="Digite o nome completo"
               required
               readOnly={isViewMode}
-              className={errors.nome ? "border-red-500 focus-visible:ring-red-500" : ""}
+              className={errors.nome ? "border-red-500 focus-visible:ring-[var(--border-strong)]" : ""}
             />
             {errors.nome && (
               <p className="text-sm text-red-500 flex items-center gap-1">
@@ -228,7 +228,7 @@ function ConteudoModal({
                 required
                 readOnly={isViewMode}
                 maxLength={14}
-                className={errors.cpf ? "border-red-500 focus-visible:ring-red-500" : ""}
+                className={errors.cpf ? "border-red-500 focus-visible:ring-[var(--border-strong)]" : ""}
               />
               {errors.cpf && (
                 <p className="text-sm text-red-500 flex items-center gap-1">

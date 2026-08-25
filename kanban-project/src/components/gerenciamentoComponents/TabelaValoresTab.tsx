@@ -418,7 +418,7 @@ export default function TabelaValoresTab() {
       <input value={busca} onChange={(e) => setBusca(e.target.value)} placeholder="Buscar por cadastro mestre, papel ou contexto..." className="w-full rounded-lg border border-[var(--border-default)] bg-[var(--surface-primary)] px-4 py-2 text-sm text-white placeholder-white/30 outline-none backdrop-blur focus:border-white/20" />
 
       {loading && <div className="py-12 text-center text-sm text-[var(--text-muted)]">Carregando...</div>}
-      {!loading && erroLista && <div className="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-700">{erroLista}<button onClick={() => void carregar()} className="ml-3 underline hover:text-white">Tentar de novo</button></div>}
+      {!loading && erroLista && <div className="rounded-lg border border-[var(--border-default)] bg-[var(--surface-secondary)] p-4 text-sm text-red-700">{erroLista}<button onClick={() => void carregar()} className="ml-3 underline hover:text-white">Tentar de novo</button></div>}
       {!loading && !erroLista && filtrados.length === 0 && <div className="rounded-xl border border-[var(--border-default)] bg-[var(--surface-primary)] py-12 text-center text-sm text-[var(--text-muted)] backdrop-blur">{busca ? 'Nenhum preço encontrado.' : 'Nenhum preço ainda. Crie o primeiro em “Novo valor”.'}</div>}
 
       {!loading && !erroLista && filtrados.length > 0 && (
@@ -443,7 +443,7 @@ export default function TabelaValoresTab() {
                     <td className="px-3 py-2.5 text-[var(--text-secondary)]">{om.origem}</td>
                     <CelulaDimensao dim={linha.custo} onEditar={abrirEditar} onExcluir={excluir} />
                     <CelulaDimensao dim={linha.venda} onEditar={abrirEditar} onExcluir={excluir} />
-                    <td className="px-3 py-2.5"><span className={`rounded px-2 py-0.5 text-[11px] font-medium ${ativo ? 'bg-green-50 text-green-700' : 'bg-[var(--surface-primary)] text-[var(--text-secondary)]'}`}>{ativo ? 'Ativo' : 'Inativo'}</span></td>
+                    <td className="px-3 py-2.5"><span className={`rounded px-2 py-0.5 text-[11px] font-medium ${ativo ? 'bg-[var(--surface-secondary)] text-green-700' : 'bg-[var(--surface-primary)] text-[var(--text-secondary)]'}`}>{ativo ? 'Ativo' : 'Inativo'}</span></td>
                     <td className="px-3 py-2.5 text-right text-[11px] text-[var(--text-muted)]">
                       {/* VARIAÇÃO ≠ SEM PAPEL. O preço de um fornecedor específico
                           convivendo com o genérico é cadastro correto — é a régua
@@ -471,7 +471,7 @@ export default function TabelaValoresTab() {
 
       {modalAberto && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-[var(--overlay-modal)] p-4 backdrop-blur-sm">
-          <div className="max-h-[90vh] w-full max-w-2xl overflow-auto rounded-2xl border border-[var(--border-default)] bg-zinc-900/95 shadow-2xl">
+          <div className="max-h-[90vh] w-full max-w-2xl overflow-auto rounded-2xl border border-[var(--border-default)] bg-zinc-900/95 shadow-[var(--elev-3)]">
             <div className="flex items-center justify-between border-b border-[var(--border-default)] px-6 py-4">
               <h3 className="text-lg font-semibold text-white">{editando ? 'Editar preço' : 'Novo valor'}</h3>
               <button onClick={() => setModalAberto(false)} className="text-[var(--text-muted)] transition hover:text-white">✕</button>
@@ -537,7 +537,7 @@ export default function TabelaValoresTab() {
                   </select>
                   {/* Confirmação do VÍNCULO — o que a tela mostra é o item resolvido pelo id. */}
                   {itemVinculado && rotuloItemVinculado && (
-                    <p className="mt-1 text-[11px] text-emerald-700/80">Item vinculado: {rotuloItemVinculado}</p>
+                    <p className="mt-1 text-[11px] text-green-700/80">Item vinculado: {rotuloItemVinculado}</p>
                   )}
                   {form.categoria && !editando && itensDaCategoria.length === 0 && (
                     <p className="mt-1 text-[11px] text-[var(--text-muted)]">Nenhum item nesta categoria. Cadastre a Configuração Financeira do mestre.</p>
@@ -603,7 +603,7 @@ export default function TabelaValoresTab() {
 
               {/* Bloco PREÇO DE CUSTO — Fornecedor + Moeda + Valor */}
               {form.precoCusto && (
-                <div className="rounded-lg border border-amber-200 bg-amber-500/[0.04] p-3">
+                <div className="rounded-lg border border-[var(--border-default)] bg-[var(--surface-secondary)] p-3">
                   <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-amber-700/80">Preço de Custo</div>
                   <div className="grid grid-cols-3 gap-3">
                     <div>
@@ -643,8 +643,8 @@ export default function TabelaValoresTab() {
 
               {/* Bloco PREÇO DE VENDA — Moeda + Valor (sem fornecedor) */}
               {form.precoVenda && (
-                <div className="rounded-lg border border-emerald-200 bg-emerald-500/[0.04] p-3">
-                  <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-emerald-700/80">Preço de Venda</div>
+                <div className="rounded-lg border border-[var(--border-default)] bg-[var(--surface-secondary)] p-3">
+                  <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-green-700/80">Preço de Venda</div>
                   <div className="grid grid-cols-2 gap-3">
                     <div>
                       <label className="mb-1 block text-xs text-[var(--text-secondary)]">Moeda da venda *</label>
@@ -699,7 +699,7 @@ export default function TabelaValoresTab() {
                 <label className="flex items-center gap-2 text-sm text-white/80"><input type="checkbox" checked={!form.arquivado} onChange={(e) => set('arquivado', !e.target.checked)} className="h-4 w-4 accent-blue-500" />Ativo</label>
               </div>
 
-              {erroModal && <div className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700">{erroModal}</div>}
+              {erroModal && <div className="rounded-lg border border-[var(--border-default)] bg-[var(--surface-secondary)] p-3 text-sm text-red-700">{erroModal}</div>}
             </div>
             <div className="flex items-center justify-end gap-2 border-t border-[var(--border-default)] px-6 py-4">
               <button onClick={() => setModalAberto(false)} className="rounded-lg px-4 py-2 text-sm text-[var(--text-secondary)] transition hover:text-white">Cancelar</button>

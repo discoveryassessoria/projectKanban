@@ -14,7 +14,7 @@ import { AvisoRascunho, TITULO_RASCUNHO, BTN_RASCUNHO } from './_RascunhoUI'
 
 const CARD = 'rounded-xl border border-[var(--border-default)] bg-[var(--surface-primary)] backdrop-blur'
 const BTN_PRIMARY =
-  'rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-blue-500'
+  'rounded-lg bg-[var(--text-muted)] px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-[var(--surface-secondary)]'
 
 function Section({ title, action }: { title: string; action?: React.ReactNode }) {
   return (
@@ -76,7 +76,7 @@ export function FinCatalogTab() {
             onClick={() => setFiltro(f)}
             className={`rounded-full border px-2.5 py-1 text-[11.5px] font-semibold transition ${
               filtro === f
-                ? 'border-blue-500/60 bg-blue-50 text-blue-700'
+                ? 'border-[var(--border-default)] bg-[var(--surface-secondary)] text-[var(--text-secondary)]'
                 : 'border-[var(--border-default)] text-[var(--text-secondary)] hover:bg-[var(--surface-hover)]'
             }`}
           >
@@ -137,8 +137,8 @@ function PhaseCard({ nome }: { nome: string }) {
         <span className="rounded-md bg-[var(--surface-primary)] px-2 py-0.5 text-[10px] font-semibold text-[var(--text-secondary)]">sem regras</span>
       </div>
       <div className="mb-2.5 grid grid-cols-3 gap-1.5 text-center">
-        <div><div className="text-lg font-extrabold text-blue-700">0</div><div className="text-[9px] text-[var(--text-secondary)]">Disparos</div></div>
-        <div><div className="text-lg font-extrabold text-slate-700">0</div><div className="text-[9px] text-[var(--text-secondary)]">Operac.</div></div>
+        <div><div className="text-lg font-extrabold text-[var(--text-secondary)]">0</div><div className="text-[9px] text-[var(--text-secondary)]">Disparos</div></div>
+        <div><div className="text-lg font-extrabold text-[var(--text-secondary)]">0</div><div className="text-[9px] text-[var(--text-secondary)]">Operac.</div></div>
         <div><div className="text-lg font-extrabold text-amber-700">0</div><div className="text-[9px] text-[var(--text-secondary)]">Alertas</div></div>
       </div>
       <div className="mb-0.5 text-[10px] font-bold uppercase tracking-wide text-[var(--text-muted)]">Itens financeiros (disparo)</div>

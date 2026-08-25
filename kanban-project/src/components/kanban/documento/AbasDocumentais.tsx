@@ -170,7 +170,7 @@ function LinhaArquivo({ arquivo: a }: { arquivo: ArquivoDocumentoView }) {
           )}
         </div>
         {mestre && (
-          <div className="text-[10.5px] text-sky-700 truncate">
+          <div className="text-[10.5px] text-[var(--text-secondary)] truncate">
             {mestre.name}
             {mestre.publicCode ? ` · ${mestre.publicCode}` : ""}
           </div>
@@ -398,7 +398,7 @@ export function AbaObservacoesDocumentais({
             value={texto}
             onChange={(e) => setTexto(e.target.value)}
             placeholder="Anote algo relevante sobre este documento…"
-            className="w-full px-3 py-2 bg-[var(--surface-overlay)] border border-[var(--border-default)] rounded-md text-sm text-[var(--text-primary)] placeholder-white/30 focus:outline-none focus:border-sky-200 resize-none"
+            className="w-full px-3 py-2 bg-[var(--surface-overlay)] border border-[var(--border-default)] rounded-md text-sm text-[var(--text-primary)] placeholder-white/30 focus:outline-none focus:border-[var(--border-default)] resize-none"
           />
           <div className="flex justify-end mt-1.5">
             <button

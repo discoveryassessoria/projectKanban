@@ -202,7 +202,7 @@ function ConteudoModal({
       label: "Marcar como desnecessário",
       desc: "Cancelar este documento — não será mais cobrado.",
       icon: <Ban className="w-5 h-5" />,
-      iconBg: "bg-red-50",
+      iconBg: "bg-[var(--surface-secondary)]",
       iconColor: "text-red-700",
     },
   ]
@@ -223,7 +223,7 @@ function ConteudoModal({
       {/* MODAL */}
       <div className="fixed inset-0 z-[10011] flex items-center justify-center p-4 pointer-events-none">
         <div
-          className="bg-[var(--surface-popover)] rounded-xl shadow-2xl w-full max-w-[640px] max-h-[92vh] flex flex-col pointer-events-auto"
+          className="bg-[var(--surface-popover)] rounded-xl shadow-[var(--elev-3)] w-full max-w-[640px] max-h-[92vh] flex flex-col pointer-events-auto"
           onClick={(e) => e.stopPropagation()}
         >
           {/* HEADER */}
@@ -249,7 +249,7 @@ function ConteudoModal({
                 <Loader2 className="w-5 h-5 animate-spin text-[var(--text-muted)]" />
               </div>
             ) : erro ? (
-              <div className="bg-red-50 border border-red-200 rounded-lg px-4 py-3 text-sm text-red-700">
+              <div className="bg-[var(--surface-secondary)] border border-[var(--border-default)] rounded-lg px-4 py-3 text-sm text-red-700">
                 ⚠ {erro}
               </div>
             ) : doc ? (
@@ -265,7 +265,7 @@ function ConteudoModal({
                         onClick={() => setTipoOperacao(op.key)}
                         className={`w-full flex items-start gap-3 px-3 py-3 rounded-lg border-2 transition-all text-left ${
                           selected
-                            ? "border-blue-500 bg-sky-50"
+                            ? "border-[var(--border-default)] bg-[var(--surface-secondary)]"
                             : "border-[var(--border-default)] bg-[var(--surface-popover)] hover:border-[var(--border-strong)] hover:bg-[var(--surface-secondary)]"
                         }`}
                       >
@@ -301,7 +301,7 @@ function ConteudoModal({
                         <select
                           value={responsavelId}
                           onChange={(e) => setResponsavelId(e.target.value)}
-                          className="w-full px-3 py-2 text-sm border border-[var(--border-default)] rounded-md focus:outline-none focus:border-blue-400 focus:ring-1 focus:ring-blue-100 bg-[var(--surface-popover)]"
+                          className="w-full px-3 py-2 text-sm border border-[var(--border-default)] rounded-md focus:outline-none focus:border-[var(--border-default)] focus:ring-1 focus:ring-[var(--border-strong)] bg-[var(--surface-popover)]"
                         >
                           <option value="auto">Auto (responsável padrão da etapa)</option>
                           {usuarios.map((u) => (
@@ -319,7 +319,7 @@ function ConteudoModal({
                           type="date"
                           value={dataPrazoInicial}
                           onChange={(e) => setDataPrazoInicial(e.target.value)}
-                          className="w-full px-3 py-2 text-sm border border-[var(--border-default)] rounded-md focus:outline-none focus:border-blue-400 focus:ring-1 focus:ring-blue-100 bg-[var(--surface-popover)]"
+                          className="w-full px-3 py-2 text-sm border border-[var(--border-default)] rounded-md focus:outline-none focus:border-[var(--border-default)] focus:ring-1 focus:ring-[var(--border-strong)] bg-[var(--surface-popover)]"
                         />
                       </div>
                     </div>
@@ -334,8 +334,8 @@ function ConteudoModal({
                       {(
                         [
                           { key: "normal", label: "Normal", bgActive: "bg-[var(--app-background)] text-white", bgIdle: "bg-[var(--surface-popover)] text-white/80 border-[var(--border-default)]" },
-                          { key: "urgente", label: "Urgente", bgActive: "bg-amber-500 text-white", bgIdle: "bg-[var(--surface-popover)] text-white/80 border-[var(--border-default)]" },
-                          { key: "critica", label: "⚠ Crítica", bgActive: "bg-red-50 text-white", bgIdle: "bg-[var(--surface-popover)] text-white/80 border-[var(--border-default)]" },
+                          { key: "urgente", label: "Urgente", bgActive: "bg-amber-600 text-white", bgIdle: "bg-[var(--surface-popover)] text-white/80 border-[var(--border-default)]" },
+                          { key: "critica", label: "⚠ Crítica", bgActive: "bg-[var(--surface-secondary)] text-white", bgIdle: "bg-[var(--surface-popover)] text-white/80 border-[var(--border-default)]" },
                         ] as Array<{ key: Prioridade; label: string; bgActive: string; bgIdle: string }>
                       ).map((p) => {
                         const selected = prioridade === p.key
@@ -370,7 +370,7 @@ function ConteudoModal({
                       ? "Por que este documento não é mais necessário?"
                       : "Contexto, instruções para quem vai iniciar, particularidades do caso…"
                   }
-                  className="w-full px-3 py-2 text-sm border border-[var(--border-default)] rounded-md focus:outline-none focus:border-blue-400 focus:ring-1 focus:ring-blue-100 resize-none"
+                  className="w-full px-3 py-2 text-sm border border-[var(--border-default)] rounded-md focus:outline-none focus:border-[var(--border-default)] focus:ring-1 focus:ring-[var(--border-strong)] resize-none"
                 />
               </>
             ) : null}
@@ -390,8 +390,8 @@ function ConteudoModal({
               disabled={!tipoOperacao || saving}
               className={`px-4 py-2 text-sm font-semibold text-white rounded-md disabled:opacity-50 disabled:cursor-not-allowed inline-flex items-center gap-2 ${
                 tipoOperacao === "desnecessario"
-                  ? "bg-red-50 hover:bg-red-600"
-                  : "bg-sky-50 hover:bg-sky-50"
+                  ? "bg-[var(--surface-secondary)] hover:bg-red-600"
+                  : "bg-[var(--surface-secondary)] hover:bg-[var(--surface-secondary)]"
               }`}
             >
               {saving && <Loader2 className="w-3.5 h-3.5 animate-spin" />}

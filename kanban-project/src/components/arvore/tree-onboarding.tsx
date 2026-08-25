@@ -202,14 +202,14 @@ function Step1TypeSelector({
                 onClick={() => onSelect(opt.value)}
                 className={`w-full text-left p-5 rounded-xl border-2 transition-all ${
                   isSelected
-                    ? "border-amber-500 bg-amber-50 shadow-sm"
+                    ? "border-amber-500 bg-[var(--surface-secondary)] shadow-[var(--elev-1)]"
                     : "border-gray-200 bg-[var(--surface-primary)] hover:border-gray-300 hover:bg-gray-50"
                 }`}
               >
                 <div className="flex items-start gap-3">
                   <div
                     className={`mt-0.5 w-5 h-5 rounded-full border-2 flex items-center justify-center flex-shrink-0 transition-colors ${
-                      isSelected ? "border-amber-500 bg-amber-500" : "border-gray-300"
+                      isSelected ? "border-amber-500 bg-amber-600" : "border-gray-300"
                     }`}
                   >
                     {isSelected && <Check className="w-3 h-3 text-white" strokeWidth={3} />}
@@ -235,7 +235,7 @@ function Step1TypeSelector({
           disabled={!selectedType}
           className={`w-full py-3.5 rounded-lg font-semibold text-sm tracking-wide transition-all ${
             selectedType
-              ? "bg-amber-700 text-white hover:bg-amber-800 hover:shadow-lg"
+              ? "bg-amber-700 text-white hover:bg-amber-800 hover:shadow-[var(--elev-2)]"
               : "bg-gray-200 text-gray-500 cursor-not-allowed"
           }`}
         >
@@ -339,7 +339,7 @@ function Step2PersonForm({
               processo recebe `text-white/80` com `finDark` ligado, e `position: fixed`
               não interrompe herança. Corrigir só os inputs deixaria qualquer outro
               texto deste card sem cor — e o próximo campo adicionado nasceria invisível. */}
-          <div className="bg-[var(--surface-primary)] text-gray-900 rounded-2xl shadow-sm border border-gray-200 p-6">
+          <div className="bg-[var(--surface-primary)] text-gray-900 rounded-2xl shadow-[var(--elev-1)] border border-gray-200 p-6">
           <h2 className="text-2xl font-bold text-gray-900 mb-1">
             Adicionar {typeRoleLabel(type, paisProcesso)}
           </h2>
@@ -417,11 +417,11 @@ function Step2PersonForm({
           </div>
 
           {/* Banner: Atributos da engine */}
-          <div className="mb-4 p-3 rounded-lg bg-blue-50 border border-blue-200">
-            <p className="text-xs font-semibold text-blue-900 mb-0.5">
+          <div className="mb-4 p-3 rounded-lg bg-[var(--surface-secondary)] border border-[var(--border-default)]">
+            <p className="text-xs font-semibold text-[var(--text-secondary)] mb-0.5">
               Atributos que alimentam a engine documental
             </p>
-            <p className="text-xs text-blue-700 leading-relaxed">
+            <p className="text-xs text-[var(--text-secondary)] leading-relaxed">
               Estes flags determinam quais documentos serão gerados automaticamente.
             </p>
           </div>
@@ -474,7 +474,7 @@ function Step2PersonForm({
 
           {/* Banner do tipo escolhido */}
           {type !== "common" && (
-            <div className="mb-6 p-3 rounded-lg bg-amber-50 border-l-4 border-amber-500">
+            <div className="mb-6 p-3 rounded-lg bg-[var(--surface-secondary)] border-l-4 border-amber-500">
               <p className="text-xs text-amber-800 leading-relaxed">
                 Esta pessoa será criada como{" "}
                 <strong>{typeRoleLabel(type, paisProcesso)}</strong>{" "}
@@ -500,7 +500,7 @@ function Step2PersonForm({
                 disabled={!canSubmit || saving}
                 className={`flex-1 py-3 rounded-lg font-semibold text-sm tracking-wide transition-all flex items-center justify-center gap-2 ${
                   canSubmit
-                    ? "bg-amber-700 text-white hover:bg-amber-800 hover:shadow-lg"
+                    ? "bg-amber-700 text-white hover:bg-amber-800 hover:shadow-[var(--elev-2)]"
                     : "bg-gray-200 text-gray-500 cursor-not-allowed"
                 }`}
               >
@@ -565,10 +565,10 @@ const NACIONALIDADE_ADJ: Record<PaisProcesso, string> = {
 // `text-gray-900` aqui, o que o usuário digita sai branco sobre branco: só
 // aparece ao selecionar o texto.
 const inputCls =
-  "w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-500 bg-[var(--surface-primary)] text-gray-900 placeholder:text-[var(--text-muted)] text-sm h-[42px]"
+  "w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--border-strong)] bg-[var(--surface-primary)] text-gray-900 placeholder:text-[var(--text-muted)] text-sm h-[42px]"
 
 const selectCls =
-  "w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-500 bg-[var(--surface-primary)] text-gray-900 text-sm h-[42px] appearance-none cursor-pointer"
+  "w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--border-strong)] bg-[var(--surface-primary)] text-gray-900 text-sm h-[42px] appearance-none cursor-pointer"
 
 const selectStyle = {
   backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%239ca3af' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E")`,
@@ -604,8 +604,8 @@ function RadioOption({
   label: string
   color: "blue" | "pink"
 }) {
-  const checkedColor = color === "blue" ? "border-blue-500" : "border-pink-500"
-  const dotColor = color === "blue" ? "bg-blue-500" : "bg-pink-500"
+  const checkedColor = color === "blue" ? "border-[var(--border-default)]" : "border-red-500"
+  const dotColor = color === "blue" ? "bg-[var(--surface-secondary)]" : "bg-red-500"
   return (
     <label className="flex items-center gap-2 cursor-pointer group">
       <div className="relative">

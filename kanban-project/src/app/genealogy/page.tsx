@@ -475,7 +475,7 @@ export default function GenealogyPage() {
                       <button
                         onClick={handlePesquisar}
                         disabled={loading}
-                        className="flex-1 bg-emerald-700 hover:bg-emerald-800 text-[var(--action-primary-ink)] py-2.5 px-4 rounded-lg font-medium transition flex items-center justify-center gap-2 disabled:opacity-50 text-sm"
+                        className="flex-1 bg-green-700 hover:bg-green-800 text-[var(--action-primary-ink)] py-2.5 px-4 rounded-lg font-medium transition flex items-center justify-center gap-2 disabled:opacity-50 text-sm"
                       >
                         <Search className="h-4 w-4" />
                         {loading ? 'Pesquisando...' : 'PESQUISAR'}
@@ -544,7 +544,7 @@ export default function GenealogyPage() {
                       <button
                         onClick={handlePesquisar}
                         disabled={loading}
-                        className="flex-1 bg-emerald-700 hover:bg-emerald-800 text-[var(--action-primary-ink)] py-2.5 px-4 rounded-lg font-medium transition flex items-center justify-center gap-2 disabled:opacity-50 text-sm"
+                        className="flex-1 bg-green-700 hover:bg-green-800 text-[var(--action-primary-ink)] py-2.5 px-4 rounded-lg font-medium transition flex items-center justify-center gap-2 disabled:opacity-50 text-sm"
                       >
                         <Search className="h-4 w-4" />
                         {loading ? 'Pesquisando...' : 'PESQUISAR'}
@@ -595,8 +595,8 @@ export default function GenealogyPage() {
                             >
                               <div className="flex items-start gap-3">
                                 <div className={`w-10 h-10 rounded-full flex items-center justify-center text-white font-bold ${
-                                  pessoa.sexo?.toLowerCase() === 'masculino' ? 'bg-blue-500' : 
-                                  pessoa.sexo?.toLowerCase() === 'feminino' ? 'bg-pink-500' : 'bg-gray-400'
+                                  pessoa.sexo?.toLowerCase() === 'masculino' ? 'bg-[var(--surface-secondary)]' : 
+                                  pessoa.sexo?.toLowerCase() === 'feminino' ? 'bg-red-500' : 'bg-gray-400'
                                 }`}>
                                   {pessoa.nome?.charAt(0)?.toUpperCase() || '?'}
                                 </div>
@@ -666,8 +666,8 @@ export default function GenealogyPage() {
                                   </h3>
                                   
                                   <span className={`inline-block text-xs px-2 py-0.5 rounded mt-1 ${
-                                    doc.status === 'RECEBIDO' ? 'bg-green-50 text-green-700' :
-                                    doc.status === 'SOLICITADO' ? 'bg-yellow-50 text-yellow-700' :
+                                    doc.status === 'RECEBIDO' ? 'bg-[var(--surface-secondary)] text-green-700' :
+                                    doc.status === 'SOLICITADO' ? 'bg-[var(--surface-secondary)] text-amber-700' :
                                     'bg-[var(--surface-primary)] text-[var(--text-secondary)]'
                                   }`}>
                                     {doc.status}

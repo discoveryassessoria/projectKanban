@@ -64,11 +64,11 @@ interface ContaPagar {
 }
 
 const statusConfig = {
-  PENDENTE: { label: 'Pendente', color: 'bg-yellow-50 text-yellow-700', icon: Clock },
-  PAGO: { label: 'Pago', color: 'bg-green-50 text-green-700', icon: CheckCircle },
-  VENCIDO: { label: 'Vencido', color: 'bg-red-50 text-red-700', icon: AlertTriangle },
+  PENDENTE: { label: 'Pendente', color: 'bg-[var(--surface-secondary)] text-amber-700', icon: Clock },
+  PAGO: { label: 'Pago', color: 'bg-[var(--surface-secondary)] text-green-700', icon: CheckCircle },
+  VENCIDO: { label: 'Vencido', color: 'bg-[var(--surface-secondary)] text-red-700', icon: AlertTriangle },
   CANCELADO: { label: 'Cancelado', color: 'bg-gray-500/20 text-[var(--text-muted)]', icon: XCircle },
-  AGENDADO: { label: 'Agendado', color: 'bg-blue-50 text-blue-700', icon: Calendar },
+  AGENDADO: { label: 'Agendado', color: 'bg-[var(--surface-secondary)] text-[var(--text-secondary)]', icon: Calendar },
 }
 
 // Identidade estável para a ausência de dados (evita recomputar memos).
@@ -143,7 +143,7 @@ export default function ContasPagarPage() {
       {erro && (
         <div
           role="alert"
-          className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700"
+          className="rounded-lg border border-[var(--border-default)] bg-[var(--surface-secondary)] px-4 py-3 text-sm text-red-700"
         >
           {erro} Tente novamente em instantes — nenhum dado foi exibido no lugar.
         </div>
@@ -244,7 +244,7 @@ export default function ContasPagarPage() {
         <Card className="bg-[var(--surface-primary)] border-[var(--border-strong)]">
           <CardContent className="pt-4">
             <p className="text-sm text-white/70">A Pagar</p>
-            <p className="text-xl font-bold text-yellow-700">{formatCurrency(totais.pendente)}</p>
+            <p className="text-xl font-bold text-amber-700">{formatCurrency(totais.pendente)}</p>
           </CardContent>
         </Card>
         <Card className="bg-[var(--surface-primary)] border-[var(--border-strong)]">

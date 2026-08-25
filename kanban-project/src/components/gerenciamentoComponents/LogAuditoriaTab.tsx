@@ -112,7 +112,7 @@ export default function LogAuditoriaTab({ escopo }: { escopo?: string }) {
               <Fragment key={l.id}>
                 <tr className={`border-b border-[var(--border-subtle)] last:border-0 ${l.detalhes ? "cursor-pointer hover:bg-[var(--surface-hover)]" : ""}`} onClick={() => l.detalhes && setAberto(aberto === l.id ? null : l.id)}>
                   <td className="whitespace-nowrap px-4 py-2.5 text-[var(--text-secondary)]">{fmt(l.criadoEm)}</td>
-                  <td className="px-4 py-2.5"><span className="rounded bg-sky-50 px-1.5 py-0.5 text-[10px] text-sky-700">{l.acao}</span></td>
+                  <td className="px-4 py-2.5"><span className="rounded bg-[var(--surface-secondary)] px-1.5 py-0.5 text-[10px] text-[var(--text-secondary)]">{l.acao}</span></td>
                   <td className="px-4 py-2.5 text-white/70">{l.entidade}{l.entidadeId != null && <span className="text-[var(--text-muted)]"> #{l.entidadeId}</span>}</td>
                   <td className="px-4 py-2.5 text-white">{l.descricao}{l.detalhes ? <span className="ml-1 text-[10px] text-[var(--text-muted)]">(detalhes)</span> : null}</td>
                   <td className="px-4 py-2.5 text-white/70">{l.usuarioNome || (l.usuarioId != null ? `#${l.usuarioId}` : "sistema")}</td>

@@ -61,7 +61,7 @@ export function SeloSaude({
     <button
       onClick={onAbrir}
       title="Diagnóstico do processo (D)"
-      className={`flex items-center gap-2 rounded-lg border px-3 py-2 text-[13px] shadow-sm transition ${
+      className={`flex items-center gap-2 rounded-lg border px-3 py-2 text-[13px] shadow-[var(--elev-1)] transition ${
         ativo ? "border-gray-300 bg-gray-50 font-medium text-gray-900" : "hover:border-gray-300"
       }`}
       style={
@@ -164,7 +164,7 @@ export function PainelDiagnostico({
   // Cor própria na raiz: este painel pode abrir dentro do modal do processo,
   // que é escuro, e `position: fixed` não interrompe herança de cor.
   return (
-    <div className="fixed right-0 top-0 z-[10002] flex h-full w-[420px] flex-col border-l border-gray-200 bg-[var(--surface-primary)] text-gray-900 shadow-2xl">
+    <div className="fixed right-0 top-0 z-[10002] flex h-full w-[420px] flex-col border-l border-gray-200 bg-[var(--surface-primary)] text-gray-900 shadow-[var(--elev-3)]">
       <div className="flex items-center justify-between border-b border-gray-100 px-4 py-3">
         <div className="min-w-0">
           <h2 className="text-sm font-semibold text-gray-900">Diagnóstico</h2>

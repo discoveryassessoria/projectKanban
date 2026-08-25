@@ -464,7 +464,7 @@ export function CentralTarefas({ podeDistribuir }: { podeDistribuir: boolean }) 
               onClick={() => setVisao(a.id)}
               className={`rounded-t border-b-2 px-3 py-1.5 text-[12px] transition-colors ${
                 visao === a.id
-                  ? "border-sky-400/70 text-white/90"
+                  ? "border-[var(--border-default)] text-white/90"
                   : "border-transparent text-[var(--text-muted)] hover:text-white/70"
               }`}
             >
@@ -528,7 +528,7 @@ export function CentralTarefas({ podeDistribuir }: { podeDistribuir: boolean }) 
       {erroComando && (
         <div
           role="alert"
-          className="mb-2 flex items-start justify-between gap-3 rounded border border-red-200 bg-red-400/[0.08] px-3 py-2 text-[11px] text-red-100/90"
+          className="mb-2 flex items-start justify-between gap-3 rounded border border-[var(--border-default)] bg-[var(--surface-secondary)] px-3 py-2 text-[11px] text-red-100/90"
         >
           <span>{erroComando}</span>
           <button
@@ -541,7 +541,7 @@ export function CentralTarefas({ podeDistribuir }: { podeDistribuir: boolean }) 
         </div>
       )}
       {aviso && (
-        <div className="mb-2 rounded border border-sky-200 bg-sky-400/[0.07] px-3 py-2 text-[11px] text-sky-100/85">
+        <div className="mb-2 rounded border border-[var(--border-default)] bg-[var(--surface-secondary)] px-3 py-2 text-[11px] text-[var(--text-secondary)]">
           {aviso}
         </div>
       )}

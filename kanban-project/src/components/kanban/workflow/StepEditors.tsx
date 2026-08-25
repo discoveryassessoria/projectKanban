@@ -315,7 +315,7 @@ function EditorShell({
       />
       <div className="fixed inset-0 z-[10005] flex items-center justify-center p-4 pointer-events-none">
         <div
-          className="w-full max-w-3xl max-h-[92vh] flex flex-col rounded-xl overflow-hidden shadow-2xl pointer-events-auto"
+          className="w-full max-w-3xl max-h-[92vh] flex flex-col rounded-xl overflow-hidden shadow-[var(--elev-3)] pointer-events-auto"
           style={{ background: "#0d1117", border: "1px solid rgba(255,255,255,0.08)" }}
         >
           {/* Header */}
@@ -376,7 +376,7 @@ function Label({
 }
 
 const inputCls =
-  "w-full px-3 py-2 bg-[var(--surface-overlay)] border border-[var(--border-default)] rounded-md text-sm text-white placeholder-white/30 focus:outline-none focus:border-sky-200 focus:ring-1 focus:border-sky-200"
+  "w-full px-3 py-2 bg-[var(--surface-overlay)] border border-[var(--border-default)] rounded-md text-sm text-white placeholder-white/30 focus:outline-none focus:border-[var(--border-default)] focus:ring-1 focus:border-[var(--border-default)]"
 
 const inputClsInvalid =
   "w-full px-3 py-2 bg-[var(--surface-overlay)] border border-[var(--accent-primary)]/40 rounded-md text-sm text-white placeholder-white/30 focus:outline-none focus:border-[var(--accent-primary)]/60 focus:ring-1 focus:ring-[var(--accent-primary)]/30"
@@ -385,7 +385,7 @@ function ReadOnlyBanner({ stepStatus }: { stepStatus: string }) {
   if (stepStatus !== "concluida") return null
   return (
     <div className="mb-5 p-3 rounded-lg border border-[var(--border-default)] bg-[var(--surface-overlay)]">
-      <div className="text-[12px] font-semibold text-sky-700 mb-0.5 flex items-center gap-1.5">
+      <div className="text-[12px] font-semibold text-[var(--text-secondary)] mb-0.5 flex items-center gap-1.5">
         <AlertCircle className="w-3.5 h-3.5" />
         Etapa já concluída
       </div>
@@ -919,7 +919,7 @@ function FormSolicitarCertidao({
   }
 
   const bannerErro = erroServidor ? (
-    <div className="mb-4 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-[12px] text-red-700">
+    <div className="mb-4 rounded-md border border-[var(--border-default)] bg-[var(--surface-secondary)] px-3 py-2 text-[12px] text-red-700">
       {erroServidor}
     </div>
   ) : null
@@ -1115,16 +1115,16 @@ function FormSolicitarCertidao({
                   disabled={readOnly}
                   className={`px-3 py-2.5 rounded-md border text-left transition-all disabled:cursor-not-allowed ${
                     isSelected
-                      ? "border-sky-200 bg-sky-50 ring-1 border-sky-200"
+                      ? "border-[var(--border-default)] bg-[var(--surface-secondary)] ring-1 border-[var(--border-default)]"
                       : "border-[var(--border-default)] bg-[var(--surface-overlay)] hover:bg-[var(--surface-secondary)]"
                   }`}
                 >
                   <div className="flex items-center gap-2 mb-0.5">
-                    <Icon className={`w-3.5 h-3.5 ${isSelected ? "text-sky-700" : "text-[var(--text-secondary)]"}`} />
+                    <Icon className={`w-3.5 h-3.5 ${isSelected ? "text-[var(--text-secondary)]" : "text-[var(--text-secondary)]"}`} />
                     <span className={`text-[12px] font-semibold ${isSelected ? "text-white" : "text-white/80"}`}>
                       {canal.label}
                     </span>
-                    {isSelected && <Check className="w-3 h-3 text-sky-700 ml-auto" />}
+                    {isSelected && <Check className="w-3 h-3 text-[var(--text-secondary)] ml-auto" />}
                   </div>
                   <div className="text-[10px] text-[var(--text-secondary)] leading-snug">{canal.desc}</div>
                 </button>
@@ -1650,7 +1650,7 @@ function FormAguardarRetorno({
       ) : (
         <div className="space-y-5">
           {(erro || falha) && (
-            <div className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-[12px] text-red-700">
+            <div className="rounded-md border border-[var(--border-default)] bg-[var(--surface-secondary)] px-3 py-2 text-[12px] text-red-700">
               {falha || erro}
             </div>
           )}
@@ -1658,7 +1658,7 @@ function FormAguardarRetorno({
           {/* 1. SITUAÇÃO DA ESPERA */}
           <div className="rounded-lg border border-[var(--border-default)] bg-[var(--surface-overlay)] overflow-hidden">
             <div className="px-3.5 py-2 bg-[var(--surface-popover)] border-b border-[var(--border-default)] flex items-center gap-2">
-              <Clock className="w-3.5 h-3.5 text-sky-700" />
+              <Clock className="w-3.5 h-3.5 text-[var(--text-secondary)]" />
               <span className="text-[11px] font-bold uppercase tracking-wider text-[var(--text-secondary)]">
                 Situação da espera
               </span>
@@ -1703,7 +1703,7 @@ function FormAguardarRetorno({
           {/* 2. PROTOCOLO DA SOLICITAÇÃO (somente leitura — não duplica nada) */}
           <div className="rounded-lg border border-[var(--border-default)] bg-[var(--surface-overlay)] overflow-hidden">
             <div className="px-3.5 py-2 bg-[var(--surface-popover)] border-b border-[var(--border-default)] flex items-center gap-2">
-              <Send className="w-3.5 h-3.5 text-sky-700" />
+              <Send className="w-3.5 h-3.5 text-[var(--text-secondary)]" />
               <span className="text-[11px] font-bold uppercase tracking-wider text-[var(--text-secondary)]">
                 Protocolo da solicitação
               </span>
@@ -1742,7 +1742,7 @@ function FormAguardarRetorno({
                     href={solicit.requerimentoUrl}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="text-[12px] text-sky-700 hover:underline inline-flex items-center gap-1 break-all"
+                    className="text-[12px] text-[var(--text-secondary)] hover:underline inline-flex items-center gap-1 break-all"
                   >
                     <Paperclip className="w-3 h-3 flex-shrink-0" />
                     {solicitacao?.arquivos.find((a) => a.tipo === "REQUERIMENTO_ENVIADO")?.nome ?? solicit.requerimentoUrl}
@@ -1759,7 +1759,7 @@ function FormAguardarRetorno({
                     href={solicit.link}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="text-[12px] text-sky-700 hover:underline inline-flex items-center gap-1 break-all"
+                    className="text-[12px] text-[var(--text-secondary)] hover:underline inline-flex items-center gap-1 break-all"
                   >
                     {solicit.link}
                     <ExternalLink className="w-3 h-3 flex-shrink-0" />
@@ -1977,7 +1977,7 @@ function InformarProtocoloInline({
             onChange={(e) => setNumero(e.target.value)}
             placeholder="Número devolvido pelo cartório"
             autoFocus
-            className="flex-1 px-2.5 py-1.5 bg-[var(--app-background)] border border-[var(--border-default)] rounded text-[12px] text-[var(--text-primary)] placeholder-white/30 focus:outline-none focus:border-sky-200 font-mono"
+            className="flex-1 px-2.5 py-1.5 bg-[var(--app-background)] border border-[var(--border-default)] rounded text-[12px] text-[var(--text-primary)] placeholder-white/30 focus:outline-none focus:border-[var(--border-default)] font-mono"
           />
           <button
             onClick={registrar}
@@ -2235,7 +2235,7 @@ function FormReceberCertidao({
    * ninguém soubesse. Falso sucesso é pior que silêncio.
    */
   const bannerErro = erroServidor ? (
-    <div className="mb-4 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-[12px] text-red-700">
+    <div className="mb-4 rounded-md border border-[var(--border-default)] bg-[var(--surface-secondary)] px-3 py-2 text-[12px] text-red-700">
       {erroServidor}
     </div>
   ) : null
@@ -2330,7 +2330,7 @@ function FormReceberCertidao({
                     disabled={readOnly}
                     className={`text-left px-3.5 py-2.5 rounded-md border transition-all disabled:cursor-not-allowed ${
                       ativo
-                        ? "border-green-200 bg-green-50 ring-1 border-green-200"
+                        ? "border-[var(--border-default)] bg-[var(--surface-secondary)] ring-1 border-[var(--border-default)]"
                         : "border-[var(--border-default)] bg-[var(--surface-overlay)] hover:bg-[var(--surface-secondary)]"
                     }`}
                   >
@@ -2338,7 +2338,7 @@ function FormReceberCertidao({
                       <div
                         className={`w-5 h-5 rounded-full border-2 flex items-center justify-center flex-shrink-0 mt-0.5 ${
                           ativo
-                            ? "border-green-200 bg-green-50"
+                            ? "border-[var(--border-default)] bg-[var(--surface-secondary)]"
                             : "border-[var(--border-strong)] bg-transparent"
                         }`}
                       >
@@ -2697,7 +2697,7 @@ function FormConferirCertidao({
    * ninguém soubesse. Falso sucesso é pior que silêncio.
    */
   const bannerErro = erroServidor ? (
-    <div className="mb-4 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-[12px] text-red-700">
+    <div className="mb-4 rounded-md border border-[var(--border-default)] bg-[var(--surface-secondary)] px-3 py-2 text-[12px] text-red-700">
       {erroServidor}
     </div>
   ) : null
@@ -2726,7 +2726,7 @@ function FormConferirCertidao({
                 : resultado === "divergente"
                 ? "bg-[var(--accent-primary)] hover:bg-[var(--accent-primary)]/15 disabled:bg-[var(--accent-primary)]/15"
                 : resultado === "nova_via"
-                ? "bg-rose-500 hover:bg-rose-600 disabled:bg-rose-900"
+                ? "bg-red-600 hover:bg-red-600 disabled:bg-red-900"
                 : "bg-[var(--surface-secondary)]0 disabled:bg-[var(--surface-secondary)]"
             }`}
           >
@@ -2748,14 +2748,14 @@ function FormConferirCertidao({
           {/* Anexo da certidão (link) */}
           {arquivoUrl && (
             <div className="px-3 py-2 rounded-md border border-[var(--border-default)] bg-[var(--surface-overlay)] flex items-center gap-2">
-              <FileCheck className="w-3.5 h-3.5 text-sky-700 flex-shrink-0" />
+              <FileCheck className="w-3.5 h-3.5 text-[var(--text-secondary)] flex-shrink-0" />
               <div className="flex-1 min-w-0">
                 <div className="text-[11px] text-white/70">Anexo recebido</div>
                 <a
                   href={arquivoUrl}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="text-[12px] text-sky-700 hover:text-sky-700 hover:underline inline-flex items-center gap-1"
+                  className="text-[12px] text-[var(--text-secondary)] hover:text-[var(--text-secondary)] hover:underline inline-flex items-center gap-1"
                 >
                   {arquivoNome || "Abrir arquivo"}
                   <ExternalLink className="w-2.5 h-2.5" />
@@ -2778,8 +2778,8 @@ function FormConferirCertidao({
 
             {/* Hint árvore */}
             {treeRef && (
-              <div className="px-3 py-2 rounded-md bg-sky-50 border border-sky-200 mb-3">
-                <div className="text-[10px] uppercase font-semibold tracking-wider text-sky-700 mb-1">
+              <div className="px-3 py-2 rounded-md bg-[var(--surface-secondary)] border border-[var(--border-default)] mb-3">
+                <div className="text-[10px] uppercase font-semibold tracking-wider text-[var(--text-secondary)] mb-1">
                   Nomes na árvore (referência)
                 </div>
                 <div className="text-[11.5px] text-white/75 leading-snug">{treeRef}</div>
@@ -2884,7 +2884,7 @@ function FormConferirCertidao({
                     disabled={readOnly}
                     className={`w-full text-left px-3 py-2.5 rounded-md border transition-all disabled:cursor-not-allowed ${
                       isChecked
-                        ? "border-green-200 bg-green-50"
+                        ? "border-[var(--border-default)] bg-[var(--surface-secondary)]"
                         : "border-[var(--border-default)] bg-[var(--surface-overlay)] hover:bg-[var(--surface-secondary)]"
                     }`}
                   >
@@ -2892,7 +2892,7 @@ function FormConferirCertidao({
                       <div
                         className={`w-5 h-5 rounded border-2 flex items-center justify-center flex-shrink-0 mt-0.5 ${
                           isChecked
-                            ? "border-green-200 bg-green-50"
+                            ? "border-[var(--border-default)] bg-[var(--surface-secondary)]"
                             : "border-[var(--border-strong)] bg-transparent"
                         }`}
                       >
@@ -3009,7 +3009,7 @@ function ResultadoBtn({
 }) {
   const colorMap = {
     emerald: {
-      ativo: "border-green-200 bg-green-50 text-green-700",
+      ativo: "border-[var(--border-default)] bg-[var(--surface-secondary)] text-green-700",
       icon: "text-green-700",
     },
     amber: {
@@ -3017,7 +3017,7 @@ function ResultadoBtn({
       icon: "text-[var(--accent-text)]",
     },
     red: {
-      ativo: "border-red-200 bg-red-50 text-red-700",
+      ativo: "border-[var(--border-default)] bg-[var(--surface-secondary)] text-red-700",
       icon: "text-red-700",
     },
   }
@@ -3320,7 +3320,7 @@ function FormValidarCertidao({
    * ninguém soubesse. Falso sucesso é pior que silêncio.
    */
   const bannerErro = erroServidor ? (
-    <div className="mb-4 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-[12px] text-red-700">
+    <div className="mb-4 rounded-md border border-[var(--border-default)] bg-[var(--surface-secondary)] px-3 py-2 text-[12px] text-red-700">
       {erroServidor}
     </div>
   ) : null
@@ -3348,7 +3348,7 @@ function FormValidarCertidao({
               decisao === "aprovado"
                 ? "bg-[var(--action-primary)] hover:bg-[var(--action-primary-hover)] disabled:bg-[var(--action-primary)]/40"
                 : decisao === "aprovado_ressalvas"
-                ? "bg-sky-50 hover:bg-sky-50 disabled:bg-sky-50"
+                ? "bg-[var(--surface-secondary)] hover:bg-[var(--surface-secondary)] disabled:bg-[var(--surface-secondary)]"
                 : decisao === "nova_via"
                 ? "bg-[var(--accent-primary)] hover:bg-[var(--accent-primary)]/15 disabled:bg-[var(--accent-primary)]/15"
                 : decisao === "rejeitado"
@@ -3402,7 +3402,7 @@ function FormValidarCertidao({
                     href={arquivoUrl}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="text-[12px] text-sky-700 hover:text-sky-700 hover:underline inline-flex items-center gap-1 truncate"
+                    className="text-[12px] text-[var(--text-secondary)] hover:text-[var(--text-secondary)] hover:underline inline-flex items-center gap-1 truncate"
                   >
                     📎 {arquivoNome || "Abrir"}
                     <ExternalLink className="w-2.5 h-2.5 flex-shrink-0" />
@@ -3446,20 +3446,20 @@ function FormValidarCertidao({
               {DECISAO_OPTIONS.map((opt) => {
                 const ativo = decisao === opt.value
                 const colorMap = {
-                  emerald: ativo ? "border-green-200 bg-green-50 ring-1 border-green-200" : "",
-                  blue: ativo ? "border-sky-200 bg-sky-50 ring-1 border-sky-200" : "",
+                  emerald: ativo ? "border-[var(--border-default)] bg-[var(--surface-secondary)] ring-1 border-[var(--border-default)]" : "",
+                  blue: ativo ? "border-[var(--border-default)] bg-[var(--surface-secondary)] ring-1 border-[var(--border-default)]" : "",
                   amber: ativo ? "border-[var(--accent-primary)]/60 bg-[var(--accent-primary)]/10 ring-1 ring-[var(--accent-primary)]/30" : "",
-                  red: ativo ? "border-red-200 bg-red-50 ring-1 border-red-200" : "",
+                  red: ativo ? "border-[var(--border-default)] bg-[var(--surface-secondary)] ring-1 border-[var(--border-default)]" : "",
                 }
                 const iconColorMap = {
                   emerald: ativo ? "text-green-700" : "text-[var(--text-secondary)]",
-                  blue: ativo ? "text-sky-700" : "text-[var(--text-secondary)]",
+                  blue: ativo ? "text-[var(--text-secondary)]" : "text-[var(--text-secondary)]",
                   amber: ativo ? "text-[var(--accent-text)]" : "text-[var(--text-secondary)]",
                   red: ativo ? "text-red-700" : "text-[var(--text-secondary)]",
                 }
                 const textColorMap = {
                   emerald: ativo ? "text-green-700" : "text-white/85",
-                  blue: ativo ? "text-sky-700" : "text-white/85",
+                  blue: ativo ? "text-[var(--text-secondary)]" : "text-white/85",
                   amber: ativo ? "text-[var(--accent-text)]" : "text-white/85",
                   red: ativo ? "text-red-700" : "text-white/85",
                 }
@@ -3703,9 +3703,9 @@ function FileUploadField({
       {/* Estados */}
       {uploading ? (
         // 1. SUBINDO
-        <div className="px-3 py-2.5 bg-[var(--surface-overlay)] border border-sky-200 rounded-md">
+        <div className="px-3 py-2.5 bg-[var(--surface-overlay)] border border-[var(--border-default)] rounded-md">
           <div className="flex items-center gap-2.5 mb-2">
-            <Loader2 className="w-3.5 h-3.5 animate-spin text-sky-700 flex-shrink-0" />
+            <Loader2 className="w-3.5 h-3.5 animate-spin text-[var(--text-secondary)] flex-shrink-0" />
             <div className="flex-1 min-w-0">
               <div className="text-[12px] text-white truncate">{fileName}</div>
               <div className="text-[10px] text-[var(--text-secondary)]">
@@ -3722,7 +3722,7 @@ function FileUploadField({
         </div>
       ) : value ? (
         // 2. ARQUIVO CARREGADO
-        <div className="px-3 py-2.5 bg-green-50 border border-green-200 rounded-md">
+        <div className="px-3 py-2.5 bg-[var(--surface-secondary)] border border-[var(--border-default)] rounded-md">
           <div className="flex items-center gap-2.5">
             <FileCheck className="w-4 h-4 text-green-700 flex-shrink-0" />
             <div className="flex-1 min-w-0">
@@ -3735,7 +3735,7 @@ function FileUploadField({
                   href={value}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="text-sky-700 hover:text-sky-700 hover:underline inline-flex items-center gap-0.5"
+                  className="text-[var(--text-secondary)] hover:text-[var(--text-secondary)] hover:underline inline-flex items-center gap-0.5"
                 >
                   Abrir <ExternalLink className="w-2.5 h-2.5" />
                 </a>
@@ -3753,7 +3753,7 @@ function FileUploadField({
                 <button
                   type="button"
                   onClick={handleRemove}
-                  className="text-[10.5px] font-semibold px-2 py-1 bg-red-50 hover:bg-red-50 rounded text-red-700 inline-flex items-center gap-1"
+                  className="text-[10.5px] font-semibold px-2 py-1 bg-[var(--surface-secondary)] hover:bg-[var(--surface-secondary)] rounded text-red-700 inline-flex items-center gap-1"
                   title="Remover anexo"
                 >
                   <Trash2 className="w-3 h-3" />
@@ -3912,7 +3912,7 @@ function FormPadrao({
           <SituacaoDaEtapa etapa={etapa} usuarios={usuarios} />
 
           {(erro || falha) && (
-            <div className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-[12px] text-red-700">
+            <div className="rounded-md border border-[var(--border-default)] bg-[var(--surface-secondary)] px-3 py-2 text-[12px] text-red-700">
               {falha || erro}
             </div>
           )}
@@ -3967,7 +3967,7 @@ function SituacaoDaEtapa({
   return (
     <div className="rounded-lg border border-[var(--border-default)] bg-[var(--surface-overlay)] overflow-hidden">
       <div className="px-3.5 py-2 bg-[var(--surface-popover)] border-b border-[var(--border-default)] flex items-center gap-2">
-        <Clock className="w-3.5 h-3.5 text-sky-700" />
+        <Clock className="w-3.5 h-3.5 text-[var(--text-secondary)]" />
         <span className="text-[11px] font-bold uppercase tracking-wider text-[var(--text-secondary)]">Situação atual</span>
       </div>
       <div className="p-3.5 grid grid-cols-2 gap-x-4 gap-y-2.5 text-[12px]">

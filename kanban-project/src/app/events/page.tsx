@@ -581,7 +581,7 @@ const handleSubmit = async () => {
                     <Button
                       onClick={handleSubmit}
                       disabled={isSaving}
-                      className="bg-emerald-700 hover:bg-emerald-800 text-[var(--action-primary-ink)]"
+                      className="bg-green-700 hover:bg-green-800 text-[var(--action-primary-ink)]"
                     >
                       <Check className="h-4 w-4 mr-1.5" />
                       {isSaving ? "Salvando..." : editingId ? "Salvar" : "Criar Evento"}
@@ -744,13 +744,13 @@ const handleSubmit = async () => {
                           key={dia}
                           className={`h-24 p-1 rounded-lg border transition-colors ${
                             ehHoje
-                              ? "bg-emerald-50 border-emerald-200"
+                              ? "bg-[var(--surface-secondary)] border-[var(--border-default)]"
                               : "border-[var(--border-default)] hover:bg-[var(--surface-hover)]"
                           }`}
                         >
                           <div
                             className={`text-sm font-medium mb-1 ${
-                              ehHoje ? "text-emerald-700" : "text-white/70"
+                              ehHoje ? "text-green-700" : "text-white/70"
                             }`}
                           >
                             {dia}

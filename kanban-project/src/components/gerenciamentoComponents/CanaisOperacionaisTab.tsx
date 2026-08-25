@@ -26,7 +26,7 @@ interface Canal {
   observacaoObrigatoria: boolean
 }
 
-const inp = "w-full rounded-lg border border-[var(--border-default)] bg-[var(--surface-primary)] px-3 py-2 text-sm text-white placeholder-white/30 outline-none focus:border-blue-200"
+const inp = "w-full rounded-lg border border-[var(--border-default)] bg-[var(--surface-primary)] px-3 py-2 text-sm text-white placeholder-white/30 outline-none focus:border-[var(--border-default)]"
 const lbl = "mb-1 block text-[11px] uppercase tracking-wide text-[var(--text-muted)]"
 
 function headers(): HeadersInit {
@@ -109,7 +109,7 @@ export default function CanaisOperacionaisTab() {
       {visao === "tipos" && (
       <div className="space-y-4">
 
-      {erro && <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700">{erro}</div>}
+      {erro && <div className="rounded-lg border border-[var(--border-default)] bg-[var(--surface-secondary)] px-3 py-2 text-xs text-red-700">{erro}</div>}
 
       <div className="space-y-1.5">
         {canais.length === 0 && (
@@ -151,9 +151,9 @@ export default function CanaisOperacionaisTab() {
                     {!c.ativo && <span className="rounded bg-[var(--surface-primary)] px-1.5 py-0.5 text-[10px] text-[var(--text-secondary)]">inativo</span>}
                   </div>
                   <div className="mt-0.5 flex flex-wrap gap-1.5 text-[10px]">
-                    {c.protocoloObrigatorio && <span className="rounded bg-sky-50 px-1.5 py-0.5 text-sky-700">protocolo no ato</span>}
+                    {c.protocoloObrigatorio && <span className="rounded bg-[var(--surface-secondary)] px-1.5 py-0.5 text-[var(--text-secondary)]">protocolo no ato</span>}
                     {c.anexoObrigatorioLabel && <span className="rounded bg-[var(--surface-primary)] px-1.5 py-0.5 text-[var(--text-secondary)]">{c.anexoObrigatorioLabel}</span>}
-                    {c.rastreioObrigatorio && <span className="rounded bg-amber-50 px-1.5 py-0.5 text-amber-700">rastreio</span>}
+                    {c.rastreioObrigatorio && <span className="rounded bg-[var(--surface-secondary)] px-1.5 py-0.5 text-amber-700">rastreio</span>}
                     {c.observacaoObrigatoria && <span className="rounded bg-[var(--surface-primary)] px-1.5 py-0.5 text-[var(--text-secondary)]">observação</span>}
                   </div>
                 </div>
@@ -165,7 +165,7 @@ export default function CanaisOperacionaisTab() {
       </div>
 
       {form ? (
-        <div className="space-y-2 rounded-lg border border-blue-200 bg-blue-500/5 p-3">
+        <div className="space-y-2 rounded-lg border border-[var(--border-default)] bg-[var(--surface-secondary)] p-3">
           <div className="grid grid-cols-2 gap-2">
             <div><label className={lbl}>Nome do canal</label>
               <input className={inp} autoFocus value={form.label} onChange={(e) => setForm({ ...form, label: e.target.value })} placeholder="ex.: Portal Estadual" /></div>

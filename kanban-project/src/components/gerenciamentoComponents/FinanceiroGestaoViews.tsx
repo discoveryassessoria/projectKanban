@@ -75,7 +75,7 @@ export function CreditoTab() {
   return (
     <div className="space-y-5">
       {erro && (
-        <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+        <div className="rounded-xl border border-[var(--border-default)] bg-[var(--surface-secondary)] px-4 py-3 text-sm text-red-700">
           {erro} <button onClick={() => { void load() }} className="ml-2 underline hover:text-white">Tentar de novo</button>
         </div>
       )}
@@ -115,7 +115,7 @@ export function CreditoTab() {
                     <td className="px-4 py-2.5 text-white">{dinheiro(c.disponivel, c.moeda)}</td>
                     <td className="px-4 py-2.5 text-white/70">{dinheiro(c.utilizado, c.moeda)}</td>
                     <td className="px-4 py-2.5">
-                      <span className={`rounded-full px-2 py-0.5 text-[10px] ${c.status === "ABERTO" ? "bg-green-50 text-green-700" : "bg-[var(--surface-primary)] text-[var(--text-secondary)]"}`}>{c.status}</span>
+                      <span className={`rounded-full px-2 py-0.5 text-[10px] ${c.status === "ABERTO" ? "bg-[var(--surface-secondary)] text-green-700" : "bg-[var(--surface-primary)] text-[var(--text-secondary)]"}`}>{c.status}</span>
                     </td>
                   </tr>
                 ))}
@@ -146,7 +146,7 @@ export function DocumentosFinanceirosTab() {
   return (
     <div className="space-y-5">
       {erro && (
-        <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+        <div className="rounded-xl border border-[var(--border-default)] bg-[var(--surface-secondary)] px-4 py-3 text-sm text-red-700">
           {erro} <button onClick={() => { void load() }} className="ml-2 underline hover:text-white">Tentar de novo</button>
         </div>
       )}
@@ -205,7 +205,7 @@ export function DocumentosFinanceirosTab() {
                       <td className="px-4 py-2.5 text-[var(--text-secondary)]">#{r.processoId}</td>
                       <td className="px-4 py-2.5">
                         {r.pdfUrl
-                          ? <a href={r.pdfUrl} target="_blank" rel="noreferrer" className="text-sky-700 underline hover:text-sky-700">abrir</a>
+                          ? <a href={r.pdfUrl} target="_blank" rel="noreferrer" className="text-[var(--text-secondary)] underline hover:text-[var(--text-secondary)]">abrir</a>
                           : <span className="text-[var(--text-muted)]">—</span>}
                       </td>
                     </tr>

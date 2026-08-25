@@ -257,7 +257,7 @@ function ProcessosTooltip({
 
   const tooltipContent = isVisible && mounted ? createPortal(
     <div 
-      className="fixed z-[9999] w-72 bg-[var(--surface-primary)] border border-gray-200 rounded-lg shadow-2xl p-3 animate-in fade-in-0 zoom-in-95 duration-200"
+      className="fixed z-[9999] w-72 bg-[var(--surface-primary)] border border-gray-200 rounded-lg shadow-[var(--elev-3)] p-3 animate-in fade-in-0 zoom-in-95 duration-200"
       style={tooltipPosition.showAbove ? {
         bottom: window.innerHeight - tooltipPosition.top,
         left: tooltipPosition.left,
@@ -274,7 +274,7 @@ function ProcessosTooltip({
       
       {loading ? (
         <div className="flex items-center justify-center py-3">
-          <Loader2 className="h-4 w-4 animate-spin text-indigo-500" />
+          <Loader2 className="h-4 w-4 animate-spin text-[var(--text-secondary)]" />
           <span className="ml-2 text-xs text-gray-500">Carregando...</span>
         </div>
       ) : (
@@ -321,7 +321,7 @@ function ProcessosTooltip({
       onMouseLeave={handleMouseLeave}
       onClick={(e) => e.stopPropagation()}
     >
-      <span className="px-2 py-1 bg-indigo-50 hover:bg-indigo-500/30 rounded text-xs text-indigo-700 cursor-pointer transition-colors">
+      <span className="px-2 py-1 bg-[var(--surface-secondary)] hover:bg-[var(--surface-secondary)] rounded text-xs text-[var(--text-secondary)] cursor-pointer transition-colors">
         {count}
       </span>
       {tooltipContent}
@@ -1044,7 +1044,7 @@ const removerDocumentoObrigatorio = async (categoria: string) => {
       />
       
       <div 
-        className="relative bg-[var(--surface-primary)] rounded-lg shadow-2xl flex flex-col overflow-hidden"
+        className="relative bg-[var(--surface-primary)] rounded-lg shadow-[var(--elev-3)] flex flex-col overflow-hidden"
         style={{
           position: 'absolute',
           top: '2rem',
@@ -1059,7 +1059,7 @@ const removerDocumentoObrigatorio = async (categoria: string) => {
         <div className="flex items-center justify-between px-8 py-5 border-b border-gray-200 bg-gray-50 shrink-0">
           <div className="flex items-center gap-4">
             <div className={`w-12 h-12 rounded-full flex items-center justify-center text-white text-xl font-semibold ${
-              formData.tipo === 'requerente' ? 'bg-slate-600' : 'bg-indigo-600'
+              formData.tipo === 'requerente' ? 'bg-[var(--surface-secondary)]' : 'bg-[var(--surface-secondary)]'
             }`}>
               {formData.nome ? formData.nome.charAt(0).toUpperCase() : <User className="h-6 w-6" />}
             </div>
@@ -1078,7 +1078,7 @@ const removerDocumentoObrigatorio = async (categoria: string) => {
               podeEditar && (
                 <Button
                   onClick={() => setIsViewMode(false)}
-                  className="bg-indigo-700 hover:bg-indigo-800 text-[var(--action-primary-ink)]"
+                  className="bg-[var(--text-muted)] hover:bg-[var(--text-muted)] text-[var(--action-primary-ink)]"
                 >
                   <Edit className="h-4 w-4 mr-2" />
                   Editar
@@ -1088,7 +1088,7 @@ const removerDocumentoObrigatorio = async (categoria: string) => {
               <Button
                 onClick={onSave}
                 disabled={isLoading}
-                className="bg-emerald-700 hover:bg-emerald-800 text-[var(--action-primary-ink)]"
+                className="bg-green-700 hover:bg-green-800 text-[var(--action-primary-ink)]"
               >
                 {isLoading ? "Salvando..." : editingId ? "Salvar Alterações" : "Criar Cliente"}
               </Button>
@@ -1104,7 +1104,7 @@ const removerDocumentoObrigatorio = async (categoria: string) => {
 
         {/* ✅ NOVO: Erro geral no topo */}
         {errors.geral && (
-          <div className="mx-8 mt-4 flex items-center gap-2 p-3 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm">
+          <div className="mx-8 mt-4 flex items-center gap-2 p-3 bg-[var(--surface-secondary)] border border-[var(--border-default)] rounded-lg text-red-700 text-sm">
             <AlertTriangle className="h-4 w-4 flex-shrink-0" />
             <span>{errors.geral}</span>
           </div>
@@ -1125,7 +1125,7 @@ const removerDocumentoObrigatorio = async (categoria: string) => {
               className={`
                 flex items-center gap-2 px-5 py-4 text-sm font-medium border-b-2 transition-colors
                 ${activeTab === tab.id 
-                  ? 'border-indigo-600 text-indigo-600' 
+                  ? 'border-[var(--border-default)] text-[var(--text-secondary)]' 
                   : 'border-transparent text-gray-500 hover:text-gray-700'
                 }
               `}
@@ -1149,7 +1149,7 @@ const removerDocumentoObrigatorio = async (categoria: string) => {
                     mostra; cliente existente SEM código é anomalia administrativa
                     — dizer "será gerado ao salvar" ali seria mentira, porque
                     salvar não gera código para quem já existe. */}
-                <div className="bg-[var(--surface-primary)] rounded-xl px-6 py-4 shadow-sm border border-gray-200">
+                <div className="bg-[var(--surface-primary)] rounded-xl px-6 py-4 shadow-[var(--elev-1)] border border-gray-200">
                   <label className="block text-xs font-medium text-gray-500 mb-1">Código</label>
                   {codigoPublico ? (
                     <div className="font-mono text-sm font-bold text-gray-900">{codigoPublico}</div>
@@ -1163,9 +1163,9 @@ const removerDocumentoObrigatorio = async (categoria: string) => {
                   )}
                 </div>
                 {/* Seção: Identificação */}
-                <div className="bg-[var(--surface-primary)] rounded-xl p-6 shadow-sm border border-gray-200">
+                <div className="bg-[var(--surface-primary)] rounded-xl p-6 shadow-[var(--elev-1)] border border-gray-200">
                   <h3 className="text-sm font-semibold text-gray-900 mb-4 flex items-center gap-2">
-                    <User className="h-4 w-4 text-indigo-600" />
+                    <User className="h-4 w-4 text-[var(--text-secondary)]" />
                     Identificação
                   </h3>
                   
@@ -1179,9 +1179,9 @@ const removerDocumentoObrigatorio = async (categoria: string) => {
                           value={formData.tipo}
                           onChange={(e) => setFormData({ ...formData, tipo: e.target.value })}
                           disabled={isViewMode || !!editingId}
-                          className={`w-full h-[42px] px-3 rounded-lg border text-gray-900 disabled:opacity-50 disabled:bg-[var(--surface-primary)] focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-0 focus:border-indigo-500 appearance-none cursor-pointer ${
+                          className={`w-full h-[42px] px-3 rounded-lg border text-gray-900 disabled:opacity-50 disabled:bg-[var(--surface-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--border-strong)] focus:ring-offset-0 focus:border-[var(--border-default)] appearance-none cursor-pointer ${
                             formData.tipo === 'requerente' 
-                              ? 'bg-slate-50 border-slate-300' 
+                              ? 'bg-[var(--surface-secondary)] border-[var(--border-default)]' 
                               : 'bg-[var(--surface-primary)] border-gray-300'
                           }`}
                           style={{
@@ -1211,7 +1211,7 @@ const removerDocumentoObrigatorio = async (categoria: string) => {
                           placeholder="Nome completo"
                           disabled={isViewMode}
                           className={`bg-[var(--surface-primary)] border-gray-300 text-gray-900 placeholder:text-[var(--text-muted)] disabled:opacity-50 disabled:bg-[var(--surface-primary)] ${
-                            errors.nome ? 'border-red-500 focus-visible:ring-red-500' : ''
+                            errors.nome ? 'border-red-500 focus-visible:ring-[var(--border-strong)]' : ''
                           }`}
                         />
                         {/* ✅ NOVO: Mensagem de erro para Nome */}
@@ -1236,7 +1236,7 @@ const removerDocumentoObrigatorio = async (categoria: string) => {
                           maxLength={14}
                           disabled={isViewMode}
                           className={`bg-[var(--surface-primary)] border-gray-300 text-gray-900 placeholder:text-[var(--text-muted)] disabled:opacity-50 disabled:bg-[var(--surface-primary)] ${
-                            errors.cpf ? 'border-red-500 focus-visible:ring-red-500' : ''
+                            errors.cpf ? 'border-red-500 focus-visible:ring-[var(--border-strong)]' : ''
                           }`}
                         />
                         {/* ✅ NOVO: Mensagem de erro para CPF */}
@@ -1287,9 +1287,9 @@ const removerDocumentoObrigatorio = async (categoria: string) => {
                 </div>
 
                 {/* Seção: Dados Pessoais */}
-                <div className="bg-[var(--surface-primary)] rounded-xl p-6 shadow-sm border border-gray-200">
+                <div className="bg-[var(--surface-primary)] rounded-xl p-6 shadow-[var(--elev-1)] border border-gray-200">
                   <h3 className="text-sm font-semibold text-gray-900 mb-4 flex items-center gap-2">
-                    <Calendar className="h-4 w-4 text-indigo-600" />
+                    <Calendar className="h-4 w-4 text-[var(--text-secondary)]" />
                     Dados Pessoais
                   </h3>
                   
@@ -1312,7 +1312,7 @@ const removerDocumentoObrigatorio = async (categoria: string) => {
                           value={formData.sexo}
                           onChange={(e) => setFormData({ ...formData, sexo: e.target.value })}
                           disabled={isViewMode}
-                          className="w-full h-[42px] px-3 rounded-lg bg-[var(--surface-primary)] border border-gray-300 text-gray-900 disabled:opacity-50 disabled:bg-[var(--surface-primary)] focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-0 focus:border-indigo-500 appearance-none cursor-pointer"
+                          className="w-full h-[42px] px-3 rounded-lg bg-[var(--surface-primary)] border border-gray-300 text-gray-900 disabled:opacity-50 disabled:bg-[var(--surface-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--border-strong)] focus:ring-offset-0 focus:border-[var(--border-default)] appearance-none cursor-pointer"
 style={{
   backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%239ca3af' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E")`,
   backgroundRepeat: 'no-repeat',
@@ -1337,7 +1337,7 @@ style={{
                           value={formData.estadoCivil}
                           onChange={(e) => setFormData({ ...formData, estadoCivil: e.target.value })}
                           disabled={isViewMode}
-                          className="w-full h-[42px] px-3 rounded-lg bg-[var(--surface-primary)] border border-gray-300 text-gray-900 disabled:opacity-50 disabled:bg-[var(--surface-primary)] focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-0 focus:border-indigo-500 appearance-none cursor-pointer"
+                          className="w-full h-[42px] px-3 rounded-lg bg-[var(--surface-primary)] border border-gray-300 text-gray-900 disabled:opacity-50 disabled:bg-[var(--surface-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--border-strong)] focus:ring-offset-0 focus:border-[var(--border-default)] appearance-none cursor-pointer"
 style={{
   backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%239ca3af' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E")`,
   backgroundRepeat: 'no-repeat',
@@ -1359,7 +1359,7 @@ style={{
                           value={formData.nacionalidade}
                           onChange={(e) => setFormData({ ...formData, nacionalidade: e.target.value })}
                           disabled={isViewMode}
-                          className="w-full h-[42px] px-3 rounded-lg bg-[var(--surface-primary)] border border-gray-300 text-gray-900 disabled:opacity-50 disabled:bg-[var(--surface-primary)] focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-0 focus:border-indigo-500 appearance-none cursor-pointer"
+                          className="w-full h-[42px] px-3 rounded-lg bg-[var(--surface-primary)] border border-gray-300 text-gray-900 disabled:opacity-50 disabled:bg-[var(--surface-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--border-strong)] focus:ring-offset-0 focus:border-[var(--border-default)] appearance-none cursor-pointer"
 style={{
   backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%239ca3af' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E")`,
   backgroundRepeat: 'no-repeat',
@@ -1377,9 +1377,9 @@ style={{
                 </div>
 
                 {/* Seção: Contato */}
-                <div className="bg-[var(--surface-primary)] rounded-xl p-6 shadow-sm border border-gray-200">
+                <div className="bg-[var(--surface-primary)] rounded-xl p-6 shadow-[var(--elev-1)] border border-gray-200">
                   <h3 className="text-sm font-semibold text-gray-900 mb-4 flex items-center gap-2">
-                    <Phone className="h-4 w-4 text-indigo-600" />
+                    <Phone className="h-4 w-4 text-[var(--text-secondary)]" />
                     Contato
                   </h3>
                   
@@ -1413,9 +1413,9 @@ style={{
 
             {/* Tab Endereço */}
             {activeTab === "endereco" && (
-              <div className="bg-[var(--surface-primary)] rounded-xl p-6 shadow-sm border border-gray-200">
+              <div className="bg-[var(--surface-primary)] rounded-xl p-6 shadow-[var(--elev-1)] border border-gray-200">
                 <h3 className="text-sm font-semibold text-gray-900 mb-4 flex items-center gap-2">
-                  <MapPin className="h-4 w-4 text-indigo-600" />
+                  <MapPin className="h-4 w-4 text-[var(--text-secondary)]" />
                   Endereço
                 </h3>
                 
@@ -1432,7 +1432,7 @@ style={{
                             value={formData.pais}
                             onChange={(e) => handlePaisChange(e.target.value)}
                             disabled={isViewMode}
-                            className="w-full h-[42px] px-3 rounded-lg bg-[var(--surface-primary)] border border-gray-300 text-gray-900 disabled:opacity-50 disabled:bg-[var(--surface-primary)] focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-0 focus:border-indigo-500 appearance-none cursor-pointer"
+                            className="w-full h-[42px] px-3 rounded-lg bg-[var(--surface-primary)] border border-gray-300 text-gray-900 disabled:opacity-50 disabled:bg-[var(--surface-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--border-strong)] focus:ring-offset-0 focus:border-[var(--border-default)] appearance-none cursor-pointer"
 style={{
   backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%239ca3af' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E")`,
   backgroundRepeat: 'no-repeat',
@@ -1485,7 +1485,7 @@ style={{
                           value={formData.pais}
                           onChange={(e) => handlePaisChange(e.target.value)}
                           disabled={isViewMode}
-                          className="w-full h-[42px] px-3 rounded-lg bg-[var(--surface-primary)] border border-gray-300 text-gray-900 disabled:opacity-50 disabled:bg-[var(--surface-primary)] focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-0 focus:border-indigo-500 appearance-none cursor-pointer"
+                          className="w-full h-[42px] px-3 rounded-lg bg-[var(--surface-primary)] border border-gray-300 text-gray-900 disabled:opacity-50 disabled:bg-[var(--surface-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--border-strong)] focus:ring-offset-0 focus:border-[var(--border-default)] appearance-none cursor-pointer"
 style={{
   backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%239ca3af' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E")`,
   backgroundRepeat: 'no-repeat',
@@ -1514,7 +1514,7 @@ style={{
                           />
                           {buscandoCep && (
                             <div className="absolute right-3 top-1/2 -translate-y-1/2">
-                              <Loader2 className="h-4 w-4 animate-spin text-indigo-600" />
+                              <Loader2 className="h-4 w-4 animate-spin text-[var(--text-secondary)]" />
                             </div>
                           )}
                         </div>
@@ -1604,9 +1604,9 @@ style={{
             {activeTab === "observacoes" && (
               <div className="space-y-6">
                 {/* Seção: Observações */}
-                <div className="bg-[var(--surface-primary)] rounded-xl p-6 shadow-sm border border-gray-200">
+                <div className="bg-[var(--surface-primary)] rounded-xl p-6 shadow-[var(--elev-1)] border border-gray-200">
                   <h3 className="text-sm font-semibold text-gray-900 mb-4 flex items-center gap-2">
-                    <FileText className="h-4 w-4 text-indigo-600" />
+                    <FileText className="h-4 w-4 text-[var(--text-secondary)]" />
                     Observações
                   </h3>
                   <textarea
@@ -1615,20 +1615,20 @@ style={{
                     placeholder="Anotações, informações importantes..."
                     rows={4}
                     disabled={isViewMode}
-                    className="w-full px-3 py-2 rounded-xl bg-[var(--surface-primary)] border border-gray-300 text-gray-900 placeholder:text-[var(--text-muted)] disabled:opacity-50 disabled:bg-[var(--surface-primary)] resize-none focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-0 focus:border-indigo-500"
+                    className="w-full px-3 py-2 rounded-xl bg-[var(--surface-primary)] border border-gray-300 text-gray-900 placeholder:text-[var(--text-muted)] disabled:opacity-50 disabled:bg-[var(--surface-primary)] resize-none focus:outline-none focus:ring-2 focus:ring-[var(--border-strong)] focus:ring-offset-0 focus:border-[var(--border-default)]"
                   />
                 </div>
 
                 {/* Seção: Documentos Obrigatórios */}
-                <div className="bg-[var(--surface-primary)] rounded-xl p-6 shadow-sm border border-gray-200">
+                <div className="bg-[var(--surface-primary)] rounded-xl p-6 shadow-[var(--elev-1)] border border-gray-200">
                   <h3 className="text-sm font-semibold text-gray-900 mb-4 flex items-center gap-2">
-                    <Shield className="h-4 w-4 text-indigo-600" />
+                    <Shield className="h-4 w-4 text-[var(--text-secondary)]" />
                     Documentos Obrigatórios
-                    {carregandoAnexos && <Loader2 className="h-4 w-4 animate-spin text-indigo-600" />}
+                    {carregandoAnexos && <Loader2 className="h-4 w-4 animate-spin text-[var(--text-secondary)]" />}
                   </h3>
 
                   {!editingId && (
-                    <div className="mb-4 p-3 bg-amber-50 border border-amber-200 rounded-lg">
+                    <div className="mb-4 p-3 bg-[var(--surface-secondary)] border border-[var(--border-default)] rounded-lg">
                       <p className="text-sm text-amber-700">
                         ⚠️ Salve o cliente primeiro para poder adicionar documentos.
                       </p>
@@ -1646,24 +1646,24 @@ style={{
                           className={`
                             relative rounded-xl border-2 p-4 transition-all
                             ${temDocumento 
-                              ? 'border-emerald-300 bg-emerald-50' 
-                              : 'border-red-200 bg-red-50'
+                              ? 'border-[var(--border-default)] bg-[var(--surface-secondary)]' 
+                              : 'border-[var(--border-default)] bg-[var(--surface-secondary)]'
                             }
                           `}
                         >
                           {/* Header com status */}
                           <div className="flex items-center justify-between mb-3 min-h-[48px]">
                             <div className="flex items-center gap-2">
-                              <Icon className={`h-4 w-4 ${temDocumento ? 'text-emerald-600' : 'text-red-500'}`} />
+                              <Icon className={`h-4 w-4 ${temDocumento ? 'text-green-600' : 'text-red-500'}`} />
                               <span className="text-sm font-semibold text-gray-800">{label}</span>
                             </div>
                             {temDocumento ? (
-                              <div className="flex items-center gap-1 px-2 py-0.5 bg-emerald-100 rounded-full">
-                                <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600" />
-                                <span className="text-xs font-medium text-emerald-700">Enviado</span>
+                              <div className="flex items-center gap-1 px-2 py-0.5 bg-[var(--surface-secondary)] rounded-full">
+                                <CheckCircle2 className="h-3.5 w-3.5 text-green-600" />
+                                <span className="text-xs font-medium text-green-700">Enviado</span>
                               </div>
                             ) : (
-                              <div className="flex items-center gap-1 px-2 py-0.5 bg-red-100 rounded-full">
+                              <div className="flex items-center gap-1 px-2 py-0.5 bg-[var(--surface-secondary)] rounded-full">
                                 <XCircle className="h-3.5 w-3.5 text-red-500" />
                                 <span className="text-xs font-medium text-red-600">Pendente</span>
                               </div>
@@ -1711,7 +1711,7 @@ style={{
                                   <button
                                     type="button"
                                     onClick={() => removerDocumentoObrigatorio(categoria)}
-                                    className="ml-2 p-1 text-red-500 hover:bg-red-100 rounded transition-colors"
+                                    className="ml-2 p-1 text-red-500 hover:bg-[var(--surface-secondary)] rounded transition-colors"
                                     title="Remover documento"
                                   >
                                     <Trash2 className="h-3.5 w-3.5" />
@@ -1735,10 +1735,10 @@ style={{
                                     e.target.value = '' // Reset input
                                   }}
                                 />
-                                <div className="flex flex-col items-center justify-center py-6 border-2 border-dashed border-red-300 rounded-lg hover:border-indigo-400 hover:bg-indigo-50/50 transition-colors">
+                                <div className="flex flex-col items-center justify-center py-6 border-2 border-dashed border-[var(--border-default)] rounded-lg hover:border-[var(--border-default)] hover:bg-[var(--surface-secondary)]/50 transition-colors">
                                   {isUploading ? (
                                     <>
-                                      <Loader2 className="h-6 w-6 animate-spin text-indigo-500 mb-2" />
+                                      <Loader2 className="h-6 w-6 animate-spin text-[var(--text-secondary)] mb-2" />
                                       <p className="text-xs text-gray-500">Enviando...</p>
                                     </>
                                   ) : (
@@ -1764,15 +1764,15 @@ style={{
                 </div>
 
                 {/* Seção: Outros Documentos (genéricos) */}
-                <div className="bg-[var(--surface-primary)] rounded-xl p-6 shadow-sm border border-gray-200">
+                <div className="bg-[var(--surface-primary)] rounded-xl p-6 shadow-[var(--elev-1)] border border-gray-200">
                   <h3 className="text-sm font-semibold text-gray-900 mb-4 flex items-center gap-2">
-                    <FileText className="h-4 w-4 text-indigo-600" />
+                    <FileText className="h-4 w-4 text-[var(--text-secondary)]" />
                     Todos os Documentos
-                    {carregandoAnexos && <Loader2 className="h-4 w-4 animate-spin text-indigo-600" />}
+                    {carregandoAnexos && <Loader2 className="h-4 w-4 animate-spin text-[var(--text-secondary)]" />}
                   </h3>
 
                   {!editingId && (
-                    <div className="mb-4 p-3 bg-amber-50 border border-amber-200 rounded-lg">
+                    <div className="mb-4 p-3 bg-[var(--surface-secondary)] border border-[var(--border-default)] rounded-lg">
                       <p className="text-sm text-amber-700">
                         ⚠️ Salve o cliente primeiro para poder adicionar anexos.
                       </p>
@@ -1794,7 +1794,7 @@ style={{
                           return (
                             <div 
                               key={anexo.id || index} 
-                              className="group relative bg-gray-50 rounded-lg border border-gray-200 overflow-hidden hover:shadow-md transition-shadow"
+                              className="group relative bg-gray-50 rounded-lg border border-gray-200 overflow-hidden hover:shadow-[var(--elev-2)] transition-shadow"
                             >
                               <a 
                                 href={anexo.urlArquivo} 
@@ -1854,7 +1854,7 @@ style={{
                                     e.preventDefault()
                                     removerAnexoExistente(anexo, index)
                                   }}
-                                  className="absolute top-1 right-1 p-1 bg-red-500 hover:bg-red-800 rounded-full text-[var(--action-primary-ink)] opacity-0 group-hover:opacity-100 transition-opacity"
+                                  className="absolute top-1 right-1 p-1 bg-red-600 hover:bg-red-800 rounded-full text-[var(--action-primary-ink)] opacity-0 group-hover:opacity-100 transition-opacity"
                                 >
                                   <X className="h-3 w-3" />
                                 </button>
@@ -1870,7 +1870,7 @@ style={{
                     <div className="mb-4 space-y-2">
                       <p className="text-sm text-gray-600 font-medium">Arquivos selecionados:</p>
                       {arquivos.map((arquivo, index) => (
-                        <div key={index} className="flex items-center justify-between p-3 bg-amber-50 rounded-lg border border-amber-200">
+                        <div key={index} className="flex items-center justify-between p-3 bg-[var(--surface-secondary)] rounded-lg border border-[var(--border-default)]">
                           <div className="flex items-center gap-3">
                             <FileText className="h-5 w-5 text-amber-600" />
                             <div>
@@ -1881,7 +1881,7 @@ style={{
                           <button
                             type="button"
                             onClick={() => removerArquivo(index)}
-                            className="p-1 hover:bg-red-100 rounded text-red-500"
+                            className="p-1 hover:bg-[var(--surface-secondary)] rounded text-red-500"
                           >
                             <X className="h-4 w-4" />
                           </button>
@@ -1892,7 +1892,7 @@ style={{
                         type="button"
                         onClick={handleUpload}
                         disabled={isUploading}
-                        className="mt-2 w-full py-2 px-4 bg-indigo-700 hover:bg-indigo-800 disabled:bg-indigo-400 text-[var(--action-primary-ink)] rounded-lg font-medium transition-colors"
+                        className="mt-2 w-full py-2 px-4 bg-[var(--text-muted)] hover:bg-[var(--text-muted)] disabled:bg-[var(--text-muted)] text-[var(--action-primary-ink)] rounded-lg font-medium transition-colors"
                       >
                         {isUploading ? (
                           <span className="flex items-center justify-center gap-2">
@@ -1907,7 +1907,7 @@ style={{
                   )}
 
                   {!isViewMode && editingId && (
-                    <label className="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center cursor-pointer hover:border-indigo-400 hover:bg-indigo-50/50 transition-colors block">
+                    <label className="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center cursor-pointer hover:border-[var(--border-default)] hover:bg-[var(--surface-secondary)]/50 transition-colors block">
                       <input
                         type="file"
                         multiple
@@ -1942,7 +1942,7 @@ style={{
                   podeGerar={!isViewMode && podeEditar}
                 />
               ) : (
-                <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-700">
+                <div className="rounded-xl border border-[var(--border-default)] bg-[var(--surface-secondary)] p-4 text-sm text-amber-700">
                   Salve o cliente primeiro para gerar procurações.
                 </div>
               )
@@ -2289,7 +2289,7 @@ export function ContratantesTabela({ contratantes, onRefresh, onOpenProcesso }: 
           {pode('clientes.criar') && (
             <Button
               onClick={handleNew}
-              className="bg-emerald-700 hover:bg-emerald-800 text-[var(--action-primary-ink)]"
+              className="bg-green-700 hover:bg-green-800 text-[var(--action-primary-ink)]"
             >
               <Plus className="h-4 w-4 mr-2" />
               Novo Cliente
@@ -2331,8 +2331,8 @@ export function ContratantesTabela({ contratantes, onRefresh, onOpenProcesso }: 
                     <span className={`
                       px-2 py-1 rounded text-xs font-medium
                       ${contratante.tipo === 'requerente' 
-                        ? 'bg-slate-50 text-slate-700' 
-                        : 'bg-blue-50 text-blue-700'
+                        ? 'bg-[var(--surface-secondary)] text-[var(--text-secondary)]' 
+                        : 'bg-[var(--surface-secondary)] text-[var(--text-secondary)]'
                       }
                     `}>
                       {contratante.tipo === 'requerente' ? 'Requerente' : 'Contratante'}
@@ -2342,7 +2342,7 @@ export function ContratantesTabela({ contratantes, onRefresh, onOpenProcesso }: 
                   <td className="px-4 py-3">
                     <div className="flex items-center gap-3">
                       <div className={`w-8 h-8 rounded-full flex items-center justify-center text-white text-sm font-medium ${
-                        contratante.tipo === 'requerente' ? 'bg-slate-600' : 'bg-indigo-600'
+                        contratante.tipo === 'requerente' ? 'bg-[var(--surface-secondary)]' : 'bg-[var(--surface-secondary)]'
                       }`}>
                         {contratante.nome.charAt(0).toUpperCase()}
                       </div>
@@ -2410,7 +2410,7 @@ export function ContratantesTabela({ contratantes, onRefresh, onOpenProcesso }: 
                         {pode('clientes.excluir') && (
                           <DropdownMenuItem 
                             onClick={() => handleDelete(contratante.id, contratante.tipo)}
-                            className="text-red-500 focus:text-red-500 data-[highlighted]:text-red-500 data-[highlighted]:bg-red-50 cursor-pointer"
+                            className="text-red-500 focus:text-red-500 data-[highlighted]:text-red-500 data-[highlighted]:bg-[var(--surface-secondary)] cursor-pointer"
                           >
                             <Trash2 className="h-4 w-4 mr-2 text-red-500" />
                             Excluir

@@ -352,7 +352,7 @@ export function KanbanBoard({
       </div>
 
       {fases.length === 0 ? (
-        <div className="rounded-lg border border-amber-200 bg-amber-50 p-6 text-center text-sm text-amber-700">
+        <div className="rounded-lg border border-[var(--border-default)] bg-[var(--surface-secondary)] p-6 text-center text-sm text-amber-700">
           Este tipo de processo ainda não tem fases configuradas.
           Monte o workflow em Gerenciamento → Workflows e Fases → Workflow Macro.
         </div>
@@ -412,7 +412,7 @@ export function KanbanBoard({
       {/* MODAL: Novo processo — em portal pro body (senão fica preso no painel com blur) */}
       {criarModal && createPortal(
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-[var(--overlay-modal)] p-4 backdrop-blur-sm">
-          <div className="w-full max-w-md overflow-auto rounded-2xl border border-[var(--border-default)] bg-zinc-900/95 shadow-2xl">
+          <div className="w-full max-w-md overflow-auto rounded-2xl border border-[var(--border-default)] bg-zinc-900/95 shadow-[var(--elev-3)]">
             <div className="flex items-center justify-between border-b border-[var(--border-default)] px-6 py-4">
               <h3 className="text-lg font-semibold text-white">Novo processo</h3>
               <button onClick={() => setCriarModal(false)} className="text-[var(--text-muted)] transition hover:text-white">✕</button>
@@ -437,7 +437,7 @@ export function KanbanBoard({
               </p>
 
               {erroCriar && (
-                <div className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700">{erroCriar}</div>
+                <div className="rounded-lg border border-[var(--border-default)] bg-[var(--surface-secondary)] p-3 text-sm text-red-700">{erroCriar}</div>
               )}
             </div>
 
@@ -491,7 +491,7 @@ export function KanbanBoard({
 
       {aviso && (
         <div className="fixed inset-0 z-[10060] flex items-center justify-center bg-[var(--overlay-modal)] px-4" onClick={() => setAviso(null)}>
-          <div className="max-w-sm rounded-xl border border-[var(--border-default)] bg-[var(--surface-popover)] p-5 shadow-2xl" onClick={(e) => e.stopPropagation()}>
+          <div className="max-w-sm rounded-xl border border-[var(--border-default)] bg-[var(--surface-popover)] p-5 shadow-[var(--elev-3)]" onClick={(e) => e.stopPropagation()}>
             <div className="text-[13px] text-white/90 leading-relaxed">{aviso}</div>
             <div className="flex justify-end mt-4">
               <button

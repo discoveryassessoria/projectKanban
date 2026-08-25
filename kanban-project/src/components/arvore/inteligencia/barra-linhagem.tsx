@@ -8,7 +8,7 @@
 // botões "Buscar" e "Análise" que já existiam:
 //
 //     rounded-lg border border-gray-200 bg-[var(--surface-primary)] px-3 py-2 text-[13px]
-//     text-gray-600 shadow-sm hover:border-gray-300 hover:text-gray-900
+//     text-gray-600 shadow-[var(--elev-1)] hover:border-gray-300 hover:text-gray-900
 //
 // Isso não é economia de esforço: é o requisito. A árvore tem de continuar
 // parecendo a mesma. Nenhum controle daqui entra no fluxo do canvas — abrir,
@@ -30,9 +30,9 @@ import type { ResumoLinhagem } from "@/src/lib/genealogia/operacional/dossie"
 import type { AcaoRecomendada } from "@/src/lib/genealogia/operacional/diagnostico"
 
 const CASCA =
-  "flex items-center gap-2 rounded-lg border border-gray-200 bg-[var(--surface-primary)] px-3 py-2 text-[13px] text-gray-600 shadow-sm transition hover:border-gray-300 hover:text-gray-900"
+  "flex items-center gap-2 rounded-lg border border-gray-200 bg-[var(--surface-primary)] px-3 py-2 text-[13px] text-gray-600 shadow-[var(--elev-1)] transition hover:border-gray-300 hover:text-gray-900"
 const CASCA_ATIVA =
-  "flex items-center gap-2 rounded-lg border border-gray-300 bg-gray-50 px-3 py-2 text-[13px] font-medium text-gray-900 shadow-sm transition"
+  "flex items-center gap-2 rounded-lg border border-gray-300 bg-gray-50 px-3 py-2 text-[13px] font-medium text-gray-900 shadow-[var(--elev-1)] transition"
 
 const FILTROS_RAPIDOS: ChaveFiltro[] = [
   "requerentes",
@@ -162,7 +162,7 @@ export function BarraLinhagem(props: Props) {
         <div
           role="group"
           aria-label="Visualização da árvore"
-          className="flex items-center overflow-hidden rounded-lg border border-gray-200 bg-[var(--surface-primary)] shadow-sm"
+          className="flex items-center overflow-hidden rounded-lg border border-gray-200 bg-[var(--surface-primary)] shadow-[var(--elev-1)]"
         >
           <button
             onClick={() => onModo("todos")}
@@ -210,7 +210,7 @@ export function BarraLinhagem(props: Props) {
           </button>
 
           {menuRequerente && (
-            <div className="absolute left-0 top-full mt-1 w-[300px] overflow-hidden rounded-lg border border-gray-200 bg-[var(--surface-primary)] shadow-lg">
+            <div className="absolute left-0 top-full mt-1 w-[300px] overflow-hidden rounded-lg border border-gray-200 bg-[var(--surface-primary)] shadow-[var(--elev-2)]">
               <p className="border-b border-gray-100 px-3 py-2 text-[11px] uppercase tracking-wide text-gray-500">
                 {mapa.linhagens.length} requerente(s) neste processo
               </p>
@@ -238,7 +238,7 @@ export function BarraLinhagem(props: Props) {
                           </span>
                         </span>
                         {l.marca === "menor" && (
-                          <span className="mt-0.5 rounded bg-amber-100 px-1.5 py-0.5 text-[10px] font-semibold text-amber-800">
+                          <span className="mt-0.5 rounded bg-[var(--surface-secondary)] px-1.5 py-0.5 text-[10px] font-semibold text-amber-800">
                             menor
                           </span>
                         )}
@@ -319,7 +319,7 @@ export function BarraLinhagem(props: Props) {
           </button>
 
           {menuFiltros && (
-            <div className="absolute left-0 top-full mt-1 w-[260px] overflow-hidden rounded-lg border border-gray-200 bg-[var(--surface-primary)] shadow-lg">
+            <div className="absolute left-0 top-full mt-1 w-[260px] overflow-hidden rounded-lg border border-gray-200 bg-[var(--surface-primary)] shadow-[var(--elev-2)]">
               <p className="border-b border-gray-100 px-3 py-2 text-[11px] leading-snug text-gray-500">
                 O filtro <strong className="font-semibold">realça</strong> quem casa. Ninguém sai da
                 árvore — esconder um pai deixaria o filho órfão na tela.
@@ -400,7 +400,7 @@ export function BarraLinhagem(props: Props) {
             </button>
 
             {resumoAberto && (
-              <div className="absolute left-0 top-full mt-1 w-[330px] rounded-lg border border-gray-200 bg-[var(--surface-primary)] p-3 shadow-lg">
+              <div className="absolute left-0 top-full mt-1 w-[330px] rounded-lg border border-gray-200 bg-[var(--surface-primary)] p-3 shadow-[var(--elev-2)]">
                 <p className="text-[13px] font-semibold text-gray-900">{resumo.nome}</p>
                 <p className="mt-0.5 text-[11px] text-gray-500">
                   Linhagem: {resumo.pessoas} pessoas · {resumo.geracoes} geração(ões)
@@ -492,7 +492,7 @@ export function BarraLinhagem(props: Props) {
               Comparar
             </button>
             {comparando && (
-              <div className="absolute left-0 top-full mt-1 w-[380px] overflow-hidden rounded-lg border border-gray-200 bg-[var(--surface-primary)] shadow-lg">
+              <div className="absolute left-0 top-full mt-1 w-[380px] overflow-hidden rounded-lg border border-gray-200 bg-[var(--surface-primary)] shadow-[var(--elev-2)]">
                 <p className="border-b border-gray-100 px-3 py-2 text-[11px] uppercase tracking-wide text-gray-500">
                   Comparação · clique para focar a linhagem
                 </p>
@@ -543,7 +543,7 @@ export function BarraLinhagem(props: Props) {
           e sem ela o operador precisa abrir três popovers para saber onde está.
           Rótulo em cima do número: "0/4" sozinho não diz nada. */}
       {resumo && (
-        <div className="flex flex-wrap items-center gap-x-4 gap-y-1 rounded-lg border border-gray-200 bg-[var(--surface-primary)] px-3 py-1.5 shadow-sm">
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-1 rounded-lg border border-gray-200 bg-[var(--surface-primary)] px-3 py-1.5 shadow-[var(--elev-1)]">
           <Campo rotulo="Requerente" valor={resumo.nome} destaque />
           <Campo
             rotulo="Ascendente transmissor"
@@ -589,7 +589,7 @@ export function BarraLinhagem(props: Props) {
       {/* ── LEGENDA DA SAÚDE ───────────────────────────────────────────────
           Números reais, não só cores: "amarelo" não diz quantas pessoas. */}
       {saudeLigada && (
-        <div className="flex flex-wrap items-center gap-3 rounded-lg border border-gray-200 bg-[var(--surface-primary)] px-2.5 py-1.5 shadow-sm">
+        <div className="flex flex-wrap items-center gap-3 rounded-lg border border-gray-200 bg-[var(--surface-primary)] px-2.5 py-1.5 shadow-[var(--elev-1)]">
           {(["critico", "atencao", "saudavel", "fora"] as NivelSaudePessoa[]).map((n) => (
             <span key={n} className="flex items-center gap-1.5 text-[12px] text-gray-600">
               <span
@@ -613,7 +613,7 @@ export function BarraLinhagem(props: Props) {
       {emLinhagem && trilha.length > 1 && (
         <nav
           aria-label="Caminho da linhagem"
-          className="flex max-w-full flex-wrap items-center gap-1 rounded-lg border border-gray-200 bg-[var(--surface-primary)] px-2.5 py-1.5 shadow-sm"
+          className="flex max-w-full flex-wrap items-center gap-1 rounded-lg border border-gray-200 bg-[var(--surface-primary)] px-2.5 py-1.5 shadow-[var(--elev-1)]"
         >
           {trilha.map((degrau, i) => (
             <span key={degrau.pessoaId} className="flex items-center gap-1">

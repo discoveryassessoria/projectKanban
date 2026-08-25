@@ -146,13 +146,13 @@ export function WorkflowControls({
 
         {/* Banner de status */}
         {isPausado && (
-          <div className="mt-3 px-3 py-2 bg-amber-50 border border-amber-200 rounded-md text-[11px] text-amber-700 flex items-center gap-2">
+          <div className="mt-3 px-3 py-2 bg-[var(--surface-secondary)] border border-[var(--border-default)] rounded-md text-[11px] text-amber-700 flex items-center gap-2">
             <Pause className="w-3 h-3 flex-shrink-0" />
             <span><strong>Operação PAUSADA</strong> · use Retomar quando estiver pronto pra continuar</span>
           </div>
         )}
         {isCancelado && (
-          <div className="mt-3 px-3 py-2 bg-red-50 border border-red-200 rounded-md text-[11px] text-red-700 flex items-center gap-2">
+          <div className="mt-3 px-3 py-2 bg-[var(--surface-secondary)] border border-[var(--border-default)] rounded-md text-[11px] text-red-700 flex items-center gap-2">
             <Ban className="w-3 h-3 flex-shrink-0" />
             <span><strong>Operação CANCELADA</strong> · documento voltou pra fila de pendentes</span>
           </div>
@@ -165,7 +165,7 @@ export function WorkflowControls({
               <button
                 onClick={handlePausar}
                 disabled={!!actionLoading}
-                className="inline-flex items-center gap-1.5 px-3 py-1.5 text-[11px] font-medium rounded-md transition-colors disabled:opacity-50 border border-[var(--border-strong)]/50 text-sky-700 bg-transparent hover:bg-[var(--action-primary)]/10"
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 text-[11px] font-medium rounded-md transition-colors disabled:opacity-50 border border-[var(--border-strong)]/50 text-[var(--text-secondary)] bg-transparent hover:bg-[var(--action-primary)]/10"
               >
                 {actionLoading === "pausar" ? <Loader2 className="w-3 h-3 animate-spin" /> : <Pause className="w-3 h-3" />}
                 Pausar operação
@@ -175,7 +175,7 @@ export function WorkflowControls({
               <button
                 onClick={handleRetomar}
                 disabled={!!actionLoading}
-                className="inline-flex items-center gap-1.5 px-3 py-1.5 text-[11px] font-medium rounded-md transition-colors disabled:opacity-50 border border-green-200 text-green-700 bg-transparent hover:bg-green-50"
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 text-[11px] font-medium rounded-md transition-colors disabled:opacity-50 border border-[var(--border-default)] text-green-700 bg-transparent hover:bg-[var(--surface-secondary)]"
               >
                 {actionLoading === "retomar" ? <Loader2 className="w-3 h-3 animate-spin" /> : <Play className="w-3 h-3" />}
                 Retomar operação
@@ -193,7 +193,7 @@ export function WorkflowControls({
               <button
                 onClick={() => setConfirmAction("invalidar")}
                 disabled={!!actionLoading}
-                className="inline-flex items-center gap-1.5 px-3 py-1.5 text-[11px] font-medium rounded-md transition-colors disabled:opacity-50 border border-red-200 text-red-700 bg-transparent hover:bg-red-50"
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 text-[11px] font-medium rounded-md transition-colors disabled:opacity-50 border border-[var(--border-default)] text-red-700 bg-transparent hover:bg-[var(--surface-secondary)]"
               >
                 <Ban className="w-3 h-3" />
                 Invalidar operação

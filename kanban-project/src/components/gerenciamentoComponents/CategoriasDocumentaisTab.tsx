@@ -65,7 +65,7 @@ export default function CategoriasDocumentaisTab() {
 
   return (
     <div className="space-y-5">
-      {flash && <div className="rounded-xl border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-700">{flash}</div>}
+      {flash && <div className="rounded-xl border border-[var(--border-default)] bg-[var(--surface-secondary)] px-4 py-3 text-sm text-green-700">{flash}</div>}
 
       <div className="rounded-2xl border border-[var(--border-default)] bg-[var(--surface-primary)] p-5 backdrop-blur-sm">
         <div className="flex items-start justify-between gap-3">
@@ -85,7 +85,7 @@ export default function CategoriasDocumentaisTab() {
         </div>
       </div>
 
-      {erro && <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{erro}</div>}
+      {erro && <div className="rounded-xl border border-[var(--border-default)] bg-[var(--surface-secondary)] px-4 py-3 text-sm text-red-700">{erro}</div>}
 
       <div className="overflow-hidden rounded-2xl border border-[var(--border-default)] bg-[var(--surface-primary)] backdrop-blur-sm">
         <table className="w-full text-sm">
@@ -105,7 +105,7 @@ export default function CategoriasDocumentaisTab() {
               <tr key={c.id} className="border-b border-[var(--border-subtle)] last:border-0">
                 <td className="px-4 py-2.5 text-white">{c.name}{c.sistema && <span className="ml-1.5 rounded bg-[var(--surface-primary)] px-1.5 py-0.5 text-[9px] uppercase text-[var(--text-secondary)]">sistema</span>}</td>
                 <td className="px-4 py-2.5 text-white/70">{c.ordem}</td>
-                <td className="px-4 py-2.5"><span className={`rounded-full px-2 py-0.5 text-[10px] ${c.ativo ? "bg-green-50 text-green-700" : "bg-[var(--surface-primary)] text-[var(--text-secondary)]"}`}>{c.ativo ? "Ativa" : "Inativa"}</span></td>
+                <td className="px-4 py-2.5"><span className={`rounded-full px-2 py-0.5 text-[10px] ${c.ativo ? "bg-[var(--surface-secondary)] text-green-700" : "bg-[var(--surface-primary)] text-[var(--text-secondary)]"}`}>{c.ativo ? "Ativa" : "Inativa"}</span></td>
                 <td className="px-4 py-2.5 text-white/70">{c.tiposCount}</td>
                 <td className="px-4 py-2.5">
                   <div className="flex items-center justify-end gap-1 text-xs text-[var(--text-secondary)]">
@@ -114,7 +114,7 @@ export default function CategoriasDocumentaisTab() {
                     {c.sistema || c.tiposCount > 0 ? (
                       <span title={c.sistema ? "Categoria de sistema — não pode ser excluída" : `Em uso por ${c.tiposCount} tipo(s)`} className="cursor-not-allowed rounded px-1.5 py-0.5 text-[var(--text-muted)]">Excluir</span>
                     ) : (
-                      <button onClick={() => del(c)} className="rounded px-1.5 py-0.5 text-red-700/70 hover:bg-red-50 hover:text-red-700">Excluir</button>
+                      <button onClick={() => del(c)} className="rounded px-1.5 py-0.5 text-red-700/70 hover:bg-[var(--surface-secondary)] hover:text-red-700">Excluir</button>
                     )}
                   </div>
                 </td>
@@ -126,7 +126,7 @@ export default function CategoriasDocumentaisTab() {
 
       {form && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-[var(--overlay-modal)] p-4 backdrop-blur-sm" onClick={() => setForm(null)}>
-          <div className="w-full max-w-md rounded-2xl border border-[var(--border-default)] bg-zinc-900/95 shadow-2xl" onClick={(e) => e.stopPropagation()}>
+          <div className="w-full max-w-md rounded-2xl border border-[var(--border-default)] bg-zinc-900/95 shadow-[var(--elev-3)]" onClick={(e) => e.stopPropagation()}>
             <div className="border-b border-[var(--border-default)] px-6 py-4"><h3 className="font-semibold text-white">{form.id ? "Editar" : "Nova"} categoria documental</h3></div>
             <div className="space-y-3 px-6 py-4">
               <div><label className={labelCls}>Nome *</label><input value={form.name} onChange={(e) => setForm((f) => f && { ...f, name: e.target.value })} autoFocus className={inputCls} /></div>

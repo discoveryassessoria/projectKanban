@@ -64,7 +64,7 @@ export function RetornarFaseButton({ processoId, faseKey, faseLabel, onRetornou 
 
       {aberto && (
         <div className="fixed inset-0 z-[80] flex items-center justify-center bg-[var(--overlay-modal)] p-4" onClick={() => !enviando && setAberto(false)}>
-          <div className="max-w-md w-full rounded-2xl bg-[var(--surface-popover)] p-6 shadow-xl" onClick={(e) => e.stopPropagation()}>
+          <div className="max-w-md w-full rounded-2xl bg-[var(--surface-popover)] p-6 shadow-[var(--elev-3)]" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center gap-2 mb-3">
               <RotateCcw className="w-5 h-5 text-white/80" />
               <h3 className="text-[16px] font-extrabold text-white/95">Retornar processo para esta fase</h3>
@@ -79,18 +79,18 @@ export function RetornarFaseButton({ processoId, faseKey, faseLabel, onRetornou 
               value={justificativa}
               onChange={(e) => setJustificativa(e.target.value)}
               rows={3}
-              className="w-full text-[13px] rounded-lg border border-[var(--border-default)] px-3 py-2 mb-3 focus:outline-none focus:border-blue-400"
+              className="w-full text-[13px] rounded-lg border border-[var(--border-default)] px-3 py-2 mb-3 focus:outline-none focus:border-[var(--border-default)]"
               placeholder="Por que o processo precisa voltar a esta fase?"
             />
             <label className="block text-[12px] font-semibold text-white/68 mb-1">Código de motivo</label>
             <input
               value={motivoCodigo}
               onChange={(e) => setMotivoCodigo(e.target.value)}
-              className="w-full text-[13px] rounded-lg border border-[var(--border-default)] px-3 py-2 mb-3 focus:outline-none focus:border-blue-400"
+              className="w-full text-[13px] rounded-lg border border-[var(--border-default)] px-3 py-2 mb-3 focus:outline-none focus:border-[var(--border-default)]"
               placeholder="Ex.: DOC_NAO_LOCALIZADO"
             />
 
-            {erro && <div className="bg-red-50 border border-red-200 rounded-lg px-3 py-2 text-[12.5px] text-red-700 mb-3">{erro}</div>}
+            {erro && <div className="bg-[var(--surface-secondary)] border border-[var(--border-default)] rounded-lg px-3 py-2 text-[12.5px] text-red-700 mb-3">{erro}</div>}
 
             <div className="flex justify-end gap-2">
               <button disabled={enviando} onClick={() => setAberto(false)} className="px-3.5 py-2 text-[12.5px] font-semibold rounded-lg bg-[var(--surface-tertiary)] hover:bg-[var(--surface-tertiary)] text-white/95 disabled:opacity-50">Cancelar</button>

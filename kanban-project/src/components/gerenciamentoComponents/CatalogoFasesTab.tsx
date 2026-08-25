@@ -148,9 +148,9 @@ export default function CatalogoFasesTab() {
 
   return (
     <div className="space-y-5">
-      {flash && <div className="rounded-xl border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-700">{flash}</div>}
+      {flash && <div className="rounded-xl border border-[var(--border-default)] bg-[var(--surface-secondary)] px-4 py-3 text-sm text-green-700">{flash}</div>}
       {erro && (
-        <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+        <div className="rounded-xl border border-[var(--border-default)] bg-[var(--surface-secondary)] px-4 py-3 text-sm text-red-700">
           {erro} <button onClick={() => { void load() }} className="ml-2 underline hover:text-white">Tentar de novo</button>
         </div>
       )}
@@ -198,7 +198,7 @@ export default function CatalogoFasesTab() {
                 <td className="px-4 py-2.5">
                   <div className="flex flex-wrap gap-1 text-[10px]">
                     {f.requiredPadrao && <span className="rounded bg-[var(--surface-primary)] px-1.5 py-0.5 text-white/70">obrigatória</span>}
-                    {f.conditionalPadrao && <span className="rounded bg-amber-50 px-1.5 py-0.5 text-amber-700">condicional</span>}
+                    {f.conditionalPadrao && <span className="rounded bg-[var(--surface-secondary)] px-1.5 py-0.5 text-amber-700">condicional</span>}
                     {!f.requiredPadrao && !f.conditionalPadrao && <span className="text-[var(--text-muted)]">—</span>}
                   </div>
                 </td>
@@ -208,7 +208,7 @@ export default function CatalogoFasesTab() {
                   <button
                     onClick={() => toggleAtivo(f)}
                     title={f.ativo ? "Inativar (some do seletor de fases, sem apagar)" : "Ativar"}
-                    className={`rounded-full px-2 py-0.5 text-[10px] ${f.ativo ? "bg-green-50 text-green-700" : "bg-[var(--surface-primary)] text-[var(--text-secondary)]"}`}
+                    className={`rounded-full px-2 py-0.5 text-[10px] ${f.ativo ? "bg-[var(--surface-secondary)] text-green-700" : "bg-[var(--surface-primary)] text-[var(--text-secondary)]"}`}
                   >
                     {f.ativo ? "Ativa" : "Inativa"}
                   </button>
@@ -231,7 +231,7 @@ export default function CatalogoFasesTab() {
                       aria-label="Excluir"
                       disabled={f.usos > 0}
                       onClick={() => del(f)}
-                      className="rounded p-1 text-red-700/70 hover:bg-red-50 hover:text-red-700 disabled:cursor-not-allowed disabled:opacity-30"
+                      className="rounded p-1 text-red-700/70 hover:bg-[var(--surface-secondary)] hover:text-red-700 disabled:cursor-not-allowed disabled:opacity-30"
                     ><ITrash /></button>
                   </div>
                 </td>
@@ -243,7 +243,7 @@ export default function CatalogoFasesTab() {
 
       {form && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-[var(--overlay-modal)] p-4 backdrop-blur-sm" onClick={() => setForm(null)}>
-          <div className="w-full max-w-lg rounded-2xl border border-[var(--border-default)] bg-zinc-900/95 shadow-2xl" onClick={e => e.stopPropagation()}>
+          <div className="w-full max-w-lg rounded-2xl border border-[var(--border-default)] bg-zinc-900/95 shadow-[var(--elev-3)]" onClick={e => e.stopPropagation()}>
             <div className="border-b border-[var(--border-default)] px-6 py-4">
               <h3 className="font-semibold text-white">{form.id ? "Editar fase" : "Nova fase"}</h3>
               <p className="mt-0.5 text-xs text-[var(--text-secondary)]">Os padrões abaixo são sugeridos ao adicionar a fase a um fluxo — cada fluxo pode ajustá-los.</p>

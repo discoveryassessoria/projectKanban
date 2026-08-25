@@ -107,7 +107,7 @@ export function PersonCardSimple({ pessoa, isMain = false, mode = 'paisagem', on
     // Card HORIZONTAL (retangular)
     return (
       <div
-        className={`person-card relative bg-[var(--surface-primary)] rounded-xl shadow-md cursor-pointer hover:shadow-lg transition-all overflow-hidden ${isMain ? 'ring-2 ring-green-500 ring-offset-2' : ''}`}
+        className={`person-card relative bg-[var(--surface-primary)] rounded-xl shadow-[var(--elev-2)] cursor-pointer hover:shadow-[var(--elev-2)] transition-all overflow-hidden ${isMain ? 'ring-2 ring-[var(--border-strong)] ring-offset-2' : ''}`}
         style={{
           width: size.width,
           height: size.height,
@@ -150,7 +150,7 @@ export function PersonCardSimple({ pessoa, isMain = false, mode = 'paisagem', on
   // Card VERTICAL (quadrado)
   return (
     <div
-      className={`person-card relative bg-[var(--surface-primary)] rounded-xl shadow-md cursor-pointer hover:shadow-lg transition-all overflow-hidden ${isMain ? 'ring-2 ring-green-500 ring-offset-2' : ''}`}
+      className={`person-card relative bg-[var(--surface-primary)] rounded-xl shadow-[var(--elev-2)] cursor-pointer hover:shadow-[var(--elev-2)] transition-all overflow-hidden ${isMain ? 'ring-2 ring-[var(--border-strong)] ring-offset-2' : ''}`}
       style={{
         width: size.width,
         height: size.height,
@@ -214,7 +214,7 @@ export function AddPersonButtonSimple({ type, mode = 'paisagem', onClick }: AddP
     // Botão HORIZONTAL
     return (
       <div
-        className="relative bg-[var(--surface-primary)] rounded-xl border-2 border-dashed border-gray-300 cursor-pointer hover:border-gray-400 hover:bg-gray-50 transition-all shadow-sm"
+        className="relative bg-[var(--surface-primary)] rounded-xl border-2 border-dashed border-gray-300 cursor-pointer hover:border-gray-400 hover:bg-gray-50 transition-all shadow-[var(--elev-1)]"
         style={{ width: size.width, height: size.height }}
         onClick={onClick}
       >
@@ -238,7 +238,7 @@ export function AddPersonButtonSimple({ type, mode = 'paisagem', onClick }: AddP
   // Botão VERTICAL
   return (
     <div
-      className="relative bg-[var(--surface-primary)] rounded-xl border-2 border-dashed border-gray-300 cursor-pointer hover:border-gray-400 hover:bg-gray-50 transition-all shadow-sm"
+      className="relative bg-[var(--surface-primary)] rounded-xl border-2 border-dashed border-gray-300 cursor-pointer hover:border-gray-400 hover:bg-gray-50 transition-all shadow-[var(--elev-1)]"
       style={{ width: size.width, height: size.height }}
       onClick={onClick}
     >
@@ -266,7 +266,7 @@ export function AddSpouseButton({ mode = 'paisagem', onClick }: { mode?: ViewMod
   if (mode === 'paisagem') {
     return (
       <div
-        className="relative bg-[var(--surface-primary)] rounded-xl border-2 border-dashed border-gray-300 cursor-pointer hover:border-gray-400 hover:bg-gray-50 transition-all shadow-sm"
+        className="relative bg-[var(--surface-primary)] rounded-xl border-2 border-dashed border-gray-300 cursor-pointer hover:border-gray-400 hover:bg-gray-50 transition-all shadow-[var(--elev-1)]"
         style={{ width: size.width, height: size.height }}
         onClick={onClick}
       >
@@ -286,7 +286,7 @@ export function AddSpouseButton({ mode = 'paisagem', onClick }: { mode?: ViewMod
 
   return (
     <div
-      className="relative bg-[var(--surface-primary)] rounded-xl border-2 border-dashed border-gray-300 cursor-pointer hover:border-gray-400 hover:bg-gray-50 transition-all shadow-sm"
+      className="relative bg-[var(--surface-primary)] rounded-xl border-2 border-dashed border-gray-300 cursor-pointer hover:border-gray-400 hover:bg-gray-50 transition-all shadow-[var(--elev-1)]"
       style={{ width: size.width, height: size.height }}
       onClick={onClick}
     >

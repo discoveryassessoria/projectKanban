@@ -209,7 +209,7 @@ export function PainelInteligencia({
 
   // Cor própria na raiz — ver comentário equivalente em tree-onboarding.tsx.
   return (
-    <div className="fixed right-0 top-0 z-[10002] flex h-full w-[380px] flex-col border-l border-gray-200 bg-[var(--surface-primary)] text-gray-900 shadow-2xl">
+    <div className="fixed right-0 top-0 z-[10002] flex h-full w-[380px] flex-col border-l border-gray-200 bg-[var(--surface-primary)] text-gray-900 shadow-[var(--elev-3)]">
       <div className="flex items-center justify-between border-b border-gray-100 px-4 py-3">
         <div>
           <h2 className="text-sm font-semibold text-gray-900">Inteligência da árvore</h2>
@@ -287,7 +287,7 @@ export function PainelInteligencia({
               </h3>
               {analise.truncado && (
                 // Honestidade sobre cobertura: a lista foi cortada por relevância.
-                <p className="mb-2 rounded-md bg-amber-50 px-2.5 py-1.5 text-[11px] text-amber-800">
+                <p className="mb-2 rounded-md bg-[var(--surface-secondary)] px-2.5 py-1.5 text-[11px] text-amber-800">
                   Mostrando os mais relevantes. Resolva os primeiros para os demais aparecerem.
                 </p>
               )}

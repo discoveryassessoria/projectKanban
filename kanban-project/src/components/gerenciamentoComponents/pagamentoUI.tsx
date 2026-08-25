@@ -247,7 +247,7 @@ export function MultiSelect({
       ref={menuRef}
       // z acima do modal (z-50/z-[60]); sem backdrop — nada cobre a página.
       style={{ position: 'fixed', left: pos.left, top: pos.top, width: pos.width, maxHeight: pos.maxH, zIndex: 120 }}
-      className="flex flex-col overflow-hidden rounded-lg border border-[var(--border-default)] bg-zinc-900 shadow-2xl"
+      className="flex flex-col overflow-hidden rounded-lg border border-[var(--border-default)] bg-zinc-900 shadow-[var(--elev-3)]"
       onKeyDown={teclado}
     >
       {busca && (
@@ -373,7 +373,7 @@ export function ModalWizard({ onClose, largura = 'max-w-2xl', header, footer, ch
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-[var(--overlay-modal)] p-4 backdrop-blur-sm" onClick={() => { fecharTodosMultiSelects(); onClose() }}>
       <div
-        className={`flex max-h-[90vh] w-full ${largura} flex-col rounded-2xl border border-[var(--border-default)] bg-zinc-900/95 text-white shadow-2xl`}
+        className={`flex max-h-[90vh] w-full ${largura} flex-col rounded-2xl border border-[var(--border-default)] bg-zinc-900/95 text-white shadow-[var(--elev-3)]`}
         onClick={(e) => e.stopPropagation()}
       >
         <div className="shrink-0 rounded-t-2xl border-b border-[var(--border-default)] bg-zinc-900/95 px-6 py-4">{header}</div>
@@ -391,8 +391,8 @@ export function Stepper({ passos, atual }: { passos: string[]; atual: number }) 
       {passos.map((label, i) => {
         const n = i + 1
         return (
-          <div key={label} className={`flex items-center gap-1.5 text-xs ${atual === n ? 'text-white' : atual > n ? 'text-emerald-700' : 'text-[var(--text-muted)]'}`}>
-            <span className={`grid h-5 w-5 place-items-center rounded-full border text-[10px] ${atual === n ? 'border-[var(--border-strong)]' : atual > n ? 'border-emerald-200 bg-emerald-50' : 'border-[var(--border-default)]'}`}>{atual > n ? <Check className="h-3 w-3" /> : n}</span>
+          <div key={label} className={`flex items-center gap-1.5 text-xs ${atual === n ? 'text-white' : atual > n ? 'text-green-700' : 'text-[var(--text-muted)]'}`}>
+            <span className={`grid h-5 w-5 place-items-center rounded-full border text-[10px] ${atual === n ? 'border-[var(--border-strong)]' : atual > n ? 'border-[var(--border-default)] bg-[var(--surface-secondary)]' : 'border-[var(--border-default)]'}`}>{atual > n ? <Check className="h-3 w-3" /> : n}</span>
             {label}
           </div>
         )

@@ -484,7 +484,7 @@ function RowMenu({ onAbrir, onToggle, aberto, codigo, onAcao, saldo, statusConso
       {open && pos && typeof document !== "undefined" && createPortal(
         <>
           <div className="fixed inset-0 z-[10049]" onClick={() => setOpen(false)} />
-          <div className="fixed z-[10050] max-h-[70vh] w-56 overflow-y-auto rounded-[var(--radius-sm)] border border-[var(--border-default)] bg-[var(--surface-popover)] py-1 text-left shadow-[var(--shadow-surface)]" style={{ top: pos.top, right: pos.right }}>
+          <div className="fixed z-[10050] max-h-[70vh] w-56 overflow-y-auto rounded-[var(--radius-sm)] border border-[var(--border-default)] bg-[var(--surface-popover)] py-1 text-left shadow-[var(--elev-2)]" style={{ top: pos.top, right: pos.right }}>
             <MenuItem icon={<ExternalLink className="h-4 w-4" />} onClick={() => { setOpen(false); onAbrir() }}>Abrir detalhe</MenuItem>
             <MenuItem icon={<Users className="h-4 w-4" />} onClick={() => { setOpen(false); onToggle() }}>{aberto ? "Ocultar" : "Ver"} distribuição</MenuItem>
             {codigo && <MenuItem icon={<Layers className="h-4 w-4" />} onClick={() => { setOpen(false); navigator.clipboard?.writeText(codigo).catch(() => {}) }}>Copiar código</MenuItem>}

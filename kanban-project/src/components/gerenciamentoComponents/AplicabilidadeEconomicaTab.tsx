@@ -82,7 +82,7 @@ export default function AplicabilidadeEconomicaTab() {
         <button onClick={() => setForm({ ...VAZIO })} className="rounded-lg bg-[var(--action-primary)] px-3 py-2 text-sm font-medium hover:bg-[var(--action-primary)]">+ Nova regra</button>
       </div>
 
-      {erro && <div className="mb-3 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700 ring-1 ring-red-500/20">{erro}</div>}
+      {erro && <div className="mb-3 rounded-lg bg-[var(--surface-secondary)] px-3 py-2 text-sm text-red-700 ring-1 ring-[var(--border-strong)]">{erro}</div>}
       {loading ? <div className="py-10 text-center text-[var(--text-muted)]">Carregando…</div>
       : (d?.regras.length ?? 0) === 0 ? <div className="py-10 text-center text-[var(--text-muted)]">Nenhuma regra. Clique em "+ Nova regra".</div>
       : (
@@ -101,9 +101,9 @@ export default function AplicabilidadeEconomicaTab() {
                   <td className="px-3 py-2 font-mono text-xs">{r.custoProdutoCode || <span className="text-amber-700/70">[AJUSTAR]</span>}</td>
                   <td className="px-3 py-2 font-mono text-xs">{r.receitaProdutoCode || <span className="text-amber-700/70">[AJUSTAR]</span>}</td>
                   <td className="px-3 py-2">{r.participaPlanilha ? '✓' : '—'}</td>
-                  <td className="px-3 py-2">{r.ativo ? <span className="text-emerald-700">Ativo</span> : <span className="text-[var(--text-muted)]">Inativo</span>}</td>
+                  <td className="px-3 py-2">{r.ativo ? <span className="text-green-700">Ativo</span> : <span className="text-[var(--text-muted)]">Inativo</span>}</td>
                   <td className="px-3 py-2 text-right whitespace-nowrap">
-                    <button onClick={() => setForm({ ...r })} className="text-blue-700 hover:underline">Editar</button>
+                    <button onClick={() => setForm({ ...r })} className="text-[var(--text-secondary)] hover:underline">Editar</button>
                     <button onClick={() => excluir(r)} className="ml-3 text-red-700 hover:underline">Excluir</button>
                   </td>
                 </tr>
@@ -119,31 +119,31 @@ export default function AplicabilidadeEconomicaTab() {
             <h3 className="mb-4 text-base font-semibold">{form.id ? 'Editar regra' : 'Nova regra econômica'}</h3>
             <div className="grid grid-cols-2 gap-3 text-sm">
               <label><span className="text-[var(--text-secondary)]">Fase *</span>
-                <select value={form.phaseKey} onChange={e => setForm(f => f && { ...f, phaseKey: e.target.value })} className="mt-1 w-full rounded-lg bg-[var(--surface-primary)] px-3 py-2 ring-1 ring-white/10 focus:ring-blue-500">
+                <select value={form.phaseKey} onChange={e => setForm(f => f && { ...f, phaseKey: e.target.value })} className="mt-1 w-full rounded-lg bg-[var(--surface-primary)] px-3 py-2 ring-1 ring-white/10 focus:ring-[var(--border-strong)]">
                   {FASES.map(([v, l]) => <option key={v} value={v} className="bg-neutral-900">{l}</option>)}</select></label>
               <label><span className="text-[var(--text-secondary)]">Nome do componente * (coluna da Planilha)</span>
-                <input value={form.componentName} onChange={e => setForm(f => f && { ...f, componentName: e.target.value })} className="mt-1 w-full rounded-lg bg-[var(--surface-primary)] px-3 py-2 ring-1 ring-white/10 focus:ring-blue-500" placeholder="Tradução Juramentada" /></label>
+                <input value={form.componentName} onChange={e => setForm(f => f && { ...f, componentName: e.target.value })} className="mt-1 w-full rounded-lg bg-[var(--surface-primary)] px-3 py-2 ring-1 ring-white/10 focus:ring-[var(--border-strong)]" placeholder="Tradução Juramentada" /></label>
               <label><span className="text-[var(--text-secondary)]">Processo (nacionalidade)</span>
-                <select value={form.tipoProcessoId ?? ''} onChange={e => setForm(f => f && { ...f, tipoProcessoId: e.target.value === '' ? null : Number(e.target.value) })} className="mt-1 w-full rounded-lg bg-[var(--surface-primary)] px-3 py-2 ring-1 ring-white/10 focus:ring-blue-500">
+                <select value={form.tipoProcessoId ?? ''} onChange={e => setForm(f => f && { ...f, tipoProcessoId: e.target.value === '' ? null : Number(e.target.value) })} className="mt-1 w-full rounded-lg bg-[var(--surface-primary)] px-3 py-2 ring-1 ring-white/10 focus:ring-[var(--border-strong)]">
                   <option value="" className="bg-neutral-900">Qualquer</option>
                   {d?.tiposProcesso.map(t => <option key={t.id} value={t.id} className="bg-neutral-900">{t.name}</option>)}</select></label>
               <label><span className="text-[var(--text-secondary)]">Aplica a</span>
-                <select value={form.appliesTo} onChange={e => setForm(f => f && { ...f, appliesTo: e.target.value })} className="mt-1 w-full rounded-lg bg-[var(--surface-primary)] px-3 py-2 ring-1 ring-white/10 focus:ring-blue-500">
+                <select value={form.appliesTo} onChange={e => setForm(f => f && { ...f, appliesTo: e.target.value })} className="mt-1 w-full rounded-lg bg-[var(--surface-primary)] px-3 py-2 ring-1 ring-white/10 focus:ring-[var(--border-strong)]">
                   {APPLIES.map(([v, l]) => <option key={v} value={v} className="bg-neutral-900">{l}</option>)}</select></label>
               <label><span className="text-[var(--text-secondary)]">Produto de CUSTO</span>
-                <select value={form.custoProdutoCode ?? ''} onChange={e => setForm(f => f && { ...f, custoProdutoCode: e.target.value || null })} className="mt-1 w-full rounded-lg bg-[var(--surface-primary)] px-3 py-2 ring-1 ring-white/10 focus:ring-blue-500">
+                <select value={form.custoProdutoCode ?? ''} onChange={e => setForm(f => f && { ...f, custoProdutoCode: e.target.value || null })} className="mt-1 w-full rounded-lg bg-[var(--surface-primary)] px-3 py-2 ring-1 ring-white/10 focus:ring-[var(--border-strong)]">
                   <option value="" className="bg-neutral-900">— nenhum —</option>
                   {custos.map(p => <option key={p.codigo} value={p.codigo} className="bg-neutral-900">{p.nome} ({p.codigo})</option>)}</select></label>
               <label><span className="text-[var(--text-secondary)]">Produto de RECEITA</span>
-                <select value={form.receitaProdutoCode ?? ''} onChange={e => setForm(f => f && { ...f, receitaProdutoCode: e.target.value || null })} className="mt-1 w-full rounded-lg bg-[var(--surface-primary)] px-3 py-2 ring-1 ring-white/10 focus:ring-blue-500">
+                <select value={form.receitaProdutoCode ?? ''} onChange={e => setForm(f => f && { ...f, receitaProdutoCode: e.target.value || null })} className="mt-1 w-full rounded-lg bg-[var(--surface-primary)] px-3 py-2 ring-1 ring-white/10 focus:ring-[var(--border-strong)]">
                   <option value="" className="bg-neutral-900">— nenhum —</option>
                   {receitas.map(p => <option key={p.codigo} value={p.codigo} className="bg-neutral-900">{p.nome} ({p.codigo})</option>)}</select></label>
               <label><span className="text-[var(--text-secondary)]">Doc específico (code, opcional)</span>
-                <select value={form.documentTypeCode ?? ''} onChange={e => setForm(f => f && { ...f, documentTypeCode: e.target.value || null })} className="mt-1 w-full rounded-lg bg-[var(--surface-primary)] px-3 py-2 ring-1 ring-white/10 focus:ring-blue-500">
+                <select value={form.documentTypeCode ?? ''} onChange={e => setForm(f => f && { ...f, documentTypeCode: e.target.value || null })} className="mt-1 w-full rounded-lg bg-[var(--surface-primary)] px-3 py-2 ring-1 ring-white/10 focus:ring-[var(--border-strong)]">
                   <option value="" className="bg-neutral-900">Qualquer</option>
                   {d?.docTypes.filter(t => t.code).map(t => <option key={t.code!} value={t.code!} className="bg-neutral-900">{t.name}</option>)}</select></label>
               <label><span className="text-[var(--text-secondary)]">Ordem</span>
-                <input type="number" value={form.ordem} onChange={e => setForm(f => f && { ...f, ordem: Number(e.target.value) })} className="mt-1 w-full rounded-lg bg-[var(--surface-primary)] px-3 py-2 ring-1 ring-white/10 focus:ring-blue-500" /></label>
+                <input type="number" value={form.ordem} onChange={e => setForm(f => f && { ...f, ordem: Number(e.target.value) })} className="mt-1 w-full rounded-lg bg-[var(--surface-primary)] px-3 py-2 ring-1 ring-white/10 focus:ring-[var(--border-strong)]" /></label>
               <label className="flex items-center gap-2"><input type="checkbox" checked={form.participaPlanilha} onChange={e => setForm(f => f && { ...f, participaPlanilha: e.target.checked })} /> <span className="text-white/70">Aparece na Planilha</span></label>
               <label className="flex items-center gap-2"><input type="checkbox" checked={form.ativo} onChange={e => setForm(f => f && { ...f, ativo: e.target.checked })} /> <span className="text-white/70">Ativo</span></label>
             </div>

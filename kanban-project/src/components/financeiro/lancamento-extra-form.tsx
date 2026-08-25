@@ -158,7 +158,7 @@ export function LancamentoExtraForm({ processoIdInicial, onClose, onDone }: { pr
               {cotas.map((c) => (
                 <div key={c.pessoaId} className="flex justify-between py-0.5 text-sm"><span className="text-[var(--text-muted)]">pessoa #{c.pessoaId}</span><span>{fmt(c.valor, moeda)}</span></div>
               ))}
-              <div className={`mt-2 flex justify-between border-t border-neutral-800 pt-2 text-sm ${distConfere ? "text-emerald-700" : "text-red-700"}`}>
+              <div className={`mt-2 flex justify-between border-t border-neutral-800 pt-2 text-sm ${distConfere ? "text-green-700" : "text-red-700"}`}>
                 <span>Soma das cotas</span><span>{fmt(somaCotas, moeda)} {distConfere ? "✓" : `≠ ${fmt(total, moeda)}`}</span>
               </div>
             </div>

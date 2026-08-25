@@ -159,7 +159,7 @@ function PersonAvatar({ pessoa, size = 56 }: { pessoa: PessoaArvore; size?: numb
   
   return (
     <div
-      className="rounded-xl flex items-center justify-center font-bold text-white shadow-md"
+      className="rounded-xl flex items-center justify-center font-bold text-white shadow-[var(--elev-2)]"
       style={{ 
         width: size, 
         height: size, 
@@ -185,13 +185,13 @@ function InfoItem({
 }) {
   return (
     <div className="flex items-start gap-3 py-2">
-      <div className="w-8 h-8 rounded-lg bg-slate-100 flex items-center justify-center flex-shrink-0">
-        <Icon className="w-4 h-4 text-slate-500" />
+      <div className="w-8 h-8 rounded-lg bg-[var(--surface-secondary)] flex items-center justify-center flex-shrink-0">
+        <Icon className="w-4 h-4 text-[var(--text-secondary)]" />
       </div>
       <div className="flex-1 min-w-0">
-        <p className="text-xs text-slate-500 font-medium">{label}</p>
+        <p className="text-xs text-[var(--text-secondary)] font-medium">{label}</p>
         {value ? (
-          <p className="text-sm text-slate-900 mt-0.5">{value}</p>
+          <p className="text-sm text-[var(--text-secondary)] mt-0.5">{value}</p>
         ) : onAdd ? (
           <button 
             onClick={onAdd}
@@ -201,7 +201,7 @@ function InfoItem({
             Adicionar
           </button>
         ) : (
-          <p className="text-sm text-slate-700 italic mt-0.5">Não informado</p>
+          <p className="text-sm text-[var(--text-secondary)] italic mt-0.5">Não informado</p>
         )}
       </div>
     </div>
@@ -222,17 +222,17 @@ function CollapsibleSection({
   const [isOpen, setIsOpen] = useState(defaultOpen)
   
   return (
-    <div className="border-b border-slate-100 last:border-0">
+    <div className="border-b border-[var(--border-default)] last:border-0">
       <button 
-        className="w-full flex items-center justify-between py-3 px-4 hover:bg-slate-50 transition-colors"
+        className="w-full flex items-center justify-between py-3 px-4 hover:bg-[var(--surface-secondary)] transition-colors"
         onClick={() => setIsOpen(!isOpen)}
       >
         <div className="flex items-center gap-2">
-          {Icon && <Icon className="w-4 h-4 text-slate-500" />}
-          <span className="font-semibold text-slate-900 text-sm">{title}</span>
+          {Icon && <Icon className="w-4 h-4 text-[var(--text-secondary)]" />}
+          <span className="font-semibold text-[var(--text-secondary)] text-sm">{title}</span>
         </div>
         <div className={`transform transition-transform ${isOpen ? '' : '-rotate-90'}`}>
-          <ChevronDown className="h-4 w-4 text-slate-700" />
+          <ChevronDown className="h-4 w-4 text-[var(--text-secondary)]" />
         </div>
       </button>
       {isOpen && (
@@ -261,12 +261,12 @@ function ResumoOperacional({
   const compartilhada = dossie.requerentesDependentes.length > 1
 
   return (
-    <div className="border-b border-slate-200 bg-slate-50/60 px-5 py-3">
+    <div className="border-b border-[var(--border-default)] bg-[var(--surface-secondary)]/60 px-5 py-3">
       <div className="flex items-center justify-between gap-2">
-        <span className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+        <span className="text-[11px] font-semibold uppercase tracking-wide text-[var(--text-secondary)]">
           Resumo operacional
         </span>
-        <span className="text-xs font-medium text-slate-600">
+        <span className="text-xs font-medium text-[var(--text-secondary)]">
           {d.progresso == null ? "Sem exigência" : `${d.progresso}% do dossiê`}
         </span>
       </div>
@@ -288,13 +288,13 @@ function ResumoOperacional({
       </div>
 
       {d.naoLocalizadas > 0 && (
-        <p className="mt-2 rounded-md bg-red-50 px-2 py-1 text-[11px] font-medium text-red-700">
+        <p className="mt-2 rounded-md bg-[var(--surface-secondary)] px-2 py-1 text-[11px] font-medium text-red-700">
           {d.naoLocalizadas} documento(s) marcado(s) como não localizado(s).
         </p>
       )}
 
       {compartilhada && (
-        <p className="mt-2 text-[11px] leading-snug text-slate-600">
+        <p className="mt-2 text-[11px] leading-snug text-[var(--text-secondary)]">
           {dossie.requerentesDependentes.length} requerentes dependem desta pessoa
           {nomeDeRequerente
             ? `: ${dossie.requerentesDependentes.map(nomeDeRequerente).join(", ")}`
@@ -304,11 +304,11 @@ function ResumoOperacional({
       )}
 
       {dossie.proximaAcao && (
-        <div className="mt-2 rounded-md border border-slate-200 bg-[var(--surface-primary)] px-2.5 py-2">
-          <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-500">
+        <div className="mt-2 rounded-md border border-[var(--border-default)] bg-[var(--surface-primary)] px-2.5 py-2">
+          <p className="text-[10px] font-semibold uppercase tracking-wide text-[var(--text-secondary)]">
             Próxima ação
           </p>
-          <p className="mt-0.5 text-xs leading-snug text-slate-800">{dossie.proximaAcao}</p>
+          <p className="mt-0.5 text-xs leading-snug text-[var(--text-secondary)]">{dossie.proximaAcao}</p>
         </div>
       )}
     </div>
@@ -325,13 +325,13 @@ function Numero({
   destaque?: boolean
 }) {
   return (
-    <div className="rounded-md bg-[var(--surface-primary)] px-1 py-1.5 ring-1 ring-slate-200">
+    <div className="rounded-md bg-[var(--surface-primary)] px-1 py-1.5 ring-1 ring-[var(--border-default)]">
       <p
-        className={`text-sm font-semibold tabular-nums ${destaque ? "text-amber-700" : "text-slate-900"}`}
+        className={`text-sm font-semibold tabular-nums ${destaque ? "text-amber-700" : "text-[var(--text-secondary)]"}`}
       >
         {valor}
       </p>
-      <p className="text-[10px] leading-none text-slate-500">{rotulo}</p>
+      <p className="text-[10px] leading-none text-[var(--text-secondary)]">{rotulo}</p>
     </div>
   )
 }
@@ -359,30 +359,30 @@ function BlocoValores({
   if (!visivel) {
     return (
       <div className="py-2">
-        <p className="text-xs font-medium text-slate-500">{titulo}</p>
-        <p className="mt-0.5 text-sm text-slate-700 italic">Sem permissão para ver valores</p>
+        <p className="text-xs font-medium text-[var(--text-secondary)]">{titulo}</p>
+        <p className="mt-0.5 text-sm text-[var(--text-secondary)] italic">Sem permissão para ver valores</p>
       </div>
     )
   }
   if (totais.length === 0) {
     return (
       <div className="py-2">
-        <p className="text-xs font-medium text-slate-500">{titulo}</p>
-        <p className="mt-0.5 text-sm text-slate-700 italic">Nenhum lançamento para esta pessoa</p>
+        <p className="text-xs font-medium text-[var(--text-secondary)]">{titulo}</p>
+        <p className="mt-0.5 text-sm text-[var(--text-secondary)] italic">Nenhum lançamento para esta pessoa</p>
       </div>
     )
   }
   return (
     <div className="py-2">
-      <p className="text-xs font-medium text-slate-500">{titulo}</p>
+      <p className="text-xs font-medium text-[var(--text-secondary)]">{titulo}</p>
       <ul className="mt-1 space-y-1">
         {totais.map((t) => (
           <li key={t.moeda} className="flex items-baseline justify-between text-sm">
-            <span className="text-slate-700">{t.moeda}</span>
-            <span className="font-medium tabular-nums text-slate-900">
+            <span className="text-[var(--text-secondary)]">{t.moeda}</span>
+            <span className="font-medium tabular-nums text-[var(--text-secondary)]">
               {formatarTotal(t)}
               {t.recebido > 0 && (
-                <span className="ml-1 text-[11px] font-normal text-slate-500">
+                <span className="ml-1 text-[11px] font-normal text-[var(--text-secondary)]">
                   (liquidado {formatarTotal({ ...t, valor: t.recebido })})
                 </span>
               )}
@@ -421,21 +421,21 @@ function DocumentoCard({
   
   return (
     <div 
-      className={`p-3 bg-[var(--surface-primary)] rounded-lg border border-slate-200 hover:border-slate-300 transition-colors ${onClick ? 'cursor-pointer hover:shadow-sm' : ''}`}
+      className={`p-3 bg-[var(--surface-primary)] rounded-lg border border-[var(--border-default)] hover:border-[var(--border-default)] transition-colors ${onClick ? 'cursor-pointer hover:shadow-[var(--elev-1)]' : ''}`}
       onClick={onClick}
     >
       <div className="flex items-start justify-between gap-2">
         <div className="flex-1 min-w-0">
-          <p className="font-medium text-slate-900 text-sm truncate">
+          <p className="font-medium text-[var(--text-secondary)] text-sm truncate">
             {TIPO_DOCUMENTO_LABELS[documento.tipo] || documento.tipo}
           </p>
           {documento.cartorio && (
-            <p className="text-xs text-slate-500 mt-0.5 truncate">
+            <p className="text-xs text-[var(--text-secondary)] mt-0.5 truncate">
               {documento.cartorio}
             </p>
           )}
           {(documento.livro || documento.folha || documento.termo) && (
-            <p className="text-xs text-slate-700 mt-0.5">
+            <p className="text-xs text-[var(--text-secondary)] mt-0.5">
               {[
                 documento.livro && `Livro: ${documento.livro}`,
                 documento.folha && `Folha: ${documento.folha}`,
@@ -459,8 +459,8 @@ function DocumentoCard({
               onClick={handleDelete}
               className={`p-1.5 rounded-md transition-colors ${
                 confirmDelete 
-                  ? 'bg-red-500 text-white hover:bg-red-600' 
-                  : 'hover:bg-red-50 text-slate-700 hover:text-red-500'
+                  ? 'bg-red-600 text-white hover:bg-red-600' 
+                  : 'hover:bg-[var(--surface-secondary)] text-[var(--text-secondary)] hover:text-red-500'
               }`}
               title={confirmDelete ? 'Clique para confirmar' : 'Excluir documento'}
             >
@@ -473,12 +473,12 @@ function DocumentoCard({
       {/* Badges e links de arquivos */}
       <div className="flex items-center gap-2 mt-2 flex-wrap">
         {documento.traduzido && (
-          <span className="px-1.5 py-0.5 text-[10px] font-medium rounded bg-amber-50 text-amber-700">
+          <span className="px-1.5 py-0.5 text-[10px] font-medium rounded bg-[var(--surface-secondary)] text-amber-700">
             Traduzido
           </span>
         )}
         {documento.apostilado && (
-          <span className="px-1.5 py-0.5 text-[10px] font-medium rounded bg-slate-50 text-slate-700">
+          <span className="px-1.5 py-0.5 text-[10px] font-medium rounded bg-[var(--surface-secondary)] text-[var(--text-secondary)]">
             Apostilado
           </span>
         )}
@@ -486,7 +486,7 @@ function DocumentoCard({
       
       {/* Links para arquivos */}
       {(documento.arquivo_url || documento.arquivo_traducao_url || documento.arquivo_apostila_url) && (
-        <div className="flex items-center gap-3 mt-2 pt-2 border-t border-slate-100">
+        <div className="flex items-center gap-3 mt-2 pt-2 border-t border-[var(--border-default)]">
           {documento.arquivo_url && (
             <a 
               href={documento.arquivo_url} 
@@ -517,7 +517,7 @@ function DocumentoCard({
               target="_blank" 
               rel="noopener noreferrer"
               onClick={(e) => e.stopPropagation()}
-              className="flex items-center gap-1 text-[10px] text-slate-600 hover:text-slate-700 font-medium"
+              className="flex items-center gap-1 text-[10px] text-[var(--text-secondary)] hover:text-[var(--text-secondary)] font-medium"
             >
               <FileText className="w-3 h-3" />
               Apostila
@@ -545,18 +545,18 @@ function FamiliarCard({
 }) {
   return (
     <div 
-      className="flex items-center gap-3 p-3 bg-slate-50 rounded-lg hover:bg-amber-50 hover:ring-1 hover:ring-amber-200 transition-all cursor-pointer group"
+      className="flex items-center gap-3 p-3 bg-[var(--surface-secondary)] rounded-lg hover:bg-[var(--surface-secondary)] hover:ring-1 hover:ring-[var(--border-strong)] transition-all cursor-pointer group"
       onClick={onClick}
     >
       <PersonAvatar pessoa={familiar} size={40} />
       <div className="flex-1 min-w-0">
-        <p className="font-medium text-slate-900 text-sm group-hover:text-amber-700 transition-colors">
+        <p className="font-medium text-[var(--text-secondary)] text-sm group-hover:text-amber-700 transition-colors">
           {familiar.nome} {familiar.sobrenome}
         </p>
-        <p className="text-xs text-slate-500">{relacao}</p>
+        <p className="text-xs text-[var(--text-secondary)]">{relacao}</p>
         {extra}
       </div>
-      <ExternalLink className="w-4 h-4 text-slate-700 group-hover:text-amber-500 transition-colors" />
+      <ExternalLink className="w-4 h-4 text-[var(--text-secondary)] group-hover:text-amber-500 transition-colors" />
     </div>
   )
 }
@@ -632,21 +632,21 @@ function ConteudoSidebar({
   // rótulos "Adicionar Pai/Mãe/cônjuge/filho(a)" — sai branco sobre `bg-[var(--surface-primary)]`,
   // isto é, invisível.
   return (
-    <div className="fixed right-0 top-0 h-full w-[420px] bg-[var(--surface-primary)] text-gray-900 shadow-2xl z-[10001] flex flex-col border-l border-slate-200">
+    <div className="fixed right-0 top-0 h-full w-[420px] bg-[var(--surface-primary)] text-gray-900 shadow-[var(--elev-3)] z-[10001] flex flex-col border-l border-[var(--border-default)]">
       {/* Header */}
-      <div className="p-5 border-b border-slate-200 bg-gradient-to-r from-slate-50 to-white">
+      <div className="p-5 border-b border-[var(--border-default)] bg-gradient-to-r from-slate-50 to-white">
         <button 
           onClick={onClose}
-          className="absolute top-4 right-4 p-1.5 hover:bg-slate-100 rounded-lg transition-colors"
+          className="absolute top-4 right-4 p-1.5 hover:bg-[var(--surface-secondary)] rounded-lg transition-colors"
         >
-          <X className="h-5 w-5 text-slate-500" />
+          <X className="h-5 w-5 text-[var(--text-secondary)]" />
         </button>
         
         <div className="flex items-start gap-4">
           <PersonAvatar pessoa={pessoa} size={64} />
           <div className="flex-1 min-w-0">
             <h2 
-              className="text-xl font-bold text-slate-900 hover:text-amber-600 cursor-pointer transition-colors truncate"
+              className="text-xl font-bold text-[var(--text-secondary)] hover:text-amber-600 cursor-pointer transition-colors truncate"
               onClick={() => onOpenFullDetails(pessoa)}
             >
               {nomeCompleto}
@@ -654,16 +654,16 @@ function ConteudoSidebar({
             
             <div className="flex items-center gap-2 mt-1">
               {isDeceased ? (
-                <span className="inline-flex items-center px-2 py-0.5 text-xs font-medium rounded-md bg-slate-100 text-slate-600">
+                <span className="inline-flex items-center px-2 py-0.5 text-xs font-medium rounded-md bg-[var(--surface-secondary)] text-[var(--text-secondary)]">
                   Falecido
                 </span>
               ) : (
-                <span className="inline-flex items-center px-2 py-0.5 text-xs font-medium rounded-md bg-emerald-50 text-emerald-700">
+                <span className="inline-flex items-center px-2 py-0.5 text-xs font-medium rounded-md bg-[var(--surface-secondary)] text-green-700">
                   Vivo
                 </span>
               )}
               {pessoa.nacionalidade && (
-                <span className="inline-flex items-center px-2 py-0.5 text-xs font-medium rounded-md bg-blue-50 text-blue-700">
+                <span className="inline-flex items-center px-2 py-0.5 text-xs font-medium rounded-md bg-[var(--surface-secondary)] text-[var(--text-secondary)]">
                   {pessoa.nacionalidade}
                 </span>
               )}
@@ -677,7 +677,7 @@ function ConteudoSidebar({
             {onEdit && (
               <button 
                 onClick={() => onEdit(pessoa)}
-                className="flex-1 flex items-center justify-center gap-2 px-3 py-2 bg-amber-50 text-amber-700 rounded-lg hover:bg-amber-100 transition-colors"
+                className="flex-1 flex items-center justify-center gap-2 px-3 py-2 bg-[var(--surface-secondary)] text-amber-700 rounded-lg hover:bg-[var(--surface-secondary)] transition-colors"
               >
                 <Pencil className="h-4 w-4" />
                 <span className="text-sm font-medium">Editar</span>
@@ -687,7 +687,7 @@ function ConteudoSidebar({
               <button
                 onClick={handleDelete}
                 title="Remover da árvore"
-                className="flex items-center justify-center gap-2 px-3 py-2 rounded-lg bg-red-50 text-red-600 hover:bg-red-100 transition-colors"
+                className="flex items-center justify-center gap-2 px-3 py-2 rounded-lg bg-[var(--surface-secondary)] text-red-600 hover:bg-[var(--surface-secondary)] transition-colors"
               >
                 <Trash2 className="h-4 w-4" />
               </button>
@@ -704,19 +704,19 @@ function ConteudoSidebar({
           Com a 4ª aba (Operação), os rótulos encurtam para caber nos 420px do
           painel — os ícones, que são a âncora visual, ficam. Sem dossiê são as
           MESMAS três abas de antes, com os mesmos rótulos longos. */}
-      <div className="flex border-b border-slate-200 bg-slate-50">
+      <div className="flex border-b border-[var(--border-default)] bg-[var(--surface-secondary)]">
         <button
           onClick={() => setActiveTab("info")}
           className={`flex-1 flex items-center justify-center gap-2 ${dossie ? 'px-2' : 'px-4'} py-3 text-sm font-medium transition-colors relative ${
             activeTab === "info"
               ? 'text-amber-600 bg-[var(--surface-primary)]'
-              : 'text-slate-600 hover:text-slate-900'
+              : 'text-[var(--text-secondary)] hover:text-[var(--text-secondary)]'
           }`}
         >
           <User className="h-4 w-4" />
           {dossie ? "Info" : "Informações"}
           {activeTab === "info" && (
-            <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-amber-500" />
+            <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-amber-600" />
           )}
         </button>
         <button
@@ -724,13 +724,13 @@ function ConteudoSidebar({
           className={`flex-1 flex items-center justify-center gap-2 ${dossie ? 'px-2' : 'px-4'} py-3 text-sm font-medium transition-colors relative ${
             activeTab === "familia"
               ? 'text-amber-600 bg-[var(--surface-primary)]'
-              : 'text-slate-600 hover:text-slate-900'
+              : 'text-[var(--text-secondary)] hover:text-[var(--text-secondary)]'
           }`}
         >
           <GitBranch className="h-4 w-4" />
           Família
           {activeTab === "familia" && (
-            <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-amber-500" />
+            <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-amber-600" />
           )}
         </button>
         <button
@@ -738,18 +738,18 @@ function ConteudoSidebar({
           className={`flex-1 flex items-center justify-center gap-2 ${dossie ? 'px-2' : 'px-4'} py-3 text-sm font-medium transition-colors relative ${
             activeTab === "docs"
               ? 'text-amber-600 bg-[var(--surface-primary)]'
-              : 'text-slate-600 hover:text-slate-900'
+              : 'text-[var(--text-secondary)] hover:text-[var(--text-secondary)]'
           }`}
         >
           <FileText className="h-4 w-4" />
           {dossie ? "Docs" : "Documentos"}
           {documentos.length > 0 && (
-            <span className="px-1.5 py-0.5 text-[10px] font-medium rounded-full bg-amber-100 text-amber-700">
+            <span className="px-1.5 py-0.5 text-[10px] font-medium rounded-full bg-[var(--surface-secondary)] text-amber-700">
               {documentos.length}
             </span>
           )}
           {activeTab === "docs" && (
-            <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-amber-500" />
+            <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-amber-600" />
           )}
         </button>
         {dossie && (
@@ -758,18 +758,18 @@ function ConteudoSidebar({
             className={`flex-1 flex items-center justify-center gap-2 px-2 py-3 text-sm font-medium transition-colors relative ${
               activeTab === "operacao"
                 ? 'text-amber-600 bg-[var(--surface-primary)]'
-                : 'text-slate-600 hover:text-slate-900'
+                : 'text-[var(--text-secondary)] hover:text-[var(--text-secondary)]'
             }`}
           >
             <ListChecks className="h-4 w-4" />
             Operação
             {dossie.tarefasAbertas.length > 0 && (
-              <span className="px-1.5 py-0.5 text-[10px] font-medium rounded-full bg-amber-100 text-amber-700">
+              <span className="px-1.5 py-0.5 text-[10px] font-medium rounded-full bg-[var(--surface-secondary)] text-amber-700">
                 {dossie.tarefasAbertas.length}
               </span>
             )}
             {activeTab === "operacao" && (
-              <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-amber-500" />
+              <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-amber-600" />
             )}
           </button>
         )}
@@ -818,7 +818,7 @@ function ConteudoSidebar({
                     return (
                       <div key={casamento.id} className="space-y-1">
                         {casamentos.length > 1 && (
-                          <p className="text-xs font-medium text-slate-500">
+                          <p className="text-xs font-medium text-[var(--text-secondary)]">
                             {index + 1}º Casamento {conjuge && `- ${conjuge.nome}`}
                           </p>
                         )}
@@ -836,7 +836,7 @@ function ConteudoSidebar({
                     )
                   })
                 ) : (
-                  <p className="text-sm text-slate-700">Nenhum casamento registrado</p>
+                  <p className="text-sm text-[var(--text-secondary)]">Nenhum casamento registrado</p>
                 )}
               </div>
             </CollapsibleSection>
@@ -860,7 +860,7 @@ function ConteudoSidebar({
             {/* Seção: Observações */}
             {pessoa.comentario && (
               <CollapsibleSection title="Observações" defaultOpen={false}>
-                <p className="text-sm text-slate-600 whitespace-pre-wrap">
+                <p className="text-sm text-[var(--text-secondary)] whitespace-pre-wrap">
                   {pessoa.comentario}
                 </p>
               </CollapsibleSection>
@@ -873,7 +873,7 @@ function ConteudoSidebar({
           <div className="p-4 space-y-4">
             {/* Pais */}
             <div>
-              <h4 className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-2">Pais</h4>
+              <h4 className="text-xs font-semibold text-[var(--text-secondary)] uppercase tracking-wide mb-2">Pais</h4>
               {(pessoa.pai || pessoa.mae) ? (
                 <div className="space-y-2">
                   {pessoa.pai && (
@@ -894,7 +894,7 @@ function ConteudoSidebar({
                   {pode('arvore.criar') && !pessoa.pai && onAddPai && (
                     <button 
                       onClick={() => onAddPai(pessoa.id)}
-                      className="w-full flex items-center justify-center gap-2 p-3 border-2 border-dashed border-slate-200 rounded-lg text-amber-600 hover:border-amber-300 hover:bg-amber-50 transition-colors"
+                      className="w-full flex items-center justify-center gap-2 p-3 border-2 border-dashed border-[var(--border-default)] rounded-lg text-amber-600 hover:border-[var(--border-default)] hover:bg-[var(--surface-secondary)] transition-colors"
                     >
                       <Plus className="w-4 h-4" />
                       <span className="text-sm font-medium">Adicionar Pai</span>
@@ -904,7 +904,7 @@ function ConteudoSidebar({
                   {pode('arvore.criar') && !pessoa.mae && onAddMae && (
                     <button 
                       onClick={() => onAddMae(pessoa.id)}
-                      className="w-full flex items-center justify-center gap-2 p-3 border-2 border-dashed border-slate-200 rounded-lg text-amber-600 hover:border-amber-300 hover:bg-amber-50 transition-colors"
+                      className="w-full flex items-center justify-center gap-2 p-3 border-2 border-dashed border-[var(--border-default)] rounded-lg text-amber-600 hover:border-[var(--border-default)] hover:bg-[var(--surface-secondary)] transition-colors"
                     >
                       <Plus className="w-4 h-4" />
                       <span className="text-sm font-medium">Adicionar Mãe</span>
@@ -915,14 +915,14 @@ function ConteudoSidebar({
                 <div className="space-y-2">
                   <button 
                     onClick={() => onAddPai?.(pessoa.id)}
-                    className="w-full flex items-center justify-center gap-2 p-3 border-2 border-dashed border-slate-200 rounded-lg text-amber-600 hover:border-amber-300 hover:bg-amber-50 transition-colors"
+                    className="w-full flex items-center justify-center gap-2 p-3 border-2 border-dashed border-[var(--border-default)] rounded-lg text-amber-600 hover:border-[var(--border-default)] hover:bg-[var(--surface-secondary)] transition-colors"
                   >
                     <Plus className="w-4 h-4" />
                     <span className="text-sm font-medium">Adicionar Pai</span>
                   </button>
                   <button 
                     onClick={() => onAddMae?.(pessoa.id)}
-                    className="w-full flex items-center justify-center gap-2 p-3 border-2 border-dashed border-slate-200 rounded-lg text-amber-600 hover:border-amber-300 hover:bg-amber-50 transition-colors"
+                    className="w-full flex items-center justify-center gap-2 p-3 border-2 border-dashed border-[var(--border-default)] rounded-lg text-amber-600 hover:border-[var(--border-default)] hover:bg-[var(--surface-secondary)] transition-colors"
                   >
                     <Plus className="w-4 h-4" />
                     <span className="text-sm font-medium">Adicionar Mãe</span>
@@ -933,7 +933,7 @@ function ConteudoSidebar({
             
             {/* Cônjuges */}
             <div>
-              <h4 className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-2">Cônjuge</h4>
+              <h4 className="text-xs font-semibold text-[var(--text-secondary)] uppercase tracking-wide mb-2">Cônjuge</h4>
               <div className="space-y-2">
                 {conjuges.map((conjuge) => {
                   // Encontrar o casamento correspondente
@@ -945,25 +945,25 @@ function ConteudoSidebar({
                   return (
                     <div 
                       key={conjuge.id} 
-                      className="p-3 bg-slate-50 rounded-lg hover:bg-amber-50 hover:ring-1 hover:ring-amber-200 transition-all cursor-pointer group"
+                      className="p-3 bg-[var(--surface-secondary)] rounded-lg hover:bg-[var(--surface-secondary)] hover:ring-1 hover:ring-[var(--border-strong)] transition-all cursor-pointer group"
                       onClick={() => handleSelectFamiliar(conjuge)}
                     >
                       <div className="flex items-center gap-3">
                         <PersonAvatar pessoa={conjuge} size={40} />
                         <div className="flex-1 min-w-0">
-                          <p className="font-medium text-slate-900 text-sm group-hover:text-amber-700 transition-colors">
+                          <p className="font-medium text-[var(--text-secondary)] text-sm group-hover:text-amber-700 transition-colors">
                             {conjuge.nome} {conjuge.sobrenome}
                           </p>
                           {casamento?.data_inicio && (
-                            <p className="text-xs text-slate-500">
+                            <p className="text-xs text-[var(--text-secondary)]">
                               Casamento: {formatDateFull(casamento.data_inicio)}
                             </p>
                           )}
                         </div>
-                        <ExternalLink className="w-4 h-4 text-slate-700 group-hover:text-amber-500 transition-colors" />
+                        <ExternalLink className="w-4 h-4 text-[var(--text-secondary)] group-hover:text-amber-500 transition-colors" />
                       </div>
                       {casamento && (casamento.local || casamento.cartorio) && (
-                        <div className="mt-2 pt-2 border-t border-slate-200 text-xs text-slate-500">
+                        <div className="mt-2 pt-2 border-t border-[var(--border-default)] text-xs text-[var(--text-secondary)]">
                           {casamento.local && <p>{casamento.local}</p>}
                           {casamento.cartorio && <p>{casamento.cartorio}</p>}
                         </div>
@@ -975,7 +975,7 @@ function ConteudoSidebar({
                 {/* Botão para adicionar cônjuge - sempre visível */}
                 {pode('arvore.criar') && <button 
                   onClick={() => onAddConjuge?.(pessoa.id)}
-                  className="w-full flex items-center justify-center gap-2 p-3 border-2 border-dashed border-slate-200 rounded-lg text-amber-600 hover:border-amber-300 hover:bg-amber-50 transition-colors"
+                  className="w-full flex items-center justify-center gap-2 p-3 border-2 border-dashed border-[var(--border-default)] rounded-lg text-amber-600 hover:border-[var(--border-default)] hover:bg-[var(--surface-secondary)] transition-colors"
                 >
                   <Heart className="w-4 h-4" />
                   <span className="text-sm font-medium">Adicionar cônjuge</span>
@@ -985,7 +985,7 @@ function ConteudoSidebar({
             
             {/* Filhos */}
             <div>
-              <h4 className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-2">Filhos</h4>
+              <h4 className="text-xs font-semibold text-[var(--text-secondary)] uppercase tracking-wide mb-2">Filhos</h4>
               {(() => {
                 const filhos = [
                   ...(pessoa.filhosComoPai || []),
@@ -1006,7 +1006,7 @@ function ConteudoSidebar({
                     ))}
                     {pode('arvore.criar') && <button 
                       onClick={() => onAddFilho?.(pessoa.id)}
-                      className="w-full flex items-center justify-center gap-2 p-3 border-2 border-dashed border-slate-200 rounded-lg text-amber-600 hover:border-amber-300 hover:bg-amber-50 transition-colors"
+                      className="w-full flex items-center justify-center gap-2 p-3 border-2 border-dashed border-[var(--border-default)] rounded-lg text-amber-600 hover:border-[var(--border-default)] hover:bg-[var(--surface-secondary)] transition-colors"
                     >
                       <Plus className="w-4 h-4" />
                       <span className="text-sm font-medium">Adicionar filho(a)</span>
@@ -1033,16 +1033,16 @@ function ConteudoSidebar({
               </div>
             ) : (
               <div className="text-center py-8">
-                <div className="w-16 h-16 bg-slate-100 rounded-full flex items-center justify-center mx-auto mb-3">
-                  <FileText className="w-8 h-8 text-slate-700" />
+                <div className="w-16 h-16 bg-[var(--surface-secondary)] rounded-full flex items-center justify-center mx-auto mb-3">
+                  <FileText className="w-8 h-8 text-[var(--text-secondary)]" />
                 </div>
-                <p className="text-slate-500 text-sm mb-4">Nenhum documento cadastrado</p>
+                <p className="text-[var(--text-secondary)] text-sm mb-4">Nenhum documento cadastrado</p>
               </div>
             )}
             
             {pode('arvore.criar_documento') && onAddDocumento && <button 
               onClick={() => onAddDocumento(pessoa.id)}
-              className="w-full mt-4 flex items-center justify-center gap-2 p-3 bg-amber-50 text-amber-700 rounded-lg hover:bg-amber-100 transition-colors"
+              className="w-full mt-4 flex items-center justify-center gap-2 p-3 bg-[var(--surface-secondary)] text-amber-700 rounded-lg hover:bg-[var(--surface-secondary)] transition-colors"
             >
               <Plus className="w-4 h-4" />
               <span className="text-sm font-medium">Adicionar documento</span>
@@ -1057,7 +1057,7 @@ function ConteudoSidebar({
           <div>
             <CollapsibleSection title="Tarefas abertas" icon={ListChecks} defaultOpen>
               {dossie.tarefasAbertas.length === 0 ? (
-                <p className="py-2 text-sm italic text-slate-700">
+                <p className="py-2 text-sm italic text-[var(--text-secondary)]">
                   {dossie.tarefasConcluidas > 0
                     ? `Nenhuma tarefa aberta. ${dossie.tarefasConcluidas} já concluída(s).`
                     : "Nenhuma tarefa vinculada a esta pessoa."}
@@ -1067,10 +1067,10 @@ function ConteudoSidebar({
                   {dossie.tarefasAbertas.map((t) => (
                     <li
                       key={t.id}
-                      className="rounded-lg border border-slate-200 bg-[var(--surface-primary)] px-3 py-2"
+                      className="rounded-lg border border-[var(--border-default)] bg-[var(--surface-primary)] px-3 py-2"
                     >
-                      <p className="text-sm font-medium leading-snug text-slate-900">{t.titulo}</p>
-                      <p className="mt-0.5 text-[11px] text-slate-500">
+                      <p className="text-sm font-medium leading-snug text-[var(--text-secondary)]">{t.titulo}</p>
+                      <p className="mt-0.5 text-[11px] text-[var(--text-secondary)]">
                         {t.statusTarefa ? t.statusTarefa.replace(/_/g, " ").toLowerCase() : "sem status"}
                         {t.responsavel ? ` · ${t.responsavel}` : ""}
                         {t.dataPrazo ? ` · prazo ${formatDateFull(t.dataPrazo)}` : ""}
@@ -1083,13 +1083,13 @@ function ConteudoSidebar({
 
             <CollapsibleSection title="Divergências" icon={TriangleAlert} defaultOpen={false}>
               {dossie.divergencias.length === 0 ? (
-                <p className="py-2 text-sm italic text-slate-700">
+                <p className="py-2 text-sm italic text-[var(--text-secondary)]">
                   Nenhuma contradição de dado encontrada.
                 </p>
               ) : (
                 <ul className="space-y-2">
                   {dossie.divergencias.map((i) => (
-                    <li key={i.id} className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2">
+                    <li key={i.id} className="rounded-lg border border-[var(--border-default)] bg-[var(--surface-secondary)] px-3 py-2">
                       <p className="text-sm font-medium leading-snug text-amber-900">{i.titulo}</p>
                       <p className="mt-0.5 text-[11px] leading-snug text-amber-800">{i.explicacao}</p>
                       {i.acao && (
@@ -1103,7 +1103,7 @@ function ConteudoSidebar({
 
             <CollapsibleSection title="Histórico" icon={History} defaultOpen={false}>
               {!eventos || eventos.length === 0 ? (
-                <p className="py-2 text-sm italic text-slate-700">
+                <p className="py-2 text-sm italic text-[var(--text-secondary)]">
                   Nenhum evento de vida registrado no cadastro desta pessoa.
                 </p>
               ) : (
@@ -1115,18 +1115,18 @@ function ConteudoSidebar({
                           aria-hidden
                           className={`mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full ${
                             e.precisao === "conflito"
-                              ? "bg-red-500"
+                              ? "bg-red-600"
                               : e.precisao === "ausente"
-                                ? "bg-slate-300"
-                                : "bg-slate-400"
+                                ? "bg-[var(--surface-secondary)]"
+                                : "bg-[var(--surface-secondary)]"
                           }`}
                         />
                         <span className="min-w-0">
-                          <span className="block text-sm text-slate-900">
+                          <span className="block text-sm text-[var(--text-secondary)]">
                             {ROTULO_EVENTO[e.tipo]}
-                            {e.local ? <span className="text-slate-500"> · {e.local}</span> : null}
+                            {e.local ? <span className="text-[var(--text-secondary)]"> · {e.local}</span> : null}
                           </span>
-                          <span className="block text-[11px] text-slate-500">
+                          <span className="block text-[11px] text-[var(--text-secondary)]">
                             {/* Data ausente e PENDENCIA de pesquisa, nao vazio —
                                 por isso ela e nomeada, nao escondida. */}
                             {e.data
@@ -1140,7 +1140,7 @@ function ConteudoSidebar({
                       </li>
                     ))}
                   </ol>
-                  <p className="mt-2 text-[11px] leading-snug text-slate-500">
+                  <p className="mt-2 text-[11px] leading-snug text-[var(--text-secondary)]">
                     Projeção dos dados do cadastro — a árvore não mantém histórico próprio.
                   </p>
                 </>
@@ -1150,7 +1150,7 @@ function ConteudoSidebar({
             <CollapsibleSection title="Custos e receitas" icon={Wallet} defaultOpen={false}>
               <BlocoValores titulo="Custos" totais={dossie.custos} visivel={financeiroVisivel} />
               <BlocoValores titulo="Receitas" totais={dossie.receitas} visivel={financeiroVisivel} />
-              <p className="mt-2 text-[11px] leading-snug text-slate-500">
+              <p className="mt-2 text-[11px] leading-snug text-[var(--text-secondary)]">
                 Valores por moeda, sem conversão: converter aqui exigiria uma taxa, e a taxa é do
                 motor de câmbio. O saldo vem do Ledger.
               </p>
@@ -1160,7 +1160,7 @@ function ConteudoSidebar({
       </div>
 
       {/* Footer */}
-      <div className="p-4 border-t border-slate-200 bg-slate-50">
+      <div className="p-4 border-t border-[var(--border-default)] bg-[var(--surface-secondary)]">
         <button 
           onClick={() => onOpenFullDetails(pessoa)}
           className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-[var(--action-primary)] text-[var(--action-primary-ink)] rounded-lg hover:bg-[var(--action-primary-hover)] transition-colors"

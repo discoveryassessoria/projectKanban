@@ -52,9 +52,9 @@ const SEV_LABEL: Record<string, string> = { baixa: "Leve", media: "Média", crit
 const SEV_STYLE: Record<string, string> = {
   baixa: "bg-[var(--accent-primary)]/12 text-[var(--accent-text)]",
   media: "bg-[var(--accent-primary)]/12 text-[var(--accent-text)]",
-  critica: "bg-red-50 text-red-700",
+  critica: "bg-[var(--surface-secondary)] text-red-700",
 }
-const SEV_DOT: Record<string, string> = { baixa: "bg-amber-400", media: "bg-[var(--accent-primary)]", critica: "bg-red-50" }
+const SEV_DOT: Record<string, string> = { baixa: "bg-amber-600", media: "bg-[var(--accent-primary)]", critica: "bg-[var(--surface-secondary)]" }
 
 const authHeaders = () => ({ Authorization: `Bearer ${localStorage.getItem("authToken")}` })
 const ini = (nome: string) => {
@@ -162,8 +162,8 @@ export function ProcessoAnalise({ processoId, onConcluido, readOnly = false }: P
             <Stat label="Ressalvas" value={ress} />
             <Stat label="Aprovados" value={aprov} />
           </div>
-          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-sky-50 text-sky-700">
-            <span className="w-1.5 h-1.5 rounded-full bg-sky-400" />
+          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-[var(--surface-secondary)] text-[var(--text-secondary)]">
+            <span className="w-1.5 h-1.5 rounded-full bg-[var(--surface-secondary)]" />
             {analise.status === "concluida" ? "Análise concluída" : "Em análise"}
           </span>
         </div>
@@ -176,7 +176,7 @@ export function ProcessoAnalise({ processoId, onConcluido, readOnly = false }: P
               <div key={e.label} className={`flex items-start ${i < etapas.length - 1 ? "flex-1" : ""}`}>
                 <div className="flex flex-col items-center text-center w-[88px] shrink-0">
                   <div className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold ${
-                    e.st === "concluida" ? "bg-green-50 text-white"
+                    e.st === "concluida" ? "bg-[var(--surface-secondary)] text-white"
                     : e.st === "em_andamento" ? "bg-[var(--action-primary)] text-white"
                     : "bg-[var(--surface-tertiary)] text-[var(--text-secondary)]"}`}>
                     {e.st === "concluida" ? <Check className="w-4 h-4" /> : i + 1}
@@ -184,13 +184,13 @@ export function ProcessoAnalise({ processoId, onConcluido, readOnly = false }: P
                   <div className="mt-1.5 text-[11px] font-medium text-white/80 leading-tight">{e.label}</div>
                   <div className={`text-[10px] ${
                     e.st === "concluida" ? "text-green-700"
-                    : e.st === "em_andamento" ? "text-sky-700"
+                    : e.st === "em_andamento" ? "text-[var(--text-secondary)]"
                     : "text-[var(--text-muted)]"}`}>
                     {e.st === "concluida" ? "Concluído" : e.st === "em_andamento" ? "Em andamento" : "Pendente"}
                   </div>
                 </div>
                 {i < etapas.length - 1 && (
-                  <div className={`flex-1 h-0.5 mt-3.5 ${e.st === "concluida" ? "bg-green-50" : "bg-[var(--surface-tertiary)]"}`} />
+                  <div className={`flex-1 h-0.5 mt-3.5 ${e.st === "concluida" ? "bg-[var(--surface-secondary)]" : "bg-[var(--surface-tertiary)]"}`} />
                 )}
               </div>
             ))}
@@ -209,8 +209,8 @@ export function ProcessoAnalise({ processoId, onConcluido, readOnly = false }: P
         </button>
       </div>
 
-      {erro && <div className="bg-red-50 border border-red-200 rounded-lg px-4 py-3 text-sm text-red-700">{erro}</div>}
-      {resultado && <div className="bg-green-50 border border-green-200 rounded-lg px-4 py-3 text-sm text-green-700 flex items-center gap-2"><CheckCircle2 className="w-4 h-4" />{resultado}</div>}
+      {erro && <div className="bg-[var(--surface-secondary)] border border-[var(--border-default)] rounded-lg px-4 py-3 text-sm text-red-700">{erro}</div>}
+      {resultado && <div className="bg-[var(--surface-secondary)] border border-[var(--border-default)] rounded-lg px-4 py-3 text-sm text-green-700 flex items-center gap-2"><CheckCircle2 className="w-4 h-4" />{resultado}</div>}
 
       {!analise ? (
         <div className="rounded-xl border border-dashed border-[var(--border-default)] p-8 text-center text-sm text-[var(--text-secondary)]">A análise ainda não foi rodada. Clique em <b>Rodar análise IA</b>.</div>
@@ -248,7 +248,7 @@ export function ProcessoAnalise({ processoId, onConcluido, readOnly = false }: P
                     <td className="px-3 py-2.5"><span className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs font-semibold ${SEV_STYLE[d.severidade] || "bg-[var(--surface-tertiary)] text-white/80"}`}><span className={`w-1.5 h-1.5 rounded-full ${SEV_DOT[d.severidade] || "bg-[var(--surface-secondary)]"}`} />{SEV_LABEL[d.severidade] || d.severidade}</span></td>
                     <td className="px-3 py-2.5 text-xs text-white/68 max-w-[200px]">{d.sugestaoIA || "—"}</td>
                     <td className="px-3 py-2.5">
-                      <select value={d.status} onChange={(e) => decidir(d.id, e.target.value)} className={`text-xs border rounded-md px-2 py-1.5 bg-[var(--surface-popover)] focus:outline-none ${d.status === "retificacao" ? "border-red-200 text-red-700" : d.status === "aceita" ? "border-green-200 text-green-700" : d.status === "pendente" ? "border-[var(--border-default)] text-white/68" : "border-[var(--accent-primary)]/30 text-[var(--accent-text)]"}`}>
+                      <select value={d.status} onChange={(e) => decidir(d.id, e.target.value)} className={`text-xs border rounded-md px-2 py-1.5 bg-[var(--surface-popover)] focus:outline-none ${d.status === "retificacao" ? "border-[var(--border-default)] text-red-700" : d.status === "aceita" ? "border-[var(--border-default)] text-green-700" : d.status === "pendente" ? "border-[var(--border-default)] text-white/68" : "border-[var(--accent-primary)]/30 text-[var(--accent-text)]"}`}>
                         {DECISOES.map(([v, l]) => <option key={v} value={v}>{l}</option>)}
                       </select>
                     </td>
@@ -277,7 +277,7 @@ export function ProcessoAnalise({ processoId, onConcluido, readOnly = false }: P
       )}
 
       {analise?.status === "concluida" && (
-        <div className="rounded-xl border border-green-200 bg-green-50 p-4 text-sm text-green-700 flex items-center gap-2"><CheckCircle2 className="w-4 h-4" />Análise concluída {analise.decisaoJuridica === "com_retificacao" ? "com retificação" : "sem retificação"}.</div>
+        <div className="rounded-xl border border-[var(--border-default)] bg-[var(--surface-secondary)] p-4 text-sm text-green-700 flex items-center gap-2"><CheckCircle2 className="w-4 h-4" />Análise concluída {analise.decisaoJuridica === "com_retificacao" ? "com retificação" : "sem retificação"}.</div>
       )}
 
       {drawerDiv && (
@@ -319,7 +319,7 @@ function DivergenciaDrawer({ div, readOnly, onClose, onSalvar }: {
   return (
     <div className="fixed inset-0 z-50 flex justify-end">
       <div className="absolute inset-0 bg-[var(--overlay-modal)]" onClick={onClose} />
-      <div className="relative w-full max-w-md bg-[var(--surface-popover)] h-full shadow-xl overflow-y-auto flex flex-col">
+      <div className="relative w-full max-w-md bg-[var(--surface-popover)] h-full shadow-[var(--elev-3)] overflow-y-auto flex flex-col">
         <div className="flex items-center justify-between px-5 py-4 border-b border-[var(--border-default)]">
           <div>
             <div className="text-sm font-bold text-white/95">Detalhe da divergência</div>
@@ -349,8 +349,8 @@ function DivergenciaDrawer({ div, readOnly, onClose, onSalvar }: {
           </div>
 
           {(div.sugestaoIA || div.motivoIA || div.impacto) && (
-            <div className="rounded-lg bg-sky-50 border border-sky-200 p-3 text-sm">
-              <div className="text-xs font-semibold text-sky-700 mb-1">Sugestão da IA</div>
+            <div className="rounded-lg bg-[var(--surface-secondary)] border border-[var(--border-default)] p-3 text-sm">
+              <div className="text-xs font-semibold text-[var(--text-secondary)] mb-1">Sugestão da IA</div>
               {div.sugestaoIA && <div className="text-white/80">{div.sugestaoIA}</div>}
               {div.motivoIA && <div className="text-white/68 text-xs mt-1">{div.motivoIA}</div>}
               {div.impacto && <div className="text-white/68 text-xs mt-1">Impacto: {div.impacto}</div>}

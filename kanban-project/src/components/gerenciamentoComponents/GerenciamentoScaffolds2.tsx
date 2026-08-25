@@ -12,7 +12,7 @@ import { AvisoRascunho, TITULO_RASCUNHO, BTN_RASCUNHO } from './_RascunhoUI'
 
 const CARD = 'rounded-xl border border-[var(--border-default)] bg-[var(--surface-primary)] backdrop-blur'
 const BTN_PRIMARY =
-  'rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-blue-500'
+  'rounded-lg bg-[var(--text-muted)] px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-[var(--surface-secondary)]'
 const SELECT =
   'rounded-lg border border-[var(--border-default)] bg-[var(--surface-primary)] px-3 py-1.5 text-xs text-white outline-none focus:border-white/20'
 

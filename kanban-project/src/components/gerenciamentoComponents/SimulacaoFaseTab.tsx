@@ -41,7 +41,7 @@ function money(v: number, ccy: string) {
 
 // selo "condicional"
 function CondBadge({ nota }: { nota?: string | null }) {
-  return <span className="ml-1.5 rounded bg-sky-50 px-1.5 py-0.5 text-[10px] text-sky-700" title={nota || "Condição avaliada na execução"}>condicional</span>
+  return <span className="ml-1.5 rounded bg-[var(--surface-secondary)] px-1.5 py-0.5 text-[10px] text-[var(--text-secondary)]" title={nota || "Condição avaliada na execução"}>condicional</span>
 }
 
 // ============================================================
@@ -130,7 +130,7 @@ export default function SimulacaoFaseTab() {
       {/* resultado */}
       {report && (
         <div className="space-y-3">
-          <div className="rounded-xl border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-100">
+          <div className="rounded-xl border border-[var(--border-default)] bg-[var(--surface-secondary)] px-4 py-3 text-sm text-[var(--text-secondary)]">
             <b>{report.totalCriaria}</b> ação(ões) seriam criadas nesta fase{report.ignoradas.length > 0 && <> · {report.ignoradas.length} ignorada(s)</>}.
           </div>
 
@@ -191,7 +191,7 @@ export default function SimulacaoFaseTab() {
 // Blocos visuais
 // ============================================================
 function Secao({ titulo, count, tone, children }: { titulo: string; count: number; tone: string; children: React.ReactNode }) {
-  const dot: Record<string, string> = { green: "bg-green-400", amber: "bg-amber-400", sky: "bg-sky-400", red: "bg-red-400", neutral: "bg-[var(--surface-secondary)]" }
+  const dot: Record<string, string> = { green: "bg-green-600", amber: "bg-amber-600", sky: "bg-[var(--surface-secondary)]", red: "bg-red-600", neutral: "bg-[var(--surface-secondary)]" }
   return (
     <div className="rounded-2xl border border-[var(--border-default)] bg-[var(--surface-primary)] p-4 backdrop-blur-sm">
       <div className="mb-2 flex items-center gap-2">

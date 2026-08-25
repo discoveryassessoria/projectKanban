@@ -164,7 +164,7 @@ function RowMenuCusto({ onAcao, pode, estadoCusto }: { onAcao: (tipo: string) =>
       <button ref={btn} onClick={abrir} title="Mais ações" className="rounded-[var(--radius-sm)] border border-[var(--border-strong)] bg-[var(--surface-hover)] p-1.5 text-[var(--text-secondary)] hover:bg-[var(--surface-active)]"><MoreVertical className="h-4 w-4" /></button>
       {open && pos && createPortal(<>
         <div className="fixed inset-0 z-[10049]" onClick={() => setOpen(false)} />
-        <div className="fixed z-[10050] w-48 rounded-[var(--radius-md)] border border-[var(--border-default)] bg-[var(--surface-overlay)] py-1 shadow-[var(--shadow-surface)]" style={{ top: pos.top, right: pos.right }}>
+        <div className="fixed z-[10050] w-48 rounded-[var(--radius-md)] border border-[var(--border-default)] bg-[var(--surface-overlay)] py-1 shadow-[var(--elev-2)]" style={{ top: pos.top, right: pos.right }}>
           {item("editar", "Editar custo", Pencil, "editar")}
           {item("duplicar", "Duplicar custo", Copy, "criar")}
           {item("arquivar", "Arquivar custo", Archive, "arquivar")}

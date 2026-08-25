@@ -136,7 +136,7 @@ export function NovaFaturaModal({
   // ========================================
   const modal = (
     <div className="fixed inset-0 bg-[var(--app-overlay)] flex items-center justify-center p-4" style={{ zIndex: LAYER.aboveProcess }}>
-      <div className="border border-[var(--border-default)] bg-[var(--surface-overlay)] rounded-[var(--radius-lg)] shadow-[var(--shadow-surface)] w-full max-w-md max-h-[90vh] overflow-hidden flex flex-col">
+      <div className="border border-[var(--border-default)] bg-[var(--surface-overlay)] rounded-[var(--radius-lg)] shadow-[var(--elev-2)] w-full max-w-md max-h-[90vh] overflow-hidden flex flex-col">
 
         {/* Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-[var(--border-default)] bg-[var(--surface-secondary)]">

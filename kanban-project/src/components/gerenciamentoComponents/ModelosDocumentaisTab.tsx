@@ -96,8 +96,8 @@ const labelCls = "mb-1 block text-xs text-[var(--action-primary-ink)]/60"
 const SEM_ITENS: never[] = Object.freeze([]) as never[]
 
 const CORES_STATUS: Record<StatusVersao, string> = {
-  RASCUNHO: "bg-amber-50 text-amber-700",
-  PUBLICADA: "bg-green-50 text-green-700",
+  RASCUNHO: "bg-[var(--surface-secondary)] text-amber-700",
+  PUBLICADA: "bg-[var(--surface-secondary)] text-green-700",
   REVOGADA: "bg-[var(--surface-primary)] text-[var(--action-primary-ink)]/50",
 }
 
@@ -145,7 +145,7 @@ export default function ModelosDocumentaisTab() {
   return (
     <div className="space-y-5">
       {flash && (
-        <div className="rounded-xl border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-100">{flash}</div>
+        <div className="rounded-xl border border-[var(--border-default)] bg-[var(--surface-secondary)] px-4 py-3 text-sm text-[var(--text-secondary)]">{flash}</div>
       )}
 
       <div className="rounded-2xl border border-[var(--border-default)] bg-[var(--surface-primary)] p-5 backdrop-blur-sm">
@@ -169,7 +169,7 @@ export default function ModelosDocumentaisTab() {
       </div>
 
       {lista.erro && (
-        <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+        <div className="rounded-xl border border-[var(--border-default)] bg-[var(--surface-secondary)] px-4 py-3 text-sm text-red-700">
           Falha ao carregar os modelos.
           <button onClick={() => void lista.recarregar()} className="ml-2 underline">Tentar novamente</button>
         </div>
@@ -210,7 +210,7 @@ export default function ModelosDocumentaisTab() {
                   <span className="ml-1 text-[var(--text-muted)]">de {m.totalVersoes}</span>
                 </td>
                 <td className="px-4 py-2.5">
-                  <span className={`rounded-full px-2 py-0.5 text-[10px] ${m.ativo ? "bg-green-50 text-green-700" : "bg-[var(--surface-primary)] text-[var(--action-primary-ink)]/50"}`}>
+                  <span className={`rounded-full px-2 py-0.5 text-[10px] ${m.ativo ? "bg-[var(--surface-secondary)] text-green-700" : "bg-[var(--surface-primary)] text-[var(--action-primary-ink)]/50"}`}>
                     {m.ativo ? "Ativo" : "Inativo"}
                   </span>
                 </td>
@@ -238,7 +238,7 @@ export default function ModelosDocumentaisTab() {
           <div className="mt-3 grid gap-2 md:grid-cols-2 xl:grid-cols-3">
             {variaveis.map((v) => (
               <div key={v.chave} className="rounded-lg border border-[var(--border-default)] bg-[var(--surface-primary)] px-3 py-2">
-                <code className="text-[11px] text-blue-700">{`{{${v.chave}}}`}</code>
+                <code className="text-[11px] text-[var(--text-secondary)]">{`{{${v.chave}}}`}</code>
                 <div className="mt-0.5 text-xs text-[var(--text-secondary)]">{v.rotulo}</div>
                 <div className="text-[10px] text-[var(--text-muted)]">
                   {v.exigidaQuandoUsada ? "Obrigatória quando usada" : "Opcional"} · cadastro: {v.campo}
@@ -281,7 +281,7 @@ function FormularioModelo({
 }) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-[var(--overlay-modal)] p-4 backdrop-blur-sm" onClick={() => setForm(null)}>
-      <div className="w-full max-w-lg rounded-2xl border border-[var(--border-default)] bg-zinc-900/95 shadow-2xl" onClick={(e) => e.stopPropagation()}>
+      <div className="w-full max-w-lg rounded-2xl border border-[var(--border-default)] bg-zinc-900/95 shadow-[var(--elev-3)]" onClick={(e) => e.stopPropagation()}>
         <div className="border-b border-[var(--border-default)] px-6 py-4">
           <h3 className="font-semibold text-[var(--text-primary)]">{form.id ? "Editar" : "Novo"} modelo</h3>
         </div>
@@ -402,7 +402,7 @@ function PainelVersoes({
 
   return (
     <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-[var(--overlay-modal)] p-4 backdrop-blur-sm" onClick={fechar}>
-      <div className="my-8 w-full max-w-5xl rounded-2xl border border-[var(--border-default)] bg-zinc-900/95 shadow-2xl" onClick={(e) => e.stopPropagation()}>
+      <div className="my-8 w-full max-w-5xl rounded-2xl border border-[var(--border-default)] bg-zinc-900/95 shadow-[var(--elev-3)]" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-start justify-between border-b border-[var(--border-default)] px-6 py-4">
           <div>
             <h3 className="font-semibold text-[var(--text-primary)]">{modelo?.nome ?? "Modelo"}</h3>
@@ -451,10 +451,10 @@ function PainelVersoes({
                       <button onClick={() => void baixar(v.id)} className="rounded px-1.5 py-0.5 hover:bg-[var(--surface-hover)] hover:text-[var(--action-primary-ink)]">Baixar</button>
                       <button disabled={busy} onClick={() => void agir(v.id, "validar")} className="rounded px-1.5 py-0.5 hover:bg-[var(--surface-hover)] hover:text-[var(--action-primary-ink)] disabled:opacity-40">Validar</button>
                       {v.status === "RASCUNHO" && (
-                        <button disabled={busy} onClick={() => void agir(v.id, "publicar")} className="rounded bg-green-600/80 px-2 py-0.5 text-[var(--action-primary-ink)] hover:bg-green-800 disabled:opacity-40">Publicar</button>
+                        <button disabled={busy} onClick={() => void agir(v.id, "publicar")} className="rounded bg-[var(--surface-secondary)] px-2 py-0.5 text-[var(--action-primary-ink)] hover:bg-green-800 disabled:opacity-40">Publicar</button>
                       )}
                       {v.status !== "REVOGADA" && (
-                        <button disabled={busy} onClick={() => void agir(v.id, "revogar")} className="rounded px-1.5 py-0.5 text-red-700/70 hover:bg-red-50 hover:text-red-700 disabled:opacity-40">Revogar</button>
+                        <button disabled={busy} onClick={() => void agir(v.id, "revogar")} className="rounded px-1.5 py-0.5 text-red-700/70 hover:bg-[var(--surface-secondary)] hover:text-red-700 disabled:opacity-40">Revogar</button>
                       )}
                     </div>
                   </div>
@@ -475,7 +475,7 @@ function PainelVersoes({
                       <span
                         key={p}
                         className={`rounded px-1.5 py-0.5 text-[10px] ${
-                          (v.obrigatorios ?? []).includes(p) ? "bg-blue-50 text-blue-700" : "bg-[var(--surface-primary)] text-[var(--action-primary-ink)]/50"
+                          (v.obrigatorios ?? []).includes(p) ? "bg-[var(--surface-secondary)] text-[var(--text-secondary)]" : "bg-[var(--surface-primary)] text-[var(--action-primary-ink)]/50"
                         }`}
                       >
                         {p}

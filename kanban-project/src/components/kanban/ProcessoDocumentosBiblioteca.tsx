@@ -163,7 +163,7 @@ export function ProcessoDocumentosBiblioteca({
                   onClick={() => setFiltro(f)}
                   className={`border rounded-lg px-[13px] py-2 text-[12.5px] font-semibold cursor-pointer transition-colors ${
                     f === filtro
-                      ? "bg-sky-50 border-sky-200 text-sky-700"
+                      ? "bg-[var(--surface-secondary)] border-[var(--border-default)] text-[var(--text-secondary)]"
                       : "border-[var(--border-default)] bg-[var(--surface-popover)] text-[var(--text-secondary)] hover:border-[var(--border-strong)]"
                   }`}
                 >
@@ -184,7 +184,7 @@ export function ProcessoDocumentosBiblioteca({
 
           {/* Seção LINHA PRINCIPAL */}
           <div className="mb-6">
-            <div className="border-l-[3px] border-sky-200 pl-3 mb-3.5">
+            <div className="border-l-[3px] border-[var(--border-default)] pl-3 mb-3.5">
               <b className="text-[13px] font-extrabold text-white/95 tracking-wide">LINHA PRINCIPAL · TRANSMISSÃO DE CIDADANIA</b>
               <span className="block text-[12px] text-[var(--text-secondary)] mt-0.5">Pessoas da linha reta ordenadas por geração</span>
             </div>
@@ -284,7 +284,7 @@ function PersonGroup({
           <span className="inline-flex items-center gap-1.5 text-[12px] font-semibold text-[var(--text-secondary)] bg-[var(--surface-secondary)] border border-[var(--border-default)] rounded-lg px-[11px] py-1.5">
             <FileText className="w-3.5 h-3.5" /> {g.stats.totalDocuments} documentos
           </span>
-          <span className="inline-flex items-center gap-1.5 text-[12px] font-semibold text-green-700 bg-green-50 border border-green-200 rounded-lg px-[11px] py-1.5">
+          <span className="inline-flex items-center gap-1.5 text-[12px] font-semibold text-green-700 bg-[var(--surface-secondary)] border border-[var(--border-default)] rounded-lg px-[11px] py-1.5">
             <CheckCircle2 className="w-3.5 h-3.5" /> {g.stats.readyForProtocol} pronto{g.stats.readyForProtocol === 1 ? "" : "s"}
           </span>
           <span className="inline-flex items-center gap-1.5 text-[12px] font-semibold text-[var(--accent-text)] bg-[var(--accent-primary)]/12 border border-[var(--accent-primary)]/30 rounded-lg px-[11px] py-1.5">
@@ -357,7 +357,7 @@ function DocRow({ it, onAbrirDetalhes }: { it: BibDocItem; onAbrirDetalhes: (doc
       <span>
         <button
           onClick={() => onAbrirDetalhes(it.id)}
-          className="border border-[var(--border-default)] bg-[var(--surface-popover)] rounded-lg px-[13px] py-[7px] text-[12px] font-semibold text-white/95 cursor-pointer hover:border-sky-200 hover:text-sky-700 transition-colors"
+          className="border border-[var(--border-default)] bg-[var(--surface-popover)] rounded-lg px-[13px] py-[7px] text-[12px] font-semibold text-white/95 cursor-pointer hover:border-[var(--border-default)] hover:text-[var(--text-secondary)] transition-colors"
         >
           Abrir detalhes
         </button>
@@ -371,7 +371,7 @@ function StatusCell({ st, date }: { st: CellStatus; date?: string | null }) {
 
   const cls =
     st === "validada" ? "text-green-700"
-    : st === "recebida" ? "text-sky-700"
+    : st === "recebida" ? "text-[var(--text-secondary)]"
     : "text-[var(--accent-text)]"
   const txt =
     st === "validada" ? "Validada"
@@ -453,11 +453,11 @@ function Donut({ kpis }: { kpis: BibKpis }) {
 // ---- Legenda de status ----
 function Legenda() {
   const items: Array<[string, string, string]> = [
-    ["bg-green-50", "Validada", "Documento validado e aprovado"],
-    ["bg-sky-50", "Recebida", "Documento recebido, aguardando validação"],
+    ["bg-[var(--surface-secondary)]", "Validada", "Documento validado e aprovado"],
+    ["bg-[var(--surface-secondary)]", "Recebida", "Documento recebido, aguardando validação"],
     ["bg-[var(--accent-primary)]/120", "Pendente", "Documento ainda não recebido"],
     ["bg-[var(--surface-secondary)]", "Não se aplica", "Não aplicável para este documento"],
-    ["bg-green-50", "Pronto para protocolo", "Certidão + Tradução + Apostila concluídas"],
+    ["bg-[var(--surface-secondary)]", "Pronto para protocolo", "Certidão + Tradução + Apostila concluídas"],
     ["bg-[var(--accent-primary)]/120", "Aguardando", "Etapa pendente para conclusão"],
   ]
   return (

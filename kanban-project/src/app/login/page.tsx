@@ -46,7 +46,7 @@ export default function AuthPage() {
               alt="Logo Discovery"
               width={560}
               height={200}
-              className="drop-shadow-2xl"
+              className="drop-shadow-[var(--elev-3)]"
               priority
             />
           </motion.div>

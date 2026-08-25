@@ -34,8 +34,8 @@ const CELL_LABEL: Record<CellStatus, string> = {
 }
 
 const CELL_DOT: Record<CellStatus, string> = {
-  validada: "bg-green-50",
-  recebida: "bg-sky-50",
+  validada: "bg-[var(--surface-secondary)]",
+  recebida: "bg-[var(--surface-secondary)]",
   pendente: "bg-[var(--accent-primary)]/15",
   nao_aplica: "bg-[var(--surface-secondary)]",
 }
@@ -74,7 +74,7 @@ function ConteudoDrawer({ item, context, onClose }: Props) {
 
   const badge =
     item.finalStatus === "pronta_protocolo"
-      ? { txt: "Pronto", cls: "bg-green-50 text-green-700 border-green-200" }
+      ? { txt: "Pronto", cls: "bg-[var(--surface-secondary)] text-green-700 border-[var(--border-default)]" }
       : item.finalStatus === "aguardando"
       ? { txt: "Aguardando", cls: "bg-[var(--accent-primary)]/12 text-[var(--accent-text)] border-[var(--accent-primary)]/30" }
       : { txt: "Pendente", cls: "bg-[var(--accent-primary)]/12 text-[var(--accent-text)] border-[var(--accent-primary)]/30" }
@@ -85,7 +85,7 @@ function ConteudoDrawer({ item, context, onClose }: Props) {
       <div className="fixed inset-0 bg-[var(--overlay-modal)] z-40" onClick={onClose} />
 
       {/* Painel claro */}
-      <div className="fixed top-0 right-0 h-full w-[560px] max-w-[94vw] bg-[var(--surface-popover)] text-white/95 z-50 shadow-2xl flex flex-col">
+      <div className="fixed top-0 right-0 h-full w-[560px] max-w-[94vw] bg-[var(--surface-popover)] text-white/95 z-50 shadow-[var(--elev-3)] flex flex-col">
         {/* ---- Cabeçalho ---- */}
         <div className="px-6 pt-5 pb-4 border-b border-[var(--border-default)]">
           <div className="flex items-start gap-3">
@@ -138,7 +138,7 @@ function ConteudoDrawer({ item, context, onClose }: Props) {
                 onClick={() => setTab(t)}
                 className={`whitespace-nowrap text-[12.5px] font-semibold pb-2.5 border-b-2 transition-colors ${
                   t === tab
-                    ? "border-sky-200 text-sky-700"
+                    ? "border-[var(--border-default)] text-[var(--text-secondary)]"
                     : "border-transparent text-[var(--text-secondary)] hover:text-white/80"
                 }`}
               >
@@ -236,7 +236,7 @@ function Overview({
               <span
                 className={`relative z-10 w-[26px] h-[26px] rounded-full border-2 grid place-items-center bg-[var(--surface-popover)] ${
                   n.tone === "ok"
-                    ? "border-green-200"
+                    ? "border-[var(--border-default)]"
                     : n.tone === "na"
                     ? "border-[var(--border-default)]"
                     : "border-[var(--accent-primary)]/30"
@@ -244,7 +244,7 @@ function Overview({
               >
                 <span
                   className={`w-2 h-2 rounded-full ${
-                    n.tone === "ok" ? "bg-green-50" : n.tone === "na" ? "bg-[var(--surface-secondary)]" : "bg-[var(--accent-primary)]/15"
+                    n.tone === "ok" ? "bg-[var(--surface-secondary)]" : n.tone === "na" ? "bg-[var(--surface-secondary)]" : "bg-[var(--accent-primary)]/15"
                   }`}
                 />
               </span>
@@ -289,8 +289,8 @@ function Overview({
       </div>
 
       {/* Próxima ação sugerida */}
-      <div className="flex items-start gap-3 border border-sky-200 bg-sky-50/50 rounded-xl p-4">
-        <Clock className="w-[18px] h-[18px] text-sky-700 flex-none mt-0.5" />
+      <div className="flex items-start gap-3 border border-[var(--border-default)] bg-[var(--surface-secondary)]/50 rounded-xl p-4">
+        <Clock className="w-[18px] h-[18px] text-[var(--text-secondary)] flex-none mt-0.5" />
         <div>
           <b className="text-[12.5px] text-white/95 block">Próxima ação sugerida</b>
           <span className="text-[12px] text-white/68">{nextAction}</span>
@@ -299,7 +299,7 @@ function Overview({
 
       <button
         onClick={onGoToDados}
-        className="inline-flex items-center gap-1.5 text-[12.5px] font-semibold text-sky-700 hover:text-sky-700 self-start"
+        className="inline-flex items-center gap-1.5 text-[12.5px] font-semibold text-[var(--text-secondary)] hover:text-[var(--text-secondary)] self-start"
       >
         Ver dados registrais completos <ArrowRight className="w-[14px] h-[14px]" />
       </button>

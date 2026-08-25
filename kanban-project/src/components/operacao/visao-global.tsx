@@ -162,7 +162,7 @@ function Sinais({ l }: { l: LinhaGerencial }) {
 }
 
 const INDICADORES: Array<{ chave: keyof Indicadores; rotulo: string; filtro: Partial<Filtros>; tom: string }> = [
-  { chave: "semResponsavel", rotulo: "Sem responsável", filtro: { semResponsavel: true }, tom: "text-sky-700/90" },
+  { chave: "semResponsavel", rotulo: "Sem responsável", filtro: { semResponsavel: true }, tom: "text-[var(--text-secondary)]/90" },
   { chave: "emAndamento", rotulo: "Em andamento", filtro: {}, tom: "text-white/80" },
   { chave: "aguardandoTerceiro", rotulo: "Aguardando terceiro", filtro: {}, tom: "text-white/80" },
   { chave: "bloqueadas", rotulo: "Bloqueadas", filtro: {}, tom: "text-white/80" },
@@ -424,7 +424,7 @@ export function VisaoGlobal() {
       {(erroComando || aviso) && (
         <div
           className={`border-b px-4 py-2 text-[11px] ${
-            erroComando ? "border-red-200 bg-red-50 text-red-700/90" : "border-emerald-200 bg-emerald-50 text-emerald-700/90"
+            erroComando ? "border-[var(--border-default)] bg-[var(--surface-secondary)] text-red-700/90" : "border-[var(--border-default)] bg-[var(--surface-secondary)] text-green-700/90"
           }`}
         >
           {erroComando ?? aviso}
@@ -597,7 +597,7 @@ function Lista({
                 {l.responsavelId == null && (
                   <button
                     onClick={() => aoSugerir(l)}
-                    className="rounded border border-sky-200 px-2 py-1 text-[10px] text-sky-700/80 transition-colors hover:bg-sky-50 hover:text-sky-100"
+                    className="rounded border border-[var(--border-default)] px-2 py-1 text-[10px] text-[var(--text-secondary)]/80 transition-colors hover:bg-[var(--surface-secondary)] hover:text-[var(--text-secondary)]"
                   >
                     Sugerir
                   </button>
@@ -685,7 +685,7 @@ function Quadro({
             onDragLeave={() => setSobre((s) => (s === c.chave ? null : s))}
             onDrop={() => soltar(c.chave)}
             className={`flex h-full w-72 shrink-0 flex-col rounded-lg border transition-colors ${
-              sobre === c.chave && alvoValido ? "border-sky-200 bg-sky-400/[0.06]"
+              sobre === c.chave && alvoValido ? "border-[var(--border-default)] bg-[var(--surface-secondary)]"
               : alvoInvalido ? "border-white/[0.04] bg-[var(--surface-primary)] opacity-40"
               : "border-white/[0.08] bg-[var(--surface-primary)]"
             }`}
@@ -695,7 +695,7 @@ function Quadro({
               <span className="text-[11px] tabular-nums text-[var(--text-muted)]">{linhas.length}</span>
             </div>
             {alvoValido && (
-              <div className="border-b border-sky-200 px-3 py-1.5 text-[10px] text-sky-700/80">{permitido.rotulo}</div>
+              <div className="border-b border-[var(--border-default)] px-3 py-1.5 text-[10px] text-[var(--text-secondary)]/80">{permitido.rotulo}</div>
             )}
             <div className="flex min-h-[60px] flex-1 flex-col gap-2 overflow-y-auto p-2">
               {linhas.length === 0 && <p className="px-1 py-3 text-[11px] text-[var(--text-muted)]">{c.nota ?? "Nada aqui."}</p>}
@@ -798,7 +798,7 @@ function Card({
           {l.responsavelId == null && (
             <button
               onClick={aoSugerir}
-              className="rounded border border-sky-200 px-1.5 py-0.5 text-[10px] text-sky-700/80 transition-colors hover:bg-sky-50 hover:text-sky-100"
+              className="rounded border border-[var(--border-default)] px-1.5 py-0.5 text-[10px] text-[var(--text-secondary)]/80 transition-colors hover:bg-[var(--surface-secondary)] hover:text-[var(--text-secondary)]"
             >
               Sugerir
             </button>
@@ -841,7 +841,7 @@ function PainelSugestao({
   return (
     <div className="fixed inset-0 z-[60] flex items-center justify-center bg-[var(--overlay-modal)] p-4" onClick={aoFechar}>
       <div
-        className="flex max-h-[85vh] w-full max-w-2xl flex-col overflow-hidden rounded-lg border border-[var(--border-default)] bg-[var(--surface-overlay)] shadow-2xl"
+        className="flex max-h-[85vh] w-full max-w-2xl flex-col overflow-hidden rounded-lg border border-[var(--border-default)] bg-[var(--surface-overlay)] shadow-[var(--elev-3)]"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="border-b border-white/[0.08] px-4 py-3">
@@ -853,7 +853,7 @@ function PainelSugestao({
         </div>
 
         <div className="min-h-0 flex-1 overflow-y-auto">
-          {erro && <div className="border-b border-red-200 bg-red-50 px-4 py-2.5 text-[11px] text-red-700/90">{erro}</div>}
+          {erro && <div className="border-b border-[var(--border-default)] bg-[var(--surface-secondary)] px-4 py-2.5 text-[11px] text-red-700/90">{erro}</div>}
           {!s && !erro && <Estado tipo="carregando" mensagem="Calculando elegibilidade e carga…" />}
 
           {s && (
@@ -863,7 +863,7 @@ function PainelSugestao({
                 {s.recomendado ? (
                   <>
                     <div className="flex items-baseline gap-2">
-                      <span className="grid h-7 w-7 shrink-0 place-items-center rounded-full bg-emerald-50 text-[10px] font-medium text-emerald-700/90">
+                      <span className="grid h-7 w-7 shrink-0 place-items-center rounded-full bg-[var(--surface-secondary)] text-[10px] font-medium text-green-700/90">
                         {iniciais(s.recomendado.nome)}
                       </span>
                       <span className="text-[15px] font-medium text-white/95">{s.recomendado.nome}</span>
@@ -901,7 +901,7 @@ function PainelSugestao({
                     {elegiveis.map((a) => (
                       <div key={a.usuarioId} className="rounded border border-white/[0.07] px-2.5 py-2">
                         <div className="flex items-baseline justify-between gap-2">
-                          <span className={`text-[12px] ${a.usuarioId === s.recomendado?.usuarioId ? "text-emerald-700/90" : "text-white/80"}`}>
+                          <span className={`text-[12px] ${a.usuarioId === s.recomendado?.usuarioId ? "text-green-700/90" : "text-white/80"}`}>
                             {a.nome}
                           </span>
                           <span className="text-[11px] tabular-nums text-[var(--text-secondary)]">custo {a.score}</span>

@@ -91,7 +91,7 @@ interface Dados {
   execucoesAnteriores: Tentativa[]
 }
 
-const inp = "w-full rounded-lg border border-[var(--border-default)] bg-[var(--surface-primary)] px-3 py-2 text-sm text-white placeholder-white/30 outline-none focus:border-blue-200"
+const inp = "w-full rounded-lg border border-[var(--border-default)] bg-[var(--surface-primary)] px-3 py-2 text-sm text-white placeholder-white/30 outline-none focus:border-[var(--border-default)]"
 const lbl = "mb-1 block text-[11px] uppercase tracking-wide text-[var(--text-muted)]"
 
 function headers(): HeadersInit {
@@ -205,9 +205,9 @@ export default function PainelDeclarativoDaEtapa({
 
   if (erroCarga) {
     return (
-      <div className="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-700">
+      <div className="rounded-lg border border-[var(--border-default)] bg-[var(--surface-secondary)] p-4 text-sm text-red-700">
         {erroCarga}
-        <button onClick={() => void carregar()} className="ml-3 rounded-lg border border-red-200 px-2.5 py-1 text-xs hover:bg-red-50">Tentar novamente</button>
+        <button onClick={() => void carregar()} className="ml-3 rounded-lg border border-[var(--border-default)] px-2.5 py-1 text-xs hover:bg-[var(--surface-secondary)]">Tentar novamente</button>
       </div>
     )
   }
@@ -255,12 +255,12 @@ export default function PainelDeclarativoDaEtapa({
                   <div className="min-w-0">
                     <div className="flex items-center gap-2">
                       <span className={`h-2 w-2 flex-none rounded-full ${
-                        st.concluida ? "bg-emerald-400"
+                        st.concluida ? "bg-green-600"
                         : st.status === "BLOQUEADO" || st.status === "PENDENTE" ? "bg-[var(--surface-secondary)]"
-                        : st.status === "AGUARDANDO_EXTERNO" ? "bg-sky-400"
-                        : "bg-amber-400"}`} />
+                        : st.status === "AGUARDANDO_EXTERNO" ? "bg-[var(--surface-secondary)]"
+                        : "bg-amber-600"}`} />
                       <span className={`text-sm ${st.concluida ? "text-[var(--text-secondary)] line-through" : "text-white"}`}>{st.label}</span>
-                      {st.obrigatoria && !st.concluida && <span className="rounded bg-amber-50 px-1.5 py-0.5 text-[10px] text-amber-700">obrigatória</span>}
+                      {st.obrigatoria && !st.concluida && <span className="rounded bg-[var(--surface-secondary)] px-1.5 py-0.5 text-[10px] text-amber-700">obrigatória</span>}
                       {st.ocorrencias > 1 && <span className="rounded bg-[var(--surface-primary)] px-1.5 py-0.5 text-[10px] text-[var(--text-secondary)]">{st.ocorrencias}ª vez</span>}
                     </div>
                     {st.descricao && <p className="mt-0.5 text-[11px] text-[var(--text-muted)]">{st.descricao}</p>}
@@ -269,7 +269,7 @@ export default function PainelDeclarativoDaEtapa({
                       <p className="mt-1 text-[11px] text-amber-700/70">{st.bloqueioTexto}</p>
                     )}
                     {st.concluida && st.execucao?.resultado && (
-                      <p className="mt-1 text-[11px] text-emerald-700/60">
+                      <p className="mt-1 text-[11px] text-green-700/60">
                         {st.execucao.resultado}
                         {st.execucao.completedAt && ` · ${new Date(st.execucao.completedAt).toLocaleDateString("pt-BR")}`}
                       </p>
@@ -460,8 +460,8 @@ export default function PainelDeclarativoDaEtapa({
         </div>
       )}
 
-      {recusa && <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-100">{recusa}</div>}
-      {feito && <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs text-emerald-100">{feito}</div>}
+      {recusa && <div className="rounded-lg border border-[var(--border-default)] bg-[var(--surface-secondary)] px-3 py-2 text-xs text-amber-100">{recusa}</div>}
+      {feito && <div className="rounded-lg border border-[var(--border-default)] bg-[var(--surface-secondary)] px-3 py-2 text-xs text-green-100">{feito}</div>}
 
       <div>
         <div className={lbl}>Resultado</div>
@@ -493,7 +493,7 @@ export default function PainelDeclarativoDaEtapa({
               Reexecutar esta etapa
             </button>
           ) : (
-            <div className="space-y-2 rounded-lg border border-amber-200 bg-amber-500/5 p-3">
+            <div className="space-y-2 rounded-lg border border-[var(--border-default)] bg-[var(--surface-secondary)] p-3">
               <div className="text-xs font-medium text-amber-100">O que a reexecução faz</div>
               <ul className="space-y-1 text-[11px] text-white/70">
                 <li>Reexecutada: <b>{preview.seraReexecutado.map((p) => p.stepKey).join(", ") || "—"}</b></li>

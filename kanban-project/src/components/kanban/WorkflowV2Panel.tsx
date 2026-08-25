@@ -86,7 +86,7 @@ export function WorkflowV2Panel({ processoId }: Props) {
       <div className="mb-3 flex items-center justify-between">
         <div className="flex items-center gap-2">
           <span className="font-semibold text-gray-800">Runtime do Workflow</span>
-          <span className={`rounded px-2 py-0.5 text-xs font-medium ${view.runtime === "v2" ? "bg-blue-100 text-blue-700" : "bg-gray-100 text-gray-600"}`}>
+          <span className={`rounded px-2 py-0.5 text-xs font-medium ${view.runtime === "v2" ? "bg-[var(--surface-secondary)] text-[var(--text-secondary)]" : "bg-gray-100 text-gray-600"}`}>
             {view.runtime.toUpperCase()}
           </span>
           <span className="rounded bg-gray-100 px-2 py-0.5 text-xs text-gray-500">source: {view.source}</span>
@@ -97,7 +97,7 @@ export function WorkflowV2Panel({ processoId }: Props) {
       </div>
 
       {!view.killSwitchGlobal && (
-        <div className="mb-3 rounded border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+        <div className="mb-3 rounded border border-[var(--border-default)] bg-[var(--surface-secondary)] px-3 py-2 text-xs text-amber-800">
           ⚠️ Runtime v2 desligado globalmente (kill switch OFF). Ações v2 não são efetivadas.
         </div>
       )}

@@ -74,7 +74,7 @@ export function CommandPalette() {
             className="fixed inset-0 flex items-start justify-center bg-[var(--overlay-modal)] px-4 pt-[14vh] backdrop-blur-sm"
             style={{ zIndex: LAYER.aboveProcess }}
           >
-            <div className="w-full max-w-xl rounded-2xl border border-[var(--border-strong)] bg-[var(--surface-popover)] p-3 shadow-2xl">
+            <div className="w-full max-w-xl rounded-2xl border border-[var(--border-strong)] bg-[var(--surface-popover)] p-3 shadow-[var(--elev-3)]">
               <GlobalSearch autoFocusRef={inputRef} />
               <p className="px-1 pt-2 text-[11px] text-[var(--text-muted)]">
                 Família, requerente, processo ou cliente · <kbd className="text-[var(--text-secondary)]">Esc</kbd> para fechar

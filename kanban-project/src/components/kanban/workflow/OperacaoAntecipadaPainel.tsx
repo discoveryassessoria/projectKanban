@@ -54,11 +54,11 @@ export type AvaliarFn = (id: number, resultado: ResultadoAvaliacaoUI, resultadoO
 
 const ST_OP_LABEL: Record<string, { t: string; c: string }> = {
   CRIADA: { t: "Criada", c: "bg-[var(--surface-tertiary)] text-white/68" },
-  EM_EXECUCAO: { t: "Em execução", c: "bg-sky-50 text-sky-700" },
+  EM_EXECUCAO: { t: "Em execução", c: "bg-[var(--surface-secondary)] text-[var(--text-secondary)]" },
   AGUARDANDO_RESULTADO: { t: "Aguardando avaliação", c: "bg-[var(--accent-primary)]/15 text-[var(--accent-text)]" },
-  CONCLUIDA: { t: "Concluída", c: "bg-green-50 text-green-700" },
-  CONCLUIDA_PARCIAL: { t: "Concluída parcial", c: "bg-amber-50 text-amber-700" },
-  NAO_ATINGIDA: { t: "Não atingida", c: "bg-red-50 text-red-700" },
+  CONCLUIDA: { t: "Concluída", c: "bg-[var(--surface-secondary)] text-green-700" },
+  CONCLUIDA_PARCIAL: { t: "Concluída parcial", c: "bg-[var(--surface-secondary)] text-amber-700" },
+  NAO_ATINGIDA: { t: "Não atingida", c: "bg-[var(--surface-secondary)] text-red-700" },
   CANCELADA: { t: "Cancelada", c: "bg-[var(--surface-tertiary)] text-[var(--text-muted)]" },
 }
 
@@ -71,10 +71,10 @@ export function OperacoesAntecipadasInline({ ops, readOnly, onAvaliar, onAbrir }
   const abertas = ops.filter((o) => !o.encerrada).length
   return (
     <div className="px-1 pb-2">
-      <div className="rounded-lg border border-slate-200 bg-slate-50 overflow-hidden">
-        <div className="flex items-center gap-1.5 px-3 py-1.5 border-b border-slate-200 text-[10.5px] font-bold uppercase tracking-wide text-slate-700">
+      <div className="rounded-lg border border-[var(--border-default)] bg-[var(--surface-secondary)] overflow-hidden">
+        <div className="flex items-center gap-1.5 px-3 py-1.5 border-b border-[var(--border-default)] text-[10.5px] font-bold uppercase tracking-wide text-[var(--text-secondary)]">
           <ArrowLeftRight className="w-3 h-3" /> Operações antecipadas
-          <span className="font-semibold text-slate-700 normal-case tracking-normal">· {ops.length}{abertas > 0 ? ` (${abertas} aberta${abertas > 1 ? "s" : ""})` : ""}</span>
+          <span className="font-semibold text-[var(--text-secondary)] normal-case tracking-normal">· {ops.length}{abertas > 0 ? ` (${abertas} aberta${abertas > 1 ? "s" : ""})` : ""}</span>
         </div>
         <div className="divide-y divide-[var(--border-default)]">
           {ops.map((o) => (
@@ -133,20 +133,20 @@ function OperacaoAntecipadaItem({ o, readOnly, onAvaliar, onAbrir }: {
             {apoio && (
               <div className="grid grid-cols-2 gap-2">
                 {[["cartorio", "Cartório"], ["municipio", "Município"], ["livro", "Livro"], ["folha", "Folha"], ["termo", "Termo"], ["data", "Data"], ["fonte", "Fonte da informação"]].map(([k, label]) => (
-                  <input key={k} value={dados[k] ?? ""} onChange={(e) => setD(k, e.target.value)} placeholder={label} className="text-[12px] rounded-md border border-[var(--border-default)] px-2 py-1.5 focus:outline-none focus:border-sky-200 focus:ring-1 focus:border-sky-200" />
+                  <input key={k} value={dados[k] ?? ""} onChange={(e) => setD(k, e.target.value)} placeholder={label} className="text-[12px] rounded-md border border-[var(--border-default)] px-2 py-1.5 focus:outline-none focus:border-[var(--border-default)] focus:ring-1 focus:border-[var(--border-default)]" />
                 ))}
               </div>
             )}
-            <input value={resultado} onChange={(e) => setResultado(e.target.value)} placeholder={apoio ? "Observações" : "Resultado obtido"} className="w-full text-[12px] rounded-md border border-[var(--border-default)] px-2 py-1.5 focus:outline-none focus:border-sky-200 focus:ring-1 focus:border-sky-200" autoFocus />
+            <input value={resultado} onChange={(e) => setResultado(e.target.value)} placeholder={apoio ? "Observações" : "Resultado obtido"} className="w-full text-[12px] rounded-md border border-[var(--border-default)] px-2 py-1.5 focus:outline-none focus:border-[var(--border-default)] focus:ring-1 focus:border-[var(--border-default)]" autoFocus />
             <div className="flex items-center gap-2 flex-wrap">
-              <button onClick={() => enviar("SIM")} className="inline-flex items-center gap-1 text-[11.5px] font-bold px-2.5 py-1.5 rounded-md bg-green-50 text-green-700 border border-green-200 hover:bg-green-50"><CheckCircle2 className="w-3.5 h-3.5" /> Objetivo atingido</button>
-              <button onClick={() => enviar("PARCIAL")} className="text-[11.5px] font-semibold px-2.5 py-1.5 rounded-md border border-amber-200 text-amber-700 hover:bg-amber-50">Parcialmente</button>
+              <button onClick={() => enviar("SIM")} className="inline-flex items-center gap-1 text-[11.5px] font-bold px-2.5 py-1.5 rounded-md bg-[var(--surface-secondary)] text-green-700 border border-[var(--border-default)] hover:bg-[var(--surface-secondary)]"><CheckCircle2 className="w-3.5 h-3.5" /> Objetivo atingido</button>
+              <button onClick={() => enviar("PARCIAL")} className="text-[11.5px] font-semibold px-2.5 py-1.5 rounded-md border border-[var(--border-default)] text-amber-700 hover:bg-[var(--surface-secondary)]">Parcialmente</button>
               <button onClick={() => enviar("NAO")} className="text-[11.5px] font-semibold px-2.5 py-1.5 rounded-md border border-[var(--border-default)] text-white/80 hover:bg-[var(--surface-secondary)]">Não atingido</button>
               <button onClick={() => enviar("CANCELAR")} className="text-[11.5px] text-[var(--text-muted)] hover:text-red-700 ml-auto">Cancelar operação</button>
             </div>
           </div>
         ) : (
-          <button onClick={() => { setAvaliando(true); setResultado("") }} className="mt-2 inline-flex items-center gap-1 text-[11.5px] font-bold px-2.5 py-1.5 rounded-md bg-green-50 text-green-700 border border-green-200 hover:bg-green-50"><CheckCircle2 className="w-3.5 h-3.5" /> Operação concluída — avaliar objetivo</button>
+          <button onClick={() => { setAvaliando(true); setResultado("") }} className="mt-2 inline-flex items-center gap-1 text-[11.5px] font-bold px-2.5 py-1.5 rounded-md bg-[var(--surface-secondary)] text-green-700 border border-[var(--border-default)] hover:bg-[var(--surface-secondary)]"><CheckCircle2 className="w-3.5 h-3.5" /> Operação concluída — avaliar objetivo</button>
         )
       )}
       {o.resultadoObtido && <div className="text-[11px] text-[var(--text-secondary)] mt-1">Resultado: {o.resultadoObtido}</div>}

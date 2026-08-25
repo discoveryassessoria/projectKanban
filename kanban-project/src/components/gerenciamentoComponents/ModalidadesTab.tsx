@@ -127,9 +127,9 @@ export default function ModalidadesTab() {
 
   return (
     <div className="space-y-5">
-      {flash && <div className="rounded-xl border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-700">{flash}</div>}
+      {flash && <div className="rounded-xl border border-[var(--border-default)] bg-[var(--surface-secondary)] px-4 py-3 text-sm text-green-700">{flash}</div>}
       {erro && (
-        <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+        <div className="rounded-xl border border-[var(--border-default)] bg-[var(--surface-secondary)] px-4 py-3 text-sm text-red-700">
           {erro} <button onClick={() => { setErro(null); void carregarMods() }} className="ml-2 underline hover:text-white">Recarregar</button>
         </div>
       )}
@@ -200,7 +200,7 @@ export default function ModalidadesTab() {
                     <button
                       onClick={() => toggleAtivo(m)}
                       title={(m.ativo ?? true) ? "Inativar (some do seletor de Tipos de Processo, sem apagar)" : "Ativar"}
-                      className={`rounded-full px-2 py-0.5 text-[10px] ${(m.ativo ?? true) ? "bg-green-50 text-green-700" : "bg-[var(--surface-primary)] text-[var(--text-secondary)]"}`}
+                      className={`rounded-full px-2 py-0.5 text-[10px] ${(m.ativo ?? true) ? "bg-[var(--surface-secondary)] text-green-700" : "bg-[var(--surface-primary)] text-[var(--text-secondary)]"}`}
                     >
                       {(m.ativo ?? true) ? "Ativa" : "Inativa"}
                     </button>
@@ -217,7 +217,7 @@ export default function ModalidadesTab() {
                         aria-label="Excluir"
                         disabled={(m.tiposCount ?? 0) > 0}
                         onClick={() => excluir(m)}
-                        className="rounded p-1 text-red-700/70 hover:bg-red-50 hover:text-red-700 disabled:cursor-not-allowed disabled:opacity-30"
+                        className="rounded p-1 text-red-700/70 hover:bg-[var(--surface-secondary)] hover:text-red-700 disabled:cursor-not-allowed disabled:opacity-30"
                       ><ITrash /></button>
                     </div>
                   </td>
@@ -230,7 +230,7 @@ export default function ModalidadesTab() {
 
       {form && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-[var(--overlay-modal)] p-4 backdrop-blur-sm" onClick={() => setForm(null)}>
-          <div className="w-full max-w-md rounded-2xl border border-[var(--border-default)] bg-zinc-900/95 shadow-2xl" onClick={e => e.stopPropagation()}>
+          <div className="w-full max-w-md rounded-2xl border border-[var(--border-default)] bg-zinc-900/95 shadow-[var(--elev-3)]" onClick={e => e.stopPropagation()}>
             <div className="border-b border-[var(--border-default)] px-6 py-4">
               <h3 className="font-semibold text-white">{form.editando ? "Editar modalidade" : "Nova modalidade"}</h3>
               <p className="mt-0.5 text-xs text-[var(--text-secondary)]">{paises.find(p => p.countryKey === countryKey)?.countryLabel}</p>

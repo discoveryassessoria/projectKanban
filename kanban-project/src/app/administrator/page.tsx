@@ -775,7 +775,7 @@ export default function GerenciamentoPage() {
                               aria-disabled={indisponivel || undefined}
                               className={`flex min-h-[38px] w-full items-center gap-2 rounded-lg border-l-2 py-2 pl-3 pr-2.5 text-left text-[13.5px] transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/40 ${
                                 ativo
-                                  ? "border-sky-400/80 bg-[var(--surface-primary)] font-semibold text-white"
+                                  ? "border-[var(--border-default)] bg-[var(--surface-primary)] font-semibold text-white"
                                   : indisponivel
                                     ? "cursor-not-allowed border-transparent text-[var(--text-muted)]"
                                     : "border-transparent text-white/65 hover:bg-[var(--surface-primary)] hover:text-white"

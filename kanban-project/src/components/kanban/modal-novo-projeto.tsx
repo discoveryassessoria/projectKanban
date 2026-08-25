@@ -65,7 +65,7 @@ export default function ModalNovoProjeto({ isOpen, onClose, onSubmit }: ModalNov
         onClick={handleClose}
       />
 
-      <Card className="relative z-10 w-full max-w-md mx-4 shadow-2xl animate-in fade-in-0 zoom-in-95 duration-300 bg-zinc-900 border-zinc-800">
+      <Card className="relative z-10 w-full max-w-md mx-4 shadow-[var(--elev-3)] animate-in fade-in-0 zoom-in-95 duration-300 bg-zinc-900 border-zinc-800">
         <CardHeader className="pb-4 border-b border-zinc-800">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
@@ -118,7 +118,7 @@ export default function ModalNovoProjeto({ isOpen, onClose, onSubmit }: ModalNov
                 disabled={loading}
                 maxLength={200}
                 rows={3}
-                className="w-full px-3 py-2 bg-zinc-950 border border-zinc-800 rounded-md text-sm text-zinc-100 placeholder:text-zinc-600 resize-none focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                className="w-full px-3 py-2 bg-zinc-950 border border-zinc-800 rounded-md text-sm text-zinc-100 placeholder:text-zinc-600 resize-none focus:outline-none focus:ring-2 focus:ring-[var(--border-strong)] focus:border-transparent"
               />
               <p className="text-xs text-zinc-500">Máximo 200 caracteres ({descricao.length}/200)</p>
             </div>
@@ -142,7 +142,7 @@ export default function ModalNovoProjeto({ isOpen, onClose, onSubmit }: ModalNov
               <Button
                 type="submit"
                 disabled={loading || !nome.trim()}
-                className="flex-1 bg-indigo-600 hover:bg-indigo-700"
+                className="flex-1 bg-[var(--text-muted)] hover:bg-[var(--surface-secondary)]"
               >
                 {loading ? (
                   <div className="flex items-center gap-2">

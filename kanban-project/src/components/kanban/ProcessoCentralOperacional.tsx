@@ -288,7 +288,7 @@ function DecisaoSobreCausa({
               type="button"
               onClick={() => decidir("ENCERRAR")}
               disabled={enviando !== null}
-              className="rounded-md border border-red-200 bg-red-50 px-3 py-1.5 text-xs font-medium text-red-700 hover:bg-red-50 disabled:opacity-50"
+              className="rounded-md border border-[var(--border-default)] bg-[var(--surface-secondary)] px-3 py-1.5 text-xs font-medium text-red-700 hover:bg-[var(--surface-secondary)] disabled:opacity-50"
             >
               {enviando === "ENCERRAR" ? "Encerrando…" : "Encerrar a tarefa"}
             </button>
@@ -1113,7 +1113,7 @@ export function ProcessoCentralOperacional({
 
           {erroOperacao && (
             <div className="fixed inset-0 z-[70] flex items-center justify-center bg-[var(--overlay-modal)]" onClick={() => setErroOperacao(null)}>
-              <div className="max-w-sm rounded-lg bg-[var(--surface-popover)] p-5 shadow-xl" onClick={(e) => e.stopPropagation()}>
+              <div className="max-w-sm rounded-lg bg-[var(--surface-popover)] p-5 shadow-[var(--elev-3)]" onClick={(e) => e.stopPropagation()}>
                 <div className="text-sm font-semibold text-white/95 mb-1">Não foi possível abrir a operação</div>
                 <div className="text-sm text-white/68 mb-4">{erroOperacao}</div>
                 <div className="flex justify-end">
