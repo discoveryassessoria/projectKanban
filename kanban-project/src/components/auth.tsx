@@ -143,6 +143,38 @@ export default function AuthComponent({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []) // ← deps vazias: roda só uma vez no mount
 
+  // ── Diagnóstico do travamento relatado ────────────────────────────────────
+  // Há uma falha que não reproduz em bancada: depois de ficar ocioso, o usuário
+  // volta, digita a senha e a tela fica em "Entrando…" para sempre. Duas coisas
+  // acontecem aqui, e as duas valem independentemente da causa raiz:
+  //
+  //   1. RELATAR — se a requisição não responder, ou se o 200 chegar e a
+  //      navegação não acontecer, o cliente conta o que viu. Sem isso eu só
+  //      posso adivinhar, e já adivinhei errado duas vezes.
+  //   2. NÃO MENTIR — um botão preso em "Entrando…" é beco sem saída. Passado
+  //      o limite, o estado volta e o usuário recebe uma saída de verdade.
+  const relatar = (fase: string, extra: Record<string, unknown> = {}) => {
+    try {
+      const nav = (performance.getEntriesByType("navigation")[0] ?? {}) as PerformanceNavigationTiming
+      void fetch("/api/auth/diagnostico-login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        keepalive: true,
+        body: JSON.stringify({
+          fase,
+          visibilidade: document.visibilityState,
+          restauradaDoCache: nav.type === "back_forward",
+          msDesdeCarregamento: Math.round(performance.now()),
+          temTokenLocal: !!localStorage.getItem("authToken"),
+          temCookie: document.cookie.includes("authToken="),
+          online: navigator.onLine,
+          agente: navigator.userAgent,
+          ...extra,
+        }),
+      }).catch(() => { /* diagnóstico nunca atrapalha o login */ })
+    } catch { /* idem */ }
+  }
+
   const handleLogin = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault()
     setIsLoading(true)
@@ -152,12 +184,19 @@ export default function AuthComponent({
     const email = formData.get("email") as string
     const senha = formData.get("senha") as string
 
+    const t0 = Date.now()
+    // A requisição não pode ficar pendente para sempre: é exatamente esse o
+    // sintoma relatado. 20s é folgado para uma rota que responde em ~0,4s.
+    const cancelador = new AbortController()
+    const limite = setTimeout(() => cancelador.abort(), 20_000)
+
     try {
       console.log("Tentando fazer login com email:", email)
       const response = await fetch("/api/auth/login", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email, senha }),
+        signal: cancelador.signal,
       })
 
       console.log("Status da resposta:", response.status)
@@ -182,6 +221,17 @@ export default function AuthComponent({
           // (token velho que sobrou de pré-migração JWT) seja descartado.
           // Custo: um reload de página. Benefício: zero race condition
           // entre estado React, localStorage, cookie e middleware.
+          //
+          // VIGIA: se em 8s esta página ainda estiver viva, a navegação não
+          // aconteceu — e é esse o segundo sintoma possível do travamento.
+          // O usuário deixa de ficar preso num botão que não anda.
+          setTimeout(() => {
+            relatar("navegacao-nao-ocorreu", {
+              msDecorridos: Date.now() - t0, fetchConcluido: true, httpStatus: 200,
+            })
+            setIsLoading(false)
+            setError("A sessão foi criada, mas a página não avançou. Clique em Entrar novamente.")
+          }, 8_000)
           window.location.href = redirectTo
         }
       } else {
@@ -189,9 +239,16 @@ export default function AuthComponent({
         setError(data.error || "Erro ao fazer login")
       }
     } catch (error) {
-      console.error("Erro de conexão:", error)
-      setError("Erro de conexão. Tente novamente.")
+      const porTempo = error instanceof DOMException && error.name === "AbortError"
+      if (porTempo) {
+        relatar("fetch-nao-respondeu", { msDecorridos: Date.now() - t0, fetchConcluido: false })
+        setError("O servidor não respondeu. Tente entrar novamente.")
+      } else {
+        console.error("Erro de conexão:", error)
+        setError("Erro de conexão. Tente novamente.")
+      }
     } finally {
+      clearTimeout(limite)
       setIsLoading(false)
     }
   }

@@ -600,9 +600,9 @@ function ConteudoDrawer({
                       secundária: acompanha o status do trabalho, não o substitui.
                       Era ele que ocupava o campo "Status" e fazia a mesma certidão
                       ser "Em andamento" na linha e "Solicitado" aqui. */}
-                  <div className={`text-[10.5px] truncate ${statusCls ? "text-[var(--text-muted)]" : "text-[var(--text-muted)]"}`}>
-                    Documento: {statusDocumentalLabel}
-                  </div>
+                  {/* O estado legado do Documento deixou de ser exibido: era ele que
+                      fazia a mesma certidão dizer "Recebido" aqui e "Solicitar certidão"
+                      no workflow. Fonte única do ponto da execução é o passo. */}
                 </div>
                 {/* RESPONSÁVEL */}
                 <div className="flex flex-col gap-1.5 min-w-0">

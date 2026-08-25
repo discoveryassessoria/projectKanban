@@ -33,6 +33,11 @@ async function registrarAcesso(
 }
 
 export async function POST(request: NextRequest) {
+  // Marcos de tempo por FASE. Quando o travamento for relatado pelo cliente,
+  // estes números dizem se o tempo foi gasto aqui (conexão fria do Prisma,
+  // bcrypt, escrita de auditoria) ou fora — e evitam mais uma rodada de palpite.
+  const t0 = Date.now()
+  const marcos: Record<string, number> = {}
   try {
     console.log("🔐 Requisição de login recebida")
     const { email, senha } = await request.json()
@@ -51,6 +56,7 @@ export async function POST(request: NextRequest) {
     const usuario = await prisma.usuario.findUnique({
       where: { email },
     })
+    marcos.buscaUsuarioMs = Date.now() - t0
 
     if (!usuario) {
       console.log("❌ Usuário não encontrado")
@@ -66,6 +72,7 @@ export async function POST(request: NextRequest) {
     // Verificar a senha
     console.log("🔑 Verificando senha...")
     const senhaCorreta = await compare(senha, usuario.senha)
+    marcos.bcryptMs = Date.now() - t0
 
     if (!senhaCorreta) {
       console.log("❌ Senha incorreta")
@@ -88,7 +95,14 @@ export async function POST(request: NextRequest) {
     })
 
     console.log("🎫 Token JWT gerado com sucesso")
+    marcos.tokenMs = Date.now() - t0
     await registrarAcesso("LOGIN", `Acesso concedido a ${usuario.email}`, usuario.id, request)
+    marcos.auditoriaMs = Date.now() - t0
+    // Só vale a pena registrar quando destoa: uma rota que responde em ~0,4s
+    // gerando linha a cada acesso vira ruído, não sinal.
+    if (marcos.auditoriaMs > 3_000) {
+      console.warn("[login] resposta lenta", JSON.stringify(marcos))
+    }
 
     // Retornar dados do usuário (sem a senha)
     const { senha: _, ...usuarioSemSenha } = usuario

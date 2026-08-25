@@ -49,6 +49,10 @@ const API_PUBLICA: string[] = [
   // por inatividade que queremos registrar quem expirou. O handler só audita e
   // apaga o cookie — não concede nada.
   "/api/auth/logout",
+  // Diagnóstico do login: quem trava no login não tem sessão, por definição.
+  // A rota só grava LogAuditoria com um punhado de campos saneados — nunca lê
+  // credencial, nunca concede nada.
+  "/api/auth/diagnostico-login",
   "/api/app/",
   "/api/blog/",
   "/api/blog",

@@ -1286,14 +1286,12 @@ function LinhaDocumento({
             </span>
           )}
         </div>
-        {doc.naFase.statusDocumentalLabel && (
-          <div
-            className="text-[10.5px] text-[var(--text-muted)] mt-1 truncate"
-            title={`Estado do documento: ${doc.naFase.statusDocumentalLabel}`}
-          >
-            Doc.: {doc.naFase.statusDocumentalLabel}
-          </div>
-        )}
+        {/* `Documento.status` NÃO é exibido aqui. Ele é uma máquina de estados do
+            motor antigo — PENDENTE→SOLICITAR→SOLICITADO→EM_BUSCA→RECEBIDO→…→ENTREGUE,
+            os mesmos passos que o workflow já governa. Mantido no banco porque o
+            upload do app do cliente ainda escreve nele, mas mostrá-lo ao lado do
+            estado operacional produzia a contradição "Doc.: Recebido" numa unidade
+            parada em "Solicitar certidão". Onde a etapa está, quem diz é o passo. */}
       </div>
 
       <div className="flex justify-end">
