@@ -289,7 +289,7 @@ export default function UsersTab() {
 
       {/* MODAL criar/editar (igual à tela antiga) */}
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-        <DialogContent className="bg-white max-w-2xl max-h-[90vh] overflow-y-auto">
+        <DialogContent className="bg-[var(--surface-primary)] max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="text-gray-900">{isEditing ? "Editar Usuário" : "Novo Usuário"}</DialogTitle>
             <DialogDescription>{isEditing ? "Atualize as informações e permissões do usuário" : "Preencha os dados para criar um novo usuário"}</DialogDescription>
@@ -299,17 +299,17 @@ export default function UsersTab() {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label htmlFor="nome" className="text-gray-700">Nome *</Label>
-                <Input id="nome" value={formData.nome} onChange={e => setFormData({ ...formData, nome: e.target.value })} placeholder="Nome completo" required className="bg-white border-gray-300" />
+                <Input id="nome" value={formData.nome} onChange={e => setFormData({ ...formData, nome: e.target.value })} placeholder="Nome completo" required className="bg-[var(--surface-primary)] border-gray-300" />
               </div>
               <div className="space-y-2">
                 <Label htmlFor="email" className="text-gray-700">Email *</Label>
-                <Input id="email" type="email" value={formData.email} onChange={e => setFormData({ ...formData, email: e.target.value })} placeholder="email@exemplo.com" required className="bg-white border-gray-300" />
+                <Input id="email" type="email" value={formData.email} onChange={e => setFormData({ ...formData, email: e.target.value })} placeholder="email@exemplo.com" required className="bg-[var(--surface-primary)] border-gray-300" />
               </div>
             </div>
 
             <div className="space-y-2">
               <Label htmlFor="senha" className="text-gray-700">Senha {!isEditing && "*"} {isEditing && "(em branco = manter)"}</Label>
-              <Input id="senha" type="password" value={formData.senha} onChange={e => setFormData({ ...formData, senha: e.target.value })} placeholder="Senha" required={!isEditing} className="bg-white border-gray-300" />
+              <Input id="senha" type="password" value={formData.senha} onChange={e => setFormData({ ...formData, senha: e.target.value })} placeholder="Senha" required={!isEditing} className="bg-[var(--surface-primary)] border-gray-300" />
             </div>
 
             <div className="border-t border-gray-200 pt-4 space-y-4">
@@ -321,7 +321,7 @@ export default function UsersTab() {
                   const ps = perfis.find(p => p.id === val)
                   if (ps) { const map: Record<string, string> = { Administrador: "admin", Gerente: "gerente", Assistente: "assistente", Estagiário: "estagiario" }; setFormData(prev => ({ ...prev, tipo: map[ps.nome] || "assistente" })) }
                   else setFormData(prev => ({ ...prev, tipo: "" }))
-                }} className="flex h-10 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 focus:border-blue-500 focus:ring-1 focus:ring-blue-500/20 focus:outline-none">
+                }} className="flex h-10 w-full rounded-md border border-gray-300 bg-[var(--surface-primary)] px-3 py-2 text-sm text-gray-900 focus:border-blue-500 focus:ring-1 focus:ring-blue-500/20 focus:outline-none">
                   <option value="">Sem perfil (todas permissões desligadas)</option>
                   {perfis.map(p => <option key={p.id} value={p.id}>{p.nome}{p.descricao ? ` — ${p.descricao}` : ""}</option>)}
                 </select>
@@ -346,7 +346,7 @@ export default function UsersTab() {
                     const todasAtivas = modulo.permissoes.every(p => permissoesEfetivas[p.chave])
                     const temOverrides = modulo.permissoes.some(p => temOverride(p.chave))
                     return (
-                      <div key={modulo.modulo} className="bg-white rounded-lg border border-gray-200 overflow-hidden">
+                      <div key={modulo.modulo} className="bg-[var(--surface-primary)] rounded-lg border border-gray-200 overflow-hidden">
                         <div className="flex items-center justify-between px-3 py-2.5 cursor-pointer hover:bg-gray-50" onClick={() => toggleExpandModulo(modulo.modulo)}>
                           <div className="flex items-center gap-2">
                             <span className="text-sm">{modulo.icone}</span>
@@ -403,7 +403,7 @@ export default function UsersTab() {
 
       {/* Confirmação de exclusão */}
       <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
-        <AlertDialogContent className="bg-white">
+        <AlertDialogContent className="bg-[var(--surface-primary)]">
           <AlertDialogHeader>
             <AlertDialogTitle className="text-gray-900">Confirmar Exclusão</AlertDialogTitle>
             <AlertDialogDescription>Tem certeza que deseja deletar o usuário <strong>{userToDelete?.nome}</strong>? Esta ação não pode ser desfeita.</AlertDialogDescription>

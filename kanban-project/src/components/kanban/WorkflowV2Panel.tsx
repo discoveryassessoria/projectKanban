@@ -82,7 +82,7 @@ export function WorkflowV2Panel({ processoId }: Props) {
   const v2 = view.source === "v2"
 
   return (
-    <div className="mb-4 rounded-lg border border-gray-200 bg-white p-4 text-sm">
+    <div className="mb-4 rounded-lg border border-gray-200 bg-[var(--surface-primary)] p-4 text-sm">
       <div className="mb-3 flex items-center justify-between">
         <div className="flex items-center gap-2">
           <span className="font-semibold text-gray-800">Runtime do Workflow</span>

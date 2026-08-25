@@ -206,7 +206,7 @@ export default function RelatorioClientesButton() {
       </DropdownMenuTrigger>
       <DropdownMenuContent
         align="end"
-        className="bg-white border-gray-200 text-gray-900 w-64"
+        className="bg-[var(--surface-primary)] border-gray-200 text-gray-900 w-64"
       >
         {/* ===== TELA PRINCIPAL ===== */}
         {menuView === "main" && (

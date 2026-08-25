@@ -271,7 +271,7 @@ export function DocumentosGeradosTab({
       )}
 
       {/* ── BLOCO 1 — GERAR NOVA PROCURAÇÃO ─────────────────────────────────── */}
-      <div className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
+      <div className="rounded-xl border border-gray-200 bg-[var(--surface-primary)] p-6 shadow-sm">
         <h3 className="mb-4 flex items-center gap-2 text-sm font-semibold text-gray-900">
           <FileText className="h-4 w-4 text-indigo-600" />
           Gerar nova procuração
@@ -290,7 +290,7 @@ export function DocumentosGeradosTab({
                   value={modeloId ?? ""}
                   onChange={(e) => setModeloId(e.target.value ? Number(e.target.value) : null)}
                   disabled={!podeGerar}
-                  className="w-full rounded-xl border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 disabled:bg-gray-50"
+                  className="w-full rounded-xl border border-gray-300 bg-[var(--surface-primary)] px-3 py-2 text-sm text-gray-900 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 disabled:bg-gray-50"
                 >
                   <option value="">Selecione…</option>
                   {modelos.map((m) => <option key={m.id} value={m.id}>{m.nome}</option>)}
@@ -312,7 +312,7 @@ export function DocumentosGeradosTab({
                   value={processoId ?? ""}
                   onChange={(e) => setProcessoId(e.target.value ? Number(e.target.value) : null)}
                   disabled={!podeGerar}
-                  className="w-full rounded-xl border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 disabled:bg-gray-50"
+                  className="w-full rounded-xl border border-gray-300 bg-[var(--surface-primary)] px-3 py-2 text-sm text-gray-900 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 disabled:bg-gray-50"
                 >
                   <option value="">Sem processo</option>
                   {processos.map((p) => (
@@ -343,7 +343,7 @@ export function DocumentosGeradosTab({
                   onChange={(e) => setLocalEmissao(e.target.value)}
                   disabled={!podeGerar}
                   placeholder="Amparo"
-                  className="w-full rounded-xl border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 disabled:bg-gray-50"
+                  className="w-full rounded-xl border border-gray-300 bg-[var(--surface-primary)] px-3 py-2 text-sm text-gray-900 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 disabled:bg-gray-50"
                 />
               </div>
 
@@ -354,7 +354,7 @@ export function DocumentosGeradosTab({
                   value={dataEmissao}
                   onChange={(e) => setDataEmissao(e.target.value)}
                   disabled={!podeGerar}
-                  className="w-full rounded-xl border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 disabled:bg-gray-50"
+                  className="w-full rounded-xl border border-gray-300 bg-[var(--surface-primary)] px-3 py-2 text-sm text-gray-900 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 disabled:bg-gray-50"
                 />
               </div>
             </div>
@@ -399,7 +399,7 @@ export function DocumentosGeradosTab({
               <button
                 onClick={() => void validar()}
                 disabled={!podeGerar || ocupado != null}
-                className="inline-flex items-center gap-2 rounded-xl border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+                className="inline-flex items-center gap-2 rounded-xl border border-gray-300 bg-[var(--surface-primary)] px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50"
               >
                 {ocupado === "validando" && <Loader2 className="h-4 w-4 animate-spin" />}
                 Validar dados
@@ -407,7 +407,7 @@ export function DocumentosGeradosTab({
               <button
                 onClick={() => void previa()}
                 disabled={!podeGerar || ocupado != null}
-                className="inline-flex items-center gap-2 rounded-xl border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+                className="inline-flex items-center gap-2 rounded-xl border border-gray-300 bg-[var(--surface-primary)] px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50"
               >
                 {ocupado === "previa" ? <Loader2 className="h-4 w-4 animate-spin" /> : <Eye className="h-4 w-4" />}
                 Visualizar prévia
@@ -426,7 +426,7 @@ export function DocumentosGeradosTab({
       </div>
 
       {/* ── BLOCO 2 — DOCUMENTOS GERADOS ────────────────────────────────────── */}
-      <div className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
+      <div className="rounded-xl border border-gray-200 bg-[var(--surface-primary)] p-6 shadow-sm">
         <h3 className="mb-4 text-sm font-semibold text-gray-900">Documentos gerados</h3>
 
         {carregando ? (
@@ -460,7 +460,7 @@ export function DocumentosGeradosTab({
                     <select
                       onChange={(e) => e.target.value && void vincularProcesso(d.id, Number(e.target.value))}
                       defaultValue=""
-                      className="rounded-lg border border-gray-300 bg-white px-2 py-1 text-xs text-gray-700"
+                      className="rounded-lg border border-gray-300 bg-[var(--surface-primary)] px-2 py-1 text-xs text-gray-700"
                     >
                       <option value="">Vincular ao processo…</option>
                       {processos.map((p) => (

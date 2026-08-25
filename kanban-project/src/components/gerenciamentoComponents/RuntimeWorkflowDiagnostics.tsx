@@ -45,7 +45,7 @@ export default function RuntimeWorkflowDiagnostics() {
 
       {processoId != null ? (
         // Os painéis kanban usam tema claro — renderiza sobre fundo branco.
-        <div className="space-y-3 rounded-2xl bg-white p-4">
+        <div className="space-y-3 rounded-2xl bg-[var(--surface-primary)] p-4">
           <WorkflowV2AtivacaoPanel processoId={processoId} />
           <WorkflowV2Panel processoId={processoId} />
         </div>

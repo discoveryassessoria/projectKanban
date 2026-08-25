@@ -240,7 +240,7 @@ export function ProcessosLista({
                             <MoreVertical className="h-4 w-4" />
                           </Button>
                         </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end" className="bg-white border-gray-200">
+                        <DropdownMenuContent align="end" className="bg-[var(--surface-primary)] border-gray-200">
                           <DropdownMenuItem 
                             onClick={() => handleEdit(processo)}
                             className="text-gray-700 hover:bg-gray-100 cursor-pointer"

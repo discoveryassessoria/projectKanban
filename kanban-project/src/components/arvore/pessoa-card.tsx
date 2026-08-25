@@ -289,7 +289,7 @@ export function PessoaCard({
 
   return (
     <div
-      className={`relative bg-white rounded-xl shadow-lg overflow-visible transition-all hover:shadow-xl ${isMain ? 'ring-2 ring-offset-2' : ''}`}
+      className={`relative bg-[var(--surface-primary)] rounded-xl shadow-lg overflow-visible transition-all hover:shadow-xl ${isMain ? 'ring-2 ring-offset-2' : ''}`}
       style={{
         minWidth: '260px',
         maxWidth: '320px',
@@ -439,7 +439,7 @@ export function AddPersonButton({ type, onClick, disabled, size = 'md' }: AddPer
 
   return (
     <button
-      className={`flex items-center gap-3 ${sizeClasses[size]} bg-white rounded-xl border-2 border-dashed border-gray-300 cursor-pointer hover:border-teal-500 hover:bg-teal-50 transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-sm hover:shadow-md`}
+      className={`flex items-center gap-3 ${sizeClasses[size]} bg-[var(--surface-primary)] rounded-xl border-2 border-dashed border-gray-300 cursor-pointer hover:border-teal-500 hover:bg-teal-50 transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-sm hover:shadow-md`}
       onClick={onClick}
       disabled={disabled}
     >

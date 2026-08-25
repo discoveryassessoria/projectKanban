@@ -25,7 +25,7 @@ export function PaisTabs({ paises, paisSelecionado, onSelect }: PaisTabsProps) {
             onClick={() => onSelect(p.countryKey)}
             className={`
               flex items-center gap-1.5 whitespace-nowrap px-3 py-1.5 rounded-lg text-sm font-medium transition-all duration-200
-              ${ativo ? "bg-white text-gray-900 shadow" : "text-white/70 hover:text-white hover:bg-white/10"}
+              ${ativo ? "bg-[var(--surface-primary)] text-gray-900 shadow" : "text-white/70 hover:text-white hover:bg-white/10"}
             `}
           >
             {p.flag && <span>{p.flag}</span>}

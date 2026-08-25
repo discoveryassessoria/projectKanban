@@ -180,7 +180,7 @@ export default function ContasReceberPage() {
         <CardContent className="p-0">
           {loading ? (
             <div className="flex items-center justify-center h-48">
-              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-white"></div>
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[var(--border-default)]"></div>
             </div>
           ) : filteredFaturas.length === 0 ? (
             <div className="flex flex-col items-center justify-center h-48 text-white/50">

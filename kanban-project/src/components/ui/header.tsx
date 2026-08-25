@@ -97,7 +97,7 @@ export function Header({
 
             {/* Dropdown de resultados */}
             {showSearchResults && (
-              <div className="absolute top-full mt-2 left-0 right-0 w-80 bg-white border border-gray-200 rounded-xl shadow-2xl overflow-hidden z-50">
+              <div className="absolute top-full mt-2 left-0 right-0 w-80 bg-[var(--surface-primary)] border border-gray-200 rounded-xl shadow-2xl overflow-hidden z-50">
                 {searchResults.length === 0 ? (
                   <div className="px-4 py-6 text-center text-gray-400">
                     <Search className="h-8 w-8 mx-auto mb-2 opacity-50" />
@@ -145,7 +145,7 @@ export function Header({
 
             {/* Dropdown de notificações */}
             {showNotifications && (
-              <div className="absolute top-full mt-2 right-0 w-80 bg-white border border-gray-200 rounded-xl shadow-2xl overflow-hidden z-50">
+              <div className="absolute top-full mt-2 right-0 w-80 bg-[var(--surface-primary)] border border-gray-200 rounded-xl shadow-2xl overflow-hidden z-50">
                 <div className="px-4 py-3 border-b border-gray-100 bg-gray-50">
                   <h3 className="font-semibold text-gray-800 text-sm">Notificações</h3>
                   <p className="text-xs text-gray-500">0 pendentes</p>

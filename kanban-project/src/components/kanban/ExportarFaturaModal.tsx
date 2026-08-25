@@ -305,7 +305,7 @@ export function ExportarFaturaModal({ faturas, requerentes, onClose }: ExportarF
       onClick={onClose}
     >
       <div 
-        className="bg-white rounded-2xl shadow-2xl w-full max-w-lg max-h-[90vh] overflow-hidden flex flex-col"
+        className="bg-[var(--surface-primary)] rounded-2xl shadow-2xl w-full max-w-lg max-h-[90vh] overflow-hidden flex flex-col"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
@@ -367,7 +367,7 @@ export function ExportarFaturaModal({ faturas, requerentes, onClose }: ExportarF
                           p-3 rounded-xl border-2 cursor-pointer transition-all
                           ${isSelected 
                             ? 'border-blue-500 bg-blue-50' 
-                            : 'border-gray-200 hover:border-gray-300 bg-white'
+                            : 'border-gray-200 hover:border-gray-300 bg-[var(--surface-primary)]'
                           }
                           ${qtdFaturas === 0 ? 'opacity-50' : ''}
                         `}
@@ -463,7 +463,7 @@ export function ExportarFaturaModal({ faturas, requerentes, onClose }: ExportarF
                             flex items-center gap-3 p-2 rounded-lg border cursor-pointer transition-all
                             ${isSelected 
                               ? 'bg-blue-50 border-blue-200' 
-                              : 'bg-white border-gray-200 hover:border-gray-300'
+                              : 'bg-[var(--surface-primary)] border-gray-200 hover:border-gray-300'
                             }
                           `}
                         >
@@ -472,7 +472,7 @@ export function ExportarFaturaModal({ faturas, requerentes, onClose }: ExportarF
                             w-5 h-5 rounded border-2 flex items-center justify-center flex-shrink-0 transition-colors
                             ${isSelected 
                               ? 'bg-blue-500 border-blue-500' 
-                              : 'border-gray-300 bg-white'
+                              : 'border-gray-300 bg-[var(--surface-primary)]'
                             }
                           `}>
                             {isSelected && <Check className="h-3 w-3 text-white" />}

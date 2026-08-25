@@ -165,7 +165,7 @@ function CartaoInsight({
                 <button
                   key={id}
                   onClick={() => onIrParaPessoa?.(id)}
-                  className="rounded-full border border-gray-200 bg-white px-2 py-0.5 text-[11px] text-gray-700 transition hover:border-gray-300 hover:bg-gray-50"
+                  className="rounded-full border border-gray-200 bg-[var(--surface-primary)] px-2 py-0.5 text-[11px] text-gray-700 transition hover:border-gray-300 hover:bg-gray-50"
                 >
                   {nomeDePessoa(id)}
                 </button>
@@ -209,7 +209,7 @@ export function PainelInteligencia({
 
   // Cor própria na raiz — ver comentário equivalente em tree-onboarding.tsx.
   return (
-    <div className="fixed right-0 top-0 z-[10002] flex h-full w-[380px] flex-col border-l border-gray-200 bg-white text-gray-900 shadow-2xl">
+    <div className="fixed right-0 top-0 z-[10002] flex h-full w-[380px] flex-col border-l border-gray-200 bg-[var(--surface-primary)] text-gray-900 shadow-2xl">
       <div className="flex items-center justify-between border-b border-gray-100 px-4 py-3">
         <div>
           <h2 className="text-sm font-semibold text-gray-900">Inteligência da árvore</h2>

@@ -200,9 +200,9 @@ function ConteudoModal({
   // Classes padrão para formulários
   // Sem uso hoje, mas mantido com a cor explícita de propósito: é justamente
   // deste arquivo que sai o `text-white/80` das abas, e uma classe de campo com
-  // `bg-white` e sem cor de texto é a semente do bug — quem copiar daqui herda
+  // `bg-[var(--surface-primary)]` e sem cor de texto é a semente do bug — quem copiar daqui herda
   // o campo branco no branco.
-  const inputClass = "w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white text-gray-900 placeholder:text-gray-400 text-sm h-[42px]"
+  const inputClass = "w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-[var(--surface-primary)] text-gray-900 placeholder:text-gray-400 text-sm h-[42px]"
 
   // ✅ Verificar se o processo é da Itália (aba Informações)
   const isItalia = ehItalia(processo)
@@ -509,13 +509,13 @@ function ConteudoModal({
 
       <div 
         className={`fixed z-[9999] shadow-2xl flex flex-col overflow-hidden rounded-tl-xl rounded-tr-xl ${
-          finDark ? 'bg-[var(--surface-popover)]' : 'bg-white'
+          finDark ? 'bg-[var(--surface-popover)]' : 'bg-[var(--surface-primary)]'
         }`}
         style={{ left: '155px', top: '45px', right: '35px', bottom: '0px' }}
       >
         {/* Header */}
         <div className={`flex items-center justify-between px-6 py-4 border-b flex-shrink-0 ${
-          finDark ? 'bg-[var(--surface-popover)] border-white/10' : 'bg-white'
+          finDark ? 'bg-[var(--surface-popover)] border-white/10' : 'bg-[var(--surface-primary)]'
         }`}>
           <div className="flex items-center gap-4">
             <button 
@@ -580,7 +580,7 @@ function ConteudoModal({
         </div>
 
         {/* Abas principais - dinâmicas */}
-        <div className={`flex border-b px-6 flex-shrink-0 ${finDark ? 'bg-[var(--surface-popover)] border-white/10' : 'bg-white'}`}>
+        <div className={`flex border-b px-6 flex-shrink-0 ${finDark ? 'bg-[var(--surface-popover)] border-white/10' : 'bg-[var(--surface-primary)]'}`}>
           {tabs.map((tab) => (
             <button
               key={tab.id}

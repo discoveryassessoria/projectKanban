@@ -395,7 +395,7 @@ function ConteudoDialog({
                           value={selectedPersonId}
                         >
                           <FormControl>
-                            <SelectTrigger className="border-blue-300 focus:border-blue-500 bg-white">
+                            <SelectTrigger className="border-blue-300 focus:border-blue-500 bg-[var(--surface-primary)]">
                               <SelectValue placeholder="Selecione uma pessoa da árvore" />
                             </SelectTrigger>
                           </FormControl>

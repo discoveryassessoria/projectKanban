@@ -346,7 +346,7 @@ function Toggle({ label, on, onChange }: { label: string; on: boolean; onChange:
   return (
     <button type="button" onClick={() => onChange(!on)} className="flex items-center gap-2 text-left text-sm text-white/80">
       <span className={`relative h-5 w-9 shrink-0 rounded-full transition ${on ? '' : 'bg-white/15'}`} style={on ? { background: OURO } : undefined}>
-        <span className={`absolute top-0.5 h-4 w-4 rounded-full bg-white transition-all ${on ? 'left-[18px]' : 'left-0.5'}`} />
+        <span className={`absolute top-0.5 h-4 w-4 rounded-full bg-[var(--surface-primary)] transition-all ${on ? 'left-[18px]' : 'left-0.5'}`} />
       </span>
       {label}
     </button>

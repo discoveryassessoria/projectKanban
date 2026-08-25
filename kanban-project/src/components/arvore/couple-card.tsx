@@ -196,7 +196,7 @@ function ExpandArrowButton({
 
   return (
     <button
-      className={`absolute ${getPosition()} w-5 h-5 rounded-full bg-white border border-gray-300 flex items-center justify-center shadow-sm hover:bg-gray-50 hover:border-gray-400 transition-all z-20`}
+      className={`absolute ${getPosition()} w-5 h-5 rounded-full bg-[var(--surface-primary)] border border-gray-300 flex items-center justify-center shadow-sm hover:bg-gray-50 hover:border-gray-400 transition-all z-20`}
       onClick={(e) => {
         e.stopPropagation()
         onClick()
@@ -258,7 +258,7 @@ export function CoupleCard({
 
   if (mode === 'paisagem') {
     return (
-      <div className={`relative bg-white rounded-xl shadow-lg overflow-hidden ${isMain ? 'ring-2 ring-green-500 ring-offset-2' : ''}`}>
+      <div className={`relative bg-[var(--surface-primary)] rounded-xl shadow-lg overflow-hidden ${isMain ? 'ring-2 ring-green-500 ring-offset-2' : ''}`}>
         {/* Container principal */}
         <div className="min-w-[200px]">
           {/* Pessoa 1 (marido ou principal) */}
@@ -354,7 +354,7 @@ export function CoupleCard({
 
   // MODO RETRATO
   return (
-    <div className={`relative bg-white rounded-xl shadow-lg overflow-hidden ${isMain ? 'ring-2 ring-green-500 ring-offset-2' : ''}`}>
+    <div className={`relative bg-[var(--surface-primary)] rounded-xl shadow-lg overflow-hidden ${isMain ? 'ring-2 ring-green-500 ring-offset-2' : ''}`}>
       {/* Botões de expandir para pais (cima) */}
       {showExpandButtons && marido && (
         <ExpandArrowButton
@@ -398,7 +398,7 @@ export function CoupleCard({
       {showExpandButtons && esposa && marido && (
         <div className="absolute top-0 right-1/4 -translate-y-1/2">
           <button
-            className="w-5 h-5 rounded-full bg-white border border-gray-300 flex items-center justify-center shadow-sm hover:bg-gray-50 z-20"
+            className="w-5 h-5 rounded-full bg-[var(--surface-primary)] border border-gray-300 flex items-center justify-center shadow-sm hover:bg-gray-50 z-20"
             onClick={(e) => {
               e.stopPropagation()
               onExpandMae?.()
@@ -494,7 +494,7 @@ export function PersonCardFS({
   if (mode === 'paisagem') {
     return (
       <div
-        className="relative bg-white rounded-xl shadow-md cursor-pointer hover:shadow-lg transition-all overflow-hidden"
+        className="relative bg-[var(--surface-primary)] rounded-xl shadow-md cursor-pointer hover:shadow-lg transition-all overflow-hidden"
         style={{ borderLeft: `3px solid ${genderColors.border}` }}
         onClick={() => onClick?.(pessoa)}
       >
@@ -541,14 +541,14 @@ export function PersonCardFS({
   // RETRATO
   return (
     <div
-      className="relative bg-white rounded-xl shadow-md cursor-pointer hover:shadow-lg transition-all overflow-hidden"
+      className="relative bg-[var(--surface-primary)] rounded-xl shadow-md cursor-pointer hover:shadow-lg transition-all overflow-hidden"
       style={{ borderTop: `3px solid ${genderColors.border}` }}
       onClick={() => onClick?.(pessoa)}
     >
       {/* Botão de adicionar pai */}
       {showExpandButtons && onAddPai && (
         <button
-          className="absolute -top-2 left-1/4 w-5 h-5 rounded-full bg-white border border-gray-300 flex items-center justify-center shadow-sm hover:bg-blue-50 z-20"
+          className="absolute -top-2 left-1/4 w-5 h-5 rounded-full bg-[var(--surface-primary)] border border-gray-300 flex items-center justify-center shadow-sm hover:bg-blue-50 z-20"
           onClick={(e) => {
             e.stopPropagation()
             onAddPai()
@@ -562,7 +562,7 @@ export function PersonCardFS({
       {/* Botão de adicionar mãe */}
       {showExpandButtons && onAddMae && (
         <button
-          className="absolute -top-2 right-1/4 w-5 h-5 rounded-full bg-white border border-gray-300 flex items-center justify-center shadow-sm hover:bg-pink-50 z-20"
+          className="absolute -top-2 right-1/4 w-5 h-5 rounded-full bg-[var(--surface-primary)] border border-gray-300 flex items-center justify-center shadow-sm hover:bg-pink-50 z-20"
           onClick={(e) => {
             e.stopPropagation()
             onAddMae()
@@ -624,7 +624,7 @@ export function AddPersonCardFS({
   if (mode === 'paisagem') {
     return (
       <div
-        className="relative bg-white rounded-xl border-2 border-dashed border-gray-300 cursor-pointer hover:border-gray-400 hover:bg-gray-50 transition-all"
+        className="relative bg-[var(--surface-primary)] rounded-xl border-2 border-dashed border-gray-300 cursor-pointer hover:border-gray-400 hover:bg-gray-50 transition-all"
         onClick={onClick}
       >
         <div className="p-3 flex items-center gap-2 min-w-[160px]">
@@ -647,7 +647,7 @@ export function AddPersonCardFS({
   // RETRATO
   return (
     <div
-      className="relative bg-white rounded-xl border-2 border-dashed border-gray-300 cursor-pointer hover:border-gray-400 hover:bg-gray-50 transition-all"
+      className="relative bg-[var(--surface-primary)] rounded-xl border-2 border-dashed border-gray-300 cursor-pointer hover:border-gray-400 hover:bg-gray-50 transition-all"
       onClick={onClick}
     >
       <div className="p-3 flex flex-col items-center text-center min-w-[100px]">

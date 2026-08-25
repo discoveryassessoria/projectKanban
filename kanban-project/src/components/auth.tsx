@@ -200,7 +200,7 @@ export default function AuthComponent({
     <div
       className="
         w-full max-w-md mx-auto
-        bg-white
+        bg-[var(--surface-primary)]
         text-slate-900
         rounded-[20px] 
         shadow-2xl 
@@ -268,7 +268,7 @@ export default function AuthComponent({
               disabled={isLoading}
               className="
                 h-12 text-[15px]
-                bg-white
+                bg-[var(--surface-primary)]
                 border border-slate-200
                 text-slate-900
                 placeholder:text-slate-400
@@ -302,7 +302,7 @@ export default function AuthComponent({
             disabled={isLoading}
             className="
               h-12 text-[15px]
-              bg-white
+              bg-[var(--surface-primary)]
               border border-slate-200
               text-slate-900
               placeholder:text-slate-400

@@ -257,7 +257,7 @@ function ProcessosTooltip({
 
   const tooltipContent = isVisible && mounted ? createPortal(
     <div 
-      className="fixed z-[9999] w-72 bg-white border border-gray-200 rounded-lg shadow-2xl p-3 animate-in fade-in-0 zoom-in-95 duration-200"
+      className="fixed z-[9999] w-72 bg-[var(--surface-primary)] border border-gray-200 rounded-lg shadow-2xl p-3 animate-in fade-in-0 zoom-in-95 duration-200"
       style={tooltipPosition.showAbove ? {
         bottom: window.innerHeight - tooltipPosition.top,
         left: tooltipPosition.left,
@@ -1044,7 +1044,7 @@ const removerDocumentoObrigatorio = async (categoria: string) => {
       />
       
       <div 
-        className="relative bg-white rounded-lg shadow-2xl flex flex-col overflow-hidden"
+        className="relative bg-[var(--surface-primary)] rounded-lg shadow-2xl flex flex-col overflow-hidden"
         style={{
           position: 'absolute',
           top: '2rem',
@@ -1111,7 +1111,7 @@ const removerDocumentoObrigatorio = async (categoria: string) => {
         )}
 
         {/* Tabs */}
-        <div className="flex border-b border-gray-200 px-8 bg-white shrink-0">
+        <div className="flex border-b border-gray-200 px-8 bg-[var(--surface-primary)] shrink-0">
           {[
             { id: "dados", label: "Dados Pessoais", icon: User },
             { id: "endereco", label: "Endereço", icon: MapPin },
@@ -1149,7 +1149,7 @@ const removerDocumentoObrigatorio = async (categoria: string) => {
                     mostra; cliente existente SEM código é anomalia administrativa
                     — dizer "será gerado ao salvar" ali seria mentira, porque
                     salvar não gera código para quem já existe. */}
-                <div className="bg-white rounded-xl px-6 py-4 shadow-sm border border-gray-200">
+                <div className="bg-[var(--surface-primary)] rounded-xl px-6 py-4 shadow-sm border border-gray-200">
                   <label className="block text-xs font-medium text-gray-500 mb-1">Código</label>
                   {codigoPublico ? (
                     <div className="font-mono text-sm font-bold text-gray-900">{codigoPublico}</div>
@@ -1163,7 +1163,7 @@ const removerDocumentoObrigatorio = async (categoria: string) => {
                   )}
                 </div>
                 {/* Seção: Identificação */}
-                <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-200">
+                <div className="bg-[var(--surface-primary)] rounded-xl p-6 shadow-sm border border-gray-200">
                   <h3 className="text-sm font-semibold text-gray-900 mb-4 flex items-center gap-2">
                     <User className="h-4 w-4 text-indigo-600" />
                     Identificação
@@ -1179,10 +1179,10 @@ const removerDocumentoObrigatorio = async (categoria: string) => {
                           value={formData.tipo}
                           onChange={(e) => setFormData({ ...formData, tipo: e.target.value })}
                           disabled={isViewMode || !!editingId}
-                          className={`w-full h-[42px] px-3 rounded-lg border text-gray-900 disabled:opacity-50 disabled:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-0 focus:border-indigo-500 appearance-none cursor-pointer ${
+                          className={`w-full h-[42px] px-3 rounded-lg border text-gray-900 disabled:opacity-50 disabled:bg-[var(--surface-primary)] focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-0 focus:border-indigo-500 appearance-none cursor-pointer ${
                             formData.tipo === 'requerente' 
                               ? 'bg-purple-50 border-purple-300' 
-                              : 'bg-white border-gray-300'
+                              : 'bg-[var(--surface-primary)] border-gray-300'
                           }`}
                           style={{
                             backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%239ca3af' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E")`,
@@ -1210,7 +1210,7 @@ const removerDocumentoObrigatorio = async (categoria: string) => {
                           onChange={(e) => handleNomeChange(e.target.value)}
                           placeholder="Nome completo"
                           disabled={isViewMode}
-                          className={`bg-white border-gray-300 text-gray-900 placeholder:text-gray-400 disabled:opacity-50 disabled:bg-white ${
+                          className={`bg-[var(--surface-primary)] border-gray-300 text-gray-900 placeholder:text-gray-400 disabled:opacity-50 disabled:bg-[var(--surface-primary)] ${
                             errors.nome ? 'border-red-500 focus-visible:ring-red-500' : ''
                           }`}
                         />
@@ -1235,7 +1235,7 @@ const removerDocumentoObrigatorio = async (categoria: string) => {
                           placeholder="000.000.000-00"
                           maxLength={14}
                           disabled={isViewMode}
-                          className={`bg-white border-gray-300 text-gray-900 placeholder:text-gray-400 disabled:opacity-50 disabled:bg-white ${
+                          className={`bg-[var(--surface-primary)] border-gray-300 text-gray-900 placeholder:text-gray-400 disabled:opacity-50 disabled:bg-[var(--surface-primary)] ${
                             errors.cpf ? 'border-red-500 focus-visible:ring-red-500' : ''
                           }`}
                         />
@@ -1254,7 +1254,7 @@ const removerDocumentoObrigatorio = async (categoria: string) => {
                           onChange={(e) => setFormData({ ...formData, rg: e.target.value })}
                           placeholder="Número do RG"
                           disabled={isViewMode}
-                          className="bg-white border-gray-300 text-gray-900 placeholder:text-gray-400 disabled:opacity-50 disabled:bg-white"
+                          className="bg-[var(--surface-primary)] border-gray-300 text-gray-900 placeholder:text-gray-400 disabled:opacity-50 disabled:bg-[var(--surface-primary)]"
                         />
                       </div>
                     </div>
@@ -1268,7 +1268,7 @@ const removerDocumentoObrigatorio = async (categoria: string) => {
                           placeholder="Número do passaporte"
                           maxLength={15}
                           disabled={isViewMode}
-                          className="bg-white border-gray-300 text-gray-900 placeholder:text-gray-400 disabled:opacity-50 disabled:bg-white"
+                          className="bg-[var(--surface-primary)] border-gray-300 text-gray-900 placeholder:text-gray-400 disabled:opacity-50 disabled:bg-[var(--surface-primary)]"
                         />
                       </div>
                       <div>
@@ -1279,7 +1279,7 @@ const removerDocumentoObrigatorio = async (categoria: string) => {
                           placeholder="Número do CRNM"
                           maxLength={15}
                           disabled={isViewMode}
-                          className="bg-white border-gray-300 text-gray-900 placeholder:text-gray-400 disabled:opacity-50 disabled:bg-white"
+                          className="bg-[var(--surface-primary)] border-gray-300 text-gray-900 placeholder:text-gray-400 disabled:opacity-50 disabled:bg-[var(--surface-primary)]"
                         />
                       </div>
                     </div>
@@ -1287,7 +1287,7 @@ const removerDocumentoObrigatorio = async (categoria: string) => {
                 </div>
 
                 {/* Seção: Dados Pessoais */}
-                <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-200">
+                <div className="bg-[var(--surface-primary)] rounded-xl p-6 shadow-sm border border-gray-200">
                   <h3 className="text-sm font-semibold text-gray-900 mb-4 flex items-center gap-2">
                     <Calendar className="h-4 w-4 text-indigo-600" />
                     Dados Pessoais
@@ -1312,7 +1312,7 @@ const removerDocumentoObrigatorio = async (categoria: string) => {
                           value={formData.sexo}
                           onChange={(e) => setFormData({ ...formData, sexo: e.target.value })}
                           disabled={isViewMode}
-                          className="w-full h-[42px] px-3 rounded-lg bg-white border border-gray-300 text-gray-900 disabled:opacity-50 disabled:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-0 focus:border-indigo-500 appearance-none cursor-pointer"
+                          className="w-full h-[42px] px-3 rounded-lg bg-[var(--surface-primary)] border border-gray-300 text-gray-900 disabled:opacity-50 disabled:bg-[var(--surface-primary)] focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-0 focus:border-indigo-500 appearance-none cursor-pointer"
 style={{
   backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%239ca3af' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E")`,
   backgroundRepeat: 'no-repeat',
@@ -1337,7 +1337,7 @@ style={{
                           value={formData.estadoCivil}
                           onChange={(e) => setFormData({ ...formData, estadoCivil: e.target.value })}
                           disabled={isViewMode}
-                          className="w-full h-[42px] px-3 rounded-lg bg-white border border-gray-300 text-gray-900 disabled:opacity-50 disabled:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-0 focus:border-indigo-500 appearance-none cursor-pointer"
+                          className="w-full h-[42px] px-3 rounded-lg bg-[var(--surface-primary)] border border-gray-300 text-gray-900 disabled:opacity-50 disabled:bg-[var(--surface-primary)] focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-0 focus:border-indigo-500 appearance-none cursor-pointer"
 style={{
   backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%239ca3af' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E")`,
   backgroundRepeat: 'no-repeat',
@@ -1359,7 +1359,7 @@ style={{
                           value={formData.nacionalidade}
                           onChange={(e) => setFormData({ ...formData, nacionalidade: e.target.value })}
                           disabled={isViewMode}
-                          className="w-full h-[42px] px-3 rounded-lg bg-white border border-gray-300 text-gray-900 disabled:opacity-50 disabled:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-0 focus:border-indigo-500 appearance-none cursor-pointer"
+                          className="w-full h-[42px] px-3 rounded-lg bg-[var(--surface-primary)] border border-gray-300 text-gray-900 disabled:opacity-50 disabled:bg-[var(--surface-primary)] focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-0 focus:border-indigo-500 appearance-none cursor-pointer"
 style={{
   backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%239ca3af' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E")`,
   backgroundRepeat: 'no-repeat',
@@ -1377,7 +1377,7 @@ style={{
                 </div>
 
                 {/* Seção: Contato */}
-                <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-200">
+                <div className="bg-[var(--surface-primary)] rounded-xl p-6 shadow-sm border border-gray-200">
                   <h3 className="text-sm font-semibold text-gray-900 mb-4 flex items-center gap-2">
                     <Phone className="h-4 w-4 text-indigo-600" />
                     Contato
@@ -1392,7 +1392,7 @@ style={{
                         placeholder="+55 (11) 99999-9999"
                         maxLength={25}
                         disabled={isViewMode}
-                        className="bg-white border-gray-300 text-gray-900 placeholder:text-gray-400 disabled:opacity-50 disabled:bg-white"
+                        className="bg-[var(--surface-primary)] border-gray-300 text-gray-900 placeholder:text-gray-400 disabled:opacity-50 disabled:bg-[var(--surface-primary)]"
                       />
                     </div>
                     <div>
@@ -1403,7 +1403,7 @@ style={{
                         onChange={(e) => setFormData({ ...formData, email: e.target.value })}
                         placeholder="email@exemplo.com"
                         disabled={isViewMode}
-                        className="bg-white border-gray-300 text-gray-900 placeholder:text-gray-400 disabled:opacity-50 disabled:bg-white"
+                        className="bg-[var(--surface-primary)] border-gray-300 text-gray-900 placeholder:text-gray-400 disabled:opacity-50 disabled:bg-[var(--surface-primary)]"
                       />
                     </div>
                   </div>
@@ -1413,7 +1413,7 @@ style={{
 
             {/* Tab Endereço */}
             {activeTab === "endereco" && (
-              <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-200">
+              <div className="bg-[var(--surface-primary)] rounded-xl p-6 shadow-sm border border-gray-200">
                 <h3 className="text-sm font-semibold text-gray-900 mb-4 flex items-center gap-2">
                   <MapPin className="h-4 w-4 text-indigo-600" />
                   Endereço
@@ -1432,7 +1432,7 @@ style={{
                             value={formData.pais}
                             onChange={(e) => handlePaisChange(e.target.value)}
                             disabled={isViewMode}
-                            className="w-full h-[42px] px-3 rounded-lg bg-white border border-gray-300 text-gray-900 disabled:opacity-50 disabled:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-0 focus:border-indigo-500 appearance-none cursor-pointer"
+                            className="w-full h-[42px] px-3 rounded-lg bg-[var(--surface-primary)] border border-gray-300 text-gray-900 disabled:opacity-50 disabled:bg-[var(--surface-primary)] focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-0 focus:border-indigo-500 appearance-none cursor-pointer"
 style={{
   backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%239ca3af' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E")`,
   backgroundRepeat: 'no-repeat',
@@ -1455,7 +1455,7 @@ style={{
                             onChange={(e) => setFormData({ ...formData, paisOutro: e.target.value })}
                             placeholder="Digite o nome do país"
                             disabled={isViewMode}
-                            className="bg-white border-gray-300 text-gray-900 placeholder:text-gray-400 disabled:opacity-50 disabled:bg-white"
+                            className="bg-[var(--surface-primary)] border-gray-300 text-gray-900 placeholder:text-gray-400 disabled:opacity-50 disabled:bg-[var(--surface-primary)]"
                           />
                         </div>
                         <div>
@@ -1468,7 +1468,7 @@ style={{
                             placeholder="Código postal"
                             maxLength={15}
                             disabled={isViewMode}
-                            className="bg-white border-gray-300 text-gray-900 placeholder:text-gray-400 disabled:opacity-50 disabled:bg-white"
+                            className="bg-[var(--surface-primary)] border-gray-300 text-gray-900 placeholder:text-gray-400 disabled:opacity-50 disabled:bg-[var(--surface-primary)]"
                           />
                           <p className="text-xs text-gray-500 mt-1">Preencha manualmente</p>
                         </div>
@@ -1485,7 +1485,7 @@ style={{
                           value={formData.pais}
                           onChange={(e) => handlePaisChange(e.target.value)}
                           disabled={isViewMode}
-                          className="w-full h-[42px] px-3 rounded-lg bg-white border border-gray-300 text-gray-900 disabled:opacity-50 disabled:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-0 focus:border-indigo-500 appearance-none cursor-pointer"
+                          className="w-full h-[42px] px-3 rounded-lg bg-[var(--surface-primary)] border border-gray-300 text-gray-900 disabled:opacity-50 disabled:bg-[var(--surface-primary)] focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-0 focus:border-indigo-500 appearance-none cursor-pointer"
 style={{
   backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%239ca3af' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E")`,
   backgroundRepeat: 'no-repeat',
@@ -1510,7 +1510,7 @@ style={{
                             placeholder={getCEPPlaceholder(formData.pais)}
                             maxLength={isBrasil ? 9 : 15}
                             disabled={isViewMode}
-                            className="bg-white border-gray-300 text-gray-900 placeholder:text-gray-400 disabled:opacity-50 disabled:bg-white pr-10"
+                            className="bg-[var(--surface-primary)] border-gray-300 text-gray-900 placeholder:text-gray-400 disabled:opacity-50 disabled:bg-[var(--surface-primary)] pr-10"
                           />
                           {buscandoCep && (
                             <div className="absolute right-3 top-1/2 -translate-y-1/2">
@@ -1533,7 +1533,7 @@ style={{
                         onChange={(e) => setFormData({ ...formData, endereco: e.target.value })}
                         placeholder="Rua, Avenida..."
                         disabled={isViewMode}
-                        className="bg-white border-gray-300 text-gray-900 placeholder:text-gray-400 disabled:opacity-50 disabled:bg-white"
+                        className="bg-[var(--surface-primary)] border-gray-300 text-gray-900 placeholder:text-gray-400 disabled:opacity-50 disabled:bg-[var(--surface-primary)]"
                       />
                     </div>
                     <div>
@@ -1543,7 +1543,7 @@ style={{
                         onChange={(e) => setFormData({ ...formData, numero: e.target.value })}
                         placeholder="Nº"
                         disabled={isViewMode}
-                        className="bg-white border-gray-300 text-gray-900 placeholder:text-gray-400 disabled:opacity-50 disabled:bg-white"
+                        className="bg-[var(--surface-primary)] border-gray-300 text-gray-900 placeholder:text-gray-400 disabled:opacity-50 disabled:bg-[var(--surface-primary)]"
                       />
                     </div>
                   </div>
@@ -1556,7 +1556,7 @@ style={{
                         onChange={(e) => setFormData({ ...formData, complemento: e.target.value })}
                         placeholder="Apto, Bloco..."
                         disabled={isViewMode}
-                        className="bg-white border-gray-300 text-gray-900 placeholder:text-gray-400 disabled:opacity-50 disabled:bg-white"
+                        className="bg-[var(--surface-primary)] border-gray-300 text-gray-900 placeholder:text-gray-400 disabled:opacity-50 disabled:bg-[var(--surface-primary)]"
                       />
                     </div>
                     <div>
@@ -1568,7 +1568,7 @@ style={{
                         onChange={(e) => setFormData({ ...formData, bairro: e.target.value })}
                         placeholder="Nome do bairro"
                         disabled={isViewMode}
-                        className="bg-white border-gray-300 text-gray-900 placeholder:text-gray-400 disabled:opacity-50 disabled:bg-white"
+                        className="bg-[var(--surface-primary)] border-gray-300 text-gray-900 placeholder:text-gray-400 disabled:opacity-50 disabled:bg-[var(--surface-primary)]"
                       />
                     </div>
                   </div>
@@ -1581,7 +1581,7 @@ style={{
                         onChange={(e) => setFormData({ ...formData, cidade: e.target.value })}
                         placeholder="Nome da cidade"
                         disabled={isViewMode}
-                        className="bg-white border-gray-300 text-gray-900 placeholder:text-gray-400 disabled:opacity-50 disabled:bg-white"
+                        className="bg-[var(--surface-primary)] border-gray-300 text-gray-900 placeholder:text-gray-400 disabled:opacity-50 disabled:bg-[var(--surface-primary)]"
                       />
                     </div>
                     <div>
@@ -1593,7 +1593,7 @@ style={{
                         onChange={(e) => setFormData({ ...formData, estado: e.target.value })}
                         placeholder="UF"
                         disabled={isViewMode}
-                        className="bg-white border-gray-300 text-gray-900 placeholder:text-gray-400 disabled:opacity-50 disabled:bg-white"
+                        className="bg-[var(--surface-primary)] border-gray-300 text-gray-900 placeholder:text-gray-400 disabled:opacity-50 disabled:bg-[var(--surface-primary)]"
                       />
                     </div>
                   </div>
@@ -1604,7 +1604,7 @@ style={{
             {activeTab === "observacoes" && (
               <div className="space-y-6">
                 {/* Seção: Observações */}
-                <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-200">
+                <div className="bg-[var(--surface-primary)] rounded-xl p-6 shadow-sm border border-gray-200">
                   <h3 className="text-sm font-semibold text-gray-900 mb-4 flex items-center gap-2">
                     <FileText className="h-4 w-4 text-indigo-600" />
                     Observações
@@ -1615,12 +1615,12 @@ style={{
                     placeholder="Anotações, informações importantes..."
                     rows={4}
                     disabled={isViewMode}
-                    className="w-full px-3 py-2 rounded-xl bg-white border border-gray-300 text-gray-900 placeholder:text-gray-400 disabled:opacity-50 disabled:bg-white resize-none focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-0 focus:border-indigo-500"
+                    className="w-full px-3 py-2 rounded-xl bg-[var(--surface-primary)] border border-gray-300 text-gray-900 placeholder:text-gray-400 disabled:opacity-50 disabled:bg-[var(--surface-primary)] resize-none focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-0 focus:border-indigo-500"
                   />
                 </div>
 
                 {/* Seção: Documentos Obrigatórios */}
-                <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-200">
+                <div className="bg-[var(--surface-primary)] rounded-xl p-6 shadow-sm border border-gray-200">
                   <h3 className="text-sm font-semibold text-gray-900 mb-4 flex items-center gap-2">
                     <Shield className="h-4 w-4 text-indigo-600" />
                     Documentos Obrigatórios
@@ -1680,7 +1680,7 @@ style={{
                                 rel="noopener noreferrer"
                                 className="block group"
                               >
-                                <div className="relative aspect-[4/3] rounded-lg overflow-hidden bg-white border border-gray-200">
+                                <div className="relative aspect-[4/3] rounded-lg overflow-hidden bg-[var(--surface-primary)] border border-gray-200">
                                   {anexo.mimeType?.startsWith('image/') || /\.(jpg|jpeg|png|gif|webp)$/i.test(anexo.nomeArquivo) ? (
                                     <img 
                                       src={anexo.urlArquivo} 
@@ -1764,7 +1764,7 @@ style={{
                 </div>
 
                 {/* Seção: Outros Documentos (genéricos) */}
-                <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-200">
+                <div className="bg-[var(--surface-primary)] rounded-xl p-6 shadow-sm border border-gray-200">
                   <h3 className="text-sm font-semibold text-gray-900 mb-4 flex items-center gap-2">
                     <FileText className="h-4 w-4 text-indigo-600" />
                     Todos os Documentos
@@ -2390,7 +2390,7 @@ export function ContratantesTabela({ contratantes, onRefresh, onOpenProcesso }: 
                           <MoreHorizontal className="h-4 w-4" />
                         </Button>
                       </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end" className="bg-white border-gray-200">
+                      <DropdownMenuContent align="end" className="bg-[var(--surface-primary)] border-gray-200">
                         <DropdownMenuItem 
                           onClick={() => handleView(contratante)}
                           className="text-gray-700 hover:bg-gray-100 cursor-pointer"

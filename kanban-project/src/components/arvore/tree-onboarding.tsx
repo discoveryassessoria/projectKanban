@@ -203,7 +203,7 @@ function Step1TypeSelector({
                 className={`w-full text-left p-5 rounded-xl border-2 transition-all ${
                   isSelected
                     ? "border-teal-500 bg-teal-50 shadow-sm"
-                    : "border-gray-200 bg-white hover:border-gray-300 hover:bg-gray-50"
+                    : "border-gray-200 bg-[var(--surface-primary)] hover:border-gray-300 hover:bg-gray-50"
                 }`}
               >
                 <div className="flex items-start gap-3">
@@ -339,7 +339,7 @@ function Step2PersonForm({
               processo recebe `text-white/80` com `finDark` ligado, e `position: fixed`
               não interrompe herança. Corrigir só os inputs deixaria qualquer outro
               texto deste card sem cor — e o próximo campo adicionado nasceria invisível. */}
-          <div className="bg-white text-gray-900 rounded-2xl shadow-sm border border-gray-200 p-6">
+          <div className="bg-[var(--surface-primary)] text-gray-900 rounded-2xl shadow-sm border border-gray-200 p-6">
           <h2 className="text-2xl font-bold text-gray-900 mb-1">
             Adicionar {typeRoleLabel(type, paisProcesso)}
           </h2>
@@ -559,16 +559,16 @@ const NACIONALIDADE_ADJ: Record<PaisProcesso, string> = {
 // ─────────────────────────────────────────────────────────────
 
 // O Preflight do Tailwind aplica `color: inherit` em input/select/textarea.
-// Declarar `bg-white` sem declarar a cor do texto deixa o campo à mercê do
+// Declarar `bg-[var(--surface-primary)]` sem declarar a cor do texto deixa o campo à mercê do
 // ancestral — e este formulário é filho do container de abas que recebe
 // `text-white/80` quando `finDark` está ligado (atividade-details-modal). Sem
 // `text-gray-900` aqui, o que o usuário digita sai branco sobre branco: só
 // aparece ao selecionar o texto.
 const inputCls =
-  "w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500 bg-white text-gray-900 placeholder:text-gray-400 text-sm h-[42px]"
+  "w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500 bg-[var(--surface-primary)] text-gray-900 placeholder:text-gray-400 text-sm h-[42px]"
 
 const selectCls =
-  "w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500 bg-white text-gray-900 text-sm h-[42px] appearance-none cursor-pointer"
+  "w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500 bg-[var(--surface-primary)] text-gray-900 text-sm h-[42px] appearance-none cursor-pointer"
 
 const selectStyle = {
   backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%239ca3af' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E")`,

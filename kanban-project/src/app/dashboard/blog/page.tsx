@@ -233,7 +233,7 @@ export default function BlogAdminPage() {
         <div className="pointer-events-none fixed inset-0 -z-10 bg-[url('/espanha.jpg')] bg-cover bg-center bg-no-repeat" />
         <div className="min-h-screen bg-black/40 backdrop-blur-sm flex items-center justify-center">
           <div className="text-center">
-            <div className="animate-spin h-12 w-12 border-4 border-white border-t-transparent rounded-full mx-auto mb-4" />
+            <div className="animate-spin h-12 w-12 border-4 border-[var(--border-default)] border-t-transparent rounded-full mx-auto mb-4" />
             <p className="text-white/70">Carregando posts...</p>
           </div>
         </div>

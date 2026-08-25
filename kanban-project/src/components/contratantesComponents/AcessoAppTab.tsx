@@ -237,7 +237,7 @@ export function AcessoAppTab({ clienteId, clienteTipo, clienteEmail, clienteNome
 
   if (!clienteId) {
     return (
-      <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-200">
+      <div className="bg-[var(--surface-primary)] rounded-xl p-6 shadow-sm border border-gray-200">
         <div className="flex items-center gap-3 p-4 bg-amber-50 border border-amber-200 rounded-lg">
           <AlertTriangle className="h-5 w-5 text-amber-500 flex-shrink-0" />
           <p className="text-sm text-amber-700">
@@ -251,7 +251,7 @@ export function AcessoAppTab({ clienteId, clienteTipo, clienteEmail, clienteNome
   return (
     <div className="space-y-6">
       {/* Status do acesso */}
-      <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-200">
+      <div className="bg-[var(--surface-primary)] rounded-xl p-6 shadow-sm border border-gray-200">
         <h3 className="text-sm font-semibold text-gray-900 mb-4 flex items-center gap-2">
           <Smartphone className="h-4 w-4 text-indigo-600" />
           Acesso ao App
@@ -319,12 +319,12 @@ export function AcessoAppTab({ clienteId, clienteTipo, clienteEmail, clienteNome
                 </div>
                 
                 <div className="flex items-center gap-2">
-                  <div className="flex-1 px-4 py-3 bg-white rounded-lg border border-indigo-200 font-mono text-lg text-center tracking-widest text-indigo-800 font-bold">
+                  <div className="flex-1 px-4 py-3 bg-[var(--surface-primary)] rounded-lg border border-indigo-200 font-mono text-lg text-center tracking-widest text-indigo-800 font-bold">
                     {senhaTemporaria}
                   </div>
                   <button
                     onClick={copiarSenha}
-                    className="p-3 bg-white border border-indigo-200 rounded-lg hover:bg-indigo-100 transition-colors"
+                    className="p-3 bg-[var(--surface-primary)] border border-indigo-200 rounded-lg hover:bg-indigo-100 transition-colors"
                     title="Copiar senha"
                   >
                     {copiado ? (
@@ -415,7 +415,7 @@ export function AcessoAppTab({ clienteId, clienteTipo, clienteEmail, clienteNome
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
                     placeholder="email@exemplo.com"
-                    className="bg-white border-gray-300 text-gray-900 placeholder:text-gray-400"
+                    className="bg-[var(--surface-primary)] border-gray-300 text-gray-900 placeholder:text-gray-400"
                   />
                   {clienteEmail && email !== clienteEmail && (
                     <p className="text-xs text-amber-600 mt-1">
@@ -454,7 +454,7 @@ export function AcessoAppTab({ clienteId, clienteTipo, clienteEmail, clienteNome
       </div>
 
       {/* Explicação do fluxo */}
-      <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-200">
+      <div className="bg-[var(--surface-primary)] rounded-xl p-6 shadow-sm border border-gray-200">
         <h3 className="text-sm font-semibold text-gray-900 mb-3 flex items-center gap-2">
           <Shield className="h-4 w-4 text-indigo-600" />
           Como funciona

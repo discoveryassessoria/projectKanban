@@ -279,13 +279,13 @@ export function ImportarArvoreModal({ arvoreId, aberto, onFechar, onImportado }:
               className="rounded-lg border border-white/10 px-4 py-2 text-sm text-white/80 transition hover:bg-white/10 disabled:opacity-40">Cancelar</button>
             {!naPrevia ? (
               <button onClick={analisar} disabled={!arquivo || ocupado}
-                className="flex items-center gap-2 rounded-lg bg-white/90 px-4 py-2 text-sm font-medium text-black transition hover:bg-white disabled:opacity-40">
+                className="flex items-center gap-2 rounded-lg bg-white/90 px-4 py-2 text-sm font-medium text-black transition hover:bg-[var(--surface-primary)] disabled:opacity-40">
                 {etapa === "analisando" && <Loader2 className="h-4 w-4 animate-spin" />}
                 {etapa === "analisando" ? "Lendo a imagem…" : "Analisar"}
               </button>
             ) : (
               <button onClick={confirmar} disabled={ocupado || restantes.length === 0}
-                className="flex items-center gap-2 rounded-lg bg-white/90 px-4 py-2 text-sm font-medium text-black transition hover:bg-white disabled:opacity-40">
+                className="flex items-center gap-2 rounded-lg bg-white/90 px-4 py-2 text-sm font-medium text-black transition hover:bg-[var(--surface-primary)] disabled:opacity-40">
                 {etapa === "gravando" && <Loader2 className="h-4 w-4 animate-spin" />}
                 {etapa === "gravando" ? "Gravando…" : `Confirmar e criar ${restantes.length}`}
               </button>

@@ -152,7 +152,7 @@ export default function ExecutorMotorTab() {
           <div className="mt-0.5 text-xs text-white/50">Ligado: o motor roda sozinho ao <b>avançar a fase</b> de um processo conectado. Desligado: só pelo botão abaixo. {autoExecutar && <span className="text-amber-300/80">Cuidado — cria artefatos automaticamente.</span>}</div>
         </div>
         <button onClick={toggleAuto} role="switch" aria-checked={autoExecutar} aria-label="Gatilho automático" className={`relative inline-flex h-6 w-11 flex-none items-center rounded-full transition-colors ${autoExecutar ? "bg-green-600" : "bg-white/15"}`}>
-          <span className={`inline-block h-4 w-4 rounded-full bg-white shadow transition-transform ${autoExecutar ? "translate-x-6" : "translate-x-1"}`} />
+          <span className={`inline-block h-4 w-4 rounded-full bg-[var(--surface-primary)] shadow transition-transform ${autoExecutar ? "translate-x-6" : "translate-x-1"}`} />
         </button>
       </div>
 

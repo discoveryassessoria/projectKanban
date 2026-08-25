@@ -352,7 +352,7 @@ const handleSubmit = async () => {
         />
         <div className="min-h-screen flex items-center justify-center">
           <div className="text-center">
-            <div className="animate-spin h-12 w-12 border-4 border-white border-t-transparent rounded-full mx-auto mb-4" />
+            <div className="animate-spin h-12 w-12 border-4 border-[var(--border-default)] border-t-transparent rounded-full mx-auto mb-4" />
             <p className="text-white/70">Carregando eventos...</p>
           </div>
         </div>
@@ -464,7 +464,7 @@ const handleSubmit = async () => {
                               onClick={() => setTipo(t.value)}
                               className={`p-2 rounded-lg border text-sm flex flex-col items-center gap-1 transition-colors ${
                                 tipo === t.value
-                                  ? "border-white bg-white/20 text-white"
+                                  ? "border-[var(--border-default)] bg-white/20 text-white"
                                   : "border-white/20 hover:border-white/40 text-white/60"
                               }`}
                             >

@@ -54,7 +54,7 @@ export default function CambioHistoricoPage() {
           </div>
           <button onClick={atualizarAgora} disabled={rodando} className="rounded-lg bg-sky-600 px-4 py-2 text-sm font-medium text-[#fff] transition hover:bg-sky-500 disabled:opacity-50">{rodando ? 'Atualizando…' : 'Atualizar agora'}</button>
         </div>
-        {msg && <div className="mb-3 rounded-lg border border-slate-200 bg-white p-3 text-sm text-slate-700">{msg}</div>}
+        {msg && <div className="mb-3 rounded-lg border border-slate-200 bg-[var(--surface-primary)] p-3 text-sm text-slate-700">{msg}</div>}
         {erro && <div className="mb-3 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700">{erro}</div>}
 
         {/* Vigentes por moeda */}
@@ -62,7 +62,7 @@ export default function CambioHistoricoPage() {
           {(['EUR', 'USD'] as const).map((cod) => {
             const m = snap?.moedas?.find((x: any) => x.moeda === cod)
             return (
-              <div key={cod} className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+              <div key={cod} className="rounded-xl border border-slate-200 bg-[var(--surface-primary)] p-4 shadow-sm">
                 <div className="flex items-center justify-between">
                   <span className="text-sm font-semibold text-slate-800">{cod}/BRL</span>
                   <span className="rounded-full border border-slate-200 bg-slate-50 px-2 py-0.5 text-[11px] text-slate-600">{m?.estado ?? 'INDISPONIVEL'}</span>
@@ -80,7 +80,7 @@ export default function CambioHistoricoPage() {
         </div>
 
         {/* Histórico completo */}
-        <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
+        <div className="overflow-hidden rounded-xl border border-slate-200 bg-[var(--surface-primary)] shadow-sm">
           <table className="w-full text-[13px]">
             <thead><tr className="bg-slate-50 text-left text-[11px] uppercase tracking-wide text-slate-500">
               {['Par', 'Valor', 'Data fonte', 'Consulta', 'Origem', 'Modalidade', 'Vigente'].map((h) => <th key={h} className="border-b border-slate-200 px-3 py-2 font-semibold">{h}</th>)}

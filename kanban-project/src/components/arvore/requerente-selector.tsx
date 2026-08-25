@@ -167,7 +167,7 @@ export function RequerenteSelector({
       )}
 
       {/* Cor própria na raiz — ver comentário equivalente em tree-onboarding.tsx. */}
-      <div className="bg-white text-gray-900 rounded-2xl shadow-sm border border-gray-200 p-6">
+      <div className="bg-[var(--surface-primary)] text-gray-900 rounded-2xl shadow-sm border border-gray-200 p-6">
         <h2 className="text-xl font-bold text-gray-900 mb-1">Selecionar requerente</h2>
         <p className="text-sm text-gray-500 mb-5">
           O requerente já cadastrado no processo é reaproveitado — a árvore não cria uma
@@ -212,7 +212,7 @@ export function RequerenteSelector({
                     className={`w-full text-left p-4 rounded-xl border-2 transition-all ${
                       isSel
                         ? "border-teal-500 bg-teal-50"
-                        : "border-gray-200 bg-white hover:border-gray-300 hover:bg-gray-50"
+                        : "border-gray-200 bg-[var(--surface-primary)] hover:border-gray-300 hover:bg-gray-50"
                     }`}
                   >
                     <div className="flex items-start gap-3">

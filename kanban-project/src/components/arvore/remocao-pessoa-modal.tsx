@@ -112,8 +112,8 @@ export function RemocaoPessoaModal({
     <div className="fixed inset-0 flex items-center justify-center p-4" style={{ zIndex: LAYER.aboveProcessCritical }}>
       <div className="absolute inset-0 bg-slate-900/40" onClick={executando ? undefined : onFechar} />
 
-      <div className="relative w-full max-w-lg max-h-[85vh] overflow-y-auto rounded-xl bg-white shadow-xl border border-slate-200">
-        <div className="sticky top-0 flex items-start justify-between gap-3 border-b border-slate-200 bg-white px-5 py-4">
+      <div className="relative w-full max-w-lg max-h-[85vh] overflow-y-auto rounded-xl bg-[var(--surface-primary)] shadow-xl border border-slate-200">
+        <div className="sticky top-0 flex items-start justify-between gap-3 border-b border-slate-200 bg-[var(--surface-primary)] px-5 py-4">
           <div>
             <h2 className="text-base font-semibold text-slate-900">Remover da árvore</h2>
             <p className="mt-0.5 text-sm text-slate-500">
@@ -205,7 +205,7 @@ export function RemocaoPessoaModal({
 
         {/* ── AÇÕES ─────────────────────────────────────────────────────── */}
         {!carregando && plano && (
-          <div className="sticky bottom-0 flex flex-col gap-2 border-t border-slate-200 bg-white px-5 py-4">
+          <div className="sticky bottom-0 flex flex-col gap-2 border-t border-slate-200 bg-[var(--surface-primary)] px-5 py-4">
             {plano.podeHardDelete ? (
               <button
                 onClick={() => executar("HARD")}

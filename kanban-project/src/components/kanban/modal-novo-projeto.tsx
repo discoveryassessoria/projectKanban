@@ -146,7 +146,7 @@ export default function ModalNovoProjeto({ isOpen, onClose, onSubmit }: ModalNov
               >
                 {loading ? (
                   <div className="flex items-center gap-2">
-                    <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                    <div className="w-4 h-4 border-2 border-[var(--border-default)] border-t-transparent rounded-full animate-spin" />
                     Criando...
                   </div>
                 ) : (

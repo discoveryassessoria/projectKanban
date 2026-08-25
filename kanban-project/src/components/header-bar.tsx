@@ -240,7 +240,7 @@ export function HeaderBar({
 
             {/* Dropdown de resultados */}
             {showSearchResults && (
-              <div className="absolute top-full mt-2 left-0 right-0 w-80 bg-white border border-gray-200 rounded-xl shadow-2xl overflow-hidden z-50">
+              <div className="absolute top-full mt-2 left-0 right-0 w-80 bg-[var(--surface-primary)] border border-gray-200 rounded-xl shadow-2xl overflow-hidden z-50">
                 {totalResults === 0 ? (
                   <div className="px-4 py-6 text-center text-gray-400">
                     <Search className="h-8 w-8 mx-auto mb-2 opacity-50" />
@@ -286,7 +286,7 @@ export function HeaderBar({
             >
               <Bell className="h-4 w-4 text-white" />
               {totalNotificacoes > 0 && (
-                <span className="absolute -top-1 -right-1 h-5 w-5 rounded-full bg-red-500 border-2 border-white text-[10px] font-bold flex items-center justify-center">
+                <span className="absolute -top-1 -right-1 h-5 w-5 rounded-full bg-red-500 border-2 border-[var(--border-default)] text-[10px] font-bold flex items-center justify-center">
                   {totalNotificacoes > 9 ? '9+' : totalNotificacoes}
                 </span>
               )}
@@ -294,7 +294,7 @@ export function HeaderBar({
 
             {/* Dropdown de notificações */}
             {showNotifications && (
-              <div className="absolute top-full mt-2 right-0 w-80 bg-white border border-gray-200 rounded-xl shadow-2xl overflow-hidden z-50">
+              <div className="absolute top-full mt-2 right-0 w-80 bg-[var(--surface-primary)] border border-gray-200 rounded-xl shadow-2xl overflow-hidden z-50">
                 <div className="px-4 py-3 border-b border-gray-100 bg-gray-50">
                   <h3 className="font-semibold text-gray-800 text-sm">Notificações</h3>
                   <p className="text-xs text-gray-500">{totalNotificacoes} pendentes</p>

@@ -92,7 +92,7 @@ const PersonNode = ({ data }: { data: TreeNode["data"] }) => {
       case "irmao":
         return "border-orange-500 bg-orange-50 shadow-orange-100"
       default:
-        return "border-gray-300 bg-white shadow-gray-100"
+        return "border-gray-300 bg-[var(--surface-primary)] shadow-gray-100"
     }
   }
 
@@ -129,32 +129,32 @@ const PersonNode = ({ data }: { data: TreeNode["data"] }) => {
         type="target"
         position={Position.Top}
         id="top"
-        className="w-3 h-3 bg-blue-500 border-2 border-white shadow-md"
+        className="w-3 h-3 bg-blue-500 border-2 border-[var(--border-default)] shadow-md"
       />
       <Handle
         type="source"
         position={Position.Bottom}
         id="bottom"
-        className="w-3 h-3 bg-green-500 border-2 border-white shadow-md"
+        className="w-3 h-3 bg-green-500 border-2 border-[var(--border-default)] shadow-md"
       />
       <Handle
         type="source"
         position={Position.Right}
         id="right"
-        className="w-3 h-3 bg-purple-500 border-2 border-white shadow-md"
+        className="w-3 h-3 bg-purple-500 border-2 border-[var(--border-default)] shadow-md"
       />
       <Handle
         type="target"
         position={Position.Left}
         id="left"
-        className="w-3 h-3 bg-purple-500 border-2 border-white shadow-md"
+        className="w-3 h-3 bg-purple-500 border-2 border-[var(--border-default)] shadow-md"
       />
 
       <div className="absolute -top-3 -right-3 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity z-10">
         <Button
           size="sm"
           variant="outline"
-          className="h-7 w-7 p-0 bg-white shadow-md hover:bg-green-500 hover:text-[#fff] border-green-200"
+          className="h-7 w-7 p-0 bg-[var(--surface-primary)] shadow-md hover:bg-green-500 hover:text-[#fff] border-green-200"
           onClick={() => onAddChild(pessoa.id)}
           title="Adicionar Filho"
         >
@@ -163,7 +163,7 @@ const PersonNode = ({ data }: { data: TreeNode["data"] }) => {
         <Button
           size="sm"
           variant="outline"
-          className="h-7 w-7 p-0 bg-white shadow-md hover:bg-blue-500 hover:text-[#fff] border-blue-200"
+          className="h-7 w-7 p-0 bg-[var(--surface-primary)] shadow-md hover:bg-blue-500 hover:text-[#fff] border-blue-200"
           onClick={() => onAddParent(pessoa.id, "pai")}
           disabled={!!pessoa.paiId}
           title="Adicionar Pai"
@@ -173,7 +173,7 @@ const PersonNode = ({ data }: { data: TreeNode["data"] }) => {
         <Button
           size="sm"
           variant="outline"
-          className="h-7 w-7 p-0 bg-white shadow-md hover:bg-pink-500 hover:text-[#fff] border-pink-200"
+          className="h-7 w-7 p-0 bg-[var(--surface-primary)] shadow-md hover:bg-pink-500 hover:text-[#fff] border-pink-200"
           onClick={() => onAddParent(pessoa.id, "mae")}
           disabled={!!pessoa.maeId}
           title="Adicionar Mãe"
@@ -183,7 +183,7 @@ const PersonNode = ({ data }: { data: TreeNode["data"] }) => {
         <Button
           size="sm"
           variant="outline"
-          className="h-7 w-7 p-0 bg-white shadow-md hover:bg-purple-500 hover:text-[#fff] border-purple-200"
+          className="h-7 w-7 p-0 bg-[var(--surface-primary)] shadow-md hover:bg-purple-500 hover:text-[#fff] border-purple-200"
           onClick={() => onAddSpouse(pessoa.id)}
           title="Adicionar Cônjuge"
         >
@@ -192,7 +192,7 @@ const PersonNode = ({ data }: { data: TreeNode["data"] }) => {
         <Button
           size="sm"
           variant="outline"
-          className="h-7 w-7 p-0 bg-white shadow-md hover:bg-yellow-500 hover:text-white border-yellow-200"
+          className="h-7 w-7 p-0 bg-[var(--surface-primary)] shadow-md hover:bg-yellow-500 hover:text-white border-yellow-200"
           onClick={() => onEdit(pessoa)}
           title="Editar"
         >
@@ -201,7 +201,7 @@ const PersonNode = ({ data }: { data: TreeNode["data"] }) => {
         <Button
           size="sm"
           variant="outline"
-          className="h-7 w-7 p-0 bg-white shadow-md hover:bg-red-500 hover:text-[#fff] border-red-200"
+          className="h-7 w-7 p-0 bg-[var(--surface-primary)] shadow-md hover:bg-red-500 hover:text-[#fff] border-red-200"
           onClick={() => onDelete(pessoa.id)}
           title="Excluir"
         >
@@ -931,7 +931,7 @@ const GenealogicalTreeComponent = forwardRef<GenealogicalTreeHandle, Genealogica
           className="bg-gradient-to-br from-slate-50 to-slate-100"
         >
           <Controls
-            className="bg-white border border-gray-200 rounded-lg shadow-lg"
+            className="bg-[var(--surface-primary)] border border-gray-200 rounded-lg shadow-lg"
             showZoom={true}
             showFitView={true}
             showInteractive={true}
@@ -941,7 +941,7 @@ const GenealogicalTreeComponent = forwardRef<GenealogicalTreeHandle, Genealogica
             </Button>
           </Controls>
           <MiniMap
-            className="bg-white border border-gray-200 rounded-lg shadow-lg"
+            className="bg-[var(--surface-primary)] border border-gray-200 rounded-lg shadow-lg"
             nodeColor={(node) => {
               const relationshipType = node.data?.relationshipType
               switch (relationshipType) {
@@ -965,7 +965,7 @@ const GenealogicalTreeComponent = forwardRef<GenealogicalTreeHandle, Genealogica
         </ReactFlow>
       </ReactFlowProvider>
 
-      <div className="absolute bottom-4 left-4 bg-white rounded-lg shadow-lg border border-gray-200 p-4 z-10 max-w-xs flex flex-col gap-4">
+      <div className="absolute bottom-4 left-4 bg-[var(--surface-primary)] rounded-lg shadow-lg border border-gray-200 p-4 z-10 max-w-xs flex flex-col gap-4">
         <div className="flex justify-between items-center">
           <h3 className="font-semibold text-sm text-gray-800 flex items-center gap-2">
             <TreePine className="h-4 w-4 text-gray-600" />

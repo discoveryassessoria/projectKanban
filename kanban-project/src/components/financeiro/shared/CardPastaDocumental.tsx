@@ -28,7 +28,7 @@ export function CardPastaDocumental({ ctx }: Props) {
   })
 
   return (
-    <div className="bg-white border border-gray-200 border-l-4 border-l-blue-500 rounded-xl p-4 shadow-sm">
+    <div className="bg-[var(--surface-primary)] border border-gray-200 border-l-4 border-l-blue-500 rounded-xl p-4 shadow-sm">
       <div className="flex justify-between items-start mb-3">
         <div className="flex-1">
           <div className="font-bold text-gray-900">

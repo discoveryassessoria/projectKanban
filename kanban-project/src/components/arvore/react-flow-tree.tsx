@@ -272,7 +272,7 @@ function PersonNode({ data }: NodeProps<PersonNodeData>) {
   if (mode === 'paisagem') {
     return (
       <div
-        className={`relative bg-white rounded-lg shadow-md cursor-pointer hover:shadow-lg transition-all ${ringClass}`}
+        className={`relative bg-[var(--surface-primary)] rounded-lg shadow-md cursor-pointer hover:shadow-lg transition-all ${ringClass}`}
         style={{
           width: NODE_SIZES.paisagem.width,
           height: NODE_SIZES.paisagem.height,
@@ -284,12 +284,12 @@ function PersonNode({ data }: NodeProps<PersonNodeData>) {
         <Handle
           type="source"
           position={Position.Right}
-          className="!bg-gray-400 !w-2 !h-2 !border-2 !border-white"
+          className="!bg-gray-400 !w-2 !h-2 !border-2 !border-[var(--border-default)]"
         />
         <Handle
           type="target"
           position={Position.Left}
-          className="!bg-gray-400 !w-2 !h-2 !border-2 !border-white"
+          className="!bg-gray-400 !w-2 !h-2 !border-2 !border-[var(--border-default)]"
         />
         {/* Handles para linha de casamento (invisíveis) */}
         <Handle
@@ -392,7 +392,7 @@ function PersonNode({ data }: NodeProps<PersonNodeData>) {
   // MODO RETRATO
   return (
     <div
-      className={`relative bg-white rounded-lg shadow-md cursor-pointer hover:shadow-lg transition-all ${ringClass}`}
+      className={`relative bg-[var(--surface-primary)] rounded-lg shadow-md cursor-pointer hover:shadow-lg transition-all ${ringClass}`}
       style={{
         width: NODE_SIZES.retrato.width,
         height: NODE_SIZES.retrato.height,
@@ -404,12 +404,12 @@ function PersonNode({ data }: NodeProps<PersonNodeData>) {
       <Handle
         type="source"
         position={Position.Top}
-        className="!bg-gray-400 !w-2 !h-2 !border-2 !border-white"
+        className="!bg-gray-400 !w-2 !h-2 !border-2 !border-[var(--border-default)]"
       />
       <Handle
         type="target"
         position={Position.Bottom}
-        className="!bg-gray-400 !w-2 !h-2 !border-2 !border-white"
+        className="!bg-gray-400 !w-2 !h-2 !border-2 !border-[var(--border-default)]"
       />
       {/* Handles para linha de casamento (invisíveis) */}
       <Handle
@@ -549,7 +549,7 @@ function AddPersonNode({ data }: NodeProps<AddPersonNodeData>) {
   if (mode === 'paisagem') {
     return (
       <div
-        className={`relative bg-white rounded-lg border-2 border-dashed ${bordaContexto} cursor-pointer hover:border-gray-400 hover:bg-gray-50 transition-all`}
+        className={`relative bg-[var(--surface-primary)] rounded-lg border-2 border-dashed ${bordaContexto} cursor-pointer hover:border-gray-400 hover:bg-gray-50 transition-all`}
         style={{ width: NODE_SIZES.paisagem.width, height: NODE_SIZES.paisagem.height }}
         onClick={onClick}
         title={dica}
@@ -569,7 +569,7 @@ function AddPersonNode({ data }: NodeProps<AddPersonNodeData>) {
   // RETRATO
   return (
     <div
-      className={`relative bg-white rounded-lg border-2 border-dashed ${bordaContexto} cursor-pointer hover:border-gray-400 hover:bg-gray-50 transition-all`}
+      className={`relative bg-[var(--surface-primary)] rounded-lg border-2 border-dashed ${bordaContexto} cursor-pointer hover:border-gray-400 hover:bg-gray-50 transition-all`}
       style={{ width: NODE_SIZES.retrato.width, height: NODE_SIZES.retrato.height }}
       onClick={onClick}
       title={dica}
@@ -604,7 +604,7 @@ function GrupoRecolhidoNode({ data }: NodeProps<GrupoNodeData>) {
   const tamanho = NODE_SIZES[mode]
   return (
     <div
-      className="relative bg-white rounded-lg border-2 border-dashed border-gray-300 cursor-pointer hover:border-gray-400 hover:bg-gray-50 transition-all"
+      className="relative bg-[var(--surface-primary)] rounded-lg border-2 border-dashed border-gray-300 cursor-pointer hover:border-gray-400 hover:bg-gray-50 transition-all"
       style={{ width: tamanho.width, height: tamanho.height }}
       onClick={onClick}
       title="Expandir este ramo"
@@ -1815,7 +1815,7 @@ const ReactFlowTreeInner = forwardRef<ReactFlowTreeRef, ReactFlowTreeProps>(({
             declaram cor própria. Sem isto, herdam a cor do ancestral — e quando a
             árvore abre dentro do modal de processo (tema escuro, text-white), o
             ícone fica branco sobre botão branco: invisível. */}
-        <div className="flex flex-col bg-white border border-gray-200 rounded shadow-sm text-gray-700">
+        <div className="flex flex-col bg-[var(--surface-primary)] border border-gray-200 rounded shadow-sm text-gray-700">
           <button
             onClick={() => zoomIn()}
             className="p-2 hover:bg-gray-100 border-b border-gray-200"

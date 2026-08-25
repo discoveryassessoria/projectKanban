@@ -502,7 +502,7 @@ export default function GerenciamentoPage() {
         />
         <div className="flex min-h-screen items-center justify-center">
           <div className="text-center">
-            <div className="mx-auto mb-4 h-16 w-16 animate-spin rounded-full border-b-2 border-white" />
+            <div className="mx-auto mb-4 h-16 w-16 animate-spin rounded-full border-b-2 border-[var(--border-default)]" />
             <p className="text-lg">Verificando permissões…</p>
           </div>
         </div>

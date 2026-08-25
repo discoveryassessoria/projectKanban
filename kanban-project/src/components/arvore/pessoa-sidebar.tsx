@@ -304,7 +304,7 @@ function ResumoOperacional({
       )}
 
       {dossie.proximaAcao && (
-        <div className="mt-2 rounded-md border border-slate-200 bg-white px-2.5 py-2">
+        <div className="mt-2 rounded-md border border-slate-200 bg-[var(--surface-primary)] px-2.5 py-2">
           <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-500">
             Próxima ação
           </p>
@@ -325,7 +325,7 @@ function Numero({
   destaque?: boolean
 }) {
   return (
-    <div className="rounded-md bg-white px-1 py-1.5 ring-1 ring-slate-200">
+    <div className="rounded-md bg-[var(--surface-primary)] px-1 py-1.5 ring-1 ring-slate-200">
       <p
         className={`text-sm font-semibold tabular-nums ${destaque ? "text-amber-700" : "text-slate-900"}`}
       >
@@ -421,7 +421,7 @@ function DocumentoCard({
   
   return (
     <div 
-      className={`p-3 bg-white rounded-lg border border-slate-200 hover:border-slate-300 transition-colors ${onClick ? 'cursor-pointer hover:shadow-sm' : ''}`}
+      className={`p-3 bg-[var(--surface-primary)] rounded-lg border border-slate-200 hover:border-slate-300 transition-colors ${onClick ? 'cursor-pointer hover:shadow-sm' : ''}`}
       onClick={onClick}
     >
       <div className="flex items-start justify-between gap-2">
@@ -629,10 +629,10 @@ function ConteudoSidebar({
   // abas que recebe `text-white/80` quando `finDark` está ligado
   // (atividade-details-modal), e `position: fixed` NÃO interrompe herança de cor.
   // Sem cor própria aqui, todo texto sem `text-` explícito — e há vários, como os
-  // rótulos "Adicionar Pai/Mãe/cônjuge/filho(a)" — sai branco sobre `bg-white`,
+  // rótulos "Adicionar Pai/Mãe/cônjuge/filho(a)" — sai branco sobre `bg-[var(--surface-primary)]`,
   // isto é, invisível.
   return (
-    <div className="fixed right-0 top-0 h-full w-[420px] bg-white text-gray-900 shadow-2xl z-[10001] flex flex-col border-l border-slate-200">
+    <div className="fixed right-0 top-0 h-full w-[420px] bg-[var(--surface-primary)] text-gray-900 shadow-2xl z-[10001] flex flex-col border-l border-slate-200">
       {/* Header */}
       <div className="p-5 border-b border-slate-200 bg-gradient-to-r from-slate-50 to-white">
         <button 
@@ -709,7 +709,7 @@ function ConteudoSidebar({
           onClick={() => setActiveTab("info")}
           className={`flex-1 flex items-center justify-center gap-2 ${dossie ? 'px-2' : 'px-4'} py-3 text-sm font-medium transition-colors relative ${
             activeTab === "info"
-              ? 'text-teal-600 bg-white'
+              ? 'text-teal-600 bg-[var(--surface-primary)]'
               : 'text-slate-600 hover:text-slate-900'
           }`}
         >
@@ -723,7 +723,7 @@ function ConteudoSidebar({
           onClick={() => setActiveTab("familia")}
           className={`flex-1 flex items-center justify-center gap-2 ${dossie ? 'px-2' : 'px-4'} py-3 text-sm font-medium transition-colors relative ${
             activeTab === "familia"
-              ? 'text-teal-600 bg-white'
+              ? 'text-teal-600 bg-[var(--surface-primary)]'
               : 'text-slate-600 hover:text-slate-900'
           }`}
         >
@@ -737,7 +737,7 @@ function ConteudoSidebar({
           onClick={() => setActiveTab("docs")}
           className={`flex-1 flex items-center justify-center gap-2 ${dossie ? 'px-2' : 'px-4'} py-3 text-sm font-medium transition-colors relative ${
             activeTab === "docs"
-              ? 'text-teal-600 bg-white'
+              ? 'text-teal-600 bg-[var(--surface-primary)]'
               : 'text-slate-600 hover:text-slate-900'
           }`}
         >
@@ -757,7 +757,7 @@ function ConteudoSidebar({
             onClick={() => setActiveTab("operacao")}
             className={`flex-1 flex items-center justify-center gap-2 px-2 py-3 text-sm font-medium transition-colors relative ${
               activeTab === "operacao"
-                ? 'text-teal-600 bg-white'
+                ? 'text-teal-600 bg-[var(--surface-primary)]'
                 : 'text-slate-600 hover:text-slate-900'
             }`}
           >
@@ -1067,7 +1067,7 @@ function ConteudoSidebar({
                   {dossie.tarefasAbertas.map((t) => (
                     <li
                       key={t.id}
-                      className="rounded-lg border border-slate-200 bg-white px-3 py-2"
+                      className="rounded-lg border border-slate-200 bg-[var(--surface-primary)] px-3 py-2"
                     >
                       <p className="text-sm font-medium leading-snug text-slate-900">{t.titulo}</p>
                       <p className="mt-0.5 text-[11px] text-slate-500">

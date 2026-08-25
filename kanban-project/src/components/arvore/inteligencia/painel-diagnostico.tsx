@@ -101,7 +101,7 @@ interface Props {
  */
 function CadeiaCausal({ e, onIrParaPessoa }: { e: Explicacao; onIrParaPessoa?: (id: number) => void }) {
   return (
-    <div className="mt-2 rounded-md border border-gray-200 bg-white p-2.5">
+    <div className="mt-2 rounded-md border border-gray-200 bg-[var(--surface-primary)] p-2.5">
       <p className="text-[12px] font-medium leading-snug text-gray-900">{e.resposta}</p>
       <ol className="mt-2 space-y-1.5">
         {e.cadeia.map((elo, i) => (
@@ -140,7 +140,7 @@ function BotaoPorQue({ aberto, onToggle }: { aberto: boolean; onToggle: () => vo
   return (
     <button
       onClick={onToggle}
-      className="flex shrink-0 items-center gap-1 rounded-md border border-gray-200 bg-white px-2 py-0.5 text-[11px] text-gray-600 transition hover:border-gray-300 hover:text-gray-900"
+      className="flex shrink-0 items-center gap-1 rounded-md border border-gray-200 bg-[var(--surface-primary)] px-2 py-0.5 text-[11px] text-gray-600 transition hover:border-gray-300 hover:text-gray-900"
     >
       <HelpCircle className="h-3 w-3" />
       {aberto ? "Ocultar" : "Por que isso?"}
@@ -164,7 +164,7 @@ export function PainelDiagnostico({
   // Cor própria na raiz: este painel pode abrir dentro do modal do processo,
   // que é escuro, e `position: fixed` não interrompe herança de cor.
   return (
-    <div className="fixed right-0 top-0 z-[10002] flex h-full w-[420px] flex-col border-l border-gray-200 bg-white text-gray-900 shadow-2xl">
+    <div className="fixed right-0 top-0 z-[10002] flex h-full w-[420px] flex-col border-l border-gray-200 bg-[var(--surface-primary)] text-gray-900 shadow-2xl">
       <div className="flex items-center justify-between border-b border-gray-100 px-4 py-3">
         <div className="min-w-0">
           <h2 className="text-sm font-semibold text-gray-900">Diagnóstico</h2>
@@ -286,7 +286,7 @@ export function PainelDiagnostico({
                         {p.pessoaId != null && (
                           <button
                             onClick={() => onIrParaPessoa(p.pessoaId!)}
-                            className="shrink-0 rounded-md border border-gray-200 bg-white px-2 py-0.5 text-[11px] text-gray-700 transition hover:border-gray-300 hover:text-gray-900"
+                            className="shrink-0 rounded-md border border-gray-200 bg-[var(--surface-primary)] px-2 py-0.5 text-[11px] text-gray-700 transition hover:border-gray-300 hover:text-gray-900"
                           >
                             Abrir pessoa
                           </button>

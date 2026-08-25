@@ -27,7 +27,7 @@ export default function AuthPage() {
       {/* Loading spinner */}
       {!mounted && (
         <div className="absolute inset-0 flex items-center justify-center bg-[var(--overlay-modal)] z-10">
-          <div className="animate-spin h-12 w-12 border-4 border-white border-t-transparent rounded-full" />
+          <div className="animate-spin h-12 w-12 border-4 border-[var(--border-default)] border-t-transparent rounded-full" />
         </div>
       )}
 

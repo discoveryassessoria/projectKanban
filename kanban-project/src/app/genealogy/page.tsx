@@ -282,7 +282,7 @@ export default function GenealogyPage() {
         />
         <div className="min-h-screen flex items-center justify-center">
           <div className="text-center">
-            <div className="animate-spin h-12 w-12 border-4 border-white border-t-transparent rounded-full mx-auto mb-4" />
+            <div className="animate-spin h-12 w-12 border-4 border-[var(--border-default)] border-t-transparent rounded-full mx-auto mb-4" />
             <p className="text-white/70">Carregando pesquisa genealógica...</p>
           </div>
         </div>
@@ -356,7 +356,7 @@ export default function GenealogyPage() {
                     onClick={() => setActiveTab('pessoa')}
                     className={`flex-1 py-3 px-4 text-sm font-medium transition ${
                       activeTab === 'pessoa' 
-                        ? 'text-white border-b-2 border-white' 
+                        ? 'text-white border-b-2 border-[var(--border-default)]' 
                         : 'text-white/50 hover:text-white/70'
                     }`}
                   >
@@ -367,7 +367,7 @@ export default function GenealogyPage() {
                     onClick={() => setActiveTab('documento')}
                     className={`flex-1 py-3 px-4 text-sm font-medium transition ${
                       activeTab === 'documento' 
-                        ? 'text-white border-b-2 border-white' 
+                        ? 'text-white border-b-2 border-[var(--border-default)]' 
                         : 'text-white/50 hover:text-white/70'
                     }`}
                   >
@@ -569,7 +569,7 @@ export default function GenealogyPage() {
             <section className="bg-white/10 backdrop-blur-sm rounded-xl border border-white/20 p-6">
               {loading ? (
                 <div className="flex items-center justify-center py-16">
-                  <div className="animate-spin h-10 w-10 border-4 border-white border-t-transparent rounded-full" />
+                  <div className="animate-spin h-10 w-10 border-4 border-[var(--border-default)] border-t-transparent rounded-full" />
                 </div>
               ) : (
                 <>

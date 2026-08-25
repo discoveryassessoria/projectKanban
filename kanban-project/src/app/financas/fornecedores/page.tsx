@@ -445,7 +445,7 @@ export default function FornecedoresPage() {
       {/* Grid de fornecedores */}
       {loading ? (
         <div className="flex items-center justify-center h-48">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-white"></div>
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[var(--border-default)]"></div>
         </div>
       ) : filteredFornecedores.length === 0 ? (
         <Card className="bg-white/10 border-white/20">

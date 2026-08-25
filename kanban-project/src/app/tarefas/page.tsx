@@ -50,7 +50,7 @@ export default function TarefasEProjetosPage() {
         <div className="pointer-events-none fixed inset-0 -z-10" style={{ background: FUNDO }} />
         <div className="flex min-h-screen items-center justify-center">
           <div className="text-center">
-            <div className="mx-auto mb-4 h-12 w-12 animate-spin rounded-full border-4 border-white border-t-transparent" />
+            <div className="mx-auto mb-4 h-12 w-12 animate-spin rounded-full border-4 border-[var(--border-default)] border-t-transparent" />
             <p className="text-white/70">Carregando a operação…</p>
           </div>
         </div>

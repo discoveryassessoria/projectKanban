@@ -138,7 +138,7 @@ export function PreviewImpactoModal({ proposta, onCancelar, onConfirmar }: Props
 
   return (
     <div className="fixed inset-0 z-[10050] flex items-center justify-center bg-[var(--overlay-modal)] p-4">
-      <div className="flex max-h-[85vh] w-full max-w-lg flex-col overflow-hidden rounded-xl border border-gray-200 bg-white text-gray-900 shadow-2xl">
+      <div className="flex max-h-[85vh] w-full max-w-lg flex-col overflow-hidden rounded-xl border border-gray-200 bg-[var(--surface-primary)] text-gray-900 shadow-2xl">
         <div className="flex items-start justify-between gap-3 border-b border-gray-100 px-5 py-4">
           <div>
             <h2 className="text-sm font-semibold text-gray-900">Impacto previsto</h2>
@@ -321,7 +321,7 @@ export function PreviewImpactoModal({ proposta, onCancelar, onConfirmar }: Props
         <div className="flex items-center justify-end gap-2 border-t border-gray-100 px-5 py-3">
           <button
             onClick={onCancelar}
-            className="rounded-lg border border-gray-200 bg-white px-3 py-2 text-[13px] text-gray-700 transition hover:border-gray-300 hover:text-gray-900"
+            className="rounded-lg border border-gray-200 bg-[var(--surface-primary)] px-3 py-2 text-[13px] text-gray-700 transition hover:border-gray-300 hover:text-gray-900"
           >
             Cancelar
           </button>

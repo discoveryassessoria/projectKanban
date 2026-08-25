@@ -116,7 +116,7 @@ export function KanbanCard({ processo, onClick, isDragging: isDraggingProp, pode
     <div ref={setNodeRef} style={style} {...attributes} {...listeners}>
       <div
         className={`
-          mb-3 bg-white rounded-lg shadow-sm border border-gray-200
+          mb-3 bg-[var(--surface-primary)] rounded-lg shadow-sm border border-gray-200
           hover:shadow-md transition-all cursor-grab active:cursor-grabbing
           ${isDragging ? "shadow-xl ring-2 ring-blue-400/50" : ""}
         `}

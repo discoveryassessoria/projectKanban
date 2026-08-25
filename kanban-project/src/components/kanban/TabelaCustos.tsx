@@ -844,7 +844,7 @@ export function TabelaCustos({ processoId, nomeFamilia, onTotaisChange }: Tabela
               
               return linhasOrdenadas.map((linha, idx) => {
               const isFirstOfPerson = linha.isPrimeiraLinha
-              const bgColor = idx % 2 === 0 ? 'bg-white' : 'bg-gray-50'
+              const bgColor = idx % 2 === 0 ? 'bg-[var(--surface-primary)]' : 'bg-gray-50'
               const personBg = isFirstOfPerson ? '' : 'bg-gray-100/50'
               const isSelected = linhasSelecionadas.has(getLinhaKey(linha))
               const selectedBg = isSelected ? 'bg-blue-50' : ''

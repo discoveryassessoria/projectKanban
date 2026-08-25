@@ -132,7 +132,7 @@ function ToggleSwitch({ label, checked, onChange }: { label: string; checked: bo
   return (
     <label className="flex items-center gap-2 cursor-pointer">
       <div className={`relative w-10 h-5 rounded-full transition-colors ${checked ? 'bg-teal-500' : 'bg-gray-300'}`}>
-        <div className={`absolute top-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform ${checked ? 'translate-x-5' : 'translate-x-0.5'}`} />
+        <div className={`absolute top-0.5 w-4 h-4 bg-[var(--surface-primary)] rounded-full shadow transition-transform ${checked ? 'translate-x-5' : 'translate-x-0.5'}`} />
       </div>
       <span className="text-sm text-gray-600">{label}</span>
     </label>
@@ -144,7 +144,7 @@ function CollapsibleSection({ title, children, defaultOpen = true }: { title: st
   const [isOpen, setIsOpen] = useState(defaultOpen)
   
   return (
-    <div className="border border-gray-200 rounded-lg mb-4 bg-white">
+    <div className="border border-gray-200 rounded-lg mb-4 bg-[var(--surface-primary)]">
       <button 
         className="w-full flex items-center justify-between p-4 hover:bg-gray-50 transition-colors"
         onClick={() => setIsOpen(!isOpen)}
@@ -217,7 +217,7 @@ export function PessoaDetailsPage({
   return (
     <div className="fixed inset-0 bg-gray-100 text-gray-900 z-[10002] overflow-auto">
       {/* Header fixo */}
-      <div className="bg-white border-b border-gray-200 sticky top-0 z-10">
+      <div className="bg-[var(--surface-primary)] border-b border-gray-200 sticky top-0 z-10">
         <div className="max-w-4xl mx-auto">
           {/* Top section with avatar and name */}
           <div className="p-6 pb-4">
@@ -540,14 +540,14 @@ export function PessoaDetailsPage({
         )}
         
         {activeTab === 'sobre' && (
-          <div className="bg-white rounded-lg border border-gray-200 p-6">
+          <div className="bg-[var(--surface-primary)] rounded-lg border border-gray-200 p-6">
             <h3 className="text-lg font-semibold text-gray-900 mb-4">Sobre {nomeCompleto}</h3>
             <p className="text-gray-600 whitespace-pre-wrap">{pessoa.comentario || 'Nenhuma informação adicional disponível.'}</p>
           </div>
         )}
         
         {activeTab === 'fontes' && (
-          <div className="bg-white rounded-lg border border-gray-200 p-6">
+          <div className="bg-[var(--surface-primary)] rounded-lg border border-gray-200 p-6">
             <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
               <FileText className="h-5 w-5" />
               Documentos ({pessoa.documentos?.length || 0})

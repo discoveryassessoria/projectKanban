@@ -314,7 +314,7 @@ export function ProcessoInformacoes({
   return (
     <div className="h-full flex flex-col">
       {/* Header */}
-      <div className="flex items-center justify-between px-6 py-4 border-b bg-white flex-shrink-0">
+      <div className="flex items-center justify-between px-6 py-4 border-b bg-[var(--surface-primary)] flex-shrink-0">
         <div className="flex items-center gap-2">
           <Gavel className="h-5 w-5 text-green-600" />
           <h3 className="font-semibold text-gray-900">Informações do Processo</h3>
@@ -329,7 +329,7 @@ export function ProcessoInformacoes({
           </div>
         ) : showForm ? (
           /* ===== FORMULÁRIO ===== */
-          <div className="max-w-lg mx-auto bg-white border border-gray-200 rounded-lg p-6">
+          <div className="max-w-lg mx-auto bg-[var(--surface-primary)] border border-gray-200 rounded-lg p-6">
             <div className="flex items-center justify-between mb-6">
               <h4 className="font-semibold text-gray-900">
                 {editando ? "Editar Informações" : "Cadastrar Informações"}
@@ -456,7 +456,7 @@ export function ProcessoInformacoes({
         ) : (
           /* ===== EXIBIÇÃO DAS INFORMAÇÕES ===== */
           <div className="max-w-2xl mx-auto">
-            <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
+            <div className="bg-[var(--surface-primary)] border border-gray-200 rounded-lg overflow-hidden">
               {/* Header do card */}
               <div className="bg-gradient-to-r from-green-50 to-emerald-50 px-6 py-4 border-b border-gray-200">
                 <div className="flex items-center justify-between">

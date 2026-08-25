@@ -606,7 +606,7 @@ export function ProcessoFaturas({ processoId, nomeFamilia, onUpdate }: ProcessoF
   return (
     <div className="h-full flex flex-col bg-gray-50 overflow-y-auto">
       {/* ===== SEÇÃO: TABELA DE CUSTOS ===== */}
-      <div className="bg-white border-b">
+      <div className="bg-[var(--surface-primary)] border-b">
         <div
           onClick={() => setShowCustos(!showCustos)}
           className="w-full px-6 py-4 flex items-center justify-between hover:bg-gray-50 transition-colors cursor-pointer"
@@ -639,7 +639,7 @@ export function ProcessoFaturas({ processoId, nomeFamilia, onUpdate }: ProcessoF
 
       {/* ===== SEÇÃO: FATURAS ===== */}
       <div className="flex-1 flex flex-col">
-        <div className="bg-white border-b">
+        <div className="bg-[var(--surface-primary)] border-b">
           <div
             onClick={() => setShowFaturas(!showFaturas)}
             className="w-full px-6 py-4 flex items-center justify-between hover:bg-gray-50 transition-colors cursor-pointer"
@@ -828,7 +828,7 @@ export function ProcessoFaturas({ processoId, nomeFamilia, onUpdate }: ProcessoF
                   return (
                     <div
                       key={fatura.id}
-                      className="bg-white rounded-xl border shadow-sm overflow-hidden"
+                      className="bg-[var(--surface-primary)] rounded-xl border shadow-sm overflow-hidden"
                     >
                       {/* Linha principal */}
                       <div 
@@ -928,8 +928,8 @@ export function ProcessoFaturas({ processoId, nomeFamilia, onUpdate }: ProcessoF
                                     key={dest.id}
                                     // `text-gray-900` explícito: a aba "faturas" roda com
                                     // `finDark`, e o container das abas aplica `text-white/80`.
-                                    // Sem cor própria, este nome sairia branco sobre `bg-white`.
-                                    className="px-2 py-1 bg-white text-gray-900 border rounded-lg text-sm"
+                                    // Sem cor própria, este nome sairia branco sobre `bg-[var(--surface-primary)]`.
+                                    className="px-2 py-1 bg-[var(--surface-primary)] text-gray-900 border rounded-lg text-sm"
                                   >
                                     {nomePessoa(dest)}
                                   </span>
@@ -945,7 +945,7 @@ export function ProcessoFaturas({ processoId, nomeFamilia, onUpdate }: ProcessoF
                                 <Calendar className="h-3 w-3" />
                                 Parcelas do Boleto
                               </p>
-                              <div className="bg-white rounded-lg border overflow-hidden">
+                              <div className="bg-[var(--surface-primary)] rounded-lg border overflow-hidden">
                                 <div className="grid grid-cols-[auto_1fr_auto_auto] gap-4 p-3 bg-gray-100 text-xs font-medium text-gray-600 uppercase">
                                   <span></span>
                                   <span>Vencimento</span>
@@ -1069,7 +1069,7 @@ export function ProcessoFaturas({ processoId, nomeFamilia, onUpdate }: ProcessoF
 
                           {/* Resumo financeiro */}
                           {(!isBoleto || !temParcelas) && (
-                            <div className="grid grid-cols-3 gap-4 mb-4 p-3 bg-white rounded-lg border">
+                            <div className="grid grid-cols-3 gap-4 mb-4 p-3 bg-[var(--surface-primary)] rounded-lg border">
                               <div>
                                 <p className="text-xs text-gray-500 uppercase">Valor Total</p>
                                 <p className="text-sm font-bold text-gray-900">
@@ -1103,7 +1103,7 @@ export function ProcessoFaturas({ processoId, nomeFamilia, onUpdate }: ProcessoF
                                       e.stopPropagation()
                                       abrirVisualizarPagamento(fatura, pag)
                                     }}
-                                    className="p-3 bg-white rounded-lg border hover:border-green-300 hover:bg-green-50 cursor-pointer transition-colors"
+                                    className="p-3 bg-[var(--surface-primary)] rounded-lg border hover:border-green-300 hover:bg-green-50 cursor-pointer transition-colors"
                                   >
                                     <div className="flex items-center justify-between">
                                       <div className="flex items-center gap-3">
@@ -1215,7 +1215,7 @@ export function ProcessoFaturas({ processoId, nomeFamilia, onUpdate }: ProcessoF
       {/* Modal de Confirmação de Parcela */}
       {confirmarParcela && (
       <div className="fixed inset-0 bg-[var(--overlay-modal)] flex items-center justify-center z-50" onClick={() => setConfirmarParcela(null)}>
-        <div className="bg-white rounded-xl shadow-xl w-full max-w-sm mx-4" onClick={(e) => e.stopPropagation()}>
+        <div className="bg-[var(--surface-primary)] rounded-xl shadow-xl w-full max-w-sm mx-4" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center justify-between p-4 border-b">
               <h3 className="font-semibold text-gray-900">Confirmar Pagamento</h3>
               <button 
@@ -1273,7 +1273,7 @@ export function ProcessoFaturas({ processoId, nomeFamilia, onUpdate }: ProcessoF
       {/* ===== MODAL REGISTRAR PAGAMENTO ===== */}
       {showPagar && (
         <div className="fixed inset-0 bg-[var(--overlay-modal)] flex items-center justify-center z-50 p-4" onClick={() => setShowPagar(null)}>
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-3xl max-h-[90vh] overflow-hidden flex flex-col" onClick={(e) => e.stopPropagation()}>
+          <div className="bg-[var(--surface-primary)] rounded-2xl shadow-2xl w-full max-w-3xl max-h-[90vh] overflow-hidden flex flex-col" onClick={(e) => e.stopPropagation()}>
             
             <div className="flex items-center justify-between px-6 py-4 border-b bg-gradient-to-r from-green-500 to-green-600">
               <div className="flex items-center gap-3">
@@ -1446,7 +1446,7 @@ export function ProcessoFaturas({ processoId, nomeFamilia, onUpdate }: ProcessoF
                                 p-3 rounded-xl border-2 cursor-pointer transition-all
                                 ${isSelected 
                                   ? 'border-green-500 bg-green-50' 
-                                  : 'border-gray-200 hover:border-gray-300 bg-white'
+                                  : 'border-gray-200 hover:border-gray-300 bg-[var(--surface-primary)]'
                                 }
                               `}
                             >
@@ -1508,7 +1508,7 @@ export function ProcessoFaturas({ processoId, nomeFamilia, onUpdate }: ProcessoF
       {/* ===== MODAL VISUALIZAR/EDITAR PAGAMENTO ===== */}
       {pagamentoSelecionado && (
         <div className="fixed inset-0 bg-[var(--overlay-modal)] flex items-center justify-center z-50 p-4" onClick={() => setPagamentoSelecionado(null)}>
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-3xl max-h-[90vh] overflow-hidden flex flex-col" onClick={(e) => e.stopPropagation()}>
+          <div className="bg-[var(--surface-primary)] rounded-2xl shadow-2xl w-full max-w-3xl max-h-[90vh] overflow-hidden flex flex-col" onClick={(e) => e.stopPropagation()}>
             
             <div className="flex items-center justify-between px-6 py-4 border-b bg-gradient-to-r from-green-500 to-green-600">
               <div className="flex items-center gap-3">
@@ -1651,7 +1651,7 @@ export function ProcessoFaturas({ processoId, nomeFamilia, onUpdate }: ProcessoF
                                     p-3 rounded-xl border-2 cursor-pointer transition-all
                                     ${isSelected 
                                       ? 'border-green-500 bg-green-50' 
-                                      : 'border-gray-200 hover:border-gray-300 bg-white'
+                                      : 'border-gray-200 hover:border-gray-300 bg-[var(--surface-primary)]'
                                     }
                                   `}
                                 >
@@ -1745,7 +1745,7 @@ export function ProcessoFaturas({ processoId, nomeFamilia, onUpdate }: ProcessoF
                         {pagamentoSelecionado.pagamento.destinatarios && pagamentoSelecionado.pagamento.destinatarios.length > 0 ? (
                           <div className="space-y-2">
                             {pagamentoSelecionado.pagamento.destinatarios.map(dest => (
-                              <div key={dest.id} className="p-3 bg-white border rounded-lg">
+                              <div key={dest.id} className="p-3 bg-[var(--surface-primary)] border rounded-lg">
                                 <p className="font-medium text-gray-900">{dest.nome}</p>
                               </div>
                             ))}
